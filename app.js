@@ -90,7 +90,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "476";
+const APP_VERSION = "477";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -335,16 +335,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     closeTextEditorSheet();
   });
 
-  $("btn-logout").addEventListener("click", async () => {
-    if (!confirm("Log out?")) return;
-    await signOutUser();
-  });
+  // Staff want the PIN required every single time the app is opened, not
+  // just the first time on a device — force a clean slate before checking
+  // auth state, so the persisted Firebase session never auto-resumes.
+  await signOutUser();
 
   // Firestore now requires a real signed-in user (see firebase-service.js),
-  // so none of the app's data can be fetched until sign-in resolves. Stay on
-  // the PIN screen until that happens, then load data and show home — this
-  // fires immediately with "signed out" on a fresh visit, or with the
-  // already-persisted user if the PIN was entered on a previous visit.
+  // so none of the app's data can be fetched until sign-in resolves.
   onAuthChange(async user => {
     console.log("[PinDebug] onAuthChange fired, user =", user && user.email);
     if (!user) {
@@ -634,7 +631,9 @@ function renderGroupButtons() {
     .filter(g => !q || g.name.toLowerCase().includes(q))
     .sort((a, b) => a.name.localeCompare(b.name));
   if (filtered.length === 0) {
-    container.innerHTML = `<div class="roster-list"><p class="empty-hint">${q ? "No matches." : "No groups yet."}</p></div>`;
+    container.innerHTML = q
+      ? `<p class="empty-hint">No matches.</p>`
+      : `<p class="empty-hint">None yet.</p>`;
     return;
   }
   container.innerHTML = `<div class="roster-list">` +
