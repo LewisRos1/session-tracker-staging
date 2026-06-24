@@ -29,10 +29,17 @@
 
   <div id="update-toast" class="update-toast hidden"></div>
 
+  <!-- Shown by default until the code determines whether you're already
+       signed in — avoids a flash of the PIN screen for already-logged-in
+       staff every time the app loads. -->
+  <div id="screen-loading" class="screen">
+    <div class="pin-logo" style="margin: auto;">🧩</div>
+  </div>
+
   <!-- ══════════════════════════════════════════════════════
        PIN SCREEN
        ══════════════════════════════════════════════════════ -->
-  <div id="screen-pin" class="screen active">
+  <div id="screen-pin" class="screen hidden">
     <div class="pin-container">
       <div class="pin-logo">🧩</div>
       <h1 class="pin-title">Session Tracker</h1>

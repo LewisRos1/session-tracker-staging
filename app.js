@@ -80,7 +80,7 @@ function showUpdateToastIfJustUpdated() {
   setTimeout(() => el.classList.add("hidden"), 5000);
 }
 
-const APP_VERSION = "468";
+const APP_VERSION = "469";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
