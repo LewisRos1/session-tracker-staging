@@ -73,11 +73,24 @@ if ("serviceWorker" in navigator) {
   });
 }
 
+// Set when this page load is showing "App Updating…" right after a SW
+// update reload — holds the timestamp it was revealed so the caller can
+// guarantee a minimum visible time before moving on, regardless of how
+// fast sign-in/data-loading actually finishes.
+let updatingScreenShownAt = null;
+
+async function waitForUpdatingScreenMinimum(minMs = 5000) {
+  if (!updatingScreenShownAt) return;
+  const remaining = minMs - (Date.now() - updatingScreenShownAt);
+  updatingScreenShownAt = null; // only delay once per page load
+  if (remaining > 0) await new Promise(r => setTimeout(r, remaining));
+}
+
 function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "474";
+const APP_VERSION = "475";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -273,6 +286,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (sessionStorage.getItem("justUpdated")) {
     sessionStorage.removeItem("justUpdated");
     $("updating-content")?.classList.remove("hidden");
+    updatingScreenShownAt = Date.now();
   }
 
 
@@ -333,8 +347,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   // already-persisted user if the PIN was entered on a previous visit.
   onAuthChange(async user => {
     console.log("[PinDebug] onAuthChange fired, user =", user && user.email);
-    if (!user) { initPin(); return; }
+    if (!user) {
+      await waitForUpdatingScreenMinimum();
+      initPin();
+      return;
+    }
     await loadAppData();
+    await waitForUpdatingScreenMinimum();
     showHome();
   });
 });
