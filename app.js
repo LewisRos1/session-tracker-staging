@@ -110,7 +110,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "491";
+const APP_VERSION = "492";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -200,6 +200,15 @@ function isGroupViewBusy() {
 // happened to be true at the moment the resulting Firestore snapshot
 // actually arrived (same idea as the Entry screens' entryActionsInFlight —
 // see the matching comment on state.viewActionsInFlight).
+// Renders immediately unless the view is mid-edit elsewhere (a focused
+// remark/mastery-note box that an immediate full rebuild would yank focus
+// out from under) — in that case the deferred-render flag is set instead,
+// and the existing onIdle/snapshot machinery picks it up once free.
+function renderViewOrDefer(pendingKey, isBusy, render) {
+  if (isBusy()) state[pendingKey] = true;
+  else render();
+}
+
 function withViewAction(counterKey, pendingKey, isBusy, render, fn) {
   return async (...args) => {
     state[counterKey]++;
@@ -2777,11 +2786,18 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
       <td class="vcol-score" contenteditable="false">&nbsp;</td>
     </tr>`;
   }
+  const addMoreRow = `<tr class="view-add-remark-row">
+    <td class="vcol-no" contenteditable="false"></td>
+    <td class="vcol-act" contenteditable="false"></td>
+    <td class="vcol-rem" colspan="4" contenteditable="false">
+      <button class="view-add-remark-more" data-act-id="${escHtml(actId || "")}">+ Add Remark &amp; Trials</button>
+    </td>
+  </tr>`;
   return remarks.map((rem, ri) => viewRemarkRow(
     ri === 0 ? no : null,
     ri === 0 ? actCell : null,
     rem, target, inlineOptions, sentenceStarter, multiSelect, isMastery
-  )).join("");
+  )).join("") + addMoreRow;
 }
 
 function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, isMastery = false) {
@@ -2912,7 +2928,15 @@ function setupMergedRemarkSaving(body, getSessionId, onIdle) {
       const html = div.innerHTML;
       if (div.dataset.savedHtml === html) return;
       div.dataset.savedHtml = html;
-      updateRemarkText(sid, div.dataset.remId, html);
+      updateRemarkText(sid, div.dataset.remId, html).catch(err => {
+        // savedHtml already says this is saved — if the write actually
+        // failed, leaving it pointing at the unsaved value means nothing
+        // ever retries it, and the next render (from anything else on the
+        // page) shows the server's older text instead, looking exactly
+        // like what was just typed silently vanished.
+        if (div.dataset.savedHtml === html) div.dataset.savedHtml = " ";
+        alert("Couldn't save remark — check your connection and try again.\n\n" + err.message);
+      });
     });
 
     body.querySelectorAll(".group-remark-input-combined[data-rem-ids]").forEach(div => {
@@ -2920,7 +2944,10 @@ function setupMergedRemarkSaving(body, getSessionId, onIdle) {
       if (div.dataset.savedHtml === html) return;
       div.dataset.savedHtml = html;
       const remIds = div.dataset.remIds.split(",").filter(Boolean);
-      Promise.all(remIds.map(id => updateRemarkText(sid, id, html)));
+      Promise.all(remIds.map(id => updateRemarkText(sid, id, html))).catch(err => {
+        if (div.dataset.savedHtml === html) div.dataset.savedHtml = " ";
+        alert("Couldn't save remark — check your connection and try again.\n\n" + err.message);
+      });
     });
 
     body.querySelectorAll(".view-remark-empty").forEach(div => {
@@ -2937,7 +2964,10 @@ function setupMergedRemarkSaving(body, getSessionId, onIdle) {
       if (div.dataset.remId) {
         if (div.dataset.savedHtml === text) return;
         div.dataset.savedHtml = text;
-        updateRemarkText(sid, div.dataset.remId, text);
+        updateRemarkText(sid, div.dataset.remId, text).catch(err => {
+          if (div.dataset.savedHtml === text) div.dataset.savedHtml = " ";
+          alert("Couldn't save remark — check your connection and try again.\n\n" + err.message);
+        });
         return;
       }
       div.dataset.creating = "true";
@@ -2961,6 +2991,11 @@ function setupMergedRemarkSaving(body, getSessionId, onIdle) {
           div.dataset.actId      = actId;
           div.dataset.remId      = remId;
           div.dataset.savedHtml  = text;
+        } catch (err) {
+          // Leaves remId/savedHtml unset — the next flush (next keystroke or
+          // focusout) sees "no remark created yet" and retries from scratch,
+          // instead of the typed text just sitting there unsaved forever.
+          alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
         } finally {
           div.dataset.creating = "false";
         }
@@ -3318,10 +3353,16 @@ function setupViewEnterKeyDelegation(host, getSaver) {
     if (isSelectAll) { e.preventDefault(); selectAllWithin(ta); return; }
     if (e.ctrlKey || e.metaKey) { e.preventDefault(); getSaver()?.flush(); return; }
     e.preventDefault();
-    setTimeout(() => {
-      insertBrAtCaret();
-      ta.dispatchEvent(new Event("input", { bubbles: true }));
-    }, 0);
+    // Inserted synchronously, not deferred — range.insertNode() is a direct
+    // DOM mutation, not a simulated input, so it never triggers beforeinput/
+    // input itself and doesn't need to dodge onBeforeInput's own handling.
+    // Deferring via setTimeout instead left a same-task window where, in
+    // this nested-contenteditable setup, the browser could still go ahead
+    // with its own (supposedly prevented) native paragraph split first —
+    // landing the manual <br> on top of that half-applied native change a
+    // moment later, which read as "the first Enter did nothing."
+    insertBrAtCaret();
+    ta.dispatchEvent(new Event("input", { bubbles: true }));
   };
   host.addEventListener("keydown", onKeydown);
   return () => host.removeEventListener("keydown", onKeydown);
@@ -3341,30 +3382,51 @@ function attachViewListeners() {
   });
 
   body.querySelectorAll(".view-trial-del").forEach(btn => {
-    btn.addEventListener("click", withViewAction("viewActionsInFlight", "viewRenderPending", isViewBusy, renderSessionView, async () => {
+    btn.addEventListener("click", () => {
       const rem = state.viewSessionData?.remarks?.[btn.dataset.remId];
       if (!rem) return;
-      const trials = (rem.trials || []).filter((_, i) => i !== Number(btn.dataset.trialIdx));
-      await setTrials(state.viewSessionId, btn.dataset.remId, trials);
-    }));
+      const prevTrials = rem.trials || [];
+      const trials = prevTrials.filter((_, i) => i !== Number(btn.dataset.trialIdx));
+      rem.trials = trials;
+      renderViewOrDefer("viewRenderPending", isViewBusy, renderSessionView);
+      setTrials(state.viewSessionId, btn.dataset.remId, trials).catch(err => {
+        rem.trials = prevTrials;
+        renderViewOrDefer("viewRenderPending", isViewBusy, renderSessionView);
+        alert("Couldn't update — check your connection and try again.\n\n" + err.message);
+      });
+    });
   });
 
   body.querySelectorAll(".view-add-trial").forEach(btn => {
-    btn.addEventListener("click", withViewAction("viewActionsInFlight", "viewRenderPending", isViewBusy, renderSessionView, async () => {
+    btn.addEventListener("click", () => {
       const rem = state.viewSessionData?.remarks?.[btn.dataset.remId];
       if (!rem) return;
-      const act    = state.viewSessionData?.activities?.[rem.activityId];
-      const target = act
-        ? getViewEffectiveTargets().find(t => t.name === act.targetName)
-        : null;
-      const maxPts = target?.maxPoints || 3;
-      const prevLen = (rem.trials || []).length;
-      await setTrials(state.viewSessionId, btn.dataset.remId, [...(rem.trials || []), -1]);
-      // setTrials() resolving only means the write was sent — wait for the
-      // local snapshot to actually have it before letting the render fire,
-      // or the new trial dropdown looks like it didn't appear at all.
-      await waitForSessionData(() => (state.viewSessionData?.remarks?.[btn.dataset.remId]?.trials || []).length > prevLen);
-    }));
+      const prevTrials = rem.trials || [];
+      const trials = [...prevTrials, -1];
+      rem.trials = trials;
+      renderViewOrDefer("viewRenderPending", isViewBusy, renderSessionView);
+      setTrials(state.viewSessionId, btn.dataset.remId, trials).catch(err => {
+        rem.trials = prevTrials;
+        renderViewOrDefer("viewRenderPending", isViewBusy, renderSessionView);
+        alert("Couldn't add trial — check your connection and try again.\n\n" + err.message);
+      });
+    });
+  });
+
+  body.querySelectorAll(".view-add-remark-more").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const actId = btn.dataset.actId;
+      if (!actId) return;
+      const remId = generateId("r");
+      state.viewSessionData.remarks = state.viewSessionData.remarks || {};
+      state.viewSessionData.remarks[remId] = { activityId: actId, text: "", trials: [], order: Date.now() };
+      renderViewOrDefer("viewRenderPending", isViewBusy, renderSessionView);
+      addRemark(state.viewSessionId, actId, "", null, remId).catch(err => {
+        delete state.viewSessionData.remarks[remId];
+        renderViewOrDefer("viewRenderPending", isViewBusy, renderSessionView);
+        alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
+      });
+    });
   });
 
   // ── Sketch board buttons (view screen) ────────────────────
@@ -3480,10 +3542,19 @@ function attachViewListeners() {
   });
 
   body.querySelectorAll(".view-rem-del").forEach(btn => {
-    btn.addEventListener("click", withViewAction("viewActionsInFlight", "viewRenderPending", isViewBusy, renderSessionView, async () => {
+    btn.addEventListener("click", () => {
       if (!confirm("Delete this remark?")) return;
-      await deleteRemark(state.viewSessionId, btn.dataset.remId);
-    }));
+      const remId = btn.dataset.remId;
+      const rem = state.viewSessionData?.remarks?.[remId];
+      if (!rem) return;
+      delete state.viewSessionData.remarks[remId];
+      renderViewOrDefer("viewRenderPending", isViewBusy, renderSessionView);
+      deleteRemark(state.viewSessionId, remId).catch(err => {
+        state.viewSessionData.remarks[remId] = rem;
+        renderViewOrDefer("viewRenderPending", isViewBusy, renderSessionView);
+        alert("Couldn't delete remark — check your connection and try again.\n\n" + err.message);
+      });
+    });
   });
 
   body.querySelectorAll(".view-comment-edit").forEach(ta => {
@@ -3974,22 +4045,35 @@ function attachGroupViewListeners() {
   });
 
   body.querySelectorAll(".view-trial-del").forEach(btn => {
-    btn.addEventListener("click", wrap(async () => {
+    btn.addEventListener("click", () => {
       const rem = state.viewGroupSessionData?.remarks?.[btn.dataset.remId];
       if (!rem) return;
-      const trials = (rem.trials || []).filter((_, i) => i !== Number(btn.dataset.trialIdx));
-      await setTrials(sid(), btn.dataset.remId, trials);
-    }));
+      const prevTrials = rem.trials || [];
+      const trials = prevTrials.filter((_, i) => i !== Number(btn.dataset.trialIdx));
+      rem.trials = trials;
+      renderViewOrDefer("viewGroupRenderPending", isGroupViewBusy, renderGroupSessionView);
+      setTrials(sid(), btn.dataset.remId, trials).catch(err => {
+        rem.trials = prevTrials;
+        renderViewOrDefer("viewGroupRenderPending", isGroupViewBusy, renderGroupSessionView);
+        alert("Couldn't update — check your connection and try again.\n\n" + err.message);
+      });
+    });
   });
 
   body.querySelectorAll(".view-add-trial").forEach(btn => {
-    btn.addEventListener("click", wrap(async () => {
+    btn.addEventListener("click", () => {
       const rem = state.viewGroupSessionData?.remarks?.[btn.dataset.remId];
       if (!rem) return;
-      const prevLen = (rem.trials || []).length;
-      await setTrials(sid(), btn.dataset.remId, [...(rem.trials || []), -1]);
-      await waitForSessionData(() => (state.viewGroupSessionData?.remarks?.[btn.dataset.remId]?.trials || []).length > prevLen);
-    }));
+      const prevTrials = rem.trials || [];
+      const trials = [...prevTrials, -1];
+      rem.trials = trials;
+      renderViewOrDefer("viewGroupRenderPending", isGroupViewBusy, renderGroupSessionView);
+      setTrials(sid(), btn.dataset.remId, trials).catch(err => {
+        rem.trials = prevTrials;
+        renderViewOrDefer("viewGroupRenderPending", isGroupViewBusy, renderGroupSessionView);
+        alert("Couldn't add trial — check your connection and try again.\n\n" + err.message);
+      });
+    });
   });
 
   // ── Sketch board buttons (group view screen) ────────────────
@@ -4176,10 +4260,19 @@ function attachGroupViewListeners() {
   });
 
   body.querySelectorAll(".view-rem-del").forEach(btn => {
-    btn.addEventListener("click", wrap(async () => {
+    btn.addEventListener("click", () => {
       if (!confirm("Delete this remark?")) return;
-      await deleteRemark(sid(), btn.dataset.remId);
-    }));
+      const remId = btn.dataset.remId;
+      const rem = state.viewGroupSessionData?.remarks?.[remId];
+      if (!rem) return;
+      delete state.viewGroupSessionData.remarks[remId];
+      renderViewOrDefer("viewGroupRenderPending", isGroupViewBusy, renderGroupSessionView);
+      deleteRemark(sid(), remId).catch(err => {
+        state.viewGroupSessionData.remarks[remId] = rem;
+        renderViewOrDefer("viewGroupRenderPending", isGroupViewBusy, renderGroupSessionView);
+        alert("Couldn't delete remark — check your connection and try again.\n\n" + err.message);
+      });
+    });
   });
 
   body.querySelectorAll(".view-comment-edit").forEach(ta => {
