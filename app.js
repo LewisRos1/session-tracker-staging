@@ -45,7 +45,6 @@ import {
   updateGroupSessionDate,
   deleteTargetDataFromSessions,
   signInWithPin,
-  signOutUser,
   onAuthChange
 } from "./firebase-service.js";
 import {
@@ -90,7 +89,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "477";
+const APP_VERSION = "478";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -335,13 +334,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     closeTextEditorSheet();
   });
 
-  // Staff want the PIN required every single time the app is opened, not
-  // just the first time on a device — force a clean slate before checking
-  // auth state, so the persisted Firebase session never auto-resumes.
-  await signOutUser();
-
   // Firestore now requires a real signed-in user (see firebase-service.js),
-  // so none of the app's data can be fetched until sign-in resolves.
+  // so none of the app's data can be fetched until sign-in resolves. Auth
+  // uses inMemoryPersistence (see firebase-service.js) so this always
+  // starts out signed-out on a fresh page load — staff want the PIN
+  // required every time, not just the first time on a device.
   onAuthChange(async user => {
     console.log("[PinDebug] onAuthChange fired, user =", user && user.email);
     if (!user) {

@@ -27,9 +27,8 @@ import {
 import {
   getAuth,
   setPersistence,
-  browserLocalPersistence,
+  inMemoryPersistence,
   signInWithEmailAndPassword,
-  signOut,
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 
@@ -61,16 +60,15 @@ const db = initializeFirestore(app, {
 // the PIN gets a fixed prefix glued on before being sent — staff never see
 // or type that prefix, they still just enter the PIN on the keypad.
 const auth = getAuth(app);
-setPersistence(auth, browserLocalPersistence); // stay signed in across reloads
+// Staff want the PIN required every single time the app opens — app.js
+// forces a sign-out at the start of every load to guarantee that, so there
+// is nothing for Firebase itself to persist across reloads.
+setPersistence(auth, inMemoryPersistence);
 const AUTH_EMAIL    = "staff@session-tracker.app";
 const PIN_PASSWORD_PREFIX = "str-pin-";
 
 export function signInWithPin(pin) {
   return signInWithEmailAndPassword(auth, AUTH_EMAIL, PIN_PASSWORD_PREFIX + pin);
-}
-
-export function signOutUser() {
-  return signOut(auth);
 }
 
 // Calls back immediately with the current state, then on every change.
