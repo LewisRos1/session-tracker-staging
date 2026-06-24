@@ -58,16 +58,34 @@ import {
 if ("serviceWorker" in navigator) {
   const hadController = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    // Only reload for updates, not for the very first SW install.
-    if (hadController) window.location.reload();
+    // Only reload for updates, not for the very first SW install. The
+    // reload always lands back on the home screen automatically (staff stay
+    // signed in), so there's nothing extra to do for that part — just let
+    // the reloaded page know to say so.
+    if (hadController) {
+      sessionStorage.setItem("justUpdated", "1");
+      window.location.reload();
+    }
   });
+}
+
+function showUpdateBanner(text, { withNowButton = false } = {}) {
+  const el = $("update-banner");
+  if (!el) return;
+  $("update-banner-text").textContent = text;
+  $("update-banner-now").classList.toggle("hidden", !withNowButton);
+  el.classList.add("show");
+}
+
+function hideUpdateBanner() {
+  $("update-banner")?.classList.remove("show");
 }
 
 function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "472";
+const APP_VERSION = "473";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -255,6 +273,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Register SW immediately — don't wait for Firebase so updates are never blocked.
   registerServiceWorker();
 
+  if (sessionStorage.getItem("justUpdated")) {
+    sessionStorage.removeItem("justUpdated");
+    showUpdateBanner("Update complete!");
+    setTimeout(hideUpdateBanner, 4000);
+  }
+
 
   // On iOS, relatedTarget is always null and pointerdown may not fire for <select>.
   // Use both pointerdown and touchstart (touchstart fires reliably before focusout on iOS).
@@ -349,7 +373,32 @@ async function loadAppData() {
 
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
-  const promptSkip = sw => sw.postMessage("skipWaiting");
+
+  // Instead of applying a new version the instant it's downloaded (which
+  // could yank the screen out from under someone mid-task), give a 30s
+  // heads-up banner first — staff can finish what they're doing, or tap
+  // "Update now" to skip the wait.
+  let updateTimer = null;
+  const promptSkip = sw => {
+    if (updateTimer) return; // already counting down for an earlier-found update
+    let secondsLeft = 30;
+    const tick = () => {
+      showUpdateBanner(`Updating in ${secondsLeft}s…`, { withNowButton: true });
+      if (secondsLeft <= 0) {
+        clearInterval(updateTimer);
+        sw.postMessage("skipWaiting");
+        return;
+      }
+      secondsLeft--;
+    };
+    tick();
+    updateTimer = setInterval(tick, 1000);
+    $("update-banner-now").onclick = () => {
+      clearInterval(updateTimer);
+      sw.postMessage("skipWaiting");
+    };
+  };
+
   navigator.serviceWorker.register("sw.js", { updateViaCache: "none" })
     .then(reg => {
       if (reg.waiting) promptSkip(reg.waiting);
