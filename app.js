@@ -89,7 +89,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "483";
+const APP_VERSION = "484";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1167,7 +1167,7 @@ function renderStartSessionCalendar(student, today, displayDate, takenDates = ne
   const daysInMon = new Date(y, m, 0).getDate();
 
   let html = `<div class="date-picker-wrap">
-    <p class="date-picker-legend"><span class="date-taken-dot"></span> Session exists on this day</p>
+    <p class="date-picker-legend"><span class="date-taken-dot">✓</span> Session exists on this day</p>
     <div class="date-picker-cal">
       <div class="date-picker-nav">
         <button class="btn-date-prev">‹</button>
@@ -1190,7 +1190,7 @@ function renderStartSessionCalendar(student, today, displayDate, takenDates = ne
     if (isFut)   cls += " date-picker-day-future";
     if (isTaken) cls += " date-picker-day-taken";
     const dotCls = isTaken ? "date-taken-dot" : "day-dot-spacer";
-    html += `<button class="${cls}" data-date="${ds}"${isFut ? " disabled" : ""}><span class="day-num">${d}</span><span class="${dotCls}"></span></button>`;
+    html += `<button class="${cls}" data-date="${ds}"${isFut ? " disabled" : ""}><span class="day-num">${d}</span><span class="${dotCls}">${isTaken ? "✓" : ""}</span></button>`;
   }
   html += `</div></div></div>`;
 
@@ -1226,7 +1226,7 @@ function renderGroupStartSessionCalendar(group, today, displayDate, takenDates =
   const daysInMon = new Date(y, m, 0).getDate();
 
   let html = `<div class="date-picker-wrap">
-    <p class="date-picker-legend"><span class="date-taken-dot"></span> Session exists on this day</p>
+    <p class="date-picker-legend"><span class="date-taken-dot">✓</span> Session exists on this day</p>
     <div class="date-picker-cal">
       <div class="date-picker-nav">
         <button class="btn-date-prev">‹</button>
@@ -1249,7 +1249,7 @@ function renderGroupStartSessionCalendar(group, today, displayDate, takenDates =
     if (isFut)   cls += " date-picker-day-future";
     if (isTaken) cls += " date-picker-day-taken";
     const dotCls = isTaken ? "date-taken-dot" : "day-dot-spacer";
-    html += `<button class="${cls}" data-date="${ds}"${isFut ? " disabled" : ""}><span class="day-num">${d}</span><span class="${dotCls}"></span></button>`;
+    html += `<button class="${cls}" data-date="${ds}"${isFut ? " disabled" : ""}><span class="day-num">${d}</span><span class="${dotCls}">${isTaken ? "✓" : ""}</span></button>`;
   }
   html += `</div></div></div>`;
 
@@ -1288,7 +1288,7 @@ function renderDatePickerCalendar(displayDate, takenDates, today, currentDate) {
 
   let html = `<div class="date-picker-wrap">
     <p class="date-picker-subtitle">Select a new date</p>
-    <p class="date-picker-legend"><span class="date-taken-dot"></span> Session exists on this day</p>
+    <p class="date-picker-legend"><span class="date-taken-dot">✓</span> Session exists on this day</p>
     <div class="date-picker-cal">
       <div class="date-picker-nav">
         <button class="btn-date-prev">‹</button>
@@ -1314,8 +1314,8 @@ function renderDatePickerCalendar(displayDate, takenDates, today, currentDate) {
     if (isCur)   cls += " date-picker-day-current";
     if (isFut)   cls += " date-picker-day-future";
     if (isTaken) cls += " date-picker-day-taken";
-    const dotCls = (isTaken || isCur) ? "date-taken-dot" : "day-dot-spacer";
-    html += `<button class="${cls}" data-date="${ds}"${dis ? " disabled" : ""}><span class="day-num">${d}</span><span class="${dotCls}"></span></button>`;
+    const dotCls = isTaken ? "date-taken-dot" : "day-dot-spacer";
+    html += `<button class="${cls}" data-date="${ds}"${dis ? " disabled" : ""}><span class="day-num">${d}</span><span class="${dotCls}">${isTaken ? "✓" : ""}</span></button>`;
   }
   html += `</div></div></div>`;
 
@@ -4270,7 +4270,7 @@ function renderGroupDatePickerCalendar(displayDate, takenDates, today, currentDa
 
   let html = `<div class="date-picker-wrap">
     <p class="date-picker-subtitle">Select a new date</p>
-    <p class="date-picker-legend"><span class="date-taken-dot"></span> Session exists on this day</p>
+    <p class="date-picker-legend"><span class="date-taken-dot">✓</span> Session exists on this day</p>
     <div class="date-picker-cal">
       <div class="date-picker-nav">
         <button class="btn-date-prev">‹</button>
@@ -4295,8 +4295,8 @@ function renderGroupDatePickerCalendar(displayDate, takenDates, today, currentDa
     if (isCur)   cls += " date-picker-day-current";
     if (isFut)   cls += " date-picker-day-future";
     if (isTaken) cls += " date-picker-day-taken";
-    const dotCls = (isTaken || isCur) ? "date-taken-dot" : "day-dot-spacer";
-    html += `<button class="${cls}" data-date="${ds}"${dis ? " disabled" : ""}><span class="day-num">${d}</span><span class="${dotCls}"></span></button>`;
+    const dotCls = isTaken ? "date-taken-dot" : "day-dot-spacer";
+    html += `<button class="${cls}" data-date="${ds}"${dis ? " disabled" : ""}><span class="day-num">${d}</span><span class="${dotCls}">${isTaken ? "✓" : ""}</span></button>`;
   }
   html += `</div></div></div>`;
 

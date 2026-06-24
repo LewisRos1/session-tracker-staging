@@ -541,32 +541,31 @@ html, body {
   font-weight: 700;
 }
 .date-picker-day-future { color: #bbb; cursor: default; }
-.date-picker-day-taken {
-  cursor: default;
-  background: var(--primary-light);
-  color: var(--primary-dark);
-  font-weight: 700;
-}
-/* A day can be both "currently being viewed" and "has a session" — keep the
-   bolder current-day treatment winning over the taken tint in that case, so
-   it's still obvious which day is the one actually selected. */
+.date-picker-day-taken { cursor: default; }
 .date-picker-day-current.date-picker-day-taken {
   background: var(--primary);
   color: #fff;
 }
-/* The whole cell is tinted above now — the little dot was too easy to miss,
-   so it's hidden inside the actual grid and kept only in the legend, as a
-   small swatch instead of a circle, to explain what the tint means. */
-.date-picker-grid .date-taken-dot,
-.date-picker-grid .day-dot-spacer { display: none; }
 .date-taken-dot, .day-dot-spacer {
   display: block;
-  width: .6rem; height: .6rem;
-  border-radius: 3px;
+  height: .9rem;
+  line-height: 1;
+  font-size: .75rem;
+  font-weight: 700;
   flex-shrink: 0;
 }
-.date-taken-dot { background: var(--primary-light); border: 1.5px solid var(--primary-dark); }
-.day-dot-spacer { background: transparent; }
+.date-taken-dot { color: var(--primary-dark); }
+.date-picker-day-current .date-taken-dot { color: #fff; }
+.day-dot-spacer { visibility: hidden; }
+.date-picker-legend .date-taken-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: .9rem; height: .9rem;
+  border-radius: 3px;
+  background: var(--primary-light);
+  color: var(--primary-dark);
+}
 .date-picker-subtitle {
   font-size: 1rem;
   font-weight: 700;
