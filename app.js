@@ -88,7 +88,7 @@ function versionLineText() {
   return text;
 }
 
-const APP_VERSION = "470";
+const APP_VERSION = "471";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
