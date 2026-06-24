@@ -58,37 +58,16 @@ import {
 if ("serviceWorker" in navigator) {
   const hadController = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    // Only reload for updates, not for the very first SW install. Leave a
-    // note for the reloaded page to read — shown next to the version number
-    // so staff have a heads-up the app just changed, without a popup.
-    if (hadController) {
-      sessionStorage.setItem("justUpdatedAt", String(Date.now()));
-      window.location.reload();
-    }
+    // Only reload for updates, not for the very first SW install.
+    if (hadController) window.location.reload();
   });
 }
 
-// Read once per page load — null unless this load is a reload triggered by
-// a fresh version installing.
-let justUpdatedAt = null;
-{
-  const ts = sessionStorage.getItem("justUpdatedAt");
-  if (ts) {
-    sessionStorage.removeItem("justUpdatedAt");
-    justUpdatedAt = Number(ts);
-  }
-}
-
 function versionLineText() {
-  let text = `Made by Lewis · Version ${APP_VERSION}`;
-  if (justUpdatedAt) {
-    const time = new Date(justUpdatedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-    text += ` · Updated at ${time}`;
-  }
-  return text;
+  return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "471";
+const APP_VERSION = "472";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -333,6 +312,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // fires immediately with "signed out" on a fresh visit, or with the
   // already-persisted user if the PIN was entered on a previous visit.
   onAuthChange(async user => {
+    console.log("[PinDebug] onAuthChange fired, user =", user && user.email);
     if (!user) { initPin(); return; }
     await loadAppData();
     showHome();
@@ -392,6 +372,7 @@ function registerServiceWorker() {
 // ============================================================
 
 function initPin() {
+  console.log("[PinDebug] initPin() called", new Error().stack?.split("\n").slice(1, 4).join(" | "));
   showScreen("screen-pin");
   const vEl = $("pin-version");
   if (vEl) vEl.textContent = versionLineText();
@@ -419,6 +400,7 @@ function initPin() {
   }
 
   async function submit() {
+    console.log("[PinDebug] submit() called, value =", JSON.stringify(value), "length =", value.length, "pinLen =", pinLen);
     if (checking) return;
     checking = true;
     keypad.classList.add("checking");
@@ -447,6 +429,7 @@ function initPin() {
   }
 
   function pressKey(key) {
+    console.log("[PinDebug] pressKey", key, "current value =", JSON.stringify(value), "pinLen =", pinLen);
     if (key === "back") {
       value = value.slice(0, -1);
       errMsg.classList.add("hidden");
