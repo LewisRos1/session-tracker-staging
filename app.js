@@ -89,7 +89,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "479";
+const APP_VERSION = "480";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -878,18 +878,9 @@ function renderSessionsForMonth(student, month, monthSessions, byMonth, today) {
   const list = $("session-picker-list");
   let html = `<button class="btn-picker-back">← Back</button>`;
 
-  const sorted    = [...monthSessions].sort((a, b) => a.date.localeCompare(b.date));
-  const display   = [...sorted].reverse();
-  const yesterday = getYesterdayString();
-  for (const s of display) {
-    const num   = sorted.findIndex(x => x.id === s.id) + 1;
-    const label = sessionDateLabel(s.date, today, yesterday, false);
-    html += `<div class="session-list-item" data-session-id="${s.id}">
-      <div class="session-list-meta">
-        <div class="session-list-label"><strong>Session ${num}</strong>: ${formatDate(s.date)}${label}</div>
-      </div>
-    </div>`;
-  }
+  const sorted  = [...monthSessions].sort((a, b) => a.date.localeCompare(b.date));
+  const display = [...sorted].reverse();
+  html += renderSessionListRows(sorted, display, today);
 
   list.innerHTML = html;
 
@@ -1002,18 +993,9 @@ function renderExportSessionsForMonth(entityLabel, month, monthSessions, byMonth
   let html = `<button class="btn-picker-back">← Back</button>`;
   html += `<p class="session-date-prompt">Choose a session note to export:</p>`;
 
-  const sorted    = [...monthSessions].sort((a, b) => a.date.localeCompare(b.date));
-  const display   = [...sorted].reverse();
-  const yesterday = getYesterdayString();
-  for (const s of display) {
-    const num   = sorted.findIndex(x => x.id === s.id) + 1;
-    const label = sessionDateLabel(s.date, today, yesterday, false);
-    html += `<div class="session-list-item" data-session-id="${s.id}">
-      <div class="session-list-meta">
-        <div class="session-list-label"><strong>Session ${num}</strong>: ${formatDate(s.date)}${label}</div>
-      </div>
-    </div>`;
-  }
+  const sorted  = [...monthSessions].sort((a, b) => a.date.localeCompare(b.date));
+  const display = [...sorted].reverse();
+  html += renderSessionListRows(sorted, display, today);
 
   list.innerHTML = html;
 
@@ -1136,21 +1118,10 @@ function renderGoToMonthGrid(student, byMonth, today) {
 
 function renderGoToSessionsForMonth(student, month, monthSessions, byMonth, today) {
   $("session-picker-title").textContent = month;
-  const sorted    = [...monthSessions].sort((a, b) => a.date.localeCompare(b.date));
-  const display   = [...sorted].reverse();
-  const yesterday = getYesterdayString();
+  const sorted  = [...monthSessions].sort((a, b) => a.date.localeCompare(b.date));
+  const display = [...sorted].reverse();
   let html = `<button class="btn-picker-back">← Back</button>`;
-  for (const s of display) {
-    const num       = sorted.findIndex(x => x.id === s.id) + 1;
-    const isCurrent = s.id === state.viewSessionId;
-    const cls       = `session-list-item${isCurrent ? " session-list-current" : ""}`;
-    const label     = sessionDateLabel(s.date, today, yesterday, isCurrent);
-    html += `<div class="${cls}" data-session-id="${s.id}">
-      <div class="session-list-meta">
-        <div class="session-list-label"><strong>Session ${num}</strong>: ${formatDate(s.date)}${label}</div>
-      </div>
-    </div>`;
-  }
+  html += renderSessionListRows(sorted, display, today, { isCurrentId: state.viewSessionId });
   const list = $("session-picker-list");
   list.innerHTML = html;
   list.querySelector(".btn-picker-back").addEventListener("click", () => {
@@ -4248,21 +4219,10 @@ function renderGoToGroupMonthGrid(group, byMonth, today) {
 
 function renderGoToGroupSessionsForMonth(group, month, monthSessions, byMonth, today) {
   $("session-picker-title").textContent = month;
-  const sorted    = [...monthSessions].sort((a, b) => a.date.localeCompare(b.date));
-  const display   = [...sorted].reverse();
-  const yesterday = getYesterdayString();
+  const sorted  = [...monthSessions].sort((a, b) => a.date.localeCompare(b.date));
+  const display = [...sorted].reverse();
   let html = `<button class="btn-picker-back">← Back</button>`;
-  for (const s of display) {
-    const num       = sorted.findIndex(x => x.id === s.id) + 1;
-    const isCurrent = s.id === state.viewGroupSessionId;
-    const cls       = `session-list-item${isCurrent ? " session-list-current" : ""}`;
-    const label     = sessionDateLabel(s.date, today, yesterday, isCurrent);
-    html += `<div class="${cls}" data-session-id="${s.id}">
-      <div class="session-list-meta">
-        <div class="session-list-label"><strong>Session ${num}</strong>: ${formatDate(s.date)}${label}</div>
-      </div>
-    </div>`;
-  }
+  html += renderSessionListRows(sorted, display, today, { isCurrentId: state.viewGroupSessionId });
   const list = $("session-picker-list");
   list.innerHTML = html;
   list.querySelector(".btn-picker-back").addEventListener("click", () => {
@@ -6712,20 +6672,14 @@ function renderGroupSessionsForMonth(group, month, monthSessions, byMonth) {
   $("session-picker-title").textContent = month;
   const sorted  = [...monthSessions].sort((a, b) => a.date.localeCompare(b.date));
   const display = [...sorted].reverse();
-  const today     = getTodayString();
-  const yesterday = getYesterdayString();
+  const today   = getTodayString();
   let html = `<button class="btn-picker-back">← Back</button>`;
-  for (const s of display) {
-    const num       = sorted.findIndex(x => x.id === s.id) + 1;
-    const label     = sessionDateLabel(s.date, today, yesterday, false);
-    const attendees = (s.attendees || []).join(", ");
-    html += `<div class="session-list-item" data-session-id="${s.id}">
-      <div class="session-list-meta">
-        <div class="session-list-label"><strong>Session ${num}</strong>: ${formatDate(s.date)}${label}</div>
-        ${attendees ? `<div class="session-list-date">${escHtml(attendees)}</div>` : ""}
-      </div>
-    </div>`;
-  }
+  html += renderSessionListRows(sorted, display, today, {
+    extraLine: s => {
+      const attendees = (s.attendees || []).join(", ");
+      return attendees ? `<div class="session-list-date">${escHtml(attendees)}</div>` : "";
+    }
+  });
   $("session-picker-list").innerHTML = html;
   $("session-picker-list").querySelector(".btn-picker-back").addEventListener("click", () =>
     renderGroupMonthGrid(group, byMonth)
@@ -6889,10 +6843,66 @@ function getYesterdayString() {
   d.setDate(d.getDate() - 1);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
-function sessionDateLabel(date, today, yesterday, isCurrent) {
-  const parts = [];
-  if (isCurrent) parts.push("currently viewing");
-  if (date === today) parts.push("today");
-  else if (date === yesterday) parts.push("yesterday");
-  return parts.length ? ` (${parts.join(" · ")})` : "";
+function formatDateShort(dateStr) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return `${d} ${months[m - 1]}`;
+}
+function dayAbbr(dateStr) {
+  const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return days[new Date(y, m - 1, d).getDay()];
+}
+function startOfWeek(dateStr) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  const dow = date.getDay();
+  date.setDate(date.getDate() - (dow === 0 ? 6 : dow - 1));
+  return date;
+}
+// Buckets a session date into "This week" / "Last week" / "Earlier" relative
+// to today, so the picker list can group sessions under short headers instead
+// of spelling the day/week out in every row.
+function sessionWeekSection(dateStr, todayStr) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  const thisWeekStart = startOfWeek(todayStr);
+  const lastWeekStart = new Date(thisWeekStart);
+  lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+  if (date >= thisWeekStart) return "This week";
+  if (date >= lastWeekStart) return "Last week";
+  return "Earlier";
+}
+function sessionItemLabel(dateStr, todayStr, yesterdayStr) {
+  if (dateStr === todayStr) return "Today";
+  if (dateStr === yesterdayStr) return "Yesterday";
+  return `${dayAbbr(dateStr)}, ${formatDateShort(dateStr)}`;
+}
+// Shared renderer for the "Session N: ..." rows used by every session picker
+// (individual/group, normal/export/go-to) — groups rows under week headers
+// and lets callers add a per-row extra line (e.g. group attendees) or mark
+// one row as the currently-viewed session.
+function renderSessionListRows(sorted, display, today, { isCurrentId, extraLine } = {}) {
+  const yesterday = getYesterdayString();
+  let html = "";
+  let lastSection = null;
+  for (const s of display) {
+    const section = sessionWeekSection(s.date, today);
+    if (section !== lastSection) {
+      html += `<div class="session-month-label">${escHtml(section)}</div>`;
+      lastSection = section;
+    }
+    const num       = sorted.findIndex(x => x.id === s.id) + 1;
+    const isCurrent = isCurrentId != null && s.id === isCurrentId;
+    const cls       = `session-list-item${isCurrent ? " session-list-current" : ""}`;
+    const label     = sessionItemLabel(s.date, today, yesterday);
+    const extra     = extraLine ? extraLine(s) : "";
+    html += `<div class="${cls}" data-session-id="${s.id}">
+      <div class="session-list-meta">
+        <div class="session-list-label"><strong>Session ${num}</strong>: ${label}</div>
+        ${extra}
+      </div>
+    </div>`;
+  }
+  return html;
 }
