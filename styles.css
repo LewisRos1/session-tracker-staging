@@ -145,6 +145,14 @@ html, body {
 
 .pin-error.hidden { display: none; }
 
+.pin-status {
+  color: var(--text-muted);
+  font-size: .9rem;
+  text-align: center;
+  margin-top: -.5rem;
+}
+.pin-status.hidden { display: none; }
+
 .pin-keypad {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

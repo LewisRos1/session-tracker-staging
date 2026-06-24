@@ -63,7 +63,7 @@ if ("serviceWorker" in navigator) {
   });
 }
 
-const APP_VERSION = "466";
+const APP_VERSION = "467";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -372,6 +372,7 @@ function initPin() {
   const vEl = $("pin-version");
   if (vEl) vEl.textContent = `Made by Lewis · Version ${APP_VERSION}`;
   const errMsg = $("pin-error");
+  const statusMsg = $("pin-status");
   const dotsEl = $("pin-dots");
   const keypad = $("pin-keypad");
   const pinLen = CONFIG.PIN_LENGTH;
@@ -397,6 +398,8 @@ function initPin() {
     if (checking) return;
     checking = true;
     keypad.classList.add("checking");
+    errMsg.classList.add("hidden");
+    statusMsg.classList.remove("hidden");
     try {
       await signInWithPin(value);
       // Success: onAuthChange (registered once in DOMContentLoaded) picks up
@@ -410,6 +413,7 @@ function initPin() {
     } finally {
       checking = false;
       keypad.classList.remove("checking");
+      statusMsg.classList.add("hidden");
     }
   }
 
