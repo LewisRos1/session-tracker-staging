@@ -110,7 +110,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "492";
+const APP_VERSION = "493";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -173,26 +173,36 @@ const $ = id => document.getElementById(id);
 
 // True while a View/Edit-past-session screen's box is focused — used to
 // defer a render that would otherwise yank a remark box out from under the
-// user mid-edit. Identical logic for individual and group.
+// user mid-edit.
 //
-// Deliberately checks specific editable-field classes rather than
-// activeElement.isContentEditable — contenteditable="true" on the whole
-// session-view-body host inherits to every descendant that isn't marked
-// contenteditable="false", so that check also matches the host div itself.
-// A button's mousedown handler intentionally blocks the focus-shift that
-// would otherwise blur whatever was previously focused (that's the fix for
-// buttons needing 2 clicks) — so if the host (or any such inherited-editable
-// element) ever ends up focused, isContentEditable would stay true forever,
-// permanently blocking every future render until a manual page refresh.
+// .view-remark-edit boxes have no contenteditable attribute of their own —
+// they only inherit editability from the session-view-body host (only
+// .view-mastery-note re-declares contenteditable="true" to carve out its
+// own independently-focusable region). That means typing inside a regular
+// remark box never actually focuses the box itself; document.activeElement
+// stays the host the whole time. Checking for a focused .view-remark-edit
+// (as this used to) was therefore never true during normal typing, so a
+// render could barge in and rebuild the box mid-edit — the cursor dropping
+// out the moment the autosave's debounce fired. Checking for the host
+// itself being focused is the correct signal instead: clicking a button
+// (contenteditable="false") deliberately can't blur the host (that's the
+// fix for buttons needing 2 clicks), but clicking an actual <select>/
+// <input>/<textarea> still can, so this isn't permanently stuck busy.
 function isViewBusy() {
   const active = document.activeElement;
   return !!(active && (
     active.tagName === "INPUT" || active.tagName === "TEXTAREA"
-    || active.matches?.(".view-remark-edit, .view-mastery-note")
+    || active.id === "session-view-body"
+    || active.matches?.(".view-mastery-note")
   ));
 }
 function isGroupViewBusy() {
-  return isViewBusy();
+  const active = document.activeElement;
+  return !!(active && (
+    active.tagName === "INPUT" || active.tagName === "TEXTAREA"
+    || active.id === "group-session-view-body"
+    || active.matches?.(".view-mastery-note")
+  ));
 }
 
 // Wraps a View-screen action button's async handler so its own write always
@@ -2735,6 +2745,7 @@ function buildTargetViewTable(target, data) {
         <tbody>${rows}</tbody>
       </table>
     </div>
+    <button class="view-add-remark-target" data-target="${escHtml(target.name)}">+ Add Remark &amp; Trials</button>
   </div>`;
 }
 
@@ -2786,18 +2797,11 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
       <td class="vcol-score" contenteditable="false">&nbsp;</td>
     </tr>`;
   }
-  const addMoreRow = `<tr class="view-add-remark-row">
-    <td class="vcol-no" contenteditable="false"></td>
-    <td class="vcol-act" contenteditable="false"></td>
-    <td class="vcol-rem" colspan="4" contenteditable="false">
-      <button class="view-add-remark-more" data-act-id="${escHtml(actId || "")}">+ Add Remark &amp; Trials</button>
-    </td>
-  </tr>`;
   return remarks.map((rem, ri) => viewRemarkRow(
     ri === 0 ? no : null,
     ri === 0 ? actCell : null,
     rem, target, inlineOptions, sentenceStarter, multiSelect, isMastery
-  )).join("") + addMoreRow;
+  )).join("");
 }
 
 function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, isMastery = false) {
@@ -3368,6 +3372,38 @@ function setupViewEnterKeyDelegation(host, getSaver) {
   return () => host.removeEventListener("keydown", onKeydown);
 }
 
+function showViewAddRemarkPicker(targetName) {
+  const data = state.viewSessionData;
+  const choices = Object.entries(data.activities || {})
+    .filter(([actId, a]) => a.targetName === targetName && viewGetRemarks(data, actId).length > 0)
+    .map(([actId, a]) => ({ actId, name: a.activityName }));
+
+  $("session-picker-title").textContent = "Add Remark & Trials";
+  $("session-picker-list").innerHTML = choices.length
+    ? `<div class="choice-list">` + choices.map(c => `
+        <button class="choice-btn view-add-remark-choice" data-act-id="${escHtml(c.actId)}">
+          <div class="choice-text"><div class="choice-label">${escHtml(c.name)}</div></div>
+        </button>`).join("") + `</div>`
+    : `<p class="empty-hint">No activities with a remark yet — use the + under an activity's Trials column to start one.</p>`;
+  $("session-picker-modal").classList.remove("hidden");
+
+  $("session-picker-list").querySelectorAll(".view-add-remark-choice").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const actId = btn.dataset.actId;
+      closeSessionPicker();
+      const remId = generateId("r");
+      state.viewSessionData.remarks = state.viewSessionData.remarks || {};
+      state.viewSessionData.remarks[remId] = { activityId: actId, text: "", trials: [], order: Date.now() };
+      renderViewOrDefer("viewRenderPending", isViewBusy, renderSessionView);
+      addRemark(state.viewSessionId, actId, "", null, remId).catch(err => {
+        delete state.viewSessionData.remarks[remId];
+        renderViewOrDefer("viewRenderPending", isViewBusy, renderSessionView);
+        alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
+      });
+    });
+  });
+}
+
 function attachViewListeners() {
   const body = $("session-view-body");
 
@@ -3413,20 +3449,8 @@ function attachViewListeners() {
     });
   });
 
-  body.querySelectorAll(".view-add-remark-more").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const actId = btn.dataset.actId;
-      if (!actId) return;
-      const remId = generateId("r");
-      state.viewSessionData.remarks = state.viewSessionData.remarks || {};
-      state.viewSessionData.remarks[remId] = { activityId: actId, text: "", trials: [], order: Date.now() };
-      renderViewOrDefer("viewRenderPending", isViewBusy, renderSessionView);
-      addRemark(state.viewSessionId, actId, "", null, remId).catch(err => {
-        delete state.viewSessionData.remarks[remId];
-        renderViewOrDefer("viewRenderPending", isViewBusy, renderSessionView);
-        alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
-      });
-    });
+  body.querySelectorAll(".view-add-remark-target").forEach(btn => {
+    btn.addEventListener("click", () => showViewAddRemarkPicker(btn.dataset.target));
   });
 
   // ── Sketch board buttons (view screen) ────────────────────
