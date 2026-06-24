@@ -89,7 +89,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "481";
+const APP_VERSION = "482";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -6838,18 +6838,11 @@ function formatDate(dateStr) {
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   return `${d} ${months[m - 1]} ${y}`;
 }
-function dayName(dateStr) {
-  const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-  const [y, m, d] = dateStr.split("-").map(Number);
-  return days[new Date(y, m - 1, d).getDay()];
-}
 function formatDateWithDay(dateStr) {
-  return `${dayName(dateStr)}, ${formatDate(dateStr)}`;
+  return `${dayAbbr(dateStr)}, ${formatDate(dateStr)}`;
 }
 function relativeDaySuffix(dateStr) {
-  if (dateStr === getTodayString())     return " (Today)";
-  if (dateStr === getYesterdayString()) return " (Yesterday)";
-  return "";
+  return dateStr === getTodayString() ? " (Today)" : "";
 }
 function getYesterdayString() {
   const d = new Date();
@@ -6886,18 +6879,15 @@ function sessionWeekSection(dateStr, todayStr) {
   if (date >= lastWeekStart) return "Last week";
   return "Earlier";
 }
-function sessionItemLabel(dateStr, todayStr, yesterdayStr) {
+function sessionItemLabel(dateStr, todayStr) {
   const base = `${dayAbbr(dateStr)}, ${formatDateShort(dateStr)}`;
-  if (dateStr === todayStr) return `${base} (Today)`;
-  if (dateStr === yesterdayStr) return `${base} (Yesterday)`;
-  return base;
+  return dateStr === todayStr ? `${base} (Today)` : base;
 }
 // Shared renderer for the "Session N: ..." rows used by every session picker
 // (individual/group, normal/export/go-to) — groups rows under week headers
 // and lets callers add a per-row extra line (e.g. group attendees) or mark
 // one row as the currently-viewed session.
 function renderSessionListRows(sorted, display, today, { isCurrentId, extraLine } = {}) {
-  const yesterday = getYesterdayString();
   let html = "";
   let lastSection = null;
   for (const s of display) {
@@ -6909,7 +6899,7 @@ function renderSessionListRows(sorted, display, today, { isCurrentId, extraLine 
     const num       = sorted.findIndex(x => x.id === s.id) + 1;
     const isCurrent = isCurrentId != null && s.id === isCurrentId;
     const cls       = `session-list-item${isCurrent ? " session-list-current" : ""}`;
-    const label     = sessionItemLabel(s.date, today, yesterday);
+    const label     = sessionItemLabel(s.date, today);
     const extra     = extraLine ? extraLine(s) : "";
     html += `<div class="${cls}" data-session-id="${s.id}">
       <div class="session-list-meta">
