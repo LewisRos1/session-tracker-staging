@@ -548,10 +548,11 @@ html, body {
 }
 .date-taken-dot, .day-dot-spacer {
   display: block;
-  height: .9rem;
+  height: 1.1rem;
   line-height: 1;
-  font-size: .75rem;
+  font-size: 1.05rem;
   font-weight: 700;
+  font-family: Arial, Helvetica, sans-serif;
   flex-shrink: 0;
 }
 .date-taken-dot { color: var(--primary-dark); }
@@ -561,7 +562,7 @@ html, body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: .9rem; height: .9rem;
+  width: 1.1rem; height: 1.1rem;
   border-radius: 3px;
   background: var(--primary-light);
   color: var(--primary-dark);
