@@ -58,12 +58,29 @@ import {
 if ("serviceWorker" in navigator) {
   const hadController = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    // Only reload for updates, not for the very first SW install.
-    if (hadController) window.location.reload();
+    // Only reload for updates, not for the very first SW install. Leave a
+    // note for the reloaded page to read — staff get a "just updated" toast
+    // instead of the app silently looking different with no explanation.
+    if (hadController) {
+      sessionStorage.setItem("justUpdatedAt", String(Date.now()));
+      window.location.reload();
+    }
   });
 }
 
-const APP_VERSION = "467";
+function showUpdateToastIfJustUpdated() {
+  const ts = sessionStorage.getItem("justUpdatedAt");
+  if (!ts) return;
+  sessionStorage.removeItem("justUpdatedAt");
+  const time = new Date(Number(ts)).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const el = $("update-toast");
+  if (!el) return;
+  el.textContent = `App updated at ${time}`;
+  el.classList.remove("hidden");
+  setTimeout(() => el.classList.add("hidden"), 5000);
+}
+
+const APP_VERSION = "468";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -247,6 +264,8 @@ function closeTextEditorSheet() {
 
 // ─── INIT ────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", async () => {
+  showUpdateToastIfJustUpdated();
+
   // Register SW immediately — don't wait for Firebase so updates are never blocked.
   registerServiceWorker();
 
@@ -403,17 +422,22 @@ function initPin() {
     try {
       await signInWithPin(value);
       // Success: onAuthChange (registered once in DOMContentLoaded) picks up
-      // the new signed-in user, loads data, and shows home from there.
+      // the new signed-in user, loads data, and shows home from there. Leave
+      // "Logging in…" up the whole time — loading that data after sign-in
+      // can itself take a few seconds, and showScreen() will hide this
+      // entire PIN screen (status message included) once home appears, so
+      // there's no gap where nothing is showing.
       document.removeEventListener("keydown", onKeyDown);
+      checking = false;
+      keypad.classList.remove("checking");
     } catch (err) {
       shake();
       errMsg.classList.remove("hidden");
+      statusMsg.classList.add("hidden");
       value = "";
       renderDots();
-    } finally {
       checking = false;
       keypad.classList.remove("checking");
-      statusMsg.classList.add("hidden");
     }
   }
 

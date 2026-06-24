@@ -153,6 +153,23 @@ html, body {
 }
 .pin-status.hidden { display: none; }
 
+.update-toast {
+  position: fixed;
+  top: .8rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--text);
+  color: #fff;
+  font-size: .85rem;
+  font-weight: 600;
+  padding: .6rem 1.1rem;
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  z-index: 9999;
+  white-space: nowrap;
+}
+.update-toast.hidden { display: none; }
+
 .pin-keypad {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
