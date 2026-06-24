@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<!-- Open this file once in a browser, then right-click each canvas
+     and "Save image as" icon-192.png / icon-512.png.
+     Or the page auto-downloads them. -->
+<html><head><title>Generate Icons</title></head>
+<body>
+<script>
+function makeIcon(size) {
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const ctx = c.getContext("2d");
+
+  // Background
+  const grad = ctx.createLinearGradient(0, 0, size, size);
+  grad.addColorStop(0, "#6366f1");
+  grad.addColorStop(1, "#8b5cf6");
+  ctx.fillStyle = grad;
+  ctx.roundRect(0, 0, size, size, size * 0.22);
+  ctx.fill();
+
+  // Puzzle piece emoji substitute — draw a simple "T" mark
+  ctx.fillStyle = "rgba(255,255,255,0.95)";
+  ctx.font = `bold ${size * 0.52}px sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("🧩", size / 2, size / 2);
+
+  return c;
+}
+
+function download(canvas, name) {
+  const a = document.createElement("a");
+  a.href = canvas.toDataURL("image/png");
+  a.download = name;
+  a.click();
+}
+
+window.onload = () => {
+  const c192 = makeIcon(192);
+  const c512 = makeIcon(512);
+  document.body.appendChild(c192);
+  document.body.appendChild(c512);
+  setTimeout(() => {
+    download(c192, "icon-192.png");
+    setTimeout(() => download(c512, "icon-512.png"), 300);
+  }, 500);
+};
+</script>
+<p>Generating icons… They will download automatically.<br>
+Place <code>icon-192.png</code> and <code>icon-512.png</code>
+in the same folder as <code>index.html</code>.</p>
+</body></html>
