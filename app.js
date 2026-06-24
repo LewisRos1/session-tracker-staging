@@ -110,7 +110,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "490";
+const APP_VERSION = "491";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -453,6 +453,13 @@ function initPin() {
   const pinLen = CONFIG.PIN_LENGTH;
   let value = "";
   let checking = false;
+
+  // A previous successful login leaves statusMsg's "hidden" class removed
+  // (only the error path explicitly re-hides it — success just navigates
+  // away from this whole screen). Reset both on every fresh entry so
+  // "Logging in…" can't still be showing before anything's been typed.
+  errMsg.classList.add("hidden");
+  statusMsg.classList.add("hidden");
 
   dotsEl.innerHTML = Array.from({ length: pinLen }, () =>
     '<span class="pin-dot"></span>'
