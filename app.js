@@ -58,34 +58,26 @@ import {
 if ("serviceWorker" in navigator) {
   const hadController = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    // Only reload for updates, not for the very first SW install. The
-    // reload always lands back on the home screen automatically (staff stay
-    // signed in), so there's nothing extra to do for that part — just let
-    // the reloaded page know to say so.
+    // Only reload for updates, not for the very first SW install. Show
+    // "App Updating…" on THIS page first so it's visible for a moment, then
+    // reload — the fresh page picks the same message back up immediately
+    // (see the sessionStorage check in DOMContentLoaded below) so it reads
+    // as one continuous transition instead of the app silently bouncing to
+    // the home screen with no explanation.
     if (hadController) {
       sessionStorage.setItem("justUpdated", "1");
-      window.location.reload();
+      document.querySelectorAll(".screen").forEach(s => s.classList.toggle("hidden", s.id !== "screen-loading"));
+      document.getElementById("updating-content")?.classList.remove("hidden");
+      setTimeout(() => window.location.reload(), 700);
     }
   });
-}
-
-function showUpdateBanner(text, { withNowButton = false } = {}) {
-  const el = $("update-banner");
-  if (!el) return;
-  $("update-banner-text").textContent = text;
-  $("update-banner-now").classList.toggle("hidden", !withNowButton);
-  el.classList.add("show");
-}
-
-function hideUpdateBanner() {
-  $("update-banner")?.classList.remove("show");
 }
 
 function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "473";
+const APP_VERSION = "474";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -273,10 +265,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Register SW immediately — don't wait for Firebase so updates are never blocked.
   registerServiceWorker();
 
+  // Picks the "App Updating…" message back up on the fresh page (it was
+  // already showing on the old page right before this reload happened) —
+  // #screen-loading is already the default-visible screen at this point,
+  // so this just reveals its content; initPin()/showHome() naturally hides
+  // the whole thing once sign-in state is known.
   if (sessionStorage.getItem("justUpdated")) {
     sessionStorage.removeItem("justUpdated");
-    showUpdateBanner("Update complete!");
-    setTimeout(hideUpdateBanner, 4000);
+    $("updating-content")?.classList.remove("hidden");
   }
 
 
@@ -373,32 +369,7 @@ async function loadAppData() {
 
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
-
-  // Instead of applying a new version the instant it's downloaded (which
-  // could yank the screen out from under someone mid-task), give a 30s
-  // heads-up banner first — staff can finish what they're doing, or tap
-  // "Update now" to skip the wait.
-  let updateTimer = null;
-  const promptSkip = sw => {
-    if (updateTimer) return; // already counting down for an earlier-found update
-    let secondsLeft = 30;
-    const tick = () => {
-      showUpdateBanner(`Updating in ${secondsLeft}s…`, { withNowButton: true });
-      if (secondsLeft <= 0) {
-        clearInterval(updateTimer);
-        sw.postMessage("skipWaiting");
-        return;
-      }
-      secondsLeft--;
-    };
-    tick();
-    updateTimer = setInterval(tick, 1000);
-    $("update-banner-now").onclick = () => {
-      clearInterval(updateTimer);
-      sw.postMessage("skipWaiting");
-    };
-  };
-
+  const promptSkip = sw => sw.postMessage("skipWaiting");
   navigator.serviceWorker.register("sw.js", { updateViaCache: "none" })
     .then(reg => {
       if (reg.waiting) promptSkip(reg.waiting);

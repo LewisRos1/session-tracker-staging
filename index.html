@@ -27,15 +27,18 @@
 </head>
 <body>
 
-  <div id="update-banner" class="update-banner">
-    <span id="update-banner-text"></span>
-    <button id="update-banner-now" class="update-banner-now hidden">Update now</button>
-  </div>
-
   <!-- Shown by default until the code determines whether you're already
        signed in — avoids a flash of the PIN screen for already-logged-in
-       staff every time the app loads. -->
-  <div id="screen-loading" class="screen"></div>
+       staff every time the app loads. Also reused to show "App Updating…"
+       across a SW-update-triggered reload (see controllerchange below) so
+       it reads as one continuous, intentional transition instead of the
+       app silently bouncing back to the home screen with no explanation. -->
+  <div id="screen-loading" class="screen">
+    <div id="updating-content" class="updating-content hidden">
+      <div class="pin-logo">🧩</div>
+      <p class="updating-text">App Updating<span class="pin-status-dot">.</span><span class="pin-status-dot">.</span><span class="pin-status-dot">.</span></p>
+    </div>
+  </div>
 
   <!-- ══════════════════════════════════════════════════════
        PIN SCREEN
