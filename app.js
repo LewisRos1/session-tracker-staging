@@ -45,6 +45,7 @@ import {
   updateGroupSessionDate,
   deleteTargetDataFromSessions,
   signInWithPin,
+  signOutUser,
   onAuthChange,
   generateId
 } from "./firebase-service.js";
@@ -109,7 +110,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "488";
+const APP_VERSION = "489";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -355,13 +356,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     closeTextEditorSheet();
   });
 
-  // Firestore now requires a real signed-in user (see firebase-service.js),
-  // so none of the app's data can be fetched until sign-in resolves. Auth
-  // uses inMemoryPersistence (see firebase-service.js) so this always
-  // starts out signed-out on a fresh page load — staff want the PIN
-  // required every time, not just the first time on a device.
+  // Firestore now requires a real signed-in user (see firebase-service.js).
+  // Sign-in persists across reloads, but only counts for the calendar day
+  // it happened on — a persisted sign-in from an earlier day gets silently
+  // signed back out here, which makes onAuthChange fire again with
+  // user = null and fall into the PIN branch below.
   onAuthChange(async user => {
-    console.log("[PinDebug] onAuthChange fired, user =", user && user.email);
+    if (user && !hasLoggedInToday()) {
+      await signOutUser();
+      return;
+    }
     if (!user) {
       await waitForUpdatingScreenMinimum();
       initPin();
@@ -372,6 +376,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     showHome();
   });
 });
+
+const LAST_LOGIN_DATE_KEY = "lastLoginDate";
+function hasLoggedInToday() {
+  return localStorage.getItem(LAST_LOGIN_DATE_KEY) === getTodayString();
+}
+function markLoggedInToday() {
+  localStorage.setItem(LAST_LOGIN_DATE_KEY, getTodayString());
+}
 
 // Student/template/group/remark-preset config — only fetchable once signed in.
 async function loadAppData() {
@@ -426,7 +438,6 @@ function registerServiceWorker() {
 // ============================================================
 
 function initPin() {
-  console.log("[PinDebug] initPin() called", new Error().stack?.split("\n").slice(1, 4).join(" | "));
   showScreen("screen-pin");
   const vEl = $("pin-version");
   if (vEl) vEl.textContent = versionLineText();
@@ -454,7 +465,6 @@ function initPin() {
   }
 
   async function submit() {
-    console.log("[PinDebug] submit() called, value =", JSON.stringify(value), "length =", value.length, "pinLen =", pinLen);
     if (checking) return;
     checking = true;
     keypad.classList.add("checking");
@@ -462,6 +472,7 @@ function initPin() {
     statusMsg.classList.remove("hidden");
     try {
       await signInWithPin(value);
+      markLoggedInToday();
       // Success: onAuthChange (registered once in DOMContentLoaded) picks up
       // the new signed-in user, loads data, and shows home from there. Leave
       // "Logging in…" up the whole time — loading that data after sign-in
@@ -483,7 +494,6 @@ function initPin() {
   }
 
   function pressKey(key) {
-    console.log("[PinDebug] pressKey", key, "current value =", JSON.stringify(value), "pinLen =", pinLen);
     if (key === "back") {
       value = value.slice(0, -1);
       errMsg.classList.add("hidden");

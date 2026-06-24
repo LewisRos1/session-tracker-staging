@@ -146,14 +146,14 @@ html, body {
 
 .pin-dots {
   display: flex;
-  gap: 1rem;
+  gap: .5rem;
   justify-content: center;
   margin: .25rem 0;
 }
 
 .pin-dot {
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   border: 2px solid var(--primary);
   background: transparent;

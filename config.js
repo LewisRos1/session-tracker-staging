@@ -9,7 +9,7 @@ export const CONFIG = {
   // Firebase Auth account now (see signInWithPin in firebase-service.js),
   // checked by Firebase's servers instead of compared inside this
   // downloadable file. This just tells the keypad UI how many dots to show.
-  PIN_LENGTH: 4,
+  PIN_LENGTH: 8,
 
   SCORE_LABELS: {
     3: {
