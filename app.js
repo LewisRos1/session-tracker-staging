@@ -89,7 +89,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "480";
+const APP_VERSION = "481";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2565,7 +2565,7 @@ function renderSessionView() {
   if (!data || !student) return;
 
   $("view-session-meta").innerHTML =
-    `Session ${data.sessionNumber}: ${formatDate(data.date)}`
+    `Session ${data.sessionNumber}: ${formatDateWithDay(data.date)}${relativeDaySuffix(data.date)}`
     + ` <button class="btn-edit-session-date">Edit Date</button>`;
 
   const delBtn = $("btn-delete-session");
@@ -3551,7 +3551,7 @@ function renderGroupSessionView() {
   if (!data || !group) return;
 
   $("group-view-session-meta").innerHTML =
-    `Session ${data.sessionNumber}: ${formatDate(data.date)}`
+    `Session ${data.sessionNumber}: ${formatDateWithDay(data.date)}${relativeDaySuffix(data.date)}`
     + ` <button class="btn-edit-session-date">Edit Date</button>`;
 
   const delBtn = $("btn-group-delete-session");
@@ -6838,6 +6838,19 @@ function formatDate(dateStr) {
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   return `${d} ${months[m - 1]} ${y}`;
 }
+function dayName(dateStr) {
+  const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return days[new Date(y, m - 1, d).getDay()];
+}
+function formatDateWithDay(dateStr) {
+  return `${dayName(dateStr)}, ${formatDate(dateStr)}`;
+}
+function relativeDaySuffix(dateStr) {
+  if (dateStr === getTodayString())     return " (Today)";
+  if (dateStr === getYesterdayString()) return " (Yesterday)";
+  return "";
+}
 function getYesterdayString() {
   const d = new Date();
   d.setDate(d.getDate() - 1);
@@ -6874,9 +6887,10 @@ function sessionWeekSection(dateStr, todayStr) {
   return "Earlier";
 }
 function sessionItemLabel(dateStr, todayStr, yesterdayStr) {
-  if (dateStr === todayStr) return "Today";
-  if (dateStr === yesterdayStr) return "Yesterday";
-  return `${dayAbbr(dateStr)}, ${formatDateShort(dateStr)}`;
+  const base = `${dayAbbr(dateStr)}, ${formatDateShort(dateStr)}`;
+  if (dateStr === todayStr) return `${base} (Today)`;
+  if (dateStr === yesterdayStr) return `${base} (Yesterday)`;
+  return base;
 }
 // Shared renderer for the "Session N: ..." rows used by every session picker
 // (individual/group, normal/export/go-to) — groups rows under week headers
