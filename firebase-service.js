@@ -294,8 +294,10 @@ export async function deleteActivity(sessionId, actId, remarkIds) {
 
 // ─── REMARK OPERATIONS ───────────────────────────────────────
 
-export async function addRemark(sessionId, actId, text, predefinedKey = null) {
-  const remId = generateId("r");
+// remId can be supplied by the caller (e.g. to write a remark into local
+// state immediately, before this write reaches the server, so the UI
+// doesn't have to wait on the round trip) — otherwise one is generated here.
+export async function addRemark(sessionId, actId, text, predefinedKey = null, remId = generateId("r")) {
   const data = { activityId: actId, text, trials: [], order: Date.now() };
   if (predefinedKey !== null) data.predefinedKey = predefinedKey;
   await updateDoc(doc(db, "sessions", sessionId), {
@@ -572,26 +574,24 @@ export async function deleteGroupTargetDataFromSessions(groupId, targetName) {
 }
 
 /** Add a remark for a specific student in a group session. */
-export async function addGroupRemark(sessionId, actId, studentName, text = "") {
-  const remId = generateId("r");
+export async function addGroupRemark(sessionId, actId, studentName, text = "", remId = generateId("r")) {
   await updateDoc(doc(db, "sessions", sessionId), {
     [`remarks.${remId}`]: { activityId: actId, studentName, text, trials: [], order: Date.now() }
   });
   return remId;
 }
 
-/** Add remarks for multiple students in one write (no sequential re-renders). */
-export async function addGroupRemarksBatch(sessionId, entries) {
+/** Add remarks for multiple students in one write (no sequential re-renders).
+ *  remIds, if supplied, must be the same length as entries (see addRemark). */
+export async function addGroupRemarksBatch(sessionId, entries, remIds = null) {
   const updates = {};
   const now = Date.now();
-  const remIds = [];
-  for (const { actId, studentName } of entries) {
-    const remId = generateId("r");
-    remIds.push(remId);
-    updates[`remarks.${remId}`] = { activityId: actId, studentName, text: "", trials: [], order: now };
-  }
+  const ids = remIds || entries.map(() => generateId("r"));
+  entries.forEach(({ actId, studentName }, i) => {
+    updates[`remarks.${ids[i]}`] = { activityId: actId, studentName, text: "", trials: [], order: now };
+  });
   await updateDoc(doc(db, "sessions", sessionId), updates);
-  return remIds;
+  return ids;
 }
 
 /** Delete multiple remarks in one write (no sequential re-renders). */

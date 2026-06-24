@@ -45,7 +45,8 @@ import {
   updateGroupSessionDate,
   deleteTargetDataFromSessions,
   signInWithPin,
-  onAuthChange
+  onAuthChange,
+  generateId
 } from "./firebase-service.js";
 import {
   exportStudentData, exportAllStudents, exportGroupMemberData,
@@ -89,7 +90,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "484";
+const APP_VERSION = "485";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2094,30 +2095,23 @@ function attachTargetListeners(target) {
           renderTargetContent();
         }
       };
-      // Released the instant "click" actually fires (proving the button
-      // survived the gap) — the main click handler's own increment (added
-      // earlier, so it runs first) takes over from there with no added
-      // delay. The timeout is only a fallback for a press that never
-      // resolves into a click at all.
+      // Released the instant "click" actually fires, proving the button
+      // survived the gap — the main click handler renders synchronously
+      // once it's done (no further write to guard against). The timeout is
+      // only a fallback for a press that never resolves into a click at all.
       btn.addEventListener("click", release, { once: true });
       setTimeout(release, 600);
     });
     btn.addEventListener("click", async () => {
       if (btn.disabled) return;
       btn.disabled = true;
-      btn.textContent = "Adding…";
-      // Tracked so the busy-check defers any unrelated render until this
-      // write lands — otherwise a write from a completely different row
-      // landing mid-click can pass the busy-check, force a render, and
-      // replace this very button before its own write resolves.
-      state.entryActionsInFlight++;
       try {
         const paName  = btn.dataset.paName || null;
         const paOrder = Number(btn.dataset.paOrder) || 0;
         let   actId   = btn.dataset.actId  || null;
         state.pendingNewActivity = null;
         if (paName) actId = await ensureFedcActivity(target.name, paName, paOrder);
-        if (!actId) { btn.disabled = false; btn.textContent = "+ Add Remark & Trials"; return; }
+        if (!actId) { btn.disabled = false; return; }
         let initialText = "";
         if (paName) {
           const pa = target.predefinedActivities?.find(a => a.name === paName);
@@ -2125,25 +2119,21 @@ function attachTargetListeners(target) {
             initialText = await getLastMasteryValue(state.currentStudent, target.name, paName, state.currentSessionId);
           }
         }
-        const remId = await addRemark(state.currentSessionId, actId, initialText);
-        // Wait for the new remark to actually land in state.sessionData
-        // before letting the finally block render — addRemark() resolving
-        // only means the write was sent, not that onSnapshot delivered it.
-        await waitForSessionData(() => !!state.sessionData?.remarks?.[remId]);
+        // Write the remark into local state and render right away instead of
+        // waiting on the Firestore round trip — addRemark() is handed the
+        // same ID so it just confirms this row server-side in the background.
+        const remId = generateId("r");
+        state.sessionData.remarks = state.sessionData.remarks || {};
+        state.sessionData.remarks[remId] = { activityId: actId, text: initialText, trials: [], order: Date.now() };
+        renderTargetContent();
+        addRemark(state.currentSessionId, actId, initialText, null, remId).catch(err => {
+          delete state.sessionData.remarks[remId];
+          renderTargetContent();
+          alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
+        });
       } catch (err) {
         btn.disabled = false;
-        btn.textContent = "+ Add Remark & Trials";
         alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
-      } finally {
-        state.entryActionsInFlight--;
-        // The write's own onSnapshot may have already fired and deferred a
-        // render (renderPending) while the counter was still > 0 — nothing
-        // else proactively re-checks once it drops back to 0, so do it here
-        // (same check as setupEntryRemarkSaving's onIdle).
-        if (state.entryActionsInFlight === 0 && state.renderPending) {
-          state.renderPending = false;
-          renderTargetContent();
-        }
       }
     });
   });
@@ -6462,9 +6452,10 @@ function attachGroupTargetListeners(target) {
           renderGroupTargetContent();
         }
       };
-      // Released the instant "click" fires (the main click handler's own
-      // increment, registered earlier, takes over with no added delay) —
-      // the timeout is only a fallback for a press that never becomes a click.
+      // Released the instant "click" fires, proving the button survived the
+      // gap — the main click handler renders synchronously once it's done,
+      // no further write to guard against. The timeout is only a fallback
+      // for a press that never becomes a click.
       btn.addEventListener("click", release, { once: true });
       setTimeout(release, 600);
     });
@@ -6474,11 +6465,6 @@ function attachGroupTargetListeners(target) {
   c.querySelectorAll(".btn-group-add-remark-all").forEach(btn => {
     btn.addEventListener("click", async () => {
       btn.disabled = true;
-      btn.textContent = "Adding…";
-      // See the individual screen's .btn-add-remark handler for why this is
-      // tracked — an unrelated write landing mid-click can otherwise pass
-      // the busy-check and replace this button before its own write resolves.
-      state.entryGroupActionsInFlight++;
       try {
         const actName    = btn.dataset.actName;
         const targetName = btn.dataset.target;
@@ -6493,15 +6479,12 @@ function attachGroupTargetListeners(target) {
             .some(r => r.activityId === actId && r.studentName === studentName))
           .map(studentName => ({ actId, studentName }));
         if (entries.length) {
-          const remIds = await addGroupRemarksBatch(state.groupSessionId, entries);
-          await waitForSessionData(() => remIds.every(id => !!state.groupSessionData?.remarks?.[id]));
-        }
-      } finally {
-        state.entryGroupActionsInFlight--;
-        if (state.entryGroupActionsInFlight === 0 && state.groupRenderPending) {
-          state.groupRenderPending = false;
+          addGroupRemarksOptimistic(entries);
           renderGroupTargetContent();
         }
+      } catch (err) {
+        btn.disabled = false;
+        alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
       }
     });
   });
@@ -6510,17 +6493,12 @@ function attachGroupTargetListeners(target) {
   c.querySelectorAll(".btn-group-add-remark-pending").forEach(btn => {
     btn.addEventListener("click", async () => {
       btn.disabled = true;
-      btn.textContent = "Adding…";
-      state.entryGroupActionsInFlight++;
       try {
-        const { remId } = await ensureGroupActivityAndRemark(btn);
-        await waitForSessionData(() => !!state.groupSessionData?.remarks?.[remId]);
-      } finally {
-        state.entryGroupActionsInFlight--;
-        if (state.entryGroupActionsInFlight === 0 && state.groupRenderPending) {
-          state.groupRenderPending = false;
-          renderGroupTargetContent();
-        }
+        await ensureGroupActivityAndRemark(btn);
+        renderGroupTargetContent();
+      } catch (err) {
+        btn.disabled = false;
+        alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
       }
     });
   });
@@ -6544,41 +6522,21 @@ function attachGroupTargetListeners(target) {
 
   // + Add Remark & Trials (bottom of expanded card — always adds new remarks for all students)
   c.querySelectorAll(".btn-group-add-remark-more").forEach(btn => {
-    btn.addEventListener("click", async () => {
+    btn.addEventListener("click", () => {
       btn.disabled = true;
-      btn.textContent = "Adding…";
-      state.entryGroupActionsInFlight++;
-      try {
-        const actId = btn.dataset.actId;
-        const entries = state.groupAttendees.map(studentName => ({ actId, studentName }));
-        const remIds = await addGroupRemarksBatch(state.groupSessionId, entries);
-        await waitForSessionData(() => remIds.every(id => !!state.groupSessionData?.remarks?.[id]));
-      } finally {
-        state.entryGroupActionsInFlight--;
-        if (state.entryGroupActionsInFlight === 0 && state.groupRenderPending) {
-          state.groupRenderPending = false;
-          renderGroupTargetContent();
-        }
-      }
+      const actId = btn.dataset.actId;
+      const entries = state.groupAttendees.map(studentName => ({ actId, studentName }));
+      addGroupRemarksOptimistic(entries);
+      renderGroupTargetContent();
     });
   });
 
   // + Add Remark & Trials (student-grouped layout — bottom of card, adds another round for just this student)
   c.querySelectorAll(".btn-group-add-remark-student-more").forEach(btn => {
-    btn.addEventListener("click", async () => {
+    btn.addEventListener("click", () => {
       btn.disabled = true;
-      btn.textContent = "Adding…";
-      state.entryGroupActionsInFlight++;
-      try {
-        const remId = await addGroupRemark(state.groupSessionId, btn.dataset.actId, btn.dataset.student);
-        await waitForSessionData(() => !!state.groupSessionData?.remarks?.[remId]);
-      } finally {
-        state.entryGroupActionsInFlight--;
-        if (state.entryGroupActionsInFlight === 0 && state.groupRenderPending) {
-          state.groupRenderPending = false;
-          renderGroupTargetContent();
-        }
-      }
+      addGroupRemarksOptimistic([{ actId: btn.dataset.actId, studentName: btn.dataset.student }]);
+      renderGroupTargetContent();
     });
   });
 
@@ -6608,7 +6566,31 @@ function attachGroupTargetListeners(target) {
   });
 }
 
-// Helper: ensure activity + remark exist in Firestore for a pending row element
+// Writes one or more group remarks into local state immediately instead of
+// waiting on the Firestore round trip (callers render right after calling
+// this), then fires the real writes in the background — rolling back and
+// alerting if any of them fail.
+function addGroupRemarksOptimistic(entries) {
+  const data = state.groupSessionData;
+  data.remarks = data.remarks || {};
+  const now     = Date.now();
+  const remIds  = entries.map(() => generateId("r"));
+  entries.forEach(({ actId, studentName }, i) => {
+    data.remarks[remIds[i]] = { activityId: actId, studentName, text: "", trials: [], order: now };
+  });
+  addGroupRemarksBatch(state.groupSessionId, entries, remIds).catch(err => {
+    remIds.forEach(id => delete data.remarks[id]);
+    renderGroupTargetContent();
+    alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
+  });
+  return remIds;
+}
+
+// Helper: ensure activity + remark exist for a pending row element. The
+// remark write itself is optimistic (see addGroupRemarksOptimistic) — only
+// activity creation (rare: first time this predefined activity is used in
+// the session) still waits on the network, since the remark needs a real
+// activity ID to point at.
 async function ensureGroupActivityAndRemark(el) {
   const studentName = el.dataset.student;
   const actName     = el.dataset.actName;
@@ -6624,7 +6606,7 @@ async function ensureGroupActivityAndRemark(el) {
   const existing = Object.entries(data.remarks || {})
     .find(([, r]) => r.activityId === actId && r.studentName === studentName);
   if (existing) return { actId, remId: existing[0] };
-  const remId = await addGroupRemark(state.groupSessionId, actId, studentName);
+  const [remId] = addGroupRemarksOptimistic([{ actId, studentName }]);
   return { actId, remId };
 }
 
