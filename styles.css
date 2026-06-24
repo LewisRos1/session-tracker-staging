@@ -73,15 +73,16 @@ html, body {
   overflow: hidden;
 }
 .updating-progress-bar {
-  width: 40%;
+  width: 0%;
   height: 100%;
   background: var(--primary);
   border-radius: 999px;
-  animation: updatingProgressSlide 1.1s ease-in-out infinite;
+  transition: width .1s linear;
 }
-@keyframes updatingProgressSlide {
-  0%   { transform: translateX(-100%); }
-  100% { transform: translateX(350%); }
+.updating-percent {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-muted);
 }
 
 /* ─── LOADING / ERROR ────────────────────────────────────── */

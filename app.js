@@ -78,19 +78,38 @@ if ("serviceWorker" in navigator) {
 // guarantee a minimum visible time before moving on, regardless of how
 // fast sign-in/data-loading actually finishes.
 let updatingScreenShownAt = null;
+const UPDATING_SCREEN_MIN_MS = 3000;
 
-async function waitForUpdatingScreenMinimum(minMs = 3000) {
+async function waitForUpdatingScreenMinimum(minMs = UPDATING_SCREEN_MIN_MS) {
   if (!updatingScreenShownAt) return;
   const remaining = minMs - (Date.now() - updatingScreenShownAt);
   updatingScreenShownAt = null; // only delay once per page load
   if (remaining > 0) await new Promise(r => setTimeout(r, remaining));
 }
 
+// Fills the "App Updating…" progress bar and percentage text from 0 to 100
+// over durationMs (matching waitForUpdatingScreenMinimum's own minimum), so
+// it reads as real progress rather than a generic spinner. Holds at 100% if
+// the actual load ends up taking longer than durationMs.
+function animateUpdatingProgress(durationMs = UPDATING_SCREEN_MIN_MS) {
+  const bar = $("updating-progress-bar");
+  const pct = $("updating-percent");
+  if (!bar || !pct) return;
+  const start = Date.now();
+  const tick = () => {
+    const percent = Math.min(100, Math.round((Date.now() - start) / durationMs * 100));
+    bar.style.width = percent + "%";
+    pct.textContent = percent + "%";
+    if (percent < 100) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
 function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "487";
+const APP_VERSION = "488";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -287,6 +306,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     sessionStorage.removeItem("justUpdated");
     $("updating-content")?.classList.remove("hidden");
     updatingScreenShownAt = Date.now();
+    animateUpdatingProgress();
   }
 
 
