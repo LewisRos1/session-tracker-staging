@@ -59,8 +59,8 @@ if ("serviceWorker" in navigator) {
   const hadController = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     // Only reload for updates, not for the very first SW install. Leave a
-    // note for the reloaded page to read — staff get a "just updated" toast
-    // instead of the app silently looking different with no explanation.
+    // note for the reloaded page to read — shown next to the version number
+    // so staff have a heads-up the app just changed, without a popup.
     if (hadController) {
       sessionStorage.setItem("justUpdatedAt", String(Date.now()));
       window.location.reload();
@@ -68,19 +68,27 @@ if ("serviceWorker" in navigator) {
   });
 }
 
-function showUpdateToastIfJustUpdated() {
+// Read once per page load — null unless this load is a reload triggered by
+// a fresh version installing.
+let justUpdatedAt = null;
+{
   const ts = sessionStorage.getItem("justUpdatedAt");
-  if (!ts) return;
-  sessionStorage.removeItem("justUpdatedAt");
-  const time = new Date(Number(ts)).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  const el = $("update-toast");
-  if (!el) return;
-  el.textContent = `App updated at ${time}`;
-  el.classList.remove("hidden");
-  setTimeout(() => el.classList.add("hidden"), 5000);
+  if (ts) {
+    sessionStorage.removeItem("justUpdatedAt");
+    justUpdatedAt = Number(ts);
+  }
 }
 
-const APP_VERSION = "469";
+function versionLineText() {
+  let text = `Made by Lewis · Version ${APP_VERSION}`;
+  if (justUpdatedAt) {
+    const time = new Date(justUpdatedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    text += ` · Updated at ${time}`;
+  }
+  return text;
+}
+
+const APP_VERSION = "470";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -264,7 +272,6 @@ function closeTextEditorSheet() {
 
 // ─── INIT ────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", async () => {
-  showUpdateToastIfJustUpdated();
 
   // Register SW immediately — don't wait for Firebase so updates are never blocked.
   registerServiceWorker();
@@ -334,32 +341,30 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 // Student/template/group/remark-preset config — only fetchable once signed in.
 async function loadAppData() {
-  // Load student config from Firebase (seeds from INITIAL_STUDENTS if empty)
-  try {
-    let students = await loadStudentsConfig();
+  // These 4 reads are independent of each other — fire them all at once
+  // instead of one-after-another, or their wait times just add up.
+  const [studentsR, templatesR, groupsR, presetsR] = await Promise.allSettled([
+    loadStudentsConfig(),
+    loadTemplates(),
+    loadGroups(),
+    loadRemarkPresets()
+  ]);
+
+  // Student config (seeds from INITIAL_STUDENTS if empty)
+  if (studentsR.status === "fulfilled") {
+    let students = studentsR.value;
     if (students.length === 0) {
       for (const s of CONFIG.INITIAL_STUDENTS) await saveStudent(s);
       students = CONFIG.INITIAL_STUDENTS;
     }
     state.students = students;
-  } catch (_) {
+  } else {
     state.students = CONFIG.INITIAL_STUDENTS;
   }
 
-  // Load templates
-  try {
-    state.templates = await loadTemplates();
-  } catch (_) {}
-
-  // Load groups
-  try {
-    state.groups = await loadGroups();
-  } catch (_) {}
-
-  // Load remark presets
-  try {
-    state.remarkPresets = await loadRemarkPresets();
-  } catch (_) {}
+  if (templatesR.status === "fulfilled") state.templates = templatesR.value;
+  if (groupsR.status === "fulfilled") state.groups = groupsR.value;
+  if (presetsR.status === "fulfilled") state.remarkPresets = presetsR.value;
 }
 
 function registerServiceWorker() {
@@ -389,7 +394,7 @@ function registerServiceWorker() {
 function initPin() {
   showScreen("screen-pin");
   const vEl = $("pin-version");
-  if (vEl) vEl.textContent = `Made by Lewis · Version ${APP_VERSION}`;
+  if (vEl) vEl.textContent = versionLineText();
   const errMsg = $("pin-error");
   const statusMsg = $("pin-status");
   const dotsEl = $("pin-dots");
@@ -475,7 +480,7 @@ function initPin() {
 async function showHome() {
   showScreen("screen-home");
   const verEl = document.getElementById("app-version");
-  if (verEl) verEl.textContent = `Made by Lewis · Version ${APP_VERSION}`;
+  if (verEl) verEl.textContent = versionLineText();
   // Clear section searches when returning home
   state.searchExisting = ""; state.searchAssessment = ""; state.searchTemplate = "";
   state.searchGroup = "";

@@ -27,14 +27,10 @@
 </head>
 <body>
 
-  <div id="update-toast" class="update-toast hidden"></div>
-
   <!-- Shown by default until the code determines whether you're already
        signed in — avoids a flash of the PIN screen for already-logged-in
        staff every time the app loads. -->
-  <div id="screen-loading" class="screen">
-    <div class="pin-logo" style="margin: auto;">🧩</div>
-  </div>
+  <div id="screen-loading" class="screen"></div>
 
   <!-- ══════════════════════════════════════════════════════
        PIN SCREEN
@@ -46,7 +42,7 @@
       <p class="pin-subtitle">Enter PIN to continue</p>
       <div class="pin-dots" id="pin-dots"></div>
       <div id="pin-error" class="pin-error hidden">Incorrect PIN. Try again.</div>
-      <div id="pin-status" class="pin-status hidden">Logging in…</div>
+      <div id="pin-status" class="pin-status hidden">Authenticating…</div>
       <div class="pin-keypad" id="pin-keypad">
         <button class="pin-key" data-key="1">1</button>
         <button class="pin-key" data-key="2">2</button>
