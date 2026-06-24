@@ -79,7 +79,7 @@ if ("serviceWorker" in navigator) {
 // fast sign-in/data-loading actually finishes.
 let updatingScreenShownAt = null;
 
-async function waitForUpdatingScreenMinimum(minMs = 5000) {
+async function waitForUpdatingScreenMinimum(minMs = 3000) {
   if (!updatingScreenShownAt) return;
   const remaining = minMs - (Date.now() - updatingScreenShownAt);
   updatingScreenShownAt = null; // only delay once per page load
@@ -90,7 +90,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "486";
+const APP_VERSION = "487";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
