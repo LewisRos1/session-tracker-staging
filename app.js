@@ -110,7 +110,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "513";
+const APP_VERSION = "514";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -171,148 +171,19 @@ const state = {
 
 const $ = id => document.getElementById(id);
 
-// True while there's a real reason a render right now would lose something
-// the user hasn't seen saved yet — NOT just "a box happens to have focus."
-// An earlier version of this treated the whole merged-editing host having
-// focus as busy (since .view-remark-edit boxes have no contenteditable of
-// their own and never become document.activeElement themselves — only the
-// host does, the whole time the user is typing in a box nested inside it).
-// That correctly stopped a render from yanking focus away mid-typing, but
-// it also meant the host stayed "busy" forever after being focused even
-// once, since clicking a button (contenteditable="false") deliberately
-// can't blur it (that's the fix for buttons needing 2 clicks) — so renders
-// for unrelated button clicks (the Trials column's +/×/score controls) kept
-// deferring indefinitely, only landing all at once whenever something else
-// finally did blur the host.
-//
-// The actual thing worth protecting is content that's been typed but not
-// yet saved — which is exactly what the merged saver's own debounce timer
-// already tracks (isPending). Pairing that with captureViewFocus/
-// restoreViewFocus (called around every render) covers the rest: a render
-// is now safe to fire promptly any time nothing is actively mid-edit,
-// because even when it does land while the user's cursor sits in some
-// unrelated, already-saved box, the cursor gets put right back afterward
-// instead of just disappearing.
+// Busy = an in-flight multi-step write only (see counterKey on
+// setupViewRemarkSaving — covers the Trials/mastery/etc. action buttons and
+// a ghost box's activity+remark creation). Typing/focus itself never needs
+// to defer a render — captureActiveEditState/restoreActiveEditState (see
+// renderSessionView/renderGroupSessionView) protect an in-progress edit
+// through any render regardless of timing, so gating on "is a box focused"
+// or "is there unsaved text mid-debounce" here would only ever add delay,
+// never safety.
 function isViewBusy() {
-  const active = document.activeElement;
-  if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.matches?.(".view-mastery-note"))) return true;
-  return !!state.viewRemarkSaver?.isPending?.();
+  return state.viewActionsInFlight > 0;
 }
 function isGroupViewBusy() {
-  const active = document.activeElement;
-  if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.matches?.(".view-mastery-note"))) return true;
-  return !!state.viewGroupRemarkSaver?.isPending?.();
-}
-
-// Captures where the user's cursor/selection logically is inside a View-
-// screen body before a full re-render replaces all of it, keyed off each
-// box's own stable data-rem-id/data-act-id (not the DOM node, which won't
-// survive the rebuild) so restoreViewFocus can find the same logical box
-// again afterward and put the cursor back — making a render harmless to
-// sit through even when it lands while the user is looking at (but not
-// actively typing in) some box.
-function captureViewFocus(body) {
-  const active = document.activeElement;
-  if (active && body.contains(active) && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) {
-    const key = viewElementIdentityKey(active);
-    if (key) return { type: "input", key, start: active.selectionStart, end: active.selectionEnd };
-    return null;
-  }
-
-  const sel = document.getSelection();
-  if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return null;
-  const node = sel.anchorNode;
-  if (!node || !body.contains(node)) return null;
-  const box = (node.nodeType === 1 ? node : node.parentElement)?.closest(".view-remark-edit, .view-mastery-note");
-  if (!box) return null;
-  const key = viewElementIdentityKey(box);
-  if (!key) return null;
-  return { type: "contenteditable", key, offset: viewOffsetWithBr(box, node, sel.anchorOffset) };
-}
-
-// Range.prototype.toString() silently drops <br> elements — they aren't
-// text nodes, so they contribute zero characters to the string. Capturing
-// caret position as a plain-text offset meant that pressing Enter (which
-// only inserts <br>s, no new text) didn't move the captured offset at all;
-// when the next debounced save's render landed ~700ms later and restored
-// the caret using that offset, it snapped back to the end of whatever real
-// text came before the new blank lines — looking like the cursor jumping
-// back up a line or more, on a delay, every time. Counting each <br> as
-// one unit (matching restoreViewFocus's matching treewalker below) fixes
-// that without changing anything about how the rest of the box works.
-function viewOffsetWithBr(el, targetNode, targetOffset) {
-  if (targetNode === el) {
-    let total = 0;
-    for (let i = 0; i < targetOffset && i < el.childNodes.length; i++) {
-      const n = el.childNodes[i];
-      total += n.nodeType === Node.TEXT_NODE ? n.textContent.length : n.nodeName === "BR" ? 1 : (n.textContent || "").length;
-    }
-    return total;
-  }
-  let total = 0;
-  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
-  let node;
-  while ((node = walker.nextNode())) {
-    if (node === targetNode) return total + targetOffset;
-    if (node.nodeType === Node.TEXT_NODE) total += node.textContent.length;
-    else if (node.nodeName === "BR") total += 1;
-  }
-  return total;
-}
-
-// Mirrors viewOffsetWithBr for restoreViewFocus — walks text nodes AND
-// <br> elements (each counting as 1), so an offset that "passed through" N
-// <br>s during capture lands after those same N <br>s during restore,
-// instead of only ever landing inside real text.
-function viewNodeAtOffsetWithBr(el, offset) {
-  let consumed = 0;
-  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
-  let node, lastText = null;
-  while ((node = walker.nextNode())) {
-    if (node.nodeType === Node.TEXT_NODE) {
-      const len = node.textContent.length;
-      if (consumed + len >= offset) return { node, offset: offset - consumed };
-      consumed += len;
-      lastText = node;
-    } else if (node.nodeName === "BR") {
-      if (consumed + 1 > offset) {
-        const parent = node.parentNode;
-        return { node: parent, offset: Array.prototype.indexOf.call(parent.childNodes, node) + 1 };
-      }
-      consumed += 1;
-    }
-  }
-  if (lastText) return { node: lastText, offset: lastText.textContent.length };
-  return { node: el, offset: el.childNodes.length };
-}
-
-function viewElementIdentityKey(el) {
-  const cls = Array.from(el.classList || []).find(c => c.startsWith("view-"));
-  if (!cls) return null;
-  if (el.dataset.remId) return `.${cls}[data-rem-id="${el.dataset.remId}"]`;
-  if (el.dataset.actId) return `.${cls}[data-act-id="${el.dataset.actId}"]`;
-  return null;
-}
-
-function restoreViewFocus(body, captured) {
-  if (!captured) return;
-  const el = body.querySelector(captured.key);
-  if (!el) return;
-
-  if (captured.type === "input") {
-    el.focus();
-    el.setSelectionRange?.(captured.start, captured.end);
-    return;
-  }
-
-  body.focus();
-  const { node: landedNode, offset: landedOffset } = viewNodeAtOffsetWithBr(el, captured.offset);
-  const range = document.createRange();
-  range.setStart(landedNode, landedOffset);
-  range.collapse(true);
-  const sel = document.getSelection();
-  sel.removeAllRanges();
-  sel.addRange(range);
+  return state.viewGroupActionsInFlight > 0;
 }
 
 // Wraps a View-screen action button's async handler so its own write always
@@ -384,10 +255,9 @@ function isEmptyActItem(a) {
 
 function openTextEditorSheet(originEl) {
   _sheetOriginEl = originEl;
-  // Session-entry boxes are real <textarea> elements now (plain text, "\n"
-  // for line breaks) — the sketch sheet itself stays contenteditable (it's
-  // shared with the View screens' boxes, which still are too), so bridge
-  // between the two formats going in and out.
+  // Both the Entry and View screens' remark boxes are real <textarea>
+  // elements (plain text, "\n" for line breaks) — the sketch sheet itself
+  // stays contenteditable, so bridge between the two formats going in and out.
   const isFormField = originEl.tagName === "TEXTAREA" || originEl.tagName === "INPUT";
   $("text-editor-content").innerHTML = isFormField
     ? remarkToHtml(originEl.value).replace(/\n/g, "<br>")
@@ -2668,13 +2538,11 @@ async function openSessionView(student, sessionId) {
   if (state.fbViewUnsubscribe) { state.fbViewUnsubscribe(); state.fbViewUnsubscribe = null; }
 
   state.viewRemarkSaver?.cleanup();
-  state.viewRemarkSaver = setupMergedRemarkSaving($("session-view-body"), () => state.viewSessionId, () => {
+  state.viewRemarkSaver = setupViewRemarkSaving($("session-view-body"), () => state.viewSessionId, "viewActionsInFlight", () => {
     if (!state.viewRenderPending || isViewBusy() || state.viewActionsInFlight > 0) return;
     state.viewRenderPending = false;
     renderSessionView();
   });
-  state.viewEnterKeyCleanup?.();
-  state.viewEnterKeyCleanup = setupViewEnterKeyDelegation($("session-view-body"), () => state.viewRemarkSaver);
 
   try {
     state.fbViewUnsubscribe = listenToSession(sessionId, data => {
@@ -2697,8 +2565,6 @@ function leaveSessionView() {
   state.viewRemarkSaver?.flush();
   state.viewRemarkSaver?.cleanup();
   state.viewRemarkSaver = null;
-  state.viewEnterKeyCleanup?.();
-  state.viewEnterKeyCleanup = null;
   const sessionId = state.viewSessionId;
   const data      = state.viewSessionData;
   const student   = state.viewStudent;
@@ -2730,6 +2596,52 @@ function leaveSessionView() {
   showHome();
 }
 
+// Gathers every typed remark/mastery-note in the currently-rendered View/Edit
+// Past Sessions table into one plain-text block, labeled by target/activity
+// (and student, on the group screen) — for "Copy All Remarks", so the boss
+// can paste a whole session into Grammarly's own editor (or Word/Docs) and
+// check everything in one pass instead of one remark box at a time, now
+// that each box only checks itself. Reads straight from the rendered DOM
+// (not the underlying data model) so it always matches exactly what's on
+// screen, including unsaved edits still sitting in a textarea.
+function collectAllRemarksText(body) {
+  const blocks = [];
+  body.querySelectorAll(".target-view-section").forEach(section => {
+    const targetName = section.querySelector(".target-view-name")?.textContent.trim() || "";
+    const lines = [];
+    let lastActName = "";
+    section.querySelectorAll("table.view-table > tbody > tr").forEach(tr => {
+      if (tr.matches(".view-heading-row, .view-note-row, .view-comment-row, .view-dayavg-row")) return;
+      const actCell  = tr.querySelector(".vcol-act");
+      const actInput = actCell?.querySelector(".view-act-edit");
+      const actText  = actInput ? actInput.value.trim() : (actCell?.textContent.trim() || "");
+      if (actText) lastActName = actText;
+      const studentName = tr.querySelector(".vcol-student")?.textContent.trim() || "";
+      tr.querySelectorAll(".view-remark-edit, .view-mastery-note").forEach(field => {
+        const text = field.value.trim();
+        if (!text) return;
+        const label = studentName ? `${lastActName} — ${studentName}` : lastActName;
+        lines.push(`${label}: ${text}`);
+      });
+    });
+    if (lines.length) blocks.push(`${targetName}\n${lines.join("\n")}`);
+  });
+  return blocks.join("\n\n");
+}
+
+async function copyAllRemarksToClipboard(body, button) {
+  const text = collectAllRemarksText(body);
+  if (!text) { alert("No remarks to copy yet."); return; }
+  try {
+    await navigator.clipboard.writeText(text);
+    const original = button.textContent;
+    button.textContent = "Copied!";
+    setTimeout(() => { button.textContent = original; }, 1500);
+  } catch {
+    alert("Couldn't copy automatically — here's the text to copy manually:\n\n" + text);
+  }
+}
+
 $("btn-view-back").addEventListener("click", leaveSessionView);
 
 function renderSessionView() {
@@ -2754,6 +2666,12 @@ function renderSessionView() {
     gotoBtn.onclick = () => showGoToAnotherSession(state.viewStudent);
   }
 
+  const copyBtn = $("btn-copy-remarks");
+  if (copyBtn) {
+    copyBtn.classList.remove("hidden");
+    copyBtn.onclick = () => copyAllRemarksToClipboard($("session-view-body"), copyBtn);
+  }
+
   // Wire delete button (static element in header — re-attach each time)
   const _delBtn = $("btn-delete-session");
   if (_delBtn) {
@@ -2773,13 +2691,13 @@ function renderSessionView() {
   const sorted  = [...targets].sort((a, b) => a.name.localeCompare(b.name));
 
   const body = $("session-view-body");
-  const focusState = captureViewFocus(body);
+  const captured = captureActiveEditState(body);
   body.innerHTML = sorted.length
     ? sorted.map(t => buildTargetViewTable(t, data)).join("")
     : `<p style="color:var(--text-muted);padding:1rem">No targets recorded.</p>`;
 
   attachViewListeners();
-  restoreViewFocus(body, focusState);
+  restoreActiveEditState(body, captured);
 }
 
 function buildTargetViewTable(target, data) {
@@ -2888,12 +2806,12 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
     const opts = parseOpts(inlineOptions);
     const showEmpty = opts.length === 0 && !isMastery;
     const emptyCell = showEmpty
-      ? `<div class="view-remark-edit view-remark-empty"
+      ? `<textarea class="view-remark-edit view-remark-empty" rows="1"
            data-act-id="${escHtml(actId || "")}"
            data-act-name="${escHtml(actName)}"
            data-target="${escHtml(target.name)}"
            data-is-predefined="${isPredefined}"
-           data-placeholder="Click to add remark…"></div>`
+           placeholder="Click to add remark…"></textarea>`
       : "";
     // "+ " shows even with no remark yet — clicking it creates the activity/
     // remark and a first trial in one go, so a score can be logged without
@@ -2968,19 +2886,21 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
   }
 
   const optSelect = isMastery
-    ? `<div class="mastery-remark-wrap" contenteditable="false">
+    ? `<div class="mastery-remark-wrap">
         <div class="remark-mastery-opts view-mastery-opts" data-rem-id="${rem.id}">
           ${["In Progress", "Mastered", "Maintain"].map(v =>
             `<button class="btn-mastery${rem.text === v ? " active" : ""}" data-rem-id="${escHtml(rem.id)}" data-val="${v}">${v}</button>`
           ).join("")}
         </div>
         <div class="mastery-note-row">
-          <div class="view-mastery-note" contenteditable="true"
-            data-rem-id="${escHtml(rem.id)}" data-placeholder="Notes…">${rem.masteryNote || ""}</div>
+          <textarea class="view-mastery-note" rows="1" data-rem-id="${escHtml(rem.id)}"
+            data-saved-html="${escHtml(rem.masteryNote || "")}"
+            placeholder="Notes…">${escHtml(plainTextForEdit(rem.masteryNote))}</textarea>
         </div>
       </div>`
     : (makeViewOpts(rem.id, rem.text)
-        || `<div class="view-remark-edit" data-rem-id="${escHtml(rem.id)}" data-saved-html="${escHtml(remarkToHtml(rem.text))}">${remarkToHtml(rem.text)}</div>`);
+        || `<textarea class="view-remark-edit" rows="1" data-rem-id="${escHtml(rem.id)}"
+              data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`);
 
   let remarkCell;
   if (sentenceStarter) {
@@ -3031,233 +2951,126 @@ function calcViewDayAvg(data, target) {
   return avgs.length ? Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length) : null;
 }
 
-// ── Merged remark editing ────────────────────────────────────
-// All free-text remark boxes (.view-remark-edit, incl. the group "combined"
-// variant) on a view/edit-past-session screen share ONE contenteditable host
-// (the screen's body container) instead of each having its own. This lets
-// Grammarly (and similar tools) analyze every remark box on the page at once
-// instead of only the one currently focused — the same reason a single large
-// textarea gets checked in full while a page of many small inputs doesn't.
-// Everything else (activity names, scores, selects, buttons) is carved out
-// with contenteditable="false" in the HTML so only remark text is editable.
+// ── View-screen remark editing ───────────────────────────────
+// Replaces the old merged-contenteditable-host saver. The View screens'
+// remark/mastery-note boxes are real <textarea> elements now (same as the
+// already-proven Session Entry screens via setupEntryRemarkSaving) — native
+// Enter/backspace/Ctrl+A all just work per-field, with no nested-
+// contenteditable quirks to fight, and no buttons-need-2-clicks issue since
+// a normal table of buttons next to normal textareas never needs to
+// preventDefault its own mousedown.
 //
-// Because the boxes no longer have individual focus/blur events, saving moves
-// from "save on blur" to: diff every box's content on a short typing-pause
-// debounce, and again whenever focus actually leaves the shared host.
-function setupMergedRemarkSaving(body, getSessionId, onIdle) {
+// counterKey (state.viewActionsInFlight / state.viewGroupActionsInFlight) is
+// the same in-flight counter the screen's other action buttons already use
+// to keep the background snapshot listener from rendering mid-write. Ghost
+// boxes need it too: creating an activity/remark for a box that has none
+// yet is multi-step (addActivity, then addRemark), and a render landing
+// partway through would destroy this exact textarea — including the
+// dataset.creating/actId/remId tracking that lives only on it — leaving a
+// fresh-looking ghost box behind. If the user was still typing, that looked
+// like the typed text vanishing and then reappearing as a duplicate remark
+// a moment later, because the next flush had no way to know a remark was
+// already being created for it.
+function setupViewRemarkSaving(body, getSessionId, counterKey, onIdle) {
   let saveTimer = null;
 
   function flush() {
     clearTimeout(saveTimer);
     saveTimer = null;
     const sid = getSessionId();
-    if (!sid) return;
+    if (!sid) return Promise.resolve();
 
-    body.querySelectorAll(".view-remark-edit[data-rem-id]:not(.group-remark-input-combined)").forEach(div => {
-      const html = div.innerHTML;
-      if (div.dataset.savedHtml === html) return;
-      div.dataset.savedHtml = html;
-      updateRemarkText(sid, div.dataset.remId, html).catch(err => {
-        // savedHtml already says this is saved — if the write actually
-        // failed, leaving it pointing at the unsaved value means nothing
-        // ever retries it, and the next render (from anything else on the
-        // page) shows the server's older text instead, looking exactly
-        // like what was just typed silently vanished.
-        if (div.dataset.savedHtml === html) div.dataset.savedHtml = " ";
-        alert("Couldn't save remark — check your connection and try again.\n\n" + err.message);
-      });
-    });
+    const pending = [];
+    const trackWrite = p => { pending.push(Promise.resolve(p)); };
 
-    body.querySelectorAll(".group-remark-input-combined[data-rem-ids]").forEach(div => {
-      const html = div.innerHTML;
-      if (div.dataset.savedHtml === html) return;
-      div.dataset.savedHtml = html;
-      const remIds = div.dataset.remIds.split(",").filter(Boolean);
-      Promise.all(remIds.map(id => updateRemarkText(sid, id, html))).catch(err => {
-        if (div.dataset.savedHtml === html) div.dataset.savedHtml = " ";
-        alert("Couldn't save remark — check your connection and try again.\n\n" + err.message);
-      });
-    });
-
-    body.querySelectorAll(".view-remark-empty").forEach(div => {
-      const strip = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
-      const text = div.innerHTML;
-      if (!strip(text) || div.dataset.creating === "true") return;
-      // Once a remark has actually been created for this box, every later
-      // flush (e.g. the render that would replace this ghost box with a real
-      // .view-remark-edit got deferred while the user kept typing/pressed
-      // Enter again) must update that SAME remark, not create another one —
-      // div.dataset.actId was only ever read here, never written back, so a
-      // second flush before the re-render landed always looked like "no
-      // activity yet" and created a brand new duplicate remark each time.
-      if (div.dataset.remId) {
-        if (div.dataset.savedHtml === text) return;
-        div.dataset.savedHtml = text;
-        updateRemarkText(sid, div.dataset.remId, text).catch(err => {
-          if (div.dataset.savedHtml === text) div.dataset.savedHtml = " ";
+    const diffAndSave = (selector, getValue, doSave) => {
+      body.querySelectorAll(selector).forEach(el => {
+        const value = getValue(el);
+        if (el.dataset.savedHtml === value) return;
+        el.dataset.savedHtml = value;
+        trackWrite(Promise.resolve(doSave(el, value)).catch(err => {
+          // savedHtml already says this is saved — if the write actually
+          // failed, leaving it pointing at the unsaved value means nothing
+          // ever retries it, and the next render (from anything else on the
+          // page) shows the server's older text instead, looking exactly
+          // like what was just typed silently vanished.
+          if (el.dataset.savedHtml === value) el.dataset.savedHtml = " ";
           alert("Couldn't save remark — check your connection and try again.\n\n" + err.message);
-        });
-        return;
-      }
-      div.dataset.creating = "true";
-      (async () => {
+        }));
+      });
+    };
+
+    diffAndSave(".view-remark-edit[data-rem-id]:not(.view-remark-empty)", el => htmlForStorage(el.value),
+      (el, html) => updateRemarkText(sid, el.dataset.remId, html));
+
+    diffAndSave(".view-mastery-note[data-rem-id]", el => htmlForStorage(el.value),
+      (el, html) => updateRemarkNote(sid, el.dataset.remId, html));
+
+    diffAndSave(".group-remark-input-combined[data-rem-ids]", el => htmlForStorage(el.value),
+      (el, html) => {
+        const remIds = el.dataset.remIds.split(",").filter(Boolean);
+        return Promise.all(remIds.map(id => updateRemarkText(sid, id, html)));
+      });
+
+    body.querySelectorAll(".view-remark-empty").forEach(el => {
+      const text = el.value.trim();
+      if (!text || el.dataset.creating === "true") return;
+      el.dataset.creating = "true";
+      state[counterKey]++;
+      const create = async () => {
         try {
-          let actId = div.dataset.actId;
+          let actId = el.dataset.actId;
           if (!actId) {
             actId = await addActivity(
-              sid, div.dataset.target, div.dataset.actName, Date.now(), div.dataset.isPredefined === "true"
+              sid, el.dataset.target, el.dataset.actName, Date.now(), el.dataset.isPredefined === "true"
             );
           }
           // Group view's empty boxes are scoped to one attendee (data-student);
-          // the individual view's aren't. Pass text straight into the create
-          // call (both accept it) instead of a separate updateRemarkText
-          // write after — one less sequential round-trip before the remark
-          // (and its "+ Trial" button) actually shows up.
-          const studentName = div.dataset.student;
+          // the individual view's aren't.
+          const studentName = el.dataset.student;
           const remId = studentName
             ? await addGroupRemark(sid, actId, studentName, text)
             : await addRemark(sid, actId, text);
-          div.dataset.actId      = actId;
-          div.dataset.remId      = remId;
-          div.dataset.savedHtml  = text;
+          el.dataset.actId     = actId;
+          el.dataset.remId     = remId;
+          el.dataset.savedHtml = htmlForStorage(text);
         } catch (err) {
           // Leaves remId/savedHtml unset — the next flush (next keystroke or
           // focusout) sees "no remark created yet" and retries from scratch,
           // instead of the typed text just sitting there unsaved forever.
           alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
         } finally {
-          div.dataset.creating = "false";
+          el.dataset.creating = "false";
+          state[counterKey]--;
         }
-      })();
+      };
+      trackWrite(create());
     });
+
+    return Promise.all(pending);
   }
 
-  // Every other cell is carved out with contenteditable="false", so any "input"
-  // event reaching the shared host can only have come from a free-text remark box.
-  // The busy-check this saver pairs with (isViewBusy) treats the WHOLE host as
-  // "still busy" while this single shared debounce timer is pending, not just
-  // the one box that changed — so if the user moves on to typing in a
-  // different remark box right after,
-  // the render that would reveal the newly-created remark's "+ Trial" button
-  // stays deferred until they focus something non-editable. onIdle fires the
-  // moment a flush actually runs (debounce settled, data already saved) so
-  // the caller can re-check its deferred-render flag right then instead of
-  // waiting on an unrelated focusout that might not come for a while.
-  const onInput = () => {
+  const onInput = e => {
+    if (e.target.tagName === "TEXTAREA") autoResizeTextarea(e.target);
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => { flush(); onIdle?.(); }, 700);
   };
   const onFocusOut = () => { flush(); onIdle?.(); };
-  const onSelectionChange = () => {
-    body.querySelectorAll(".view-remark-edit.rem-edit-active").forEach(el => el.classList.remove("rem-edit-active"));
-    const sel  = document.getSelection();
-    const node = sel && sel.rangeCount > 0 ? sel.anchorNode : null;
-    if (!node || !body.contains(node)) return;
-    const el = (node.nodeType === 1 ? node : node.parentElement)?.closest(".view-remark-edit");
-    if (el) el.classList.add("rem-edit-active");
-  };
-  // Backstop against the browser's native paragraph/line-break insertion —
-  // each remark box's own keydown handler calls preventDefault() and inserts
-  // a manual <br> instead, but that alone isn't reliable inside a
-  // contenteditable="true" box nested in this larger contenteditable="true"
-  // host: Chrome's "beforeinput" event (the one that actually performs the
-  // native split into a new sibling element) can still fire and go through
-  // even after keydown was prevented. Catching it at the host level (it
-  // bubbles) blocks the native insert everywhere in one place.
-  //
-  // ALSO guards backspace/delete from escaping a box's own boundary — once a
-  // box is emptied, continuing to backspace can otherwise keep consuming the
-  // surrounding contenteditable="false" structure (labels, whole table rows)
-  // as if it were deletable content, for the same nested-contenteditable
-  // reason the paragraph insert needed a backstop.
-  const onBeforeInput = e => {
-    if (e.inputType === "insertParagraph" || e.inputType === "insertLineBreak") {
-      e.preventDefault();
-      return;
-    }
-    if (e.inputType !== "deleteContentBackward" && e.inputType !== "deleteContentForward") return;
-    const sel = document.getSelection();
-    if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return;
-    const node = sel.anchorNode;
-    const el = node && (node.nodeType === 1 ? node : node.parentElement)?.closest(".view-remark-edit");
-    if (!el || !body.contains(el)) return;
-    if (e.inputType === "deleteContentBackward" && isAtStartOf(el, sel.anchorNode, sel.anchorOffset)) {
-      e.preventDefault();
-    } else if (e.inputType === "deleteContentForward" && isAtEndOf(el, sel.anchorNode, sel.anchorOffset)) {
-      e.preventDefault();
-    }
-  };
-  // Buttons/selects nested inside this contenteditable host (Trials column
-  // "+"/"×", mastery buttons, etc. — all marked contenteditable="false") need
-  // an explicit mousedown preventDefault, or the browser's default "place a
-  // caret here" handling for the click can eat the first click on them
-  // entirely — the button only responds on a second click. Doesn't stop the
-  // click event itself (still fires normally), just stops the contenteditable
-  // region from also trying to claim the mousedown as a focus/selection
-  // change. Standard fix for buttons embedded in editable regions.
-  const onMouseDown = e => {
-    // Native form controls (the Trials column's score <select>, etc.) need
-    // their own default mousedown behavior (opening the dropdown, focusing)
-    // to fire — preventDefault() here would silently break that.
-    if (e.target.closest("select, input, textarea")) return;
-    if (e.target.closest('[contenteditable="false"]')) e.preventDefault();
-  };
-  // Pasting into a remark box otherwise inserts whatever's on the clipboard
-  // verbatim — copied formatting/markup from elsewhere on the page (or an
-  // actual image) lands as real HTML/an <img> inside the table, which can
-  // visually break the row layout entirely (floating boxes, broken columns)
-  // since this contenteditable region was only ever designed to hold plain
-  // text + the app's own <br>/<b> markup. Force every paste down to plain
-  // text only, reusing the box's own Enter-key convention (one <br> per
-  // newline) so a multi-line paste still looks right.
-  const onPaste = e => {
-    const sel  = document.getSelection();
-    const node = sel && sel.rangeCount > 0 ? sel.anchorNode : null;
-    const el = node && (node.nodeType === 1 ? node : node.parentElement)?.closest(".view-remark-edit, .view-mastery-note");
-    if (!el || !body.contains(el)) return;
-    e.preventDefault();
-    const text = (e.clipboardData || window.clipboardData)?.getData("text/plain") || "";
-    if (!text || sel.rangeCount === 0) return;
-    const range = sel.getRangeAt(0);
-    range.deleteContents();
-    const frag = document.createDocumentFragment();
-    let lastNode = null;
-    text.split(/\r\n|\r|\n/).forEach((line, i) => {
-      if (i > 0) lastNode = frag.appendChild(document.createElement("br"));
-      if (line) lastNode = frag.appendChild(document.createTextNode(line));
-    });
-    range.insertNode(frag);
-    if (lastNode) {
-      range.setStartAfter(lastNode);
-      range.collapse(true);
-      sel.removeAllRanges();
-      sel.addRange(range);
-    }
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-  };
+
   body.addEventListener("input", onInput);
   body.addEventListener("focusout", onFocusOut);
-  body.addEventListener("beforeinput", onBeforeInput);
-  body.addEventListener("mousedown", onMouseDown);
-  body.addEventListener("paste", onPaste);
-  document.addEventListener("selectionchange", onSelectionChange);
 
   return {
     flush,
-    isPending: () => saveTimer !== null,
     cleanup() {
       clearTimeout(saveTimer);
-      body.removeEventListener("beforeinput", onBeforeInput);
       body.removeEventListener("input", onInput);
       body.removeEventListener("focusout", onFocusOut);
-      body.removeEventListener("mousedown", onMouseDown);
-      body.removeEventListener("paste", onPaste);
-      document.removeEventListener("selectionchange", onSelectionChange);
     }
   };
 }
 
-// Same idea as setupMergedRemarkSaving, but for the live Session Entry screens
+// Same idea as setupViewRemarkSaving, but for the live Session Entry screens
 // (#target-content / #group-target-content). The free-text boxes there are
 // real <textarea>/<input> elements, not contenteditable — but they're still
 // scattered across many activity/remark cards that get torn down and rebuilt
@@ -3375,7 +3188,8 @@ function setupEntryRemarkSaving(host, getSessionId, onIdle) {
 // <textarea>/<input> elements expose selectionStart/selectionEnd directly,
 // so this no longer needs any manual Range/offset math.
 const EDITABLE_BOX_SELECTOR =
-  ".remark-text-input, .mastery-note-input, .activity-name-input, .predef-remark-input-live, .group-remark-input, .group-remark-input-combined";
+  ".remark-text-input, .mastery-note-input, .activity-name-input, .predef-remark-input-live, .group-remark-input, .group-remark-input-combined, " +
+  ".view-remark-edit, .view-mastery-note, .view-act-edit, .view-starter-input";
 
 function captureActiveEditState(host) {
   const el = document.activeElement;
@@ -3403,59 +3217,6 @@ function restoreActiveEditState(host, captured) {
   if (el.tagName === "TEXTAREA") autoResizeTextarea(el);
   el.focus();
   el.setSelectionRange(captured.selectionStart, captured.selectionEnd);
-}
-
-// Manually insert a <br> at the current caret position, bypassing
-// document.execCommand("insertLineBreak") entirely — it turned out unreliable
-// inside this nested table-cell contenteditable structure (still let the
-// browser split into a new block-level element in some cases, which could
-// then escape its row and render as a stray floating box outside the table).
-function insertBrAtCaret() {
-  const sel = document.getSelection();
-  if (!sel || sel.rangeCount === 0) return;
-  const range = sel.getRangeAt(0);
-  range.deleteContents();
-  const br = document.createElement("br");
-  range.insertNode(br);
-  // A lone trailing <br> with nothing after it doesn't reliably get its own
-  // visible line in contenteditable — browsers only render the new empty
-  // line once there's a node anchoring it. Standard fix: add a second <br>
-  // right after as a placeholder (consumed the moment the user types), and
-  // park the caret between the two so the first one is guaranteed visible.
-  if (!br.nextSibling) br.after(document.createElement("br"));
-  range.setStartAfter(br);
-  range.collapse(true);
-  sel.removeAllRanges();
-  sel.addRange(range);
-}
-
-// True if there is nothing between the very start of el's content and the
-// given (node, offset) point — i.e. the caret is at el's own left boundary,
-// with no character/<br> left to delete before it.
-function isAtStartOf(el, node, offset) {
-  const probe = document.createRange();
-  probe.setStart(el, 0);
-  probe.setEnd(node, offset);
-  return probe.collapsed;
-}
-// Same idea, mirrored for el's right boundary (used for forward-delete).
-function isAtEndOf(el, node, offset) {
-  const probe = document.createRange();
-  probe.setStart(node, offset);
-  probe.setEnd(el, el.childNodes.length);
-  return probe.collapsed;
-}
-
-// Selects all of el's own content, instead of the browser's native Ctrl+A
-// default — which, in this nested-contenteditable setup, selects everything
-// in the whole merged editing host (all activities/remarks), not just the
-// box the caret happens to be in.
-function selectAllWithin(el) {
-  const range = document.createRange();
-  range.selectNodeContents(el);
-  const sel = document.getSelection();
-  sel.removeAllRanges();
-  sel.addRange(range);
 }
 
 // Delegated Escape/Ctrl+Enter handling for the individual session-entry
@@ -3500,32 +3261,6 @@ function setupEntryEnterKeyDelegation(host, getTarget) {
   return () => host.removeEventListener("keydown", onKeydown);
 }
 
-// Same idea for the view/edit-past-session screens' .view-remark-edit boxes
-// (individual and group share the same markup/class). getSaver returns
-// whichever merged-editing saver (state.viewRemarkSaver / .viewGroupRemarkSaver)
-// is currently active, so Ctrl+Enter can force an immediate flush.
-function setupViewEnterKeyDelegation(host, getSaver) {
-  const onKeydown = e => {
-    const isSelectAll = (e.key === "a" || e.key === "A") && (e.ctrlKey || e.metaKey);
-    if (e.key !== "Enter" && !isSelectAll) return;
-    // See the matching comment in setupEntryEnterKeyDelegation — an active
-    // IME/text-prediction composition consumes the first Enter as "commit",
-    // not "newline".
-    if (e.isComposing) return;
-    const sel  = document.getSelection();
-    const node = sel && sel.rangeCount > 0 ? sel.anchorNode : null;
-    const ta = node && (node.nodeType === 1 ? node : node.parentElement)?.closest(".view-remark-edit");
-    if (!ta || !host.contains(ta)) return;
-    if (isSelectAll) { e.preventDefault(); selectAllWithin(ta); return; }
-    if (e.ctrlKey || e.metaKey) { e.preventDefault(); getSaver()?.flush(); return; }
-    e.preventDefault();
-    insertBrAtCaret();
-    ta.dispatchEvent(new Event("input", { bubbles: true }));
-  };
-  host.addEventListener("keydown", onKeydown);
-  return () => host.removeEventListener("keydown", onKeydown);
-}
-
 function getViewMaxPtsForRemark(remId) {
   const data = state.viewSessionData;
   const rem  = data?.remarks?.[remId];
@@ -3535,15 +3270,10 @@ function getViewMaxPtsForRemark(remId) {
 }
 
 // Patches just one remark's trial cells/running total/score in place instead
-// of going through a full renderSessionView() — the Trials column's buttons
-// sit inside a contenteditable="false" cell, so clicking them never moves
-// focus off the page's single big contenteditable host (mousedown is
-// deliberately suppressed there in setupMergedRemarkSaving's onMouseDown, to
-// fix buttons needing 2 clicks). That leaves the host looking permanently
-// "focused" to isViewBusy() from the moment it's ever clicked once, so a
-// full-page render after a trial-button click was being deferred
-// indefinitely — only landing (all at once, for every click queued up in the
-// meantime) whenever something else happened to genuinely blur the host.
+// of going through a full renderSessionView() — a render is safe to do at
+// any time now (see isViewBusy/captureActiveEditState), but updating just
+// this one row's own cells is still faster and avoids momentarily rebuilding
+// anything else on the page for what's normally a quick, repeated action.
 // Updating just this row's own cells sidesteps that defer system entirely:
 // there's nothing else on the page this could disturb, so it's always safe
 // to do immediately, no busy-check needed.
@@ -3674,6 +3404,8 @@ function showViewAddRemarkPicker(targetName) {
 function attachViewListeners() {
   const body = $("session-view-body");
 
+  body.querySelectorAll("textarea.view-remark-edit, textarea.view-mastery-note").forEach(autoResizeTextarea);
+
   bindViewTrialCellListeners(body);
 
   body.querySelectorAll(".view-add-remark-target").forEach(btn => {
@@ -3690,21 +3422,11 @@ function attachViewListeners() {
     });
   });
 
-  // Saving for .view-remark-edit / .view-remark-empty is handled by the shared
-  // merged-editing host (state.viewRemarkSaver) set up in openSessionView.
-  // Enter-key delegation is also set up once there (setupViewEnterKeyDelegation),
-  // not here — this function runs on every render, and the body persists
-  // across renders, so attaching it here would stack up duplicate listeners.
-
-  body.querySelectorAll(".view-mastery-note").forEach(div => {
-    let orig = div.innerHTML;
-    div.addEventListener("blur", async () => {
-      const newNote = div.innerHTML;
-      if (newNote === orig) return;
-      orig = newNote;
-      await updateRemarkNote(state.viewSessionId, div.dataset.remId, newNote);
-    });
-  });
+  // Saving for .view-remark-edit / .view-remark-empty / .view-mastery-note is
+  // handled by the shared host saver (state.viewRemarkSaver) set up once in
+  // openSessionView, not here — this function runs on every render, and the
+  // body persists across renders, so attaching per-box listeners here would
+  // stack up duplicates.
 
   body.querySelectorAll(".view-mastery-opts .btn-mastery").forEach(btn => {
     btn.addEventListener("click", withViewAction("viewActionsInFlight", "viewRenderPending", isViewBusy, renderSessionView, async () => {
@@ -3847,13 +3569,11 @@ async function openGroupSessionView(group, sessionId) {
   if (state.fbViewGroupUnsubscribe) { state.fbViewGroupUnsubscribe(); state.fbViewGroupUnsubscribe = null; }
 
   state.viewGroupRemarkSaver?.cleanup();
-  state.viewGroupRemarkSaver = setupMergedRemarkSaving($("group-session-view-body"), () => state.viewGroupSessionId, () => {
+  state.viewGroupRemarkSaver = setupViewRemarkSaving($("group-session-view-body"), () => state.viewGroupSessionId, "viewGroupActionsInFlight", () => {
     if (!state.viewGroupRenderPending || isGroupViewBusy() || state.viewGroupActionsInFlight > 0) return;
     state.viewGroupRenderPending = false;
     renderGroupSessionView();
   });
-  state.viewGroupEnterKeyCleanup?.();
-  state.viewGroupEnterKeyCleanup = setupViewEnterKeyDelegation($("group-session-view-body"), () => state.viewGroupRemarkSaver);
 
   try {
     state.fbViewGroupUnsubscribe = listenToSession(sessionId, data => {
@@ -3876,8 +3596,6 @@ function leaveGroupSessionView() {
   state.viewGroupRemarkSaver?.flush();
   state.viewGroupRemarkSaver?.cleanup();
   state.viewGroupRemarkSaver = null;
-  state.viewGroupEnterKeyCleanup?.();
-  state.viewGroupEnterKeyCleanup = null;
   const sessionId = state.viewGroupSessionId;
   const data      = state.viewGroupSessionData;
   const group     = state.viewGroup;
@@ -3933,6 +3651,12 @@ function renderGroupSessionView() {
     gotoBtn.onclick = () => showGoToAnotherGroupSession(state.viewGroup);
   }
 
+  const copyBtn = $("btn-group-copy-remarks");
+  if (copyBtn) {
+    copyBtn.classList.remove("hidden");
+    copyBtn.onclick = () => copyAllRemarksToClipboard($("group-session-view-body"), copyBtn);
+  }
+
   // Wire delete button (static element in header — re-attach each time)
   const _delBtn = $("btn-group-delete-session");
   if (_delBtn) {
@@ -3953,13 +3677,13 @@ function renderGroupSessionView() {
   const sorted    = [...targets].sort((a, b) => a.name.localeCompare(b.name));
 
   const body = $("group-session-view-body");
-  const focusState = captureViewFocus(body);
+  const captured = captureActiveEditState(body);
   body.innerHTML = sorted.length
     ? sorted.map(t => buildGroupTargetViewTable(t, data, attendees)).join("")
     : `<p style="color:var(--text-muted);padding:1rem">No targets recorded.</p>`;
 
   attachGroupViewListeners();
-  restoreViewFocus(body, focusState);
+  restoreActiveEditState(body, captured);
 }
 
 // Pairs each attending student's remarks for one activity into "rounds" by creation order,
@@ -4108,13 +3832,13 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
         <td class="vcol-act" contenteditable="false">${idx === 0 ? actCellWithToggle : ""}</td>
         <td class="vcol-student" contenteditable="false">${escHtml(studentName)}</td>
         <td class="vcol-rem">
-          <div class="view-remark-edit view-remark-empty"
+          <textarea class="view-remark-edit view-remark-empty" rows="1"
             data-act-id="${escHtml(actId || "")}"
             data-act-name="${escHtml(actName)}"
             data-target="${escHtml(target.name)}"
             data-is-predefined="${isPredefined}"
             data-student="${escHtml(studentName)}"
-            data-placeholder="Click to add remark…"></div>
+            placeholder="Click to add remark…"></textarea>
         </td>
         <td class="vcol-trials" contenteditable="false">
           <button class="view-group-add-trial-new" data-act-id="${escHtml(actId || "")}"
@@ -4198,8 +3922,9 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
       // group session editor's "Combined Remarks" mode, which is free-text only).
       const idList = combineOpts.combinedRemIds.join(",");
       remarkTd = `<td class="vcol-rem" rowspan="${combineOpts.rowspan}">
-        <div class="view-remark-edit group-remark-input-combined"
-          data-rem-ids="${idList}">${remarkToHtml(combineOpts.sharedText)}</div>
+        <textarea class="view-remark-edit group-remark-input-combined" rows="1"
+          data-rem-ids="${idList}"
+          data-saved-html="${escHtml(combineOpts.sharedText || "")}">${escHtml(plainTextForEdit(combineOpts.sharedText))}</textarea>
       </td>`;
     } else {
       const opts = parseOpts(inlineOptions);
@@ -4222,19 +3947,21 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
       };
 
       const optSelect = isMastery
-        ? `<div class="mastery-remark-wrap" contenteditable="false">
+        ? `<div class="mastery-remark-wrap">
             <div class="remark-mastery-opts view-mastery-opts" data-rem-id="${rem.id}">
               ${["In Progress", "Mastered", "Maintain"].map(v =>
                 `<button class="btn-mastery${rem.text === v ? " active" : ""}" data-rem-id="${escHtml(rem.id)}" data-val="${v}">${v}</button>`
               ).join("")}
             </div>
             <div class="mastery-note-row">
-              <div class="view-mastery-note" contenteditable="true"
-                data-rem-id="${escHtml(rem.id)}" data-placeholder="Notes…">${rem.masteryNote || ""}</div>
+              <textarea class="view-mastery-note" rows="1" data-rem-id="${escHtml(rem.id)}"
+                data-saved-html="${escHtml(rem.masteryNote || "")}"
+                placeholder="Notes…">${escHtml(plainTextForEdit(rem.masteryNote))}</textarea>
             </div>
           </div>`
         : (makeViewOpts(rem.id, rem.text)
-            || `<div class="view-remark-edit" data-rem-id="${escHtml(rem.id)}" data-saved-html="${escHtml(remarkToHtml(rem.text))}">${remarkToHtml(rem.text)}</div>`);
+            || `<textarea class="view-remark-edit" rows="1" data-rem-id="${escHtml(rem.id)}"
+                  data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`);
 
       let remarkCell;
       if (sentenceStarter) {
@@ -4367,6 +4094,8 @@ function attachGroupViewListeners() {
   const body = $("group-session-view-body");
   const sid  = () => state.viewGroupSessionId;
 
+  body.querySelectorAll("textarea.view-remark-edit, textarea.view-mastery-note").forEach(autoResizeTextarea);
+
   const wrap = fn => withViewAction("viewGroupActionsInFlight", "viewGroupRenderPending", isGroupViewBusy, renderGroupSessionView, fn);
 
   bindGroupViewTrialCellListeners(body);
@@ -4382,11 +4111,10 @@ function attachGroupViewListeners() {
   });
 
   // Saving for .view-remark-edit / .group-remark-input-combined is handled by
-  // the shared merged-editing host (state.viewGroupRemarkSaver) set up in
-  // openGroupSessionView. Enter-key delegation is also set up once there
-  // (setupViewEnterKeyDelegation), not here — this function runs on every
-  // render, and the body persists across renders, so attaching it here would
-  // stack up duplicate listeners.
+  // the shared host saver (state.viewGroupRemarkSaver) set up once in
+  // openGroupSessionView, not here — this function runs on every render, and
+  // the body persists across renders, so attaching per-box listeners here
+  // would stack up duplicates.
 
   // Combine/Separate remarks toggle (mirrors the live group session editor's confirm logic)
   body.querySelectorAll(".btn-combine-toggle").forEach(btn => {
@@ -4440,15 +4168,9 @@ function attachGroupViewListeners() {
     }));
   });
 
-  body.querySelectorAll(".view-mastery-note").forEach(div => {
-    let orig = div.innerHTML;
-    div.addEventListener("blur", async () => {
-      const newNote = div.innerHTML;
-      if (newNote === orig) return;
-      orig = newNote;
-      await updateRemarkNote(sid(), div.dataset.remId, newNote);
-    });
-  });
+  // Saving for .view-remark-edit / .view-remark-empty / .group-remark-input-
+  // combined / .view-mastery-note is handled by the shared host saver
+  // (state.viewGroupRemarkSaver) set up once in openGroupSessionView.
 
   body.querySelectorAll(".view-mastery-opts .btn-mastery").forEach(btn => {
     btn.addEventListener("click", wrap(async () => {

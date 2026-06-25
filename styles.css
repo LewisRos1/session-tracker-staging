@@ -471,6 +471,7 @@ html, body {
 .btn-goto-session-wrap {
   display: flex;
   justify-content: center;
+  gap: .5rem;
 }
 .btn-goto-session {
   background: rgba(255,255,255,.12);
@@ -2077,11 +2078,10 @@ div.admin-note-editable:empty::before {
   word-break: break-word;
   cursor: text;
 }
-.mastery-note-input[data-placeholder]:empty:before,
-.view-mastery-note[data-placeholder]:empty:before {
-  content: attr(data-placeholder);
+.mastery-note-input::placeholder,
+.view-mastery-note::placeholder {
   color: #9ca3af;
-  pointer-events: none;
+  opacity: 1;
 }
 /* view table note: no border box, just subtle */
 .view-mastery-note {
@@ -2645,8 +2645,9 @@ div.admin-note-editable:empty::before {
   min-height: 1.8rem;
   cursor: text;
 }
-.view-remark-edit.rem-edit-active,
-.view-comment-edit:focus { border-color: var(--primary); background: #fff; }
+.view-remark-edit:focus,
+.view-comment-edit:focus { border-color: var(--primary); background: #fff; outline: none; }
+.view-remark-edit::placeholder { color: #9ca3af; opacity: 1; }
 
 .view-remark-preset-select {
   width: 100%;
