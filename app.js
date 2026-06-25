@@ -110,7 +110,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "516";
+const APP_VERSION = "517";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1630,6 +1630,12 @@ function renderTargetContent() {
   if (avgEl) avgEl.textContent = avg !== null ? avg + "%" : "—";
 
   const container = $("target-content");
+  // Replacing innerHTML resets the scrolling ancestor's scrollTop to 0 in
+  // every browser — capture/restore around the swap so clicking a button
+  // (which has no cursor position for captureActiveEditState to preserve)
+  // doesn't yank the page back to the top.
+  const scrollHost = container.closest(".session-body");
+  const scrollTop  = scrollHost?.scrollTop;
   const captured = captureActiveEditState(container);
   container.innerHTML = target.predefinedActivities?.length > 0
     ? renderFedcTarget(target)
@@ -1637,6 +1643,7 @@ function renderTargetContent() {
 
   attachTargetListeners(target);
   restoreActiveEditState(container, captured);
+  if (scrollHost) scrollHost.scrollTop = scrollTop;
 }
 
 // ─── FEDC TARGET ─────────────────────────────────────────────
@@ -2658,6 +2665,9 @@ function renderSessionView() {
   const sorted  = [...targets].sort((a, b) => a.name.localeCompare(b.name));
 
   const body = $("session-view-body");
+  // body itself scrolls (overflow-y:auto) — replacing its innerHTML resets
+  // scrollTop to 0 in every browser, so capture/restore around the swap.
+  const scrollTop = body.scrollTop;
   const captured = captureActiveEditState(body);
   body.innerHTML = sorted.length
     ? sorted.map(t => buildTargetViewTable(t, data)).join("")
@@ -2665,6 +2675,7 @@ function renderSessionView() {
 
   attachViewListeners();
   restoreActiveEditState(body, captured);
+  body.scrollTop = scrollTop;
 }
 
 function buildTargetViewTable(target, data) {
@@ -3638,6 +3649,7 @@ function renderGroupSessionView() {
   const sorted    = [...targets].sort((a, b) => a.name.localeCompare(b.name));
 
   const body = $("group-session-view-body");
+  const scrollTop = body.scrollTop;
   const captured = captureActiveEditState(body);
   body.innerHTML = sorted.length
     ? sorted.map(t => buildGroupTargetViewTable(t, data, attendees)).join("")
@@ -3645,6 +3657,7 @@ function renderGroupSessionView() {
 
   attachGroupViewListeners();
   restoreActiveEditState(body, captured);
+  body.scrollTop = scrollTop;
 }
 
 // Pairs each attending student's remarks for one activity into "rounds" by creation order,
@@ -6132,11 +6145,14 @@ function renderGroupTargetContent() {
 
   items.push(`<button class="btn-add-activity btn-group-add-activity" contenteditable="false">+ Add Activity (This activity only appears in this session)</button>`);
 
+  const scrollHost = content.closest(".session-body");
+  const scrollTop  = scrollHost?.scrollTop;
   const captured = captureActiveEditState(content);
   content.innerHTML = items.join("");
   updateGroupAvgChips(target, data);
   attachGroupTargetListeners(target);
   restoreActiveEditState(content, captured);
+  if (scrollHost) scrollHost.scrollTop = scrollTop;
 }
 
 // "Group students together": activity is the heading, students are listed underneath
