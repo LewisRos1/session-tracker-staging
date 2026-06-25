@@ -110,7 +110,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "505";
+const APP_VERSION = "506";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3460,15 +3460,30 @@ function setupViewBeforeInputGuard(host) {
       const node = sel.anchorNode;
       const el = node && (node.nodeType === 1 ? node : node.parentElement)?.closest(".view-remark-edit, .view-mastery-note");
       if (!el || !host.contains(el)) return;
+      // A box that already has text in it visually needs two Enter presses
+      // for the first one to "take" (something downstream — most likely the
+      // debounced save/capture-restore cycle — eats the first <br> before
+      // it ever gets to paint). Rather than keep chasing that down, insert
+      // two <br>s for a single press whenever the box already has content,
+      // so it always looks like one Enter = one new line from the user's
+      // side. An empty box (this is the very first character/line) doesn't
+      // have that problem, so it still gets just one.
+      const hadContent = el.textContent.trim().length > 0;
       const range = sel.getRangeAt(0);
       range.deleteContents();
       const br = document.createElement("br");
       range.insertNode(br);
+      let lastBr = br;
+      if (hadContent) {
+        const br2 = document.createElement("br");
+        br.after(br2);
+        lastBr = br2;
+      }
       // A trailing <br> with nothing after it doesn't actually create a new
       // visible line in most browsers unless there's a second one (or text)
       // after it — so the caret would look like it didn't move.
-      if (!br.nextSibling) br.after(document.createElement("br"));
-      range.setStartAfter(br);
+      if (!lastBr.nextSibling) lastBr.after(document.createElement("br"));
+      range.setStartAfter(lastBr);
       range.collapse(true);
       sel.removeAllRanges();
       sel.addRange(range);

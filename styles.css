@@ -2415,14 +2415,17 @@ div.admin-note-editable:empty::before {
 }
 
 .view-table-wrapper {
-  /* Shrink-to-fit instead of a normal block (which sizes to the viewport's
-     available width, not the grid's actual rendered width). Without this,
-     when the grid needs to be wider than the viewport (and overflows
-     rightward for the shared horizontal scrollbar on .session-view-body to
-     pick up), this wrapper's box — and the border-radius/box-shadow drawn
-     on it — stayed at the narrower viewport width, so the rounded corner
-     and shadow visibly cut off before reaching the grid's true right edge. */
-  display: inline-block;
+  /* fit-content (not a plain block, which would just be 100% of the
+     viewport) lets this box grow WIDER than the viewport when the grid's
+     own minimum column widths need it (half a Chrome window, mobile —
+     overflows rightward for .session-view-body's horizontal scrollbar to
+     pick up, same as before); min-width:100% makes it STRETCH to fill the
+     full available width on a wide screen instead of shrinking to the
+     grid's bare minimum, since the grid's flexible (fr) columns only grow
+     to use space their own container actually offers them. */
+  display: block;
+  width: fit-content;
+  min-width: 100%;
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   overflow: hidden;
@@ -2441,14 +2444,19 @@ div.admin-note-editable:empty::before {
    border-collapse (CSS Grid has no equivalent for that). */
 .view-table-grid {
   display: grid;
-  grid-template-columns: 36px 250px 340px 155px 54px 82px;
+  /* minmax() floors keep every column readable when the wrapper shrinks
+     toward the viewport's narrow side (below this, .view-table-wrapper
+     overflows it and the user scrolls horizontally instead); the fr part
+     lets Activity/Remark soak up whatever extra width the wrapper has on a
+     wide screen, instead of leaving empty space to the table's right. */
+  grid-template-columns: 36px minmax(170px, 1.2fr) minmax(240px, 1.6fr) 155px 54px 82px;
   background: var(--border);
   gap: 1px;
   font-size: .875rem;
-  min-width: 600px;
+  width: 100%;
 }
 .view-table-grid-group {
-  grid-template-columns: 36px 250px 100px 340px 155px 54px 82px;
+  grid-template-columns: 36px minmax(170px, 1.1fr) 100px minmax(240px, 1.6fr) 155px 54px 82px;
 }
 
 .view-table-grid .view-row > div {
@@ -2510,11 +2518,6 @@ div.admin-note-editable:empty::before {
 .vcol-total   { justify-content: center; text-align: center; white-space: nowrap; }
 .vcol-score   { justify-content: center; text-align: center; font-weight: 600; white-space: nowrap; }
 
-@media (min-width: 900px) {
-  .view-table-grid       { grid-template-columns: 36px 390px 340px 155px 54px 82px; }
-  .view-table-grid-group { grid-template-columns: 36px 390px 100px 340px 155px 54px 82px; }
-}
-
 .view-act-cell-row {
   display: flex;
   align-items: flex-start;
@@ -2524,10 +2527,6 @@ div.admin-note-editable:empty::before {
 }
 
 @media (max-width: 767px) {
-  /* Give remark a real width on mobile so it's readable with horizontal scroll */
-  .view-table-grid       { grid-template-columns: 36px 250px 180px 155px 54px 82px; min-width: 860px; }
-  .view-table-grid-group { grid-template-columns: 36px 250px 100px 180px 155px 54px 82px; min-width: 860px; }
-
   /* Drop "Go To Another Session" onto its own row below the title/delete buttons */
   .session-header-view  { display: flex; flex-wrap: wrap; }
   .btn-goto-session-wrap {
