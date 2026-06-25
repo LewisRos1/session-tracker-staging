@@ -110,7 +110,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "503";
+const APP_VERSION = "504";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2670,10 +2670,23 @@ function renderSessionView() {
   restoreViewEditState(body, captured);
 }
 
+// One labeled entry in a target's Remarks panel (see buildTargetViewTable) —
+// a non-editable activity-name label followed by the actual editable box.
+// Shared by the individual and group screens.
+function viewRemarkPanelEntry(label, boxHtml) {
+  return `<div class="view-remark-entry">
+    <div class="view-remark-entry-label" contenteditable="false">${escHtml(label)}</div>
+    ${boxHtml}
+  </div>`;
+}
+
 function buildTargetViewTable(target, data) {
   const dayAvg = calcViewDayAvg(data, target);
 
   let rows = "";
+  let panelEntries = "";
+  const addRows = r => { rows += r.rowHtml; panelEntries += r.panelHtml; };
+
   if (target.predefinedActivities?.length > 0) {
     let no = 0;
     for (const pa of target.predefinedActivities) {
@@ -2688,7 +2701,7 @@ function buildTargetViewTable(target, data) {
       no++;
       const entry = Object.entries(data.activities || {})
         .find(([, a]) => a.targetName === target.name && a.activityName === pa.name);
-      rows += viewActivityRows(no, pa.name, entry?.[0] || null, data, target, true);
+      addRows(viewActivityRows(no, pa.name, entry?.[0] || null, data, target, true));
     }
     // manual (non-predefined) activities added during session
     Object.entries(data.activities || {})
@@ -2696,7 +2709,7 @@ function buildTargetViewTable(target, data) {
       .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
       .forEach(([actId, act]) => {
         no++;
-        rows += viewActivityRows(no, act.activityName, actId, data, target, false);
+        addRows(viewActivityRows(no, act.activityName, actId, data, target, false));
       });
   } else {
     let no = 0;
@@ -2705,7 +2718,7 @@ function buildTargetViewTable(target, data) {
       .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
       .forEach(([actId, act]) => {
         no++;
-        rows += viewActivityRows(no, act.activityName, actId, data, target, false);
+        addRows(viewActivityRows(no, act.activityName, actId, data, target, false));
       });
   }
 
@@ -2747,9 +2760,20 @@ function buildTargetViewTable(target, data) {
       </div>
     </div>
     <button class="view-add-remark-target" data-target="${escHtml(target.name)}">+ Add Remark &amp; Trials</button>
+    ${panelEntries ? `<div class="view-remarks-panel">
+      <div class="view-remarks-panel-title" contenteditable="false">Remarks</div>
+      <div class="view-remarks-list">${panelEntries}</div>
+    </div>` : ""}
   </div>`;
 }
 
+// Returns { rowHtml, panelHtml } — rowHtml is this activity's grid row(s)
+// (trials/score only, no typed text); panelHtml is any free-text remark or
+// mastery-note entries for this activity, rendered separately in the
+// target's Remarks panel (see buildTargetViewTable). Splitting it this way
+// keeps the grid free of contenteditable text entirely — only the Remarks
+// panel has any, and it has no embedded buttons/dropdowns to confuse
+// Chrome's editing commands the way the grid (rightly) still does.
 function viewActivityRows(no, actName, actId, data, target, isPredefined = true) {
   const remarks = actId ? viewGetRemarks(data, actId) : [];
 
@@ -2772,16 +2796,18 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
   const isMastery       = paEntry?.isMastery || false;
 
   if (remarks.length === 0) {
-    // For free-text remark types (no preset opts, not mastery), show a clickable empty box
+    // For free-text remark types (no preset opts, not mastery), the Remarks
+    // panel gets a ready-to-type ghost entry; the grid's Remark column has
+    // nothing to show until that's typed into.
     const opts = parseOpts(inlineOptions);
     const showEmpty = opts.length === 0 && !isMastery;
-    const emptyCell = showEmpty
-      ? `<div class="view-remark-edit view-remark-empty"
+    const panelHtml = showEmpty
+      ? viewRemarkPanelEntry(actName, `<div class="view-remark-edit view-remark-empty"
            data-act-id="${escHtml(actId || "")}"
            data-act-name="${escHtml(actName)}"
            data-target="${escHtml(target.name)}"
            data-is-predefined="${isPredefined}"
-           data-placeholder="Click to add remark…"></div>`
+           data-placeholder="Click to add remark…"></div>`)
       : "";
     // "+ " shows even with no remark yet — clicking it creates the activity/
     // remark and a first trial in one go, so a score can be logged without
@@ -2789,20 +2815,29 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
     const addTrialBtn = `<button class="view-add-trial-new" data-act-id="${escHtml(actId || "")}"
       data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
       data-is-predefined="${isPredefined}">+</button>`;
-    return `<div class="view-row" style="display:contents">
+    const rowHtml = `<div class="view-row" style="display:contents">
       <div class="vcol-no" contenteditable="false">${no}</div>
       <div class="vcol-act" contenteditable="false">${actCell}</div>
-      <div class="vcol-rem">${emptyCell}</div>
+      <div class="vcol-rem" contenteditable="false">&nbsp;</div>
       <div class="vcol-trials" contenteditable="false">${addTrialBtn}</div>
       <div class="vcol-total" contenteditable="false">&nbsp;</div>
       <div class="vcol-score" contenteditable="false">&nbsp;</div>
     </div>`;
+    return { rowHtml, panelHtml };
   }
-  return remarks.map((rem, ri) => viewRemarkRow(
-    ri === 0 ? no : null,
-    ri === 0 ? actCell : null,
-    rem, target, inlineOptions, sentenceStarter, multiSelect, isMastery
-  )).join("");
+
+  let rowHtml = "", panelHtml = "";
+  remarks.forEach((rem, ri) => {
+    const r = viewRemarkRow(
+      ri === 0 ? no : null,
+      ri === 0 ? actCell : null,
+      actName,
+      rem, target, inlineOptions, sentenceStarter, multiSelect, isMastery
+    );
+    rowHtml += r.rowHtml;
+    panelHtml += r.panelHtml;
+  });
+  return { rowHtml, panelHtml };
 }
 
 // Shared by viewRemarkRow/viewGroupRemarkRow (initial render) and
@@ -2831,7 +2866,12 @@ function buildTrialCellsHtml(rem, maxPts) {
     `<button class="view-add-trial" data-rem-id="${escHtml(rem.id)}">+</button>`;
 }
 
-function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, isMastery = false) {
+// Returns { rowHtml, panelHtml } — see the comment on viewActivityRows.
+// actCellHtml is null on every row after an activity's first (so the
+// Activity column only shows its name/edit-box once); actNamePlain is the
+// activity's plain name, always available, used to label this remark's
+// Remarks-panel entry regardless of row position.
+function viewRemarkRow(no, actCellHtml, actNamePlain, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, isMastery = false) {
   const maxPts = target.maxPoints || 3;
   const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts);
   const trialCells = buildTrialCellsHtml(rem, maxPts);
@@ -2855,26 +2895,24 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
        </select>`;
   }
 
-  const optSelect = isMastery
-    ? `<div class="mastery-remark-wrap" contenteditable="false">
-        <div class="remark-mastery-opts view-mastery-opts" data-rem-id="${rem.id}">
-          ${["In Progress", "Mastered", "Maintain"].map(v =>
-            `<button class="btn-mastery${rem.text === v ? " active" : ""}" data-rem-id="${escHtml(rem.id)}" data-val="${v}">${v}</button>`
-          ).join("")}
-        </div>
-        <div class="mastery-note-row">
-          <div class="view-mastery-note" data-rem-id="${escHtml(rem.id)}"
-            data-saved-html="${escHtml(remarkToHtml(rem.masteryNote))}"
-            data-placeholder="Notes…">${remarkToHtml(rem.masteryNote)}</div>
-        </div>
-      </div>`
-    : (makeViewOpts(rem.id, rem.text)
-        || `<div class="view-remark-edit" data-rem-id="${escHtml(rem.id)}"
-              data-saved-html="${escHtml(remarkToHtml(rem.text))}">${remarkToHtml(rem.text)}</div>`);
+  // Buttons, dropdowns and plain <input> fields stay in the grid cell (none
+  // of them are contenteditable, so none of them were ever the source of
+  // the Enter-key/cursor bugs). Only genuinely typed prose — a free-text
+  // remark or a mastery note — goes to the panel instead.
+  let remarkCellInner;
+  let panelHtml = "";
 
-  let remarkCell;
-  if (sentenceStarter) {
-    remarkCell = `<div class="view-starter-wrap" contenteditable="false">
+  if (isMastery) {
+    remarkCellInner = `<div class="remark-mastery-opts view-mastery-opts" data-rem-id="${rem.id}">
+      ${["In Progress", "Mastered", "Maintain"].map(v =>
+        `<button class="btn-mastery${rem.text === v ? " active" : ""}" data-rem-id="${escHtml(rem.id)}" data-val="${v}">${v}</button>`
+      ).join("")}
+    </div>`;
+    panelHtml = viewRemarkPanelEntry(actNamePlain, `<div class="view-mastery-note" data-rem-id="${escHtml(rem.id)}"
+      data-saved-html="${escHtml(remarkToHtml(rem.masteryNote))}"
+      data-placeholder="Notes…">${remarkToHtml(rem.masteryNote)}</div>`);
+  } else if (sentenceStarter) {
+    remarkCellInner = `<div class="view-starter-wrap" contenteditable="false">
       <span class="view-starter-prefix">${escHtml(sentenceStarter)}</span>
       ${makeViewOpts(rem.id, rem.text)
         || `<input type="text" class="view-starter-input" data-rem-id="${escHtml(rem.id)}"
@@ -2882,13 +2920,20 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
       }
     </div>`;
   } else {
-    remarkCell = optSelect;
+    const opt = makeViewOpts(rem.id, rem.text);
+    if (opt) {
+      remarkCellInner = opt;
+    } else {
+      remarkCellInner = "&nbsp;";
+      panelHtml = viewRemarkPanelEntry(actNamePlain, `<div class="view-remark-edit" data-rem-id="${escHtml(rem.id)}"
+        data-saved-html="${escHtml(remarkToHtml(rem.text))}">${remarkToHtml(rem.text)}</div>`);
+    }
   }
 
-  return `<div class="view-row" style="display:contents">
+  const rowHtml = `<div class="view-row" style="display:contents">
     <div class="vcol-no" contenteditable="false">${no !== null ? no : ""}</div>
-    <div class="vcol-act" contenteditable="false">${actName !== null ? actName : ""}</div>
-    <div class="vcol-rem">${remarkCell}</div>
+    <div class="vcol-act" contenteditable="false">${actCellHtml !== null ? actCellHtml : ""}</div>
+    <div class="vcol-rem" contenteditable="false">${remarkCellInner}</div>
     <div class="vcol-trials" contenteditable="false"><div class="trial-cells">${trialCells}</div></div>
     <div class="vcol-total" contenteditable="false">${validTrials.length > 0 ? total : "&nbsp;"}</div>
     <div class="vcol-score" contenteditable="false">
@@ -2898,6 +2943,7 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
       </div>
     </div>
   </div>`;
+  return { rowHtml, panelHtml };
 }
 
 function viewGetRemarks(data, actId) {
@@ -3985,6 +4031,9 @@ function buildGroupTargetViewTable(target, data, attendees) {
   const dayAvg = calcViewDayAvg(data, target);
 
   let rows = "";
+  let panelEntries = "";
+  const addRows = r => { rows += r.rowHtml; panelEntries += r.panelHtml; };
+
   if (target.predefinedActivities?.length > 0) {
     let no = 0;
     for (const pa of target.predefinedActivities) {
@@ -3999,14 +4048,14 @@ function buildGroupTargetViewTable(target, data, attendees) {
       no++;
       const entry = Object.entries(data.activities || {})
         .find(([, a]) => a.targetName === target.name && a.activityName === pa.name);
-      rows += viewGroupActivityRows(no, pa.name, entry?.[0] || null, data, target, attendees, true);
+      addRows(viewGroupActivityRows(no, pa.name, entry?.[0] || null, data, target, attendees, true));
     }
     Object.entries(data.activities || {})
       .filter(([, a]) => a.targetName === target.name && !a.isPredefined)
       .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
       .forEach(([actId, act]) => {
         no++;
-        rows += viewGroupActivityRows(no, act.activityName, actId, data, target, attendees, false);
+        addRows(viewGroupActivityRows(no, act.activityName, actId, data, target, attendees, false));
       });
   } else {
     let no = 0;
@@ -4015,7 +4064,7 @@ function buildGroupTargetViewTable(target, data, attendees) {
       .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
       .forEach(([actId, act]) => {
         no++;
-        rows += viewGroupActivityRows(no, act.activityName, actId, data, target, attendees, false);
+        addRows(viewGroupActivityRows(no, act.activityName, actId, data, target, attendees, false));
       });
   }
 
@@ -4057,9 +4106,17 @@ function buildGroupTargetViewTable(target, data, attendees) {
         ${rows}
       </div>
     </div>
+    ${panelEntries ? `<div class="view-remarks-panel">
+      <div class="view-remarks-panel-title" contenteditable="false">Remarks</div>
+      <div class="view-remarks-list">${panelEntries}</div>
+    </div>` : ""}
   </div>`;
 }
 
+// Returns { rowHtml, panelHtml } — see the comment on viewActivityRows
+// (individual screen). Group panel entries are labeled "Activity — Student"
+// (or "Activity — Student1, Student2 (combined)" for a combined round) since
+// one target can have several students' remarks for the same activity.
 function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPredefined = true) {
   const rounds = actId ? viewGroupGetRounds(data, actId, attendees) : [];
   const combineFlagForAct = !!(actId && data.activities?.[actId]?.combineRemarks);
@@ -4090,10 +4147,10 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
   const isMastery       = paEntry?.isMastery || false;
 
   if (rounds.length === 0) {
-    // Free-text activities (no presets, not mastery): show a ready-to-type empty
-    // box per attendee, like the individual screen does, instead of a generic
-    // "+ Add Remark & Trials" bulk button — this activity is already in "Separate
-    // Remarks" mode, so each student gets their own row from the start.
+    // Free-text activities (no presets, not mastery): the Remarks panel gets
+    // a ready-to-type ghost entry per attendee, like the individual screen
+    // does — this activity is already in "Separate Remarks" mode, so each
+    // student gets their own entry from the start.
     const opts      = parseOpts(inlineOptions);
     const showEmpty = opts.length === 0 && !isMastery;
 
@@ -4101,30 +4158,34 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
       // "+ " shows even with no remark yet — see the individual screen's
       // viewActivityRows for why (lets a score be logged without first
       // typing a remark).
-      return attendees.map((studentName, idx) => `<div class="view-row" style="display:contents">
-        <div class="vcol-no" contenteditable="false">${idx === 0 ? no : ""}</div>
-        <div class="vcol-act" contenteditable="false">${idx === 0 ? actCellWithToggle : ""}</div>
-        <div class="vcol-student" contenteditable="false">${escHtml(studentName)}</div>
-        <div class="vcol-rem">
-          <div class="view-remark-edit view-remark-empty"
+      let rowHtml = "", panelHtml = "";
+      attendees.forEach((studentName, idx) => {
+        rowHtml += `<div class="view-row" style="display:contents">
+          <div class="vcol-no" contenteditable="false">${idx === 0 ? no : ""}</div>
+          <div class="vcol-act" contenteditable="false">${idx === 0 ? actCellWithToggle : ""}</div>
+          <div class="vcol-student" contenteditable="false">${escHtml(studentName)}</div>
+          <div class="vcol-rem" contenteditable="false">&nbsp;</div>
+          <div class="vcol-trials" contenteditable="false">
+            <button class="view-group-add-trial-new" data-act-id="${escHtml(actId || "")}"
+              data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
+              data-is-predefined="${isPredefined}" data-student="${escHtml(studentName)}">+</button>
+          </div>
+          <div class="vcol-total" contenteditable="false">&nbsp;</div>
+          <div class="vcol-score" contenteditable="false">&nbsp;</div>
+        </div>`;
+        panelHtml += viewRemarkPanelEntry(`${actName} — ${studentName}`,
+          `<div class="view-remark-edit view-remark-empty"
             data-act-id="${escHtml(actId || "")}"
             data-act-name="${escHtml(actName)}"
             data-target="${escHtml(target.name)}"
             data-is-predefined="${isPredefined}"
             data-student="${escHtml(studentName)}"
-            data-placeholder="Click to add remark…"></div>
-        </div>
-        <div class="vcol-trials" contenteditable="false">
-          <button class="view-group-add-trial-new" data-act-id="${escHtml(actId || "")}"
-            data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
-            data-is-predefined="${isPredefined}" data-student="${escHtml(studentName)}">+</button>
-        </div>
-        <div class="vcol-total" contenteditable="false">&nbsp;</div>
-        <div class="vcol-score" contenteditable="false">&nbsp;</div>
-      </div>`).join("");
+            data-placeholder="Click to add remark…"></div>`);
+      });
+      return { rowHtml, panelHtml };
     }
 
-    return `<div class="view-row" style="display:contents">
+    const rowHtml = `<div class="view-row" style="display:contents">
       <div class="vcol-no" contenteditable="false">${no}</div>
       <div class="vcol-act" contenteditable="false">${actCellWithToggle}</div>
       <div class="vcol-student" contenteditable="false"></div>
@@ -4136,15 +4197,17 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
       <div class="vcol-total" contenteditable="false">&nbsp;</div>
       <div class="vcol-score" contenteditable="false">&nbsp;</div>
     </div>`;
+    return { rowHtml, panelHtml: "" };
   }
 
   let firstRowOverall = true;
-  let html = "";
+  let rowHtml = "", panelHtml = "";
   for (const round of rounds) {
     const presentEntries  = round.filter(e => !e.pending);
     const combineThisRound = combineFlagForAct && presentEntries.length > 1;
     const sharedRemIds     = combineThisRound ? presentEntries.map(e => e.id) : null;
     const sharedText       = combineThisRound ? presentEntries[0].text : null;
+    const combinedNames    = combineThisRound ? presentEntries.map(e => e.studentName).join(", ") : null;
     let usedSharedCell     = false;
 
     for (const entry of round) {
@@ -4152,7 +4215,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
       const actVal = firstRowOverall ? actCellWithToggle : null;
 
       if (entry.pending) {
-        html += `<div class="view-row" style="display:contents">
+        rowHtml += `<div class="view-row" style="display:contents">
           <div class="vcol-no" contenteditable="false">${noVal !== null ? noVal : ""}</div>
           <div class="vcol-act" contenteditable="false">${actVal !== null ? actVal : ""}</div>
           <div class="vcol-student" contenteditable="false">${escHtml(entry.studentName)}</div>
@@ -4168,45 +4231,53 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
         continue;
       }
 
-      // No table rowspan in a CSS Grid layout — the first present student in a
-      // combined round gets the shared editable box; every other student in
-      // that round gets a small read-only note instead of their own box
-      // (still its own grid cell, so column alignment stays intact).
+      // A combined round shares ONE Remarks-panel entry (labeled with every
+      // student in it) instead of one per student; only the first present
+      // student's call actually emits that panel entry.
       const combineOpts = !combineThisRound ? null
         : usedSharedCell
           ? { skipRemarkCell: true }
-          : { combinedRemIds: sharedRemIds, sharedText };
+          : { combinedRemIds: sharedRemIds, sharedText, combinedNames };
       if (combineThisRound) usedSharedCell = true;
 
-      html += viewGroupRemarkRow(
+      const r = viewGroupRemarkRow(
         noVal, actVal, entry.studentName, entry, target,
-        inlineOptions, sentenceStarter, multiSelect, isMastery, combineOpts
+        inlineOptions, sentenceStarter, multiSelect, isMastery, combineOpts, actName
       );
+      rowHtml += r.rowHtml;
+      panelHtml += r.panelHtml;
       firstRowOverall = false;
     }
   }
-  return html;
+  return { rowHtml, panelHtml };
 }
 
-function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, isMastery = false, combineOpts = null) {
+// Returns { rowHtml, panelHtml } — see the comment on viewActivityRows
+// (individual screen) for why typed text moves out of the grid. actNamePlain
+// is this row's activity name as plain text (always available, regardless
+// of whether actCellHtml — which only shows on an activity's first row —
+// is null here), used to label this entry in the Remarks panel.
+function viewGroupRemarkRow(no, actCellHtml, studentName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, isMastery = false, combineOpts = null, actNamePlain = "") {
   const maxPts = target.maxPoints || 3;
   const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts);
   const trialCells = buildTrialCellsHtml(rem, maxPts);
 
-  let remarkCellDiv;
+  let remarkCellInner = "&nbsp;";
+  let panelHtml = "";
+
   if (combineOpts?.skipRemarkCell) {
-    // No rowspan in a grid layout — this student's remark is the one shown
-    // in the first row of the combined round above; this cell just says so.
-    remarkCellDiv = `<div class="vcol-rem view-rem-combined-hint" contenteditable="false">(combined above)</div>`;
+    // This student's remark text is shown once, in the combined round's one
+    // shared Remarks-panel entry (labeled with every student in it) — see
+    // the "else if (combineOpts)" branch below, emitted by the first
+    // present student in the round.
   } else if (combineOpts) {
     // Combined round — one shared plain-text box across remIds (mirrors the live
     // group session editor's "Combined Remarks" mode, which is free-text only).
     const idList = combineOpts.combinedRemIds.join(",");
-    remarkCellDiv = `<div class="vcol-rem">
-      <div class="view-remark-edit group-remark-input-combined"
+    panelHtml = viewRemarkPanelEntry(`${actNamePlain} — ${combineOpts.combinedNames} (combined)`,
+      `<div class="view-remark-edit group-remark-input-combined"
         data-rem-ids="${idList}" data-saved-html="${escHtml(remarkToHtml(combineOpts.sharedText))}"
-        >${remarkToHtml(combineOpts.sharedText)}</div>
-    </div>`;
+        >${remarkToHtml(combineOpts.sharedText)}</div>`);
   } else {
     const opts = parseOpts(inlineOptions);
 
@@ -4227,26 +4298,18 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
          </select>`;
     };
 
-    const optSelect = isMastery
-      ? `<div class="mastery-remark-wrap" contenteditable="false">
-          <div class="remark-mastery-opts view-mastery-opts" data-rem-id="${rem.id}">
-            ${["In Progress", "Mastered", "Maintain"].map(v =>
-              `<button class="btn-mastery${rem.text === v ? " active" : ""}" data-rem-id="${escHtml(rem.id)}" data-val="${v}">${v}</button>`
-            ).join("")}
-          </div>
-          <div class="mastery-note-row">
-            <div class="view-mastery-note" data-rem-id="${escHtml(rem.id)}"
-              data-saved-html="${escHtml(remarkToHtml(rem.masteryNote))}"
-              data-placeholder="Notes…">${remarkToHtml(rem.masteryNote)}</div>
-          </div>
-        </div>`
-      : (makeViewOpts(rem.id, rem.text)
-          || `<div class="view-remark-edit" data-rem-id="${escHtml(rem.id)}"
-                data-saved-html="${escHtml(remarkToHtml(rem.text))}">${remarkToHtml(rem.text)}</div>`);
-
-    let remarkCell;
-    if (sentenceStarter) {
-      remarkCell = `<div class="view-starter-wrap" contenteditable="false">
+    if (isMastery) {
+      remarkCellInner = `<div class="remark-mastery-opts view-mastery-opts" data-rem-id="${rem.id}">
+        ${["In Progress", "Mastered", "Maintain"].map(v =>
+          `<button class="btn-mastery${rem.text === v ? " active" : ""}" data-rem-id="${escHtml(rem.id)}" data-val="${v}">${v}</button>`
+        ).join("")}
+      </div>`;
+      panelHtml = viewRemarkPanelEntry(`${actNamePlain} — ${studentName}`,
+        `<div class="view-mastery-note" data-rem-id="${escHtml(rem.id)}"
+          data-saved-html="${escHtml(remarkToHtml(rem.masteryNote))}"
+          data-placeholder="Notes…">${remarkToHtml(rem.masteryNote)}</div>`);
+    } else if (sentenceStarter) {
+      remarkCellInner = `<div class="view-starter-wrap" contenteditable="false">
         <span class="view-starter-prefix">${escHtml(sentenceStarter)}</span>
         ${makeViewOpts(rem.id, rem.text)
           || `<input type="text" class="view-starter-input" data-rem-id="${escHtml(rem.id)}"
@@ -4254,16 +4317,22 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
         }
       </div>`;
     } else {
-      remarkCell = optSelect;
+      const opt = makeViewOpts(rem.id, rem.text);
+      if (opt) {
+        remarkCellInner = opt;
+      } else {
+        panelHtml = viewRemarkPanelEntry(`${actNamePlain} — ${studentName}`,
+          `<div class="view-remark-edit" data-rem-id="${escHtml(rem.id)}"
+            data-saved-html="${escHtml(remarkToHtml(rem.text))}">${remarkToHtml(rem.text)}</div>`);
+      }
     }
-    remarkCellDiv = `<div class="vcol-rem">${remarkCell}</div>`;
   }
 
-  return `<div class="view-row" style="display:contents">
+  const rowHtml = `<div class="view-row" style="display:contents">
     <div class="vcol-no" contenteditable="false">${no !== null ? no : ""}</div>
-    <div class="vcol-act" contenteditable="false">${actName !== null ? actName : ""}</div>
+    <div class="vcol-act" contenteditable="false">${actCellHtml !== null ? actCellHtml : ""}</div>
     <div class="vcol-student" contenteditable="false">${escHtml(studentName)}</div>
-    ${remarkCellDiv}
+    <div class="vcol-rem" contenteditable="false">${remarkCellInner}</div>
     <div class="vcol-trials" contenteditable="false"><div class="trial-cells">${trialCells}</div></div>
     <div class="vcol-total" contenteditable="false">${validTrials.length > 0 ? total : "&nbsp;"}</div>
     <div class="vcol-score" contenteditable="false">
@@ -4273,6 +4342,7 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
       </div>
     </div>
   </div>`;
+  return { rowHtml, panelHtml };
 }
 
 function getGroupViewMaxPtsForRemark(remId) {
