@@ -110,7 +110,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "494";
+const APP_VERSION = "495";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3042,9 +3042,14 @@ function setupMergedRemarkSaving(body, getSessionId, onIdle) {
     const el = (node.nodeType === 1 ? node : node.parentElement)?.closest(".view-remark-edit");
     if (el) el.classList.add("rem-edit-active");
   };
-  // Cancels and replaces the browser's native paragraph/line-break insertion
-  // for Enter (see the inline comment below for why this event, not the
-  // remark box's own keydown handler, is where that replacement happens).
+  // Backstop against the browser's native paragraph/line-break insertion —
+  // each remark box's own keydown handler calls preventDefault() and inserts
+  // a manual <br> instead, but that alone isn't reliable inside a
+  // contenteditable="true" box nested in this larger contenteditable="true"
+  // host: Chrome's "beforeinput" event (the one that actually performs the
+  // native split into a new sibling element) can still fire and go through
+  // even after keydown was prevented. Catching it at the host level (it
+  // bubbles) blocks the native insert everywhere in one place.
   //
   // ALSO guards backspace/delete from escaping a box's own boundary — once a
   // box is emptied, continuing to backspace can otherwise keep consuming the
@@ -3054,23 +3059,6 @@ function setupMergedRemarkSaving(body, getSessionId, onIdle) {
   const onBeforeInput = e => {
     if (e.inputType === "insertParagraph" || e.inputType === "insertLineBreak") {
       e.preventDefault();
-      // The actual <br> substitution for Enter happens here, not in the
-      // remark box's own keydown handler — in this nested-contenteditable
-      // setup Chrome's native paragraph-split can partially apply even
-      // after keydown.preventDefault() already ran (it doesn't reliably
-      // suppress this event), so inserting from keydown risked landing the
-      // manual <br> on top of that half-applied native change, especially
-      // when there was trailing text to split around (needing a 2nd Enter
-      // to "fix" the result). Reacting here instead — the one event Chrome
-      // actually checks before proceeding — is the reliable cancellation
-      // point, so this is also the reliable place to do the replacement.
-      const sel  = document.getSelection();
-      const node = sel && sel.rangeCount > 0 ? sel.anchorNode : null;
-      const ta = node && (node.nodeType === 1 ? node : node.parentElement)?.closest(".view-remark-edit");
-      if (ta && body.contains(ta)) {
-        insertBrAtCaret();
-        ta.dispatchEvent(new Event("input", { bubbles: true }));
-      }
       return;
     }
     if (e.inputType !== "deleteContentBackward" && e.inputType !== "deleteContentForward") return;
@@ -3380,13 +3368,9 @@ function setupViewEnterKeyDelegation(host, getSaver) {
     if (!ta || !host.contains(ta)) return;
     if (isSelectAll) { e.preventDefault(); selectAllWithin(ta); return; }
     if (e.ctrlKey || e.metaKey) { e.preventDefault(); getSaver()?.flush(); return; }
-    // Just prevents the native split from starting here — the actual <br>
-    // substitution happens in setupMergedRemarkSaving's onBeforeInput
-    // backstop instead (see its comment): this nested-contenteditable setup
-    // doesn't reliably honor preventDefault() on keydown itself, so doing
-    // the replacement here risked landing on top of a half-applied native
-    // change a moment later, which is what needed a 2nd Enter to "fix".
     e.preventDefault();
+    insertBrAtCaret();
+    ta.dispatchEvent(new Event("input", { bubbles: true }));
   };
   host.addEventListener("keydown", onKeydown);
   return () => host.removeEventListener("keydown", onKeydown);
@@ -3432,6 +3416,28 @@ function refreshViewTrialRow(remId) {
   if (scoreSpan) scoreSpan.textContent = scorePct;
 }
 
+// Each trial click fires its own independent Firestore write rather than
+// awaiting the previous one (so clicking + repeatedly stays instant) — but
+// openSessionView's snapshot listener overwrites state.viewSessionData and
+// can trigger a full renderSessionView() the moment it's not "busy",
+// regardless of whether every one of those writes has actually landed yet.
+// If a render lands using a snapshot that only reflects some of several
+// rapid-fire writes, it shows a stale (lower) trial count until the next
+// snapshot catches up — visible as cells appearing then disappearing.
+// Tracking each write against the same viewActionsInFlight counter the
+// snapshot listener already checks defers that render until every write
+// here has actually settled, instead of mid-flight.
+function trackViewTrialWrite(promise) {
+  state.viewActionsInFlight++;
+  promise.finally(() => {
+    state.viewActionsInFlight--;
+    if (state.viewActionsInFlight === 0 && state.viewRenderPending && !isViewBusy()) {
+      state.viewRenderPending = false;
+      renderSessionView();
+    }
+  });
+}
+
 function bindViewTrialCellListeners(container) {
   container.querySelectorAll(".view-trial-select").forEach(sel => {
     sel.addEventListener("change", () => {
@@ -3442,11 +3448,11 @@ function bindViewTrialCellListeners(container) {
       trials[Number(sel.dataset.trialIdx)] = Number(sel.value);
       rem.trials = trials;
       refreshViewTrialRow(sel.dataset.remId);
-      setTrials(state.viewSessionId, sel.dataset.remId, trials).catch(err => {
+      trackViewTrialWrite(setTrials(state.viewSessionId, sel.dataset.remId, trials).catch(err => {
         rem.trials = prevTrials;
         refreshViewTrialRow(sel.dataset.remId);
         alert("Couldn't update — check your connection and try again.\n\n" + err.message);
-      });
+      }));
     });
   });
 
@@ -3458,11 +3464,11 @@ function bindViewTrialCellListeners(container) {
       const trials = prevTrials.filter((_, i) => i !== Number(btn.dataset.trialIdx));
       rem.trials = trials;
       refreshViewTrialRow(btn.dataset.remId);
-      setTrials(state.viewSessionId, btn.dataset.remId, trials).catch(err => {
+      trackViewTrialWrite(setTrials(state.viewSessionId, btn.dataset.remId, trials).catch(err => {
         rem.trials = prevTrials;
         refreshViewTrialRow(btn.dataset.remId);
         alert("Couldn't update — check your connection and try again.\n\n" + err.message);
-      });
+      }));
     });
   });
 
@@ -3474,11 +3480,11 @@ function bindViewTrialCellListeners(container) {
       const trials = [...prevTrials, -1];
       rem.trials = trials;
       refreshViewTrialRow(btn.dataset.remId);
-      setTrials(state.viewSessionId, btn.dataset.remId, trials).catch(err => {
+      trackViewTrialWrite(setTrials(state.viewSessionId, btn.dataset.remId, trials).catch(err => {
         rem.trials = prevTrials;
         refreshViewTrialRow(btn.dataset.remId);
         alert("Couldn't add trial — check your connection and try again.\n\n" + err.message);
-      });
+      }));
     });
   });
 }
@@ -4141,6 +4147,18 @@ function refreshGroupViewTrialRow(remId) {
   if (scoreSpan) scoreSpan.textContent = scorePct;
 }
 
+// See trackViewTrialWrite's comment — same race, group-view counterpart.
+function trackGroupViewTrialWrite(promise) {
+  state.viewGroupActionsInFlight++;
+  promise.finally(() => {
+    state.viewGroupActionsInFlight--;
+    if (state.viewGroupActionsInFlight === 0 && state.viewGroupRenderPending && !isGroupViewBusy()) {
+      state.viewGroupRenderPending = false;
+      renderGroupSessionView();
+    }
+  });
+}
+
 function bindGroupViewTrialCellListeners(container) {
   container.querySelectorAll(".view-trial-select").forEach(sel => {
     sel.addEventListener("change", () => {
@@ -4151,11 +4169,11 @@ function bindGroupViewTrialCellListeners(container) {
       trials[Number(sel.dataset.trialIdx)] = Number(sel.value);
       rem.trials = trials;
       refreshGroupViewTrialRow(sel.dataset.remId);
-      setTrials(state.viewGroupSessionId, sel.dataset.remId, trials).catch(err => {
+      trackGroupViewTrialWrite(setTrials(state.viewGroupSessionId, sel.dataset.remId, trials).catch(err => {
         rem.trials = prevTrials;
         refreshGroupViewTrialRow(sel.dataset.remId);
         alert("Couldn't update — check your connection and try again.\n\n" + err.message);
-      });
+      }));
     });
   });
 
@@ -4167,11 +4185,11 @@ function bindGroupViewTrialCellListeners(container) {
       const trials = prevTrials.filter((_, i) => i !== Number(btn.dataset.trialIdx));
       rem.trials = trials;
       refreshGroupViewTrialRow(btn.dataset.remId);
-      setTrials(state.viewGroupSessionId, btn.dataset.remId, trials).catch(err => {
+      trackGroupViewTrialWrite(setTrials(state.viewGroupSessionId, btn.dataset.remId, trials).catch(err => {
         rem.trials = prevTrials;
         refreshGroupViewTrialRow(btn.dataset.remId);
         alert("Couldn't update — check your connection and try again.\n\n" + err.message);
-      });
+      }));
     });
   });
 
@@ -4183,11 +4201,11 @@ function bindGroupViewTrialCellListeners(container) {
       const trials = [...prevTrials, -1];
       rem.trials = trials;
       refreshGroupViewTrialRow(btn.dataset.remId);
-      setTrials(state.viewGroupSessionId, btn.dataset.remId, trials).catch(err => {
+      trackGroupViewTrialWrite(setTrials(state.viewGroupSessionId, btn.dataset.remId, trials).catch(err => {
         rem.trials = prevTrials;
         refreshGroupViewTrialRow(btn.dataset.remId);
         alert("Couldn't add trial — check your connection and try again.\n\n" + err.message);
-      });
+      }));
     });
   });
 }
