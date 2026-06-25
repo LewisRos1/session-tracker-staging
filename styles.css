@@ -2416,13 +2416,11 @@ div.admin-note-editable:empty::before {
 
 .view-table-wrapper {
   /* fit-content (not a plain block, which would just be 100% of the
-     viewport) lets this box grow WIDER than the viewport when the grid's
-     own minimum column widths need it (half a Chrome window, mobile —
-     overflows rightward for .session-view-body's horizontal scrollbar to
-     pick up, same as before); min-width:100% makes it STRETCH to fill the
-     full available width on a wide screen instead of shrinking to the
-     grid's bare minimum, since the grid's flexible (fr) columns only grow
-     to use space their own container actually offers them. */
+     viewport) lets this box grow WIDER than the viewport when the table's
+     own min-width needs it (half a Chrome window, mobile — overflows
+     rightward for .session-view-body's horizontal scrollbar to pick up);
+     min-width:100% makes it STRETCH to fill the full available width on a
+     wide screen instead of shrinking to the table's bare minimum. */
   display: block;
   width: fit-content;
   min-width: 100%;
@@ -2431,92 +2429,98 @@ div.admin-note-editable:empty::before {
   overflow: hidden;
 }
 
-/* CSS Grid replacement for the old <table>/<tr>/<td> markup — Chrome has
-   contenteditable quirks specific to real <table> elements (a split caused
-   by Enter could "escape" its row and land as a stray box outside the
-   table), so the View/Edit-past-session screens are laid out with divs
-   instead. Each logical row is a ".view-row" wrapper with
-   "display:contents" — invisible to grid layout (its own children become
-   direct grid items of .view-table-grid, exactly like a real row's cells
-   would be) while still letting JS find "the row a given cell belongs to"
-   via .closest(".view-row") the same way .closest("tr") used to work.
-   1px gap + a background color showing through it stands in for
-   border-collapse (CSS Grid has no equivalent for that). */
-.view-table-grid {
-  display: grid;
-  /* minmax() floors keep every column readable when the wrapper shrinks
-     toward the viewport's narrow side (below this, .view-table-wrapper
-     overflows it and the user scrolls horizontally instead); the fr part
-     lets Activity/Remark soak up whatever extra width the wrapper has on a
-     wide screen, instead of leaving empty space to the table's right. */
-  grid-template-columns: 36px minmax(170px, 1.2fr) minmax(240px, 1.6fr) 155px 54px 82px;
-  background: var(--border);
-  gap: 1px;
-  font-size: .875rem;
+/* Real <table>/<tr>/<td> markup — the CSS Grid div rewrite tried earlier this
+   session never actually fixed the Enter-key bugs it was meant to fix, AND
+   broke Grammarly's ability to detect this region as editable (confirmed by
+   comparing against the live site, which still uses a literal <table> and
+   has Grammarly working). table-layout:fixed + width:100% on .view-table
+   makes the declared column widths below act as PROPORTIONS that scale up
+   to fill all available width on a wide screen, while still flooring at
+   min-width so the wrapper overflows (horizontal scroll) on a narrow one —
+   the same stretch-but-floor behavior the grid version needed minmax()/fr
+   tricks for, for free. */
+.view-table {
   width: 100%;
-}
-.view-table-grid-group {
-  grid-template-columns: 36px minmax(170px, 1.1fr) 100px minmax(240px, 1.6fr) 155px 54px 82px;
-}
-
-.view-table-grid .view-row > div {
-  background: var(--white);
-  padding: .4rem .6rem;
-  display: flex;
-  align-items: center;
-  color: var(--text);
+  min-width: 600px;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: .875rem;
 }
 
-.view-col-head {
-  background: var(--primary-light) !important;
+.view-table th {
+  background: var(--primary-light);
   color: var(--primary-dark);
   font-weight: 700;
   text-align: center;
-  justify-content: center;
-  padding: .55rem .7rem !important;
+  padding: .55rem .7rem;
+  border: 1px solid var(--border);
+  border-bottom: 2px solid var(--primary);
   white-space: nowrap;
 }
 
-.view-heading-row > div {
-  background: var(--primary-light) !important;
-  font-weight: 700;
-  color: var(--primary-dark);
-  padding: .45rem .75rem !important;
+.view-table td {
+  padding: .4rem .6rem;
+  border: 1px solid var(--border);
+  vertical-align: middle;
+  color: var(--text);
 }
 
-.view-note-row > div {
-  background: #fffbeb !important;
+.view-heading-row td {
+  background: var(--primary-light);
+  font-weight: 700;
+  color: var(--primary-dark);
+  padding: .45rem .75rem;
+  border-top: 2px solid var(--primary) !important;
+  border-bottom: 2px solid var(--primary) !important;
+}
+
+.view-note-row td {
+  background: #fffbeb;
   color: #92400e;
   font-size: .88rem;
-  padding: .4rem .75rem !important;
+  padding: .4rem .75rem;
+  border-top: 2px solid #f59e0b !important;
+  border-bottom: 2px solid #f59e0b !important;
   white-space: pre-wrap;
 }
 .view-note-row div,
 .view-note-row p { margin: 0; padding: 0; }
 
-.view-dayavg-row > div {
-  background: #fffbe6 !important;
+.view-dayavg-row td {
+  background: #fffbe6;
   font-weight: 700;
 }
 
-.view-comment-row > div { background: #fafaf9 !important; }
+.view-comment-row td { background: #fafaf9; }
 .view-comment-label { font-weight: 600; color: var(--text-muted); }
 
-.vcol-no      { justify-content: center; text-align: center; white-space: nowrap; }
-.vcol-act     { white-space: pre-wrap; word-break: break-word; align-items: flex-start; }
-.vcol-student { justify-content: center; text-align: center; white-space: pre-wrap; word-break: break-word; font-weight: 600; }
-.vcol-rem     { padding: 0 !important; align-items: stretch; }
-.vcol-rem > * { padding: .4rem .6rem; box-sizing: border-box; width: 100%; }
-.vcol-rem > .view-remark-edit { min-height: 1.8rem; }
+.vcol-no      { width: 36px; text-align: center; white-space: nowrap; }
+.vcol-act     { width: 250px; white-space: pre-wrap; word-break: break-word; }
+.vcol-student { width: 100px; text-align: center; white-space: pre-wrap; word-break: break-word; font-weight: 600; }
+.vcol-rem     { width: 340px; height: 1px; padding: 0; }
+.vcol-rem > * { padding: .4rem .6rem; box-sizing: border-box; }
+/* Both empty and pre-filled edit divs are direct children of .vcol-rem.
+   min-height:100% resolves to the rendered row height (Chrome table-cell %
+   behavior); using min- so content taller than the row can still expand the
+   row. Floored with max() at the single-line height (1.8rem) — otherwise a
+   row with no other tall content (e.g. no trials) can collapse shorter than
+   one real text line, leaving the caret visibly taller than the box until
+   text is typed and forces the row to grow. */
+.vcol-rem > .view-remark-edit { min-height: max(1.8rem, 100%); }
 .view-rem-combined-hint {
   color: var(--text-muted);
   font-size: .8rem;
   font-style: italic;
-  justify-content: center;
+  text-align: center;
   padding: .4rem .6rem !important;
 }
-.vcol-total   { justify-content: center; text-align: center; white-space: nowrap; }
-.vcol-score   { justify-content: center; text-align: center; font-weight: 600; white-space: nowrap; }
+.vcol-trials  { width: 155px; }
+.vcol-total   { width: 54px; text-align: center; white-space: nowrap; }
+.vcol-score   { width: 82px; text-align: center; font-weight: 600; white-space: nowrap; }
+
+@media (min-width: 900px) {
+  .vcol-act { width: 390px; }
+}
 
 .view-act-cell-row {
   display: flex;
@@ -2527,6 +2531,10 @@ div.admin-note-editable:empty::before {
 }
 
 @media (max-width: 767px) {
+  /* Give remark a real width on mobile so it's readable with horizontal scroll */
+  .vcol-rem   { width: 180px; }
+  .view-table { min-width: 860px; }
+
   /* Drop "Go To Another Session" onto its own row below the title/delete buttons */
   .session-header-view  { display: flex; flex-wrap: wrap; }
   .btn-goto-session-wrap {

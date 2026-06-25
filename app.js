@@ -110,7 +110,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "508";
+const APP_VERSION = "509";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2678,11 +2678,11 @@ function buildTargetViewTable(target, data) {
     let no = 0;
     for (const pa of target.predefinedActivities) {
       if (pa.isHeading) {
-        rows += `<div class="view-row view-heading-row" style="display:contents"><div style="grid-column:1/-1" contenteditable="false">${escHtml(pa.name)}</div></div>`;
+        rows += `<tr class="view-heading-row"><td colspan="6" contenteditable="false">${escHtml(pa.name)}</td></tr>`;
         continue;
       }
       if (pa.isNote) {
-        rows += `<div class="view-row view-note-row" style="display:contents"><div style="grid-column:1/-1" contenteditable="false">${noteToHtml(pa.text)}</div></div>`;
+        rows += `<tr class="view-note-row"><td colspan="6" contenteditable="false">${noteToHtml(pa.text)}</td></tr>`;
         continue;
       }
       no++;
@@ -2712,20 +2712,20 @@ function buildTargetViewTable(target, data) {
   if (target.hasComment) {
     const key     = sanitizeKey(target.name);
     const comment = (data.fedcComments || {})[key] || "";
-    rows += `<div class="view-row view-comment-row" style="display:contents">
-      <div class="view-comment-label" style="grid-column:span 2" contenteditable="false">Comment</div>
-      <div style="grid-column:span 4" contenteditable="false">
+    rows += `<tr class="view-comment-row">
+      <td colspan="2" class="view-comment-label" contenteditable="false">Comment</td>
+      <td colspan="4" contenteditable="false">
         <textarea class="view-comment-edit" data-target-key="${escHtml(key)}" rows="3"
         >${escHtml(comment)}</textarea>
-      </div>
-    </div>`;
+      </td>
+    </tr>`;
   }
 
   if (dayAvg !== null) {
-    rows += `<div class="view-row view-dayavg-row" style="display:contents">
-      <div style="grid-column:span 5;text-align:right" contenteditable="false">Day's Average</div>
-      <div class="vcol-score" contenteditable="false">${dayAvg}%</div>
-    </div>`;
+    rows += `<tr class="view-dayavg-row">
+      <td colspan="5" style="text-align:right" contenteditable="false">Day's Average</td>
+      <td class="vcol-score" contenteditable="false">${dayAvg}%</td>
+    </tr>`;
   }
 
   return `<div class="target-view-section">
@@ -2734,17 +2734,17 @@ function buildTargetViewTable(target, data) {
       ${dayAvg !== null ? `<span class="target-view-avg">${dayAvg}%</span>` : ""}
     </div>
     <div class="view-table-wrapper">
-      <div class="view-table-grid">
-        <div class="view-row" style="display:contents" contenteditable="false">
-          <div class="vcol-no view-col-head">No.</div>
-          <div class="vcol-act view-col-head">Activity</div>
-          <div class="vcol-rem view-col-head">Remark</div>
-          <div class="vcol-trials view-col-head">Trials</div>
-          <div class="vcol-total view-col-head">Total</div>
-          <div class="vcol-score view-col-head">% Score</div>
-        </div>
-        ${rows}
-      </div>
+      <table class="view-table">
+        <thead><tr contenteditable="false">
+          <th class="vcol-no">No.</th>
+          <th class="vcol-act">Activity</th>
+          <th class="vcol-rem">Remark</th>
+          <th class="vcol-trials">Trials</th>
+          <th class="vcol-total">Total</th>
+          <th class="vcol-score">% Score</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
     </div>
     <button class="view-add-remark-target" data-target="${escHtml(target.name)}">+ Add Remark &amp; Trials</button>
   </div>`;
@@ -2789,14 +2789,14 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
     const addTrialBtn = `<button class="view-add-trial-new" data-act-id="${escHtml(actId || "")}"
       data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
       data-is-predefined="${isPredefined}">+</button>`;
-    return `<div class="view-row" style="display:contents">
-      <div class="vcol-no" contenteditable="false">${no}</div>
-      <div class="vcol-act" contenteditable="false">${actCell}</div>
-      <div class="vcol-rem">${emptyCell}</div>
-      <div class="vcol-trials" contenteditable="false">${addTrialBtn}</div>
-      <div class="vcol-total" contenteditable="false">&nbsp;</div>
-      <div class="vcol-score" contenteditable="false">&nbsp;</div>
-    </div>`;
+    return `<tr class="view-row">
+      <td class="vcol-no" contenteditable="false">${no}</td>
+      <td class="vcol-act" contenteditable="false">${actCell}</td>
+      <td class="vcol-rem">${emptyCell}</td>
+      <td class="vcol-trials" contenteditable="false">${addTrialBtn}</td>
+      <td class="vcol-total" contenteditable="false">&nbsp;</td>
+      <td class="vcol-score" contenteditable="false">&nbsp;</td>
+    </tr>`;
   }
   return remarks.map((rem, ri) => viewRemarkRow(
     ri === 0 ? no : null,
@@ -2885,19 +2885,19 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
     remarkCell = optSelect;
   }
 
-  return `<div class="view-row" style="display:contents">
-    <div class="vcol-no" contenteditable="false">${no !== null ? no : ""}</div>
-    <div class="vcol-act" contenteditable="false">${actName !== null ? actName : ""}</div>
-    <div class="vcol-rem">${remarkCell}</div>
-    <div class="vcol-trials" contenteditable="false"><div class="trial-cells">${trialCells}</div></div>
-    <div class="vcol-total" contenteditable="false">${validTrials.length > 0 ? total : "&nbsp;"}</div>
-    <div class="vcol-score" contenteditable="false">
+  return `<tr class="view-row">
+    <td class="vcol-no" contenteditable="false">${no !== null ? no : ""}</td>
+    <td class="vcol-act" contenteditable="false">${actName !== null ? actName : ""}</td>
+    <td class="vcol-rem">${remarkCell}</td>
+    <td class="vcol-trials" contenteditable="false"><div class="trial-cells">${trialCells}</div></td>
+    <td class="vcol-total" contenteditable="false">${validTrials.length > 0 ? total : "&nbsp;"}</td>
+    <td class="vcol-score" contenteditable="false">
       <div style="display:flex;align-items:center;gap:.3rem;justify-content:flex-end">
         <span>${scorePct}</span>
         <button class="view-rem-del" data-rem-id="${escHtml(rem.id)}" title="Delete remark">×</button>
       </div>
-    </div>
-  </div>`;
+    </td>
+  </tr>`;
 }
 
 function viewGetRemarks(data, actId) {
@@ -3985,11 +3985,11 @@ function buildGroupTargetViewTable(target, data, attendees) {
     let no = 0;
     for (const pa of target.predefinedActivities) {
       if (pa.isHeading) {
-        rows += `<div class="view-row view-heading-row" style="display:contents"><div style="grid-column:1/-1" contenteditable="false">${escHtml(pa.name)}</div></div>`;
+        rows += `<tr class="view-heading-row"><td colspan="7" contenteditable="false">${escHtml(pa.name)}</td></tr>`;
         continue;
       }
       if (pa.isNote) {
-        rows += `<div class="view-row view-note-row" style="display:contents"><div style="grid-column:1/-1" contenteditable="false">${noteToHtml(pa.text)}</div></div>`;
+        rows += `<tr class="view-note-row"><td colspan="7" contenteditable="false">${noteToHtml(pa.text)}</td></tr>`;
         continue;
       }
       no++;
@@ -4018,20 +4018,20 @@ function buildGroupTargetViewTable(target, data, attendees) {
   if (target.hasComment) {
     const key     = sanitizeKey(target.name);
     const comment = (data.fedcComments || {})[key] || "";
-    rows += `<div class="view-row view-comment-row" style="display:contents">
-      <div class="view-comment-label" style="grid-column:span 3" contenteditable="false">Comment</div>
-      <div style="grid-column:span 4" contenteditable="false">
+    rows += `<tr class="view-comment-row">
+      <td colspan="3" class="view-comment-label" contenteditable="false">Comment</td>
+      <td colspan="4" contenteditable="false">
         <textarea class="view-comment-edit" data-target-key="${escHtml(key)}" rows="3"
         >${escHtml(comment)}</textarea>
-      </div>
-    </div>`;
+      </td>
+    </tr>`;
   }
 
   if (dayAvg !== null) {
-    rows += `<div class="view-row view-dayavg-row" style="display:contents">
-      <div style="grid-column:span 6;text-align:right" contenteditable="false">Day's Average</div>
-      <div class="vcol-score" contenteditable="false">${dayAvg}%</div>
-    </div>`;
+    rows += `<tr class="view-dayavg-row">
+      <td colspan="6" style="text-align:right" contenteditable="false">Day's Average</td>
+      <td class="vcol-score" contenteditable="false">${dayAvg}%</td>
+    </tr>`;
   }
 
   return `<div class="target-view-section">
@@ -4040,18 +4040,18 @@ function buildGroupTargetViewTable(target, data, attendees) {
       ${dayAvg !== null ? `<span class="target-view-avg">${dayAvg}%</span>` : ""}
     </div>
     <div class="view-table-wrapper">
-      <div class="view-table-grid view-table-grid-group">
-        <div class="view-row" style="display:contents" contenteditable="false">
-          <div class="vcol-no view-col-head">No.</div>
-          <div class="vcol-act view-col-head">Activity</div>
-          <div class="vcol-student view-col-head">Student</div>
-          <div class="vcol-rem view-col-head">Remark</div>
-          <div class="vcol-trials view-col-head">Trials</div>
-          <div class="vcol-total view-col-head">Total</div>
-          <div class="vcol-score view-col-head">% Score</div>
-        </div>
-        ${rows}
-      </div>
+      <table class="view-table view-table-group">
+        <thead><tr contenteditable="false">
+          <th class="vcol-no">No.</th>
+          <th class="vcol-act">Activity</th>
+          <th class="vcol-student">Student</th>
+          <th class="vcol-rem">Remark</th>
+          <th class="vcol-trials">Trials</th>
+          <th class="vcol-total">Total</th>
+          <th class="vcol-score">% Score</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
     </div>
   </div>`;
 }
@@ -4097,11 +4097,11 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
       // "+ " shows even with no remark yet — see the individual screen's
       // viewActivityRows for why (lets a score be logged without first
       // typing a remark).
-      return attendees.map((studentName, idx) => `<div class="view-row" style="display:contents">
-        <div class="vcol-no" contenteditable="false">${idx === 0 ? no : ""}</div>
-        <div class="vcol-act" contenteditable="false">${idx === 0 ? actCellWithToggle : ""}</div>
-        <div class="vcol-student" contenteditable="false">${escHtml(studentName)}</div>
-        <div class="vcol-rem">
+      return attendees.map((studentName, idx) => `<tr class="view-row">
+        <td class="vcol-no" contenteditable="false">${idx === 0 ? no : ""}</td>
+        <td class="vcol-act" contenteditable="false">${idx === 0 ? actCellWithToggle : ""}</td>
+        <td class="vcol-student" contenteditable="false">${escHtml(studentName)}</td>
+        <td class="vcol-rem">
           <div class="view-remark-edit view-remark-empty"
             data-act-id="${escHtml(actId || "")}"
             data-act-name="${escHtml(actName)}"
@@ -4109,29 +4109,29 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
             data-is-predefined="${isPredefined}"
             data-student="${escHtml(studentName)}"
             data-placeholder="Click to add remark…"></div>
-        </div>
-        <div class="vcol-trials" contenteditable="false">
+        </td>
+        <td class="vcol-trials" contenteditable="false">
           <button class="view-group-add-trial-new" data-act-id="${escHtml(actId || "")}"
             data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
             data-is-predefined="${isPredefined}" data-student="${escHtml(studentName)}">+</button>
-        </div>
-        <div class="vcol-total" contenteditable="false">&nbsp;</div>
-        <div class="vcol-score" contenteditable="false">&nbsp;</div>
-      </div>`).join("");
+        </td>
+        <td class="vcol-total" contenteditable="false">&nbsp;</td>
+        <td class="vcol-score" contenteditable="false">&nbsp;</td>
+      </tr>`).join("");
     }
 
-    return `<div class="view-row" style="display:contents">
-      <div class="vcol-no" contenteditable="false">${no}</div>
-      <div class="vcol-act" contenteditable="false">${actCellWithToggle}</div>
-      <div class="vcol-student" contenteditable="false"></div>
-      <div class="vcol-rem" contenteditable="false">
+    return `<tr class="view-row">
+      <td class="vcol-no" contenteditable="false">${no}</td>
+      <td class="vcol-act" contenteditable="false">${actCellWithToggle}</td>
+      <td class="vcol-student" contenteditable="false"></td>
+      <td class="vcol-rem" contenteditable="false">
         <button class="btn-view-group-add-remark-all" data-act-id="${escHtml(actId || "")}"
           data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}">+ Add Remark &amp; Trials</button>
-      </div>
-      <div class="vcol-trials" contenteditable="false">&nbsp;</div>
-      <div class="vcol-total" contenteditable="false">&nbsp;</div>
-      <div class="vcol-score" contenteditable="false">&nbsp;</div>
-    </div>`;
+      </td>
+      <td class="vcol-trials" contenteditable="false">&nbsp;</td>
+      <td class="vcol-total" contenteditable="false">&nbsp;</td>
+      <td class="vcol-score" contenteditable="false">&nbsp;</td>
+    </tr>`;
   }
 
   let firstRowOverall = true;
@@ -4148,26 +4148,26 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
       const actVal = firstRowOverall ? actCellWithToggle : null;
 
       if (entry.pending) {
-        html += `<div class="view-row" style="display:contents">
-          <div class="vcol-no" contenteditable="false">${noVal !== null ? noVal : ""}</div>
-          <div class="vcol-act" contenteditable="false">${actVal !== null ? actVal : ""}</div>
-          <div class="vcol-student" contenteditable="false">${escHtml(entry.studentName)}</div>
-          <div class="vcol-rem" contenteditable="false">
+        html += `<tr class="view-row">
+          <td class="vcol-no" contenteditable="false">${noVal !== null ? noVal : ""}</td>
+          <td class="vcol-act" contenteditable="false">${actVal !== null ? actVal : ""}</td>
+          <td class="vcol-student" contenteditable="false">${escHtml(entry.studentName)}</td>
+          <td class="vcol-rem" contenteditable="false">
             <button class="btn-view-group-add-remark-pending" data-act-id="${escHtml(actId || "")}"
               data-student="${escHtml(entry.studentName)}">+ Add Remark &amp; Trials</button>
-          </div>
-          <div class="vcol-trials" contenteditable="false">&nbsp;</div>
-          <div class="vcol-total" contenteditable="false">&nbsp;</div>
-          <div class="vcol-score" contenteditable="false">&nbsp;</div>
-        </div>`;
+          </td>
+          <td class="vcol-trials" contenteditable="false">&nbsp;</td>
+          <td class="vcol-total" contenteditable="false">&nbsp;</td>
+          <td class="vcol-score" contenteditable="false">&nbsp;</td>
+        </tr>`;
         firstRowOverall = false;
         continue;
       }
 
-      // No table rowspan in a CSS Grid layout — the first present student in a
-      // combined round gets the shared editable box; every other student in
-      // that round gets a small read-only note instead of their own box
-      // (still its own grid cell, so column alignment stays intact).
+      // The first present student in a combined round gets the shared
+      // editable box; every other student in that round gets a small
+      // read-only note instead of their own box (still its own cell, so
+      // column alignment stays intact).
       const combineOpts = !combineThisRound ? null
         : usedSharedCell
           ? { skipRemarkCell: true }
@@ -4191,18 +4191,18 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
 
   let remarkCellDiv;
   if (combineOpts?.skipRemarkCell) {
-    // No rowspan in a grid layout — this student's remark is the one shown
-    // in the first row of the combined round above; this cell just says so.
-    remarkCellDiv = `<div class="vcol-rem view-rem-combined-hint" contenteditable="false">(combined above)</div>`;
+    // This student's remark is the one shown in the first row of the
+    // combined round above; this cell just says so.
+    remarkCellDiv = `<td class="vcol-rem view-rem-combined-hint" contenteditable="false">(combined above)</td>`;
   } else if (combineOpts) {
     // Combined round — one shared plain-text box across remIds (mirrors the live
     // group session editor's "Combined Remarks" mode, which is free-text only).
     const idList = combineOpts.combinedRemIds.join(",");
-    remarkCellDiv = `<div class="vcol-rem">
+    remarkCellDiv = `<td class="vcol-rem">
       <div class="view-remark-edit group-remark-input-combined"
         data-rem-ids="${idList}" data-saved-html="${escHtml(remarkToHtml(combineOpts.sharedText))}"
         >${remarkToHtml(combineOpts.sharedText)}</div>
-    </div>`;
+    </td>`;
   } else {
     const opts = parseOpts(inlineOptions);
 
@@ -4252,23 +4252,23 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
     } else {
       remarkCell = optSelect;
     }
-    remarkCellDiv = `<div class="vcol-rem">${remarkCell}</div>`;
+    remarkCellDiv = `<td class="vcol-rem">${remarkCell}</td>`;
   }
 
-  return `<div class="view-row" style="display:contents">
-    <div class="vcol-no" contenteditable="false">${no !== null ? no : ""}</div>
-    <div class="vcol-act" contenteditable="false">${actName !== null ? actName : ""}</div>
-    <div class="vcol-student" contenteditable="false">${escHtml(studentName)}</div>
+  return `<tr class="view-row">
+    <td class="vcol-no" contenteditable="false">${no !== null ? no : ""}</td>
+    <td class="vcol-act" contenteditable="false">${actName !== null ? actName : ""}</td>
+    <td class="vcol-student" contenteditable="false">${escHtml(studentName)}</td>
     ${remarkCellDiv}
-    <div class="vcol-trials" contenteditable="false"><div class="trial-cells">${trialCells}</div></div>
-    <div class="vcol-total" contenteditable="false">${validTrials.length > 0 ? total : "&nbsp;"}</div>
-    <div class="vcol-score" contenteditable="false">
+    <td class="vcol-trials" contenteditable="false"><div class="trial-cells">${trialCells}</div></td>
+    <td class="vcol-total" contenteditable="false">${validTrials.length > 0 ? total : "&nbsp;"}</td>
+    <td class="vcol-score" contenteditable="false">
       <div style="display:flex;align-items:center;gap:.3rem;justify-content:flex-end">
         <span>${scorePct}</span>
         <button class="view-rem-del" data-rem-id="${escHtml(rem.id)}" title="Delete remark">×</button>
       </div>
-    </div>
-  </div>`;
+    </td>
+  </tr>`;
 }
 
 function getGroupViewMaxPtsForRemark(remId) {
