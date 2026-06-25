@@ -110,7 +110,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "519";
+const APP_VERSION = "520";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2118,7 +2118,7 @@ function attachTargetListeners(target) {
 
   // ── Mastery level buttons ─────────────────────────────────
   c.querySelectorAll(".btn-mastery").forEach(btn => {
-    btn.addEventListener("click", async () => {
+    btn.addEventListener("click", () => {
       const container  = btn.closest(".remark-mastery-opts");
       const currentVal = container?.querySelector(".btn-mastery.active")?.dataset.val || "";
       const isActive   = btn.classList.contains("active");
@@ -2129,7 +2129,23 @@ function attachTargetListeners(target) {
       if (!confirm(`Change mastery level from "${fromLabel}" to "${toLabel}"?`)) return;
       container?.querySelectorAll(".btn-mastery").forEach(b => b.classList.remove("active"));
       if (!isActive) btn.classList.add("active");
-      await updateRemarkText(state.currentSessionId, btn.dataset.remId, newVal);
+      // Update local state synchronously, not just the DOM — leaveSession()'s
+      // cleanup-empty-remarks check reads state.sessionData straight off a
+      // snapshot taken on the way out, with no guard for an in-flight write
+      // from a button click. If only the Firestore write were fired and the
+      // boss left the screen before the listener echoed it back, the cleanup
+      // could see the OLD (e.g. blank) value and delete the remark she just
+      // set, even though the write itself had succeeded.
+      const remId = btn.dataset.remId;
+      const rem = state.sessionData?.remarks?.[remId];
+      const prevVal = rem?.text;
+      if (rem) rem.text = newVal;
+      updateRemarkText(state.currentSessionId, remId, newVal).catch(err => {
+        if (rem) rem.text = prevVal;
+        container?.querySelectorAll(".btn-mastery").forEach(b =>
+          b.classList.toggle("active", b.dataset.val === prevVal));
+        alert("Couldn't save — check your connection and try again.\n\n" + err.message);
+      });
     });
   });
 
@@ -2200,22 +2216,39 @@ function attachTargetListeners(target) {
 
   // ── Remark option buttons (single-select) ─────────────────
   c.querySelectorAll(".remark-preset-opts:not(.remark-preset-opts-multi) .btn-remark-opt").forEach(btn => {
-    btn.addEventListener("click", async () => {
+    btn.addEventListener("click", () => {
       const isActive = btn.classList.contains("active");
       btn.closest(".remark-preset-opts")?.querySelectorAll(".btn-remark-opt").forEach(b => b.classList.remove("active"));
       const newText = isActive ? "" : btn.dataset.opt;
       if (!isActive) btn.classList.add("active");
-      await updateRemarkText(state.currentSessionId, btn.dataset.remId, newText);
+      // See the .btn-mastery handler above for why this needs to update
+      // state.sessionData synchronously, not just the DOM.
+      const remId = btn.dataset.remId;
+      const rem = state.sessionData?.remarks?.[remId];
+      const prevText = rem?.text;
+      if (rem) rem.text = newText;
+      updateRemarkText(state.currentSessionId, remId, newText).catch(err => {
+        if (rem) rem.text = prevText;
+        alert("Couldn't save — check your connection and try again.\n\n" + err.message);
+      });
     });
   });
 
   // ── Remark option buttons (multi-select) ──────────────────
   c.querySelectorAll(".remark-preset-opts-multi .btn-remark-opt").forEach(btn => {
-    btn.addEventListener("click", async () => {
+    btn.addEventListener("click", () => {
       btn.classList.toggle("active");
       const container = btn.closest(".remark-preset-opts-multi");
       const selected = [...container.querySelectorAll(".btn-remark-opt.active")].map(b => b.dataset.opt);
-      await updateRemarkText(state.currentSessionId, btn.dataset.remId, selected.join(", "));
+      const newText = selected.join(", ");
+      const remId = btn.dataset.remId;
+      const rem = state.sessionData?.remarks?.[remId];
+      const prevText = rem?.text;
+      if (rem) rem.text = newText;
+      updateRemarkText(state.currentSessionId, remId, newText).catch(err => {
+        if (rem) rem.text = prevText;
+        alert("Couldn't save — check your connection and try again.\n\n" + err.message);
+      });
     });
   });
 
@@ -2582,13 +2615,18 @@ async function openSessionView(student, sessionId) {
   }
 }
 
-function leaveSessionView() {
+async function leaveSessionView() {
   commitTextEditorSheet();
   $("text-editor-sheet").classList.add("hidden");
   $("btn-delete-session")?.classList.add("hidden");
   $("btn-goto-session")?.classList.add("hidden");
+  // Flush (and await it) while the Firestore listener is still live, same as
+  // leaveSession() does for the live entry screen — flush() only writes to
+  // Firestore, state.viewSessionData only updates once the listener echoes
+  // it back, so unsubscribing first or not waiting for the flush both risk
+  // the cleanup below seeing stale "empty" data for a remark just edited.
+  await state.viewRemarkSaver?.flush();
   if (state.fbViewUnsubscribe) { state.fbViewUnsubscribe(); state.fbViewUnsubscribe = null; }
-  state.viewRemarkSaver?.flush();
   state.viewRemarkSaver?.cleanup();
   state.viewRemarkSaver = null;
   const sessionId = state.viewSessionId;
@@ -3406,6 +3444,12 @@ function attachViewListeners() {
   // body persists across renders, so attaching per-box listeners here would
   // stack up duplicates.
 
+  // These four handlers update state.viewSessionData synchronously (not
+  // just the DOM/Firestore) before awaiting the write — leaveSessionView()
+  // reads state.viewSessionData straight off a captured snapshot on the way
+  // out with no guard for an in-flight write, so without this, leaving the
+  // screen right after a click could see the OLD value and let
+  // cleanupEmptyEntries() delete a remark the boss just set.
   body.querySelectorAll(".view-mastery-opts .btn-mastery").forEach(btn => {
     btn.addEventListener("click", withViewAction("viewActionsInFlight", "viewRenderPending", isViewBusy, renderSessionView, async () => {
       const container  = btn.closest(".remark-mastery-opts");
@@ -3416,14 +3460,31 @@ function attachViewListeners() {
       if (!confirm(`Change mastery level from "${currentVal || "none"}" to "${newVal || "none"}"?`)) return;
       container?.querySelectorAll(".btn-mastery").forEach(b => b.classList.remove("active"));
       if (!isActive) btn.classList.add("active");
-      await updateRemarkText(state.viewSessionId, btn.dataset.remId, newVal);
+      const rem = state.viewSessionData?.remarks?.[btn.dataset.remId];
+      const prevVal = rem?.text;
+      if (rem) rem.text = newVal;
+      try {
+        await updateRemarkText(state.viewSessionId, btn.dataset.remId, newVal);
+      } catch (err) {
+        if (rem) rem.text = prevVal;
+        container?.querySelectorAll(".btn-mastery").forEach(b => b.classList.toggle("active", b.dataset.val === prevVal));
+        alert("Couldn't save — check your connection and try again.\n\n" + err.message);
+      }
     }));
   });
 
   body.querySelectorAll(".view-remark-preset-select").forEach(sel => {
     sel.addEventListener("change", withViewAction("viewActionsInFlight", "viewRenderPending", isViewBusy, renderSessionView, async () => {
       if (!sel.value) return;
-      await updateRemarkText(state.viewSessionId, sel.dataset.remId, sel.value);
+      const rem = state.viewSessionData?.remarks?.[sel.dataset.remId];
+      const prevText = rem?.text;
+      if (rem) rem.text = sel.value;
+      try {
+        await updateRemarkText(state.viewSessionId, sel.dataset.remId, sel.value);
+      } catch (err) {
+        if (rem) rem.text = prevText;
+        alert("Couldn't save — check your connection and try again.\n\n" + err.message);
+      }
     }));
   });
 
@@ -3432,7 +3493,16 @@ function attachViewListeners() {
       btn.classList.toggle("active");
       const container = btn.closest(".view-remark-multi-opts");
       const selected = [...container.querySelectorAll(".view-remark-multi-btn.active")].map(b => b.dataset.opt);
-      await updateRemarkText(state.viewSessionId, btn.dataset.remId, selected.join(", "));
+      const newText = selected.join(", ");
+      const rem = state.viewSessionData?.remarks?.[btn.dataset.remId];
+      const prevText = rem?.text;
+      if (rem) rem.text = newText;
+      try {
+        await updateRemarkText(state.viewSessionId, btn.dataset.remId, newText);
+      } catch (err) {
+        if (rem) rem.text = prevText;
+        alert("Couldn't save — check your connection and try again.\n\n" + err.message);
+      }
     }));
   });
 
@@ -3440,7 +3510,14 @@ function attachViewListeners() {
     input.addEventListener("blur", async () => {
       const rem = state.viewSessionData?.remarks?.[input.dataset.remId];
       if (!rem || input.value === (rem.text || "")) return;
-      await updateRemarkText(state.viewSessionId, input.dataset.remId, input.value);
+      const prevText = rem.text;
+      rem.text = input.value;
+      try {
+        await updateRemarkText(state.viewSessionId, input.dataset.remId, input.value);
+      } catch (err) {
+        rem.text = prevText;
+        alert("Couldn't save — check your connection and try again.\n\n" + err.message);
+      }
     });
   });
 
@@ -3565,13 +3642,17 @@ async function openGroupSessionView(group, sessionId) {
   }
 }
 
-function leaveGroupSessionView() {
+async function leaveGroupSessionView() {
   commitTextEditorSheet();
   $("text-editor-sheet").classList.add("hidden");
   $("btn-group-delete-session")?.classList.add("hidden");
   $("btn-group-goto-session")?.classList.add("hidden");
+  // See the matching comment in leaveSessionView() — flush (and await it)
+  // before unsubscribing, not after, so the listener is still alive to
+  // reflect the flushed write into state.viewGroupSessionData before the
+  // cleanup below reads it.
+  await state.viewGroupRemarkSaver?.flush();
   if (state.fbViewGroupUnsubscribe) { state.fbViewGroupUnsubscribe(); state.fbViewGroupUnsubscribe = null; }
-  state.viewGroupRemarkSaver?.flush();
   state.viewGroupRemarkSaver?.cleanup();
   state.viewGroupRemarkSaver = null;
   const sessionId = state.viewGroupSessionId;
@@ -4146,6 +4227,12 @@ function attachGroupViewListeners() {
   // combined / .view-mastery-note is handled by the shared host saver
   // (state.viewGroupRemarkSaver) set up once in openGroupSessionView.
 
+  // These four handlers update state.viewGroupSessionData synchronously
+  // (not just the DOM/Firestore) before awaiting the write — see the matching
+  // comment on the individual view screen's equivalent handlers for why:
+  // leaveGroupSessionView()'s cleanup reads a captured snapshot with no guard
+  // for an in-flight write, which could otherwise let it delete a remark the
+  // boss just set.
   body.querySelectorAll(".view-mastery-opts .btn-mastery").forEach(btn => {
     btn.addEventListener("click", wrap(async () => {
       const container  = btn.closest(".remark-mastery-opts");
@@ -4156,14 +4243,31 @@ function attachGroupViewListeners() {
       if (!confirm(`Change mastery level from "${currentVal || "none"}" to "${newVal || "none"}"?`)) return;
       container?.querySelectorAll(".btn-mastery").forEach(b => b.classList.remove("active"));
       if (!isActive) btn.classList.add("active");
-      await updateRemarkText(sid(), btn.dataset.remId, newVal);
+      const rem = state.viewGroupSessionData?.remarks?.[btn.dataset.remId];
+      const prevVal = rem?.text;
+      if (rem) rem.text = newVal;
+      try {
+        await updateRemarkText(sid(), btn.dataset.remId, newVal);
+      } catch (err) {
+        if (rem) rem.text = prevVal;
+        container?.querySelectorAll(".btn-mastery").forEach(b => b.classList.toggle("active", b.dataset.val === prevVal));
+        alert("Couldn't save — check your connection and try again.\n\n" + err.message);
+      }
     }));
   });
 
   body.querySelectorAll(".view-remark-preset-select").forEach(sel => {
     sel.addEventListener("change", wrap(async () => {
       if (!sel.value) return;
-      await updateRemarkText(sid(), sel.dataset.remId, sel.value);
+      const rem = state.viewGroupSessionData?.remarks?.[sel.dataset.remId];
+      const prevText = rem?.text;
+      if (rem) rem.text = sel.value;
+      try {
+        await updateRemarkText(sid(), sel.dataset.remId, sel.value);
+      } catch (err) {
+        if (rem) rem.text = prevText;
+        alert("Couldn't save — check your connection and try again.\n\n" + err.message);
+      }
     }));
   });
 
@@ -4172,7 +4276,16 @@ function attachGroupViewListeners() {
       btn.classList.toggle("active");
       const container = btn.closest(".view-remark-multi-opts");
       const selected = [...container.querySelectorAll(".view-remark-multi-btn.active")].map(b => b.dataset.opt);
-      await updateRemarkText(sid(), btn.dataset.remId, selected.join(", "));
+      const newText = selected.join(", ");
+      const rem = state.viewGroupSessionData?.remarks?.[btn.dataset.remId];
+      const prevText = rem?.text;
+      if (rem) rem.text = newText;
+      try {
+        await updateRemarkText(sid(), btn.dataset.remId, newText);
+      } catch (err) {
+        if (rem) rem.text = prevText;
+        alert("Couldn't save — check your connection and try again.\n\n" + err.message);
+      }
     }));
   });
 
@@ -4180,7 +4293,14 @@ function attachGroupViewListeners() {
     input.addEventListener("blur", async () => {
       const rem = state.viewGroupSessionData?.remarks?.[input.dataset.remId];
       if (!rem || input.value === (rem.text || "")) return;
-      await updateRemarkText(sid(), input.dataset.remId, input.value);
+      const prevText = rem.text;
+      rem.text = input.value;
+      try {
+        await updateRemarkText(sid(), input.dataset.remId, input.value);
+      } catch (err) {
+        rem.text = prevText;
+        alert("Couldn't save — check your connection and try again.\n\n" + err.message);
+      }
     });
   });
 
