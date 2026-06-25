@@ -110,7 +110,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "493";
+const APP_VERSION = "494";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2804,15 +2804,21 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
   )).join("");
 }
 
-function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, isMastery = false) {
-  const allTrials  = rem.trials || [];
-  const maxPts     = target.maxPoints || 3;
-  const validTrials = allTrials.filter(t => t !== -1);
-  const total      = validTrials.reduce((a, b) => a + b, 0);
-  const scorePct   = validTrials.length > 0
+// Shared by viewRemarkRow/viewGroupRemarkRow (initial render) and
+// refreshViewTrialRow/refreshGroupViewTrialRow (surgical in-place update
+// after a trial add/delete/score change — see the comment on
+// bindViewTrialCellListeners for why those don't go through a full render).
+function calcViewTrialSummary(trials, maxPts) {
+  const validTrials = (trials || []).filter(t => t !== -1);
+  const total       = validTrials.reduce((a, b) => a + b, 0);
+  const scorePct    = validTrials.length > 0
     ? Math.round(total / (validTrials.length * maxPts) * 100) + "%" : "";
+  return { validTrials, total, scorePct };
+}
 
-  const trialCells = allTrials.map((t, ti) => `
+function buildTrialCellsHtml(rem, maxPts) {
+  const allTrials = rem.trials || [];
+  return allTrials.map((t, ti) => `
     <span class="trial-cell">
       <select class="view-trial-select" data-rem-id="${escHtml(rem.id)}" data-trial-idx="${ti}">
         <option value="-1"${t === -1 ? " selected" : ""}>—</option>
@@ -2822,6 +2828,12 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
       <button class="view-trial-del" data-rem-id="${escHtml(rem.id)}" data-trial-idx="${ti}">×</button>
     </span>`).join("") +
     `<button class="view-add-trial" data-rem-id="${escHtml(rem.id)}">+</button>`;
+}
+
+function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, isMastery = false) {
+  const maxPts = target.maxPoints || 3;
+  const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts);
+  const trialCells = buildTrialCellsHtml(rem, maxPts);
 
   const opts = parseOpts(inlineOptions);
 
@@ -3030,14 +3042,9 @@ function setupMergedRemarkSaving(body, getSessionId, onIdle) {
     const el = (node.nodeType === 1 ? node : node.parentElement)?.closest(".view-remark-edit");
     if (el) el.classList.add("rem-edit-active");
   };
-  // Backstop against the browser's native paragraph/line-break insertion —
-  // each remark box's own keydown handler calls preventDefault() and inserts
-  // a manual <br> instead, but that alone isn't reliable inside a
-  // contenteditable="true" box nested in this larger contenteditable="true"
-  // host: Chrome's "beforeinput" event (the one that actually performs the
-  // native split into a new sibling element) can still fire and go through
-  // even after keydown was prevented. Catching it at the host level (it
-  // bubbles) blocks the native insert everywhere in one place.
+  // Cancels and replaces the browser's native paragraph/line-break insertion
+  // for Enter (see the inline comment below for why this event, not the
+  // remark box's own keydown handler, is where that replacement happens).
   //
   // ALSO guards backspace/delete from escaping a box's own boundary — once a
   // box is emptied, continuing to backspace can otherwise keep consuming the
@@ -3047,6 +3054,23 @@ function setupMergedRemarkSaving(body, getSessionId, onIdle) {
   const onBeforeInput = e => {
     if (e.inputType === "insertParagraph" || e.inputType === "insertLineBreak") {
       e.preventDefault();
+      // The actual <br> substitution for Enter happens here, not in the
+      // remark box's own keydown handler — in this nested-contenteditable
+      // setup Chrome's native paragraph-split can partially apply even
+      // after keydown.preventDefault() already ran (it doesn't reliably
+      // suppress this event), so inserting from keydown risked landing the
+      // manual <br> on top of that half-applied native change, especially
+      // when there was trailing text to split around (needing a 2nd Enter
+      // to "fix" the result). Reacting here instead — the one event Chrome
+      // actually checks before proceeding — is the reliable cancellation
+      // point, so this is also the reliable place to do the replacement.
+      const sel  = document.getSelection();
+      const node = sel && sel.rangeCount > 0 ? sel.anchorNode : null;
+      const ta = node && (node.nodeType === 1 ? node : node.parentElement)?.closest(".view-remark-edit");
+      if (ta && body.contains(ta)) {
+        insertBrAtCaret();
+        ta.dispatchEvent(new Event("input", { bubbles: true }));
+      }
       return;
     }
     if (e.inputType !== "deleteContentBackward" && e.inputType !== "deleteContentForward") return;
@@ -3356,20 +3380,107 @@ function setupViewEnterKeyDelegation(host, getSaver) {
     if (!ta || !host.contains(ta)) return;
     if (isSelectAll) { e.preventDefault(); selectAllWithin(ta); return; }
     if (e.ctrlKey || e.metaKey) { e.preventDefault(); getSaver()?.flush(); return; }
+    // Just prevents the native split from starting here — the actual <br>
+    // substitution happens in setupMergedRemarkSaving's onBeforeInput
+    // backstop instead (see its comment): this nested-contenteditable setup
+    // doesn't reliably honor preventDefault() on keydown itself, so doing
+    // the replacement here risked landing on top of a half-applied native
+    // change a moment later, which is what needed a 2nd Enter to "fix".
     e.preventDefault();
-    // Inserted synchronously, not deferred — range.insertNode() is a direct
-    // DOM mutation, not a simulated input, so it never triggers beforeinput/
-    // input itself and doesn't need to dodge onBeforeInput's own handling.
-    // Deferring via setTimeout instead left a same-task window where, in
-    // this nested-contenteditable setup, the browser could still go ahead
-    // with its own (supposedly prevented) native paragraph split first —
-    // landing the manual <br> on top of that half-applied native change a
-    // moment later, which read as "the first Enter did nothing."
-    insertBrAtCaret();
-    ta.dispatchEvent(new Event("input", { bubbles: true }));
   };
   host.addEventListener("keydown", onKeydown);
   return () => host.removeEventListener("keydown", onKeydown);
+}
+
+function getViewMaxPtsForRemark(remId) {
+  const data = state.viewSessionData;
+  const rem  = data?.remarks?.[remId];
+  const act  = rem && data.activities?.[rem.activityId];
+  const target = act && getViewEffectiveTargets().find(t => t.name === act.targetName);
+  return target?.maxPoints || 3;
+}
+
+// Patches just one remark's trial cells/running total/score in place instead
+// of going through a full renderSessionView() — the Trials column's buttons
+// sit inside a contenteditable="false" cell, so clicking them never moves
+// focus off the page's single big contenteditable host (mousedown is
+// deliberately suppressed there in setupMergedRemarkSaving's onMouseDown, to
+// fix buttons needing 2 clicks). That leaves the host looking permanently
+// "focused" to isViewBusy() from the moment it's ever clicked once, so a
+// full-page render after a trial-button click was being deferred
+// indefinitely — only landing (all at once, for every click queued up in the
+// meantime) whenever something else happened to genuinely blur the host.
+// Updating just this row's own cells sidesteps that defer system entirely:
+// there's nothing else on the page this could disturb, so it's always safe
+// to do immediately, no busy-check needed.
+function refreshViewTrialRow(remId) {
+  const rem = state.viewSessionData?.remarks?.[remId];
+  if (!rem) return;
+  const body = $("session-view-body");
+  const tr   = body.querySelector(`.view-rem-del[data-rem-id="${remId}"]`)?.closest("tr");
+  if (!tr) return;
+  const maxPts = getViewMaxPtsForRemark(remId);
+  const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts);
+  const trialCellsDiv = tr.querySelector(".trial-cells");
+  if (trialCellsDiv) {
+    trialCellsDiv.innerHTML = buildTrialCellsHtml(rem, maxPts);
+    bindViewTrialCellListeners(trialCellsDiv);
+  }
+  const totalTd = tr.querySelector(".vcol-total");
+  if (totalTd) totalTd.innerHTML = validTrials.length > 0 ? String(total) : "&nbsp;";
+  const scoreSpan = tr.querySelector(".vcol-score span");
+  if (scoreSpan) scoreSpan.textContent = scorePct;
+}
+
+function bindViewTrialCellListeners(container) {
+  container.querySelectorAll(".view-trial-select").forEach(sel => {
+    sel.addEventListener("change", () => {
+      const rem = state.viewSessionData?.remarks?.[sel.dataset.remId];
+      if (!rem) return;
+      const prevTrials = rem.trials || [];
+      const trials = [...prevTrials];
+      trials[Number(sel.dataset.trialIdx)] = Number(sel.value);
+      rem.trials = trials;
+      refreshViewTrialRow(sel.dataset.remId);
+      setTrials(state.viewSessionId, sel.dataset.remId, trials).catch(err => {
+        rem.trials = prevTrials;
+        refreshViewTrialRow(sel.dataset.remId);
+        alert("Couldn't update — check your connection and try again.\n\n" + err.message);
+      });
+    });
+  });
+
+  container.querySelectorAll(".view-trial-del").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const rem = state.viewSessionData?.remarks?.[btn.dataset.remId];
+      if (!rem) return;
+      const prevTrials = rem.trials || [];
+      const trials = prevTrials.filter((_, i) => i !== Number(btn.dataset.trialIdx));
+      rem.trials = trials;
+      refreshViewTrialRow(btn.dataset.remId);
+      setTrials(state.viewSessionId, btn.dataset.remId, trials).catch(err => {
+        rem.trials = prevTrials;
+        refreshViewTrialRow(btn.dataset.remId);
+        alert("Couldn't update — check your connection and try again.\n\n" + err.message);
+      });
+    });
+  });
+
+  container.querySelectorAll(".view-add-trial").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const rem = state.viewSessionData?.remarks?.[btn.dataset.remId];
+      if (!rem) return;
+      const prevTrials = rem.trials || [];
+      const trials = [...prevTrials, -1];
+      rem.trials = trials;
+      refreshViewTrialRow(btn.dataset.remId);
+      setTrials(state.viewSessionId, btn.dataset.remId, trials).catch(err => {
+        rem.trials = prevTrials;
+        refreshViewTrialRow(btn.dataset.remId);
+        alert("Couldn't add trial — check your connection and try again.\n\n" + err.message);
+      });
+    });
+  });
 }
 
 function showViewAddRemarkPicker(targetName) {
@@ -3407,47 +3518,7 @@ function showViewAddRemarkPicker(targetName) {
 function attachViewListeners() {
   const body = $("session-view-body");
 
-  body.querySelectorAll(".view-trial-select").forEach(sel => {
-    sel.addEventListener("change", withViewAction("viewActionsInFlight", "viewRenderPending", isViewBusy, renderSessionView, async () => {
-      const rem = state.viewSessionData?.remarks?.[sel.dataset.remId];
-      if (!rem) return;
-      const trials = [...(rem.trials || [])];
-      trials[Number(sel.dataset.trialIdx)] = Number(sel.value);
-      await setTrials(state.viewSessionId, sel.dataset.remId, trials);
-    }));
-  });
-
-  body.querySelectorAll(".view-trial-del").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const rem = state.viewSessionData?.remarks?.[btn.dataset.remId];
-      if (!rem) return;
-      const prevTrials = rem.trials || [];
-      const trials = prevTrials.filter((_, i) => i !== Number(btn.dataset.trialIdx));
-      rem.trials = trials;
-      renderViewOrDefer("viewRenderPending", isViewBusy, renderSessionView);
-      setTrials(state.viewSessionId, btn.dataset.remId, trials).catch(err => {
-        rem.trials = prevTrials;
-        renderViewOrDefer("viewRenderPending", isViewBusy, renderSessionView);
-        alert("Couldn't update — check your connection and try again.\n\n" + err.message);
-      });
-    });
-  });
-
-  body.querySelectorAll(".view-add-trial").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const rem = state.viewSessionData?.remarks?.[btn.dataset.remId];
-      if (!rem) return;
-      const prevTrials = rem.trials || [];
-      const trials = [...prevTrials, -1];
-      rem.trials = trials;
-      renderViewOrDefer("viewRenderPending", isViewBusy, renderSessionView);
-      setTrials(state.viewSessionId, btn.dataset.remId, trials).catch(err => {
-        rem.trials = prevTrials;
-        renderViewOrDefer("viewRenderPending", isViewBusy, renderSessionView);
-        alert("Couldn't add trial — check your connection and try again.\n\n" + err.message);
-      });
-    });
-  });
+  bindViewTrialCellListeners(body);
 
   body.querySelectorAll(".view-add-remark-target").forEach(btn => {
     btn.addEventListener("click", () => showViewAddRemarkPicker(btn.dataset.target));
@@ -3957,23 +4028,9 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
 }
 
 function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, isMastery = false, combineOpts = null) {
-  const allTrials   = rem.trials || [];
-  const maxPts      = target.maxPoints || 3;
-  const validTrials = allTrials.filter(t => t !== -1);
-  const total       = validTrials.reduce((a, b) => a + b, 0);
-  const scorePct    = validTrials.length > 0
-    ? Math.round(total / (validTrials.length * maxPts) * 100) + "%" : "";
-
-  const trialCells = allTrials.map((t, ti) => `
-    <span class="trial-cell">
-      <select class="view-trial-select" data-rem-id="${escHtml(rem.id)}" data-trial-idx="${ti}">
-        <option value="-1"${t === -1 ? " selected" : ""}>—</option>
-        ${Array.from({ length: maxPts + 1 }, (_, i) => maxPts - i)
-          .map(v => `<option value="${v}"${v === t ? " selected" : ""}>${v}</option>`).join("")}
-      </select>
-      <button class="view-trial-del" data-rem-id="${escHtml(rem.id)}" data-trial-idx="${ti}">×</button>
-    </span>`).join("") +
-    `<button class="view-add-trial" data-rem-id="${escHtml(rem.id)}">+</button>`;
+  const maxPts = target.maxPoints || 3;
+  const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts);
+  const trialCells = buildTrialCellsHtml(rem, maxPts);
 
   let remarkTd = "";
   if (!combineOpts?.skipRemarkCell) {
@@ -4052,53 +4109,96 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
   </tr>`;
 }
 
-function attachGroupViewListeners() {
+function getGroupViewMaxPtsForRemark(remId) {
+  const data = state.viewGroupSessionData;
+  const rem  = data?.remarks?.[remId];
+  const act  = rem && data.activities?.[rem.activityId];
+  const target = act && getViewGroupEffectiveTargets().find(t => t.name === act.targetName);
+  return target?.maxPoints || 3;
+}
+
+// Group-view counterpart of refreshViewTrialRow — same reasoning applies
+// (see its comment): the Trials column's buttons can't blur the shared
+// contenteditable host, so a full renderGroupSessionView() after clicking
+// one gets deferred by isGroupViewBusy() until something unrelated finally
+// blurs the host. Patching just this row sidesteps that entirely.
+function refreshGroupViewTrialRow(remId) {
+  const rem = state.viewGroupSessionData?.remarks?.[remId];
+  if (!rem) return;
   const body = $("group-session-view-body");
-  const sid  = () => state.viewGroupSessionId;
+  const tr   = body.querySelector(`.view-rem-del[data-rem-id="${remId}"]`)?.closest("tr");
+  if (!tr) return;
+  const maxPts = getGroupViewMaxPtsForRemark(remId);
+  const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts);
+  const trialCellsDiv = tr.querySelector(".trial-cells");
+  if (trialCellsDiv) {
+    trialCellsDiv.innerHTML = buildTrialCellsHtml(rem, maxPts);
+    bindGroupViewTrialCellListeners(trialCellsDiv);
+  }
+  const totalTd = tr.querySelector(".vcol-total");
+  if (totalTd) totalTd.innerHTML = validTrials.length > 0 ? String(total) : "&nbsp;";
+  const scoreSpan = tr.querySelector(".vcol-score span");
+  if (scoreSpan) scoreSpan.textContent = scorePct;
+}
 
-  const wrap = fn => withViewAction("viewGroupActionsInFlight", "viewGroupRenderPending", isGroupViewBusy, renderGroupSessionView, fn);
-
-  body.querySelectorAll(".view-trial-select").forEach(sel => {
-    sel.addEventListener("change", wrap(async () => {
+function bindGroupViewTrialCellListeners(container) {
+  container.querySelectorAll(".view-trial-select").forEach(sel => {
+    sel.addEventListener("change", () => {
       const rem = state.viewGroupSessionData?.remarks?.[sel.dataset.remId];
       if (!rem) return;
-      const trials = [...(rem.trials || [])];
+      const prevTrials = rem.trials || [];
+      const trials = [...prevTrials];
       trials[Number(sel.dataset.trialIdx)] = Number(sel.value);
-      await setTrials(sid(), sel.dataset.remId, trials);
-    }));
+      rem.trials = trials;
+      refreshGroupViewTrialRow(sel.dataset.remId);
+      setTrials(state.viewGroupSessionId, sel.dataset.remId, trials).catch(err => {
+        rem.trials = prevTrials;
+        refreshGroupViewTrialRow(sel.dataset.remId);
+        alert("Couldn't update — check your connection and try again.\n\n" + err.message);
+      });
+    });
   });
 
-  body.querySelectorAll(".view-trial-del").forEach(btn => {
+  container.querySelectorAll(".view-trial-del").forEach(btn => {
     btn.addEventListener("click", () => {
       const rem = state.viewGroupSessionData?.remarks?.[btn.dataset.remId];
       if (!rem) return;
       const prevTrials = rem.trials || [];
       const trials = prevTrials.filter((_, i) => i !== Number(btn.dataset.trialIdx));
       rem.trials = trials;
-      renderViewOrDefer("viewGroupRenderPending", isGroupViewBusy, renderGroupSessionView);
-      setTrials(sid(), btn.dataset.remId, trials).catch(err => {
+      refreshGroupViewTrialRow(btn.dataset.remId);
+      setTrials(state.viewGroupSessionId, btn.dataset.remId, trials).catch(err => {
         rem.trials = prevTrials;
-        renderViewOrDefer("viewGroupRenderPending", isGroupViewBusy, renderGroupSessionView);
+        refreshGroupViewTrialRow(btn.dataset.remId);
         alert("Couldn't update — check your connection and try again.\n\n" + err.message);
       });
     });
   });
 
-  body.querySelectorAll(".view-add-trial").forEach(btn => {
+  container.querySelectorAll(".view-add-trial").forEach(btn => {
     btn.addEventListener("click", () => {
       const rem = state.viewGroupSessionData?.remarks?.[btn.dataset.remId];
       if (!rem) return;
       const prevTrials = rem.trials || [];
       const trials = [...prevTrials, -1];
       rem.trials = trials;
-      renderViewOrDefer("viewGroupRenderPending", isGroupViewBusy, renderGroupSessionView);
-      setTrials(sid(), btn.dataset.remId, trials).catch(err => {
+      refreshGroupViewTrialRow(btn.dataset.remId);
+      setTrials(state.viewGroupSessionId, btn.dataset.remId, trials).catch(err => {
         rem.trials = prevTrials;
-        renderViewOrDefer("viewGroupRenderPending", isGroupViewBusy, renderGroupSessionView);
+        refreshGroupViewTrialRow(btn.dataset.remId);
         alert("Couldn't add trial — check your connection and try again.\n\n" + err.message);
       });
     });
   });
+}
+
+function attachGroupViewListeners() {
+  const body = $("group-session-view-body");
+  const sid  = () => state.viewGroupSessionId;
+
+  const wrap = fn => withViewAction("viewGroupActionsInFlight", "viewGroupRenderPending", isGroupViewBusy, renderGroupSessionView, fn);
+
+  bindGroupViewTrialCellListeners(body);
 
   // ── Sketch board buttons (group view screen) ────────────────
   body.querySelectorAll(".btn-sketch[data-rem-id]").forEach(btn => {
