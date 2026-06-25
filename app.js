@@ -110,7 +110,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "514";
+const APP_VERSION = "515";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2596,52 +2596,6 @@ function leaveSessionView() {
   showHome();
 }
 
-// Gathers every typed remark/mastery-note in the currently-rendered View/Edit
-// Past Sessions table into one plain-text block, labeled by target/activity
-// (and student, on the group screen) — for "Copy All Remarks", so the boss
-// can paste a whole session into Grammarly's own editor (or Word/Docs) and
-// check everything in one pass instead of one remark box at a time, now
-// that each box only checks itself. Reads straight from the rendered DOM
-// (not the underlying data model) so it always matches exactly what's on
-// screen, including unsaved edits still sitting in a textarea.
-function collectAllRemarksText(body) {
-  const blocks = [];
-  body.querySelectorAll(".target-view-section").forEach(section => {
-    const targetName = section.querySelector(".target-view-name")?.textContent.trim() || "";
-    const lines = [];
-    let lastActName = "";
-    section.querySelectorAll("table.view-table > tbody > tr").forEach(tr => {
-      if (tr.matches(".view-heading-row, .view-note-row, .view-comment-row, .view-dayavg-row")) return;
-      const actCell  = tr.querySelector(".vcol-act");
-      const actInput = actCell?.querySelector(".view-act-edit");
-      const actText  = actInput ? actInput.value.trim() : (actCell?.textContent.trim() || "");
-      if (actText) lastActName = actText;
-      const studentName = tr.querySelector(".vcol-student")?.textContent.trim() || "";
-      tr.querySelectorAll(".view-remark-edit, .view-mastery-note").forEach(field => {
-        const text = field.value.trim();
-        if (!text) return;
-        const label = studentName ? `${lastActName} — ${studentName}` : lastActName;
-        lines.push(`${label}: ${text}`);
-      });
-    });
-    if (lines.length) blocks.push(`${targetName}\n${lines.join("\n")}`);
-  });
-  return blocks.join("\n\n");
-}
-
-async function copyAllRemarksToClipboard(body, button) {
-  const text = collectAllRemarksText(body);
-  if (!text) { alert("No remarks to copy yet."); return; }
-  try {
-    await navigator.clipboard.writeText(text);
-    const original = button.textContent;
-    button.textContent = "Copied!";
-    setTimeout(() => { button.textContent = original; }, 1500);
-  } catch {
-    alert("Couldn't copy automatically — here's the text to copy manually:\n\n" + text);
-  }
-}
-
 $("btn-view-back").addEventListener("click", leaveSessionView);
 
 function renderSessionView() {
@@ -2664,12 +2618,6 @@ function renderSessionView() {
   if (gotoBtn) {
     gotoBtn.classList.remove("hidden");
     gotoBtn.onclick = () => showGoToAnotherSession(state.viewStudent);
-  }
-
-  const copyBtn = $("btn-copy-remarks");
-  if (copyBtn) {
-    copyBtn.classList.remove("hidden");
-    copyBtn.onclick = () => copyAllRemarksToClipboard($("session-view-body"), copyBtn);
   }
 
   // Wire delete button (static element in header — re-attach each time)
@@ -3649,12 +3597,6 @@ function renderGroupSessionView() {
   if (gotoBtn) {
     gotoBtn.classList.remove("hidden");
     gotoBtn.onclick = () => showGoToAnotherGroupSession(state.viewGroup);
-  }
-
-  const copyBtn = $("btn-group-copy-remarks");
-  if (copyBtn) {
-    copyBtn.classList.remove("hidden");
-    copyBtn.onclick = () => copyAllRemarksToClipboard($("group-session-view-body"), copyBtn);
   }
 
   // Wire delete button (static element in header — re-attach each time)
