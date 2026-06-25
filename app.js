@@ -110,7 +110,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "512";
+const APP_VERSION = "513";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3202,10 +3202,44 @@ function setupMergedRemarkSaving(body, getSessionId, onIdle) {
     if (e.target.closest("select, input, textarea")) return;
     if (e.target.closest('[contenteditable="false"]')) e.preventDefault();
   };
+  // Pasting into a remark box otherwise inserts whatever's on the clipboard
+  // verbatim — copied formatting/markup from elsewhere on the page (or an
+  // actual image) lands as real HTML/an <img> inside the table, which can
+  // visually break the row layout entirely (floating boxes, broken columns)
+  // since this contenteditable region was only ever designed to hold plain
+  // text + the app's own <br>/<b> markup. Force every paste down to plain
+  // text only, reusing the box's own Enter-key convention (one <br> per
+  // newline) so a multi-line paste still looks right.
+  const onPaste = e => {
+    const sel  = document.getSelection();
+    const node = sel && sel.rangeCount > 0 ? sel.anchorNode : null;
+    const el = node && (node.nodeType === 1 ? node : node.parentElement)?.closest(".view-remark-edit, .view-mastery-note");
+    if (!el || !body.contains(el)) return;
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData)?.getData("text/plain") || "";
+    if (!text || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    range.deleteContents();
+    const frag = document.createDocumentFragment();
+    let lastNode = null;
+    text.split(/\r\n|\r|\n/).forEach((line, i) => {
+      if (i > 0) lastNode = frag.appendChild(document.createElement("br"));
+      if (line) lastNode = frag.appendChild(document.createTextNode(line));
+    });
+    range.insertNode(frag);
+    if (lastNode) {
+      range.setStartAfter(lastNode);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  };
   body.addEventListener("input", onInput);
   body.addEventListener("focusout", onFocusOut);
   body.addEventListener("beforeinput", onBeforeInput);
   body.addEventListener("mousedown", onMouseDown);
+  body.addEventListener("paste", onPaste);
   document.addEventListener("selectionchange", onSelectionChange);
 
   return {
@@ -3217,6 +3251,7 @@ function setupMergedRemarkSaving(body, getSessionId, onIdle) {
       body.removeEventListener("input", onInput);
       body.removeEventListener("focusout", onFocusOut);
       body.removeEventListener("mousedown", onMouseDown);
+      body.removeEventListener("paste", onPaste);
       document.removeEventListener("selectionchange", onSelectionChange);
     }
   };
