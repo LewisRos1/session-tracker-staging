@@ -110,7 +110,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "520";
+const APP_VERSION = "521";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3391,7 +3391,7 @@ function showViewAddRemarkPicker(targetName) {
     .filter(([actId, a]) => a.targetName === targetName && viewGetRemarks(data, actId).length > 0)
     .map(([actId, a]) => ({ actId, name: a.activityName }));
 
-  $("session-picker-title").textContent = "Add Remark & Trials";
+  $("session-picker-title").textContent = "Add Remark & Trials to which Activity?";
   $("session-picker-list").innerHTML = choices.length
     ? `<div class="choice-list">` + choices.map(c => `
         <button class="choice-btn view-add-remark-choice" data-act-id="${escHtml(c.actId)}">
