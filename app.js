@@ -110,7 +110,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "502";
+const APP_VERSION = "503";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3383,37 +3383,46 @@ function selectAllWithin(el) {
   sel.addRange(range);
 }
 
-// Delegated Ctrl+Enter/Ctrl+A handling for the View/Edit-past-session
+// Delegated Enter/Ctrl+Enter/Ctrl+A handling for the View/Edit-past-session
 // screens' .view-remark-edit and .view-mastery-note boxes (individual and
-// group share the same markup/class). Plain Enter is deliberately NOT
-// intercepted here — an earlier version manually preventDefault()'d it and
-// inserted a <br> by hand (working around document.execCommand("insertLineBreak")
-// being unreliable), but that manual replacement was itself the source of a
-// "needs 2 presses when there's text after the caret" bug, and replacing the
-// table this lived in with a CSS Grid layout didn't change that (the bug was
-// about nested contenteditable regions in general, not <table> specifically).
-// Letting the browser's own Enter handling run instead — configured via
-// document.execCommand("defaultParagraphSeparator", false, "br") at app
-// startup to insert <br> instead of wrapping in a new block element — is
-// simpler and doesn't fight the browser's own (now correctly configured)
-// behavior. MUST be set up once per session-open (not per-render) — host is
-// a persistent container whose children get replaced on every render, but
-// the host itself never does, so re-attaching this on every render would
-// stack up duplicate listeners. getSaver returns whichever merged-editing
-// saver (state.viewRemarkSaver / .viewGroupRemarkSaver) is currently active,
-// so Ctrl+Enter can force an immediate flush.
+// group share the same markup/class).
+//
+// Plain Enter MUST be fully intercepted, not left to the browser — trusting
+// native handling here (even with defaultParagraphSeparator set to "br") let
+// Chrome's nested-contenteditable split land in the wrong container: instead
+// of a <br> inside the box the caret was in, it could create a whole new
+// stray <div> that escapes the box entirely and floats outside the grid
+// cell — exactly the "stray floating box outside the table" failure the
+// very first version of this screen's Enter handling was already written to
+// avoid (back when the table really was a literal <table>; the failure
+// turned out to be about nested contenteditable regions in general, not
+// <table> specifically, so the CSS Grid rewrite didn't avoid it either).
+//
+// document.execCommand("insertHTML", false, "<br>") is used instead of
+// manually splicing a <br> into the Range — that manual approach (this
+// screen's previous Enter handling) was the source of a "needs 2 presses
+// when there's text after the caret" bug: a raw DOM mutation via Range
+// doesn't go through the browser's own editing-command pipeline, leaving
+// its internal editing/undo state out of sync with the actual DOM, which
+// seems to only get reconciled (sometimes destructively) on the NEXT
+// editing operation. execCommand drives that pipeline directly, so the
+// browser's internal state and the DOM never disagree in the first place.
 function setupViewEnterKeyDelegation(host, getSaver) {
   const onKeydown = e => {
     const isSelectAll = (e.key === "a" || e.key === "A") && (e.ctrlKey || e.metaKey);
-    const isCtrlEnter = e.key === "Enter" && (e.ctrlKey || e.metaKey);
-    if (!isSelectAll && !isCtrlEnter) return;
+    if (e.key !== "Enter" && !isSelectAll) return;
+    // An active IME/text-prediction composition consumes the first Enter as
+    // "commit", not "newline".
+    if (e.isComposing) return;
     const sel  = document.getSelection();
     const node = sel && sel.rangeCount > 0 ? sel.anchorNode : null;
     const el = node && (node.nodeType === 1 ? node : node.parentElement)?.closest(".view-remark-edit, .view-mastery-note");
     if (!el || !host.contains(el)) return;
+    if (isSelectAll) { e.preventDefault(); selectAllWithin(el); return; }
+    if (e.ctrlKey || e.metaKey) { e.preventDefault(); getSaver()?.flush(); return; }
     e.preventDefault();
-    if (isSelectAll) selectAllWithin(el);
-    else getSaver()?.flush();
+    document.execCommand("insertHTML", false, "<br>");
+    el.dispatchEvent(new Event("input", { bubbles: true }));
   };
   host.addEventListener("keydown", onKeydown);
   return () => host.removeEventListener("keydown", onKeydown);
@@ -3442,17 +3451,28 @@ function setupViewMouseDownGuard(host) {
   return () => host.removeEventListener("mousedown", onMouseDown);
 }
 
-// Guards backspace/delete from escaping a box's own boundary — once a box
-// is emptied, continuing to backspace can otherwise keep consuming the
+// Backstop against the browser's native paragraph/line-break insertion —
+// setupViewEnterKeyDelegation's own keydown handler calls preventDefault()
+// and inserts a <br> via execCommand("insertHTML") instead, but that alone
+// isn't fully reliable inside a contenteditable="true" box nested in this
+// larger contenteditable="true" host: Chrome's "beforeinput" event (the one
+// that actually performs the native split into a new sibling element) can
+// still fire and go through even after keydown was prevented — and when it
+// does, the new element it creates can land outside the box (or even
+// outside the grid cell) entirely instead of inside it. Catching it at the
+// host level (it bubbles) blocks the native insert everywhere in one place.
+//
+// ALSO guards backspace/delete from escaping a box's own boundary — once a
+// box is emptied, continuing to backspace can otherwise keep consuming the
 // surrounding contenteditable="false" structure (labels, whole rows) as if
-// it were deletable content, a side effect of nesting contenteditable
-// regions inside one shared contenteditable host. Plain Enter's native
-// insertParagraph/insertLineBreak is deliberately NOT cancelled here — see
-// the comment on setupViewEnterKeyDelegation for why letting it through
-// (configured to insert <br> via defaultParagraphSeparator) replaced the
-// old manual interception.
+// it were deletable content, for the same nested-contenteditable reason the
+// paragraph insert needs a backstop.
 function setupViewBeforeInputGuard(host) {
   const onBeforeInput = e => {
+    if (e.inputType === "insertParagraph" || e.inputType === "insertLineBreak") {
+      e.preventDefault();
+      return;
+    }
     if (e.inputType !== "deleteContentBackward" && e.inputType !== "deleteContentForward") return;
     const sel = document.getSelection();
     if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return;
