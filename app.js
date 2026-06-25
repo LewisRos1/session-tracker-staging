@@ -110,7 +110,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "501";
+const APP_VERSION = "502";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2953,11 +2953,22 @@ function setupViewRemarkSaving(body, getSessionId, counterKey, onIdle) {
     const pending = [];
     const trackWrite = p => { pending.push(Promise.resolve(p)); };
 
+    // Every write here — not just ghost-box creation — has to hold
+    // state[counterKey] up until it lands, or the Firestore write's own
+    // local-echo snapshot update (arriving a beat later, often near-
+    // instantly) finds isViewBusy() already false and fires an immediate
+    // full renderSessionView() the moment the 700ms debounce settles —
+    // right when the user just stopped typing. captureViewEditState/
+    // restoreViewEditState are supposed to make that render harmless, but
+    // skipping the render entirely (by holding it off until the write is
+    // actually confirmed) is both simpler and removes a whole class of
+    // "cursor vanished right after I stopped typing" timing risk.
     const diffAndSave = (selector, getValue, doSave) => {
       body.querySelectorAll(selector).forEach(el => {
         const value = getValue(el);
         if (el.dataset.savedHtml === value) return;
         el.dataset.savedHtml = value;
+        state[counterKey]++;
         trackWrite(Promise.resolve(doSave(el, value)).catch(err => {
           // savedHtml already says this is saved — if the write actually
           // failed, leaving it pointing at the unsaved value means nothing
@@ -2966,7 +2977,7 @@ function setupViewRemarkSaving(body, getSessionId, counterKey, onIdle) {
           // like what was just typed silently vanished.
           if (el.dataset.savedHtml === value) el.dataset.savedHtml = " ";
           alert("Couldn't save remark — check your connection and try again.\n\n" + err.message);
-        }));
+        }).finally(() => { state[counterKey]--; }));
       });
     };
 
@@ -3215,40 +3226,84 @@ function viewBoxKey(el) {
   return null;
 }
 
-// Counts plain-text characters of `root` up to (node, offset), the same way
-// a contenteditable selection's Range reports positions — used to capture a
-// caret/selection position as a single number that survives an innerHTML
-// rebuild (DOM nodes themselves don't).
+// Walks root once, recording the cumulative "character offset" immediately
+// before every node in the tree (each text node counts its own length, each
+// <br> counts as 1) — built once per capture/restore so both an ordinary
+// (textNode, charOffset) boundary AND a (containerElement, childIndex)
+// boundary (what the caret looks like when it's sitting right at/after a
+// <br>, which Chrome often reports as an element+index rather than drilling
+// into a neighboring text node) can be resolved the same way.
+function viewOffsetUnits(root) {
+  const beforeCount = new Map();
+  const units = [];
+  let total = 0;
+  (function walk(node) {
+    beforeCount.set(node, total);
+    if (node.nodeType === 3) {
+      total += node.nodeValue.length;
+      units.push(node);
+    } else if (node.nodeName === "BR") {
+      total += 1;
+      units.push(node);
+    } else {
+      for (const child of node.childNodes) walk(child);
+    }
+  })(root);
+  return { beforeCount, units, total };
+}
+
+// Converts a live Range boundary (node, offset) into a single character
+// offset that survives an innerHTML rebuild (DOM nodes themselves don't) —
+// the same way a contenteditable selection's Range reports positions, but
+// counting <br> elements too (a plain TreeWalker over text nodes alone
+// can't tell "right after a <br>" apart from "at the end of the text before
+// it", which put a restored caret on the wrong line whenever a box had more
+// than one line in it).
 function textOffsetWithin(root, node, offset) {
   if (!node) return 0;
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  let total = 0, n;
-  while ((n = walker.nextNode())) {
-    if (n === node) return total + offset;
-    total += n.nodeValue.length;
+  const { beforeCount, total } = viewOffsetUnits(root);
+  if (node.nodeType === 3) {
+    const base = beforeCount.get(node);
+    return base !== undefined ? base + offset : total;
+  }
+  if (node.nodeType === 1) {
+    // offset is a child index into node.childNodes here, not a character offset.
+    if (offset >= node.childNodes.length) {
+      if (node.childNodes.length === 0) return beforeCount.get(node) ?? total;
+      const last = node.childNodes[node.childNodes.length - 1];
+      const base = beforeCount.get(last);
+      if (base === undefined) return total;
+      return base + (last.nodeType === 3 ? last.nodeValue.length : last.nodeName === "BR" ? 1 : 0);
+    }
+    return beforeCount.get(node.childNodes[offset]) ?? total;
   }
   return total;
 }
 
-// Inverse of textOffsetWithin — turns a plain-text character offset back
-// into a live Range inside root's (freshly restored) content.
+// Inverse of textOffsetWithin — turns a character offset back into a live
+// Range inside root's (freshly restored) content.
 function rangeAtOffset(root, target) {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  let total = 0, n, last = null;
-  while ((n = walker.nextNode())) {
-    last = n;
-    const len = n.nodeValue.length;
+  const { units } = viewOffsetUnits(root);
+  let total = 0;
+  for (const u of units) {
+    const len = u.nodeType === 3 ? u.nodeValue.length : 1; // <br>
     if (total + len >= target) {
       const range = document.createRange();
-      range.setStart(n, target - total);
+      if (u.nodeType === 3) range.setStart(u, target - total);
+      else range.setStartAfter(u);
       range.collapse(true);
       return range;
     }
     total += len;
   }
   const range = document.createRange();
-  if (last) range.setStart(last, last.nodeValue.length);
-  else range.selectNodeContents(root);
+  if (units.length) {
+    const last = units[units.length - 1];
+    if (last.nodeType === 3) range.setStart(last, last.nodeValue.length);
+    else range.setStartAfter(last);
+  } else {
+    range.selectNodeContents(root);
+  }
   range.collapse(true);
   return range;
 }
@@ -3299,29 +3354,6 @@ function restoreViewEditState(host, captured) {
   }
 }
 
-// Manually insert a <br> at the current caret position, bypassing
-// document.execCommand("insertLineBreak") entirely — it turned out unreliable
-// inside this nested contenteditable structure (could still let the browser
-// split into a new block-level element in some cases).
-function insertBrAtCaret() {
-  const sel = document.getSelection();
-  if (!sel || sel.rangeCount === 0) return;
-  const range = sel.getRangeAt(0);
-  range.deleteContents();
-  const br = document.createElement("br");
-  range.insertNode(br);
-  // A lone trailing <br> with nothing after it doesn't reliably get its own
-  // visible line in contenteditable — browsers only render the new empty
-  // line once there's a node anchoring it. Standard fix: add a second <br>
-  // right after as a placeholder (consumed the moment the user types), and
-  // park the caret between the two so the first one is guaranteed visible.
-  if (!br.nextSibling) br.after(document.createElement("br"));
-  range.setStartAfter(br);
-  range.collapse(true);
-  sel.removeAllRanges();
-  sel.addRange(range);
-}
-
 // True if there is nothing between the very start of el's content and the
 // given (node, offset) point — i.e. the caret is at el's own left boundary,
 // with no character/<br> left to delete before it.
@@ -3351,32 +3383,37 @@ function selectAllWithin(el) {
   sel.addRange(range);
 }
 
-// Delegated Enter/Ctrl+Enter/Ctrl+A handling for the View/Edit-past-session
+// Delegated Ctrl+Enter/Ctrl+A handling for the View/Edit-past-session
 // screens' .view-remark-edit and .view-mastery-note boxes (individual and
-// group share the same markup/class). MUST be set up once per session-open
-// (not per-render) — host is a persistent container whose children get
-// replaced on every render, but the host itself never does, so re-attaching
-// this on every render would stack up duplicate listeners. getSaver returns
-// whichever merged-editing saver (state.viewRemarkSaver / .viewGroupRemarkSaver)
-// is currently active, so Ctrl+Enter can force an immediate flush.
+// group share the same markup/class). Plain Enter is deliberately NOT
+// intercepted here — an earlier version manually preventDefault()'d it and
+// inserted a <br> by hand (working around document.execCommand("insertLineBreak")
+// being unreliable), but that manual replacement was itself the source of a
+// "needs 2 presses when there's text after the caret" bug, and replacing the
+// table this lived in with a CSS Grid layout didn't change that (the bug was
+// about nested contenteditable regions in general, not <table> specifically).
+// Letting the browser's own Enter handling run instead — configured via
+// document.execCommand("defaultParagraphSeparator", false, "br") at app
+// startup to insert <br> instead of wrapping in a new block element — is
+// simpler and doesn't fight the browser's own (now correctly configured)
+// behavior. MUST be set up once per session-open (not per-render) — host is
+// a persistent container whose children get replaced on every render, but
+// the host itself never does, so re-attaching this on every render would
+// stack up duplicate listeners. getSaver returns whichever merged-editing
+// saver (state.viewRemarkSaver / .viewGroupRemarkSaver) is currently active,
+// so Ctrl+Enter can force an immediate flush.
 function setupViewEnterKeyDelegation(host, getSaver) {
   const onKeydown = e => {
     const isSelectAll = (e.key === "a" || e.key === "A") && (e.ctrlKey || e.metaKey);
-    if (e.key !== "Enter" && !isSelectAll) return;
-    // An active IME/text-prediction composition consumes the first Enter as
-    // "commit", not "newline".
-    if (e.isComposing) return;
+    const isCtrlEnter = e.key === "Enter" && (e.ctrlKey || e.metaKey);
+    if (!isSelectAll && !isCtrlEnter) return;
     const sel  = document.getSelection();
     const node = sel && sel.rangeCount > 0 ? sel.anchorNode : null;
     const el = node && (node.nodeType === 1 ? node : node.parentElement)?.closest(".view-remark-edit, .view-mastery-note");
     if (!el || !host.contains(el)) return;
-    if (isSelectAll) { e.preventDefault(); selectAllWithin(el); return; }
-    if (e.ctrlKey || e.metaKey) { e.preventDefault(); getSaver()?.flush(); return; }
     e.preventDefault();
-    setTimeout(() => {
-      insertBrAtCaret();
-      el.dispatchEvent(new Event("input", { bubbles: true }));
-    }, 0);
+    if (isSelectAll) selectAllWithin(el);
+    else getSaver()?.flush();
   };
   host.addEventListener("keydown", onKeydown);
   return () => host.removeEventListener("keydown", onKeydown);
@@ -3405,26 +3442,17 @@ function setupViewMouseDownGuard(host) {
   return () => host.removeEventListener("mousedown", onMouseDown);
 }
 
-// Backstop against the browser's native paragraph/line-break insertion —
-// setupViewEnterKeyDelegation's own keydown handler calls preventDefault()
-// and inserts a manual <br> instead, but that alone isn't fully reliable
-// inside a contenteditable="true" box nested in this larger
-// contenteditable="true" host: Chrome's "beforeinput" event (the one that
-// actually performs the native split into a new sibling element) can still
-// fire and go through even after keydown was prevented. Catching it at the
-// host level (it bubbles) blocks the native insert everywhere in one place.
-//
-// ALSO guards backspace/delete from escaping a box's own boundary — once a
-// box is emptied, continuing to backspace can otherwise keep consuming the
+// Guards backspace/delete from escaping a box's own boundary — once a box
+// is emptied, continuing to backspace can otherwise keep consuming the
 // surrounding contenteditable="false" structure (labels, whole rows) as if
-// it were deletable content, for the same nested-contenteditable reason the
-// paragraph insert needed a backstop.
+// it were deletable content, a side effect of nesting contenteditable
+// regions inside one shared contenteditable host. Plain Enter's native
+// insertParagraph/insertLineBreak is deliberately NOT cancelled here — see
+// the comment on setupViewEnterKeyDelegation for why letting it through
+// (configured to insert <br> via defaultParagraphSeparator) replaced the
+// old manual interception.
 function setupViewBeforeInputGuard(host) {
   const onBeforeInput = e => {
-    if (e.inputType === "insertParagraph" || e.inputType === "insertLineBreak") {
-      e.preventDefault();
-      return;
-    }
     if (e.inputType !== "deleteContentBackward" && e.inputType !== "deleteContentForward") return;
     const sel = document.getSelection();
     if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return;
