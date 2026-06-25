@@ -110,7 +110,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "495";
+const APP_VERSION = "496";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -171,38 +171,104 @@ const state = {
 
 const $ = id => document.getElementById(id);
 
-// True while a View/Edit-past-session screen's box is focused — used to
-// defer a render that would otherwise yank a remark box out from under the
-// user mid-edit.
+// True while there's a real reason a render right now would lose something
+// the user hasn't seen saved yet — NOT just "a box happens to have focus."
+// An earlier version of this treated the whole merged-editing host having
+// focus as busy (since .view-remark-edit boxes have no contenteditable of
+// their own and never become document.activeElement themselves — only the
+// host does, the whole time the user is typing in a box nested inside it).
+// That correctly stopped a render from yanking focus away mid-typing, but
+// it also meant the host stayed "busy" forever after being focused even
+// once, since clicking a button (contenteditable="false") deliberately
+// can't blur it (that's the fix for buttons needing 2 clicks) — so renders
+// for unrelated button clicks (the Trials column's +/×/score controls) kept
+// deferring indefinitely, only landing all at once whenever something else
+// finally did blur the host.
 //
-// .view-remark-edit boxes have no contenteditable attribute of their own —
-// they only inherit editability from the session-view-body host (only
-// .view-mastery-note re-declares contenteditable="true" to carve out its
-// own independently-focusable region). That means typing inside a regular
-// remark box never actually focuses the box itself; document.activeElement
-// stays the host the whole time. Checking for a focused .view-remark-edit
-// (as this used to) was therefore never true during normal typing, so a
-// render could barge in and rebuild the box mid-edit — the cursor dropping
-// out the moment the autosave's debounce fired. Checking for the host
-// itself being focused is the correct signal instead: clicking a button
-// (contenteditable="false") deliberately can't blur the host (that's the
-// fix for buttons needing 2 clicks), but clicking an actual <select>/
-// <input>/<textarea> still can, so this isn't permanently stuck busy.
+// The actual thing worth protecting is content that's been typed but not
+// yet saved — which is exactly what the merged saver's own debounce timer
+// already tracks (isPending). Pairing that with captureViewFocus/
+// restoreViewFocus (called around every render) covers the rest: a render
+// is now safe to fire promptly any time nothing is actively mid-edit,
+// because even when it does land while the user's cursor sits in some
+// unrelated, already-saved box, the cursor gets put right back afterward
+// instead of just disappearing.
 function isViewBusy() {
   const active = document.activeElement;
-  return !!(active && (
-    active.tagName === "INPUT" || active.tagName === "TEXTAREA"
-    || active.id === "session-view-body"
-    || active.matches?.(".view-mastery-note")
-  ));
+  if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.matches?.(".view-mastery-note"))) return true;
+  return !!state.viewRemarkSaver?.isPending?.();
 }
 function isGroupViewBusy() {
   const active = document.activeElement;
-  return !!(active && (
-    active.tagName === "INPUT" || active.tagName === "TEXTAREA"
-    || active.id === "group-session-view-body"
-    || active.matches?.(".view-mastery-note")
-  ));
+  if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.matches?.(".view-mastery-note"))) return true;
+  return !!state.viewGroupRemarkSaver?.isPending?.();
+}
+
+// Captures where the user's cursor/selection logically is inside a View-
+// screen body before a full re-render replaces all of it, keyed off each
+// box's own stable data-rem-id/data-act-id (not the DOM node, which won't
+// survive the rebuild) so restoreViewFocus can find the same logical box
+// again afterward and put the cursor back — making a render harmless to
+// sit through even when it lands while the user is looking at (but not
+// actively typing in) some box.
+function captureViewFocus(body) {
+  const active = document.activeElement;
+  if (active && body.contains(active) && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) {
+    const key = viewElementIdentityKey(active);
+    if (key) return { type: "input", key, start: active.selectionStart, end: active.selectionEnd };
+    return null;
+  }
+
+  const sel = document.getSelection();
+  if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return null;
+  const node = sel.anchorNode;
+  if (!node || !body.contains(node)) return null;
+  const box = (node.nodeType === 1 ? node : node.parentElement)?.closest(".view-remark-edit, .view-mastery-note");
+  if (!box) return null;
+  const key = viewElementIdentityKey(box);
+  if (!key) return null;
+  const range = document.createRange();
+  range.selectNodeContents(box);
+  range.setEnd(node, sel.anchorOffset);
+  return { type: "contenteditable", key, offset: range.toString().length };
+}
+
+function viewElementIdentityKey(el) {
+  const cls = Array.from(el.classList || []).find(c => c.startsWith("view-"));
+  if (!cls) return null;
+  if (el.dataset.remId) return `.${cls}[data-rem-id="${el.dataset.remId}"]`;
+  if (el.dataset.actId) return `.${cls}[data-act-id="${el.dataset.actId}"]`;
+  return null;
+}
+
+function restoreViewFocus(body, captured) {
+  if (!captured) return;
+  const el = body.querySelector(captured.key);
+  if (!el) return;
+
+  if (captured.type === "input") {
+    el.focus();
+    el.setSelectionRange?.(captured.start, captured.end);
+    return;
+  }
+
+  body.focus();
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  let consumed = 0, node, landedNode = null, landedOffset = 0;
+  while ((node = walker.nextNode())) {
+    landedNode = node;
+    const len = node.textContent.length;
+    if (consumed + len >= captured.offset) { landedOffset = captured.offset - consumed; break; }
+    consumed += len;
+    landedOffset = len;
+  }
+  const range = document.createRange();
+  if (landedNode) range.setStart(landedNode, landedOffset);
+  else range.selectNodeContents(el);
+  range.collapse(true);
+  const sel = document.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
 }
 
 // Wraps a View-screen action button's async handler so its own write always
@@ -2662,11 +2728,14 @@ function renderSessionView() {
   const targets = getViewEffectiveTargets();
   const sorted  = [...targets].sort((a, b) => a.name.localeCompare(b.name));
 
-  $("session-view-body").innerHTML = sorted.length
+  const body = $("session-view-body");
+  const focusState = captureViewFocus(body);
+  body.innerHTML = sorted.length
     ? sorted.map(t => buildTargetViewTable(t, data)).join("")
     : `<p style="color:var(--text-muted);padding:1rem">No targets recorded.</p>`;
 
   attachViewListeners();
+  restoreViewFocus(body, focusState);
 }
 
 function buildTargetViewTable(target, data) {
@@ -3021,9 +3090,10 @@ function setupMergedRemarkSaving(body, getSessionId, onIdle) {
 
   // Every other cell is carved out with contenteditable="false", so any "input"
   // event reaching the shared host can only have come from a free-text remark box.
-  // The busy-check this saver pairs with (isViewBusy) treats ANY focused
-  // remark/note box as "still busy", not just the one that changed — so
-  // if the user moves on to typing in a different remark box right after,
+  // The busy-check this saver pairs with (isViewBusy) treats the WHOLE host as
+  // "still busy" while this single shared debounce timer is pending, not just
+  // the one box that changed — so if the user moves on to typing in a
+  // different remark box right after,
   // the render that would reveal the newly-created remark's "+ Trial" button
   // stays deferred until they focus something non-editable. onIdle fires the
   // moment a flush actually runs (debounce settled, data already saved) so
@@ -3096,6 +3166,7 @@ function setupMergedRemarkSaving(body, getSessionId, onIdle) {
 
   return {
     flush,
+    isPending: () => saveTimer !== null,
     cleanup() {
       clearTimeout(saveTimer);
       body.removeEventListener("beforeinput", onBeforeInput);
@@ -3802,11 +3873,14 @@ function renderGroupSessionView() {
   const targets   = getViewGroupEffectiveTargets();
   const sorted    = [...targets].sort((a, b) => a.name.localeCompare(b.name));
 
-  $("group-session-view-body").innerHTML = sorted.length
+  const body = $("group-session-view-body");
+  const focusState = captureViewFocus(body);
+  body.innerHTML = sorted.length
     ? sorted.map(t => buildGroupTargetViewTable(t, data, attendees)).join("")
     : `<p style="color:var(--text-muted);padding:1rem">No targets recorded.</p>`;
 
   attachGroupViewListeners();
+  restoreViewFocus(body, focusState);
 }
 
 // Pairs each attending student's remarks for one activity into "rounds" by creation order,
