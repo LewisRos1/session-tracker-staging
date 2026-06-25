@@ -2069,26 +2069,32 @@ div.admin-note-editable:empty::before {
   flex-direction: column;
   gap: .4rem;
 }
-.mastery-note-input,
-.view-mastery-note {
+.mastery-note-input {
   resize: none;
   min-height: 2rem;
   white-space: pre-wrap;
   word-break: break-word;
   cursor: text;
 }
-.mastery-note-input::placeholder,
-.view-mastery-note::placeholder {
-  color: #9ca3af;
-  opacity: 1;
-}
-/* view table note: no border box, just subtle */
+.mastery-note-input::placeholder { color: #9ca3af; opacity: 1; }
+
+/* .view-mastery-note is a contenteditable div, not a textarea — no own
+   placeholder support, so show data-placeholder via the :empty pseudo-class
+   instead (same trick as .view-remark-empty below). */
 .view-mastery-note {
+  min-height: 2rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  cursor: text;
   font-size: .82rem;
   color: var(--text-muted);
   padding: .15rem .3rem;
   border: 1px solid transparent;
   border-radius: 4px;
+}
+.view-mastery-note:empty:before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
 }
 .view-mastery-note:focus { border-color: var(--border); color: var(--text); }
 
@@ -2410,91 +2416,103 @@ div.admin-note-editable:empty::before {
 
 .view-table-wrapper {
   /* Shrink-to-fit instead of a normal block (which sizes to the viewport's
-     available width, not the table's actual rendered width). Without this,
-     when the table needs to be wider than the viewport (and overflows
+     available width, not the grid's actual rendered width). Without this,
+     when the grid needs to be wider than the viewport (and overflows
      rightward for the shared horizontal scrollbar on .session-view-body to
      pick up), this wrapper's box — and the border-radius/box-shadow drawn
      on it — stayed at the narrower viewport width, so the rounded corner
-     and shadow visibly cut off before reaching the table's true right edge. */
+     and shadow visibly cut off before reaching the grid's true right edge. */
   display: inline-block;
   border-radius: var(--radius);
   box-shadow: var(--shadow);
+  overflow: hidden;
 }
 
-.view-table {
-  width: 100%;
-  min-width: 600px;
-  table-layout: fixed;
-  border-collapse: collapse;
+/* CSS Grid replacement for the old <table>/<tr>/<td> markup — Chrome has
+   contenteditable quirks specific to real <table> elements (a split caused
+   by Enter could "escape" its row and land as a stray box outside the
+   table), so the View/Edit-past-session screens are laid out with divs
+   instead. Each logical row is a ".view-row" wrapper with
+   "display:contents" — invisible to grid layout (its own children become
+   direct grid items of .view-table-grid, exactly like a real row's cells
+   would be) while still letting JS find "the row a given cell belongs to"
+   via .closest(".view-row") the same way .closest("tr") used to work.
+   1px gap + a background color showing through it stands in for
+   border-collapse (CSS Grid has no equivalent for that). */
+.view-table-grid {
+  display: grid;
+  grid-template-columns: 36px 250px 340px 155px 54px 82px;
+  background: var(--border);
+  gap: 1px;
   font-size: .875rem;
+  min-width: 600px;
+}
+.view-table-grid-group {
+  grid-template-columns: 36px 250px 100px 340px 155px 54px 82px;
 }
 
-.view-table th {
-  background: var(--primary-light);
-  color: var(--primary-dark);
-  font-weight: 700;
-  text-align: center;
-  padding: .55rem .7rem;
-  border: 1px solid var(--border);
-  border-bottom: 2px solid var(--primary);
-  white-space: nowrap;
-}
-
-.view-table td {
+.view-table-grid .view-row > div {
+  background: var(--white);
   padding: .4rem .6rem;
-  border: 1px solid var(--border);
-  vertical-align: middle;
+  display: flex;
+  align-items: center;
   color: var(--text);
 }
 
-.view-heading-row td {
-  background: var(--primary-light);
-  font-weight: 700;
+.view-col-head {
+  background: var(--primary-light) !important;
   color: var(--primary-dark);
-  padding: .45rem .75rem;
-  border-top: 2px solid var(--primary) !important;
-  border-bottom: 2px solid var(--primary) !important;
+  font-weight: 700;
+  text-align: center;
+  justify-content: center;
+  padding: .55rem .7rem !important;
+  white-space: nowrap;
 }
 
-.view-note-row td {
-  background: #fffbeb;
+.view-heading-row > div {
+  background: var(--primary-light) !important;
+  font-weight: 700;
+  color: var(--primary-dark);
+  padding: .45rem .75rem !important;
+}
+
+.view-note-row > div {
+  background: #fffbeb !important;
   color: #92400e;
   font-size: .88rem;
-  padding: .4rem .75rem;
-  border-top: 2px solid #f59e0b !important;
-  border-bottom: 2px solid #f59e0b !important;
+  padding: .4rem .75rem !important;
   white-space: pre-wrap;
 }
 .view-note-row div,
 .view-note-row p { margin: 0; padding: 0; }
 
-.view-dayavg-row td {
-  background: #fffbe6;
+.view-dayavg-row > div {
+  background: #fffbe6 !important;
   font-weight: 700;
 }
 
-.view-comment-row td { background: #fafaf9; }
+.view-comment-row > div { background: #fafaf9 !important; }
 .view-comment-label { font-weight: 600; color: var(--text-muted); }
 
-.vcol-no      { width: 36px; text-align: center; white-space: nowrap; }
-.vcol-act     { width: 250px; white-space: pre-wrap; word-break: break-word; }
-.vcol-student { width: 100px; text-align: center; white-space: pre-wrap; word-break: break-word; font-weight: 600; }
-.vcol-rem    { width: 340px; height: 1px; padding: 0; }
-.vcol-rem > * { padding: .4rem .6rem; box-sizing: border-box; }
-/* Both empty and pre-filled edit divs are direct children of .vcol-rem.
-   min-height:100% resolves to the rendered row height (Chrome table-cell % behaviour);
-   using min- so content taller than the row can still expand the row. Floored
-   with max() at the single-line height (1.8rem, matching .view-remark-edit's own
-   min-height) — otherwise a row with no other tall content (e.g. no trials) can
-   collapse shorter than one real text line, leaving the caret visibly taller
-   than the box until text is typed and forces the row to grow. */
-.vcol-rem > .view-remark-edit { min-height: max(1.8rem, 100%); }
-.vcol-trials { width: 155px; }
-.vcol-total  { width: 54px; text-align: center; white-space: nowrap; }
-.vcol-score  { width: 82px; text-align: center; font-weight: 600; white-space: nowrap; }
+.vcol-no      { justify-content: center; text-align: center; white-space: nowrap; }
+.vcol-act     { white-space: pre-wrap; word-break: break-word; align-items: flex-start; }
+.vcol-student { justify-content: center; text-align: center; white-space: pre-wrap; word-break: break-word; font-weight: 600; }
+.vcol-rem     { padding: 0 !important; align-items: stretch; }
+.vcol-rem > * { padding: .4rem .6rem; box-sizing: border-box; width: 100%; }
+.vcol-rem > .view-remark-edit { min-height: 1.8rem; }
+.view-rem-combined-hint {
+  color: var(--text-muted);
+  font-size: .8rem;
+  font-style: italic;
+  justify-content: center;
+  padding: .4rem .6rem !important;
+}
+.vcol-total   { justify-content: center; text-align: center; white-space: nowrap; }
+.vcol-score   { justify-content: center; text-align: center; font-weight: 600; white-space: nowrap; }
 
 @media (min-width: 900px) {
-  .vcol-act { width: 390px; }
+  .view-table-grid       { grid-template-columns: 36px 390px 340px 155px 54px 82px; }
+  .view-table-grid-group { grid-template-columns: 36px 390px 100px 340px 155px 54px 82px; }
 }
 
 .view-act-cell-row {
@@ -2502,12 +2520,13 @@ div.admin-note-editable:empty::before {
   align-items: flex-start;
   justify-content: space-between;
   gap: .5rem;
+  width: 100%;
 }
 
 @media (max-width: 767px) {
   /* Give remark a real width on mobile so it's readable with horizontal scroll */
-  .vcol-rem    { width: 180px; }
-  .view-table  { min-width: 860px; }
+  .view-table-grid       { grid-template-columns: 36px 250px 180px 155px 54px 82px; min-width: 860px; }
+  .view-table-grid-group { grid-template-columns: 36px 250px 100px 180px 155px 54px 82px; min-width: 860px; }
 
   /* Drop "Go To Another Session" onto its own row below the title/delete buttons */
   .session-header-view  { display: flex; flex-wrap: wrap; }
@@ -2646,7 +2665,13 @@ div.admin-note-editable:empty::before {
 }
 .view-remark-edit:focus,
 .view-comment-edit:focus { border-color: var(--primary); background: #fff; outline: none; }
-.view-remark-edit::placeholder { color: #9ca3af; opacity: 1; }
+/* .view-remark-edit is a contenteditable div (so the whole page can be one
+   Grammarly-scannable document), not a textarea — no native placeholder
+   support, so show data-placeholder via :empty instead. */
+.view-remark-edit:empty:before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+}
 
 .view-remark-preset-select {
   width: 100%;
