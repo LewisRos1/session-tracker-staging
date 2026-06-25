@@ -110,7 +110,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "515";
+const APP_VERSION = "516";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2244,9 +2244,18 @@ function attachTargetListeners(target) {
 
   // ── Delete remark ─────────────────────────────────────────
   c.querySelectorAll(".btn-delete-remark").forEach(btn => {
-    btn.addEventListener("click", async () => {
+    btn.addEventListener("click", () => {
       if (!confirm("Delete this remark and its trials?")) return;
-      await deleteRemark(state.currentSessionId, btn.dataset.remId);
+      const remId = btn.dataset.remId;
+      const rem = state.sessionData?.remarks?.[remId];
+      if (!rem) return;
+      delete state.sessionData.remarks[remId];
+      renderTargetContent();
+      deleteRemark(state.currentSessionId, remId).catch(err => {
+        state.sessionData.remarks[remId] = rem;
+        renderTargetContent();
+        alert("Couldn't delete remark — check your connection and try again.\n\n" + err.message);
+      });
     });
   });
 
@@ -2267,8 +2276,11 @@ function attachTargetListeners(target) {
       );
       const initialText = ghostInput?.value.trim() || "";
       const remId = await ensurePredefinedRemark(actId, btn.dataset.remName, initialText);
-      if (initialText) await updateRemarkText(state.currentSessionId, remId, initialText);
       openScorePicker(remId, tgt.maxPoints || 3);
+      // ensurePredefinedRemark already wrote initialText when creating a brand-new
+      // remark — this only matters for the rare case where it already existed
+      // with stale text, so don't block opening the score picker on it.
+      if (initialText) updateRemarkText(state.currentSessionId, remId, initialText).catch(() => {});
     });
   });
 
@@ -2282,12 +2294,19 @@ function attachTargetListeners(target) {
 
   // ── Delete trial ──────────────────────────────────────────
   c.querySelectorAll(".btn-trial-delete").forEach(btn => {
-    btn.addEventListener("click", async e => {
+    btn.addEventListener("click", e => {
       e.stopPropagation();
       const rem = state.sessionData?.remarks?.[btn.dataset.remId];
       if (!rem) return;
-      await deleteTrial(state.currentSessionId, btn.dataset.remId,
-        Number(btn.dataset.idx), rem.trials || []);
+      const idx = Number(btn.dataset.idx);
+      const prevTrials = rem.trials || [];
+      rem.trials = prevTrials.filter((_, i) => i !== idx);
+      renderTargetContent();
+      deleteTrial(state.currentSessionId, btn.dataset.remId, idx, prevTrials).catch(err => {
+        rem.trials = prevTrials;
+        renderTargetContent();
+        alert("Couldn't delete trial — check your connection and try again.\n\n" + err.message);
+      });
     });
   });
 
@@ -6620,9 +6639,18 @@ function attachGroupTargetListeners(target) {
 
   // Delete round — remove all remarks in this set at once
   c.querySelectorAll(".btn-group-del-round").forEach(btn => {
-    btn.addEventListener("click", async () => {
+    btn.addEventListener("click", () => {
       const remIds = btn.dataset.remIds.split(",").filter(Boolean);
-      if (remIds.length) await deleteRemarksBatch(state.groupSessionId, remIds);
+      if (!remIds.length) return;
+      const data = state.groupSessionData;
+      const prevRemarks = {};
+      remIds.forEach(id => { prevRemarks[id] = data.remarks?.[id]; delete data.remarks?.[id]; });
+      renderGroupTargetContent();
+      deleteRemarksBatch(state.groupSessionId, remIds).catch(err => {
+        Object.assign(data.remarks, prevRemarks);
+        renderGroupTargetContent();
+        alert("Couldn't delete round — check your connection and try again.\n\n" + err.message);
+      });
     });
   });
 
@@ -6648,19 +6676,36 @@ function attachGroupTargetListeners(target) {
 
   // Delete a single round (student-grouped layout)
   c.querySelectorAll(".btn-group-del-student-remark").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      await deleteRemark(state.groupSessionId, btn.dataset.remId);
+    btn.addEventListener("click", () => {
+      const remId = btn.dataset.remId;
+      const rem = state.groupSessionData?.remarks?.[remId];
+      if (!rem) return;
+      delete state.groupSessionData.remarks[remId];
+      renderGroupTargetContent();
+      deleteRemark(state.groupSessionId, remId).catch(err => {
+        state.groupSessionData.remarks[remId] = rem;
+        renderGroupTargetContent();
+        alert("Couldn't delete remark — check your connection and try again.\n\n" + err.message);
+      });
     });
   });
 
   // Delete trial badge
   c.querySelectorAll(".btn-group-trial-del").forEach(btn => {
-    btn.addEventListener("click", async () => {
+    btn.addEventListener("click", () => {
       const remId = btn.dataset.remId;
       const rem   = state.groupSessionData?.remarks?.[remId];
       if (!rem) return;
-      const updated = (rem.trials || []).filter((_, i) => i !== Number(btn.dataset.idx));
-      await setTrials(state.groupSessionId, remId, updated);
+      const idx = Number(btn.dataset.idx);
+      const prevTrials = rem.trials || [];
+      const updated = prevTrials.filter((_, i) => i !== idx);
+      rem.trials = updated;
+      renderGroupTargetContent();
+      setTrials(state.groupSessionId, remId, updated).catch(err => {
+        rem.trials = prevTrials;
+        renderGroupTargetContent();
+        alert("Couldn't delete trial — check your connection and try again.\n\n" + err.message);
+      });
     });
   });
 

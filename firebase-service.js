@@ -432,12 +432,11 @@ export async function deleteSession(sessionId) {
 export async function getRecentSessionsForStudent(studentId, maxCount = 60) {
   const snap = await getDocs(
     query(collection(db, "sessions"),
-      where("studentId", "==", studentId))
+      where("studentId", "==", studentId),
+      orderBy("date", "desc"),
+      firestoreLimit(maxCount))
   );
-  return snap.docs
-    .map(d => ({ id: d.id, ...d.data() }))
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, maxCount);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
 /** Fetch all sessions for a student, sorted oldest-first. */
