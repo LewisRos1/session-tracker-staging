@@ -110,7 +110,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "511";
+const APP_VERSION = "512";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -227,10 +227,63 @@ function captureViewFocus(body) {
   if (!box) return null;
   const key = viewElementIdentityKey(box);
   if (!key) return null;
-  const range = document.createRange();
-  range.selectNodeContents(box);
-  range.setEnd(node, sel.anchorOffset);
-  return { type: "contenteditable", key, offset: range.toString().length };
+  return { type: "contenteditable", key, offset: viewOffsetWithBr(box, node, sel.anchorOffset) };
+}
+
+// Range.prototype.toString() silently drops <br> elements — they aren't
+// text nodes, so they contribute zero characters to the string. Capturing
+// caret position as a plain-text offset meant that pressing Enter (which
+// only inserts <br>s, no new text) didn't move the captured offset at all;
+// when the next debounced save's render landed ~700ms later and restored
+// the caret using that offset, it snapped back to the end of whatever real
+// text came before the new blank lines — looking like the cursor jumping
+// back up a line or more, on a delay, every time. Counting each <br> as
+// one unit (matching restoreViewFocus's matching treewalker below) fixes
+// that without changing anything about how the rest of the box works.
+function viewOffsetWithBr(el, targetNode, targetOffset) {
+  if (targetNode === el) {
+    let total = 0;
+    for (let i = 0; i < targetOffset && i < el.childNodes.length; i++) {
+      const n = el.childNodes[i];
+      total += n.nodeType === Node.TEXT_NODE ? n.textContent.length : n.nodeName === "BR" ? 1 : (n.textContent || "").length;
+    }
+    return total;
+  }
+  let total = 0;
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  let node;
+  while ((node = walker.nextNode())) {
+    if (node === targetNode) return total + targetOffset;
+    if (node.nodeType === Node.TEXT_NODE) total += node.textContent.length;
+    else if (node.nodeName === "BR") total += 1;
+  }
+  return total;
+}
+
+// Mirrors viewOffsetWithBr for restoreViewFocus — walks text nodes AND
+// <br> elements (each counting as 1), so an offset that "passed through" N
+// <br>s during capture lands after those same N <br>s during restore,
+// instead of only ever landing inside real text.
+function viewNodeAtOffsetWithBr(el, offset) {
+  let consumed = 0;
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  let node, lastText = null;
+  while ((node = walker.nextNode())) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const len = node.textContent.length;
+      if (consumed + len >= offset) return { node, offset: offset - consumed };
+      consumed += len;
+      lastText = node;
+    } else if (node.nodeName === "BR") {
+      if (consumed + 1 > offset) {
+        const parent = node.parentNode;
+        return { node: parent, offset: Array.prototype.indexOf.call(parent.childNodes, node) + 1 };
+      }
+      consumed += 1;
+    }
+  }
+  if (lastText) return { node: lastText, offset: lastText.textContent.length };
+  return { node: el, offset: el.childNodes.length };
 }
 
 function viewElementIdentityKey(el) {
@@ -253,18 +306,9 @@ function restoreViewFocus(body, captured) {
   }
 
   body.focus();
-  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-  let consumed = 0, node, landedNode = null, landedOffset = 0;
-  while ((node = walker.nextNode())) {
-    landedNode = node;
-    const len = node.textContent.length;
-    if (consumed + len >= captured.offset) { landedOffset = captured.offset - consumed; break; }
-    consumed += len;
-    landedOffset = len;
-  }
+  const { node: landedNode, offset: landedOffset } = viewNodeAtOffsetWithBr(el, captured.offset);
   const range = document.createRange();
-  if (landedNode) range.setStart(landedNode, landedOffset);
-  else range.selectNodeContents(el);
+  range.setStart(landedNode, landedOffset);
   range.collapse(true);
   const sel = document.getSelection();
   sel.removeAllRanges();
