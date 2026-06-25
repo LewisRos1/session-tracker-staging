@@ -5,9 +5,18 @@
 
 import { getAllSessionsForStudent, getAllSessionsForGroup, sanitizeKey } from "./firebase-service.js";
 
-// Strip HTML tags from remark text (stored as HTML for visual bold support)
+// Strip HTML tags from remark text (stored as HTML for visual bold support).
+// Line breaks are stored as <br>/<div>/<p> (see app.js's htmlForStorage) —
+// convert those to real newlines first so multi-line remarks don't collapse
+// onto one line once the tags are stripped.
 function stripRemarkHtml(s) {
-  return (s || "").replace(/<[^>]*>/g, "");
+  return (s || "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/div>/gi, "\n").replace(/<div>/gi, "")
+    .replace(/<\/p>/gi, "\n").replace(/<p>/gi, "")
+    .replace(/<[^>]*>/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 // ─── STYLE CONSTANTS ─────────────────────────────────────────
@@ -1005,7 +1014,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
         const validTrials = (rem.trials || []).filter(t => t !== -1);
         const remarkAvg   = calcRemarkAvg(validTrials, target.maxPoints);
         const masteryNote = stripRemarkHtml(rem.masteryNote || "");
-        const baseText    = starter ? `${starter} ${stripRemarkHtml(rem.text)}`.trim() : stripRemarkHtml(rem.text);
+        const baseText    = starter ? `${starter}: ${stripRemarkHtml(rem.text)}`.trim() : stripRemarkHtml(rem.text);
         const remarkText  = masteryNote ? `${baseText} — ${masteryNote}` : baseText;
         rows.push([
           "",

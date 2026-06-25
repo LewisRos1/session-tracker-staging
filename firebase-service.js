@@ -18,8 +18,6 @@ import {
   getDocs,
   query,
   where,
-  orderBy,
-  limit as firestoreLimit,
   onSnapshot,
   deleteField,
   serverTimestamp
@@ -448,12 +446,16 @@ export async function getRecentSessionsForStudent(studentId, maxCount = 60) {
 
 /** Fetch all sessions for a student, sorted oldest-first. */
 export async function getAllSessionsForStudent(studentId) {
+  // No orderBy on purpose — see getRecentSessionsForStudent above. This is
+  // the exact query shape that produced the real "query requires an index"
+  // error from Export All, confirming the studentId+date composite index
+  // doesn't exist in this project. Sort client-side instead.
   const snap = await getDocs(
-    query(collection(db, "sessions"),
-      where("studentId", "==", studentId),
-      orderBy("date", "asc"))
+    query(collection(db, "sessions"), where("studentId", "==", studentId))
   );
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => a.date.localeCompare(b.date));
 }
 
 export async function getAllSessionsForGroup(groupId) {
