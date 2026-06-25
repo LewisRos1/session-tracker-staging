@@ -2497,10 +2497,16 @@ div.admin-note-editable:empty::before {
 .vcol-no      { justify-content: center; text-align: center; white-space: nowrap; }
 .vcol-act     { white-space: pre-wrap; word-break: break-word; align-items: flex-start; }
 .vcol-student { justify-content: center; text-align: center; white-space: pre-wrap; word-break: break-word; font-weight: 600; }
-/* The grid's Remark column never holds typed text anymore (see
-   .view-remarks-panel below) — only buttons, dropdowns, or a plain <input>,
-   none of which need the old full-height-box padding/sizing tricks. */
-.vcol-rem > * { width: 100%; }
+.vcol-rem     { padding: 0 !important; align-items: stretch; }
+.vcol-rem > * { padding: .4rem .6rem; box-sizing: border-box; width: 100%; }
+.vcol-rem > .view-remark-edit { min-height: 1.8rem; }
+.view-rem-combined-hint {
+  color: var(--text-muted);
+  font-size: .8rem;
+  font-style: italic;
+  justify-content: center;
+  padding: .4rem .6rem !important;
+}
 .vcol-total   { justify-content: center; text-align: center; white-space: nowrap; }
 .vcol-score   { justify-content: center; text-align: center; font-weight: 600; white-space: nowrap; }
 
@@ -2623,45 +2629,6 @@ div.admin-note-editable:empty::before {
   width: 100%;
 }
 .view-add-remark-target:hover { background: var(--primary-light); border-style: solid; }
-
-/* Remarks panel — every free-text remark and mastery note for this target,
-   moved out of the grid into one place. Unlike the grid (which still mixes
-   contenteditable="false" buttons/dropdowns with text), this panel contains
-   ONLY plain text and non-editable labels — the combination that was
-   actually causing the Enter-key/cursor bugs, not contenteditable itself. */
-.view-remarks-panel {
-  margin-top: .75rem;
-  background: var(--white);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: .75rem 1rem;
-}
-.view-remarks-panel-title {
-  font-weight: 700;
-  color: var(--primary-dark);
-  font-size: .85rem;
-  margin-bottom: .6rem;
-}
-.view-remarks-list {
-  display: flex;
-  flex-direction: column;
-  gap: .65rem;
-}
-.view-remark-entry {
-  display: flex;
-  flex-direction: column;
-  gap: .25rem;
-}
-.view-remark-entry + .view-remark-entry {
-  border-top: 1px solid var(--border);
-  padding-top: .6rem;
-}
-.view-remark-entry-label {
-  font-size: .78rem;
-  font-weight: 600;
-  color: var(--text-muted);
-}
 
 .view-rem-del {
   background: none;
