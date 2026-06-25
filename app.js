@@ -110,7 +110,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "491";
+const APP_VERSION = "511";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -171,28 +171,104 @@ const state = {
 
 const $ = id => document.getElementById(id);
 
-// True while a View/Edit-past-session screen's box is focused — used to
-// defer a render that would otherwise yank a remark box out from under the
-// user mid-edit. Identical logic for individual and group.
+// True while there's a real reason a render right now would lose something
+// the user hasn't seen saved yet — NOT just "a box happens to have focus."
+// An earlier version of this treated the whole merged-editing host having
+// focus as busy (since .view-remark-edit boxes have no contenteditable of
+// their own and never become document.activeElement themselves — only the
+// host does, the whole time the user is typing in a box nested inside it).
+// That correctly stopped a render from yanking focus away mid-typing, but
+// it also meant the host stayed "busy" forever after being focused even
+// once, since clicking a button (contenteditable="false") deliberately
+// can't blur it (that's the fix for buttons needing 2 clicks) — so renders
+// for unrelated button clicks (the Trials column's +/×/score controls) kept
+// deferring indefinitely, only landing all at once whenever something else
+// finally did blur the host.
 //
-// Deliberately checks specific editable-field classes rather than
-// activeElement.isContentEditable — contenteditable="true" on the whole
-// session-view-body host inherits to every descendant that isn't marked
-// contenteditable="false", so that check also matches the host div itself.
-// A button's mousedown handler intentionally blocks the focus-shift that
-// would otherwise blur whatever was previously focused (that's the fix for
-// buttons needing 2 clicks) — so if the host (or any such inherited-editable
-// element) ever ends up focused, isContentEditable would stay true forever,
-// permanently blocking every future render until a manual page refresh.
+// The actual thing worth protecting is content that's been typed but not
+// yet saved — which is exactly what the merged saver's own debounce timer
+// already tracks (isPending). Pairing that with captureViewFocus/
+// restoreViewFocus (called around every render) covers the rest: a render
+// is now safe to fire promptly any time nothing is actively mid-edit,
+// because even when it does land while the user's cursor sits in some
+// unrelated, already-saved box, the cursor gets put right back afterward
+// instead of just disappearing.
 function isViewBusy() {
   const active = document.activeElement;
-  return !!(active && (
-    active.tagName === "INPUT" || active.tagName === "TEXTAREA"
-    || active.matches?.(".view-remark-edit, .view-mastery-note")
-  ));
+  if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.matches?.(".view-mastery-note"))) return true;
+  return !!state.viewRemarkSaver?.isPending?.();
 }
 function isGroupViewBusy() {
-  return isViewBusy();
+  const active = document.activeElement;
+  if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.matches?.(".view-mastery-note"))) return true;
+  return !!state.viewGroupRemarkSaver?.isPending?.();
+}
+
+// Captures where the user's cursor/selection logically is inside a View-
+// screen body before a full re-render replaces all of it, keyed off each
+// box's own stable data-rem-id/data-act-id (not the DOM node, which won't
+// survive the rebuild) so restoreViewFocus can find the same logical box
+// again afterward and put the cursor back — making a render harmless to
+// sit through even when it lands while the user is looking at (but not
+// actively typing in) some box.
+function captureViewFocus(body) {
+  const active = document.activeElement;
+  if (active && body.contains(active) && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) {
+    const key = viewElementIdentityKey(active);
+    if (key) return { type: "input", key, start: active.selectionStart, end: active.selectionEnd };
+    return null;
+  }
+
+  const sel = document.getSelection();
+  if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return null;
+  const node = sel.anchorNode;
+  if (!node || !body.contains(node)) return null;
+  const box = (node.nodeType === 1 ? node : node.parentElement)?.closest(".view-remark-edit, .view-mastery-note");
+  if (!box) return null;
+  const key = viewElementIdentityKey(box);
+  if (!key) return null;
+  const range = document.createRange();
+  range.selectNodeContents(box);
+  range.setEnd(node, sel.anchorOffset);
+  return { type: "contenteditable", key, offset: range.toString().length };
+}
+
+function viewElementIdentityKey(el) {
+  const cls = Array.from(el.classList || []).find(c => c.startsWith("view-"));
+  if (!cls) return null;
+  if (el.dataset.remId) return `.${cls}[data-rem-id="${el.dataset.remId}"]`;
+  if (el.dataset.actId) return `.${cls}[data-act-id="${el.dataset.actId}"]`;
+  return null;
+}
+
+function restoreViewFocus(body, captured) {
+  if (!captured) return;
+  const el = body.querySelector(captured.key);
+  if (!el) return;
+
+  if (captured.type === "input") {
+    el.focus();
+    el.setSelectionRange?.(captured.start, captured.end);
+    return;
+  }
+
+  body.focus();
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  let consumed = 0, node, landedNode = null, landedOffset = 0;
+  while ((node = walker.nextNode())) {
+    landedNode = node;
+    const len = node.textContent.length;
+    if (consumed + len >= captured.offset) { landedOffset = captured.offset - consumed; break; }
+    consumed += len;
+    landedOffset = len;
+  }
+  const range = document.createRange();
+  if (landedNode) range.setStart(landedNode, landedOffset);
+  else range.selectNodeContents(el);
+  range.collapse(true);
+  const sel = document.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
 }
 
 // Wraps a View-screen action button's async handler so its own write always
@@ -200,6 +276,15 @@ function isGroupViewBusy() {
 // happened to be true at the moment the resulting Firestore snapshot
 // actually arrived (same idea as the Entry screens' entryActionsInFlight —
 // see the matching comment on state.viewActionsInFlight).
+// Renders immediately unless the view is mid-edit elsewhere (a focused
+// remark/mastery-note box that an immediate full rebuild would yank focus
+// out from under) — in that case the deferred-render flag is set instead,
+// and the existing onIdle/snapshot machinery picks it up once free.
+function renderViewOrDefer(pendingKey, isBusy, render) {
+  if (isBusy()) state[pendingKey] = true;
+  else render();
+}
+
 function withViewAction(counterKey, pendingKey, isBusy, render, fn) {
   return async (...args) => {
     state[counterKey]++;
@@ -2643,11 +2728,14 @@ function renderSessionView() {
   const targets = getViewEffectiveTargets();
   const sorted  = [...targets].sort((a, b) => a.name.localeCompare(b.name));
 
-  $("session-view-body").innerHTML = sorted.length
+  const body = $("session-view-body");
+  const focusState = captureViewFocus(body);
+  body.innerHTML = sorted.length
     ? sorted.map(t => buildTargetViewTable(t, data)).join("")
     : `<p style="color:var(--text-muted);padding:1rem">No targets recorded.</p>`;
 
   attachViewListeners();
+  restoreViewFocus(body, focusState);
 }
 
 function buildTargetViewTable(target, data) {
@@ -2726,6 +2814,7 @@ function buildTargetViewTable(target, data) {
         <tbody>${rows}</tbody>
       </table>
     </div>
+    <button class="view-add-remark-target" data-target="${escHtml(target.name)}">+ Add Remark &amp; Trials</button>
   </div>`;
 }
 
@@ -2784,15 +2873,21 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
   )).join("");
 }
 
-function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, isMastery = false) {
-  const allTrials  = rem.trials || [];
-  const maxPts     = target.maxPoints || 3;
-  const validTrials = allTrials.filter(t => t !== -1);
-  const total      = validTrials.reduce((a, b) => a + b, 0);
-  const scorePct   = validTrials.length > 0
+// Shared by viewRemarkRow/viewGroupRemarkRow (initial render) and
+// refreshViewTrialRow/refreshGroupViewTrialRow (surgical in-place update
+// after a trial add/delete/score change — see the comment on
+// bindViewTrialCellListeners for why those don't go through a full render).
+function calcViewTrialSummary(trials, maxPts) {
+  const validTrials = (trials || []).filter(t => t !== -1);
+  const total       = validTrials.reduce((a, b) => a + b, 0);
+  const scorePct    = validTrials.length > 0
     ? Math.round(total / (validTrials.length * maxPts) * 100) + "%" : "";
+  return { validTrials, total, scorePct };
+}
 
-  const trialCells = allTrials.map((t, ti) => `
+function buildTrialCellsHtml(rem, maxPts) {
+  const allTrials = rem.trials || [];
+  return allTrials.map((t, ti) => `
     <span class="trial-cell">
       <select class="view-trial-select" data-rem-id="${escHtml(rem.id)}" data-trial-idx="${ti}">
         <option value="-1"${t === -1 ? " selected" : ""}>—</option>
@@ -2802,6 +2897,12 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
       <button class="view-trial-del" data-rem-id="${escHtml(rem.id)}" data-trial-idx="${ti}">×</button>
     </span>`).join("") +
     `<button class="view-add-trial" data-rem-id="${escHtml(rem.id)}">+</button>`;
+}
+
+function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, isMastery = false) {
+  const maxPts = target.maxPoints || 3;
+  const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts);
+  const trialCells = buildTrialCellsHtml(rem, maxPts);
 
   const opts = parseOpts(inlineOptions);
 
@@ -2912,7 +3013,15 @@ function setupMergedRemarkSaving(body, getSessionId, onIdle) {
       const html = div.innerHTML;
       if (div.dataset.savedHtml === html) return;
       div.dataset.savedHtml = html;
-      updateRemarkText(sid, div.dataset.remId, html);
+      updateRemarkText(sid, div.dataset.remId, html).catch(err => {
+        // savedHtml already says this is saved — if the write actually
+        // failed, leaving it pointing at the unsaved value means nothing
+        // ever retries it, and the next render (from anything else on the
+        // page) shows the server's older text instead, looking exactly
+        // like what was just typed silently vanished.
+        if (div.dataset.savedHtml === html) div.dataset.savedHtml = " ";
+        alert("Couldn't save remark — check your connection and try again.\n\n" + err.message);
+      });
     });
 
     body.querySelectorAll(".group-remark-input-combined[data-rem-ids]").forEach(div => {
@@ -2920,7 +3029,10 @@ function setupMergedRemarkSaving(body, getSessionId, onIdle) {
       if (div.dataset.savedHtml === html) return;
       div.dataset.savedHtml = html;
       const remIds = div.dataset.remIds.split(",").filter(Boolean);
-      Promise.all(remIds.map(id => updateRemarkText(sid, id, html)));
+      Promise.all(remIds.map(id => updateRemarkText(sid, id, html))).catch(err => {
+        if (div.dataset.savedHtml === html) div.dataset.savedHtml = " ";
+        alert("Couldn't save remark — check your connection and try again.\n\n" + err.message);
+      });
     });
 
     body.querySelectorAll(".view-remark-empty").forEach(div => {
@@ -2937,7 +3049,10 @@ function setupMergedRemarkSaving(body, getSessionId, onIdle) {
       if (div.dataset.remId) {
         if (div.dataset.savedHtml === text) return;
         div.dataset.savedHtml = text;
-        updateRemarkText(sid, div.dataset.remId, text);
+        updateRemarkText(sid, div.dataset.remId, text).catch(err => {
+          if (div.dataset.savedHtml === text) div.dataset.savedHtml = " ";
+          alert("Couldn't save remark — check your connection and try again.\n\n" + err.message);
+        });
         return;
       }
       div.dataset.creating = "true";
@@ -2961,6 +3076,11 @@ function setupMergedRemarkSaving(body, getSessionId, onIdle) {
           div.dataset.actId      = actId;
           div.dataset.remId      = remId;
           div.dataset.savedHtml  = text;
+        } catch (err) {
+          // Leaves remId/savedHtml unset — the next flush (next keystroke or
+          // focusout) sees "no remark created yet" and retries from scratch,
+          // instead of the typed text just sitting there unsaved forever.
+          alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
         } finally {
           div.dataset.creating = "false";
         }
@@ -2970,9 +3090,10 @@ function setupMergedRemarkSaving(body, getSessionId, onIdle) {
 
   // Every other cell is carved out with contenteditable="false", so any "input"
   // event reaching the shared host can only have come from a free-text remark box.
-  // The busy-check this saver pairs with (isViewBusy) treats ANY focused
-  // remark/note box as "still busy", not just the one that changed — so
-  // if the user moves on to typing in a different remark box right after,
+  // The busy-check this saver pairs with (isViewBusy) treats the WHOLE host as
+  // "still busy" while this single shared debounce timer is pending, not just
+  // the one box that changed — so if the user moves on to typing in a
+  // different remark box right after,
   // the render that would reveal the newly-created remark's "+ Trial" button
   // stays deferred until they focus something non-editable. onIdle fires the
   // moment a flush actually runs (debounce settled, data already saved) so
@@ -3045,6 +3166,7 @@ function setupMergedRemarkSaving(body, getSessionId, onIdle) {
 
   return {
     flush,
+    isPending: () => saveTimer !== null,
     cleanup() {
       clearTimeout(saveTimer);
       body.removeEventListener("beforeinput", onBeforeInput);
@@ -3318,53 +3440,165 @@ function setupViewEnterKeyDelegation(host, getSaver) {
     if (isSelectAll) { e.preventDefault(); selectAllWithin(ta); return; }
     if (e.ctrlKey || e.metaKey) { e.preventDefault(); getSaver()?.flush(); return; }
     e.preventDefault();
-    setTimeout(() => {
-      insertBrAtCaret();
-      ta.dispatchEvent(new Event("input", { bubbles: true }));
-    }, 0);
+    insertBrAtCaret();
+    ta.dispatchEvent(new Event("input", { bubbles: true }));
   };
   host.addEventListener("keydown", onKeydown);
   return () => host.removeEventListener("keydown", onKeydown);
 }
 
+function getViewMaxPtsForRemark(remId) {
+  const data = state.viewSessionData;
+  const rem  = data?.remarks?.[remId];
+  const act  = rem && data.activities?.[rem.activityId];
+  const target = act && getViewEffectiveTargets().find(t => t.name === act.targetName);
+  return target?.maxPoints || 3;
+}
+
+// Patches just one remark's trial cells/running total/score in place instead
+// of going through a full renderSessionView() — the Trials column's buttons
+// sit inside a contenteditable="false" cell, so clicking them never moves
+// focus off the page's single big contenteditable host (mousedown is
+// deliberately suppressed there in setupMergedRemarkSaving's onMouseDown, to
+// fix buttons needing 2 clicks). That leaves the host looking permanently
+// "focused" to isViewBusy() from the moment it's ever clicked once, so a
+// full-page render after a trial-button click was being deferred
+// indefinitely — only landing (all at once, for every click queued up in the
+// meantime) whenever something else happened to genuinely blur the host.
+// Updating just this row's own cells sidesteps that defer system entirely:
+// there's nothing else on the page this could disturb, so it's always safe
+// to do immediately, no busy-check needed.
+function refreshViewTrialRow(remId) {
+  const rem = state.viewSessionData?.remarks?.[remId];
+  if (!rem) return;
+  const body = $("session-view-body");
+  const tr   = body.querySelector(`.view-rem-del[data-rem-id="${remId}"]`)?.closest("tr");
+  if (!tr) return;
+  const maxPts = getViewMaxPtsForRemark(remId);
+  const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts);
+  const trialCellsDiv = tr.querySelector(".trial-cells");
+  if (trialCellsDiv) {
+    trialCellsDiv.innerHTML = buildTrialCellsHtml(rem, maxPts);
+    bindViewTrialCellListeners(trialCellsDiv);
+  }
+  const totalTd = tr.querySelector(".vcol-total");
+  if (totalTd) totalTd.innerHTML = validTrials.length > 0 ? String(total) : "&nbsp;";
+  const scoreSpan = tr.querySelector(".vcol-score span");
+  if (scoreSpan) scoreSpan.textContent = scorePct;
+}
+
+// Each trial click fires its own independent Firestore write rather than
+// awaiting the previous one (so clicking + repeatedly stays instant) — but
+// openSessionView's snapshot listener overwrites state.viewSessionData and
+// can trigger a full renderSessionView() the moment it's not "busy",
+// regardless of whether every one of those writes has actually landed yet.
+// If a render lands using a snapshot that only reflects some of several
+// rapid-fire writes, it shows a stale (lower) trial count until the next
+// snapshot catches up — visible as cells appearing then disappearing.
+// Tracking each write against the same viewActionsInFlight counter the
+// snapshot listener already checks defers that render until every write
+// here has actually settled, instead of mid-flight.
+function trackViewTrialWrite(promise) {
+  state.viewActionsInFlight++;
+  promise.finally(() => {
+    state.viewActionsInFlight--;
+    if (state.viewActionsInFlight === 0 && state.viewRenderPending && !isViewBusy()) {
+      state.viewRenderPending = false;
+      renderSessionView();
+    }
+  });
+}
+
+function bindViewTrialCellListeners(container) {
+  container.querySelectorAll(".view-trial-select").forEach(sel => {
+    sel.addEventListener("change", () => {
+      const rem = state.viewSessionData?.remarks?.[sel.dataset.remId];
+      if (!rem) return;
+      const prevTrials = rem.trials || [];
+      const trials = [...prevTrials];
+      trials[Number(sel.dataset.trialIdx)] = Number(sel.value);
+      rem.trials = trials;
+      refreshViewTrialRow(sel.dataset.remId);
+      trackViewTrialWrite(setTrials(state.viewSessionId, sel.dataset.remId, trials).catch(err => {
+        rem.trials = prevTrials;
+        refreshViewTrialRow(sel.dataset.remId);
+        alert("Couldn't update — check your connection and try again.\n\n" + err.message);
+      }));
+    });
+  });
+
+  container.querySelectorAll(".view-trial-del").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const rem = state.viewSessionData?.remarks?.[btn.dataset.remId];
+      if (!rem) return;
+      const prevTrials = rem.trials || [];
+      const trials = prevTrials.filter((_, i) => i !== Number(btn.dataset.trialIdx));
+      rem.trials = trials;
+      refreshViewTrialRow(btn.dataset.remId);
+      trackViewTrialWrite(setTrials(state.viewSessionId, btn.dataset.remId, trials).catch(err => {
+        rem.trials = prevTrials;
+        refreshViewTrialRow(btn.dataset.remId);
+        alert("Couldn't update — check your connection and try again.\n\n" + err.message);
+      }));
+    });
+  });
+
+  container.querySelectorAll(".view-add-trial").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const rem = state.viewSessionData?.remarks?.[btn.dataset.remId];
+      if (!rem) return;
+      const prevTrials = rem.trials || [];
+      const trials = [...prevTrials, -1];
+      rem.trials = trials;
+      refreshViewTrialRow(btn.dataset.remId);
+      trackViewTrialWrite(setTrials(state.viewSessionId, btn.dataset.remId, trials).catch(err => {
+        rem.trials = prevTrials;
+        refreshViewTrialRow(btn.dataset.remId);
+        alert("Couldn't add trial — check your connection and try again.\n\n" + err.message);
+      }));
+    });
+  });
+}
+
+function showViewAddRemarkPicker(targetName) {
+  const data = state.viewSessionData;
+  const choices = Object.entries(data.activities || {})
+    .filter(([actId, a]) => a.targetName === targetName && viewGetRemarks(data, actId).length > 0)
+    .map(([actId, a]) => ({ actId, name: a.activityName }));
+
+  $("session-picker-title").textContent = "Add Remark & Trials";
+  $("session-picker-list").innerHTML = choices.length
+    ? `<div class="choice-list">` + choices.map(c => `
+        <button class="choice-btn view-add-remark-choice" data-act-id="${escHtml(c.actId)}">
+          <div class="choice-text"><div class="choice-label">${escHtml(c.name)}</div></div>
+        </button>`).join("") + `</div>`
+    : `<p class="empty-hint">No activities with a remark yet — use the + under an activity's Trials column to start one.</p>`;
+  $("session-picker-modal").classList.remove("hidden");
+
+  $("session-picker-list").querySelectorAll(".view-add-remark-choice").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const actId = btn.dataset.actId;
+      closeSessionPicker();
+      const remId = generateId("r");
+      state.viewSessionData.remarks = state.viewSessionData.remarks || {};
+      state.viewSessionData.remarks[remId] = { activityId: actId, text: "", trials: [], order: Date.now() };
+      renderViewOrDefer("viewRenderPending", isViewBusy, renderSessionView);
+      addRemark(state.viewSessionId, actId, "", null, remId).catch(err => {
+        delete state.viewSessionData.remarks[remId];
+        renderViewOrDefer("viewRenderPending", isViewBusy, renderSessionView);
+        alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
+      });
+    });
+  });
+}
+
 function attachViewListeners() {
   const body = $("session-view-body");
 
-  body.querySelectorAll(".view-trial-select").forEach(sel => {
-    sel.addEventListener("change", withViewAction("viewActionsInFlight", "viewRenderPending", isViewBusy, renderSessionView, async () => {
-      const rem = state.viewSessionData?.remarks?.[sel.dataset.remId];
-      if (!rem) return;
-      const trials = [...(rem.trials || [])];
-      trials[Number(sel.dataset.trialIdx)] = Number(sel.value);
-      await setTrials(state.viewSessionId, sel.dataset.remId, trials);
-    }));
-  });
+  bindViewTrialCellListeners(body);
 
-  body.querySelectorAll(".view-trial-del").forEach(btn => {
-    btn.addEventListener("click", withViewAction("viewActionsInFlight", "viewRenderPending", isViewBusy, renderSessionView, async () => {
-      const rem = state.viewSessionData?.remarks?.[btn.dataset.remId];
-      if (!rem) return;
-      const trials = (rem.trials || []).filter((_, i) => i !== Number(btn.dataset.trialIdx));
-      await setTrials(state.viewSessionId, btn.dataset.remId, trials);
-    }));
-  });
-
-  body.querySelectorAll(".view-add-trial").forEach(btn => {
-    btn.addEventListener("click", withViewAction("viewActionsInFlight", "viewRenderPending", isViewBusy, renderSessionView, async () => {
-      const rem = state.viewSessionData?.remarks?.[btn.dataset.remId];
-      if (!rem) return;
-      const act    = state.viewSessionData?.activities?.[rem.activityId];
-      const target = act
-        ? getViewEffectiveTargets().find(t => t.name === act.targetName)
-        : null;
-      const maxPts = target?.maxPoints || 3;
-      const prevLen = (rem.trials || []).length;
-      await setTrials(state.viewSessionId, btn.dataset.remId, [...(rem.trials || []), -1]);
-      // setTrials() resolving only means the write was sent — wait for the
-      // local snapshot to actually have it before letting the render fire,
-      // or the new trial dropdown looks like it didn't appear at all.
-      await waitForSessionData(() => (state.viewSessionData?.remarks?.[btn.dataset.remId]?.trials || []).length > prevLen);
-    }));
+  body.querySelectorAll(".view-add-remark-target").forEach(btn => {
+    btn.addEventListener("click", () => showViewAddRemarkPicker(btn.dataset.target));
   });
 
   // ── Sketch board buttons (view screen) ────────────────────
@@ -3480,10 +3714,19 @@ function attachViewListeners() {
   });
 
   body.querySelectorAll(".view-rem-del").forEach(btn => {
-    btn.addEventListener("click", withViewAction("viewActionsInFlight", "viewRenderPending", isViewBusy, renderSessionView, async () => {
+    btn.addEventListener("click", () => {
       if (!confirm("Delete this remark?")) return;
-      await deleteRemark(state.viewSessionId, btn.dataset.remId);
-    }));
+      const remId = btn.dataset.remId;
+      const rem = state.viewSessionData?.remarks?.[remId];
+      if (!rem) return;
+      delete state.viewSessionData.remarks[remId];
+      renderViewOrDefer("viewRenderPending", isViewBusy, renderSessionView);
+      deleteRemark(state.viewSessionId, remId).catch(err => {
+        state.viewSessionData.remarks[remId] = rem;
+        renderViewOrDefer("viewRenderPending", isViewBusy, renderSessionView);
+        alert("Couldn't delete remark — check your connection and try again.\n\n" + err.message);
+      });
+    });
   });
 
   body.querySelectorAll(".view-comment-edit").forEach(ta => {
@@ -3630,11 +3873,14 @@ function renderGroupSessionView() {
   const targets   = getViewGroupEffectiveTargets();
   const sorted    = [...targets].sort((a, b) => a.name.localeCompare(b.name));
 
-  $("group-session-view-body").innerHTML = sorted.length
+  const body = $("group-session-view-body");
+  const focusState = captureViewFocus(body);
+  body.innerHTML = sorted.length
     ? sorted.map(t => buildGroupTargetViewTable(t, data, attendees)).join("")
     : `<p style="color:var(--text-muted);padding:1rem">No targets recorded.</p>`;
 
   attachGroupViewListeners();
+  restoreViewFocus(body, focusState);
 }
 
 // Pairs each attending student's remarks for one activity into "rounds" by creation order,
@@ -3862,23 +4108,9 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
 }
 
 function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, isMastery = false, combineOpts = null) {
-  const allTrials   = rem.trials || [];
-  const maxPts      = target.maxPoints || 3;
-  const validTrials = allTrials.filter(t => t !== -1);
-  const total       = validTrials.reduce((a, b) => a + b, 0);
-  const scorePct    = validTrials.length > 0
-    ? Math.round(total / (validTrials.length * maxPts) * 100) + "%" : "";
-
-  const trialCells = allTrials.map((t, ti) => `
-    <span class="trial-cell">
-      <select class="view-trial-select" data-rem-id="${escHtml(rem.id)}" data-trial-idx="${ti}">
-        <option value="-1"${t === -1 ? " selected" : ""}>—</option>
-        ${Array.from({ length: maxPts + 1 }, (_, i) => maxPts - i)
-          .map(v => `<option value="${v}"${v === t ? " selected" : ""}>${v}</option>`).join("")}
-      </select>
-      <button class="view-trial-del" data-rem-id="${escHtml(rem.id)}" data-trial-idx="${ti}">×</button>
-    </span>`).join("") +
-    `<button class="view-add-trial" data-rem-id="${escHtml(rem.id)}">+</button>`;
+  const maxPts = target.maxPoints || 3;
+  const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts);
+  const trialCells = buildTrialCellsHtml(rem, maxPts);
 
   let remarkTd = "";
   if (!combineOpts?.skipRemarkCell) {
@@ -3957,40 +4189,108 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
   </tr>`;
 }
 
+function getGroupViewMaxPtsForRemark(remId) {
+  const data = state.viewGroupSessionData;
+  const rem  = data?.remarks?.[remId];
+  const act  = rem && data.activities?.[rem.activityId];
+  const target = act && getViewGroupEffectiveTargets().find(t => t.name === act.targetName);
+  return target?.maxPoints || 3;
+}
+
+// Group-view counterpart of refreshViewTrialRow — same reasoning applies
+// (see its comment): the Trials column's buttons can't blur the shared
+// contenteditable host, so a full renderGroupSessionView() after clicking
+// one gets deferred by isGroupViewBusy() until something unrelated finally
+// blurs the host. Patching just this row sidesteps that entirely.
+function refreshGroupViewTrialRow(remId) {
+  const rem = state.viewGroupSessionData?.remarks?.[remId];
+  if (!rem) return;
+  const body = $("group-session-view-body");
+  const tr   = body.querySelector(`.view-rem-del[data-rem-id="${remId}"]`)?.closest("tr");
+  if (!tr) return;
+  const maxPts = getGroupViewMaxPtsForRemark(remId);
+  const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts);
+  const trialCellsDiv = tr.querySelector(".trial-cells");
+  if (trialCellsDiv) {
+    trialCellsDiv.innerHTML = buildTrialCellsHtml(rem, maxPts);
+    bindGroupViewTrialCellListeners(trialCellsDiv);
+  }
+  const totalTd = tr.querySelector(".vcol-total");
+  if (totalTd) totalTd.innerHTML = validTrials.length > 0 ? String(total) : "&nbsp;";
+  const scoreSpan = tr.querySelector(".vcol-score span");
+  if (scoreSpan) scoreSpan.textContent = scorePct;
+}
+
+// See trackViewTrialWrite's comment — same race, group-view counterpart.
+function trackGroupViewTrialWrite(promise) {
+  state.viewGroupActionsInFlight++;
+  promise.finally(() => {
+    state.viewGroupActionsInFlight--;
+    if (state.viewGroupActionsInFlight === 0 && state.viewGroupRenderPending && !isGroupViewBusy()) {
+      state.viewGroupRenderPending = false;
+      renderGroupSessionView();
+    }
+  });
+}
+
+function bindGroupViewTrialCellListeners(container) {
+  container.querySelectorAll(".view-trial-select").forEach(sel => {
+    sel.addEventListener("change", () => {
+      const rem = state.viewGroupSessionData?.remarks?.[sel.dataset.remId];
+      if (!rem) return;
+      const prevTrials = rem.trials || [];
+      const trials = [...prevTrials];
+      trials[Number(sel.dataset.trialIdx)] = Number(sel.value);
+      rem.trials = trials;
+      refreshGroupViewTrialRow(sel.dataset.remId);
+      trackGroupViewTrialWrite(setTrials(state.viewGroupSessionId, sel.dataset.remId, trials).catch(err => {
+        rem.trials = prevTrials;
+        refreshGroupViewTrialRow(sel.dataset.remId);
+        alert("Couldn't update — check your connection and try again.\n\n" + err.message);
+      }));
+    });
+  });
+
+  container.querySelectorAll(".view-trial-del").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const rem = state.viewGroupSessionData?.remarks?.[btn.dataset.remId];
+      if (!rem) return;
+      const prevTrials = rem.trials || [];
+      const trials = prevTrials.filter((_, i) => i !== Number(btn.dataset.trialIdx));
+      rem.trials = trials;
+      refreshGroupViewTrialRow(btn.dataset.remId);
+      trackGroupViewTrialWrite(setTrials(state.viewGroupSessionId, btn.dataset.remId, trials).catch(err => {
+        rem.trials = prevTrials;
+        refreshGroupViewTrialRow(btn.dataset.remId);
+        alert("Couldn't update — check your connection and try again.\n\n" + err.message);
+      }));
+    });
+  });
+
+  container.querySelectorAll(".view-add-trial").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const rem = state.viewGroupSessionData?.remarks?.[btn.dataset.remId];
+      if (!rem) return;
+      const prevTrials = rem.trials || [];
+      const trials = [...prevTrials, -1];
+      rem.trials = trials;
+      refreshGroupViewTrialRow(btn.dataset.remId);
+      trackGroupViewTrialWrite(setTrials(state.viewGroupSessionId, btn.dataset.remId, trials).catch(err => {
+        rem.trials = prevTrials;
+        refreshGroupViewTrialRow(btn.dataset.remId);
+        alert("Couldn't add trial — check your connection and try again.\n\n" + err.message);
+      }));
+    });
+  });
+}
+
 function attachGroupViewListeners() {
   const body = $("group-session-view-body");
   const sid  = () => state.viewGroupSessionId;
 
   const wrap = fn => withViewAction("viewGroupActionsInFlight", "viewGroupRenderPending", isGroupViewBusy, renderGroupSessionView, fn);
 
-  body.querySelectorAll(".view-trial-select").forEach(sel => {
-    sel.addEventListener("change", wrap(async () => {
-      const rem = state.viewGroupSessionData?.remarks?.[sel.dataset.remId];
-      if (!rem) return;
-      const trials = [...(rem.trials || [])];
-      trials[Number(sel.dataset.trialIdx)] = Number(sel.value);
-      await setTrials(sid(), sel.dataset.remId, trials);
-    }));
-  });
-
-  body.querySelectorAll(".view-trial-del").forEach(btn => {
-    btn.addEventListener("click", wrap(async () => {
-      const rem = state.viewGroupSessionData?.remarks?.[btn.dataset.remId];
-      if (!rem) return;
-      const trials = (rem.trials || []).filter((_, i) => i !== Number(btn.dataset.trialIdx));
-      await setTrials(sid(), btn.dataset.remId, trials);
-    }));
-  });
-
-  body.querySelectorAll(".view-add-trial").forEach(btn => {
-    btn.addEventListener("click", wrap(async () => {
-      const rem = state.viewGroupSessionData?.remarks?.[btn.dataset.remId];
-      if (!rem) return;
-      const prevLen = (rem.trials || []).length;
-      await setTrials(sid(), btn.dataset.remId, [...(rem.trials || []), -1]);
-      await waitForSessionData(() => (state.viewGroupSessionData?.remarks?.[btn.dataset.remId]?.trials || []).length > prevLen);
-    }));
-  });
+  bindGroupViewTrialCellListeners(body);
 
   // ── Sketch board buttons (group view screen) ────────────────
   body.querySelectorAll(".btn-sketch[data-rem-id]").forEach(btn => {
@@ -4176,10 +4476,19 @@ function attachGroupViewListeners() {
   });
 
   body.querySelectorAll(".view-rem-del").forEach(btn => {
-    btn.addEventListener("click", wrap(async () => {
+    btn.addEventListener("click", () => {
       if (!confirm("Delete this remark?")) return;
-      await deleteRemark(sid(), btn.dataset.remId);
-    }));
+      const remId = btn.dataset.remId;
+      const rem = state.viewGroupSessionData?.remarks?.[remId];
+      if (!rem) return;
+      delete state.viewGroupSessionData.remarks[remId];
+      renderViewOrDefer("viewGroupRenderPending", isGroupViewBusy, renderGroupSessionView);
+      deleteRemark(sid(), remId).catch(err => {
+        state.viewGroupSessionData.remarks[remId] = rem;
+        renderViewOrDefer("viewGroupRenderPending", isGroupViewBusy, renderGroupSessionView);
+        alert("Couldn't delete remark — check your connection and try again.\n\n" + err.message);
+      });
+    });
   });
 
   body.querySelectorAll(".view-comment-edit").forEach(ta => {
