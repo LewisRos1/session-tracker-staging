@@ -110,7 +110,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "506";
+const APP_VERSION = "507";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2776,7 +2776,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
     const opts = parseOpts(inlineOptions);
     const showEmpty = opts.length === 0 && !isMastery;
     const emptyCell = showEmpty
-      ? `<div class="view-remark-edit view-remark-empty"
+      ? `<div class="view-remark-edit view-remark-empty" contenteditable="true"
            data-act-id="${escHtml(actId || "")}"
            data-act-name="${escHtml(actName)}"
            data-target="${escHtml(target.name)}"
@@ -2863,13 +2863,13 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
           ).join("")}
         </div>
         <div class="mastery-note-row">
-          <div class="view-mastery-note" data-rem-id="${escHtml(rem.id)}"
+          <div class="view-mastery-note" contenteditable="true" data-rem-id="${escHtml(rem.id)}"
             data-saved-html="${escHtml(remarkToHtml(rem.masteryNote))}"
             data-placeholder="Notes…">${remarkToHtml(rem.masteryNote)}</div>
         </div>
       </div>`
     : (makeViewOpts(rem.id, rem.text)
-        || `<div class="view-remark-edit" data-rem-id="${escHtml(rem.id)}"
+        || `<div class="view-remark-edit" contenteditable="true" data-rem-id="${escHtml(rem.id)}"
               data-saved-html="${escHtml(remarkToHtml(rem.text))}">${remarkToHtml(rem.text)}</div>`);
 
   let remarkCell;
@@ -3430,66 +3430,27 @@ function setupViewMouseDownGuard(host) {
   return () => host.removeEventListener("mousedown", onMouseDown);
 }
 
-// Plain Enter inside a .view-remark-edit/.view-mastery-note box is handled
-// HERE, exclusively, via "beforeinput" — not via a separate keydown handler.
-// Earlier versions had BOTH a keydown handler (preventDefault + insert a
-// <br> itself) AND this beforeinput handler (cancelling native
-// insertParagraph/insertLineBreak) running for the same Enter press. That
-// split was the actual bug: Chrome appears to classify even a programmatic
-// <br>-only insertion (e.g. execCommand("insertHTML", false, "<br>")) under
-// the same inputType ("insertLineBreak") as a native line break, so the
-// keydown handler's own insertion could trigger THIS handler's
-// unconditional preventDefault and cancel itself — explaining symptoms like
-// "first Enter does something wrong, second Enter does nothing at all."
-// Letting exactly one handler own detection AND insertion removes that
-// race entirely: beforeinput fires before any DOM mutation, so cancelling
-// the native insert and performing our own manual Range-based <br> splice
-// in the same callback is a single atomic step with nothing else competing.
+// .view-remark-edit/.view-mastery-note boxes now carry their OWN explicit
+// contenteditable="true" (instead of just inheriting it from the page-wide
+// host). That makes each one a real, independent nested editing root —
+// exactly the browser feature "mentions"/"chips" widgets in rich text
+// editors rely on — so native Enter handling is now scoped to that one
+// small box and can no longer split into a stray element that escapes it.
+// Every earlier attempt at this (manual Range splicing, execCommand,
+// various keydown/beforeinput combinations — see git history) was fighting
+// the browser's own block-splitting logic from OUTSIDE the box, applied to
+// one giant inherited-editable region with thousands of non-editable
+// islands in it; giving each box its own boundary lets native handling do
+// the one job it's actually designed to do reliably. Combined with
+// document.execCommand("defaultParagraphSeparator", false, "br") (set once
+// at app init), native Enter now produces a plain <br> inside the box, not
+// a wrapping <div>. No custom Enter-key code left at all.
 //
-// ALSO guards backspace/delete from escaping a box's own boundary — once a
-// box is emptied, continuing to backspace can otherwise keep consuming the
-// surrounding contenteditable="false" structure (labels, whole rows) as if
-// it were deletable content, for the same nested-contenteditable reason the
-// paragraph insert needs a backstop.
+// Still guards backspace/delete from escaping a box's own boundary as a
+// backstop — nested contenteditable should already stop this natively, but
+// it's cheap insurance and was already here.
 function setupViewBeforeInputGuard(host) {
   const onBeforeInput = e => {
-    if (e.inputType === "insertParagraph" || e.inputType === "insertLineBreak") {
-      e.preventDefault();
-      const sel = document.getSelection();
-      if (!sel || sel.rangeCount === 0) return;
-      const node = sel.anchorNode;
-      const el = node && (node.nodeType === 1 ? node : node.parentElement)?.closest(".view-remark-edit, .view-mastery-note");
-      if (!el || !host.contains(el)) return;
-      // A box that already has text in it visually needs two Enter presses
-      // for the first one to "take" (something downstream — most likely the
-      // debounced save/capture-restore cycle — eats the first <br> before
-      // it ever gets to paint). Rather than keep chasing that down, insert
-      // two <br>s for a single press whenever the box already has content,
-      // so it always looks like one Enter = one new line from the user's
-      // side. An empty box (this is the very first character/line) doesn't
-      // have that problem, so it still gets just one.
-      const hadContent = el.textContent.trim().length > 0;
-      const range = sel.getRangeAt(0);
-      range.deleteContents();
-      const br = document.createElement("br");
-      range.insertNode(br);
-      let lastBr = br;
-      if (hadContent) {
-        const br2 = document.createElement("br");
-        br.after(br2);
-        lastBr = br2;
-      }
-      // A trailing <br> with nothing after it doesn't actually create a new
-      // visible line in most browsers unless there's a second one (or text)
-      // after it — so the caret would look like it didn't move.
-      if (!lastBr.nextSibling) lastBr.after(document.createElement("br"));
-      range.setStartAfter(lastBr);
-      range.collapse(true);
-      sel.removeAllRanges();
-      sel.addRange(range);
-      el.dispatchEvent(new Event("input", { bubbles: true }));
-      return;
-    }
     if (e.inputType !== "deleteContentBackward" && e.inputType !== "deleteContentForward") return;
     const sel = document.getSelection();
     if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return;
@@ -4123,7 +4084,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
         <div class="vcol-act" contenteditable="false">${idx === 0 ? actCellWithToggle : ""}</div>
         <div class="vcol-student" contenteditable="false">${escHtml(studentName)}</div>
         <div class="vcol-rem">
-          <div class="view-remark-edit view-remark-empty"
+          <div class="view-remark-edit view-remark-empty" contenteditable="true"
             data-act-id="${escHtml(actId || "")}"
             data-act-name="${escHtml(actName)}"
             data-target="${escHtml(target.name)}"
@@ -4220,7 +4181,7 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
     // group session editor's "Combined Remarks" mode, which is free-text only).
     const idList = combineOpts.combinedRemIds.join(",");
     remarkCellDiv = `<div class="vcol-rem">
-      <div class="view-remark-edit group-remark-input-combined"
+      <div class="view-remark-edit group-remark-input-combined" contenteditable="true"
         data-rem-ids="${idList}" data-saved-html="${escHtml(remarkToHtml(combineOpts.sharedText))}"
         >${remarkToHtml(combineOpts.sharedText)}</div>
     </div>`;
@@ -4252,13 +4213,13 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
             ).join("")}
           </div>
           <div class="mastery-note-row">
-            <div class="view-mastery-note" data-rem-id="${escHtml(rem.id)}"
+            <div class="view-mastery-note" contenteditable="true" data-rem-id="${escHtml(rem.id)}"
               data-saved-html="${escHtml(remarkToHtml(rem.masteryNote))}"
               data-placeholder="Notes…">${remarkToHtml(rem.masteryNote)}</div>
           </div>
         </div>`
       : (makeViewOpts(rem.id, rem.text)
-          || `<div class="view-remark-edit" data-rem-id="${escHtml(rem.id)}"
+          || `<div class="view-remark-edit" contenteditable="true" data-rem-id="${escHtml(rem.id)}"
                 data-saved-html="${escHtml(remarkToHtml(rem.text))}">${remarkToHtml(rem.text)}</div>`);
 
     let remarkCell;
