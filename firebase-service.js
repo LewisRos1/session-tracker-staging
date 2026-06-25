@@ -20,7 +20,6 @@ import {
   where,
   orderBy,
   limit as firestoreLimit,
-  limitToLast,
   onSnapshot,
   deleteField,
   serverTimestamp
@@ -431,17 +430,20 @@ export async function deleteSession(sessionId) {
 
 /** Fetch recent sessions for a student, newest-first (for session picker). */
 export async function getRecentSessionsForStudent(studentId, maxCount = 60) {
-  // orderBy("date","asc") + limitToLast reuses the same composite index that
-  // getAllSessionsForStudent already needs below — orderBy("date","desc")
-  // would require a separate composite index that doesn't exist in Firestore,
-  // which silently looked like "no sessions" since callers swallow the error.
+  // No orderBy here on purpose — combining where("studentId") with an
+  // orderBy on a different field needs a Firestore composite index that
+  // doesn't exist in this project (confirmed: the v516/v517 attempts to add
+  // one both failed silently, since callers swallow the error). Sorting and
+  // slicing client-side is slower as a student's history grows, but it's
+  // guaranteed to work without needing any index to be created first.
   const snap = await getDocs(
     query(collection(db, "sessions"),
-      where("studentId", "==", studentId),
-      orderBy("date", "asc"),
-      limitToLast(maxCount))
+      where("studentId", "==", studentId))
   );
-  return snap.docs.map(d => ({ id: d.id, ...d.data() })).reverse();
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, maxCount);
 }
 
 /** Fetch all sessions for a student, sorted oldest-first. */

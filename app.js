@@ -110,7 +110,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "517";
+const APP_VERSION = "518";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -864,7 +864,7 @@ async function showSessionPicker(student) {
   $("session-picker-modal").classList.remove("hidden");
 
   let sessions = [];
-  try { sessions = await getRecentSessionsForStudent(student.id); } catch (_) {}
+  try { sessions = await getRecentSessionsForStudent(student.id); } catch (err) { console.error("getRecentSessionsForStudent failed:", err); }
 
   // Auto-delete sessions with no meaningful data for any currently existing target
   const currentTargetNames = new Set((student.targets || []).map(t => t.name));
@@ -1109,7 +1109,7 @@ async function showGoToAnotherSession(student) {
   $("session-picker-modal").classList.remove("hidden");
 
   let sessions = [];
-  try { sessions = await getRecentSessionsForStudent(student.id); } catch (_) {}
+  try { sessions = await getRecentSessionsForStudent(student.id); } catch (err) { console.error("getRecentSessionsForStudent failed:", err); }
 
   const currentTargetNames = new Set((student.targets || []).map(t => t.name));
   const stripEmpty = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
@@ -1200,7 +1200,7 @@ async function showEditDatePicker() {
   $("session-picker-modal").classList.remove("hidden");
 
   let sessions = [];
-  try { sessions = await getRecentSessionsForStudent(student.id); } catch (_) {}
+  try { sessions = await getRecentSessionsForStudent(student.id); } catch (err) { console.error("getRecentSessionsForStudent failed:", err); }
   // Dates already occupied by another session
   const takenDates = new Set(
     sessions.filter(s => s.id !== state.viewSessionId).map(s => s.date)
