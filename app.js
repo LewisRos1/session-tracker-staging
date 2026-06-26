@@ -115,7 +115,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "532";
+const APP_VERSION = "533";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -679,7 +679,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
   if (highlightAdd) {
     const btn = $("btn-add-student-row");
     btn.classList.add("btn-flash-hint");
-    setTimeout(() => btn.classList.remove("btn-flash-hint"), 2300);
+    setTimeout(() => btn.classList.remove("btn-flash-hint"), 3400);
   }
 
   const latestNumber = sessions => sessions.reduce((max, s) => Math.max(max, s.number || 0), 0);
@@ -797,7 +797,7 @@ function showRegisteredStudentPicker(targetType) {
             <div class="choice-text"><div class="choice-label">${escHtml(s.name)}</div></div>
           </button>`).join("")}
       </div>
-      ${candidates.length === 0 ? `<p class="empty-hint" style="padding:1rem">No other registered students available to add right now.</p>` : ""}`;
+      ${candidates.length === 0 ? `<p class="empty-hint" style="padding:1rem">All registered students have already been added.</p>` : ""}`;
 
     $("session-picker-list").querySelector(".choice-register-new").addEventListener("click", () => {
       closeSessionPicker();
@@ -5584,12 +5584,17 @@ function renderSessionNumberKindSubsection(student, kind, label, sessions, conta
   }
 
   const id = suffix => `mn-s-sessnum-${kind}-${suffix}`;
+  // Dropdown lists newest-first so the latest session is the default
+  // selection — sessions itself stays oldest-first (needed below for the
+  // "earliest session" floor check), this is purely display order.
+  const dropdownOrder = [...sessions].reverse();
   container.innerHTML = `
     <p class="admin-label" style="margin-bottom:.35rem">${label}</p>
     <select class="admin-input" id="${id("date")}">
-      ${sessions.map(s => `<option value="${s.id}">${formatDate(s.date)} — currently Session ${s.number}</option>`).join("")}
+      ${dropdownOrder.map(s => `<option value="${s.id}">${formatDate(s.date)} — currently Session ${s.number}</option>`).join("")}
     </select>
     <div style="display:flex;align-items:center;gap:.5rem;margin-top:.6rem">
+      <span style="font-size:.85rem;color:var(--text-muted);white-space:nowrap">Change Session Number To:</span>
       <button type="button" class="btn-adm-edit" id="${id("minus")}" style="padding:.5rem .8rem;line-height:1;font-size:1.05rem">−</button>
       <input class="admin-input" id="${id("value")}" type="number" min="1" style="width:5rem;text-align:center;flex:0 0 auto" />
       <button type="button" class="btn-adm-edit" id="${id("plus")}" style="padding:.5rem .8rem;line-height:1;font-size:1.05rem">+</button>
@@ -5636,7 +5641,12 @@ function renderSessionNumberKindSubsection(student, kind, label, sessions, conta
     }
     try {
       await withSaveFeedback($(id("save")), changeSessionNumber(student.id, sessionId, newNumber, kind));
-      await renderSessionNumberSection(student);
+      // Mirror the same uniform shift locally instead of re-fetching from
+      // Firestore — a fresh fetch right after the write was leaving a
+      // confusing gap where the button said "Save" again but the dropdown
+      // still showed the old number until the (slow) re-fetch finished.
+      sessions.forEach(s => { s.number += delta; });
+      renderSessionNumberKindSubsection(student, kind, label, sessions, container);
     } catch (err) {
       alert(err.message);
     }
