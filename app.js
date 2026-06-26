@@ -114,7 +114,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "522";
+const APP_VERSION = "523";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3837,6 +3837,20 @@ function viewGroupGetRounds(data, actId, attendees) {
   return rounds;
 }
 
+// Appends "(Session N)" to an attendee's displayed name if they're linked to
+// a registered student (see Manage Group's "Link to registered student")
+// and have a personal lifetime number recorded for this session — see
+// project_unified_session_numbering. Reads straight from the view screen's
+// globals rather than threading params through every render function that
+// shows a student name.
+function groupAttendeeLabel(studentName) {
+  const linkedId = state.viewGroup?.studentLinks?.[studentName];
+  const num = linkedId ? state.viewGroupSessionData?.attendeePersonalSessionNumbers?.[linkedId] : null;
+  return num != null
+    ? `${escHtml(studentName)} <span style="font-weight:400;color:var(--text-muted);font-size:.85em">(Session ${num})</span>`
+    : escHtml(studentName);
+}
+
 function buildGroupTargetViewTable(target, data, attendees) {
   const dayAvg = calcViewDayAvg(data, target);
 
@@ -3960,7 +3974,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
       return attendees.map((studentName, idx) => `<tr>
         <td class="vcol-no" contenteditable="false">${idx === 0 ? no : ""}</td>
         <td class="vcol-act" contenteditable="false">${idx === 0 ? actCellWithToggle : ""}</td>
-        <td class="vcol-student" contenteditable="false">${escHtml(studentName)}</td>
+        <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(studentName)}</td>
         <td class="vcol-rem">
           <textarea class="view-remark-edit view-remark-empty" rows="1"
             data-act-id="${escHtml(actId || "")}"
@@ -4011,7 +4025,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
         html += `<tr>
           <td class="vcol-no" contenteditable="false">${noVal !== null ? noVal : ""}</td>
           <td class="vcol-act" contenteditable="false">${actVal !== null ? actVal : ""}</td>
-          <td class="vcol-student" contenteditable="false">${escHtml(entry.studentName)}</td>
+          <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(entry.studentName)}</td>
           <td class="vcol-rem" contenteditable="false">
             <button class="btn-view-group-add-remark-pending" data-act-id="${escHtml(actId || "")}"
               data-student="${escHtml(entry.studentName)}">+ Add Remark &amp; Trials</button>
@@ -4112,7 +4126,7 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
   return `<tr>
     <td class="vcol-no" contenteditable="false">${no !== null ? no : ""}</td>
     <td class="vcol-act" contenteditable="false">${actName !== null ? actName : ""}</td>
-    <td class="vcol-student" contenteditable="false">${escHtml(studentName)}</td>
+    <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(studentName)}</td>
     ${remarkTd}
     <td class="vcol-trials" contenteditable="false"><div class="trial-cells">${trialCells}</div></td>
     <td class="vcol-total" contenteditable="false">${validTrials.length > 0 ? total : "&nbsp;"}</td>
@@ -6475,14 +6489,8 @@ function renderGroupStudentBlock(studentName, target, data) {
         renderGroupStudentActivityCard(studentName, actName, actId, target, data, actNote)).join("")
     : `<p class="empty-hint" contenteditable="false" style="padding:1rem">No activities yet. Add them under Edit Target.</p>`;
 
-  const linkedId = state.currentGroup?.studentLinks?.[studentName];
-  const personalNum = linkedId ? data.attendeePersonalSessionNumbers?.[linkedId] : null;
-  const headingLabel = personalNum != null
-    ? `${escHtml(studentName)} <span style="font-weight:400;color:var(--text-muted)">(Session ${personalNum})</span>`
-    : escHtml(studentName);
-
   return `<div class="group-by-student-block" data-student="${escHtml(studentName)}">
-    <div class="activity-group-heading" contenteditable="false">${headingLabel}</div>
+    <div class="activity-group-heading" contenteditable="false">${liveGroupAttendeeLabel(studentName)}</div>
     ${cards}
   </div>`;
 }
@@ -6524,6 +6532,16 @@ function renderGroupStudentActivityCard(studentName, actName, actId, target, dat
 
   html += `</div>`;
   return html;
+}
+
+// Live-entry-screen counterpart of groupAttendeeLabel (View/Edit Past
+// Sessions) — same idea, reads the live screen's globals instead.
+function liveGroupAttendeeLabel(studentName) {
+  const linkedId = state.currentGroup?.studentLinks?.[studentName];
+  const num = linkedId ? state.groupSessionData?.attendeePersonalSessionNumbers?.[linkedId] : null;
+  return num != null
+    ? `${escHtml(studentName)} <span style="font-weight:400;color:var(--text-muted);font-size:.85em">(Session ${num})</span>`
+    : escHtml(studentName);
 }
 
 function renderGroupStudentRowCompact(remId, rem, target) {
@@ -6674,7 +6692,7 @@ function renderGroupStudentTrialsOnlyRow(studentName, remId, rem, target) {
   ).join("");
   return `<div class="group-student-section" data-rem-id="${remId}" data-student="${escHtml(studentName)}">
     <div class="group-student-name-row" contenteditable="false">
-      <span class="group-student-name-label">${escHtml(studentName)}</span>
+      <span class="group-student-name-label">${liveGroupAttendeeLabel(studentName)}</span>
     </div>
     <div class="entry-field" contenteditable="false">
       <span class="field-label">Trials</span>
@@ -6694,7 +6712,7 @@ function renderGroupStudentRow(studentName, remId, rem, target) {
   ).join("");
   return `<div class="group-student-section" data-rem-id="${remId}" data-student="${escHtml(studentName)}">
     <div class="group-student-name-row" contenteditable="false">
-      <span class="group-student-name-label">${escHtml(studentName)}</span>
+      <span class="group-student-name-label">${liveGroupAttendeeLabel(studentName)}</span>
     </div>
     <div class="entry-field">
       <span class="field-label" contenteditable="false">Remark</span>
@@ -6721,7 +6739,7 @@ function renderGroupStudentPendingRow(studentName, actId, actName, target) {
     data-act-name="${escHtml(actName)}"
     data-target="${escHtml(target.name)}">
     <div class="group-student-name-row">
-      <span class="group-student-name-label">${escHtml(studentName)}</span>
+      <span class="group-student-name-label">${liveGroupAttendeeLabel(studentName)}</span>
       <button class="btn-add-remark btn-group-add-remark-pending"
         data-student="${escHtml(studentName)}"
         data-act-id="${escHtml(actId || "")}"
