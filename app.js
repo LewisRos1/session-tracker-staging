@@ -114,7 +114,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "524";
+const APP_VERSION = "525";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -562,6 +562,7 @@ async function showHome() {
   renderTemplateButtons();
   renderExportButtons();
   renderRegistryMigrationButton();
+  renderStudentDatabaseButton();
 }
 
 $("btn-logout").addEventListener("click", () => {
@@ -570,8 +571,6 @@ $("btn-logout").addEventListener("click", () => {
 
 // ── Add student / template from home screen ───────────────────
 
-$("btn-add-registered-student").addEventListener("click", () => promptRegisterNewStudent());
-$("btn-view-registered-students").addEventListener("click", () => showRegisteredStudentsTable());
 $("btn-add-existing-student").addEventListener("click", () => showRegisteredStudentPicker("existing"));
 $("btn-add-assessment-student").addEventListener("click", () => showRegisteredStudentPicker("assessment"));
 $("btn-add-template").addEventListener("click", addNewTemplate);
@@ -595,11 +594,12 @@ $("search-template").addEventListener("input", e => {
 
 // Registers a brand-new person in the central student registry, with no
 // Individual/Assessment assignment yet (type stays unset until she +Adds
-// them via showRegisteredStudentPicker, or links them into a group). Shared
-// by the "Registered Students" section's own +Add, and as the inline
-// "register a new student" fallback inside the Individual/Assessment picker
-// and the group roster picker — one creation path everywhere, so there's
-// never more than one record for the same person.
+// them via showRegisteredStudentPicker, or links them into a group). Used as
+// the inline "register a new student" fallback inside the Individual/
+// Assessment picker and the group roster picker — keeps creation funneled
+// through one path so there's never more than one record for the same
+// person. (The Student Database screen's own "Add New Student" uses an
+// inline table row instead of prompt() dialogs — see startAddStudentRow.)
 async function promptRegisterNewStudent() {
   // First + last name are both required (not just one combined field) so two
   // students sharing a first name don't collide once they're cross-referenced
@@ -621,53 +621,137 @@ async function promptRegisterNewStudent() {
   return s;
 }
 
-function showRegisteredStudentsTable() {
-  $("manage-modal-title").textContent = "Registered Students";
-  $("manage-modal").classList.remove("hidden");
+function renderStudentDatabaseButton() {
+  const container = $("student-database-button");
+  if (!container) return;
+  container.innerHTML = `<button class="export-btn" id="btn-open-student-registry">View Student Database</button>`;
+  $("btn-open-student-registry").addEventListener("click", () => openStudentRegistryScreen());
+}
 
-  const renderTable = () => {
-    const sorted = [...state.students].sort((a, b) => a.name.localeCompare(b.name));
-    const statusLabel = s => {
-      const parts = [];
-      if (s.type === "existing") parts.push("Individual Sessions");
-      if (s.type === "assessment") parts.push("Assessment");
-      const groupNames = state.groups
-        .filter(g => Object.values(g.studentLinks || {}).includes(s.id))
-        .map(g => g.name);
-      if (groupNames.length) parts.push(`Group: ${groupNames.join(", ")}`);
-      return parts.length ? parts.join(" · ") : "Unassigned";
-    };
-    $("manage-modal-body").innerHTML = `
+function openStudentRegistryScreen() {
+  showScreen("screen-student-registry");
+  renderStudentRegistryBody();
+}
+
+// Full-page Student Database screen — table of every registered student
+// (No./First/Last/latest lifetime Session number), with "Add New Student"
+// (inline editable row, both names required) and "Delete Student" (pick by
+// number, then type DELETE) actions above it. Clicking a row still opens
+// Manage Student for editing/transfer.
+async function renderStudentRegistryBody() {
+  const body = $("student-registry-body");
+  if (!body) return;
+  body.innerHTML = `<div class="loading">Loading…</div>`;
+
+  const sorted = [...state.students].sort((a, b) => a.name.localeCompare(b.name));
+  const unifiedLists = await Promise.all(
+    sorted.map(s => getUnifiedSessionsForStudent(s.id).catch(() => []))
+  );
+  const latestNumber = sessions => sessions.reduce((max, s) => Math.max(max, s.number || 0), 0);
+
+  body.innerHTML = `
+    <div style="padding:1rem">
+      <div style="display:flex;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap">
+        <button class="export-btn" id="btn-add-student-row">+ Add New Student</button>
+        <button class="export-btn" id="btn-delete-student-row" style="color:#dc2626">Delete Student</button>
+      </div>
       <table style="width:100%;border-collapse:collapse;font-size:.9rem">
         <thead>
           <tr style="text-align:left;border-bottom:2px solid var(--border)">
             <th style="padding:.4rem .3rem">No.</th>
             <th style="padding:.4rem .3rem">First Name</th>
             <th style="padding:.4rem .3rem">Last Name</th>
-            <th style="padding:.4rem .3rem">Status</th>
+            <th style="padding:.4rem .3rem">Session</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="student-registry-tbody">
           ${sorted.map((s, i) => `
             <tr class="registry-row" data-id="${escHtml(s.id)}" style="cursor:pointer;border-bottom:1px solid var(--border)">
               <td style="padding:.5rem .3rem">${i + 1}</td>
               <td style="padding:.5rem .3rem">${escHtml(s.firstName || s.name.split(/\s+/)[0] || "")}</td>
               <td style="padding:.5rem .3rem">${escHtml(s.lastName || s.name.split(/\s+/).slice(1).join(" ") || "")}</td>
-              <td style="padding:.5rem .3rem;color:var(--text-muted)">${escHtml(statusLabel(s))}</td>
+              <td style="padding:.5rem .3rem">${latestNumber(unifiedLists[i]) || "—"}</td>
             </tr>`).join("")}
         </tbody>
       </table>
-      ${sorted.length === 0 ? `<p class="empty-hint" style="padding:1rem">No students registered yet.</p>` : ""}`;
+      ${sorted.length === 0 ? `<p class="empty-hint" style="padding:1rem">No students registered yet.</p>` : ""}
+    </div>`;
 
-    $("manage-modal-body").querySelectorAll(".registry-row").forEach(row => {
-      row.addEventListener("click", () => {
-        const s = state.students.find(x => x.id === row.dataset.id);
-        if (s) openManageModal(s);
-      });
+  $("student-registry-body").querySelectorAll(".registry-row").forEach(row => {
+    row.addEventListener("click", () => {
+      const s = state.students.find(x => x.id === row.dataset.id);
+      if (s) openManageModal(s);
     });
-  };
+  });
 
-  renderTable();
+  $("btn-add-student-row").addEventListener("click", startAddStudentRow);
+  $("btn-delete-student-row").addEventListener("click", promptDeleteStudentFromRegistry);
+}
+
+function startAddStudentRow() {
+  const tbody = $("student-registry-tbody");
+  if (!tbody || $("new-student-row")) return;
+  $("btn-add-student-row").disabled = true;
+  const tr = document.createElement("tr");
+  tr.id = "new-student-row";
+  tr.innerHTML = `
+    <td style="padding:.5rem .3rem">—</td>
+    <td style="padding:.3rem"><input class="admin-input" id="new-student-first" placeholder="First name" style="width:100%" /></td>
+    <td style="padding:.3rem"><input class="admin-input" id="new-student-last" placeholder="Last name" style="width:100%" /></td>
+    <td style="padding:.3rem;display:flex;gap:.4rem">
+      <button class="btn-primary-sm" id="btn-save-new-student">Save</button>
+      <button class="btn-adm-edit" id="btn-cancel-new-student">Cancel</button>
+    </td>`;
+  tbody.insertBefore(tr, tbody.firstChild);
+
+  const firstInput = $("new-student-first");
+  const lastInput  = $("new-student-last");
+  firstInput.focus();
+  firstInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); lastInput.focus(); } });
+  lastInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $("btn-save-new-student").click(); } });
+
+  $("btn-save-new-student").addEventListener("click", async () => {
+    const firstName = firstInput.value.trim();
+    const lastName  = lastInput.value.trim();
+    if (!firstName || !lastName) {
+      alert("Please enter both a first name and a last name.");
+      return;
+    }
+    const s = {
+      id: cfgId("s"),
+      name: `${firstName} ${lastName}`,
+      firstName, lastName,
+      type: "unassigned",
+      order: state.students.length,
+      targets: []
+    };
+    state.students.push(s);
+    await saveStudent(s);
+    renderStudentRegistryBody();
+  });
+
+  $("btn-cancel-new-student").addEventListener("click", renderStudentRegistryBody);
+}
+
+async function promptDeleteStudentFromRegistry() {
+  if (state.students.length === 0) { alert("No students to delete."); return; }
+  const sorted = [...state.students].sort((a, b) => a.name.localeCompare(b.name));
+  const choice = prompt(
+    "Type the No. of the student to delete:\n" +
+    sorted.map((s, i) => `${i + 1}. ${s.name}`).join("\n")
+  );
+  if (choice === null) return;
+  const idx = Number(choice) - 1;
+  if (!Number.isInteger(idx) || idx < 0 || idx >= sorted.length) {
+    alert("Invalid number.");
+    return;
+  }
+  const student = sorted[idx];
+  const typed = prompt(`Type DELETE to permanently delete "${student.name}". Session data is kept in Firebase, but the student will be removed from all lists.`);
+  if (typed !== "DELETE") return;
+  state.students = state.students.filter(s => s.id !== student.id);
+  await deleteStudentConfig(student.id);
+  renderStudentRegistryBody();
 }
 
 // Choosing a student here adds them to Individual Sessions or Assessments.
@@ -2864,6 +2948,7 @@ async function leaveSessionView() {
 }
 
 $("btn-view-back").addEventListener("click", leaveSessionView);
+$("btn-student-registry-back").addEventListener("click", showHome);
 
 function renderSessionView() {
   const data    = state.viewSessionData;

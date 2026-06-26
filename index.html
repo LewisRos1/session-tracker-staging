@@ -83,12 +83,9 @@
     <main class="home-main">
       <section>
         <div class="section-header">
-          <h2 class="section-title">Registered Students <span style="font-size:.7em;font-weight:400;color:var(--text-muted)">(Register a student once here, then add them to Individual Sessions, Assessments, or a Group below)</span></h2>
-          <div style="display:flex;gap:.5rem">
-            <button class="btn-add-section" id="btn-view-registered-students">View/Manage Registered Students</button>
-            <button class="btn-add-section" id="btn-add-registered-student">+ Add</button>
-          </div>
+          <h2 class="section-title">Student Database</h2>
         </div>
+        <div id="student-database-button"></div>
       </section>
       <section>
         <div class="section-header">
@@ -248,6 +245,23 @@
       </div>
     </header>
     <div class="session-view-body" id="group-session-view-body">
+      <!-- populated by JS -->
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       STUDENT DATABASE SCREEN
+       ══════════════════════════════════════════════════════ -->
+  <div id="screen-student-registry" class="screen hidden">
+    <header class="session-header session-header-view">
+      <div class="view-header-left">
+        <button class="btn-back" id="btn-student-registry-back" aria-label="Back to home">←</button>
+        <div class="session-info">
+          <span class="session-student-name">Student Database</span>
+        </div>
+      </div>
+    </header>
+    <div class="session-view-body" id="student-registry-body">
       <!-- populated by JS -->
     </div>
   </div>
