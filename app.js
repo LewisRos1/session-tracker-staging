@@ -56,7 +56,7 @@ import {
 } from "./firebase-service.js";
 import {
   exportStudentData, exportAllStudents, exportGroupMemberData,
-  exportStudentSingleSession, exportGroupMemberSingleSession
+  exportStudentSingleSessionWord, exportGroupMemberSingleSessionWord
 } from "./export.js";
 
 // ── SW update detection — must run at parse time, before DOMContentLoaded,
@@ -115,7 +115,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "534";
+const APP_VERSION = "535";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1083,21 +1083,33 @@ function showStudentChoice(student) {
           <div class="choice-label">Manage Student</div>
         </div>
       </button>
-      <button class="choice-btn choice-export">
-        <span class="choice-icon">📤</span>
+      <button class="choice-btn choice-export-excel">
+        <span class="choice-icon">📊</span>
         <div class="choice-text">
-          <div class="choice-label">Export to Excel</div>
+          <div class="choice-label">Export to Excel (Yearly Summary)</div>
+        </div>
+      </button>
+      <button class="choice-btn choice-export-word">
+        <span class="choice-icon">📝</span>
+        <div class="choice-text">
+          <div class="choice-label">Export to Word (Daily Session Note)</div>
         </div>
       </button>
     </div>`;
   $("session-picker-modal").classList.remove("hidden");
 
-  $("session-picker-list").querySelector(".choice-export").addEventListener("click", () => {
-    showExportChoiceGeneric(
+  $("session-picker-list").querySelector(".choice-export-excel").addEventListener("click", async e => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    btn.querySelector(".choice-label").textContent = "Generating…";
+    try { await exportStudentData(student); } catch (err) { alert("Export failed: " + err.message); }
+    closeSessionPicker();
+  });
+  $("session-picker-list").querySelector(".choice-export-word").addEventListener("click", () => {
+    showExportSessionPickerGeneric(
       student.name,
-      () => exportStudentData(student),
       () => getRecentSessionsForStudent(student.id),
-      session => exportStudentSingleSession(student, session)
+      session => exportStudentSingleSessionWord(student, session)
     );
   });
 
@@ -1255,43 +1267,10 @@ function closeSessionPicker() {
 $("session-picker-close").addEventListener("click",    closeSessionPicker);
 $("session-picker-backdrop").addEventListener("click", closeSessionPicker);
 
-// ─── EXPORT NOTES TO EXCEL (shared by individual students and group members) ─
+// ─── EXPORT NOTES TO WORD (shared by individual students and group members) ─
 // entityLabel: display name shown in the picker.
-// onExportAll(): exports every session for this entity (full workbook).
 // getSessions(): fetches the full session list to populate the day picker.
-// onExportSingle(session): exports just the one picked session (light workbook).
-function showExportChoiceGeneric(entityLabel, onExportAll, getSessions, onExportSingle) {
-  $("session-picker-title").textContent = entityLabel;
-  $("session-picker-list").innerHTML = `
-    <div class="choice-list">
-      <button class="choice-btn choice-export-all">
-        <span class="choice-icon">📊</span>
-        <div class="choice-text"><div class="choice-label">Export All Session Notes</div></div>
-      </button>
-      <button class="choice-btn choice-export-one">
-        <span class="choice-icon">📅</span>
-        <div class="choice-text"><div class="choice-label">Export 1 Session Note Only</div></div>
-      </button>
-    </div>`;
-  $("session-picker-modal").classList.remove("hidden");
-
-  $("session-picker-list").querySelector(".choice-export-all").addEventListener("click", async e => {
-    const btn = e.currentTarget;
-    btn.disabled = true;
-    btn.querySelector(".choice-label").textContent = "Generating…";
-    try {
-      await onExportAll();
-    } catch (err) {
-      alert("Export failed: " + err.message);
-    }
-    closeSessionPicker();
-  });
-
-  $("session-picker-list").querySelector(".choice-export-one").addEventListener("click", () => {
-    showExportSessionPickerGeneric(entityLabel, getSessions, onExportSingle);
-  });
-}
-
+// onExportSingle(session): exports the one picked session as a Word doc.
 async function showExportSessionPickerGeneric(entityLabel, getSessions, onExportSingle) {
   $("session-picker-title").textContent = entityLabel;
   $("session-picker-list").innerHTML = `<div class="session-picker-loading">Loading sessions…</div>`;
@@ -1369,9 +1348,11 @@ function renderExportSessionsForMonth(entityLabel, month, monthSessions, byMonth
   });
 }
 
-// Group "Export Notes to Excel" exports one student at a time — ask which
-// student in this group first, then hand off to the same All/One-day flow.
-function showGroupExportStudentPicker(group) {
+// Group export (Excel or Word) exports one student at a time — ask which
+// student in this group first. mode "excel" exports that student's full
+// yearly summary directly; mode "word" opens the day picker for a single
+// session's daily note.
+function showGroupExportStudentPicker(group, mode) {
   $("session-picker-title").textContent = group.name;
   const students = group.students || [];
   $("session-picker-list").innerHTML = students.length
@@ -1387,14 +1368,20 @@ function showGroupExportStudentPicker(group) {
   $("session-picker-modal").classList.remove("hidden");
 
   $("session-picker-list").querySelectorAll(".choice-export-student").forEach(btn => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       const name = btn.dataset.name;
-      showExportChoiceGeneric(
-        `${name} (Group)`,
-        () => exportGroupMemberData(name, [group]),
-        () => getRecentGroupSessions(group.id),
-        session => exportGroupMemberSingleSession(name, [group], session)
-      );
+      if (mode === "word") {
+        showExportSessionPickerGeneric(
+          `${name} (Group)`,
+          () => getRecentGroupSessions(group.id),
+          session => exportGroupMemberSingleSessionWord(name, [group], session)
+        );
+        return;
+      }
+      btn.disabled = true;
+      btn.querySelector(".choice-label").textContent = "Generating…";
+      try { await exportGroupMemberData(name, [group]); } catch (err) { alert("Export failed: " + err.message); }
+      closeSessionPicker();
     });
   });
 }
@@ -6456,15 +6443,22 @@ function showGroupChoice(group) {
         <span class="choice-icon">✏️</span>
         <div class="choice-text"><div class="choice-label">Manage Group</div></div>
       </button>
-      <button class="choice-btn choice-export">
-        <span class="choice-icon">📤</span>
-        <div class="choice-text"><div class="choice-label">Export to Excel</div></div>
+      <button class="choice-btn choice-export-excel">
+        <span class="choice-icon">📊</span>
+        <div class="choice-text"><div class="choice-label">Export to Excel (Yearly Summary)</div></div>
+      </button>
+      <button class="choice-btn choice-export-word">
+        <span class="choice-icon">📝</span>
+        <div class="choice-text"><div class="choice-label">Export to Word (Daily Session Note)</div></div>
       </button>
     </div>`;
   $("session-picker-modal").classList.remove("hidden");
 
-  $("session-picker-list").querySelector(".choice-export").addEventListener("click", () => {
-    showGroupExportStudentPicker(group);
+  $("session-picker-list").querySelector(".choice-export-excel").addEventListener("click", () => {
+    showGroupExportStudentPicker(group, "excel");
+  });
+  $("session-picker-list").querySelector(".choice-export-word").addEventListener("click", () => {
+    showGroupExportStudentPicker(group, "word");
   });
 
   const today = getTodayString();

@@ -166,43 +166,6 @@ function addSummarySheets(wb, allTargets, sessions) {
   applyBorders(detWs, detMaxCols);
 }
 
-// ── Single-session export: Daily Summary (Target + that day's score only) ──
-function addDailySummarySheet(wb, entityName, allTargets, session) {
-  const rows = [
-    [`${entityName}: Daily Summary — ${fmtDate(session.date)}`, ""],
-    ["Target", "Score"]
-  ];
-  for (const target of allTargets) {
-    const snap   = (session.targetsSnapshot || []).find(t => t.name === target.name);
-    const eff    = snap ? { ...target, maxPoints: snap.maxPoints } : target;
-    const dayAvg = calcDailyAverage(session, eff);
-    rows.push([target.name, dayAvg !== null ? pct(dayAvg) : ""]);
-  }
-
-  const ws = wb.addWorksheet("Daily Summary");
-  rows.forEach(row => ws.addRow(row));
-  ws.getColumn(1).width     = 36;
-  ws.getColumn(2).width     = 16;
-  ws.getColumn(1).alignment = { vertical: "middle" };
-  ws.getColumn(2).alignment = { horizontal: "center", vertical: "middle" };
-
-  try { ws.mergeCells("A1:B1"); } catch (_) {}
-  const title     = ws.getRow(1).getCell(1);
-  title.fill      = STYLE_SESSION.fill;
-  title.font      = STYLE_SESSION.font;
-  title.alignment = { horizontal: "center", vertical: "middle" };
-  fitTitleRow(ws, 1, 52);
-
-  for (let c = 1; c <= 2; c++) {
-    const cell     = ws.getRow(2).getCell(c);
-    cell.fill      = STYLE_COL_HEADER.fill;
-    cell.font      = STYLE_COL_HEADER.font;
-    cell.alignment = STYLE_COL_HEADER.alignment;
-  }
-
-  applyBorders(ws, 2);
-}
-
 function targetHasDataInSession(target, session) {
   const actIds = new Set(
     Object.entries(session.activities || {})
@@ -529,169 +492,245 @@ export async function exportGroupMemberData(studentName, groups) {
   URL.revokeObjectURL(url);
 }
 
-// ── Single-session export (one specific day) ─────────────────
-// Much lighter than the full export: just two sheets — one combined sheet with
-// every target's data for that day, and a Daily Summary table — no monthly or
-// detailed summary, no per-target sheets, no baseline-vs-current, no charts.
+// ── Word export (single session, "Daily Session Note") ───────
+// Same content as the Excel single-session export above, but: no Date or
+// Avg Score columns (Student/Session/Date moved into the page header
+// instead, so repeating them in the table is redundant), and each target's
+// title is just its name (no "— Score: X%", since that's only really
+// useful when comparing across many sessions, not a single day's note).
+// docx is loaded globally via a <script> tag in index.html, same pattern
+// as ExcelJS/JSZip/Chart elsewhere in this file.
 
-function buildCombinedSessionRows(allTargets, session, entityName) {
-  const rows                = [];
-  const targetHeaderRows    = new Set();
-  const colHeaderRows       = new Set();
-  const activityHeadingRows = new Set();
-  const noteRows            = new Set();
-  const sessionDateBlocks   = [];
-  const spacerRows          = new Set();
+function wordTargetRows(target, session) {
+  const rows = [];
+  const activities = getAllActivitiesForTarget(session, target);
 
-  const titleRow = rows.length;
-  rows.push([`${entityName} — Session Note — ${fmtDate(session.date)}`, "", "", "", ""]);
-  spacerRows.add(rows.length);
-  rows.push(["", "", "", "", ""]);
+  if (activities.length === 0) {
+    rows.push({ merge: true, text: "(no data recorded)" });
+    return rows;
+  }
+
+  for (const act of activities) {
+    if (act.isHeading) {
+      rows.push({ merge: true, text: act.activityName, style: "heading" });
+      continue;
+    }
+
+    if (act.isNote) {
+      const noteText = (act.activityName || "")
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/div>/gi, "\n").replace(/<div>/gi, "")
+        .replace(/<\/p>/gi, "\n").replace(/<p>/gi, "")
+        .replace(/<[^>]*>/g, "")
+        .replace(/\*\*/g, "")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+      rows.push({ merge: true, text: `Note: ${noteText}`, style: "note" });
+      continue;
+    }
+
+    const actNoteText = (target.predefinedActivities || []).find(
+      p => !p.isHeading && !p.isNote && p.name === act.activityName
+    )?.actNote;
+    const activityLabel = (actNoteText && actNoteText.trim())
+      ? `${act.activityName}\nNote: ${actNoteText.trim()}`
+      : act.activityName;
+
+    if (act.empty) {
+      rows.push({ cells: [activityLabel, "", ""] });
+      continue;
+    }
+
+    const remarks = getRemarksForActivity(session, act.id);
+    const starter = (target.predefinedActivities || []).find(
+      p => !p.isHeading && !p.isNote && p.name === act.activityName
+    )?.sentenceStarter || null;
+
+    if (remarks.length === 0) {
+      rows.push({ cells: [activityLabel, "", ""] });
+      continue;
+    }
+
+    let first = true;
+    for (const rem of remarks) {
+      const validTrials = (rem.trials || []).filter(t => t !== -1);
+      const remarkAvg   = calcRemarkAvg(validTrials, target.maxPoints);
+      const masteryNote = stripRemarkHtml(rem.masteryNote || "");
+      const baseText    = starter ? `${starter}: ${stripRemarkHtml(rem.text)}`.trim() : stripRemarkHtml(rem.text);
+      const remarkText  = masteryNote ? `${baseText} — ${masteryNote}` : baseText;
+      rows.push({ cells: [first ? activityLabel : "", remarkText, remarkAvg !== null ? pct(remarkAvg) : ""] });
+      first = false;
+    }
+  }
+
+  if (target.hasComment) {
+    const commentText = (session.fedcComments || {})[sanitizeKey(target.name)] || "";
+    if (commentText) rows.push({ cells: ["Comment", commentText, ""] });
+  }
+
+  return rows;
+}
+
+function buildSessionDocxBody(entityName, sessionLabel, allTargets, session) {
+  const {
+    Paragraph, TextRun, Table, TableRow, TableCell,
+    AlignmentType, WidthType, BorderStyle, ShadingType,
+    Header, Footer, PageNumber, TabStopType
+  } = docx;
+
+  const HEADER_FILL = "C8DFF2";
+  const TARGET_FILL = "A8C8E8";
+  const NOTE_FILL   = "FFF8ED";
+
+  const cellBorders = {
+    top:    { style: BorderStyle.SINGLE, size: 2, color: "B0C8E0" },
+    bottom: { style: BorderStyle.SINGLE, size: 2, color: "B0C8E0" },
+    left:   { style: BorderStyle.SINGLE, size: 2, color: "B0C8E0" },
+    right:  { style: BorderStyle.SINGLE, size: 2, color: "B0C8E0" }
+  };
+
+  function textLines(text, opts) {
+    const lines = (text || "").split("\n");
+    const runs = [];
+    lines.forEach((line, i) => {
+      if (i > 0) runs.push(new TextRun({ text: "", break: 1 }));
+      runs.push(new TextRun({ text: line, ...opts }));
+    });
+    return runs;
+  }
+
+  function cell(text, { bold = false, italics = false, fill = null, colSpan = 1, align = AlignmentType.LEFT } = {}) {
+    return new TableCell({
+      columnSpan: colSpan,
+      shading: fill ? { type: ShadingType.CLEAR, color: "auto", fill } : undefined,
+      borders: cellBorders,
+      margins: { top: 80, bottom: 80, left: 100, right: 100 },
+      children: [new Paragraph({ alignment: align, children: textLines(text, { bold, italics }) })]
+    });
+  }
+
+  const body = [];
+  let anyTarget = false;
 
   for (const target of allTargets) {
     if (!targetHasDataInSession(target, session)) continue;
+    anyTarget = true;
 
-    const snap   = (session.targetsSnapshot || []).find(t => t.name === target.name);
-    const eff    = snap ? { ...target, maxPoints: snap.maxPoints } : target;
-    const dayAvg = calcDailyAverage(session, eff);
+    body.push(new Paragraph({
+      spacing: { before: 240, after: 80 },
+      children: [new TextRun({ text: target.name, bold: true, size: 26 })]
+    }));
 
-    if (targetHeaderRows.size > 0) { spacerRows.add(rows.length); rows.push(["", "", "", "", ""]); }
+    const tableRows = [
+      new TableRow({
+        tableHeader: true,
+        children: [
+          cell("Activity", { bold: true, fill: HEADER_FILL }),
+          cell("Remark",   { bold: true, fill: HEADER_FILL }),
+          cell("Score",    { bold: true, fill: HEADER_FILL, align: AlignmentType.CENTER })
+        ]
+      })
+    ];
 
-    targetHeaderRows.add(rows.length);
-    rows.push([`${target.name}  —  Score: ${dayAvg !== null ? pct(dayAvg) : "N/A"}`, "", "", "", ""]);
-
-    colHeaderRows.add(rows.length);
-    rows.push(["Date", "Activity", "Remark", "Score", "Avg Score"]);
-
-    appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRows, session, eff);
-  }
-
-  return { rows, titleRow, targetHeaderRows, colHeaderRows, activityHeadingRows, noteRows, sessionDateBlocks, spacerRows };
-}
-
-// One sheet combining every target's data for the single exported day
-// (mirrors addIndividualTargetSheets' styling, but per-target header blocks
-// instead of per-target sheets).
-function addCombinedSessionSheet(wb, allTargets, session, entityName) {
-  const { rows, titleRow, targetHeaderRows, colHeaderRows, activityHeadingRows, noteRows, sessionDateBlocks, spacerRows } =
-    buildCombinedSessionRows(allTargets, session, entityName);
-
-  const ws = wb.addWorksheet("Session Note");
-  rows.forEach(row => ws.addRow(row));
-
-  ws.getColumn(1).width     = 6.33;
-  ws.getColumn(2).width     = 40.89;
-  ws.getColumn(3).width     = 62;
-  ws.getColumn(4).width     = 6.78;
-  ws.getColumn(5).width     = 8.56;
-  ws.getColumn(1).alignment = { horizontal: "center", vertical: "top" };
-  ws.getColumn(2).alignment = { wrapText: true, vertical: "top" };
-  ws.getColumn(3).alignment = { wrapText: true, vertical: "top" };
-  ws.getColumn(4).alignment = { horizontal: "center", vertical: "top" };
-  ws.getColumn(5).alignment = { horizontal: "center", vertical: "top" };
-
-  {
-    const n = titleRow + 1;
-    try { ws.mergeCells(`A${n}:E${n}`); } catch (_) {}
-    const cell = ws.getRow(n).getCell(1);
-    cell.fill      = STYLE_TARGET_MONTH.fill;
-    cell.font      = STYLE_TARGET_MONTH.font;
-    cell.alignment = { horizontal: "center", vertical: "middle" };
-    fitTitleRow(ws, n, 110);
-  }
-
-  for (const rowIdx of targetHeaderRows) {
-    const n = rowIdx + 1;
-    try { ws.mergeCells(`A${n}:E${n}`); } catch (_) {}
-    const cell = ws.getRow(n).getCell(1);
-    cell.fill      = STYLE_TARGET_MONTH.fill;
-    cell.font      = STYLE_TARGET_MONTH.font;
-    cell.alignment = STYLE_TARGET_MONTH.alignment;
-  }
-
-  for (const rowIdx of colHeaderRows) {
-    const n = rowIdx + 1;
-    for (let c = 1; c <= 5; c++) {
-      const cell = ws.getRow(n).getCell(c);
-      cell.fill      = STYLE_TARGET_COLHDR.fill;
-      cell.font      = STYLE_TARGET_COLHDR.font;
-      cell.alignment = STYLE_TARGET_COLHDR.alignment;
+    for (const r of wordTargetRows(target, session)) {
+      if (r.merge) {
+        tableRows.push(new TableRow({
+          children: [cell(r.text, {
+            colSpan: 3,
+            italics: r.style === "note",
+            fill: r.style === "heading" ? TARGET_FILL : (r.style === "note" ? NOTE_FILL : null)
+          })]
+        }));
+      } else {
+        tableRows.push(new TableRow({
+          children: [
+            cell(r.cells[0]),
+            cell(r.cells[1]),
+            cell(r.cells[2], { align: AlignmentType.CENTER })
+          ]
+        }));
+      }
     }
+
+    body.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: tableRows }));
   }
 
-  for (const rowIdx of activityHeadingRows) {
-    const n = rowIdx + 1;
-    try { ws.mergeCells(`B${n}:D${n}`); } catch (_) {}
-    const cell = ws.getRow(n).getCell(2);
-    cell.fill      = STYLE_ACT_HEADING.fill;
-    cell.font      = STYLE_ACT_HEADING.font;
-    cell.alignment = { vertical: "top" };
+  if (!anyTarget) {
+    body.push(new Paragraph({ children: [new TextRun({ text: "No data recorded for this session." })] }));
   }
 
-  for (const rowIdx of noteRows) {
-    const n = rowIdx + 1;
-    try { ws.mergeCells(`B${n}:D${n}`); } catch (_) {}
-    const cell = ws.getRow(n).getCell(2);
-    cell.fill      = STYLE_NOTE.fill;
-    cell.font      = STYLE_NOTE.font;
-    cell.alignment = { wrapText: true, vertical: "top" };
-    const text = (cell.value || "").toString();
-    const visLines = text.split("\n").reduce((sum, seg) =>
-      sum + Math.max(1, Math.ceil((seg.length || 1) / 90)), 0);
-    ws.getRow(n).height = Math.max(18, visLines * 15);
-  }
-
-  for (const { startRow, endRow, dateLabel, avgScore } of sessionDateBlocks) {
-    const startN = startRow + 1;
-    const endN   = endRow + 1;
-    if (startN < endN) {
-      try { ws.mergeCells(`A${startN}:A${endN}`); } catch (_) {}
-      try { ws.mergeCells(`E${startN}:E${endN}`); } catch (_) {}
-    }
-    const dateCell = ws.getRow(startN).getCell(1);
-    dateCell.value     = dateLabel;
-    dateCell.alignment = { horizontal: "center", vertical: "top" };
-
-    const avgCell = ws.getRow(startN).getCell(5);
-    avgCell.value     = avgScore;
-    avgCell.font      = { color: { argb: "FF000000" } };
-    avgCell.alignment = { horizontal: "center", vertical: "top" };
-  }
-
-  ws.headerFooter.oddFooter = `&LZORA Behavioural Intervention&C${entityName}&R&P`;
-
-  ws.eachRow((row, rowNumber) => {
-    if (spacerRows.has(rowNumber - 1)) return;
-    for (let c = 1; c <= 5; c++) row.getCell(c).border = TARGET_CELL_BORDER;
+  const header = new Header({
+    children: [new Paragraph({
+      tabStops: [
+        { type: TabStopType.CENTER, position: 4680 },
+        { type: TabStopType.RIGHT,  position: 9360 }
+      ],
+      children: [
+        new TextRun({ text: entityName, bold: true }),
+        new TextRun({ text: "\t" }),
+        new TextRun({ text: sessionLabel, bold: true }),
+        new TextRun({ text: "\t" }),
+        new TextRun({ text: fmtDate(session.date) })
+      ]
+    })]
   });
+
+  const footer = new Footer({
+    children: [new Paragraph({
+      alignment: AlignmentType.RIGHT,
+      children: [new TextRun({ text: "Page " }), new TextRun({ children: [PageNumber.CURRENT] })]
+    })]
+  });
+
+  return { header, footer, body };
 }
 
-async function buildSingleSessionWorkbook(entityName, allTargets, session) {
-  const sortedTargets = allTargets.slice().sort((a, b) => a.name.localeCompare(b.name));
-  const wb = new ExcelJS.Workbook();
-
-  addCombinedSessionSheet(wb, sortedTargets, session, entityName);
-  addDailySummarySheet(wb, entityName, sortedTargets, session);
-
-  return wb.xlsx.writeBuffer();
+async function buildSingleSessionWordBlob(entityName, sessionLabel, allTargets, session) {
+  const { Document, Packer } = docx;
+  const { header, footer, body } = buildSessionDocxBody(entityName, sessionLabel, allTargets, session);
+  const doc = new Document({
+    sections: [{ headers: { default: header }, footers: { default: footer }, children: body }]
+  });
+  return Packer.toBlob(doc);
 }
 
-export async function exportStudentSingleSession(student, session) {
-  if (!student || !session) return;
+function formatExportFilenameWord(name, sessionType, dateStr, now) {
+  const dd   = String(now.getDate()).padStart(2, "0");
+  const mm   = String(now.getMonth() + 1).padStart(2, "0");
+  const yyyy = now.getFullYear();
+  const hh   = String(now.getHours()).padStart(2, "0");
+  const min  = String(now.getMinutes()).padStart(2, "0");
+  return `${name} - ${sessionType} - ${fmtDate(dateStr)} - ${dd}.${mm}.${yyyy} - ${hh}-${min}.docx`;
+}
 
-  const allTargets = getAllTargets(student);
-  const buffer = await buildSingleSessionWorkbook(student.name, allTargets, session);
-  const blob   = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-  const url    = URL.createObjectURL(blob);
-  const a      = document.createElement("a");
-  a.href       = url;
-  a.download   = formatExportFilename(student.name, "Individual Session", new Date());
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a   = document.createElement("a");
+  a.href     = url;
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
 }
 
-export async function exportGroupMemberSingleSession(studentName, groups, session) {
+export async function exportStudentSingleSessionWord(student, session) {
+  if (!student || !session) return;
+  if (typeof docx === "undefined") {
+    alert("Word export isn't available right now (the docx library didn't load) — check your internet connection and try again.");
+    return;
+  }
+
+  const allTargets   = getAllTargets(student).slice().sort((a, b) => a.name.localeCompare(b.name));
+  const sessionLabel = session.sessionNumber != null ? `Session ${session.sessionNumber}` : "";
+  const blob = await buildSingleSessionWordBlob(student.name, sessionLabel, allTargets, session);
+  downloadBlob(blob, formatExportFilenameWord(student.name, "Individual Session", session.date, new Date()));
+}
+
+export async function exportGroupMemberSingleSessionWord(studentName, groups, session) {
   if (!studentName || !groups?.length || !session) return;
+  if (typeof docx === "undefined") {
+    alert("Word export isn't available right now (the docx library didn't load) — check your internet connection and try again.");
+    return;
+  }
 
   const filteredRemarks = Object.fromEntries(
     Object.entries(session.remarks || {}).filter(([, r]) => r.studentName === studentName)
@@ -701,17 +740,14 @@ export async function exportGroupMemberSingleSession(studentName, groups, sessio
     return;
   }
 
-  const allTargets    = unionTargetsByName(groups);
-  const entityName     = `${studentName} (Group)`;
+  const studentId      = groups.map(g => g.studentLinks?.[studentName]).find(Boolean);
+  const personalNumber = studentId ? session.attendeePersonalSessionNumbers?.[studentId] : null;
+  const sessionLabel   = personalNumber != null ? `Session ${personalNumber}` : "";
+
+  const allTargets      = unionTargetsByName(groups).slice().sort((a, b) => a.name.localeCompare(b.name));
   const filteredSession = { ...session, remarks: filteredRemarks };
-  const buffer = await buildSingleSessionWorkbook(entityName, allTargets, filteredSession);
-  const blob   = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-  const url    = URL.createObjectURL(blob);
-  const a      = document.createElement("a");
-  a.href       = url;
-  a.download   = formatExportFilename(studentName, "Group Session", new Date());
-  a.click();
-  URL.revokeObjectURL(url);
+  const blob = await buildSingleSessionWordBlob(studentName, sessionLabel, allTargets, filteredSession);
+  downloadBlob(blob, formatExportFilenameWord(studentName, "Group Session", session.date, new Date()));
 }
 
 export async function exportAllStudents(students) {
