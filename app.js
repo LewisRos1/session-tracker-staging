@@ -48,7 +48,8 @@ import {
   signOutUser,
   onAuthChange,
   generateId,
-  getUnifiedSessionsForStudent,
+  getIndividualSessionsForStudent,
+  getGroupSessionsForStudent,
   changeSessionNumber,
   previewRegistryMigration,
   runRegistryMigration
@@ -114,7 +115,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "526";
+const APP_VERSION = "528";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -592,39 +593,10 @@ $("search-template").addEventListener("input", e => {
   renderTemplateButtons();
 });
 
-// Registers a brand-new person in the central student registry, with no
-// Individual/Assessment assignment yet (type stays unset until she +Adds
-// them via showRegisteredStudentPicker, or links them into a group). Used as
-// the inline "register a new student" fallback inside the Individual/
-// Assessment picker and the group roster picker — keeps creation funneled
-// through one path so there's never more than one record for the same
-// person. (The Student Database screen's own "Add New Student" uses an
-// inline table row instead of prompt() dialogs — see startAddStudentRow.)
-async function promptRegisterNewStudent() {
-  // First + last name are both required (not just one combined field) so two
-  // students sharing a first name don't collide once they're cross-referenced
-  // against group rosters elsewhere in the registry.
-  const firstName = prompt("First name:")?.trim();
-  if (!firstName) return null;
-  const lastName = prompt("Last name:")?.trim();
-  if (!lastName) return null;
-  const s = {
-    id: cfgId("s"),
-    name: `${firstName} ${lastName}`,
-    firstName, lastName,
-    type: "unassigned",
-    order: state.students.length,
-    targets: []
-  };
-  state.students.push(s);
-  await saveStudent(s);
-  return s;
-}
-
 function renderStudentDatabaseButton() {
   const container = $("student-database-button");
   if (!container) return;
-  container.innerHTML = `<button class="export-btn" id="btn-open-student-registry">View Student Database</button>`;
+  container.innerHTML = `<button class="export-btn export-btn-all" id="btn-open-student-registry">View</button>`;
   $("btn-open-student-registry").addEventListener("click", () => openStudentRegistryScreen());
 }
 
@@ -634,19 +606,23 @@ function openStudentRegistryScreen() {
 }
 
 // Full-page Student Database screen — table of every registered student
-// (No./First/Last/latest lifetime Session number), with "Add New Student"
-// (inline editable row, both names required) and "Delete Student" (pick by
-// number, then type DELETE) actions above it. Clicking a row still opens
-// Manage Student for editing/transfer.
+// (No./First/Last/latest individual session/latest group session), with
+// "Add New Student" (inline editable row, both names required) and "Delete
+// Student" (pick by number, then type DELETE) actions above it. Clicking a
+// row still opens Manage Student for editing/transfer. Individual and group
+// session numbers are tracked as two separate lifetime sequences per
+// student (see getIndividualSessionsForStudent/getGroupSessionsForStudent),
+// so they get their own columns rather than one combined number.
 async function renderStudentRegistryBody() {
   const body = $("student-registry-body");
   if (!body) return;
   body.innerHTML = `<div class="loading">Loading…</div>`;
 
   const sorted = [...state.students].sort((a, b) => a.name.localeCompare(b.name));
-  const unifiedLists = await Promise.all(
-    sorted.map(s => getUnifiedSessionsForStudent(s.id).catch(() => []))
-  );
+  const [indivLists, groupLists] = await Promise.all([
+    Promise.all(sorted.map(s => getIndividualSessionsForStudent(s.id).catch(() => []))),
+    Promise.all(sorted.map(s => getGroupSessionsForStudent(s.id).catch(() => [])))
+  ]);
   const latestNumber = sessions => sessions.reduce((max, s) => Math.max(max, s.number || 0), 0);
 
   body.innerHTML = `
@@ -661,7 +637,8 @@ async function renderStudentRegistryBody() {
             <th style="padding:.4rem .3rem">No.</th>
             <th style="padding:.4rem .3rem">First Name</th>
             <th style="padding:.4rem .3rem">Last Name</th>
-            <th style="padding:.4rem .3rem">Latest Session No.</th>
+            <th style="padding:.4rem .3rem">Latest Individual Session Recorded</th>
+            <th style="padding:.4rem .3rem">Latest Group Session Recorded</th>
           </tr>
         </thead>
         <tbody id="student-registry-tbody">
@@ -670,7 +647,8 @@ async function renderStudentRegistryBody() {
               <td style="padding:.5rem .3rem">${i + 1}</td>
               <td style="padding:.5rem .3rem">${escHtml(s.firstName || s.name.split(/\s+/)[0] || "")}</td>
               <td style="padding:.5rem .3rem">${escHtml(s.lastName || s.name.split(/\s+/).slice(1).join(" ") || "")}</td>
-              <td style="padding:.5rem .3rem">${latestNumber(unifiedLists[i]) || "—"}</td>
+              <td style="padding:.5rem .3rem">${latestNumber(indivLists[i]) || "—"}</td>
+              <td style="padding:.5rem .3rem">${latestNumber(groupLists[i]) || "—"}</td>
             </tr>`).join("")}
         </tbody>
       </table>
@@ -699,7 +677,7 @@ function startAddStudentRow() {
     <td style="padding:.5rem .3rem">${nextNo}</td>
     <td style="padding:.3rem"><input class="admin-input" id="new-student-first" placeholder="First name" style="width:100%" /></td>
     <td style="padding:.3rem"><input class="admin-input" id="new-student-last" placeholder="Last name" style="width:100%" /></td>
-    <td style="padding:.3rem;display:flex;gap:.4rem">
+    <td colspan="2" style="padding:.3rem;display:flex;gap:.4rem">
       <button class="btn-primary-sm" id="btn-save-new-student">Save</button>
       <button class="btn-adm-edit" id="btn-cancel-new-student">Cancel</button>
     </td>`;
@@ -757,35 +735,46 @@ async function promptDeleteStudentFromRegistry() {
 }
 
 // Choosing a student here adds them to Individual Sessions or Assessments.
-// Doesn't create a new person directly — that's promptRegisterNewStudent's
-// job, offered inline here too for someone who isn't registered yet.
+// Doesn't create a new person directly — "Register a New Student" sends the
+// boss to the Student Database page instead, which is the one place new
+// students get created (see openStudentRegistryScreen).
 function showRegisteredStudentPicker(targetType) {
   $("session-picker-title").textContent =
     targetType === "assessment" ? "Add to Assessments" : "Add to Individual Sessions";
 
   const renderList = () => {
-    const candidates = [...state.students].sort((a, b) => a.name.localeCompare(b.name));
-    const statusLabel = s => s.type === "existing" ? "Individual Sessions"
-      : s.type === "assessment" ? "Assessment" : "Unassigned";
+    // Already-in-this-bucket students, and (for Individual Sessions)
+    // Assessment students, are left out of the flat list — Assessment
+    // students get a dedicated Transfer entry instead of showing up here.
+    const candidates = state.students
+      .filter(s => s.type !== targetType)
+      .filter(s => !(targetType === "existing" && s.type === "assessment"))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
     $("session-picker-list").innerHTML = `
       <div class="choice-list">
         <button class="choice-btn choice-register-new">
           <span class="choice-icon">➕</span>
           <div class="choice-text"><div class="choice-label">Register a New Student</div></div>
         </button>
+        ${targetType === "existing" ? `
+        <button class="choice-btn choice-transfer-assessment">
+          <span class="choice-icon">↪</span>
+          <div class="choice-text"><div class="choice-label">Transfer Student from Student Assessment to Individual Sessions</div></div>
+        </button>` : ""}
         ${candidates.map(s => `
           <button class="choice-btn reg-student-pick" data-id="${escHtml(s.id)}">
-            <div class="choice-text">
-              <div class="choice-label">${escHtml(s.name)}</div>
-              <div class="choice-sub" style="font-size:.8em;color:var(--text-muted)">${escHtml(statusLabel(s))}</div>
-            </div>
+            <div class="choice-text"><div class="choice-label">${escHtml(s.name)}</div></div>
           </button>`).join("")}
       </div>`;
 
-    $("session-picker-list").querySelector(".choice-register-new").addEventListener("click", async () => {
-      const created = await promptRegisterNewStudent();
-      if (!created) return;
-      await assignStudentToBucket(created, targetType);
+    $("session-picker-list").querySelector(".choice-register-new").addEventListener("click", () => {
+      closeSessionPicker();
+      openStudentRegistryScreen();
+      alert('Register the new student using the "+ Add New Student" button on the Student Database page.');
+    });
+    $("session-picker-list").querySelector(".choice-transfer-assessment")?.addEventListener("click", () => {
+      showAssessmentTransferPicker();
     });
     $("session-picker-list").querySelectorAll(".reg-student-pick").forEach(btn => {
       btn.addEventListener("click", async () => {
@@ -799,16 +788,46 @@ function showRegisteredStudentPicker(targetType) {
   $("session-picker-modal").classList.remove("hidden");
 }
 
+// Dedicated entry point for the Assessment → Individual Sessions move
+// (replaces having to click an Assessment student in the flat list above,
+// hit a guard error, then go do it from Manage Student instead).
+function showAssessmentTransferPicker() {
+  $("session-picker-title").textContent = "Transfer to Individual Sessions";
+  const assessmentStudents = state.students
+    .filter(s => s.type === "assessment")
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  $("session-picker-list").innerHTML = `
+    <button class="btn-picker-back">← Back</button>
+    <div class="choice-list">
+      ${assessmentStudents.length === 0
+        ? `<p class="empty-hint" style="padding:1rem">No students in Assessment right now.</p>`
+        : assessmentStudents.map(s => `
+          <button class="choice-btn transfer-student-pick" data-id="${escHtml(s.id)}">
+            <div class="choice-text"><div class="choice-label">${escHtml(s.name)}</div></div>
+          </button>`).join("")}
+    </div>`;
+
+  $("session-picker-list").querySelector(".btn-picker-back").addEventListener("click", () => {
+    showRegisteredStudentPicker("existing");
+  });
+  $("session-picker-list").querySelectorAll(".transfer-student-pick").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const s = state.students.find(x => x.id === btn.dataset.id);
+      if (!s) return;
+      if (!confirm(`Transfer "${s.name}" to Individual Sessions?`)) return;
+      s.type = "existing";
+      await saveStudent(s);
+      closeSessionPicker();
+      renderExistingStudentButtons();
+      renderAssessmentStudentButtons();
+    });
+  });
+}
+
 async function assignStudentToBucket(student, targetType) {
   if (student.type === targetType) {
     alert(`"${student.name}" is already in ${targetType === "existing" ? "Individual Sessions" : "Assessments"}.`);
-    return;
-  }
-  if (student.type === "assessment" && targetType === "existing") {
-    alert(
-      `"${student.name}" already exists in Assessment. Go to Manage Student under that student ` +
-      `and click Transfer from there — you don't have to add them manually like this.`
-    );
     return;
   }
   if (student.type === "existing" && targetType === "assessment") {
@@ -872,20 +891,21 @@ function renderStudentList(container, students, query = "") {
 function renderExistingStudentButtons() {
   // Pre-registry records have no type field at all (undefined) and should
   // keep defaulting to "existing" for backward compatibility — only the new
-  // explicit "unassigned" (see promptRegisterNewStudent) opts out of that
-  // default, so a freshly-registered student doesn't show here until she
-  // actually +Adds them via showRegisteredStudentPicker.
+  // explicit "unassigned" (set when a student is registered via the Student
+  // Database page or a group roster picker) opts out of that default, so a
+  // freshly-registered student doesn't show here until she actually +Adds
+  // them via showRegisteredStudentPicker.
   const students = state.students.filter(s => s.type !== "assessment" && s.type !== "unassigned");
   renderStudentList($("existing-student-buttons"), students, state.searchExisting);
 }
 
-async function addNewGroup() {
+function addNewGroup() {
   const g = { id: cfgId("g"), name: "", order: state.groups.length, students: [], targets: [] };
   state.groups.push(g);
-  await saveGroup(g);
   renderGroupButtons();
   _newGroupId = g.id;
   openGroupManageModal(g);
+  saveGroup(g).catch(() => {});
 }
 
 function groupAutoName(students) {
@@ -1819,9 +1839,10 @@ async function leaveSession() {
 function updateSessionHeader() {
   const d = state.sessionData;
   if (!d) return;
-  // sessionNumber is this student's lifetime count (individual + group
-  // sessions combined, see getUnifiedSessionsForStudent) — no longer scoped
-  // to "this month", so it's shown plainly rather than as "X of [Month]".
+  // sessionNumber is this student's lifetime individual-session count (see
+  // getIndividualSessionsForStudent — independent of their group session
+  // count) — no longer scoped to "this month", so it's shown plainly
+  // rather than as "X of [Month]".
   $("session-meta").textContent =
     `Session ${d.sessionNumber} · ${formatDate(d.date)}`;
 }
@@ -5535,57 +5556,100 @@ function renderStudentManageContent(student) {
 
 // Lets the boss correct a veteran student's lifetime session count (e.g. they
 // were tracked on paper for years before this app) — pick one of their
-// existing sessions (individual or group) and type its true number; every
-// one of their sessions shifts by the same amount to keep order/spacing.
+// existing sessions and type its true number; every one of their sessions
+// of that SAME kind shifts by the same amount to keep order/spacing.
+// Individual and group session counts are separate lifetime sequences (a
+// group session never affects an individual number or vice versa), so each
+// gets its own picker rather than one shared one.
 async function renderSessionNumberSection(student) {
   const area = $("mn-s-session-number-area");
   if (!area) return;
-  const sessions = (await getUnifiedSessionsForStudent(student.id))
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const [indivSessions, groupSessions] = await Promise.all([
+    getIndividualSessionsForStudent(student.id),
+    getGroupSessionsForStudent(student.id)
+  ]);
   if (!area.isConnected) return; // modal closed while the fetch was in flight
 
+  area.innerHTML = `
+    <div id="mn-s-sessnum-individual"></div>
+    <div id="mn-s-sessnum-group" style="margin-top:1.1rem"></div>`;
+
+  renderSessionNumberKindSubsection(student, "individual", "Individual Sessions",
+    indivSessions.sort((a, b) => a.date.localeCompare(b.date)), $("mn-s-sessnum-individual"));
+  renderSessionNumberKindSubsection(student, "group", "Group Sessions",
+    groupSessions.sort((a, b) => a.date.localeCompare(b.date)), $("mn-s-sessnum-group"));
+}
+
+function renderSessionNumberKindSubsection(student, kind, label, sessions, container) {
+  if (!container) return;
   if (sessions.length === 0) {
-    area.innerHTML = `<p class="empty-hint" style="padding:.5rem 0">Create a session first before you can set its number.</p>`;
+    container.innerHTML = `
+      <p class="admin-label" style="margin-bottom:.3rem">${label}</p>
+      <p class="empty-hint" style="padding:.4rem 0">No ${kind} sessions recorded yet.</p>`;
     return;
   }
 
-  area.innerHTML = `
-    <select class="admin-input" id="mn-s-sessnum-date">
+  const id = suffix => `mn-s-sessnum-${kind}-${suffix}`;
+  container.innerHTML = `
+    <p class="admin-label" style="margin-bottom:.3rem">${label}</p>
+    <select class="admin-input" id="${id("date")}">
       ${sessions.map(s => `<option value="${s.id}">${formatDate(s.date)} — currently Session ${s.number}</option>`).join("")}
     </select>
-    <p class="admin-hint" style="margin:.5rem 0 .3rem">What session number do you want to change this to? Other sessions will change accordingly.</p>
-    <div style="display:flex;gap:.5rem;align-items:center">
-      <input class="admin-input" id="mn-s-sessnum-value" type="number" min="1" placeholder="e.g. 11" style="flex:1" />
-      <button class="btn-primary-sm" id="btn-mn-sessnum-save">Save</button>
+    <p class="admin-hint" style="margin:.5rem 0 .3rem">Which session number would you like to change this date to?</p>
+    <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+      <span id="${id("label")}" style="font-size:.9rem;color:var(--text-muted);white-space:nowrap"></span>
+      <span style="color:var(--text-muted)">→</span>
+      <button type="button" class="btn-adm-edit" id="${id("minus")}" style="padding:.5rem .8rem;line-height:1;font-size:1.05rem">−</button>
+      <input class="admin-input" id="${id("value")}" type="number" min="1" style="width:5rem;text-align:center;flex:0 0 auto" />
+      <button type="button" class="btn-adm-edit" id="${id("plus")}" style="padding:.5rem .8rem;line-height:1;font-size:1.05rem">+</button>
+      <button class="btn-primary-sm" id="${id("save")}">Save</button>
     </div>`;
 
-  $("btn-mn-sessnum-save").addEventListener("click", async () => {
-    const sessionId  = $("mn-s-sessnum-date").value;
-    const newNumber  = Number($("mn-s-sessnum-value").value);
+  // Keeps the date label + stepper's starting value in sync with whichever
+  // session the dropdown above currently has selected.
+  const syncToSelectedDate = () => {
+    const anchor = sessions.find(s => s.id === $(id("date")).value);
+    $(id("label")).textContent = formatDate(anchor.date);
+    $(id("value")).value = anchor.number;
+  };
+  syncToSelectedDate();
+  $(id("date")).addEventListener("change", syncToSelectedDate);
+
+  $(id("minus")).addEventListener("click", () => {
+    const input = $(id("value"));
+    input.value = Math.max(1, (Number(input.value) || 1) - 1);
+  });
+  $(id("plus")).addEventListener("click", () => {
+    const input = $(id("value"));
+    input.value = (Number(input.value) || 0) + 1;
+  });
+
+  $(id("save")).addEventListener("click", async () => {
+    const sessionId = $(id("date")).value;
+    const newNumber = Number($(id("value")).value);
     if (!newNumber || newNumber < 1) { alert("Enter a valid session number."); return; }
     const anchor = sessions.find(s => s.id === sessionId);
     const delta = newNumber - anchor.number;
     if (delta === 0) return;
     // sessions is sorted oldest-first, so sessions[0] is the earliest —
-    // every session shifts by the same delta, so that's the one that would
-    // go below Session 1 first if the typed number is too low.
+    // every session of this kind shifts by the same delta, so that's the
+    // one that would go below Session 1 first if the typed number is too low.
     const earliest = sessions[0];
     const earliestNewNumber = earliest.number + delta;
     if (earliestNewNumber < 1) {
       alert(
         `If you set this to Session ${newNumber}, ${formatDate(earliest.date)} ` +
-        `(this student's earliest recorded session) would become Session ${earliestNewNumber}. ` +
+        `(this student's earliest recorded ${kind} session) would become Session ${earliestNewNumber}. ` +
         `Choose a different number.`
       );
       return;
     }
-    const btn = $("btn-mn-sessnum-save");
+    const btn = $(id("save"));
     btn.disabled = true;
     btn.innerHTML = `Changing<span class="pin-status-dot">.</span><span class="pin-status-dot">.</span><span class="pin-status-dot">.</span>`;
     try {
-      await changeSessionNumber(student.id, sessionId, newNumber);
+      await changeSessionNumber(student.id, sessionId, newNumber, kind);
       await renderSessionNumberSection(student);
-      flashSaved($("mn-s-sessnum-date"));
     } catch (err) {
       alert(err.message);
       btn.disabled = false;
@@ -7381,11 +7445,9 @@ function renderGroupManageContent(group) {
   // 3 fixed student slots — always show exactly 3. Each is a single picker
   // into the central student registry (not a free-text name field), so a
   // roster slot is always linked to a real student.id and naturally counts
-  // toward that person's unified lifetime session number — see
-  // getUnifiedSessionsForStudent / [[project_unified_session_numbering]].
+  // toward that person's lifetime group session number — see
+  // getGroupSessionsForStudent / [[project_unified_session_numbering]].
   const registryOptions = [...state.students].sort((a, b) => a.name.localeCompare(b.name));
-  const statusLabel = s => s.type === "existing" ? "Individual Sessions"
-    : s.type === "assessment" ? "Assessment" : "Unassigned";
   const studentRowsHtml = [0, 1, 2].map(i => {
     const name = group.students?.[i] || "";
     const linkedId = group.studentLinks?.[name] || "";
@@ -7395,7 +7457,7 @@ function renderGroupManageContent(group) {
       <select class="admin-input mn-g-student-pick" data-idx="${i}" style="flex:1;min-width:9rem">
         <option value="">— empty —</option>
         <option value="__new__">+ Register a new student…</option>
-        ${registryOptions.map(s => `<option value="${s.id}"${s.id === linkedId ? " selected" : ""}>${escHtml(s.name)} (${escHtml(statusLabel(s))})</option>`).join("")}
+        ${registryOptions.map(s => `<option value="${s.id}"${s.id === linkedId ? " selected" : ""}>${escHtml(s.name)}</option>`).join("")}
       </select>
     </div>`;
   }).join("");
@@ -7427,14 +7489,17 @@ function renderGroupManageContent(group) {
       const idx = Number(sel.dataset.idx);
       const prevName = group.students?.[idx] || "";
 
-      let pickedStudent = null;
       if (sel.value === "__new__") {
-        const created = await promptRegisterNewStudent();
-        if (!created) { sel.value = group.studentLinks?.[prevName] || ""; return; }
-        pickedStudent = created;
-      } else if (sel.value) {
-        pickedStudent = state.students.find(s => s.id === sel.value) || null;
+        sel.value = group.studentLinks?.[prevName] || "";
+        // Just hide the modal rather than closeManageModal()'s full cleanup —
+        // that cleanup deletes a brand-new, still-empty group (tracked via
+        // _newGroupId), which would wipe out the group she's mid-creating.
+        $("manage-modal").classList.add("hidden");
+        openStudentRegistryScreen();
+        alert('Register the new student using the "+ Add New Student" button on the Student Database page, then come back here to add them to this group.');
+        return;
       }
+      const pickedStudent = sel.value ? (state.students.find(s => s.id === sel.value) || null) : null;
 
       // Guard against picking the same registered student into two slots
       // of the same group — a real mistake, not a valid roster shape.
