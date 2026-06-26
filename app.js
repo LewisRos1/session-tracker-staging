@@ -115,7 +115,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "533";
+const APP_VERSION = "534";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -634,7 +634,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
         <button class="export-btn" id="btn-delete-student-row" style="color:#dc2626">Delete Student</button>
       </div>
       <div class="view-table-wrapper">
-        <table class="view-table" style="min-width:0">
+        <table class="view-table">
           <colgroup>
             <col style="width:42px">
             <col style="width:30%">
