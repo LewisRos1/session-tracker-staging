@@ -115,7 +115,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "530";
+const APP_VERSION = "531";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -5144,10 +5144,13 @@ async function closeManageModal() {
       }
     }
   }
-  // If a brand-new group was being created but has no students, remove it
+  // If a brand-new group was being created but has no students, remove it.
+  // filter(Boolean) (not .length) because an untouched/cleared roster slot
+  // can leave an empty-string or sparse-array hole at some index — that's
+  // still an empty group, just not one with .length === 0.
   if (_newGroupId) {
     const g = state.groups.find(x => x.id === _newGroupId);
-    if (g && (!g.students || g.students.length === 0)) {
+    if (g && (!g.students || g.students.filter(Boolean).length === 0)) {
       const gi = state.groups.findIndex(x => x.id === _newGroupId);
       if (gi >= 0) state.groups.splice(gi, 1);
       deleteGroup(_newGroupId).catch(() => {});
@@ -7495,7 +7498,12 @@ function renderGroupManageContent(group) {
       }
 
       const wasAuto = groupNameIsAuto(group);
-      group.students = group.students || [];
+      // Pad to exactly 3 real entries (never sparse/holes) before assigning
+      // by index — a sparse array's .length looks "non-empty" even when
+      // every slot is blank (e.g. opening then clearing slot 2 without
+      // touching slot 1 leaves a hole at index 0), which let a fully-empty
+      // brand-new group survive closeManageModal()'s empty-group cleanup.
+      group.students = [0, 1, 2].map(i => group.students?.[i] || "");
       group.studentLinks = group.studentLinks || {};
       if (prevName) delete group.studentLinks[prevName];
       if (pickedStudent) {
@@ -7504,7 +7512,6 @@ function renderGroupManageContent(group) {
       } else {
         group.students[idx] = "";
       }
-      group.students = group.students.map(n => n || "");
       const filledNames = group.students.filter(Boolean);
       if (wasAuto) group.name = groupAutoName(filledNames);
       if (filledNames.length > 0) _newGroupId = null; // group is no longer empty
