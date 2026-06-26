@@ -115,7 +115,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "531";
+const APP_VERSION = "532";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -655,8 +655,8 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
             ${sorted.map((s, i) => `
               <tr class="registry-row" data-id="${escHtml(s.id)}" style="cursor:pointer">
                 <td style="text-align:center">${i + 1}</td>
-                <td>${escHtml(s.firstName || s.name.split(/\s+/)[0] || "")}</td>
-                <td>${escHtml(s.lastName || s.name.split(/\s+/).slice(1).join(" ") || "")}</td>
+                <td style="text-align:center">${escHtml(s.firstName || s.name.split(/\s+/)[0] || "")}</td>
+                <td style="text-align:center">${escHtml(s.lastName || s.name.split(/\s+/).slice(1).join(" ") || "")}</td>
                 <td class="reg-indiv-num" data-id="${escHtml(s.id)}" style="text-align:center">…</td>
                 <td class="reg-group-num" data-id="${escHtml(s.id)}" style="text-align:center">…</td>
               </tr>`).join("")}
@@ -705,8 +705,8 @@ function startAddStudentRow() {
   tr.id = "new-student-row";
   tr.innerHTML = `
     <td style="padding:.5rem .3rem;text-align:center">${nextNo}</td>
-    <td style="padding:.3rem"><input class="admin-input" id="new-student-first" placeholder="First name" style="width:100%" /></td>
-    <td style="padding:.3rem"><input class="admin-input" id="new-student-last" placeholder="Last name" style="width:100%" /></td>
+    <td style="padding:.3rem"><input class="admin-input" id="new-student-first" placeholder="First name" style="width:100%;text-align:center" /></td>
+    <td style="padding:.3rem"><input class="admin-input" id="new-student-last" placeholder="Last name" style="width:100%;text-align:center" /></td>
     <td colspan="2" style="padding:.3rem;display:flex;gap:.4rem">
       <button class="btn-primary-sm" id="btn-save-new-student">Save</button>
       <button class="btn-adm-edit" id="btn-cancel-new-student">Cancel</button>
@@ -5488,9 +5488,9 @@ function renderStudentManageContent(student) {
   const lastName  = student.lastName  || student.name?.split(/\s+/).slice(1).join(" ") || "";
 
   const html = `
-    <div class="admin-section">
+    <div class="admin-section" style="margin-bottom:1.5rem">
       <label class="admin-label">Student Name</label>
-      <div style="display:flex;gap:.5rem;align-items:center">
+      <div style="display:flex;gap:.6rem;align-items:center">
         <input class="admin-input" id="mn-s-firstname" value="${escHtml(firstName)}" placeholder="First name" style="flex:1" />
         <input class="admin-input" id="mn-s-lastname" value="${escHtml(lastName)}" placeholder="Last name" style="flex:1" />
         <button class="btn-primary-sm" id="btn-mn-rename">Save</button>
@@ -5498,7 +5498,7 @@ function renderStudentManageContent(student) {
     </div>
     <div class="admin-section">
       <label class="admin-label">Change Session Number</label>
-      <div id="mn-s-session-number-area">Loading…</div>
+      <div id="mn-s-session-number-area" style="margin-top:.2rem">Loading…</div>
     </div>
     ${isAssessment ? `
     <div class="admin-section">
@@ -5585,25 +5585,21 @@ function renderSessionNumberKindSubsection(student, kind, label, sessions, conta
 
   const id = suffix => `mn-s-sessnum-${kind}-${suffix}`;
   container.innerHTML = `
-    <p class="admin-label" style="margin-bottom:.3rem">${label}</p>
+    <p class="admin-label" style="margin-bottom:.35rem">${label}</p>
     <select class="admin-input" id="${id("date")}">
       ${sessions.map(s => `<option value="${s.id}">${formatDate(s.date)} — currently Session ${s.number}</option>`).join("")}
     </select>
-    <p class="admin-hint" style="margin:.5rem 0 .3rem">Which session number would you like to change this date to?</p>
-    <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
-      <span id="${id("label")}" style="font-size:.9rem;color:var(--text-muted);white-space:nowrap"></span>
-      <span style="color:var(--text-muted)">→</span>
+    <div style="display:flex;align-items:center;gap:.5rem;margin-top:.6rem">
       <button type="button" class="btn-adm-edit" id="${id("minus")}" style="padding:.5rem .8rem;line-height:1;font-size:1.05rem">−</button>
       <input class="admin-input" id="${id("value")}" type="number" min="1" style="width:5rem;text-align:center;flex:0 0 auto" />
       <button type="button" class="btn-adm-edit" id="${id("plus")}" style="padding:.5rem .8rem;line-height:1;font-size:1.05rem">+</button>
-      <button class="btn-primary-sm" id="${id("save")}">Save</button>
+      <button class="btn-primary-sm" id="${id("save")}" style="margin-left:.3rem">Save</button>
     </div>`;
 
-  // Keeps the date label + stepper's starting value in sync with whichever
-  // session the dropdown above currently has selected.
+  // Keeps the stepper's starting value in sync with whichever session the
+  // dropdown above currently has selected (it already shows the date).
   const syncToSelectedDate = () => {
     const anchor = sessions.find(s => s.id === $(id("date")).value);
-    $(id("label")).textContent = formatDate(anchor.date);
     $(id("value")).value = anchor.number;
   };
   syncToSelectedDate();
