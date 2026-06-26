@@ -217,21 +217,24 @@ async function assignLifetimeSessionNumber(studentId, dateStr, excludeSessionId 
 
 /**
  * Boss-driven correction for veteran students/clients whose recorded count
- * understates their true lifetime total (e.g. they were tracked on paper
- * for years before this app existed). Shifts EVERY one of the student's
- * unified sessions by the same delta so relative order/spacing is kept —
- * which means it can only raise numbers, never lower them (lowering would
- * push their earliest recorded session below Session 1).
+ * is off (e.g. they were tracked on paper for years before this app
+ * existed, or a session got mis-numbered). Shifts EVERY one of the
+ * student's unified sessions by the same delta so relative order/spacing is
+ * kept — can raise or lower, but rejects a change that would push their
+ * earliest recorded session below Session 1 (the UI checks this too, with
+ * a friendlier message naming the actual date — this is just the backstop).
  */
 export async function changeSessionNumber(studentId, anchorSessionId, newNumber) {
   const sessions = await getUnifiedSessionsForStudent(studentId);
   const anchor = sessions.find(s => s.id === anchorSessionId);
   if (!anchor) throw new Error("That session could not be found.");
   const delta = newNumber - anchor.number;
-  if (delta <= 0) {
+  if (delta === 0) return;
+  const earliest = sessions.reduce((min, s) => (!min || s.date < min.date) ? s : min, null);
+  if (earliest.number + delta < 1) {
     throw new Error(
-      `New number must be greater than the current number (${anchor.number}) for this date — ` +
-      `lowering it would push this student's earliest recorded session below Session 1.`
+      `Session ${newNumber} would push this student's earliest recorded session ` +
+      `(${earliest.date}) to Session ${earliest.number + delta}. Choose a different number.`
     );
   }
   const CHUNK = 450; // Firestore batch cap is 500 ops

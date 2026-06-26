@@ -114,7 +114,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "525";
+const APP_VERSION = "526";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -661,7 +661,7 @@ async function renderStudentRegistryBody() {
             <th style="padding:.4rem .3rem">No.</th>
             <th style="padding:.4rem .3rem">First Name</th>
             <th style="padding:.4rem .3rem">Last Name</th>
-            <th style="padding:.4rem .3rem">Session</th>
+            <th style="padding:.4rem .3rem">Latest Session No.</th>
           </tr>
         </thead>
         <tbody id="student-registry-tbody">
@@ -692,17 +692,19 @@ function startAddStudentRow() {
   const tbody = $("student-registry-tbody");
   if (!tbody || $("new-student-row")) return;
   $("btn-add-student-row").disabled = true;
+  const nextNo = tbody.querySelectorAll("tr").length + 1;
   const tr = document.createElement("tr");
   tr.id = "new-student-row";
   tr.innerHTML = `
-    <td style="padding:.5rem .3rem">—</td>
+    <td style="padding:.5rem .3rem">${nextNo}</td>
     <td style="padding:.3rem"><input class="admin-input" id="new-student-first" placeholder="First name" style="width:100%" /></td>
     <td style="padding:.3rem"><input class="admin-input" id="new-student-last" placeholder="Last name" style="width:100%" /></td>
     <td style="padding:.3rem;display:flex;gap:.4rem">
       <button class="btn-primary-sm" id="btn-save-new-student">Save</button>
       <button class="btn-adm-edit" id="btn-cancel-new-student">Cancel</button>
     </td>`;
-  tbody.insertBefore(tr, tbody.firstChild);
+  tbody.appendChild(tr);
+  tr.scrollIntoView({ block: "center" });
 
   const firstInput = $("new-student-first");
   const lastInput  = $("new-student-last");
@@ -5165,6 +5167,12 @@ async function closeManageModal() {
   renderExportButtons();
   renderRegistryMigrationButton();
   renderGroupButtons();
+  // Manage Student can be opened from on top of the Student Database page
+  // (clicking a row there) — refresh its table too, otherwise a rename or
+  // session-number change made in the modal doesn't show up underneath it.
+  if ($("screen-student-registry")?.classList.contains("active")) {
+    renderStudentRegistryBody();
+  }
 }
 
 $("manage-modal-close").addEventListener("click",    closeManageModal);
@@ -5545,26 +5553,43 @@ async function renderSessionNumberSection(student) {
     <select class="admin-input" id="mn-s-sessnum-date">
       ${sessions.map(s => `<option value="${s.id}">${formatDate(s.date)} — currently Session ${s.number}</option>`).join("")}
     </select>
-    <div style="display:flex;gap:.5rem;align-items:center;margin-top:.5rem">
-      <input class="admin-input" id="mn-s-sessnum-value" type="number" min="1" placeholder="New session number" style="flex:1" />
+    <p class="admin-hint" style="margin:.5rem 0 .3rem">What session number do you want to change this to? Other sessions will change accordingly.</p>
+    <div style="display:flex;gap:.5rem;align-items:center">
+      <input class="admin-input" id="mn-s-sessnum-value" type="number" min="1" placeholder="e.g. 11" style="flex:1" />
       <button class="btn-primary-sm" id="btn-mn-sessnum-save">Save</button>
-    </div>
-    <p class="admin-hint" style="margin-top:.4rem">Can only be raised, not lowered — every one of this student's sessions (individual and group) shifts by the same amount, to keep them in order.</p>`;
+    </div>`;
 
   $("btn-mn-sessnum-save").addEventListener("click", async () => {
     const sessionId  = $("mn-s-sessnum-date").value;
     const newNumber  = Number($("mn-s-sessnum-value").value);
     if (!newNumber || newNumber < 1) { alert("Enter a valid session number."); return; }
+    const anchor = sessions.find(s => s.id === sessionId);
+    const delta = newNumber - anchor.number;
+    if (delta === 0) return;
+    // sessions is sorted oldest-first, so sessions[0] is the earliest —
+    // every session shifts by the same delta, so that's the one that would
+    // go below Session 1 first if the typed number is too low.
+    const earliest = sessions[0];
+    const earliestNewNumber = earliest.number + delta;
+    if (earliestNewNumber < 1) {
+      alert(
+        `If you set this to Session ${newNumber}, ${formatDate(earliest.date)} ` +
+        `(this student's earliest recorded session) would become Session ${earliestNewNumber}. ` +
+        `Choose a different number.`
+      );
+      return;
+    }
     const btn = $("btn-mn-sessnum-save");
     btn.disabled = true;
+    btn.innerHTML = `Changing<span class="pin-status-dot">.</span><span class="pin-status-dot">.</span><span class="pin-status-dot">.</span>`;
     try {
       await changeSessionNumber(student.id, sessionId, newNumber);
-      flashSaved($("mn-s-sessnum-value"));
       await renderSessionNumberSection(student);
+      flashSaved($("mn-s-sessnum-date"));
     } catch (err) {
       alert(err.message);
-    } finally {
       btn.disabled = false;
+      btn.textContent = "Save";
     }
   });
 }
@@ -7574,14 +7599,13 @@ function renderSessionListRows(sorted, display, today, { isCurrentId, extraLine 
       html += `<div class="session-month-label">${escHtml(section)}</div>`;
       lastSection = section;
     }
-    const num       = sorted.findIndex(x => x.id === s.id) + 1;
     const isCurrent = isCurrentId != null && s.id === isCurrentId;
     const cls       = `session-list-item${isCurrent ? " session-list-current" : ""}`;
     const label     = sessionItemLabel(s.date, today);
     const extra     = extraLine ? extraLine(s) : "";
     html += `<div class="${cls}" data-session-id="${s.id}">
       <div class="session-list-meta">
-        <div class="session-list-label"><strong>Session ${num}</strong>: ${label}</div>
+        <div class="session-list-label"><strong>Session ${s.sessionNumber}</strong>: ${label}</div>
         ${extra}
       </div>
     </div>`;
