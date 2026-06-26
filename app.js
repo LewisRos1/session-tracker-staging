@@ -47,7 +47,11 @@ import {
   signInWithPin,
   signOutUser,
   onAuthChange,
-  generateId
+  generateId,
+  getUnifiedSessionsForStudent,
+  changeSessionNumber,
+  previewRegistryMigration,
+  runRegistryMigration
 } from "./firebase-service.js";
 import {
   exportStudentData, exportAllStudents, exportGroupMemberData,
@@ -110,7 +114,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "521";
+const APP_VERSION = "522";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -557,6 +561,7 @@ async function showHome() {
   renderAssessmentStudentButtons();
   renderTemplateButtons();
   renderExportButtons();
+  renderRegistryMigrationButton();
 }
 
 $("btn-logout").addEventListener("click", () => {
@@ -587,12 +592,17 @@ $("search-template").addEventListener("input", e => {
 });
 
 async function addNewStudent(type) {
-  const label = type === "assessment" ? "Assessment student name:" : "Student name:";
-  const name = prompt(label);
-  if (!name?.trim()) return;
+  // First + last name are both required (not just one combined field) so two
+  // students sharing a first name don't collide once they're cross-referenced
+  // against group rosters elsewhere in the registry.
+  const firstName = prompt("First name:")?.trim();
+  if (!firstName) return;
+  const lastName = prompt("Last name:")?.trim();
+  if (!lastName) return;
   const s = {
     id: cfgId("s"),
-    name: name.trim(),
+    name: `${firstName} ${lastName}`,
+    firstName, lastName,
     type,
     order: state.students.length,
     targets: []
@@ -754,6 +764,68 @@ function renderExportButtons() {
       btn.disabled = false;
       btn.textContent = "Export All (ZIP)";
       btn.style.width = "";
+    }
+  });
+}
+
+// One-time setup tool: links every group's free-typed attendee names to a
+// registered student record (auto-creating one for anyone who's never had
+// an individual session), then renumbers everyone's sessions into one
+// lifetime sequence spanning both individual and group attendance. Always
+// runs the dry-run report first — nothing is written until the boss
+// confirms after reading it.
+function renderRegistryMigrationButton() {
+  const container = $("registry-migration-button");
+  if (!container) return;
+
+  container.innerHTML = `<button class="export-btn" id="btn-run-registry-migration">Preview & Run Setup</button>`;
+
+  $("btn-run-registry-migration").addEventListener("click", async () => {
+    const btn = $("btn-run-registry-migration");
+    btn.disabled = true;
+    btn.textContent = "Checking…";
+    try {
+      const report = await previewRegistryMigration();
+      const nothingToDo = report.nameSplits.length === 0 && report.toLink.length === 0
+        && report.toCreate.length === 0 && report.sessionsToBackfill === 0;
+      if (nothingToDo) {
+        alert("Nothing to do — every student and group is already set up.");
+        return;
+      }
+      const lines = [
+        `This will make the following changes:`,
+        `- Split ${report.nameSplits.length} student name(s) into first/last name`,
+        `- Link ${report.toLink.length} group attendee name(s) to their matching registered student`,
+        `- Create ${report.toCreate.length} new student record(s) for group attendees who've never had an individual session`,
+        `- Update ${report.sessionsToBackfill} historical group session record(s)`,
+        ``,
+        report.toCreate.length
+          ? `New records will be created for:\n` + report.toCreate.map(c => `  • "${c.rosterName}" (in group "${c.groupName}")`).join("\n") + `\n`
+          : ``,
+        `This cannot be easily undone — make sure you have a recent Firestore backup. Proceed?`
+      ].filter(Boolean).join("\n");
+      if (!confirm(lines)) return;
+
+      btn.textContent = "Running…";
+      const createdLog = await runRegistryMigration();
+      state.students = await loadStudentsConfig();
+      state.groups   = await loadGroups();
+      renderExistingStudentButtons();
+      renderAssessmentStudentButtons();
+      renderGroupButtons();
+
+      alert(
+        "Setup complete." +
+        (createdLog.length
+          ? `\n\nNew student records were created for these group attendees — please check Manage Student for each to confirm their first/last name split correctly:\n`
+            + createdLog.map(c => `  • "${c.rosterName}" (in group "${c.groupName}")`).join("\n")
+          : "")
+      );
+    } catch (err) {
+      alert("Setup failed: " + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Preview & Run Setup";
     }
   });
 }
@@ -1533,8 +1605,11 @@ async function leaveSession() {
 function updateSessionHeader() {
   const d = state.sessionData;
   if (!d) return;
+  // sessionNumber is this student's lifetime count (individual + group
+  // sessions combined, see getUnifiedSessionsForStudent) — no longer scoped
+  // to "this month", so it's shown plainly rather than as "X of [Month]".
   $("session-meta").textContent =
-    `Session ${d.sessionNumber} of ${d.month.split(" ")[0]} · ${formatDate(d.date)}`;
+    `Session ${d.sessionNumber} · ${formatDate(d.date)}`;
 }
 
 
@@ -2691,7 +2766,7 @@ function renderSessionView() {
     newDelBtn.classList.remove("hidden");
     _delBtn.replaceWith(newDelBtn);
     newDelBtn.addEventListener("click", async () => {
-      const typed = prompt(`Delete Session ${data.sessionNumber} of ${data.month.split(" ")[0]} (${formatDate(data.date)})?\n\nThis cannot be undone. Type DELETE to confirm:`);
+      const typed = prompt(`Delete Session ${data.sessionNumber} (${formatDate(data.date)})?\n\nThis cannot be undone. Type DELETE to confirm:`);
       if (typed !== "DELETE") return;
       const sid = state.viewSessionId;
       leaveSessionView();
@@ -4861,6 +4936,7 @@ async function closeManageModal() {
   renderAssessmentStudentButtons();
   renderTemplateButtons();
   renderExportButtons();
+  renderRegistryMigrationButton();
   renderGroupButtons();
 }
 
@@ -5155,14 +5231,23 @@ function renderStudentManageContent(student) {
   _pendingActsCleanup = null;
   $("manage-modal-title").textContent = student.name;
   const isAssessment = student.type === "assessment";
+  // Older records (pre-registry) only have a single combined name — fall
+  // back to splitting it for display until the migration backfills these.
+  const firstName = student.firstName || student.name?.split(/\s+/)[0] || "";
+  const lastName  = student.lastName  || student.name?.split(/\s+/).slice(1).join(" ") || "";
 
   const html = `
     <div class="admin-section">
       <label class="admin-label">Student Name</label>
       <div style="display:flex;gap:.5rem;align-items:center">
-        <input class="admin-input" id="mn-s-name" value="${escHtml(student.name)}" style="flex:1" />
+        <input class="admin-input" id="mn-s-firstname" value="${escHtml(firstName)}" placeholder="First name" style="flex:1" />
+        <input class="admin-input" id="mn-s-lastname" value="${escHtml(lastName)}" placeholder="Last name" style="flex:1" />
         <button class="btn-primary-sm" id="btn-mn-rename">Save</button>
       </div>
+    </div>
+    <div class="admin-section">
+      <label class="admin-label">Change Session Number</label>
+      <div id="mn-s-session-number-area">Loading…</div>
     </div>
     ${isAssessment ? `
     <div class="admin-section">
@@ -5178,16 +5263,25 @@ function renderStudentManageContent(student) {
   $("manage-modal-body").innerHTML = html;
 
   $("btn-mn-rename").addEventListener("click", async () => {
-    const v = $("mn-s-name").value.trim();
-    if (!v || v === student.name) return;
-    student.name = v;
+    const fn = $("mn-s-firstname").value.trim();
+    const ln = $("mn-s-lastname").value.trim();
+    if (!fn || !ln) { alert("First and last name are both required."); return; }
+    const newName = `${fn} ${ln}`;
+    if (fn === student.firstName && ln === student.lastName && newName === student.name) return;
+    student.firstName = fn;
+    student.lastName  = ln;
+    student.name      = newName;
     await saveStudent(student);
-    $("manage-modal-title").textContent = v;
-    flashSaved($("mn-s-name"));
+    $("manage-modal-title").textContent = newName;
+    flashSaved($("mn-s-lastname"));
   });
-  $("mn-s-name").addEventListener("keydown", e => {
-    if (e.key === "Enter") $("btn-mn-rename").click();
+  [$("mn-s-firstname"), $("mn-s-lastname")].forEach(input => {
+    input.addEventListener("keydown", e => {
+      if (e.key === "Enter") $("btn-mn-rename").click();
+    });
   });
+
+  renderSessionNumberSection(student);
 
   $("btn-mn-move-to-existing")?.addEventListener("click", async () => {
     if (!confirm(`Move "${student.name}" to Existing Students?`)) return;
@@ -5201,6 +5295,50 @@ function renderStudentManageContent(student) {
     await deleteStudentConfig(student.id);
     state.students = state.students.filter(s => s.id !== student.id);
     closeManageModal();
+  });
+}
+
+// Lets the boss correct a veteran student's lifetime session count (e.g. they
+// were tracked on paper for years before this app) — pick one of their
+// existing sessions (individual or group) and type its true number; every
+// one of their sessions shifts by the same amount to keep order/spacing.
+async function renderSessionNumberSection(student) {
+  const area = $("mn-s-session-number-area");
+  if (!area) return;
+  const sessions = (await getUnifiedSessionsForStudent(student.id))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  if (!area.isConnected) return; // modal closed while the fetch was in flight
+
+  if (sessions.length === 0) {
+    area.innerHTML = `<p class="empty-hint" style="padding:.5rem 0">Create a session first before you can set its number.</p>`;
+    return;
+  }
+
+  area.innerHTML = `
+    <select class="admin-input" id="mn-s-sessnum-date">
+      ${sessions.map(s => `<option value="${s.id}">${formatDate(s.date)} — currently Session ${s.number}</option>`).join("")}
+    </select>
+    <div style="display:flex;gap:.5rem;align-items:center;margin-top:.5rem">
+      <input class="admin-input" id="mn-s-sessnum-value" type="number" min="1" placeholder="New session number" style="flex:1" />
+      <button class="btn-primary-sm" id="btn-mn-sessnum-save">Save</button>
+    </div>
+    <p class="admin-hint" style="margin-top:.4rem">Can only be raised, not lowered — every one of this student's sessions (individual and group) shifts by the same amount, to keep them in order.</p>`;
+
+  $("btn-mn-sessnum-save").addEventListener("click", async () => {
+    const sessionId  = $("mn-s-sessnum-date").value;
+    const newNumber  = Number($("mn-s-sessnum-value").value);
+    if (!newNumber || newNumber < 1) { alert("Enter a valid session number."); return; }
+    const btn = $("btn-mn-sessnum-save");
+    btn.disabled = true;
+    try {
+      await changeSessionNumber(student.id, sessionId, newNumber);
+      flashSaved($("mn-s-sessnum-value"));
+      await renderSessionNumberSection(student);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      btn.disabled = false;
+    }
   });
 }
 
@@ -6090,7 +6228,7 @@ async function openGroupSession(group, dateStr, attendees) {
   $("group-target-content").innerHTML = `<div class="loading">Loading…</div>`;
 
   try {
-    const sid = await getOrCreateGroupSessionForDate(group.id, dateStr, group.targets, attendees);
+    const sid = await getOrCreateGroupSessionForDate(group.id, dateStr, group.targets, attendees, group.studentLinks || {});
     state.groupSessionId = sid;
     let firstLoad = true;
     state.fbGroupUnsubscribe = listenToSession(sid, async data => {
@@ -6337,8 +6475,14 @@ function renderGroupStudentBlock(studentName, target, data) {
         renderGroupStudentActivityCard(studentName, actName, actId, target, data, actNote)).join("")
     : `<p class="empty-hint" contenteditable="false" style="padding:1rem">No activities yet. Add them under Edit Target.</p>`;
 
+  const linkedId = state.currentGroup?.studentLinks?.[studentName];
+  const personalNum = linkedId ? data.attendeePersonalSessionNumbers?.[linkedId] : null;
+  const headingLabel = personalNum != null
+    ? `${escHtml(studentName)} <span style="font-weight:400;color:var(--text-muted)">(Session ${personalNum})</span>`
+    : escHtml(studentName);
+
   return `<div class="group-by-student-block" data-student="${escHtml(studentName)}">
-    <div class="activity-group-heading" contenteditable="false">${escHtml(studentName)}</div>
+    <div class="activity-group-heading" contenteditable="false">${headingLabel}</div>
     ${cards}
   </div>`;
 }
@@ -6978,14 +7122,26 @@ function renderGroupManageContent(group) {
   _pendingActsCleanup = null;
   $("manage-modal-title").textContent = group.name || "New Group";
 
-  // 3 fixed student rows — always show exactly 3
-  const studentRowsHtml = [0, 1, 2].map(i => `
-    <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.45rem">
+  // 3 fixed student rows — always show exactly 3. The "Link to registered
+  // student" dropdown next to each name is what lets a person's group
+  // attendance count toward their personal lifetime session number (see
+  // getUnifiedSessionsForStudent) — an unlinked name just won't get one.
+  const registryOptions = [...state.students].sort((a, b) => a.name.localeCompare(b.name));
+  const studentRowsHtml = [0, 1, 2].map(i => {
+    const name = group.students?.[i] || "";
+    const linkedId = group.studentLinks?.[name] || "";
+    return `
+    <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.45rem;flex-wrap:wrap">
       <span style="min-width:5.5rem;font-size:.85rem;font-weight:600;color:var(--text-muted)">Student ${i + 1}</span>
       <input class="admin-input mn-g-student-field" data-idx="${i}"
-        value="${escHtml(group.students?.[i] || "")}"
-        placeholder="Enter name…" style="flex:1" />
-    </div>`).join("");
+        value="${escHtml(name)}"
+        placeholder="Enter name…" style="flex:1;min-width:8rem" />
+      <select class="admin-input mn-g-student-link" data-idx="${i}" style="flex:1;min-width:9rem">
+        <option value="">— not linked to a registered student —</option>
+        ${registryOptions.map(s => `<option value="${s.id}"${s.id === linkedId ? " selected" : ""}>${escHtml(s.name)}</option>`).join("")}
+      </select>
+    </div>`;
+  }).join("");
 
   $("manage-modal-body").innerHTML = `
     <div class="admin-section">
@@ -7016,6 +7172,14 @@ function renderGroupManageContent(group) {
       .map(f => f.value.trim()).filter(Boolean);
     if (wasAuto) group.name = groupAutoName(group.students);
     if (group.students.length > 0) _newGroupId = null; // group is no longer empty
+    // Drop links for names that no longer appear in the roster (e.g. a typo
+    // got fixed) — a stale link would otherwise sit there unused forever.
+    if (group.studentLinks) {
+      const validNames = new Set(group.students);
+      for (const k of Object.keys(group.studentLinks)) {
+        if (!validNames.has(k)) delete group.studentLinks[k];
+      }
+    }
     const nameEl = $("mn-g-name");
     if (nameEl) {
       nameEl.textContent = group.name || "The group name is automatically set based on the student names entered below. Just fill in the students and this field will be filled automatically.";
@@ -7031,6 +7195,21 @@ function renderGroupManageContent(group) {
   $("manage-modal-body").querySelectorAll(".mn-g-student-field").forEach(input => {
     input.addEventListener("blur", saveStudents);
     input.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); input.blur(); } });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-g-student-link").forEach(sel => {
+    sel.addEventListener("change", async () => {
+      const idx = Number(sel.dataset.idx);
+      const nameInput = $("manage-modal-body").querySelector(`.mn-g-student-field[data-idx="${idx}"]`);
+      const name = nameInput?.value.trim();
+      if (!name) { alert("Enter the student's name first."); sel.value = ""; return; }
+      group.studentLinks = group.studentLinks || {};
+      if (sel.value) group.studentLinks[name] = sel.value;
+      else delete group.studentLinks[name];
+      const gi = state.groups.findIndex(g => g.id === group.id);
+      if (gi >= 0) state.groups[gi] = group;
+      await saveGroup(group);
+    });
   });
 
   // Done
