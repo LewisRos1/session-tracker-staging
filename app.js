@@ -114,7 +114,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "523";
+const APP_VERSION = "524";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -570,8 +570,10 @@ $("btn-logout").addEventListener("click", () => {
 
 // ── Add student / template from home screen ───────────────────
 
-$("btn-add-existing-student").addEventListener("click", () => addNewStudent("existing"));
-$("btn-add-assessment-student").addEventListener("click", () => addNewStudent("assessment"));
+$("btn-add-registered-student").addEventListener("click", () => promptRegisterNewStudent());
+$("btn-view-registered-students").addEventListener("click", () => showRegisteredStudentsTable());
+$("btn-add-existing-student").addEventListener("click", () => showRegisteredStudentPicker("existing"));
+$("btn-add-assessment-student").addEventListener("click", () => showRegisteredStudentPicker("assessment"));
 $("btn-add-template").addEventListener("click", addNewTemplate);
 $("btn-add-group").addEventListener("click", addNewGroup);
 $("search-existing").addEventListener("input", e => {
@@ -591,25 +593,146 @@ $("search-template").addEventListener("input", e => {
   renderTemplateButtons();
 });
 
-async function addNewStudent(type) {
+// Registers a brand-new person in the central student registry, with no
+// Individual/Assessment assignment yet (type stays unset until she +Adds
+// them via showRegisteredStudentPicker, or links them into a group). Shared
+// by the "Registered Students" section's own +Add, and as the inline
+// "register a new student" fallback inside the Individual/Assessment picker
+// and the group roster picker — one creation path everywhere, so there's
+// never more than one record for the same person.
+async function promptRegisterNewStudent() {
   // First + last name are both required (not just one combined field) so two
   // students sharing a first name don't collide once they're cross-referenced
   // against group rosters elsewhere in the registry.
   const firstName = prompt("First name:")?.trim();
-  if (!firstName) return;
+  if (!firstName) return null;
   const lastName = prompt("Last name:")?.trim();
-  if (!lastName) return;
+  if (!lastName) return null;
   const s = {
     id: cfgId("s"),
     name: `${firstName} ${lastName}`,
     firstName, lastName,
-    type,
+    type: "unassigned",
     order: state.students.length,
     targets: []
   };
   state.students.push(s);
   await saveStudent(s);
-  if (type === "existing") renderExistingStudentButtons();
+  return s;
+}
+
+function showRegisteredStudentsTable() {
+  $("manage-modal-title").textContent = "Registered Students";
+  $("manage-modal").classList.remove("hidden");
+
+  const renderTable = () => {
+    const sorted = [...state.students].sort((a, b) => a.name.localeCompare(b.name));
+    const statusLabel = s => {
+      const parts = [];
+      if (s.type === "existing") parts.push("Individual Sessions");
+      if (s.type === "assessment") parts.push("Assessment");
+      const groupNames = state.groups
+        .filter(g => Object.values(g.studentLinks || {}).includes(s.id))
+        .map(g => g.name);
+      if (groupNames.length) parts.push(`Group: ${groupNames.join(", ")}`);
+      return parts.length ? parts.join(" · ") : "Unassigned";
+    };
+    $("manage-modal-body").innerHTML = `
+      <table style="width:100%;border-collapse:collapse;font-size:.9rem">
+        <thead>
+          <tr style="text-align:left;border-bottom:2px solid var(--border)">
+            <th style="padding:.4rem .3rem">No.</th>
+            <th style="padding:.4rem .3rem">First Name</th>
+            <th style="padding:.4rem .3rem">Last Name</th>
+            <th style="padding:.4rem .3rem">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${sorted.map((s, i) => `
+            <tr class="registry-row" data-id="${escHtml(s.id)}" style="cursor:pointer;border-bottom:1px solid var(--border)">
+              <td style="padding:.5rem .3rem">${i + 1}</td>
+              <td style="padding:.5rem .3rem">${escHtml(s.firstName || s.name.split(/\s+/)[0] || "")}</td>
+              <td style="padding:.5rem .3rem">${escHtml(s.lastName || s.name.split(/\s+/).slice(1).join(" ") || "")}</td>
+              <td style="padding:.5rem .3rem;color:var(--text-muted)">${escHtml(statusLabel(s))}</td>
+            </tr>`).join("")}
+        </tbody>
+      </table>
+      ${sorted.length === 0 ? `<p class="empty-hint" style="padding:1rem">No students registered yet.</p>` : ""}`;
+
+    $("manage-modal-body").querySelectorAll(".registry-row").forEach(row => {
+      row.addEventListener("click", () => {
+        const s = state.students.find(x => x.id === row.dataset.id);
+        if (s) openManageModal(s);
+      });
+    });
+  };
+
+  renderTable();
+}
+
+// Choosing a student here adds them to Individual Sessions or Assessments.
+// Doesn't create a new person directly — that's promptRegisterNewStudent's
+// job, offered inline here too for someone who isn't registered yet.
+function showRegisteredStudentPicker(targetType) {
+  $("session-picker-title").textContent =
+    targetType === "assessment" ? "Add to Assessments" : "Add to Individual Sessions";
+
+  const renderList = () => {
+    const candidates = [...state.students].sort((a, b) => a.name.localeCompare(b.name));
+    const statusLabel = s => s.type === "existing" ? "Individual Sessions"
+      : s.type === "assessment" ? "Assessment" : "Unassigned";
+    $("session-picker-list").innerHTML = `
+      <div class="choice-list">
+        <button class="choice-btn choice-register-new">
+          <span class="choice-icon">➕</span>
+          <div class="choice-text"><div class="choice-label">Register a New Student</div></div>
+        </button>
+        ${candidates.map(s => `
+          <button class="choice-btn reg-student-pick" data-id="${escHtml(s.id)}">
+            <div class="choice-text">
+              <div class="choice-label">${escHtml(s.name)}</div>
+              <div class="choice-sub" style="font-size:.8em;color:var(--text-muted)">${escHtml(statusLabel(s))}</div>
+            </div>
+          </button>`).join("")}
+      </div>`;
+
+    $("session-picker-list").querySelector(".choice-register-new").addEventListener("click", async () => {
+      const created = await promptRegisterNewStudent();
+      if (!created) return;
+      await assignStudentToBucket(created, targetType);
+    });
+    $("session-picker-list").querySelectorAll(".reg-student-pick").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const s = state.students.find(x => x.id === btn.dataset.id);
+        if (s) await assignStudentToBucket(s, targetType);
+      });
+    });
+  };
+
+  renderList();
+  $("session-picker-modal").classList.remove("hidden");
+}
+
+async function assignStudentToBucket(student, targetType) {
+  if (student.type === targetType) {
+    alert(`"${student.name}" is already in ${targetType === "existing" ? "Individual Sessions" : "Assessments"}.`);
+    return;
+  }
+  if (student.type === "assessment" && targetType === "existing") {
+    alert(
+      `"${student.name}" already exists in Assessment. Go to Manage Student under that student ` +
+      `and click Transfer from there — you don't have to add them manually like this.`
+    );
+    return;
+  }
+  if (student.type === "existing" && targetType === "assessment") {
+    alert(`"${student.name}" is already in Individual Sessions.`);
+    return;
+  }
+  student.type = targetType;
+  await saveStudent(student);
+  closeSessionPicker();
+  if (targetType === "existing") renderExistingStudentButtons();
   else renderAssessmentStudentButtons();
 }
 
@@ -661,7 +784,12 @@ function renderStudentList(container, students, query = "") {
 }
 
 function renderExistingStudentButtons() {
-  const students = state.students.filter(s => !s.type || s.type === "existing");
+  // Pre-registry records have no type field at all (undefined) and should
+  // keep defaulting to "existing" for backward compatibility — only the new
+  // explicit "unassigned" (see promptRegisterNewStudent) opts out of that
+  // default, so a freshly-registered student doesn't show here until she
+  // actually +Adds them via showRegisteredStudentPicker.
+  const students = state.students.filter(s => s.type !== "assessment" && s.type !== "unassigned");
   renderStudentList($("existing-student-buttons"), students, state.searchExisting);
 }
 
@@ -7140,23 +7268,24 @@ function renderGroupManageContent(group) {
   _pendingActsCleanup = null;
   $("manage-modal-title").textContent = group.name || "New Group";
 
-  // 3 fixed student rows — always show exactly 3. The "Link to registered
-  // student" dropdown next to each name is what lets a person's group
-  // attendance count toward their personal lifetime session number (see
-  // getUnifiedSessionsForStudent) — an unlinked name just won't get one.
+  // 3 fixed student slots — always show exactly 3. Each is a single picker
+  // into the central student registry (not a free-text name field), so a
+  // roster slot is always linked to a real student.id and naturally counts
+  // toward that person's unified lifetime session number — see
+  // getUnifiedSessionsForStudent / [[project_unified_session_numbering]].
   const registryOptions = [...state.students].sort((a, b) => a.name.localeCompare(b.name));
+  const statusLabel = s => s.type === "existing" ? "Individual Sessions"
+    : s.type === "assessment" ? "Assessment" : "Unassigned";
   const studentRowsHtml = [0, 1, 2].map(i => {
     const name = group.students?.[i] || "";
     const linkedId = group.studentLinks?.[name] || "";
     return `
     <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.45rem;flex-wrap:wrap">
       <span style="min-width:5.5rem;font-size:.85rem;font-weight:600;color:var(--text-muted)">Student ${i + 1}</span>
-      <input class="admin-input mn-g-student-field" data-idx="${i}"
-        value="${escHtml(name)}"
-        placeholder="Enter name…" style="flex:1;min-width:8rem" />
-      <select class="admin-input mn-g-student-link" data-idx="${i}" style="flex:1;min-width:9rem">
-        <option value="">— not linked to a registered student —</option>
-        ${registryOptions.map(s => `<option value="${s.id}"${s.id === linkedId ? " selected" : ""}>${escHtml(s.name)}</option>`).join("")}
+      <select class="admin-input mn-g-student-pick" data-idx="${i}" style="flex:1;min-width:9rem">
+        <option value="">— empty —</option>
+        <option value="__new__">+ Register a new student…</option>
+        ${registryOptions.map(s => `<option value="${s.id}"${s.id === linkedId ? " selected" : ""}>${escHtml(s.name)} (${escHtml(statusLabel(s))})</option>`).join("")}
       </select>
     </div>`;
   }).join("");
@@ -7170,7 +7299,7 @@ function renderGroupManageContent(group) {
                font-style:${group.name ? "normal" : "italic"};cursor:default;line-height:1.4">
         ${group.name
           ? escHtml(group.name)
-          : "The group name is automatically set based on the student names entered below. Just fill in the students and this field will be filled automatically."}
+          : "The group name is automatically set based on the students picked below. Just fill in the students and this field will be filled automatically."}
       </div>
     </div>
     <div class="admin-section">
@@ -7183,50 +7312,48 @@ function renderGroupManageContent(group) {
       <button class="btn-adm-danger" id="btn-mn-del-group">Delete Group</button>
     </div>`;
 
-  // Save student fields on blur — reads all 3 inputs, filters empty, updates group
-  const saveStudents = async () => {
-    const wasAuto = groupNameIsAuto(group);
-    group.students = [...$("manage-modal-body").querySelectorAll(".mn-g-student-field")]
-      .map(f => f.value.trim()).filter(Boolean);
-    if (wasAuto) group.name = groupAutoName(group.students);
-    if (group.students.length > 0) _newGroupId = null; // group is no longer empty
-    // Drop links for names that no longer appear in the roster (e.g. a typo
-    // got fixed) — a stale link would otherwise sit there unused forever.
-    if (group.studentLinks) {
-      const validNames = new Set(group.students);
-      for (const k of Object.keys(group.studentLinks)) {
-        if (!validNames.has(k)) delete group.studentLinks[k];
-      }
-    }
-    const nameEl = $("mn-g-name");
-    if (nameEl) {
-      nameEl.textContent = group.name || "The group name is automatically set based on the student names entered below. Just fill in the students and this field will be filled automatically.";
-      nameEl.style.color = group.name ? "var(--text)" : "var(--text-muted)";
-      nameEl.style.fontStyle = group.name ? "normal" : "italic";
-    }
-    $("manage-modal-title").textContent = group.name || "New Group";
-    const gi = state.groups.findIndex(g => g.id === group.id);
-    if (gi >= 0) state.groups[gi] = group;
-    await saveGroup(group);
-    renderGroupButtons();
-  };
-  $("manage-modal-body").querySelectorAll(".mn-g-student-field").forEach(input => {
-    input.addEventListener("blur", saveStudents);
-    input.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); input.blur(); } });
-  });
-
-  $("manage-modal-body").querySelectorAll(".mn-g-student-link").forEach(sel => {
+  $("manage-modal-body").querySelectorAll(".mn-g-student-pick").forEach(sel => {
     sel.addEventListener("change", async () => {
       const idx = Number(sel.dataset.idx);
-      const nameInput = $("manage-modal-body").querySelector(`.mn-g-student-field[data-idx="${idx}"]`);
-      const name = nameInput?.value.trim();
-      if (!name) { alert("Enter the student's name first."); sel.value = ""; return; }
+      const prevName = group.students?.[idx] || "";
+
+      let pickedStudent = null;
+      if (sel.value === "__new__") {
+        const created = await promptRegisterNewStudent();
+        if (!created) { sel.value = group.studentLinks?.[prevName] || ""; return; }
+        pickedStudent = created;
+      } else if (sel.value) {
+        pickedStudent = state.students.find(s => s.id === sel.value) || null;
+      }
+
+      // Guard against picking the same registered student into two slots
+      // of the same group — a real mistake, not a valid roster shape.
+      if (pickedStudent && group.students?.some((n, j) => j !== idx && group.studentLinks?.[n] === pickedStudent.id)) {
+        alert(`"${pickedStudent.name}" is already in another slot in this group.`);
+        sel.value = group.studentLinks?.[prevName] || "";
+        return;
+      }
+
+      const wasAuto = groupNameIsAuto(group);
+      group.students = group.students || [];
       group.studentLinks = group.studentLinks || {};
-      if (sel.value) group.studentLinks[name] = sel.value;
-      else delete group.studentLinks[name];
+      if (prevName) delete group.studentLinks[prevName];
+      if (pickedStudent) {
+        group.students[idx] = pickedStudent.name;
+        group.studentLinks[pickedStudent.name] = pickedStudent.id;
+      } else {
+        group.students[idx] = "";
+      }
+      group.students = group.students.map(n => n || "");
+      const filledNames = group.students.filter(Boolean);
+      if (wasAuto) group.name = groupAutoName(filledNames);
+      if (filledNames.length > 0) _newGroupId = null; // group is no longer empty
+
       const gi = state.groups.findIndex(g => g.id === group.id);
       if (gi >= 0) state.groups[gi] = group;
       await saveGroup(group);
+      renderGroupButtons();
+      renderGroupManageContent(group); // re-render so other slots see the updated registry/links
     });
   });
 
