@@ -115,7 +115,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "529";
+const APP_VERSION = "530";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -736,7 +736,7 @@ function startAddStudentRow() {
       targets: []
     };
     state.students.push(s);
-    await saveStudent(s);
+    await withSaveFeedback($("btn-save-new-student"), saveStudent(s));
     renderStudentRegistryBody();
   });
 
@@ -5519,9 +5519,8 @@ function renderStudentManageContent(student) {
     student.firstName = fn;
     student.lastName  = ln;
     student.name      = newName;
-    await saveStudent(student);
+    await withSaveFeedback($("btn-mn-rename"), saveStudent(student));
     $("manage-modal-title").textContent = newName;
-    flashSaved($("mn-s-lastname"));
   });
   [$("mn-s-firstname"), $("mn-s-lastname")].forEach(input => {
     input.addEventListener("keydown", e => {
@@ -5636,16 +5635,11 @@ function renderSessionNumberKindSubsection(student, kind, label, sessions, conta
       );
       return;
     }
-    const btn = $(id("save"));
-    btn.disabled = true;
-    btn.innerHTML = `Changing<span class="pin-status-dot">.</span><span class="pin-status-dot">.</span><span class="pin-status-dot">.</span>`;
     try {
-      await changeSessionNumber(student.id, sessionId, newNumber, kind);
+      await withSaveFeedback($(id("save")), changeSessionNumber(student.id, sessionId, newNumber, kind));
       await renderSessionNumberSection(student);
     } catch (err) {
       alert(err.message);
-      btn.disabled = false;
-      btn.textContent = "Save";
     }
   });
 }
@@ -7551,6 +7545,35 @@ function showAutosaved() {
 // ─── SAVED FLASH ─────────────────────────────────────────────
 
 function flashSaved() {}
+
+// Wraps a "Save" button's click handler so it only shows "Saving…" if the
+// save is actually slow enough to need it, and always confirms with a
+// brief "Saved!" afterwards — answers "did that actually save?" without
+// making a fast save feel sluggish by flashing a loading state nobody
+// needed to see. Resolves once "Saved!" has actually been visible for a
+// moment, so callers that re-render/destroy the button right after saving
+// (e.g. Student Database's inline add-row) should await this first.
+function withSaveFeedback(btn, promise, { savingDelay = 250, savedHold = 700 } = {}) {
+  const original = btn.textContent;
+  btn.disabled = true;
+  const timer = setTimeout(() => { btn.textContent = "Saving…"; }, savingDelay);
+  return promise.then(
+    async result => {
+      clearTimeout(timer);
+      btn.textContent = "Saved!";
+      await new Promise(r => setTimeout(r, savedHold));
+      btn.textContent = original;
+      btn.disabled = false;
+      return result;
+    },
+    err => {
+      clearTimeout(timer);
+      btn.textContent = original;
+      btn.disabled = false;
+      throw err;
+    }
+  );
+}
 
 // ─── SCREEN MANAGEMENT ───────────────────────────────────────
 
