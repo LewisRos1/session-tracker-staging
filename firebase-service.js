@@ -372,8 +372,10 @@ export async function updateGroupSessionDate(sessionId, newDateStr, groupId) {
 
 // ─── ACTIVITY OPERATIONS ─────────────────────────────────────
 
-export async function addActivity(sessionId, targetName, activityName, order, isPredefined = false) {
-  const actId = generateId("a");
+// actId can be supplied by the caller (e.g. to write the activity into local
+// state immediately, before this write reaches the server — see addRemark's
+// matching comment) — otherwise one is generated here.
+export async function addActivity(sessionId, targetName, activityName, order, isPredefined = false, actId = generateId("a")) {
   await updateDoc(doc(db, "sessions", sessionId), {
     [`activities.${actId}`]: { targetName, activityName, order, isPredefined }
   });

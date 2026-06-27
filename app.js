@@ -115,7 +115,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "554";
+const APP_VERSION = "555";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4001,17 +4001,41 @@ function attachViewListeners() {
   // no remark yet — these don't get the typeable empty box (there's no free
   // text to click into), so without this the Remark cell is just blank with
   // no way to create the first remark at all.
+  // Writes to local state and renders immediately (optimistic) instead of
+  // awaiting both Firestore round trips first — addActivity/addRemark are
+  // handed the same ids used locally so the writes settle into the exact
+  // same keys once the snapshot listener catches up, with no mismatch.
   body.querySelectorAll(".view-add-remark-row").forEach(btn => {
-    btn.addEventListener("click", withViewAction("viewActionsInFlight", "viewRenderPending", isViewBusy, renderSessionView, async () => {
-      let actId = btn.dataset.actId;
-      if (!actId) {
-        actId = await addActivity(
-          state.viewSessionId, btn.dataset.targetName, btn.dataset.actName, Date.now(),
-          btn.dataset.isPredefined === "true"
-        );
+    btn.addEventListener("click", () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      const data       = state.viewSessionData;
+      const targetName = btn.dataset.targetName;
+      const actName    = btn.dataset.actName;
+      const isPredef   = btn.dataset.isPredefined === "true";
+      const isNewAct   = !btn.dataset.actId;
+      const actId      = btn.dataset.actId || generateId("a");
+      const remId      = generateId("r");
+      const actOrder   = Date.now();
+      data.activities = data.activities || {};
+      data.remarks    = data.remarks || {};
+      if (isNewAct) {
+        data.activities[actId] = { targetName, activityName: actName, order: actOrder, isPredefined: isPredef };
       }
-      await addRemark(state.viewSessionId, actId, "", null);
-    }));
+      data.remarks[remId] = { activityId: actId, text: "", trials: [], order: actOrder };
+      renderSessionView();
+      (async () => {
+        try {
+          if (isNewAct) await addActivity(state.viewSessionId, targetName, actName, actOrder, isPredef, actId);
+          await addRemark(state.viewSessionId, actId, "", null, remId);
+        } catch (err) {
+          if (isNewAct) delete data.activities[actId];
+          delete data.remarks[remId];
+          renderSessionView();
+          alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
+        }
+      })();
+    });
   });
 
   body.querySelectorAll(".view-act-edit").forEach(input => {
@@ -4846,46 +4870,112 @@ function attachGroupViewListeners() {
     });
   });
 
-  // "+ Add Remark & Trials" on a brand-new (round-less) activity — adds one remark for every attendee
+  // "+ Add Remark & Trials" on a brand-new (round-less) activity — adds one
+  // remark for every attendee. Writes to local state and renders immediately
+  // (optimistic) instead of awaiting addActivity + addGroupRemarksBatch
+  // first — both are handed the same ids used locally, so the background
+  // writes settle into the exact same keys once the snapshot catches up.
   body.querySelectorAll(".btn-view-group-add-remark-all").forEach(btn => {
-    btn.addEventListener("click", wrap(async () => {
+    btn.addEventListener("click", () => {
+      if (btn.disabled) return;
       btn.disabled = true;
       const data       = state.viewGroupSessionData;
       const targetName = btn.dataset.targetName;
+      const actName    = btn.dataset.actName;
       const attendees  = data.attendees || state.viewGroup?.students || [];
-      let actId = btn.dataset.actId || Object.entries(data.activities || {})
-        .find(([, a]) => a.targetName === targetName && a.activityName === btn.dataset.actName)?.[0] || null;
-      if (!actId) actId = await addActivity(sid(), targetName, btn.dataset.actName, Date.now(), true);
-      const entries = attendees
-        .filter(studentName => !Object.values(data.remarks || {})
-          .some(r => r.activityId === actId && r.studentName === studentName))
-        .map(studentName => ({ actId, studentName }));
-      if (entries.length) await addGroupRemarksBatch(sid(), entries);
-    }));
+      data.activities = data.activities || {};
+      data.remarks    = data.remarks || {};
+      let actId = btn.dataset.actId || Object.entries(data.activities)
+        .find(([, a]) => a.targetName === targetName && a.activityName === actName)?.[0] || null;
+      const isNewAct = !actId;
+      const actOrder = Date.now();
+      if (isNewAct) {
+        actId = generateId("a");
+        data.activities[actId] = { targetName, activityName: actName, order: actOrder, isPredefined: true };
+      }
+      const studentNames = attendees.filter(studentName => !Object.values(data.remarks)
+        .some(r => r.activityId === actId && r.studentName === studentName));
+      const remIds = studentNames.map(() => generateId("r"));
+      studentNames.forEach((studentName, i) => {
+        data.remarks[remIds[i]] = { activityId: actId, studentName, text: "", trials: [], order: actOrder };
+      });
+      renderGroupSessionView();
+      (async () => {
+        try {
+          if (isNewAct) await addActivity(sid(), targetName, actName, actOrder, true, actId);
+          if (studentNames.length) {
+            await addGroupRemarksBatch(sid(), studentNames.map(studentName => ({ actId, studentName })), remIds);
+          }
+        } catch (err) {
+          if (isNewAct) delete data.activities[actId];
+          remIds.forEach(id => delete data.remarks[id]);
+          renderGroupSessionView();
+          alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
+        }
+      })();
+    });
   });
 
-  // "+ Add Remark & Trials" on a pending (missing) student within an existing round
+  // "+ Add Remark & Trials" on a pending (missing) student within an existing
+  // round — actId always already exists here (the round itself came from an
+  // existing remark), so this is a single optimistic write.
   body.querySelectorAll(".btn-view-group-add-remark-pending").forEach(btn => {
-    btn.addEventListener("click", wrap(async () => {
+    btn.addEventListener("click", () => {
+      if (btn.disabled) return;
       btn.disabled = true;
-      await addGroupRemark(sid(), btn.dataset.actId, btn.dataset.student);
-    }));
+      const data        = state.viewGroupSessionData;
+      const actId        = btn.dataset.actId;
+      const studentName  = btn.dataset.student;
+      const remId        = generateId("r");
+      data.remarks = data.remarks || {};
+      data.remarks[remId] = { activityId: actId, studentName, text: "", trials: [], order: Date.now() };
+      renderGroupSessionView();
+      addGroupRemark(sid(), actId, studentName, "", remId).catch(err => {
+        delete data.remarks[remId];
+        renderGroupSessionView();
+        alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
+      });
+    });
   });
 
   // "+ Add Remark" for a mapped-score activity, one attendee at a time — unlike
   // the plain pending button above, the activity may not exist yet at all
   // (mapped activities skip the bulk "add for everyone" button), so this
   // creates it on demand, same as ensureGroupActivityAndRemark's live-entry
-  // counterpart.
+  // counterpart — also optimistic now, for the same reason as the buttons above.
   body.querySelectorAll(".btn-view-group-add-remark-mapped-pending").forEach(btn => {
-    btn.addEventListener("click", wrap(async () => {
+    btn.addEventListener("click", () => {
+      if (btn.disabled) return;
       btn.disabled = true;
-      const data = state.viewGroupSessionData;
-      let actId = btn.dataset.actId || Object.entries(data.activities || {})
-        .find(([, a]) => a.targetName === btn.dataset.targetName && a.activityName === btn.dataset.actName)?.[0] || null;
-      if (!actId) actId = await addActivity(sid(), btn.dataset.targetName, btn.dataset.actName, Date.now(), true);
-      await addGroupRemark(sid(), actId, btn.dataset.student);
-    }));
+      const data       = state.viewGroupSessionData;
+      const targetName = btn.dataset.targetName;
+      const actName    = btn.dataset.actName;
+      const studentName = btn.dataset.student;
+      data.activities = data.activities || {};
+      data.remarks    = data.remarks || {};
+      let actId = btn.dataset.actId || Object.entries(data.activities)
+        .find(([, a]) => a.targetName === targetName && a.activityName === actName)?.[0] || null;
+      const isNewAct = !actId;
+      const actOrder = Date.now();
+      if (isNewAct) {
+        actId = generateId("a");
+        data.activities[actId] = { targetName, activityName: actName, order: actOrder, isPredefined: true };
+      }
+      const remId = generateId("r");
+      data.remarks[remId] = { activityId: actId, studentName, text: "", trials: [], order: actOrder };
+      renderGroupSessionView();
+      (async () => {
+        try {
+          if (isNewAct) await addActivity(sid(), targetName, actName, actOrder, true, actId);
+          await addGroupRemark(sid(), actId, studentName, "", remId);
+        } catch (err) {
+          if (isNewAct) delete data.activities[actId];
+          delete data.remarks[remId];
+          renderGroupSessionView();
+          alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
+        }
+      })();
+    });
   });
 
   // "+" under Trials with no remark yet — creates the activity/remark for
