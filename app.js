@@ -115,7 +115,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "558";
+const APP_VERSION = "560";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -258,14 +258,23 @@ function isEmptyActItem(a) {
   return strip(a.name).length === 0;
 }
 
+// Activity Name / Notes (actNote) fields support underline as well as bold —
+// remarks never needed underline (see feedback on the mapped-score autofill
+// work), so they keep using remarkToHtml/plainTextForEdit while these two
+// fields round-trip through activityMarkupToHtml/FromHtml instead.
+function isActivityMarkupField(el) {
+  return el.classList?.contains("mn-act-name-input") || el.classList?.contains("mn-act-note-input");
+}
+
 function openTextEditorSheet(originEl) {
   _sheetOriginEl = originEl;
   // Both the Entry and View screens' remark boxes are real <textarea>
   // elements (plain text, "\n" for line breaks) — the sketch sheet itself
   // stays contenteditable, so bridge between the two formats going in and out.
   const isFormField = originEl.tagName === "TEXTAREA" || originEl.tagName === "INPUT";
+  const toHtml = isActivityMarkupField(originEl) ? activityMarkupToHtml : remarkToHtml;
   $("text-editor-content").innerHTML = isFormField
-    ? remarkToHtml(originEl.value).replace(/\n/g, "<br>")
+    ? toHtml(originEl.value).replace(/\n/g, "<br>")
     : originEl.innerHTML;
   $("text-editor-sheet").classList.remove("hidden");
   requestAnimationFrame(() => $("text-editor-content").focus());
@@ -275,7 +284,8 @@ function commitTextEditorSheet() {
   if (!_sheetOriginEl) return;
   const isFormField = _sheetOriginEl.tagName === "TEXTAREA" || _sheetOriginEl.tagName === "INPUT";
   if (isFormField) {
-    _sheetOriginEl.value = plainTextForEdit($("text-editor-content").innerHTML);
+    const fromHtml = isActivityMarkupField(_sheetOriginEl) ? activityMarkupFromHtml : plainTextForEdit;
+    _sheetOriginEl.value = fromHtml($("text-editor-content").innerHTML);
     autoResizeTextarea(_sheetOriginEl);
   } else {
     _sheetOriginEl.innerHTML = $("text-editor-content").innerHTML;
@@ -351,6 +361,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (el.isContentEditable) {
       e.preventDefault();
       document.execCommand("bold");
+      return;
+    }
+  });
+
+  // Ctrl+U / Cmd+U: visual underline — only Activity Name/Notes fields (via
+  // the sketch sheet) need this; remarks never asked for underline support.
+  document.addEventListener("keydown", e => {
+    if (!(e.key === "u" && (e.ctrlKey || e.metaKey))) return;
+    const el = document.activeElement;
+    if (!el) return;
+    if (el.isContentEditable) {
+      e.preventDefault();
+      document.execCommand("underline");
       return;
     }
   });
@@ -2026,13 +2049,13 @@ function renderFedcTarget(target) {
     html += `<div class="entry-block entry-block-predefined">
       <div class="entry-field" contenteditable="false">
         <span class="field-label">Activity</span>
-        <span class="field-value-fixed">${escHtml(pa.name)}</span>
+        <span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span>
       </div>`;
 
     if (pa.actNote && pa.actNote.trim()) {
       html += `<div class="entry-field" contenteditable="false">
         <span class="field-label">Note</span>
-        <span class="field-value-note">${escHtml(pa.actNote)}</span>
+        <span class="field-value-note">${formatActivityMarkup(pa.actNote)}</span>
       </div>`;
     }
 
@@ -2224,6 +2247,39 @@ function plainTextForEdit(html) {
 }
 function htmlForStorage(text) {
   return escHtml(text || "").replace(/\n/g, "<br>");
+}
+
+// Activity Name / Notes (actNote) fields support bold AND underline (unlike
+// remarks, which only ever needed bold) — same **bold**-marker idea as
+// remarkToHtml/plainTextForEdit above, extended with __underline__, and kept
+// as separate functions since the round-trip is only wired up for those two
+// Edit Target fields, not remarks.
+function activityMarkupToHtml(text) {
+  if (!text) return "";
+  return text
+    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+    .replace(/__(.+?)__/g, "<u>$1</u>");
+}
+function activityMarkupFromHtml(html) {
+  if (!html) return "";
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/?b>/gi, "**")
+    .replace(/<\/?u>/gi, "__")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&amp;/gi, "&");
+}
+// Read-only display of activity name/note text that may contain
+// **bold**/__underline__ markers typed via the sketch editor above — escapes
+// the raw text first so it can't inject arbitrary HTML, then turns the
+// markers into real tags.
+function formatActivityMarkup(text) {
+  return escHtml(text || "")
+    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+    .replace(/__(.+?)__/g, "<u>$1</u>");
 }
 
 // ─── REMARK FIELDS ───────────────────────────────────────────
@@ -3208,7 +3264,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
     : null;
 
   const actCell = isPredefined
-    ? escHtml(actName) + (paEntry?.actNote?.trim() ? `<div class="view-act-note">${escHtml(paEntry.actNote)}</div>` : "")
+    ? formatActivityMarkup(actName) + (paEntry?.actNote?.trim() ? `<div class="view-act-note">${formatActivityMarkup(paEntry.actNote)}</div>` : "")
     : `<div style="display:flex;align-items:center;gap:.3rem">
         <input class="view-act-edit" type="text" value="${escHtml(actName)}"
           data-act-id="${escHtml(actId || "")}" data-original="${escHtml(actName)}" />
@@ -4502,7 +4558,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
     : null;
 
   const actCell = isPredefined
-    ? escHtml(actName) + (paEntry?.actNote?.trim() ? `<div class="view-act-note">${escHtml(paEntry.actNote)}</div>` : "")
+    ? formatActivityMarkup(actName) + (paEntry?.actNote?.trim() ? `<div class="view-act-note">${formatActivityMarkup(paEntry.actNote)}</div>` : "")
     : `<div style="display:flex;align-items:center;gap:.3rem">
         <input class="view-act-edit" type="text" value="${escHtml(actName)}"
           data-act-id="${escHtml(actId || "")}" data-original="${escHtml(actName)}" />
@@ -6453,7 +6509,8 @@ function renderTargetManageContent(student, target) {
     } else if (a.isNote) {
       html += `<div class="admin-list-item admin-note-item" data-idx="${idx}">
         <span class="drag-handle">⠿</span>
-        <textarea class="admin-input" id="mn-act-name-${idx}" data-idx="${idx}"
+        <button class="btn-sketch mn-act-sketch" data-idx="${idx}" data-input-id="mn-act-name-${idx}" aria-label="Open sketch board">✏</button>
+        <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
           rows="1" placeholder="Enter Note"
           style="flex:1;overflow-y:hidden;resize:none">${escHtml(stripNoteHtml(a.text || ""))}</textarea>
         <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
@@ -6463,15 +6520,21 @@ function renderTargetManageContent(student, target) {
         `<option value="${escHtml(t.id)}"${a.mappedTargetId === t.id ? " selected" : ""}>${escHtml(t.name)}</option>`
       ).join("");
       const mappedNoteRow = a.actNote !== undefined
-        ? `<textarea class="admin-input mn-act-note-input" id="mn-act-note-${idx}" data-idx="${idx}"
-            rows="1" placeholder="Enter Note"
-            style="overflow-y:hidden;resize:none">${escHtml(a.actNote || "")}</textarea>`
+        ? `<div style="display:flex;align-items:flex-start;gap:.3rem">
+            <button class="btn-sketch mn-act-sketch" data-idx="${idx}" data-input-id="mn-act-note-${idx}" aria-label="Open sketch board">✏</button>
+            <textarea class="admin-input mn-act-note-input" id="mn-act-note-${idx}" data-idx="${idx}"
+              rows="1" placeholder="Enter Note"
+              style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.actNote || "")}</textarea>
+          </div>`
         : "";
       html += `<div class="admin-list-item" data-idx="${idx}">
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
-          <textarea class="admin-input" id="mn-act-name-${idx}" data-idx="${idx}"
-            rows="1" placeholder="Enter Activity">${escHtml(a.name || "")}</textarea>
+          <div style="display:flex;align-items:flex-start;gap:.3rem">
+            <button class="btn-sketch mn-act-sketch" data-idx="${idx}" data-input-id="mn-act-name-${idx}" aria-label="Open sketch board">✏</button>
+            <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
+              rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
+          </div>
           ${mappedNoteRow}
           <div style="display:flex;align-items:center;gap:.5rem">
             <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Remark Type:</span>
@@ -6490,15 +6553,21 @@ function renderTargetManageContent(student, target) {
     } else {
       const remarkTypeSelect = buildRemarkTypeControls(a, idx);
       const noteRow = a.actNote !== undefined
-        ? `<textarea class="admin-input mn-act-note-input" id="mn-act-note-${idx}" data-idx="${idx}"
-            rows="1" placeholder="Enter Note"
-            style="overflow-y:hidden;resize:none">${escHtml(a.actNote || "")}</textarea>`
+        ? `<div style="display:flex;align-items:flex-start;gap:.3rem">
+            <button class="btn-sketch mn-act-sketch" data-idx="${idx}" data-input-id="mn-act-note-${idx}" aria-label="Open sketch board">✏</button>
+            <textarea class="admin-input mn-act-note-input" id="mn-act-note-${idx}" data-idx="${idx}"
+              rows="1" placeholder="Enter Note"
+              style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.actNote || "")}</textarea>
+          </div>`
         : "";
       html += `<div class="admin-list-item" data-idx="${idx}">
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
-          <textarea class="admin-input" id="mn-act-name-${idx}" data-idx="${idx}"
-            rows="1" placeholder="Enter Activity">${escHtml(a.name || "")}</textarea>
+          <div style="display:flex;align-items:flex-start;gap:.3rem">
+            <button class="btn-sketch mn-act-sketch" data-idx="${idx}" data-input-id="mn-act-name-${idx}" aria-label="Open sketch board">✏</button>
+            <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
+              rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
+          </div>
           ${noteRow}
           <div style="display:flex;align-items:center;gap:.5rem">
             <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Remark Type:</span>
@@ -6633,6 +6702,13 @@ function renderTargetManageContent(student, target) {
         flashSaved(noteInput);
       });
     }
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-act-sketch").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const field = $(btn.dataset.inputId);
+      if (field) openTextEditorSheet(field);
+    });
   });
 
   $("manage-modal-body").querySelectorAll(".mn-del-act").forEach(btn => {
@@ -6832,7 +6908,8 @@ function renderTemplateManageContent(template) {
     } else if (a.isNote) {
       html += `<div class="admin-list-item admin-note-item" data-idx="${idx}">
         <span class="drag-handle">⠿</span>
-        <textarea class="admin-input" id="mn-act-name-${idx}" data-idx="${idx}"
+        <button class="btn-sketch mn-act-sketch" data-idx="${idx}" data-input-id="mn-act-name-${idx}" aria-label="Open sketch board">✏</button>
+        <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
           rows="1" placeholder="Enter Note"
           style="flex:1;overflow-y:hidden;resize:none">${escHtml(stripNoteHtml(a.text || ""))}</textarea>
         <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
@@ -6840,15 +6917,21 @@ function renderTemplateManageContent(template) {
     } else {
       const remarkTypeSelect = buildRemarkTypeControls(a, idx);
       const noteRow = a.actNote !== undefined
-        ? `<textarea class="admin-input mn-act-note-input" id="mn-act-note-${idx}" data-idx="${idx}"
-            rows="1" placeholder="Enter Note"
-            style="overflow-y:hidden;resize:none">${escHtml(a.actNote || "")}</textarea>`
+        ? `<div style="display:flex;align-items:flex-start;gap:.3rem">
+            <button class="btn-sketch mn-act-sketch" data-idx="${idx}" data-input-id="mn-act-note-${idx}" aria-label="Open sketch board">✏</button>
+            <textarea class="admin-input mn-act-note-input" id="mn-act-note-${idx}" data-idx="${idx}"
+              rows="1" placeholder="Enter Note"
+              style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.actNote || "")}</textarea>
+          </div>`
         : "";
       html += `<div class="admin-list-item" data-idx="${idx}">
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
-          <textarea class="admin-input" id="mn-act-name-${idx}" data-idx="${idx}"
-            rows="1" placeholder="Enter Activity">${escHtml(a.name || "")}</textarea>
+          <div style="display:flex;align-items:flex-start;gap:.3rem">
+            <button class="btn-sketch mn-act-sketch" data-idx="${idx}" data-input-id="mn-act-name-${idx}" aria-label="Open sketch board">✏</button>
+            <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
+              rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
+          </div>
           ${noteRow}
           <div style="display:flex;align-items:center;gap:.5rem">
             <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Remark Type:</span>
@@ -6963,6 +7046,13 @@ function renderTemplateManageContent(template) {
         flashSaved(noteInput);
       });
     }
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-act-sketch").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const field = $(btn.dataset.inputId);
+      if (field) openTextEditorSheet(field);
+    });
   });
 
   $("manage-modal-body").querySelectorAll(".mn-del-act").forEach(btn => {
@@ -7516,14 +7606,14 @@ function renderGroupStudentActivityCard(studentName, actName, actId, target, dat
   const noteRow = actNote && actNote.trim()
     ? `<div class="entry-field" contenteditable="false">
         <span class="field-label">Note</span>
-        <span class="field-value-note">${escHtml(actNote)}</span>
+        <span class="field-value-note">${formatActivityMarkup(actNote)}</span>
       </div>`
     : "";
 
   let html = `<div class="entry-block entry-block-predefined" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">
     <div class="entry-field" contenteditable="false">
       <span class="field-label">Activity</span>
-      <span class="field-value-fixed">${escHtml(actName)}</span>
+      <span class="field-value-fixed">${formatActivityMarkup(actName)}</span>
     </div>
     ${noteRow}`;
 
@@ -7592,7 +7682,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
   const noteRow = actNote && actNote.trim()
     ? `<div class="entry-field" contenteditable="false">
         <span class="field-label">Note</span>
-        <span class="field-value-note">${escHtml(actNote)}</span>
+        <span class="field-value-note">${formatActivityMarkup(actNote)}</span>
       </div>`
     : "";
 
@@ -7613,7 +7703,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
     return `<div class="entry-block entry-block-predefined" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">
       <div class="entry-field" contenteditable="false">
         <span class="field-label">Activity</span>
-        <span class="field-value-fixed">${escHtml(actName)}</span>
+        <span class="field-value-fixed">${formatActivityMarkup(actName)}</span>
       </div>
       ${noteRow}
       <div class="entry-divider" contenteditable="false"></div>
@@ -7638,7 +7728,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
     return `<div class="entry-block entry-block-predefined" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">
       <div class="entry-field" contenteditable="false">
         <span class="field-label">Activity</span>
-        <span class="field-value-fixed">${escHtml(actName)}</span>
+        <span class="field-value-fixed">${formatActivityMarkup(actName)}</span>
         ${combineToggle}
       </div>
       ${noteRow}
@@ -7702,7 +7792,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
   return `<div class="entry-block entry-block-predefined" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">
     <div class="entry-field" contenteditable="false">
       <span class="field-label">Activity</span>
-      <span class="field-value-fixed">${escHtml(actName)}</span>
+      <span class="field-value-fixed">${formatActivityMarkup(actName)}</span>
       ${combineToggle}
     </div>
     ${noteRow}

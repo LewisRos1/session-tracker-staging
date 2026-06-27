@@ -19,6 +19,13 @@ function stripRemarkHtml(s) {
     .trim();
 }
 
+// Excel doesn't attempt rich (partial-bold) text for Activity Name/Notes the
+// way the Word export does (see parseInlineMarkup) — just drop the **/__
+// markers so they don't show up literally in the cell text.
+function stripActivityMarkup(s) {
+  return (s || "").replace(/\*\*(.+?)\*\*/g, "$1").replace(/__(.+?)__/g, "$1");
+}
+
 // ─── STYLE CONSTANTS ─────────────────────────────────────────
 // Palette: Bright Periwinkle — cheerful, child-friendly, single-hue graduated
 //
@@ -164,15 +171,6 @@ function addSummarySheets(wb, allTargets, sessions) {
   }
   mergeAndCenterRows(detWs, detMonthHdrs, detMaxCols);
   applyBorders(detWs, detMaxCols);
-}
-
-function targetHasDataInSession(target, session) {
-  const actIds = new Set(
-    Object.entries(session.activities || {})
-      .filter(([, a]) => a.targetName === target.name)
-      .map(([id]) => id)
-  );
-  return Object.values(session.remarks || {}).some(r => actIds.has(r.activityId));
 }
 
 // Union of targets across every group a student belongs to (first occurrence by name wins)
@@ -501,6 +499,47 @@ export async function exportGroupMemberData(studentName, groups) {
 // docx is loaded globally via a <script> tag in index.html, same pattern
 // as ExcelJS/JSZip/Chart elsewhere in this file.
 
+// Builds the Remark column's content as an array of "lines" (each an array
+// of {text, bold} runs) for richCell. For sentence-starter activities, the
+// starter + colon is bold and the selected option isn't; a free-text Notes
+// field (masteryNote) lands two lines below the starter line, not inline
+// after an em dash, so it reads as its own paragraph rather than a caption.
+function buildRemarkLines(starter, text, masteryNote) {
+  const lines = [];
+  if (starter || text) {
+    const runs = [];
+    if (starter) runs.push({ text: `${starter}:`, bold: true });
+    if (text) runs.push({ text: starter ? ` ${text}` : text });
+    lines.push(runs);
+  }
+  if (masteryNote) {
+    if (lines.length > 0) lines.push([{ text: "" }]);
+    lines.push([{ text: masteryNote }]);
+  }
+  if (lines.length === 0) lines.push([{ text: "" }]);
+  return lines;
+}
+
+// Splits a string on **bold**/__underline__ markers into an array of
+// {text, bold, underline} runs, for richCell. Activity Name is the only
+// export field that can carry these markers (see app.js's sketch editor on
+// the Edit Target Activity Name/Notes fields) — remarks never type them.
+function parseInlineMarkup(text) {
+  const runs = [];
+  const str = text || "";
+  const re = /\*\*(.+?)\*\*|__(.+?)__/g;
+  let lastIndex = 0, m;
+  while ((m = re.exec(str)) !== null) {
+    if (m.index > lastIndex) runs.push({ text: str.slice(lastIndex, m.index) });
+    if (m[1] !== undefined) runs.push({ text: m[1], bold: true });
+    else runs.push({ text: m[2], underline: true });
+    lastIndex = re.lastIndex;
+  }
+  if (lastIndex < str.length) runs.push({ text: str.slice(lastIndex) });
+  if (runs.length === 0) runs.push({ text: str });
+  return runs;
+}
+
 function wordTargetRows(target, session, allTargets) {
   const rows = [];
   const activities = getAllActivitiesForTarget(session, target);
@@ -516,28 +555,18 @@ function wordTargetRows(target, session, allTargets) {
       continue;
     }
 
-    if (act.isNote) {
-      const noteText = (act.activityName || "")
-        .replace(/<br\s*\/?>/gi, "\n")
-        .replace(/<\/div>/gi, "\n").replace(/<div>/gi, "")
-        .replace(/<\/p>/gi, "\n").replace(/<p>/gi, "")
-        .replace(/<[^>]*>/g, "")
-        .replace(/\*\*/g, "")
-        .replace(/\n{3,}/g, "\n\n")
-        .trim();
-      rows.push({ merge: true, text: `Note: ${noteText}`, style: "note" });
-      continue;
-    }
+    // Free-standing "+ Add Note" rows are reference text for the facilitator,
+    // not session data — Excel keeps them, but the boss asked Word to leave
+    // them out entirely.
+    if (act.isNote) continue;
 
-    const actNoteText = (target.predefinedActivities || []).find(
-      p => !p.isHeading && !p.isNote && p.name === act.activityName
-    )?.actNote;
-    const activityLabel = (actNoteText && actNoteText.trim())
-      ? `${act.activityName}\nNote: ${actNoteText.trim()}`
-      : act.activityName;
+    // An activity's own attached note (from "+ Add Activity & Note") is also
+    // facilitator-reference text, not session data — Word treats this exactly
+    // like a plain "+ Add Activity" and drops the note, same reasoning as above.
+    const activityLabel = act.activityName;
 
     if (act.empty) {
-      rows.push({ cells: [activityLabel, "", ""] });
+      rows.push({ cells: [activityLabel, "", ""], actLines: [parseInlineMarkup(activityLabel)] });
       continue;
     }
 
@@ -547,7 +576,7 @@ function wordTargetRows(target, session, allTargets) {
     )?.sentenceStarter || null;
 
     if (remarks.length === 0) {
-      rows.push({ cells: [activityLabel, "", ""] });
+      rows.push({ cells: [activityLabel, "", ""], actLines: [parseInlineMarkup(activityLabel)] });
       continue;
     }
 
@@ -558,9 +587,12 @@ function wordTargetRows(target, session, allTargets) {
       const validTrials = (rem.trials || []).filter(t => t !== -1);
       const remarkAvg   = act.isMapped ? mappedScore : calcRemarkAvg(validTrials, target.maxPoints);
       const masteryNote = stripRemarkHtml(rem.masteryNote || "");
-      const baseText    = starter ? `${starter}: ${stripRemarkHtml(rem.text)}`.trim() : stripRemarkHtml(rem.text);
-      const remarkText  = masteryNote ? `${baseText} — ${masteryNote}` : baseText;
-      rows.push({ cells: [first ? activityLabel : "", remarkText, remarkAvg !== null ? pct(remarkAvg) : ""] });
+      const text        = stripRemarkHtml(rem.text);
+      rows.push({
+        cells: [first ? activityLabel : "", "", remarkAvg !== null ? pct(remarkAvg) : ""],
+        actLines: first ? [parseInlineMarkup(activityLabel)] : null,
+        remarkLines: buildRemarkLines(starter, text, masteryNote)
+      });
       first = false;
     }
   }
@@ -632,13 +664,35 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
     });
   }
 
+  // Like textLines, but each "line" is an array of {text, bold, underline}
+  // runs instead of one uniform string — needed for the Remark column, whose
+  // sentence-starter prefix is bold while the rest of the line isn't.
+  function richTextLines(lines) {
+    const runs = [];
+    lines.forEach((lineRuns, i) => {
+      if (i > 0) runs.push(new TextRun({ text: "", break: 1 }));
+      lineRuns.forEach(r => runs.push(new TextRun({
+        text: r.text, bold: !!r.bold, underline: r.underline ? {} : undefined
+      })));
+    });
+    return runs;
+  }
+
+  function richCell(lines, { fill = null, colSpan = 1, align = AlignmentType.LEFT, width = null } = {}) {
+    return new TableCell({
+      columnSpan: colSpan,
+      width: width != null ? { size: width, type: WidthType.DXA } : undefined,
+      shading: fill ? { type: ShadingType.CLEAR, color: "auto", fill } : undefined,
+      borders: cellBorders,
+      margins: { top: 80, bottom: 80, left: 100, right: 100 },
+      children: [new Paragraph({ alignment: align, children: richTextLines(lines) })]
+    });
+  }
+
   const body = [];
-  let anyTarget = false;
+  const anyTarget = allTargets.length > 0;
 
   for (const target of allTargets) {
-    if (!targetHasDataInSession(target, session)) continue;
-    anyTarget = true;
-
     body.push(new Paragraph({
       spacing: { before: 240, after: 80 },
       children: [new TextRun({ text: target.name, bold: true, size: 26 })]
@@ -668,8 +722,12 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
       } else {
         tableRows.push(new TableRow({
           children: [
-            cell(r.cells[0], { width: WORD_COL_ACTIVITY }),
-            cell(r.cells[1], { width: WORD_COL_REMARK }),
+            r.actLines
+              ? richCell(r.actLines, { width: WORD_COL_ACTIVITY })
+              : cell(r.cells[0], { width: WORD_COL_ACTIVITY }),
+            r.remarkLines
+              ? richCell(r.remarkLines, { width: WORD_COL_REMARK })
+              : cell(r.cells[1], { width: WORD_COL_REMARK }),
             cell(r.cells[2], { align: AlignmentType.CENTER, width: WORD_COL_SCORE })
           ]
         }));
@@ -1087,20 +1145,19 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
     for (const act of activities) {
       if (act.isHeading) {
         activityHeadingRows.add(rows.length);
-        rows.push(["", act.activityName, "", "", ""]);
+        rows.push(["", stripActivityMarkup(act.activityName), "", "", ""]);
         continue;
       }
 
       if (act.isNote) {
         noteRows.add(rows.length);
-        const noteText = (act.activityName || "")
+        const noteText = stripActivityMarkup((act.activityName || "")
           .replace(/<br\s*\/?>/gi, "\n")
           .replace(/<\/div>/gi, "\n").replace(/<div>/gi, "")
           .replace(/<\/p>/gi, "\n").replace(/<p>/gi, "")
           .replace(/<[^>]*>/g, "")
-          .replace(/\*\*/g, "")
           .replace(/\n{3,}/g, "\n\n")
-          .trim();
+          .trim());
         rows.push(["", `Note: ${noteText}`, "", "", ""]);
         continue;
       }
@@ -1109,8 +1166,8 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
         p => !p.isHeading && !p.isNote && p.name === act.activityName
       )?.actNote;
       const activityCell = (actNoteText && actNoteText.trim())
-        ? richTextActivityWithNote(act.activityName, actNoteText.trim())
-        : act.activityName;
+        ? richTextActivityWithNote(stripActivityMarkup(act.activityName), stripActivityMarkup(actNoteText.trim()))
+        : stripActivityMarkup(act.activityName);
 
       if (act.empty) {
         rows.push(["", activityCell, "", "", ""]);
