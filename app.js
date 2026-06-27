@@ -115,7 +115,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "548";
+const APP_VERSION = "549";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2229,6 +2229,25 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
       data-rem-id="${rem.id}" data-idx="${idx}">×</button></span>`
   ).join("");
 
+  // Shared by the mastery branch below and the normal branch further down —
+  // a mastery-typed remark can also be mapped-score (Remark Type and Mapped
+  // To are independent settings), so both branches need the same mappedInfo-
+  // vs-Trials choice instead of the mastery branch hardcoding Trials.
+  const trailingField = mappedInfo
+    ? `<div class="entry-field" contenteditable="false">
+        <span class="field-label">${escHtml(mappedInfo.label)}</span>
+        <span class="field-value-fixed">${mappedInfo.pct !== null ? mappedInfo.pct + "%" : "—"}</span>
+      </div>`
+    : `<div class="entry-field" contenteditable="false">
+        <span class="field-label">Trials</span>
+        <div class="trials-row">
+          <div class="trials-badges">${badgesHtml}</div>
+          <button class="btn-add-trial btn-primary-sm"
+            data-rem-id="${rem.id}"
+            data-target="${escHtml(target.name)}">+ Trial</button>
+        </div>
+      </div>`;
+
   if (isMastery) {
     const cur = rem.text || "";
     return `
@@ -2251,15 +2270,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
       <button class="btn-icon btn-delete-remark"
         data-rem-id="${rem.id}" title="Delete remark">🗑</button>
     </div>
-    <div class="entry-field" contenteditable="false">
-      <span class="field-label">Trials</span>
-      <div class="trials-row">
-        <div class="trials-badges">${badgesHtml}</div>
-        <button class="btn-add-trial btn-primary-sm"
-          data-rem-id="${rem.id}"
-          data-target="${escHtml(target.name)}">+ Trial</button>
-      </div>
-    </div>`;
+    ${trailingField}`;
   }
 
   function makeOptPills(remId, remText) {
@@ -2298,21 +2309,6 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
   } else {
     remarkContent = optBtns;
   }
-
-  const trailingField = mappedInfo
-    ? `<div class="entry-field" contenteditable="false">
-        <span class="field-label">${escHtml(mappedInfo.label)}</span>
-        <span class="field-value-fixed">${mappedInfo.pct !== null ? mappedInfo.pct + "%" : "—"}</span>
-      </div>`
-    : `<div class="entry-field" contenteditable="false">
-        <span class="field-label">Trials</span>
-        <div class="trials-row">
-          <div class="trials-badges">${badgesHtml}</div>
-          <button class="btn-add-trial btn-primary-sm"
-            data-rem-id="${rem.id}"
-            data-target="${escHtml(target.name)}">+ Trial</button>
-        </div>
-      </div>`;
 
   return `
     <div class="entry-divider" contenteditable="false"></div>
@@ -4292,6 +4288,10 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
   // remark + their own per-attendee mapped score (see renderGroupActivityCard's
   // live-entry counterpart for the same per-attendee bypass).
   if (paEntry?.isMapped) {
+    const mappedInlineOptions   = getActivityInlineOptions(paEntry);
+    const mappedSentenceStarter = paEntry.sentenceStarter || null;
+    const mappedMultiSelect     = paEntry.optionsMulti || false;
+    const mappedIsMastery       = paEntry.isMastery || false;
     let firstRow = true;
     return attendees.map(studentName => {
       const remarks = actId
@@ -4321,7 +4321,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
       const mappedInfo = resolveViewGroupMappedScoreDisplay(paEntry, data, studentName);
       return remarks.map((rem, ri) => viewGroupRemarkRow(
         ri === 0 ? noVal : null, ri === 0 ? actVal : null, studentName, rem, target,
-        null, null, false, false, null, mappedInfo
+        mappedInlineOptions, mappedSentenceStarter, mappedMultiSelect, mappedIsMastery, null, mappedInfo
       )).join("");
     }).join("");
   }
@@ -6043,6 +6043,31 @@ function stripNoteHtml(text) {
     .trim();
 }
 
+// Shared by the normal-activity and mapped-score-activity rows in
+// renderTargetManageContent — both let the boss configure how the Remark
+// field is captured (free text / preset options / sentence starter / mastery
+// levels), independently of where the Score comes from.
+function buildRemarkTypeControls(a, idx) {
+  const type = a.isMastery ? "mastery" : (a.sentenceStarter && a.inlineOptions && a.optionsMulti) ? "starter_fixed_multi" : (a.sentenceStarter && a.inlineOptions) ? "starter_fixed" : a.sentenceStarter ? "starter" : (a.inlineOptions && a.optionsMulti) ? "fixed_multi" : (a.inlineOptions || a.remarkPresetId) ? "fixed" : "";
+  return `<select class="act-preset-select mn-act-preset" data-idx="${idx}">
+      <option value="">Free text</option>
+      <option value="fixed"${type === "fixed" ? " selected" : ""}>Select one</option>
+      <option value="fixed_multi"${type === "fixed_multi" ? " selected" : ""}>Tick boxes</option>
+      <option value="starter"${type === "starter" ? " selected" : ""}>Sentence Starter + Free Text</option>
+      <option value="starter_fixed"${type === "starter_fixed" ? " selected" : ""}>Sentence Starter + Select one</option>
+      <option value="starter_fixed_multi"${type === "starter_fixed_multi" ? " selected" : ""}>Sentence Starter + Tick boxes</option>
+      <option value="mastery"${type === "mastery" ? " selected" : ""}>Mastery Level + Free Text</option>
+    </select>
+    <input class="admin-input mn-act-starter-text" data-idx="${idx}"
+      placeholder="Starter phrase…"
+      value="${escHtml(a.sentenceStarter || "")}"
+      style="${type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" ? "" : "display:none"}">
+    <input class="admin-input mn-act-inline-opts" data-idx="${idx}"
+      placeholder="Options separated by /  e.g. Low/Medium/High"
+      value="${escHtml(a.inlineOptions || (a.remarkPresetId ? (state.remarkPresets.find(p=>p.id===a.remarkPresetId)?.options||[]).join("/") : ""))}"
+      style="${type === "fixed" || type === "fixed_multi" || type === "starter_fixed" || type === "starter_fixed_multi" ? "" : "display:none"}">`;
+}
+
 function renderTargetManageContent(student, target) {
   $("manage-modal-title").textContent = target.name;
   target.predefinedActivities = normalizeActivitiesFormat(target.predefinedActivities || []);
@@ -6117,11 +6142,21 @@ function renderTargetManageContent(student, target) {
       const mappedOptions = siblingTargets.map(t =>
         `<option value="${escHtml(t.id)}"${a.mappedTargetId === t.id ? " selected" : ""}>${escHtml(t.name)}</option>`
       ).join("");
+      const mappedNoteRow = a.actNote !== undefined
+        ? `<textarea class="admin-input mn-act-note-input" id="mn-act-note-${idx}" data-idx="${idx}"
+            rows="1" placeholder="Enter Note"
+            style="overflow-y:hidden;resize:none">${escHtml(a.actNote || "")}</textarea>`
+        : "";
       html += `<div class="admin-list-item" data-idx="${idx}">
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
           <textarea class="admin-input" id="mn-act-name-${idx}" data-idx="${idx}"
             rows="1" placeholder="Enter Activity">${escHtml(a.name || "")}</textarea>
+          ${mappedNoteRow}
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Remark Type:</span>
+            ${buildRemarkTypeControls(a, idx)}
+          </div>
           <div style="display:flex;flex-direction:column;gap:.2rem">
             <span style="font-size:.75rem;color:#6b7280;font-weight:600">Mapped To Which Target's Average:</span>
             <select class="admin-input mn-mapped-target-select" data-idx="${idx}">
@@ -6133,24 +6168,7 @@ function renderTargetManageContent(student, target) {
         <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
       </div>`;
     } else {
-      const type = a.isMastery ? "mastery" : (a.sentenceStarter && a.inlineOptions && a.optionsMulti) ? "starter_fixed_multi" : (a.sentenceStarter && a.inlineOptions) ? "starter_fixed" : a.sentenceStarter ? "starter" : (a.inlineOptions && a.optionsMulti) ? "fixed_multi" : (a.inlineOptions || a.remarkPresetId) ? "fixed" : "";
-      const remarkTypeSelect = `<select class="act-preset-select mn-act-preset" data-idx="${idx}">
-          <option value="">Free text</option>
-          <option value="fixed"${type === "fixed" ? " selected" : ""}>Select one</option>
-          <option value="fixed_multi"${type === "fixed_multi" ? " selected" : ""}>Tick boxes</option>
-          <option value="starter"${type === "starter" ? " selected" : ""}>Sentence Starter + Free Text</option>
-          <option value="starter_fixed"${type === "starter_fixed" ? " selected" : ""}>Sentence Starter + Select one</option>
-          <option value="starter_fixed_multi"${type === "starter_fixed_multi" ? " selected" : ""}>Sentence Starter + Tick boxes</option>
-          <option value="mastery"${type === "mastery" ? " selected" : ""}>Mastery Level + Free Text</option>
-        </select>
-        <input class="admin-input mn-act-starter-text" data-idx="${idx}"
-          placeholder="Starter phrase…"
-          value="${escHtml(a.sentenceStarter || "")}"
-          style="${type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" ? "" : "display:none"}">
-        <input class="admin-input mn-act-inline-opts" data-idx="${idx}"
-          placeholder="Options separated by /  e.g. Low/Medium/High"
-          value="${escHtml(a.inlineOptions || (a.remarkPresetId ? (state.remarkPresets.find(p=>p.id===a.remarkPresetId)?.options||[]).join("/") : ""))}"
-          style="${type === "fixed" || type === "fixed_multi" || type === "starter_fixed" || type === "starter_fixed_multi" ? "" : "display:none"}">`;
+      const remarkTypeSelect = buildRemarkTypeControls(a, idx);
       const noteRow = a.actNote !== undefined
         ? `<textarea class="admin-input mn-act-note-input" id="mn-act-note-${idx}" data-idx="${idx}"
             rows="1" placeholder="Enter Note"
@@ -6174,11 +6192,12 @@ function renderTargetManageContent(student, target) {
 
   html += `</div>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.25rem">
-      <button class="btn-admin-add" id="btn-mn-add-act" style="flex:1">+ Add Activity</button>
-      <button class="btn-admin-add" id="btn-mn-add-act-note" style="flex:1">+ Add Activity &amp; Note</button>
-      <button class="btn-admin-add" id="btn-mn-add-heading" style="flex:1">+ Add Section Heading</button>
-      <button class="btn-admin-add" id="btn-mn-add-note" style="flex:1">+ Add Note</button>
-      <button class="btn-admin-add" id="btn-mn-add-mapped" style="flex:1">+ Add Activity &amp; Mapped Score</button>
+      <button class="btn-admin-add" id="btn-mn-add-act" style="flex:0 0 auto;width:auto">+ Add Activity</button>
+      <button class="btn-admin-add" id="btn-mn-add-act-note" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Note</button>
+      <button class="btn-admin-add" id="btn-mn-add-heading" style="flex:0 0 auto;width:auto">+ Add Section Heading</button>
+      <button class="btn-admin-add" id="btn-mn-add-note" style="flex:0 0 auto;width:auto">+ Add Note</button>
+      <button class="btn-admin-add" id="btn-mn-add-mapped" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Mapped Score</button>
+      <button class="btn-admin-add" id="btn-mn-add-act-note-mapped" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Note &amp; Mapped Score</button>
     </div>
     <div style="margin-top:2rem;padding-bottom:1.5rem">
       <button class="btn-primary-sm" id="btn-mn-done-target"
@@ -6342,6 +6361,13 @@ function renderTargetManageContent(student, target) {
 
   $("btn-mn-add-mapped").addEventListener("click", async () => {
     acts.push({ id: cfgId("m"), isMapped: true, name: "", mappedTargetId: null, order: acts.length });
+    target.predefinedActivities = acts;
+    await saveTarget();
+    renderTargetManageContent(student, target);
+  });
+
+  $("btn-mn-add-act-note-mapped").addEventListener("click", async () => {
+    acts.push({ id: cfgId("m"), isMapped: true, name: "", actNote: "", mappedTargetId: null, order: acts.length });
     target.predefinedActivities = acts;
     await saveTarget();
     renderTargetManageContent(student, target);
