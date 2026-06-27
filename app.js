@@ -115,7 +115,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "547";
+const APP_VERSION = "548";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -6122,9 +6122,9 @@ function renderTargetManageContent(student, target) {
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
           <textarea class="admin-input" id="mn-act-name-${idx}" data-idx="${idx}"
             rows="1" placeholder="Enter Activity">${escHtml(a.name || "")}</textarea>
-          <div style="display:flex;align-items:center;gap:.5rem">
-            <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Mapped To:</span>
-            <select class="admin-input mn-mapped-target-select" data-idx="${idx}" style="flex:1">
+          <div style="display:flex;flex-direction:column;gap:.2rem">
+            <span style="font-size:.75rem;color:#6b7280;font-weight:600">Mapped To Which Target's Average:</span>
+            <select class="admin-input mn-mapped-target-select" data-idx="${idx}">
               <option value="">— select target —</option>
               ${mappedOptions}
             </select>
