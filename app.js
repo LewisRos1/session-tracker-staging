@@ -115,7 +115,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "549";
+const APP_VERSION = "550";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2462,9 +2462,6 @@ function attachTargetListeners(target) {
       const isActive   = btn.classList.contains("active");
       const newVal     = isActive ? "" : btn.dataset.val;
       if (currentVal === newVal) return;
-      const fromLabel = currentVal || "none";
-      const toLabel   = newVal     || "none";
-      if (!confirm(`Change mastery level from "${fromLabel}" to "${toLabel}"?`)) return;
       container?.querySelectorAll(".btn-mastery").forEach(b => b.classList.remove("active"));
       if (!isActive) btn.classList.add("active");
       // Update local state synchronously, not just the DOM — leaveSession()'s
@@ -3868,7 +3865,6 @@ function attachViewListeners() {
       const isActive   = btn.classList.contains("active");
       const newVal     = isActive ? "" : btn.dataset.val;
       if (currentVal === newVal) return;
-      if (!confirm(`Change mastery level from "${currentVal || "none"}" to "${newVal || "none"}"?`)) return;
       container?.querySelectorAll(".btn-mastery").forEach(b => b.classList.remove("active"));
       if (!isActive) btn.classList.add("active");
       const rem = state.viewSessionData?.remarks?.[btn.dataset.remId];
@@ -4714,7 +4710,6 @@ function attachGroupViewListeners() {
       const isActive   = btn.classList.contains("active");
       const newVal     = isActive ? "" : btn.dataset.val;
       if (currentVal === newVal) return;
-      if (!confirm(`Change mastery level from "${currentVal || "none"}" to "${newVal || "none"}"?`)) return;
       container?.querySelectorAll(".btn-mastery").forEach(b => b.classList.remove("active"));
       if (!isActive) btn.classList.add("active");
       const rem = state.viewGroupSessionData?.remarks?.[btn.dataset.remId];
