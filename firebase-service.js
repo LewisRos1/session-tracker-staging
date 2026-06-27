@@ -513,6 +513,31 @@ export async function deleteTargetDataFromSessions(studentId, targetName) {
   }
 }
 
+// Activities are matched to a target's predefinedActivities config by exact
+// name text (see export.js's getAllActivitiesForTarget and app.js's
+// findActivityByName) — so editing an activity's name without also updating
+// every session that already recorded a remark under the old name would
+// silently orphan that remark: invisible in the live UI, and surfaced as a
+// confusing duplicate row in exports. Called right after a rename is saved
+// in Edit Target, mirroring deleteTargetDataFromSessions' query shape above.
+export async function renameActivityAcrossSessions(studentId, targetName, oldName, newName) {
+  const snap = await getDocs(
+    query(collection(db, "sessions"), where("studentId", "==", studentId))
+  );
+  for (const sessionDoc of snap.docs) {
+    const data = sessionDoc.data();
+    const updates = {};
+    for (const [actId, act] of Object.entries(data.activities || {})) {
+      if (act.targetName === targetName && act.activityName === oldName) {
+        updates[`activities.${actId}.activityName`] = newName;
+      }
+    }
+    if (Object.keys(updates).length > 0) {
+      await updateDoc(doc(db, "sessions", sessionDoc.id), updates);
+    }
+  }
+}
+
 /** Delete a session document entirely (e.g. empty sessions on leave). */
 export async function deleteSession(sessionId) {
   await deleteDoc(doc(db, "sessions", sessionId));
@@ -850,6 +875,23 @@ export async function deleteGroupTargetDataFromSessions(groupId, targetName) {
       if (actIds.includes(rem.activityId)) updates[`remarks.${remId}`] = deleteField();
     }
     if ((data.fedcComments || {})[key] !== undefined) updates[`fedcComments.${key}`] = deleteField();
+    if (Object.keys(updates).length > 0) await updateDoc(doc(db, "sessions", sd.id), updates);
+  }
+}
+
+// Group counterpart of renameActivityAcrossSessions above — see its comment.
+export async function renameGroupActivityAcrossSessions(groupId, targetName, oldName, newName) {
+  const snap = await getDocs(
+    query(collection(db, "sessions"), where("groupId", "==", groupId))
+  );
+  for (const sd of snap.docs) {
+    const data = sd.data();
+    const updates = {};
+    for (const [actId, act] of Object.entries(data.activities || {})) {
+      if (act.targetName === targetName && act.activityName === oldName) {
+        updates[`activities.${actId}.activityName`] = newName;
+      }
+    }
     if (Object.keys(updates).length > 0) await updateDoc(doc(db, "sessions", sd.id), updates);
   }
 }

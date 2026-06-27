@@ -507,36 +507,49 @@ export async function exportGroupMemberData(studentName, groups) {
 function buildRemarkLines(starter, text, masteryNote) {
   const lines = [];
   if (starter || text) {
-    const runs = [];
-    if (starter) runs.push({ text: `${starter}:`, bold: true });
-    if (text) runs.push({ text: starter ? ` ${text}` : text });
-    lines.push(runs);
+    // Only the first line gets the bold starter prefix — further lines of a
+    // multi-line remark continue as plain text, same paragraph.
+    (text || "").split("\n").forEach((ln, i) => {
+      if (i === 0) {
+        const runs = [];
+        if (starter) runs.push({ text: `${starter}:`, bold: true });
+        if (ln) runs.push({ text: starter ? ` ${ln}` : ln });
+        lines.push(runs);
+      } else {
+        lines.push([{ text: ln }]);
+      }
+    });
   }
   if (masteryNote) {
     if (lines.length > 0) lines.push([{ text: "" }]);
-    lines.push([{ text: masteryNote }]);
+    masteryNote.split("\n").forEach(ln => lines.push([{ text: ln }]));
   }
   if (lines.length === 0) lines.push([{ text: "" }]);
   return lines;
 }
 
-// Splits a string on **bold**/__underline__ markers into an array of
-// {text, bold, underline} runs, for richCell. Activity Name is the only
-// export field that can carry these markers (see app.js's sketch editor on
-// the Edit Target Activity Name/Notes fields) — remarks never type them.
+// Splits a string into richCell's "array of lines, each an array of
+// {text, bold, underline} runs" shape — first on real line breaks (Activity
+// Name is a multi-line textarea, e.g. a reference block with one bullet per
+// line), then on **bold**/__underline__ markers within each line. Activity
+// Name is the only export field that can carry these markers (see app.js's
+// sketch editor on the Edit Target Activity Name/Notes fields) — remarks
+// never type them.
 function parseInlineMarkup(text) {
+  return (text || "").split("\n").map(line => parseInlineMarkupLine(line));
+}
+function parseInlineMarkupLine(line) {
   const runs = [];
-  const str = text || "";
   const re = /\*\*(.+?)\*\*|__(.+?)__/g;
   let lastIndex = 0, m;
-  while ((m = re.exec(str)) !== null) {
-    if (m.index > lastIndex) runs.push({ text: str.slice(lastIndex, m.index) });
+  while ((m = re.exec(line)) !== null) {
+    if (m.index > lastIndex) runs.push({ text: line.slice(lastIndex, m.index) });
     if (m[1] !== undefined) runs.push({ text: m[1], bold: true });
     else runs.push({ text: m[2], underline: true });
     lastIndex = re.lastIndex;
   }
-  if (lastIndex < str.length) runs.push({ text: str.slice(lastIndex) });
-  if (runs.length === 0) runs.push({ text: str });
+  if (lastIndex < line.length) runs.push({ text: line.slice(lastIndex) });
+  if (runs.length === 0) runs.push({ text: line });
   return runs;
 }
 
@@ -566,7 +579,7 @@ function wordTargetRows(target, session, allTargets) {
     const activityLabel = act.activityName;
 
     if (act.empty) {
-      rows.push({ cells: [activityLabel, "", ""], actLines: [parseInlineMarkup(activityLabel)] });
+      rows.push({ cells: [activityLabel, "", ""], actLines: parseInlineMarkup(activityLabel) });
       continue;
     }
 
@@ -576,7 +589,7 @@ function wordTargetRows(target, session, allTargets) {
     )?.sentenceStarter || null;
 
     if (remarks.length === 0) {
-      rows.push({ cells: [activityLabel, "", ""], actLines: [parseInlineMarkup(activityLabel)] });
+      rows.push({ cells: [activityLabel, "", ""], actLines: parseInlineMarkup(activityLabel) });
       continue;
     }
 
@@ -590,7 +603,7 @@ function wordTargetRows(target, session, allTargets) {
       const text        = stripRemarkHtml(rem.text);
       rows.push({
         cells: [first ? activityLabel : "", "", remarkAvg !== null ? pct(remarkAvg) : ""],
-        actLines: first ? [parseInlineMarkup(activityLabel)] : null,
+        actLines: first ? parseInlineMarkup(activityLabel) : null,
         remarkLines: buildRemarkLines(starter, text, masteryNote)
       });
       first = false;

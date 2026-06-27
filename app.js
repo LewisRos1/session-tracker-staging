@@ -44,6 +44,8 @@ import {
   updateSessionDate,
   updateGroupSessionDate,
   deleteTargetDataFromSessions,
+  renameActivityAcrossSessions,
+  renameGroupActivityAcrossSessions,
   signInWithPin,
   signOutUser,
   onAuthChange,
@@ -115,7 +117,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "563";
+const APP_VERSION = "566";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -245,6 +247,22 @@ let _sheetOriginEl = null;
 // When editing a target belonging to a group, this is set so that
 // renderTargetManageContent saves to the group instead of the student.
 let _groupForTargetEdit = null;
+
+// Activities are matched to session data by name text (see
+// renameActivityAcrossSessions in firebase-service.js for the full
+// explanation) — call this right after a rename is saved in Edit Target so
+// every session that already has a remark recorded under the old name
+// doesn't lose its link to it. Fire-and-forget: the rename itself already
+// saved by the time this runs, so a failure here is logged, not surfaced —
+// it just means old sessions keep showing the pre-existing orphaned-row
+// behavior rather than this being a new way to actually lose data.
+function propagateActivityRename(student, targetName, oldName, newName) {
+  if (!oldName || oldName === newName) return;
+  const promise = _groupForTargetEdit
+    ? renameGroupActivityAcrossSessions(_groupForTargetEdit.id, targetName, oldName, newName)
+    : renameActivityAcrossSessions(student.id, targetName, oldName, newName);
+  promise.catch(err => console.error("propagateActivityRename failed:", err));
+}
 // Tracks a newly-created group ID so it can be auto-deleted if closed with no students.
 let _newGroupId = null;
 // When the Edit Target/Template modal is open, holds { acts, save } so closeManageModal
@@ -1764,13 +1782,20 @@ async function openSession(student, existingSessionId = null, dateStr = null) {
         // Auto-create mastery remarks if previous session had values.
         // If any are created the Firestore write triggers another snapshot
         // which will render — so we return early here to avoid a stale render.
-        const filled = await autoFillMasteryRemarks(student, sessionId);
-        if (filled > 0) return;
+        // Wrapped in try/catch: an uncaught error here (e.g. malformed
+        // target config) would otherwise leave the screen stuck on
+        // "Loading…" forever, since nothing below this line would ever run.
+        try {
+          const filled = await autoFillMasteryRemarks(student, sessionId);
+          if (filled > 0) return;
+        } catch (err) { console.error("autoFillMasteryRemarks failed:", err); }
       }
       // Mapped-score activities can become fillable any time during the
       // session (not just on open), so this check isn't gated to firstLoad.
-      const mappedFilled = await autoFillMappedRemarks(student, sessionId);
-      if (mappedFilled > 0) return;
+      try {
+        const mappedFilled = await autoFillMappedRemarks(student, sessionId);
+        if (mappedFilled > 0) return;
+      } catch (err) { console.error("autoFillMappedRemarks failed:", err); }
       // Keep score modal trial badges in sync with Firestore
       if (state.scorePicker?.open && state.scorePicker?.remId) {
         renderScoreModalTrials(state.scorePicker.remId);
@@ -3121,8 +3146,10 @@ async function openSessionView(student, sessionId) {
   try {
     state.fbViewUnsubscribe = listenToSession(sessionId, async data => {
       state.viewSessionData = data;
-      const filled = await autoFillViewMappedRemarks(student, sessionId, data);
-      if (filled > 0) return; // the write triggers another snapshot, which renders
+      try {
+        const filled = await autoFillViewMappedRemarks(student, sessionId, data);
+        if (filled > 0) return; // the write triggers another snapshot, which renders
+      } catch (err) { console.error("autoFillViewMappedRemarks failed:", err); }
       if (isViewBusy() || state.viewActionsInFlight > 0) { state.viewRenderPending = true; }
       else               { renderSessionView(); }
     });
@@ -4383,8 +4410,10 @@ async function openGroupSessionView(group, sessionId) {
   try {
     state.fbViewGroupUnsubscribe = listenToSession(sessionId, async data => {
       state.viewGroupSessionData = data;
-      const filled = await autoFillViewGroupMappedRemarks(group, sessionId, data);
-      if (filled > 0) return; // the write triggers another snapshot, which renders
+      try {
+        const filled = await autoFillViewGroupMappedRemarks(group, sessionId, data);
+        if (filled > 0) return; // the write triggers another snapshot, which renders
+      } catch (err) { console.error("autoFillViewGroupMappedRemarks failed:", err); }
       if (isGroupViewBusy() || state.viewGroupActionsInFlight > 0) { state.viewGroupRenderPending = true; }
       else                   { renderGroupSessionView(); }
     });
@@ -6731,6 +6760,7 @@ function renderTargetManageContent(student, target) {
       });
     }
     input?.addEventListener("blur", async () => {
+      let oldName = null;
       if (a.isNote) {
         const v = input.value;
         if (v === (a.text || "")) return;
@@ -6738,10 +6768,12 @@ function renderTargetManageContent(student, target) {
       } else {
         const v = input.value.trim();
         if (!v || v === a.name) return;
+        oldName = a.name;
         a.name = v;
       }
       await saveTarget();
       flashSaved(input);
+      if (oldName) propagateActivityRename(student, target.name, oldName, a.name);
     });
     if (!a.isNote) input?.addEventListener("input", () => autoResizeTextarea(input));
 
@@ -7376,10 +7408,12 @@ async function openGroupSession(group, dateStr, attendees) {
         state.selectedGroupTargetName = state.selectedGroupTargetName || sortTargetsByOrder(group.targets)[0]?.name || null;
         populateGroupTargetDropdown(group.targets);
         if (state.selectedGroupTargetName) {
-          const filled = await autoFillGroupSession(group, sid, data, state.selectedGroupTargetName, attendees);
-          if (filled > 0) return;
-          const mappedFilled = await autoFillGroupMappedRemarks(group, sid, data, state.selectedGroupTargetName, attendees);
-          if (mappedFilled > 0) return;
+          try {
+            const filled = await autoFillGroupSession(group, sid, data, state.selectedGroupTargetName, attendees);
+            if (filled > 0) return;
+            const mappedFilled = await autoFillGroupMappedRemarks(group, sid, data, state.selectedGroupTargetName, attendees);
+            if (mappedFilled > 0) return;
+          } catch (err) { console.error("Group session auto-fill failed:", err); }
         }
       }
       if (state.scorePicker?.open && state.scorePicker?.isGroup) renderScoreModalTrials(state.scorePicker.remId);
@@ -7465,16 +7499,18 @@ function populateGroupTargetDropdown(targets) {
     if (!state.selectedGroupTargetName) { renderGroupTargetContent(); return; }
     const data = state.groupSessionData;
     if (data) {
-      const filled = await autoFillGroupSession(
-        state.currentGroup, state.groupSessionId, data,
-        state.selectedGroupTargetName, state.groupAttendees
-      );
-      if (filled > 0) return;
-      const mappedFilled = await autoFillGroupMappedRemarks(
-        state.currentGroup, state.groupSessionId, data,
-        state.selectedGroupTargetName, state.groupAttendees
-      );
-      if (mappedFilled > 0) return;
+      try {
+        const filled = await autoFillGroupSession(
+          state.currentGroup, state.groupSessionId, data,
+          state.selectedGroupTargetName, state.groupAttendees
+        );
+        if (filled > 0) return;
+        const mappedFilled = await autoFillGroupMappedRemarks(
+          state.currentGroup, state.groupSessionId, data,
+          state.selectedGroupTargetName, state.groupAttendees
+        );
+        if (mappedFilled > 0) return;
+      } catch (err) { console.error("Group target auto-fill failed:", err); }
     }
     renderGroupTargetContent();
   };
