@@ -2803,6 +2803,29 @@ div.admin-note-editable:empty::before {
 }
 .btn-sketch:active { background: #c7d2fe; }
 
+/* ── Bold/Underline buttons beside Activity Name/Notes (Edit Target) ── */
+.fmt-btn-group {
+  display: flex;
+  flex-direction: column;
+  gap: .2rem;
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+.btn-fmt {
+  background: var(--primary-light);
+  border: none;
+  border-radius: var(--radius-sm);
+  width: 1.6rem;
+  height: 1.4rem;
+  font-size: .75rem;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+  color: var(--primary-dark);
+}
+.btn-fmt-underline { text-decoration: underline; }
+.btn-fmt:active { background: #c7d2fe; }
+
 /* Mastery note row: sketch button + note input side by side */
 .mastery-note-row {
   display: flex;

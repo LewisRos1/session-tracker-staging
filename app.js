@@ -115,7 +115,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "560";
+const APP_VERSION = "561";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -258,10 +258,9 @@ function isEmptyActItem(a) {
   return strip(a.name).length === 0;
 }
 
-// Activity Name / Notes (actNote) fields support underline as well as bold —
-// remarks never needed underline (see feedback on the mapped-score autofill
-// work), so they keep using remarkToHtml/plainTextForEdit while these two
-// fields round-trip through activityMarkupToHtml/FromHtml instead.
+// Activity Name / Notes (actNote) fields format bold/underline directly in
+// their plain <textarea> (see wrapTextareaSelection) rather than through this
+// popup — the popup is only for remarks now, same as it always was.
 function isActivityMarkupField(el) {
   return el.classList?.contains("mn-act-name-input") || el.classList?.contains("mn-act-note-input");
 }
@@ -272,9 +271,8 @@ function openTextEditorSheet(originEl) {
   // elements (plain text, "\n" for line breaks) — the sketch sheet itself
   // stays contenteditable, so bridge between the two formats going in and out.
   const isFormField = originEl.tagName === "TEXTAREA" || originEl.tagName === "INPUT";
-  const toHtml = isActivityMarkupField(originEl) ? activityMarkupToHtml : remarkToHtml;
   $("text-editor-content").innerHTML = isFormField
-    ? toHtml(originEl.value).replace(/\n/g, "<br>")
+    ? remarkToHtml(originEl.value).replace(/\n/g, "<br>")
     : originEl.innerHTML;
   $("text-editor-sheet").classList.remove("hidden");
   requestAnimationFrame(() => $("text-editor-content").focus());
@@ -284,8 +282,7 @@ function commitTextEditorSheet() {
   if (!_sheetOriginEl) return;
   const isFormField = _sheetOriginEl.tagName === "TEXTAREA" || _sheetOriginEl.tagName === "INPUT";
   if (isFormField) {
-    const fromHtml = isActivityMarkupField(_sheetOriginEl) ? activityMarkupFromHtml : plainTextForEdit;
-    _sheetOriginEl.value = fromHtml($("text-editor-content").innerHTML);
+    _sheetOriginEl.value = plainTextForEdit($("text-editor-content").innerHTML);
     autoResizeTextarea(_sheetOriginEl);
   } else {
     _sheetOriginEl.innerHTML = $("text-editor-content").innerHTML;
@@ -353,7 +350,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }, 0);
   });
 
-  // Ctrl+B / Cmd+B: visual bold in contenteditable remark fields
+  // Ctrl+B / Cmd+B: visual bold in contenteditable remark fields, or a
+  // **marker** wrap directly in the Activity Name/Notes plain textareas.
   document.addEventListener("keydown", e => {
     if (!(e.key === "b" && (e.ctrlKey || e.metaKey))) return;
     const el = document.activeElement;
@@ -363,10 +361,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       document.execCommand("bold");
       return;
     }
+    if (isActivityMarkupField(el)) {
+      e.preventDefault();
+      wrapTextareaSelection(el, "**");
+    }
   });
 
-  // Ctrl+U / Cmd+U: visual underline — only Activity Name/Notes fields (via
-  // the sketch sheet) need this; remarks never asked for underline support.
+  // Ctrl+U / Cmd+U: same idea as Ctrl+B above, with an __underline__ marker —
+  // only Activity Name/Notes fields need this; remarks never asked for
+  // underline support.
   document.addEventListener("keydown", e => {
     if (!(e.key === "u" && (e.ctrlKey || e.metaKey))) return;
     const el = document.activeElement;
@@ -375,6 +378,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       e.preventDefault();
       document.execCommand("underline");
       return;
+    }
+    if (isActivityMarkupField(el)) {
+      e.preventDefault();
+      wrapTextareaSelection(el, "__");
     }
   });
 
@@ -2249,37 +2256,39 @@ function htmlForStorage(text) {
   return escHtml(text || "").replace(/\n/g, "<br>");
 }
 
-// Activity Name / Notes (actNote) fields support bold AND underline (unlike
-// remarks, which only ever needed bold) — same **bold**-marker idea as
-// remarkToHtml/plainTextForEdit above, extended with __underline__, and kept
-// as separate functions since the round-trip is only wired up for those two
-// Edit Target fields, not remarks.
-function activityMarkupToHtml(text) {
-  if (!text) return "";
-  return text
-    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
-    .replace(/__(.+?)__/g, "<u>$1</u>");
-}
-function activityMarkupFromHtml(html) {
-  if (!html) return "";
-  return html
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/?b>/gi, "**")
-    .replace(/<\/?u>/gi, "__")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/&amp;/gi, "&");
-}
 // Read-only display of activity name/note text that may contain
-// **bold**/__underline__ markers typed via the sketch editor above — escapes
-// the raw text first so it can't inject arbitrary HTML, then turns the
-// markers into real tags.
+// **bold**/__underline__ markers (typed via wrapTextareaSelection below) —
+// escapes the raw text first so it can't inject arbitrary HTML, then turns
+// the markers into real tags.
 function formatActivityMarkup(text) {
   return escHtml(text || "")
     .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
     .replace(/__(.+?)__/g, "<u>$1</u>");
+}
+
+// Wraps the current selection in a plain <textarea>/<input> with a marker
+// (** for bold, __ for underline) without going through the contenteditable
+// sketch popup — Activity Name/Notes are the only fields that use this; a
+// plain textarea can't render the result as real bold/underline inline, but
+// this avoids the popup entirely, which is what the boss asked for. Caller
+// is responsible for keeping the field focused (see the mousedown handlers
+// on the format buttons) so the selection survives long enough to read it.
+function wrapTextareaSelection(el, marker) {
+  const start = el.selectionStart, end = el.selectionEnd;
+  const value = el.value;
+  el.value = value.slice(0, start) + marker + value.slice(start, end) + marker + value.slice(end);
+  const newPos = start === end ? start + marker.length : end + marker.length;
+  el.setSelectionRange(start + marker.length, newPos);
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+// Small "B"/"U" buttons next to an Activity Name/Notes field — same wrap
+// action as Ctrl+B/Ctrl+U, for anyone who doesn't know/use the shortcut.
+function formatButtonsHtml(inputId) {
+  return `<span class="fmt-btn-group">
+    <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="${inputId}" title="Bold (Ctrl+B)">B</button>
+    <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="${inputId}" title="Underline (Ctrl+U)">U</button>
+  </span>`;
 }
 
 // ─── REMARK FIELDS ───────────────────────────────────────────
@@ -6509,7 +6518,7 @@ function renderTargetManageContent(student, target) {
     } else if (a.isNote) {
       html += `<div class="admin-list-item admin-note-item" data-idx="${idx}">
         <span class="drag-handle">⠿</span>
-        <button class="btn-sketch mn-act-sketch" data-idx="${idx}" data-input-id="mn-act-name-${idx}" aria-label="Open sketch board">✏</button>
+        ${formatButtonsHtml(`mn-act-name-${idx}`)}
         <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
           rows="1" placeholder="Enter Note"
           style="flex:1;overflow-y:hidden;resize:none">${escHtml(stripNoteHtml(a.text || ""))}</textarea>
@@ -6521,7 +6530,7 @@ function renderTargetManageContent(student, target) {
       ).join("");
       const mappedNoteRow = a.actNote !== undefined
         ? `<div style="display:flex;align-items:flex-start;gap:.3rem">
-            <button class="btn-sketch mn-act-sketch" data-idx="${idx}" data-input-id="mn-act-note-${idx}" aria-label="Open sketch board">✏</button>
+            ${formatButtonsHtml(`mn-act-note-${idx}`)}
             <textarea class="admin-input mn-act-note-input" id="mn-act-note-${idx}" data-idx="${idx}"
               rows="1" placeholder="Enter Note"
               style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.actNote || "")}</textarea>
@@ -6531,7 +6540,7 @@ function renderTargetManageContent(student, target) {
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
           <div style="display:flex;align-items:flex-start;gap:.3rem">
-            <button class="btn-sketch mn-act-sketch" data-idx="${idx}" data-input-id="mn-act-name-${idx}" aria-label="Open sketch board">✏</button>
+            ${formatButtonsHtml(`mn-act-name-${idx}`)}
             <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
               rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
           </div>
@@ -6554,7 +6563,7 @@ function renderTargetManageContent(student, target) {
       const remarkTypeSelect = buildRemarkTypeControls(a, idx);
       const noteRow = a.actNote !== undefined
         ? `<div style="display:flex;align-items:flex-start;gap:.3rem">
-            <button class="btn-sketch mn-act-sketch" data-idx="${idx}" data-input-id="mn-act-note-${idx}" aria-label="Open sketch board">✏</button>
+            ${formatButtonsHtml(`mn-act-note-${idx}`)}
             <textarea class="admin-input mn-act-note-input" id="mn-act-note-${idx}" data-idx="${idx}"
               rows="1" placeholder="Enter Note"
               style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.actNote || "")}</textarea>
@@ -6564,7 +6573,7 @@ function renderTargetManageContent(student, target) {
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
           <div style="display:flex;align-items:flex-start;gap:.3rem">
-            <button class="btn-sketch mn-act-sketch" data-idx="${idx}" data-input-id="mn-act-name-${idx}" aria-label="Open sketch board">✏</button>
+            ${formatButtonsHtml(`mn-act-name-${idx}`)}
             <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
               rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
           </div>
@@ -6704,10 +6713,14 @@ function renderTargetManageContent(student, target) {
     }
   });
 
-  $("manage-modal-body").querySelectorAll(".mn-act-sketch").forEach(btn => {
+  $("manage-modal-body").querySelectorAll(".btn-fmt").forEach(btn => {
+    // Prevent the textarea from losing focus/selection on click — by the
+    // time "click" fires the selection would otherwise already be gone.
+    btn.addEventListener("mousedown", e => e.preventDefault());
     btn.addEventListener("click", () => {
       const field = $(btn.dataset.inputId);
-      if (field) openTextEditorSheet(field);
+      if (!field) return;
+      wrapTextareaSelection(field, btn.classList.contains("btn-fmt-bold") ? "**" : "__");
     });
   });
 
@@ -6908,7 +6921,7 @@ function renderTemplateManageContent(template) {
     } else if (a.isNote) {
       html += `<div class="admin-list-item admin-note-item" data-idx="${idx}">
         <span class="drag-handle">⠿</span>
-        <button class="btn-sketch mn-act-sketch" data-idx="${idx}" data-input-id="mn-act-name-${idx}" aria-label="Open sketch board">✏</button>
+        ${formatButtonsHtml(`mn-act-name-${idx}`)}
         <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
           rows="1" placeholder="Enter Note"
           style="flex:1;overflow-y:hidden;resize:none">${escHtml(stripNoteHtml(a.text || ""))}</textarea>
@@ -6918,7 +6931,7 @@ function renderTemplateManageContent(template) {
       const remarkTypeSelect = buildRemarkTypeControls(a, idx);
       const noteRow = a.actNote !== undefined
         ? `<div style="display:flex;align-items:flex-start;gap:.3rem">
-            <button class="btn-sketch mn-act-sketch" data-idx="${idx}" data-input-id="mn-act-note-${idx}" aria-label="Open sketch board">✏</button>
+            ${formatButtonsHtml(`mn-act-note-${idx}`)}
             <textarea class="admin-input mn-act-note-input" id="mn-act-note-${idx}" data-idx="${idx}"
               rows="1" placeholder="Enter Note"
               style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.actNote || "")}</textarea>
@@ -6928,7 +6941,7 @@ function renderTemplateManageContent(template) {
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
           <div style="display:flex;align-items:flex-start;gap:.3rem">
-            <button class="btn-sketch mn-act-sketch" data-idx="${idx}" data-input-id="mn-act-name-${idx}" aria-label="Open sketch board">✏</button>
+            ${formatButtonsHtml(`mn-act-name-${idx}`)}
             <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
               rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
           </div>
@@ -7048,10 +7061,14 @@ function renderTemplateManageContent(template) {
     }
   });
 
-  $("manage-modal-body").querySelectorAll(".mn-act-sketch").forEach(btn => {
+  $("manage-modal-body").querySelectorAll(".btn-fmt").forEach(btn => {
+    // Prevent the textarea from losing focus/selection on click — by the
+    // time "click" fires the selection would otherwise already be gone.
+    btn.addEventListener("mousedown", e => e.preventDefault());
     btn.addEventListener("click", () => {
       const field = $(btn.dataset.inputId);
-      if (field) openTextEditorSheet(field);
+      if (!field) return;
+      wrapTextareaSelection(field, btn.classList.contains("btn-fmt-bold") ? "**" : "__");
     });
   });
 
