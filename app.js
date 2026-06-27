@@ -115,7 +115,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "541";
+const APP_VERSION = "544";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -639,16 +639,16 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
             <col style="width:42px">
             <col style="width:30%">
             <col style="width:30%">
-            <col style="width:130px">
-            <col style="width:120px">
+            <col style="width:160px">
+            <col style="width:150px">
           </colgroup>
           <thead>
             <tr>
               <th>No.</th>
               <th>First Name</th>
               <th>Last Name</th>
-              <th>Latest Individual Session</th>
-              <th>Latest Group Session</th>
+              <th style="white-space:normal">Latest Individual Session</th>
+              <th style="white-space:normal">Latest Group Session</th>
             </tr>
           </thead>
           <tbody id="student-registry-tbody">

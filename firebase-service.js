@@ -201,10 +201,14 @@ export async function getGroupSessionsForStudent(studentId) {
  * individual and group session counts are deliberately independent of each
  * other, each its own lifetime sequence.
  */
-async function assignLifetimeSessionNumber(studentId, dateStr, excludeSessionId, kind) {
+// prefetchedExisting: pass an already-fetched list (from getIndividualSessionsForStudent
+// /getGroupSessionsForStudent) to skip the redundant re-fetch — used by the
+// "start a session" hot path, which already has to fetch this same list to
+// check whether today's session exists yet.
+async function assignLifetimeSessionNumber(studentId, dateStr, excludeSessionId, kind, prefetchedExisting = null) {
   const fetchExisting = kind === "individual" ? getIndividualSessionsForStudent : getGroupSessionsForStudent;
   const field = kind === "individual" ? "sessionNumber" : `attendeePersonalSessionNumbers.${studentId}`;
-  const existing = (await fetchExisting(studentId))
+  const existing = (prefetchedExisting || await fetchExisting(studentId))
     .filter(s => s.id !== excludeSessionId);
   const dateSet = new Set(existing.map(s => s.date));
   dateSet.add(dateStr);
@@ -259,14 +263,16 @@ export async function changeSessionNumber(studentId, anchorSessionId, newNumber,
 export async function getOrCreateSessionForDate(studentId, dateStr, targets = []) {
   const month = getMonthString(dateStr);
 
-  const existingSnap = await getDocs(
-    query(collection(db, "sessions"),
-      where("studentId", "==", studentId),
-      where("date",      "==", dateStr))
-  );
-  if (!existingSnap.empty) return existingSnap.docs[0].id;
+  // One fetch covers both "does today's session already exist" and the data
+  // assignLifetimeSessionNumber needs — used to be two sequential round
+  // trips (an exists-check query, then a separate full-history fetch inside
+  // assignLifetimeSessionNumber), which was real added latency on every
+  // single "Start Session" click.
+  const existing = await getIndividualSessionsForStudent(studentId);
+  const already  = existing.find(s => s.date === dateStr);
+  if (already) return already.id;
 
-  const sessionNumber = await assignLifetimeSessionNumber(studentId, dateStr, null, "individual");
+  const sessionNumber = await assignLifetimeSessionNumber(studentId, dateStr, null, "individual", existing);
 
   const targetsSnapshot = targets.map(t => ({
     id: t.id, name: t.name, maxPoints: t.maxPoints,
@@ -607,36 +613,38 @@ export async function deleteGroup(groupId) {
 export async function getOrCreateGroupSessionForDate(groupId, dateStr, targets = [], attendees = [], studentLinks = {}) {
   const month = getMonthString(dateStr);
   const linkedIds = [...new Set(attendees.map(name => studentLinks[name]).filter(Boolean))];
-  const existing = await getDocs(
-    query(collection(db, "sessions"),
-      where("groupId", "==", groupId),
-      where("date",    "==", dateStr))
-  );
-  if (!existing.empty) {
-    const existingId = existing.docs[0].id;
-    const existingNumbers = existing.docs[0].data().attendeePersonalSessionNumbers || {};
+
+  // One fetch of this group's sessions covers both the exists-check and the
+  // month-count below — used to be two separate queries. And each
+  // attendee's personal lifetime number is looked up in parallel
+  // (Promise.all) instead of one at a time — these used to run sequentially
+  // in a for-loop even though each attendee's lookup is fully independent of
+  // the others, so a group of N students cost N sequential round trips on
+  // every single "Start Session" click.
+  const groupSnap    = await getDocs(query(collection(db, "sessions"), where("groupId", "==", groupId)));
+  const existingDoc  = groupSnap.docs.find(d => d.data().date === dateStr);
+
+  if (existingDoc) {
+    const existingId      = existingDoc.id;
+    const existingNumbers = existingDoc.data().attendeePersonalSessionNumbers || {};
+    const idsNeedingNumber = linkedIds.filter(id => existingNumbers[id] == null);
+    const numberPairs = await Promise.all(
+      idsNeedingNumber.map(async id => [id, await assignLifetimeSessionNumber(id, dateStr, null, "group")])
+    );
     const numbersPatch = {};
-    for (const id of linkedIds) {
-      if (existingNumbers[id] == null) {
-        numbersPatch[`attendeePersonalSessionNumbers.${id}`] = await assignLifetimeSessionNumber(id, dateStr, null, "group");
-      }
-    }
+    for (const [id, num] of numberPairs) numbersPatch[`attendeePersonalSessionNumbers.${id}`] = num;
     await updateDoc(doc(db, "sessions", existingId), { attendees, attendeeIds: linkedIds, ...numbersPatch });
     return existingId;
   }
-  const monthSnap = await getDocs(
-    query(collection(db, "sessions"),
-      where("groupId", "==", groupId),
-      where("month",   "==", month))
-  );
-  const dates = new Set(monthSnap.docs.map(d => d.data().date));
+
+  const dates = new Set(groupSnap.docs.filter(d => d.data().month === month).map(d => d.data().date));
   dates.add(dateStr);
   const sessionNumber = [...dates].sort().indexOf(dateStr) + 1;
 
-  const attendeePersonalSessionNumbers = {};
-  for (const id of linkedIds) {
-    attendeePersonalSessionNumbers[id] = await assignLifetimeSessionNumber(id, dateStr, null, "group");
-  }
+  const numberPairs = await Promise.all(
+    linkedIds.map(async id => [id, await assignLifetimeSessionNumber(id, dateStr, null, "group")])
+  );
+  const attendeePersonalSessionNumbers = Object.fromEntries(numberPairs);
 
   const targetsSnapshot = targets.map(t => ({
     id: t.id, name: t.name, maxPoints: t.maxPoints,
@@ -776,11 +784,20 @@ export async function runRegistryMigration() {
     }
   }
 
-  // Phase 4: renumber each affected student's individual sessions and group
-  // sessions into two separate lifetime sequences (their individual
-  // sessions previously used a per-month count, and their group sessions
-  // had no personal count at all until phase 3 linked them) — oldest = 1 in
-  // each, independently.
+  // Phase 4: give each affected student's individual sessions and group
+  // sessions a lifetime number where they're still missing one (their
+  // individual sessions previously used a per-month count, and their group
+  // sessions had no personal count at all until phase 3 linked them) — oldest
+  // numbered session = 1, counting only up from there, independently for
+  // each track.
+  // Deliberately only fills in MISSING numbers (s.number == null) and never
+  // touches a session that already has one — this used to unconditionally
+  // reset every session to sequential-by-date order on every run, which
+  // silently destroyed any manual "Change Session Number" edit the moment
+  // this one-time setup was run a second time (e.g. because a new group was
+  // added later and the preview reported other legitimate work to do). A
+  // student's first migration run assigns every session a number, so on any
+  // run after that this loop is a no-op for them — safe to re-run indefinitely.
   const affectedIds = new Set();
   for (const g of groups) Object.values(g.studentLinks || {}).forEach(id => affectedIds.add(id));
   for (const s of students) {
@@ -789,17 +806,15 @@ export async function runRegistryMigration() {
   }
   for (const studentId of affectedIds) {
     const indiv = (await getIndividualSessionsForStudent(studentId)).sort((a, b) => a.date.localeCompare(b.date));
-    for (let i = 0; i < indiv.length; i++) {
-      const s = indiv[i];
-      const correctNum = i + 1;
-      if (s.number !== correctNum) await updateDoc(doc(db, "sessions", s.id), { sessionNumber: correctNum });
+    let nextIndivNum = indiv.reduce((max, s) => Math.max(max, s.number || 0), 0) + 1;
+    for (const s of indiv) {
+      if (s.number == null) await updateDoc(doc(db, "sessions", s.id), { sessionNumber: nextIndivNum++ });
     }
     const group = (await getGroupSessionsForStudent(studentId)).sort((a, b) => a.date.localeCompare(b.date));
-    for (let i = 0; i < group.length; i++) {
-      const s = group[i];
-      const correctNum = i + 1;
-      if (s.number !== correctNum) {
-        await updateDoc(doc(db, "sessions", s.id), { [`attendeePersonalSessionNumbers.${studentId}`]: correctNum });
+    let nextGroupNum = group.reduce((max, s) => Math.max(max, s.number || 0), 0) + 1;
+    for (const s of group) {
+      if (s.number == null) {
+        await updateDoc(doc(db, "sessions", s.id), { [`attendeePersonalSessionNumbers.${studentId}`]: nextGroupNum++ });
       }
     }
   }
