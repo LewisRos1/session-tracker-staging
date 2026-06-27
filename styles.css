@@ -2539,6 +2539,15 @@ div.admin-note-editable:empty::before {
 
 .trial-cell { display: inline-flex; align-items: center; gap: 1px; }
 
+/* Mapped-score activities have no trials — this sits in the Trials column
+   instead, naming the target the score is pulled from. */
+.view-mapped-label {
+  display: inline-block;
+  font-size: .75rem;
+  line-height: 1.25;
+  color: var(--text-muted);
+}
+
 .view-trial-select {
   width: 42px;
   padding: .2rem .1rem;

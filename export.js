@@ -207,8 +207,8 @@ function addBaselineVsCurrentSheet(wb, entityName, allTargets, sortedSessions) {
     const effF   = snapF ? { ...target, maxPoints: snapF.maxPoints } : target;
     const snapL  = (lastSession.targetsSnapshot  || []).find(t => t.name === target.name);
     const effL   = snapL ? { ...target, maxPoints: snapL.maxPoints } : target;
-    const scoreF = calcDailyAverage(firstSession, effF);
-    const scoreL = calcDailyAverage(lastSession,  effL);
+    const scoreF = calcDailyAverage(firstSession, effF, allTargets);
+    const scoreL = calcDailyAverage(lastSession,  effL, allTargets);
 
     bvcRows.push([
       target.name,
@@ -279,7 +279,7 @@ function addChartsSheet(wb, allTargets, sortedSessions) {
     for (const session of sortedSessions) {
       const snap  = (session.targetsSnapshot || []).find(t => t.name === target.name);
       const eff   = snap ? { ...target, maxPoints: snap.maxPoints } : target;
-      const score = calcDailyAverage(session, eff);
+      const score = calcDailyAverage(session, eff, allTargets);
       if (score !== null) { yValues.push(Math.round(score)); datesWithData.push(session.date); }
     }
     if (yValues.length < 2) { chartIdx++; continue; }
@@ -302,7 +302,7 @@ function addChartsSheet(wb, allTargets, sortedSessions) {
 function addIndividualTargetSheets(wb, allTargets, sessions, studentName) {
   for (const target of allTargets) {
     const { rows, monthHeaderRows, colHeaderRows, activityHeadingRows, noteRows, sessionDateBlocks, spacerRows } =
-      buildTargetSheet(target, sessions);
+      buildTargetSheet(target, sessions, allTargets);
     const ws = wb.addWorksheet(target.name.slice(0, 31));
     rows.forEach(row => ws.addRow(row));
 
@@ -501,7 +501,7 @@ export async function exportGroupMemberData(studentName, groups) {
 // docx is loaded globally via a <script> tag in index.html, same pattern
 // as ExcelJS/JSZip/Chart elsewhere in this file.
 
-function wordTargetRows(target, session) {
+function wordTargetRows(target, session, allTargets) {
   const rows = [];
   const activities = getAllActivitiesForTarget(session, target);
 
@@ -551,10 +551,12 @@ function wordTargetRows(target, session) {
       continue;
     }
 
+    const mappedScore = act.isMapped ? resolveExportMappedScore(act, session, allTargets) : null;
+
     let first = true;
     for (const rem of remarks) {
       const validTrials = (rem.trials || []).filter(t => t !== -1);
-      const remarkAvg   = calcRemarkAvg(validTrials, target.maxPoints);
+      const remarkAvg   = act.isMapped ? mappedScore : calcRemarkAvg(validTrials, target.maxPoints);
       const masteryNote = stripRemarkHtml(rem.masteryNote || "");
       const baseText    = starter ? `${starter}: ${stripRemarkHtml(rem.text)}`.trim() : stripRemarkHtml(rem.text);
       const remarkText  = masteryNote ? `${baseText} — ${masteryNote}` : baseText;
@@ -653,7 +655,7 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
       })
     ];
 
-    for (const r of wordTargetRows(target, session)) {
+    for (const r of wordTargetRows(target, session, allTargets)) {
       if (r.merge) {
         tableRows.push(new TableRow({
           children: [cell(r.text, {
@@ -935,7 +937,7 @@ function buildSummarySheet(allTargets, sessions) {
         .map(s => {
           const snap = (s.targetsSnapshot || []).find(t => t.name === target.name);
           const eff  = snap ? { ...target, maxPoints: snap.maxPoints } : target;
-          return calcDailyAverage(s, eff);
+          return calcDailyAverage(s, eff, allTargets);
         })
         .filter(v => v !== null);
       row.push(dailyAvgs.length > 0 ? pct(avg(dailyAvgs)) : "");
@@ -983,7 +985,7 @@ function buildDetailedSummarySheet(allTargets, sessions) {
       const sessionAvgs = monthSessions.map(session => {
         const snap = (session.targetsSnapshot || []).find(t => t.name === target.name);
         const eff  = snap ? { ...target, maxPoints: snap.maxPoints } : target;
-        return calcDailyAverage(session, eff);
+        return calcDailyAverage(session, eff, allTargets);
       });
       const validAvgs  = sessionAvgs.filter(v => v !== null);
       const monthlyAvg = validAvgs.length > 0 ? avg(validAvgs) : null;
@@ -1009,7 +1011,7 @@ function parseMonth(monthStr) {
 
 // ─── TARGET DETAIL SHEET ─────────────────────────────────────
 
-function buildTargetSheet(target, sessions) {
+function buildTargetSheet(target, sessions, allTargets) {
   const byMonth = new Map();
   for (const s of sessions) {
     if (!byMonth.has(s.month)) byMonth.set(s.month, []);
@@ -1032,7 +1034,7 @@ function buildTargetSheet(target, sessions) {
         const eff  = snap
           ? { ...target, maxPoints: snap.maxPoints, predefinedActivities: snap.predefinedActivities || target.predefinedActivities || [] }
           : target;
-        return calcDailyAverage(s, eff);
+        return calcDailyAverage(s, eff, allTargets);
       })
       .filter(v => v !== null);
     const monthlyAvg = dailyAvgsForMonth.length > 0 ? avg(dailyAvgsForMonth) : null;
@@ -1061,7 +1063,7 @@ function buildTargetSheet(target, sessions) {
 
       const snap = (session.targetsSnapshot || []).find(t => t.name === target.name);
       const effectiveTarget = snap ? { ...target, maxPoints: snap.maxPoints } : target;
-      appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRows, session, effectiveTarget);
+      appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRows, session, effectiveTarget, allTargets);
     }
   }
 
@@ -1070,7 +1072,7 @@ function buildTargetSheet(target, sessions) {
 
 // ─── SESSION ROWS ────────────────────────────────────────────
 
-function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRows, session, target) {
+function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRows, session, target, allTargets) {
   const [, m, d] = session.date.split("-").map(Number);
   const shortMonths = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const dateLabel = `${d} ${shortMonths[m - 1]}`;
@@ -1125,10 +1127,12 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
         continue;
       }
 
+      const mappedScore = act.isMapped ? resolveExportMappedScore(act, session, allTargets) : null;
+
       let firstRemark = true;
       for (const rem of remarks) {
         const validTrials = (rem.trials || []).filter(t => t !== -1);
-        const remarkAvg   = calcRemarkAvg(validTrials, target.maxPoints);
+        const remarkAvg   = act.isMapped ? mappedScore : calcRemarkAvg(validTrials, target.maxPoints);
         const masteryNote = stripRemarkHtml(rem.masteryNote || "");
         const baseText    = starter ? `${starter}: ${stripRemarkHtml(rem.text)}`.trim() : stripRemarkHtml(rem.text);
         const remarkText  = masteryNote ? `${baseText} — ${masteryNote}` : baseText;
@@ -1149,7 +1153,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
     }
   }
 
-  const daily = calcDailyAverage(session, target);
+  const daily = calcDailyAverage(session, target, allTargets);
   sessionDateBlocks.push({
     startRow,
     endRow: rows.length - 1,
@@ -1189,9 +1193,12 @@ function getAllActivitiesForTarget(session, target) {
     const sessionAct = sessionActs.find(a => a.activityName === pa.name && a.isPredefined);
     if (sessionAct) {
       usedIds.add(sessionAct.id);
-      result.push(sessionAct);
+      result.push(pa.isMapped ? { ...sessionAct, isMapped: true, mappedTargetId: pa.mappedTargetId || null } : sessionAct);
     } else {
-      result.push({ id: null, activityName: pa.name, isPredefined: true, empty: true });
+      result.push({
+        id: null, activityName: pa.name, isPredefined: true, empty: true,
+        isMapped: pa.isMapped || false, mappedTargetId: pa.mappedTargetId || null
+      });
     }
   }
 
@@ -1225,10 +1232,25 @@ function calcRemarkAvg(trials, maxPoints) {
   return valid.reduce((a, b) => a + b, 0) / (valid.length * maxPoints) * 100;
 }
 
-function calcDailyAverage(session, target) {
+// visited guards against a circular mapping chain recursing forever — direct
+// self-mapping is already blocked in the Edit Target picker, this is a
+// defensive backstop. allTargets is needed to resolve a mapped activity's
+// sibling target by id; group-member exports already pre-filter `session`
+// down to one student's remarks before this is ever called, so the
+// per-attendee semantics fall out for free without any export-side branching.
+function calcDailyAverage(session, target, allTargets = [], visited = new Set()) {
+  if (visited.has(target.id)) return null;
+  visited.add(target.id);
+
   const avgs = [];
   for (const act of getAllActivitiesForTarget(session, target)) {
     if (act.isHeading || act.isNote || act.empty) continue;
+    if (act.isMapped) {
+      if (getRemarksForActivity(session, act.id).length === 0) continue;
+      const a = resolveExportMappedScore(act, session, allTargets, visited);
+      if (a !== null) avgs.push(a);
+      continue;
+    }
     for (const rem of getRemarksForActivity(session, act.id)) {
       const validTrials = (rem.trials || []).filter(t => t !== -1);
       const a = calcRemarkAvg(validTrials, target.maxPoints);
@@ -1236,6 +1258,14 @@ function calcDailyAverage(session, target) {
     }
   }
   return avgs.length > 0 ? avg(avgs) : null;
+}
+
+// Resolves a mapped-score activity's value for export — see calcDaysAverage's
+// live-entry counterpart (app.js) for the same idea.
+function resolveExportMappedScore(act, session, allTargets, visited) {
+  const mappedTarget = act.mappedTargetId ? allTargets.find(t => t.id === act.mappedTargetId) : null;
+  if (!mappedTarget) return null;
+  return calcDailyAverage(session, mappedTarget, allTargets, visited);
 }
 
 function avg(arr) { return arr.reduce((a, b) => a + b, 0) / arr.length; }

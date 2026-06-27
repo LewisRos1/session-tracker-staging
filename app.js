@@ -115,7 +115,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "546";
+const APP_VERSION = "547";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1887,15 +1887,46 @@ $("btn-back").addEventListener("click", leaveSession);
 // TARGET CONTENT RENDERING
 // ============================================================
 
-function calcDaysAverage(target) {
+// Resolves a mapped-score activity's live display: the label naming its
+// mapped target, and that target's current day average (null if unmapped,
+// the mapped target was deleted, or it has no data yet today).
+function resolveMappedScoreDisplay(pa, visited) {
+  const mappedTarget = pa.mappedTargetId
+    ? getEffectiveTargets().find(t => t.id === pa.mappedTargetId)
+    : null;
+  if (!mappedTarget) return { label: "Score (Not Mapped Yet)", pct: null };
+  return {
+    label: `Score (Mapped to ${mappedTarget.name}'s Average)`,
+    pct: calcDaysAverage(mappedTarget, visited)
+  };
+}
+
+// visited guards against a circular mapping chain (A maps to B, B maps back
+// to A) recursing forever — direct self-mapping is already blocked in the
+// Edit Target picker, but this is a defensive backstop, not the primary guard.
+function calcDaysAverage(target, visited = new Set()) {
+  if (visited.has(target.id)) return null;
+  visited.add(target.id);
+
   let totalScore = 0;
   let totalPossible = 0;
+  const maxPts = target.maxPoints || 3;
   for (const act of getActivitiesForTarget(target.name)) {
+    const pa = (target.predefinedActivities || []).find(p => p.isMapped && p.name === act.activityName);
+    if (pa) {
+      if (getRemarksForActivity(act.id).length === 0) continue;
+      const mappedPct = resolveMappedScoreDisplay(pa, visited).pct;
+      if (mappedPct !== null) {
+        totalScore    += mappedPct / 100 * maxPts;
+        totalPossible += maxPts;
+      }
+      continue;
+    }
     for (const rem of getRemarksForActivity(act.id)) {
       const trials = rem.trials || [];
       if (trials.length === 0) continue;
       totalScore    += trials.reduce((a, b) => a + b, 0);
-      totalPossible += trials.length * (target.maxPoints || 3);
+      totalPossible += trials.length * maxPts;
     }
   }
   return totalPossible > 0 ? Math.round(totalScore / totalPossible * 100) : null;
@@ -1982,6 +2013,7 @@ function renderFedcTarget(target) {
     const actId      = actData ? actData.id : null;
     const remarks    = actId ? getRemarksForActivity(actId) : [];
     const isPending  = state.pendingNewRemark?.pendingKey === pendingKey;
+    const mappedInfo = pa.isMapped ? resolveMappedScoreDisplay(pa) : null;
 
     html += `<div class="entry-block entry-block-predefined">
       <div class="entry-field" contenteditable="false">
@@ -2015,7 +2047,7 @@ function renderFedcTarget(target) {
       }
     } else {
       for (const rem of remarks) {
-        html += renderRemarkFields(rem, target, getActivityInlineOptions(pa), pa.sentenceStarter || null, pa.optionsMulti || false, pa.isMastery || false);
+        html += renderRemarkFields(rem, target, getActivityInlineOptions(pa), pa.sentenceStarter || null, pa.optionsMulti || false, pa.isMastery || false, mappedInfo);
       }
       if (isPending) {
         html += renderPendingRemarkFields(pendingKey, actId, pa.name, idx, target);
@@ -2025,7 +2057,7 @@ function renderFedcTarget(target) {
           data-act-id="${actId || ""}"
           data-pa-name="${escHtml(pa.name)}"
           data-pa-order="${idx}"
-          data-target="${escHtml(target.name)}">+ Add Remark &amp; Trials</button>`;
+          data-target="${escHtml(target.name)}">+ Add Remark${pa.isMapped ? "" : " &amp; Trials"}</button>`;
       }
     }
 
@@ -2188,7 +2220,7 @@ function htmlForStorage(text) {
 
 // ─── REMARK FIELDS ───────────────────────────────────────────
 
-function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, isMastery = false) {
+function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, isMastery = false, mappedInfo = null) {
   const opts = parseOpts(inlineOptions);
 
   const trials = rem.trials || [];
@@ -2267,6 +2299,21 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
     remarkContent = optBtns;
   }
 
+  const trailingField = mappedInfo
+    ? `<div class="entry-field" contenteditable="false">
+        <span class="field-label">${escHtml(mappedInfo.label)}</span>
+        <span class="field-value-fixed">${mappedInfo.pct !== null ? mappedInfo.pct + "%" : "—"}</span>
+      </div>`
+    : `<div class="entry-field" contenteditable="false">
+        <span class="field-label">Trials</span>
+        <div class="trials-row">
+          <div class="trials-badges">${badgesHtml}</div>
+          <button class="btn-add-trial btn-primary-sm"
+            data-rem-id="${rem.id}"
+            data-target="${escHtml(target.name)}">+ Trial</button>
+        </div>
+      </div>`;
+
   return `
     <div class="entry-divider" contenteditable="false"></div>
     <div class="entry-field">
@@ -2276,15 +2323,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
       <button class="btn-icon btn-delete-remark" contenteditable="false"
         data-rem-id="${rem.id}" title="Delete remark">🗑</button>
     </div>
-    <div class="entry-field" contenteditable="false">
-      <span class="field-label">Trials</span>
-      <div class="trials-row">
-        <div class="trials-badges">${badgesHtml}</div>
-        <button class="btn-add-trial btn-primary-sm"
-          data-rem-id="${rem.id}"
-          data-target="${escHtml(target.name)}">+ Trial</button>
-      </div>
-    </div>`;
+    ${trailingField}`;
 }
 
 function renderPendingRemarkFields(pendingKey, actId, paName, paOrder, target) {
@@ -3120,6 +3159,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
   const sentenceStarter = paEntry?.sentenceStarter || null;
   const multiSelect     = paEntry?.optionsMulti || false;
   const isMastery       = paEntry?.isMastery || false;
+  const mappedInfo      = paEntry?.isMapped ? resolveViewMappedScoreDisplay(paEntry, data) : null;
 
   if (remarks.length === 0) {
     // For free-text remark types (no preset opts, not mastery), show a clickable empty input
@@ -3135,8 +3175,12 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
       : "";
     // "+ " shows even with no remark yet — clicking it creates the activity/
     // remark and a first trial in one go, so a score can be logged without
-    // first having to type something into the remark box.
-    const addTrialBtn = `<button class="view-add-trial-new" data-act-id="${escHtml(actId || "")}"
+    // first having to type something into the remark box. Mapped-score
+    // activities have no trials at all, so they skip this button entirely —
+    // typing into the empty box above is the only way to create the remark.
+    const addTrialBtn = mappedInfo
+      ? `<span class="view-mapped-label">${escHtml(mappedInfo.label)}</span>`
+      : `<button class="view-add-trial-new" data-act-id="${escHtml(actId || "")}"
       data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
       data-is-predefined="${isPredefined}">+</button>`;
     return `<tr>
@@ -3145,13 +3189,13 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
       <td class="vcol-rem">${emptyCell}</td>
       <td class="vcol-trials" contenteditable="false">${addTrialBtn}</td>
       <td class="vcol-total" contenteditable="false">&nbsp;</td>
-      <td class="vcol-score" contenteditable="false">&nbsp;</td>
+      <td class="vcol-score" contenteditable="false">${mappedInfo ? (mappedInfo.pct !== null ? mappedInfo.pct + "%" : "—") : "&nbsp;"}</td>
     </tr>`;
   }
   return remarks.map((rem, ri) => viewRemarkRow(
     ri === 0 ? no : null,
     ri === 0 ? actCell : null,
-    rem, target, inlineOptions, sentenceStarter, multiSelect, isMastery
+    rem, target, inlineOptions, sentenceStarter, multiSelect, isMastery, mappedInfo
   )).join("");
 }
 
@@ -3181,10 +3225,16 @@ function buildTrialCellsHtml(rem, maxPts) {
     `<button class="view-add-trial" data-rem-id="${escHtml(rem.id)}">+</button>`;
 }
 
-function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, isMastery = false) {
+function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, isMastery = false, mappedInfo = null) {
   const maxPts = target.maxPoints || 3;
   const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts);
-  const trialCells = buildTrialCellsHtml(rem, maxPts);
+  const trialCells = mappedInfo
+    ? `<span class="view-mapped-label">${escHtml(mappedInfo.label)}</span>`
+    : `<div class="trial-cells">${buildTrialCellsHtml(rem, maxPts)}</div>`;
+  const totalCell = mappedInfo ? "&nbsp;" : (validTrials.length > 0 ? total : "&nbsp;");
+  const scoreDisplay = mappedInfo
+    ? (mappedInfo.pct !== null ? mappedInfo.pct + "%" : "—")
+    : scorePct;
 
   const opts = parseOpts(inlineOptions);
 
@@ -3239,11 +3289,11 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
     <td class="vcol-no" contenteditable="false">${no !== null ? no : ""}</td>
     <td class="vcol-act" contenteditable="false">${actName !== null ? actName : ""}</td>
     <td class="vcol-rem">${remarkCell}</td>
-    <td class="vcol-trials" contenteditable="false"><div class="trial-cells">${trialCells}</div></td>
-    <td class="vcol-total" contenteditable="false">${validTrials.length > 0 ? total : "&nbsp;"}</td>
+    <td class="vcol-trials" contenteditable="false">${trialCells}</td>
+    <td class="vcol-total" contenteditable="false">${totalCell}</td>
     <td class="vcol-score" contenteditable="false">
       <div style="display:flex;align-items:center;gap:.3rem;justify-content:flex-end">
-        <span>${scorePct}</span>
+        <span>${scoreDisplay}</span>
         <button class="view-rem-del" data-rem-id="${escHtml(rem.id)}" title="Delete remark">×</button>
       </div>
     </td>
@@ -3257,11 +3307,45 @@ function viewGetRemarks(data, actId) {
     .map(([id, r]) => ({ id, ...r }));
 }
 
-function calcViewDayAvg(data, target) {
+// visited guards against a circular mapping chain recursing forever — see
+// calcDaysAverage's comment (this is the View-screen counterpart, working off
+// a passed-in `data` snapshot instead of the live session's global state, so
+// it doubles as both the individual and group View/Edit Past Sessions calc).
+// Group sessions fold in each attendee's own per-attendee mapped score
+// separately (one push per attendee with a remark on the activity) rather
+// than a single blended number, per the boss's "per-attendee" decision —
+// detected via data.attendees, same signal already used elsewhere for group
+// session data.
+function calcViewDayAvg(data, target, visited = new Set()) {
+  if (visited.has(target.id)) return null;
+  visited.add(target.id);
+
+  const attendees = data.attendees || state.viewGroup?.students || null;
   const avgs = [];
   Object.entries(data.activities || {})
     .filter(([, a]) => a.targetName === target.name)
-    .forEach(([actId]) => {
+    .forEach(([actId, act]) => {
+      const pa = (target.predefinedActivities || []).find(p => p.isMapped && p.name === act.activityName);
+      if (pa) {
+        const mappedTarget = pa.mappedTargetId
+          ? (state.viewGroup?.targets || state.viewStudent?.targets || []).find(t => t.id === pa.mappedTargetId)
+          : null;
+        if (!mappedTarget) return;
+        if (attendees) {
+          attendees.forEach(studentName => {
+            const hasRemark = Object.values(data.remarks || {})
+              .some(r => r.activityId === actId && r.studentName === studentName);
+            if (!hasRemark) return;
+            const pct = calcGroupStudentDaysAverage(mappedTarget, data, studentName, visited);
+            if (pct !== null) avgs.push(pct);
+          });
+        } else {
+          if (viewGetRemarks(data, actId).length === 0) return;
+          const pct = calcViewDayAvg(data, mappedTarget, visited);
+          if (pct !== null) avgs.push(pct);
+        }
+        return;
+      }
       viewGetRemarks(data, actId).forEach(rem => {
         const trials = (rem.trials || []).filter(t => t !== -1);
         if (!trials.length) return;
@@ -3269,6 +3353,33 @@ function calcViewDayAvg(data, target) {
       });
     });
   return avgs.length ? Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length) : null;
+}
+
+// Resolves a mapped-score activity's display on the individual View/Edit Past
+// Sessions screen — see resolveMappedScoreDisplay (live-entry counterpart).
+function resolveViewMappedScoreDisplay(pa, data, visited) {
+  const mappedTarget = pa.mappedTargetId
+    ? getViewEffectiveTargets().find(t => t.id === pa.mappedTargetId)
+    : null;
+  if (!mappedTarget) return { label: "Score (Not Mapped Yet)", pct: null };
+  return {
+    label: `Score (Mapped to ${mappedTarget.name}'s Average)`,
+    pct: calcViewDayAvg(data, mappedTarget, visited)
+  };
+}
+
+// Resolves a mapped-score activity's display for one attendee on the group
+// View/Edit Past Sessions screen — see resolveGroupMappedScoreDisplay
+// (live-entry counterpart). Per-attendee throughout, per the boss's decision.
+function resolveViewGroupMappedScoreDisplay(pa, data, studentName, visited) {
+  const mappedTarget = pa.mappedTargetId
+    ? getViewGroupEffectiveTargets().find(t => t.id === pa.mappedTargetId)
+    : null;
+  if (!mappedTarget) return { label: "Score (Not Mapped Yet)", pct: null };
+  return {
+    label: `Score (Mapped to ${mappedTarget.name}'s Average)`,
+    pct: calcGroupStudentDaysAverage(mappedTarget, data, studentName, visited)
+  };
 }
 
 // ── View-screen remark editing ───────────────────────────────
@@ -4176,6 +4287,45 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
           data-target-name="${escHtml(target.name)}" title="Delete activity">×</button>
        </div>`;
 
+  // Mapped-score activities have no trials/combine-remarks concept — bypass
+  // the rounds/combine machinery entirely and list every attendee's own
+  // remark + their own per-attendee mapped score (see renderGroupActivityCard's
+  // live-entry counterpart for the same per-attendee bypass).
+  if (paEntry?.isMapped) {
+    let firstRow = true;
+    return attendees.map(studentName => {
+      const remarks = actId
+        ? Object.entries(data.remarks || {})
+            .filter(([, r]) => r.activityId === actId && r.studentName === studentName)
+            .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
+            .map(([id, r]) => ({ id, ...r }))
+        : [];
+      const noVal  = firstRow ? no : null;
+      const actVal = firstRow ? actCell : null;
+      firstRow = false;
+      if (remarks.length === 0) {
+        return `<tr>
+          <td class="vcol-no" contenteditable="false">${noVal !== null ? noVal : ""}</td>
+          <td class="vcol-act" contenteditable="false">${actVal !== null ? actVal : ""}</td>
+          <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(studentName)}</td>
+          <td class="vcol-rem" contenteditable="false">
+            <button class="btn-view-group-add-remark-mapped-pending" data-act-id="${escHtml(actId || "")}"
+              data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
+              data-student="${escHtml(studentName)}">+ Add Remark</button>
+          </td>
+          <td class="vcol-trials" contenteditable="false">&nbsp;</td>
+          <td class="vcol-total" contenteditable="false">&nbsp;</td>
+          <td class="vcol-score" contenteditable="false">&nbsp;</td>
+        </tr>`;
+      }
+      const mappedInfo = resolveViewGroupMappedScoreDisplay(paEntry, data, studentName);
+      return remarks.map((rem, ri) => viewGroupRemarkRow(
+        ri === 0 ? noVal : null, ri === 0 ? actVal : null, studentName, rem, target,
+        null, null, false, false, null, mappedInfo
+      )).join("");
+    }).join("");
+  }
+
   const combineToggle = actId
     ? `<button class="btn-combine-toggle${combineFlagForAct ? " active" : ""}" data-act-id="${escHtml(actId)}">
         ${combineFlagForAct ? "Combined Remarks" : "Separate Remarks"}
@@ -4283,10 +4433,16 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
   return html;
 }
 
-function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, isMastery = false, combineOpts = null) {
+function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, isMastery = false, combineOpts = null, mappedInfo = null) {
   const maxPts = target.maxPoints || 3;
   const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts);
-  const trialCells = buildTrialCellsHtml(rem, maxPts);
+  const trialCells = mappedInfo
+    ? `<span class="view-mapped-label">${escHtml(mappedInfo.label)}</span>`
+    : `<div class="trial-cells">${buildTrialCellsHtml(rem, maxPts)}</div>`;
+  const totalCell = mappedInfo ? "&nbsp;" : (validTrials.length > 0 ? total : "&nbsp;");
+  const scoreDisplay = mappedInfo
+    ? (mappedInfo.pct !== null ? mappedInfo.pct + "%" : "—")
+    : scorePct;
 
   let remarkTd = "";
   if (!combineOpts?.skipRemarkCell) {
@@ -4357,11 +4513,11 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
     <td class="vcol-act" contenteditable="false">${actName !== null ? actName : ""}</td>
     <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(studentName)}</td>
     ${remarkTd}
-    <td class="vcol-trials" contenteditable="false"><div class="trial-cells">${trialCells}</div></td>
-    <td class="vcol-total" contenteditable="false">${validTrials.length > 0 ? total : "&nbsp;"}</td>
+    <td class="vcol-trials" contenteditable="false">${trialCells}</td>
+    <td class="vcol-total" contenteditable="false">${totalCell}</td>
     <td class="vcol-score" contenteditable="false">
       <div style="display:flex;align-items:center;gap:.3rem;justify-content:flex-end">
-        <span>${scorePct}</span>
+        <span>${scoreDisplay}</span>
         <button class="view-rem-del" data-rem-id="${escHtml(rem.id)}" title="Delete remark">×</button>
       </div>
     </td>
@@ -4645,6 +4801,22 @@ function attachGroupViewListeners() {
     btn.addEventListener("click", wrap(async () => {
       btn.disabled = true;
       await addGroupRemark(sid(), btn.dataset.actId, btn.dataset.student);
+    }));
+  });
+
+  // "+ Add Remark" for a mapped-score activity, one attendee at a time — unlike
+  // the plain pending button above, the activity may not exist yet at all
+  // (mapped activities skip the bulk "add for everyone" button), so this
+  // creates it on demand, same as ensureGroupActivityAndRemark's live-entry
+  // counterpart.
+  body.querySelectorAll(".btn-view-group-add-remark-mapped-pending").forEach(btn => {
+    btn.addEventListener("click", wrap(async () => {
+      btn.disabled = true;
+      const data = state.viewGroupSessionData;
+      let actId = btn.dataset.actId || Object.entries(data.activities || {})
+        .find(([, a]) => a.targetName === btn.dataset.targetName && a.activityName === btn.dataset.actName)?.[0] || null;
+      if (!actId) actId = await addActivity(sid(), btn.dataset.targetName, btn.dataset.actName, Date.now(), true);
+      await addGroupRemark(sid(), actId, btn.dataset.student);
     }));
   });
 
@@ -5884,6 +6056,10 @@ function renderTargetManageContent(student, target) {
   }
 
   const acts = target.predefinedActivities;
+  // Other targets this target's mapped-score activities can point at — never
+  // itself (self-mapping would make a target's average depend on itself).
+  const siblingTargets = (_groupForTargetEdit ? _groupForTargetEdit.targets : student.targets)
+    .filter(t => t.id !== target.id);
 
   let html = `
     <div class="admin-section">
@@ -5937,6 +6113,25 @@ function renderTargetManageContent(student, target) {
           style="flex:1;overflow-y:hidden;resize:none">${escHtml(stripNoteHtml(a.text || ""))}</textarea>
         <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
       </div>`;
+    } else if (a.isMapped) {
+      const mappedOptions = siblingTargets.map(t =>
+        `<option value="${escHtml(t.id)}"${a.mappedTargetId === t.id ? " selected" : ""}>${escHtml(t.name)}</option>`
+      ).join("");
+      html += `<div class="admin-list-item" data-idx="${idx}">
+        <span class="drag-handle">⠿</span>
+        <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
+          <textarea class="admin-input" id="mn-act-name-${idx}" data-idx="${idx}"
+            rows="1" placeholder="Enter Activity">${escHtml(a.name || "")}</textarea>
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Mapped To:</span>
+            <select class="admin-input mn-mapped-target-select" data-idx="${idx}" style="flex:1">
+              <option value="">— select target —</option>
+              ${mappedOptions}
+            </select>
+          </div>
+        </div>
+        <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
+      </div>`;
     } else {
       const type = a.isMastery ? "mastery" : (a.sentenceStarter && a.inlineOptions && a.optionsMulti) ? "starter_fixed_multi" : (a.sentenceStarter && a.inlineOptions) ? "starter_fixed" : a.sentenceStarter ? "starter" : (a.inlineOptions && a.optionsMulti) ? "fixed_multi" : (a.inlineOptions || a.remarkPresetId) ? "fixed" : "";
       const remarkTypeSelect = `<select class="act-preset-select mn-act-preset" data-idx="${idx}">
@@ -5983,6 +6178,7 @@ function renderTargetManageContent(student, target) {
       <button class="btn-admin-add" id="btn-mn-add-act-note" style="flex:1">+ Add Activity &amp; Note</button>
       <button class="btn-admin-add" id="btn-mn-add-heading" style="flex:1">+ Add Section Heading</button>
       <button class="btn-admin-add" id="btn-mn-add-note" style="flex:1">+ Add Note</button>
+      <button class="btn-admin-add" id="btn-mn-add-mapped" style="flex:1">+ Add Activity &amp; Mapped Score</button>
     </div>
     <div style="margin-top:2rem;padding-bottom:1.5rem">
       <button class="btn-primary-sm" id="btn-mn-done-target"
@@ -6104,7 +6300,7 @@ function renderTargetManageContent(student, target) {
     btn.addEventListener("click", async () => {
       const idx = Number(btn.dataset.idx);
       const item = acts[idx];
-      const label = item?.isHeading ? "section heading" : item?.isNote ? "reference note" : "activity";
+      const label = item?.isHeading ? "section heading" : item?.isNote ? "reference note" : item?.isMapped ? "mapped-score activity" : "activity";
       if (!confirm(`Delete this ${label}?`)) return;
       acts.splice(idx, 1);
       acts.forEach((a, i) => a.order = i);
@@ -6142,6 +6338,23 @@ function renderTargetManageContent(student, target) {
     target.predefinedActivities = acts;
     await saveTarget();
     renderTargetManageContent(student, target);
+  });
+
+  $("btn-mn-add-mapped").addEventListener("click", async () => {
+    acts.push({ id: cfgId("m"), isMapped: true, name: "", mappedTargetId: null, order: acts.length });
+    target.predefinedActivities = acts;
+    await saveTarget();
+    renderTargetManageContent(student, target);
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-mapped-target-select").forEach(sel => {
+    sel.addEventListener("change", async () => {
+      const idx = Number(sel.dataset.idx);
+      acts[idx].mappedTargetId = sel.value || null;
+      target.predefinedActivities = acts;
+      await saveTarget();
+      flashSaved(sel);
+    });
   });
 
   $("manage-modal-body").querySelectorAll(".mn-act-preset").forEach(sel => {
@@ -6831,7 +7044,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
     }
     const actId = Object.entries(data.activities || {})
       .find(([, a]) => a.targetName === target.name && a.activityName === pa.name)?.[0] || null;
-    items.push(renderGroupActivityCard(pa.name, actId, target, data, attendees, pa.actNote));
+    items.push(renderGroupActivityCard(pa.name, actId, target, data, attendees, pa.actNote, pa.isMapped ? pa : null));
   }
 
   // Manually added (non-predefined) activities
@@ -6865,7 +7078,7 @@ function renderGroupStudentBlock(studentName, target, data) {
     if (pa.isNote || pa.isHeading || !pa.name) continue;
     const actId = Object.entries(data.activities || {})
       .find(([, a]) => a.targetName === target.name && a.activityName === pa.name)?.[0] || null;
-    activityEntries.push({ actId, actName: pa.name, actNote: pa.actNote });
+    activityEntries.push({ actId, actName: pa.name, actNote: pa.actNote, pa });
   }
   Object.entries(data.activities || {})
     .filter(([, a]) => a.targetName === target.name && !a.isPredefined)
@@ -6873,8 +7086,8 @@ function renderGroupStudentBlock(studentName, target, data) {
     .forEach(([actId, act]) => activityEntries.push({ actId, actName: act.activityName }));
 
   const cards = activityEntries.length
-    ? activityEntries.map(({ actId, actName, actNote }) =>
-        renderGroupStudentActivityCard(studentName, actName, actId, target, data, actNote)).join("")
+    ? activityEntries.map(({ actId, actName, actNote, pa }) =>
+        renderGroupStudentActivityCard(studentName, actName, actId, target, data, actNote, pa?.isMapped ? pa : null)).join("")
     : `<p class="empty-hint" contenteditable="false" style="padding:1rem">No activities yet. Add them under Edit Target.</p>`;
 
   return `<div class="group-by-student-block" data-student="${escHtml(studentName)}">
@@ -6883,7 +7096,7 @@ function renderGroupStudentBlock(studentName, target, data) {
   </div>`;
 }
 
-function renderGroupStudentActivityCard(studentName, actName, actId, target, data, actNote = null) {
+function renderGroupStudentActivityCard(studentName, actName, actId, target, data, actNote = null, mappedPa = null) {
   const remarksForThisStudent = actId
     ? Object.entries(data.remarks || {})
         .filter(([, r]) => r.activityId === actId && r.studentName === studentName)
@@ -6904,8 +7117,10 @@ function renderGroupStudentActivityCard(studentName, actName, actId, target, dat
     </div>
     ${noteRow}`;
 
+  const mappedInfo = mappedPa ? resolveGroupMappedScoreDisplay(mappedPa, target, data, studentName) : null;
+
   for (const [remId, rem] of remarksForThisStudent) {
-    html += renderGroupStudentRowCompact(remId, rem, target);
+    html += renderGroupStudentRowCompact(remId, rem, target, mappedInfo);
   }
 
   html += remarksForThisStudent.length === 0
@@ -6913,10 +7128,10 @@ function renderGroupStudentActivityCard(studentName, actName, actId, target, dat
         data-student="${escHtml(studentName)}"
         data-act-id="${escHtml(actId || "")}"
         data-act-name="${escHtml(actName)}"
-        data-target="${escHtml(target.name)}">+ Add Remark &amp; Trials</button>`
+        data-target="${escHtml(target.name)}">+ Add Remark${mappedPa ? "" : " &amp; Trials"}</button>`
     : `<button class="btn-add-remark btn-group-add-remark-student-more" contenteditable="false"
         data-act-id="${escHtml(actId || "")}"
-        data-student="${escHtml(studentName)}">+ Add Remark &amp; Trials</button>`;
+        data-student="${escHtml(studentName)}">+ Add Remark${mappedPa ? "" : " &amp; Trials"}</button>`;
 
   html += `</div>`;
   return html;
@@ -6932,11 +7147,24 @@ function liveGroupAttendeeLabel(studentName) {
     : escHtml(studentName);
 }
 
-function renderGroupStudentRowCompact(remId, rem, target) {
+function renderGroupStudentRowCompact(remId, rem, target, mappedInfo = null) {
   const trials = rem.trials || [];
   const badges = trials.map((t, i) =>
     `<span class="trial-badge">${t === -1 ? "—" : t}<button class="btn-trial-delete btn-group-trial-del" data-rem-id="${remId}" data-idx="${i}">×</button></span>`
   ).join("");
+  const trailingField = mappedInfo
+    ? `<div class="entry-field" contenteditable="false">
+        <span class="field-label">${escHtml(mappedInfo.label)}</span>
+        <span class="field-value-fixed">${mappedInfo.pct !== null ? mappedInfo.pct + "%" : "—"}</span>
+      </div>`
+    : `<div class="entry-field" contenteditable="false">
+        <span class="field-label">Trials</span>
+        <div class="trials-row">
+          <div class="trials-badges">${badges}</div>
+          <button class="btn-primary-sm btn-add-trial btn-group-add-trial"
+            data-rem-id="${remId}" data-target="${escHtml(target.name)}">+ Trial</button>
+        </div>
+      </div>`;
   return `
     <div class="entry-divider" contenteditable="false"></div>
     <div class="entry-field">
@@ -6947,23 +7175,41 @@ function renderGroupStudentRowCompact(remId, rem, target) {
         data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>
       <button class="btn-icon btn-group-del-student-remark" contenteditable="false" data-rem-id="${remId}" title="Delete remark">🗑</button>
     </div>
-    <div class="entry-field" contenteditable="false">
-      <span class="field-label">Trials</span>
-      <div class="trials-row">
-        <div class="trials-badges">${badges}</div>
-        <button class="btn-primary-sm btn-add-trial btn-group-add-trial"
-          data-rem-id="${remId}" data-target="${escHtml(target.name)}">+ Trial</button>
-      </div>
-    </div>`;
+    ${trailingField}`;
 }
 
-function renderGroupActivityCard(actName, actId, target, data, attendees, actNote = null) {
+function renderGroupActivityCard(actName, actId, target, data, attendees, actNote = null, mappedPa = null) {
   const noteRow = actNote && actNote.trim()
     ? `<div class="entry-field" contenteditable="false">
         <span class="field-label">Note</span>
         <span class="field-value-note">${escHtml(actNote)}</span>
       </div>`
     : "";
+
+  // Mapped-score activities have no trials/combine-remarks concept at all —
+  // bypass the rounds/combine machinery below entirely and just list every
+  // attendee's own remark + their own per-attendee mapped score.
+  if (mappedPa) {
+    const rows = attendees.map(studentName => {
+      const remarks = actId
+        ? Object.entries(data.remarks || {})
+            .filter(([, r]) => r.activityId === actId && r.studentName === studentName)
+            .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
+        : [];
+      if (remarks.length === 0) return renderGroupStudentPendingRow(studentName, actId, actName, target, true);
+      const mappedInfo = resolveGroupMappedScoreDisplay(mappedPa, target, data, studentName);
+      return remarks.map(([remId, rem]) => renderGroupStudentRow(studentName, remId, rem, target, mappedInfo)).join("");
+    }).join("");
+    return `<div class="entry-block entry-block-predefined" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">
+      <div class="entry-field" contenteditable="false">
+        <span class="field-label">Activity</span>
+        <span class="field-value-fixed">${escHtml(actName)}</span>
+      </div>
+      ${noteRow}
+      <div class="entry-divider" contenteditable="false"></div>
+      ${rows}
+    </div>`;
+  }
 
   const combineRemarks = !!(actId && data.activities?.[actId]?.combineRemarks);
   const combineToggle = actId
@@ -7093,11 +7339,24 @@ function renderGroupStudentTrialsOnlyRow(studentName, remId, rem, target) {
   </div>`;
 }
 
-function renderGroupStudentRow(studentName, remId, rem, target) {
+function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = null) {
   const trials = rem.trials || [];
   const badges = trials.map((t, i) =>
     `<span class="trial-badge">${t === -1 ? "—" : t}<button class="btn-trial-delete btn-group-trial-del" data-rem-id="${remId}" data-idx="${i}">×</button></span>`
   ).join("");
+  const trailingField = mappedInfo
+    ? `<div class="entry-field" contenteditable="false">
+        <span class="field-label">${escHtml(mappedInfo.label)}</span>
+        <span class="field-value-fixed">${mappedInfo.pct !== null ? mappedInfo.pct + "%" : "—"}</span>
+      </div>`
+    : `<div class="entry-field" contenteditable="false">
+        <span class="field-label">Trials</span>
+        <div class="trials-row">
+          <div class="trials-badges">${badges}</div>
+          <button class="btn-primary-sm btn-add-trial btn-group-add-trial"
+            data-rem-id="${remId}" data-target="${escHtml(target.name)}">+ Trial</button>
+        </div>
+      </div>`;
   return `<div class="group-student-section" data-rem-id="${remId}" data-student="${escHtml(studentName)}">
     <div class="group-student-name-row" contenteditable="false">
       <span class="group-student-name-label">${liveGroupAttendeeLabel(studentName)}</span>
@@ -7109,18 +7368,11 @@ function renderGroupStudentRow(studentName, remId, rem, target) {
         data-rem-id="${remId}" placeholder="Remark…"
         data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>
     </div>
-    <div class="entry-field" contenteditable="false">
-      <span class="field-label">Trials</span>
-      <div class="trials-row">
-        <div class="trials-badges">${badges}</div>
-        <button class="btn-primary-sm btn-add-trial btn-group-add-trial"
-          data-rem-id="${remId}" data-target="${escHtml(target.name)}">+ Trial</button>
-      </div>
-    </div>
+    ${trailingField}
   </div>`;
 }
 
-function renderGroupStudentPendingRow(studentName, actId, actName, target) {
+function renderGroupStudentPendingRow(studentName, actId, actName, target, mapped = false) {
   return `<div class="group-student-section group-student-pending" contenteditable="false"
     data-student="${escHtml(studentName)}"
     data-act-id="${escHtml(actId || "")}"
@@ -7132,9 +7384,53 @@ function renderGroupStudentPendingRow(studentName, actId, actName, target) {
         data-student="${escHtml(studentName)}"
         data-act-id="${escHtml(actId || "")}"
         data-act-name="${escHtml(actName)}"
-        data-target="${escHtml(target.name)}">+ Add Remark &amp; Trials</button>
+        data-target="${escHtml(target.name)}">+ Add Remark${mapped ? "" : " &amp; Trials"}</button>
     </div>
   </div>`;
+}
+
+// One attendee's own day average for a group target — per-attendee throughout
+// (group sessions score each attendee separately even on a shared target).
+// visited (keyed "targetId::studentName") guards a circular mapping chain.
+function calcGroupStudentDaysAverage(target, data, studentName, visited = new Set()) {
+  const key = target.id + "::" + studentName;
+  if (visited.has(key)) return null;
+  visited.add(key);
+
+  const maxPts = target.maxPoints || 3;
+  let totalScore = 0, totalPossible = 0;
+  const actsForTarget = Object.entries(data.activities || {})
+    .filter(([, a]) => a.targetName === target.name);
+
+  for (const [actId, act] of actsForTarget) {
+    const remarksForStudent = Object.values(data.remarks || {})
+      .filter(r => r.activityId === actId && r.studentName === studentName);
+    const pa = (target.predefinedActivities || []).find(p => p.isMapped && p.name === act.activityName);
+    if (pa) {
+      if (remarksForStudent.length === 0) continue;
+      const mappedPct = resolveGroupMappedScoreDisplay(pa, target, data, studentName, visited).pct;
+      if (mappedPct !== null) { totalScore += mappedPct / 100 * maxPts; totalPossible += maxPts; }
+      continue;
+    }
+    const trials = remarksForStudent.flatMap(r => (r.trials || []).filter(t => t !== -1));
+    if (trials.length === 0) continue;
+    totalScore    += trials.reduce((a, b) => a + b, 0);
+    totalPossible += trials.length * maxPts;
+  }
+  return totalPossible > 0 ? Math.round(totalScore / totalPossible * 100) : null;
+}
+
+// Resolves a mapped-score activity's live display for one attendee — see
+// calcDaysAverage's individual-session counterpart, resolveMappedScoreDisplay.
+function resolveGroupMappedScoreDisplay(pa, target, data, studentName, visited) {
+  const mappedTarget = pa.mappedTargetId
+    ? (state.currentGroup?.targets || []).find(t => t.id === pa.mappedTargetId)
+    : null;
+  if (!mappedTarget) return { label: "Score (Not Mapped Yet)", pct: null };
+  return {
+    label: `Score (Mapped to ${mappedTarget.name}'s Average)`,
+    pct: calcGroupStudentDaysAverage(mappedTarget, data, studentName, visited)
+  };
 }
 
 function updateGroupAvgChips(target, data) {
@@ -7150,19 +7446,11 @@ function updateGroupAvgChips(target, data) {
     ).join("");
     return;
   }
-  const maxPts = target.maxPoints || 3;
   container.innerHTML = attendees.map(name => {
-    const actIds = Object.entries(data.activities || {})
-      .filter(([, a]) => a.targetName === target.name).map(([id]) => id);
-    const valid = Object.values(data.remarks || {})
-      .filter(r => actIds.includes(r.activityId) && r.studentName === name)
-      .flatMap(r => (r.trials || []).filter(t => t !== -1));
-    const avg = valid.length
-      ? Math.round(valid.reduce((a, b) => a + b, 0) / (valid.length * maxPts) * 100) + "%"
-      : "—";
+    const avg = calcGroupStudentDaysAverage(target, data, name);
     return `<div class="days-average-chip">
       <span class="days-average-label">${escHtml(name)}'s Avg</span>
-      <span class="days-average-value">${avg}</span>
+      <span class="days-average-value">${avg !== null ? avg + "%" : "—"}</span>
     </div>`;
   }).join("");
 }
