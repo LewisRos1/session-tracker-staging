@@ -115,7 +115,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "539";
+const APP_VERSION = "540";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4919,7 +4919,7 @@ function openManageModal(student, targetOrNull, templateOrNull = null, remarkPre
 // ── Reorder Targets (group) — same mechanism as the individual-student version ──
 function showGroupTargetReorderList(group) {
   _pendingActsCleanup = null;
-  $("manage-modal-title").textContent = "Reorder Targets";
+  $("manage-modal-title").textContent = "Rearrange Targets";
   $("manage-modal").classList.remove("hidden");
   renderGroupTargetReorderList(group);
 }
@@ -5250,7 +5250,7 @@ $("btn-manage-targets").addEventListener("click", () => {
 // the Word/Excel exports — see sortTargetsByOrder.
 function showTargetReorderList(student) {
   _pendingActsCleanup = null;
-  $("manage-modal-title").textContent = "Reorder Targets";
+  $("manage-modal-title").textContent = "Rearrange Targets";
   $("manage-modal").classList.remove("hidden");
   renderTargetReorderList(student);
 }

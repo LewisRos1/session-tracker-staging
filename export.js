@@ -600,8 +600,8 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
   const HEADER_FILL = "C8DFF2";
   const TARGET_FILL = "A8C8E8";
   const NOTE_FILL   = "FFF8ED";
-  const FACILITATION_FILL   = "EEF3FA";
-  const FACILITATION_ACCENT = "2F5C8A";
+  const FACILITATION_FILL   = "F5F5F5";
+  const FACILITATION_ACCENT = "C0C0C0";
 
   const cellBorders = {
     top:    { style: BorderStyle.SINGLE, size: 2, color: "B0C8E0" },
@@ -647,8 +647,8 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
       new TableRow({
         tableHeader: true,
         children: [
-          cell("Activity",                  { bold: true, fill: HEADER_FILL, width: WORD_COL_ACTIVITY }),
-          cell("Highlights of Observation",  { bold: true, fill: HEADER_FILL, width: WORD_COL_REMARK }),
+          cell("Activity",                  { bold: true, fill: HEADER_FILL, align: AlignmentType.CENTER, width: WORD_COL_ACTIVITY }),
+          cell("Highlights of Observation",  { bold: true, fill: HEADER_FILL, align: AlignmentType.CENTER, width: WORD_COL_REMARK }),
           cell("Score",                      { bold: true, fill: HEADER_FILL, align: AlignmentType.CENTER, width: WORD_COL_SCORE })
         ]
       })
@@ -698,7 +698,7 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
             top:    { style: BorderStyle.NONE, size: 0, color: "auto" },
             bottom: { style: BorderStyle.NONE, size: 0, color: "auto" },
             right:  { style: BorderStyle.NONE, size: 0, color: "auto" },
-            left:   { style: BorderStyle.SINGLE, size: 24, color: FACILITATION_ACCENT }
+            left:   { style: BorderStyle.SINGLE, size: 12, color: FACILITATION_ACCENT }
           },
           margins: { top: 120, bottom: 120, left: 200, right: 200 },
           children: [
@@ -728,7 +728,7 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
       new Paragraph({ spacing: { before: 280 }, children: [] }),
       new Paragraph({
         alignment: AlignmentType.LEFT,
-        children: [new ImageRun({ type: "png", data: stampImageBuffer, transformation: { width: 210, height: 133 } })]
+        children: [new ImageRun({ type: "png", data: stampImageBuffer, transformation: { width: 264, height: 167 } })]
       })
     );
   }
