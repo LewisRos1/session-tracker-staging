@@ -115,7 +115,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "552";
+const APP_VERSION = "553";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3304,14 +3304,17 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
 
   let remarkCell;
   if (sentenceStarter) {
-    remarkCell = `<div class="view-starter-wrap" contenteditable="false">
-      <span class="view-starter-prefix">${escHtml(sentenceStarter)}</span>
+    const starterTopRow = `<span class="view-starter-prefix">${escHtml(sentenceStarter)}</span>
       ${makeViewOpts(rem.id, rem.text)
         || `<input type="text" class="view-starter-input" data-rem-id="${escHtml(rem.id)}"
             value="${escHtml(rem.text || "")}">`
-      }
-      ${noteField}
-    </div>`;
+      }`;
+    remarkCell = remarkHasNote
+      ? `<div class="view-starter-wrap view-starter-wrap-note" contenteditable="false">
+          <div class="view-starter-top-row">${starterTopRow}</div>
+          ${noteField}
+        </div>`
+      : `<div class="view-starter-wrap" contenteditable="false">${starterTopRow}</div>`;
   } else {
     remarkCell = optSelect;
   }
@@ -4552,14 +4555,17 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
 
       let remarkCell;
       if (sentenceStarter) {
-        remarkCell = `<div class="view-starter-wrap" contenteditable="false">
-          <span class="view-starter-prefix">${escHtml(sentenceStarter)}</span>
+        const starterTopRow = `<span class="view-starter-prefix">${escHtml(sentenceStarter)}</span>
           ${makeViewOpts(rem.id, rem.text)
             || `<input type="text" class="view-starter-input" data-rem-id="${escHtml(rem.id)}"
                 value="${escHtml(rem.text || "")}">`
-          }
-          ${noteField}
-        </div>`;
+          }`;
+        remarkCell = remarkHasNote
+          ? `<div class="view-starter-wrap view-starter-wrap-note" contenteditable="false">
+              <div class="view-starter-top-row">${starterTopRow}</div>
+              ${noteField}
+            </div>`
+          : `<div class="view-starter-wrap" contenteditable="false">${starterTopRow}</div>`;
       } else {
         remarkCell = optSelect;
       }
