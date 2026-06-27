@@ -115,7 +115,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "545";
+const APP_VERSION = "546";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -5576,8 +5576,7 @@ function renderStudentManageContent(student) {
       </div>
     </div>
     <div class="admin-section">
-      <label class="admin-label">Change Session Number</label>
-      <div id="mn-s-session-number-area" style="margin-top:.2rem">Loading…</div>
+      <div id="mn-s-session-number-area">Loading…</div>
     </div>
     ${isAssessment ? `
     <div class="admin-section">
