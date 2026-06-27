@@ -2803,7 +2803,7 @@ div.admin-note-editable:empty::before {
 }
 .btn-sketch:active { background: #c7d2fe; }
 
-/* ── Bold/Underline buttons beside Activity Name/Notes (Edit Target) ── */
+/* ── Bold/Underline/Bullet buttons beside Activity Name/Notes (Edit Target) ── */
 .fmt-btn-group {
   display: flex;
   flex-direction: column;
@@ -2824,6 +2824,7 @@ div.admin-note-editable:empty::before {
   color: var(--primary-dark);
 }
 .btn-fmt-underline { text-decoration: underline; }
+.btn-fmt-bullet { font-size: 1rem; }
 .btn-fmt:active { background: #c7d2fe; }
 
 /* Mastery note row: sketch button + note input side by side */

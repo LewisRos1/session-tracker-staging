@@ -540,12 +540,20 @@ function parseInlineMarkup(text) {
 }
 function parseInlineMarkupLine(line) {
   const runs = [];
-  const re = /\*\*(.+?)\*\*|__(.+?)__/g;
+  // Combined-marker alternatives (**__x__** / __**x**__) must come before the
+  // single-marker ones — a boss who selects already-bolded text and also
+  // presses underline (or vice versa) ends up with nested markers, and the
+  // single-marker alternatives alone would swallow the inner pair as part of
+  // their own captured text (literal "__" showing up inside a bold run)
+  // instead of recognizing it as bold+underline together.
+  const re = /\*\*__(.+?)__\*\*|__\*\*(.+?)\*\*__|\*\*(.+?)\*\*|__(.+?)__/g;
   let lastIndex = 0, m;
   while ((m = re.exec(line)) !== null) {
     if (m.index > lastIndex) runs.push({ text: line.slice(lastIndex, m.index) });
-    if (m[1] !== undefined) runs.push({ text: m[1], bold: true });
-    else runs.push({ text: m[2], underline: true });
+    if (m[1] !== undefined) runs.push({ text: m[1], bold: true, underline: true });
+    else if (m[2] !== undefined) runs.push({ text: m[2], bold: true, underline: true });
+    else if (m[3] !== undefined) runs.push({ text: m[3], bold: true });
+    else runs.push({ text: m[4], underline: true });
     lastIndex = re.lastIndex;
   }
   if (lastIndex < line.length) runs.push({ text: line.slice(lastIndex) });

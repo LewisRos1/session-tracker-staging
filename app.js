@@ -117,7 +117,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "566";
+const APP_VERSION = "567";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -401,6 +401,16 @@ document.addEventListener("DOMContentLoaded", async () => {
       e.preventDefault();
       wrapTextareaSelection(el, "__");
     }
+  });
+
+  // Ctrl+Shift+L / Cmd+Shift+L: bullet point, same shortcut Word itself uses.
+  // Activity Name/Notes fields only — bullets aren't supported in remarks.
+  document.addEventListener("keydown", e => {
+    if (!(e.key === "L" || e.key === "l") || !e.shiftKey || !(e.ctrlKey || e.metaKey)) return;
+    const el = document.activeElement;
+    if (!el || !isActivityMarkupField(el)) return;
+    e.preventDefault();
+    toggleBulletSelection(el);
   });
 
   $("text-editor-done").addEventListener("click", () => {
@@ -2359,13 +2369,84 @@ function wrapTextareaSelection(el, marker) {
   el.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
-// Small "B"/"U" buttons next to an Activity Name/Notes field — same wrap
-// action as Ctrl+B/Ctrl+U, for anyone who doesn't know/use the shortcut.
+// Small "B"/"U"/"•" buttons next to an Activity Name/Notes field — same wrap
+// action as Ctrl+B/Ctrl+U/Ctrl+Shift+L, for anyone who doesn't know/use the shortcut.
 function formatButtonsHtml(inputId) {
   return `<span class="fmt-btn-group">
     <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="${inputId}" title="Bold (Ctrl+B)">B</button>
     <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="${inputId}" title="Underline (Ctrl+U)">U</button>
+    <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="${inputId}" title="Bullet point (Ctrl+Shift+L)">•</button>
   </span>`;
+}
+
+// Finds the start/end of the line containing `pos` in a plain textarea value.
+function lineBoundsAt(value, pos) {
+  const start = value.lastIndexOf("\n", pos - 1) + 1;
+  let end = value.indexOf("\n", pos);
+  if (end === -1) end = value.length;
+  return { start, end };
+}
+
+// A line "has a bullet" if it starts with the • marker (whatever indentation
+// precedes it) — checked with a plain regex, not a hidden flag, so a bullet
+// typed by hand (bypassing the button entirely) is still recognized and can
+// still be toggled off, same as the bold/underline markers.
+function isBulletLine(line) {
+  return /^\s*•\s?/.test(line);
+}
+function addBulletMarker(line) {
+  return isBulletLine(line) ? line : "• " + line.replace(/^\s+/, "");
+}
+function stripBulletMarker(line) {
+  return line.replace(/^(\s*)•\s?/, "$1");
+}
+
+// Toggle bullet points on the line(s) touched by the current selection in a
+// plain <textarea> — same "format like Word" intent as wrapTextareaSelection,
+// but bullets are a per-line prefix rather than a paired inline marker, so
+// the logic works on whole lines instead of an arbitrary text span:
+// - A highlighted range only needs to touch part of a line to affect the
+//   whole line (selecting one character is enough), matching how Word's
+//   bullet button always applies to the full paragraph(s) touched.
+// - Re-toggling never accumulates: every line's bullet state is read fresh
+//   from the text itself (via isBulletLine) each time, never assumed, so
+//   clicking twice always returns to the original state.
+// - A mixed selection (some lines already bulleted, some not) always adds
+//   bullets to every line, matching Word's behaviour for a mixed selection.
+// - Blank lines inside a multi-line selection are left alone (they're used
+//   as readability separators between rubric sections, not list items) —
+//   but a bare cursor resting on a single blank line starts a fresh bullet
+//   right there, same as clicking the bullet button on an empty paragraph.
+function toggleBulletSelection(el) {
+  const value = el.value;
+  const selStart = el.selectionStart, selEnd = el.selectionEnd;
+
+  if (selStart === selEnd) {
+    const { start, end } = lineBoundsAt(value, selStart);
+    if (value.slice(start, end).trim() === "") {
+      el.value = value.slice(0, start) + "• " + value.slice(end);
+      el.setSelectionRange(start + 2, start + 2);
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      return;
+    }
+  }
+
+  const blockStart = lineBoundsAt(value, selStart).start;
+  const blockEnd = lineBoundsAt(value, Math.max(selEnd - 1, selStart)).end;
+  const lines = value.slice(blockStart, blockEnd).split("\n");
+
+  const nonBlank = lines.filter(ln => ln.trim() !== "");
+  const shouldAdd = nonBlank.length === 0 || !nonBlank.every(isBulletLine);
+
+  const newLines = lines.map(ln => {
+    if (ln.trim() === "") return ln;
+    return shouldAdd ? addBulletMarker(ln) : stripBulletMarker(ln);
+  });
+
+  const newBlock = newLines.join("\n");
+  el.value = value.slice(0, blockStart) + newBlock + value.slice(blockEnd);
+  el.setSelectionRange(blockStart, blockStart + newBlock.length);
+  el.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
 // ─── REMARK FIELDS ───────────────────────────────────────────
@@ -6804,7 +6885,11 @@ function renderTargetManageContent(student, target) {
     btn.addEventListener("click", () => {
       const field = $(btn.dataset.inputId);
       if (!field) return;
-      wrapTextareaSelection(field, btn.classList.contains("btn-fmt-bold") ? "**" : "__");
+      if (btn.classList.contains("btn-fmt-bullet")) {
+        toggleBulletSelection(field);
+      } else {
+        wrapTextareaSelection(field, btn.classList.contains("btn-fmt-bold") ? "**" : "__");
+      }
     });
   });
 
@@ -7152,7 +7237,11 @@ function renderTemplateManageContent(template) {
     btn.addEventListener("click", () => {
       const field = $(btn.dataset.inputId);
       if (!field) return;
-      wrapTextareaSelection(field, btn.classList.contains("btn-fmt-bold") ? "**" : "__");
+      if (btn.classList.contains("btn-fmt-bullet")) {
+        toggleBulletSelection(field);
+      } else {
+        wrapTextareaSelection(field, btn.classList.contains("btn-fmt-bold") ? "**" : "__");
+      }
     });
   });
 
