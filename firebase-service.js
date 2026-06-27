@@ -193,13 +193,23 @@ export async function getGroupSessionsForStudent(studentId) {
 
 /**
  * Computes the lifetime session number for a date being added/moved-to for
- * this student, and corrects any of their existing sessions whose position
+ * this student, and shifts any of their existing sessions whose position
  * shifted as a result (e.g. inserting a back-dated session pushes every
  * later one up by one). excludeSessionId skips a session's own pre-edit
  * entry when recomputing for a date change on that same session. kind
  * ("individual" | "group") scopes this to just that track — a student's
  * individual and group session counts are deliberately independent of each
  * other, each its own lifetime sequence.
+ *
+ * IMPORTANT: this shifts existing sessions RELATIVE to their own current
+ * number (+1 each, for every session from the insertion point onward) —
+ * it must never recompute a session's number from its absolute chronological
+ * position. A boss-driven Change Session Number edit deliberately makes a
+ * session's number NOT match its chronological position (e.g. continuing a
+ * real-world paper-tracked count) — recomputing from scratch on every later
+ * "Start Session" call silently undid that edit the moment any new session
+ * was created for that student afterward. (Real bug, found from boss
+ * reports of an edited number "reverting" with no migration button involved.)
  */
 // prefetchedExisting: pass an already-fetched list (from getIndividualSessionsForStudent
 // /getGroupSessionsForStudent) to skip the redundant re-fetch — used by the
@@ -209,17 +219,17 @@ async function assignLifetimeSessionNumber(studentId, dateStr, excludeSessionId,
   const fetchExisting = kind === "individual" ? getIndividualSessionsForStudent : getGroupSessionsForStudent;
   const field = kind === "individual" ? "sessionNumber" : `attendeePersonalSessionNumbers.${studentId}`;
   const existing = (prefetchedExisting || await fetchExisting(studentId))
-    .filter(s => s.id !== excludeSessionId);
-  const dateSet = new Set(existing.map(s => s.date));
-  dateSet.add(dateStr);
-  const sorted = [...dateSet].sort();
-  const myNumber = sorted.indexOf(dateStr) + 1;
+    .filter(s => s.id !== excludeSessionId)
+    .sort((a, b) => a.date.localeCompare(b.date));
 
-  for (const s of existing) {
-    const newNum = sorted.indexOf(s.date) + 1;
-    if (newNum !== s.number) {
-      updateDoc(doc(db, "sessions", s.id), { [field]: newNum }).catch(() => {});
-    }
+  const insertPos = existing.findIndex(s => s.date > dateStr);
+  const pos = insertPos === -1 ? existing.length : insertPos;
+  const myNumber = pos === 0 ? 1 : (existing[pos - 1].number || 0) + 1;
+
+  for (let i = pos; i < existing.length; i++) {
+    const s = existing[i];
+    const newNum = (s.number || 0) + 1;
+    updateDoc(doc(db, "sessions", s.id), { [field]: newNum }).catch(() => {});
   }
   return myNumber;
 }
