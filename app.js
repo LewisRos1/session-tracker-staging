@@ -115,7 +115,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "555";
+const APP_VERSION = "556";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2951,7 +2951,7 @@ async function openSessionView(student, sessionId) {
     if (!state.viewRenderPending || isViewBusy() || state.viewActionsInFlight > 0) return;
     state.viewRenderPending = false;
     renderSessionView();
-  });
+  }, () => state.viewSessionData);
 
   try {
     state.fbViewUnsubscribe = listenToSession(sessionId, data => {
@@ -3439,7 +3439,7 @@ function resolveViewGroupMappedScoreDisplay(pa, data, studentName, visited) {
 // like the typed text vanishing and then reappearing as a duplicate remark
 // a moment later, because the next flush had no way to know a remark was
 // already being created for it.
-function setupViewRemarkSaving(body, getSessionId, counterKey, onIdle) {
+function setupViewRemarkSaving(body, getSessionId, counterKey, onIdle, getData) {
   let saveTimer = null;
 
   function flush() {
@@ -3502,6 +3502,18 @@ function setupViewRemarkSaving(body, getSessionId, counterKey, onIdle) {
           el.dataset.actId     = actId;
           el.dataset.remId     = remId;
           el.dataset.savedHtml = htmlForStorage(text);
+          // addRemark resolving doesn't mean state.viewSessionData has the new
+          // remark yet — the snapshot listener delivers that a beat later.
+          // Without waiting here, a render could land in that gap, see "no
+          // remark yet" (since this textarea's local dataset tracking lives
+          // only on the DOM, not in state), and redraw this exact box back to
+          // its empty starting markup — which is what caused the typed text
+          // to "vanish" and then get saved a second time as a duplicate when
+          // re-typed into the fresh-looking box.
+          await waitForSessionData(() => {
+            const d = getData?.();
+            return !!d?.activities?.[actId] && !!d?.remarks?.[remId];
+          });
         } catch (err) {
           // Leaves remId/savedHtml unset — the next flush (next keystroke or
           // focusout) sees "no remark created yet" and retries from scratch,
@@ -4120,7 +4132,7 @@ async function openGroupSessionView(group, sessionId) {
     if (!state.viewGroupRenderPending || isGroupViewBusy() || state.viewGroupActionsInFlight > 0) return;
     state.viewGroupRenderPending = false;
     renderGroupSessionView();
-  });
+  }, () => state.viewGroupSessionData);
 
   try {
     state.fbViewGroupUnsubscribe = listenToSession(sessionId, data => {

@@ -2104,6 +2104,7 @@ div.admin-note-editable:empty::before {
   white-space: pre-wrap;
   word-break: break-word;
   cursor: text;
+  font-family: var(--font);
 }
 .mastery-note-input::placeholder,
 .view-mastery-note::placeholder {
