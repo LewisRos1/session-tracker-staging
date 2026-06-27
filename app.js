@@ -115,7 +115,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "562";
+const APP_VERSION = "563";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2266,33 +2266,71 @@ function formatActivityMarkup(text) {
     .replace(/__(.+?)__/g, "<u>$1</u>");
 }
 
-// Wraps the current selection in a plain <textarea>/<input> with a marker
+// A "word" for cursor-with-no-selection formatting — letters/digits/'/- so
+// "Self-Regulation" or "don't" count as one word, but stops at punctuation
+// like ":" or "(" so parenthesised text doesn't get swept in.
+function wordBoundsAt(value, pos) {
+  const isWordChar = c => /[A-Za-z0-9'-]/.test(c);
+  let start = pos, end = pos;
+  while (start > 0 && isWordChar(value[start - 1])) start--;
+  while (end < value.length && isWordChar(value[end])) end++;
+  return { start, end };
+}
+
+// Finds a marker...marker pair anywhere in the text whose span (including
+// the markers themselves) overlaps [selStart, selEnd] — covers all 3 ways a
+// boss might re-select already-formatted text: just the inner words, the
+// whole "**text**" including the markers, or just a bare cursor resting
+// somewhere inside it.
+function findMarkerSpan(value, selStart, selEnd, marker) {
+  const esc = marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(esc + "(.+?)" + esc, "g");
+  let m;
+  while ((m = re.exec(value)) !== null) {
+    const mStart = m.index, mEnd = m.index + m[0].length;
+    if (mStart <= selEnd && mEnd >= selStart) return { start: mStart, end: mEnd, inner: m[1] };
+  }
+  return null;
+}
+
+// Formats the current selection in a plain <textarea>/<input> with a marker
 // (** for bold, __ for underline) without going through the contenteditable
 // sketch popup — Activity Name/Notes are the only fields that use this; a
 // plain textarea can't render the result as real bold/underline inline, but
-// this avoids the popup entirely, which is what the boss asked for. Toggles
-// off (strips the markers) if the selection is already wrapped in this exact
-// marker — otherwise pressing Ctrl+B twice would pile up as "****text****"
-// instead of turning bold back off, like every other editor's Ctrl+B does.
-// Caller is responsible for keeping the field focused (see the mousedown
-// handlers on the format buttons) so the selection survives long enough to
-// read it.
+// this avoids the popup entirely, which is what the boss asked for.
+//
+// Same toggle behaviour as a word processor's Ctrl+B: if the cursor/selection
+// overlaps an existing marker pair *in any way* (see findMarkerSpan above),
+// that pair is removed — it can never stack into "****text****" no matter
+// how it's re-selected. Otherwise, a bare cursor (no selection) expands to
+// the whole word under it before wrapping, instead of dropping markers with
+// nothing between them. Caller is responsible for keeping the field focused
+// (see the mousedown handlers on the format buttons) so the selection
+// survives long enough to read it.
 function wrapTextareaSelection(el, marker) {
-  const start = el.selectionStart, end = el.selectionEnd;
   const value = el.value;
+  const mLen = marker.length;
+  let start = el.selectionStart, end = el.selectionEnd;
+
+  const existing = findMarkerSpan(value, start, end, marker);
+  if (existing) {
+    el.value = value.slice(0, existing.start) + existing.inner + value.slice(existing.end);
+    el.setSelectionRange(existing.start, existing.start + existing.inner.length);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    return;
+  }
+
+  if (start === end) {
+    const word = wordBoundsAt(value, start);
+    if (word.end === word.start) return; // no word under the cursor — nothing to format
+    start = word.start; end = word.end;
+  }
+
   const before = value.slice(0, start);
   const selected = value.slice(start, end);
   const after = value.slice(end);
-  const mLen = marker.length;
-
-  if (before.endsWith(marker) && after.startsWith(marker)) {
-    el.value = before.slice(0, -mLen) + selected + after.slice(mLen);
-    el.setSelectionRange(start - mLen, end - mLen);
-  } else {
-    el.value = before + marker + selected + marker + after;
-    const newPos = start === end ? start + mLen : end + mLen;
-    el.setSelectionRange(start + mLen, newPos);
-  }
+  el.value = before + marker + selected + marker + after;
+  el.setSelectionRange(start + mLen, end + mLen);
   el.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
