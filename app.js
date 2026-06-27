@@ -115,7 +115,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "538";
+const APP_VERSION = "539";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1827,9 +1827,17 @@ function updateSessionHeader() {
 }
 
 
+// Shared by individual + group target dropdowns, the Manage Targets reorder
+// list, and the Word/Excel exports — keeps display order consistent with
+// whatever the boss last dragged it to, falling back to alphabetical for
+// any target predating the order field.
+function sortTargetsByOrder(targets) {
+  return [...targets].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
+}
+
 function populateTargetDropdown(targets) {
   const sel = $("target-select");
-  const sorted = [...targets].sort((a, b) => a.name.localeCompare(b.name));
+  const sorted = sortTargetsByOrder(targets);
   const placeholder = sorted.length === 0
     ? `<option value="" disabled selected>— no targets yet —</option>` : "";
   sel.innerHTML = placeholder +
@@ -1837,11 +1845,17 @@ function populateTargetDropdown(targets) {
       `<option value="${escHtml(t.name)}">${escHtml(t.name)}</option>`
     ).join("") + `<option value="__add_target__">+ Add Target…</option>`;
 
-  sel.value = state.selectedTargetName || targets[0]?.name || "";
+  sel.value = state.selectedTargetName || sorted[0]?.name || "";
+
+  const reorderBtn = $("btn-reorder-targets");
+  if (reorderBtn) {
+    reorderBtn.classList.toggle("hidden", targets.length < 2);
+    reorderBtn.onclick = () => showTargetReorderList(state.currentStudent);
+  }
 
   sel.onchange = async () => {
     if (sel.value === "__add_target__") {
-      sel.value = state.selectedTargetName || targets[0]?.name || "";
+      sel.value = state.selectedTargetName || sorted[0]?.name || "";
       showAddTargetPicker(state.currentStudent);
       return;
     }
@@ -2990,7 +3004,7 @@ function renderSessionView() {
   }
 
   const targets = getViewEffectiveTargets();
-  const sorted  = [...targets].sort((a, b) => a.name.localeCompare(b.name));
+  const sorted  = sortTargetsByOrder(targets);
 
   const body = $("session-view-body");
   // body itself scrolls (overflow-y:auto) — replacing its innerHTML resets
@@ -4017,7 +4031,7 @@ function renderGroupSessionView() {
 
   const attendees = data.attendees || group.students || [];
   const targets   = getViewGroupEffectiveTargets();
-  const sorted    = [...targets].sort((a, b) => a.name.localeCompare(b.name));
+  const sorted    = sortTargetsByOrder(targets);
 
   const body = $("group-session-view-body");
   const scrollTop = body.scrollTop;
@@ -4902,6 +4916,44 @@ function openManageModal(student, targetOrNull, templateOrNull = null, remarkPre
 
 // ── Group Add Target picker ───────────────────────────────────
 
+// ── Reorder Targets (group) — same mechanism as the individual-student version ──
+function showGroupTargetReorderList(group) {
+  _pendingActsCleanup = null;
+  $("manage-modal-title").textContent = "Reorder Targets";
+  $("manage-modal").classList.remove("hidden");
+  renderGroupTargetReorderList(group);
+}
+
+function renderGroupTargetReorderList(group) {
+  const sorted = sortTargetsByOrder(group.targets);
+  $("manage-modal-body").innerHTML = `
+    <p class="admin-hint" style="padding:0 .1rem .9rem;color:var(--text-muted);font-size:.85rem">
+      Drag to reorder. This is the order targets appear in the dropdown and in exported session notes.
+    </p>
+    <div class="admin-list" id="mn-target-reorder-list">
+      ${sorted.map((t, idx) => `
+        <div class="admin-list-item" data-idx="${idx}">
+          <span class="drag-handle">⠿</span>
+          <span style="flex:1">${escHtml(t.name)}</span>
+        </div>`).join("")}
+    </div>
+    <div style="margin-top:1.5rem;padding-bottom:1.5rem">
+      <button class="btn-primary-sm" id="btn-mn-done-reorder" style="width:100%;padding:.75rem">Done</button>
+    </div>`;
+
+  initDragSort($("mn-target-reorder-list"), async newOrder => {
+    const reordered = newOrder.map(oldIdx => sorted[oldIdx]);
+    reordered.forEach((t, i) => t.order = i);
+    group.targets = reordered;
+    const gi = state.groups.findIndex(g => g.id === group.id);
+    if (gi >= 0) state.groups[gi] = group;
+    await saveGroup(group);
+    renderGroupTargetReorderList(group);
+  });
+
+  $("btn-mn-done-reorder").addEventListener("click", closeManageModal);
+}
+
 function showGroupAddTargetPicker(group) {
   _pendingActsCleanup = null;
   $("manage-modal-title").textContent = "Add Target";
@@ -4956,7 +5008,7 @@ function showGroupAddTargetPicker(group) {
 }
 
 function showGroupDupFromCurrent(group) {
-  const sorted = [...group.targets].sort((a, b) => a.name.localeCompare(b.name));
+  const sorted = sortTargetsByOrder(group.targets);
   $("manage-modal-body").innerHTML = `
     <div class="admin-section-title" style="margin-bottom:.5rem">Choose a target to duplicate</div>
     <div class="admin-list">
@@ -5018,7 +5070,7 @@ function showGroupDupFromOther(group, otherGroups) {
 }
 
 function showGroupDupFromOtherPickTarget(group, sourceGroup) {
-  const sorted = [...(sourceGroup.targets || [])].sort((a, b) => a.name.localeCompare(b.name));
+  const sorted = sortTargetsByOrder(sourceGroup.targets || []);
   if (!sorted.length) { alert(`${sourceGroup.name} has no targets.`); showGroupAddTargetPicker(group); return; }
   $("manage-modal-body").innerHTML = `
     <div class="admin-section-title" style="margin-bottom:.5rem">Choose a target from ${escHtml(sourceGroup.name)}</div>
@@ -5193,6 +5245,46 @@ $("btn-manage-targets").addEventListener("click", () => {
 
 // ── Add Target picker (replaces confirm/prompt flow) ──────────
 
+// ── Reorder Targets (drag-to-reorder, same mechanism as activity reordering) ──
+// Persisted order drives the dropdown, the View/Edit Past Sessions table, and
+// the Word/Excel exports — see sortTargetsByOrder.
+function showTargetReorderList(student) {
+  _pendingActsCleanup = null;
+  $("manage-modal-title").textContent = "Reorder Targets";
+  $("manage-modal").classList.remove("hidden");
+  renderTargetReorderList(student);
+}
+
+function renderTargetReorderList(student) {
+  const sorted = sortTargetsByOrder(student.targets);
+  $("manage-modal-body").innerHTML = `
+    <p class="admin-hint" style="padding:0 .1rem .9rem;color:var(--text-muted);font-size:.85rem">
+      Drag to reorder. This is the order targets appear in the dropdown and in exported session notes.
+    </p>
+    <div class="admin-list" id="mn-target-reorder-list">
+      ${sorted.map((t, idx) => `
+        <div class="admin-list-item" data-idx="${idx}">
+          <span class="drag-handle">⠿</span>
+          <span style="flex:1">${escHtml(t.name)}</span>
+        </div>`).join("")}
+    </div>
+    <div style="margin-top:1.5rem;padding-bottom:1.5rem">
+      <button class="btn-primary-sm" id="btn-mn-done-reorder" style="width:100%;padding:.75rem">Done</button>
+    </div>`;
+
+  initDragSort($("mn-target-reorder-list"), async newOrder => {
+    const reordered = newOrder.map(oldIdx => sorted[oldIdx]);
+    reordered.forEach((t, i) => t.order = i);
+    student.targets = reordered;
+    const si = state.students.findIndex(s => s.id === student.id);
+    if (si >= 0) state.students[si] = student;
+    await saveStudent(student);
+    renderTargetReorderList(student);
+  });
+
+  $("btn-mn-done-reorder").addEventListener("click", closeManageModal);
+}
+
 function showAddTargetPicker(student) {
   _pendingActsCleanup = null;
   $("manage-modal-title").textContent = "Add Target";
@@ -5266,7 +5358,7 @@ function showAddTargetPicker(student) {
 }
 
 function showDupFromCurrentStudent(student) {
-  const sorted = [...student.targets].sort((a, b) => a.name.localeCompare(b.name));
+  const sorted = sortTargetsByOrder(student.targets);
   $("manage-modal-body").innerHTML = `
     <div class="admin-section-title" style="margin-bottom:.5rem">Choose a target to duplicate</div>
     <div class="admin-list">
@@ -5359,7 +5451,7 @@ function showDupFromOtherStudent_pickStudent(student, otherStudents) {
 }
 
 function showDupFromOtherStudent_pickTarget(student, sourceStudent) {
-  const sorted = [...sourceStudent.targets].sort((a, b) => a.name.localeCompare(b.name));
+  const sorted = sortTargetsByOrder(sourceStudent.targets);
   if (sorted.length === 0) {
     alert(`${sourceStudent.name} has no targets to duplicate.`);
     showAddTargetPicker(student);
@@ -6541,7 +6633,7 @@ async function openGroupSession(group, dateStr, attendees) {
       renderGroupSessionHeader(data);
       if (firstLoad) {
         firstLoad = false;
-        state.selectedGroupTargetName = state.selectedGroupTargetName || group.targets.sort((a,b)=>a.name.localeCompare(b.name))[0]?.name || null;
+        state.selectedGroupTargetName = state.selectedGroupTargetName || sortTargetsByOrder(group.targets)[0]?.name || null;
         populateGroupTargetDropdown(group.targets);
         if (state.selectedGroupTargetName) {
           const filled = await autoFillGroupSession(group, sid, data, state.selectedGroupTargetName, attendees);
@@ -6580,7 +6672,7 @@ function renderGroupSessionHeader(data) {
 function populateGroupTargetDropdown(targets) {
   const sel = $("group-target-select");
   if (!sel) return;
-  const sorted = [...targets].sort((a, b) => a.name.localeCompare(b.name));
+  const sorted = sortTargetsByOrder(targets);
   const placeholder = sorted.length === 0
     ? `<option value="" disabled selected>— no targets yet —</option>` : "";
   sel.innerHTML = placeholder +
@@ -6596,6 +6688,12 @@ function populateGroupTargetDropdown(targets) {
       const tgt = state.currentGroup?.targets.find(t => t.name === state.selectedGroupTargetName);
       if (tgt) openGroupManageModal(state.currentGroup, tgt);
     };
+  }
+
+  const reorderBtn = $("btn-group-reorder-targets");
+  if (reorderBtn) {
+    reorderBtn.classList.toggle("hidden", targets.length < 2);
+    reorderBtn.onclick = () => showGroupTargetReorderList(state.currentGroup);
   }
 
   // Wire change handler — same pattern as individual session's populateTargetDropdown

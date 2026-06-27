@@ -397,7 +397,7 @@ async function buildStudentWorkbook(student, sessions) {
   // A session only counts as real once at least one remark (which carries trial scores) exists.
   sessions = sessions.filter(s => Object.keys(s.remarks || {}).length > 0);
 
-  const allTargets = getAllTargets(student).slice().sort((a, b) => a.name.localeCompare(b.name));
+  const allTargets = getAllTargets(student).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
   const wb = new ExcelJS.Workbook();
   const sortedSessions = sessions.slice().sort((a, b) => a.date.localeCompare(b.date));
 
@@ -422,7 +422,7 @@ async function buildGroupMemberWorkbook(studentName, allTargets, sessions) {
     }))
     .filter(s => Object.keys(s.remarks).length > 0);
 
-  const sortedTargets  = allTargets.slice().sort((a, b) => a.name.localeCompare(b.name));
+  const sortedTargets  = allTargets.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
   const wb              = new ExcelJS.Workbook();
   const sortedSessions  = filtered.slice().sort((a, b) => a.date.localeCompare(b.date));
 
@@ -794,7 +794,7 @@ export async function exportStudentSingleSessionWord(student, session) {
     return;
   }
 
-  const allTargets   = getAllTargets(student).slice().sort((a, b) => a.name.localeCompare(b.name));
+  const allTargets   = getAllTargets(student).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
   const sessionLabel = session.sessionNumber != null ? `Session ${session.sessionNumber}` : "";
   const blob = await buildSingleSessionWordBlob(student.name, sessionLabel, allTargets, session);
   downloadBlob(blob, formatExportFilenameWord(student.name, "Individual Session", session.date, new Date()));
@@ -819,7 +819,7 @@ export async function exportGroupMemberSingleSessionWord(studentName, groups, se
   const personalNumber = studentId ? session.attendeePersonalSessionNumbers?.[studentId] : null;
   const sessionLabel   = personalNumber != null ? `Session ${personalNumber}` : "";
 
-  const allTargets      = unionTargetsByName(groups).slice().sort((a, b) => a.name.localeCompare(b.name));
+  const allTargets      = unionTargetsByName(groups).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
   const filteredSession = { ...session, remarks: filteredRemarks };
   const blob = await buildSingleSessionWordBlob(studentName, sessionLabel, allTargets, filteredSession);
   downloadBlob(blob, formatExportFilenameWord(studentName, "Group Session", session.date, new Date()));
