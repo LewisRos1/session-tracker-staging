@@ -115,7 +115,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "553";
+const APP_VERSION = "554";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3203,13 +3203,16 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
     // empty box (there's no free text to click into), so without an explicit
     // button here the Remark cell was just blank with no way to create the
     // first remark at all.
+    const addRowLabel = opts.length > 0
+      ? "+ Show Selections"
+      : `+ Add Remark${mappedInfo ? "" : " &amp; Trials"}`;
     return `<tr>
       <td class="vcol-no" contenteditable="false">${no}</td>
       <td class="vcol-act" contenteditable="false">${actCell}</td>
       <td class="vcol-rem" contenteditable="false">
         <button class="view-add-remark-row" data-act-id="${escHtml(actId || "")}"
           data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
-          data-is-predefined="${isPredefined}">+ Add Remark${mappedInfo ? "" : " &amp; Trials"}</button>
+          data-is-predefined="${isPredefined}">${addRowLabel}</button>
       </td>
       <td class="vcol-trials" contenteditable="false">&nbsp;</td>
       <td class="vcol-total" contenteditable="false">&nbsp;</td>
@@ -4393,13 +4396,13 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
   const multiSelect     = paEntry?.optionsMulti || false;
   const isMastery       = paEntry?.isMastery || false;
   const remarkHasNote   = paEntry?.remarkHasNote || false;
+  const opts            = parseOpts(inlineOptions);
 
   if (rounds.length === 0) {
     // Free-text activities (no presets, not mastery): show a ready-to-type empty
     // box per attendee, like the individual screen does, instead of a generic
     // "+ Add Remark & Trials" bulk button — this activity is already in "Separate
     // Remarks" mode, so each student gets their own row from the start.
-    const opts      = parseOpts(inlineOptions);
     const showEmpty = opts.length === 0 && !isMastery;
 
     if (showEmpty) {
@@ -4428,13 +4431,14 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
       </tr>`).join("");
     }
 
+    const addAllLabel = opts.length > 0 ? "+ Show Selections" : "+ Add Remark &amp; Trials";
     return `<tr>
       <td class="vcol-no" contenteditable="false">${no}</td>
       <td class="vcol-act" contenteditable="false">${actCellWithToggle}</td>
       <td class="vcol-student" contenteditable="false"></td>
       <td class="vcol-rem" contenteditable="false">
         <button class="btn-view-group-add-remark-all" data-act-id="${escHtml(actId || "")}"
-          data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}">+ Add Remark &amp; Trials</button>
+          data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}">${addAllLabel}</button>
       </td>
       <td class="vcol-trials" contenteditable="false">&nbsp;</td>
       <td class="vcol-total" contenteditable="false">&nbsp;</td>
@@ -4462,7 +4466,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
           <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(entry.studentName)}</td>
           <td class="vcol-rem" contenteditable="false">
             <button class="btn-view-group-add-remark-pending" data-act-id="${escHtml(actId || "")}"
-              data-student="${escHtml(entry.studentName)}">+ Add Remark &amp; Trials</button>
+              data-student="${escHtml(entry.studentName)}">${opts.length > 0 ? "+ Show Selections" : "+ Add Remark &amp; Trials"}</button>
           </td>
           <td class="vcol-trials" contenteditable="false">&nbsp;</td>
           <td class="vcol-total" contenteditable="false">&nbsp;</td>
