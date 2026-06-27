@@ -115,7 +115,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "550";
+const APP_VERSION = "551";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2047,7 +2047,7 @@ function renderFedcTarget(target) {
       }
     } else {
       for (const rem of remarks) {
-        html += renderRemarkFields(rem, target, getActivityInlineOptions(pa), pa.sentenceStarter || null, pa.optionsMulti || false, pa.isMastery || false, mappedInfo);
+        html += renderRemarkFields(rem, target, getActivityInlineOptions(pa), pa.sentenceStarter || null, pa.optionsMulti || false, pa.isMastery || false, mappedInfo, pa.remarkHasNote || false);
       }
       if (isPending) {
         html += renderPendingRemarkFields(pendingKey, actId, pa.name, idx, target);
@@ -2220,7 +2220,7 @@ function htmlForStorage(text) {
 
 // ─── REMARK FIELDS ───────────────────────────────────────────
 
-function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, isMastery = false, mappedInfo = null) {
+function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, isMastery = false, mappedInfo = null, remarkHasNote = false) {
   const opts = parseOpts(inlineOptions);
 
   const trials = rem.trials || [];
@@ -2310,6 +2310,20 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
     remarkContent = optBtns;
   }
 
+  // Generalized version of Mastery's separate Notes field — same idea, but
+  // the select-one options above are whatever the boss configured (not
+  // hardcoded mastery values), so this reuses the same .mastery-note-input
+  // class/rem.masteryNote field to pick up the existing save wiring for free.
+  const noteField = remarkHasNote
+    ? `<div class="entry-field" contenteditable="false">
+        <span class="field-label">Notes</span>
+        <button class="btn-sketch" data-rem-id="${rem.id}" aria-label="Open sketch board">✏</button>
+        <textarea class="field-input mastery-note-input" rows="1"
+          data-rem-id="${rem.id}" placeholder="Notes…"
+          data-saved-html="${escHtml(rem.masteryNote || "")}">${escHtml(plainTextForEdit(rem.masteryNote || ""))}</textarea>
+      </div>`
+    : "";
+
   return `
     <div class="entry-divider" contenteditable="false"></div>
     <div class="entry-field">
@@ -2319,6 +2333,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
       <button class="btn-icon btn-delete-remark" contenteditable="false"
         data-rem-id="${rem.id}" title="Delete remark">🗑</button>
     </div>
+    ${noteField}
     ${trailingField}`;
 }
 
@@ -3152,6 +3167,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
   const sentenceStarter = paEntry?.sentenceStarter || null;
   const multiSelect     = paEntry?.optionsMulti || false;
   const isMastery       = paEntry?.isMastery || false;
+  const remarkHasNote   = paEntry?.remarkHasNote || false;
   const mappedInfo      = paEntry?.isMapped ? resolveViewMappedScoreDisplay(paEntry, data) : null;
 
   if (remarks.length === 0) {
@@ -3188,7 +3204,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
   return remarks.map((rem, ri) => viewRemarkRow(
     ri === 0 ? no : null,
     ri === 0 ? actCell : null,
-    rem, target, inlineOptions, sentenceStarter, multiSelect, isMastery, mappedInfo
+    rem, target, inlineOptions, sentenceStarter, multiSelect, isMastery, mappedInfo, remarkHasNote
   )).join("");
 }
 
@@ -3218,7 +3234,7 @@ function buildTrialCellsHtml(rem, maxPts) {
     `<button class="view-add-trial" data-rem-id="${escHtml(rem.id)}">+</button>`;
 }
 
-function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, isMastery = false, mappedInfo = null) {
+function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, isMastery = false, mappedInfo = null, remarkHasNote = false) {
   const maxPts = target.maxPoints || 3;
   const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts);
   const trialCells = mappedInfo
@@ -3265,6 +3281,12 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
         || `<textarea class="view-remark-edit" rows="1" data-rem-id="${escHtml(rem.id)}"
               data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`);
 
+  const noteField = remarkHasNote
+    ? `<textarea class="view-mastery-note" rows="1" data-rem-id="${escHtml(rem.id)}"
+        data-saved-html="${escHtml(rem.masteryNote || "")}"
+        placeholder="Notes…">${escHtml(plainTextForEdit(rem.masteryNote))}</textarea>`
+    : "";
+
   let remarkCell;
   if (sentenceStarter) {
     remarkCell = `<div class="view-starter-wrap" contenteditable="false">
@@ -3273,6 +3295,7 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
         || `<input type="text" class="view-starter-input" data-rem-id="${escHtml(rem.id)}"
             value="${escHtml(rem.text || "")}">`
       }
+      ${noteField}
     </div>`;
   } else {
     remarkCell = optSelect;
@@ -4288,6 +4311,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
     const mappedSentenceStarter = paEntry.sentenceStarter || null;
     const mappedMultiSelect     = paEntry.optionsMulti || false;
     const mappedIsMastery       = paEntry.isMastery || false;
+    const mappedHasNote         = paEntry.remarkHasNote || false;
     let firstRow = true;
     return attendees.map(studentName => {
       const remarks = actId
@@ -4317,7 +4341,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
       const mappedInfo = resolveViewGroupMappedScoreDisplay(paEntry, data, studentName);
       return remarks.map((rem, ri) => viewGroupRemarkRow(
         ri === 0 ? noVal : null, ri === 0 ? actVal : null, studentName, rem, target,
-        mappedInlineOptions, mappedSentenceStarter, mappedMultiSelect, mappedIsMastery, null, mappedInfo
+        mappedInlineOptions, mappedSentenceStarter, mappedMultiSelect, mappedIsMastery, null, mappedInfo, mappedHasNote
       )).join("");
     }).join("");
   }
@@ -4333,6 +4357,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
   const sentenceStarter = paEntry?.sentenceStarter || null;
   const multiSelect     = paEntry?.optionsMulti || false;
   const isMastery       = paEntry?.isMastery || false;
+  const remarkHasNote   = paEntry?.remarkHasNote || false;
 
   if (rounds.length === 0) {
     // Free-text activities (no presets, not mastery): show a ready-to-type empty
@@ -4421,7 +4446,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
 
       html += viewGroupRemarkRow(
         noVal, actVal, entry.studentName, entry, target,
-        inlineOptions, sentenceStarter, multiSelect, isMastery, combineOpts
+        inlineOptions, sentenceStarter, multiSelect, isMastery, combineOpts, null, remarkHasNote
       );
       firstRowOverall = false;
     }
@@ -4429,7 +4454,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
   return html;
 }
 
-function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, isMastery = false, combineOpts = null, mappedInfo = null) {
+function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, isMastery = false, combineOpts = null, mappedInfo = null, remarkHasNote = false) {
   const maxPts = target.maxPoints || 3;
   const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts);
   const trialCells = mappedInfo
@@ -4488,6 +4513,12 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
             || `<textarea class="view-remark-edit" rows="1" data-rem-id="${escHtml(rem.id)}"
                   data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`);
 
+      const noteField = remarkHasNote
+        ? `<textarea class="view-mastery-note" rows="1" data-rem-id="${escHtml(rem.id)}"
+            data-saved-html="${escHtml(rem.masteryNote || "")}"
+            placeholder="Notes…">${escHtml(plainTextForEdit(rem.masteryNote))}</textarea>`
+        : "";
+
       let remarkCell;
       if (sentenceStarter) {
         remarkCell = `<div class="view-starter-wrap" contenteditable="false">
@@ -4496,6 +4527,7 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
             || `<input type="text" class="view-starter-input" data-rem-id="${escHtml(rem.id)}"
                 value="${escHtml(rem.text || "")}">`
           }
+          ${noteField}
         </div>`;
       } else {
         remarkCell = optSelect;
@@ -6043,7 +6075,16 @@ function stripNoteHtml(text) {
 // field is captured (free text / preset options / sentence starter / mastery
 // levels), independently of where the Score comes from.
 function buildRemarkTypeControls(a, idx) {
-  const type = a.isMastery ? "mastery" : (a.sentenceStarter && a.inlineOptions && a.optionsMulti) ? "starter_fixed_multi" : (a.sentenceStarter && a.inlineOptions) ? "starter_fixed" : a.sentenceStarter ? "starter" : (a.inlineOptions && a.optionsMulti) ? "fixed_multi" : (a.inlineOptions || a.remarkPresetId) ? "fixed" : "";
+  const type = a.isMastery ? "mastery"
+    : a.remarkHasNote ? "starter_fixed_note"
+    : (a.sentenceStarter && a.inlineOptions && a.optionsMulti) ? "starter_fixed_multi"
+    : (a.sentenceStarter && a.inlineOptions) ? "starter_fixed"
+    : a.sentenceStarter ? "starter"
+    : (a.inlineOptions && a.optionsMulti) ? "fixed_multi"
+    : (a.inlineOptions || a.remarkPresetId) ? "fixed" : "";
+  const convertBtn = a.isMastery
+    ? `<button class="btn-mn-convert mn-convert-mastery" data-idx="${idx}" type="button">Convert to "Sentence Starter + Select One + Free Text"</button>`
+    : "";
   return `<select class="act-preset-select mn-act-preset" data-idx="${idx}">
       <option value="">Free text</option>
       <option value="fixed"${type === "fixed" ? " selected" : ""}>Select one</option>
@@ -6051,16 +6092,18 @@ function buildRemarkTypeControls(a, idx) {
       <option value="starter"${type === "starter" ? " selected" : ""}>Sentence Starter + Free Text</option>
       <option value="starter_fixed"${type === "starter_fixed" ? " selected" : ""}>Sentence Starter + Select one</option>
       <option value="starter_fixed_multi"${type === "starter_fixed_multi" ? " selected" : ""}>Sentence Starter + Tick boxes</option>
+      <option value="starter_fixed_note"${type === "starter_fixed_note" ? " selected" : ""}>Sentence Starter + Select One + Free Text</option>
       <option value="mastery"${type === "mastery" ? " selected" : ""}>Mastery Level + Free Text</option>
     </select>
     <input class="admin-input mn-act-starter-text" data-idx="${idx}"
       placeholder="Starter phrase…"
       value="${escHtml(a.sentenceStarter || "")}"
-      style="${type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" ? "" : "display:none"}">
+      style="${type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note" ? "" : "display:none"}">
     <input class="admin-input mn-act-inline-opts" data-idx="${idx}"
       placeholder="Options separated by /  e.g. Low/Medium/High"
       value="${escHtml(a.inlineOptions || (a.remarkPresetId ? (state.remarkPresets.find(p=>p.id===a.remarkPresetId)?.options||[]).join("/") : ""))}"
-      style="${type === "fixed" || type === "fixed_multi" || type === "starter_fixed" || type === "starter_fixed_multi" ? "" : "display:none"}">`;
+      style="${type === "fixed" || type === "fixed_multi" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note" ? "" : "display:none"}">
+    ${convertBtn}`;
 }
 
 function renderTargetManageContent(student, target) {
@@ -6152,9 +6195,9 @@ function renderTargetManageContent(student, target) {
             <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Remark Type:</span>
             ${buildRemarkTypeControls(a, idx)}
           </div>
-          <div style="display:flex;flex-direction:column;gap:.2rem">
-            <span style="font-size:.75rem;color:#6b7280;font-weight:600">Mapped To Which Target's Average:</span>
-            <select class="admin-input mn-mapped-target-select" data-idx="${idx}">
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Mapped To Which Target's Average:</span>
+            <select class="admin-input mn-mapped-target-select" data-idx="${idx}" style="flex:1">
               <option value="">— select target —</option>
               ${mappedOptions}
             </select>
@@ -6390,11 +6433,33 @@ function renderTargetManageContent(student, target) {
       acts[idx].inlineOptions   = null;
       acts[idx].optionsMulti    = (type === "fixed_multi" || type === "starter_fixed_multi");
       acts[idx].isMastery       = (type === "mastery");
-      starterInput.style.display = (type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi") ? "" : "none";
-      optsInput.style.display    = (type === "fixed" || type === "fixed_multi" || type === "starter_fixed" || type === "starter_fixed_multi") ? "" : "none";
-      if (type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi") { starterInput.focus(); }
+      acts[idx].remarkHasNote   = (type === "starter_fixed_note");
+      starterInput.style.display = (type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") ? "" : "none";
+      optsInput.style.display    = (type === "fixed" || type === "fixed_multi" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") ? "" : "none";
+      if (type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") { starterInput.focus(); }
       else if (type === "fixed" || type === "fixed_multi") { optsInput.focus(); }
       else { target.predefinedActivities = acts; await saveTarget(); }
+    });
+  });
+
+  // One-click migration for old "Mastery Level + Free Text" activities — flips
+  // the activity's own config to the generic Sentence Starter + Select One +
+  // Free Text type without touching any remark documents at all: existing
+  // remarks' rem.text ("In Progress"/"Mastered"/"Maintain") and rem.masteryNote
+  // already line up exactly with the new type's select options and notes
+  // field, so they render correctly the moment the config changes.
+  $("manage-modal-body").querySelectorAll(".mn-convert-mastery").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const idx = Number(btn.dataset.idx);
+      acts[idx].sentenceStarter = "Mastery Level";
+      acts[idx].inlineOptions   = "In Progress/Mastered/Maintain";
+      acts[idx].optionsMulti    = false;
+      acts[idx].remarkPresetId  = null;
+      acts[idx].isMastery       = false;
+      acts[idx].remarkHasNote   = true;
+      target.predefinedActivities = acts;
+      await saveTarget();
+      renderTargetManageContent(student, target);
     });
   });
 
@@ -6491,24 +6556,7 @@ function renderTemplateManageContent(template) {
         <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
       </div>`;
     } else {
-      const type = a.isMastery ? "mastery" : (a.sentenceStarter && a.inlineOptions && a.optionsMulti) ? "starter_fixed_multi" : (a.sentenceStarter && a.inlineOptions) ? "starter_fixed" : a.sentenceStarter ? "starter" : (a.inlineOptions && a.optionsMulti) ? "fixed_multi" : (a.inlineOptions || a.remarkPresetId) ? "fixed" : "";
-      const remarkTypeSelect = `<select class="act-preset-select mn-act-preset" data-idx="${idx}">
-          <option value="">Free text</option>
-          <option value="fixed"${type === "fixed" ? " selected" : ""}>Select one</option>
-          <option value="fixed_multi"${type === "fixed_multi" ? " selected" : ""}>Tick boxes</option>
-          <option value="starter"${type === "starter" ? " selected" : ""}>Sentence Starter + Free Text</option>
-          <option value="starter_fixed"${type === "starter_fixed" ? " selected" : ""}>Sentence Starter + Select one</option>
-          <option value="starter_fixed_multi"${type === "starter_fixed_multi" ? " selected" : ""}>Sentence Starter + Tick boxes</option>
-          <option value="mastery"${type === "mastery" ? " selected" : ""}>Mastery Level + Free Text</option>
-        </select>
-        <input class="admin-input mn-act-starter-text" data-idx="${idx}"
-          placeholder="Starter phrase…"
-          value="${escHtml(a.sentenceStarter || "")}"
-          style="${type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" ? "" : "display:none"}">
-        <input class="admin-input mn-act-inline-opts" data-idx="${idx}"
-          placeholder="Options separated by /  e.g. Low/Medium/High"
-          value="${escHtml(a.inlineOptions || (a.remarkPresetId ? (state.remarkPresets.find(p=>p.id===a.remarkPresetId)?.options||[]).join("/") : ""))}"
-          style="${type === "fixed" || type === "fixed_multi" || type === "starter_fixed" || type === "starter_fixed_multi" ? "" : "display:none"}">`;
+      const remarkTypeSelect = buildRemarkTypeControls(a, idx);
       const noteRow = a.actNote !== undefined
         ? `<textarea class="admin-input mn-act-note-input" id="mn-act-note-${idx}" data-idx="${idx}"
             rows="1" placeholder="Enter Note"
@@ -6532,10 +6580,10 @@ function renderTemplateManageContent(template) {
 
   html += `</div>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.25rem">
-      <button class="btn-admin-add" id="btn-mn-add-act" style="flex:1">+ Add Activity</button>
-      <button class="btn-admin-add" id="btn-mn-add-act-note" style="flex:1">+ Add Activity &amp; Note</button>
-      <button class="btn-admin-add" id="btn-mn-add-heading" style="flex:1">+ Add Section Heading</button>
-      <button class="btn-admin-add" id="btn-mn-add-note" style="flex:1">+ Add Note</button>
+      <button class="btn-admin-add" id="btn-mn-add-act" style="flex:0 0 auto;width:auto">+ Add Activity</button>
+      <button class="btn-admin-add" id="btn-mn-add-act-note" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Note</button>
+      <button class="btn-admin-add" id="btn-mn-add-heading" style="flex:0 0 auto;width:auto">+ Add Section Heading</button>
+      <button class="btn-admin-add" id="btn-mn-add-note" style="flex:0 0 auto;width:auto">+ Add Note</button>
     </div>
     <div style="margin-top:2rem;padding-bottom:1.5rem">
       <button class="btn-primary-sm" id="btn-mn-done-template"
@@ -6691,11 +6739,29 @@ function renderTemplateManageContent(template) {
       acts[idx].inlineOptions   = null;
       acts[idx].optionsMulti    = (type === "fixed_multi" || type === "starter_fixed_multi");
       acts[idx].isMastery       = (type === "mastery");
-      starterInput.style.display = (type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi") ? "" : "none";
-      optsInput.style.display    = (type === "fixed" || type === "fixed_multi" || type === "starter_fixed" || type === "starter_fixed_multi") ? "" : "none";
-      if (type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi") { starterInput.focus(); }
+      acts[idx].remarkHasNote   = (type === "starter_fixed_note");
+      starterInput.style.display = (type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") ? "" : "none";
+      optsInput.style.display    = (type === "fixed" || type === "fixed_multi" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") ? "" : "none";
+      if (type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") { starterInput.focus(); }
       else if (type === "fixed" || type === "fixed_multi") { optsInput.focus(); }
       else { template.predefinedActivities = acts; await saveTemplateFn(); }
+    });
+  });
+
+  // See the matching handler in renderTargetManageContent for why this is a
+  // pure config flip with no remark-data migration needed.
+  $("manage-modal-body").querySelectorAll(".mn-convert-mastery").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const idx = Number(btn.dataset.idx);
+      acts[idx].sentenceStarter = "Mastery Level";
+      acts[idx].inlineOptions   = "In Progress/Mastered/Maintain";
+      acts[idx].optionsMulti    = false;
+      acts[idx].remarkPresetId  = null;
+      acts[idx].isMastery       = false;
+      acts[idx].remarkHasNote   = true;
+      template.predefinedActivities = acts;
+      await saveTemplateFn();
+      renderTemplateManageContent(template);
     });
   });
 

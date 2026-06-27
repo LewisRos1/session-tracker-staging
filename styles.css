@@ -2024,6 +2024,21 @@ div.admin-note-editable:empty::before {
 }
 .btn-admin-add:hover { background: var(--primary-light); }
 
+/* One-click migration button shown only on old Mastery-typed activity rows */
+.btn-mn-convert {
+  align-self: flex-start;
+  margin-top: .15rem;
+  padding: .3rem .6rem;
+  background: var(--white);
+  border: 1.5px dashed var(--primary);
+  border-radius: var(--radius-sm);
+  font-size: .72rem;
+  font-weight: 600;
+  color: var(--primary);
+  cursor: pointer;
+}
+.btn-mn-convert:hover { background: var(--primary-light); }
+
 /* ─── Add target type buttons ───────────────────────────── */
 .btn-target-type {
   width: 100%;
