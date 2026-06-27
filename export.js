@@ -571,10 +571,17 @@ function wordTargetRows(target, session) {
   return rows;
 }
 
+// Column widths in twips (1 inch = 1440 twips): Activity 2.37", Highlights of
+// Observation 3.38", Score 0.52".
+const WORD_COL_ACTIVITY = 3413;
+const WORD_COL_REMARK   = 4867;
+const WORD_COL_SCORE    = 749;
+const WORD_COL_TOTAL    = WORD_COL_ACTIVITY + WORD_COL_REMARK + WORD_COL_SCORE;
+
 function buildSessionDocxBody(entityName, sessionLabel, allTargets, session) {
   const {
     Paragraph, TextRun, Table, TableRow, TableCell,
-    AlignmentType, WidthType, BorderStyle, ShadingType,
+    AlignmentType, WidthType, BorderStyle, ShadingType, TableLayoutType,
     Header, Footer, PageNumber, TabStopType
   } = docx;
 
@@ -599,9 +606,10 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session) {
     return runs;
   }
 
-  function cell(text, { bold = false, italics = false, fill = null, colSpan = 1, align = AlignmentType.LEFT } = {}) {
+  function cell(text, { bold = false, italics = false, fill = null, colSpan = 1, align = AlignmentType.LEFT, width = null } = {}) {
     return new TableCell({
       columnSpan: colSpan,
+      width: width != null ? { size: width, type: WidthType.DXA } : undefined,
       shading: fill ? { type: ShadingType.CLEAR, color: "auto", fill } : undefined,
       borders: cellBorders,
       margins: { top: 80, bottom: 80, left: 100, right: 100 },
@@ -625,9 +633,9 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session) {
       new TableRow({
         tableHeader: true,
         children: [
-          cell("Activity", { bold: true, fill: HEADER_FILL }),
-          cell("Remark",   { bold: true, fill: HEADER_FILL }),
-          cell("Score",    { bold: true, fill: HEADER_FILL, align: AlignmentType.CENTER })
+          cell("Activity",                  { bold: true, fill: HEADER_FILL, width: WORD_COL_ACTIVITY }),
+          cell("Highlights of Observation",  { bold: true, fill: HEADER_FILL, width: WORD_COL_REMARK }),
+          cell("Score",                      { bold: true, fill: HEADER_FILL, align: AlignmentType.CENTER, width: WORD_COL_SCORE })
         ]
       })
     ];
@@ -637,6 +645,7 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session) {
         tableRows.push(new TableRow({
           children: [cell(r.text, {
             colSpan: 3,
+            width: WORD_COL_TOTAL,
             italics: r.style === "note",
             fill: r.style === "heading" ? TARGET_FILL : (r.style === "note" ? NOTE_FILL : null)
           })]
@@ -644,15 +653,20 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session) {
       } else {
         tableRows.push(new TableRow({
           children: [
-            cell(r.cells[0]),
-            cell(r.cells[1]),
-            cell(r.cells[2], { align: AlignmentType.CENTER })
+            cell(r.cells[0], { width: WORD_COL_ACTIVITY }),
+            cell(r.cells[1], { width: WORD_COL_REMARK }),
+            cell(r.cells[2], { align: AlignmentType.CENTER, width: WORD_COL_SCORE })
           ]
         }));
       }
     }
 
-    body.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: tableRows }));
+    body.push(new Table({
+      width: { size: WORD_COL_TOTAL, type: WidthType.DXA },
+      columnWidths: [WORD_COL_ACTIVITY, WORD_COL_REMARK, WORD_COL_SCORE],
+      layout: TableLayoutType.FIXED,
+      rows: tableRows
+    }));
   }
 
   if (!anyTarget) {
@@ -666,9 +680,9 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session) {
         { type: TabStopType.RIGHT,  position: 9360 }
       ],
       children: [
-        new TextRun({ text: entityName, bold: true }),
+        new TextRun({ text: entityName }),
         new TextRun({ text: "\t" }),
-        new TextRun({ text: sessionLabel, bold: true }),
+        new TextRun({ text: sessionLabel }),
         new TextRun({ text: "\t" }),
         new TextRun({ text: fmtDate(session.date) })
       ]
@@ -678,7 +692,7 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session) {
   const footer = new Footer({
     children: [new Paragraph({
       alignment: AlignmentType.RIGHT,
-      children: [new TextRun({ text: "Page " }), new TextRun({ children: [PageNumber.CURRENT] })]
+      children: [new TextRun({ children: [PageNumber.CURRENT] })]
     })]
   });
 
