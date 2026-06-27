@@ -115,7 +115,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "557";
+const APP_VERSION = "558";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1737,6 +1737,10 @@ async function openSession(student, existingSessionId = null, dateStr = null) {
         const filled = await autoFillMasteryRemarks(student, sessionId);
         if (filled > 0) return;
       }
+      // Mapped-score activities can become fillable any time during the
+      // session (not just on open), so this check isn't gated to firstLoad.
+      const mappedFilled = await autoFillMappedRemarks(student, sessionId);
+      if (mappedFilled > 0) return;
       // Keep score modal trial badges in sync with Firestore
       if (state.scorePicker?.open && state.scorePicker?.remId) {
         renderScoreModalTrials(state.scorePicker.remId);
@@ -1808,7 +1812,10 @@ async function leaveSession() {
       deleteSession(sessionId).catch(() => {});
     } else {
       const allTargetNames = new Set(Object.values(data.activities || {}).map(a => a.targetName));
-      allTargetNames.forEach(name => cleanupEmptyEntries(sessionId, data, name).catch(() => {}));
+      allTargetNames.forEach(name => {
+        const target = (student?.targets || []).find(t => t.name === name);
+        cleanupEmptyEntries(sessionId, data, name, target).catch(() => {});
+      });
     }
   }
 
@@ -1870,7 +1877,8 @@ function populateTargetDropdown(targets) {
     state.pendingNewRemark   = null;
     // Clean up empty entries from the previous target (fire-and-forget)
     if (prevTarget && prevTarget !== sel.value) {
-      cleanupEmptyEntries(state.currentSessionId, state.sessionData, prevTarget).catch(() => {});
+      const prevTargetObj = (state.currentStudent?.targets || []).find(t => t.name === prevTarget);
+      cleanupEmptyEntries(state.currentSessionId, state.sessionData, prevTarget, prevTargetObj).catch(() => {});
     }
     // A <select> keeps focus after its own change event fires, and the
     // busy-check in openSession's listener treats "the dropdown is focused"
@@ -2794,6 +2802,41 @@ async function autoFillMasteryRemarks(student, sessionId) {
   return count;
 }
 
+// Auto-create an empty remark for a mapped-score activity as soon as its
+// mapped target gains a computable average — otherwise the row stays
+// collapsed (no remark of its own) even after the target it pulls from has
+// real data. Unlike autoFillMasteryRemarks this runs on every snapshot, not
+// just first load: the trigger ("the other target now has data") can become
+// true at any point while this session stays open, not only when it's opened.
+async function autoFillMappedRemarks(student, sessionId) {
+  const data = state.sessionData;
+  let count = 0;
+  for (const target of (student.targets || [])) {
+    for (const pa of (target.predefinedActivities || [])) {
+      if (!pa.isMapped) continue;
+
+      const existingAct = Object.entries(data.activities || {})
+        .find(([, a]) => a.targetName === target.name && a.activityName === pa.name);
+      let actId = existingAct?.[0] || null;
+
+      if (actId) {
+        const hasRemark = Object.values(data.remarks || {}).some(r => r.activityId === actId);
+        if (hasRemark) continue;
+      }
+
+      const pct = resolveMappedScoreDisplay(pa, new Set()).pct;
+      if (pct === null) continue; // mapped target has no average yet — stay collapsed
+
+      if (!actId) {
+        actId = await addActivity(sessionId, target.name, pa.name, pa.order ?? 0, true);
+      }
+      await addRemark(sessionId, actId, "");
+      count++;
+    }
+  }
+  return count;
+}
+
 // Deletes remarks that have no text, no mastery note, and no valid trials for
 // the given target, then removes any activity that is left with no remarks.
 // A "-1" trial is the View/Edit screen's "+" placeholder for a slot that was
@@ -2801,10 +2844,15 @@ async function autoFillMasteryRemarks(student, sessionId) {
 // remark that's otherwise empty gets deleted outright (as if "+" was never
 // clicked), and one that has other real content just has that stray slot
 // quietly dropped from its trials array.
-async function cleanupEmptyEntries(sessionId, data, targetName) {
+async function cleanupEmptyEntries(sessionId, data, targetName, target = null) {
   if (!sessionId || !data) return;
+  // Mapped-score activities are designed to have no remark of their own until
+  // their mapped target gains an average (see autoFillMappedRemarks) — an
+  // empty one isn't stale data, it's the activity waiting to auto-fill. Treat
+  // them as exempt so this cleanup never races that auto-fill and deletes it.
+  const mappedNames = new Set((target?.predefinedActivities || []).filter(pa => pa.isMapped).map(pa => pa.name));
   const acts = Object.entries(data.activities || {})
-    .filter(([, a]) => a.targetName === targetName);
+    .filter(([, a]) => a.targetName === targetName && !mappedNames.has(a.activityName));
   for (const [actId] of acts) {
     const rems = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === actId);
     const stripEmpty = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
@@ -2954,8 +3002,10 @@ async function openSessionView(student, sessionId) {
   }, () => state.viewSessionData);
 
   try {
-    state.fbViewUnsubscribe = listenToSession(sessionId, data => {
+    state.fbViewUnsubscribe = listenToSession(sessionId, async data => {
       state.viewSessionData = data;
+      const filled = await autoFillViewMappedRemarks(student, sessionId, data);
+      if (filled > 0) return; // the write triggers another snapshot, which renders
       if (isViewBusy() || state.viewActionsInFlight > 0) { state.viewRenderPending = true; }
       else               { renderSessionView(); }
     });
@@ -3003,7 +3053,10 @@ async function leaveSessionView() {
       deleteSession(sessionId).catch(() => {});
     } else {
       const allTargetNames = new Set(Object.values(data.activities || {}).map(a => a.targetName));
-      allTargetNames.forEach(name => cleanupEmptyEntries(sessionId, data, name).catch(() => {}));
+      allTargetNames.forEach(name => {
+        const target = (student?.targets || []).find(t => t.name === name);
+        cleanupEmptyEntries(sessionId, data, name, target).catch(() => {});
+      });
     }
   }
 
@@ -3411,6 +3464,38 @@ function resolveViewMappedScoreDisplay(pa, data, visited) {
   };
 }
 
+// View/Edit Past Sessions counterpart of autoFillMappedRemarks (live-entry
+// session) — same trigger (mapped target gained a computable average), but
+// runs on every snapshot here since this screen has no "first load" gate and
+// the mapped-to target's data could change at any time while it's open.
+async function autoFillViewMappedRemarks(student, sessionId, data) {
+  let count = 0;
+  for (const target of (student.targets || [])) {
+    for (const pa of (target.predefinedActivities || [])) {
+      if (!pa.isMapped) continue;
+
+      const existingAct = Object.entries(data.activities || {})
+        .find(([, a]) => a.targetName === target.name && a.activityName === pa.name);
+      let actId = existingAct?.[0] || null;
+
+      if (actId) {
+        const hasRemark = Object.values(data.remarks || {}).some(r => r.activityId === actId);
+        if (hasRemark) continue;
+      }
+
+      const pct = resolveViewMappedScoreDisplay(pa, data, new Set()).pct;
+      if (pct === null) continue;
+
+      if (!actId) {
+        actId = await addActivity(sessionId, target.name, pa.name, pa.order ?? 0, true);
+      }
+      await addRemark(sessionId, actId, "");
+      count++;
+    }
+  }
+  return count;
+}
+
 // Resolves a mapped-score activity's display for one attendee on the group
 // View/Edit Past Sessions screen — see resolveGroupMappedScoreDisplay
 // (live-entry counterpart). Per-attendee throughout, per the boss's decision.
@@ -3423,6 +3508,37 @@ function resolveViewGroupMappedScoreDisplay(pa, data, studentName, visited) {
     label: `Score (Mapped to ${mappedTarget.name}'s Average)`,
     pct: calcGroupStudentDaysAverage(mappedTarget, data, studentName, visited)
   };
+}
+
+// Group View/Edit Past Sessions counterpart of autoFillMappedRemarks — unlike
+// the live group entry version, this screen renders every target at once (no
+// per-target lazy loading), so it checks all of them on every snapshot, same
+// as the individual View screen's autoFillViewMappedRemarks.
+async function autoFillViewGroupMappedRemarks(group, sessionId, data) {
+  const attendees = data.attendees || group.students || [];
+  let count = 0;
+  for (const target of (group.targets || [])) {
+    for (const pa of (target.predefinedActivities || [])) {
+      if (!pa.isMapped) continue;
+      const existingAct = Object.entries(data.activities || {})
+        .find(([, a]) => a.targetName === target.name && a.activityName === pa.name);
+      let actId = existingAct?.[0] || null;
+
+      for (const studentName of attendees) {
+        const hasRemark = actId && Object.values(data.remarks || {})
+          .some(r => r.activityId === actId && r.studentName === studentName);
+        if (hasRemark) continue;
+        const pct = resolveViewGroupMappedScoreDisplay(pa, data, studentName, new Set()).pct;
+        if (pct === null) continue;
+        if (!actId) {
+          actId = await addActivity(sessionId, target.name, pa.name, pa.order ?? 0, true);
+        }
+        await addGroupRemark(sessionId, actId, studentName, "");
+        count++;
+      }
+    }
+  }
+  return count;
 }
 
 // ── View-screen remark editing ───────────────────────────────
@@ -4148,8 +4264,10 @@ async function openGroupSessionView(group, sessionId) {
   }, () => state.viewGroupSessionData);
 
   try {
-    state.fbViewGroupUnsubscribe = listenToSession(sessionId, data => {
+    state.fbViewGroupUnsubscribe = listenToSession(sessionId, async data => {
       state.viewGroupSessionData = data;
+      const filled = await autoFillViewGroupMappedRemarks(group, sessionId, data);
+      if (filled > 0) return; // the write triggers another snapshot, which renders
       if (isGroupViewBusy() || state.viewGroupActionsInFlight > 0) { state.viewGroupRenderPending = true; }
       else                   { renderGroupSessionView(); }
     });
@@ -4196,7 +4314,10 @@ async function leaveGroupSessionView() {
       deleteSession(sessionId).catch(() => {});
     } else {
       const allTargetNames = new Set(Object.values(data.activities || {}).map(a => a.targetName));
-      allTargetNames.forEach(name => cleanupEmptyEntries(sessionId, data, name).catch(() => {}));
+      allTargetNames.forEach(name => {
+        const target = (group?.targets || []).find(t => t.name === name);
+        cleanupEmptyEntries(sessionId, data, name, target).catch(() => {});
+      });
     }
   }
 
@@ -5564,8 +5685,13 @@ async function closeManageModal() {
       autoFillGroupSession(
         state.currentGroup, state.groupSessionId, state.groupSessionData,
         state.selectedGroupTargetName, state.groupAttendees
-      ).then(filled => { if (filled === 0) renderGroupTargetContent(); })
-       .catch(() => renderGroupTargetContent());
+      ).then(filled => {
+        if (filled > 0) return;
+        return autoFillGroupMappedRemarks(
+          state.currentGroup, state.groupSessionId, state.groupSessionData,
+          state.selectedGroupTargetName, state.groupAttendees
+        ).then(mappedFilled => { if (mappedFilled === 0) renderGroupTargetContent(); });
+      }).catch(() => renderGroupTargetContent());
     } else if (state.groupSessionId) {
       renderGroupTargetContent();
     }
@@ -7093,6 +7219,8 @@ async function openGroupSession(group, dateStr, attendees) {
         if (state.selectedGroupTargetName) {
           const filled = await autoFillGroupSession(group, sid, data, state.selectedGroupTargetName, attendees);
           if (filled > 0) return;
+          const mappedFilled = await autoFillGroupMappedRemarks(group, sid, data, state.selectedGroupTargetName, attendees);
+          if (mappedFilled > 0) return;
         }
       }
       if (state.scorePicker?.open && state.scorePicker?.isGroup) renderScoreModalTrials(state.scorePicker.remId);
@@ -7166,7 +7294,8 @@ function populateGroupTargetDropdown(targets) {
     await state.entryGroupRemarkSaver?.flush();
     state.selectedGroupTargetName = sel.value || null;
     if (prevTarget && prevTarget !== sel.value) {
-      cleanupEmptyEntries(state.groupSessionId, state.groupSessionData, prevTarget).catch(() => {});
+      const prevTargetObj = (state.currentGroup?.targets || []).find(t => t.name === prevTarget);
+      cleanupEmptyEntries(state.groupSessionId, state.groupSessionData, prevTarget, prevTargetObj).catch(() => {});
     }
     // See individual session's populateTargetDropdown for why this matters:
     // a <select> keeps focus after its own change event, and nothing else
@@ -7182,6 +7311,11 @@ function populateGroupTargetDropdown(targets) {
         state.selectedGroupTargetName, state.groupAttendees
       );
       if (filled > 0) return;
+      const mappedFilled = await autoFillGroupMappedRemarks(
+        state.currentGroup, state.groupSessionId, data,
+        state.selectedGroupTargetName, state.groupAttendees
+      );
+      if (mappedFilled > 0) return;
     }
     renderGroupTargetContent();
   };
@@ -7204,6 +7338,35 @@ async function autoFillGroupSession(group, sessionId, data, targetName, attendee
   return created;
 }
 
+// Group-entry counterpart of autoFillMappedRemarks — only checks the
+// currently selected target (group activity stubs are filled in lazily per
+// selected target too, via autoFillGroupSession above, not for every target
+// up front), per attendee. Call only after confirming autoFillGroupSession
+// didn't just create a brand-new stub for this target — that write triggers
+// its own snapshot, which gets a fresh look at this on the next pass.
+async function autoFillGroupMappedRemarks(group, sessionId, data, targetName, attendees) {
+  const target = group.targets.find(t => t.name === targetName);
+  if (!target) return 0;
+  let count = 0;
+  for (const pa of (target.predefinedActivities || [])) {
+    if (!pa.isMapped) continue;
+    const existingAct = Object.entries(data.activities || {})
+      .find(([, a]) => a.targetName === targetName && a.activityName === pa.name);
+    const actId = existingAct?.[0];
+    if (!actId) continue;
+    for (const studentName of attendees) {
+      const hasRemark = Object.values(data.remarks || {})
+        .some(r => r.activityId === actId && r.studentName === studentName);
+      if (hasRemark) continue;
+      const pct = resolveGroupMappedScoreDisplay(pa, target, data, studentName, new Set()).pct;
+      if (pct === null) continue;
+      await addGroupRemark(sessionId, actId, studentName, "");
+      count++;
+    }
+  }
+  return count;
+}
+
 async function leaveGroupSession() {
   commitTextEditorSheet();
   $("text-editor-sheet").classList.add("hidden");
@@ -7215,6 +7378,7 @@ async function leaveGroupSession() {
   if (state.fbGroupUnsubscribe) { state.fbGroupUnsubscribe(); state.fbGroupUnsubscribe = null; }
   const sessionId = state.groupSessionId;
   const data      = state.groupSessionData;
+  const group     = state.currentGroup;
   state.currentGroup            = null;
   state.groupSessionId          = null;
   state.groupSessionData        = null;
@@ -7232,7 +7396,10 @@ async function leaveGroupSession() {
       deleteSession(sessionId).catch(() => {});
     } else {
       const allTargetNames = new Set(Object.values(data.activities || {}).map(a => a.targetName));
-      allTargetNames.forEach(name => cleanupEmptyEntries(sessionId, data, name).catch(() => {}));
+      allTargetNames.forEach(name => {
+        const target = (group?.targets || []).find(t => t.name === name);
+        cleanupEmptyEntries(sessionId, data, name, target).catch(() => {});
+      });
     }
   }
   showHome();
