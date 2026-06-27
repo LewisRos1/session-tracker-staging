@@ -578,9 +578,21 @@ const WORD_COL_REMARK   = 4867;
 const WORD_COL_SCORE    = 749;
 const WORD_COL_TOTAL    = WORD_COL_ACTIVITY + WORD_COL_REMARK + WORD_COL_SCORE;
 
-function buildSessionDocxBody(entityName, sessionLabel, allTargets, session) {
+// Cached so the stamp image is only fetched once even if multiple exports
+// happen in the same session.
+let stampImageBufferPromise = null;
+function getStampImageBuffer() {
+  if (!stampImageBufferPromise) {
+    stampImageBufferPromise = fetch("zora-stamp.png")
+      .then(r => (r.ok ? r.arrayBuffer() : null))
+      .catch(() => null);
+  }
+  return stampImageBufferPromise;
+}
+
+function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, stampImageBuffer) {
   const {
-    Paragraph, TextRun, Table, TableRow, TableCell,
+    Paragraph, TextRun, Table, TableRow, TableCell, ImageRun,
     AlignmentType, WidthType, BorderStyle, ShadingType, TableLayoutType,
     Header, Footer, PageNumber, TabStopType
   } = docx;
@@ -588,6 +600,8 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session) {
   const HEADER_FILL = "C8DFF2";
   const TARGET_FILL = "A8C8E8";
   const NOTE_FILL   = "FFF8ED";
+  const FACILITATION_FILL   = "EEF3FA";
+  const FACILITATION_ACCENT = "2F5C8A";
 
   const cellBorders = {
     top:    { style: BorderStyle.SINGLE, size: 2, color: "B0C8E0" },
@@ -673,6 +687,52 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session) {
     body.push(new Paragraph({ children: [new TextRun({ text: "No data recorded for this session." })] }));
   }
 
+  // ── Facilitation note + company stamp (every exported note ends with this) ──
+  function facilitationBox(heading, text) {
+    return new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [new TableRow({
+        children: [new TableCell({
+          shading: { type: ShadingType.CLEAR, color: "auto", fill: FACILITATION_FILL },
+          borders: {
+            top:    { style: BorderStyle.NONE, size: 0, color: "auto" },
+            bottom: { style: BorderStyle.NONE, size: 0, color: "auto" },
+            right:  { style: BorderStyle.NONE, size: 0, color: "auto" },
+            left:   { style: BorderStyle.SINGLE, size: 24, color: FACILITATION_ACCENT }
+          },
+          margins: { top: 120, bottom: 120, left: 200, right: 200 },
+          children: [
+            new Paragraph({ spacing: { after: 60 }, children: [new TextRun({ text: heading, bold: true })] }),
+            new Paragraph({ children: [new TextRun({ text })] })
+          ]
+        })]
+      })]
+    });
+  }
+
+  body.push(
+    new Paragraph({ spacing: { before: 400, after: 120 }, children: [new TextRun({ text: "The session is facilitated according to:", bold: true })] }),
+    facilitationBox(
+      "ABA evidence-based treatment program",
+      "VB MAPP is a functional language program. It teaches children vocalisation, imitation of sounds, labels, and requests (ranging from the lowest to the highest order of language and functional communication skills). Thus, the goal is to equip the child to be both a listener and a speaker, thereby developing academic skills and social interaction."
+    ),
+    new Paragraph({ spacing: { before: 160 }, children: [] }),
+    facilitationBox(
+      "DIRFloortime evidence-based practice",
+      "It honours a child's sensory processing system during a session to promote self-regulation and information processing and to build a relationship with the facilitator."
+    )
+  );
+
+  if (stampImageBuffer) {
+    body.push(
+      new Paragraph({ spacing: { before: 280 }, children: [] }),
+      new Paragraph({
+        alignment: AlignmentType.LEFT,
+        children: [new ImageRun({ type: "png", data: stampImageBuffer, transformation: { width: 210, height: 133 } })]
+      })
+    );
+  }
+
   const header = new Header({
     children: [new Paragraph({
       tabStops: [
@@ -701,7 +761,8 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session) {
 
 async function buildSingleSessionWordBlob(entityName, sessionLabel, allTargets, session) {
   const { Document, Packer } = docx;
-  const { header, footer, body } = buildSessionDocxBody(entityName, sessionLabel, allTargets, session);
+  const stampImageBuffer = await getStampImageBuffer();
+  const { header, footer, body } = buildSessionDocxBody(entityName, sessionLabel, allTargets, session, stampImageBuffer);
   const doc = new Document({
     sections: [{ headers: { default: header }, footers: { default: footer }, children: body }]
   });

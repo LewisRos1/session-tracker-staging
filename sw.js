@@ -3,7 +3,7 @@
 // Firebase SDK handles Firestore data offline independently.
 // ============================================================
 
-const CACHE_NAME = "therapy-tracker-v537";
+const CACHE_NAME = "therapy-tracker-v538";
 
 // App shell files to pre-cache
 const SHELL_URLS = [
@@ -16,7 +16,8 @@ const SHELL_URLS = [
   "/export.js",
   "/manifest.json",
   "/icon-192.png",
-  "/icon-512.png"
+  "/icon-512.png",
+  "/zora-stamp.png"
 ];
 
 // Client sends "skipWaiting" when it detects a new SW is installed and ready.
