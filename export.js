@@ -600,8 +600,7 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
   const HEADER_FILL = "C8DFF2";
   const TARGET_FILL = "A8C8E8";
   const NOTE_FILL   = "FFF8ED";
-  const FACILITATION_FILL   = "F5F5F5";
-  const FACILITATION_ACCENT = "C0C0C0";
+  const FACILITATION_BORDER = "000000";
 
   const cellBorders = {
     top:    { style: BorderStyle.SINGLE, size: 2, color: "B0C8E0" },
@@ -688,23 +687,28 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
   }
 
   // ── Facilitation note + company stamp (every exported note ends with this) ──
-  function facilitationBox(heading, text) {
+  // Single plain-bordered white box (no shading) holding both programs, so it
+  // reads as a quiet footnote rather than competing with the target tables.
+  function facilitationBox(items) {
+    const facilitationBorders = {
+      top:    { style: BorderStyle.SINGLE, size: 4, color: FACILITATION_BORDER },
+      bottom: { style: BorderStyle.SINGLE, size: 4, color: FACILITATION_BORDER },
+      left:   { style: BorderStyle.SINGLE, size: 4, color: FACILITATION_BORDER },
+      right:  { style: BorderStyle.SINGLE, size: 4, color: FACILITATION_BORDER }
+    };
+    const children = [];
+    items.forEach(({ heading, text }, i) => {
+      if (i > 0) children.push(new Paragraph({ spacing: { before: 200 }, children: [] }));
+      children.push(new Paragraph({ spacing: { after: 60 }, children: [new TextRun({ text: heading, bold: true })] }));
+      children.push(new Paragraph({ children: [new TextRun({ text })] }));
+    });
     return new Table({
       width: { size: 100, type: WidthType.PERCENTAGE },
       rows: [new TableRow({
         children: [new TableCell({
-          shading: { type: ShadingType.CLEAR, color: "auto", fill: FACILITATION_FILL },
-          borders: {
-            top:    { style: BorderStyle.NONE, size: 0, color: "auto" },
-            bottom: { style: BorderStyle.NONE, size: 0, color: "auto" },
-            right:  { style: BorderStyle.NONE, size: 0, color: "auto" },
-            left:   { style: BorderStyle.SINGLE, size: 12, color: FACILITATION_ACCENT }
-          },
-          margins: { top: 120, bottom: 120, left: 200, right: 200 },
-          children: [
-            new Paragraph({ spacing: { after: 60 }, children: [new TextRun({ text: heading, bold: true })] }),
-            new Paragraph({ children: [new TextRun({ text })] })
-          ]
+          borders: facilitationBorders,
+          margins: { top: 160, bottom: 160, left: 200, right: 200 },
+          children
         })]
       })]
     });
@@ -712,15 +716,16 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
 
   body.push(
     new Paragraph({ spacing: { before: 400, after: 120 }, children: [new TextRun({ text: "The session is facilitated according to:", bold: true })] }),
-    facilitationBox(
-      "ABA evidence-based treatment program",
-      "VB MAPP is a functional language program. It teaches children vocalisation, imitation of sounds, labels, and requests (ranging from the lowest to the highest order of language and functional communication skills). Thus, the goal is to equip the child to be both a listener and a speaker, thereby developing academic skills and social interaction."
-    ),
-    new Paragraph({ spacing: { before: 160 }, children: [] }),
-    facilitationBox(
-      "DIRFloortime evidence-based practice",
-      "It honours a child's sensory processing system during a session to promote self-regulation and information processing and to build a relationship with the facilitator."
-    )
+    facilitationBox([
+      {
+        heading: "ABA evidence-based treatment program",
+        text: "VB MAPP is a functional language program. It teaches children vocalisation, imitation of sounds, labels, and requests (ranging from the lowest to the highest order of language and functional communication skills). Thus, the goal is to equip the child to be both a listener and a speaker, thereby developing academic skills and social interaction."
+      },
+      {
+        heading: "DIRFloortime evidence-based practice",
+        text: "It honours a child's sensory processing system during a session to promote self-regulation and information processing and to build a relationship with the facilitator."
+      }
+    ])
   );
 
   if (stampImageBuffer) {
