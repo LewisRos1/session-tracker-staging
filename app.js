@@ -115,7 +115,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "551";
+const APP_VERSION = "552";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3174,29 +3174,44 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
     // For free-text remark types (no preset opts, not mastery), show a clickable empty input
     const opts = parseOpts(inlineOptions);
     const showEmpty = opts.length === 0 && !isMastery;
-    const emptyCell = showEmpty
-      ? `<textarea class="view-remark-edit view-remark-empty" rows="1"
+    if (showEmpty) {
+      const emptyCell = `<textarea class="view-remark-edit view-remark-empty" rows="1"
            data-act-id="${escHtml(actId || "")}"
            data-act-name="${escHtml(actName)}"
            data-target="${escHtml(target.name)}"
-           data-is-predefined="${isPredefined}"
-           placeholder="Click to add remark…"></textarea>`
-      : "";
-    // "+ " shows even with no remark yet — clicking it creates the activity/
-    // remark and a first trial in one go, so a score can be logged without
-    // first having to type something into the remark box. Mapped-score
-    // activities have no trials at all, so they skip this button entirely —
-    // typing into the empty box above is the only way to create the remark.
-    const addTrialBtn = mappedInfo
-      ? `<span class="view-mapped-label">${escHtml(mappedInfo.label)}</span>`
-      : `<button class="view-add-trial-new" data-act-id="${escHtml(actId || "")}"
-      data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
-      data-is-predefined="${isPredefined}">+</button>`;
+           data-is-predefined="${isPredefined}"></textarea>`;
+      // "+ " shows even with no remark yet — clicking it creates the activity/
+      // remark and a first trial in one go, so a score can be logged without
+      // first having to type something into the remark box. Mapped-score
+      // activities have no trials at all, so they skip this button entirely —
+      // typing into the empty box above is the only way to create the remark.
+      const addTrialBtn = mappedInfo
+        ? `<span class="view-mapped-label">${escHtml(mappedInfo.label)}</span>`
+        : `<button class="view-add-trial-new" data-act-id="${escHtml(actId || "")}"
+        data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
+        data-is-predefined="${isPredefined}">+</button>`;
+      return `<tr>
+        <td class="vcol-no" contenteditable="false">${no}</td>
+        <td class="vcol-act" contenteditable="false">${actCell}</td>
+        <td class="vcol-rem">${emptyCell}</td>
+        <td class="vcol-trials" contenteditable="false">${addTrialBtn}</td>
+        <td class="vcol-total" contenteditable="false">&nbsp;</td>
+        <td class="vcol-score" contenteditable="false">${mappedInfo ? (mappedInfo.pct !== null ? mappedInfo.pct + "%" : "—") : "&nbsp;"}</td>
+      </tr>`;
+    }
+    // Preset-option / sentence-starter / mastery activities have no typeable
+    // empty box (there's no free text to click into), so without an explicit
+    // button here the Remark cell was just blank with no way to create the
+    // first remark at all.
     return `<tr>
       <td class="vcol-no" contenteditable="false">${no}</td>
       <td class="vcol-act" contenteditable="false">${actCell}</td>
-      <td class="vcol-rem">${emptyCell}</td>
-      <td class="vcol-trials" contenteditable="false">${addTrialBtn}</td>
+      <td class="vcol-rem" contenteditable="false">
+        <button class="view-add-remark-row" data-act-id="${escHtml(actId || "")}"
+          data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
+          data-is-predefined="${isPredefined}">+ Add Remark${mappedInfo ? "" : " &amp; Trials"}</button>
+      </td>
+      <td class="vcol-trials" contenteditable="false">&nbsp;</td>
       <td class="vcol-total" contenteditable="false">&nbsp;</td>
       <td class="vcol-score" contenteditable="false">${mappedInfo ? (mappedInfo.pct !== null ? mappedInfo.pct + "%" : "—") : "&nbsp;"}</td>
     </tr>`;
@@ -3976,6 +3991,23 @@ function attachViewListeners() {
     }));
   });
 
+  // "+ Add Remark" for preset-option/sentence-starter/mastery activities with
+  // no remark yet — these don't get the typeable empty box (there's no free
+  // text to click into), so without this the Remark cell is just blank with
+  // no way to create the first remark at all.
+  body.querySelectorAll(".view-add-remark-row").forEach(btn => {
+    btn.addEventListener("click", withViewAction("viewActionsInFlight", "viewRenderPending", isViewBusy, renderSessionView, async () => {
+      let actId = btn.dataset.actId;
+      if (!actId) {
+        actId = await addActivity(
+          state.viewSessionId, btn.dataset.targetName, btn.dataset.actName, Date.now(),
+          btn.dataset.isPredefined === "true"
+        );
+      }
+      await addRemark(state.viewSessionId, actId, "", null);
+    }));
+  });
+
   body.querySelectorAll(".view-act-edit").forEach(input => {
     input.addEventListener("blur", async () => {
       const newName = input.value.trim();
@@ -4381,8 +4413,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
             data-act-name="${escHtml(actName)}"
             data-target="${escHtml(target.name)}"
             data-is-predefined="${isPredefined}"
-            data-student="${escHtml(studentName)}"
-            placeholder="Click to add remark…"></textarea>
+            data-student="${escHtml(studentName)}"></textarea>
         </td>
         <td class="vcol-trials" contenteditable="false">
           <button class="view-group-add-trial-new" data-act-id="${escHtml(actId || "")}"
