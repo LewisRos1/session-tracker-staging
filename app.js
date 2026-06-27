@@ -115,7 +115,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "556";
+const APP_VERSION = "557";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3185,8 +3185,14 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
       // first having to type something into the remark box. Mapped-score
       // activities have no trials at all, so they skip this button entirely —
       // typing into the empty box above is the only way to create the remark.
+      // No score/label shown here even though mappedInfo resolves to a real
+      // percentage — that percentage is the mapped TARGET's own average, which
+      // exists independently of whether THIS activity has any remark yet, so
+      // showing it here would look like this row already has live data when
+      // it actually contributes nothing until a remark exists (matches the
+      // group screen's equivalent empty case, which already left this blank).
       const addTrialBtn = mappedInfo
-        ? `<span class="view-mapped-label">${escHtml(mappedInfo.label)}</span>`
+        ? ""
         : `<button class="view-add-trial-new" data-act-id="${escHtml(actId || "")}"
         data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
         data-is-predefined="${isPredefined}">+</button>`;
@@ -3194,9 +3200,9 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
         <td class="vcol-no" contenteditable="false">${no}</td>
         <td class="vcol-act" contenteditable="false">${actCell}</td>
         <td class="vcol-rem">${emptyCell}</td>
-        <td class="vcol-trials" contenteditable="false">${addTrialBtn}</td>
+        <td class="vcol-trials" contenteditable="false">${addTrialBtn || "&nbsp;"}</td>
         <td class="vcol-total" contenteditable="false">&nbsp;</td>
-        <td class="vcol-score" contenteditable="false">${mappedInfo ? (mappedInfo.pct !== null ? mappedInfo.pct + "%" : "—") : "&nbsp;"}</td>
+        <td class="vcol-score" contenteditable="false">&nbsp;</td>
       </tr>`;
     }
     // Preset-option / sentence-starter / mastery activities have no typeable
@@ -3482,7 +3488,14 @@ function setupViewRemarkSaving(body, getSessionId, counterKey, onIdle, getData) 
 
     body.querySelectorAll(".view-remark-empty").forEach(el => {
       const text = el.value.trim();
-      if (!text || el.dataset.creating === "true") return;
+      // dataset.remId guards against flush() running a second time for this
+      // exact box before a re-render ever replaces its markup — e.g. the
+      // 700ms debounce timer firing and THEN focusout firing (or vice versa)
+      // both call flush(); without this check, the second call sees
+      // dataset.creating already reset to "false" by the first call's
+      // completion and the same typed text still sitting in the box, and
+      // creates a second, duplicate remark with identical text.
+      if (!text || el.dataset.creating === "true" || el.dataset.remId) return;
       el.dataset.creating = "true";
       state[counterKey]++;
       const create = async () => {
