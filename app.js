@@ -118,7 +118,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "587";
+const APP_VERSION = "588";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -680,7 +680,7 @@ function openStudentRegistryScreen(opts = {}) {
 // (state.students) — the per-student session-number lookups are genuinely
 // slow (2 Firestore queries each), so those fill in afterwards per-cell
 // instead of blocking the whole screen behind a "Loading…" spinner.
-async function renderStudentRegistryBody({ highlightAdd = false, highlightStudentId = null } = {}) {
+async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
   const body = $("student-registry-body");
   if (!body) return;
 
@@ -714,18 +714,8 @@ async function renderStudentRegistryBody({ highlightAdd = false, highlightStuden
             ${sorted.map((s, i) => `
               <tr class="registry-row" data-id="${escHtml(s.id)}" style="cursor:pointer">
                 <td style="text-align:center">${i + 1}</td>
-                <td style="text-align:center">
-                  <input class="admin-input reg-firstname-input" data-id="${escHtml(s.id)}"
-                    data-original="${escHtml(s.firstName || s.name.split(/\s+/)[0] || "")}"
-                    value="${escHtml(s.firstName || s.name.split(/\s+/)[0] || "")}"
-                    style="width:100%;text-align:center;border:none;background:transparent" />
-                </td>
-                <td style="text-align:center">
-                  <input class="admin-input reg-lastname-input" data-id="${escHtml(s.id)}"
-                    data-original="${escHtml(s.lastName || s.name.split(/\s+/).slice(1).join(" ") || "")}"
-                    value="${escHtml(s.lastName || s.name.split(/\s+/).slice(1).join(" ") || "")}"
-                    style="width:100%;text-align:center;border:none;background:transparent" />
-                </td>
+                <td style="text-align:center">${escHtml(s.firstName || s.name.split(/\s+/)[0] || "")}</td>
+                <td style="text-align:center">${escHtml(s.lastName || s.name.split(/\s+/).slice(1).join(" ") || "")}</td>
                 <td class="reg-indiv-num" data-id="${escHtml(s.id)}" style="text-align:center">…</td>
                 <td class="reg-group-num" data-id="${escHtml(s.id)}" style="text-align:center">…</td>
               </tr>`).join("")}
@@ -736,46 +726,10 @@ async function renderStudentRegistryBody({ highlightAdd = false, highlightStuden
     </div>`;
 
   $("student-registry-body").querySelectorAll(".registry-row").forEach(row => {
-    row.addEventListener("click", e => {
-      if (e.target.closest("input")) return; // name cells are click-to-edit, not a row-open click
+    row.addEventListener("click", () => {
       const s = state.students.find(x => x.id === row.dataset.id);
       if (s) openManageModal(s);
     });
-  });
-
-  // Click-to-edit First/Last Name cells (spreadsheet-style) — saves once
-  // focus leaves the row entirely (not on every individual field's blur, so
-  // tabbing from First Name into Last Name in the same row doesn't trigger a
-  // save/re-render mid-edit and wipe out the Last Name box's just-typed,
-  // not-yet-blurred text). Renaming can shift this student's row to a new
-  // alphabetical position, so a successful save re-renders the whole table.
-  const saveRegistryRow = async row => {
-    const s = state.students.find(x => x.id === row.dataset.id);
-    if (!s) return;
-    const fnInput = row.querySelector(".reg-firstname-input");
-    const lnInput = row.querySelector(".reg-lastname-input");
-    const fn = fnInput.value.trim();
-    const ln = lnInput.value.trim();
-    if (!fn) fnInput.value = fnInput.dataset.original;
-    if (!ln) lnInput.value = lnInput.dataset.original;
-    if (!fn || !ln) return;
-    const newName = `${fn} ${ln}`;
-    if (fn === s.firstName && ln === s.lastName && newName === s.name) return;
-    s.firstName = fn;
-    s.lastName  = ln;
-    s.name      = newName;
-    await saveStudent(s);
-    renderStudentRegistryBody();
-  };
-  $("student-registry-body").querySelectorAll(".reg-firstname-input, .reg-lastname-input").forEach(input => {
-    input.addEventListener("blur", () => {
-      const row = input.closest("tr");
-      setTimeout(() => {
-        if (row.contains(document.activeElement)) return; // focus moved to the other name field in this row — not done editing yet
-        saveRegistryRow(row);
-      }, 0);
-    });
-    input.addEventListener("keydown", e => { if (e.key === "Enter") input.blur(); });
   });
 
   $("btn-add-student-row").addEventListener("click", startAddStudentRow);
@@ -785,14 +739,6 @@ async function renderStudentRegistryBody({ highlightAdd = false, highlightStuden
     const btn = $("btn-add-student-row");
     btn.classList.add("btn-flash-hint");
     setTimeout(() => btn.classList.remove("btn-flash-hint"), 3400);
-  }
-
-  if (highlightStudentId) {
-    const row = body.querySelector(`.registry-row[data-id="${highlightStudentId}"]`);
-    if (row) {
-      row.scrollIntoView({ block: "center" });
-      row.querySelector(".reg-firstname-input")?.focus();
-    }
   }
 
   const latestNumber = sessions => sessions.reduce((max, s) => Math.max(max, s.number || 0), 0);
@@ -6392,6 +6338,53 @@ function showDupFromTemplate(student) {
 
 // ── Student management content ────────────────────────────────
 
+function renderStudentNameDisplay(student) {
+  return `<div style="display:flex;gap:.6rem;align-items:center">
+    <div class="admin-input" style="flex:1;color:var(--text-muted);cursor:default">${escHtml(student.name)}</div>
+    <button class="btn-primary-sm" id="btn-mn-rename">Change Student's Name</button>
+  </div>`;
+}
+
+// "Change Student's Name" swaps the read-only name display for the old
+// First Name/Last Name editor in place (same popup, no navigation) — with
+// persistent labels instead of placeholder text (which disappears once you
+// type) and no Save button, since each field autosaves on blur instead.
+function wireStudentNameSection(student) {
+  $("btn-mn-rename")?.addEventListener("click", () => {
+    const firstName = student.firstName || student.name?.split(/\s+/)[0] || "";
+    const lastName  = student.lastName  || student.name?.split(/\s+/).slice(1).join(" ") || "";
+    $("mn-s-name-section").innerHTML = `
+      <div style="display:flex;gap:.6rem;align-items:flex-end;flex-wrap:wrap">
+        <div style="flex:1;min-width:8rem">
+          <div style="font-size:.75rem;font-weight:600;color:var(--text-muted);margin-bottom:.25rem">First Name</div>
+          <input class="admin-input" id="mn-s-firstname" value="${escHtml(firstName)}" style="width:100%" />
+        </div>
+        <div style="flex:1;min-width:8rem">
+          <div style="font-size:.75rem;font-weight:600;color:var(--text-muted);margin-bottom:.25rem">Last Name</div>
+          <input class="admin-input" id="mn-s-lastname" value="${escHtml(lastName)}" style="width:100%" />
+        </div>
+      </div>`;
+
+    const save = async () => {
+      const fn = $("mn-s-firstname").value.trim();
+      const ln = $("mn-s-lastname").value.trim();
+      if (!fn || !ln) return;
+      const newName = `${fn} ${ln}`;
+      if (fn === student.firstName && ln === student.lastName && newName === student.name) return;
+      student.firstName = fn;
+      student.lastName  = ln;
+      student.name      = newName;
+      await saveStudent(student);
+      $("manage-modal-title").textContent = newName;
+    };
+    [$("mn-s-firstname"), $("mn-s-lastname")].forEach(input => {
+      input.addEventListener("blur", save);
+      input.addEventListener("keydown", e => { if (e.key === "Enter") input.blur(); });
+    });
+    $("mn-s-firstname").focus();
+  });
+}
+
 function renderStudentManageContent(student) {
   _pendingActsCleanup = null;
   $("manage-modal-title").textContent = student.name;
@@ -6400,10 +6393,7 @@ function renderStudentManageContent(student) {
   const html = `
     <div class="admin-section" style="margin-bottom:1.5rem">
       <label class="admin-label">Student Name</label>
-      <div style="display:flex;gap:.6rem;align-items:center">
-        <div class="admin-input" style="flex:1;color:var(--text-muted);cursor:default">${escHtml(student.name)}</div>
-        <button class="btn-primary-sm" id="btn-mn-rename">Change Student's Name</button>
-      </div>
+      <div id="mn-s-name-section">${renderStudentNameDisplay(student)}</div>
     </div>
     <div class="admin-section">
       <div id="mn-s-session-number-area">Loading…</div>
@@ -6420,14 +6410,7 @@ function renderStudentManageContent(student) {
     </div>`;
 
   $("manage-modal-body").innerHTML = html;
-
-  // Renaming now happens on the Student Database page itself (click-to-edit
-  // First/Last Name cells there) — this just gets you to that row instead of
-  // duplicating the rename UI here.
-  $("btn-mn-rename").addEventListener("click", () => {
-    closeManageModal();
-    openStudentRegistryScreen({ highlightStudentId: student.id });
-  });
+  wireStudentNameSection(student);
 
   renderSessionNumberSection(student);
 
