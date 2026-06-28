@@ -118,7 +118,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "574";
+const APP_VERSION = "575";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1034,23 +1034,31 @@ function renderExportButtons() {
   const exportAllContainer = $("export-all-button");
   if (!exportAllContainer) return;
 
-  exportAllContainer.innerHTML = `<button class="export-btn export-btn-all" id="btn-export-all">Export All (ZIP)</button>`;
+  exportAllContainer.innerHTML = `
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+      <button class="export-btn export-btn-all" id="btn-export-all-trials">Export All (ZIP) — with Trials</button>
+      <button class="export-btn export-btn-all" id="btn-export-all-notrials">Export All (ZIP) — without Trials</button>
+    </div>`;
 
-  $("btn-export-all").addEventListener("click", async () => {
-    const btn = $("btn-export-all");
-    btn.style.width = btn.offsetWidth + "px";
-    btn.disabled = true;
-    btn.textContent = "Generating…";
-    try {
-      await exportAllStudents(state.students, state.groups);
-    } catch (err) {
-      alert("Export failed: " + err.message);
-    } finally {
-      btn.disabled = false;
-      btn.textContent = "Export All (ZIP)";
-      btn.style.width = "";
-    }
-  });
+  const wire = (btnId, defaultLabel, includeTrials) => {
+    $(btnId).addEventListener("click", async () => {
+      const btn = $(btnId);
+      btn.style.width = btn.offsetWidth + "px";
+      btn.disabled = true;
+      btn.textContent = "Generating…";
+      try {
+        await exportAllStudents(state.students, state.groups, includeTrials);
+      } catch (err) {
+        alert("Export failed: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = defaultLabel;
+        btn.style.width = "";
+      }
+    });
+  };
+  wire("btn-export-all-trials", "Export All (ZIP) — with Trials", true);
+  wire("btn-export-all-notrials", "Export All (ZIP) — without Trials", false);
 }
 
 // One-time setup tool: links every group's free-typed attendee names to a
@@ -1157,12 +1165,8 @@ function showStudentChoice(student) {
     </div>`;
   $("session-picker-modal").classList.remove("hidden");
 
-  $("session-picker-list").querySelector(".choice-export-excel").addEventListener("click", async e => {
-    const btn = e.currentTarget;
-    btn.disabled = true;
-    btn.querySelector(".choice-label").textContent = "Generating…";
-    try { await exportStudentData(student); } catch (err) { alert("Export failed: " + err.message); }
-    closeSessionPicker();
+  $("session-picker-list").querySelector(".choice-export-excel").addEventListener("click", () => {
+    showExportTrialsChoice(student.name, includeTrials => exportStudentData(student, includeTrials));
   });
   $("session-picker-list").querySelector(".choice-export-word").addEventListener("click", () => {
     showExportSessionPickerGeneric(
@@ -1326,6 +1330,36 @@ function closeSessionPicker() {
 $("session-picker-close").addEventListener("click",    closeSessionPicker);
 $("session-picker-backdrop").addEventListener("click", closeSessionPicker);
 
+// ─── EXPORT TO EXCEL: Trials column choice ───────────────────
+// Shared by individual students, group members, and the home screen's
+// Backup Database — Excel export always asks this explicitly with two
+// buttons rather than a browser confirm() dialog. onExport(includeTrials)
+// does the actual export.
+function showExportTrialsChoice(entityLabel, onExport) {
+  $("session-picker-title").textContent = entityLabel;
+  $("session-picker-list").innerHTML = `
+    <div class="choice-list">
+      <button class="choice-btn choice-trials-yes">
+        <span class="choice-icon">📊</span>
+        <div class="choice-text"><div class="choice-label">Export with Trials</div></div>
+      </button>
+      <button class="choice-btn choice-trials-no">
+        <span class="choice-icon">📊</span>
+        <div class="choice-text"><div class="choice-label">Export without Trials</div></div>
+      </button>
+    </div>`;
+  $("session-picker-modal").classList.remove("hidden");
+
+  const run = async (btn, includeTrials) => {
+    btn.disabled = true;
+    btn.querySelector(".choice-label").textContent = "Generating…";
+    try { await onExport(includeTrials); } catch (err) { alert("Export failed: " + err.message); }
+    closeSessionPicker();
+  };
+  $("session-picker-list").querySelector(".choice-trials-yes").addEventListener("click", e => run(e.currentTarget, true));
+  $("session-picker-list").querySelector(".choice-trials-no").addEventListener("click", e => run(e.currentTarget, false));
+}
+
 // ─── EXPORT NOTES TO WORD (shared by individual students and group members) ─
 // entityLabel: display name shown in the picker.
 // getSessions(): fetches the full session list to populate the day picker.
@@ -1427,7 +1461,7 @@ function showGroupExportStudentPicker(group, mode) {
   $("session-picker-modal").classList.remove("hidden");
 
   $("session-picker-list").querySelectorAll(".choice-export-student").forEach(btn => {
-    btn.addEventListener("click", async () => {
+    btn.addEventListener("click", () => {
       const name = btn.dataset.name;
       if (mode === "word") {
         showExportSessionPickerGeneric(
@@ -1437,10 +1471,7 @@ function showGroupExportStudentPicker(group, mode) {
         );
         return;
       }
-      btn.disabled = true;
-      btn.querySelector(".choice-label").textContent = "Generating…";
-      try { await exportGroupMemberData(name, [group]); } catch (err) { alert("Export failed: " + err.message); }
-      closeSessionPicker();
+      showExportTrialsChoice(`${name} (Group)`, includeTrials => exportGroupMemberData(name, [group], includeTrials));
     });
   });
 }

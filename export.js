@@ -459,7 +459,7 @@ function formatExportFilename(name, now) {
   return `${name} - Yearly Summary (${exportedOnSuffix(now)}).xlsx`;
 }
 
-export async function exportStudentData(student) {
+export async function exportStudentData(student, includeTrials = false) {
   if (!student) return;
 
   const sessions = await getAllSessionsForStudent(student.id);
@@ -468,7 +468,6 @@ export async function exportStudentData(student) {
     return;
   }
 
-  const includeTrials = confirm("Include the Trials column in this Excel export?");
   const now    = new Date();
   const buffer = await buildStudentWorkbook(student, sessions, includeTrials);
   const blob   = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
@@ -482,7 +481,7 @@ export async function exportStudentData(student) {
 
 // Exports one student's data across every group session they attended (possibly
 // across multiple groups). Formatted exactly like an individual session export.
-export async function exportGroupMemberData(studentName, groups) {
+export async function exportGroupMemberData(studentName, groups, includeTrials = false) {
   if (!studentName || !groups?.length) return;
 
   let sessions = [];
@@ -495,7 +494,6 @@ export async function exportGroupMemberData(studentName, groups) {
   }
 
   const allTargets = unionTargetsByName(groups);
-  const includeTrials = confirm("Include the Trials column in this Excel export?");
 
   const now    = new Date();
   const buffer = await buildGroupMemberWorkbook(studentName, allTargets, sessions, includeTrials);
@@ -943,10 +941,9 @@ export async function exportGroupMemberSingleSessionWord(studentName, groups, se
 // same "{Name} - Yearly Summary (...)" filename now, so they're kept in
 // separate "Individual Sessions"/"Group Sessions" folders inside the zip to
 // avoid one overwriting the other.
-export async function exportAllStudents(students, groups = []) {
+export async function exportAllStudents(students, groups = [], includeTrials = false) {
   if (!students || students.length === 0) return;
 
-  const includeTrials = confirm("Include the Trials column in this Excel backup?");
   const zip = new JSZip();
   const now = new Date();
   let exported = 0;
