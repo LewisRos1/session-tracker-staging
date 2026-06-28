@@ -118,7 +118,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "582";
+const APP_VERSION = "583";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4873,6 +4873,34 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
       const actVal = firstRowOverall ? actCellWithToggle : null;
 
       if (entry.pending) {
+        // Free-text activities (no presets, not mastery) get a ready-to-type
+        // empty box here too, same as the "nobody has a remark yet" case
+        // below — only preset-option/sentence-starter/mastery activities
+        // (which have no typeable free text) still need an explicit button.
+        if (opts.length === 0 && !isMastery) {
+          html += `<tr>
+            <td class="vcol-no" contenteditable="false">${noVal !== null ? noVal : ""}</td>
+            <td class="vcol-act" contenteditable="false">${actVal !== null ? actVal : ""}</td>
+            <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(entry.studentName)}</td>
+            <td class="vcol-rem">
+              <textarea class="view-remark-edit view-remark-empty" rows="1"
+                data-act-id="${escHtml(actId || "")}"
+                data-act-name="${escHtml(actName)}"
+                data-target="${escHtml(target.name)}"
+                data-is-predefined="${isPredefined}"
+                data-student="${escHtml(entry.studentName)}"></textarea>
+            </td>
+            <td class="vcol-trials" contenteditable="false">
+              <button class="view-group-add-trial-new" data-act-id="${escHtml(actId || "")}"
+                data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
+                data-is-predefined="${isPredefined}" data-student="${escHtml(entry.studentName)}">+</button>
+            </td>
+            <td class="vcol-total" contenteditable="false">&nbsp;</td>
+            <td class="vcol-score" contenteditable="false">&nbsp;</td>
+          </tr>`;
+          firstRowOverall = false;
+          continue;
+        }
         html += `<tr>
           <td class="vcol-no" contenteditable="false">${noVal !== null ? noVal : ""}</td>
           <td class="vcol-act" contenteditable="false">${actVal !== null ? actVal : ""}</td>
