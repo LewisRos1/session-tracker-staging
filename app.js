@@ -118,7 +118,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "588";
+const APP_VERSION = "589";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1189,7 +1189,7 @@ function showStudentChoice(student) {
         <div class="date-quick-btns">
           <button class="btn-date-quick" data-date="${yesterday}">Yesterday (${fmtShort(yesterday)})</button>
           <button class="btn-date-quick" data-date="${today}">Today (${fmtShort(today)})</button>
-          <button class="btn-date-other">Pick a date…</button>
+          <button class="btn-date-other">Pick A Date</button>
         </div>
       </div>`;
 
@@ -1264,13 +1264,17 @@ async function showSessionPicker(student) {
     return;
   }
 
-  renderMonthGrid(student, byMonth, today);
+  renderMonthGrid(student, byMonth, today, sessions);
 }
 
-function renderMonthGrid(student, byMonth, today) {
+function renderMonthGrid(student, byMonth, today, sessions) {
   $("session-picker-title").textContent = student.name;
 
-  let html = `<div class="month-grid">`;
+  let html = `<div class="month-grid">
+    <button class="month-grid-btn month-grid-btn-pickdate" data-action="pick-date">
+      <span class="mgb-month">📅</span>
+      <span class="mgb-year">Pick a Date</span>
+    </button>`;
   for (const month of byMonth.keys()) {
     const [name, year] = month.split(" ");
     const abbr = name.slice(0, 3);
@@ -1284,16 +1288,21 @@ function renderMonthGrid(student, byMonth, today) {
   const list = $("session-picker-list");
   list.innerHTML = html;
 
-  list.querySelectorAll(".month-grid-btn").forEach(btn => {
+  list.querySelector('[data-action="pick-date"]').addEventListener("click", () => {
+    const mostRecent = sessions.reduce((max, s) => (s.date > max ? s.date : max), sessions[0].date);
+    renderPickDateCalendar(student, sessions, byMonth, today, `${mostRecent.slice(0, 7)}-01`);
+  });
+
+  list.querySelectorAll(".month-grid-btn[data-month]").forEach(btn => {
     btn.addEventListener("click", () => {
       const month = btn.dataset.month;
-      renderSessionsForMonth(student, month, byMonth.get(month), byMonth, today);
+      renderSessionsForMonth(student, month, byMonth.get(month), byMonth, today, sessions);
     });
   });
 }
 
 // Page 2: sessions for chosen month
-function renderSessionsForMonth(student, month, monthSessions, byMonth, today) {
+function renderSessionsForMonth(student, month, monthSessions, byMonth, today, sessions) {
   $("session-picker-title").textContent = month;
 
   const list = $("session-picker-list");
@@ -1306,13 +1315,71 @@ function renderSessionsForMonth(student, month, monthSessions, byMonth, today) {
   list.innerHTML = html;
 
   list.querySelector(".btn-picker-back").addEventListener("click", () => {
-    renderMonthGrid(student, byMonth, today);
+    renderMonthGrid(student, byMonth, today, sessions);
   });
 
   list.querySelectorAll(".session-list-item").forEach(item => {
     item.addEventListener("click", () => {
       closeSessionPicker();
       openSessionView(student, item.dataset.sessionId);
+    });
+  });
+}
+
+// "Pick a Date" calendar: jump directly to any past date that has a recorded session
+function renderPickDateCalendar(student, sessions, byMonth, today, displayDate) {
+  const sessionIdByDate = new Map(sessions.map(s => [s.date, s.id]));
+  const [y, m] = displayDate.split("-").map(Number);
+  const monthLabel = new Date(y, m - 1, 1).toLocaleString("default", { month: "long", year: "numeric" });
+  const pad = n => String(n).padStart(2, "0");
+  const prevM = m === 1  ? `${y - 1}-12-01` : `${y}-${pad(m - 1)}-01`;
+  const nextM = m === 12 ? `${y + 1}-01-01` : `${y}-${pad(m + 1)}-01`;
+  const firstDow  = new Date(y, m - 1, 1).getDay();
+  const daysInMon = new Date(y, m, 0).getDate();
+
+  let html = `<button class="btn-picker-back">← Back</button>
+    <div class="date-picker-wrap">
+    <p class="date-picker-legend"><span class="date-taken-dot">✓︎</span> Session recorded on this day</p>
+    <div class="date-picker-cal">
+      <div class="date-picker-nav">
+        <button class="btn-date-prev">‹</button>
+        <span class="date-picker-month-label">${escHtml(monthLabel)}</span>
+        <button class="btn-date-next">›</button>
+      </div>
+      <div class="date-picker-day-headers">
+        <span>Su</span><span>Mo</span><span>Tu</span><span>We</span>
+        <span>Th</span><span>Fr</span><span>Sa</span>
+      </div>
+      <div class="date-picker-grid">`;
+
+  for (let cell = 0; cell < 42; cell++) {
+    const d = cell - firstDow + 1;
+    if (d < 1 || d > daysInMon) { html += `<span></span>`; continue; }
+    const ds      = `${y}-${pad(m)}-${pad(d)}`;
+    const isTaken = sessionIdByDate.has(ds);
+    let cls = "date-picker-day";
+    cls += isTaken ? " date-picker-day-taken" : " date-picker-day-future";
+    const dotCls = isTaken ? "date-taken-dot" : "day-dot-spacer";
+    html += `<button class="${cls}" data-date="${ds}"${isTaken ? "" : " disabled"}><span class="day-num">${d}</span><span class="${dotCls}">${isTaken ? "✓︎" : ""}</span></button>`;
+  }
+  html += `</div></div></div>`;
+
+  $("session-picker-title").textContent = "Pick a Date";
+  $("session-picker-list").innerHTML = html;
+
+  $("session-picker-list").querySelector(".btn-picker-back").addEventListener("click", () =>
+    renderMonthGrid(student, byMonth, today, sessions)
+  );
+  $("session-picker-list").querySelector(".btn-date-prev").addEventListener("click", () => {
+    renderPickDateCalendar(student, sessions, byMonth, today, prevM);
+  });
+  $("session-picker-list").querySelector(".btn-date-next").addEventListener("click", () => {
+    renderPickDateCalendar(student, sessions, byMonth, today, nextM);
+  });
+  $("session-picker-list").querySelectorAll(".date-picker-day:not([disabled])").forEach(btn => {
+    btn.addEventListener("click", () => {
+      closeSessionPicker();
+      openSessionView(student, sessionIdByDate.get(btn.dataset.date));
     });
   });
 }
@@ -7528,7 +7595,7 @@ function showGroupChoice(group) {
         <div class="date-quick-btns">
           <button class="btn-date-quick" data-date="${yesterday}">Yesterday (${fmtShort(yesterday)})</button>
           <button class="btn-date-quick" data-date="${today}">Today (${fmtShort(today)})</button>
-          <button class="btn-date-other">Pick a date…</button>
+          <button class="btn-date-other">Pick A Date</button>
         </div>
       </div>`;
     $("session-picker-list").querySelectorAll(".btn-date-quick").forEach(btn => {
@@ -8587,7 +8654,7 @@ async function showGroupSessionPicker(group) {
 function renderGroupMonthGrid(group, byMonth, sessions) {
   $("session-picker-title").textContent = group.name;
   let html = `<div class="month-grid">
-    <button class="month-grid-btn" data-action="pick-date">
+    <button class="month-grid-btn month-grid-btn-pickdate" data-action="pick-date">
       <span class="mgb-month">📅</span>
       <span class="mgb-year">Pick a Date</span>
     </button>`;

@@ -1499,6 +1499,19 @@ input.field-input::placeholder {
 .mgb-month { font-size: 1rem; font-weight: 700; color: var(--text-main); }
 .mgb-year  { font-size: .72rem; color: var(--text-muted); }
 
+.month-grid-btn-pickdate {
+  border-color: var(--primary);
+  background: var(--white);
+}
+.month-grid-btn-pickdate:hover, .month-grid-btn-pickdate:active {
+  background: var(--bg);
+  border-color: var(--primary);
+}
+.month-grid-btn-pickdate .mgb-month,
+.month-grid-btn-pickdate .mgb-year {
+  color: var(--primary);
+}
+
 .btn-picker-back {
   display: inline-flex;
   align-items: center;
