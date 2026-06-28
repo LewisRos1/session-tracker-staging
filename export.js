@@ -432,9 +432,9 @@ async function buildGroupMemberWorkbook(studentName, allTargets, sessions) {
   return wb.xlsx.writeBuffer();
 }
 
-// "Exported On {D Mon YYYY}, {HHMM}" — date in the same "D Mon YYYY" style as
-// fmtDate below, time as 24h HHMM with no separator. Shared by both the Excel
-// and Word filename formats; always reflects the moment of export, never any
+// "Exported On {D Mon YYYY}, {HH.MM}" — date in the same "D Mon YYYY" style as
+// fmtDate below, time as 24h HH.MM. Shared by both the Excel and Word
+// filename formats; always reflects the moment of export, never any
 // session date.
 function exportedOnSuffix(now) {
   const yyyy = now.getFullYear();
@@ -442,10 +442,10 @@ function exportedOnSuffix(now) {
   const dd   = String(now.getDate()).padStart(2, "0");
   const hh   = String(now.getHours()).padStart(2, "0");
   const min  = String(now.getMinutes()).padStart(2, "0");
-  return `Exported On ${fmtDate(`${yyyy}-${mm}-${dd}`)}, ${hh}${min}`;
+  return `Exported On ${fmtDate(`${yyyy}-${mm}-${dd}`)}, ${hh}.${min}`;
 }
 
-// Filename format: "{Name} - Yearly Summary (Exported On {D Mon YYYY}, {HHMM})"
+// Filename format: "{Name} - Yearly Summary (Exported On {D Mon YYYY}, {HH.MM})"
 function formatExportFilename(name, now) {
   return `${name} - Yearly Summary (${exportedOnSuffix(now)}).xlsx`;
 }
@@ -873,7 +873,7 @@ async function buildSingleSessionWordBlob(entityName, sessionLabel, allTargets, 
   return Packer.toBlob(doc);
 }
 
-// Filename format: "{Name} - Session {N} - {D Mon YYYY} (Exported On {D Mon YYYY}, {HHMM})"
+// Filename format: "{Name} - Session {N} - {D Mon YYYY} (Exported On {D Mon YYYY}, {HH.MM})"
 function formatExportFilenameWord(name, sessionLabel, dateStr, now) {
   const sessionPart = sessionLabel ? `${sessionLabel} - ` : "";
   return `${name} - ${sessionPart}${fmtDate(dateStr)} (${exportedOnSuffix(now)}).docx`;
