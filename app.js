@@ -117,7 +117,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "572";
+const APP_VERSION = "573";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1041,7 +1041,7 @@ function renderExportButtons() {
     btn.disabled = true;
     btn.textContent = "Generating…";
     try {
-      await exportAllStudents(state.students);
+      await exportAllStudents(state.students, state.groups);
     } catch (err) {
       alert("Export failed: " + err.message);
     } finally {

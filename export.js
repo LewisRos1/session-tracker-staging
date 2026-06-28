@@ -681,7 +681,7 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
     return runs;
   }
 
-  function cell(text, { bold = false, italics = false, fill = null, colSpan = 1, align = AlignmentType.LEFT, width = null } = {}) {
+  function cell(text, { bold = false, italics = false, fill = null, colSpan = 1, align = AlignmentType.JUSTIFIED, width = null } = {}) {
     return new TableCell({
       columnSpan: colSpan,
       width: width != null ? { size: width, type: WidthType.DXA } : undefined,
@@ -706,7 +706,7 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
     return runs;
   }
 
-  function richCell(lines, { fill = null, colSpan = 1, align = AlignmentType.LEFT, width = null } = {}) {
+  function richCell(lines, { fill = null, colSpan = 1, align = AlignmentType.JUSTIFIED, width = null } = {}) {
     return new TableCell({
       columnSpan: colSpan,
       width: width != null ? { size: width, type: WidthType.DXA } : undefined,
@@ -771,7 +771,7 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
   }
 
   if (!anyTarget) {
-    body.push(new Paragraph({ children: [new TextRun({ text: "No data recorded for this session." })] }));
+    body.push(new Paragraph({ alignment: AlignmentType.JUSTIFIED, children: [new TextRun({ text: "No data recorded for this session." })] }));
   }
 
   // ── Facilitation note + company stamp (every exported note ends with this) ──
@@ -788,7 +788,7 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
     items.forEach(({ heading, text }, i) => {
       if (i > 0) children.push(new Paragraph({ spacing: { before: 200 }, children: [] }));
       children.push(new Paragraph({ spacing: { after: 60 }, children: [new TextRun({ text: heading, bold: true })] }));
-      children.push(new Paragraph({ children: [new TextRun({ text })] }));
+      children.push(new Paragraph({ alignment: AlignmentType.JUSTIFIED, children: [new TextRun({ text })] }));
     });
     return new Table({
       width: { size: 100, type: WidthType.PERCENTAGE },
@@ -926,7 +926,13 @@ export async function exportGroupMemberSingleSessionWord(studentName, groups, se
   downloadBlob(blob, formatExportFilenameWord(studentName, sessionLabel, session.date, new Date()));
 }
 
-export async function exportAllStudents(students) {
+// `groups` is optional (defaults to none, so existing callers that only
+// pass students still work) — when given, each student's group-session
+// data is bundled in too, alongside their individual sessions. Both use the
+// same "{Name} - Yearly Summary (...)" filename now, so they're kept in
+// separate "Individual Sessions"/"Group Sessions" folders inside the zip to
+// avoid one overwriting the other.
+export async function exportAllStudents(students, groups = []) {
   if (!students || students.length === 0) return;
 
   const zip = new JSZip();
@@ -935,10 +941,31 @@ export async function exportAllStudents(students) {
 
   for (const student of students) {
     const sessions = await getAllSessionsForStudent(student.id);
-    if (sessions.length === 0) continue;
-    const buffer = await buildStudentWorkbook(student, sessions);
-    zip.file(formatExportFilename(student.name, now), buffer);
-    exported++;
+    if (sessions.length > 0) {
+      const buffer = await buildStudentWorkbook(student, sessions);
+      zip.file(`Individual Sessions/${formatExportFilename(student.name, now)}`, buffer);
+      exported++;
+    }
+
+    // A student can be linked into a group under a free-typed name that
+    // doesn't exactly match their registered name — same lookup the
+    // single-group "Export" button next to a group attendee already uses
+    // (see exportGroupMemberData), just generalized across every group they
+    // appear in instead of one.
+    const studentGroups = groups.filter(g => Object.values(g.studentLinks || {}).includes(student.id));
+    if (studentGroups.length > 0) {
+      const groupName = Object.entries(studentGroups[0].studentLinks || {}).find(([, id]) => id === student.id)?.[0];
+      let groupSessions = [];
+      for (const group of studentGroups) {
+        groupSessions.push(...await getAllSessionsForGroup(group.id));
+      }
+      if (groupName && groupSessions.length > 0) {
+        const allTargets = unionTargetsByName(studentGroups);
+        const buffer = await buildGroupMemberWorkbook(groupName, allTargets, groupSessions);
+        zip.file(`Group Sessions/${formatExportFilename(student.name, now)}`, buffer);
+        exported++;
+      }
+    }
   }
 
   if (exported === 0) {
