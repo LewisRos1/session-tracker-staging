@@ -118,7 +118,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "576";
+const APP_VERSION = "577";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -961,12 +961,6 @@ function addNewGroup() {
 
 function groupAutoName(students) {
   return (students || []).join(" & ");
-}
-// Returns true if the group's name still matches the auto-generated pattern
-// (meaning it's safe to update it automatically when students change).
-function groupNameIsAuto(group) {
-  const s = group.students || [];
-  return !group.name || group.name === groupAutoName(s);
 }
 
 function renderGroupButtons() {
@@ -8609,7 +8603,6 @@ function renderGroupManageContent(group) {
         return;
       }
 
-      const wasAuto = groupNameIsAuto(group);
       // Pad to exactly 3 real entries (never sparse/holes) before assigning
       // by index — a sparse array's .length looks "non-empty" even when
       // every slot is blank (e.g. opening then clearing slot 2 without
@@ -8625,7 +8618,11 @@ function renderGroupManageContent(group) {
         group.students[idx] = "";
       }
       const filledNames = group.students.filter(Boolean);
-      if (wasAuto) group.name = groupAutoName(filledNames);
+      // The Group Name field is fully automatic now (no manual-rename input
+      // exists in this modal), so it should always reflect the currently
+      // linked students rather than only updating when an old "was this
+      // already auto?" heuristic happened to hold.
+      group.name = groupAutoName(filledNames);
       if (filledNames.length > 0) _newGroupId = null; // group is no longer empty
 
       const gi = state.groups.findIndex(g => g.id === group.id);
