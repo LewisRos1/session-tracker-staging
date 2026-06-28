@@ -493,6 +493,28 @@ export async function exportGroupMemberData(studentName, groups, includeTrials =
     return;
   }
 
+  // If this exact name has zero remarks anywhere in these sessions, the
+  // export would otherwise silently come back empty (every sheet renders,
+  // just with no scores) — surface what name(s) the recorded data is
+  // actually tagged with instead, which is the real symptom when a group
+  // slot was relinked to a different/renamed student after sessions were
+  // already recorded under the old name.
+  const matchCount = sessions.reduce(
+    (n, s) => n + Object.values(s.remarks || {}).filter(r => r.studentName === studentName).length, 0
+  );
+  if (matchCount === 0) {
+    const otherNames = [...new Set(
+      sessions.flatMap(s => Object.values(s.remarks || {}).map(r => r.studentName).filter(Boolean))
+    )];
+    alert(
+      `No recorded data is tagged to "${studentName}" in this group's sessions.\n\n` +
+      (otherNames.length
+        ? `The data found is tagged to: ${otherNames.join(", ")}.\nThis can happen if the group's student link was changed after sessions were already recorded under the old name.`
+        : `No student names were found on any remark in this group's sessions at all.`)
+    );
+    return;
+  }
+
   const allTargets = unionTargetsByName(groups);
 
   const now    = new Date();
