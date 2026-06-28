@@ -118,7 +118,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "581";
+const APP_VERSION = "582";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -7851,11 +7851,11 @@ function renderGroupStudentActivityCard(studentName, actName, actId, target, dat
 // Live-entry-screen counterpart of groupAttendeeLabel (View/Edit Past
 // Sessions) — same idea, reads the live screen's globals instead.
 function liveGroupAttendeeLabel(studentName) {
-  const linkedId = state.currentGroup?.studentLinks?.[studentName];
-  const num = linkedId ? state.groupSessionData?.attendeePersonalSessionNumbers?.[linkedId] : null;
-  return num != null
-    ? `${escHtml(studentName)} <span style="font-weight:400;color:var(--text-muted);font-size:.85em">(Session ${num})</span>`
-    : escHtml(studentName);
+  return escHtml(studentName);
+}
+
+function firstNameOf(name) {
+  return (name || "").trim().split(/\s+/)[0] || name;
 }
 
 function renderGroupStudentRowCompact(remId, rem, target, mappedInfo = null) {
@@ -8151,7 +8151,7 @@ function updateGroupAvgChips(target, data) {
   if (!target || !data || !attendees.length) {
     container.innerHTML = attendees.map(name =>
       `<div class="days-average-chip">
-        <span class="days-average-label">${escHtml(name)}'s Avg</span>
+        <span class="days-average-label">${escHtml(firstNameOf(name))}'s Avg</span>
         <span class="days-average-value">—</span>
       </div>`
     ).join("");
@@ -8160,7 +8160,7 @@ function updateGroupAvgChips(target, data) {
   container.innerHTML = attendees.map(name => {
     const avg = calcGroupStudentDaysAverage(target, data, name);
     return `<div class="days-average-chip">
-      <span class="days-average-label">${escHtml(name)}'s Avg</span>
+      <span class="days-average-label">${escHtml(firstNameOf(name))}'s Avg</span>
       <span class="days-average-value">${avg !== null ? avg + "%" : "—"}</span>
     </div>`;
   }).join("");
