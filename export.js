@@ -853,10 +853,21 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
 }
 
 async function buildSingleSessionWordBlob(entityName, sessionLabel, allTargets, session) {
-  const { Document, Packer } = docx;
+  const { Document, Packer, LineRuleType } = docx;
   const stampImageBuffer = await getStampImageBuffer();
   const { header, footer, body } = buildSessionDocxBody(entityName, sessionLabel, allTargets, session, stampImageBuffer);
   const doc = new Document({
+    // 1.5 line spacing document-wide (360 = 1.5 * the single-spacing unit of
+    // 240) — every Paragraph inherits this unless it sets its own "spacing",
+    // so table cells, headings, and body text all get it without having to
+    // touch each individual Paragraph call site.
+    styles: {
+      default: {
+        document: {
+          paragraph: { spacing: { line: 360, lineRule: LineRuleType.AUTO } }
+        }
+      }
+    },
     sections: [{ headers: { default: header }, footers: { default: footer }, children: body }]
   });
   return Packer.toBlob(doc);
