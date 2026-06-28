@@ -474,6 +474,9 @@ export async function loadStudentsConfig() {
 
 /** Save (upsert) a student config document. */
 export async function saveStudent(student) {
+  if (!student.name || !student.name.trim()) {
+    throw new Error("Cannot save a student with a blank name.");
+  }
   await setDoc(doc(db, "students", student.id), student);
 }
 
