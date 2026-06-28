@@ -297,29 +297,38 @@ function addChartsSheet(wb, allTargets, sortedSessions) {
   }
 }
 
-function addIndividualTargetSheets(wb, allTargets, sessions, studentName) {
+function addIndividualTargetSheets(wb, allTargets, sessions, studentName, includeTrials) {
+  // Date | Activity | Remark | Score | [Trials] | Avg Score — Trials is an
+  // optional extra column, so the avg-score column's letter/index shifts
+  // from E/5 to F/6 whenever it's included.
+  const numCols   = includeTrials ? 6 : 5;
+  const avgCol    = includeTrials ? 6 : 5;
+  const avgColLet = includeTrials ? "F" : "E";
+
   for (const target of allTargets) {
     const { rows, monthHeaderRows, colHeaderRows, activityHeadingRows, noteRows, sessionDateBlocks, spacerRows } =
-      buildTargetSheet(target, sessions, allTargets);
+      buildTargetSheet(target, sessions, allTargets, includeTrials);
     const ws = wb.addWorksheet(target.name.slice(0, 31));
     rows.forEach(row => ws.addRow(row));
 
-    // Col widths: Date | Activity | Remark | Score | Avg Score
+    // Col widths: Date | Activity | Remark | Score | [Trials] | Avg Score
     ws.getColumn(1).width     = 6.33;
     ws.getColumn(2).width     = 40.89;
     ws.getColumn(3).width     = 62;
     ws.getColumn(4).width     = 6.78;
-    ws.getColumn(5).width     = 8.56;
+    if (includeTrials) ws.getColumn(5).width = 16;
+    ws.getColumn(avgCol).width = 8.56;
     ws.getColumn(1).alignment = { horizontal: "center", vertical: "top" };
     ws.getColumn(2).alignment = { wrapText: true, vertical: "top" };
     ws.getColumn(3).alignment = { wrapText: true, vertical: "top" };
     ws.getColumn(4).alignment = { horizontal: "center", vertical: "top" };
-    ws.getColumn(5).alignment = { horizontal: "center", vertical: "top" };
+    if (includeTrials) ws.getColumn(5).alignment = { horizontal: "center", vertical: "top" };
+    ws.getColumn(avgCol).alignment = { horizontal: "center", vertical: "top" };
 
-    // Month headers: merge A:E, White Darker 25%, bold black
+    // Month headers: merge A:[last col], White Darker 25%, bold black
     for (const rowIdx of monthHeaderRows) {
       const n = rowIdx + 1;
-      try { ws.mergeCells(`A${n}:E${n}`); } catch (_) {}
+      try { ws.mergeCells(`A${n}:${avgColLet}${n}`); } catch (_) {}
       const cell = ws.getRow(n).getCell(1);
       cell.fill      = STYLE_TARGET_MONTH.fill;
       cell.font      = STYLE_TARGET_MONTH.font;
@@ -329,7 +338,7 @@ function addIndividualTargetSheets(wb, allTargets, sessions, studentName) {
     // Column headers: White Darker 15%, bold black
     for (const rowIdx of colHeaderRows) {
       const n = rowIdx + 1;
-      for (let c = 1; c <= 5; c++) {
+      for (let c = 1; c <= numCols; c++) {
         const cell = ws.getRow(n).getCell(c);
         cell.fill      = STYLE_TARGET_COLHDR.fill;
         cell.font      = STYLE_TARGET_COLHDR.font;
@@ -337,7 +346,7 @@ function addIndividualTargetSheets(wb, allTargets, sessions, studentName) {
       }
     }
 
-    // Activity heading rows: merge B:D (leave E free for the avg-score column merge)
+    // Activity heading rows: merge B:D (leave the rest free for the avg-score column merge)
     for (const rowIdx of activityHeadingRows) {
       const n = rowIdx + 1;
       try { ws.mergeCells(`B${n}:D${n}`); } catch (_) {}
@@ -347,7 +356,7 @@ function addIndividualTargetSheets(wb, allTargets, sessions, studentName) {
       cell.alignment = { vertical: "top" };
     }
 
-    // Note rows: merge B:D (leave E free for the avg-score column merge)
+    // Note rows: merge B:D (leave the rest free for the avg-score column merge)
     for (const rowIdx of noteRows) {
       const n = rowIdx + 1;
       try { ws.mergeCells(`B${n}:D${n}`); } catch (_) {}
@@ -361,19 +370,19 @@ function addIndividualTargetSheets(wb, allTargets, sessions, studentName) {
       ws.getRow(n).height = Math.max(18, visLines * 15);
     }
 
-    // Session date blocks: col A = date (top+center), col E = avg score (middle+center)
+    // Session date blocks: col A = date (top+center), last col = avg score (middle+center)
     for (const { startRow, endRow, dateLabel, avgScore } of sessionDateBlocks) {
       const startN = startRow + 1;
       const endN   = endRow + 1;
       if (startN < endN) {
         try { ws.mergeCells(`A${startN}:A${endN}`); } catch (_) {}
-        try { ws.mergeCells(`E${startN}:E${endN}`); } catch (_) {}
+        try { ws.mergeCells(`${avgColLet}${startN}:${avgColLet}${endN}`); } catch (_) {}
       }
       const dateCell = ws.getRow(startN).getCell(1);
       dateCell.value     = dateLabel;
       dateCell.alignment = { horizontal: "center", vertical: "top" };
 
-      const avgCell = ws.getRow(startN).getCell(5);
+      const avgCell = ws.getRow(startN).getCell(avgCol);
       avgCell.value     = avgScore;
       avgCell.font      = { color: { argb: "FF000000" } };
       avgCell.alignment = { horizontal: "center", vertical: "top" };
@@ -385,12 +394,12 @@ function addIndividualTargetSheets(wb, allTargets, sessions, studentName) {
     // Borders: White Darker 15% (#D9D9D9) — skip blank spacer rows
     ws.eachRow((row, rowNumber) => {
       if (spacerRows.has(rowNumber - 1)) return;
-      for (let c = 1; c <= 5; c++) row.getCell(c).border = TARGET_CELL_BORDER;
+      for (let c = 1; c <= numCols; c++) row.getCell(c).border = TARGET_CELL_BORDER;
     });
   }
 }
 
-async function buildStudentWorkbook(student, sessions) {
+async function buildStudentWorkbook(student, sessions, includeTrials) {
   // Drop ghost sessions: activities are auto-created on target selection even without data entry.
   // A session only counts as real once at least one remark (which carries trial scores) exists.
   sessions = sessions.filter(s => Object.keys(s.remarks || {}).length > 0);
@@ -402,7 +411,7 @@ async function buildStudentWorkbook(student, sessions) {
   addSummarySheets(wb, allTargets, sessions);
   addBaselineVsCurrentSheet(wb, student.name, allTargets, sortedSessions);
   addChartsSheet(wb, allTargets, sortedSessions);
-  addIndividualTargetSheets(wb, allTargets, sessions, student.name);
+  addIndividualTargetSheets(wb, allTargets, sessions, student.name, includeTrials);
 
   return wb.xlsx.writeBuffer();
 }
@@ -410,7 +419,7 @@ async function buildStudentWorkbook(student, sessions) {
 // Builds a workbook for ONE student's slice of their group sessions, formatted
 // identically to an individual student export (no Student column — every
 // session here has already been filtered down to just this student's remarks).
-async function buildGroupMemberWorkbook(studentName, allTargets, sessions) {
+async function buildGroupMemberWorkbook(studentName, allTargets, sessions, includeTrials) {
   const filtered = sessions
     .map(s => ({
       ...s,
@@ -427,7 +436,7 @@ async function buildGroupMemberWorkbook(studentName, allTargets, sessions) {
   addSummarySheets(wb, sortedTargets, filtered);
   addBaselineVsCurrentSheet(wb, studentName, sortedTargets, sortedSessions);
   addChartsSheet(wb, sortedTargets, sortedSessions);
-  addIndividualTargetSheets(wb, sortedTargets, filtered, studentName);
+  addIndividualTargetSheets(wb, sortedTargets, filtered, studentName, includeTrials);
 
   return wb.xlsx.writeBuffer();
 }
@@ -459,8 +468,9 @@ export async function exportStudentData(student) {
     return;
   }
 
+  const includeTrials = confirm("Include the Trials column in this Excel export?");
   const now    = new Date();
-  const buffer = await buildStudentWorkbook(student, sessions);
+  const buffer = await buildStudentWorkbook(student, sessions, includeTrials);
   const blob   = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const url    = URL.createObjectURL(blob);
   const a      = document.createElement("a");
@@ -485,9 +495,10 @@ export async function exportGroupMemberData(studentName, groups) {
   }
 
   const allTargets = unionTargetsByName(groups);
+  const includeTrials = confirm("Include the Trials column in this Excel export?");
 
   const now    = new Date();
-  const buffer = await buildGroupMemberWorkbook(studentName, allTargets, sessions);
+  const buffer = await buildGroupMemberWorkbook(studentName, allTargets, sessions, includeTrials);
   const blob   = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const url    = URL.createObjectURL(blob);
   const a      = document.createElement("a");
@@ -935,6 +946,7 @@ export async function exportGroupMemberSingleSessionWord(studentName, groups, se
 export async function exportAllStudents(students, groups = []) {
   if (!students || students.length === 0) return;
 
+  const includeTrials = confirm("Include the Trials column in this Excel backup?");
   const zip = new JSZip();
   const now = new Date();
   let exported = 0;
@@ -942,7 +954,7 @@ export async function exportAllStudents(students, groups = []) {
   for (const student of students) {
     const sessions = await getAllSessionsForStudent(student.id);
     if (sessions.length > 0) {
-      const buffer = await buildStudentWorkbook(student, sessions);
+      const buffer = await buildStudentWorkbook(student, sessions, includeTrials);
       zip.file(`Individual Sessions/${formatExportFilename(student.name, now)}`, buffer);
       exported++;
     }
@@ -961,7 +973,7 @@ export async function exportAllStudents(students, groups = []) {
       }
       if (groupName && groupSessions.length > 0) {
         const allTargets = unionTargetsByName(studentGroups);
-        const buffer = await buildGroupMemberWorkbook(groupName, allTargets, groupSessions);
+        const buffer = await buildGroupMemberWorkbook(groupName, allTargets, groupSessions, includeTrials);
         zip.file(`Group Sessions/${formatExportFilename(student.name, now)}`, buffer);
         exported++;
       }
@@ -1132,7 +1144,8 @@ function parseMonth(monthStr) {
 
 // ─── TARGET DETAIL SHEET ─────────────────────────────────────
 
-function buildTargetSheet(target, sessions, allTargets) {
+function buildTargetSheet(target, sessions, allTargets, includeTrials) {
+  const blank = () => (includeTrials ? ["", "", "", "", "", ""] : ["", "", "", "", ""]);
   const byMonth = new Map();
   for (const s of sessions) {
     if (!byMonth.has(s.month)) byMonth.set(s.month, []);
@@ -1160,16 +1173,20 @@ function buildTargetSheet(target, sessions, allTargets) {
       .filter(v => v !== null);
     const monthlyAvg = dailyAvgsForMonth.length > 0 ? avg(dailyAvgsForMonth) : null;
 
-    if (!firstMonth) { spacerRows.add(rows.length); rows.push(["", "", "", "", ""]); }
+    if (!firstMonth) { spacerRows.add(rows.length); rows.push(blank()); }
     firstMonth = false;
 
     monthHeaderRows.add(rows.length);
-    rows.push([`${target.name}  —  ${month}  —  Monthly Average: ${monthlyAvg !== null ? pct(monthlyAvg) : "N/A"}`, "", "", "", ""]);
+    const monthRow = blank();
+    monthRow[0] = `${target.name}  —  ${month}  —  Monthly Average: ${monthlyAvg !== null ? pct(monthlyAvg) : "N/A"}`;
+    rows.push(monthRow);
     spacerRows.add(rows.length);
-    rows.push(["", "", "", "", ""]); // blank spacer
+    rows.push(blank()); // blank spacer
 
     colHeaderRows.add(rows.length);
-    rows.push(["Date", "Activity", "Remark", "Score", "Avg Score"]);
+    rows.push(includeTrials
+      ? ["Date", "Activity", "Remark", "Score", "Trials", "Avg Score"]
+      : ["Date", "Activity", "Remark", "Score", "Avg Score"]);
 
     for (const session of monthSessions) {
       // Skip if this target has no remarks in this session (activity was auto-created but never used)
@@ -1184,7 +1201,7 @@ function buildTargetSheet(target, sessions, allTargets) {
 
       const snap = (session.targetsSnapshot || []).find(t => t.name === target.name);
       const effectiveTarget = snap ? { ...target, maxPoints: snap.maxPoints } : target;
-      appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRows, session, effectiveTarget, allTargets);
+      appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRows, session, effectiveTarget, allTargets, includeTrials);
     }
   }
 
@@ -1193,7 +1210,17 @@ function buildTargetSheet(target, sessions, allTargets) {
 
 // ─── SESSION ROWS ────────────────────────────────────────────
 
-function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRows, session, target, allTargets) {
+// blankRow()/trialsList() exist so every row pushed here has the same
+// column count whether or not the Trials column is included — ExcelJS
+// merges (month headers, the avg-score column) are addressed by column
+// letter/index in addIndividualTargetSheets, so a row with the wrong
+// length would silently misalign everything after it.
+function trialsList(trials) {
+  return (trials || []).map(t => (t === -1 ? "—" : t)).join(", ");
+}
+
+function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRows, session, target, allTargets, includeTrials) {
+  const blankRow = () => (includeTrials ? ["", "", "", "", "", ""] : ["", "", "", "", ""]);
   const [, m, d] = session.date.split("-").map(Number);
   const shortMonths = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const dateLabel = `${d} ${shortMonths[m - 1]}`;
@@ -1203,12 +1230,12 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
   const activities = getAllActivitiesForTarget(session, target);
 
   if (activities.length === 0) {
-    rows.push(["", "(no data recorded)", "", "", ""]);
+    const r = blankRow(); r[1] = "(no data recorded)"; rows.push(r);
   } else {
     for (const act of activities) {
       if (act.isHeading) {
         activityHeadingRows.add(rows.length);
-        rows.push(["", stripActivityMarkup(act.activityName), "", "", ""]);
+        const r = blankRow(); r[1] = stripActivityMarkup(act.activityName); rows.push(r);
         continue;
       }
 
@@ -1221,7 +1248,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
           .replace(/<[^>]*>/g, "")
           .replace(/\n{3,}/g, "\n\n")
           .trim());
-        rows.push(["", `Note: ${noteText}`, "", "", ""]);
+        const r = blankRow(); r[1] = `Note: ${noteText}`; rows.push(r);
         continue;
       }
 
@@ -1233,7 +1260,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
         : stripActivityMarkup(act.activityName);
 
       if (act.empty) {
-        rows.push(["", activityCell, "", "", ""]);
+        const r = blankRow(); r[1] = activityCell; rows.push(r);
         continue;
       }
 
@@ -1243,7 +1270,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
       )?.sentenceStarter || null;
 
       if (remarks.length === 0) {
-        rows.push(["", activityCell, "", "", ""]);
+        const r = blankRow(); r[1] = activityCell; rows.push(r);
         continue;
       }
 
@@ -1256,20 +1283,19 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
         const masteryNote = stripRemarkHtml(rem.masteryNote || "");
         const baseText    = starter ? `${starter}: ${stripRemarkHtml(rem.text)}`.trim() : stripRemarkHtml(rem.text);
         const remarkText  = masteryNote ? `${baseText} — ${masteryNote}` : baseText;
-        rows.push([
-          "",
-          firstRemark ? activityCell : "",
-          remarkText,
-          remarkAvg !== null ? pct(remarkAvg) : "",
-          ""
-        ]);
+        const r = blankRow();
+        r[1] = firstRemark ? activityCell : "";
+        r[2] = remarkText;
+        r[3] = remarkAvg !== null ? pct(remarkAvg) : "";
+        if (includeTrials) r[4] = trialsList(rem.trials);
+        rows.push(r);
         firstRemark = false;
       }
     }
 
     if (target.hasComment) {
       const commentText = (session.fedcComments || {})[sanitizeKey(target.name)] || "";
-      if (commentText) rows.push(["", "Comment", commentText, "", ""]);
+      if (commentText) { const r = blankRow(); r[1] = "Comment"; r[2] = commentText; rows.push(r); }
     }
   }
 

@@ -46,6 +46,7 @@ import {
   deleteTargetDataFromSessions,
   renameActivityAcrossSessions,
   renameGroupActivityAcrossSessions,
+  reassignGroupStudentAcrossSessions,
   signInWithPin,
   signOutUser,
   onAuthChange,
@@ -117,7 +118,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "573";
+const APP_VERSION = "574";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -8556,6 +8557,7 @@ function renderGroupManageContent(group) {
     sel.addEventListener("change", async () => {
       const idx = Number(sel.dataset.idx);
       const prevName = group.students?.[idx] || "";
+      const prevId   = group.studentLinks?.[prevName] || null;
 
       if (sel.value === "__new__") {
         sel.value = group.studentLinks?.[prevName] || "";
@@ -8598,6 +8600,19 @@ function renderGroupManageContent(group) {
       const gi = state.groups.findIndex(g => g.id === group.id);
       if (gi >= 0) state.groups[gi] = group;
       await saveGroup(group);
+
+      // A slot being RE-LINKED (not just filled or cleared) leaves every
+      // already-recorded session for this group still pointing at the old
+      // student — without this, the registry keeps showing that history
+      // under the old (now-unlinked) student instead of the new one.
+      if (pickedStudent && prevId && prevId !== pickedStudent.id) {
+        try {
+          await reassignGroupStudentAcrossSessions(group.id, prevName, prevId, pickedStudent.name, pickedStudent.id);
+        } catch (err) {
+          alert("Saved the new link, but failed to update this group's past sessions: " + err.message);
+        }
+      }
+
       renderGroupButtons();
       renderGroupManageContent(group); // re-render so other slots see the updated registry/links
     });

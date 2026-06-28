@@ -879,6 +879,52 @@ export async function deleteGroupTargetDataFromSessions(groupId, targetName) {
   }
 }
 
+// When a group roster slot is re-pointed at a different registered student
+// (e.g. it was linked to an auto-created placeholder like "Hayden" and gets
+// corrected to the real "Hayden Chan"), this is the same orphaning problem
+// as renameActivityAcrossSessions, just one layer up: every existing session
+// for this group still has the OLD name/id baked into its attendees/
+// attendeeIds/attendeePersonalSessionNumbers/remarks, so the student
+// registry keeps showing that history under the old (now-unlinked) student
+// instead of the new one. Reassigns all of it in one pass. oldId may be
+// null (the slot was previously unlinked/empty) — in that case there's
+// nothing to migrate, callers should skip calling this entirely.
+export async function reassignGroupStudentAcrossSessions(groupId, oldName, oldId, newName, newId) {
+  if (!oldId) return;
+  const snap = await getDocs(
+    query(collection(db, "sessions"), where("groupId", "==", groupId))
+  );
+  for (const sd of snap.docs) {
+    const data = sd.data();
+    const updates = {};
+
+    const attendees = data.attendees || [];
+    const nameIdx = attendees.indexOf(oldName);
+    if (nameIdx !== -1) {
+      const newAttendees = attendees.slice();
+      newAttendees[nameIdx] = newName;
+      updates.attendees = newAttendees;
+    }
+
+    const attendeeIds = data.attendeeIds || [];
+    if (attendeeIds.includes(oldId)) {
+      updates.attendeeIds = attendeeIds.map(id => (id === oldId ? newId : id));
+    }
+
+    const numbers = data.attendeePersonalSessionNumbers || {};
+    if (numbers[oldId] !== undefined) {
+      updates[`attendeePersonalSessionNumbers.${newId}`] = numbers[oldId];
+      updates[`attendeePersonalSessionNumbers.${oldId}`] = deleteField();
+    }
+
+    for (const [remId, rem] of Object.entries(data.remarks || {})) {
+      if (rem.studentName === oldName) updates[`remarks.${remId}.studentName`] = newName;
+    }
+
+    if (Object.keys(updates).length > 0) await updateDoc(doc(db, "sessions", sd.id), updates);
+  }
+}
+
 // Group counterpart of renameActivityAcrossSessions above — see its comment.
 export async function renameGroupActivityAcrossSessions(groupId, targetName, oldName, newName) {
   const snap = await getDocs(
