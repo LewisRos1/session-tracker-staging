@@ -53,9 +53,7 @@ import {
   generateId,
   getIndividualSessionsForStudent,
   getGroupSessionsForStudent,
-  changeSessionNumber,
-  previewRegistryMigration,
-  runRegistryMigration
+  changeSessionNumber
 } from "./firebase-service.js";
 import {
   exportStudentData, exportAllStudents, exportGroupMemberData,
@@ -118,7 +116,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "592";
+const APP_VERSION = "593";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -621,7 +619,6 @@ async function showHome() {
   renderAssessmentStudentButtons();
   renderTemplateButtons();
   renderExportButtons();
-  renderRegistryMigrationButton();
   renderStudentDatabaseButton();
 }
 
@@ -1030,8 +1027,7 @@ function renderExportButtons() {
 
   exportAllContainer.innerHTML = `
     <div style="display:flex;gap:.6rem;flex-wrap:wrap">
-      <button class="export-btn export-btn-all" id="btn-export-all-trials">Export All (ZIP) — with Trials</button>
-      <button class="export-btn export-btn-all" id="btn-export-all-notrials">Export All (ZIP) — without Trials</button>
+      <button class="export-btn export-btn-all" id="btn-export-all-trials">Export All (ZIP)</button>
     </div>`;
 
   const wire = (btnId, defaultLabel, includeTrials) => {
@@ -1051,70 +1047,7 @@ function renderExportButtons() {
       }
     });
   };
-  wire("btn-export-all-trials", "Export All (ZIP) — with Trials", true);
-  wire("btn-export-all-notrials", "Export All (ZIP) — without Trials", false);
-}
-
-// One-time setup tool: links every group's free-typed attendee names to a
-// registered student record (auto-creating one for anyone who's never had
-// an individual session), then renumbers everyone's sessions into one
-// lifetime sequence spanning both individual and group attendance. Always
-// runs the dry-run report first — nothing is written until the boss
-// confirms after reading it.
-function renderRegistryMigrationButton() {
-  const container = $("registry-migration-button");
-  if (!container) return;
-
-  container.innerHTML = `<button class="export-btn" id="btn-run-registry-migration">Preview & Run Setup</button>`;
-
-  $("btn-run-registry-migration").addEventListener("click", async () => {
-    const btn = $("btn-run-registry-migration");
-    btn.disabled = true;
-    btn.textContent = "Checking…";
-    try {
-      const report = await previewRegistryMigration();
-      const nothingToDo = report.nameSplits.length === 0 && report.toLink.length === 0
-        && report.toCreate.length === 0 && report.sessionsToBackfill === 0;
-      if (nothingToDo) {
-        alert("Nothing to do — every student and group is already set up.");
-        return;
-      }
-      const lines = [
-        `This will make the following changes:`,
-        `- Split ${report.nameSplits.length} student name(s) into first/last name`,
-        `- Link ${report.toLink.length} group attendee name(s) to their matching registered student`,
-        `- Create ${report.toCreate.length} new student record(s) for group attendees who've never had an individual session`,
-        `- Update ${report.sessionsToBackfill} historical group session record(s)`,
-        ``,
-        report.toCreate.length
-          ? `New records will be created for:\n` + report.toCreate.map(c => `  • "${c.rosterName}" (in group "${c.groupName}")`).join("\n") + `\n`
-          : ``,
-        `This cannot be easily undone — make sure you have a recent Firestore backup. Proceed?`
-      ].filter(Boolean).join("\n");
-      if (!confirm(lines)) return;
-
-      btn.textContent = "Running…";
-      const createdLog = await runRegistryMigration();
-      state.students = await loadStudentsConfig();
-      state.groups   = await loadGroups();
-      renderExistingStudentButtons();
-      renderAssessmentStudentButtons();
-      renderGroupButtons();
-
-      alert(
-        "Setup complete." +
-        (createdLog.length
-          ? `\n\nNew student records were created for these group attendees — please check Manage Student for each to confirm their first/last name split correctly:\n`
-            + createdLog.map(c => `  • "${c.rosterName}" (in group "${c.groupName}")`).join("\n")
-          : "")
-      );
-    } catch (err) {
-      alert("Setup failed: " + err.message);
-    } finally {
-      btn.disabled = false;
-      btn.textContent = "Preview & Run Setup";
-    }
-  });
+  wire("btn-export-all-trials", "Export All (ZIP)", true);
 }
 
 // ============================================================
@@ -6078,7 +6011,6 @@ async function closeManageModal() {
   renderAssessmentStudentButtons();
   renderTemplateButtons();
   renderExportButtons();
-  renderRegistryMigrationButton();
   renderGroupButtons();
   // Manage Student can be opened from on top of the Student Database page
   // (clicking a row there) — refresh its table too, otherwise a rename or
