@@ -118,7 +118,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "590";
+const APP_VERSION = "591";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1272,8 +1272,7 @@ function renderMonthGrid(student, byMonth, today, sessions) {
 
   let html = `<div class="month-grid">
     <button class="month-grid-btn month-grid-btn-pickdate" data-action="pick-date">
-      <span class="mgb-month">📅</span>
-      <span class="mgb-year">Pick a Date</span>
+      <span class="mgb-pickdate-label">Pick A Date</span>
     </button>`;
   for (const month of byMonth.keys()) {
     const [name, year] = month.split(" ");
@@ -1326,11 +1325,16 @@ function renderSessionsForMonth(student, month, monthSessions, byMonth, today, s
   });
 }
 
-// "Pick a Date" calendar: jump directly to any past date that has a recorded session
+// "Pick a Date" calendar: jump straight to any past/today date's View/Edit
+// screen — if that date has no session yet, one is created blank (and will
+// be auto-deleted on the way out, same as any other empty session, if
+// nothing ends up typed into it).
 function renderPickDateCalendar(student, sessions, byMonth, today, displayDate) {
   const sessionIdByDate = new Map(sessions.map(s => [s.date, s.id]));
   const [y, m] = displayDate.split("-").map(Number);
   const monthLabel = new Date(y, m - 1, 1).toLocaleString("default", { month: "long", year: "numeric" });
+  const [ty, tm] = today.split("-").map(Number);
+  const canNext = y < ty || (y === ty && m < tm);
   const pad = n => String(n).padStart(2, "0");
   const prevM = m === 1  ? `${y - 1}-12-01` : `${y}-${pad(m - 1)}-01`;
   const nextM = m === 12 ? `${y + 1}-01-01` : `${y}-${pad(m + 1)}-01`;
@@ -1344,7 +1348,7 @@ function renderPickDateCalendar(student, sessions, byMonth, today, displayDate) 
       <div class="date-picker-nav">
         <button class="btn-date-prev">‹</button>
         <span class="date-picker-month-label">${escHtml(monthLabel)}</span>
-        <button class="btn-date-next">›</button>
+        <button class="btn-date-next"${canNext ? "" : " disabled"}>›</button>
       </div>
       <div class="date-picker-day-headers">
         <span>Su</span><span>Mo</span><span>Tu</span><span>We</span>
@@ -1356,11 +1360,13 @@ function renderPickDateCalendar(student, sessions, byMonth, today, displayDate) 
     const d = cell - firstDow + 1;
     if (d < 1 || d > daysInMon) { html += `<span></span>`; continue; }
     const ds      = `${y}-${pad(m)}-${pad(d)}`;
+    const isFut   = ds > today;
     const isTaken = sessionIdByDate.has(ds);
     let cls = "date-picker-day";
-    cls += isTaken ? " date-picker-day-taken" : " date-picker-day-future";
+    if (isFut)   cls += " date-picker-day-future";
+    if (isTaken) cls += " date-picker-day-taken";
     const dotCls = isTaken ? "date-taken-dot" : "day-dot-spacer";
-    html += `<button class="${cls}" data-date="${ds}"${isTaken ? "" : " disabled"}><span class="day-num">${d}</span><span class="${dotCls}">${isTaken ? "✓︎" : ""}</span></button>`;
+    html += `<button class="${cls}" data-date="${ds}"${isFut ? " disabled" : ""}><span class="day-num">${d}</span><span class="${dotCls}">${isTaken ? "✓︎" : ""}</span></button>`;
   }
   html += `</div></div></div>`;
 
@@ -1373,13 +1379,17 @@ function renderPickDateCalendar(student, sessions, byMonth, today, displayDate) 
   $("session-picker-list").querySelector(".btn-date-prev").addEventListener("click", () => {
     renderPickDateCalendar(student, sessions, byMonth, today, prevM);
   });
-  $("session-picker-list").querySelector(".btn-date-next").addEventListener("click", () => {
-    renderPickDateCalendar(student, sessions, byMonth, today, nextM);
-  });
+  if (canNext) {
+    $("session-picker-list").querySelector(".btn-date-next").addEventListener("click", () => {
+      renderPickDateCalendar(student, sessions, byMonth, today, nextM);
+    });
+  }
   $("session-picker-list").querySelectorAll(".date-picker-day:not([disabled])").forEach(btn => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       closeSessionPicker();
-      openSessionView(student, sessionIdByDate.get(btn.dataset.date));
+      const ds = btn.dataset.date;
+      const sessionId = sessionIdByDate.get(ds) || await getOrCreateSessionForDate(student.id, ds, student.targets);
+      openSessionView(student, sessionId);
     });
   });
 }
@@ -4750,7 +4760,7 @@ function viewGroupGetRounds(data, actId, attendees) {
 }
 
 function groupAttendeeLabel(studentName) {
-  return escHtml(studentName);
+  return escHtml(firstNameOf(studentName));
 }
 
 function buildGroupTargetViewTable(target, data, attendees) {
@@ -8655,8 +8665,7 @@ function renderGroupMonthGrid(group, byMonth, sessions) {
   $("session-picker-title").textContent = group.name;
   let html = `<div class="month-grid">
     <button class="month-grid-btn month-grid-btn-pickdate" data-action="pick-date">
-      <span class="mgb-month">📅</span>
-      <span class="mgb-year">Pick a Date</span>
+      <span class="mgb-pickdate-label">Pick A Date</span>
     </button>`;
   for (const month of byMonth.keys()) {
     const [name, year] = month.split(" ");
@@ -8678,15 +8687,17 @@ function renderGroupMonthGrid(group, byMonth, sessions) {
   });
 }
 
-// "Pick a Date" calendar for the group session picker — unlike
-// renderGroupStartSessionCalendar (which lets you START a session on any
-// past/today date), this only cares about jumping to an EXISTING session's
-// View/Edit screen, so days without a recorded session are disabled instead
-// of future days, and there's no restriction on which month you can browse to.
+// "Pick a Date" calendar for the group session picker: jump straight to any
+// past/today date's View/Edit screen — if that date has no session yet, one
+// is created blank (and will be auto-deleted on the way out, same as any
+// other empty session, if nothing ends up typed into it).
 function renderGroupPickDateCalendar(group, sessions, byMonth, displayDate) {
   const sessionIdByDate = new Map(sessions.map(s => [s.date, s.id]));
+  const today = getTodayString();
   const [y, m] = displayDate.split("-").map(Number);
   const monthLabel = new Date(y, m - 1, 1).toLocaleString("default", { month: "long", year: "numeric" });
+  const [ty, tm] = today.split("-").map(Number);
+  const canNext = y < ty || (y === ty && m < tm);
   const pad = n => String(n).padStart(2, "0");
   const prevM = m === 1  ? `${y - 1}-12-01` : `${y}-${pad(m - 1)}-01`;
   const nextM = m === 12 ? `${y + 1}-01-01` : `${y}-${pad(m + 1)}-01`;
@@ -8700,7 +8711,7 @@ function renderGroupPickDateCalendar(group, sessions, byMonth, displayDate) {
       <div class="date-picker-nav">
         <button class="btn-date-prev">‹</button>
         <span class="date-picker-month-label">${escHtml(monthLabel)}</span>
-        <button class="btn-date-next">›</button>
+        <button class="btn-date-next"${canNext ? "" : " disabled"}>›</button>
       </div>
       <div class="date-picker-day-headers">
         <span>Su</span><span>Mo</span><span>Tu</span><span>We</span>
@@ -8712,14 +8723,13 @@ function renderGroupPickDateCalendar(group, sessions, byMonth, displayDate) {
     const d = cell - firstDow + 1;
     if (d < 1 || d > daysInMon) { html += `<span></span>`; continue; }
     const ds      = `${y}-${pad(m)}-${pad(d)}`;
+    const isFut   = ds > today;
     const isTaken = sessionIdByDate.has(ds);
-    // Reuses the "future day" greyed-out look for any day with no recorded
-    // session — there's nothing date-specific about it here, it's just the
-    // existing "not pickable" visual treatment.
     let cls = "date-picker-day";
-    cls += isTaken ? " date-picker-day-taken" : " date-picker-day-future";
+    if (isFut)   cls += " date-picker-day-future";
+    if (isTaken) cls += " date-picker-day-taken";
     const dotCls = isTaken ? "date-taken-dot" : "day-dot-spacer";
-    html += `<button class="${cls}" data-date="${ds}"${isTaken ? "" : " disabled"}><span class="day-num">${d}</span><span class="${dotCls}">${isTaken ? "✓︎" : ""}</span></button>`;
+    html += `<button class="${cls}" data-date="${ds}"${isFut ? " disabled" : ""}><span class="day-num">${d}</span><span class="${dotCls}">${isTaken ? "✓︎" : ""}</span></button>`;
   }
   html += `</div></div></div>`;
 
@@ -8732,13 +8742,18 @@ function renderGroupPickDateCalendar(group, sessions, byMonth, displayDate) {
   $("session-picker-list").querySelector(".btn-date-prev").addEventListener("click", () => {
     renderGroupPickDateCalendar(group, sessions, byMonth, prevM);
   });
-  $("session-picker-list").querySelector(".btn-date-next").addEventListener("click", () => {
-    renderGroupPickDateCalendar(group, sessions, byMonth, nextM);
-  });
+  if (canNext) {
+    $("session-picker-list").querySelector(".btn-date-next").addEventListener("click", () => {
+      renderGroupPickDateCalendar(group, sessions, byMonth, nextM);
+    });
+  }
   $("session-picker-list").querySelectorAll(".date-picker-day:not([disabled])").forEach(btn => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       closeSessionPicker();
-      openGroupSessionView(group, sessionIdByDate.get(btn.dataset.date));
+      const ds = btn.dataset.date;
+      const sessionId = sessionIdByDate.get(ds)
+        || await getOrCreateGroupSessionForDate(group.id, ds, group.targets, group.students, group.studentLinks || {});
+      openGroupSessionView(group, sessionId);
     });
   });
 }
