@@ -118,7 +118,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "583";
+const APP_VERSION = "584";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2003,32 +2003,33 @@ function resolveMappedScoreDisplay(pa, visited) {
 // visited guards against a circular mapping chain (A maps to B, B maps back
 // to A) recursing forever — direct self-mapping is already blocked in the
 // Edit Target picker, but this is a defensive backstop, not the primary guard.
+// One percentage per remark/activity, averaged equally — same method as
+// calcViewDayAvg (View screen) and export.js's calcDailyAverage, so the live
+// entry screen's day average always agrees with the View screen and every
+// export instead of pooling raw trial points (which let activities with more
+// trials outweigh ones with fewer, purely from incidental trial-count
+// differences rather than how well each activity actually went).
 function calcDaysAverage(target, visited = new Set()) {
   if (visited.has(target.id)) return null;
   visited.add(target.id);
 
-  let totalScore = 0;
-  let totalPossible = 0;
+  const avgs = [];
   const maxPts = target.maxPoints || 3;
   for (const act of getActivitiesForTarget(target.name)) {
     const pa = (target.predefinedActivities || []).find(p => p.isMapped && p.name === act.activityName);
     if (pa) {
       if (getRemarksForActivity(act.id).length === 0) continue;
       const mappedPct = resolveMappedScoreDisplay(pa, visited).pct;
-      if (mappedPct !== null) {
-        totalScore    += mappedPct / 100 * maxPts;
-        totalPossible += maxPts;
-      }
+      if (mappedPct !== null) avgs.push(mappedPct);
       continue;
     }
     for (const rem of getRemarksForActivity(act.id)) {
-      const trials = rem.trials || [];
+      const trials = (rem.trials || []).filter(t => t !== -1);
       if (trials.length === 0) continue;
-      totalScore    += trials.reduce((a, b) => a + b, 0);
-      totalPossible += trials.length * maxPts;
+      avgs.push(trials.reduce((a, b) => a + b, 0) / (trials.length * maxPts) * 100);
     }
   }
-  return totalPossible > 0 ? Math.round(totalScore / totalPossible * 100) : null;
+  return avgs.length > 0 ? Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length) : null;
 }
 
 function renderTargetContent() {
@@ -8137,7 +8138,7 @@ function calcGroupStudentDaysAverage(target, data, studentName, visited = new Se
   visited.add(key);
 
   const maxPts = target.maxPoints || 3;
-  let totalScore = 0, totalPossible = 0;
+  const avgs = [];
   const actsForTarget = Object.entries(data.activities || {})
     .filter(([, a]) => a.targetName === target.name);
 
@@ -8148,15 +8149,16 @@ function calcGroupStudentDaysAverage(target, data, studentName, visited = new Se
     if (pa) {
       if (remarksForStudent.length === 0) continue;
       const mappedPct = resolveGroupMappedScoreDisplay(pa, target, data, studentName, visited).pct;
-      if (mappedPct !== null) { totalScore += mappedPct / 100 * maxPts; totalPossible += maxPts; }
+      if (mappedPct !== null) avgs.push(mappedPct);
       continue;
     }
-    const trials = remarksForStudent.flatMap(r => (r.trials || []).filter(t => t !== -1));
-    if (trials.length === 0) continue;
-    totalScore    += trials.reduce((a, b) => a + b, 0);
-    totalPossible += trials.length * maxPts;
+    for (const r of remarksForStudent) {
+      const trials = (r.trials || []).filter(t => t !== -1);
+      if (trials.length === 0) continue;
+      avgs.push(trials.reduce((a, b) => a + b, 0) / (trials.length * maxPts) * 100);
+    }
   }
-  return totalPossible > 0 ? Math.round(totalScore / totalPossible * 100) : null;
+  return avgs.length > 0 ? Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length) : null;
 }
 
 // Resolves a mapped-score activity's live display for one attendee — see
