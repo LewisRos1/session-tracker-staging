@@ -118,7 +118,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "580";
+const APP_VERSION = "581";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4653,18 +4653,8 @@ function viewGroupGetRounds(data, actId, attendees) {
   return rounds;
 }
 
-// Appends "(Session N)" to an attendee's displayed name if they're linked to
-// a registered student (see Manage Group's "Link to registered student")
-// and have a personal lifetime number recorded for this session — see
-// project_unified_session_numbering. Reads straight from the view screen's
-// globals rather than threading params through every render function that
-// shows a student name.
 function groupAttendeeLabel(studentName) {
-  const linkedId = state.viewGroup?.studentLinks?.[studentName];
-  const num = linkedId ? state.viewGroupSessionData?.attendeePersonalSessionNumbers?.[linkedId] : null;
-  return num != null
-    ? `${escHtml(studentName)} <span style="font-weight:400;color:var(--text-muted);font-size:.85em">(Session ${num})</span>`
-    : escHtml(studentName);
+  return escHtml(studentName);
 }
 
 function buildGroupTargetViewTable(target, data, attendees) {
