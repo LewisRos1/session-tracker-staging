@@ -668,9 +668,13 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
     Header, Footer, PageNumber, TabStopType
   } = docx;
 
-  const HEADER_FILL = "C8DFF2";
-  const TARGET_FILL = "A8C8E8";
+  // Matches the Excel per-target sheet palette (STYLE_TARGET_COLHDR / STYLE_ACT_HEADING / STYLE_NOTE).
+  const HEADER_FILL = "D9D9D9";
+  const HEADER_TEXT_COLOR = "000000";
+  const TARGET_FILL = "E4F0F8";
+  const TARGET_TEXT_COLOR = "2A4060";
   const NOTE_FILL   = "FFF8ED";
+  const NOTE_TEXT_COLOR = "7A5030";
   const FACILITATION_BORDER = "000000";
 
   const cellBorders = {
@@ -690,14 +694,14 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
     return runs;
   }
 
-  function cell(text, { bold = false, italics = false, fill = null, colSpan = 1, align = AlignmentType.JUSTIFIED, width = null } = {}) {
+  function cell(text, { bold = false, italics = false, fill = null, color = null, colSpan = 1, align = AlignmentType.JUSTIFIED, width = null } = {}) {
     return new TableCell({
       columnSpan: colSpan,
       width: width != null ? { size: width, type: WidthType.DXA } : undefined,
       shading: fill ? { type: ShadingType.CLEAR, color: "auto", fill } : undefined,
       borders: cellBorders,
       margins: { top: 80, bottom: 80, left: 100, right: 100 },
-      children: [new Paragraph({ alignment: align, children: textLines(text, { bold, italics }) })]
+      children: [new Paragraph({ alignment: align, children: textLines(text, { bold, italics, color: color || undefined }) })]
     });
   }
 
@@ -737,11 +741,10 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
 
     const tableRows = [
       new TableRow({
-        tableHeader: true,
         children: [
-          cell("Activity",                  { bold: true, fill: HEADER_FILL, align: AlignmentType.CENTER, width: WORD_COL_ACTIVITY }),
-          cell("Highlights of Observation",  { bold: true, fill: HEADER_FILL, align: AlignmentType.CENTER, width: WORD_COL_REMARK }),
-          cell("Score",                      { bold: true, fill: HEADER_FILL, align: AlignmentType.CENTER, width: WORD_COL_SCORE })
+          cell("Activity",                  { bold: true, fill: HEADER_FILL, color: HEADER_TEXT_COLOR, align: AlignmentType.CENTER, width: WORD_COL_ACTIVITY }),
+          cell("Highlights of Observation",  { bold: true, fill: HEADER_FILL, color: HEADER_TEXT_COLOR, align: AlignmentType.CENTER, width: WORD_COL_REMARK }),
+          cell("Score",                      { bold: true, fill: HEADER_FILL, color: HEADER_TEXT_COLOR, align: AlignmentType.CENTER, width: WORD_COL_SCORE })
         ]
       })
     ];
@@ -752,16 +755,18 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
           children: [cell(r.text, {
             colSpan: 3,
             width: WORD_COL_TOTAL,
+            bold: r.style === "heading",
             italics: r.style === "note",
-            fill: r.style === "heading" ? TARGET_FILL : (r.style === "note" ? NOTE_FILL : null)
+            fill: r.style === "heading" ? TARGET_FILL : (r.style === "note" ? NOTE_FILL : null),
+            color: r.style === "heading" ? TARGET_TEXT_COLOR : (r.style === "note" ? NOTE_TEXT_COLOR : null)
           })]
         }));
       } else {
         tableRows.push(new TableRow({
           children: [
             r.actLines
-              ? richCell(r.actLines, { width: WORD_COL_ACTIVITY })
-              : cell(r.cells[0], { width: WORD_COL_ACTIVITY }),
+              ? richCell(r.actLines, { align: AlignmentType.LEFT, width: WORD_COL_ACTIVITY })
+              : cell(r.cells[0], { align: AlignmentType.LEFT, width: WORD_COL_ACTIVITY }),
             r.remarkLines
               ? richCell(r.remarkLines, { width: WORD_COL_REMARK })
               : cell(r.cells[1], { width: WORD_COL_REMARK }),
