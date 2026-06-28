@@ -116,7 +116,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "595";
+const APP_VERSION = "596";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -620,6 +620,29 @@ async function showHome() {
   renderTemplateButtons();
   renderExportButtons();
   renderStudentDatabaseButton();
+  runOneOffRepairs();
+}
+
+// One-off repairs for specific data issues already fixed in the app's logic
+// but whose damage needs a one-time correction in already-written Firestore
+// data. Each repair is scoped to an exact studentId+targetName+oldName match,
+// so it's a no-op (and safe to leave running) once that exact mismatch no
+// longer exists — remove the call once confirmed fixed rather than leaving
+// it as permanent dead weight.
+let _ranOneOffRepairs = false;
+function runOneOffRepairs() {
+  if (_ranOneOffRepairs) return;
+  _ranOneOffRepairs = true;
+
+  // Caden Tan's "FEDC 1" target had an activity renamed without the rename
+  // propagating to historical sessions, leaving real recorded data stuck
+  // under the old name "Write FEDC 1's Comment in Self Regulation" while the
+  // current config just says "Comment".
+  const caden = state.students.find(s => s.name === "Caden Tan");
+  if (caden) {
+    renameActivityAcrossSessions(caden.id, "FEDC 1", "Write FEDC 1's Comment in Self Regulation", "Comment")
+      .catch(err => console.error("runOneOffRepairs (Caden Tan FEDC 1 Comment) failed:", err));
+  }
 }
 
 $("btn-logout").addEventListener("click", () => {
