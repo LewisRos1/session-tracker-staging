@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/User/Documents/GitHub/session-tracker-staging/**)",
+      "Edit(//c/Users/User/Documents/GitHub/session-tracker-staging/**)",
+      "Write(//c/Users/User/Documents/GitHub/session-tracker-staging/**)",
+      "Grep",
+      "Glob",
+      "Bash(git push *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
+    ]
+  }
+}
