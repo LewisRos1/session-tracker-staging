@@ -1736,6 +1736,10 @@ input.field-input::placeholder {
 }
 textarea.admin-input { resize: vertical; min-height: 60px; line-height: 1.45; }
 .admin-list-item:not(.admin-note-item) textarea.admin-input { min-height: unset; overflow: hidden; resize: none; }
+.admin-list-item:not(.admin-note-item) textarea.mn-act-name-input,
+.admin-list-item:not(.admin-note-item) textarea.mn-act-note-input {
+  min-height: 4.6rem;
+}
 
 /* ─── Note rich-text editor ──────────────────────────────── */
 .note-format-bar {
