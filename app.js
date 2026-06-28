@@ -118,7 +118,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "584";
+const APP_VERSION = "585";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3980,7 +3980,7 @@ function setupEntryRemarkSaving(host, getSessionId, onIdle) {
         return updateRemarkText(sid, el.dataset.remId, text);
       });
 
-    diffAndSave(".group-remark-input[data-rem-id]", el => htmlForStorage(el.value),
+    diffAndSave(".group-remark-input[data-rem-id]:not(.group-remark-input-empty)", el => htmlForStorage(el.value),
       (el, html) => updateRemarkText(sid, el.dataset.remId, html));
 
     diffAndSave(".group-remark-input-combined[data-rem-ids]", el => htmlForStorage(el.value),
@@ -4002,6 +4002,34 @@ function setupEntryRemarkSaving(host, getSessionId, onIdle) {
           const actId = await ensureFedcActivity(el.dataset.target, el.dataset.paName, paOrder);
           const remId = await ensurePredefinedRemark(actId, el.dataset.remName, text);
           await updateRemarkText(sid, remId, text);
+        } finally {
+          el.dataset.creating = "false";
+        }
+      };
+      trackWrite(create());
+    });
+
+    // Free-text empty box for a pending group attendee (see
+    // renderGroupStudentEmptyRow) — same "don't write anything until there's
+    // real text" guard as above, plus a remId/creating check so a debounce
+    // timer firing right after focusout (or vice versa) can't create a
+    // second, duplicate remark from the same typed text.
+    host.querySelectorAll(".group-remark-input-empty[data-student]").forEach(el => {
+      const text = el.value.trim();
+      if (!text || el.dataset.creating === "true" || el.dataset.remId) return;
+      el.dataset.creating = "true";
+      const create = async () => {
+        try {
+          let actId = el.dataset.actId;
+          if (!actId) {
+            actId = await addActivity(
+              sid, el.dataset.target, el.dataset.actName, Date.now(), el.dataset.isPredefined === "true"
+            );
+          }
+          const remId = await addGroupRemark(sid, actId, el.dataset.student, text);
+          el.dataset.actId = actId;
+          el.dataset.remId = remId;
+          el.dataset.savedHtml = htmlForStorage(text);
         } finally {
           el.dataset.creating = "false";
         }
@@ -7784,7 +7812,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
     }
     const actId = Object.entries(data.activities || {})
       .find(([, a]) => a.targetName === target.name && a.activityName === pa.name)?.[0] || null;
-    items.push(renderGroupActivityCard(pa.name, actId, target, data, attendees, pa.actNote, pa.isMapped ? pa : null));
+    items.push(renderGroupActivityCard(pa.name, actId, target, data, attendees, pa.actNote, pa.isMapped ? pa : null, pa, true));
   }
 
   // Manually added (non-predefined) activities
@@ -7918,7 +7946,16 @@ function renderGroupStudentRowCompact(remId, rem, target, mappedInfo = null) {
     ${trailingField}`;
 }
 
-function renderGroupActivityCard(actName, actId, target, data, attendees, actNote = null, mappedPa = null) {
+function renderGroupActivityCard(actName, actId, target, data, attendees, actNote = null, mappedPa = null, paEntry = null, isPredefined = false) {
+  // Free-text activities (no preset options, not mastery) get a ready-to-type
+  // empty box for a pending attendee instead of a "+ Add Remark & Trials"
+  // button once the card is already expanded (see renderGroupStudentEmptyRow)
+  // — preset-option/sentence-starter/mastery activities have no typeable
+  // free text, so those still need the explicit button.
+  const inlineOptions = paEntry ? getActivityInlineOptions(paEntry) : null;
+  const isMastery      = paEntry?.isMastery || false;
+  const isFreeText     = parseOpts(inlineOptions).length === 0 && !isMastery;
+
   const noteRow = actNote && actNote.trim()
     ? `<div class="entry-field" contenteditable="false">
         <span class="field-label">Note</span>
@@ -8010,8 +8047,9 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
     } else {
       bodyHtml = attendees.map(studentName => {
         const entry = byStudent[studentName]?.[i] || null;
-        return entry
-          ? renderGroupStudentRow(studentName, entry[0], entry[1], target)
+        if (entry) return renderGroupStudentRow(studentName, entry[0], entry[1], target);
+        return isFreeText
+          ? renderGroupStudentEmptyRow(studentName, actId, actName, target, isPredefined)
           : renderGroupStudentPendingRow(studentName, actId, actName, target);
       }).join("");
     }
@@ -8125,6 +8163,32 @@ function renderGroupStudentPendingRow(studentName, actId, actName, target, mappe
         data-act-id="${escHtml(actId || "")}"
         data-act-name="${escHtml(actName)}"
         data-target="${escHtml(target.name)}">+ Add Remark${mapped ? "" : " &amp; Trials"}</button>
+    </div>
+  </div>`;
+}
+
+// Free-text counterpart of renderGroupStudentPendingRow — once the card is
+// already expanded (some other attendee has a remark for this activity),
+// a ready-to-type empty box replaces the "+ Add Remark & Trials" button so
+// typing doesn't need that extra click first. Nothing is written to Firebase
+// until the box actually has text in it (see the ".group-remark-input-empty"
+// creation handler in setupEntryRemarkSaving) — unlike auto-creating an empty
+// remark for every attendee up front, this can't leave a ghost remark behind
+// for an attendee who never actually got anything typed for them.
+function renderGroupStudentEmptyRow(studentName, actId, actName, target, isPredefined) {
+  return `<div class="group-student-section" data-student="${escHtml(studentName)}">
+    <div class="group-student-name-row" contenteditable="false">
+      <span class="group-student-name-label">${liveGroupAttendeeLabel(studentName)}</span>
+    </div>
+    <div class="entry-field">
+      <span class="field-label" contenteditable="false">Remark</span>
+      <textarea class="field-input group-remark-input group-remark-input-empty" rows="1"
+        placeholder="Remark…"
+        data-act-id="${escHtml(actId || "")}"
+        data-act-name="${escHtml(actName)}"
+        data-target="${escHtml(target.name)}"
+        data-is-predefined="${isPredefined}"
+        data-student="${escHtml(studentName)}"></textarea>
     </div>
   </div>`;
 }
