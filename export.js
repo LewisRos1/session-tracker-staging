@@ -20,10 +20,10 @@ function stripRemarkHtml(s) {
 }
 
 // Excel doesn't attempt rich (partial-bold) text for Activity Name/Notes the
-// way the Word export does (see parseInlineMarkup) — just drop the **/__
+// way the Word export does (see parseInlineMarkup) — just drop the */_
 // markers so they don't show up literally in the cell text.
 function stripActivityMarkup(s) {
-  return (s || "").replace(/\*\*(.+?)\*\*/g, "$1").replace(/__(.+?)__/g, "$1");
+  return (s || "").replace(/\*(.+?)\*/g, "$1").replace(/_(.+?)_/g, "$1");
 }
 
 // ─── STYLE CONSTANTS ─────────────────────────────────────────
@@ -569,7 +569,7 @@ function buildRemarkLines(starter, text, masteryNote) {
 // Splits a string into richCell's "array of lines, each an array of
 // {text, bold, underline} runs" shape — first on real line breaks (Activity
 // Name is a multi-line textarea, e.g. a reference block with one bullet per
-// line), then on **bold**/__underline__ markers within each line. Activity
+// line), then on *bold*/_underline_ markers within each line. Activity
 // Name is the only export field that can carry these markers (see app.js's
 // sketch editor on the Edit Target Activity Name/Notes fields) — remarks
 // never type them.
@@ -578,13 +578,13 @@ function parseInlineMarkup(text) {
 }
 function parseInlineMarkupLine(line) {
   const runs = [];
-  // Combined-marker alternatives (**__x__** / __**x**__) must come before the
+  // Combined-marker alternatives (*_x_* / _*x*_) must come before the
   // single-marker ones — a boss who selects already-bolded text and also
   // presses underline (or vice versa) ends up with nested markers, and the
   // single-marker alternatives alone would swallow the inner pair as part of
-  // their own captured text (literal "__" showing up inside a bold run)
+  // their own captured text (literal "_" showing up inside a bold run)
   // instead of recognizing it as bold+underline together.
-  const re = /\*\*__(.+?)__\*\*|__\*\*(.+?)\*\*__|\*\*(.+?)\*\*|__(.+?)__/g;
+  const re = /\*_(.+?)_\*|_\*(.+?)\*_|\*(.+?)\*|_(.+?)_/g;
   let lastIndex = 0, m;
   while ((m = re.exec(line)) !== null) {
     if (m.index > lastIndex) runs.push({ text: line.slice(lastIndex, m.index) });

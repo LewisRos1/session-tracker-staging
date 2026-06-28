@@ -116,7 +116,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "593";
+const APP_VERSION = "594";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -368,7 +368,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // Ctrl+B / Cmd+B: visual bold in contenteditable remark fields, or a
-  // **marker** wrap directly in the Activity Name/Notes plain textareas.
+  // *marker* wrap directly in the Activity Name/Notes plain textareas.
   document.addEventListener("keydown", e => {
     if (!(e.key === "b" && (e.ctrlKey || e.metaKey))) return;
     const el = document.activeElement;
@@ -380,11 +380,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     if (isActivityMarkupField(el)) {
       e.preventDefault();
-      wrapTextareaSelection(el, "**");
+      wrapTextareaSelection(el, "*");
     }
   });
 
-  // Ctrl+U / Cmd+U: same idea as Ctrl+B above, with an __underline__ marker —
+  // Ctrl+U / Cmd+U: same idea as Ctrl+B above, with an _underline_ marker —
   // only Activity Name/Notes fields need this; remarks never asked for
   // underline support.
   document.addEventListener("keydown", e => {
@@ -398,7 +398,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     if (isActivityMarkupField(el)) {
       e.preventDefault();
-      wrapTextareaSelection(el, "__");
+      wrapTextareaSelection(el, "_");
     }
   });
 
@@ -2329,13 +2329,13 @@ function htmlForStorage(text) {
 }
 
 // Read-only display of activity name/note text that may contain
-// **bold**/__underline__ markers (typed via wrapTextareaSelection below) —
+// *bold*/_underline_ markers (typed via wrapTextareaSelection below) —
 // escapes the raw text first so it can't inject arbitrary HTML, then turns
 // the markers into real tags.
 function formatActivityMarkup(text) {
   return escHtml(text || "")
-    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
-    .replace(/__(.+?)__/g, "<u>$1</u>");
+    .replace(/\*(.+?)\*/g, "<b>$1</b>")
+    .replace(/_(.+?)_/g, "<u>$1</u>");
 }
 
 // A "word" for cursor-with-no-selection formatting — letters/digits/'/- so
@@ -2366,14 +2366,14 @@ function findMarkerSpan(value, selStart, selEnd, marker) {
 }
 
 // Formats the current selection in a plain <textarea>/<input> with a marker
-// (** for bold, __ for underline) without going through the contenteditable
+// (* for bold, _ for underline) without going through the contenteditable
 // sketch popup — Activity Name/Notes are the only fields that use this; a
 // plain textarea can't render the result as real bold/underline inline, but
 // this avoids the popup entirely, which is what the boss asked for.
 //
 // Same toggle behaviour as a word processor's Ctrl+B: if the cursor/selection
 // overlaps an existing marker pair *in any way* (see findMarkerSpan above),
-// that pair is removed — it can never stack into "****text****" no matter
+// that pair is removed — it can never stack into "**text**" no matter
 // how it's re-selected. Otherwise, a bare cursor (no selection) expands to
 // the whole word under it before wrapping, instead of dropping markers with
 // nothing between them. Caller is responsible for keeping the field focused
@@ -6661,18 +6661,18 @@ function autoResizeTextarea(el) {
 }
 
 // Converts stored note text to safe display HTML.
-// Accepts both legacy **bold** markdown and new HTML from contenteditable.
+// Accepts both legacy *bold* markdown and new HTML from contenteditable.
 function noteToHtml(text) {
   if (!text) return "";
   if (/<[a-z]/i.test(text)) return text;            // already HTML — use directly
-  return escHtml(text).replace(/\*\*([\s\S]+?)\*\*/g, "<strong>$1</strong>");
+  return escHtml(text).replace(/\*([\s\S]+?)\*/g, "<strong>$1</strong>");
 }
 
 // Convert stored note text (possibly HTML) to plain text for textarea editing
 function stripNoteHtml(text) {
   if (!text) return "";
   if (!/<[a-z]/i.test(text)) {
-    return text.replace(/\*\*([\s\S]+?)\*\*/g, "$1");
+    return text.replace(/\*([\s\S]+?)\*/g, "$1");
   }
   return text
     .replace(/<br\s*\/?>/gi, "\n")
@@ -6993,7 +6993,7 @@ function renderTargetManageContent(student, target) {
       if (btn.classList.contains("btn-fmt-bullet")) {
         toggleBulletSelection(field);
       } else {
-        wrapTextareaSelection(field, btn.classList.contains("btn-fmt-bold") ? "**" : "__");
+        wrapTextareaSelection(field, btn.classList.contains("btn-fmt-bold") ? "*" : "_");
       }
     });
   });
@@ -7345,7 +7345,7 @@ function renderTemplateManageContent(template) {
       if (btn.classList.contains("btn-fmt-bullet")) {
         toggleBulletSelection(field);
       } else {
-        wrapTextareaSelection(field, btn.classList.contains("btn-fmt-bold") ? "**" : "__");
+        wrapTextareaSelection(field, btn.classList.contains("btn-fmt-bold") ? "*" : "_");
       }
     });
   });
