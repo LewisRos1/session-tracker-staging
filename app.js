@@ -118,7 +118,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "585";
+const APP_VERSION = "586";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -8558,12 +8558,16 @@ async function showGroupSessionPicker(group) {
     $("session-picker-list").innerHTML = `<div class="session-picker-loading">No sessions found.</div>`;
     return;
   }
-  renderGroupMonthGrid(group, byMonth);
+  renderGroupMonthGrid(group, byMonth, sessions);
 }
 
-function renderGroupMonthGrid(group, byMonth) {
+function renderGroupMonthGrid(group, byMonth, sessions) {
   $("session-picker-title").textContent = group.name;
-  let html = `<div class="month-grid">`;
+  let html = `<div class="month-grid">
+    <button class="month-grid-btn" data-action="pick-date">
+      <span class="mgb-month">📅</span>
+      <span class="mgb-year">Pick a Date</span>
+    </button>`;
   for (const month of byMonth.keys()) {
     const [name, year] = month.split(" ");
     html += `<button class="month-grid-btn" data-month="${escHtml(month)}">
@@ -8573,28 +8577,105 @@ function renderGroupMonthGrid(group, byMonth) {
   }
   html += `</div>`;
   $("session-picker-list").innerHTML = html;
-  $("session-picker-list").querySelectorAll(".month-grid-btn").forEach(btn => {
+  $("session-picker-list").querySelector('[data-action="pick-date"]').addEventListener("click", () => {
+    const mostRecent = sessions.reduce((max, s) => (s.date > max ? s.date : max), sessions[0].date);
+    renderGroupPickDateCalendar(group, sessions, byMonth, `${mostRecent.slice(0, 7)}-01`);
+  });
+  $("session-picker-list").querySelectorAll(".month-grid-btn[data-month]").forEach(btn => {
     btn.addEventListener("click", () =>
-      renderGroupSessionsForMonth(group, btn.dataset.month, byMonth.get(btn.dataset.month), byMonth)
+      renderGroupSessionsForMonth(group, btn.dataset.month, byMonth.get(btn.dataset.month), byMonth, sessions)
     );
   });
 }
 
-function renderGroupSessionsForMonth(group, month, monthSessions, byMonth) {
+// "Pick a Date" calendar for the group session picker — unlike
+// renderGroupStartSessionCalendar (which lets you START a session on any
+// past/today date), this only cares about jumping to an EXISTING session's
+// View/Edit screen, so days without a recorded session are disabled instead
+// of future days, and there's no restriction on which month you can browse to.
+function renderGroupPickDateCalendar(group, sessions, byMonth, displayDate) {
+  const sessionIdByDate = new Map(sessions.map(s => [s.date, s.id]));
+  const [y, m] = displayDate.split("-").map(Number);
+  const monthLabel = new Date(y, m - 1, 1).toLocaleString("default", { month: "long", year: "numeric" });
+  const pad = n => String(n).padStart(2, "0");
+  const prevM = m === 1  ? `${y - 1}-12-01` : `${y}-${pad(m - 1)}-01`;
+  const nextM = m === 12 ? `${y + 1}-01-01` : `${y}-${pad(m + 1)}-01`;
+  const firstDow  = new Date(y, m - 1, 1).getDay();
+  const daysInMon = new Date(y, m, 0).getDate();
+
+  let html = `<button class="btn-picker-back">← Back</button>
+    <div class="date-picker-wrap">
+    <p class="date-picker-legend"><span class="date-taken-dot">✓︎</span> Session recorded on this day</p>
+    <div class="date-picker-cal">
+      <div class="date-picker-nav">
+        <button class="btn-date-prev">‹</button>
+        <span class="date-picker-month-label">${escHtml(monthLabel)}</span>
+        <button class="btn-date-next">›</button>
+      </div>
+      <div class="date-picker-day-headers">
+        <span>Su</span><span>Mo</span><span>Tu</span><span>We</span>
+        <span>Th</span><span>Fr</span><span>Sa</span>
+      </div>
+      <div class="date-picker-grid">`;
+
+  for (let cell = 0; cell < 42; cell++) {
+    const d = cell - firstDow + 1;
+    if (d < 1 || d > daysInMon) { html += `<span></span>`; continue; }
+    const ds      = `${y}-${pad(m)}-${pad(d)}`;
+    const isTaken = sessionIdByDate.has(ds);
+    // Reuses the "future day" greyed-out look for any day with no recorded
+    // session — there's nothing date-specific about it here, it's just the
+    // existing "not pickable" visual treatment.
+    let cls = "date-picker-day";
+    cls += isTaken ? " date-picker-day-taken" : " date-picker-day-future";
+    const dotCls = isTaken ? "date-taken-dot" : "day-dot-spacer";
+    html += `<button class="${cls}" data-date="${ds}"${isTaken ? "" : " disabled"}><span class="day-num">${d}</span><span class="${dotCls}">${isTaken ? "✓︎" : ""}</span></button>`;
+  }
+  html += `</div></div></div>`;
+
+  $("session-picker-title").textContent = "Pick a Date";
+  $("session-picker-list").innerHTML = html;
+
+  $("session-picker-list").querySelector(".btn-picker-back").addEventListener("click", () =>
+    renderGroupMonthGrid(group, byMonth, sessions)
+  );
+  $("session-picker-list").querySelector(".btn-date-prev").addEventListener("click", () => {
+    renderGroupPickDateCalendar(group, sessions, byMonth, prevM);
+  });
+  $("session-picker-list").querySelector(".btn-date-next").addEventListener("click", () => {
+    renderGroupPickDateCalendar(group, sessions, byMonth, nextM);
+  });
+  $("session-picker-list").querySelectorAll(".date-picker-day:not([disabled])").forEach(btn => {
+    btn.addEventListener("click", () => {
+      closeSessionPicker();
+      openGroupSessionView(group, sessionIdByDate.get(btn.dataset.date));
+    });
+  });
+}
+
+function renderGroupSessionsForMonth(group, month, monthSessions, byMonth, sessions) {
   $("session-picker-title").textContent = month;
   const sorted  = [...monthSessions].sort((a, b) => a.date.localeCompare(b.date));
   const display = [...sorted].reverse();
   const today   = getTodayString();
   let html = `<button class="btn-picker-back">← Back</button>`;
   html += renderSessionListRows(sorted, display, today, {
-    extraLine: s => {
-      const attendees = (s.attendees || []).join(", ");
-      return attendees ? `<div class="session-list-date">${escHtml(attendees)}</div>` : "";
+    // Group sessions have no one shared session number — each attendee has
+    // their own personal lifetime number (a newer/more experienced kid in
+    // the same group can be on a very different number) — so the headline
+    // is just the date, with one "Name — Session N" line per attendee below.
+    renderLabel: (s, dateLabel) => {
+      const attendeeLines = (s.attendees || []).map(name => {
+        const studentId = group.studentLinks?.[name];
+        const num = studentId ? s.attendeePersonalSessionNumbers?.[studentId] : null;
+        return `<div class="session-list-date">${escHtml(name)}${num != null ? ` — Session ${num}` : ""}</div>`;
+      }).join("");
+      return `<strong>${escHtml(dateLabel)}</strong>${attendeeLines}`;
     }
   });
   $("session-picker-list").innerHTML = html;
   $("session-picker-list").querySelector(".btn-picker-back").addEventListener("click", () =>
-    renderGroupMonthGrid(group, byMonth)
+    renderGroupMonthGrid(group, byMonth, sessions)
   );
   $("session-picker-list").querySelectorAll(".session-list-item").forEach(item => {
     item.addEventListener("click", () => {
@@ -8882,8 +8963,11 @@ function sessionItemLabel(dateStr, todayStr) {
 // Shared renderer for the "Session N: ..." rows used by every session picker
 // (individual/group, normal/export/go-to) — groups rows under week headers
 // and lets callers add a per-row extra line (e.g. group attendees) or mark
-// one row as the currently-viewed session.
-function renderSessionListRows(sorted, display, today, { isCurrentId, extraLine } = {}) {
+// one row as the currently-viewed session. renderLabel lets a caller replace
+// the default "Session N: {date}" headline entirely — group sessions have no
+// single shared session number (each attendee has their own personal one),
+// so the group picker swaps in a date headline + one line per attendee.
+function renderSessionListRows(sorted, display, today, { isCurrentId, extraLine, renderLabel } = {}) {
   let html = "";
   let lastSection = null;
   for (const s of display) {
@@ -8895,10 +8979,11 @@ function renderSessionListRows(sorted, display, today, { isCurrentId, extraLine 
     const isCurrent = isCurrentId != null && s.id === isCurrentId;
     const cls       = `session-list-item${isCurrent ? " session-list-current" : ""}`;
     const label     = sessionItemLabel(s.date, today);
+    const labelHtml = renderLabel ? renderLabel(s, label) : `<strong>Session ${s.sessionNumber}</strong>: ${label}`;
     const extra     = extraLine ? extraLine(s) : "";
     html += `<div class="${cls}" data-session-id="${s.id}">
       <div class="session-list-meta">
-        <div class="session-list-label"><strong>Session ${s.sessionNumber}</strong>: ${label}</div>
+        <div class="session-list-label">${labelHtml}</div>
         ${extra}
       </div>
     </div>`;
