@@ -1486,7 +1486,7 @@ input.field-input::placeholder {
   justify-content: center;
   gap: .1rem;
   flex: 0 0 auto;
-  min-width: 84px;
+  width: 140px;
   padding: .9rem .8rem;
   border: 1.5px solid var(--border);
   border-radius: 12px;

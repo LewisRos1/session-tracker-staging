@@ -116,7 +116,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "594";
+const APP_VERSION = "595";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3068,6 +3068,14 @@ async function autoFillMasteryRemarks(student, sessionId) {
 // real data. Unlike autoFillMasteryRemarks this runs on every snapshot, not
 // just first load: the trigger ("the other target now has data") can become
 // true at any point while this session stays open, not only when it's opened.
+// Creating a mapped-score activity's first remark is two separate Firestore
+// writes (addActivity, then addRemark) — each one's own snapshot can re-enter
+// these auto-fill functions before the second write lands, racing into a
+// duplicate remark for the same activity (or, for group sessions, the same
+// attendee). Shared by all four autoFill*MappedRemarks functions below so a
+// re-entrant call for the same key skips instead of double-adding.
+const mappedRemarkAutoFillInFlight = new Set();
+
 async function autoFillMappedRemarks(student, sessionId) {
   const data = state.sessionData;
   let count = 0;
@@ -3087,11 +3095,18 @@ async function autoFillMappedRemarks(student, sessionId) {
       const pct = resolveMappedScoreDisplay(pa, new Set()).pct;
       if (pct === null) continue; // mapped target has no average yet — stay collapsed
 
-      if (!actId) {
-        actId = await addActivity(sessionId, target.name, pa.name, pa.order ?? 0, true);
+      const key = `${sessionId}:${target.name}:${pa.name}`;
+      if (mappedRemarkAutoFillInFlight.has(key)) continue;
+      mappedRemarkAutoFillInFlight.add(key);
+      try {
+        if (!actId) {
+          actId = await addActivity(sessionId, target.name, pa.name, pa.order ?? 0, true);
+        }
+        await addRemark(sessionId, actId, "");
+        count++;
+      } finally {
+        mappedRemarkAutoFillInFlight.delete(key);
       }
-      await addRemark(sessionId, actId, "");
-      count++;
     }
   }
   return count;
@@ -3748,11 +3763,18 @@ async function autoFillViewMappedRemarks(student, sessionId, data) {
       const pct = resolveViewMappedScoreDisplay(pa, data, new Set()).pct;
       if (pct === null) continue;
 
-      if (!actId) {
-        actId = await addActivity(sessionId, target.name, pa.name, pa.order ?? 0, true);
+      const key = `${sessionId}:${target.name}:${pa.name}`;
+      if (mappedRemarkAutoFillInFlight.has(key)) continue;
+      mappedRemarkAutoFillInFlight.add(key);
+      try {
+        if (!actId) {
+          actId = await addActivity(sessionId, target.name, pa.name, pa.order ?? 0, true);
+        }
+        await addRemark(sessionId, actId, "");
+        count++;
+      } finally {
+        mappedRemarkAutoFillInFlight.delete(key);
       }
-      await addRemark(sessionId, actId, "");
-      count++;
     }
   }
   return count;
@@ -3792,11 +3814,18 @@ async function autoFillViewGroupMappedRemarks(group, sessionId, data) {
         if (hasRemark) continue;
         const pct = resolveViewGroupMappedScoreDisplay(pa, data, studentName, new Set()).pct;
         if (pct === null) continue;
-        if (!actId) {
-          actId = await addActivity(sessionId, target.name, pa.name, pa.order ?? 0, true);
+        const key = `${sessionId}:${target.name}:${pa.name}:${studentName}`;
+        if (mappedRemarkAutoFillInFlight.has(key)) continue;
+        mappedRemarkAutoFillInFlight.add(key);
+        try {
+          if (!actId) {
+            actId = await addActivity(sessionId, target.name, pa.name, pa.order ?? 0, true);
+          }
+          await addGroupRemark(sessionId, actId, studentName, "");
+          count++;
+        } finally {
+          mappedRemarkAutoFillInFlight.delete(key);
         }
-        await addGroupRemark(sessionId, actId, studentName, "");
-        count++;
       }
     }
   }
@@ -4697,7 +4726,12 @@ function groupAttendeeLabel(studentName) {
 }
 
 function buildGroupTargetViewTable(target, data, attendees) {
-  const dayAvg = calcViewDayAvg(data, target);
+  // Per-attendee, not one blended figure — a group's two students can be at
+  // very different stages, so a single combined "Day's Average" would hide
+  // that. See calcGroupStudentDaysAverage (shared with the live-entry screen).
+  const studentAvgs = attendees
+    .map(studentName => ({ studentName, pct: calcGroupStudentDaysAverage(target, data, studentName, new Set()) }))
+    .filter(sa => sa.pct !== null);
 
   let rows = "";
   if (target.predefinedActivities?.length > 0) {
@@ -4746,17 +4780,17 @@ function buildGroupTargetViewTable(target, data, attendees) {
     </tr>`;
   }
 
-  if (dayAvg !== null) {
-    rows += `<tr class="view-dayavg-row">
-      <td colspan="6" style="text-align:right" contenteditable="false">Day's Average</td>
-      <td class="vcol-score" contenteditable="false">${dayAvg}%</td>
-    </tr>`;
+  if (studentAvgs.length > 0) {
+    rows += studentAvgs.map(sa => `<tr class="view-dayavg-row">
+      <td colspan="6" style="text-align:right" contenteditable="false">Day's Average (${escHtml(firstNameOf(sa.studentName))})</td>
+      <td class="vcol-score" contenteditable="false">${sa.pct}%</td>
+    </tr>`).join("");
   }
 
   return `<div class="target-view-section">
     <div class="target-view-header" contenteditable="false">
       <span class="target-view-name">${escHtml(target.name)}</span>
-      ${dayAvg !== null ? `<span class="target-view-avg">${dayAvg}%</span>` : ""}
+      ${studentAvgs.map(sa => `<span class="target-view-avg">${escHtml(firstNameOf(sa.studentName))}: ${sa.pct}%</span>`).join("")}
     </div>
     <div class="view-table-wrapper">
       <table class="view-table">
@@ -7750,8 +7784,15 @@ async function autoFillGroupMappedRemarks(group, sessionId, data, targetName, at
       if (hasRemark) continue;
       const pct = resolveGroupMappedScoreDisplay(pa, target, data, studentName, new Set()).pct;
       if (pct === null) continue;
-      await addGroupRemark(sessionId, actId, studentName, "");
-      count++;
+      const key = `${sessionId}:${targetName}:${pa.name}:${studentName}`;
+      if (mappedRemarkAutoFillInFlight.has(key)) continue;
+      mappedRemarkAutoFillInFlight.add(key);
+      try {
+        await addGroupRemark(sessionId, actId, studentName, "");
+        count++;
+      } finally {
+        mappedRemarkAutoFillInFlight.delete(key);
+      }
     }
   }
   return count;
