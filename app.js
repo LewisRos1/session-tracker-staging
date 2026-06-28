@@ -118,7 +118,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "577";
+const APP_VERSION = "578";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1441,7 +1441,7 @@ function renderExportSessionsForMonth(entityLabel, month, monthSessions, byMonth
 // session's daily note.
 function showGroupExportStudentPicker(group, mode) {
   $("session-picker-title").textContent = group.name;
-  const students = group.students || [];
+  const students = (group.students || []).filter(Boolean);
   $("session-picker-list").innerHTML = students.length
     ? `<div class="choice-list">` +
         students.map(name => `
@@ -3766,7 +3766,7 @@ function resolveViewGroupMappedScoreDisplay(pa, data, studentName, visited) {
 // per-target lazy loading), so it checks all of them on every snapshot, same
 // as the individual View screen's autoFillViewMappedRemarks.
 async function autoFillViewGroupMappedRemarks(group, sessionId, data) {
-  const attendees = data.attendees || group.students || [];
+  const attendees = data.attendees || (group.students || []).filter(Boolean);
   let count = 0;
   for (const target of (group.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
@@ -4616,7 +4616,7 @@ function renderGroupSessionView() {
     });
   }
 
-  const attendees = data.attendees || group.students || [];
+  const attendees = data.attendees || (group.students || []).filter(Boolean);
   const targets   = getViewGroupEffectiveTargets();
   const sorted    = sortTargetsByOrder(targets);
 
@@ -5146,7 +5146,7 @@ function attachGroupViewListeners() {
       const current = !!data?.activities?.[actId]?.combineRemarks;
 
       if (!current) {
-        const attendees = data.attendees || state.viewGroup?.students || [];
+        const attendees = data.attendees || (state.viewGroup?.students || []).filter(Boolean);
         const byStudent = {};
         for (const studentName of attendees) {
           byStudent[studentName] = Object.entries(data.remarks || {})
@@ -5281,7 +5281,7 @@ function attachGroupViewListeners() {
       const data       = state.viewGroupSessionData;
       const targetName = btn.dataset.targetName;
       const actName    = btn.dataset.actName;
-      const attendees  = data.attendees || state.viewGroup?.students || [];
+      const attendees  = data.attendees || (state.viewGroup?.students || []).filter(Boolean);
       data.activities = data.activities || {};
       data.remarks    = data.remarks || {};
       let actId = btn.dataset.actId || Object.entries(data.activities)
@@ -7493,6 +7493,7 @@ function showGroupChoice(group) {
 
 // ── Open group session ───────────────────────────────────────
 async function openGroupSession(group, dateStr, attendees) {
+  attendees = (attendees || []).filter(Boolean);
   if (state.fbGroupUnsubscribe) { state.fbGroupUnsubscribe(); state.fbGroupUnsubscribe = null; }
   state.entryGroupRemarkSaver?.cleanup();
   state.entryGroupRemarkSaver = setupEntryRemarkSaving($("group-target-content"), () => state.groupSessionId, () => {
