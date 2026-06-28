@@ -432,15 +432,22 @@ async function buildGroupMemberWorkbook(studentName, allTargets, sessions) {
   return wb.xlsx.writeBuffer();
 }
 
-// Filename format: "{Name} - {Individual/Group Session} - {dd.mm.yyyy} - {hh-mm}.xlsx"
-// Date/time always reflect the moment of export, not any session date.
-function formatExportFilename(name, sessionType, now) {
-  const dd   = String(now.getDate()).padStart(2, "0");
-  const mm   = String(now.getMonth() + 1).padStart(2, "0");
+// "Exported On {D Mon YYYY}, {HHMM}" — date in the same "D Mon YYYY" style as
+// fmtDate below, time as 24h HHMM with no separator. Shared by both the Excel
+// and Word filename formats; always reflects the moment of export, never any
+// session date.
+function exportedOnSuffix(now) {
   const yyyy = now.getFullYear();
+  const mm   = String(now.getMonth() + 1).padStart(2, "0");
+  const dd   = String(now.getDate()).padStart(2, "0");
   const hh   = String(now.getHours()).padStart(2, "0");
   const min  = String(now.getMinutes()).padStart(2, "0");
-  return `${name} - ${sessionType} - ${dd}.${mm}.${yyyy} - ${hh}-${min}.xlsx`;
+  return `Exported On ${fmtDate(`${yyyy}-${mm}-${dd}`)}, ${hh}${min}`;
+}
+
+// Filename format: "{Name} - Yearly Summary (Exported On {D Mon YYYY}, {HHMM})"
+function formatExportFilename(name, now) {
+  return `${name} - Yearly Summary (${exportedOnSuffix(now)}).xlsx`;
 }
 
 export async function exportStudentData(student) {
@@ -458,7 +465,7 @@ export async function exportStudentData(student) {
   const url    = URL.createObjectURL(blob);
   const a      = document.createElement("a");
   a.href       = url;
-  a.download   = formatExportFilename(student.name, "Individual Session", now);
+  a.download   = formatExportFilename(student.name, now);
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -485,7 +492,7 @@ export async function exportGroupMemberData(studentName, groups) {
   const url    = URL.createObjectURL(blob);
   const a      = document.createElement("a");
   a.href       = url;
-  a.download   = formatExportFilename(studentName, "Group Session", now);
+  a.download   = formatExportFilename(studentName, now);
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -855,13 +862,10 @@ async function buildSingleSessionWordBlob(entityName, sessionLabel, allTargets, 
   return Packer.toBlob(doc);
 }
 
-function formatExportFilenameWord(name, sessionType, dateStr, now) {
-  const dd   = String(now.getDate()).padStart(2, "0");
-  const mm   = String(now.getMonth() + 1).padStart(2, "0");
-  const yyyy = now.getFullYear();
-  const hh   = String(now.getHours()).padStart(2, "0");
-  const min  = String(now.getMinutes()).padStart(2, "0");
-  return `${name} - ${sessionType} - ${fmtDate(dateStr)} - ${dd}.${mm}.${yyyy} - ${hh}-${min}.docx`;
+// Filename format: "{Name} - Session {N} - {D Mon YYYY} (Exported On {D Mon YYYY}, {HHMM})"
+function formatExportFilenameWord(name, sessionLabel, dateStr, now) {
+  const sessionPart = sessionLabel ? `${sessionLabel} - ` : "";
+  return `${name} - ${sessionPart}${fmtDate(dateStr)} (${exportedOnSuffix(now)}).docx`;
 }
 
 function downloadBlob(blob, filename) {
@@ -883,7 +887,7 @@ export async function exportStudentSingleSessionWord(student, session) {
   const allTargets   = getAllTargets(student).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
   const sessionLabel = session.sessionNumber != null ? `Session ${session.sessionNumber}` : "";
   const blob = await buildSingleSessionWordBlob(student.name, sessionLabel, allTargets, session);
-  downloadBlob(blob, formatExportFilenameWord(student.name, "Individual Session", session.date, new Date()));
+  downloadBlob(blob, formatExportFilenameWord(student.name, sessionLabel, session.date, new Date()));
 }
 
 export async function exportGroupMemberSingleSessionWord(studentName, groups, session) {
@@ -908,7 +912,7 @@ export async function exportGroupMemberSingleSessionWord(studentName, groups, se
   const allTargets      = unionTargetsByName(groups).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
   const filteredSession = { ...session, remarks: filteredRemarks };
   const blob = await buildSingleSessionWordBlob(studentName, sessionLabel, allTargets, filteredSession);
-  downloadBlob(blob, formatExportFilenameWord(studentName, "Group Session", session.date, new Date()));
+  downloadBlob(blob, formatExportFilenameWord(studentName, sessionLabel, session.date, new Date()));
 }
 
 export async function exportAllStudents(students) {
@@ -922,7 +926,7 @@ export async function exportAllStudents(students) {
     const sessions = await getAllSessionsForStudent(student.id);
     if (sessions.length === 0) continue;
     const buffer = await buildStudentWorkbook(student, sessions);
-    zip.file(formatExportFilename(student.name, "Individual Session", now), buffer);
+    zip.file(formatExportFilename(student.name, now), buffer);
     exported++;
   }
 
