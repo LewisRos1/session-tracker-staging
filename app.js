@@ -120,7 +120,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "604";
+const APP_VERSION = "605";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2071,6 +2071,11 @@ function getEffectiveTargets() {
 }
 
 async function openSession(student, existingSessionId = null, dateStr = null) {
+  // Jumping to another date for the SAME student via "Go To Another
+  // Session" should land back on whatever target they were already
+  // looking at, not silently reset to the first target in the list —
+  // only a genuine student switch starts fresh.
+  const preservedTargetName = state.currentStudent?.id === student.id ? state.selectedTargetName : null;
   state.currentStudent     = student;
   state.selectedTargetName = null;
   state.sessionData        = null;
@@ -2114,7 +2119,9 @@ async function openSession(student, existingSessionId = null, dateStr = null) {
       state.sessionData = data;
       if (firstLoad) {
         const eff = getEffectiveTargets();
-        state.selectedTargetName = eff[0]?.name || null;
+        state.selectedTargetName = (preservedTargetName && eff.some(t => t.name === preservedTargetName))
+          ? preservedTargetName
+          : (eff[0]?.name || null);
         populateTargetDropdown(eff);
         // Auto-create an empty remark for "pick from options" activities
         // (Select one / Tick boxes / Sentence Starter + either, or + Select
@@ -7815,6 +7822,10 @@ function showGroupChoice(group) {
 // ── Open group session ───────────────────────────────────────
 async function openGroupSession(group, dateStr, attendees) {
   attendees = (attendees || []).filter(Boolean);
+  // Same reasoning as openSession's preservedTargetName above — jumping to
+  // another date for the SAME group should keep the currently-viewed
+  // target, not reset to the first one in sort order.
+  const preservedGroupTargetName = state.currentGroup?.id === group.id ? state.selectedGroupTargetName : null;
   if (state.fbGroupUnsubscribe) { state.fbGroupUnsubscribe(); state.fbGroupUnsubscribe = null; }
   state.entryGroupRemarkSaver?.cleanup();
   state.entryGroupRemarkSaver = setupEntryRemarkSaving($("group-target-content"), () => state.groupSessionId, () => {
@@ -7848,7 +7859,8 @@ async function openGroupSession(group, dateStr, attendees) {
       renderGroupSessionHeader(data);
       if (firstLoad) {
         firstLoad = false;
-        state.selectedGroupTargetName = state.selectedGroupTargetName || sortTargetsByOrder(group.targets)[0]?.name || null;
+        const stillValid = preservedGroupTargetName && group.targets.some(t => t.name === preservedGroupTargetName);
+        state.selectedGroupTargetName = stillValid ? preservedGroupTargetName : (sortTargetsByOrder(group.targets)[0]?.name || null);
         populateGroupTargetDropdown(group.targets);
         if (state.selectedGroupTargetName) {
           try {
