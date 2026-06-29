@@ -122,7 +122,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "608";
+const APP_VERSION = "609";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -771,6 +771,76 @@ function runOneOffRepairs() {
 
   migrateAwayFromMasteryType()
     .catch(err => console.error("runOneOffRepairs (mastery removal) failed:", err));
+
+  // v608 Data Integrity Check backlog — confirmed batch 1. Every pair here
+  // was surfaced by the report and manually reviewed (not auto-merged):
+  // either a wording/typo cleanup of the same activity, a list
+  // renumbering (only the leading letter/number changed), or the v606
+  // heading-rename bug (a "Comment Section" heading hijacking a "Comment"
+  // activity's data) recurring on FEDC 2/3/Attending in addition to the
+  // ones already fixed. Deliberately excludes a few report entries that
+  // looked too ambiguous to merge safely (e.g. Leven Chua's "Overall:",
+  // which the current config split into separate Part A/Part B activities;
+  // Liam Chua's per-session "Activity Name: ..." one-offs; Caspar Lim's
+  // "Behaviour 2", which might be tracking a distinct incident rather than
+  // a renamed duplicate of "Behaviour").
+  const BACKLOG_ACTIVITY_RENAMES_V608 = [
+    { student: "Leven Chua", target: "Learning", old: "d) Story Understanding", new: "d) Story Understanding ( Can organises the retelling)" },
+    { student: "Leven Chua", target: "Learning", old: "e) Response & Interaction", new: "e) Response & Interaction (Can Responds to Follow-Up Questions from the text)" },
+    { student: "Leven Chua", target: "Learning", old: "c) Matches clues to guess", new: "c) Matches clues to guess - Skill: Previous Event connection" },
+    { student: "Leven Chua", target: "Learning", old: "d) Explain the answer", new: "d) Explain the answer - Skill: Prediction" },
+    { student: "Leven Chua", target: "Learning", old: "b) Makes a guess", new: "b) Makes a guess - Skill: Thought inference" },
+    { student: "Leven Chua", target: "Learning", old: "a) Looks for clues", new: "a) Looks for clues - Skill : Emotion inference" },
+    { student: "Leven Chua", target: "Learning", old: "c) Sentence Structure", new: "c) Sentence Structure (Uses Clear Sentences)" },
+    { student: "Leven Chua", target: "Learning", old: "Sumarise story:", new: "c) Summarises the story" },
+    { student: "Leven Chua", target: "Learning", old: "Aesop Fable:", new: "Aesop Fable" },
+    { student: "Leven Chua", target: "Learning", old: "c) Understands the answers", new: "c) Understands the answers and discussion" },
+    { student: "Leven Chua", target: "Learning", old: "e) Response & Interaction (Can Responds to Follow-Up Questions)", new: "e) Response & Interaction (Can Responds to Follow-Up Questions from the text)" },
+
+    { student: "Liam Chua", target: "Learning", old: "3. Vocabulary - use suitable words related to the topic.", new: "Vocabulary - use suitable words related to the picture, characters, actions and setting." },
+    { student: "Liam Chua", target: "Learning", old: "Completing worksheet and comprehension", new: "Completing Worksheets - Applies Story Understanding in Worksheet Tasks" },
+    { student: "Liam Chua", target: "Learning", old: "7. Confidence - attempts to speak with less teacher support.", new: "Level of Support - attempts to speak with less teacher support." },
+    { student: "Liam Chua", target: "Learning", old: "2. Clarity - speak clearly enough to understand.", new: "Clarity - Speaks at an understandable volume and pace, with words clear enough for the listener to follow." },
+    { student: "Liam Chua", target: "Learning", old: "Completing Worksheets", new: "Completing Worksheets - Applies Story Understanding in Worksheet Tasks" },
+    { student: "Liam Chua", target: "Learning", old: "Clarity - speak clearly enough to understand.", new: "Clarity - Speaks at an understandable volume and pace, with words clear enough for the listener to follow." },
+    { student: "Liam Chua", target: "Learning", old: "Participation - attempts to speak with less teacher support.", new: "Level of Support - attempts to speak with less teacher support." },
+    { student: "Liam Chua", target: "Learning", old: "Vocabulary - use suitable words related to the topic.", new: "Vocabulary - use suitable words related to the picture, characters, actions and setting." },
+    { student: "Liam Chua", target: "Learning", old: "Story Discussion and Two-Way Communication", new: "Story Discussion and Two-Way Communication (Responds to and asks questions related to the story during discussion.)" },
+
+    { student: "Hayden Chan", target: "Math", old: "Counting forward and backwards (a. Movement b. written c. application- worksheets)", new: "Counting forward and backwards (a. Movement b. written c. Application- worksheets)" },
+    { student: "Hayden Chan", target: "Math", old: "Today, yesterday and tomorrow", new: "Identify today, yesterday and tomorrow" },
+    { student: "Hayden Chan", target: "Math", old: "Numbers", new: "Maths - Numbers" },
+
+    { student: "Kayden Koh", target: "Learning", old: "c. Listen to two instructions - Find two sentences from the story.", new: "b) Find two sentences from the story." },
+    { student: "Kayden Koh", target: "Learning", old: "e, Play a barrier game -", new: "d) Play a barrier game -" },
+    { student: "Kayden Koh", target: "Learning", old: "d. complete two movements circuits", new: "c) complete two movements circuits" },
+
+    { student: "Caden Tan", target: "FEDC 2", old: "Comment Section", new: "Comment" },
+    { student: "Caden Tan", target: "FEDC 3", old: "Comment Section", new: "Comment" },
+    { student: "Caden Tan", target: "Attending", old: "Comment Section", new: "Comment" },
+    { student: "Caden Tan", target: "Two-Way Communication", old: "7. Open the door", new: "9. Open the door" },
+    { student: "Caden Tan", target: "Two-Way Communication", old: "5. I am hungry (snack)", new: "5. I am hungry (snack)" },
+    { student: "Caden Tan", target: "Two-Way Communication", old: "6. Turn on the light", new: "8. Turn on the light" },
+    { student: "Caden Tan", target: "Two-Way Communication", old: "6. Water", new: "7. Water" },
+    { student: "Caden Tan", target: "Two-Way Communication", old: "4. Sounds are too loud.", new: "4. Sounds are too loud" },
+    { student: "Caden Tan", target: "Two-Way Communication",
+      old: `Verbalising Phase 1: a. Provide 3-5 seconds to provide an answer. b. To provide an alternative, simpler question that provides a clue to the answer. c. State the answer in a functional manner before asking the question again. d. Provide a sentence stem. e. Ask the question and provide the answer. f. Provide the sentence stem "I". Phase 2: Provide a visual of the sentence stem 'I' to elicit a response to a question. Phase 3: Provide Caden with a short phrase of 3-4 words. Provide a non-'wh' question. Phase 4: To answer independently what he wants to play in the playground.`,
+      new: `Phase 1: a. Provide 3-5 seconds to provide an answer. b. To provide an alternative, simpler question that provides a clue to the answer. c. State the answer in a functional manner before asking the question again. d. Provide a sentence stem. e. Ask the question and provide the answer. f. Provide the sentence stem "I". Phase 2: Provide a visual of the sentence stem 'I' to elicit a response to a question. Phase 3: Provide Caden with a short phrase of 3-4 words. Provide a non-'wh' question. Phase 4: To answer independently what he wants to play in the playground.` },
+    { student: "Caden Tan", target: "Attending",
+      old: `Attending Phase 1: a. Intro to whole body listening. 2. b. Use of a token board. 3. A stimulus to use outdoors. Phase 2 4. To sit on a convenient, safe surface to follow the instructor's instructions.`,
+      new: `Attending Phase 1: a. Intro to whole body listening. b. Use of a token board. c. A stimulus to use outdoors. Phase 2: d. To sit on a convenient, safe surface to follow the instructor's instructions. Phase 3: e. To stand still to listen to an instructions and to follow it.` },
+
+    { student: "Caspar Lim", target: "Target Behaviour", old: "Caspar has a tendency to pinch or say he wants to bite others when he is frustrated.", new: "Target Behaviour 2: Caspar tends to pinch or say he wants to bite others when he is frustrated" },
+    { student: "Caspar Lim", target: "ABC Chart", old: "Behaviour", new: "Behaviours" }
+  ];
+
+  for (const { student: studentName, target, old: oldName, new: newName } of BACKLOG_ACTIVITY_RENAMES_V608) {
+    const s = state.students.find(st => st.name === studentName);
+    if (s) {
+      renameActivityAcrossSessions(s.id, target, oldName, newName)
+        .catch(err => console.error(`runOneOffRepairs (v608 backlog: ${studentName}/${target}/${oldName}) failed:`, err));
+    }
+  }
 }
 
 // "Mastery Level + Free Text" was removed as a Remark Type — this converts
