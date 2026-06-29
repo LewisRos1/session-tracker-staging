@@ -565,6 +565,42 @@ export async function renameTargetAcrossSessions(studentId, oldName, newName) {
   }
 }
 
+// A Select-one/Tick-boxes activity's recorded answer is the literal option
+// text (rem.text), not an index/ID into inlineOptions — so retyping an
+// option's wording (e.g. "Low" → "Fair") leaves every already-recorded
+// answer of "Low" stuck under text that no longer matches any current pill,
+// same orphaning shape as the rename bugs above. Called once per renamed
+// option (isMulti activities store a comma-joined list of selections, so
+// the old option text is replaced as a token within that list rather than
+// requiring an exact whole-field match).
+export async function renameRemarkOptionAcrossSessions(studentId, targetName, activityName, oldOpt, newOpt, isMulti) {
+  const snap = await getDocs(
+    query(collection(db, "sessions"), where("studentId", "==", studentId))
+  );
+  for (const sessionDoc of snap.docs) {
+    const data = sessionDoc.data();
+    const actIds = Object.entries(data.activities || {})
+      .filter(([, act]) => act.targetName === targetName && act.activityName === activityName)
+      .map(([actId]) => actId);
+    if (actIds.length === 0) continue;
+    const updates = {};
+    for (const [remId, rem] of Object.entries(data.remarks || {})) {
+      if (!actIds.includes(rem.activityId)) continue;
+      if (isMulti) {
+        const parts = (rem.text || "").split(", ").map(s => s.trim()).filter(Boolean);
+        if (!parts.includes(oldOpt)) continue;
+        updates[`remarks.${remId}.text`] = parts.map(p => (p === oldOpt ? newOpt : p)).join(", ");
+      } else {
+        if (rem.text !== oldOpt) continue;
+        updates[`remarks.${remId}.text`] = newOpt;
+      }
+    }
+    if (Object.keys(updates).length > 0) {
+      await updateDoc(doc(db, "sessions", sessionDoc.id), updates);
+    }
+  }
+}
+
 /** Delete a session document entirely (e.g. empty sessions on leave). */
 export async function deleteSession(sessionId) {
   await deleteDoc(doc(db, "sessions", sessionId));
@@ -985,6 +1021,35 @@ export async function renameGroupTargetAcrossSessions(groupId, oldName, newName)
     for (const [actId, act] of Object.entries(data.activities || {})) {
       if (act.targetName === oldName) {
         updates[`activities.${actId}.targetName`] = newName;
+      }
+    }
+    if (Object.keys(updates).length > 0) await updateDoc(doc(db, "sessions", sd.id), updates);
+  }
+}
+
+// Group counterpart of renameRemarkOptionAcrossSessions above — see its
+// comment. Renames the option for every attendee's recorded answer under
+// this activity, regardless of which student said it.
+export async function renameGroupRemarkOptionAcrossSessions(groupId, targetName, activityName, oldOpt, newOpt, isMulti) {
+  const snap = await getDocs(
+    query(collection(db, "sessions"), where("groupId", "==", groupId))
+  );
+  for (const sd of snap.docs) {
+    const data = sd.data();
+    const actIds = Object.entries(data.activities || {})
+      .filter(([, act]) => act.targetName === targetName && act.activityName === activityName)
+      .map(([actId]) => actId);
+    if (actIds.length === 0) continue;
+    const updates = {};
+    for (const [remId, rem] of Object.entries(data.remarks || {})) {
+      if (!actIds.includes(rem.activityId)) continue;
+      if (isMulti) {
+        const parts = (rem.text || "").split(", ").map(s => s.trim()).filter(Boolean);
+        if (!parts.includes(oldOpt)) continue;
+        updates[`remarks.${remId}.text`] = parts.map(p => (p === oldOpt ? newOpt : p)).join(", ");
+      } else {
+        if (rem.text !== oldOpt) continue;
+        updates[`remarks.${remId}.text`] = newOpt;
       }
     }
     if (Object.keys(updates).length > 0) await updateDoc(doc(db, "sessions", sd.id), updates);

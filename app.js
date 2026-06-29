@@ -48,6 +48,8 @@ import {
   renameGroupActivityAcrossSessions,
   renameTargetAcrossSessions,
   renameGroupTargetAcrossSessions,
+  renameRemarkOptionAcrossSessions,
+  renameGroupRemarkOptionAcrossSessions,
   reassignGroupStudentAcrossSessions,
   signInWithPin,
   signOutUser,
@@ -118,7 +120,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "603";
+const APP_VERSION = "604";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -295,6 +297,38 @@ function propagateTargetRename(student, oldName, newName) {
       : renameTargetAcrossSessions(student.id, oldName, newName))
     .catch(err => console.error("propagateTargetRename failed:", err));
   _renamePropagationQueues.set(entityId, next);
+}
+
+// Same orphaning risk again, one level deeper: a Select-one/Tick-boxes
+// activity's recorded answer is the literal option text, not a stable
+// index — retyping wording in the "/"-separated options box (e.g. "Low" →
+// "Fair") would otherwise leave old recorded answers stuck under text that
+// no longer matches any current pill, just like an activity/target rename.
+// oldOptsStr/newOptsStr are the raw "/"-separated strings before/after the
+// edit. Since the options box is a single free-typed field (not a
+// per-option rename control), this can only safely infer intent when the
+// same NUMBER of options were swapped out — pairs each option that
+// disappeared with one that appeared, in the order they occur in the
+// string. A pure add or pure remove (different counts) has nothing to pair
+// against, so it's left alone rather than guessing wrong.
+function propagateRemarkOptionRename(student, target, pa, oldOptsStr, newOptsStr) {
+  const oldOpts = parseOpts(oldOptsStr);
+  const newOpts = parseOpts(newOptsStr);
+  const removed = oldOpts.filter(o => !newOpts.includes(o));
+  const added   = newOpts.filter(o => !oldOpts.includes(o));
+  if (removed.length === 0 || removed.length !== added.length) return;
+  const entityId = _groupForTargetEdit ? _groupForTargetEdit.id : student.id;
+  for (let i = 0; i < removed.length; i++) {
+    const oldOpt = removed[i];
+    const newOpt = added[i];
+    const prior = _renamePropagationQueues.get(entityId) || Promise.resolve();
+    const next = prior
+      .then(() => _groupForTargetEdit
+        ? renameGroupRemarkOptionAcrossSessions(_groupForTargetEdit.id, target.name, pa.name, oldOpt, newOpt, !!pa.optionsMulti)
+        : renameRemarkOptionAcrossSessions(student.id, target.name, pa.name, oldOpt, newOpt, !!pa.optionsMulti))
+      .catch(err => console.error("propagateRemarkOptionRename failed:", err));
+    _renamePropagationQueues.set(entityId, next);
+  }
 }
 
 // A student's own profile name (changed via "Change Student's Name" in the
@@ -713,7 +747,7 @@ function runOneOffRepairs() {
   }
 
   // Caden Tan's "Self Regulation" → "Self-Regulation" and "Functional
-  // Communication" → "Two Way Communication" target renames had the same
+  // Communication" → "Two-Way Communication" target renames had the same
   // missing-propagation bug as the FEDC 1 fix above, just one level up (the
   // target's own name instead of an activity's) — renameTargetAcrossSessions
   // didn't exist yet when these renames happened, so every historical
@@ -723,8 +757,14 @@ function runOneOffRepairs() {
   if (caden) {
     renameTargetAcrossSessions(caden.id, "Self Regulation", "Self-Regulation")
       .catch(err => console.error("runOneOffRepairs (Caden Tan Self-Regulation) failed:", err));
-    renameTargetAcrossSessions(caden.id, "Functional Communication", "Two Way Communication")
-      .catch(err => console.error("runOneOffRepairs (Caden Tan Two Way Communication) failed:", err));
+    renameTargetAcrossSessions(caden.id, "Functional Communication", "Two-Way Communication")
+      .catch(err => console.error("runOneOffRepairs (Caden Tan Two-Way Communication) failed:", err));
+    // The first version of this repair (v602) guessed the new name wrong —
+    // "Two Way Communication" (no hyphen) instead of the boss's actual
+    // "Two-Way Communication" — so it already ran once and moved the data
+    // to that wrong name instead of fixing it. Correct it forward.
+    renameTargetAcrossSessions(caden.id, "Two Way Communication", "Two-Way Communication")
+      .catch(err => console.error("runOneOffRepairs (Caden Tan Two-Way Communication typo fix) failed:", err));
   }
 
   migrateAwayFromMasteryType()
@@ -7338,10 +7378,12 @@ function renderTargetManageContent(student, target) {
   $("manage-modal-body").querySelectorAll(".mn-act-inline-opts").forEach(input => {
     input.addEventListener("blur", async () => {
       const idx = Number(input.dataset.idx);
+      const oldOptsStr = acts[idx].inlineOptions;
       acts[idx].inlineOptions  = input.value.trim() || null;
       acts[idx].remarkPresetId = null;
       target.predefinedActivities = acts;
       await saveTarget();
+      propagateRemarkOptionRename(student, target, acts[idx], oldOptsStr, acts[idx].inlineOptions);
     });
   });
 
