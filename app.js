@@ -46,6 +46,8 @@ import {
   deleteTargetDataFromSessions,
   renameActivityAcrossSessions,
   renameGroupActivityAcrossSessions,
+  renameTargetAcrossSessions,
+  renameGroupTargetAcrossSessions,
   reassignGroupStudentAcrossSessions,
   signInWithPin,
   signOutUser,
@@ -116,7 +118,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "601";
+const APP_VERSION = "602";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -275,6 +277,23 @@ function propagateActivityRename(student, targetName, oldName, newName) {
       ? renameGroupActivityAcrossSessions(_groupForTargetEdit.id, targetName, oldName, newName)
       : renameActivityAcrossSessions(student.id, targetName, oldName, newName))
     .catch(err => console.error("propagateActivityRename failed:", err));
+  _renamePropagationQueues.set(entityId, next);
+}
+
+// Same orphaning risk as propagateActivityRename above, but for the target's
+// own name — call this right after a target rename is saved in Edit Target.
+// Shares the same per-student/group queue so a target rename and an activity
+// rename fired close together (e.g. editing both during the same blur-heavy
+// session) still serialize instead of racing each other's Firestore writes.
+function propagateTargetRename(student, oldName, newName) {
+  if (!oldName || oldName === newName) return;
+  const entityId = _groupForTargetEdit ? _groupForTargetEdit.id : student.id;
+  const prior = _renamePropagationQueues.get(entityId) || Promise.resolve();
+  const next = prior
+    .then(() => _groupForTargetEdit
+      ? renameGroupTargetAcrossSessions(_groupForTargetEdit.id, oldName, newName)
+      : renameTargetAcrossSessions(student.id, oldName, newName))
+    .catch(err => console.error("propagateTargetRename failed:", err));
   _renamePropagationQueues.set(entityId, next);
 }
 // Tracks a newly-created group ID so it can be auto-deleted if closed with no students.
@@ -657,6 +676,21 @@ function runOneOffRepairs() {
   if (caden) {
     renameActivityAcrossSessions(caden.id, "FEDC 1", "Write FEDC 1's Comment in Self Regulation", "Comment")
       .catch(err => console.error("runOneOffRepairs (Caden Tan FEDC 1 Comment) failed:", err));
+  }
+
+  // Caden Tan's "Self Regulation" → "Self-Regulation" and "Functional
+  // Communication" → "Two Way Communication" target renames had the same
+  // missing-propagation bug as the FEDC 1 fix above, just one level up (the
+  // target's own name instead of an activity's) — renameTargetAcrossSessions
+  // didn't exist yet when these renames happened, so every historical
+  // session's activities/remarks/trials for both targets were left stuck
+  // under the old names and looked completely empty (scores included) under
+  // the renamed targets.
+  if (caden) {
+    renameTargetAcrossSessions(caden.id, "Self Regulation", "Self-Regulation")
+      .catch(err => console.error("runOneOffRepairs (Caden Tan Self-Regulation) failed:", err));
+    renameTargetAcrossSessions(caden.id, "Functional Communication", "Two Way Communication")
+      .catch(err => console.error("runOneOffRepairs (Caden Tan Two Way Communication) failed:", err));
   }
 
   migrateAwayFromMasteryType()
@@ -7068,10 +7102,12 @@ function renderTargetManageContent(student, target) {
   $("mn-t-name").addEventListener("blur", async () => {
     const v = $("mn-t-name").value.trim();
     if (!v || v === target.name) return;
+    const oldName = target.name;
     if (state.selectedTargetName === target.name) state.selectedTargetName = v;
     target.name = v;
     $("manage-modal-title").textContent = v;
     await saveTarget();
+    propagateTargetRename(student, oldName, v);
     flashSaved($("mn-t-name"));
   });
   $("mn-t-name").addEventListener("keydown", e => {

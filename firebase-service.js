@@ -541,6 +541,30 @@ export async function renameActivityAcrossSessions(studentId, targetName, oldNam
   }
 }
 
+// Same orphaning problem as renameActivityAcrossSessions above, but for the
+// TARGET's own name rather than an activity within it: every session
+// activity stores its parent target's name as plain text (act.targetName),
+// so renaming a target without this would leave every historical session's
+// activities — and everything keyed off them (remarks, trials, exports) —
+// stuck under the old name and invisible under the renamed target.
+export async function renameTargetAcrossSessions(studentId, oldName, newName) {
+  const snap = await getDocs(
+    query(collection(db, "sessions"), where("studentId", "==", studentId))
+  );
+  for (const sessionDoc of snap.docs) {
+    const data = sessionDoc.data();
+    const updates = {};
+    for (const [actId, act] of Object.entries(data.activities || {})) {
+      if (act.targetName === oldName) {
+        updates[`activities.${actId}.targetName`] = newName;
+      }
+    }
+    if (Object.keys(updates).length > 0) {
+      await updateDoc(doc(db, "sessions", sessionDoc.id), updates);
+    }
+  }
+}
+
 /** Delete a session document entirely (e.g. empty sessions on leave). */
 export async function deleteSession(sessionId) {
   await deleteDoc(doc(db, "sessions", sessionId));
@@ -939,6 +963,23 @@ export async function renameGroupActivityAcrossSessions(groupId, targetName, old
     for (const [actId, act] of Object.entries(data.activities || {})) {
       if (act.targetName === targetName && act.activityName === oldName) {
         updates[`activities.${actId}.activityName`] = newName;
+      }
+    }
+    if (Object.keys(updates).length > 0) await updateDoc(doc(db, "sessions", sd.id), updates);
+  }
+}
+
+// Group counterpart of renameTargetAcrossSessions above — see its comment.
+export async function renameGroupTargetAcrossSessions(groupId, oldName, newName) {
+  const snap = await getDocs(
+    query(collection(db, "sessions"), where("groupId", "==", groupId))
+  );
+  for (const sd of snap.docs) {
+    const data = sd.data();
+    const updates = {};
+    for (const [actId, act] of Object.entries(data.activities || {})) {
+      if (act.targetName === oldName) {
+        updates[`activities.${actId}.targetName`] = newName;
       }
     }
     if (Object.keys(updates).length > 0) await updateDoc(doc(db, "sessions", sd.id), updates);
