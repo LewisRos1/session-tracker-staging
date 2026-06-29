@@ -116,7 +116,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "597";
+const APP_VERSION = "598";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1296,12 +1296,18 @@ function renderSessionsForMonth(student, month, monthSessions, byMonth, today, s
   });
 }
 
-// "Pick a Date" calendar: jump straight to any past/today date's View/Edit
-// screen — if that date has no session yet, one is created blank (and will
-// be auto-deleted on the way out, same as any other empty session, if
-// nothing ends up typed into it).
-function renderPickDateCalendar(student, sessions, byMonth, today, displayDate) {
-  const sessionIdByDate = new Map(sessions.map(s => [s.date, s.id]));
+// "Pick a Date" calendar: jump straight to any past/today date — if that
+// date has no session yet, one is created blank (and will be auto-deleted on
+// the way out, same as any other empty session, if nothing ends up typed
+// into it). opts.onPick/opts.onBack let callers other than the month-grid
+// entry point (e.g. the live-entry/View headers' own "Pick A Date" buttons,
+// which have no month grid to go "back" to) override the default
+// View-screen-jump and back-to-month-grid behaviour.
+function renderPickDateCalendar(student, sessions, byMonth, today, displayDate, opts = {}) {
+  const onPick = opts.onPick || (sessionId => openSessionView(student, sessionId));
+  const onBack = opts.onBack || (() => renderMonthGrid(student, byMonth, today, sessions));
+
+  const sessionByDate = new Map(sessions.map(s => [s.date, s]));
   const [y, m] = displayDate.split("-").map(Number);
   const monthLabel = new Date(y, m - 1, 1).toLocaleString("default", { month: "long", year: "numeric" });
   const [ty, tm] = today.split("-").map(Number);
@@ -1314,7 +1320,7 @@ function renderPickDateCalendar(student, sessions, byMonth, today, displayDate) 
 
   let html = `<button class="btn-picker-back">← Back</button>
     <div class="date-picker-wrap">
-    <p class="date-picker-legend"><span class="date-taken-dot">✓︎</span> Session recorded on this day</p>
+    <p class="date-picker-legend"><span class="date-taken-dot">✓︎1</span> Session recorded — number is the session number</p>
     <div class="date-picker-cal">
       <div class="date-picker-nav">
         <button class="btn-date-prev">‹</button>
@@ -1332,35 +1338,34 @@ function renderPickDateCalendar(student, sessions, byMonth, today, displayDate) 
     if (d < 1 || d > daysInMon) { html += `<span></span>`; continue; }
     const ds      = `${y}-${pad(m)}-${pad(d)}`;
     const isFut   = ds > today;
-    const isTaken = sessionIdByDate.has(ds);
+    const taken   = sessionByDate.get(ds);
     let cls = "date-picker-day";
-    if (isFut)   cls += " date-picker-day-future";
-    if (isTaken) cls += " date-picker-day-taken";
-    const dotCls = isTaken ? "date-taken-dot" : "day-dot-spacer";
-    html += `<button class="${cls}" data-date="${ds}"${isFut ? " disabled" : ""}><span class="day-num">${d}</span><span class="${dotCls}">${isTaken ? "✓︎" : ""}</span></button>`;
+    if (isFut)  cls += " date-picker-day-future";
+    if (taken)  cls += " date-picker-day-taken";
+    const dotCls = taken ? "date-taken-dot" : "day-dot-spacer";
+    html += `<button class="${cls}" data-date="${ds}"${isFut ? " disabled" : ""}><span class="day-num">${d}</span><span class="${dotCls}">${taken ? `✓︎${taken.sessionNumber}` : ""}</span></button>`;
   }
   html += `</div></div></div>`;
 
   $("session-picker-title").textContent = "Pick a Date";
   $("session-picker-list").innerHTML = html;
 
-  $("session-picker-list").querySelector(".btn-picker-back").addEventListener("click", () =>
-    renderMonthGrid(student, byMonth, today, sessions)
-  );
+  $("session-picker-list").querySelector(".btn-picker-back").addEventListener("click", onBack);
   $("session-picker-list").querySelector(".btn-date-prev").addEventListener("click", () => {
-    renderPickDateCalendar(student, sessions, byMonth, today, prevM);
+    renderPickDateCalendar(student, sessions, byMonth, today, prevM, opts);
   });
   if (canNext) {
     $("session-picker-list").querySelector(".btn-date-next").addEventListener("click", () => {
-      renderPickDateCalendar(student, sessions, byMonth, today, nextM);
+      renderPickDateCalendar(student, sessions, byMonth, today, nextM, opts);
     });
   }
   $("session-picker-list").querySelectorAll(".date-picker-day:not([disabled])").forEach(btn => {
     btn.addEventListener("click", async () => {
-      closeSessionPicker();
       const ds = btn.dataset.date;
-      const sessionId = sessionIdByDate.get(ds) || await getOrCreateSessionForDate(student.id, ds, student.targets);
-      openSessionView(student, sessionId);
+      const existing = sessionByDate.get(ds);
+      const sessionId = existing ? existing.id : await getOrCreateSessionForDate(student.id, ds, student.targets);
+      closeSessionPicker();
+      onPick(sessionId);
     });
   });
 }
@@ -1520,8 +1525,12 @@ function showGroupExportStudentPicker(group, mode) {
 
 // ─── GO TO ANOTHER SESSION ───────────────────────────────────
 // Opens session-picker starting at the current session's month.
+// Header "Pick A Date" button on the View/Edit screen — jumps straight into
+// the calendar (no month grid first, unlike the picker's own Pick a Date
+// tile) since the boss is already looking at one specific session and just
+// wants to hop to another date quickly.
 async function showGoToAnotherSession(student) {
-  $("session-picker-title").textContent = student.name;
+  $("session-picker-title").textContent = "Pick a Date";
   $("session-picker-list").innerHTML = `<div class="session-picker-loading">Loading sessions…</div>`;
   $("session-picker-modal").classList.remove("hidden");
 
@@ -1553,57 +1562,50 @@ async function showGoToAnotherSession(student) {
     byMonth.get(s.month).push(s);
   }
 
-  if (byMonth.size === 0) {
-    $("session-picker-list").innerHTML = `<div class="session-picker-loading">No sessions found.</div>`;
-    return;
-  }
-
-  // Start on the current session's month; fall back to month grid
-  const currentMonth = state.viewSessionData?.month;
-  if (currentMonth && byMonth.has(currentMonth)) {
-    renderGoToSessionsForMonth(student, currentMonth, byMonth.get(currentMonth), byMonth, today);
-  } else {
-    renderGoToMonthGrid(student, byMonth, today);
-  }
+  const displayDate = (state.viewSessionData?.date || sessions[0]?.date || today).slice(0, 7) + "-01";
+  renderPickDateCalendar(student, sessions, byMonth, today, displayDate, { onBack: closeSessionPicker });
 }
 
-function renderGoToMonthGrid(student, byMonth, today) {
-  $("session-picker-title").textContent = student.name;
-  let html = `<div class="month-grid">`;
-  for (const month of byMonth.keys()) {
-    const [name, year] = month.split(" ");
-    html += `<button class="month-grid-btn" data-month="${escHtml(month)}">
-      <span class="mgb-month">${escHtml(name.slice(0, 3))}</span>
-      <span class="mgb-year">${escHtml(year)}</span>
-    </button>`;
-  }
-  html += `</div>`;
-  $("session-picker-list").innerHTML = html;
-  $("session-picker-list").querySelectorAll(".month-grid-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const month = btn.dataset.month;
-      renderGoToSessionsForMonth(student, month, byMonth.get(month), byMonth, today);
-    });
-  });
-}
+// Header "Pick A Date" button on the live entry screen — same calendar as
+// the View screen's equivalent button, but jumps into live entry instead of
+// View/Edit (openSession instead of openSessionView) when a date is picked.
+async function showPickDateForEntry(student) {
+  $("session-picker-title").textContent = "Pick a Date";
+  $("session-picker-list").innerHTML = `<div class="session-picker-loading">Loading sessions…</div>`;
+  $("session-picker-modal").classList.remove("hidden");
 
-function renderGoToSessionsForMonth(student, month, monthSessions, byMonth, today) {
-  $("session-picker-title").textContent = month;
-  const sorted  = [...monthSessions].sort((a, b) => a.date.localeCompare(b.date));
-  const display = [...sorted].reverse();
-  let html = `<button class="btn-picker-back">← Back</button>`;
-  html += renderSessionListRows(sorted, display, today, { isCurrentId: state.viewSessionId });
-  const list = $("session-picker-list");
-  list.innerHTML = html;
-  list.querySelector(".btn-picker-back").addEventListener("click", () => {
-    renderGoToMonthGrid(student, byMonth, today);
-  });
-  list.querySelectorAll(".session-list-item").forEach(item => {
-    item.addEventListener("click", () => {
-      const sid = item.dataset.sessionId;
-      closeSessionPicker();
-      if (sid !== state.viewSessionId) openSessionView(student, sid);
+  let sessions = [];
+  try { sessions = await getRecentSessionsForStudent(student.id); } catch (err) { console.error("getRecentSessionsForStudent failed:", err); }
+
+  const currentTargetNames = new Set((student.targets || []).map(t => t.name));
+  const stripEmpty = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
+  const hasUsefulData = s => {
+    if (Object.values(s.fedcComments || {}).some(c => stripEmpty(c).length > 0)) return true;
+    return Object.values(s.remarks || {}).some(r => {
+      const act = (s.activities || {})[r.activityId];
+      if (!act || !currentTargetNames.has(act.targetName)) return false;
+      const hasText   = stripEmpty(r.text).length > 0;
+      const hasTrials = (r.trials      || []).some(t => t !== null && t !== -1);
+      const hasNote   = stripEmpty(r.masteryNote).length > 0;
+      return hasText || hasTrials || hasNote;
     });
+  };
+  // Don't auto-delete the session currently being edited
+  const empties = sessions.filter(s => s.id !== state.currentSessionId && !hasUsefulData(s));
+  empties.forEach(s => deleteSession(s.id).catch(() => {}));
+  sessions = sessions.filter(s => !empties.some(e => e.id === s.id));
+
+  const today = getTodayString();
+  const byMonth = new Map();
+  for (const s of sessions) {
+    if (!byMonth.has(s.month)) byMonth.set(s.month, []);
+    byMonth.get(s.month).push(s);
+  }
+
+  const displayDate = (state.sessionData?.date || sessions[0]?.date || today).slice(0, 7) + "-01";
+  renderPickDateCalendar(student, sessions, byMonth, today, displayDate, {
+    onBack: closeSessionPicker,
+    onPick: sessionId => openSession(student, sessionId)
   });
 }
 
@@ -1838,6 +1840,12 @@ async function openSession(student, existingSessionId = null, dateStr = null) {
   $("target-select").innerHTML  = `<option value="">— loading —</option>`;
   $("btn-manage-targets")?.classList.add("hidden");
   $("target-type-chip")?.classList.add("hidden");
+
+  const pickDateBtn = $("btn-entry-pick-date");
+  if (pickDateBtn) {
+    pickDateBtn.classList.remove("hidden");
+    pickDateBtn.onclick = () => showPickDateForEntry(student);
+  }
 
   if (state.fbUnsubscribe) { state.fbUnsubscribe(); state.fbUnsubscribe = null; }
   state.entryRemarkSaver?.cleanup();
@@ -5575,8 +5583,10 @@ function attachGroupViewListeners() {
 }
 
 // ── Go To Another (group) Session ─────────────────────────────
+// Header "Pick A Date" button on the group View/Edit screen — jumps straight
+// into the calendar (no month grid first), same idea as showGoToAnotherSession.
 async function showGoToAnotherGroupSession(group) {
-  $("session-picker-title").textContent = group.name;
+  $("session-picker-title").textContent = "Pick a Date";
   $("session-picker-list").innerHTML = `<div class="session-picker-loading">Loading sessions…</div>`;
   $("session-picker-modal").classList.remove("hidden");
 
@@ -5608,56 +5618,50 @@ async function showGoToAnotherGroupSession(group) {
     byMonth.get(s.month).push(s);
   }
 
-  if (byMonth.size === 0) {
-    $("session-picker-list").innerHTML = `<div class="session-picker-loading">No sessions found.</div>`;
-    return;
-  }
-
-  const currentMonth = state.viewGroupSessionData?.month;
-  if (currentMonth && byMonth.has(currentMonth)) {
-    renderGoToGroupSessionsForMonth(group, currentMonth, byMonth.get(currentMonth), byMonth, today);
-  } else {
-    renderGoToGroupMonthGrid(group, byMonth, today);
-  }
+  const displayDate = (state.viewGroupSessionData?.date || sessions[0]?.date || today).slice(0, 7) + "-01";
+  renderGroupPickDateCalendar(group, sessions, byMonth, displayDate, { onBack: closeSessionPicker });
 }
 
-function renderGoToGroupMonthGrid(group, byMonth, today) {
-  $("session-picker-title").textContent = group.name;
-  let html = `<div class="month-grid">`;
-  for (const month of byMonth.keys()) {
-    const [name, year] = month.split(" ");
-    html += `<button class="month-grid-btn" data-month="${escHtml(month)}">
-      <span class="mgb-month">${escHtml(name.slice(0, 3))}</span>
-      <span class="mgb-year">${escHtml(year)}</span>
-    </button>`;
-  }
-  html += `</div>`;
-  $("session-picker-list").innerHTML = html;
-  $("session-picker-list").querySelectorAll(".month-grid-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const month = btn.dataset.month;
-      renderGoToGroupSessionsForMonth(group, month, byMonth.get(month), byMonth, today);
-    });
-  });
-}
+// Header "Pick A Date" button on the group live entry screen — same
+// calendar as the group View screen's equivalent button, but jumps into live
+// entry instead of View/Edit (openGroupSession instead of openGroupSessionView).
+async function showPickDateForGroupEntry(group) {
+  $("session-picker-title").textContent = "Pick a Date";
+  $("session-picker-list").innerHTML = `<div class="session-picker-loading">Loading sessions…</div>`;
+  $("session-picker-modal").classList.remove("hidden");
 
-function renderGoToGroupSessionsForMonth(group, month, monthSessions, byMonth, today) {
-  $("session-picker-title").textContent = month;
-  const sorted  = [...monthSessions].sort((a, b) => a.date.localeCompare(b.date));
-  const display = [...sorted].reverse();
-  let html = `<button class="btn-picker-back">← Back</button>`;
-  html += renderSessionListRows(sorted, display, today, { isCurrentId: state.viewGroupSessionId });
-  const list = $("session-picker-list");
-  list.innerHTML = html;
-  list.querySelector(".btn-picker-back").addEventListener("click", () => {
-    renderGoToGroupMonthGrid(group, byMonth, today);
-  });
-  list.querySelectorAll(".session-list-item").forEach(item => {
-    item.addEventListener("click", () => {
-      const sid = item.dataset.sessionId;
-      closeSessionPicker();
-      if (sid !== state.viewGroupSessionId) openGroupSessionView(group, sid);
+  let sessions = [];
+  try { sessions = await getRecentGroupSessions(group.id); } catch (_) {}
+
+  const currentTargetNames = new Set((group.targets || []).map(t => t.name));
+  const stripEmpty = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
+  const hasUsefulData = s => {
+    if (Object.values(s.fedcComments || {}).some(c => stripEmpty(c).length > 0)) return true;
+    return Object.values(s.remarks || {}).some(r => {
+      const act = (s.activities || {})[r.activityId];
+      if (!act || !currentTargetNames.has(act.targetName)) return false;
+      const hasText   = stripEmpty(r.text).length > 0;
+      const hasTrials = (r.trials      || []).some(t => t !== null && t !== -1);
+      const hasNote   = stripEmpty(r.masteryNote).length > 0;
+      return hasText || hasTrials || hasNote;
     });
+  };
+  // Don't auto-delete the session currently being edited
+  const empties = sessions.filter(s => s.id !== state.groupSessionId && !hasUsefulData(s));
+  empties.forEach(s => deleteSession(s.id).catch(() => {}));
+  sessions = sessions.filter(s => !empties.some(e => e.id === s.id));
+
+  const today = getTodayString();
+  const byMonth = new Map();
+  for (const s of sessions) {
+    if (!byMonth.has(s.month)) byMonth.set(s.month, []);
+    byMonth.get(s.month).push(s);
+  }
+
+  const displayDate = (state.groupSessionData?.date || sessions[0]?.date || today).slice(0, 7) + "-01";
+  renderGroupPickDateCalendar(group, sessions, byMonth, displayDate, {
+    onBack: closeSessionPicker,
+    onPick: ds => openGroupSession(group, ds, group.students)
   });
 }
 
@@ -7663,6 +7667,12 @@ async function openGroupSession(group, dateStr, attendees) {
   $("group-session-name").textContent = group.name;
   $("group-target-content").innerHTML = `<div class="loading">Loading…</div>`;
 
+  const pickDateBtn = $("btn-group-entry-pick-date");
+  if (pickDateBtn) {
+    pickDateBtn.classList.remove("hidden");
+    pickDateBtn.onclick = () => showPickDateForGroupEntry(group);
+  }
+
   try {
     const sid = await getOrCreateGroupSessionForDate(group.id, dateStr, group.targets, attendees, group.studentLinks || {});
     state.groupSessionId = sid;
@@ -8307,6 +8317,8 @@ function renderGroupStudentEmptyRow(studentName, actId, actName, target, isPrede
 // One attendee's own day average for a group target — per-attendee throughout
 // (group sessions score each attendee separately even on a shared target).
 // visited (keyed "targetId::studentName") guards a circular mapping chain.
+// Same equal-per-remark averaging as calcDaysAverage's individual-session
+// counterpart — see the comment there.
 function calcGroupStudentDaysAverage(target, data, studentName, visited = new Set()) {
   const key = target.id + "::" + studentName;
   if (visited.has(key)) return null;
@@ -8698,11 +8710,27 @@ function renderGroupMonthGrid(group, byMonth, sessions) {
   });
 }
 
-// "Pick a Date" calendar for the group session picker: jump straight to any
-// past/today date's View/Edit screen — if that date has no session yet, one
-// is created blank (and will be auto-deleted on the way out, same as any
-// other empty session, if nothing ends up typed into it).
-function renderGroupPickDateCalendar(group, sessions, byMonth, displayDate) {
+// "Pick a Date" calendar for groups: jump straight to any past/today date —
+// if that date has no session yet, one is created blank (and will be
+// auto-deleted on the way out, same as any other empty session, if nothing
+// ends up typed into it). opts.onPick/opts.onBack let callers other than the
+// month-grid entry point (e.g. the live-entry/View headers' own "Pick A
+// Date" buttons, which have no month grid to go "back" to) override the
+// default View-screen-jump and back-to-month-grid behaviour. No session
+// number next to the tick here, unlike the individual version — a group
+// session has no single shared number, only a separate one per attendee.
+function renderGroupPickDateCalendar(group, sessions, byMonth, displayDate, opts = {}) {
+  // onPick receives the picked DATE STRING (not a session id) — openGroupSession
+  // (the live-entry jump) only accepts a date and resolves/creates the session
+  // itself, so the default (View-jump) does its own resolve-or-create here too
+  // rather than committing to a sessionId-shaped contract the entry jump can't use.
+  const onPick = opts.onPick || (async ds => {
+    const sessionId = sessionIdByDate.get(ds)
+      || await getOrCreateGroupSessionForDate(group.id, ds, group.targets, group.students, group.studentLinks || {});
+    openGroupSessionView(group, sessionId);
+  });
+  const onBack = opts.onBack || (() => renderGroupMonthGrid(group, byMonth, sessions));
+
   const sessionIdByDate = new Map(sessions.map(s => [s.date, s.id]));
   const today = getTodayString();
   const [y, m] = displayDate.split("-").map(Number);
@@ -8747,24 +8775,19 @@ function renderGroupPickDateCalendar(group, sessions, byMonth, displayDate) {
   $("session-picker-title").textContent = "Pick a Date";
   $("session-picker-list").innerHTML = html;
 
-  $("session-picker-list").querySelector(".btn-picker-back").addEventListener("click", () =>
-    renderGroupMonthGrid(group, byMonth, sessions)
-  );
+  $("session-picker-list").querySelector(".btn-picker-back").addEventListener("click", onBack);
   $("session-picker-list").querySelector(".btn-date-prev").addEventListener("click", () => {
-    renderGroupPickDateCalendar(group, sessions, byMonth, prevM);
+    renderGroupPickDateCalendar(group, sessions, byMonth, prevM, opts);
   });
   if (canNext) {
     $("session-picker-list").querySelector(".btn-date-next").addEventListener("click", () => {
-      renderGroupPickDateCalendar(group, sessions, byMonth, nextM);
+      renderGroupPickDateCalendar(group, sessions, byMonth, nextM, opts);
     });
   }
   $("session-picker-list").querySelectorAll(".date-picker-day:not([disabled])").forEach(btn => {
-    btn.addEventListener("click", async () => {
+    btn.addEventListener("click", () => {
       closeSessionPicker();
-      const ds = btn.dataset.date;
-      const sessionId = sessionIdByDate.get(ds)
-        || await getOrCreateGroupSessionForDate(group.id, ds, group.targets, group.students, group.studentLinks || {});
-      openGroupSessionView(group, sessionId);
+      onPick(btn.dataset.date);
     });
   });
 }
