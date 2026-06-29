@@ -346,20 +346,25 @@ function addIndividualTargetSheets(wb, allTargets, sessions, studentName, includ
       }
     }
 
-    // Activity heading rows: merge B:D (leave the rest free for the avg-score column merge)
+    // Activity heading rows: merge Activity through Trials (leave the
+    // avg-score column free for the per-session avg-score merge below).
+    // Used to always stop at D (Score), silently skipping the Trials column
+    // whenever it was included — leaving the heading visually short of the
+    // Trials column instead of spanning the full row.
+    const headingEndCol = includeTrials ? "E" : "D";
     for (const rowIdx of activityHeadingRows) {
       const n = rowIdx + 1;
-      try { ws.mergeCells(`B${n}:D${n}`); } catch (_) {}
+      try { ws.mergeCells(`B${n}:${headingEndCol}${n}`); } catch (_) {}
       const cell = ws.getRow(n).getCell(2);
       cell.fill      = STYLE_ACT_HEADING.fill;
       cell.font      = STYLE_ACT_HEADING.font;
       cell.alignment = { vertical: "top" };
     }
 
-    // Note rows: merge B:D (leave the rest free for the avg-score column merge)
+    // Note rows: same column span as activity headings above.
     for (const rowIdx of noteRows) {
       const n = rowIdx + 1;
-      try { ws.mergeCells(`B${n}:D${n}`); } catch (_) {}
+      try { ws.mergeCells(`B${n}:${headingEndCol}${n}`); } catch (_) {}
       const cell = ws.getRow(n).getCell(2);
       cell.fill      = STYLE_NOTE.fill;
       cell.font      = STYLE_NOTE.font;

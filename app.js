@@ -120,7 +120,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "605";
+const APP_VERSION = "606";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -7238,6 +7238,18 @@ function renderTargetManageContent(student, target) {
         const v = input.value;
         if (v === (a.text || "")) return;
         a.text = v;
+      } else if (a.isHeading) {
+        // A heading's text is pure display — it's never matched against any
+        // session data, unlike an activity's name. Without this branch, the
+        // code below ran for headings too and called propagateActivityRename
+        // with the heading's old/new text, which silently RENAMED any real
+        // activity in this target that happened to share the heading's old
+        // text (e.g. a "Comment" heading grouping a "Comment" activity) —
+        // hijacking that activity's actual session data over to the new
+        // heading text instead of leaving it alone.
+        const v = input.value.trim();
+        if (!v || v === a.name) return;
+        a.name = v;
       } else {
         const v = input.value.trim();
         if (!v || v === a.name) return;
