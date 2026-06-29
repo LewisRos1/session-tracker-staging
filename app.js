@@ -116,7 +116,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "600";
+const APP_VERSION = "601";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -141,7 +141,7 @@ const state = {
   entryActionsInFlight:      0,
   entryGroupActionsInFlight: 0,
   // Same idea for the View/Edit-past-session screens' own action buttons
-  // (Trials column +/×, mastery buttons, etc.) — these don't rely on a
+  // (Trials column +/×, option-pill buttons, etc.) — these don't rely on a
   // remark box's blur to trigger a render, so without this, a click can
   // land while isViewBusy() is still true and its result silently waits on
   // a render that never gets re-checked.
@@ -657,6 +657,55 @@ function runOneOffRepairs() {
   if (caden) {
     renameActivityAcrossSessions(caden.id, "FEDC 1", "Write FEDC 1's Comment in Self Regulation", "Comment")
       .catch(err => console.error("runOneOffRepairs (Caden Tan FEDC 1 Comment) failed:", err));
+  }
+
+  migrateAwayFromMasteryType()
+    .catch(err => console.error("runOneOffRepairs (mastery removal) failed:", err));
+}
+
+// "Mastery Level + Free Text" was removed as a Remark Type — this converts
+// any activity still configured as isMastery into the equivalent Sentence
+// Starter + Select One + Free Text config, the exact same pure config flip
+// the old per-activity "Convert" button used to do: existing remarks'
+// rem.text ("In Progress"/"Mastered"/"Maintain") and rem.masteryNote already
+// line up with the new type's select options and notes field, so nothing in
+// the sessions collection needs touching. Scoped to students/groups/
+// templates that still have an isMastery activity, so it's a no-op (and
+// safe to leave running) once none remain.
+function convertMasteryActivity(pa) {
+  pa.sentenceStarter = pa.sentenceStarter || "Mastery Level";
+  pa.inlineOptions    = "In Progress/Mastered/Maintain";
+  pa.optionsMulti     = false;
+  pa.remarkPresetId   = null;
+  pa.isMastery        = false;
+  pa.remarkHasNote    = true;
+}
+
+async function migrateAwayFromMasteryType() {
+  for (const student of state.students) {
+    let changed = false;
+    for (const target of (student.targets || [])) {
+      for (const pa of (target.predefinedActivities || [])) {
+        if (pa.isMastery) { convertMasteryActivity(pa); changed = true; }
+      }
+    }
+    if (changed) await saveStudent(student);
+  }
+  for (const group of state.groups) {
+    let changed = false;
+    for (const target of (group.targets || [])) {
+      for (const pa of (target.predefinedActivities || [])) {
+        if (pa.isMastery) { convertMasteryActivity(pa); changed = true; }
+      }
+    }
+    if (changed) await saveGroup(group);
+  }
+  for (const template of state.templates) {
+    let changed = false;
+    for (const pa of (template.predefinedActivities || [])) {
+      if (pa.isMastery) { convertMasteryActivity(pa); changed = true; }
+    }
+    if (changed) await saveTemplate(template);
   }
 }
 
@@ -1959,16 +2008,21 @@ async function openSession(student, existingSessionId = null, dateStr = null) {
         const eff = getEffectiveTargets();
         state.selectedTargetName = eff[0]?.name || null;
         populateTargetDropdown(eff);
-        // Auto-create mastery remarks if previous session had values.
-        // If any are created the Firestore write triggers another snapshot
-        // which will render — so we return early here to avoid a stale render.
-        // Wrapped in try/catch: an uncaught error here (e.g. malformed
-        // target config) would otherwise leave the screen stuck on
-        // "Loading…" forever, since nothing below this line would ever run.
+        // Auto-create an empty remark for "pick from options" activities
+        // (Select one / Tick boxes / Sentence Starter + either, or + Select
+        // One + Free Text) so the boss can start picking immediately
+        // instead of clicking "+ Add Remark & Trials" first. Free text and
+        // Sentence Starter + Free Text stay collapsed — there's nothing to
+        // pre-open for those. If any are created the Firestore write
+        // triggers another snapshot which will render — so we return early
+        // here to avoid a stale render. Wrapped in try/catch: an uncaught
+        // error here (e.g. malformed target config) would otherwise leave
+        // the screen stuck on "Loading…" forever, since nothing below this
+        // line would ever run.
         try {
-          const filled = await autoFillMasteryRemarks(student, sessionId);
-          if (filled > 0) return;
-        } catch (err) { console.error("autoFillMasteryRemarks failed:", err); }
+          const structuredFilled = await autoFillStructuredRemarks(student, sessionId);
+          if (structuredFilled > 0) return;
+        } catch (err) { console.error("autoFillStructuredRemarks failed:", err); }
       }
       // Mapped-score activities can become fillable any time during the
       // session (not just on open), so this check isn't gated to firstLoad.
@@ -2291,7 +2345,7 @@ function renderFedcTarget(target) {
       }
     } else {
       for (const rem of remarks) {
-        html += renderRemarkFields(rem, target, getActivityInlineOptions(pa), pa.sentenceStarter || null, pa.optionsMulti || false, pa.isMastery || false, mappedInfo, pa.remarkHasNote || false);
+        html += renderRemarkFields(rem, target, getActivityInlineOptions(pa), pa.sentenceStarter || null, pa.optionsMulti || false, mappedInfo, pa.remarkHasNote || false);
       }
       if (isPending) {
         html += renderPendingRemarkFields(pendingKey, actId, pa.name, idx, target);
@@ -2622,7 +2676,7 @@ function toggleBulletSelection(el) {
 
 // ─── REMARK FIELDS ───────────────────────────────────────────
 
-function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, isMastery = false, mappedInfo = null, remarkHasNote = false) {
+function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false) {
   const opts = parseOpts(inlineOptions);
 
   const trials = rem.trials || [];
@@ -2631,10 +2685,6 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
       data-rem-id="${rem.id}" data-idx="${idx}">×</button></span>`
   ).join("");
 
-  // Shared by the mastery branch below and the normal branch further down —
-  // a mastery-typed remark can also be mapped-score (Remark Type and Mapped
-  // To are independent settings), so both branches need the same mappedInfo-
-  // vs-Trials choice instead of the mastery branch hardcoding Trials.
   const trailingField = mappedInfo
     ? `<div class="entry-field" contenteditable="false">
         <span class="field-label">${escHtml(mappedInfo.label)}</span>
@@ -2649,31 +2699,6 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
             data-target="${escHtml(target.name)}">+ Trial</button>
         </div>
       </div>`;
-
-  if (isMastery) {
-    const cur = rem.text || "";
-    return `
-    <div class="entry-divider" contenteditable="false"></div>
-    <div class="entry-field" contenteditable="false">
-      <span class="field-label">Remark</span>
-      <div class="mastery-remark-wrap">
-        <div class="remark-mastery-opts" data-rem-id="${rem.id}">
-          ${["In Progress", "Mastered", "Maintain"].map(v =>
-            `<button class="btn-mastery${cur === v ? " active" : ""}" data-rem-id="${rem.id}" data-val="${v}">${v}</button>`
-          ).join("")}
-        </div>
-        <div class="mastery-note-row">
-          <button class="btn-sketch" data-rem-id="${rem.id}" aria-label="Open sketch board">✏</button>
-          <textarea class="field-input mastery-note-input" rows="1"
-            data-rem-id="${rem.id}" placeholder="Notes…"
-            data-saved-html="${escHtml(rem.masteryNote || "")}">${escHtml(plainTextForEdit(rem.masteryNote || ""))}</textarea>
-        </div>
-      </div>
-      <button class="btn-icon btn-delete-remark"
-        data-rem-id="${rem.id}" title="Delete remark">🗑</button>
-    </div>
-    ${trailingField}`;
-  }
 
   function makeOptPills(remId, remText) {
     if (opts.length === 0) return null;
@@ -2871,36 +2896,6 @@ function attachTargetListeners(target) {
   // render, so per-element listeners would need re-attaching constantly. See
   // setupEntryRemarkSaving.
 
-  // ── Mastery level buttons ─────────────────────────────────
-  c.querySelectorAll(".btn-mastery").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const container  = btn.closest(".remark-mastery-opts");
-      const currentVal = container?.querySelector(".btn-mastery.active")?.dataset.val || "";
-      const isActive   = btn.classList.contains("active");
-      const newVal     = isActive ? "" : btn.dataset.val;
-      if (currentVal === newVal) return;
-      container?.querySelectorAll(".btn-mastery").forEach(b => b.classList.remove("active"));
-      if (!isActive) btn.classList.add("active");
-      // Update local state synchronously, not just the DOM — leaveSession()'s
-      // cleanup-empty-remarks check reads state.sessionData straight off a
-      // snapshot taken on the way out, with no guard for an in-flight write
-      // from a button click. If only the Firestore write were fired and the
-      // boss left the screen before the listener echoed it back, the cleanup
-      // could see the OLD (e.g. blank) value and delete the remark she just
-      // set, even though the write itself had succeeded.
-      const remId = btn.dataset.remId;
-      const rem = state.sessionData?.remarks?.[remId];
-      const prevVal = rem?.text;
-      if (rem) rem.text = newVal;
-      updateRemarkText(state.currentSessionId, remId, newVal).catch(err => {
-        if (rem) rem.text = prevVal;
-        container?.querySelectorAll(".btn-mastery").forEach(b =>
-          b.classList.toggle("active", b.dataset.val === prevVal));
-        alert("Couldn't save — check your connection and try again.\n\n" + err.message);
-      });
-    });
-  });
-
   // ── Add remark (immediate creation) ──────────────────────
   c.querySelectorAll(".btn-add-remark").forEach(btn => {
     // Guards against a render (triggered by the blur this mousedown is
@@ -2940,13 +2935,7 @@ function attachTargetListeners(target) {
         state.pendingNewActivity = null;
         if (paName) actId = await ensureFedcActivity(target.name, paName, paOrder);
         if (!actId) { btn.disabled = false; return; }
-        let initialText = "";
-        if (paName) {
-          const pa = target.predefinedActivities?.find(a => a.name === paName);
-          if (pa?.isMastery) {
-            initialText = await getLastMasteryValue(state.currentStudent, target.name, paName, state.currentSessionId);
-          }
-        }
+        const initialText = "";
         // Write the remark into local state and render right away instead of
         // waiting on the Firestore round trip — addRemark() is handed the
         // same ID so it just confirms this row server-side in the background.
@@ -2973,8 +2962,9 @@ function attachTargetListeners(target) {
       btn.closest(".remark-preset-opts")?.querySelectorAll(".btn-remark-opt").forEach(b => b.classList.remove("active"));
       const newText = isActive ? "" : btn.dataset.opt;
       if (!isActive) btn.classList.add("active");
-      // See the .btn-mastery handler above for why this needs to update
-      // state.sessionData synchronously, not just the DOM.
+      // Update state.sessionData synchronously, not just the DOM — see
+      // leaveSession()'s cleanup-empty-remarks check, which reads it straight
+      // off a snapshot taken on the way out with no guard for an in-flight write.
       const remId = btn.dataset.remId;
       const rem = state.sessionData?.remarks?.[remId];
       const prevText = rem?.text;
@@ -3142,54 +3132,42 @@ async function saveNewRemark(target) {
   await addRemark(state.currentSessionId, actId, text);
 }
 
-const MASTERY_VALUES = new Set(["In Progress", "Mastered", "Maintain"]);
-
-async function getLastMasteryValue(student, targetName, activityName, currentSessionId) {
-  try {
-    const sessions = await getRecentSessionsForStudent(student.id, 10);
-    for (const sess of sessions) {
-      if (sess.id === currentSessionId) continue;
-      const actEntry = Object.entries(sess.activities || {})
-        .find(([, a]) => a.targetName === targetName && a.activityName === activityName);
-      if (!actEntry) continue;
-      const [actId] = actEntry;
-      const rem = Object.values(sess.remarks || {}).find(r => r.activityId === actId);
-      if (rem?.text && MASTERY_VALUES.has(rem.text)) return rem.text;
-      break; // found the session but value was empty — stop looking
-    }
-  } catch (_) {}
-  return "";
+// True for the remark types where there's a fixed set of things to pick from
+// (Select one / Tick boxes / Sentence Starter + either, or + Select One +
+// Free Text) — these warrant auto-opening a remark since there's no typing
+// to do first. Free text and Sentence Starter + Free Text are excluded:
+// there's nothing to pre-select, so they stay collapsed behind "+ Add
+// Remark & Trials" until the boss actually has something to type.
+function isAutoOpenRemarkType(pa) {
+  if (pa.remarkHasNote) return true;
+  if (pa.sentenceStarter && pa.inlineOptions) return true;
+  if (pa.sentenceStarter) return false;
+  return !!(pa.inlineOptions || pa.remarkPresetId);
 }
 
-// Auto-create mastery remarks on session open if previous session had a value.
-// Returns number of remarks created (so the caller can skip rendering if > 0).
-async function autoFillMasteryRemarks(student, sessionId) {
+// Auto-create an empty remark for every "pick from options" activity on
+// session open, unconditionally — the point is just to skip the extra click,
+// there's no "previous value" to wait for first.
+async function autoFillStructuredRemarks(student, sessionId) {
   const data = state.sessionData;
   let count = 0;
   for (const target of (student.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
-      if (!pa.isMastery) continue;
+      if (!isAutoOpenRemarkType(pa)) continue;
 
-      // Find existing activity entry in current session
       const existingAct = Object.entries(data.activities || {})
         .find(([, a]) => a.targetName === target.name && a.activityName === pa.name);
       let actId = existingAct?.[0] || null;
 
-      // If activity exists and already has a remark, nothing to do
       if (actId) {
         const hasRemark = Object.values(data.remarks || {}).some(r => r.activityId === actId);
         if (hasRemark) continue;
       }
 
-      // Get last chosen mastery value from previous sessions
-      const lastVal = await getLastMasteryValue(student, target.name, pa.name, sessionId);
-      if (!lastVal) continue; // no previous value — leave collapsed
-
-      // Create activity if it doesn't exist yet
       if (!actId) {
         actId = await addActivity(sessionId, target.name, pa.name, pa.order ?? 0, true);
       }
-      await addRemark(sessionId, actId, lastVal);
+      await addRemark(sessionId, actId, "");
       count++;
     }
   }
@@ -3199,9 +3177,10 @@ async function autoFillMasteryRemarks(student, sessionId) {
 // Auto-create an empty remark for a mapped-score activity as soon as its
 // mapped target gains a computable average — otherwise the row stays
 // collapsed (no remark of its own) even after the target it pulls from has
-// real data. Unlike autoFillMasteryRemarks this runs on every snapshot, not
-// just first load: the trigger ("the other target now has data") can become
-// true at any point while this session stays open, not only when it's opened.
+// real data. Unlike autoFillStructuredRemarks this runs on every snapshot,
+// not just first load: the trigger ("the other target now has data") can
+// become true at any point while this session stays open, not only when
+// it's opened.
 // Creating a mapped-score activity's first remark is two separate Firestore
 // writes (addActivity, then addRemark) — each one's own snapshot can re-enter
 // these auto-fill functions before the second write lands, racing into a
@@ -3630,14 +3609,13 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
   const inlineOptions   = paEntry ? getActivityInlineOptions(paEntry) : null;
   const sentenceStarter = paEntry?.sentenceStarter || null;
   const multiSelect     = paEntry?.optionsMulti || false;
-  const isMastery       = paEntry?.isMastery || false;
   const remarkHasNote   = paEntry?.remarkHasNote || false;
   const mappedInfo      = paEntry?.isMapped ? resolveViewMappedScoreDisplay(paEntry, data) : null;
 
   if (remarks.length === 0) {
-    // For free-text remark types (no preset opts, not mastery), show a clickable empty input
+    // For free-text remark types (no preset opts), show a clickable empty input
     const opts = parseOpts(inlineOptions);
-    const showEmpty = opts.length === 0 && !isMastery;
+    const showEmpty = opts.length === 0;
     if (showEmpty) {
       const emptyCell = `<textarea class="view-remark-edit view-remark-empty" rows="1"
            data-act-id="${escHtml(actId || "")}"
@@ -3669,7 +3647,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
         <td class="vcol-score" contenteditable="false">&nbsp;</td>
       </tr>`;
     }
-    // Preset-option / sentence-starter / mastery activities have no typeable
+    // Preset-option / sentence-starter activities have no typeable
     // empty box (there's no free text to click into), so without an explicit
     // button here the Remark cell was just blank with no way to create the
     // first remark at all.
@@ -3692,7 +3670,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
   return remarks.map((rem, ri) => viewRemarkRow(
     ri === 0 ? no : null,
     ri === 0 ? actCell : null,
-    rem, target, inlineOptions, sentenceStarter, multiSelect, isMastery, mappedInfo, remarkHasNote
+    rem, target, inlineOptions, sentenceStarter, multiSelect, mappedInfo, remarkHasNote
   )).join("");
 }
 
@@ -3722,7 +3700,7 @@ function buildTrialCellsHtml(rem, maxPts) {
     `<button class="view-add-trial" data-rem-id="${escHtml(rem.id)}">+</button>`;
 }
 
-function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, isMastery = false, mappedInfo = null, remarkHasNote = false) {
+function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false) {
   const maxPts = target.maxPoints || 3;
   const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts);
   const trialCells = mappedInfo
@@ -3752,22 +3730,9 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
        </select>`;
   }
 
-  const optSelect = isMastery
-    ? `<div class="mastery-remark-wrap">
-        <div class="remark-mastery-opts view-mastery-opts" data-rem-id="${rem.id}">
-          ${["In Progress", "Mastered", "Maintain"].map(v =>
-            `<button class="btn-mastery${rem.text === v ? " active" : ""}" data-rem-id="${escHtml(rem.id)}" data-val="${v}">${v}</button>`
-          ).join("")}
-        </div>
-        <div class="mastery-note-row">
-          <textarea class="view-mastery-note" rows="1" data-rem-id="${escHtml(rem.id)}"
-            data-saved-html="${escHtml(rem.masteryNote || "")}"
-            placeholder="Notes…">${escHtml(plainTextForEdit(rem.masteryNote))}</textarea>
-        </div>
-      </div>`
-    : (makeViewOpts(rem.id, rem.text)
-        || `<textarea class="view-remark-edit" rows="1" data-rem-id="${escHtml(rem.id)}"
-              data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`);
+  const optSelect = makeViewOpts(rem.id, rem.text)
+    || `<textarea class="view-remark-edit" rows="1" data-rem-id="${escHtml(rem.id)}"
+          data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`;
 
   const noteField = remarkHasNote
     ? `<textarea class="view-mastery-note" rows="1" data-rem-id="${escHtml(rem.id)}"
@@ -4490,34 +4455,12 @@ function attachViewListeners() {
   // body persists across renders, so attaching per-box listeners here would
   // stack up duplicates.
 
-  // These four handlers update state.viewSessionData synchronously (not
+  // These three handlers update state.viewSessionData synchronously (not
   // just the DOM/Firestore) before awaiting the write — leaveSessionView()
   // reads state.viewSessionData straight off a captured snapshot on the way
   // out with no guard for an in-flight write, so without this, leaving the
   // screen right after a click could see the OLD value and let
   // cleanupEmptyEntries() delete a remark the boss just set.
-  body.querySelectorAll(".view-mastery-opts .btn-mastery").forEach(btn => {
-    btn.addEventListener("click", withViewAction("viewActionsInFlight", "viewRenderPending", isViewBusy, renderSessionView, async () => {
-      const container  = btn.closest(".remark-mastery-opts");
-      const currentVal = container?.querySelector(".btn-mastery.active")?.dataset.val || "";
-      const isActive   = btn.classList.contains("active");
-      const newVal     = isActive ? "" : btn.dataset.val;
-      if (currentVal === newVal) return;
-      container?.querySelectorAll(".btn-mastery").forEach(b => b.classList.remove("active"));
-      if (!isActive) btn.classList.add("active");
-      const rem = state.viewSessionData?.remarks?.[btn.dataset.remId];
-      const prevVal = rem?.text;
-      if (rem) rem.text = newVal;
-      try {
-        await updateRemarkText(state.viewSessionId, btn.dataset.remId, newVal);
-      } catch (err) {
-        if (rem) rem.text = prevVal;
-        container?.querySelectorAll(".btn-mastery").forEach(b => b.classList.toggle("active", b.dataset.val === prevVal));
-        alert("Couldn't save — check your connection and try again.\n\n" + err.message);
-      }
-    }));
-  });
-
   body.querySelectorAll(".view-remark-preset-select").forEach(sel => {
     sel.addEventListener("change", withViewAction("viewActionsInFlight", "viewRenderPending", isViewBusy, renderSessionView, async () => {
       if (!sel.value) return;
@@ -4591,7 +4534,7 @@ function attachViewListeners() {
     }));
   });
 
-  // "+ Add Remark" for preset-option/sentence-starter/mastery activities with
+  // "+ Add Remark" for preset-option/sentence-starter activities with
   // no remark yet — these don't get the typeable empty box (there's no free
   // text to click into), so without this the Remark cell is just blank with
   // no way to create the first remark at all.
@@ -4968,7 +4911,6 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
     const mappedInlineOptions   = getActivityInlineOptions(paEntry);
     const mappedSentenceStarter = paEntry.sentenceStarter || null;
     const mappedMultiSelect     = paEntry.optionsMulti || false;
-    const mappedIsMastery       = paEntry.isMastery || false;
     const mappedHasNote         = paEntry.remarkHasNote || false;
     let firstRow = true;
     return attendees.map(studentName => {
@@ -4999,7 +4941,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
       const mappedInfo = resolveViewGroupMappedScoreDisplay(paEntry, data, studentName);
       return remarks.map((rem, ri) => viewGroupRemarkRow(
         ri === 0 ? noVal : null, ri === 0 ? actVal : null, studentName, rem, target,
-        mappedInlineOptions, mappedSentenceStarter, mappedMultiSelect, mappedIsMastery, null, mappedInfo, mappedHasNote
+        mappedInlineOptions, mappedSentenceStarter, mappedMultiSelect, null, mappedInfo, mappedHasNote
       )).join("");
     }).join("");
   }
@@ -5014,16 +4956,15 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
   const inlineOptions   = paEntry ? getActivityInlineOptions(paEntry) : null;
   const sentenceStarter = paEntry?.sentenceStarter || null;
   const multiSelect     = paEntry?.optionsMulti || false;
-  const isMastery       = paEntry?.isMastery || false;
   const remarkHasNote   = paEntry?.remarkHasNote || false;
   const opts            = parseOpts(inlineOptions);
 
   if (rounds.length === 0) {
-    // Free-text activities (no presets, not mastery): show a ready-to-type empty
-    // box per attendee, like the individual screen does, instead of a generic
-    // "+ Add Remark & Trials" bulk button — this activity is already in "Separate
+    // Free-text activities (no presets): show a ready-to-type empty box per
+    // attendee, like the individual screen does, instead of a generic "+ Add
+    // Remark & Trials" bulk button — this activity is already in "Separate
     // Remarks" mode, so each student gets their own row from the start.
-    const showEmpty = opts.length === 0 && !isMastery;
+    const showEmpty = opts.length === 0;
 
     if (showEmpty) {
       // "+ " shows even with no remark yet — see the individual screen's
@@ -5080,11 +5021,11 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
       const actVal = firstRowOverall ? actCellWithToggle : null;
 
       if (entry.pending) {
-        // Free-text activities (no presets, not mastery) get a ready-to-type
-        // empty box here too, same as the "nobody has a remark yet" case
-        // below — only preset-option/sentence-starter/mastery activities
-        // (which have no typeable free text) still need an explicit button.
-        if (opts.length === 0 && !isMastery) {
+        // Free-text activities (no presets) get a ready-to-type empty box
+        // here too, same as the "nobody has a remark yet" case below — only
+        // preset-option/sentence-starter activities (which have no typeable
+        // free text) still need an explicit button.
+        if (opts.length === 0) {
           html += `<tr>
             <td class="vcol-no" contenteditable="false">${noVal !== null ? noVal : ""}</td>
             <td class="vcol-act" contenteditable="false">${actVal !== null ? actVal : ""}</td>
@@ -5132,7 +5073,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
 
       html += viewGroupRemarkRow(
         noVal, actVal, entry.studentName, entry, target,
-        inlineOptions, sentenceStarter, multiSelect, isMastery, combineOpts, null, remarkHasNote
+        inlineOptions, sentenceStarter, multiSelect, combineOpts, null, remarkHasNote
       );
       firstRowOverall = false;
     }
@@ -5140,7 +5081,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
   return html;
 }
 
-function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, isMastery = false, combineOpts = null, mappedInfo = null, remarkHasNote = false) {
+function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, combineOpts = null, mappedInfo = null, remarkHasNote = false) {
   const maxPts = target.maxPoints || 3;
   const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts);
   const trialCells = mappedInfo
@@ -5182,22 +5123,9 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
            </select>`;
       };
 
-      const optSelect = isMastery
-        ? `<div class="mastery-remark-wrap">
-            <div class="remark-mastery-opts view-mastery-opts" data-rem-id="${rem.id}">
-              ${["In Progress", "Mastered", "Maintain"].map(v =>
-                `<button class="btn-mastery${rem.text === v ? " active" : ""}" data-rem-id="${escHtml(rem.id)}" data-val="${v}">${v}</button>`
-              ).join("")}
-            </div>
-            <div class="mastery-note-row">
-              <textarea class="view-mastery-note" rows="1" data-rem-id="${escHtml(rem.id)}"
-                data-saved-html="${escHtml(rem.masteryNote || "")}"
-                placeholder="Notes…">${escHtml(plainTextForEdit(rem.masteryNote))}</textarea>
-            </div>
-          </div>`
-        : (makeViewOpts(rem.id, rem.text)
-            || `<textarea class="view-remark-edit" rows="1" data-rem-id="${escHtml(rem.id)}"
-                  data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`);
+      const optSelect = makeViewOpts(rem.id, rem.text)
+        || `<textarea class="view-remark-edit" rows="1" data-rem-id="${escHtml(rem.id)}"
+              data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`;
 
       const noteField = remarkHasNote
         ? `<textarea class="view-mastery-note" rows="1" data-rem-id="${escHtml(rem.id)}"
@@ -5418,34 +5346,12 @@ function attachGroupViewListeners() {
   // combined / .view-mastery-note is handled by the shared host saver
   // (state.viewGroupRemarkSaver) set up once in openGroupSessionView.
 
-  // These four handlers update state.viewGroupSessionData synchronously
+  // These three handlers update state.viewGroupSessionData synchronously
   // (not just the DOM/Firestore) before awaiting the write — see the matching
   // comment on the individual view screen's equivalent handlers for why:
   // leaveGroupSessionView()'s cleanup reads a captured snapshot with no guard
   // for an in-flight write, which could otherwise let it delete a remark the
   // boss just set.
-  body.querySelectorAll(".view-mastery-opts .btn-mastery").forEach(btn => {
-    btn.addEventListener("click", wrap(async () => {
-      const container  = btn.closest(".remark-mastery-opts");
-      const currentVal = container?.querySelector(".btn-mastery.active")?.dataset.val || "";
-      const isActive   = btn.classList.contains("active");
-      const newVal     = isActive ? "" : btn.dataset.val;
-      if (currentVal === newVal) return;
-      container?.querySelectorAll(".btn-mastery").forEach(b => b.classList.remove("active"));
-      if (!isActive) btn.classList.add("active");
-      const rem = state.viewGroupSessionData?.remarks?.[btn.dataset.remId];
-      const prevVal = rem?.text;
-      if (rem) rem.text = newVal;
-      try {
-        await updateRemarkText(sid(), btn.dataset.remId, newVal);
-      } catch (err) {
-        if (rem) rem.text = prevVal;
-        container?.querySelectorAll(".btn-mastery").forEach(b => b.classList.toggle("active", b.dataset.val === prevVal));
-        alert("Couldn't save — check your connection and try again.\n\n" + err.message);
-      }
-    }));
-  });
-
   body.querySelectorAll(".view-remark-preset-select").forEach(sel => {
     sel.addEventListener("change", wrap(async () => {
       if (!sel.value) return;
@@ -6262,7 +6168,13 @@ async function closeManageModal() {
         return autoFillGroupMappedRemarks(
           state.currentGroup, state.groupSessionId, state.groupSessionData,
           state.selectedGroupTargetName, state.groupAttendees
-        ).then(mappedFilled => { if (mappedFilled === 0) renderGroupTargetContent(); });
+        ).then(mappedFilled => {
+          if (mappedFilled > 0) return;
+          return autoFillGroupStructuredRemarks(
+            state.currentGroup, state.groupSessionId, state.groupSessionData,
+            state.selectedGroupTargetName, state.groupAttendees
+          ).then(structuredFilled => { if (structuredFilled === 0) renderGroupTargetContent(); });
+        });
       }).catch(() => renderGroupTargetContent());
     } else if (state.groupSessionId) {
       renderGroupTargetContent();
@@ -6948,19 +6860,15 @@ function stripNoteHtml(text) {
 
 // Shared by the normal-activity and mapped-score-activity rows in
 // renderTargetManageContent — both let the boss configure how the Remark
-// field is captured (free text / preset options / sentence starter / mastery
-// levels), independently of where the Score comes from.
+// field is captured (free text / preset options / sentence starter),
+// independently of where the Score comes from.
 function buildRemarkTypeControls(a, idx) {
-  const type = a.isMastery ? "mastery"
-    : a.remarkHasNote ? "starter_fixed_note"
+  const type = a.remarkHasNote ? "starter_fixed_note"
     : (a.sentenceStarter && a.inlineOptions && a.optionsMulti) ? "starter_fixed_multi"
     : (a.sentenceStarter && a.inlineOptions) ? "starter_fixed"
     : a.sentenceStarter ? "starter"
     : (a.inlineOptions && a.optionsMulti) ? "fixed_multi"
     : (a.inlineOptions || a.remarkPresetId) ? "fixed" : "";
-  const convertBtn = a.isMastery
-    ? `<button class="btn-mn-convert mn-convert-mastery" data-idx="${idx}" type="button">Convert to "Sentence Starter + Select One + Free Text"</button>`
-    : "";
   return `<select class="act-preset-select mn-act-preset" data-idx="${idx}">
       <option value="">Free text</option>
       <option value="fixed"${type === "fixed" ? " selected" : ""}>Select one</option>
@@ -6969,7 +6877,6 @@ function buildRemarkTypeControls(a, idx) {
       <option value="starter_fixed"${type === "starter_fixed" ? " selected" : ""}>Sentence Starter + Select one</option>
       <option value="starter_fixed_multi"${type === "starter_fixed_multi" ? " selected" : ""}>Sentence Starter + Tick boxes</option>
       <option value="starter_fixed_note"${type === "starter_fixed_note" ? " selected" : ""}>Sentence Starter + Select One + Free Text</option>
-      <option value="mastery"${type === "mastery" ? " selected" : ""}>Mastery Level + Free Text</option>
     </select>
     <input class="admin-input mn-act-starter-text" data-idx="${idx}"
       placeholder="Starter phrase…"
@@ -6978,8 +6885,7 @@ function buildRemarkTypeControls(a, idx) {
     <input class="admin-input mn-act-inline-opts" data-idx="${idx}"
       placeholder="Options separated by /  e.g. Low/Medium/High"
       value="${escHtml(a.inlineOptions || (a.remarkPresetId ? (state.remarkPresets.find(p=>p.id===a.remarkPresetId)?.options||[]).join("/") : ""))}"
-      style="${type === "fixed" || type === "fixed_multi" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note" ? "" : "display:none"}">
-    ${convertBtn}`;
+      style="${type === "fixed" || type === "fixed_multi" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note" ? "" : "display:none"}">`;
 }
 
 function renderTargetManageContent(student, target) {
@@ -7339,34 +7245,12 @@ function renderTargetManageContent(student, target) {
       acts[idx].remarkPresetId  = null;
       acts[idx].inlineOptions   = null;
       acts[idx].optionsMulti    = (type === "fixed_multi" || type === "starter_fixed_multi");
-      acts[idx].isMastery       = (type === "mastery");
       acts[idx].remarkHasNote   = (type === "starter_fixed_note");
       starterInput.style.display = (type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") ? "" : "none";
       optsInput.style.display    = (type === "fixed" || type === "fixed_multi" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") ? "" : "none";
       if (type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") { starterInput.focus(); }
       else if (type === "fixed" || type === "fixed_multi") { optsInput.focus(); }
       else { target.predefinedActivities = acts; await saveTarget(); }
-    });
-  });
-
-  // One-click migration for old "Mastery Level + Free Text" activities — flips
-  // the activity's own config to the generic Sentence Starter + Select One +
-  // Free Text type without touching any remark documents at all: existing
-  // remarks' rem.text ("In Progress"/"Mastered"/"Maintain") and rem.masteryNote
-  // already line up exactly with the new type's select options and notes
-  // field, so they render correctly the moment the config changes.
-  $("manage-modal-body").querySelectorAll(".mn-convert-mastery").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const idx = Number(btn.dataset.idx);
-      acts[idx].sentenceStarter = "Mastery Level";
-      acts[idx].inlineOptions   = "In Progress/Mastered/Maintain";
-      acts[idx].optionsMulti    = false;
-      acts[idx].remarkPresetId  = null;
-      acts[idx].isMastery       = false;
-      acts[idx].remarkHasNote   = true;
-      target.predefinedActivities = acts;
-      await saveTarget();
-      renderTargetManageContent(student, target);
     });
   });
 
@@ -7667,30 +7551,12 @@ function renderTemplateManageContent(template) {
       acts[idx].remarkPresetId  = null;
       acts[idx].inlineOptions   = null;
       acts[idx].optionsMulti    = (type === "fixed_multi" || type === "starter_fixed_multi");
-      acts[idx].isMastery       = (type === "mastery");
       acts[idx].remarkHasNote   = (type === "starter_fixed_note");
       starterInput.style.display = (type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") ? "" : "none";
       optsInput.style.display    = (type === "fixed" || type === "fixed_multi" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") ? "" : "none";
       if (type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") { starterInput.focus(); }
       else if (type === "fixed" || type === "fixed_multi") { optsInput.focus(); }
       else { template.predefinedActivities = acts; await saveTemplateFn(); }
-    });
-  });
-
-  // See the matching handler in renderTargetManageContent for why this is a
-  // pure config flip with no remark-data migration needed.
-  $("manage-modal-body").querySelectorAll(".mn-convert-mastery").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const idx = Number(btn.dataset.idx);
-      acts[idx].sentenceStarter = "Mastery Level";
-      acts[idx].inlineOptions   = "In Progress/Mastered/Maintain";
-      acts[idx].optionsMulti    = false;
-      acts[idx].remarkPresetId  = null;
-      acts[idx].isMastery       = false;
-      acts[idx].remarkHasNote   = true;
-      template.predefinedActivities = acts;
-      await saveTemplateFn();
-      renderTemplateManageContent(template);
     });
   });
 
@@ -7876,6 +7742,8 @@ async function openGroupSession(group, dateStr, attendees) {
             if (filled > 0) return;
             const mappedFilled = await autoFillGroupMappedRemarks(group, sid, data, state.selectedGroupTargetName, attendees);
             if (mappedFilled > 0) return;
+            const structuredFilled = await autoFillGroupStructuredRemarks(group, sid, data, state.selectedGroupTargetName, attendees);
+            if (structuredFilled > 0) return;
           } catch (err) { console.error("Group session auto-fill failed:", err); }
         }
       }
@@ -7973,6 +7841,11 @@ function populateGroupTargetDropdown(targets) {
           state.selectedGroupTargetName, state.groupAttendees
         );
         if (mappedFilled > 0) return;
+        const structuredFilled = await autoFillGroupStructuredRemarks(
+          state.currentGroup, state.groupSessionId, data,
+          state.selectedGroupTargetName, state.groupAttendees
+        );
+        if (structuredFilled > 0) return;
       } catch (err) { console.error("Group target auto-fill failed:", err); }
     }
     renderGroupTargetContent();
@@ -8026,6 +7899,43 @@ async function autoFillGroupMappedRemarks(group, sessionId, data, targetName, at
         count++;
       } finally {
         mappedRemarkAutoFillInFlight.delete(key);
+      }
+    }
+  }
+  return count;
+}
+
+const structuredRemarkAutoFillInFlight = new Set();
+
+// Group-entry counterpart of autoFillStructuredRemarks — creates one empty
+// remark per attendee for every "pick from options" activity on the
+// selected target (group activity stubs are filled in lazily per selected
+// target, not for every target up front — see autoFillGroupSession). The
+// in-flight guard mirrors autoFillGroupMappedRemarks's: addGroupRemark is
+// awaited per attendee, so a second snapshot landing mid-loop could
+// otherwise re-enter and double-add before the first write commits.
+async function autoFillGroupStructuredRemarks(group, sessionId, data, targetName, attendees) {
+  const target = group.targets.find(t => t.name === targetName);
+  if (!target) return 0;
+  let count = 0;
+  for (const pa of (target.predefinedActivities || [])) {
+    if (!isAutoOpenRemarkType(pa)) continue;
+    const existingAct = Object.entries(data.activities || {})
+      .find(([, a]) => a.targetName === targetName && a.activityName === pa.name);
+    const actId = existingAct?.[0];
+    if (!actId) continue;
+    for (const studentName of attendees) {
+      const hasRemark = Object.values(data.remarks || {})
+        .some(r => r.activityId === actId && r.studentName === studentName);
+      if (hasRemark) continue;
+      const key = `${sessionId}:${targetName}:${pa.name}:${studentName}`;
+      if (structuredRemarkAutoFillInFlight.has(key)) continue;
+      structuredRemarkAutoFillInFlight.add(key);
+      try {
+        await addGroupRemark(sessionId, actId, studentName, "");
+        count++;
+      } finally {
+        structuredRemarkAutoFillInFlight.delete(key);
       }
     }
   }
@@ -8254,14 +8164,16 @@ function renderGroupStudentRowCompact(remId, rem, target, mappedInfo = null) {
 }
 
 function renderGroupActivityCard(actName, actId, target, data, attendees, actNote = null, mappedPa = null, paEntry = null, isPredefined = false) {
-  // Free-text activities (no preset options, not mastery) get a ready-to-type
-  // empty box for a pending attendee instead of a "+ Add Remark & Trials"
-  // button once the card is already expanded (see renderGroupStudentEmptyRow)
-  // — preset-option/sentence-starter/mastery activities have no typeable
-  // free text, so those still need the explicit button.
-  const inlineOptions = paEntry ? getActivityInlineOptions(paEntry) : null;
-  const isMastery      = paEntry?.isMastery || false;
-  const isFreeText     = parseOpts(inlineOptions).length === 0 && !isMastery;
+  // Free-text activities (no preset options, no sentence starter) get a
+  // ready-to-type empty box for a pending attendee instead of a "+ Add
+  // Remark & Trials" button once the card is already expanded (see
+  // renderGroupStudentEmptyRow) — preset-option/sentence-starter activities
+  // have no typeable free text, so those still need the explicit button.
+  const inlineOptions   = paEntry ? getActivityInlineOptions(paEntry) : null;
+  const sentenceStarter = paEntry?.sentenceStarter || null;
+  const multiSelect     = paEntry?.optionsMulti || false;
+  const remarkHasNote   = paEntry?.remarkHasNote || false;
+  const isFreeText      = parseOpts(inlineOptions).length === 0 && !sentenceStarter;
 
   const noteRow = actNote && actNote.trim()
     ? `<div class="entry-field" contenteditable="false">
@@ -8282,7 +8194,9 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
         : [];
       if (remarks.length === 0) return renderGroupStudentPendingRow(studentName, actId, actName, target, true);
       const mappedInfo = resolveGroupMappedScoreDisplay(mappedPa, target, data, studentName);
-      return remarks.map(([remId, rem]) => renderGroupStudentRow(studentName, remId, rem, target, mappedInfo)).join("");
+      return remarks.map(([remId, rem]) => renderGroupStudentRow(
+        studentName, remId, rem, target, mappedInfo, inlineOptions, sentenceStarter, multiSelect, remarkHasNote
+      )).join("");
     }).join("");
     return `<div class="entry-block entry-block-predefined" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">
       <div class="entry-field" contenteditable="false">
@@ -8354,7 +8268,9 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
     } else {
       bodyHtml = attendees.map(studentName => {
         const entry = byStudent[studentName]?.[i] || null;
-        if (entry) return renderGroupStudentRow(studentName, entry[0], entry[1], target);
+        if (entry) return renderGroupStudentRow(
+          studentName, entry[0], entry[1], target, null, inlineOptions, sentenceStarter, multiSelect, remarkHasNote
+        );
         return isFreeText
           ? renderGroupStudentEmptyRow(studentName, actId, actName, target, isPredefined)
           : renderGroupStudentPendingRow(studentName, actId, actName, target);
@@ -8424,7 +8340,12 @@ function renderGroupStudentTrialsOnlyRow(studentName, remId, rem, target) {
   </div>`;
 }
 
-function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = null) {
+// Group-entry counterpart of renderRemarkFields — same option-pill/sentence-
+// starter/notes markup (reusing the same generic CSS classes/save-wiring),
+// just with .group-remark-input instead of .remark-text-input for the
+// free-text fallback box, since this row is one attendee's slice of a
+// shared-activity card instead of a single student's own remark field.
+function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = null, inlineOptions = null, sentenceStarter = null, multiSelect = false, remarkHasNote = false) {
   const trials = rem.trials || [];
   const badges = trials.map((t, i) =>
     `<span class="trial-badge">${t === -1 ? "—" : t}<button class="btn-trial-delete btn-group-trial-del" data-rem-id="${remId}" data-idx="${i}">×</button></span>`
@@ -8442,17 +8363,62 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
             data-rem-id="${remId}" data-target="${escHtml(target.name)}">+ Trial</button>
         </div>
       </div>`;
+
+  const opts = parseOpts(inlineOptions);
+  function makeOptPills(remText) {
+    if (opts.length === 0) return null;
+    if (multiSelect) {
+      const sel = (remText || "").split(", ").map(s => s.trim()).filter(Boolean);
+      return `<div class="remark-preset-opts remark-preset-opts-multi" contenteditable="false">${opts.map(opt =>
+        `<button class="btn-remark-opt${sel.includes(opt) ? " active" : ""}"
+          data-rem-id="${remId}" data-opt="${escHtml(opt)}">${escHtml(opt)}</button>`
+      ).join("")}</div>`;
+    }
+    return `<div class="remark-preset-opts" contenteditable="false">${opts.map(opt =>
+      `<button class="btn-remark-opt${remText === opt ? " active" : ""}"
+        data-rem-id="${remId}" data-opt="${escHtml(opt)}">${escHtml(opt)}</button>`
+    ).join("")}</div>`;
+  }
+
+  const freeTextBox = `<textarea class="field-input group-remark-input" rows="1"
+      data-rem-id="${remId}" placeholder="Remark…"
+      data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`;
+
+  const sketchBtn = opts.length === 0
+    ? `<button class="btn-sketch btn-group-sketch" contenteditable="false" data-rem-id="${remId}" aria-label="Sketch">✏</button>`
+    : "";
+
+  let remarkContent;
+  if (sentenceStarter) {
+    remarkContent = `<div class="remark-starter-wrap">
+      <span class="remark-starter-prefix" contenteditable="false">${escHtml(sentenceStarter)}</span>
+      ${makeOptPills(rem.text) || freeTextBox}
+    </div>`;
+  } else {
+    remarkContent = makeOptPills(rem.text) || freeTextBox;
+  }
+
+  const noteField = remarkHasNote
+    ? `<div class="entry-field" contenteditable="false">
+        <span class="field-label">Notes</span>
+        <button class="btn-sketch btn-group-sketch" data-rem-id="${remId}" aria-label="Open sketch board">✏</button>
+        <textarea class="field-input mastery-note-input" rows="1"
+          data-rem-id="${remId}" placeholder="Notes…"
+          data-saved-html="${escHtml(rem.masteryNote || "")}">${escHtml(plainTextForEdit(rem.masteryNote || ""))}</textarea>
+      </div>`
+    : "";
+
   return `<div class="group-student-section" data-rem-id="${remId}" data-student="${escHtml(studentName)}">
     <div class="group-student-name-row" contenteditable="false">
       <span class="group-student-name-label">${liveGroupAttendeeLabel(studentName)}</span>
     </div>
     <div class="entry-field">
       <span class="field-label" contenteditable="false">Remark</span>
-      <button class="btn-sketch btn-group-sketch" contenteditable="false" data-rem-id="${remId}" aria-label="Sketch">✏</button>
-      <textarea class="field-input group-remark-input" rows="1"
-        data-rem-id="${remId}" placeholder="Remark…"
-        data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>
+      ${sketchBtn}
+      ${remarkContent}
+      <button class="btn-icon btn-group-del-student-remark" contenteditable="false" data-rem-id="${remId}" title="Delete remark">🗑</button>
     </div>
+    ${noteField}
     ${trailingField}
   </div>`;
 }
@@ -8583,7 +8549,8 @@ function attachGroupTargetListeners(target) {
   // Sketch board
   c.querySelectorAll(".btn-group-sketch").forEach(btn => {
     btn.addEventListener("click", () => {
-      const field = c.querySelector(`.group-remark-input[data-rem-id="${btn.dataset.remId}"]`);
+      const field = c.querySelector(`.group-remark-input[data-rem-id="${btn.dataset.remId}"]`)
+                 || c.querySelector(`.mastery-note-input[data-rem-id="${btn.dataset.remId}"]`);
       if (field) openTextEditorSheet(field);
     });
   });
@@ -8592,6 +8559,43 @@ function attachGroupTargetListeners(target) {
     btn.addEventListener("click", () => {
       const field = c.querySelector(`.group-remark-input-combined[data-rem-ids="${btn.dataset.remIds}"]`);
       if (field) openTextEditorSheet(field);
+    });
+  });
+
+  // ── Remark option buttons (single-select) — group entry counterpart of
+  // the individual screen's equivalent handler ──────────────
+  c.querySelectorAll(".remark-preset-opts:not(.remark-preset-opts-multi) .btn-remark-opt").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const isActive = btn.classList.contains("active");
+      btn.closest(".remark-preset-opts")?.querySelectorAll(".btn-remark-opt").forEach(b => b.classList.remove("active"));
+      const newText = isActive ? "" : btn.dataset.opt;
+      if (!isActive) btn.classList.add("active");
+      const remId = btn.dataset.remId;
+      const rem = state.groupSessionData?.remarks?.[remId];
+      const prevText = rem?.text;
+      if (rem) rem.text = newText;
+      updateRemarkText(state.groupSessionId, remId, newText).catch(err => {
+        if (rem) rem.text = prevText;
+        alert("Couldn't save — check your connection and try again.\n\n" + err.message);
+      });
+    });
+  });
+
+  // ── Remark option buttons (multi-select) ──────────────────
+  c.querySelectorAll(".remark-preset-opts-multi .btn-remark-opt").forEach(btn => {
+    btn.addEventListener("click", () => {
+      btn.classList.toggle("active");
+      const container = btn.closest(".remark-preset-opts-multi");
+      const selected = [...container.querySelectorAll(".btn-remark-opt.active")].map(b => b.dataset.opt);
+      const newText = selected.join(", ");
+      const remId = btn.dataset.remId;
+      const rem = state.groupSessionData?.remarks?.[remId];
+      const prevText = rem?.text;
+      if (rem) rem.text = newText;
+      updateRemarkText(state.groupSessionId, remId, newText).catch(err => {
+        if (rem) rem.text = prevText;
+        alert("Couldn't save — check your connection and try again.\n\n" + err.message);
+      });
     });
   });
 

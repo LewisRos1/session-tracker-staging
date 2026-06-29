@@ -2110,13 +2110,7 @@ div.admin-note-editable:empty::before {
 }
 .remark-starter-wrap .remark-text-input { flex: 1; }
 
-/* ─── Mastery Level buttons + note ──────────────────────── */
-.mastery-remark-wrap {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: .4rem;
-}
+/* ─── Notes field (generic — Sentence Starter + Select One + Free Text) ─── */
 .mastery-note-input,
 .view-mastery-note {
   resize: none;
@@ -2140,32 +2134,6 @@ div.admin-note-editable:empty::before {
   border-radius: 4px;
 }
 .view-mastery-note:focus { border-color: var(--border); color: var(--text); }
-
-.remark-mastery-opts {
-  display: flex;
-  gap: .4rem;
-  flex-wrap: wrap;
-}
-.btn-mastery {
-  padding: .35rem .8rem;
-  border: 1.5px solid var(--border);
-  border-radius: 20px;
-  background: none;
-  font-size: .88rem;
-  font-family: var(--font);
-  color: var(--text);
-  cursor: pointer;
-  transition: border-color .12s, background .12s, color .12s;
-}
-.btn-mastery:hover { border-color: var(--primary); background: var(--primary-light); }
-.btn-mastery.active {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: #fff;
-  font-weight: 600;
-}
-/* slightly smaller in the view table */
-.view-mastery-opts .btn-mastery { font-size: .8rem; padding: .25rem .6rem; }
 
 /* ─── Sentence starter remark (view/edit table) ──────────── */
 .view-starter-wrap {
