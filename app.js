@@ -122,7 +122,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "609";
+const APP_VERSION = "610";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1134,6 +1134,17 @@ function stringSimilarity(a, b) {
 // function once the backlog from before v606 has been fully reviewed.
 const LIKELY_RENAME_THRESHOLD = 0.45;
 
+// Findings live here (not just in the rendered HTML) so the Merge buttons
+// below can hand the exact in-memory orphanName/bestMatch strings straight
+// to renameActivityAcrossSessions — no round-trip through rendered HTML,
+// copy-paste into chat, and hand-retyped code, which is exactly how 4 of
+// the 38 v609 batch-1 repairs silently no-op'd (an invisible whitespace/
+// quote-style difference between the boss's pasted report text and the
+// real Firestore string meant the === match in renameActivityAcrossSessions
+// never fired). Clicking Merge here can never have that problem, since the
+// string never leaves memory.
+let _dataIntegrityFindings = [];
+
 async function runDataIntegrityCheck() {
   $("manage-modal-title").textContent = "Data Integrity Check";
   $("manage-modal-body").innerHTML = `<p style="padding:1rem">Scanning every student and group's full session history… this can take a little while.</p>`;
@@ -1141,7 +1152,7 @@ async function runDataIntegrityCheck() {
 
   const findings = [];
 
-  const scanTargets = async (who, targets, sessions) => {
+  const scanTargets = async (who, entityId, isGroup, targets, sessions) => {
     for (const target of (targets || [])) {
       const validNames = [...new Set(
         (target.predefinedActivities || [])
@@ -1171,11 +1182,11 @@ async function runDataIntegrityCheck() {
           if (sim > bestSim) { bestSim = sim; bestMatch = name; }
         }
         findings.push({
-          who, targetName: target.name, orphanName,
+          who, entityId, isGroup, targetName: target.name, orphanName,
           sessionCount: info.count,
           dateRange: dates.length > 1 ? `${dates[0]} → ${dates[dates.length - 1]}` : dates[0],
           sample: info.sample,
-          bestMatch, bestSim
+          bestMatch, bestSim, merged: false
         });
       }
     }
@@ -1184,23 +1195,31 @@ async function runDataIntegrityCheck() {
   for (const student of state.students) {
     try {
       const sessions = await getAllSessionsForStudent(student.id);
-      await scanTargets(student.name, student.targets, sessions);
+      await scanTargets(student.name, student.id, false, student.targets, sessions);
     } catch (err) { console.error(`Data integrity scan failed for ${student.name}:`, err); }
   }
   for (const group of state.groups) {
     try {
       const sessions = await getAllSessionsForGroup(group.id);
-      await scanTargets(`${group.name} (group)`, group.targets, sessions);
+      await scanTargets(`${group.name} (group)`, group.id, true, group.targets, sessions);
     } catch (err) { console.error(`Data integrity scan failed for ${group.name}:`, err); }
   }
+
+  _dataIntegrityFindings = findings;
 
   if (findings.length === 0) {
     $("manage-modal-body").innerHTML = `<p style="padding:1rem">No orphaned activity data found. Everything currently matches up.</p>`;
     return;
   }
 
-  const likely     = findings.filter(f => f.bestSim >= LIKELY_RENAME_THRESHOLD);
-  const structural = findings.filter(f => f.bestSim <  LIKELY_RENAME_THRESHOLD);
+  renderDataIntegrityReport();
+}
+
+function renderDataIntegrityReport() {
+  const findings = _dataIntegrityFindings;
+  const likely     = findings.filter(f => f.bestSim >= LIKELY_RENAME_THRESHOLD && !f.merged);
+  const structural = findings.filter(f => f.bestSim <  LIKELY_RENAME_THRESHOLD && !f.merged);
+  const merged      = findings.filter(f => f.merged);
 
   $("manage-modal-body").innerHTML = `
     <div style="padding:1rem">
@@ -1214,8 +1233,14 @@ async function runDataIntegrityCheck() {
           <div style="margin-top:.3rem">Best current match: <strong>${escHtml(f.bestMatch || "(none)")}</strong> <span style="color:var(--text-muted);font-size:.85rem">(${Math.round(f.bestSim * 100)}% text overlap)</span></div>
           <div style="margin-top:.3rem;color:var(--text-muted);font-size:.85rem">Affects ${f.sessionCount} session${f.sessionCount === 1 ? "" : "s"} (${escHtml(f.dateRange)})</div>
           <div style="margin-top:.3rem;color:var(--text-muted);font-size:.85rem">Sample remark: "${escHtml(f.sample || "")}"</div>
+          <button class="btn-primary-sm btn-integrity-merge" data-idx="${findings.indexOf(f)}" style="margin-top:.5rem">Merge into "${escHtml(f.bestMatch || "")}"</button>
         </div>
       `).join("")}
+
+      ${merged.length === 0 ? "" : `
+        <h3 style="margin:1.5rem 0 .5rem;color:#16a34a">Merged just now (${merged.length})</h3>
+        ${merged.map(f => `<div style="padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.85rem">${escHtml(f.who)} — ${escHtml(f.targetName)}: "${escHtml(f.orphanName)}" → "${escHtml(f.bestMatch)}"</div>`).join("")}
+      `}
 
       <h3 style="margin:1.5rem 0 .5rem">Looks like deliberate restructuring — no action needed (${structural.length})</h3>
       <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:.5rem">These old names don't closely match anything currently in their target, which usually means the activity list was rebuilt on purpose. The data is safely preserved under its original name — nothing to fix unless you say otherwise.</p>
@@ -1224,6 +1249,28 @@ async function runDataIntegrityCheck() {
         ${structural.map(f => `<div style="padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.85rem">${escHtml(f.who)} — ${escHtml(f.targetName)}: "${escHtml(f.orphanName)}" (${f.sessionCount} session${f.sessionCount === 1 ? "" : "s"})</div>`).join("")}
       </details>`}
     </div>`;
+
+  $("manage-modal-body").querySelectorAll(".btn-integrity-merge").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const f = _dataIntegrityFindings[Number(btn.dataset.idx)];
+      if (!f || f.merged) return;
+      btn.disabled = true;
+      btn.textContent = "Merging…";
+      try {
+        if (f.isGroup) {
+          await renameGroupActivityAcrossSessions(f.entityId, f.targetName, f.orphanName, f.bestMatch);
+        } else {
+          await renameActivityAcrossSessions(f.entityId, f.targetName, f.orphanName, f.bestMatch);
+        }
+        f.merged = true;
+        renderDataIntegrityReport();
+      } catch (err) {
+        console.error("Data integrity merge failed:", err);
+        btn.disabled = false;
+        btn.textContent = `Merge into "${f.bestMatch}" (failed — try again)`;
+      }
+    });
+  });
 }
 
 // Choosing a student here adds them to Individual Sessions or Assessments.
