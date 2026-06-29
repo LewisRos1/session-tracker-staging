@@ -938,8 +938,13 @@ export async function reassignGroupStudentAcrossSessions(groupId, oldName, oldId
       updates.attendeeIds = attendeeIds.map(id => (id === oldId ? newId : id));
     }
 
+    // Guard oldId === newId (a pure name-change re-sync, not an actual
+    // re-link to a different student): without it, these two lines write
+    // the SAME Firestore field path twice in one updates object, and the
+    // deleteField() always wins — silently wiping the session number it
+    // was just told to preserve.
     const numbers = data.attendeePersonalSessionNumbers || {};
-    if (numbers[oldId] !== undefined) {
+    if (numbers[oldId] !== undefined && oldId !== newId) {
       updates[`attendeePersonalSessionNumbers.${newId}`] = numbers[oldId];
       updates[`attendeePersonalSessionNumbers.${oldId}`] = deleteField();
     }

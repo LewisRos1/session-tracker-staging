@@ -118,7 +118,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "602";
+const APP_VERSION = "603";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -296,6 +296,40 @@ function propagateTargetRename(student, oldName, newName) {
     .catch(err => console.error("propagateTargetRename failed:", err));
   _renamePropagationQueues.set(entityId, next);
 }
+
+// A student's own profile name (changed via "Change Student's Name" in the
+// Student Database) is also baked as plain text into any group roster slot
+// linked to them — group.students/group.studentLinks key off the name
+// string, and every historical group session's attendees/
+// remarks.studentName carry that same text. Nothing else refreshes those
+// automatically, so without this a renamed student's groups would keep
+// silently recording under the pre-rename name forever — the exact same
+// denormalized-name trap that already cost real data twice (see
+// [[feedback_activity_rename_race_fix]]), just not yet visible since both
+// sides stay mutually stale together. Resync proactively instead of
+// leaving it to rot. Shares the rename queue, keyed by group id, so this
+// can't race a target/activity rename landing on the same group.
+async function propagateStudentRenameToGroups(student, oldName, newName) {
+  if (!oldName || oldName === newName) return;
+  for (const group of state.groups) {
+    const idx = (group.students || []).findIndex(n => group.studentLinks?.[n] === student.id);
+    if (idx === -1) continue;
+    const groupId = group.id;
+    const prior = _renamePropagationQueues.get(groupId) || Promise.resolve();
+    const next = prior.then(async () => {
+      group.students[idx] = newName;
+      delete group.studentLinks[oldName];
+      group.studentLinks[newName] = student.id;
+      group.name = groupAutoName(group.students.filter(Boolean));
+      const gi = state.groups.findIndex(g => g.id === groupId);
+      if (gi >= 0) state.groups[gi] = group;
+      await saveGroup(group);
+      await reassignGroupStudentAcrossSessions(groupId, oldName, student.id, newName, student.id);
+    }).catch(err => console.error("propagateStudentRenameToGroups failed:", err));
+    _renamePropagationQueues.set(groupId, next);
+  }
+}
+
 // Tracks a newly-created group ID so it can be auto-deleted if closed with no students.
 let _newGroupId = null;
 // When the Edit Target/Template modal is open, holds { acts, save } so closeManageModal
@@ -6588,10 +6622,12 @@ function wireStudentNameSection(student) {
       if (!fn || !ln) return;
       const newName = `${fn} ${ln}`;
       if (fn === student.firstName && ln === student.lastName && newName === student.name) return;
+      const oldName = student.name;
       student.firstName = fn;
       student.lastName  = ln;
       student.name      = newName;
       await saveStudent(student);
+      propagateStudentRenameToGroups(student, oldName, newName);
       $("manage-modal-title").textContent = newName;
     };
     [$("mn-s-firstname"), $("mn-s-lastname")].forEach(input => {
