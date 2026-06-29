@@ -390,6 +390,35 @@ export async function deleteActivity(sessionId, actId, remarkIds) {
   await updateDoc(doc(db, "sessions", sessionId), updates);
 }
 
+// An activity can occasionally get created TWICE within the same session
+// under the exact same (targetName, activityName) — not a rename/typo
+// problem (the name matches the current config perfectly either way), but
+// a duplicate-creation race: the structured/mapped-score auto-fill
+// features check "does a matching activity already exist?" before
+// creating one, and if two snapshot callbacks (e.g. two devices/tabs open
+// on the same session, or a reload mid-write) each run that check before
+// the other's addActivity has landed, both conclude "no" and both create
+// one. Every screen that looks up an activity by name only ever returns
+// ONE of the two (Array.find()'s first match), so whichever duplicate
+// isn't picked becomes invisible everywhere except exports (which have a
+// separate orphan-recovery fallback that surfaces it again, looking like
+// a confusing ghost duplicate). Folds the duplicate's remarks onto the
+// primary activity and removes the now-empty shell — no data deleted,
+// just re-pointed to the activity that's actually displayed.
+export async function mergeDuplicateActivity(sessionId, primaryActId, duplicateActId) {
+  const snap = await getDoc(doc(db, "sessions", sessionId));
+  if (!snap.exists()) return;
+  const data = snap.data();
+  const updates = {};
+  for (const [remId, rem] of Object.entries(data.remarks || {})) {
+    if (rem.activityId === duplicateActId) {
+      updates[`remarks.${remId}.activityId`] = primaryActId;
+    }
+  }
+  updates[`activities.${duplicateActId}`] = deleteField();
+  await updateDoc(doc(db, "sessions", sessionId), updates);
+}
+
 // ─── REMARK OPERATIONS ───────────────────────────────────────
 
 // remId can be supplied by the caller (e.g. to write a remark into local

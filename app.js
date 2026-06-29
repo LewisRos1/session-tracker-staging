@@ -50,6 +50,7 @@ import {
   renameGroupTargetAcrossSessions,
   renameRemarkOptionAcrossSessions,
   renameGroupRemarkOptionAcrossSessions,
+  mergeDuplicateActivity,
   reassignGroupStudentAcrossSessions,
   signInWithPin,
   signOutUser,
@@ -122,7 +123,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "610";
+const APP_VERSION = "611";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1144,6 +1145,16 @@ const LIKELY_RENAME_THRESHOLD = 0.45;
 // never fired). Clicking Merge here can never have that problem, since the
 // string never leaves memory.
 let _dataIntegrityFindings = [];
+// Separate from the rename findings above: this catches a DIFFERENT shape
+// of problem — two activities created in the SAME session under the exact
+// same (targetName, activityName), where the name matches the current
+// config perfectly (so the rename-detection above sees nothing wrong) but
+// whichever duplicate isn't picked by the first-match lookup used
+// everywhere becomes invisible. See mergeDuplicateActivity's comment in
+// firebase-service.js for how this happens (a race in the structured/
+// mapped-score auto-fill that an in-memory guard can't catch across
+// separate devices/tabs/reloads).
+let _dataIntegrityDuplicates = [];
 
 async function runDataIntegrityCheck() {
   $("manage-modal-title").textContent = "Data Integrity Check";
@@ -1151,6 +1162,7 @@ async function runDataIntegrityCheck() {
   $("manage-modal").classList.remove("hidden");
 
   const findings = [];
+  const duplicates = [];
 
   const scanTargets = async (who, entityId, isGroup, targets, sessions) => {
     for (const target of (targets || [])) {
@@ -1162,8 +1174,11 @@ async function runDataIntegrityCheck() {
       const validNameSet = new Set(validNames);
       const byOrphanName = new Map();
       for (const session of sessions) {
+        const actIdsByName = new Map();
         for (const [actId, act] of Object.entries(session.activities || {})) {
           if (act.targetName !== target.name) continue;
+          if (!actIdsByName.has(act.activityName)) actIdsByName.set(act.activityName, []);
+          actIdsByName.get(act.activityName).push(actId);
           if (validNameSet.has(act.activityName)) continue;
           const remarks = Object.values(session.remarks || {}).filter(r => r.activityId === actId);
           if (remarks.length === 0) continue; // no real data — not worth reporting
@@ -1172,6 +1187,21 @@ async function runDataIntegrityCheck() {
           entry.dates.push(session.date);
           if (!entry.sample) entry.sample = plainTextForEdit(remarks[0].text || "").slice(0, 140);
           byOrphanName.set(act.activityName, entry);
+        }
+        for (const [activityName, actIds] of actIdsByName) {
+          if (actIds.length < 2) continue;
+          const withCounts = actIds.map(actId => ({
+            actId,
+            remarkCount: Object.values(session.remarks || {}).filter(r => r.activityId === actId).length
+          })).sort((a, b) => b.remarkCount - a.remarkCount);
+          duplicates.push({
+            who, entityId, isGroup, targetName: target.name, activityName,
+            sessionId: session.id, sessionDate: session.date,
+            primaryActId: withCounts[0].actId,
+            duplicateActIds: withCounts.slice(1).map(w => w.actId),
+            remarkCounts: withCounts,
+            merged: false
+          });
         }
       }
       for (const [orphanName, info] of byOrphanName) {
@@ -1205,10 +1235,11 @@ async function runDataIntegrityCheck() {
     } catch (err) { console.error(`Data integrity scan failed for ${group.name}:`, err); }
   }
 
-  _dataIntegrityFindings = findings;
+  _dataIntegrityFindings  = findings;
+  _dataIntegrityDuplicates = duplicates;
 
-  if (findings.length === 0) {
-    $("manage-modal-body").innerHTML = `<p style="padding:1rem">No orphaned activity data found. Everything currently matches up.</p>`;
+  if (findings.length === 0 && duplicates.length === 0) {
+    $("manage-modal-body").innerHTML = `<p style="padding:1rem">No orphaned or duplicate activity data found. Everything currently matches up.</p>`;
     return;
   }
 
@@ -1221,11 +1252,30 @@ function renderDataIntegrityReport() {
   const structural = findings.filter(f => f.bestSim <  LIKELY_RENAME_THRESHOLD && !f.merged);
   const merged      = findings.filter(f => f.merged);
 
+  const dupesOpen   = _dataIntegrityDuplicates.filter(d => !d.merged);
+  const dupesMerged = _dataIntegrityDuplicates.filter(d => d.merged);
+
   $("manage-modal-body").innerHTML = `
     <div style="padding:1rem">
-      <p style="margin-bottom:1rem">Scanned everyone's full history — ${findings.length} orphaned activit${findings.length === 1 ? "y" : "ies"} with real recorded data found in total.</p>
+      <p style="margin-bottom:1rem">Scanned everyone's full history — ${findings.length} orphaned activit${findings.length === 1 ? "y" : "ies"} with real recorded data found, plus ${_dataIntegrityDuplicates.length} duplicate activit${_dataIntegrityDuplicates.length === 1 ? "y" : "ies"} within a single session.</p>
 
-      <h3 style="margin:.5rem 0">Likely simple renames — worth reviewing (${likely.length})</h3>
+      <h3 style="margin:.5rem 0">Duplicate activities in one session — same name, two records (${dupesOpen.length})</h3>
+      <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:.5rem">The name matches the current config fine — the problem is two separate activity records exist for that one name in the same session (usually from a sync race), and only one of them ever shows up on the entry/View screens. Merging moves any remarks off the empty/lesser one onto the one already being displayed, then removes the now-empty duplicate.</p>
+      ${dupesOpen.length === 0 ? `<p style="color:var(--text-muted);font-size:.85rem">None found.</p>` : dupesOpen.map(d => `
+        <div style="border:1px solid var(--border);border-radius:8px;padding:.75rem;margin-bottom:.75rem">
+          <div><strong>${escHtml(d.who)}</strong> — ${escHtml(d.targetName)} — ${escHtml(d.sessionDate)}</div>
+          <div style="margin-top:.3rem">Activity: <strong>${escHtml(d.activityName)}</strong></div>
+          <div style="margin-top:.3rem;color:var(--text-muted);font-size:.85rem">${d.remarkCounts.length} records found — remark counts: ${d.remarkCounts.map(w => w.remarkCount).join(", ")} (keeping the one with the most, folding the rest into it)</div>
+          <button class="btn-primary-sm btn-integrity-merge-dup" data-idx="${_dataIntegrityDuplicates.indexOf(d)}" style="margin-top:.5rem">Merge duplicates</button>
+        </div>
+      `).join("")}
+
+      ${dupesMerged.length === 0 ? "" : `
+        <h3 style="margin:1.5rem 0 .5rem;color:#16a34a">Duplicates merged just now (${dupesMerged.length})</h3>
+        ${dupesMerged.map(d => `<div style="padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.85rem">${escHtml(d.who)} — ${escHtml(d.targetName)} — ${escHtml(d.sessionDate)}: "${escHtml(d.activityName)}"</div>`).join("")}
+      `}
+
+      <h3 style="margin:1.5rem 0 .5rem">Likely simple renames — worth reviewing (${likely.length})</h3>
       ${likely.length === 0 ? `<p style="color:var(--text-muted);font-size:.85rem">None found.</p>` : likely.map(f => `
         <div style="border:1px solid var(--border);border-radius:8px;padding:.75rem;margin-bottom:.75rem">
           <div><strong>${escHtml(f.who)}</strong> — ${escHtml(f.targetName)}</div>
@@ -1268,6 +1318,26 @@ function renderDataIntegrityReport() {
         console.error("Data integrity merge failed:", err);
         btn.disabled = false;
         btn.textContent = `Merge into "${f.bestMatch}" (failed — try again)`;
+      }
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".btn-integrity-merge-dup").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const d = _dataIntegrityDuplicates[Number(btn.dataset.idx)];
+      if (!d || d.merged) return;
+      btn.disabled = true;
+      btn.textContent = "Merging…";
+      try {
+        for (const dupActId of d.duplicateActIds) {
+          await mergeDuplicateActivity(d.sessionId, d.primaryActId, dupActId);
+        }
+        d.merged = true;
+        renderDataIntegrityReport();
+      } catch (err) {
+        console.error("Duplicate merge failed:", err);
+        btn.disabled = false;
+        btn.textContent = "Merge duplicates (failed — try again)";
       }
     });
   });
@@ -3521,6 +3591,13 @@ function isAutoOpenRemarkType(pa) {
 // Auto-create an empty remark for every "pick from options" activity on
 // session open, unconditionally — the point is just to skip the extra click,
 // there's no "previous value" to wait for first.
+// Same in-flight guard as autoFillMappedRemarks below (structuredRemarkAutoFillInFlight,
+// keyed the same way) — without it, a duplicate activity could be created
+// here too if firstLoad re-entered before a prior addActivity+addRemark
+// pair finished, the exact shape mergeDuplicateActivity (firebase-service.js)
+// exists to clean up. This only protects re-entrancy within one open tab —
+// it can't stop two devices/tabs racing each other, which is why the
+// Data Integrity Check's duplicate-activity section exists as a backstop.
 async function autoFillStructuredRemarks(student, sessionId) {
   const data = state.sessionData;
   let count = 0;
@@ -3537,11 +3614,18 @@ async function autoFillStructuredRemarks(student, sessionId) {
         if (hasRemark) continue;
       }
 
-      if (!actId) {
-        actId = await addActivity(sessionId, target.name, pa.name, pa.order ?? 0, true);
+      const key = `${sessionId}:${target.name}:${pa.name}`;
+      if (structuredRemarkAutoFillInFlight.has(key)) continue;
+      structuredRemarkAutoFillInFlight.add(key);
+      try {
+        if (!actId) {
+          actId = await addActivity(sessionId, target.name, pa.name, pa.order ?? 0, true);
+        }
+        await addRemark(sessionId, actId, "");
+        count++;
+      } finally {
+        structuredRemarkAutoFillInFlight.delete(key);
       }
-      await addRemark(sessionId, actId, "");
-      count++;
     }
   }
   return count;
