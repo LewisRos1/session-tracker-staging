@@ -758,7 +758,7 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
   for (const target of allTargets) {
     body.push(new Paragraph({
       spacing: { before: 240, after: 80 },
-      children: [new TextRun({ text: target.name, bold: true, size: 26 })]
+      children: [new TextRun({ text: target.name, bold: true })]
     }));
 
     const tableRows = [
@@ -896,10 +896,14 @@ async function buildSingleSessionWordBlob(entityName, sessionLabel, allTargets, 
     // 1.5 line spacing document-wide (360 = 1.5 * the single-spacing unit of
     // 240) — every Paragraph inherits this unless it sets its own "spacing",
     // so table cells, headings, and body text all get it without having to
-    // touch each individual Paragraph call site.
+    // touch each individual Paragraph call site. size: 22 (half-points) is
+    // 11pt — explicit so every run is the same size regardless of Word's
+    // own Normal-style default, instead of leaving it unset and relying on
+    // whatever default docx/Word would otherwise fall back to.
     styles: {
       default: {
         document: {
+          run: { size: 22 },
           paragraph: { spacing: { line: 360, lineRule: LineRuleType.AUTO } }
         }
       }
