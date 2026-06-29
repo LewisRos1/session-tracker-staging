@@ -57,6 +57,8 @@ import {
   generateId,
   getIndividualSessionsForStudent,
   getGroupSessionsForStudent,
+  getAllSessionsForStudent,
+  getAllSessionsForGroup,
   changeSessionNumber
 } from "./firebase-service.js";
 import {
@@ -120,7 +122,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "606";
+const APP_VERSION = "607";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -883,6 +885,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
       <div style="display:flex;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap">
         <button class="export-btn" id="btn-add-student-row">+ Add New Student</button>
         <button class="export-btn" id="btn-delete-student-row" style="color:#dc2626">Delete Student</button>
+        <button class="export-btn" id="btn-data-integrity-check">🔍 Run Data Integrity Check</button>
       </div>
       <div class="view-table-wrapper">
         <table class="view-table">
@@ -926,6 +929,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
 
   $("btn-add-student-row").addEventListener("click", startAddStudentRow);
   $("btn-delete-student-row").addEventListener("click", promptDeleteStudentFromRegistry);
+  $("btn-data-integrity-check").addEventListener("click", runDataIntegrityCheck);
 
   if (highlightAdd) {
     const btn = $("btn-add-student-row");
@@ -1013,6 +1017,91 @@ async function promptDeleteStudentFromRegistry() {
   state.students = state.students.filter(s => s.id !== student.id);
   await deleteStudentConfig(student.id);
   renderStudentRegistryBody();
+}
+
+// Temporary diagnostic tool (v606) — scans every student and group's full
+// session history for "orphaned" activities: real, recorded remark data
+// sitting under an activityName text that no current predefinedActivities
+// entry matches for that target. This is the exact shape left behind by
+// the heading-rename bug fixed in v606 (and the older FEDC1/Comment race
+// from v596) — the data was never deleted, just denormalized-text-matched
+// to a name that no longer exists in the current config. Read-only: it
+// only reports findings so the boss can confirm each one before any repair
+// is written, rather than guessing and silently merging data that might
+// not actually belong together. Remove this button/function once the
+// backlog from before v606 has been fully repaired and confirmed clean.
+async function runDataIntegrityCheck() {
+  $("manage-modal-title").textContent = "Data Integrity Check";
+  $("manage-modal-body").innerHTML = `<p style="padding:1rem">Scanning every student and group's full session history… this can take a little while.</p>`;
+  $("manage-modal").classList.remove("hidden");
+
+  const findings = [];
+
+  const scanTargets = async (who, targets, sessions) => {
+    for (const target of (targets || [])) {
+      const validNames = new Set(
+        (target.predefinedActivities || [])
+          .filter(pa => !pa.isHeading && !pa.isNote)
+          .map(pa => pa.name)
+      );
+      const byOrphanName = new Map();
+      for (const session of sessions) {
+        for (const [actId, act] of Object.entries(session.activities || {})) {
+          if (act.targetName !== target.name) continue;
+          if (validNames.has(act.activityName)) continue;
+          const remarks = Object.values(session.remarks || {}).filter(r => r.activityId === actId);
+          if (remarks.length === 0) continue; // no real data — not worth reporting
+          const entry = byOrphanName.get(act.activityName) || { count: 0, dates: [], sample: null };
+          entry.count++;
+          entry.dates.push(session.date);
+          if (!entry.sample) entry.sample = plainTextForEdit(remarks[0].text || "").slice(0, 140);
+          byOrphanName.set(act.activityName, entry);
+        }
+      }
+      for (const [orphanName, info] of byOrphanName) {
+        const dates = info.dates.slice().sort();
+        findings.push({
+          who, targetName: target.name, orphanName,
+          validNames: [...validNames],
+          sessionCount: info.count,
+          dateRange: dates.length > 1 ? `${dates[0]} → ${dates[dates.length - 1]}` : dates[0],
+          sample: info.sample
+        });
+      }
+    }
+  };
+
+  for (const student of state.students) {
+    try {
+      const sessions = await getAllSessionsForStudent(student.id);
+      await scanTargets(student.name, student.targets, sessions);
+    } catch (err) { console.error(`Data integrity scan failed for ${student.name}:`, err); }
+  }
+  for (const group of state.groups) {
+    try {
+      const sessions = await getAllSessionsForGroup(group.id);
+      await scanTargets(`${group.name} (group)`, group.targets, sessions);
+    } catch (err) { console.error(`Data integrity scan failed for ${group.name}:`, err); }
+  }
+
+  if (findings.length === 0) {
+    $("manage-modal-body").innerHTML = `<p style="padding:1rem">No orphaned activity data found. Everything currently matches up.</p>`;
+    return;
+  }
+
+  $("manage-modal-body").innerHTML = `
+    <div style="padding:1rem">
+      <p style="margin-bottom:1rem">Found ${findings.length} orphaned activit${findings.length === 1 ? "y" : "ies"} with real recorded data. For each one, the old name shown is what's stuck in the session history — it no longer matches any current activity in that target.</p>
+      ${findings.map(f => `
+        <div style="border:1px solid var(--border);border-radius:8px;padding:.75rem;margin-bottom:.75rem">
+          <div><strong>${escHtml(f.who)}</strong> — ${escHtml(f.targetName)}</div>
+          <div style="margin-top:.3rem">Old (orphaned) activity name: <strong>${escHtml(f.orphanName)}</strong></div>
+          <div style="margin-top:.3rem;color:var(--text-muted);font-size:.85rem">Affects ${f.sessionCount} session${f.sessionCount === 1 ? "" : "s"} (${escHtml(f.dateRange)})</div>
+          <div style="margin-top:.3rem;color:var(--text-muted);font-size:.85rem">Sample remark: "${escHtml(f.sample || "")}"</div>
+          <div style="margin-top:.3rem;color:var(--text-muted);font-size:.85rem">Current activities in this target: ${f.validNames.map(escHtml).join(", ") || "(none)"}</div>
+        </div>
+      `).join("")}
+    </div>`;
 }
 
 // Choosing a student here adds them to Individual Sessions or Assessments.
