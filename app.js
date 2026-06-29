@@ -122,7 +122,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "607";
+const APP_VERSION = "608";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1019,17 +1019,51 @@ async function promptDeleteStudentFromRegistry() {
   renderStudentRegistryBody();
 }
 
-// Temporary diagnostic tool (v606) — scans every student and group's full
-// session history for "orphaned" activities: real, recorded remark data
-// sitting under an activityName text that no current predefinedActivities
-// entry matches for that target. This is the exact shape left behind by
-// the heading-rename bug fixed in v606 (and the older FEDC1/Comment race
-// from v596) — the data was never deleted, just denormalized-text-matched
-// to a name that no longer exists in the current config. Read-only: it
-// only reports findings so the boss can confirm each one before any repair
-// is written, rather than guessing and silently merging data that might
-// not actually belong together. Remove this button/function once the
-// backlog from before v606 has been fully repaired and confirmed clean.
+// Dice's coefficient over character bigrams — a cheap, dependency-free way
+// to score "is this basically the same text, just reworded/typo'd" (high
+// score) vs "this is a different activity entirely" (low score). Used by
+// runDataIntegrityCheck to separate likely propagation-failure renames from
+// activities that were deliberately deleted/restructured (where the old
+// recorded data is CORRECTLY preserved under its original name forever —
+// not a bug, and should never be auto-merged into an unrelated activity).
+function stringSimilarity(a, b) {
+  const norm = s => (s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  a = norm(a); b = norm(b);
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  const bigrams = s => {
+    const map = new Map();
+    for (let i = 0; i < s.length - 1; i++) {
+      const bg = s.slice(i, i + 2);
+      map.set(bg, (map.get(bg) || 0) + 1);
+    }
+    return map;
+  };
+  const ba = bigrams(a), bb = bigrams(b);
+  let shared = 0;
+  for (const [bg, count] of ba) if (bb.has(bg)) shared += Math.min(count, bb.get(bg));
+  let totalA = 0; for (const c of ba.values()) totalA += c;
+  let totalB = 0; for (const c of bb.values()) totalB += c;
+  return (totalA + totalB) === 0 ? 0 : (2 * shared) / (totalA + totalB);
+}
+
+// Temporary diagnostic tool (v606/v607) — scans every student and group's
+// full session history for "orphaned" activities: real, recorded remark
+// data sitting under an activityName text that no current
+// predefinedActivities entry matches for that target. This is the exact
+// shape left behind by the heading-rename bug fixed in v606 (and the older
+// FEDC1/Comment race from v596) — but it's ALSO the exact shape left behind
+// by deliberately deleting/restructuring a target's activity list, which is
+// correct, intended data preservation, not a bug. stringSimilarity above
+// splits findings into "likely a simple rename" (high text overlap with a
+// current activity — worth reviewing) vs "likely deliberate restructuring"
+// (low overlap with everything — left collapsed, no action implied).
+// Read-only: it only reports findings so the boss can confirm each one
+// before any repair is written, rather than guessing and silently merging
+// data that might not actually belong together. Remove this button/
+// function once the backlog from before v606 has been fully reviewed.
+const LIKELY_RENAME_THRESHOLD = 0.45;
+
 async function runDataIntegrityCheck() {
   $("manage-modal-title").textContent = "Data Integrity Check";
   $("manage-modal-body").innerHTML = `<p style="padding:1rem">Scanning every student and group's full session history… this can take a little while.</p>`;
@@ -1039,16 +1073,17 @@ async function runDataIntegrityCheck() {
 
   const scanTargets = async (who, targets, sessions) => {
     for (const target of (targets || [])) {
-      const validNames = new Set(
+      const validNames = [...new Set(
         (target.predefinedActivities || [])
           .filter(pa => !pa.isHeading && !pa.isNote)
           .map(pa => pa.name)
-      );
+      )];
+      const validNameSet = new Set(validNames);
       const byOrphanName = new Map();
       for (const session of sessions) {
         for (const [actId, act] of Object.entries(session.activities || {})) {
           if (act.targetName !== target.name) continue;
-          if (validNames.has(act.activityName)) continue;
+          if (validNameSet.has(act.activityName)) continue;
           const remarks = Object.values(session.remarks || {}).filter(r => r.activityId === actId);
           if (remarks.length === 0) continue; // no real data — not worth reporting
           const entry = byOrphanName.get(act.activityName) || { count: 0, dates: [], sample: null };
@@ -1060,12 +1095,17 @@ async function runDataIntegrityCheck() {
       }
       for (const [orphanName, info] of byOrphanName) {
         const dates = info.dates.slice().sort();
+        let bestMatch = null, bestSim = 0;
+        for (const name of validNames) {
+          const sim = stringSimilarity(orphanName, name);
+          if (sim > bestSim) { bestSim = sim; bestMatch = name; }
+        }
         findings.push({
           who, targetName: target.name, orphanName,
-          validNames: [...validNames],
           sessionCount: info.count,
           dateRange: dates.length > 1 ? `${dates[0]} → ${dates[dates.length - 1]}` : dates[0],
-          sample: info.sample
+          sample: info.sample,
+          bestMatch, bestSim
         });
       }
     }
@@ -1089,18 +1129,30 @@ async function runDataIntegrityCheck() {
     return;
   }
 
+  const likely     = findings.filter(f => f.bestSim >= LIKELY_RENAME_THRESHOLD);
+  const structural = findings.filter(f => f.bestSim <  LIKELY_RENAME_THRESHOLD);
+
   $("manage-modal-body").innerHTML = `
     <div style="padding:1rem">
-      <p style="margin-bottom:1rem">Found ${findings.length} orphaned activit${findings.length === 1 ? "y" : "ies"} with real recorded data. For each one, the old name shown is what's stuck in the session history — it no longer matches any current activity in that target.</p>
-      ${findings.map(f => `
+      <p style="margin-bottom:1rem">Scanned everyone's full history — ${findings.length} orphaned activit${findings.length === 1 ? "y" : "ies"} with real recorded data found in total.</p>
+
+      <h3 style="margin:.5rem 0">Likely simple renames — worth reviewing (${likely.length})</h3>
+      ${likely.length === 0 ? `<p style="color:var(--text-muted);font-size:.85rem">None found.</p>` : likely.map(f => `
         <div style="border:1px solid var(--border);border-radius:8px;padding:.75rem;margin-bottom:.75rem">
           <div><strong>${escHtml(f.who)}</strong> — ${escHtml(f.targetName)}</div>
-          <div style="margin-top:.3rem">Old (orphaned) activity name: <strong>${escHtml(f.orphanName)}</strong></div>
+          <div style="margin-top:.3rem">Old name: <strong>${escHtml(f.orphanName)}</strong></div>
+          <div style="margin-top:.3rem">Best current match: <strong>${escHtml(f.bestMatch || "(none)")}</strong> <span style="color:var(--text-muted);font-size:.85rem">(${Math.round(f.bestSim * 100)}% text overlap)</span></div>
           <div style="margin-top:.3rem;color:var(--text-muted);font-size:.85rem">Affects ${f.sessionCount} session${f.sessionCount === 1 ? "" : "s"} (${escHtml(f.dateRange)})</div>
           <div style="margin-top:.3rem;color:var(--text-muted);font-size:.85rem">Sample remark: "${escHtml(f.sample || "")}"</div>
-          <div style="margin-top:.3rem;color:var(--text-muted);font-size:.85rem">Current activities in this target: ${f.validNames.map(escHtml).join(", ") || "(none)"}</div>
         </div>
       `).join("")}
+
+      <h3 style="margin:1.5rem 0 .5rem">Looks like deliberate restructuring — no action needed (${structural.length})</h3>
+      <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:.5rem">These old names don't closely match anything currently in their target, which usually means the activity list was rebuilt on purpose. The data is safely preserved under its original name — nothing to fix unless you say otherwise.</p>
+      ${structural.length === 0 ? "" : `<details>
+        <summary style="cursor:pointer">Show the list anyway</summary>
+        ${structural.map(f => `<div style="padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.85rem">${escHtml(f.who)} — ${escHtml(f.targetName)}: "${escHtml(f.orphanName)}" (${f.sessionCount} session${f.sessionCount === 1 ? "" : "s"})</div>`).join("")}
+      </details>`}
     </div>`;
 }
 
