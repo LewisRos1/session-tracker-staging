@@ -116,7 +116,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "596";
+const APP_VERSION = "597";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -255,12 +255,27 @@ let _groupForTargetEdit = null;
 // saved by the time this runs, so a failure here is logged, not surfaced —
 // it just means old sessions keep showing the pre-existing orphaned-row
 // behavior rather than this being a new way to actually lose data.
+//
+// Renaming the same activity more than once in quick succession (e.g.
+// composing a long name across several blur events before settling on the
+// final wording) used to race: each call's getDocs()+updateDoc() pair runs
+// independently, so a later rename's query could read Firestore before an
+// earlier rename's writes had landed, find zero matches under the
+// intermediate name, and silently break the chain — exactly what happened to
+// Caden Tan's "FEDC 1" activity (see runOneOffRepairs). Queue every
+// propagation for the same student/group so each one only starts once the
+// previous one's writes have actually committed.
+const _renamePropagationQueues = new Map();
 function propagateActivityRename(student, targetName, oldName, newName) {
   if (!oldName || oldName === newName) return;
-  const promise = _groupForTargetEdit
-    ? renameGroupActivityAcrossSessions(_groupForTargetEdit.id, targetName, oldName, newName)
-    : renameActivityAcrossSessions(student.id, targetName, oldName, newName);
-  promise.catch(err => console.error("propagateActivityRename failed:", err));
+  const entityId = _groupForTargetEdit ? _groupForTargetEdit.id : student.id;
+  const prior = _renamePropagationQueues.get(entityId) || Promise.resolve();
+  const next = prior
+    .then(() => _groupForTargetEdit
+      ? renameGroupActivityAcrossSessions(_groupForTargetEdit.id, targetName, oldName, newName)
+      : renameActivityAcrossSessions(student.id, targetName, oldName, newName))
+    .catch(err => console.error("propagateActivityRename failed:", err));
+  _renamePropagationQueues.set(entityId, next);
 }
 // Tracks a newly-created group ID so it can be auto-deleted if closed with no students.
 let _newGroupId = null;
