@@ -2501,20 +2501,19 @@ div.admin-note-editable:empty::before {
   font-weight: 600;
   padding: .25rem .6rem;
   border-radius: 1rem;
-  border: 1.5px solid #d1d5db;
-  background: #f3f4f6;
-  color: #6b7280;
+  border: none;
+  background: #ef4444;
+  color: #fff;
   cursor: pointer;
   white-space: nowrap;
-  transition: background .15s, color .15s, border-color .15s;
+  transition: background .15s;
 }
-.btn-word-export-ready:hover { border-color: #9ca3af; background: #e5e7eb; }
+.btn-word-export-ready:hover { background: #dc2626; }
 .btn-word-export-ready.is-ready {
-  background: #dcfce7;
-  color: #15803d;
-  border-color: #86efac;
+  background: #16a34a;
+  color: #fff;
 }
-.btn-word-export-ready.is-ready:hover { background: #bbf7d0; border-color: #4ade80; }
+.btn-word-export-ready.is-ready:hover { background: #15803d; }
 .btn-word-export-ready:disabled { opacity: .5; cursor: not-allowed; }
 
 .view-heading-row td {
