@@ -419,6 +419,48 @@ export async function mergeDuplicateActivity(sessionId, primaryActId, duplicateA
   await updateDoc(doc(db, "sessions", sessionId), updates);
 }
 
+export async function deleteOrphanAcrossSessions(studentId, targetName, activityName) {
+  const snap = await getDocs(
+    query(collection(db, "sessions"), where("studentId", "==", studentId))
+  );
+  for (const sessionDoc of snap.docs) {
+    const data = sessionDoc.data();
+    const updates = {};
+    for (const [actId, act] of Object.entries(data.activities || {})) {
+      if (act.targetName === targetName && act.activityName === activityName) {
+        updates[`activities.${actId}`] = deleteField();
+        for (const [remId, rem] of Object.entries(data.remarks || {})) {
+          if (rem.activityId === actId) updates[`remarks.${remId}`] = deleteField();
+        }
+      }
+    }
+    if (Object.keys(updates).length > 0) {
+      await updateDoc(doc(db, "sessions", sessionDoc.id), updates);
+    }
+  }
+}
+
+export async function deleteGroupOrphanAcrossSessions(groupId, targetName, activityName) {
+  const snap = await getDocs(
+    query(collection(db, "sessions"), where("groupId", "==", groupId))
+  );
+  for (const sessionDoc of snap.docs) {
+    const data = sessionDoc.data();
+    const updates = {};
+    for (const [actId, act] of Object.entries(data.activities || {})) {
+      if (act.targetName === targetName && act.activityName === activityName) {
+        updates[`activities.${actId}`] = deleteField();
+        for (const [remId, rem] of Object.entries(data.remarks || {})) {
+          if (rem.activityId === actId) updates[`remarks.${remId}`] = deleteField();
+        }
+      }
+    }
+    if (Object.keys(updates).length > 0) {
+      await updateDoc(doc(db, "sessions", sessionDoc.id), updates);
+    }
+  }
+}
+
 // ─── REMARK OPERATIONS ───────────────────────────────────────
 
 // remId can be supplied by the caller (e.g. to write a remark into local

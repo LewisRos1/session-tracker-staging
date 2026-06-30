@@ -51,6 +51,8 @@ import {
   renameRemarkOptionAcrossSessions,
   renameGroupRemarkOptionAcrossSessions,
   mergeDuplicateActivity,
+  deleteOrphanAcrossSessions,
+  deleteGroupOrphanAcrossSessions,
   reassignGroupStudentAcrossSessions,
   signInWithPin,
   signOutUser,
@@ -123,7 +125,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "612";
+const APP_VERSION = "613";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -956,7 +958,6 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
       <div style="display:flex;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap">
         <button class="export-btn" id="btn-add-student-row">+ Add New Student</button>
         <button class="export-btn" id="btn-delete-student-row" style="color:#dc2626">Delete Student</button>
-        <button class="export-btn" id="btn-data-integrity-check">🔍 Run Data Integrity Check</button>
       </div>
       <div class="view-table-wrapper">
         <table class="view-table">
@@ -1000,7 +1001,6 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
 
   $("btn-add-student-row").addEventListener("click", startAddStudentRow);
   $("btn-delete-student-row").addEventListener("click", promptDeleteStudentFromRegistry);
-  $("btn-data-integrity-check").addEventListener("click", runDataIntegrityCheck);
 
   if (highlightAdd) {
     const btn = $("btn-add-student-row");
@@ -1293,11 +1293,25 @@ function renderDataIntegrityReport() {
       `}
 
       <h3 style="margin:1.5rem 0 .5rem">Looks like deliberate restructuring — no action needed (${structural.length})</h3>
-      <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:.5rem">These old names don't closely match anything currently in their target, which usually means the activity list was rebuilt on purpose. The data is safely preserved under its original name — nothing to fix unless you say otherwise.</p>
+      <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:.5rem">These old names don't closely match anything currently in their target, which usually means the activity list was rebuilt on purpose. If you want to permanently remove this data from all past sessions (so it stops appearing in Excel exports), click "Delete from all sessions" — this is irreversible.</p>
       ${structural.length === 0 ? "" : `<details>
         <summary style="cursor:pointer">Show the list anyway</summary>
-        ${structural.map(f => `<div style="padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.85rem">${escHtml(f.who)} — ${escHtml(f.targetName)}: "${escHtml(f.orphanName)}" (${f.sessionCount} session${f.sessionCount === 1 ? "" : "s"})</div>`).join("")}
+        ${structural.map(f => `
+          <div style="border:1px solid var(--border);border-radius:8px;padding:.75rem;margin:.5rem 0">
+            <div><strong>${escHtml(f.who)}</strong> — ${escHtml(f.targetName)}</div>
+            <div style="margin-top:.3rem;font-size:.9rem">Orphaned name: <strong>${escHtml(f.orphanName)}</strong></div>
+            <div style="margin-top:.3rem;color:var(--text-muted);font-size:.85rem">Affects ${f.sessionCount} session${f.sessionCount === 1 ? "" : "s"} (${escHtml(f.dateRange || "")})</div>
+            ${f.sample ? `<div style="margin-top:.3rem;color:var(--text-muted);font-size:.85rem">Sample: "${escHtml(f.sample)}"</div>` : ""}
+            <button class="btn-adm-danger btn-integrity-delete-orphan" data-idx="${findings.indexOf(f)}"
+              style="margin-top:.6rem;font-size:.8rem;padding:.3rem .75rem">Delete from all sessions</button>
+          </div>
+        `).join("")}
       </details>`}
+
+      ${(() => { const deleted = findings.filter(f => f.deleted); return deleted.length === 0 ? "" : `
+        <h3 style="margin:1.5rem 0 .5rem;color:#dc2626">Permanently deleted just now (${deleted.length})</h3>
+        ${deleted.map(f => `<div style="padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.85rem">${escHtml(f.who)} — ${escHtml(f.targetName)}: "${escHtml(f.orphanName)}"</div>`).join("")}
+      `; })()}
     </div>`;
 
   $("manage-modal-body").querySelectorAll(".btn-integrity-merge").forEach(btn => {
@@ -1338,6 +1352,40 @@ function renderDataIntegrityReport() {
         console.error("Duplicate merge failed:", err);
         btn.disabled = false;
         btn.textContent = "Merge duplicates (failed — try again)";
+      }
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".btn-integrity-delete-orphan").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const f = _dataIntegrityFindings[Number(btn.dataset.idx)];
+      if (!f || f.deleted) return;
+      if (btn.dataset.confirming !== "1") {
+        btn.dataset.confirming = "1";
+        btn.textContent = "⚠️ Confirm — permanently delete?";
+        setTimeout(() => {
+          if (btn.dataset.confirming === "1") {
+            btn.dataset.confirming = "";
+            btn.textContent = "Delete from all sessions";
+          }
+        }, 4000);
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = "Deleting…";
+      try {
+        if (f.isGroup) {
+          await deleteGroupOrphanAcrossSessions(f.entityId, f.targetName, f.orphanName);
+        } else {
+          await deleteOrphanAcrossSessions(f.entityId, f.targetName, f.orphanName);
+        }
+        f.deleted = true;
+        renderDataIntegrityReport();
+      } catch (err) {
+        console.error("Orphan delete failed:", err);
+        btn.disabled = false;
+        btn.dataset.confirming = "";
+        btn.textContent = "Delete from all sessions (failed — try again)";
       }
     });
   });
@@ -1550,7 +1598,8 @@ function renderExportButtons() {
 
   exportAllContainer.innerHTML = `
     <div style="display:flex;gap:.6rem;flex-wrap:wrap">
-      <button class="export-btn export-btn-all" id="btn-export-all-trials">Export All (ZIP)</button>
+      <button class="export-btn export-btn-all" id="btn-export-all-trials">Backup All Excel (ZIP)</button>
+      <button class="export-btn" id="btn-data-integrity-check">🔍 Run Data Integrity Check</button>
     </div>`;
 
   const wire = (btnId, defaultLabel, includeTrials) => {
@@ -1570,7 +1619,8 @@ function renderExportButtons() {
       }
     });
   };
-  wire("btn-export-all-trials", "Export All (ZIP)", true);
+  wire("btn-export-all-trials", "Backup All Excel (ZIP)", true);
+  $("btn-data-integrity-check").addEventListener("click", runDataIntegrityCheck);
 }
 
 // ============================================================
