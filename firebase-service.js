@@ -555,6 +555,11 @@ export async function deleteStudentConfig(studentId) {
   await deleteDoc(doc(db, "students", studentId));
 }
 
+/** Toggle the "Ready for Word Export" flag on a student document. */
+export async function setStudentWordExportReady(studentId, ready) {
+  await updateDoc(doc(db, "students", studentId), { readyForWordExport: ready });
+}
+
 /**
  * Remove all activities, remarks, and FEDC comments for a deleted target
  * from every session belonging to that student.

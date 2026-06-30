@@ -20,6 +20,7 @@ import {
   loadStudentsConfig,
   saveStudent,
   deleteStudentConfig,
+  setStudentWordExportReady,
   loadTemplates,
   saveTemplate,
   deleteTemplate,
@@ -127,7 +128,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "628";
+const APP_VERSION = "629";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -965,8 +966,9 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
         <table class="view-table">
           <colgroup>
             <col style="width:42px">
-            <col style="width:30%">
-            <col style="width:30%">
+            <col style="width:28%">
+            <col style="width:28%">
+            <col style="width:110px">
             <col style="width:160px">
             <col style="width:150px">
           </colgroup>
@@ -975,6 +977,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
               <th>No.</th>
               <th>First Name</th>
               <th>Last Name</th>
+              <th style="white-space:normal">Ready for Word Export</th>
               <th style="white-space:normal">Latest Individual Session Recorded</th>
               <th style="white-space:normal">Latest Group Session Recorded</th>
             </tr>
@@ -985,6 +988,12 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
                 <td style="text-align:center">${i + 1}</td>
                 <td style="text-align:center">${escHtml(s.firstName || s.name.split(/\s+/)[0] || "")}</td>
                 <td style="text-align:center">${escHtml(s.lastName || s.name.split(/\s+/).slice(1).join(" ") || "")}</td>
+                <td style="text-align:center">
+                  <button class="btn-word-export-ready${s.readyForWordExport ? " is-ready" : ""}"
+                    data-id="${escHtml(s.id)}" data-ready="${s.readyForWordExport ? "1" : "0"}">
+                    ${s.readyForWordExport ? "✓ Ready" : "Not yet"}
+                  </button>
+                </td>
                 <td class="reg-indiv-num" data-id="${escHtml(s.id)}" style="text-align:center">…</td>
                 <td class="reg-group-num" data-id="${escHtml(s.id)}" style="text-align:center">…</td>
               </tr>`).join("")}
@@ -998,6 +1007,29 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
     row.addEventListener("click", () => {
       const s = state.students.find(x => x.id === row.dataset.id);
       if (s) openManageModal(s);
+    });
+  });
+
+  $("student-registry-body").querySelectorAll(".btn-word-export-ready").forEach(btn => {
+    btn.addEventListener("click", async e => {
+      e.stopPropagation(); // don't open the manage modal
+      const studentId = btn.dataset.id;
+      const currentlyReady = btn.dataset.ready === "1";
+      const s = state.students.find(x => x.id === studentId);
+      if (!s) return;
+      const action = currentlyReady ? "mark as NOT ready" : "mark as READY";
+      if (!confirm(`Are you sure you want to ${action} for Word export?\n\n${s.name}`)) return;
+      const newReady = !currentlyReady;
+      btn.disabled = true;
+      try {
+        await setStudentWordExportReady(studentId, newReady);
+        s.readyForWordExport = newReady;
+        btn.dataset.ready = newReady ? "1" : "0";
+        btn.textContent = newReady ? "✓ Ready" : "Not yet";
+        btn.classList.toggle("is-ready", newReady);
+      } finally {
+        btn.disabled = false;
+      }
     });
   });
 
