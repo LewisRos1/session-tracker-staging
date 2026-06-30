@@ -2109,6 +2109,14 @@ div.admin-note-editable:empty::before {
   flex-shrink: 0;
 }
 .remark-starter-wrap .remark-text-input { flex: 1; }
+/* When starter has option pills: stack vertically so both get full width */
+.remark-starter-wrap--opts {
+  flex-direction: column;
+  gap: .25rem;
+}
+.remark-starter-wrap--opts .remark-starter-prefix {
+  padding-top: 0;
+}
 
 /* ─── Notes field (generic — Sentence Starter + Select One + Free Text) ─── */
 .mastery-note-input,

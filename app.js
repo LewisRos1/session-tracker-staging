@@ -127,7 +127,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "623";
+const APP_VERSION = "624";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3226,7 +3226,8 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
 
   let remarkContent;
   if (sentenceStarter) {
-    remarkContent = `<div class="remark-starter-wrap">
+    const starterClass = opts.length > 0 ? "remark-starter-wrap remark-starter-wrap--opts" : "remark-starter-wrap";
+    remarkContent = `<div class="${starterClass}">
       <span class="remark-starter-prefix" contenteditable="false">${escHtml(sentenceStarter)}</span>
       ${makeOptPills(rem.id, rem.text)
         || `<textarea class="field-input remark-text-input" rows="1"
@@ -3754,9 +3755,13 @@ async function cleanupEmptyEntries(sessionId, data, targetName, target = null) {
   // their mapped target gains an average (see autoFillMappedRemarks) — an
   // empty one isn't stale data, it's the activity waiting to auto-fill. Treat
   // them as exempt so this cleanup never races that auto-fill and deletes it.
-  const mappedNames = new Set((target?.predefinedActivities || []).filter(pa => pa.isMapped).map(pa => pa.name));
+  const mappedNames   = new Set((target?.predefinedActivities || []).filter(pa => pa.isMapped).map(pa => pa.name));
+  // Auto-open activities (Select One / Tickbox / Sentence Starter + select) get
+  // an empty placeholder remark on session open so the user can pick immediately.
+  // Don't delete it on target switch — it's not stale, it's waiting for input.
+  const autoOpenNames = new Set((target?.predefinedActivities || []).filter(pa => isAutoOpenRemarkType(pa)).map(pa => pa.name));
   const acts = Object.entries(data.activities || {})
-    .filter(([, a]) => a.targetName === targetName && !mappedNames.has(a.activityName));
+    .filter(([, a]) => a.targetName === targetName && !mappedNames.has(a.activityName) && !autoOpenNames.has(a.activityName));
   for (const [actId] of acts) {
     const rems = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === actId);
     const stripEmpty = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
@@ -9201,7 +9206,8 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
 
   let remarkContent;
   if (sentenceStarter) {
-    remarkContent = `<div class="remark-starter-wrap">
+    const starterClass = opts.length > 0 ? "remark-starter-wrap remark-starter-wrap--opts" : "remark-starter-wrap";
+    remarkContent = `<div class="${starterClass}">
       <span class="remark-starter-prefix" contenteditable="false">${escHtml(sentenceStarter)}</span>
       ${makeOptPills(rem.text) || freeTextBox}
     </div>`;
