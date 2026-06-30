@@ -15,6 +15,9 @@ function stripRemarkHtml(s) {
     .replace(/<\/div>/gi, "\n").replace(/<div>/gi, "")
     .replace(/<\/p>/gi, "\n").replace(/<p>/gi, "")
     .replace(/<[^>]*>/g, "")
+    // Decode HTML entities left behind after tag stripping
+    .replace(/&amp;/g, "&").replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"')
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
@@ -407,7 +410,7 @@ function addIndividualTargetSheets(wb, allTargets, sessions, studentName, includ
     ws.getColumn(2).alignment = { wrapText: true, vertical: "top" };
     ws.getColumn(3).alignment = { wrapText: true, vertical: "top" };
     ws.getColumn(4).alignment = { horizontal: "center", vertical: "top" };
-    if (includeTrials) ws.getColumn(5).alignment = { horizontal: "center", vertical: "top" };
+    if (includeTrials) ws.getColumn(5).alignment = { wrapText: true, horizontal: "center", vertical: "top" };
     ws.getColumn(avgCol).alignment = { horizontal: "center", vertical: "top" };
 
     // Month headers: merge A:[last col], White Darker 25%, bold black
@@ -457,7 +460,7 @@ function addIndividualTargetSheets(wb, allTargets, sessions, studentName, includ
       const text = (cell.value || "").toString();
       const visLines = text.split("\n").reduce((sum, seg) =>
         sum + Math.max(1, Math.ceil((seg.length || 1) / 90)), 0);
-      ws.getRow(n).height = Math.max(18, visLines * 15);
+      ws.getRow(n).height = Math.max(20, visLines * 20);
     }
 
     // Session date blocks: col A = date (top+center), last col = avg score (middle+center)
@@ -950,7 +953,7 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
       new Paragraph({ spacing: { before: 280 }, children: [] }),
       new Paragraph({
         alignment: AlignmentType.LEFT,
-        children: [new ImageRun({ type: "png", data: stampImageBuffer, transformation: { width: 264, height: 167 } })]
+        children: [new ImageRun({ type: "png", data: stampImageBuffer, transformation: { width: 312, height: 197 } })]
       })
     );
   }
