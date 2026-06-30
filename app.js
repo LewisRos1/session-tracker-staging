@@ -127,7 +127,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "625";
+const APP_VERSION = "626";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -7419,8 +7419,8 @@ function buildRemarkTypeControls(a, idx) {
     <input class="admin-input mn-act-starter-text" data-idx="${idx}"
       placeholder="Starter phrase…"
       value="${escHtml(a.sentenceStarter || "")}"
-      style="${type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note" ? "" : "display:none"}">
-    <div class="mn-opts-container" data-idx="${idx}" style="${type === "fixed" || type === "fixed_multi" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note" ? "" : "display:none"}">
+      style="${type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note" ? "flex:1;min-width:0;width:auto" : "display:none"}">
+    <div class="mn-opts-container" data-idx="${idx}" style="${type === "fixed" || type === "fixed_multi" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note" ? "flex:1;min-width:0" : "display:none"}">
       <div class="mn-opts-list">${(() => {
         const optsStr = a.inlineOptions || (a.remarkPresetId ? (state.remarkPresets.find(p=>p.id===a.remarkPresetId)?.options||[]).join("/") : "");
         const displayOpts = parseOpts(optsStr).length > 0 ? parseOpts(optsStr) : [""];
@@ -7960,8 +7960,15 @@ function renderTargetManageContent(student, target) {
       acts[idx].inlineOptions   = null;
       acts[idx].optionsMulti    = (type === "fixed_multi" || type === "starter_fixed_multi");
       acts[idx].remarkHasNote   = (type === "starter_fixed_note");
-      starterInput.style.display  = (type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") ? "" : "none";
-      optsContainer.style.display = (type === "fixed" || type === "fixed_multi" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") ? "" : "none";
+      const starterVis = (type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note");
+      const optsVis    = (type === "fixed" || type === "fixed_multi" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note");
+      starterInput.style.display  = starterVis ? "" : "none";
+      starterInput.style.flex     = starterVis ? "1" : "";
+      starterInput.style.minWidth = starterVis ? "0" : "";
+      starterInput.style.width    = starterVis ? "auto" : "";
+      optsContainer.style.display  = optsVis ? "" : "none";
+      optsContainer.style.flex     = optsVis ? "1" : "";
+      optsContainer.style.minWidth = optsVis ? "0" : "";
       if (type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") { starterInput.focus(); }
       else if (type === "fixed" || type === "fixed_multi") { optsContainer.querySelector(".mn-opt-item")?.focus(); }
       else { target.predefinedActivities = acts; await saveTarget(); }
@@ -8316,8 +8323,15 @@ function renderTemplateManageContent(template) {
       acts[idx].inlineOptions   = null;
       acts[idx].optionsMulti    = (type === "fixed_multi" || type === "starter_fixed_multi");
       acts[idx].remarkHasNote   = (type === "starter_fixed_note");
-      starterInput.style.display  = (type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") ? "" : "none";
-      optsContainer.style.display = (type === "fixed" || type === "fixed_multi" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") ? "" : "none";
+      const starterVis = (type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note");
+      const optsVis    = (type === "fixed" || type === "fixed_multi" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note");
+      starterInput.style.display  = starterVis ? "" : "none";
+      starterInput.style.flex     = starterVis ? "1" : "";
+      starterInput.style.minWidth = starterVis ? "0" : "";
+      starterInput.style.width    = starterVis ? "auto" : "";
+      optsContainer.style.display  = optsVis ? "" : "none";
+      optsContainer.style.flex     = optsVis ? "1" : "";
+      optsContainer.style.minWidth = optsVis ? "0" : "";
       if (type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") { starterInput.focus(); }
       else if (type === "fixed" || type === "fixed_multi") { optsContainer.querySelector(".mn-opt-item")?.focus(); }
       else { template.predefinedActivities = acts; await saveTemplateFn(); }
