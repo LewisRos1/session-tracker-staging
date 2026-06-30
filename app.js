@@ -125,7 +125,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "614";
+const APP_VERSION = "615";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -7510,8 +7510,8 @@ function renderTargetManageContent(student, target) {
           </div>
         </div>
         <div style="position:relative">
-          <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options">⋮</button>
-          <div class="mn-kebab-menu hidden" id="mn-km-${idx}" style="position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:175px;overflow:hidden">
+          <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
+          <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:175px;overflow:hidden">
             <button class="mn-km-opt" data-idx="${idx}" data-action="master" style="display:block;width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">⭐ Mark as Mastered</button>
             <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="display:block;width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑 Delete Activity</button>
           </div>
@@ -7542,8 +7542,8 @@ function renderTargetManageContent(student, target) {
           </div>
         </div>
         <div style="position:relative">
-          <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options">⋮</button>
-          <div class="mn-kebab-menu hidden" id="mn-km-${idx}" style="position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:175px;overflow:hidden">
+          <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
+          <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:175px;overflow:hidden">
             <button class="mn-km-opt" data-idx="${idx}" data-action="master" style="display:block;width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">⭐ Mark as Mastered</button>
             <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="display:block;width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑 Delete Activity</button>
           </div>
@@ -7743,11 +7743,11 @@ function renderTargetManageContent(student, target) {
       e.stopPropagation();
       const idx = btn.dataset.idx;
       const menu = $(`mn-km-${idx}`);
-      const wasHidden = menu.classList.contains("hidden");
-      $("manage-modal-body").querySelectorAll(".mn-kebab-menu").forEach(m => m.classList.add("hidden"));
+      const wasHidden = menu.style.display !== "block";
+      $("manage-modal-body").querySelectorAll(".mn-kebab-menu").forEach(m => m.style.display = "none");
       if (wasHidden) {
-        menu.classList.remove("hidden");
-        setTimeout(() => document.addEventListener("click", () => menu.classList.add("hidden"), { once: true }), 0);
+        menu.style.display = "block";
+        setTimeout(() => document.addEventListener("click", () => { menu.style.display = "none"; }, { once: true }), 0);
       }
     });
   });
@@ -7758,7 +7758,7 @@ function renderTargetManageContent(student, target) {
       const action = btn.dataset.action;
       const pa = acts[idx];
       if (!pa) return;
-      $("manage-modal-body").querySelectorAll(".mn-kebab-menu").forEach(m => m.classList.add("hidden"));
+      $("manage-modal-body").querySelectorAll(".mn-kebab-menu").forEach(m => m.style.display = "none");
       if (action === "master") {
         pa.isCompleted = true;
         await saveTarget();
