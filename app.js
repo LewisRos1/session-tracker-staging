@@ -128,7 +128,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "632";
+const APP_VERSION = "633";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -991,7 +991,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
                 <td style="text-align:center">
                   <button class="btn-word-export-ready${s.readyForWordExport ? " is-ready" : ""}"
                     data-id="${escHtml(s.id)}" data-ready="${s.readyForWordExport ? "1" : "0"}">
-                    ${s.readyForWordExport ? "✓ Ready" : "Not yet"}
+                    ${s.readyForWordExport ? "✓ Ready" : "No"}
                   </button>
                 </td>
                 <td class="reg-indiv-num" data-id="${escHtml(s.id)}" style="text-align:center">…</td>
@@ -1025,7 +1025,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
         await setStudentWordExportReady(studentId, newReady);
         s.readyForWordExport = newReady;
         btn.dataset.ready = newReady ? "1" : "0";
-        btn.textContent = newReady ? "✓ Ready" : "Not yet";
+        btn.textContent = newReady ? "✓ Ready" : "No";
         btn.classList.toggle("is-ready", newReady);
       } finally {
         btn.disabled = false;
