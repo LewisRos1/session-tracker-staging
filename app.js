@@ -127,7 +127,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "622";
+const APP_VERSION = "623";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -7183,33 +7183,18 @@ function renderSessionNumberKindSubsection(student, kind, label, sessions, conta
   const dropdownOrder = [...sessions].reverse(); // newest-first for picker
 
   container.innerHTML = `
-    <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:.4rem">
-      <p class="admin-label" style="margin:0">${label}</p>
-      <span style="font-size:.78rem;color:var(--text-muted)">${sessions.length} session${sessions.length === 1 ? "" : "s"}</span>
-    </div>
-    <div style="border:1px solid #e5e7eb;border-radius:.5rem;overflow:hidden;max-height:170px;overflow-y:auto;margin-bottom:.55rem">
-      ${dropdownOrder.map((s, idx) => `
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:.38rem .75rem;background:#fff;${idx < dropdownOrder.length - 1 ? "border-bottom:1px solid #f3f4f6" : ""}">
-          <span style="font-size:.84rem;font-weight:600;color:#374151">Session ${s.number}</span>
-          <span style="font-size:.82rem;color:#6b7280">${formatDate(s.date)}</span>
-        </div>`).join("")}
-    </div>
-    <details>
-      <summary style="font-size:.8rem;color:#9ca3af;cursor:pointer;user-select:none;list-style:none;padding:.15rem 0">▸ Adjust numbering…</summary>
-      <div style="margin-top:.5rem;padding:.6rem .75rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:.45rem">
-        <label style="font-size:.78rem;color:var(--text-muted);display:block;margin-bottom:.3rem">Select session to renumber</label>
-        <select class="admin-input" id="${id("date")}" style="margin-bottom:.5rem">
-          ${dropdownOrder.map(s => `<option value="${s.id}">Session ${s.number} · ${formatDate(s.date)}</option>`).join("")}
-        </select>
-        <div style="display:flex;align-items:center;gap:.4rem">
-          <span style="font-size:.82rem;color:var(--text-muted);white-space:nowrap">Renumber to</span>
-          <button type="button" class="btn-adm-edit" id="${id("minus")}" style="padding:.4rem .7rem;line-height:1">−</button>
-          <input class="admin-input" id="${id("value")}" type="number" min="1" style="width:4.5rem;text-align:center;flex:0 0 auto" />
-          <button type="button" class="btn-adm-edit" id="${id("plus")}" style="padding:.4rem .7rem;line-height:1">+</button>
-          <button class="btn-primary-sm" id="${id("save")}">Save</button>
-        </div>
-      </div>
-    </details>`;
+    <p class="admin-label" style="margin-bottom:.4rem">${label}</p>
+    <label style="font-size:.78rem;color:var(--text-muted);display:block;margin-bottom:.3rem">Select session to renumber</label>
+    <select class="admin-input" id="${id("date")}" style="margin-bottom:.5rem">
+      ${dropdownOrder.map(s => `<option value="${s.id}">Session ${s.number} · ${formatDate(s.date)}</option>`).join("")}
+    </select>
+    <div style="display:flex;align-items:center;gap:.4rem">
+      <span style="font-size:.82rem;color:var(--text-muted);white-space:nowrap">Renumber to</span>
+      <button type="button" class="btn-adm-edit" id="${id("minus")}" style="padding:.4rem .7rem;line-height:1">−</button>
+      <input class="admin-input" id="${id("value")}" type="number" min="1" style="width:4.5rem;text-align:center;flex:0 0 auto" />
+      <button type="button" class="btn-adm-edit" id="${id("plus")}" style="padding:.4rem .7rem;line-height:1">+</button>
+      <button class="btn-primary-sm" id="${id("save")}">Save</button>
+    </div>`;
 
   // Keeps the stepper's starting value in sync with whichever session the
   // dropdown above currently has selected (it already shows the date).
