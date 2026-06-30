@@ -127,7 +127,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "620";
+const APP_VERSION = "621";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -7149,12 +7149,21 @@ async function renderSessionNumberSection(student) {
   ]);
   if (!area.isConnected) return; // modal closed while the fetch was in flight
 
+  // Silently fix any gaps in individual session numbers (e.g. from an empty
+  // session that was deleted before v619 started renumbering on delete).
+  const indivSorted = indivSessions.slice().sort((a, b) => a.date.localeCompare(b.date));
+  const hasGap = indivSorted.some((s, i) => s.number !== i + 1);
+  if (hasGap) {
+    indivSorted.forEach((s, i) => { s.number = i + 1; }); // fix locally for display
+    resequenceIndividualSessions(student.id).catch(() => {});  // fix in Firestore
+  }
+
   area.innerHTML = `
     <div id="mn-s-sessnum-individual"></div>
     <div id="mn-s-sessnum-group" style="margin-top:1.1rem"></div>`;
 
   renderSessionNumberKindSubsection(student, "individual", "Individual Sessions",
-    indivSessions.sort((a, b) => a.date.localeCompare(b.date)), $("mn-s-sessnum-individual"));
+    indivSorted, $("mn-s-sessnum-individual"));
   renderSessionNumberKindSubsection(student, "group", "Group Sessions",
     groupSessions.sort((a, b) => a.date.localeCompare(b.date)), $("mn-s-sessnum-group"));
 }
