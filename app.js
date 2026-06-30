@@ -125,7 +125,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "616";
+const APP_VERSION = "617";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -7397,10 +7397,20 @@ function buildRemarkTypeControls(a, idx) {
       placeholder="Starter phrase…"
       value="${escHtml(a.sentenceStarter || "")}"
       style="${type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note" ? "" : "display:none"}">
-    <input class="admin-input mn-act-inline-opts" data-idx="${idx}"
-      placeholder="Options separated by /  e.g. Low/Medium/High"
-      value="${escHtml(a.inlineOptions || (a.remarkPresetId ? (state.remarkPresets.find(p=>p.id===a.remarkPresetId)?.options||[]).join("/") : ""))}"
-      style="${type === "fixed" || type === "fixed_multi" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note" ? "" : "display:none"}">`;
+    <div class="mn-opts-container" data-idx="${idx}" style="${type === "fixed" || type === "fixed_multi" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note" ? "" : "display:none"}">
+      <div class="mn-opts-list">${(() => {
+        const optsStr = a.inlineOptions || (a.remarkPresetId ? (state.remarkPresets.find(p=>p.id===a.remarkPresetId)?.options||[]).join("/") : "");
+        const displayOpts = parseOpts(optsStr).length > 0 ? parseOpts(optsStr) : [""];
+        return displayOpts.map((opt, oi) =>
+          `<div class="mn-opt-row" style="display:flex;align-items:center;gap:.3rem;margin-bottom:.25rem">` +
+          `<span class="mn-opt-num" style="font-size:.74rem;color:#9ca3af;min-width:1.2rem;text-align:right;flex-shrink:0">${oi + 1}.</span>` +
+          `<input class="admin-input mn-opt-item" data-idx="${idx}" data-oi="${oi}" value="${escHtml(opt)}" placeholder="Enter option…" style="flex:1;padding:.3rem .45rem;font-size:.84rem;min-width:0">` +
+          `<button class="mn-opt-del" data-idx="${idx}" data-oi="${oi}" title="Remove option" style="flex-shrink:0;padding:.2rem .4rem;font-size:.8rem;color:#9ca3af;background:none;border:1px solid #e5e7eb;border-radius:.3rem;cursor:pointer;line-height:1">×</button>` +
+          `</div>`
+        ).join("");
+      })()}</div>
+      <button class="mn-opt-add" data-idx="${idx}" style="margin-top:.2rem;font-size:.78rem;padding:.25rem .6rem;background:none;border:1px solid #d1d5db;border-radius:.35rem;cursor:pointer;color:#6b7280">+ Add Option</button>
+    </div>`;
 }
 
 function renderTargetManageContent(student, target) {
@@ -7919,18 +7929,18 @@ function renderTargetManageContent(student, target) {
     sel.addEventListener("change", async () => {
       const idx = Number(sel.dataset.idx);
       const body = $("manage-modal-body");
-      const starterInput = body.querySelector(`.mn-act-starter-text[data-idx="${idx}"]`);
-      const optsInput    = body.querySelector(`.mn-act-inline-opts[data-idx="${idx}"]`);
+      const starterInput  = body.querySelector(`.mn-act-starter-text[data-idx="${idx}"]`);
+      const optsContainer = body.querySelector(`.mn-opts-container[data-idx="${idx}"]`);
       const type = sel.value;
       acts[idx].sentenceStarter = null;
       acts[idx].remarkPresetId  = null;
       acts[idx].inlineOptions   = null;
       acts[idx].optionsMulti    = (type === "fixed_multi" || type === "starter_fixed_multi");
       acts[idx].remarkHasNote   = (type === "starter_fixed_note");
-      starterInput.style.display = (type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") ? "" : "none";
-      optsInput.style.display    = (type === "fixed" || type === "fixed_multi" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") ? "" : "none";
+      starterInput.style.display  = (type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") ? "" : "none";
+      optsContainer.style.display = (type === "fixed" || type === "fixed_multi" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") ? "" : "none";
       if (type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") { starterInput.focus(); }
-      else if (type === "fixed" || type === "fixed_multi") { optsInput.focus(); }
+      else if (type === "fixed" || type === "fixed_multi") { optsContainer.querySelector(".mn-opt-item")?.focus(); }
       else { target.predefinedActivities = acts; await saveTarget(); }
     });
   });
@@ -7944,15 +7954,63 @@ function renderTargetManageContent(student, target) {
     });
   });
 
-  $("manage-modal-body").querySelectorAll(".mn-act-inline-opts").forEach(input => {
-    input.addEventListener("blur", async () => {
-      const idx = Number(input.dataset.idx);
-      const oldOptsStr = acts[idx].inlineOptions;
-      acts[idx].inlineOptions  = input.value.trim() || null;
+  const getOptsFromDom = idx =>
+    [...$("manage-modal-body").querySelectorAll(`.mn-opt-item[data-idx="${idx}"]`)]
+      .map(i => i.value.trim()).filter(Boolean);
+
+  const renumberOpts = list => {
+    list.querySelectorAll(".mn-opt-row").forEach((r, i) => {
+      const n = r.querySelector(".mn-opt-num"); if (n) n.textContent = `${i + 1}.`;
+      const inp = r.querySelector(".mn-opt-item"); if (inp) inp.dataset.oi = i;
+      const del = r.querySelector(".mn-opt-del");  if (del) del.dataset.oi = i;
+    });
+  };
+
+  const wireOptDel = (btn, idx) => {
+    btn.addEventListener("click", async () => {
+      const list = btn.closest(".mn-opts-list");
+      list.removeChild(btn.closest(".mn-opt-row"));
+      renumberOpts(list);
+      const newOptsStr = getOptsFromDom(idx).join("/") || null;
+      acts[idx].inlineOptions = newOptsStr;
       acts[idx].remarkPresetId = null;
       target.predefinedActivities = acts;
       await saveTarget();
-      propagateRemarkOptionRename(student, target, acts[idx], oldOptsStr, acts[idx].inlineOptions);
+    });
+  };
+
+  const wireOptBlur = (input, idx) => {
+    input.addEventListener("blur", async () => {
+      const oldOptsStr = acts[idx].inlineOptions;
+      const newOptsStr = getOptsFromDom(idx).join("/") || null;
+      if (newOptsStr === oldOptsStr) return;
+      acts[idx].inlineOptions = newOptsStr;
+      acts[idx].remarkPresetId = null;
+      target.predefinedActivities = acts;
+      await saveTarget();
+      propagateRemarkOptionRename(student, target, acts[idx], oldOptsStr, newOptsStr);
+    });
+  };
+
+  $("manage-modal-body").querySelectorAll(".mn-opt-item").forEach(inp => wireOptBlur(inp, Number(inp.dataset.idx)));
+  $("manage-modal-body").querySelectorAll(".mn-opt-del").forEach(btn => wireOptDel(btn, Number(btn.dataset.idx)));
+
+  $("manage-modal-body").querySelectorAll(".mn-opt-add").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.dataset.idx);
+      const list = btn.previousElementSibling;
+      const oi = list.querySelectorAll(".mn-opt-row").length;
+      const row = document.createElement("div");
+      row.className = "mn-opt-row";
+      row.style.cssText = "display:flex;align-items:center;gap:.3rem;margin-bottom:.25rem";
+      row.innerHTML =
+        `<span class="mn-opt-num" style="font-size:.74rem;color:#9ca3af;min-width:1.2rem;text-align:right;flex-shrink:0">${oi + 1}.</span>` +
+        `<input class="admin-input mn-opt-item" data-idx="${idx}" data-oi="${oi}" placeholder="Enter option…" style="flex:1;padding:.3rem .45rem;font-size:.84rem;min-width:0">` +
+        `<button class="mn-opt-del" data-idx="${idx}" data-oi="${oi}" title="Remove option" style="flex-shrink:0;padding:.2rem .4rem;font-size:.8rem;color:#9ca3af;background:none;border:1px solid #e5e7eb;border-radius:.3rem;cursor:pointer;line-height:1">×</button>`;
+      list.appendChild(row);
+      wireOptBlur(row.querySelector(".mn-opt-item"), idx);
+      wireOptDel(row.querySelector(".mn-opt-del"), idx);
+      row.querySelector(".mn-opt-item").focus();
     });
   });
 
@@ -8227,18 +8285,18 @@ function renderTemplateManageContent(template) {
     sel.addEventListener("change", async () => {
       const idx = Number(sel.dataset.idx);
       const body = $("manage-modal-body");
-      const starterInput = body.querySelector(`.mn-act-starter-text[data-idx="${idx}"]`);
-      const optsInput    = body.querySelector(`.mn-act-inline-opts[data-idx="${idx}"]`);
+      const starterInput  = body.querySelector(`.mn-act-starter-text[data-idx="${idx}"]`);
+      const optsContainer = body.querySelector(`.mn-opts-container[data-idx="${idx}"]`);
       const type = sel.value;
       acts[idx].sentenceStarter = null;
       acts[idx].remarkPresetId  = null;
       acts[idx].inlineOptions   = null;
       acts[idx].optionsMulti    = (type === "fixed_multi" || type === "starter_fixed_multi");
       acts[idx].remarkHasNote   = (type === "starter_fixed_note");
-      starterInput.style.display = (type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") ? "" : "none";
-      optsInput.style.display    = (type === "fixed" || type === "fixed_multi" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") ? "" : "none";
+      starterInput.style.display  = (type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") ? "" : "none";
+      optsContainer.style.display = (type === "fixed" || type === "fixed_multi" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") ? "" : "none";
       if (type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") { starterInput.focus(); }
-      else if (type === "fixed" || type === "fixed_multi") { optsInput.focus(); }
+      else if (type === "fixed" || type === "fixed_multi") { optsContainer.querySelector(".mn-opt-item")?.focus(); }
       else { template.predefinedActivities = acts; await saveTemplateFn(); }
     });
   });
@@ -8252,13 +8310,60 @@ function renderTemplateManageContent(template) {
     });
   });
 
-  $("manage-modal-body").querySelectorAll(".mn-act-inline-opts").forEach(input => {
-    input.addEventListener("blur", async () => {
-      const idx = Number(input.dataset.idx);
-      acts[idx].inlineOptions  = input.value.trim() || null;
+  const getTmplOptsFromDom = idx =>
+    [...$("manage-modal-body").querySelectorAll(`.mn-opt-item[data-idx="${idx}"]`)]
+      .map(i => i.value.trim()).filter(Boolean);
+
+  const renumberTmplOpts = list => {
+    list.querySelectorAll(".mn-opt-row").forEach((r, i) => {
+      const n = r.querySelector(".mn-opt-num"); if (n) n.textContent = `${i + 1}.`;
+      const inp = r.querySelector(".mn-opt-item"); if (inp) inp.dataset.oi = i;
+      const del = r.querySelector(".mn-opt-del");  if (del) del.dataset.oi = i;
+    });
+  };
+
+  const wireTmplOptDel = (btn, idx) => {
+    btn.addEventListener("click", async () => {
+      const list = btn.closest(".mn-opts-list");
+      list.removeChild(btn.closest(".mn-opt-row"));
+      renumberTmplOpts(list);
+      acts[idx].inlineOptions = getTmplOptsFromDom(idx).join("/") || null;
       acts[idx].remarkPresetId = null;
       template.predefinedActivities = acts;
       await saveTemplateFn();
+    });
+  };
+
+  const wireTmplOptBlur = (input, idx) => {
+    input.addEventListener("blur", async () => {
+      const newOptsStr = getTmplOptsFromDom(idx).join("/") || null;
+      if (newOptsStr === acts[idx].inlineOptions) return;
+      acts[idx].inlineOptions = newOptsStr;
+      acts[idx].remarkPresetId = null;
+      template.predefinedActivities = acts;
+      await saveTemplateFn();
+    });
+  };
+
+  $("manage-modal-body").querySelectorAll(".mn-opt-item").forEach(inp => wireTmplOptBlur(inp, Number(inp.dataset.idx)));
+  $("manage-modal-body").querySelectorAll(".mn-opt-del").forEach(btn => wireTmplOptDel(btn, Number(btn.dataset.idx)));
+
+  $("manage-modal-body").querySelectorAll(".mn-opt-add").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.dataset.idx);
+      const list = btn.previousElementSibling;
+      const oi = list.querySelectorAll(".mn-opt-row").length;
+      const row = document.createElement("div");
+      row.className = "mn-opt-row";
+      row.style.cssText = "display:flex;align-items:center;gap:.3rem;margin-bottom:.25rem";
+      row.innerHTML =
+        `<span class="mn-opt-num" style="font-size:.74rem;color:#9ca3af;min-width:1.2rem;text-align:right;flex-shrink:0">${oi + 1}.</span>` +
+        `<input class="admin-input mn-opt-item" data-idx="${idx}" data-oi="${oi}" placeholder="Enter option…" style="flex:1;padding:.3rem .45rem;font-size:.84rem;min-width:0">` +
+        `<button class="mn-opt-del" data-idx="${idx}" data-oi="${oi}" title="Remove option" style="flex-shrink:0;padding:.2rem .4rem;font-size:.8rem;color:#9ca3af;background:none;border:1px solid #e5e7eb;border-radius:.3rem;cursor:pointer;line-height:1">×</button>`;
+      list.appendChild(row);
+      wireTmplOptBlur(row.querySelector(".mn-opt-item"), idx);
+      wireTmplOptDel(row.querySelector(".mn-opt-del"), idx);
+      row.querySelector(".mn-opt-item").focus();
     });
   });
 
