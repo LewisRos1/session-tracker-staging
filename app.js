@@ -125,7 +125,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "613";
+const APP_VERSION = "614";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2791,6 +2791,8 @@ function renderFedcTarget(target) {
       return;
     }
 
+    if (pa.isCompleted) return;
+
     // Old format: group field per activity (backward compat)
     if (pa.group && pa.group !== lastGroup) {
       lastGroup = pa.group;
@@ -3653,6 +3655,7 @@ async function autoFillStructuredRemarks(student, sessionId) {
   let count = 0;
   for (const target of (student.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
+      if (pa.isCompleted) continue;
       if (!isAutoOpenRemarkType(pa)) continue;
 
       const existingAct = Object.entries(data.activities || {})
@@ -3701,6 +3704,7 @@ async function autoFillMappedRemarks(student, sessionId) {
   let count = 0;
   for (const target of (student.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
+      if (pa.isCompleted) continue;
       if (!pa.isMapped) continue;
 
       const existingAct = Object.entries(data.activities || {})
@@ -4355,6 +4359,7 @@ async function autoFillViewMappedRemarks(student, sessionId, data) {
   let count = 0;
   for (const target of (student.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
+      if (pa.isCompleted) continue;
       if (!pa.isMapped) continue;
 
       const existingAct = Object.entries(data.activities || {})
@@ -4409,6 +4414,7 @@ async function autoFillViewGroupMappedRemarks(group, sessionId, data) {
   let count = 0;
   for (const target of (group.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
+      if (pa.isCompleted) continue;
       if (!pa.isMapped) continue;
       const existingAct = Object.entries(data.activities || {})
         .find(([, a]) => a.targetName === target.name && a.activityName === pa.name);
@@ -7410,6 +7416,7 @@ function renderTargetManageContent(student, target) {
   }
 
   const acts = target.predefinedActivities;
+  const completedActs = acts.filter(a => !a.isHeading && !a.isNote && a.isCompleted);
   // Other targets this target's mapped-score activities can point at — never
   // itself (self-mapping would make a target's average depend on itself).
   const siblingTargets = (_groupForTargetEdit ? _groupForTargetEdit.targets : student.targets)
@@ -7452,6 +7459,7 @@ function renderTargetManageContent(student, target) {
     <div class="admin-list" id="mn-act-list">`;
 
   acts.forEach((a, idx) => {
+    if (a.isCompleted) return;
     if (a.isHeading) {
       html += `<div class="admin-list-item mn-heading-item" data-idx="${idx}">
         <span class="drag-handle">⠿</span>
@@ -7501,7 +7509,13 @@ function renderTargetManageContent(student, target) {
             </select>
           </div>
         </div>
-        <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
+        <div style="position:relative">
+          <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options">⋮</button>
+          <div class="mn-kebab-menu hidden" id="mn-km-${idx}" style="position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:175px;overflow:hidden">
+            <button class="mn-km-opt" data-idx="${idx}" data-action="master" style="display:block;width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">⭐ Mark as Mastered</button>
+            <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="display:block;width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑 Delete Activity</button>
+          </div>
+        </div>
       </div>`;
     } else {
       const remarkTypeSelect = buildRemarkTypeControls(a, idx);
@@ -7527,12 +7541,31 @@ function renderTargetManageContent(student, target) {
             ${remarkTypeSelect}
           </div>
         </div>
-        <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
+        <div style="position:relative">
+          <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options">⋮</button>
+          <div class="mn-kebab-menu hidden" id="mn-km-${idx}" style="position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:175px;overflow:hidden">
+            <button class="mn-km-opt" data-idx="${idx}" data-action="master" style="display:block;width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">⭐ Mark as Mastered</button>
+            <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="display:block;width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑 Delete Activity</button>
+          </div>
+        </div>
       </div>`;
     }
   });
 
-  html += `</div>
+  html += `</div>`;
+  if (completedActs.length > 0) {
+    html += `<div style="margin-top:1.25rem">
+      <div style="font-size:.75rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;padding:.25rem 0 .5rem">Completed Activities</div>`;
+    completedActs.forEach((a, ci) => {
+      html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .5rem;background:#f0fdf4;border-radius:.4rem;margin-bottom:.35rem">
+        <span style="flex:1;font-size:.875rem;color:#374151">${escHtml(a.name || "")}</span>
+        <button class="btn-mn-reactivate" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Reactivate</button>
+        <button class="btn-adm-del btn-mn-del-completed" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+  html += `
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.25rem">
       <button class="btn-admin-add" id="btn-mn-add-act" style="flex:0 0 auto;width:auto">+ Add Activity</button>
       <button class="btn-admin-add" id="btn-mn-add-act-note" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Note</button>
@@ -7702,6 +7735,87 @@ function renderTargetManageContent(student, target) {
       const sp = $("manage-modal-body")?.scrollTop ?? 0;
       renderTargetManageContent(student, target);
       requestAnimationFrame(() => { const b = $("manage-modal-body"); if (b) b.scrollTop = sp; });
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-kebab-btn").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const idx = btn.dataset.idx;
+      const menu = $(`mn-km-${idx}`);
+      const wasHidden = menu.classList.contains("hidden");
+      $("manage-modal-body").querySelectorAll(".mn-kebab-menu").forEach(m => m.classList.add("hidden"));
+      if (wasHidden) {
+        menu.classList.remove("hidden");
+        setTimeout(() => document.addEventListener("click", () => menu.classList.add("hidden"), { once: true }), 0);
+      }
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-km-opt").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const idx = Number(btn.dataset.idx);
+      const action = btn.dataset.action;
+      const pa = acts[idx];
+      if (!pa) return;
+      $("manage-modal-body").querySelectorAll(".mn-kebab-menu").forEach(m => m.classList.add("hidden"));
+      if (action === "master") {
+        pa.isCompleted = true;
+        await saveTarget();
+        renderTargetManageContent(student, target);
+      } else if (action === "delete") {
+        if (!confirm(`Permanently delete "${pa.name}" and all its past session data? This cannot be undone.`)) return;
+        const actIdx = acts.indexOf(pa);
+        if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
+        target.predefinedActivities = acts;
+        await saveTarget();
+        try {
+          if (_groupForTargetEdit) {
+            await deleteGroupOrphanAcrossSessions(_groupForTargetEdit.id, target.name, pa.name);
+          } else {
+            await deleteOrphanAcrossSessions(student.id, target.name, pa.name);
+          }
+        } catch (err) {
+          console.error("Failed to purge activity from sessions:", err);
+          alert("Activity removed from config, but failed to delete from past sessions:\n" + err.message);
+        }
+        renderTargetManageContent(student, target);
+      }
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".btn-mn-reactivate").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const ci = Number(btn.dataset.completedIdx);
+      const pa = completedActs[ci];
+      if (!pa) return;
+      delete pa.isCompleted;
+      await saveTarget();
+      renderTargetManageContent(student, target);
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".btn-mn-del-completed").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const ci = Number(btn.dataset.completedIdx);
+      const pa = completedActs[ci];
+      if (!pa) return;
+      if (!confirm(`Permanently delete "${pa.name}" and all its past session data? This cannot be undone.`)) return;
+      const actIdx = acts.indexOf(pa);
+      if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
+      target.predefinedActivities = acts;
+      await saveTarget();
+      try {
+        if (_groupForTargetEdit) {
+          await deleteGroupOrphanAcrossSessions(_groupForTargetEdit.id, target.name, pa.name);
+        } else {
+          await deleteOrphanAcrossSessions(student.id, target.name, pa.name);
+        }
+      } catch (err) {
+        console.error("Failed to purge from sessions:", err);
+        alert("Activity removed from config, but failed to delete from past sessions:\n" + err.message);
+      }
+      renderTargetManageContent(student, target);
     });
   });
 
@@ -8410,6 +8524,7 @@ async function autoFillGroupMappedRemarks(group, sessionId, data, targetName, at
   if (!target) return 0;
   let count = 0;
   for (const pa of (target.predefinedActivities || [])) {
+    if (pa.isCompleted) continue;
     if (!pa.isMapped) continue;
     const existingAct = Object.entries(data.activities || {})
       .find(([, a]) => a.targetName === targetName && a.activityName === pa.name);
@@ -8449,6 +8564,7 @@ async function autoFillGroupStructuredRemarks(group, sessionId, data, targetName
   if (!target) return 0;
   let count = 0;
   for (const pa of (target.predefinedActivities || [])) {
+    if (pa.isCompleted) continue;
     if (!isAutoOpenRemarkType(pa)) continue;
     const existingAct = Object.entries(data.activities || {})
       .find(([, a]) => a.targetName === targetName && a.activityName === pa.name);
@@ -8557,6 +8673,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
       items.push(`<div class="activity-group-heading" contenteditable="false">${escHtml(pa.name)}</div>`);
       continue;
     }
+    if (pa.isCompleted) continue;
     const actId = Object.entries(data.activities || {})
       .find(([, a]) => a.targetName === target.name && a.activityName === pa.name)?.[0] || null;
     items.push(renderGroupActivityCard(pa.name, actId, target, data, attendees, pa.actNote, pa.isMapped ? pa : null, pa, true));
@@ -8590,7 +8707,7 @@ function renderGroupStudentBlock(studentName, target, data) {
   // only actual scoreable activities make sense nested under a student.
   const activityEntries = [];
   for (const pa of (target.predefinedActivities || [])) {
-    if (pa.isNote || pa.isHeading || !pa.name) continue;
+    if (pa.isNote || pa.isHeading || pa.isCompleted || !pa.name) continue;
     const actId = Object.entries(data.activities || {})
       .find(([, a]) => a.targetName === target.name && a.activityName === pa.name)?.[0] || null;
     activityEntries.push({ actId, actName: pa.name, actNote: pa.actNote, pa });

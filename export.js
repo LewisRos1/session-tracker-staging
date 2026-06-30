@@ -624,6 +624,8 @@ function wordTargetRows(target, session, allTargets) {
     // them out entirely.
     if (act.isNote) continue;
 
+    if (act.isMasteredSeparator || act.isMastered) continue;
+
     // An activity's own attached note (from "+ Add Activity & Note") is also
     // facilitator-reference text, not session data — Word treats this exactly
     // like a plain "+ Add Activity" and drops the note, same reasoning as above.
@@ -1285,12 +1287,25 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
         continue;
       }
 
+      if (act.isMasteredSeparator) {
+        activityHeadingRows.add(rows.length);
+        const r = blankRow(); r[1] = "— Mastered —"; rows.push(r);
+        continue;
+      }
+
       const actNoteText = (target.predefinedActivities || []).find(
         p => !p.isHeading && !p.isNote && p.name === act.activityName
       )?.actNote;
-      const activityCell = (actNoteText && actNoteText.trim())
-        ? richTextActivityWithNote(stripActivityMarkup(act.activityName), stripActivityMarkup(actNoteText.trim()))
-        : stripActivityMarkup(act.activityName);
+      let activityCell;
+      if (actNoteText && actNoteText.trim()) {
+        const base = richTextActivityWithNote(stripActivityMarkup(act.activityName), stripActivityMarkup(actNoteText.trim()));
+        activityCell = act.isMastered
+          ? { richText: [...base.richText, { text: " (Mastered ✓)", font: { italic: true, color: { argb: "FF6B7280" } } }] }
+          : base;
+      } else {
+        const name = stripActivityMarkup(act.activityName);
+        activityCell = act.isMastered ? name + " (Mastered ✓)" : name;
+      }
 
       if (act.empty) {
         const r = blankRow(); r[1] = activityCell; rows.push(r);
@@ -1357,6 +1372,7 @@ function getAllActivitiesForTarget(session, target) {
 
   const result = [];
   const usedIds = new Set();
+  const masteredActivities = [];
 
   for (const pa of (target.predefinedActivities || [])) {
     if (!pa.name && !pa.isNote && !pa.isHeading) continue;
@@ -1367,6 +1383,16 @@ function getAllActivitiesForTarget(session, target) {
     if (!pa.name) continue;
     if (pa.isHeading) {
       result.push({ isHeading: true, activityName: pa.name });
+      continue;
+    }
+    if (pa.isCompleted) {
+      const sessionAct = sessionActs.find(a => a.activityName === pa.name && a.isPredefined);
+      if (sessionAct) {
+        usedIds.add(sessionAct.id);
+        masteredActivities.push({ ...sessionAct, isMastered: true });
+      } else {
+        masteredActivities.push({ id: null, activityName: pa.name, isPredefined: true, empty: true, isMastered: true });
+      }
       continue;
     }
     const sessionAct = sessionActs.find(a => a.activityName === pa.name && a.isPredefined);
@@ -1389,6 +1415,11 @@ function getAllActivitiesForTarget(session, target) {
     // (Orphans that DO have remarks are kept — that's genuine historical data.)
     if (act.isPredefined && getRemarksForActivity(session, act.id).length === 0) continue;
     result.push(act);
+  }
+
+  if (masteredActivities.length > 0) {
+    result.push({ isMasteredSeparator: true, activityName: "— Mastered —" });
+    result.push(...masteredActivities);
   }
 
   return result;
@@ -1423,7 +1454,7 @@ function calcDailyAverage(session, target, allTargets = [], visited = new Set())
 
   const avgs = [];
   for (const act of getAllActivitiesForTarget(session, target)) {
-    if (act.isHeading || act.isNote || act.empty) continue;
+    if (act.isHeading || act.isNote || act.empty || act.isMasteredSeparator) continue;
     if (act.isMapped) {
       if (getRemarksForActivity(session, act.id).length === 0) continue;
       const a = resolveExportMappedScore(act, session, allTargets, visited);
