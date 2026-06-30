@@ -2510,10 +2510,10 @@ div.admin-note-editable:empty::before {
 }
 .btn-word-export-ready:hover { background: #dc2626; }
 .btn-word-export-ready.is-ready {
-  background: #16a34a;
+  background: #22c55e;
   color: #fff;
 }
-.btn-word-export-ready.is-ready:hover { background: #15803d; }
+.btn-word-export-ready.is-ready:hover { background: #16a34a; }
 .btn-word-export-ready:disabled { opacity: .5; cursor: not-allowed; }
 
 .view-heading-row td {
