@@ -689,14 +689,16 @@ export async function deleteEmptyIndividualSession(sessionId, studentId, dateStr
 }
 
 /**
- * Renumber all of a student's individual sessions in strict chronological order
- * (1, 2, 3, …). Fixes any gaps left by deletions or date changes.
+ * Fill any gaps in a student's individual session numbers while preserving the
+ * user's custom starting offset (e.g. 8,9,10,12 → 8,9,10,11 not 1,2,3,4).
  */
 export async function resequenceIndividualSessions(studentId) {
   const sessions = (await getIndividualSessionsForStudent(studentId))
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  if (sessions.length === 0) return;
+  const base = sessions[0].number ?? 1;
   for (let i = 0; i < sessions.length; i++) {
-    const expected = i + 1;
+    const expected = base + i;
     if (sessions[i].number !== expected) {
       updateDoc(doc(db, "sessions", sessions[i].id), { sessionNumber: expected }).catch(() => {});
     }

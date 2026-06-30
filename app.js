@@ -127,7 +127,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "621";
+const APP_VERSION = "622";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -7149,12 +7149,14 @@ async function renderSessionNumberSection(student) {
   ]);
   if (!area.isConnected) return; // modal closed while the fetch was in flight
 
-  // Silently fix any gaps in individual session numbers (e.g. from an empty
-  // session that was deleted before v619 started renumbering on delete).
+  // Silently fill any gaps in individual session numbers (e.g. 1,2,3,5,6 →
+  // 1,2,3,4,5). Only triggers on true gaps — consecutive sessions that differ
+  // by more than 1 — so a user-set offset like 8,9,10,11 is never touched.
   const indivSorted = indivSessions.slice().sort((a, b) => a.date.localeCompare(b.date));
-  const hasGap = indivSorted.some((s, i) => s.number !== i + 1);
+  const hasGap = indivSorted.some((s, i) => i > 0 && s.number !== indivSorted[i - 1].number + 1);
   if (hasGap) {
-    indivSorted.forEach((s, i) => { s.number = i + 1; }); // fix locally for display
+    const base = indivSorted[0]?.number ?? 1;
+    indivSorted.forEach((s, i) => { s.number = base + i; }); // fix locally for display
     resequenceIndividualSessions(student.id).catch(() => {});  // fix in Firestore
   }
 
@@ -7178,22 +7180,36 @@ function renderSessionNumberKindSubsection(student, kind, label, sessions, conta
   }
 
   const id = suffix => `mn-s-sessnum-${kind}-${suffix}`;
-  // Dropdown lists newest-first so the latest session is the default
-  // selection — sessions itself stays oldest-first (needed below for the
-  // "earliest session" floor check), this is purely display order.
-  const dropdownOrder = [...sessions].reverse();
+  const dropdownOrder = [...sessions].reverse(); // newest-first for picker
+
   container.innerHTML = `
-    <p class="admin-label" style="margin-bottom:.35rem">${label}</p>
-    <select class="admin-input" id="${id("date")}">
-      ${dropdownOrder.map(s => `<option value="${s.id}">${formatDate(s.date)} — currently Session ${s.number}</option>`).join("")}
-    </select>
-    <div style="display:flex;align-items:center;gap:.5rem;margin-top:.6rem">
-      <span style="font-size:.85rem;color:var(--text-muted);white-space:nowrap">Change Session Number To:</span>
-      <button type="button" class="btn-adm-edit" id="${id("minus")}" style="padding:.5rem .8rem;line-height:1;font-size:1.05rem">−</button>
-      <input class="admin-input" id="${id("value")}" type="number" min="1" style="width:5rem;text-align:center;flex:0 0 auto" />
-      <button type="button" class="btn-adm-edit" id="${id("plus")}" style="padding:.5rem .8rem;line-height:1;font-size:1.05rem">+</button>
-      <button class="btn-primary-sm" id="${id("save")}" style="margin-left:.3rem">Save</button>
-    </div>`;
+    <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:.4rem">
+      <p class="admin-label" style="margin:0">${label}</p>
+      <span style="font-size:.78rem;color:var(--text-muted)">${sessions.length} session${sessions.length === 1 ? "" : "s"}</span>
+    </div>
+    <div style="border:1px solid #e5e7eb;border-radius:.5rem;overflow:hidden;max-height:170px;overflow-y:auto;margin-bottom:.55rem">
+      ${dropdownOrder.map((s, idx) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:.38rem .75rem;background:#fff;${idx < dropdownOrder.length - 1 ? "border-bottom:1px solid #f3f4f6" : ""}">
+          <span style="font-size:.84rem;font-weight:600;color:#374151">Session ${s.number}</span>
+          <span style="font-size:.82rem;color:#6b7280">${formatDate(s.date)}</span>
+        </div>`).join("")}
+    </div>
+    <details>
+      <summary style="font-size:.8rem;color:#9ca3af;cursor:pointer;user-select:none;list-style:none;padding:.15rem 0">▸ Adjust numbering…</summary>
+      <div style="margin-top:.5rem;padding:.6rem .75rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:.45rem">
+        <label style="font-size:.78rem;color:var(--text-muted);display:block;margin-bottom:.3rem">Select session to renumber</label>
+        <select class="admin-input" id="${id("date")}" style="margin-bottom:.5rem">
+          ${dropdownOrder.map(s => `<option value="${s.id}">Session ${s.number} · ${formatDate(s.date)}</option>`).join("")}
+        </select>
+        <div style="display:flex;align-items:center;gap:.4rem">
+          <span style="font-size:.82rem;color:var(--text-muted);white-space:nowrap">Renumber to</span>
+          <button type="button" class="btn-adm-edit" id="${id("minus")}" style="padding:.4rem .7rem;line-height:1">−</button>
+          <input class="admin-input" id="${id("value")}" type="number" min="1" style="width:4.5rem;text-align:center;flex:0 0 auto" />
+          <button type="button" class="btn-adm-edit" id="${id("plus")}" style="padding:.4rem .7rem;line-height:1">+</button>
+          <button class="btn-primary-sm" id="${id("save")}">Save</button>
+        </div>
+      </div>
+    </details>`;
 
   // Keeps the stepper's starting value in sync with whichever session the
   // dropdown above currently has selected (it already shows the date).
