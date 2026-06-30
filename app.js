@@ -127,7 +127,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "627";
+const APP_VERSION = "628";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -7194,7 +7194,7 @@ function renderSessionNumberKindSubsection(student, kind, label, sessions, conta
     <p class="admin-label" style="margin-bottom:.4rem">${label}</p>
     <label style="font-size:.78rem;color:var(--text-muted);display:block;margin-bottom:.3rem">Select session to renumber</label>
     <select class="admin-input" id="${id("date")}" style="margin-bottom:.5rem">
-      ${dropdownOrder.map(s => `<option value="${s.id}">Session ${s.number} · ${formatDate(s.date)}</option>`).join("")}
+      ${dropdownOrder.map(s => `<option value="${s.id}">${formatDate(s.date)} → Session ${s.number}</option>`).join("")}
     </select>
     <div style="display:flex;align-items:center;gap:.4rem">
       <span style="font-size:.82rem;color:var(--text-muted);white-space:nowrap">Renumber to</span>
