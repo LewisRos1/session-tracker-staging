@@ -327,9 +327,8 @@ export async function updateSessionDate(sessionId, newDateStr, studentId) {
     throw new Error("There is already a session on that date for this student.");
   }
 
-  const sessionNumber = await assignLifetimeSessionNumber(studentId, newDateStr, sessionId, "individual");
-
-  await updateDoc(doc(db, "sessions", sessionId), { date: newDateStr, month, sessionNumber });
+  await updateDoc(doc(db, "sessions", sessionId), { date: newDateStr, month });
+  await resequenceIndividualSessions(studentId);
 }
 
 /** Change the date (and recalculate month + session number) of an existing group session. */
@@ -686,6 +685,21 @@ export async function deleteEmptyIndividualSession(sessionId, studentId, dateStr
   const later = (await getIndividualSessionsForStudent(studentId)).filter(s => s.date > dateStr);
   for (const s of later) {
     updateDoc(doc(db, "sessions", s.id), { sessionNumber: (s.number || 0) - 1 }).catch(() => {});
+  }
+}
+
+/**
+ * Renumber all of a student's individual sessions in strict chronological order
+ * (1, 2, 3, …). Fixes any gaps left by deletions or date changes.
+ */
+export async function resequenceIndividualSessions(studentId) {
+  const sessions = (await getIndividualSessionsForStudent(studentId))
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  for (let i = 0; i < sessions.length; i++) {
+    const expected = i + 1;
+    if (sessions[i].number !== expected) {
+      updateDoc(doc(db, "sessions", sessions[i].id), { sessionNumber: expected }).catch(() => {});
+    }
   }
 }
 

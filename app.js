@@ -42,6 +42,7 @@ import {
   getOrCreateSessionForDate,
   deleteSession,
   deleteEmptyIndividualSession,
+  resequenceIndividualSessions,
   updateSessionDate,
   updateGroupSessionDate,
   deleteTargetDataFromSessions,
@@ -126,7 +127,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "619";
+const APP_VERSION = "620";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1756,6 +1757,7 @@ async function showSessionPicker(student) {
   };
   const emptySessions = sessions.filter(s => !hasUsefulData(s));
   emptySessions.forEach(s => deleteSession(s.id).catch(() => {}));
+  if (emptySessions.length > 0) resequenceIndividualSessions(student.id).catch(() => {});
   sessions = sessions.filter(s => !emptySessions.some(e => e.id === s.id));
 
   const today = getTodayString();
@@ -2080,6 +2082,7 @@ async function showGoToAnotherSession(student) {
   // Don't auto-delete the session currently being viewed
   const empties = sessions.filter(s => s.id !== state.viewSessionId && !hasUsefulData(s));
   empties.forEach(s => deleteSession(s.id).catch(() => {}));
+  if (empties.length > 0) resequenceIndividualSessions(student.id).catch(() => {});
   sessions = sessions.filter(s => !empties.some(e => e.id === s.id));
 
   const today = getTodayString();
@@ -2171,6 +2174,7 @@ async function showGoToAnotherSessionForEntry(student) {
   // Don't auto-delete the session currently being edited
   const empties = sessions.filter(s => s.id !== state.currentSessionId && !hasUsefulData(s));
   empties.forEach(s => deleteSession(s.id).catch(() => {}));
+  if (empties.length > 0) resequenceIndividualSessions(student.id).catch(() => {});
   sessions = sessions.filter(s => !empties.some(e => e.id === s.id));
 
   const today = getTodayString();
@@ -3952,7 +3956,7 @@ async function leaveSessionView() {
         || stripEmpty(r.masteryNote).length > 0;
     });
     if (!fedcHasData && !remarkHasData) {
-      deleteSession(sessionId).catch(() => {});
+      deleteEmptyIndividualSession(sessionId, student.id, data.date).catch(() => {});
     } else {
       const allTargetNames = new Set(Object.values(data.activities || {}).map(a => a.targetName));
       allTargetNames.forEach(name => {

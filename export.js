@@ -1006,10 +1006,15 @@ async function buildSingleSessionWordBlob(entityName, sessionLabel, allTargets, 
   return Packer.toBlob(doc);
 }
 
-// Filename format: "{Name} - Session {N} - {D Mon YYYY} (Exported On {D Mon YYYY}, {HH.MM})"
-function formatExportFilenameWord(name, sessionLabel, dateStr, now) {
-  const sessionPart = sessionLabel ? `${sessionLabel} - ` : "";
-  return `${name} - ${sessionPart}${fmtDate(dateStr)} (${exportedOnSuffix(now)}).docx`;
+// Filename: "[Name] - Individual - Session N - (Exported on D Mon YYYY, Time HHMM).docx"
+function formatExportFilenameWord(name, sessionLabel, kind, now) {
+  const [y, mo, d] = [now.getFullYear(), now.getMonth() + 1, now.getDate()];
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const exportDate = `${d} ${months[mo - 1]} ${y}`;
+  const hh  = String(now.getHours()).padStart(2, "0");
+  const min = String(now.getMinutes()).padStart(2, "0");
+  const sessionPart = sessionLabel ? ` - ${sessionLabel}` : "";
+  return `${name} - ${kind}${sessionPart} - (Exported on ${exportDate}, Time ${hh}${min}).docx`;
 }
 
 function downloadBlob(blob, filename) {
@@ -1031,7 +1036,7 @@ export async function exportStudentSingleSessionWord(student, session) {
   const allTargets   = getAllTargets(student).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
   const sessionLabel = session.sessionNumber != null ? `Session ${session.sessionNumber}` : "";
   const blob = await buildSingleSessionWordBlob(student.name, sessionLabel, allTargets, session);
-  downloadBlob(blob, formatExportFilenameWord(student.name, sessionLabel, session.date, new Date()));
+  downloadBlob(blob, formatExportFilenameWord(student.name, sessionLabel, "Individual", new Date()));
 }
 
 export async function exportGroupMemberSingleSessionWord(studentName, groups, session) {
@@ -1056,7 +1061,7 @@ export async function exportGroupMemberSingleSessionWord(studentName, groups, se
   const allTargets      = unionTargetsByName(groups).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
   const filteredSession = { ...session, remarks: filteredRemarks };
   const blob = await buildSingleSessionWordBlob(studentName, sessionLabel, allTargets, filteredSession);
-  downloadBlob(blob, formatExportFilenameWord(studentName, sessionLabel, session.date, new Date()));
+  downloadBlob(blob, formatExportFilenameWord(studentName, sessionLabel, "Group", new Date()));
 }
 
 // `groups` is optional (defaults to none, so existing callers that only
