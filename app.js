@@ -41,6 +41,7 @@ import {
   getTodayString,
   getOrCreateSessionForDate,
   deleteSession,
+  deleteEmptyIndividualSession,
   updateSessionDate,
   updateGroupSessionDate,
   deleteTargetDataFromSessions,
@@ -125,7 +126,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "618";
+const APP_VERSION = "619";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2591,7 +2592,7 @@ async function leaveSession() {
         || stripEmpty(r.masteryNote).length > 0;
     });
     if (!fedcHasData && !remarkHasData) {
-      deleteSession(sessionId).catch(() => {});
+      deleteEmptyIndividualSession(sessionId, student.id, data.date).catch(() => {});
     } else {
       const allTargetNames = new Set(Object.values(data.activities || {}).map(a => a.targetName));
       allTargetNames.forEach(name => {

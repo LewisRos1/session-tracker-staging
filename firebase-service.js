@@ -677,6 +677,18 @@ export async function deleteSession(sessionId) {
   await deleteDoc(doc(db, "sessions", sessionId));
 }
 
+/**
+ * Delete an empty individual session and shift all later sessions' numbers
+ * down by 1 so no gap appears in the sequence.
+ */
+export async function deleteEmptyIndividualSession(sessionId, studentId, dateStr) {
+  await deleteDoc(doc(db, "sessions", sessionId));
+  const later = (await getIndividualSessionsForStudent(studentId)).filter(s => s.date > dateStr);
+  for (const s of later) {
+    updateDoc(doc(db, "sessions", s.id), { sessionNumber: (s.number || 0) - 1 }).catch(() => {});
+  }
+}
+
 // ─── EXPORT DATA ─────────────────────────────────────────────
 
 /** Fetch recent sessions for a student, newest-first (for session picker). */
