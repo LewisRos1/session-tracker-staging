@@ -125,7 +125,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "615";
+const APP_VERSION = "616";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2791,7 +2791,7 @@ function renderFedcTarget(target) {
       return;
     }
 
-    if (pa.isCompleted) return;
+    if (pa.isCompleted || pa.isArchived) return;
 
     // Old format: group field per activity (backward compat)
     if (pa.group && pa.group !== lastGroup) {
@@ -3655,7 +3655,7 @@ async function autoFillStructuredRemarks(student, sessionId) {
   let count = 0;
   for (const target of (student.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
-      if (pa.isCompleted) continue;
+      if (pa.isCompleted || pa.isArchived) continue;
       if (!isAutoOpenRemarkType(pa)) continue;
 
       const existingAct = Object.entries(data.activities || {})
@@ -3704,7 +3704,7 @@ async function autoFillMappedRemarks(student, sessionId) {
   let count = 0;
   for (const target of (student.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
-      if (pa.isCompleted) continue;
+      if (pa.isCompleted || pa.isArchived) continue;
       if (!pa.isMapped) continue;
 
       const existingAct = Object.entries(data.activities || {})
@@ -4359,7 +4359,7 @@ async function autoFillViewMappedRemarks(student, sessionId, data) {
   let count = 0;
   for (const target of (student.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
-      if (pa.isCompleted) continue;
+      if (pa.isCompleted || pa.isArchived) continue;
       if (!pa.isMapped) continue;
 
       const existingAct = Object.entries(data.activities || {})
@@ -4414,7 +4414,7 @@ async function autoFillViewGroupMappedRemarks(group, sessionId, data) {
   let count = 0;
   for (const target of (group.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
-      if (pa.isCompleted) continue;
+      if (pa.isCompleted || pa.isArchived) continue;
       if (!pa.isMapped) continue;
       const existingAct = Object.entries(data.activities || {})
         .find(([, a]) => a.targetName === target.name && a.activityName === pa.name);
@@ -7416,7 +7416,8 @@ function renderTargetManageContent(student, target) {
   }
 
   const acts = target.predefinedActivities;
-  const completedActs = acts.filter(a => !a.isHeading && !a.isNote && a.isCompleted);
+  const masteredActs = acts.filter(a => !a.isHeading && !a.isNote && a.isCompleted);
+  const archivedActs = acts.filter(a => !a.isHeading && !a.isNote && a.isArchived);
   // Other targets this target's mapped-score activities can point at — never
   // itself (self-mapping would make a target's average depend on itself).
   const siblingTargets = (_groupForTargetEdit ? _groupForTargetEdit.targets : student.targets)
@@ -7459,7 +7460,7 @@ function renderTargetManageContent(student, target) {
     <div class="admin-list" id="mn-act-list">`;
 
   acts.forEach((a, idx) => {
-    if (a.isCompleted) return;
+    if (a.isCompleted || a.isArchived) return;
     if (a.isHeading) {
       html += `<div class="admin-list-item mn-heading-item" data-idx="${idx}">
         <span class="drag-handle">⠿</span>
@@ -7511,9 +7512,19 @@ function renderTargetManageContent(student, target) {
         </div>
         <div style="position:relative">
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
-          <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:175px;overflow:hidden">
-            <button class="mn-km-opt" data-idx="${idx}" data-action="master" style="display:block;width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">⭐ Mark as Mastered</button>
-            <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="display:block;width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑 Delete Activity</button>
+          <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:215px;overflow:hidden">
+            <div style="display:flex;align-items:stretch;border-bottom:1px solid #f3f4f6">
+              <button class="mn-km-opt" data-idx="${idx}" data-action="master" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">⭐ Mark as Mastered</button>
+              <span title="Student has achieved this activity. Historical data is kept in the database." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
+            </div>
+            <div style="display:flex;align-items:stretch;border-bottom:1px solid #f3f4f6">
+              <button class="mn-km-opt" data-idx="${idx}" data-action="archive" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">📁 Archive</button>
+              <span title="Activity is no longer being tracked, but has not been mastered. Historical data is kept in the database." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
+            </div>
+            <div style="display:flex;align-items:stretch">
+              <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑 Delete Activity</button>
+              <span title="Permanently removes this activity and all of its session data. This cannot be undone." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
+            </div>
           </div>
         </div>
       </div>`;
@@ -7543,9 +7554,19 @@ function renderTargetManageContent(student, target) {
         </div>
         <div style="position:relative">
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
-          <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:175px;overflow:hidden">
-            <button class="mn-km-opt" data-idx="${idx}" data-action="master" style="display:block;width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">⭐ Mark as Mastered</button>
-            <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="display:block;width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑 Delete Activity</button>
+          <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:215px;overflow:hidden">
+            <div style="display:flex;align-items:stretch;border-bottom:1px solid #f3f4f6">
+              <button class="mn-km-opt" data-idx="${idx}" data-action="master" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">⭐ Mark as Mastered</button>
+              <span title="Student has achieved this activity. Historical data is kept in the database." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
+            </div>
+            <div style="display:flex;align-items:stretch;border-bottom:1px solid #f3f4f6">
+              <button class="mn-km-opt" data-idx="${idx}" data-action="archive" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">📁 Archive</button>
+              <span title="Activity is no longer being tracked, but has not been mastered. Historical data is kept in the database." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
+            </div>
+            <div style="display:flex;align-items:stretch">
+              <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑 Delete Activity</button>
+              <span title="Permanently removes this activity and all of its session data. This cannot be undone." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
+            </div>
           </div>
         </div>
       </div>`;
@@ -7553,14 +7574,26 @@ function renderTargetManageContent(student, target) {
   });
 
   html += `</div>`;
-  if (completedActs.length > 0) {
+  if (masteredActs.length > 0) {
     html += `<div style="margin-top:1.25rem">
-      <div style="font-size:.75rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;padding:.25rem 0 .5rem">Completed Activities</div>`;
-    completedActs.forEach((a, ci) => {
+      <div style="font-size:.75rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;padding:.25rem 0 .5rem">Mastered</div>`;
+    masteredActs.forEach((a, ci) => {
       html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .5rem;background:#f0fdf4;border-radius:.4rem;margin-bottom:.35rem">
         <span style="flex:1;font-size:.875rem;color:#374151">${escHtml(a.name || "")}</span>
-        <button class="btn-mn-reactivate" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Reactivate</button>
-        <button class="btn-adm-del btn-mn-del-completed" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
+        <button class="btn-mn-reactivate" data-completed-idx="${ci}" data-src="mastered" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Reactivate</button>
+        <button class="btn-adm-del btn-mn-del-completed" data-completed-idx="${ci}" data-src="mastered" title="Delete permanently">🗑</button>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+  if (archivedActs.length > 0) {
+    html += `<div style="margin-top:1.25rem">
+      <div style="font-size:.75rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;padding:.25rem 0 .5rem">Archived</div>`;
+    archivedActs.forEach((a, ci) => {
+      html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:.35rem">
+        <span style="flex:1;font-size:.875rem;color:#374151">${escHtml(a.name || "")}</span>
+        <button class="btn-mn-reactivate" data-completed-idx="${ci}" data-src="archived" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Reactivate</button>
+        <button class="btn-adm-del btn-mn-del-completed" data-completed-idx="${ci}" data-src="archived" title="Delete permanently">🗑</button>
       </div>`;
     });
     html += `</div>`;
@@ -7747,7 +7780,10 @@ function renderTargetManageContent(student, target) {
       $("manage-modal-body").querySelectorAll(".mn-kebab-menu").forEach(m => m.style.display = "none");
       if (wasHidden) {
         menu.style.display = "block";
-        setTimeout(() => document.addEventListener("click", () => { menu.style.display = "none"; }, { once: true }), 0);
+        const closeMenu = ev => {
+          if (!menu.contains(ev.target)) { menu.style.display = "none"; document.removeEventListener("click", closeMenu); }
+        };
+        setTimeout(() => document.addEventListener("click", closeMenu), 0);
       }
     });
   });
@@ -7761,6 +7797,12 @@ function renderTargetManageContent(student, target) {
       $("manage-modal-body").querySelectorAll(".mn-kebab-menu").forEach(m => m.style.display = "none");
       if (action === "master") {
         pa.isCompleted = true;
+        delete pa.isArchived;
+        await saveTarget();
+        renderTargetManageContent(student, target);
+      } else if (action === "archive") {
+        pa.isArchived = true;
+        delete pa.isCompleted;
         await saveTarget();
         renderTargetManageContent(student, target);
       } else if (action === "delete") {
@@ -7787,9 +7829,10 @@ function renderTargetManageContent(student, target) {
   $("manage-modal-body").querySelectorAll(".btn-mn-reactivate").forEach(btn => {
     btn.addEventListener("click", async () => {
       const ci = Number(btn.dataset.completedIdx);
-      const pa = completedActs[ci];
+      const src = btn.dataset.src;
+      const pa = src === "archived" ? archivedActs[ci] : masteredActs[ci];
       if (!pa) return;
-      delete pa.isCompleted;
+      if (src === "archived") delete pa.isArchived; else delete pa.isCompleted;
       await saveTarget();
       renderTargetManageContent(student, target);
     });
@@ -7798,7 +7841,8 @@ function renderTargetManageContent(student, target) {
   $("manage-modal-body").querySelectorAll(".btn-mn-del-completed").forEach(btn => {
     btn.addEventListener("click", async () => {
       const ci = Number(btn.dataset.completedIdx);
-      const pa = completedActs[ci];
+      const src = btn.dataset.src;
+      const pa = src === "archived" ? archivedActs[ci] : masteredActs[ci];
       if (!pa) return;
       if (!confirm(`Permanently delete "${pa.name}" and all its past session data? This cannot be undone.`)) return;
       const actIdx = acts.indexOf(pa);
@@ -8524,7 +8568,7 @@ async function autoFillGroupMappedRemarks(group, sessionId, data, targetName, at
   if (!target) return 0;
   let count = 0;
   for (const pa of (target.predefinedActivities || [])) {
-    if (pa.isCompleted) continue;
+    if (pa.isCompleted || pa.isArchived) continue;
     if (!pa.isMapped) continue;
     const existingAct = Object.entries(data.activities || {})
       .find(([, a]) => a.targetName === targetName && a.activityName === pa.name);
@@ -8564,7 +8608,7 @@ async function autoFillGroupStructuredRemarks(group, sessionId, data, targetName
   if (!target) return 0;
   let count = 0;
   for (const pa of (target.predefinedActivities || [])) {
-    if (pa.isCompleted) continue;
+    if (pa.isCompleted || pa.isArchived) continue;
     if (!isAutoOpenRemarkType(pa)) continue;
     const existingAct = Object.entries(data.activities || {})
       .find(([, a]) => a.targetName === targetName && a.activityName === pa.name);
@@ -8673,7 +8717,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
       items.push(`<div class="activity-group-heading" contenteditable="false">${escHtml(pa.name)}</div>`);
       continue;
     }
-    if (pa.isCompleted) continue;
+    if (pa.isCompleted || pa.isArchived) continue;
     const actId = Object.entries(data.activities || {})
       .find(([, a]) => a.targetName === target.name && a.activityName === pa.name)?.[0] || null;
     items.push(renderGroupActivityCard(pa.name, actId, target, data, attendees, pa.actNote, pa.isMapped ? pa : null, pa, true));
@@ -8707,7 +8751,7 @@ function renderGroupStudentBlock(studentName, target, data) {
   // only actual scoreable activities make sense nested under a student.
   const activityEntries = [];
   for (const pa of (target.predefinedActivities || [])) {
-    if (pa.isNote || pa.isHeading || pa.isCompleted || !pa.name) continue;
+    if (pa.isNote || pa.isHeading || pa.isCompleted || pa.isArchived || !pa.name) continue;
     const actId = Object.entries(data.activities || {})
       .find(([, a]) => a.targetName === target.name && a.activityName === pa.name)?.[0] || null;
     activityEntries.push({ actId, actName: pa.name, actNote: pa.actNote, pa });

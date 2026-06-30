@@ -26,6 +26,91 @@ function stripActivityMarkup(s) {
   return (s || "").replace(/\*(.+?)\*/g, "$1").replace(/_(.+?)_/g, "$1");
 }
 
+// Converts a remark's raw HTML into an ExcelJS cell value that preserves
+// <strong>/<b> (bold) and <u> (underline) formatting. Block-level tags
+// (<br>/<div>/<p>) become newlines so multi-line remarks stay multi-line.
+// Returns "" when there is no content, a plain string when no formatting
+// is needed, or { richText: [...] } for ExcelJS when formatting is present.
+// Also handles sentence-starter prefix (omitted when body is empty) and
+// mastery/note suffix.
+function buildExcelRemarkCell(html, starter, masteryNote) {
+  const normalized = (html || "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/div>/gi, "\n").replace(/<div[^>]*>/gi, "")
+    .replace(/<\/p>/gi, "\n").replace(/<p[^>]*>/gi, "")
+    .trim();
+
+  const segments = [];
+  const fmtStack = [{ bold: false, underline: false }];
+  let i = 0, buf = "";
+
+  const flush = () => {
+    if (!buf) return;
+    const f = fmtStack[fmtStack.length - 1];
+    segments.push({ text: buf, bold: f.bold, underline: f.underline });
+    buf = "";
+  };
+
+  while (i < normalized.length) {
+    if (normalized[i] !== "<") { buf += normalized[i++]; continue; }
+    const end = normalized.indexOf(">", i);
+    if (end === -1) { buf += normalized[i++]; continue; }
+    flush();
+    const tag = normalized.slice(i + 1, end);
+    const close = tag.startsWith("/");
+    const name = (close ? tag.slice(1) : tag.split(/[\s>]/)[0]).toLowerCase();
+    if (!close) {
+      const cur = fmtStack[fmtStack.length - 1];
+      fmtStack.push({
+        bold: cur.bold || name === "strong" || name === "b",
+        underline: cur.underline || name === "u"
+      });
+    } else if (fmtStack.length > 1) {
+      fmtStack.pop();
+    }
+    i = end + 1;
+  }
+  flush();
+
+  const merged = [];
+  for (const seg of segments) {
+    const text = seg.text
+      .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+    if (!text) continue;
+    const last = merged[merged.length - 1];
+    if (last && last.bold === seg.bold && last.underline === seg.underline) last.text += text;
+    else merged.push({ text, bold: seg.bold, underline: seg.underline });
+  }
+
+  const hasContent = merged.some(s => s.text.trim());
+  const richText = [];
+
+  if (starter) {
+    if (!hasContent) return "";
+    richText.push({ text: `${starter}: ` });
+  }
+
+  for (const seg of merged) {
+    const entry = { text: seg.text };
+    if (seg.bold || seg.underline) {
+      entry.font = {};
+      if (seg.bold) entry.font.bold = true;
+      if (seg.underline) entry.font.underline = true;
+    }
+    richText.push(entry);
+  }
+
+  if (masteryNote) {
+    if (richText.length > 0) richText[richText.length - 1].text += ` — ${masteryNote}`;
+    else richText.push({ text: ` — ${masteryNote}` });
+  }
+
+  if (richText.length === 0) return "";
+  if (!richText.some(r => r.font)) return richText.map(r => r.text).join("");
+  return { richText };
+}
+
 // ─── STYLE CONSTANTS ─────────────────────────────────────────
 // Palette: Bright Periwinkle — cheerful, child-friendly, single-hue graduated
 //
@@ -624,7 +709,7 @@ function wordTargetRows(target, session, allTargets) {
     // them out entirely.
     if (act.isNote) continue;
 
-    if (act.isMasteredSeparator || act.isMastered) continue;
+    if (act.isMasteredSeparator || act.isMastered || act.isArchivedSeparator || act.isArchived) continue;
 
     // An activity's own attached note (from "+ Add Activity & Note") is also
     // facilitator-reference text, not session data — Word treats this exactly
@@ -704,7 +789,7 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
   const TARGET_TEXT_COLOR = "2A4060";
   const NOTE_FILL   = "FFF8ED";
   const NOTE_TEXT_COLOR = "7A5030";
-  const FACILITATION_BORDER = "000000";
+  const FACILITATION_BORDER = "B0C8E0";
 
   const cellBorders = {
     top:    { style: BorderStyle.SINGLE, size: 2, color: "B0C8E0" },
@@ -1292,6 +1377,11 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
         const r = blankRow(); r[1] = "— Mastered —"; rows.push(r);
         continue;
       }
+      if (act.isArchivedSeparator) {
+        activityHeadingRows.add(rows.length);
+        const r = blankRow(); r[1] = "— Archived —"; rows.push(r);
+        continue;
+      }
 
       const actNoteText = (target.predefinedActivities || []).find(
         p => !p.isHeading && !p.isNote && p.name === act.activityName
@@ -1301,10 +1391,12 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
         const base = richTextActivityWithNote(stripActivityMarkup(act.activityName), stripActivityMarkup(actNoteText.trim()));
         activityCell = act.isMastered
           ? { richText: [...base.richText, { text: " (Mastered ✓)", font: { italic: true, color: { argb: "FF6B7280" } } }] }
+          : act.isArchived
+          ? { richText: [...base.richText, { text: " (Archived)", font: { italic: true, color: { argb: "FF9CA3AF" } } }] }
           : base;
       } else {
         const name = stripActivityMarkup(act.activityName);
-        activityCell = act.isMastered ? name + " (Mastered ✓)" : name;
+        activityCell = act.isMastered ? name + " (Mastered ✓)" : act.isArchived ? name + " (Archived)" : name;
       }
 
       if (act.empty) {
@@ -1329,11 +1421,9 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
         const validTrials = (rem.trials || []).filter(t => t !== -1);
         const remarkAvg   = act.isMapped ? mappedScore : calcRemarkAvg(validTrials, target.maxPoints);
         const masteryNote = stripRemarkHtml(rem.masteryNote || "");
-        const baseText    = starter ? `${starter}: ${stripRemarkHtml(rem.text)}`.trim() : stripRemarkHtml(rem.text);
-        const remarkText  = masteryNote ? `${baseText} — ${masteryNote}` : baseText;
         const r = blankRow();
         r[1] = firstRemark ? activityCell : "";
-        r[2] = remarkText;
+        r[2] = buildExcelRemarkCell(rem.text, starter, masteryNote);
         r[3] = remarkAvg !== null ? pct(remarkAvg) : "";
         if (includeTrials) r[4] = trialsList(rem.trials);
         rows.push(r);
@@ -1373,6 +1463,7 @@ function getAllActivitiesForTarget(session, target) {
   const result = [];
   const usedIds = new Set();
   const masteredActivities = [];
+  const archivedActivities = [];
 
   for (const pa of (target.predefinedActivities || [])) {
     if (!pa.name && !pa.isNote && !pa.isHeading) continue;
@@ -1392,6 +1483,16 @@ function getAllActivitiesForTarget(session, target) {
         masteredActivities.push({ ...sessionAct, isMastered: true });
       } else {
         masteredActivities.push({ id: null, activityName: pa.name, isPredefined: true, empty: true, isMastered: true });
+      }
+      continue;
+    }
+    if (pa.isArchived) {
+      const sessionAct = sessionActs.find(a => a.activityName === pa.name && a.isPredefined);
+      if (sessionAct) {
+        usedIds.add(sessionAct.id);
+        archivedActivities.push({ ...sessionAct, isArchived: true });
+      } else {
+        archivedActivities.push({ id: null, activityName: pa.name, isPredefined: true, empty: true, isArchived: true });
       }
       continue;
     }
@@ -1420,6 +1521,10 @@ function getAllActivitiesForTarget(session, target) {
   if (masteredActivities.length > 0) {
     result.push({ isMasteredSeparator: true, activityName: "— Mastered —" });
     result.push(...masteredActivities);
+  }
+  if (archivedActivities.length > 0) {
+    result.push({ isArchivedSeparator: true, activityName: "— Archived —" });
+    result.push(...archivedActivities);
   }
 
   return result;
@@ -1454,7 +1559,7 @@ function calcDailyAverage(session, target, allTargets = [], visited = new Set())
 
   const avgs = [];
   for (const act of getAllActivitiesForTarget(session, target)) {
-    if (act.isHeading || act.isNote || act.empty || act.isMasteredSeparator) continue;
+    if (act.isHeading || act.isNote || act.empty || act.isMasteredSeparator || act.isArchivedSeparator) continue;
     if (act.isMapped) {
       if (getRemarksForActivity(session, act.id).length === 0) continue;
       const a = resolveExportMappedScore(act, session, allTargets, visited);
