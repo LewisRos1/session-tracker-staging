@@ -768,7 +768,7 @@ const WORD_COL_TOTAL    = WORD_COL_ACTIVITY + WORD_COL_REMARK + WORD_COL_SCORE;
 let stampImageBufferPromise = null;
 function getStampImageBuffer() {
   if (!stampImageBufferPromise) {
-    stampImageBufferPromise = fetch("zora-stamp.png")
+    stampImageBufferPromise = fetch("Daisy Word Doc Stamp.png")
       .then(r => (r.ok ? r.arrayBuffer() : null))
       .catch(() => null);
   }
@@ -882,8 +882,8 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
               ? richCell(r.actLines, { align: AlignmentType.LEFT, width: WORD_COL_ACTIVITY })
               : cell(r.cells[0], { align: AlignmentType.LEFT, width: WORD_COL_ACTIVITY }),
             r.remarkLines
-              ? richCell(r.remarkLines, { width: WORD_COL_REMARK })
-              : cell(r.cells[1], { width: WORD_COL_REMARK }),
+              ? richCell(r.remarkLines, { align: AlignmentType.LEFT, width: WORD_COL_REMARK })
+              : cell(r.cells[1], { align: AlignmentType.LEFT, width: WORD_COL_REMARK }),
             cell(r.cells[2], { align: AlignmentType.CENTER, width: WORD_COL_SCORE })
           ]
         }));
@@ -896,6 +896,7 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
       layout: TableLayoutType.FIXED,
       rows: tableRows
     }));
+    body.push(new Paragraph({ children: [] }));
   }
 
   if (!anyTarget) {
