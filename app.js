@@ -123,7 +123,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "611";
+const APP_VERSION = "612";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -822,7 +822,7 @@ function runOneOffRepairs() {
     { student: "Caden Tan", target: "Two-Way Communication", old: "7. Open the door", new: "9. Open the door" },
     { student: "Caden Tan", target: "Two-Way Communication", old: "5. I am hungry (snack)", new: "5. I am hungry (snack)" },
     { student: "Caden Tan", target: "Two-Way Communication", old: "6. Turn on the light", new: "8. Turn on the light" },
-    { student: "Caden Tan", target: "Two-Way Communication", old: "6. Water", new: "7. Water" },
+    { student: "Caden Tan", target: "Two-Way Communication", old: "7. Water", new: "6. Water" },
     { student: "Caden Tan", target: "Two-Way Communication", old: "4. Sounds are too loud.", new: "4. Sounds are too loud" },
     { student: "Caden Tan", target: "Two-Way Communication",
       old: `Verbalising Phase 1: a. Provide 3-5 seconds to provide an answer. b. To provide an alternative, simpler question that provides a clue to the answer. c. State the answer in a functional manner before asking the question again. d. Provide a sentence stem. e. Ask the question and provide the answer. f. Provide the sentence stem "I". Phase 2: Provide a visual of the sentence stem 'I' to elicit a response to a question. Phase 3: Provide Caden with a short phrase of 3-4 words. Provide a non-'wh' question. Phase 4: To answer independently what he wants to play in the playground.`,
