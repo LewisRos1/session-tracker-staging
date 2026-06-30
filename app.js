@@ -127,7 +127,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "624";
+const APP_VERSION = "625";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1691,6 +1691,9 @@ function showStudentChoice(student) {
       return `${d} ${months[m - 1]}`;
     };
 
+    // Pre-fetch sessions immediately so ticks are ready by the time user clicks "Pick A Date"
+    const sessionsFetch = getRecentSessionsForStudent(student.id);
+
     $("session-picker-list").innerHTML = `
       <div class="session-date-step">
         <p class="session-date-prompt">What date is this session for?</p>
@@ -1713,8 +1716,8 @@ function showStudentChoice(student) {
       const displayDate = `${ty}-${String(tm).padStart(2,"0")}-01`;
       // Render immediately so iPad doesn't see a frozen UI while waiting for network
       renderStartSessionCalendar(student, today, displayDate, new Set());
-      // Then load taken dates and re-render with blue dots
-      getRecentSessionsForStudent(student.id)
+      // Use the pre-fetched promise — likely already resolved by now
+      sessionsFetch
         .then(sessions => {
           const takenDates = new Set(sessions.map(s => s.date));
           renderStartSessionCalendar(student, today, displayDate, takenDates);
