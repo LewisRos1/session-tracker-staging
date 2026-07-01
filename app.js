@@ -128,7 +128,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "633";
+const APP_VERSION = "634";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2707,7 +2707,13 @@ function populateTargetDropdown(targets) {
     // as "still choosing" — so leaving it focused here would block every
     // future render until the user happens to click elsewhere.
     sel.blur();
-    renderTargetContent();
+    // Also run autoFillMappedRemarks on target switch: the Firestore snapshot
+    // listener only fires when session data changes, but switching targets
+    // alone doesn't cause a write, so a newly-added mapped activity on the
+    // new target would otherwise never auto-fill until a write happened.
+    autoFillMappedRemarks(state.currentStudent, state.currentSessionId)
+      .then(filled => { if (filled === 0) renderTargetContent(); })
+      .catch(() => renderTargetContent());
   };
 }
 
@@ -2890,6 +2896,7 @@ function renderFedcTarget(target) {
           data-act-id="${actId || ""}"
           data-pa-name="${escHtml(pa.name)}"
           data-pa-order="${idx}"
+          data-is-mapped="${pa.isMapped ? "1" : ""}"
           data-target="${escHtml(target.name)}">+ Add Remark${pa.isMapped ? "" : " &amp; Trials"}</button>`;
       }
     }
@@ -3469,6 +3476,14 @@ function attachTargetListeners(target) {
         const paOrder = Number(btn.dataset.paOrder) || 0;
         let   actId   = btn.dataset.actId  || null;
         state.pendingNewActivity = null;
+        // Mapped activities use autoFillMappedRemarks instead of the normal
+        // path to avoid a race: addActivity's Firestore snapshot can re-enter
+        // autoFillMappedRemarks before this handler adds the remark, creating
+        // a duplicate. autoFillMappedRemarks's in-flight guard prevents that.
+        if (btn.dataset.isMapped === "1") {
+          await autoFillMappedRemarks(state.currentStudent, state.currentSessionId);
+          return; // Firestore write will trigger snapshot → re-render
+        }
         if (paName) actId = await ensureFedcActivity(target.name, paName, paOrder);
         if (!actId) { btn.disabled = false; return; }
         const initialText = "";
@@ -3756,9 +3771,6 @@ async function autoFillMappedRemarks(student, sessionId) {
         const hasRemark = Object.values(data.remarks || {}).some(r => r.activityId === actId);
         if (hasRemark) continue;
       }
-
-      const pct = resolveMappedScoreDisplay(pa, new Set()).pct;
-      if (pct === null) continue; // mapped target has no average yet — stay collapsed
 
       const key = `${sessionId}:${target.name}:${pa.name}`;
       if (mappedRemarkAutoFillInFlight.has(key)) continue;
@@ -4416,9 +4428,6 @@ async function autoFillViewMappedRemarks(student, sessionId, data) {
         if (hasRemark) continue;
       }
 
-      const pct = resolveViewMappedScoreDisplay(pa, data, new Set()).pct;
-      if (pct === null) continue;
-
       const key = `${sessionId}:${target.name}:${pa.name}`;
       if (mappedRemarkAutoFillInFlight.has(key)) continue;
       mappedRemarkAutoFillInFlight.add(key);
@@ -4469,8 +4478,6 @@ async function autoFillViewGroupMappedRemarks(group, sessionId, data) {
         const hasRemark = actId && Object.values(data.remarks || {})
           .some(r => r.activityId === actId && r.studentName === studentName);
         if (hasRemark) continue;
-        const pct = resolveViewGroupMappedScoreDisplay(pa, data, studentName, new Set()).pct;
-        if (pct === null) continue;
         const key = `${sessionId}:${target.name}:${pa.name}:${studentName}`;
         if (mappedRemarkAutoFillInFlight.has(key)) continue;
         mappedRemarkAutoFillInFlight.add(key);
@@ -6712,7 +6719,15 @@ async function closeManageModal() {
   // Refresh session dropdown / content if a session is active
   if (state.currentStudent) {
     populateTargetDropdown(state.currentStudent.targets);
-    if (state.currentSessionId) renderTargetContent();
+    if (state.currentSessionId) {
+      // Call autoFillMappedRemarks so a newly-added mapped-score activity
+      // gets its remark immediately — no Firestore session snapshot will
+      // arrive on its own here since saving the target config doesn't
+      // write to the session doc.
+      autoFillMappedRemarks(state.currentStudent, state.currentSessionId)
+        .then(filled => { if (filled === 0) renderTargetContent(); })
+        .catch(() => renderTargetContent());
+    }
   }
   // Refresh group session dropdown / content if a group session is active
   if (state.currentGroup) {
@@ -8752,8 +8767,6 @@ async function autoFillGroupMappedRemarks(group, sessionId, data, targetName, at
       const hasRemark = Object.values(data.remarks || {})
         .some(r => r.activityId === actId && r.studentName === studentName);
       if (hasRemark) continue;
-      const pct = resolveGroupMappedScoreDisplay(pa, target, data, studentName, new Set()).pct;
-      if (pct === null) continue;
       const key = `${sessionId}:${targetName}:${pa.name}:${studentName}`;
       if (mappedRemarkAutoFillInFlight.has(key)) continue;
       mappedRemarkAutoFillInFlight.add(key);
