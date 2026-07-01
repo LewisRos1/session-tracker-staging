@@ -149,10 +149,10 @@ const STYLE_ACT_HEADING = {
   fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFE4F0F8" } },
   font: { bold: true, color: { argb: "FF2A4060" } }
 };
-// Gray activity rows (mirrors the view screen's #d1d5db maintenance-activity tint)
-const STYLE_GRAY_ACT_FILL = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD1D5DB" } };
-// Gray heading rows (mirrors the view screen's #9ca3af maintenance-heading tint)
-const STYLE_GRAY_HDG_FILL = { type: "pattern", pattern: "solid", fgColor: { argb: "FF9CA3AF" } };
+// Gray activity rows — "White, Background 1, Darker 5%" (#F2F2F2)
+const STYLE_GRAY_ACT_FILL = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F2F2" } };
+// Gray heading rows — "White, Background 1, Darker 15%" (#D9D9D9)
+const STYLE_GRAY_HDG_FILL = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD9D9D9" } };
 // Daily Average: near-white blue, soft navy text
 const STYLE_DAILY_AVG = {
   fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F7FC" } },
@@ -811,11 +811,11 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
     Header, Footer, PageNumber, TabStopType
   } = docx;
 
-  // Matches the Excel per-target sheet palette (STYLE_TARGET_COLHDR / STYLE_ACT_HEADING / STYLE_NOTE).
-  const HEADER_FILL = "D9D9D9";
+  // Office theme colours: header = Darker 25%, heading = Dark Blue Text 2 Lighter 90%.
+  const HEADER_FILL = "BFBFBF";
   const HEADER_TEXT_COLOR = "000000";
-  const TARGET_FILL = "E4F0F8";
-  const TARGET_TEXT_COLOR = "2A4060";
+  const TARGET_FILL = "E9EBF0";
+  const TARGET_TEXT_COLOR = "1F3864";
   const NOTE_FILL   = "FFF8ED";
   const NOTE_TEXT_COLOR = "7A5030";
   const FACILITATION_BORDER = "B0C8E0";
@@ -894,9 +894,9 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
 
     for (const r of wordTargetRows(target, session, allTargets)) {
       if (r.merge) {
-        const mergeFill = r.isGrayHeading ? "9CA3AF"
+        const mergeFill = r.isGrayHeading ? "D9D9D9"
           : (r.style === "heading" ? TARGET_FILL : (r.style === "note" ? NOTE_FILL : null));
-        const mergeColor = r.isGrayHeading ? "111827"
+        const mergeColor = r.isGrayHeading ? "000000"
           : (r.style === "heading" ? TARGET_TEXT_COLOR : (r.style === "note" ? NOTE_TEXT_COLOR : null));
         tableRows.push(new TableRow({
           children: [cell(r.text, {
@@ -909,7 +909,7 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
           })]
         }));
       } else {
-        const grayFill = r.isGray ? "D1D5DB" : null;
+        const grayFill = r.isGray ? "F2F2F2" : null;
         tableRows.push(new TableRow({
           children: [
             r.actLines
@@ -1418,11 +1418,6 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
         continue;
       }
 
-      if (act.isMaintainSeparator) {
-        activityHeadingRows.add(rows.length);
-        const r = blankRow(); r[1] = "── Maintain ──"; rows.push(r);
-        continue;
-      }
       if (act.isMaintainHeading) {
         activityHeadingRows.add(rows.length);
         grayRows.add(rows.length);
@@ -1536,7 +1531,6 @@ function getAllActivitiesForTarget(session, target) {
   const usedIds = new Set();
   const masteredActivities = [];
   const stoppedActivities  = [];
-  const maintainActivities = [];
 
   for (const pa of (target.predefinedActivities || [])) {
     if (!pa.name && !pa.isNote && !pa.isHeading && !pa.isMaintainHeading) continue;
@@ -1549,20 +1543,20 @@ function getAllActivitiesForTarget(session, target) {
       result.push({ isHeading: true, activityName: pa.name });
       continue;
     }
-    // Gray headings (new headingColor:"gray" or legacy isMaintainHeading) → maintain section
+    // Gray headings — inline in their natural position (NOT reordered to the bottom)
     if ((pa.isHeading && pa.headingColor === "gray") || pa.isMaintainHeading) {
-      maintainActivities.push({ isMaintainHeading: true, activityName: pa.name, isGray: true });
+      result.push({ isMaintainHeading: true, activityName: pa.name, isGray: true });
       continue;
     }
-    // Fixed remark activities (new fixedRemark field or legacy isMaintain) → maintain section
+    // Fixed remark activities — inline in their natural position (NOT reordered to the bottom)
     if (pa.fixedRemark !== undefined) {
       const isGray = pa.activityColor === "gray" || !!pa.isMaintainLive;
-      maintainActivities.push({ isMaintain: true, activityName: pa.name, maintainRemark: pa.fixedRemark || "", ...(isGray ? { isGray: true } : {}) });
+      result.push({ isMaintain: true, activityName: pa.name, maintainRemark: pa.fixedRemark || "", ...(isGray ? { isGray: true } : {}) });
       continue;
     }
     if (pa.isMaintain) {
       const isGray = pa.activityColor === "gray" || !!pa.isMaintainLive;
-      maintainActivities.push({ isMaintain: true, activityName: pa.name, maintainRemark: pa.maintainRemark || "", ...(isGray ? { isGray: true } : {}) });
+      result.push({ isMaintain: true, activityName: pa.name, maintainRemark: pa.maintainRemark || "", ...(isGray ? { isGray: true } : {}) });
       continue;
     }
     if (pa.isCompleted) {
@@ -1608,10 +1602,6 @@ function getAllActivitiesForTarget(session, target) {
     result.push(act);
   }
 
-  if (maintainActivities.length > 0) {
-    result.push({ isMaintainSeparator: true, activityName: "── Maintain ──" });
-    result.push(...maintainActivities);
-  }
   if (masteredActivities.length > 0) {
     result.push({ isMasteredSeparator: true, activityName: "— Mastered —" });
     result.push(...masteredActivities);
