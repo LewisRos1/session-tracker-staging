@@ -128,7 +128,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "656";
+const APP_VERSION = "659";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4111,23 +4111,45 @@ function buildTargetViewTable(target, data) {
   let rows = "";
   if (target.predefinedActivities?.length > 0) {
     let no = 0;
+    const matchedIds = new Set();
     for (const pa of target.predefinedActivities) {
-      if (pa.isHeading) {
-        rows += `<tr class="view-heading-row"><td colspan="6" contenteditable="false">${escHtml(pa.name)}</td></tr>`;
+      if (pa.isHeading || pa.isMaintainHeading) {
+        const isGray = pa.headingColor === "gray" || pa.isMaintainHeading;
+        rows += `<tr class="view-heading-row"${isGray ? ' style="background:#9ca3af;color:#111827"' : ''}><td colspan="6" contenteditable="false">${escHtml(pa.name)}</td></tr>`;
         continue;
       }
       if (pa.isNote) {
         rows += `<tr class="view-note-row"><td colspan="6" contenteditable="false">${noteToHtml(pa.text)}</td></tr>`;
         continue;
       }
+      if (pa.fixedRemark !== undefined || pa.isMaintain) {
+        const fixedEntry = Object.entries(data.activities || {})
+          .find(([, a]) => a.targetName === target.name && a.activityName === pa.name);
+        if (fixedEntry) matchedIds.add(fixedEntry[0]);
+        const fixedText = pa.fixedRemark ?? pa.maintainRemark ?? "";
+        no++;
+        rows += `<tr style="background:#f9fafb">
+          <td class="vcol-no" contenteditable="false">${no}</td>
+          <td class="vcol-act" contenteditable="false">${formatActivityMarkup(pa.name)}</td>
+          <td class="vcol-rem" contenteditable="false" style="color:#374151;cursor:pointer"
+            onclick="alert('This is a Fixed Remark — the text is set in Edit Target and cannot be changed here.')"
+            title="Fixed Remark — click for info">${escHtml(fixedText) || "<span style='color:#9ca3af;font-style:italic'>No remark set</span>"}</td>
+          <td class="vcol-trials" contenteditable="false"><span class="view-mapped-label" style="color:#9ca3af;font-style:italic">Fixed Remark</span></td>
+          <td class="vcol-total" contenteditable="false">&nbsp;</td>
+          <td class="vcol-score" contenteditable="false">&nbsp;</td>
+        </tr>`;
+        continue;
+      }
       no++;
       const entry = Object.entries(data.activities || {})
         .find(([, a]) => a.targetName === target.name && a.activityName === pa.name);
+      if (entry) matchedIds.add(entry[0]);
       rows += viewActivityRows(no, pa.name, entry?.[0] || null, data, target, true);
     }
-    // manual (non-predefined) activities added during session
+    // All unmatched session activities — covers both manually-added activities
+    // AND predefined activities recorded under old names before a rename.
     Object.entries(data.activities || {})
-      .filter(([, a]) => a.targetName === target.name && !a.isPredefined)
+      .filter(([actId, a]) => a.targetName === target.name && !matchedIds.has(actId))
       .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
       .forEach(([actId, act]) => {
         no++;
@@ -4206,9 +4228,10 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
   const multiSelect     = paEntry?.optionsMulti || false;
   const remarkHasNote   = paEntry?.remarkHasNote || false;
   const mappedInfo      = paEntry?.isMapped ? resolveViewMappedScoreDisplay(paEntry, data) : null;
+  const isGrayAct       = isPredefined && (paEntry?.activityColor === "gray" || paEntry?.isMaintainLive);
+  const rowStyle        = isGrayAct ? "background:#f3f4f6" : "";
 
   if (remarks.length === 0) {
-    // For free-text remark types (no preset opts), show a clickable empty input
     const opts = parseOpts(inlineOptions);
     const showEmpty = opts.length === 0;
     if (showEmpty) {
@@ -4217,23 +4240,12 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
            data-act-name="${escHtml(actName)}"
            data-target="${escHtml(target.name)}"
            data-is-predefined="${isPredefined}"></textarea>`;
-      // "+ " shows even with no remark yet — clicking it creates the activity/
-      // remark and a first trial in one go, so a score can be logged without
-      // first having to type something into the remark box. Mapped-score
-      // activities have no trials at all, so they skip this button entirely —
-      // typing into the empty box above is the only way to create the remark.
-      // No score/label shown here even though mappedInfo resolves to a real
-      // percentage — that percentage is the mapped TARGET's own average, which
-      // exists independently of whether THIS activity has any remark yet, so
-      // showing it here would look like this row already has live data when
-      // it actually contributes nothing until a remark exists (matches the
-      // group screen's equivalent empty case, which already left this blank).
       const addTrialBtn = mappedInfo
         ? ""
         : `<button class="view-add-trial-new" data-act-id="${escHtml(actId || "")}"
         data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
         data-is-predefined="${isPredefined}">+</button>`;
-      return `<tr>
+      return `<tr${rowStyle ? ` style="${rowStyle}"` : ""}>
         <td class="vcol-no" contenteditable="false">${no}</td>
         <td class="vcol-act" contenteditable="false">${actCell}</td>
         <td class="vcol-rem">${emptyCell}</td>
@@ -4242,22 +4254,37 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
         <td class="vcol-score" contenteditable="false">&nbsp;</td>
       </tr>`;
     }
-    // Preset-option / sentence-starter activities have no typeable
-    // empty box (there's no free text to click into), so without an explicit
-    // button here the Remark cell was just blank with no way to create the
-    // first remark at all.
-    const addRowLabel = opts.length > 0
-      ? "+ Show Selections"
-      : `+ Add Remark${mappedInfo ? "" : " &amp; Trials"}`;
-    return `<tr>
+    // opts.length > 0 — show actual select/multi UI directly (no button)
+    let emptySelHtml;
+    if (multiSelect) {
+      emptySelHtml = `<div class="view-remark-multi-opts" contenteditable="false">${opts.map(opt =>
+        `<button class="view-multi-create-btn" data-opt="${escHtml(opt)}"
+          data-act-id="${escHtml(actId || "")}" data-act-name="${escHtml(actName)}"
+          data-target-name="${escHtml(target.name)}" data-is-predefined="${isPredefined}">${escHtml(opt)}</button>`
+      ).join("")}</div>`;
+    } else {
+      emptySelHtml = `<select class="view-preset-create-sel"
+          data-act-id="${escHtml(actId || "")}" data-act-name="${escHtml(actName)}"
+          data-target-name="${escHtml(target.name)}" data-is-predefined="${isPredefined}">
+        <option value="">— select —</option>
+        ${opts.map(opt => `<option value="${escHtml(opt)}">${escHtml(opt)}</option>`).join("")}
+      </select>`;
+    }
+    const emptyRemCell = sentenceStarter
+      ? `<div class="view-starter-wrap" contenteditable="false">
+          <span class="view-starter-prefix">${escHtml(sentenceStarter)}</span>${emptySelHtml}
+        </div>`
+      : emptySelHtml;
+    const emptyTrialBtn = mappedInfo
+      ? `<span class="view-mapped-label">${escHtml(mappedInfo.label)}</span>`
+      : `<button class="view-add-trial-new" data-act-id="${escHtml(actId || "")}"
+          data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
+          data-is-predefined="${isPredefined}">+</button>`;
+    return `<tr${rowStyle ? ` style="${rowStyle}"` : ""}>
       <td class="vcol-no" contenteditable="false">${no}</td>
       <td class="vcol-act" contenteditable="false">${actCell}</td>
-      <td class="vcol-rem" contenteditable="false">
-        <button class="view-add-remark-row" data-act-id="${escHtml(actId || "")}"
-          data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
-          data-is-predefined="${isPredefined}">${addRowLabel}</button>
-      </td>
-      <td class="vcol-trials" contenteditable="false">&nbsp;</td>
+      <td class="vcol-rem">${emptyRemCell}</td>
+      <td class="vcol-trials" contenteditable="false">${emptyTrialBtn}</td>
       <td class="vcol-total" contenteditable="false">&nbsp;</td>
       <td class="vcol-score" contenteditable="false">${mappedInfo ? (mappedInfo.pct !== null ? mappedInfo.pct + "%" : "—") : "&nbsp;"}</td>
     </tr>`;
@@ -4265,7 +4292,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
   return remarks.map((rem, ri) => viewRemarkRow(
     ri === 0 ? no : null,
     ri === 0 ? actCell : null,
-    rem, target, inlineOptions, sentenceStarter, multiSelect, mappedInfo, remarkHasNote
+    rem, target, inlineOptions, sentenceStarter, multiSelect, mappedInfo, remarkHasNote, rowStyle
   )).join("");
 }
 
@@ -4295,7 +4322,7 @@ function buildTrialCellsHtml(rem, maxPts) {
     `<button class="view-add-trial" data-rem-id="${escHtml(rem.id)}">+</button>`;
 }
 
-function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false) {
+function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false, rowStyle = "") {
   const maxPts = target.maxPoints || 3;
   const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts);
   const trialCells = mappedInfo
@@ -4339,8 +4366,8 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
   if (sentenceStarter) {
     const starterTopRow = `<span class="view-starter-prefix">${escHtml(sentenceStarter)}</span>
       ${makeViewOpts(rem.id, rem.text)
-        || `<input type="text" class="view-starter-input" data-rem-id="${escHtml(rem.id)}"
-            value="${escHtml(rem.text || "")}">`
+        || `<textarea class="view-starter-input" data-rem-id="${escHtml(rem.id)}"
+            rows="1" style="overflow-y:hidden">${escHtml(rem.text || "")}</textarea>`
       }`;
     remarkCell = remarkHasNote
       ? `<div class="view-starter-wrap view-starter-wrap-note" contenteditable="false">
@@ -4352,7 +4379,7 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
     remarkCell = optSelect;
   }
 
-  return `<tr>
+  return `<tr${rowStyle ? ` style="${rowStyle}"` : ""}>
     <td class="vcol-no" contenteditable="false">${no !== null ? no : ""}</td>
     <td class="vcol-act" contenteditable="false">${actName !== null ? actName : ""}</td>
     <td class="vcol-rem">${remarkCell}</td>
@@ -5167,6 +5194,76 @@ function attachViewListeners() {
     });
   });
 
+  // Inline select/multi for preset activities with no remark yet (replaces "+ Show Selections")
+  body.querySelectorAll(".view-preset-create-sel").forEach(sel => {
+    sel.addEventListener("change", () => {
+      if (!sel.value) return;
+      const data = state.viewSessionData;
+      const targetName = sel.dataset.targetName;
+      const actName = sel.dataset.actName;
+      const isPredef = sel.dataset.isPredefined === "true";
+      const isNewAct = !sel.dataset.actId;
+      const actId = sel.dataset.actId || generateId("a");
+      const remId = generateId("r");
+      const order = Date.now();
+      const val = sel.value;
+      data.activities = data.activities || {};
+      data.remarks = data.remarks || {};
+      if (isNewAct) data.activities[actId] = { targetName, activityName: actName, order, isPredefined: isPredef };
+      data.remarks[remId] = { activityId: actId, text: val, trials: [], order };
+      renderSessionView();
+      (async () => {
+        try {
+          if (isNewAct) await addActivity(state.viewSessionId, targetName, actName, order, isPredef, actId);
+          await addRemark(state.viewSessionId, actId, val, null, remId);
+        } catch (err) {
+          if (isNewAct) delete data.activities[actId];
+          delete data.remarks[remId];
+          renderSessionView();
+          alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
+        }
+      })();
+    });
+  });
+
+  body.querySelectorAll(".view-multi-create-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const data = state.viewSessionData;
+      const targetName = btn.dataset.targetName;
+      const actName = btn.dataset.actName;
+      const isPredef = btn.dataset.isPredefined === "true";
+      const isNewAct = !btn.dataset.actId;
+      const actId = btn.dataset.actId || generateId("a");
+      const remId = generateId("r");
+      const order = Date.now();
+      const val = btn.dataset.opt;
+      data.activities = data.activities || {};
+      data.remarks = data.remarks || {};
+      if (isNewAct) data.activities[actId] = { targetName, activityName: actName, order, isPredefined: isPredef };
+      data.remarks[remId] = { activityId: actId, text: val, trials: [], order };
+      renderSessionView();
+      (async () => {
+        try {
+          if (isNewAct) await addActivity(state.viewSessionId, targetName, actName, order, isPredef, actId);
+          await addRemark(state.viewSessionId, actId, val, null, remId);
+        } catch (err) {
+          if (isNewAct) delete data.activities[actId];
+          delete data.remarks[remId];
+          renderSessionView();
+          alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
+        }
+      })();
+    });
+  });
+
+  // Auto-expand remark/starter textareas based on content height
+  body.querySelectorAll(".view-remark-edit, .view-starter-input").forEach(ta => {
+    if (ta.tagName !== "TEXTAREA") return;
+    const expand = () => { ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; };
+    expand();
+    ta.addEventListener("input", expand);
+  });
+
   body.querySelectorAll(".view-act-edit").forEach(input => {
     input.addEventListener("blur", async () => {
       const newName = input.value.trim();
@@ -5405,22 +5502,44 @@ function buildGroupTargetViewTable(target, data, attendees) {
   let rows = "";
   if (target.predefinedActivities?.length > 0) {
     let no = 0;
+    const matchedIds = new Set();
     for (const pa of target.predefinedActivities) {
-      if (pa.isHeading) {
-        rows += `<tr class="view-heading-row"><td colspan="7" contenteditable="false">${escHtml(pa.name)}</td></tr>`;
+      if (pa.isHeading || pa.isMaintainHeading) {
+        const isGray = pa.headingColor === "gray" || pa.isMaintainHeading;
+        rows += `<tr class="view-heading-row"${isGray ? ' style="background:#9ca3af;color:#111827"' : ''}><td colspan="7" contenteditable="false">${escHtml(pa.name)}</td></tr>`;
         continue;
       }
       if (pa.isNote) {
         rows += `<tr class="view-note-row"><td colspan="7" contenteditable="false">${noteToHtml(pa.text)}</td></tr>`;
         continue;
       }
+      if (pa.fixedRemark !== undefined || pa.isMaintain) {
+        const fixedEntry = Object.entries(data.activities || {})
+          .find(([, a]) => a.targetName === target.name && a.activityName === pa.name);
+        if (fixedEntry) matchedIds.add(fixedEntry[0]);
+        const fixedText = pa.fixedRemark ?? pa.maintainRemark ?? "";
+        no++;
+        rows += `<tr style="background:#f9fafb">
+          <td class="vcol-no" contenteditable="false">${no}</td>
+          <td class="vcol-act" contenteditable="false">${formatActivityMarkup(pa.name)}</td>
+          <td class="vcol-student" contenteditable="false">—</td>
+          <td class="vcol-rem" contenteditable="false" style="color:#6b7280;font-style:italic">${escHtml(fixedText) || "—"}</td>
+          <td class="vcol-trials" contenteditable="false">—</td>
+          <td class="vcol-total" contenteditable="false">—</td>
+          <td class="vcol-score" contenteditable="false">—</td>
+        </tr>`;
+        continue;
+      }
       no++;
       const entry = Object.entries(data.activities || {})
         .find(([, a]) => a.targetName === target.name && a.activityName === pa.name);
+      if (entry) matchedIds.add(entry[0]);
       rows += viewGroupActivityRows(no, pa.name, entry?.[0] || null, data, target, attendees, true);
     }
+    // All unmatched session activities — covers both manually-added activities
+    // AND predefined activities recorded under old names before a rename.
     Object.entries(data.activities || {})
-      .filter(([, a]) => a.targetName === target.name && !a.isPredefined)
+      .filter(([actId, a]) => a.targetName === target.name && !matchedIds.has(actId))
       .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
       .forEach(([actId, act]) => {
         no++;
@@ -5550,19 +5669,12 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
   const multiSelect     = paEntry?.optionsMulti || false;
   const remarkHasNote   = paEntry?.remarkHasNote || false;
   const opts            = parseOpts(inlineOptions);
+  const isGrayAct       = isPredefined && (paEntry?.activityColor === "gray" || paEntry?.isMaintainLive);
+  const rowStyle        = isGrayAct ? "background:#f3f4f6" : "";
 
   if (rounds.length === 0) {
-    // Free-text activities (no presets): show a ready-to-type empty box per
-    // attendee, like the individual screen does, instead of a generic "+ Add
-    // Remark & Trials" bulk button — this activity is already in "Separate
-    // Remarks" mode, so each student gets their own row from the start.
-    const showEmpty = opts.length === 0;
-
-    if (showEmpty) {
-      // "+ " shows even with no remark yet — see the individual screen's
-      // viewActivityRows for why (lets a score be logged without first
-      // typing a remark).
-      return attendees.map((studentName, idx) => `<tr>
+    if (opts.length === 0) {
+      return attendees.map((studentName, idx) => `<tr${rowStyle ? ` style="${rowStyle}"` : ""}>
         <td class="vcol-no" contenteditable="false">${idx === 0 ? no : ""}</td>
         <td class="vcol-act" contenteditable="false">${idx === 0 ? actCellWithToggle : ""}</td>
         <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(studentName)}</td>
@@ -5584,19 +5696,42 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
       </tr>`).join("");
     }
 
-    const addAllLabel = opts.length > 0 ? "+ Show Selections" : "+ Add Remark &amp; Trials";
-    return `<tr>
-      <td class="vcol-no" contenteditable="false">${no}</td>
-      <td class="vcol-act" contenteditable="false">${actCellWithToggle}</td>
-      <td class="vcol-student" contenteditable="false"></td>
-      <td class="vcol-rem" contenteditable="false">
-        <button class="btn-view-group-add-remark-all" data-act-id="${escHtml(actId || "")}"
-          data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}">${addAllLabel}</button>
-      </td>
-      <td class="vcol-trials" contenteditable="false">&nbsp;</td>
-      <td class="vcol-total" contenteditable="false">&nbsp;</td>
-      <td class="vcol-score" contenteditable="false">&nbsp;</td>
-    </tr>`;
+    // opts.length > 0 — show per-attendee select/multi UI directly
+    return attendees.map((studentName, idx) => {
+      let gSelHtml;
+      if (multiSelect) {
+        gSelHtml = `<div class="view-remark-multi-opts" contenteditable="false">${opts.map(opt =>
+          `<button class="view-group-multi-create-btn" data-opt="${escHtml(opt)}"
+            data-act-id="${escHtml(actId || "")}" data-act-name="${escHtml(actName)}"
+            data-target-name="${escHtml(target.name)}" data-student="${escHtml(studentName)}">${escHtml(opt)}</button>`
+        ).join("")}</div>`;
+      } else {
+        gSelHtml = `<select class="view-group-preset-create-sel"
+            data-act-id="${escHtml(actId || "")}" data-act-name="${escHtml(actName)}"
+            data-target-name="${escHtml(target.name)}" data-student="${escHtml(studentName)}">
+          <option value="">— select —</option>
+          ${opts.map(opt => `<option value="${escHtml(opt)}">${escHtml(opt)}</option>`).join("")}
+        </select>`;
+      }
+      const gRemCell = sentenceStarter
+        ? `<div class="view-starter-wrap" contenteditable="false">
+            <span class="view-starter-prefix">${escHtml(sentenceStarter)}</span>${gSelHtml}
+          </div>`
+        : gSelHtml;
+      return `<tr${rowStyle ? ` style="${rowStyle}"` : ""}>
+        <td class="vcol-no" contenteditable="false">${idx === 0 ? no : ""}</td>
+        <td class="vcol-act" contenteditable="false">${idx === 0 ? actCellWithToggle : ""}</td>
+        <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(studentName)}</td>
+        <td class="vcol-rem">${gRemCell}</td>
+        <td class="vcol-trials" contenteditable="false">
+          <button class="view-group-add-trial-new" data-act-id="${escHtml(actId || "")}"
+            data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
+            data-is-predefined="${isPredefined}" data-student="${escHtml(studentName)}">+</button>
+        </td>
+        <td class="vcol-total" contenteditable="false">&nbsp;</td>
+        <td class="vcol-score" contenteditable="false">&nbsp;</td>
+      </tr>`;
+    }).join("");
   }
 
   let firstRowOverall = true;
@@ -5618,7 +5753,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
         // preset-option/sentence-starter activities (which have no typeable
         // free text) still need an explicit button.
         if (opts.length === 0) {
-          html += `<tr>
+          html += `<tr${rowStyle ? ` style="${rowStyle}"` : ""}>
             <td class="vcol-no" contenteditable="false">${noVal !== null ? noVal : ""}</td>
             <td class="vcol-act" contenteditable="false">${actVal !== null ? actVal : ""}</td>
             <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(entry.studentName)}</td>
@@ -5641,14 +5776,32 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
           firstRowOverall = false;
           continue;
         }
-        html += `<tr>
+        // opts.length > 0 — show inline select/multi UI directly
+        let pSelHtml;
+        if (multiSelect) {
+          pSelHtml = `<div class="view-remark-multi-opts" contenteditable="false">${opts.map(opt =>
+            `<button class="view-group-multi-create-btn" data-opt="${escHtml(opt)}"
+              data-act-id="${escHtml(actId || "")}" data-act-name="${escHtml(actName)}"
+              data-target-name="${escHtml(target.name)}" data-student="${escHtml(entry.studentName)}">${escHtml(opt)}</button>`
+          ).join("")}</div>`;
+        } else {
+          pSelHtml = `<select class="view-group-preset-create-sel"
+              data-act-id="${escHtml(actId || "")}" data-act-name="${escHtml(actName)}"
+              data-target-name="${escHtml(target.name)}" data-student="${escHtml(entry.studentName)}">
+            <option value="">— select —</option>
+            ${opts.map(opt => `<option value="${escHtml(opt)}">${escHtml(opt)}</option>`).join("")}
+          </select>`;
+        }
+        const pRemCell = sentenceStarter
+          ? `<div class="view-starter-wrap" contenteditable="false">
+              <span class="view-starter-prefix">${escHtml(sentenceStarter)}</span>${pSelHtml}
+            </div>`
+          : pSelHtml;
+        html += `<tr${rowStyle ? ` style="${rowStyle}"` : ""}>
           <td class="vcol-no" contenteditable="false">${noVal !== null ? noVal : ""}</td>
           <td class="vcol-act" contenteditable="false">${actVal !== null ? actVal : ""}</td>
           <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(entry.studentName)}</td>
-          <td class="vcol-rem" contenteditable="false">
-            <button class="btn-view-group-add-remark-pending" data-act-id="${escHtml(actId || "")}"
-              data-student="${escHtml(entry.studentName)}">${opts.length > 0 ? "+ Show Selections" : "+ Add Remark &amp; Trials"}</button>
-          </td>
+          <td class="vcol-rem">${pRemCell}</td>
           <td class="vcol-trials" contenteditable="false">&nbsp;</td>
           <td class="vcol-total" contenteditable="false">&nbsp;</td>
           <td class="vcol-score" contenteditable="false">&nbsp;</td>
@@ -5665,7 +5818,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
 
       html += viewGroupRemarkRow(
         noVal, actVal, entry.studentName, entry, target,
-        inlineOptions, sentenceStarter, multiSelect, combineOpts, null, remarkHasNote
+        inlineOptions, sentenceStarter, multiSelect, combineOpts, null, remarkHasNote, rowStyle
       );
       firstRowOverall = false;
     }
@@ -5673,7 +5826,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
   return html;
 }
 
-function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, combineOpts = null, mappedInfo = null, remarkHasNote = false) {
+function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, combineOpts = null, mappedInfo = null, remarkHasNote = false, rowStyle = "") {
   const maxPts = target.maxPoints || 3;
   const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts);
   const trialCells = mappedInfo
@@ -5729,8 +5882,8 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
       if (sentenceStarter) {
         const starterTopRow = `<span class="view-starter-prefix">${escHtml(sentenceStarter)}</span>
           ${makeViewOpts(rem.id, rem.text)
-            || `<input type="text" class="view-starter-input" data-rem-id="${escHtml(rem.id)}"
-                value="${escHtml(rem.text || "")}">`
+            || `<textarea class="view-starter-input" data-rem-id="${escHtml(rem.id)}"
+                rows="1" style="overflow-y:hidden">${escHtml(rem.text || "")}</textarea>`
           }`;
         remarkCell = remarkHasNote
           ? `<div class="view-starter-wrap view-starter-wrap-note" contenteditable="false">
@@ -5745,7 +5898,7 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
     }
   }
 
-  return `<tr>
+  return `<tr${rowStyle ? ` style="${rowStyle}"` : ""}>
     <td class="vcol-no" contenteditable="false">${no !== null ? no : ""}</td>
     <td class="vcol-act" contenteditable="false">${actName !== null ? actName : ""}</td>
     <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(studentName)}</td>
@@ -6098,6 +6251,84 @@ function attachGroupViewListeners() {
         }
       })();
     });
+  });
+
+  // Inline select/multi for group preset activities with no remark yet
+  body.querySelectorAll(".view-group-preset-create-sel").forEach(sel => {
+    sel.addEventListener("change", () => {
+      if (!sel.value) return;
+      const data = state.viewGroupSessionData;
+      const targetName = sel.dataset.targetName;
+      const actName = sel.dataset.actName;
+      const studentName = sel.dataset.student;
+      const val = sel.value;
+      data.activities = data.activities || {};
+      data.remarks = data.remarks || {};
+      let actId = sel.dataset.actId || Object.entries(data.activities)
+        .find(([, a]) => a.targetName === targetName && a.activityName === actName)?.[0] || null;
+      const isNewAct = !actId;
+      const actOrder = Date.now();
+      if (isNewAct) {
+        actId = generateId("a");
+        data.activities[actId] = { targetName, activityName: actName, order: actOrder, isPredefined: true };
+      }
+      const remId = generateId("r");
+      data.remarks[remId] = { activityId: actId, studentName, text: val, trials: [], order: actOrder };
+      renderGroupSessionView();
+      (async () => {
+        try {
+          if (isNewAct) await addActivity(sid(), targetName, actName, actOrder, true, actId);
+          await addGroupRemark(sid(), actId, studentName, val, remId);
+        } catch (err) {
+          if (isNewAct) delete data.activities[actId];
+          delete data.remarks[remId];
+          renderGroupSessionView();
+          alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
+        }
+      })();
+    });
+  });
+
+  body.querySelectorAll(".view-group-multi-create-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const data = state.viewGroupSessionData;
+      const targetName = btn.dataset.targetName;
+      const actName = btn.dataset.actName;
+      const studentName = btn.dataset.student;
+      const val = btn.dataset.opt;
+      data.activities = data.activities || {};
+      data.remarks = data.remarks || {};
+      let actId = btn.dataset.actId || Object.entries(data.activities)
+        .find(([, a]) => a.targetName === targetName && a.activityName === actName)?.[0] || null;
+      const isNewAct = !actId;
+      const actOrder = Date.now();
+      if (isNewAct) {
+        actId = generateId("a");
+        data.activities[actId] = { targetName, activityName: actName, order: actOrder, isPredefined: true };
+      }
+      const remId = generateId("r");
+      data.remarks[remId] = { activityId: actId, studentName, text: val, trials: [], order: actOrder };
+      renderGroupSessionView();
+      (async () => {
+        try {
+          if (isNewAct) await addActivity(sid(), targetName, actName, actOrder, true, actId);
+          await addGroupRemark(sid(), actId, studentName, val, remId);
+        } catch (err) {
+          if (isNewAct) delete data.activities[actId];
+          delete data.remarks[remId];
+          renderGroupSessionView();
+          alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
+        }
+      })();
+    });
+  });
+
+  // Auto-expand remark/starter textareas in group view
+  body.querySelectorAll(".view-remark-edit, .view-starter-input").forEach(ta => {
+    if (ta.tagName !== "TEXTAREA") return;
+    const expand = () => { ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; };
+    expand();
+    ta.addEventListener("input", expand);
   });
 
   // "+" under Trials with no remark yet — creates the activity/remark for

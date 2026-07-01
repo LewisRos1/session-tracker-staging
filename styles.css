@@ -2186,6 +2186,9 @@ div.admin-note-editable:empty::before {
   font-family: var(--font);
   background: var(--white);
   min-width: 0;
+  resize: none;
+  overflow-y: hidden;
+  min-height: 1.6rem;
 }
 
 /* ─── Target notes (session screen) ─────────────────────── */
@@ -2718,6 +2721,7 @@ div.admin-note-editable:empty::before {
   white-space: pre-wrap;
   word-break: break-word;
   min-height: 1.8rem;
+  overflow-y: hidden;
   cursor: text;
 }
 .view-remark-edit:focus,

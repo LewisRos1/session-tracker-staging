@@ -149,6 +149,8 @@ const STYLE_ACT_HEADING = {
   fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFE4F0F8" } },
   font: { bold: true, color: { argb: "FF2A4060" } }
 };
+// Gray activity/heading rows (mirrors the UI's #f3f4f6 maintenance-activity tint)
+const STYLE_GRAY_FILL = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
 // Daily Average: near-white blue, soft navy text
 const STYLE_DAILY_AVG = {
   fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F7FC" } },
@@ -394,7 +396,7 @@ function addIndividualTargetSheets(wb, allTargets, sessions, studentName, includ
   const avgColLet = includeTrials ? "F" : "E";
 
   for (const target of allTargets) {
-    const { rows, monthHeaderRows, colHeaderRows, activityHeadingRows, noteRows, sessionDateBlocks, spacerRows } =
+    const { rows, monthHeaderRows, colHeaderRows, activityHeadingRows, noteRows, sessionDateBlocks, spacerRows, grayRows } =
       buildTargetSheet(target, sessions, allTargets, includeTrials);
     const ws = wb.addWorksheet(target.name.slice(0, 31));
     rows.forEach(row => ws.addRow(row));
@@ -447,6 +449,14 @@ function addIndividualTargetSheets(wb, allTargets, sessions, studentName, includ
       cell.fill      = STYLE_ACT_HEADING.fill;
       cell.font      = STYLE_ACT_HEADING.font;
       cell.alignment = { vertical: "top" };
+    }
+
+    // Gray activity rows (activityColor:"gray" or isMaintainLive): light gray tint across all cols.
+    // Applied after activityHeadingRows so gray maintenance headings override the blue fill.
+    for (const rowIdx of grayRows) {
+      const n = rowIdx + 1;
+      const rowObj = ws.getRow(n);
+      for (let c = 1; c <= numCols; c++) rowObj.getCell(c).fill = STYLE_GRAY_FILL;
     }
 
     // Note rows: same column span as activity headings above.
@@ -720,7 +730,7 @@ function wordTargetRows(target, session, allTargets) {
     }
 
     if (act.isMaintainHeading) {
-      rows.push({ merge: true, text: act.activityName, style: "heading" });
+      rows.push({ merge: true, text: act.activityName, style: "heading", isGrayHeading: true });
       continue;
     }
 
@@ -735,7 +745,7 @@ function wordTargetRows(target, session, allTargets) {
     const activityLabel = act.activityName;
 
     if (act.empty) {
-      rows.push({ cells: [activityLabel, "", ""], actLines: parseInlineMarkup(activityLabel) });
+      rows.push({ cells: [activityLabel, "", ""], actLines: parseInlineMarkup(activityLabel), isGray: act.isGray });
       continue;
     }
 
@@ -745,7 +755,7 @@ function wordTargetRows(target, session, allTargets) {
     )?.sentenceStarter || null;
 
     if (remarks.length === 0) {
-      rows.push({ cells: [activityLabel, "", ""], actLines: parseInlineMarkup(activityLabel) });
+      rows.push({ cells: [activityLabel, "", ""], actLines: parseInlineMarkup(activityLabel), isGray: act.isGray });
       continue;
     }
 
@@ -760,7 +770,8 @@ function wordTargetRows(target, session, allTargets) {
       rows.push({
         cells: [first ? activityLabel : "", "", remarkAvg !== null ? pct(remarkAvg) : ""],
         actLines: first ? parseInlineMarkup(activityLabel) : null,
-        remarkLines: buildRemarkLines(starter, text, masteryNote)
+        remarkLines: buildRemarkLines(starter, text, masteryNote),
+        isGray: act.isGray
       });
       first = false;
     }
@@ -883,26 +894,31 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
 
     for (const r of wordTargetRows(target, session, allTargets)) {
       if (r.merge) {
+        const mergeFill = r.isGrayHeading ? "F3F4F6"
+          : (r.style === "heading" ? TARGET_FILL : (r.style === "note" ? NOTE_FILL : null));
+        const mergeColor = r.isGrayHeading ? "111827"
+          : (r.style === "heading" ? TARGET_TEXT_COLOR : (r.style === "note" ? NOTE_TEXT_COLOR : null));
         tableRows.push(new TableRow({
           children: [cell(r.text, {
             colSpan: 3,
             width: WORD_COL_TOTAL,
             bold: r.style === "heading",
             italics: r.style === "note",
-            fill: r.style === "heading" ? TARGET_FILL : (r.style === "note" ? NOTE_FILL : null),
-            color: r.style === "heading" ? TARGET_TEXT_COLOR : (r.style === "note" ? NOTE_TEXT_COLOR : null)
+            fill: mergeFill,
+            color: mergeColor
           })]
         }));
       } else {
+        const grayFill = r.isGray ? "F3F4F6" : null;
         tableRows.push(new TableRow({
           children: [
             r.actLines
-              ? richCell(r.actLines, { align: AlignmentType.LEFT, width: WORD_COL_ACTIVITY })
-              : cell(r.cells[0], { align: AlignmentType.LEFT, width: WORD_COL_ACTIVITY }),
+              ? richCell(r.actLines, { align: AlignmentType.LEFT, width: WORD_COL_ACTIVITY, fill: grayFill })
+              : cell(r.cells[0], { align: AlignmentType.LEFT, width: WORD_COL_ACTIVITY, fill: grayFill }),
             r.remarkLines
-              ? richCell(r.remarkLines, { align: AlignmentType.LEFT, width: WORD_COL_REMARK })
-              : cell(r.cells[1], { align: AlignmentType.LEFT, width: WORD_COL_REMARK }),
-            cell(r.cells[2], { align: AlignmentType.CENTER, width: WORD_COL_SCORE })
+              ? richCell(r.remarkLines, { align: AlignmentType.LEFT, width: WORD_COL_REMARK, fill: grayFill })
+              : cell(r.cells[1], { align: AlignmentType.LEFT, width: WORD_COL_REMARK, fill: grayFill }),
+            cell(r.cells[2], { align: AlignmentType.CENTER, width: WORD_COL_SCORE, fill: grayFill })
           ]
         }));
       }
@@ -1301,6 +1317,7 @@ function buildTargetSheet(target, sessions, allTargets, includeTrials) {
   const colHeaderRows     = new Set();
   const activityHeadingRows = new Set();
   const noteRows          = new Set();
+  const grayRows          = new Set();
   const sessionDateBlocks = []; // { startRow, endRow, dateLabel, avgScore }
   const spacerRows        = new Set(); // blank rows that should have no borders
   let firstMonth = true;
@@ -1345,11 +1362,11 @@ function buildTargetSheet(target, sessions, allTargets, includeTrials) {
 
       const snap = (session.targetsSnapshot || []).find(t => t.name === target.name);
       const effectiveTarget = snap ? { ...target, maxPoints: snap.maxPoints } : target;
-      appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRows, session, effectiveTarget, allTargets, includeTrials);
+      appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRows, grayRows, session, effectiveTarget, allTargets, includeTrials);
     }
   }
 
-  return { rows, monthHeaderRows, colHeaderRows, activityHeadingRows, noteRows, sessionDateBlocks, spacerRows };
+  return { rows, monthHeaderRows, colHeaderRows, activityHeadingRows, noteRows, grayRows, sessionDateBlocks, spacerRows };
 }
 
 // ─── SESSION ROWS ────────────────────────────────────────────
@@ -1363,7 +1380,7 @@ function trialsList(trials) {
   return (trials || []).map(t => (t === -1 ? "—" : t)).join(", ");
 }
 
-function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRows, session, target, allTargets, includeTrials) {
+function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRows, grayRows, session, target, allTargets, includeTrials) {
   const blankRow = () => (includeTrials ? ["", "", "", "", "", ""] : ["", "", "", "", ""]);
   const [, m, d] = session.date.split("-").map(Number);
   const shortMonths = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -1403,6 +1420,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
       }
       if (act.isMaintainHeading) {
         activityHeadingRows.add(rows.length);
+        grayRows.add(rows.length);
         const r = blankRow(); r[1] = act.activityName; rows.push(r);
         continue;
       }
@@ -1445,6 +1463,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
       }
 
       if (act.empty) {
+        if (act.isGray) grayRows.add(rows.length);
         const r = blankRow(); r[1] = activityCell; rows.push(r);
         continue;
       }
@@ -1455,6 +1474,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
       )?.sentenceStarter || null;
 
       if (remarks.length === 0) {
+        if (act.isGray) grayRows.add(rows.length);
         const r = blankRow(); r[1] = activityCell; rows.push(r);
         continue;
       }
@@ -1463,6 +1483,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
 
       let firstRemark = true;
       for (const rem of remarks) {
+        if (act.isGray) grayRows.add(rows.length);
         const validTrials = (rem.trials || []).filter(t => t !== -1);
         const remarkAvg   = act.isMapped ? mappedScore : calcRemarkAvg(validTrials, target.maxPoints);
         const masteryNote = stripRemarkHtml(rem.masteryNote || "");
@@ -1557,13 +1578,14 @@ function getAllActivitiesForTarget(session, target) {
       continue;
     }
     const sessionAct = sessionActs.find(a => a.activityName === pa.name && a.isPredefined);
+    const grayProps = (pa.activityColor === "gray" || pa.isMaintainLive) ? { isGray: true } : {};
     if (sessionAct) {
       usedIds.add(sessionAct.id);
-      result.push(pa.isMapped ? { ...sessionAct, isMapped: true, mappedTargetId: pa.mappedTargetId || null } : sessionAct);
+      result.push(pa.isMapped ? { ...sessionAct, isMapped: true, mappedTargetId: pa.mappedTargetId || null, ...grayProps } : { ...sessionAct, ...grayProps });
     } else {
       result.push({
         id: null, activityName: pa.name, isPredefined: true, empty: true,
-        isMapped: pa.isMapped || false, mappedTargetId: pa.mappedTargetId || null
+        isMapped: pa.isMapped || false, mappedTargetId: pa.mappedTargetId || null, ...grayProps
       });
     }
   }
