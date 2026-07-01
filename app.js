@@ -128,28 +128,41 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "643";
+const APP_VERSION = "644";
 
-// TEMP v643 — one-shot dedup helper; remove after use
-window.dedupStudentTarget = async (studentName, targetName) => {
-  const student = state.students.find(s => s.name === studentName);
-  if (!student) { console.error("Student not found:", studentName); return; }
-  const target = student.targets.find(t => t.name === targetName);
-  if (!target) { console.error("Target not found:", targetName); return; }
-  const before = (target.predefinedActivities || []).length;
-  const seen = new Set();
-  target.predefinedActivities = (target.predefinedActivities || []).filter(a => {
-    const key = a.id || JSON.stringify(a);
-    if (seen.has(key)) return false;
-    seen.add(key); return true;
-  });
-  target.predefinedActivities.forEach((a, i) => a.order = i);
-  const after = target.predefinedActivities.length;
-  console.log(`Deduped: ${before} → ${after} items. Saving…`);
-  const si = state.students.findIndex(s => s.id === student.id);
-  if (si >= 0) state.students[si] = student;
-  await saveStudent(student);
-  console.log("Done! Reload the Edit Target modal to see the cleaned list.");
+// TEMP v644 — session data cleanup; remove after use
+window.cleanupLiamSessions = async () => {
+  const student = state.students.find(s => s.name === "Liam Chua");
+  if (!student) { console.error("Student not found"); return; }
+  const targetName = "Learning Support";
+  console.log("Loading all sessions…");
+  const sessions = await getAllSessionsForStudent(student.id);
+  console.log(`Found ${sessions.length} sessions. Scanning for extra empty remarks in "${targetName}"…`);
+  const strip = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
+  let totalDeleted = 0;
+  for (const session of sessions) {
+    const actIds = Object.entries(session.activities || {})
+      .filter(([, a]) => a.targetName === targetName)
+      .map(([id]) => id);
+    if (actIds.length === 0) continue;
+    const toDelete = [];
+    for (const actId of actIds) {
+      const remarks = Object.entries(session.remarks || {})
+        .filter(([, r]) => r.activityId === actId);
+      const emptyRems = remarks.filter(([, r]) => {
+        const validTrials = (r.trials || []).filter(t => t !== -1);
+        return strip(r.text).length === 0 && strip(r.masteryNote || "").length === 0 && validTrials.length === 0;
+      });
+      // Keep at most 1 empty remark per activity; delete the rest
+      if (emptyRems.length > 1) toDelete.push(...emptyRems.slice(1).map(([id]) => id));
+    }
+    if (toDelete.length > 0) {
+      await deleteRemarksBatch(session.id, toDelete);
+      totalDeleted += toDelete.length;
+      console.log(`  ${session.date}: removed ${toDelete.length} extra empty remark(s)`);
+    }
+  }
+  console.log(`Done — deleted ${totalDeleted} extra empty remarks across ${sessions.length} sessions.`);
 };
 
 // ─── STATE ───────────────────────────────────────────────────
