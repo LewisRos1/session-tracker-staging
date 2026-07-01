@@ -128,41 +128,60 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "644";
+const APP_VERSION = "645";
 
-// TEMP v644 — session data cleanup; remove after use
+// TEMP v645 — session data cleanup; remove after use
 window.cleanupLiamSessions = async () => {
   const student = state.students.find(s => s.name === "Liam Chua");
   if (!student) { console.error("Student not found"); return; }
   const targetName = "Learning Support";
   console.log("Loading all sessions…");
   const sessions = await getAllSessionsForStudent(student.id);
-  console.log(`Found ${sessions.length} sessions. Scanning for extra empty remarks in "${targetName}"…`);
+  console.log(`Found ${sessions.length} sessions. Scanning for duplicate activity records in "${targetName}"…`);
   const strip = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
-  let totalDeleted = 0;
+  const isEmptyRem = r => {
+    const validTrials = (r.trials || []).filter(t => t !== -1);
+    return strip(r.text).length === 0 && strip(r.masteryNote || "").length === 0 && validTrials.length === 0;
+  };
+  let totalActsRemoved = 0, totalRemsRemoved = 0;
   for (const session of sessions) {
-    const actIds = Object.entries(session.activities || {})
-      .filter(([, a]) => a.targetName === targetName)
-      .map(([id]) => id);
-    if (actIds.length === 0) continue;
-    const toDelete = [];
-    for (const actId of actIds) {
-      const remarks = Object.entries(session.remarks || {})
-        .filter(([, r]) => r.activityId === actId);
-      const emptyRems = remarks.filter(([, r]) => {
-        const validTrials = (r.trials || []).filter(t => t !== -1);
-        return strip(r.text).length === 0 && strip(r.masteryNote || "").length === 0 && validTrials.length === 0;
-      });
-      // Keep at most 1 empty remark per activity; delete the rest
-      if (emptyRems.length > 1) toDelete.push(...emptyRems.slice(1).map(([id]) => id));
+    const allActs = Object.entries(session.activities || {})
+      .filter(([, a]) => a.targetName === targetName);
+    if (allActs.length === 0) continue;
+    // Group by activityName; first occurrence is the keeper
+    const seen = new Map();
+    const dupActIds = [];
+    for (const [actId, act] of allActs) {
+      if (seen.has(act.activityName)) { dupActIds.push(actId); }
+      else { seen.set(act.activityName, actId); }
     }
-    if (toDelete.length > 0) {
-      await deleteRemarksBatch(session.id, toDelete);
-      totalDeleted += toDelete.length;
-      console.log(`  ${session.date}: removed ${toDelete.length} extra empty remark(s)`);
+    if (dupActIds.length === 0) continue;
+    // For each duplicate activity: collect its remark IDs and delete
+    const remIdsToDelete = [];
+    const actIdsToDelete = [];
+    for (const actId of dupActIds) {
+      const remIds = Object.entries(session.remarks || {})
+        .filter(([, r]) => r.activityId === actId)
+        .map(([id]) => id);
+      const hasRealData = remIds.some(id => !isEmptyRem(session.remarks[id]));
+      if (hasRealData) {
+        console.warn(`  ${session.date}: duplicate activity "${session.activities[actId]?.activityName}" has real data — skipping (manual review needed)`);
+        continue;
+      }
+      remIdsToDelete.push(...remIds);
+      actIdsToDelete.push(actId);
+    }
+    if (actIdsToDelete.length > 0) {
+      await deleteRemarksBatch(session.id, remIdsToDelete);
+      for (const actId of actIdsToDelete) {
+        await deleteActivity(session.id, actId, []);
+      }
+      totalActsRemoved += actIdsToDelete.length;
+      totalRemsRemoved += remIdsToDelete.length;
+      console.log(`  ${session.date}: removed ${actIdsToDelete.length} duplicate activity record(s) + ${remIdsToDelete.length} empty remark(s)`);
     }
   }
-  console.log(`Done — deleted ${totalDeleted} extra empty remarks across ${sessions.length} sessions.`);
+  console.log(`Done — removed ${totalActsRemoved} duplicate activities and ${totalRemsRemoved} empty remarks total.`);
 };
 
 // ─── STATE ───────────────────────────────────────────────────
