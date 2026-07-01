@@ -719,6 +719,11 @@ function wordTargetRows(target, session, allTargets) {
       continue;
     }
 
+    if (act.isMaintainHeading) {
+      rows.push({ merge: true, text: act.activityName, style: "heading" });
+      continue;
+    }
+
     if (act.isMaintain) {
       rows.push({ cells: [act.activityName, act.maintainRemark || "", ""], actLines: parseInlineMarkup(act.activityName) });
       continue;
@@ -1396,6 +1401,11 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
         const r = blankRow(); r[1] = "── Maintain ──"; rows.push(r);
         continue;
       }
+      if (act.isMaintainHeading) {
+        activityHeadingRows.add(rows.length);
+        const r = blankRow(); r[1] = act.activityName; rows.push(r);
+        continue;
+      }
       if (act.isMaintain) {
         const r = blankRow(); r[1] = act.activityName; r[2] = act.maintainRemark || ""; rows.push(r);
         continue;
@@ -1502,7 +1512,7 @@ function getAllActivitiesForTarget(session, target) {
   const maintainActivities = [];
 
   for (const pa of (target.predefinedActivities || [])) {
-    if (!pa.name && !pa.isNote && !pa.isHeading) continue;
+    if (!pa.name && !pa.isNote && !pa.isHeading && !pa.isMaintainHeading) continue;
     if (pa.isNote) {
       result.push({ isNote: true, activityName: pa.text || "" });
       continue;
@@ -1514,6 +1524,10 @@ function getAllActivitiesForTarget(session, target) {
     }
     if (pa.isMaintain) {
       maintainActivities.push({ isMaintain: true, activityName: pa.name, maintainRemark: pa.maintainRemark || "" });
+      continue;
+    }
+    if (pa.isMaintainHeading) {
+      if (pa.name) maintainActivities.push({ isMaintainHeading: true, activityName: pa.name });
       continue;
     }
     if (pa.isCompleted) {
@@ -1603,7 +1617,7 @@ function calcDailyAverage(session, target, allTargets = [], visited = new Set())
 
   const avgs = [];
   for (const act of getAllActivitiesForTarget(session, target)) {
-    if (act.isHeading || act.isNote || act.empty || act.isMasteredSeparator || act.isStoppedSeparator || act.isMaintainSeparator || act.isMaintain) continue;
+    if (act.isHeading || act.isNote || act.empty || act.isMasteredSeparator || act.isStoppedSeparator || act.isMaintainSeparator || act.isMaintain || act.isMaintainHeading) continue;
     if (act.isMapped) {
       if (getRemarksForActivity(session, act.id).length === 0) continue;
       const a = resolveExportMappedScore(act, session, allTargets, visited);

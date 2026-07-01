@@ -128,7 +128,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "650";
+const APP_VERSION = "651";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -382,7 +382,7 @@ let _pendingActsCleanup = null;
 function isEmptyActItem(a) {
   const strip = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
   if (a.isNote) return strip(a.text).length === 0;
-  if (a.isMaintain) return (a.name || "").trim().length === 0;
+  if (a.isMaintain || a.isMaintainHeading) return (a.name || "").trim().length === 0;
   return strip(a.name).length === 0;
 }
 
@@ -2833,9 +2833,9 @@ function renderFedcTarget(target) {
   const firstMnIdx = allPas.findIndex(pa => pa.isMaintain);
   // Headings that appear at or after the first maintain item belong in the maintain section
   const maintainSectionIdxs = new Set(
-    firstMnIdx === -1 ? [] :
     allPas.reduce((acc, pa, i) => {
-      if (i >= firstMnIdx && (pa.isMaintain || pa.isHeading)) acc.push(i);
+      if (pa.isMaintainHeading) { acc.push(i); return acc; }
+      if (firstMnIdx !== -1 && i >= firstMnIdx && (pa.isMaintain || pa.isHeading)) acc.push(i);
       return acc;
     }, [])
   );
@@ -2926,9 +2926,8 @@ function renderFedcTarget(target) {
   if (firstMnIdx !== -1) {
     const mnItems = allPas.filter((pa, i) => maintainSectionIdxs.has(i));
     if (mnItems.some(pa => pa.isMaintain)) {
-      html += `<div class="activity-group-heading" contenteditable="false" style="text-align:center;background:#6b7280;border-color:#4b5563;color:#fff">── Maintain ──</div>`;
       for (const pa of mnItems) {
-        if (pa.isHeading) {
+        if (pa.isHeading || pa.isMaintainHeading) {
           html += `<div class="activity-group-heading" contenteditable="false" style="background:#d1d5db;border-color:#9ca3af;color:#374151">${escHtml(pa.name || "")}</div>`;
         } else if (pa.isMaintain && pa.name) {
           html += `<div class="entry-block entry-block-predefined" style="background:#f3f4f6;border:1px solid #e5e7eb;border-left:4px solid #d1d5db">
@@ -3753,7 +3752,7 @@ async function autoFillStructuredRemarks(student, sessionId) {
   let count = 0;
   for (const target of (student.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
-      if (pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain) continue;
+      if (pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || pa.isMaintainHeading) continue;
       if (!isAutoOpenRemarkType(pa)) continue;
 
       const existingAct = Object.entries(data.activities || {})
@@ -3802,7 +3801,7 @@ async function autoFillMappedRemarks(student, sessionId) {
   let count = 0;
   for (const target of (student.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
-      if (pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain) continue;
+      if (pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || pa.isMaintainHeading) continue;
       if (!pa.isMapped) continue;
 
       const existingAct = Object.entries(data.activities || {})
@@ -4458,7 +4457,7 @@ async function autoFillViewMappedRemarks(student, sessionId, data) {
   let count = 0;
   for (const target of (student.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
-      if (pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain) continue;
+      if (pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || pa.isMaintainHeading) continue;
       if (!pa.isMapped) continue;
 
       const existingAct = Object.entries(data.activities || {})
@@ -4510,7 +4509,7 @@ async function autoFillViewGroupMappedRemarks(group, sessionId, data) {
   let count = 0;
   for (const target of (group.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
-      if (pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain) continue;
+      if (pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || pa.isMaintainHeading) continue;
       if (!pa.isMapped) continue;
       const existingAct = Object.entries(data.activities || {})
         .find(([, a]) => a.targetName === target.name && a.activityName === pa.name);
@@ -7547,8 +7546,8 @@ function renderTargetManageContent(student, target) {
   }
 
   const acts = target.predefinedActivities;
-  const masteredActs = acts.filter(a => !a.isHeading && !a.isNote && !a.isMaintain && a.isCompleted);
-  const stoppedActs  = acts.filter(a => !a.isHeading && !a.isNote && !a.isMaintain && (a.isArchived || a.isStopped));
+  const masteredActs = acts.filter(a => !a.isHeading && !a.isNote && !a.isMaintain && !a.isMaintainHeading && a.isCompleted);
+  const stoppedActs  = acts.filter(a => !a.isHeading && !a.isNote && !a.isMaintain && !a.isMaintainHeading && (a.isArchived || a.isStopped));
   // Other targets this target's mapped-score activities can point at — never
   // itself (self-mapping would make a target's average depend on itself).
   const siblingTargets = (_groupForTargetEdit ? _groupForTargetEdit.targets : student.targets)
@@ -7606,6 +7605,13 @@ function renderTargetManageContent(student, target) {
         <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
           rows="1" placeholder="Enter Note"
           style="flex:1;overflow-y:hidden;resize:none">${escHtml(stripNoteHtml(a.text || ""))}</textarea>
+        <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
+      </div>`;
+    } else if (a.isMaintainHeading) {
+      html += `<div class="admin-list-item mn-heading-item" data-idx="${idx}" style="background:#d1d5db">
+        <span class="drag-handle">⠿</span>
+        <textarea class="admin-input mn-heading-input" id="mn-act-name-${idx}" data-idx="${idx}"
+          rows="1" placeholder="Enter Maintain Section Heading" style="flex:1;background:#d1d5db">${escHtml(a.name || "")}</textarea>
         <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
       </div>`;
     } else if (a.isMaintain) {
@@ -7756,6 +7762,7 @@ function renderTargetManageContent(student, target) {
       <button class="btn-admin-add" id="btn-mn-add-mapped" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Mapped Score</button>
       <button class="btn-admin-add" id="btn-mn-add-act-note-mapped" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Note &amp; Mapped Score</button>
       <button class="btn-admin-add" id="btn-mn-add-maintain" style="flex:0 0 auto;width:auto">+ Add Maintain Activity</button>
+      <button class="btn-admin-add" id="btn-mn-add-maintain-heading" style="flex:0 0 auto;width:auto">+ Add Maintain Section Heading</button>
     </div>
     <div style="margin-top:2rem;padding-bottom:1.5rem">
       <button class="btn-primary-sm" id="btn-mn-done-target"
@@ -7858,7 +7865,7 @@ function renderTargetManageContent(student, target) {
         const v = input.value.trim();
         if (!v || v === a.name) return;
         a.name = v;
-      } else if (a.isMaintain) {
+      } else if (a.isMaintain || a.isMaintainHeading) {
         const v = input.value.trim();
         if (!v || v === a.name) return;
         a.name = v;
@@ -8086,6 +8093,13 @@ function renderTargetManageContent(student, target) {
     renderTargetManageContent(student, target);
   });
 
+  $("btn-mn-add-maintain-heading").addEventListener("click", async () => {
+    acts.push({ id: cfgId("mh"), isMaintainHeading: true, name: "", order: acts.length });
+    target.predefinedActivities = acts;
+    await saveTarget();
+    renderTargetManageContent(student, target);
+  });
+
   $("manage-modal-body").querySelectorAll(".mn-mapped-target-select").forEach(sel => {
     sel.addEventListener("change", async () => {
       const idx = Number(sel.dataset.idx);
@@ -8281,6 +8295,13 @@ function renderTemplateManageContent(template) {
           style="flex:1;overflow-y:hidden;resize:none">${escHtml(stripNoteHtml(a.text || ""))}</textarea>
         <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
       </div>`;
+    } else if (a.isMaintainHeading) {
+      html += `<div class="admin-list-item mn-heading-item" data-idx="${idx}" style="background:#d1d5db">
+        <span class="drag-handle">⠿</span>
+        <textarea class="admin-input mn-heading-input" id="mn-act-name-${idx}" data-idx="${idx}"
+          rows="1" placeholder="Enter Maintain Section Heading" style="flex:1;background:#d1d5db">${escHtml(a.name || "")}</textarea>
+        <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
+      </div>`;
     } else if (a.isMaintain) {
       html += `<div class="admin-list-item" data-idx="${idx}" style="background:#f3f4f6;border:1px solid #d1d5db">
         <span class="drag-handle">⠿</span>
@@ -8335,6 +8356,7 @@ function renderTemplateManageContent(template) {
       <button class="btn-admin-add" id="btn-mn-add-heading" style="flex:0 0 auto;width:auto">+ Add Section Heading</button>
       <button class="btn-admin-add" id="btn-mn-add-note" style="flex:0 0 auto;width:auto">+ Add Note</button>
       <button class="btn-admin-add" id="btn-mn-add-maintain" style="flex:0 0 auto;width:auto">+ Add Maintain Activity</button>
+      <button class="btn-admin-add" id="btn-mn-add-maintain-heading" style="flex:0 0 auto;width:auto">+ Add Maintain Section Heading</button>
     </div>
     <div style="margin-top:2rem;padding-bottom:1.5rem">
       <button class="btn-primary-sm" id="btn-mn-done-template"
@@ -8514,6 +8536,13 @@ function renderTemplateManageContent(template) {
 
   $("btn-mn-add-maintain").addEventListener("click", async () => {
     acts.push({ id: cfgId("mt"), isMaintain: true, name: "", maintainRemark: "", order: acts.length });
+    template.predefinedActivities = acts;
+    await saveTemplateFn();
+    renderTemplateManageContent(template);
+  });
+
+  $("btn-mn-add-maintain-heading").addEventListener("click", async () => {
+    acts.push({ id: cfgId("mh"), isMaintainHeading: true, name: "", order: acts.length });
     template.predefinedActivities = acts;
     await saveTemplateFn();
     renderTemplateManageContent(template);
@@ -9080,7 +9109,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
       items.push(`<div class="activity-group-heading" contenteditable="false">${escHtml(pa.name)}</div>`);
       continue;
     }
-    if (pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain) continue;
+    if (pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || pa.isMaintainHeading) continue;
     const actId = Object.entries(data.activities || {})
       .find(([, a]) => a.targetName === target.name && a.activityName === pa.name)?.[0] || null;
     items.push(renderGroupActivityCard(pa.name, actId, target, data, attendees, pa.actNote, pa.isMapped ? pa : null, pa, true));
@@ -9114,7 +9143,7 @@ function renderGroupStudentBlock(studentName, target, data) {
   // only actual scoreable activities make sense nested under a student.
   const activityEntries = [];
   for (const pa of (target.predefinedActivities || [])) {
-    if (pa.isNote || pa.isHeading || pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || !pa.name) continue;
+    if (pa.isNote || pa.isHeading || pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || pa.isMaintainHeading || !pa.name) continue;
     const actId = Object.entries(data.activities || {})
       .find(([, a]) => a.targetName === target.name && a.activityName === pa.name)?.[0] || null;
     activityEntries.push({ actId, actName: pa.name, actNote: pa.actNote, pa });
