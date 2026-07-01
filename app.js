@@ -128,7 +128,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "640";
+const APP_VERSION = "641";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -8161,7 +8161,7 @@ function renderTargetManageContent(student, target) {
   $("manage-modal-body").querySelectorAll(".mn-opt-add").forEach(btn => {
     btn.addEventListener("click", () => {
       const idx = Number(btn.dataset.idx);
-      const list = btn.previousElementSibling;
+      const list = btn.closest(".mn-opts-container").querySelector(".mn-opts-list");
       const oi = list.querySelectorAll(".mn-opt-row").length;
       const row = document.createElement("div");
       row.className = "mn-opt-row admin-list-item";
@@ -8581,7 +8581,7 @@ function renderTemplateManageContent(template) {
   $("manage-modal-body").querySelectorAll(".mn-opt-add").forEach(btn => {
     btn.addEventListener("click", () => {
       const idx = Number(btn.dataset.idx);
-      const list = btn.previousElementSibling;
+      const list = btn.closest(".mn-opts-container").querySelector(".mn-opts-list");
       const oi = list.querySelectorAll(".mn-opt-row").length;
       const row = document.createElement("div");
       row.className = "mn-opt-row admin-list-item";
