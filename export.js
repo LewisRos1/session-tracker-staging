@@ -1363,23 +1363,6 @@ function buildTargetSheet(target, sessions, allTargets, includeTrials) {
       : ["Date", "Activity", "Remark", "Score", "Avg Score"]);
 
     for (const session of monthSessions) {
-      // Skip if this target has no content at all in this session.
-      // Three ways a session counts as having content for this target:
-      //   1. At least one remark recorded (normal activities with data)
-      //   2. Target has Fixed Remark / isMaintain activities (never produce remark docs)
-      //   3. Activity docs exist for this target — the therapist opened it, even if nothing was typed
-      const targetActIds = new Set(
-        Object.entries(session.activities || {})
-          .filter(([, a]) => a.targetName === target.name)
-          .map(([id]) => id)
-      );
-      const hasTargetRemarks = Object.values(session.remarks || {})
-        .some(r => targetActIds.has(r.activityId));
-      const hasFixedActivities = (target.predefinedActivities || []).some(
-        pa => pa.fixedRemark !== undefined || pa.isMaintain
-      );
-      if (!hasTargetRemarks && !hasFixedActivities && targetActIds.size === 0) continue;
-
       const snap = (session.targetsSnapshot || []).find(t => t.name === target.name);
       const effectiveTarget = snap ? { ...target, maxPoints: snap.maxPoints } : target;
       appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRows, grayRows, session, effectiveTarget, allTargets, includeTrials);
