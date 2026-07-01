@@ -128,7 +128,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "649";
+const APP_VERSION = "650";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2926,12 +2926,12 @@ function renderFedcTarget(target) {
   if (firstMnIdx !== -1) {
     const mnItems = allPas.filter((pa, i) => maintainSectionIdxs.has(i));
     if (mnItems.some(pa => pa.isMaintain)) {
-      html += `<div class="activity-group-heading" contenteditable="false" style="text-align:center;background:#e5e7eb;border-color:#9ca3af;color:#374151">── Maintain ──</div>`;
+      html += `<div class="activity-group-heading" contenteditable="false" style="text-align:center;background:#6b7280;border-color:#4b5563;color:#fff">── Maintain ──</div>`;
       for (const pa of mnItems) {
         if (pa.isHeading) {
-          html += `<div class="activity-group-heading" contenteditable="false" style="background:#f3f4f6;border-color:#9ca3af;color:#6b7280">${escHtml(pa.name || "")}</div>`;
+          html += `<div class="activity-group-heading" contenteditable="false" style="background:#d1d5db;border-color:#9ca3af;color:#374151">${escHtml(pa.name || "")}</div>`;
         } else if (pa.isMaintain && pa.name) {
-          html += `<div class="entry-block entry-block-predefined" style="background:#f3f4f6;border:1px solid #d1d5db;border-left:4px solid #9ca3af">
+          html += `<div class="entry-block entry-block-predefined" style="background:#f3f4f6;border:1px solid #e5e7eb;border-left:4px solid #d1d5db">
             <div class="entry-field" contenteditable="false">
               <span class="field-label">Activity</span>
               <span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span>
