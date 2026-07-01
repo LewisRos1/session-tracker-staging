@@ -127,7 +127,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "666";
+const APP_VERSION = "667";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -7814,13 +7814,13 @@ function renderTargetManageContent(student, target) {
     if (a.isHeading || a.isMaintainHeading) {
       const isGray = a.headingColor === "gray" || a.isMaintainHeading;
       html += `<div class="admin-list-item mn-heading-item" data-idx="${idx}"${isGray ? ' style="background:#9ca3af"' : ''}>
-        <span class="drag-handle">⠿</span>
+        <span class="drag-handle"${isGray ? ' style="color:#ffffff"' : ''}>⠿</span>
         <textarea class="admin-input mn-heading-input" id="mn-act-name-${idx}" data-idx="${idx}"
           rows="1" placeholder="Enter Section Heading" style="flex:1${isGray ? ";background:#9ca3af;color:#111827" : ""}">${escHtml(a.name || "")}</textarea>
         <div style="position:relative">
           <button class="btn-adm-del mn-heading-color-btn" data-idx="${idx}" title="Heading options" style="font-size:1.15rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-heading-color-menu" id="mn-hkm-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:180px;overflow:hidden">
-            <button class="mn-hkm-opt" data-idx="${idx}" data-action="${isGray ? "blue" : "gray"}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">${isGray ? "💙 Change to Blue" : "🩶 Change to Grey"}</button>
+            <button class="mn-hkm-opt" data-idx="${idx}" data-action="${isGray ? "blue" : "gray"}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">${isGray ? "💙 Change to Blue Colour" : "🩶 Change to Grey Colour"}</button>
             <button class="mn-hkm-opt" data-idx="${idx}" data-action="delete" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete</button>
           </div>
         </div>
@@ -7887,13 +7887,13 @@ function renderTargetManageContent(student, target) {
         </div>
         <div style="position:relative">
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
-          <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:215px;overflow:hidden">
+          <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:250px;overflow:hidden">
             <div style="display:flex;align-items:stretch;border-bottom:1px solid #f3f4f6">
               <button class="mn-km-opt" data-idx="${idx}" data-action="master" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">⭐ Mark as Mastered <span style="font-size:.72rem;color:#9ca3af">(Don't use this feature yet)</span></button>
               <span title="Student has achieved this activity. Historical data is kept in the database." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
             </div>
             <div style="display:flex;align-items:stretch;border-bottom:1px solid #f3f4f6">
-              <button class="mn-km-opt" data-idx="${idx}" data-action="stop" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">🛑 Stop from now onwards</button>
+              <button class="mn-km-opt" data-idx="${idx}" data-action="stop" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">🛑 Stop from now onwards <span style="font-size:.72rem;color:#9ca3af">(Don't use this feature yet)</span></button>
               <span title="Activity will no longer appear in new sessions. All past session data is preserved." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
             </div>
             <div style="display:flex;align-items:stretch">
@@ -7939,16 +7939,16 @@ function renderTargetManageContent(student, target) {
         </div>
         <div style="position:relative">
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
-          <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:215px;overflow:hidden">
+          <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:250px;overflow:hidden">
             <div style="display:flex;align-items:stretch;border-bottom:1px solid #f3f4f6">
-              <button class="mn-km-opt" data-idx="${idx}" data-action="${isGray ? "color_white" : "color_gray"}" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">${isGray ? "🤍 Change to White" : "🩶 Change to Grey"}</button>
+              <button class="mn-km-opt" data-idx="${idx}" data-action="${isGray ? "color_white" : "color_gray"}" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">${isGray ? "🤍 Change to White Colour" : "🩶 Change to Grey Colour"}</button>
             </div>
             <div style="display:flex;align-items:stretch;border-bottom:1px solid #f3f4f6">
               <button class="mn-km-opt" data-idx="${idx}" data-action="master" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">⭐ Mark as Mastered <span style="font-size:.72rem;color:#9ca3af">(Don't use this feature yet)</span></button>
               <span title="Student has achieved this activity. Historical data is kept in the database." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
             </div>
             <div style="display:flex;align-items:stretch;border-bottom:1px solid #f3f4f6">
-              <button class="mn-km-opt" data-idx="${idx}" data-action="stop" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">🛑 Stop from now onwards</button>
+              <button class="mn-km-opt" data-idx="${idx}" data-action="stop" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">🛑 Stop from now onwards <span style="font-size:.72rem;color:#9ca3af">(Don't use this feature yet)</span></button>
               <span title="Activity will no longer appear in new sessions. All past session data is preserved." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
             </div>
             <div style="display:flex;align-items:stretch">
@@ -8590,13 +8590,13 @@ function renderTemplateManageContent(template) {
     if (a.isHeading || a.isMaintainHeading) {
       const isGray = a.headingColor === "gray" || a.isMaintainHeading;
       html += `<div class="admin-list-item mn-heading-item" data-idx="${idx}"${isGray ? ' style="background:#9ca3af"' : ''}>
-        <span class="drag-handle">⠿</span>
+        <span class="drag-handle"${isGray ? ' style="color:#ffffff"' : ''}>⠿</span>
         <textarea class="admin-input mn-heading-input" id="mn-act-name-${idx}" data-idx="${idx}"
           rows="1" placeholder="Enter Section Heading" style="flex:1${isGray ? ";background:#9ca3af;color:#111827" : ""}">${escHtml(a.name || "")}</textarea>
         <div style="position:relative">
           <button class="btn-adm-del mn-heading-color-btn" data-idx="${idx}" title="Heading options" style="font-size:1.15rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-heading-color-menu" id="mn-hkm-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:180px;overflow:hidden">
-            <button class="mn-hkm-opt" data-idx="${idx}" data-action="${isGray ? "blue" : "gray"}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">${isGray ? "💙 Change to Blue" : "🩶 Change to Grey"}</button>
+            <button class="mn-hkm-opt" data-idx="${idx}" data-action="${isGray ? "blue" : "gray"}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">${isGray ? "💙 Change to Blue Colour" : "🩶 Change to Grey Colour"}</button>
             <button class="mn-hkm-opt" data-idx="${idx}" data-action="delete" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete</button>
           </div>
         </div>
@@ -8664,9 +8664,9 @@ function renderTemplateManageContent(template) {
         </div>
         <div style="position:relative">
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
-          <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:215px;overflow:hidden">
+          <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:250px;overflow:hidden">
             <div style="display:flex;align-items:stretch;border-bottom:1px solid #f3f4f6">
-              <button class="mn-km-opt" data-idx="${idx}" data-action="${isGray ? "color_white" : "color_gray"}" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">${isGray ? "🤍 Change to White" : "🩶 Change to Grey"}</button>
+              <button class="mn-km-opt" data-idx="${idx}" data-action="${isGray ? "color_white" : "color_gray"}" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">${isGray ? "🤍 Change to White Colour" : "🩶 Change to Grey Colour"}</button>
             </div>
             <div style="display:flex;align-items:stretch">
               <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
