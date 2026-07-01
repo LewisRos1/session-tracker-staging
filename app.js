@@ -128,7 +128,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "638";
+const APP_VERSION = "639";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -7480,7 +7480,10 @@ function buildRemarkTypeControls(a, idx) {
           `</div>`
         ).join("");
       })()}</div>
-      <button class="mn-opt-add" data-idx="${idx}" style="margin-top:.2rem;font-size:.78rem;padding:.25rem .6rem;background:none;border:1px solid #d1d5db;border-radius:.35rem;cursor:pointer;color:#6b7280">+ Add Option</button>
+      <div style="display:flex;align-items:center;gap:.5rem;margin-top:.2rem">
+        <button class="mn-opt-add" data-idx="${idx}" style="font-size:.78rem;padding:.25rem .6rem;background:none;border:1px solid #d1d5db;border-radius:.35rem;cursor:pointer;color:#6b7280">+ Add Option</button>
+        <span title="Renaming an option updates it across all past sessions too. If you rename &quot;A&quot; to &quot;B&quot;, every past session that chose &quot;A&quot; will now show &quot;B&quot;." style="cursor:default;color:#9ca3af;font-size:.8rem">ⓘ</span>
+      </div>
     </div>`;
 }
 
