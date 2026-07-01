@@ -128,7 +128,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "641";
+const APP_VERSION = "642";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -7377,7 +7377,7 @@ function initDragSort(listEl, onReorder) {
     lastY = e.clientY;
     dragEl.style.top = (e.clientY - offsetY) + 'px';
 
-    const items = [...listEl.querySelectorAll('.admin-list-item')].filter(el => el !== dragEl);
+    const items = [...listEl.children].filter(el => el.classList.contains('admin-list-item') && el !== dragEl);
     let inserted = false;
     for (const item of items) {
       const { top, height } = item.getBoundingClientRect();
@@ -7396,7 +7396,8 @@ function initDragSort(listEl, onReorder) {
     dragEl.style.cssText = '';
     if (placeholder?.parentNode) placeholder.parentNode.insertBefore(dragEl, placeholder);
     placeholder?.remove();
-    const newOrder = [...listEl.querySelectorAll('.admin-list-item')]
+    const newOrder = [...listEl.children]
+      .filter(el => el.classList.contains('admin-list-item'))
       .map(el => Number(el.dataset.idx));
     dragEl = null;
     placeholder = null;
