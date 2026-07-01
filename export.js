@@ -834,10 +834,10 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
   const FACILITATION_BORDER = "B0C8E0";
 
   const cellBorders = {
-    top:    { style: BorderStyle.SINGLE, size: 2, color: "B0C8E0" },
-    bottom: { style: BorderStyle.SINGLE, size: 2, color: "B0C8E0" },
-    left:   { style: BorderStyle.SINGLE, size: 2, color: "B0C8E0" },
-    right:  { style: BorderStyle.SINGLE, size: 2, color: "B0C8E0" }
+    top:    { style: BorderStyle.SINGLE, size: 2, color: "D9D9D9" },
+    bottom: { style: BorderStyle.SINGLE, size: 2, color: "D9D9D9" },
+    left:   { style: BorderStyle.SINGLE, size: 2, color: "D9D9D9" },
+    right:  { style: BorderStyle.SINGLE, size: 2, color: "D9D9D9" }
   };
 
   function textLines(text, opts) {
