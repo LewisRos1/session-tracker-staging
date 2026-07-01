@@ -127,7 +127,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "661";
+const APP_VERSION = "662";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4126,8 +4126,9 @@ function buildTargetViewTable(target, data) {
           .find(([, a]) => a.targetName === target.name && a.activityName === pa.name);
         if (fixedEntry) matchedIds.add(fixedEntry[0]);
         const fixedText = pa.fixedRemark ?? pa.maintainRemark ?? "";
+        const isGrayFixed = pa.activityColor === "gray" || !!pa.isMaintainLive;
         no++;
-        rows += `<tr style="background:#f9fafb">
+        rows += `<tr${isGrayFixed ? ' class="view-gray-row"' : ' style="background:#f9fafb"'}>
           <td class="vcol-no" contenteditable="false">${no}</td>
           <td class="vcol-act" contenteditable="false">${formatActivityMarkup(pa.name)}</td>
           <td class="vcol-rem" contenteditable="false" style="color:#374151;cursor:pointer"
@@ -5517,8 +5518,9 @@ function buildGroupTargetViewTable(target, data, attendees) {
           .find(([, a]) => a.targetName === target.name && a.activityName === pa.name);
         if (fixedEntry) matchedIds.add(fixedEntry[0]);
         const fixedText = pa.fixedRemark ?? pa.maintainRemark ?? "";
+        const isGrayFixed = pa.activityColor === "gray" || !!pa.isMaintainLive;
         no++;
-        rows += `<tr style="background:#f9fafb">
+        rows += `<tr${isGrayFixed ? ' class="view-gray-row"' : ' style="background:#f9fafb"'}>
           <td class="vcol-no" contenteditable="false">${no}</td>
           <td class="vcol-act" contenteditable="false">${formatActivityMarkup(pa.name)}</td>
           <td class="vcol-student" contenteditable="false">—</td>

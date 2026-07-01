@@ -149,8 +149,10 @@ const STYLE_ACT_HEADING = {
   fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFE4F0F8" } },
   font: { bold: true, color: { argb: "FF2A4060" } }
 };
-// Gray activity/heading rows (mirrors the UI's #f3f4f6 maintenance-activity tint)
-const STYLE_GRAY_FILL = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
+// Gray activity rows (mirrors the view screen's #d1d5db maintenance-activity tint)
+const STYLE_GRAY_ACT_FILL = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD1D5DB" } };
+// Gray heading rows (mirrors the view screen's #9ca3af maintenance-heading tint)
+const STYLE_GRAY_HDG_FILL = { type: "pattern", pattern: "solid", fgColor: { argb: "FF9CA3AF" } };
 // Daily Average: near-white blue, soft navy text
 const STYLE_DAILY_AVG = {
   fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F7FC" } },
@@ -456,7 +458,8 @@ function addIndividualTargetSheets(wb, allTargets, sessions, studentName, includ
     for (const rowIdx of grayRows) {
       const n = rowIdx + 1;
       const rowObj = ws.getRow(n);
-      for (let c = 1; c <= numCols; c++) rowObj.getCell(c).fill = STYLE_GRAY_FILL;
+      const grayFill = activityHeadingRows.has(rowIdx) ? STYLE_GRAY_HDG_FILL : STYLE_GRAY_ACT_FILL;
+      for (let c = 1; c <= numCols; c++) rowObj.getCell(c).fill = grayFill;
     }
 
     // Note rows: same column span as activity headings above.
@@ -724,10 +727,7 @@ function wordTargetRows(target, session, allTargets) {
 
     if (act.isMasteredSeparator || act.isMastered || act.isStoppedSeparator || act.isStopped) continue;
 
-    if (act.isMaintainSeparator) {
-      rows.push({ merge: true, text: "── Maintain ──", style: "heading" });
-      continue;
-    }
+    if (act.isMaintainSeparator) continue;
 
     if (act.isMaintainHeading) {
       rows.push({ merge: true, text: act.activityName, style: "heading", isGrayHeading: true });
@@ -735,7 +735,7 @@ function wordTargetRows(target, session, allTargets) {
     }
 
     if (act.isMaintain) {
-      rows.push({ cells: [act.activityName, act.maintainRemark || "", ""], actLines: parseInlineMarkup(act.activityName) });
+      rows.push({ cells: [act.activityName, act.maintainRemark || "", ""], actLines: parseInlineMarkup(act.activityName), isGray: act.isGray });
       continue;
     }
 
@@ -894,7 +894,7 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
 
     for (const r of wordTargetRows(target, session, allTargets)) {
       if (r.merge) {
-        const mergeFill = r.isGrayHeading ? "F3F4F6"
+        const mergeFill = r.isGrayHeading ? "9CA3AF"
           : (r.style === "heading" ? TARGET_FILL : (r.style === "note" ? NOTE_FILL : null));
         const mergeColor = r.isGrayHeading ? "111827"
           : (r.style === "heading" ? TARGET_TEXT_COLOR : (r.style === "note" ? NOTE_TEXT_COLOR : null));
@@ -909,7 +909,7 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
           })]
         }));
       } else {
-        const grayFill = r.isGray ? "F3F4F6" : null;
+        const grayFill = r.isGray ? "D1D5DB" : null;
         tableRows.push(new TableRow({
           children: [
             r.actLines
@@ -1350,7 +1350,9 @@ function buildTargetSheet(target, sessions, allTargets, includeTrials) {
       : ["Date", "Activity", "Remark", "Score", "Avg Score"]);
 
     for (const session of monthSessions) {
-      // Skip if this target has no remarks in this session (activity was auto-created but never used)
+      // Skip if this target has no remarks in this session (activity was auto-created but never used).
+      // Exception: targets whose predefined activities are all Fixed Remark / isMaintain — those
+      // never produce session.remarks entries but still have content worth exporting.
       const targetActIds = new Set(
         Object.entries(session.activities || {})
           .filter(([, a]) => a.targetName === target.name)
@@ -1358,7 +1360,10 @@ function buildTargetSheet(target, sessions, allTargets, includeTrials) {
       );
       const hasTargetRemarks = Object.values(session.remarks || {})
         .some(r => targetActIds.has(r.activityId));
-      if (!hasTargetRemarks) continue;
+      const hasFixedActivities = (target.predefinedActivities || []).some(
+        pa => pa.fixedRemark !== undefined || pa.isMaintain
+      );
+      if (!hasTargetRemarks && !hasFixedActivities) continue;
 
       const snap = (session.targetsSnapshot || []).find(t => t.name === target.name);
       const effectiveTarget = snap ? { ...target, maxPoints: snap.maxPoints } : target;
@@ -1425,6 +1430,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
         continue;
       }
       if (act.isMaintain) {
+        if (act.isGray) grayRows.add(rows.length);
         const r = blankRow(); r[1] = act.activityName; r[2] = act.maintainRemark || ""; rows.push(r);
         continue;
       }
@@ -1545,16 +1551,18 @@ function getAllActivitiesForTarget(session, target) {
     }
     // Gray headings (new headingColor:"gray" or legacy isMaintainHeading) → maintain section
     if ((pa.isHeading && pa.headingColor === "gray") || pa.isMaintainHeading) {
-      maintainActivities.push({ isMaintainHeading: true, activityName: pa.name });
+      maintainActivities.push({ isMaintainHeading: true, activityName: pa.name, isGray: true });
       continue;
     }
     // Fixed remark activities (new fixedRemark field or legacy isMaintain) → maintain section
     if (pa.fixedRemark !== undefined) {
-      maintainActivities.push({ isMaintain: true, activityName: pa.name, maintainRemark: pa.fixedRemark || "" });
+      const isGray = pa.activityColor === "gray" || !!pa.isMaintainLive;
+      maintainActivities.push({ isMaintain: true, activityName: pa.name, maintainRemark: pa.fixedRemark || "", ...(isGray ? { isGray: true } : {}) });
       continue;
     }
     if (pa.isMaintain) {
-      maintainActivities.push({ isMaintain: true, activityName: pa.name, maintainRemark: pa.maintainRemark || "" });
+      const isGray = pa.activityColor === "gray" || !!pa.isMaintainLive;
+      maintainActivities.push({ isMaintain: true, activityName: pa.name, maintainRemark: pa.maintainRemark || "", ...(isGray ? { isGray: true } : {}) });
       continue;
     }
     if (pa.isCompleted) {
