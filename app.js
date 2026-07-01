@@ -128,7 +128,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "647";
+const APP_VERSION = "648";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2926,19 +2926,19 @@ function renderFedcTarget(target) {
   if (firstMnIdx !== -1) {
     const mnItems = allPas.filter((pa, i) => maintainSectionIdxs.has(i));
     if (mnItems.some(pa => pa.isMaintain)) {
-      html += `<div class="activity-group-heading" contenteditable="false" style="text-align:center;background:#f3f4f6;border-color:#9ca3af;color:#6b7280">── Maintain ──</div>`;
+      html += `<div class="activity-group-heading" contenteditable="false" style="text-align:center;background:#6b7280;border-color:#4b5563;color:#fff">── Maintain ──</div>`;
       for (const pa of mnItems) {
         if (pa.isHeading) {
           html += `<div class="activity-group-heading" contenteditable="false">${escHtml(pa.name || "")}</div>`;
         } else if (pa.isMaintain && pa.name) {
-          html += `<div class="entry-block entry-block-predefined" style="background:#f0f9ff;border:1px solid #bae6fd">
+          html += `<div class="entry-block entry-block-predefined" style="background:#f3f4f6;border:1px solid #d1d5db;border-left:4px solid #9ca3af">
             <div class="entry-field" contenteditable="false">
               <span class="field-label">Activity</span>
               <span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span>
             </div>
             <div class="entry-field" contenteditable="false">
               <span class="field-label">Remark</span>
-              <span class="field-value-fixed" style="white-space:pre-wrap;color:#374151">${escHtml(pa.maintainRemark || "")}</span>
+              <span class="field-value-fixed" style="white-space:pre-wrap;color:#111827">${escHtml(pa.maintainRemark || "")}</span>
             </div>
           </div>`;
         }
@@ -7609,7 +7609,7 @@ function renderTargetManageContent(student, target) {
         <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
       </div>`;
     } else if (a.isMaintain) {
-      html += `<div class="admin-list-item" data-idx="${idx}" style="background:#f0f9ff;border:1px solid #bae6fd">
+      html += `<div class="admin-list-item" data-idx="${idx}" style="background:#f3f4f6;border:1px solid #d1d5db">
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
           <div style="display:flex;align-items:flex-start;gap:.3rem">
@@ -7620,7 +7620,7 @@ function renderTargetManageContent(student, target) {
           <div style="display:flex;align-items:center;gap:.5rem">
             <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Remark:</span>
             <textarea class="admin-input mn-maintain-remark-input" id="mn-act-mremark-${idx}" data-idx="${idx}"
-              rows="1" placeholder="Fixed remark shown in session (read-only)"
+              rows="1" placeholder="Read-Only Remark"
               style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.maintainRemark || "")}</textarea>
           </div>
         </div>
@@ -8282,7 +8282,7 @@ function renderTemplateManageContent(template) {
         <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
       </div>`;
     } else if (a.isMaintain) {
-      html += `<div class="admin-list-item" data-idx="${idx}" style="background:#f0f9ff;border:1px solid #bae6fd">
+      html += `<div class="admin-list-item" data-idx="${idx}" style="background:#f3f4f6;border:1px solid #d1d5db">
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
           <div style="display:flex;align-items:flex-start;gap:.3rem">
@@ -8293,7 +8293,7 @@ function renderTemplateManageContent(template) {
           <div style="display:flex;align-items:center;gap:.5rem">
             <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Remark:</span>
             <textarea class="admin-input mn-maintain-remark-input" id="mn-act-mremark-${idx}" data-idx="${idx}"
-              rows="1" placeholder="Fixed remark shown in session (read-only)"
+              rows="1" placeholder="Read-Only Remark"
               style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.maintainRemark || "")}</textarea>
           </div>
         </div>
