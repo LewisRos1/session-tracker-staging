@@ -128,7 +128,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "646";
+const APP_VERSION = "647";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2829,7 +2829,20 @@ function renderFedcTarget(target) {
 
   const letters = "abcdefghij";
   let lastGroup = null;
-  target.predefinedActivities.forEach((pa, idx) => {
+  const allPas = target.predefinedActivities || [];
+  const firstMnIdx = allPas.findIndex(pa => pa.isMaintain);
+  // Headings that appear at or after the first maintain item belong in the maintain section
+  const maintainSectionIdxs = new Set(
+    firstMnIdx === -1 ? [] :
+    allPas.reduce((acc, pa, i) => {
+      if (i >= firstMnIdx && (pa.isMaintain || pa.isHeading)) acc.push(i);
+      return acc;
+    }, [])
+  );
+  allPas.forEach((pa, idx) => {
+    // Headings/maintains in the maintain section are rendered below
+    if (maintainSectionIdxs.has(idx)) return;
+
     // Note item — render inline in order, styled like a section heading
     if (pa.isNote) {
       if (pa.text) html += `<div class="activity-note-heading" contenteditable="false">${noteToHtml(pa.text)}</div>`;
@@ -2910,20 +2923,26 @@ function renderFedcTarget(target) {
   });
 
   // ── Maintain section ────────────────────────────────────────────────────────
-  const maintainActs = (target.predefinedActivities || []).filter(pa => pa.isMaintain && pa.name);
-  if (maintainActs.length > 0) {
-    html += `<div class="activity-group-heading" contenteditable="false" style="font-size:.8rem;font-weight:600;color:#6b7280;text-align:center;padding:.3rem 0;margin:.75rem 0 .25rem">── Maintain ──</div>`;
-    for (const pa of maintainActs) {
-      html += `<div class="entry-block entry-block-predefined" style="background:#f0f9ff;border:1px solid #bae6fd">
-        <div class="entry-field" contenteditable="false">
-          <span class="field-label">Activity</span>
-          <span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span>
-        </div>
-        <div class="entry-field" contenteditable="false">
-          <span class="field-label">Remark</span>
-          <span class="field-value-fixed" style="white-space:pre-wrap;color:#374151">${escHtml(pa.maintainRemark || "")}</span>
-        </div>
-      </div>`;
+  if (firstMnIdx !== -1) {
+    const mnItems = allPas.filter((pa, i) => maintainSectionIdxs.has(i));
+    if (mnItems.some(pa => pa.isMaintain)) {
+      html += `<div class="activity-group-heading" contenteditable="false" style="text-align:center;background:#f3f4f6;border-color:#9ca3af;color:#6b7280">── Maintain ──</div>`;
+      for (const pa of mnItems) {
+        if (pa.isHeading) {
+          html += `<div class="activity-group-heading" contenteditable="false">${escHtml(pa.name || "")}</div>`;
+        } else if (pa.isMaintain && pa.name) {
+          html += `<div class="entry-block entry-block-predefined" style="background:#f0f9ff;border:1px solid #bae6fd">
+            <div class="entry-field" contenteditable="false">
+              <span class="field-label">Activity</span>
+              <span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span>
+            </div>
+            <div class="entry-field" contenteditable="false">
+              <span class="field-label">Remark</span>
+              <span class="field-value-fixed" style="white-space:pre-wrap;color:#374151">${escHtml(pa.maintainRemark || "")}</span>
+            </div>
+          </div>`;
+        }
+      }
     }
   }
 
@@ -7594,14 +7613,14 @@ function renderTargetManageContent(student, target) {
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
           <div style="display:flex;align-items:flex-start;gap:.3rem">
-            <span style="font-size:.68rem;color:#0369a1;white-space:nowrap;padding-top:.55rem;font-weight:700;letter-spacing:.03em">MAINTAIN</span>
+            ${formatButtonsHtml(`mn-act-name-${idx}`)}
             <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
               rows="1" placeholder="Activity name" style="flex:1">${escHtml(a.name || "")}</textarea>
           </div>
-          <div style="display:flex;align-items:flex-start;gap:.3rem">
-            <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;padding-top:.5rem;font-weight:600">Remark:</span>
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Remark:</span>
             <textarea class="admin-input mn-maintain-remark-input" id="mn-act-mremark-${idx}" data-idx="${idx}"
-              rows="2" placeholder="Fixed remark shown in session (read-only)"
+              rows="1" placeholder="Fixed remark shown in session (read-only)"
               style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.maintainRemark || "")}</textarea>
           </div>
         </div>
@@ -8267,14 +8286,14 @@ function renderTemplateManageContent(template) {
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
           <div style="display:flex;align-items:flex-start;gap:.3rem">
-            <span style="font-size:.68rem;color:#0369a1;white-space:nowrap;padding-top:.55rem;font-weight:700;letter-spacing:.03em">MAINTAIN</span>
+            ${formatButtonsHtml(`mn-act-name-${idx}`)}
             <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
               rows="1" placeholder="Activity name" style="flex:1">${escHtml(a.name || "")}</textarea>
           </div>
-          <div style="display:flex;align-items:flex-start;gap:.3rem">
-            <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;padding-top:.5rem;font-weight:600">Remark:</span>
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Remark:</span>
             <textarea class="admin-input mn-maintain-remark-input" id="mn-act-mremark-${idx}" data-idx="${idx}"
-              rows="2" placeholder="Fixed remark shown in session (read-only)"
+              rows="1" placeholder="Fixed remark shown in session (read-only)"
               style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.maintainRemark || "")}</textarea>
           </div>
         </div>
