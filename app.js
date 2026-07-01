@@ -128,7 +128,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "651";
+const APP_VERSION = "652";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2872,7 +2872,7 @@ function renderFedcTarget(target) {
     const isPending  = state.pendingNewRemark?.pendingKey === pendingKey;
     const mappedInfo = pa.isMapped ? resolveMappedScoreDisplay(pa) : null;
 
-    html += `<div class="entry-block entry-block-predefined">
+    html += `<div class="entry-block entry-block-predefined"${pa.isMaintainLive ? ' style="background:#f3f4f6;border:1px solid #e5e7eb;border-left:4px solid #d1d5db"' : ''}>
       <div class="entry-field" contenteditable="false">
         <span class="field-label">Activity</span>
         <span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span>
@@ -7624,7 +7624,7 @@ function renderTargetManageContent(student, target) {
               rows="1" placeholder="Activity name" style="flex:1">${escHtml(a.name || "")}</textarea>
           </div>
           <div style="display:flex;align-items:center;gap:.5rem">
-            <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Remark:</span>
+            <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Fixed Remark:</span>
             <textarea class="admin-input mn-maintain-remark-input" id="mn-act-mremark-${idx}" data-idx="${idx}"
               rows="1" placeholder="Read-Only Remark"
               style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.maintainRemark || "")}</textarea>
@@ -7693,7 +7693,7 @@ function renderTargetManageContent(student, target) {
               style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.actNote || "")}</textarea>
           </div>`
         : "";
-      html += `<div class="admin-list-item" data-idx="${idx}">
+      html += `<div class="admin-list-item" data-idx="${idx}"${a.isMaintainLive ? ' style="background:#f3f4f6;border:1px solid #d1d5db"' : ''}>
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
           <div style="display:flex;align-items:flex-start;gap:.3rem">
@@ -7761,7 +7761,8 @@ function renderTargetManageContent(student, target) {
       <button class="btn-admin-add" id="btn-mn-add-note" style="flex:0 0 auto;width:auto">+ Add Note</button>
       <button class="btn-admin-add" id="btn-mn-add-mapped" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Mapped Score</button>
       <button class="btn-admin-add" id="btn-mn-add-act-note-mapped" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Note &amp; Mapped Score</button>
-      <button class="btn-admin-add" id="btn-mn-add-maintain" style="flex:0 0 auto;width:auto">+ Add Maintain Activity</button>
+      <button class="btn-admin-add" id="btn-mn-add-maintain" style="flex:0 0 auto;width:auto">+ Add Maintain Activity (Fixed)</button>
+      <button class="btn-admin-add" id="btn-mn-add-maintain-live" style="flex:0 0 auto;width:auto">+ Add Maintain Activity</button>
       <button class="btn-admin-add" id="btn-mn-add-maintain-heading" style="flex:0 0 auto;width:auto">+ Add Maintain Section Heading</button>
     </div>
     <div style="margin-top:2rem;padding-bottom:1.5rem">
@@ -7939,7 +7940,7 @@ function renderTargetManageContent(student, target) {
     btn.addEventListener("click", async () => {
       const idx = Number(btn.dataset.idx);
       const item = acts[idx];
-      const label = item?.isHeading ? "section heading" : item?.isNote ? "reference note" : item?.isMapped ? "mapped-score activity" : item?.isMaintain ? "maintain activity" : "activity";
+      const label = item?.isHeading ? "section heading" : item?.isMaintainHeading ? "maintain section heading" : item?.isNote ? "reference note" : item?.isMapped ? "mapped-score activity" : item?.isMaintain ? "maintain activity (fixed)" : item?.isMaintainLive ? "maintain activity" : "activity";
       if (!confirm(`Delete this ${label}?`)) return;
       acts.splice(idx, 1);
       acts.forEach((a, i) => a.order = i);
@@ -8088,6 +8089,13 @@ function renderTargetManageContent(student, target) {
 
   $("btn-mn-add-maintain").addEventListener("click", async () => {
     acts.push({ id: cfgId("mt"), isMaintain: true, name: "", maintainRemark: "", order: acts.length });
+    target.predefinedActivities = acts;
+    await saveTarget();
+    renderTargetManageContent(student, target);
+  });
+
+  $("btn-mn-add-maintain-live").addEventListener("click", async () => {
+    acts.push({ id: cfgId("ml"), isMaintainLive: true, name: "", order: acts.length });
     target.predefinedActivities = acts;
     await saveTarget();
     renderTargetManageContent(student, target);
@@ -8312,7 +8320,7 @@ function renderTemplateManageContent(template) {
               rows="1" placeholder="Activity name" style="flex:1">${escHtml(a.name || "")}</textarea>
           </div>
           <div style="display:flex;align-items:center;gap:.5rem">
-            <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Remark:</span>
+            <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Fixed Remark:</span>
             <textarea class="admin-input mn-maintain-remark-input" id="mn-act-mremark-${idx}" data-idx="${idx}"
               rows="1" placeholder="Read-Only Remark"
               style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.maintainRemark || "")}</textarea>
@@ -8330,7 +8338,7 @@ function renderTemplateManageContent(template) {
               style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.actNote || "")}</textarea>
           </div>`
         : "";
-      html += `<div class="admin-list-item" data-idx="${idx}">
+      html += `<div class="admin-list-item" data-idx="${idx}"${a.isMaintainLive ? ' style="background:#f3f4f6;border:1px solid #d1d5db"' : ''}>
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
           <div style="display:flex;align-items:flex-start;gap:.3rem">
@@ -8355,7 +8363,8 @@ function renderTemplateManageContent(template) {
       <button class="btn-admin-add" id="btn-mn-add-act-note" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Note</button>
       <button class="btn-admin-add" id="btn-mn-add-heading" style="flex:0 0 auto;width:auto">+ Add Section Heading</button>
       <button class="btn-admin-add" id="btn-mn-add-note" style="flex:0 0 auto;width:auto">+ Add Note</button>
-      <button class="btn-admin-add" id="btn-mn-add-maintain" style="flex:0 0 auto;width:auto">+ Add Maintain Activity</button>
+      <button class="btn-admin-add" id="btn-mn-add-maintain" style="flex:0 0 auto;width:auto">+ Add Maintain Activity (Fixed)</button>
+      <button class="btn-admin-add" id="btn-mn-add-maintain-live" style="flex:0 0 auto;width:auto">+ Add Maintain Activity</button>
       <button class="btn-admin-add" id="btn-mn-add-maintain-heading" style="flex:0 0 auto;width:auto">+ Add Maintain Section Heading</button>
     </div>
     <div style="margin-top:2rem;padding-bottom:1.5rem">
@@ -8536,6 +8545,13 @@ function renderTemplateManageContent(template) {
 
   $("btn-mn-add-maintain").addEventListener("click", async () => {
     acts.push({ id: cfgId("mt"), isMaintain: true, name: "", maintainRemark: "", order: acts.length });
+    template.predefinedActivities = acts;
+    await saveTemplateFn();
+    renderTemplateManageContent(template);
+  });
+
+  $("btn-mn-add-maintain-live").addEventListener("click", async () => {
+    acts.push({ id: cfgId("ml"), isMaintainLive: true, name: "", order: acts.length });
     template.predefinedActivities = acts;
     await saveTemplateFn();
     renderTemplateManageContent(template);
