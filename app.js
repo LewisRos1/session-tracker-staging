@@ -128,7 +128,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "652";
+const APP_VERSION = "653";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -7761,7 +7761,7 @@ function renderTargetManageContent(student, target) {
       <button class="btn-admin-add" id="btn-mn-add-note" style="flex:0 0 auto;width:auto">+ Add Note</button>
       <button class="btn-admin-add" id="btn-mn-add-mapped" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Mapped Score</button>
       <button class="btn-admin-add" id="btn-mn-add-act-note-mapped" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Note &amp; Mapped Score</button>
-      <button class="btn-admin-add" id="btn-mn-add-maintain" style="flex:0 0 auto;width:auto">+ Add Maintain Activity (Fixed)</button>
+      <button class="btn-admin-add" id="btn-mn-add-maintain" style="flex:0 0 auto;width:auto">+ Add Maintain Activity (Fixed Remark)</button>
       <button class="btn-admin-add" id="btn-mn-add-maintain-live" style="flex:0 0 auto;width:auto">+ Add Maintain Activity</button>
       <button class="btn-admin-add" id="btn-mn-add-maintain-heading" style="flex:0 0 auto;width:auto">+ Add Maintain Section Heading</button>
     </div>
@@ -8363,7 +8363,7 @@ function renderTemplateManageContent(template) {
       <button class="btn-admin-add" id="btn-mn-add-act-note" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Note</button>
       <button class="btn-admin-add" id="btn-mn-add-heading" style="flex:0 0 auto;width:auto">+ Add Section Heading</button>
       <button class="btn-admin-add" id="btn-mn-add-note" style="flex:0 0 auto;width:auto">+ Add Note</button>
-      <button class="btn-admin-add" id="btn-mn-add-maintain" style="flex:0 0 auto;width:auto">+ Add Maintain Activity (Fixed)</button>
+      <button class="btn-admin-add" id="btn-mn-add-maintain" style="flex:0 0 auto;width:auto">+ Add Maintain Activity (Fixed Remark)</button>
       <button class="btn-admin-add" id="btn-mn-add-maintain-live" style="flex:0 0 auto;width:auto">+ Add Maintain Activity</button>
       <button class="btn-admin-add" id="btn-mn-add-maintain-heading" style="flex:0 0 auto;width:auto">+ Add Maintain Section Heading</button>
     </div>
