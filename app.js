@@ -128,7 +128,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "659";
+const APP_VERSION = "660";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4115,7 +4115,7 @@ function buildTargetViewTable(target, data) {
     for (const pa of target.predefinedActivities) {
       if (pa.isHeading || pa.isMaintainHeading) {
         const isGray = pa.headingColor === "gray" || pa.isMaintainHeading;
-        rows += `<tr class="view-heading-row"${isGray ? ' style="background:#9ca3af;color:#111827"' : ''}><td colspan="6" contenteditable="false">${escHtml(pa.name)}</td></tr>`;
+        rows += `<tr class="view-heading-row${isGray ? " view-gray-row" : ""}"><td colspan="6" contenteditable="false">${escHtml(pa.name)}</td></tr>`;
         continue;
       }
       if (pa.isNote) {
@@ -4229,7 +4229,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
   const remarkHasNote   = paEntry?.remarkHasNote || false;
   const mappedInfo      = paEntry?.isMapped ? resolveViewMappedScoreDisplay(paEntry, data) : null;
   const isGrayAct       = isPredefined && (paEntry?.activityColor === "gray" || paEntry?.isMaintainLive);
-  const rowStyle        = isGrayAct ? "background:#f3f4f6" : "";
+  const rowClass        = isGrayAct ? "view-gray-row" : "";
 
   if (remarks.length === 0) {
     const opts = parseOpts(inlineOptions);
@@ -4245,7 +4245,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
         : `<button class="view-add-trial-new" data-act-id="${escHtml(actId || "")}"
         data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
         data-is-predefined="${isPredefined}">+</button>`;
-      return `<tr${rowStyle ? ` style="${rowStyle}"` : ""}>
+      return `<tr${rowClass ? ` class="${rowClass}"` : ""}>
         <td class="vcol-no" contenteditable="false">${no}</td>
         <td class="vcol-act" contenteditable="false">${actCell}</td>
         <td class="vcol-rem">${emptyCell}</td>
@@ -4280,7 +4280,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
       : `<button class="view-add-trial-new" data-act-id="${escHtml(actId || "")}"
           data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
           data-is-predefined="${isPredefined}">+</button>`;
-    return `<tr${rowStyle ? ` style="${rowStyle}"` : ""}>
+    return `<tr${rowClass ? ` class="${rowClass}"` : ""}>
       <td class="vcol-no" contenteditable="false">${no}</td>
       <td class="vcol-act" contenteditable="false">${actCell}</td>
       <td class="vcol-rem">${emptyRemCell}</td>
@@ -4292,7 +4292,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
   return remarks.map((rem, ri) => viewRemarkRow(
     ri === 0 ? no : null,
     ri === 0 ? actCell : null,
-    rem, target, inlineOptions, sentenceStarter, multiSelect, mappedInfo, remarkHasNote, rowStyle
+    rem, target, inlineOptions, sentenceStarter, multiSelect, mappedInfo, remarkHasNote, rowClass
   )).join("");
 }
 
@@ -4322,7 +4322,7 @@ function buildTrialCellsHtml(rem, maxPts) {
     `<button class="view-add-trial" data-rem-id="${escHtml(rem.id)}">+</button>`;
 }
 
-function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false, rowStyle = "") {
+function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false, rowClass = "") {
   const maxPts = target.maxPoints || 3;
   const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts);
   const trialCells = mappedInfo
@@ -4379,7 +4379,7 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
     remarkCell = optSelect;
   }
 
-  return `<tr${rowStyle ? ` style="${rowStyle}"` : ""}>
+  return `<tr${rowClass ? ` class="${rowClass}"` : ""}>
     <td class="vcol-no" contenteditable="false">${no !== null ? no : ""}</td>
     <td class="vcol-act" contenteditable="false">${actName !== null ? actName : ""}</td>
     <td class="vcol-rem">${remarkCell}</td>
@@ -5506,7 +5506,7 @@ function buildGroupTargetViewTable(target, data, attendees) {
     for (const pa of target.predefinedActivities) {
       if (pa.isHeading || pa.isMaintainHeading) {
         const isGray = pa.headingColor === "gray" || pa.isMaintainHeading;
-        rows += `<tr class="view-heading-row"${isGray ? ' style="background:#9ca3af;color:#111827"' : ''}><td colspan="7" contenteditable="false">${escHtml(pa.name)}</td></tr>`;
+        rows += `<tr class="view-heading-row${isGray ? " view-gray-row" : ""}"><td colspan="7" contenteditable="false">${escHtml(pa.name)}</td></tr>`;
         continue;
       }
       if (pa.isNote) {
@@ -5670,11 +5670,11 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
   const remarkHasNote   = paEntry?.remarkHasNote || false;
   const opts            = parseOpts(inlineOptions);
   const isGrayAct       = isPredefined && (paEntry?.activityColor === "gray" || paEntry?.isMaintainLive);
-  const rowStyle        = isGrayAct ? "background:#f3f4f6" : "";
+  const rowClass        = isGrayAct ? "view-gray-row" : "";
 
   if (rounds.length === 0) {
     if (opts.length === 0) {
-      return attendees.map((studentName, idx) => `<tr${rowStyle ? ` style="${rowStyle}"` : ""}>
+      return attendees.map((studentName, idx) => `<tr${rowClass ? ` class="${rowClass}"` : ""}>
         <td class="vcol-no" contenteditable="false">${idx === 0 ? no : ""}</td>
         <td class="vcol-act" contenteditable="false">${idx === 0 ? actCellWithToggle : ""}</td>
         <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(studentName)}</td>
@@ -5718,7 +5718,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
             <span class="view-starter-prefix">${escHtml(sentenceStarter)}</span>${gSelHtml}
           </div>`
         : gSelHtml;
-      return `<tr${rowStyle ? ` style="${rowStyle}"` : ""}>
+      return `<tr${rowClass ? ` class="${rowClass}"` : ""}>
         <td class="vcol-no" contenteditable="false">${idx === 0 ? no : ""}</td>
         <td class="vcol-act" contenteditable="false">${idx === 0 ? actCellWithToggle : ""}</td>
         <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(studentName)}</td>
@@ -5753,7 +5753,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
         // preset-option/sentence-starter activities (which have no typeable
         // free text) still need an explicit button.
         if (opts.length === 0) {
-          html += `<tr${rowStyle ? ` style="${rowStyle}"` : ""}>
+          html += `<tr${rowClass ? ` class="${rowClass}"` : ""}>
             <td class="vcol-no" contenteditable="false">${noVal !== null ? noVal : ""}</td>
             <td class="vcol-act" contenteditable="false">${actVal !== null ? actVal : ""}</td>
             <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(entry.studentName)}</td>
@@ -5797,7 +5797,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
               <span class="view-starter-prefix">${escHtml(sentenceStarter)}</span>${pSelHtml}
             </div>`
           : pSelHtml;
-        html += `<tr${rowStyle ? ` style="${rowStyle}"` : ""}>
+        html += `<tr${rowClass ? ` class="${rowClass}"` : ""}>
           <td class="vcol-no" contenteditable="false">${noVal !== null ? noVal : ""}</td>
           <td class="vcol-act" contenteditable="false">${actVal !== null ? actVal : ""}</td>
           <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(entry.studentName)}</td>
@@ -5818,7 +5818,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
 
       html += viewGroupRemarkRow(
         noVal, actVal, entry.studentName, entry, target,
-        inlineOptions, sentenceStarter, multiSelect, combineOpts, null, remarkHasNote, rowStyle
+        inlineOptions, sentenceStarter, multiSelect, combineOpts, null, remarkHasNote, rowClass
       );
       firstRowOverall = false;
     }
@@ -5826,7 +5826,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
   return html;
 }
 
-function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, combineOpts = null, mappedInfo = null, remarkHasNote = false, rowStyle = "") {
+function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, combineOpts = null, mappedInfo = null, remarkHasNote = false, rowClass = "") {
   const maxPts = target.maxPoints || 3;
   const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts);
   const trialCells = mappedInfo
@@ -5898,7 +5898,7 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
     }
   }
 
-  return `<tr${rowStyle ? ` style="${rowStyle}"` : ""}>
+  return `<tr${rowClass ? ` class="${rowClass}"` : ""}>
     <td class="vcol-no" contenteditable="false">${no !== null ? no : ""}</td>
     <td class="vcol-act" contenteditable="false">${actName !== null ? actName : ""}</td>
     <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(studentName)}</td>

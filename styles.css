@@ -2525,6 +2525,15 @@ div.admin-note-editable:empty::before {
   border-top: 2px solid var(--primary) !important;
   border-bottom: 2px solid var(--primary) !important;
 }
+/* Gray activity/heading rows in view screen — class applied to <tr> so the
+   td selector here wins over row-type-specific td backgrounds above */
+tr.view-gray-row td { background: #d1d5db; }
+tr.view-heading-row.view-gray-row td {
+  background: #9ca3af;
+  color: #111827;
+  border-top-color: #6b7280 !important;
+  border-bottom-color: #6b7280 !important;
+}
 
 .view-note-row td {
   background: #fffbeb;
