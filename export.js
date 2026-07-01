@@ -712,7 +712,17 @@ function wordTargetRows(target, session, allTargets) {
     // them out entirely.
     if (act.isNote) continue;
 
-    if (act.isMasteredSeparator || act.isMastered || act.isArchivedSeparator || act.isArchived) continue;
+    if (act.isMasteredSeparator || act.isMastered || act.isStoppedSeparator || act.isStopped) continue;
+
+    if (act.isMaintainSeparator) {
+      rows.push({ merge: true, text: "── Maintain ──", style: "heading" });
+      continue;
+    }
+
+    if (act.isMaintain) {
+      rows.push({ cells: [act.activityName, act.maintainRemark || "", ""], actLines: parseInlineMarkup(act.activityName) });
+      continue;
+    }
 
     // An activity's own attached note (from "+ Add Activity & Note") is also
     // facilitator-reference text, not session data — Word treats this exactly
@@ -1381,15 +1391,31 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
         continue;
       }
 
+      if (act.isMaintainSeparator) {
+        activityHeadingRows.add(rows.length);
+        const r = blankRow(); r[1] = "── Maintain ──"; rows.push(r);
+        continue;
+      }
+      if (act.isMaintain) {
+        const r = blankRow(); r[1] = act.activityName; r[2] = act.maintainRemark || ""; rows.push(r);
+        continue;
+      }
       if (act.isMasteredSeparator) {
         activityHeadingRows.add(rows.length);
         const r = blankRow(); r[1] = "— Mastered —"; rows.push(r);
         continue;
       }
-      if (act.isArchivedSeparator) {
+      if (act.isStoppedSeparator) {
         activityHeadingRows.add(rows.length);
-        const r = blankRow(); r[1] = "— Archived —"; rows.push(r);
+        const r = blankRow(); r[1] = "— Stopped tracking —"; rows.push(r);
         continue;
+      }
+      if (act.isStopped) {
+        const name = stripActivityMarkup(act.activityName);
+        if (act.empty) {
+          const r = blankRow(); r[1] = name + " (Stopped)"; rows.push(r);
+          continue;
+        }
       }
 
       const actNoteText = (target.predefinedActivities || []).find(
@@ -1472,7 +1498,8 @@ function getAllActivitiesForTarget(session, target) {
   const result = [];
   const usedIds = new Set();
   const masteredActivities = [];
-  const archivedActivities = [];
+  const stoppedActivities  = [];
+  const maintainActivities = [];
 
   for (const pa of (target.predefinedActivities || [])) {
     if (!pa.name && !pa.isNote && !pa.isHeading) continue;
@@ -1485,6 +1512,10 @@ function getAllActivitiesForTarget(session, target) {
       result.push({ isHeading: true, activityName: pa.name });
       continue;
     }
+    if (pa.isMaintain) {
+      maintainActivities.push({ isMaintain: true, activityName: pa.name, maintainRemark: pa.maintainRemark || "" });
+      continue;
+    }
     if (pa.isCompleted) {
       const sessionAct = sessionActs.find(a => a.activityName === pa.name && a.isPredefined);
       if (sessionAct) {
@@ -1495,13 +1526,13 @@ function getAllActivitiesForTarget(session, target) {
       }
       continue;
     }
-    if (pa.isArchived) {
+    if (pa.isArchived || pa.isStopped) {
       const sessionAct = sessionActs.find(a => a.activityName === pa.name && a.isPredefined);
       if (sessionAct) {
         usedIds.add(sessionAct.id);
-        archivedActivities.push({ ...sessionAct, isArchived: true });
+        stoppedActivities.push({ ...sessionAct, isStopped: true });
       } else {
-        archivedActivities.push({ id: null, activityName: pa.name, isPredefined: true, empty: true, isArchived: true });
+        stoppedActivities.push({ id: null, activityName: pa.name, isPredefined: true, empty: true, isStopped: true });
       }
       continue;
     }
@@ -1527,13 +1558,17 @@ function getAllActivitiesForTarget(session, target) {
     result.push(act);
   }
 
+  if (maintainActivities.length > 0) {
+    result.push({ isMaintainSeparator: true, activityName: "── Maintain ──" });
+    result.push(...maintainActivities);
+  }
   if (masteredActivities.length > 0) {
     result.push({ isMasteredSeparator: true, activityName: "— Mastered —" });
     result.push(...masteredActivities);
   }
-  if (archivedActivities.length > 0) {
-    result.push({ isArchivedSeparator: true, activityName: "— Archived —" });
-    result.push(...archivedActivities);
+  if (stoppedActivities.length > 0) {
+    result.push({ isStoppedSeparator: true, activityName: "— Stopped tracking —" });
+    result.push(...stoppedActivities);
   }
 
   return result;
@@ -1568,7 +1603,7 @@ function calcDailyAverage(session, target, allTargets = [], visited = new Set())
 
   const avgs = [];
   for (const act of getAllActivitiesForTarget(session, target)) {
-    if (act.isHeading || act.isNote || act.empty || act.isMasteredSeparator || act.isArchivedSeparator) continue;
+    if (act.isHeading || act.isNote || act.empty || act.isMasteredSeparator || act.isStoppedSeparator || act.isMaintainSeparator || act.isMaintain) continue;
     if (act.isMapped) {
       if (getRemarksForActivity(session, act.id).length === 0) continue;
       const a = resolveExportMappedScore(act, session, allTargets, visited);
