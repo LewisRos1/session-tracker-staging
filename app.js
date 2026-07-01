@@ -128,7 +128,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "636";
+const APP_VERSION = "637";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -7472,7 +7472,8 @@ function buildRemarkTypeControls(a, idx) {
         const optsStr = a.inlineOptions || (a.remarkPresetId ? (state.remarkPresets.find(p=>p.id===a.remarkPresetId)?.options||[]).join("/") : "");
         const displayOpts = parseOpts(optsStr).length > 0 ? parseOpts(optsStr) : [""];
         return displayOpts.map((opt, oi) =>
-          `<div class="mn-opt-row" style="display:flex;align-items:center;gap:.3rem;margin-bottom:.25rem">` +
+          `<div class="mn-opt-row admin-list-item" data-idx="${oi}" style="display:flex;align-items:center;gap:.3rem;margin-bottom:.25rem">` +
+          `<span class="drag-handle" style="cursor:grab;color:#c4c9d4;font-size:1rem;flex-shrink:0;padding:0 .1rem;user-select:none">⠿</span>` +
           `<span class="mn-opt-num" style="font-size:.74rem;color:#9ca3af;min-width:1.2rem;text-align:right;flex-shrink:0">${oi + 1}.</span>` +
           `<input class="admin-input mn-opt-item" data-idx="${idx}" data-oi="${oi}" value="${escHtml(opt)}" placeholder="Enter option…" style="flex:1;padding:.3rem .45rem;font-size:.84rem;min-width:0">` +
           `<button class="mn-opt-del" data-idx="${idx}" data-oi="${oi}" title="Remove option" style="flex-shrink:0;padding:.2rem .4rem;font-size:.8rem;color:#9ca3af;background:none;border:1px solid #e5e7eb;border-radius:.3rem;cursor:pointer;line-height:1">×</button>` +
@@ -8037,6 +8038,7 @@ function renderTargetManageContent(student, target) {
 
   const renumberOpts = list => {
     list.querySelectorAll(".mn-opt-row").forEach((r, i) => {
+      r.dataset.idx = i; // keep row data-idx in sync for drag-sort
       const n = r.querySelector(".mn-opt-num"); if (n) n.textContent = `${i + 1}.`;
       const inp = r.querySelector(".mn-opt-item"); if (inp) inp.dataset.oi = i;
       const del = r.querySelector(".mn-opt-del");  if (del) del.dataset.oi = i;
@@ -8072,15 +8074,29 @@ function renderTargetManageContent(student, target) {
   $("manage-modal-body").querySelectorAll(".mn-opt-item").forEach(inp => wireOptBlur(inp, Number(inp.dataset.idx)));
   $("manage-modal-body").querySelectorAll(".mn-opt-del").forEach(btn => wireOptDel(btn, Number(btn.dataset.idx)));
 
+  $("manage-modal-body").querySelectorAll(".mn-opts-list").forEach(list => {
+    initDragSort(list, async () => {
+      const idx = Number(list.closest(".mn-opts-container").dataset.idx);
+      renumberOpts(list);
+      const newOptsStr = getOptsFromDom(idx).join("/") || null;
+      acts[idx].inlineOptions = newOptsStr;
+      acts[idx].remarkPresetId = null;
+      target.predefinedActivities = acts;
+      await saveTarget();
+    });
+  });
+
   $("manage-modal-body").querySelectorAll(".mn-opt-add").forEach(btn => {
     btn.addEventListener("click", () => {
       const idx = Number(btn.dataset.idx);
       const list = btn.previousElementSibling;
       const oi = list.querySelectorAll(".mn-opt-row").length;
       const row = document.createElement("div");
-      row.className = "mn-opt-row";
+      row.className = "mn-opt-row admin-list-item";
+      row.dataset.idx = String(oi);
       row.style.cssText = "display:flex;align-items:center;gap:.3rem;margin-bottom:.25rem";
       row.innerHTML =
+        `<span class="drag-handle" style="cursor:grab;color:#c4c9d4;font-size:1rem;flex-shrink:0;padding:0 .1rem;user-select:none">⠿</span>` +
         `<span class="mn-opt-num" style="font-size:.74rem;color:#9ca3af;min-width:1.2rem;text-align:right;flex-shrink:0">${oi + 1}.</span>` +
         `<input class="admin-input mn-opt-item" data-idx="${idx}" data-oi="${oi}" placeholder="Enter option…" style="flex:1;padding:.3rem .45rem;font-size:.84rem;min-width:0">` +
         `<button class="mn-opt-del" data-idx="${idx}" data-oi="${oi}" title="Remove option" style="flex-shrink:0;padding:.2rem .4rem;font-size:.8rem;color:#9ca3af;background:none;border:1px solid #e5e7eb;border-radius:.3rem;cursor:pointer;line-height:1">×</button>`;
@@ -8400,6 +8416,7 @@ function renderTemplateManageContent(template) {
 
   const renumberTmplOpts = list => {
     list.querySelectorAll(".mn-opt-row").forEach((r, i) => {
+      r.dataset.idx = i; // keep row data-idx in sync for drag-sort
       const n = r.querySelector(".mn-opt-num"); if (n) n.textContent = `${i + 1}.`;
       const inp = r.querySelector(".mn-opt-item"); if (inp) inp.dataset.oi = i;
       const del = r.querySelector(".mn-opt-del");  if (del) del.dataset.oi = i;
@@ -8432,15 +8449,29 @@ function renderTemplateManageContent(template) {
   $("manage-modal-body").querySelectorAll(".mn-opt-item").forEach(inp => wireTmplOptBlur(inp, Number(inp.dataset.idx)));
   $("manage-modal-body").querySelectorAll(".mn-opt-del").forEach(btn => wireTmplOptDel(btn, Number(btn.dataset.idx)));
 
+  $("manage-modal-body").querySelectorAll(".mn-opts-list").forEach(list => {
+    initDragSort(list, async () => {
+      const idx = Number(list.closest(".mn-opts-container").dataset.idx);
+      renumberTmplOpts(list);
+      const newOptsStr = getTmplOptsFromDom(idx).join("/") || null;
+      acts[idx].inlineOptions = newOptsStr;
+      acts[idx].remarkPresetId = null;
+      template.predefinedActivities = acts;
+      await saveTemplateFn();
+    });
+  });
+
   $("manage-modal-body").querySelectorAll(".mn-opt-add").forEach(btn => {
     btn.addEventListener("click", () => {
       const idx = Number(btn.dataset.idx);
       const list = btn.previousElementSibling;
       const oi = list.querySelectorAll(".mn-opt-row").length;
       const row = document.createElement("div");
-      row.className = "mn-opt-row";
+      row.className = "mn-opt-row admin-list-item";
+      row.dataset.idx = String(oi);
       row.style.cssText = "display:flex;align-items:center;gap:.3rem;margin-bottom:.25rem";
       row.innerHTML =
+        `<span class="drag-handle" style="cursor:grab;color:#c4c9d4;font-size:1rem;flex-shrink:0;padding:0 .1rem;user-select:none">⠿</span>` +
         `<span class="mn-opt-num" style="font-size:.74rem;color:#9ca3af;min-width:1.2rem;text-align:right;flex-shrink:0">${oi + 1}.</span>` +
         `<input class="admin-input mn-opt-item" data-idx="${idx}" data-oi="${oi}" placeholder="Enter option…" style="flex:1;padding:.3rem .45rem;font-size:.84rem;min-width:0">` +
         `<button class="mn-opt-del" data-idx="${idx}" data-oi="${oi}" title="Remove option" style="flex-shrink:0;padding:.2rem .4rem;font-size:.8rem;color:#9ca3af;background:none;border:1px solid #e5e7eb;border-radius:.3rem;cursor:pointer;line-height:1">×</button>`;
