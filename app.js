@@ -128,7 +128,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "653";
+const APP_VERSION = "654";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2830,32 +2830,40 @@ function renderFedcTarget(target) {
   const letters = "abcdefghij";
   let lastGroup = null;
   const allPas = target.predefinedActivities || [];
-  const firstMnIdx = allPas.findIndex(pa => pa.isMaintain);
-  // Headings that appear at or after the first maintain item belong in the maintain section
-  const maintainSectionIdxs = new Set(
-    allPas.reduce((acc, pa, i) => {
-      if (pa.isMaintainHeading) { acc.push(i); return acc; }
-      if (firstMnIdx !== -1 && i >= firstMnIdx && (pa.isMaintain || pa.isHeading)) acc.push(i);
-      return acc;
-    }, [])
-  );
   allPas.forEach((pa, idx) => {
-    // Headings/maintains in the maintain section are rendered below
-    if (maintainSectionIdxs.has(idx)) return;
-
     // Note item — render inline in order, styled like a section heading
     if (pa.isNote) {
       if (pa.text) html += `<div class="activity-note-heading" contenteditable="false">${noteToHtml(pa.text)}</div>`;
       return;
     }
 
-    // New format: explicit heading row
-    if (pa.isHeading) {
-      html += `<div class="activity-group-heading" contenteditable="false">${escHtml(pa.name)}</div>`;
+    // Heading rows — blue or gray based on headingColor property
+    if (pa.isHeading || pa.isMaintainHeading) {
+      const isGray = pa.headingColor === "gray" || pa.isMaintainHeading;
+      html += isGray
+        ? `<div class="activity-group-heading" contenteditable="false" style="background:#d1d5db;border-color:#9ca3af;color:#374151">${escHtml(pa.name || "")}</div>`
+        : `<div class="activity-group-heading" contenteditable="false">${escHtml(pa.name || "")}</div>`;
       return;
     }
 
-    if (pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain) return;
+    if (pa.isCompleted || pa.isArchived || pa.isStopped) return;
+
+    // Fixed remark activity — shown read-only with gray block styling
+    const isFixed = pa.fixedRemark !== undefined || pa.isMaintain;
+    if (isFixed) {
+      const fixedText = pa.fixedRemark ?? pa.maintainRemark ?? "";
+      html += `<div class="entry-block entry-block-predefined" style="background:#f3f4f6;border:1px solid #e5e7eb;border-left:4px solid #d1d5db">
+        <div class="entry-field" contenteditable="false">
+          <span class="field-label">Activity</span>
+          <span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span>
+        </div>
+        <div class="entry-field" contenteditable="false">
+          <span class="field-label">Remark</span>
+          <span class="field-value-fixed" style="white-space:pre-wrap;color:#111827">${escHtml(fixedText)}</span>
+        </div>
+      </div>`;
+      return;
+    }
 
     // Old format: group field per activity (backward compat)
     if (pa.group && pa.group !== lastGroup) {
@@ -2872,7 +2880,8 @@ function renderFedcTarget(target) {
     const isPending  = state.pendingNewRemark?.pendingKey === pendingKey;
     const mappedInfo = pa.isMapped ? resolveMappedScoreDisplay(pa) : null;
 
-    html += `<div class="entry-block entry-block-predefined"${pa.isMaintainLive ? ' style="background:#f3f4f6;border:1px solid #e5e7eb;border-left:4px solid #d1d5db"' : ''}>
+    const isGrayActivity = pa.activityColor === "gray" || pa.isMaintainLive;
+    html += `<div class="entry-block entry-block-predefined"${isGrayActivity ? ' style="background:#f3f4f6;border:1px solid #e5e7eb;border-left:4px solid #d1d5db"' : ''}>
       <div class="entry-field" contenteditable="false">
         <span class="field-label">Activity</span>
         <span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span>
@@ -2921,29 +2930,6 @@ function renderFedcTarget(target) {
 
     html += `</div>`;
   });
-
-  // ── Maintain section ────────────────────────────────────────────────────────
-  if (firstMnIdx !== -1) {
-    const mnItems = allPas.filter((pa, i) => maintainSectionIdxs.has(i));
-    if (mnItems.some(pa => pa.isMaintain)) {
-      for (const pa of mnItems) {
-        if (pa.isHeading || pa.isMaintainHeading) {
-          html += `<div class="activity-group-heading" contenteditable="false" style="background:#d1d5db;border-color:#9ca3af;color:#374151">${escHtml(pa.name || "")}</div>`;
-        } else if (pa.isMaintain && pa.name) {
-          html += `<div class="entry-block entry-block-predefined" style="background:#f3f4f6;border:1px solid #e5e7eb;border-left:4px solid #d1d5db">
-            <div class="entry-field" contenteditable="false">
-              <span class="field-label">Activity</span>
-              <span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span>
-            </div>
-            <div class="entry-field" contenteditable="false">
-              <span class="field-label">Remark</span>
-              <span class="field-value-fixed" style="white-space:pre-wrap;color:#111827">${escHtml(pa.maintainRemark || "")}</span>
-            </div>
-          </div>`;
-        }
-      }
-    }
-  }
 
   // One-off activities added just for this session (white, same as free-form)
   const manualActivities = getActivitiesForTarget(target.name).filter(a => !a.isPredefined);
@@ -3752,7 +3738,7 @@ async function autoFillStructuredRemarks(student, sessionId) {
   let count = 0;
   for (const target of (student.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
-      if (pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || pa.isMaintainHeading) continue;
+      if (pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || pa.isMaintainHeading || pa.fixedRemark !== undefined) continue;
       if (!isAutoOpenRemarkType(pa)) continue;
 
       const existingAct = Object.entries(data.activities || {})
@@ -7494,7 +7480,8 @@ function stripNoteHtml(text) {
 // field is captured (free text / preset options / sentence starter),
 // independently of where the Score comes from.
 function buildRemarkTypeControls(a, idx) {
-  const type = a.remarkHasNote ? "starter_fixed_note"
+  const type = a.fixedRemark !== undefined ? "fixed_remark"
+    : a.remarkHasNote ? "starter_fixed_note"
     : (a.sentenceStarter && a.inlineOptions && a.optionsMulti) ? "starter_fixed_multi"
     : (a.sentenceStarter && a.inlineOptions) ? "starter_fixed"
     : a.sentenceStarter ? "starter"
@@ -7502,6 +7489,7 @@ function buildRemarkTypeControls(a, idx) {
     : (a.inlineOptions || a.remarkPresetId) ? "fixed" : "";
   return `<select class="act-preset-select mn-act-preset" data-idx="${idx}">
       <option value="">Free text</option>
+      <option value="fixed_remark"${type === "fixed_remark" ? " selected" : ""}>Fixed Remark</option>
       <option value="fixed"${type === "fixed" ? " selected" : ""}>Select one</option>
       <option value="fixed_multi"${type === "fixed_multi" ? " selected" : ""}>Tick boxes</option>
       <option value="starter"${type === "starter" ? " selected" : ""}>Sentence Starter + Free Text</option>
@@ -7546,8 +7534,8 @@ function renderTargetManageContent(student, target) {
   }
 
   const acts = target.predefinedActivities;
-  const masteredActs = acts.filter(a => !a.isHeading && !a.isNote && !a.isMaintain && !a.isMaintainHeading && a.isCompleted);
-  const stoppedActs  = acts.filter(a => !a.isHeading && !a.isNote && !a.isMaintain && !a.isMaintainHeading && (a.isArchived || a.isStopped));
+  const masteredActs = acts.filter(a => !a.isHeading && !a.isNote && !a.isMaintain && !a.isMaintainHeading && a.fixedRemark === undefined && a.isCompleted);
+  const stoppedActs  = acts.filter(a => !a.isHeading && !a.isNote && !a.isMaintain && !a.isMaintainHeading && a.fixedRemark === undefined && (a.isArchived || a.isStopped));
   // Other targets this target's mapped-score activities can point at — never
   // itself (self-mapping would make a target's average depend on itself).
   const siblingTargets = (_groupForTargetEdit ? _groupForTargetEdit.targets : student.targets)
@@ -7591,12 +7579,20 @@ function renderTargetManageContent(student, target) {
 
   acts.forEach((a, idx) => {
     if (a.isCompleted || a.isArchived || a.isStopped) return;
-    if (a.isHeading) {
-      html += `<div class="admin-list-item mn-heading-item" data-idx="${idx}">
+    if (a.isHeading || a.isMaintainHeading) {
+      const isGray = a.headingColor === "gray" || a.isMaintainHeading;
+      html += `<div class="admin-list-item mn-heading-item" data-idx="${idx}"${isGray ? ' style="background:#d1d5db"' : ''}>
         <span class="drag-handle">⠿</span>
         <textarea class="admin-input mn-heading-input" id="mn-act-name-${idx}" data-idx="${idx}"
-          rows="1" placeholder="Enter Section Heading" style="flex:1">${escHtml(a.name || "")}</textarea>
-        <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
+          rows="1" placeholder="Enter Section Heading" style="flex:1${isGray ? ";background:#d1d5db" : ""}">${escHtml(a.name || "")}</textarea>
+        <div style="position:relative">
+          <button class="btn-adm-del mn-heading-color-btn" data-idx="${idx}" title="Heading options" style="font-size:1.15rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
+          <div class="mn-heading-color-menu" id="mn-hkm-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:170px;overflow:hidden">
+            <button class="mn-hkm-opt" data-idx="${idx}" data-action="blue" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem${!isGray ? ";font-weight:700" : ""}">🔵 Blue (default)</button>
+            <button class="mn-hkm-opt" data-idx="${idx}" data-action="gray" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem${isGray ? ";font-weight:700" : ""}">⬜ Gray</button>
+            <button class="mn-hkm-opt" data-idx="${idx}" data-action="delete" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑 Delete</button>
+          </div>
+        </div>
       </div>`;
     } else if (a.isNote) {
       html += `<div class="admin-list-item admin-note-item" data-idx="${idx}">
@@ -7605,13 +7601,6 @@ function renderTargetManageContent(student, target) {
         <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
           rows="1" placeholder="Enter Note"
           style="flex:1;overflow-y:hidden;resize:none">${escHtml(stripNoteHtml(a.text || ""))}</textarea>
-        <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
-      </div>`;
-    } else if (a.isMaintainHeading) {
-      html += `<div class="admin-list-item mn-heading-item" data-idx="${idx}" style="background:#d1d5db">
-        <span class="drag-handle">⠿</span>
-        <textarea class="admin-input mn-heading-input" id="mn-act-name-${idx}" data-idx="${idx}"
-          rows="1" placeholder="Enter Maintain Section Heading" style="flex:1;background:#d1d5db">${escHtml(a.name || "")}</textarea>
         <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
       </div>`;
     } else if (a.isMaintain) {
@@ -7685,6 +7674,7 @@ function renderTargetManageContent(student, target) {
       </div>`;
     } else {
       const remarkTypeSelect = buildRemarkTypeControls(a, idx);
+      const isGray = a.activityColor === "gray" || a.isMaintainLive;
       const noteRow = a.actNote !== undefined
         ? `<div style="display:flex;align-items:flex-start;gap:.3rem">
             ${formatButtonsHtml(`mn-act-note-${idx}`)}
@@ -7693,7 +7683,15 @@ function renderTargetManageContent(student, target) {
               style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.actNote || "")}</textarea>
           </div>`
         : "";
-      html += `<div class="admin-list-item" data-idx="${idx}"${a.isMaintainLive ? ' style="background:#f3f4f6;border:1px solid #d1d5db"' : ''}>
+      const fixedRemarkRow = a.fixedRemark !== undefined
+        ? `<div style="display:flex;align-items:center;gap:.5rem">
+            <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Fixed Remark:</span>
+            <textarea class="admin-input mn-fixed-remark-input" id="mn-act-fixed-remark-${idx}" data-idx="${idx}"
+              rows="1" placeholder="Remark shown read-only in sessions"
+              style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.fixedRemark || "")}</textarea>
+          </div>`
+        : "";
+      html += `<div class="admin-list-item" data-idx="${idx}"${isGray ? ' style="background:#f3f4f6;border:1px solid #d1d5db"' : ''}>
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
           <div style="display:flex;align-items:flex-start;gap:.3rem">
@@ -7706,10 +7704,14 @@ function renderTargetManageContent(student, target) {
             <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Remark Type:</span>
             ${remarkTypeSelect}
           </div>
+          ${fixedRemarkRow}
         </div>
         <div style="position:relative">
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:215px;overflow:hidden">
+            <div style="display:flex;align-items:stretch;border-bottom:1px solid #f3f4f6">
+              <button class="mn-km-opt" data-idx="${idx}" data-action="${isGray ? "color_white" : "color_gray"}" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">${isGray ? "⬜ Change to White" : "⬛ Change to Gray"}</button>
+            </div>
             <div style="display:flex;align-items:stretch;border-bottom:1px solid #f3f4f6">
               <button class="mn-km-opt" data-idx="${idx}" data-action="master" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">⭐ Mark as Mastered <span style="font-size:.72rem;color:#9ca3af">(Don't use this feature yet)</span></button>
               <span title="Student has achieved this activity. Historical data is kept in the database." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
@@ -7761,9 +7763,6 @@ function renderTargetManageContent(student, target) {
       <button class="btn-admin-add" id="btn-mn-add-note" style="flex:0 0 auto;width:auto">+ Add Note</button>
       <button class="btn-admin-add" id="btn-mn-add-mapped" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Mapped Score</button>
       <button class="btn-admin-add" id="btn-mn-add-act-note-mapped" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Note &amp; Mapped Score</button>
-      <button class="btn-admin-add" id="btn-mn-add-maintain" style="flex:0 0 auto;width:auto">+ Add Maintain Activity (Fixed Remark)</button>
-      <button class="btn-admin-add" id="btn-mn-add-maintain-live" style="flex:0 0 auto;width:auto">+ Add Maintain Activity</button>
-      <button class="btn-admin-add" id="btn-mn-add-maintain-heading" style="flex:0 0 auto;width:auto">+ Add Maintain Section Heading</button>
     </div>
     <div style="margin-top:2rem;padding-bottom:1.5rem">
       <button class="btn-primary-sm" id="btn-mn-done-target"
@@ -7976,7 +7975,17 @@ function renderTargetManageContent(student, target) {
       const pa = acts[idx];
       if (!pa) return;
       $("manage-modal-body").querySelectorAll(".mn-kebab-menu").forEach(m => m.style.display = "none");
-      if (action === "master") {
+      if (action === "color_gray") {
+        pa.activityColor = "gray";
+        delete pa.isMaintainLive;
+        await saveTarget();
+        renderTargetManageContent(student, target);
+      } else if (action === "color_white") {
+        delete pa.activityColor;
+        delete pa.isMaintainLive;
+        await saveTarget();
+        renderTargetManageContent(student, target);
+      } else if (action === "master") {
         pa.isCompleted = true;
         delete pa.isArchived;
         await saveTarget();
@@ -8087,27 +8096,6 @@ function renderTargetManageContent(student, target) {
     renderTargetManageContent(student, target);
   });
 
-  $("btn-mn-add-maintain").addEventListener("click", async () => {
-    acts.push({ id: cfgId("mt"), isMaintain: true, name: "", maintainRemark: "", order: acts.length });
-    target.predefinedActivities = acts;
-    await saveTarget();
-    renderTargetManageContent(student, target);
-  });
-
-  $("btn-mn-add-maintain-live").addEventListener("click", async () => {
-    acts.push({ id: cfgId("ml"), isMaintainLive: true, name: "", order: acts.length });
-    target.predefinedActivities = acts;
-    await saveTarget();
-    renderTargetManageContent(student, target);
-  });
-
-  $("btn-mn-add-maintain-heading").addEventListener("click", async () => {
-    acts.push({ id: cfgId("mh"), isMaintainHeading: true, name: "", order: acts.length });
-    target.predefinedActivities = acts;
-    await saveTarget();
-    renderTargetManageContent(student, target);
-  });
-
   $("manage-modal-body").querySelectorAll(".mn-mapped-target-select").forEach(sel => {
     sel.addEventListener("change", async () => {
       const idx = Number(sel.dataset.idx);
@@ -8125,6 +8113,26 @@ function renderTargetManageContent(student, target) {
       const starterInput  = body.querySelector(`.mn-act-starter-text[data-idx="${idx}"]`);
       const optsContainer = body.querySelector(`.mn-opts-container[data-idx="${idx}"]`);
       const type = sel.value;
+      // Switching to Fixed Remark triggers a re-render to show the fixed remark textarea
+      if (type === "fixed_remark") {
+        if (acts[idx].fixedRemark === undefined) acts[idx].fixedRemark = "";
+        acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
+        acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false;
+        target.predefinedActivities = acts;
+        await saveTarget();
+        renderTargetManageContent(student, target);
+        return;
+      }
+      // Switching away from Fixed Remark — clear it and re-render to remove the textarea
+      if (acts[idx].fixedRemark !== undefined) {
+        delete acts[idx].fixedRemark;
+        acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
+        acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false;
+        target.predefinedActivities = acts;
+        await saveTarget();
+        renderTargetManageContent(student, target);
+        return;
+      }
       acts[idx].sentenceStarter = null;
       acts[idx].remarkPresetId  = null;
       acts[idx].inlineOptions   = null;
@@ -8151,6 +8159,67 @@ function renderTargetManageContent(student, target) {
       acts[idx].sentenceStarter = input.value.trim() || null;
       target.predefinedActivities = acts;
       await saveTarget();
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-fixed-remark-input").forEach(input => {
+    autoResizeTextarea(input);
+    input.addEventListener("blur", async () => {
+      const idx = Number(input.dataset.idx);
+      if (acts[idx].fixedRemark === input.value) return;
+      acts[idx].fixedRemark = input.value;
+      target.predefinedActivities = acts;
+      await saveTarget();
+      flashSaved(input);
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-heading-color-btn").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const idx = btn.dataset.idx;
+      const menu = $(`mn-hkm-${idx}`);
+      const wasHidden = menu.style.display !== "block";
+      $("manage-modal-body").querySelectorAll(".mn-heading-color-menu, .mn-kebab-menu").forEach(m => m.style.display = "none");
+      if (wasHidden) {
+        menu.style.display = "block";
+        const closeMenu = ev => {
+          if (!menu.contains(ev.target)) { menu.style.display = "none"; document.removeEventListener("click", closeMenu); }
+        };
+        setTimeout(() => document.addEventListener("click", closeMenu), 0);
+      }
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-hkm-opt").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const idx = Number(btn.dataset.idx);
+      const action = btn.dataset.action;
+      const pa = acts[idx];
+      if (!pa) return;
+      $("manage-modal-body").querySelectorAll(".mn-heading-color-menu").forEach(m => m.style.display = "none");
+      if (action === "blue") {
+        pa.isHeading = true;
+        delete pa.headingColor;
+        delete pa.isMaintainHeading;
+        target.predefinedActivities = acts;
+        await saveTarget();
+        renderTargetManageContent(student, target);
+      } else if (action === "gray") {
+        pa.isHeading = true;
+        pa.headingColor = "gray";
+        delete pa.isMaintainHeading;
+        target.predefinedActivities = acts;
+        await saveTarget();
+        renderTargetManageContent(student, target);
+      } else if (action === "delete") {
+        if (!confirm(`Delete section heading "${pa.name}"?`)) return;
+        const actIdx = acts.indexOf(pa);
+        if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
+        target.predefinedActivities = acts;
+        await saveTarget();
+        renderTargetManageContent(student, target);
+      }
     });
   });
 
@@ -8287,12 +8356,20 @@ function renderTemplateManageContent(template) {
     <div class="admin-list" id="mn-act-list">`;
 
   acts.forEach((a, idx) => {
-    if (a.isHeading) {
-      html += `<div class="admin-list-item mn-heading-item" data-idx="${idx}">
+    if (a.isHeading || a.isMaintainHeading) {
+      const isGray = a.headingColor === "gray" || a.isMaintainHeading;
+      html += `<div class="admin-list-item mn-heading-item" data-idx="${idx}"${isGray ? ' style="background:#d1d5db"' : ''}>
         <span class="drag-handle">⠿</span>
         <textarea class="admin-input mn-heading-input" id="mn-act-name-${idx}" data-idx="${idx}"
-          rows="1" placeholder="Enter Section Heading" style="flex:1">${escHtml(a.name || "")}</textarea>
-        <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
+          rows="1" placeholder="Enter Section Heading" style="flex:1${isGray ? ";background:#d1d5db" : ""}">${escHtml(a.name || "")}</textarea>
+        <div style="position:relative">
+          <button class="btn-adm-del mn-heading-color-btn" data-idx="${idx}" title="Heading options" style="font-size:1.15rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
+          <div class="mn-heading-color-menu" id="mn-hkm-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:170px;overflow:hidden">
+            <button class="mn-hkm-opt" data-idx="${idx}" data-action="blue" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem${!isGray ? ";font-weight:700" : ""}">🔵 Blue (default)</button>
+            <button class="mn-hkm-opt" data-idx="${idx}" data-action="gray" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem${isGray ? ";font-weight:700" : ""}">⬜ Gray</button>
+            <button class="mn-hkm-opt" data-idx="${idx}" data-action="delete" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑 Delete</button>
+          </div>
+        </div>
       </div>`;
     } else if (a.isNote) {
       html += `<div class="admin-list-item admin-note-item" data-idx="${idx}">
@@ -8301,13 +8378,6 @@ function renderTemplateManageContent(template) {
         <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
           rows="1" placeholder="Enter Note"
           style="flex:1;overflow-y:hidden;resize:none">${escHtml(stripNoteHtml(a.text || ""))}</textarea>
-        <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
-      </div>`;
-    } else if (a.isMaintainHeading) {
-      html += `<div class="admin-list-item mn-heading-item" data-idx="${idx}" style="background:#d1d5db">
-        <span class="drag-handle">⠿</span>
-        <textarea class="admin-input mn-heading-input" id="mn-act-name-${idx}" data-idx="${idx}"
-          rows="1" placeholder="Enter Maintain Section Heading" style="flex:1;background:#d1d5db">${escHtml(a.name || "")}</textarea>
         <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
       </div>`;
     } else if (a.isMaintain) {
@@ -8330,6 +8400,7 @@ function renderTemplateManageContent(template) {
       </div>`;
     } else {
       const remarkTypeSelect = buildRemarkTypeControls(a, idx);
+      const isGray = a.activityColor === "gray" || a.isMaintainLive;
       const noteRow = a.actNote !== undefined
         ? `<div style="display:flex;align-items:flex-start;gap:.3rem">
             ${formatButtonsHtml(`mn-act-note-${idx}`)}
@@ -8338,7 +8409,15 @@ function renderTemplateManageContent(template) {
               style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.actNote || "")}</textarea>
           </div>`
         : "";
-      html += `<div class="admin-list-item" data-idx="${idx}"${a.isMaintainLive ? ' style="background:#f3f4f6;border:1px solid #d1d5db"' : ''}>
+      const fixedRemarkRow = a.fixedRemark !== undefined
+        ? `<div style="display:flex;align-items:center;gap:.5rem">
+            <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Fixed Remark:</span>
+            <textarea class="admin-input mn-fixed-remark-input" id="mn-act-fixed-remark-${idx}" data-idx="${idx}"
+              rows="1" placeholder="Remark shown read-only in sessions"
+              style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.fixedRemark || "")}</textarea>
+          </div>`
+        : "";
+      html += `<div class="admin-list-item" data-idx="${idx}"${isGray ? ' style="background:#f3f4f6;border:1px solid #d1d5db"' : ''}>
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
           <div style="display:flex;align-items:flex-start;gap:.3rem">
@@ -8351,8 +8430,19 @@ function renderTemplateManageContent(template) {
             <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Remark Type:</span>
             ${remarkTypeSelect}
           </div>
+          ${fixedRemarkRow}
         </div>
-        <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
+        <div style="position:relative">
+          <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
+          <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:215px;overflow:hidden">
+            <div style="display:flex;align-items:stretch;border-bottom:1px solid #f3f4f6">
+              <button class="mn-km-opt" data-idx="${idx}" data-action="${isGray ? "color_white" : "color_gray"}" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">${isGray ? "⬜ Change to White" : "⬛ Change to Gray"}</button>
+            </div>
+            <div style="display:flex;align-items:stretch">
+              <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
+            </div>
+          </div>
+        </div>
       </div>`;
     }
   });
@@ -8363,9 +8453,6 @@ function renderTemplateManageContent(template) {
       <button class="btn-admin-add" id="btn-mn-add-act-note" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Note</button>
       <button class="btn-admin-add" id="btn-mn-add-heading" style="flex:0 0 auto;width:auto">+ Add Section Heading</button>
       <button class="btn-admin-add" id="btn-mn-add-note" style="flex:0 0 auto;width:auto">+ Add Note</button>
-      <button class="btn-admin-add" id="btn-mn-add-maintain" style="flex:0 0 auto;width:auto">+ Add Maintain Activity (Fixed Remark)</button>
-      <button class="btn-admin-add" id="btn-mn-add-maintain-live" style="flex:0 0 auto;width:auto">+ Add Maintain Activity</button>
-      <button class="btn-admin-add" id="btn-mn-add-maintain-heading" style="flex:0 0 auto;width:auto">+ Add Maintain Section Heading</button>
     </div>
     <div style="margin-top:2rem;padding-bottom:1.5rem">
       <button class="btn-primary-sm" id="btn-mn-done-template"
@@ -8543,27 +8630,6 @@ function renderTemplateManageContent(template) {
     renderTemplateManageContent(template);
   });
 
-  $("btn-mn-add-maintain").addEventListener("click", async () => {
-    acts.push({ id: cfgId("mt"), isMaintain: true, name: "", maintainRemark: "", order: acts.length });
-    template.predefinedActivities = acts;
-    await saveTemplateFn();
-    renderTemplateManageContent(template);
-  });
-
-  $("btn-mn-add-maintain-live").addEventListener("click", async () => {
-    acts.push({ id: cfgId("ml"), isMaintainLive: true, name: "", order: acts.length });
-    template.predefinedActivities = acts;
-    await saveTemplateFn();
-    renderTemplateManageContent(template);
-  });
-
-  $("btn-mn-add-maintain-heading").addEventListener("click", async () => {
-    acts.push({ id: cfgId("mh"), isMaintainHeading: true, name: "", order: acts.length });
-    template.predefinedActivities = acts;
-    await saveTemplateFn();
-    renderTemplateManageContent(template);
-  });
-
   $("manage-modal-body").querySelectorAll(".mn-act-preset").forEach(sel => {
     sel.addEventListener("change", async () => {
       const idx = Number(sel.dataset.idx);
@@ -8571,6 +8637,24 @@ function renderTemplateManageContent(template) {
       const starterInput  = body.querySelector(`.mn-act-starter-text[data-idx="${idx}"]`);
       const optsContainer = body.querySelector(`.mn-opts-container[data-idx="${idx}"]`);
       const type = sel.value;
+      if (type === "fixed_remark") {
+        if (acts[idx].fixedRemark === undefined) acts[idx].fixedRemark = "";
+        acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
+        acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false;
+        template.predefinedActivities = acts;
+        await saveTemplateFn();
+        renderTemplateManageContent(template);
+        return;
+      }
+      if (acts[idx].fixedRemark !== undefined) {
+        delete acts[idx].fixedRemark;
+        acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
+        acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false;
+        template.predefinedActivities = acts;
+        await saveTemplateFn();
+        renderTemplateManageContent(template);
+        return;
+      }
       acts[idx].sentenceStarter = null;
       acts[idx].remarkPresetId  = null;
       acts[idx].inlineOptions   = null;
@@ -8597,6 +8681,102 @@ function renderTemplateManageContent(template) {
       acts[idx].sentenceStarter = input.value.trim() || null;
       template.predefinedActivities = acts;
       await saveTemplateFn();
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-fixed-remark-input").forEach(input => {
+    autoResizeTextarea(input);
+    input.addEventListener("blur", async () => {
+      const idx = Number(input.dataset.idx);
+      if (acts[idx].fixedRemark === input.value) return;
+      acts[idx].fixedRemark = input.value;
+      template.predefinedActivities = acts;
+      await saveTemplateFn();
+      flashSaved(input);
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-heading-color-btn").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const idx = btn.dataset.idx;
+      const menu = $(`mn-hkm-${idx}`);
+      const wasHidden = menu.style.display !== "block";
+      $("manage-modal-body").querySelectorAll(".mn-heading-color-menu, .mn-kebab-menu").forEach(m => m.style.display = "none");
+      if (wasHidden) {
+        menu.style.display = "block";
+        const closeMenu = ev => {
+          if (!menu.contains(ev.target)) { menu.style.display = "none"; document.removeEventListener("click", closeMenu); }
+        };
+        setTimeout(() => document.addEventListener("click", closeMenu), 0);
+      }
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-hkm-opt").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const idx = Number(btn.dataset.idx);
+      const action = btn.dataset.action;
+      const pa = acts[idx];
+      if (!pa) return;
+      $("manage-modal-body").querySelectorAll(".mn-heading-color-menu").forEach(m => m.style.display = "none");
+      if (action === "blue") {
+        pa.isHeading = true; delete pa.headingColor; delete pa.isMaintainHeading;
+        template.predefinedActivities = acts;
+        await saveTemplateFn(); renderTemplateManageContent(template);
+      } else if (action === "gray") {
+        pa.isHeading = true; pa.headingColor = "gray"; delete pa.isMaintainHeading;
+        template.predefinedActivities = acts;
+        await saveTemplateFn(); renderTemplateManageContent(template);
+      } else if (action === "delete") {
+        if (!confirm(`Delete section heading "${pa.name}"?`)) return;
+        const actIdx = acts.indexOf(pa);
+        if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
+        template.predefinedActivities = acts;
+        await saveTemplateFn(); renderTemplateManageContent(template);
+      }
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-kebab-btn").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const idx = btn.dataset.idx;
+      const menu = $(`mn-km-${idx}`);
+      const wasHidden = menu.style.display !== "block";
+      $("manage-modal-body").querySelectorAll(".mn-kebab-menu, .mn-heading-color-menu").forEach(m => m.style.display = "none");
+      if (wasHidden) {
+        menu.style.display = "block";
+        const closeMenu = ev => {
+          if (!menu.contains(ev.target)) { menu.style.display = "none"; document.removeEventListener("click", closeMenu); }
+        };
+        setTimeout(() => document.addEventListener("click", closeMenu), 0);
+      }
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-km-opt").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const idx = Number(btn.dataset.idx);
+      const action = btn.dataset.action;
+      const pa = acts[idx];
+      if (!pa) return;
+      $("manage-modal-body").querySelectorAll(".mn-kebab-menu").forEach(m => m.style.display = "none");
+      if (action === "color_gray") {
+        pa.activityColor = "gray"; delete pa.isMaintainLive;
+        template.predefinedActivities = acts;
+        await saveTemplateFn(); renderTemplateManageContent(template);
+      } else if (action === "color_white") {
+        delete pa.activityColor; delete pa.isMaintainLive;
+        template.predefinedActivities = acts;
+        await saveTemplateFn(); renderTemplateManageContent(template);
+      } else if (action === "delete") {
+        if (!confirm(`Delete activity "${pa.name}"?`)) return;
+        const actIdx = acts.indexOf(pa);
+        if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
+        template.predefinedActivities = acts;
+        await saveTemplateFn(); renderTemplateManageContent(template);
+      }
     });
   });
 
@@ -9159,7 +9339,7 @@ function renderGroupStudentBlock(studentName, target, data) {
   // only actual scoreable activities make sense nested under a student.
   const activityEntries = [];
   for (const pa of (target.predefinedActivities || [])) {
-    if (pa.isNote || pa.isHeading || pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || pa.isMaintainHeading || !pa.name) continue;
+    if (pa.isNote || pa.isHeading || pa.isMaintainHeading || pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || pa.fixedRemark !== undefined || !pa.name) continue;
     const actId = Object.entries(data.activities || {})
       .find(([, a]) => a.targetName === target.name && a.activityName === pa.name)?.[0] || null;
     activityEntries.push({ actId, actName: pa.name, actNote: pa.actNote, pa });

@@ -1518,16 +1518,22 @@ function getAllActivitiesForTarget(session, target) {
       continue;
     }
     if (!pa.name) continue;
-    if (pa.isHeading) {
+    if (pa.isHeading && pa.headingColor !== "gray") {
       result.push({ isHeading: true, activityName: pa.name });
+      continue;
+    }
+    // Gray headings (new headingColor:"gray" or legacy isMaintainHeading) → maintain section
+    if ((pa.isHeading && pa.headingColor === "gray") || pa.isMaintainHeading) {
+      maintainActivities.push({ isMaintainHeading: true, activityName: pa.name });
+      continue;
+    }
+    // Fixed remark activities (new fixedRemark field or legacy isMaintain) → maintain section
+    if (pa.fixedRemark !== undefined) {
+      maintainActivities.push({ isMaintain: true, activityName: pa.name, maintainRemark: pa.fixedRemark || "" });
       continue;
     }
     if (pa.isMaintain) {
       maintainActivities.push({ isMaintain: true, activityName: pa.name, maintainRemark: pa.maintainRemark || "" });
-      continue;
-    }
-    if (pa.isMaintainHeading) {
-      if (pa.name) maintainActivities.push({ isMaintainHeading: true, activityName: pa.name });
       continue;
     }
     if (pa.isCompleted) {
@@ -1617,7 +1623,7 @@ function calcDailyAverage(session, target, allTargets = [], visited = new Set())
 
   const avgs = [];
   for (const act of getAllActivitiesForTarget(session, target)) {
-    if (act.isHeading || act.isNote || act.empty || act.isMasteredSeparator || act.isStoppedSeparator || act.isMaintainSeparator || act.isMaintain || act.isMaintainHeading) continue;
+    if (act.isHeading || act.isNote || act.empty || act.isMasteredSeparator || act.isStoppedSeparator || act.isMaintainSeparator || act.isMaintain || act.isMaintainHeading || act.fixedRemark !== undefined) continue;
     if (act.isMapped) {
       if (getRemarksForActivity(session, act.id).length === 0) continue;
       const a = resolveExportMappedScore(act, session, allTargets, visited);
