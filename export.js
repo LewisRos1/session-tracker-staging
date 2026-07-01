@@ -506,11 +506,18 @@ function addIndividualTargetSheets(wb, allTargets, sessions, studentName, includ
 }
 
 async function buildStudentWorkbook(student, sessions, includeTrials) {
-  // Drop ghost sessions: activities are auto-created on target selection even without data entry.
-  // A session only counts as real once at least one remark (which carries trial scores) exists.
-  sessions = sessions.filter(s => Object.keys(s.remarks || {}).length > 0);
-
   const allTargets = getAllTargets(student).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
+
+  // Drop ghost sessions: only keep sessions where something real was recorded.
+  // "Real" means: at least one remark exists, OR the session accessed a Fixed Remark target
+  // (those never produce remark docs but still represent genuine clinical content).
+  const hasFixedTargetActivity = s => Object.values(s.activities || {}).some(
+    a => a.targetName && allTargets.some(
+      t => t.name === a.targetName &&
+        (t.predefinedActivities || []).some(pa => pa.fixedRemark !== undefined || pa.isMaintain)
+    )
+  );
+  sessions = sessions.filter(s => Object.keys(s.remarks || {}).length > 0 || hasFixedTargetActivity(s));
   const wb = new ExcelJS.Workbook();
   const sortedSessions = sessions.slice().sort((a, b) => a.date.localeCompare(b.date));
 
@@ -526,6 +533,12 @@ async function buildStudentWorkbook(student, sessions, includeTrials) {
 // identically to an individual student export (no Student column — every
 // session here has already been filtered down to just this student's remarks).
 async function buildGroupMemberWorkbook(studentName, allTargets, sessions, includeTrials) {
+  const hasFixedTargetActivity = s => Object.values(s.activities || {}).some(
+    a => a.targetName && allTargets.some(
+      t => t.name === a.targetName &&
+        (t.predefinedActivities || []).some(pa => pa.fixedRemark !== undefined || pa.isMaintain)
+    )
+  );
   const filtered = sessions
     .map(s => ({
       ...s,
@@ -533,7 +546,7 @@ async function buildGroupMemberWorkbook(studentName, allTargets, sessions, inclu
         Object.entries(s.remarks || {}).filter(([, r]) => r.studentName === studentName)
       )
     }))
-    .filter(s => Object.keys(s.remarks).length > 0);
+    .filter(s => Object.keys(s.remarks).length > 0 || hasFixedTargetActivity(s));
 
   const sortedTargets  = allTargets.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
   const wb              = new ExcelJS.Workbook();
@@ -749,7 +762,7 @@ function wordTargetRows(target, session, allTargets) {
       continue;
     }
 
-    const remarks = getRemarksForActivity(session, act.id);
+    const remarks = getRemarksForActivity(session, act.id).filter(hasRemarkContent);
     const starter = (target.predefinedActivities || []).find(
       p => !p.isHeading && !p.isNote && p.name === act.activityName
     )?.sentenceStarter || null;
@@ -1469,7 +1482,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
         continue;
       }
 
-      const remarks = getRemarksForActivity(session, act.id);
+      const remarks = getRemarksForActivity(session, act.id).filter(hasRemarkContent);
       const starter = (target.predefinedActivities || []).find(
         p => !p.isHeading && !p.isNote && p.name === act.activityName
       )?.sentenceStarter || null;
@@ -1620,6 +1633,15 @@ function getRemarksForActivity(session, actId) {
     .filter(([, r]) => r.activityId === actId)
     .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
     .map(([id, r]) => ({ id, ...r }));
+}
+
+// Returns true if a remark has any real content (text or valid trial scores).
+// Empty auto-created remarks (nothing selected / typed / checked) should not
+// appear as rows in Word or Excel exports.
+function hasRemarkContent(rem) {
+  const hasText   = stripRemarkHtml(rem.text || "").trim() !== "";
+  const hasTrials = (rem.trials || []).filter(t => t !== -1).length > 0;
+  return hasText || hasTrials;
 }
 
 // ─── CALCULATIONS ────────────────────────────────────────────
