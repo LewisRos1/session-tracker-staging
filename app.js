@@ -128,7 +128,29 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "642";
+const APP_VERSION = "643";
+
+// TEMP v643 — one-shot dedup helper; remove after use
+window.dedupStudentTarget = async (studentName, targetName) => {
+  const student = state.students.find(s => s.name === studentName);
+  if (!student) { console.error("Student not found:", studentName); return; }
+  const target = student.targets.find(t => t.name === targetName);
+  if (!target) { console.error("Target not found:", targetName); return; }
+  const before = (target.predefinedActivities || []).length;
+  const seen = new Set();
+  target.predefinedActivities = (target.predefinedActivities || []).filter(a => {
+    const key = a.id || JSON.stringify(a);
+    if (seen.has(key)) return false;
+    seen.add(key); return true;
+  });
+  target.predefinedActivities.forEach((a, i) => a.order = i);
+  const after = target.predefinedActivities.length;
+  console.log(`Deduped: ${before} → ${after} items. Saving…`);
+  const si = state.students.findIndex(s => s.id === student.id);
+  if (si >= 0) state.students[si] = student;
+  await saveStudent(student);
+  console.log("Done! Reload the Edit Target modal to see the cleaned list.");
+};
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
