@@ -128,7 +128,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "654";
+const APP_VERSION = "655";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2841,7 +2841,7 @@ function renderFedcTarget(target) {
     if (pa.isHeading || pa.isMaintainHeading) {
       const isGray = pa.headingColor === "gray" || pa.isMaintainHeading;
       html += isGray
-        ? `<div class="activity-group-heading" contenteditable="false" style="background:#d1d5db;border-color:#9ca3af;color:#374151">${escHtml(pa.name || "")}</div>`
+        ? `<div class="activity-group-heading" contenteditable="false" style="background:#9ca3af;border-color:#6b7280;color:#111827">${escHtml(pa.name || "")}</div>`
         : `<div class="activity-group-heading" contenteditable="false">${escHtml(pa.name || "")}</div>`;
       return;
     }
@@ -7581,16 +7581,16 @@ function renderTargetManageContent(student, target) {
     if (a.isCompleted || a.isArchived || a.isStopped) return;
     if (a.isHeading || a.isMaintainHeading) {
       const isGray = a.headingColor === "gray" || a.isMaintainHeading;
-      html += `<div class="admin-list-item mn-heading-item" data-idx="${idx}"${isGray ? ' style="background:#d1d5db"' : ''}>
+      html += `<div class="admin-list-item mn-heading-item" data-idx="${idx}"${isGray ? ' style="background:#9ca3af"' : ''}>
         <span class="drag-handle">⠿</span>
         <textarea class="admin-input mn-heading-input" id="mn-act-name-${idx}" data-idx="${idx}"
-          rows="1" placeholder="Enter Section Heading" style="flex:1${isGray ? ";background:#d1d5db" : ""}">${escHtml(a.name || "")}</textarea>
+          rows="1" placeholder="Enter Section Heading" style="flex:1${isGray ? ";background:#9ca3af;color:#111827" : ""}">${escHtml(a.name || "")}</textarea>
         <div style="position:relative">
           <button class="btn-adm-del mn-heading-color-btn" data-idx="${idx}" title="Heading options" style="font-size:1.15rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-heading-color-menu" id="mn-hkm-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:170px;overflow:hidden">
             <button class="mn-hkm-opt" data-idx="${idx}" data-action="blue" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem${!isGray ? ";font-weight:700" : ""}">🔵 Blue (default)</button>
-            <button class="mn-hkm-opt" data-idx="${idx}" data-action="gray" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem${isGray ? ";font-weight:700" : ""}">⬜ Gray</button>
-            <button class="mn-hkm-opt" data-idx="${idx}" data-action="delete" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑 Delete</button>
+            <button class="mn-hkm-opt" data-idx="${idx}" data-action="gray" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem${isGray ? ";font-weight:700" : ""}">⬜ Grey</button>
+            <button class="mn-hkm-opt" data-idx="${idx}" data-action="delete" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete</button>
           </div>
         </div>
       </div>`;
@@ -8358,16 +8358,16 @@ function renderTemplateManageContent(template) {
   acts.forEach((a, idx) => {
     if (a.isHeading || a.isMaintainHeading) {
       const isGray = a.headingColor === "gray" || a.isMaintainHeading;
-      html += `<div class="admin-list-item mn-heading-item" data-idx="${idx}"${isGray ? ' style="background:#d1d5db"' : ''}>
+      html += `<div class="admin-list-item mn-heading-item" data-idx="${idx}"${isGray ? ' style="background:#9ca3af"' : ''}>
         <span class="drag-handle">⠿</span>
         <textarea class="admin-input mn-heading-input" id="mn-act-name-${idx}" data-idx="${idx}"
-          rows="1" placeholder="Enter Section Heading" style="flex:1${isGray ? ";background:#d1d5db" : ""}">${escHtml(a.name || "")}</textarea>
+          rows="1" placeholder="Enter Section Heading" style="flex:1${isGray ? ";background:#9ca3af;color:#111827" : ""}">${escHtml(a.name || "")}</textarea>
         <div style="position:relative">
           <button class="btn-adm-del mn-heading-color-btn" data-idx="${idx}" title="Heading options" style="font-size:1.15rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-heading-color-menu" id="mn-hkm-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:170px;overflow:hidden">
             <button class="mn-hkm-opt" data-idx="${idx}" data-action="blue" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem${!isGray ? ";font-weight:700" : ""}">🔵 Blue (default)</button>
-            <button class="mn-hkm-opt" data-idx="${idx}" data-action="gray" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem${isGray ? ";font-weight:700" : ""}">⬜ Gray</button>
-            <button class="mn-hkm-opt" data-idx="${idx}" data-action="delete" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑 Delete</button>
+            <button class="mn-hkm-opt" data-idx="${idx}" data-action="gray" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem${isGray ? ";font-weight:700" : ""}">⬜ Grey</button>
+            <button class="mn-hkm-opt" data-idx="${idx}" data-action="delete" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete</button>
           </div>
         </div>
       </div>`;
