@@ -75,15 +75,14 @@ import {
 // ── SW update detection — must run at parse time, before DOMContentLoaded,
 //   so the listener is in place before the new SW can fire controllerchange.
 if ("serviceWorker" in navigator) {
-  const hadController = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    // Only reload for updates, not for the very first SW install. Show
-    // "App Updating…" on THIS page first so it's visible for a moment, then
-    // reload — the fresh page picks the same message back up immediately
-    // (see the sessionStorage check in DOMContentLoaded below) so it reads
-    // as one continuous transition instead of the app silently bouncing to
-    // the home screen with no explanation.
-    if (hadController) {
+    // Reload whenever the controller changes AND there is now a controller.
+    // Previously guarded by hadController (captured at parse time), but that
+    // variable stays false for the whole page load if the user opened the app
+    // without an active SW (hard refresh, cleared cache, iOS PWA restart) —
+    // meaning any subsequent update that session would silently fail to reload.
+    // Checking navigator.serviceWorker.controller at event time is always accurate.
+    if (navigator.serviceWorker.controller) {
       sessionStorage.setItem("justUpdated", "1");
       document.querySelectorAll(".screen").forEach(s => s.classList.toggle("hidden", s.id !== "screen-loading"));
       document.getElementById("updating-content")?.classList.remove("hidden");
@@ -128,7 +127,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "660";
+const APP_VERSION = "661";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
