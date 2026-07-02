@@ -127,7 +127,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "676";
+const APP_VERSION = "678";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1751,7 +1751,22 @@ function showStudentChoice(student) {
       // Use the pre-fetched promise — likely already resolved by now
       sessionsFetch
         .then(sessions => {
-          const takenDates = new Set(sessions.map(s => s.date));
+          // Filter out empty sessions so stale Firestore docs don't show phantom checkmarks.
+          // Matches the same hasUsefulData logic used in showSessionPicker.
+          const curTgtNames = new Set((student.targets || []).map(t => t.name));
+          const stripE = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
+          const hasData = s => {
+            if (Object.values(s.fedcComments || {}).some(c => stripE(c).length > 0)) return true;
+            return Object.values(s.remarks || {}).some(r => {
+              const act = (s.activities || {})[r.activityId];
+              if (!act || !curTgtNames.has(act.targetName)) return false;
+              return stripE(r.text).length > 0 || (r.trials || []).some(t => t !== null && t !== -1) || stripE(r.masteryNote).length > 0;
+            });
+          };
+          const empties = sessions.filter(s => !hasData(s));
+          empties.forEach(s => deleteSession(s.id).catch(() => {}));
+          if (empties.length > 0) resequenceIndividualSessions(student.id).catch(() => {});
+          const takenDates = new Set(sessions.filter(hasData).map(s => s.date));
           renderStartSessionCalendar(student, today, displayDate, takenDates);
         })
         .catch(() => {});
@@ -2997,16 +3012,16 @@ function renderFedcTarget(target) {
         const isGrayH  = pa.headingColor === "gray" || pa.isMaintainHeading;
         const isGreenH = pa.headingColor === "green";
         return isGrayH
-          ? `<div class="activity-group-heading" contenteditable="false" style="opacity:.5;background:#9ca3af;border-color:#6b7280;color:#ffffff">${escHtml(pa.name || "")}</div>`
+          ? `<div class="activity-group-heading" contenteditable="false" style="opacity:.3;background:#9ca3af;border-color:#6b7280;color:#ffffff">${escHtml(pa.name || "")}</div>`
           : isGreenH
-          ? `<div class="activity-group-heading" contenteditable="false" style="opacity:.5;background:#a9d18e;border-color:#70ad47;color:#1a4731">${escHtml(pa.name || "")}</div>`
-          : `<div class="activity-group-heading" contenteditable="false" style="opacity:.5">${escHtml(pa.name || "")}</div>`;
+          ? `<div class="activity-group-heading" contenteditable="false" style="opacity:.3;background:#a9d18e;border-color:#70ad47;color:#1a4731">${escHtml(pa.name || "")}</div>`
+          : `<div class="activity-group-heading" contenteditable="false" style="opacity:.3">${escHtml(pa.name || "")}</div>`;
       }
       if (pa.isNote) {
-        return pa.text ? `<div class="activity-note-heading" contenteditable="false" style="opacity:.5">${noteToHtml(pa.text)}</div>` : '';
+        return pa.text ? `<div class="activity-note-heading" contenteditable="false" style="opacity:.3">${noteToHtml(pa.text)}</div>` : '';
       }
       const fixedText = pa.fixedRemark !== undefined ? pa.fixedRemark : pa.isMaintain ? (pa.maintainRemark ?? "") : null;
-      return `<div class="entry-block entry-block-predefined" style="opacity:.5;pointer-events:none">
+      return `<div class="entry-block entry-block-predefined" style="opacity:.3;pointer-events:none">
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Activity</span>
           <span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span>
@@ -6762,13 +6777,13 @@ function periodSectionHtml(activeFrom, activeTo, idx, withBorder) {
   const toCol     = activeTo   ? '#111827' : '#6b7280';
   const border    = withBorder ? 'border-bottom:1px solid #f3f4f6;' : '';
   return `<div style="padding:.45rem .6rem;${border}">
-    <div style="font-size:.84rem;color:#374151;margin-bottom:.35rem">📅 Active Period</div>
+    <div style="font-size:.84rem;color:inherit;margin-bottom:.35rem">📅 Active Period</div>
     <div style="display:flex;align-items:center;gap:.4rem">
       <div style="position:relative;flex:1;min-width:0">
         <button class="mn-period-from-btn" data-idx="${idx}" style="width:100%;padding:.28rem .4rem;border:1px solid #d1d5db;border-radius:.3rem;background:${fromBg};cursor:pointer;font-size:.8rem;color:${fromCol};white-space:nowrap;text-align:center">${fromLabel}</button>
         <div class="mn-period-from-panel" data-idx="${idx}" style="display:none;position:absolute;top:calc(100% + 3px);left:0;z-index:300;background:#fff;border:1px solid #e5e7eb;border-radius:.45rem;padding:.4rem;box-shadow:0 4px 14px rgba(0,0,0,.12);min-width:175px">
           <input type="date" class="mn-period-date" data-idx="${idx}" data-which="from" value="${activeFrom||''}" style="width:100%;font-size:.8rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;margin-bottom:.3rem;box-sizing:border-box">
-          <button class="mn-period-inf" data-idx="${idx}" data-which="from" style="width:100%;padding:.25rem;font-size:.78rem;border:1px solid #bfdbfe;border-radius:.3rem;background:#eff6ff;cursor:pointer;color:#1d4ed8">-∞ No Start Date</button>
+          <button class="mn-period-inf" data-idx="${idx}" data-which="from" style="width:100%;padding:.25rem;font-size:.78rem;border:1px solid #bfdbfe;border-radius:.3rem;background:#eff6ff;cursor:pointer;color:#1d4ed8">Clear / Set as -∞</button>
         </div>
       </div>
       <span style="color:#9ca3af;flex-shrink:0">→</span>
@@ -6776,7 +6791,7 @@ function periodSectionHtml(activeFrom, activeTo, idx, withBorder) {
         <button class="mn-period-to-btn" data-idx="${idx}" style="width:100%;padding:.28rem .4rem;border:1px solid #d1d5db;border-radius:.3rem;background:${toBg};cursor:pointer;font-size:.8rem;color:${toCol};white-space:nowrap;text-align:center">${toLabel}</button>
         <div class="mn-period-to-panel" data-idx="${idx}" style="display:none;position:absolute;top:calc(100% + 3px);right:0;z-index:300;background:#fff;border:1px solid #e5e7eb;border-radius:.45rem;padding:.4rem;box-shadow:0 4px 14px rgba(0,0,0,.12);min-width:175px">
           <input type="date" class="mn-period-date" data-idx="${idx}" data-which="to" value="${activeTo||''}" style="width:100%;font-size:.8rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;margin-bottom:.3rem;box-sizing:border-box">
-          <button class="mn-period-inf" data-idx="${idx}" data-which="to" style="width:100%;padding:.25rem;font-size:.78rem;border:1px solid #bfdbfe;border-radius:.3rem;background:#eff6ff;cursor:pointer;color:#1d4ed8">+∞ No End Date</button>
+          <button class="mn-period-inf" data-idx="${idx}" data-which="to" style="width:100%;padding:.25rem;font-size:.78rem;border:1px solid #bfdbfe;border-radius:.3rem;background:#eff6ff;cursor:pointer;color:#1d4ed8">Clear / Set as +∞</button>
         </div>
       </div>
     </div>
@@ -7942,7 +7957,7 @@ function renderTargetManageContent(student, target) {
       </div>`;
     } else if (a.isNote) {
       const noteInactive = !isActivityActive(a, todayDateStr());
-      html += `<div class="admin-list-item admin-note-item" data-idx="${idx}"${noteInactive ? ' style="opacity:0.45"' : ''}>
+      html += `<div class="admin-list-item admin-note-item" data-idx="${idx}"${noteInactive ? ' style="opacity:0.3"' : ''}>
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.25rem">
           <div style="display:flex;align-items:flex-start;gap:.3rem">
@@ -7987,8 +8002,8 @@ function renderTargetManageContent(student, target) {
         : "";
       const actInactive = !isActivityActive(a, todayDateStr());
       const actExpired  = actInactive && !!a.activeTo && a.activeTo < todayDateStr();
-      const actOverlay  = actExpired ? `<div style="position:absolute;inset:0;background:rgba(255,255,255,.7);pointer-events:none;z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center"><div style="pointer-events:none;background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.35rem .75rem;text-align:center;font-size:.78rem;color:#374151;max-width:80%">⏸ Period has ended — tap ⋮ to adjust the dates and bring it back.</div></div>` : '';
-      html += `<div class="admin-list-item" data-idx="${idx}"${actExpired ? ' style="position:relative"' : actInactive ? ' style="opacity:0.45"' : ''}>
+      const actOverlay  = actExpired ? `<div style="position:absolute;inset:0 2.5rem 0 0;background:rgba(255,255,255,.7);pointer-events:none;z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center"><div style="pointer-events:none;background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.35rem .75rem;text-align:center;font-size:1.17rem;color:#374151;max-width:80%">⏸ This activity's period has ended — tap ⋮ on the right side to adjust the dates and bring it back.</div></div>` : '';
+      html += `<div class="admin-list-item" data-idx="${idx}"${actExpired ? ' style="position:relative"' : actInactive ? ' style="opacity:0.3"' : ''}>
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
           <div style="display:flex;align-items:flex-start;gap:.3rem">
@@ -8028,8 +8043,8 @@ function renderTargetManageContent(student, target) {
       const actInactive = !isActivityActive(a, todayDateStr());
       const actExpired  = actInactive && !!a.activeTo && a.activeTo < todayDateStr();
       const actBaseBg   = isGray ? 'background:#f3f4f6;border:1px solid #d1d5db' : isGreen ? 'background:#e2efda;border:1px solid #a9d18e' : null;
-      const actItemStyle = actExpired ? (actBaseBg ? ` style="position:relative;${actBaseBg}"` : ' style="position:relative"') : (actBaseBg ? ` style="${actBaseBg}${actInactive ? ';opacity:0.45' : ''}"` : actInactive ? ' style="opacity:0.45"' : '');
-      const actOverlay  = actExpired ? `<div style="position:absolute;inset:0;background:rgba(255,255,255,.7);pointer-events:none;z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center"><div style="pointer-events:none;background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.35rem .75rem;text-align:center;font-size:.78rem;color:#374151;max-width:80%">⏸ Period has ended — tap ⋮ to adjust the dates and bring it back.</div></div>` : '';
+      const actItemStyle = actExpired ? (actBaseBg ? ` style="position:relative;${actBaseBg}"` : ' style="position:relative"') : (actBaseBg ? ` style="${actBaseBg}${actInactive ? ';opacity:0.3' : ''}"` : actInactive ? ' style="opacity:0.3"' : '');
+      const actOverlay  = actExpired ? `<div style="position:absolute;inset:0 2.5rem 0 0;background:rgba(255,255,255,.7);pointer-events:none;z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center"><div style="pointer-events:none;background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.35rem .75rem;text-align:center;font-size:1.17rem;color:#374151;max-width:80%">⏸ This activity's period has ended — tap ⋮ on the right side to adjust the dates and bring it back.</div></div>` : '';
       const noteRow = a.actNote !== undefined
         ? `<div style="display:flex;align-items:flex-start;gap:.3rem">
             ${formatButtonsHtml(`mn-act-name-${idx}`)}
@@ -8408,42 +8423,42 @@ function renderTargetManageContent(student, target) {
   });
 
   $("btn-mn-add-act").addEventListener("click", async () => {
-    acts.push({ id: cfgId("a"), name: "", order: acts.length, activeFrom: todayDateStr() });
+    acts.push({ id: cfgId("a"), name: "", order: acts.length, activeFrom: null });
     target.predefinedActivities = acts;
     await saveTarget();
     renderTargetManageContent(student, target);
   });
 
   $("btn-mn-add-act-note").addEventListener("click", async () => {
-    acts.push({ id: cfgId("a"), name: "", actNote: "", order: acts.length, activeFrom: todayDateStr() });
+    acts.push({ id: cfgId("a"), name: "", actNote: "", order: acts.length, activeFrom: null });
     target.predefinedActivities = acts;
     await saveTarget();
     renderTargetManageContent(student, target);
   });
 
   $("btn-mn-add-heading").addEventListener("click", async () => {
-    acts.push({ id: cfgId("h"), isHeading: true, name: "", order: acts.length, activeFrom: todayDateStr() });
+    acts.push({ id: cfgId("h"), isHeading: true, name: "", order: acts.length, activeFrom: null });
     target.predefinedActivities = acts;
     await saveTarget();
     renderTargetManageContent(student, target);
   });
 
   $("btn-mn-add-note").addEventListener("click", async () => {
-    acts.push({ id: cfgId("n"), isNote: true, text: "", order: acts.length, activeFrom: todayDateStr() });
+    acts.push({ id: cfgId("n"), isNote: true, text: "", order: acts.length, activeFrom: null });
     target.predefinedActivities = acts;
     await saveTarget();
     renderTargetManageContent(student, target);
   });
 
   $("btn-mn-add-mapped").addEventListener("click", async () => {
-    acts.push({ id: cfgId("m"), isMapped: true, name: "", mappedTargetId: null, order: acts.length, activeFrom: todayDateStr() });
+    acts.push({ id: cfgId("m"), isMapped: true, name: "", mappedTargetId: null, order: acts.length, activeFrom: null });
     target.predefinedActivities = acts;
     await saveTarget();
     renderTargetManageContent(student, target);
   });
 
   $("btn-mn-add-act-note-mapped").addEventListener("click", async () => {
-    acts.push({ id: cfgId("m"), isMapped: true, name: "", actNote: "", mappedTargetId: null, order: acts.length, activeFrom: todayDateStr() });
+    acts.push({ id: cfgId("m"), isMapped: true, name: "", actNote: "", mappedTargetId: null, order: acts.length, activeFrom: null });
     target.predefinedActivities = acts;
     await saveTarget();
     renderTargetManageContent(student, target);
@@ -8621,6 +8636,13 @@ function renderTargetManageContent(student, target) {
       savePeriodField(+btn.dataset.idx, field, null);
     });
   });
+  if (window._closePeriodPanels) document.removeEventListener("click", window._closePeriodPanels);
+  window._closePeriodPanels = e => {
+    if (!e.target.closest(".mn-period-from-panel,.mn-period-to-panel,.mn-period-from-btn,.mn-period-to-btn,.mn-period-date,.mn-period-inf")) {
+      $("manage-modal-body").querySelectorAll(".mn-period-from-panel,.mn-period-to-panel").forEach(p => p.style.display = "none");
+    }
+  };
+  document.addEventListener("click", window._closePeriodPanels);
 
   const getOptsFromDom = idx =>
     [...$("manage-modal-body").querySelectorAll(`.mn-opt-item[data-idx="${idx}"]`)]
@@ -8780,7 +8802,7 @@ function renderTemplateManageContent(template) {
       </div>`;
     } else if (a.isNote) {
       const noteInactive = !isActivityActive(a, todayDateStr());
-      html += `<div class="admin-list-item admin-note-item" data-idx="${idx}"${noteInactive ? ' style="opacity:0.45"' : ''}>
+      html += `<div class="admin-list-item admin-note-item" data-idx="${idx}"${noteInactive ? ' style="opacity:0.3"' : ''}>
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.25rem">
           <div style="display:flex;align-items:flex-start;gap:.3rem">
@@ -8818,8 +8840,8 @@ function renderTemplateManageContent(template) {
       const actInactive = !isActivityActive(a, todayDateStr());
       const actExpired  = actInactive && !!a.activeTo && a.activeTo < todayDateStr();
       const actBaseBg   = isGray ? 'background:#f3f4f6;border:1px solid #d1d5db' : isGreen ? 'background:#e2efda;border:1px solid #a9d18e' : null;
-      const actItemStyle = actExpired ? (actBaseBg ? ` style="position:relative;${actBaseBg}"` : ' style="position:relative"') : (actBaseBg ? ` style="${actBaseBg}${actInactive ? ';opacity:0.45' : ''}"` : actInactive ? ' style="opacity:0.45"' : '');
-      const actOverlay  = actExpired ? `<div style="position:absolute;inset:0;background:rgba(255,255,255,.7);pointer-events:none;z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center"><div style="pointer-events:none;background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.35rem .75rem;text-align:center;font-size:.78rem;color:#374151;max-width:80%">⏸ Period has ended — tap ⋮ to adjust the dates and bring it back.</div></div>` : '';
+      const actItemStyle = actExpired ? (actBaseBg ? ` style="position:relative;${actBaseBg}"` : ' style="position:relative"') : (actBaseBg ? ` style="${actBaseBg}${actInactive ? ';opacity:0.3' : ''}"` : actInactive ? ' style="opacity:0.3"' : '');
+      const actOverlay  = actExpired ? `<div style="position:absolute;inset:0 2.5rem 0 0;background:rgba(255,255,255,.7);pointer-events:none;z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center"><div style="pointer-events:none;background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.35rem .75rem;text-align:center;font-size:1.17rem;color:#374151;max-width:80%">⏸ This activity's period has ended — tap ⋮ on the right side to adjust the dates and bring it back.</div></div>` : '';
       const noteRow = a.actNote !== undefined
         ? `<div style="display:flex;align-items:flex-start;gap:.3rem">
             ${formatButtonsHtml(`mn-act-note-${idx}`)}
@@ -9029,28 +9051,28 @@ function renderTemplateManageContent(template) {
   });
 
   $("btn-mn-add-act").addEventListener("click", async () => {
-    acts.push({ id: cfgId("a"), name: "", order: acts.length, activeFrom: todayDateStr() });
+    acts.push({ id: cfgId("a"), name: "", order: acts.length, activeFrom: null });
     template.predefinedActivities = acts;
     await saveTemplateFn();
     renderTemplateManageContent(template);
   });
 
   $("btn-mn-add-act-note").addEventListener("click", async () => {
-    acts.push({ id: cfgId("a"), name: "", actNote: "", order: acts.length, activeFrom: todayDateStr() });
+    acts.push({ id: cfgId("a"), name: "", actNote: "", order: acts.length, activeFrom: null });
     template.predefinedActivities = acts;
     await saveTemplateFn();
     renderTemplateManageContent(template);
   });
 
   $("btn-mn-add-heading").addEventListener("click", async () => {
-    acts.push({ id: cfgId("h"), isHeading: true, name: "", order: acts.length, activeFrom: todayDateStr() });
+    acts.push({ id: cfgId("h"), isHeading: true, name: "", order: acts.length, activeFrom: null });
     template.predefinedActivities = acts;
     await saveTemplateFn();
     renderTemplateManageContent(template);
   });
 
   $("btn-mn-add-note").addEventListener("click", async () => {
-    acts.push({ id: cfgId("n"), isNote: true, text: "", order: acts.length, activeFrom: todayDateStr() });
+    acts.push({ id: cfgId("n"), isNote: true, text: "", order: acts.length, activeFrom: null });
     template.predefinedActivities = acts;
     await saveTemplateFn();
     renderTemplateManageContent(template);
@@ -9258,6 +9280,13 @@ function renderTemplateManageContent(template) {
       saveTmplPeriodField(+btn.dataset.idx, field, null);
     });
   });
+  if (window._closePeriodPanels) document.removeEventListener("click", window._closePeriodPanels);
+  window._closePeriodPanels = e => {
+    if (!e.target.closest(".mn-period-from-panel,.mn-period-to-panel,.mn-period-from-btn,.mn-period-to-btn,.mn-period-date,.mn-period-inf")) {
+      $("manage-modal-body").querySelectorAll(".mn-period-from-panel,.mn-period-to-panel").forEach(p => p.style.display = "none");
+    }
+  };
+  document.addEventListener("click", window._closePeriodPanels);
 
   const getTmplOptsFromDom = idx =>
     [...$("manage-modal-body").querySelectorAll(`.mn-opt-item[data-idx="${idx}"]`)]
@@ -9806,10 +9835,10 @@ function buildGroupItemsByActivity(target, data, attendees) {
   }
   if (grpInactivePas.length > 0) {
     const grpInactiveHtml = grpInactivePas.map(pa => {
-      if (pa.isHeading || pa.isMaintainHeading) return `<div class="activity-group-heading" contenteditable="false" style="opacity:.5">${escHtml(pa.name || "")}</div>`;
-      if (pa.isNote) return pa.text ? `<div class="activity-note-heading" contenteditable="false" style="opacity:.5">${noteToHtml(pa.text)}</div>` : '';
+      if (pa.isHeading || pa.isMaintainHeading) return `<div class="activity-group-heading" contenteditable="false" style="opacity:.3">${escHtml(pa.name || "")}</div>`;
+      if (pa.isNote) return pa.text ? `<div class="activity-note-heading" contenteditable="false" style="opacity:.3">${noteToHtml(pa.text)}</div>` : '';
       if (!pa.name) return '';
-      return `<div class="entry-block entry-block-predefined" style="opacity:.5;pointer-events:none"><div class="entry-field" contenteditable="false"><span class="field-label">Activity</span><span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span></div></div>`;
+      return `<div class="entry-block entry-block-predefined" style="opacity:.3;pointer-events:none"><div class="entry-field" contenteditable="false"><span class="field-label">Activity</span><span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span></div></div>`;
     }).filter(Boolean).join('');
     items.push(`<div style="margin-top:.75rem">
       <button class="btn-inactive-toggle" contenteditable="false" style="display:flex;align-items:center;gap:.4rem;width:100%;padding:.4rem .6rem;background:none;border:1px dashed #d1d5db;border-radius:.4rem;cursor:pointer;font-size:.8rem;color:#6b7280;text-align:left">
