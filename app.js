@@ -138,7 +138,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "692";
+const APP_VERSION = "693";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -8538,13 +8538,41 @@ function renderTargetManageContent(student, target) {
         await saveTarget();
         renderTargetManageContent(student, target);
       } else if (action === "delete") {
-        const delLabel = pa.isNote ? "this note" : `"${pa.name}" and all its past session data`;
-        if (!confirm(`Permanently delete ${delLabel}? This cannot be undone.`)) return;
-        const actIdx = acts.indexOf(pa);
-        if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
-        target.predefinedActivities = acts;
-        await saveTarget();
-        if (!pa.isNote) {
+        if (pa.isNote) {
+          if (!confirm(`Delete this note?`)) return;
+          const actIdx = acts.indexOf(pa);
+          if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
+          target.predefinedActivities = acts;
+          await saveTarget();
+          renderTargetManageContent(student, target);
+        } else if (btn.dataset.confirmDelete !== "1") {
+          btn.disabled = true;
+          btn.textContent = "Checking…";
+          try {
+            const allSessions = _groupForTargetEdit
+              ? await getAllSessionsForGroup(_groupForTargetEdit.id)
+              : await getAllSessionsForStudent(student.id);
+            const affected = allSessions.filter(s =>
+              Object.values(s.activities || {}).some(a => a.targetName === target.name && a.activityName === pa.name)
+            ).length;
+            btn.dataset.confirmDelete = "1";
+            btn.disabled = false;
+            btn.style.background = "#dc2626"; btn.style.color = "#fff"; btn.style.fontSize = ".7rem"; btn.style.whiteSpace = "normal";
+            btn.textContent = affected > 0
+              ? `⚠️ Deletes data from ${affected} past session${affected !== 1 ? "s" : ""}! Tap again to confirm`
+              : "Confirm delete (no past session data found)";
+          } catch {
+            btn.dataset.confirmDelete = "1";
+            btn.disabled = false;
+            btn.style.background = "#dc2626"; btn.style.color = "#fff"; btn.style.fontSize = ".7rem"; btn.style.whiteSpace = "normal";
+            btn.textContent = "⚠️ Permanently erases ALL past data! Tap again to confirm";
+          }
+        } else {
+          delete btn.dataset.confirmDelete;
+          const actIdx = acts.indexOf(pa);
+          if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
+          target.predefinedActivities = acts;
+          await saveTarget();
           try {
             if (_groupForTargetEdit) {
               await deleteGroupOrphanAcrossSessions(_groupForTargetEdit.id, target.name, pa.name);
@@ -8555,8 +8583,8 @@ function renderTargetManageContent(student, target) {
             console.error("Failed to purge activity from sessions:", err);
             alert("Activity removed from config, but failed to delete from past sessions:\n" + err.message);
           }
+          renderTargetManageContent(student, target);
         }
-        renderTargetManageContent(student, target);
       }
     });
   });
