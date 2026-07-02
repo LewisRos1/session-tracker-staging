@@ -150,7 +150,9 @@ const STYLE_ACT_HEADING = {
   font: { bold: true, color: { argb: "FF2A4060" } }
 };
 // Gray activity rows — "White, Background 1, Darker 5%" (#F2F2F2)
-const STYLE_GRAY_ACT_FILL = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F2F2" } };
+const STYLE_GRAY_ACT_FILL  = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F2F2" } };
+const STYLE_GREEN_ACT_FILL = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE2EFDA" } };
+const STYLE_GREEN_HDG_FILL = { type: "pattern", pattern: "solid", fgColor: { argb: "FFA9D18E" } };
 // Gray heading rows — "White, Background 1, Darker 15%" (#D9D9D9)
 const STYLE_GRAY_HDG_FILL = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD9D9D9" } };
 // Daily Average: near-white blue, soft navy text
@@ -398,7 +400,7 @@ function addIndividualTargetSheets(wb, allTargets, sessions, studentName, includ
   const avgColLet = includeTrials ? "F" : "E";
 
   for (const target of allTargets) {
-    const { rows, monthHeaderRows, colHeaderRows, activityHeadingRows, noteRows, sessionDateBlocks, spacerRows, grayRows } =
+    const { rows, monthHeaderRows, colHeaderRows, activityHeadingRows, noteRows, sessionDateBlocks, spacerRows, grayRows, greenRows } =
       buildTargetSheet(target, sessions, allTargets, includeTrials);
     const ws = wb.addWorksheet(target.name.slice(0, 31));
     rows.forEach(row => ws.addRow(row));
@@ -460,6 +462,14 @@ function addIndividualTargetSheets(wb, allTargets, sessions, studentName, includ
       const rowObj = ws.getRow(n);
       const grayFill = activityHeadingRows.has(rowIdx) ? STYLE_GRAY_HDG_FILL : STYLE_GRAY_ACT_FILL;
       for (let c = 1; c <= numCols; c++) rowObj.getCell(c).fill = grayFill;
+    }
+
+    // Green activity rows (activityColor:"green"): green tint across all cols.
+    for (const rowIdx of greenRows) {
+      const n = rowIdx + 1;
+      const rowObj = ws.getRow(n);
+      const greenFill = activityHeadingRows.has(rowIdx) ? STYLE_GREEN_HDG_FILL : STYLE_GREEN_ACT_FILL;
+      for (let c = 1; c <= numCols; c++) rowObj.getCell(c).fill = greenFill;
     }
 
     // Note rows: same column span as activity headings above.
@@ -733,6 +743,11 @@ function wordTargetRows(target, session, allTargets) {
       continue;
     }
 
+    if (act.isGreenHeading) {
+      rows.push({ merge: true, text: act.activityName, style: "heading", isGreenHeading: true });
+      continue;
+    }
+
     // Free-standing "+ Add Note" rows are reference text for the facilitator,
     // not session data — Excel keeps them, but the boss asked Word to leave
     // them out entirely.
@@ -748,7 +763,7 @@ function wordTargetRows(target, session, allTargets) {
     }
 
     if (act.isMaintain) {
-      rows.push({ cells: [act.activityName, act.maintainRemark || "", ""], actLines: parseInlineMarkup(act.activityName), isGray: act.isGray });
+      rows.push({ cells: [act.activityName, act.maintainRemark || "", ""], actLines: parseInlineMarkup(act.activityName), isGray: act.isGray, isGreen: act.isGreen });
       continue;
     }
 
@@ -758,7 +773,7 @@ function wordTargetRows(target, session, allTargets) {
     const activityLabel = act.activityName;
 
     if (act.empty) {
-      rows.push({ cells: [activityLabel, "", ""], actLines: parseInlineMarkup(activityLabel), isGray: act.isGray });
+      rows.push({ cells: [activityLabel, "", ""], actLines: parseInlineMarkup(activityLabel), isGray: act.isGray, isGreen: act.isGreen });
       continue;
     }
 
@@ -768,7 +783,7 @@ function wordTargetRows(target, session, allTargets) {
     )?.sentenceStarter || null;
 
     if (remarks.length === 0) {
-      rows.push({ cells: [activityLabel, "", ""], actLines: parseInlineMarkup(activityLabel), isGray: act.isGray });
+      rows.push({ cells: [activityLabel, "", ""], actLines: parseInlineMarkup(activityLabel), isGray: act.isGray, isGreen: act.isGreen });
       continue;
     }
 
@@ -784,7 +799,8 @@ function wordTargetRows(target, session, allTargets) {
         cells: [first ? activityLabel : "", "", remarkAvg !== null ? pct(remarkAvg) : ""],
         actLines: first ? parseInlineMarkup(activityLabel) : null,
         remarkLines: buildRemarkLines(starter, text, masteryNote),
-        isGray: act.isGray
+        isGray: act.isGray,
+        isGreen: act.isGreen
       });
       first = false;
     }
@@ -908,8 +924,10 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
     for (const r of wordTargetRows(target, session, allTargets)) {
       if (r.merge) {
         const mergeFill = r.isGrayHeading ? "D9D9D9"
+          : r.isGreenHeading ? "A9D18E"
           : (r.style === "heading" ? TARGET_FILL : (r.style === "note" ? NOTE_FILL : null));
         const mergeColor = r.isGrayHeading ? "000000"
+          : r.isGreenHeading ? "111827"
           : (r.style === "heading" ? TARGET_TEXT_COLOR : (r.style === "note" ? NOTE_TEXT_COLOR : null));
         tableRows.push(new TableRow({
           children: [cell(r.text, {
@@ -922,7 +940,8 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
           })]
         }));
       } else {
-        const grayFill = r.isGray ? "F2F2F2" : null;
+        const actFill = r.isGray ? "F2F2F2" : r.isGreen ? "E2EFDA" : null;
+        const grayFill = actFill;
         tableRows.push(new TableRow({
           children: [
             r.actLines
@@ -1341,6 +1360,7 @@ function buildTargetSheet(target, sessions, allTargets, includeTrials) {
   const activityHeadingRows = new Set();
   const noteRows          = new Set();
   const grayRows          = new Set();
+  const greenRows         = new Set();
   const sessionDateBlocks = []; // { startRow, endRow, dateLabel, avgScore }
   const spacerRows        = new Set(); // blank rows that should have no borders
   let firstMonth = true;
@@ -1375,11 +1395,11 @@ function buildTargetSheet(target, sessions, allTargets, includeTrials) {
     for (const session of monthSessions) {
       const snap = (session.targetsSnapshot || []).find(t => t.name === target.name);
       const effectiveTarget = snap ? { ...target, maxPoints: snap.maxPoints } : target;
-      appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRows, grayRows, session, effectiveTarget, allTargets, includeTrials);
+      appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRows, grayRows, greenRows, session, effectiveTarget, allTargets, includeTrials);
     }
   }
 
-  return { rows, monthHeaderRows, colHeaderRows, activityHeadingRows, noteRows, grayRows, sessionDateBlocks, spacerRows };
+  return { rows, monthHeaderRows, colHeaderRows, activityHeadingRows, noteRows, grayRows, greenRows, sessionDateBlocks, spacerRows };
 }
 
 // ─── SESSION ROWS ────────────────────────────────────────────
@@ -1393,7 +1413,7 @@ function trialsList(trials) {
   return (trials || []).map(t => (t === -1 ? "—" : t)).join(", ");
 }
 
-function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRows, grayRows, session, target, allTargets, includeTrials) {
+function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRows, grayRows, greenRows, session, target, allTargets, includeTrials) {
   const blankRow = () => (includeTrials ? ["", "", "", "", "", ""] : ["", "", "", "", ""]);
   const [, m, d] = session.date.split("-").map(Number);
   const shortMonths = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -1432,8 +1452,15 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
         const r = blankRow(); r[1] = act.activityName; rows.push(r);
         continue;
       }
+      if (act.isGreenHeading) {
+        activityHeadingRows.add(rows.length);
+        greenRows.add(rows.length);
+        const r = blankRow(); r[1] = act.activityName; rows.push(r);
+        continue;
+      }
       if (act.isMaintain) {
         if (act.isGray) grayRows.add(rows.length);
+        if (act.isGreen) greenRows.add(rows.length);
         const r = blankRow(); r[1] = act.activityName; r[2] = act.maintainRemark || ""; rows.push(r);
         continue;
       }
@@ -1473,6 +1500,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
 
       if (act.empty) {
         if (act.isGray) grayRows.add(rows.length);
+        if (act.isGreen) greenRows.add(rows.length);
         const r = blankRow(); r[1] = activityCell; rows.push(r);
         continue;
       }
@@ -1484,6 +1512,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
 
       if (remarks.length === 0) {
         if (act.isGray) grayRows.add(rows.length);
+        if (act.isGreen) greenRows.add(rows.length);
         const r = blankRow(); r[1] = activityCell; rows.push(r);
         continue;
       }
@@ -1493,6 +1522,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
       let firstRemark = true;
       for (const rem of remarks) {
         if (act.isGray) grayRows.add(rows.length);
+        if (act.isGreen) greenRows.add(rows.length);
         const validTrials = (rem.trials || []).filter(t => t !== -1);
         const remarkAvg   = act.isMapped ? mappedScore : calcRemarkAvg(validTrials, target.maxPoints);
         const masteryNote = stripRemarkHtml(rem.masteryNote || "");
@@ -1547,13 +1577,18 @@ function getAllActivitiesForTarget(session, target) {
       continue;
     }
     if (!pa.name) continue;
-    if (pa.isHeading && pa.headingColor !== "gray") {
+    if (pa.isHeading && !pa.headingColor && !pa.isMaintainHeading) {
       result.push({ isHeading: true, activityName: pa.name });
       continue;
     }
-    // Gray headings — inline in their natural position (NOT reordered to the bottom)
+    // Gray headings — inline in their natural position
     if ((pa.isHeading && pa.headingColor === "gray") || pa.isMaintainHeading) {
       result.push({ isMaintainHeading: true, activityName: pa.name, isGray: true });
+      continue;
+    }
+    // Green headings — inline in their natural position
+    if (pa.isHeading && pa.headingColor === "green") {
+      result.push({ isGreenHeading: true, activityName: pa.name });
       continue;
     }
     // Fixed remark activities — inline in their natural position (NOT reordered to the bottom)
@@ -1588,14 +1623,15 @@ function getAllActivitiesForTarget(session, target) {
       continue;
     }
     const sessionAct = sessionActs.find(a => a.activityName === pa.name && a.isPredefined);
-    const grayProps = (pa.activityColor === "gray" || pa.isMaintainLive) ? { isGray: true } : {};
+    const colorProps = (pa.activityColor === "gray" || pa.isMaintainLive) ? { isGray: true }
+                     : pa.activityColor === "green" ? { isGreen: true } : {};
     if (sessionAct) {
       usedIds.add(sessionAct.id);
-      result.push(pa.isMapped ? { ...sessionAct, isMapped: true, mappedTargetId: pa.mappedTargetId || null, ...grayProps } : { ...sessionAct, ...grayProps });
+      result.push(pa.isMapped ? { ...sessionAct, isMapped: true, mappedTargetId: pa.mappedTargetId || null, ...colorProps } : { ...sessionAct, ...colorProps });
     } else {
       result.push({
         id: null, activityName: pa.name, isPredefined: true, empty: true,
-        isMapped: pa.isMapped || false, mappedTargetId: pa.mappedTargetId || null, ...grayProps
+        isMapped: pa.isMapped || false, mappedTargetId: pa.mappedTargetId || null, ...colorProps
       });
     }
   }

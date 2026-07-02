@@ -127,7 +127,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "670";
+const APP_VERSION = "671";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4114,7 +4114,8 @@ function buildTargetViewTable(target, data) {
     for (const pa of target.predefinedActivities) {
       if (pa.isHeading || pa.isMaintainHeading) {
         const isGray = pa.headingColor === "gray" || pa.isMaintainHeading;
-        rows += `<tr class="view-heading-row${isGray ? " view-gray-row" : ""}"><td colspan="6" contenteditable="false">${escHtml(pa.name)}</td></tr>`;
+        const isGreen = pa.headingColor === "green";
+        rows += `<tr class="view-heading-row${isGray ? " view-gray-row" : isGreen ? " view-green-row" : ""}"><td colspan="6" contenteditable="false">${escHtml(pa.name)}</td></tr>`;
         continue;
       }
       if (pa.isNote) {
@@ -4127,8 +4128,9 @@ function buildTargetViewTable(target, data) {
         if (fixedEntry) matchedIds.add(fixedEntry[0]);
         const fixedText = pa.fixedRemark ?? pa.maintainRemark ?? "";
         const isGrayFixed = pa.activityColor === "gray" || !!pa.isMaintainLive;
+        const isGreenFixed = pa.activityColor === "green";
         no++;
-        rows += `<tr${isGrayFixed ? ' class="view-gray-row"' : ' style="background:#f9fafb"'}>
+        rows += `<tr${isGrayFixed ? ' class="view-gray-row"' : isGreenFixed ? ' class="view-green-row"' : ' style="background:#f9fafb"'}>
           <td class="vcol-no" contenteditable="false">${no}</td>
           <td class="vcol-act" contenteditable="false">${formatActivityMarkup(pa.name)}</td>
           <td class="vcol-rem" contenteditable="false" style="color:#374151;cursor:pointer"
@@ -4229,7 +4231,8 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
   const remarkHasNote   = paEntry?.remarkHasNote || false;
   const mappedInfo      = paEntry?.isMapped ? resolveViewMappedScoreDisplay(paEntry, data) : null;
   const isGrayAct       = isPredefined && (paEntry?.activityColor === "gray" || paEntry?.isMaintainLive);
-  const rowClass        = isGrayAct ? "view-gray-row" : "";
+  const isGreenAct      = isPredefined && paEntry?.activityColor === "green";
+  const rowClass        = isGrayAct ? "view-gray-row" : isGreenAct ? "view-green-row" : "";
 
   if (remarks.length === 0) {
     const opts = parseOpts(inlineOptions);
@@ -5506,7 +5509,8 @@ function buildGroupTargetViewTable(target, data, attendees) {
     for (const pa of target.predefinedActivities) {
       if (pa.isHeading || pa.isMaintainHeading) {
         const isGray = pa.headingColor === "gray" || pa.isMaintainHeading;
-        rows += `<tr class="view-heading-row${isGray ? " view-gray-row" : ""}"><td colspan="7" contenteditable="false">${escHtml(pa.name)}</td></tr>`;
+        const isGreenHdg = pa.headingColor === "green";
+        rows += `<tr class="view-heading-row${isGray ? " view-gray-row" : isGreenHdg ? " view-green-row" : ""}"><td colspan="7" contenteditable="false">${escHtml(pa.name)}</td></tr>`;
         continue;
       }
       if (pa.isNote) {
@@ -5519,8 +5523,9 @@ function buildGroupTargetViewTable(target, data, attendees) {
         if (fixedEntry) matchedIds.add(fixedEntry[0]);
         const fixedText = pa.fixedRemark ?? pa.maintainRemark ?? "";
         const isGrayFixed = pa.activityColor === "gray" || !!pa.isMaintainLive;
+        const isGreenFixed2 = pa.activityColor === "green";
         no++;
-        rows += `<tr${isGrayFixed ? ' class="view-gray-row"' : ' style="background:#f9fafb"'}>
+        rows += `<tr${isGrayFixed ? ' class="view-gray-row"' : isGreenFixed2 ? ' class="view-green-row"' : ' style="background:#f9fafb"'}>
           <td class="vcol-no" contenteditable="false">${no}</td>
           <td class="vcol-act" contenteditable="false">${formatActivityMarkup(pa.name)}</td>
           <td class="vcol-student" contenteditable="false">—</td>
@@ -5671,7 +5676,8 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
   const remarkHasNote   = paEntry?.remarkHasNote || false;
   const opts            = parseOpts(inlineOptions);
   const isGrayAct       = isPredefined && (paEntry?.activityColor === "gray" || paEntry?.isMaintainLive);
-  const rowClass        = isGrayAct ? "view-gray-row" : "";
+  const isGreenAct      = isPredefined && paEntry?.activityColor === "green";
+  const rowClass        = isGrayAct ? "view-gray-row" : isGreenAct ? "view-green-row" : "";
 
   if (rounds.length === 0) {
     if (opts.length === 0) {
@@ -7813,14 +7819,21 @@ function renderTargetManageContent(student, target) {
     if (a.isCompleted || a.isArchived || a.isStopped) return;
     if (a.isHeading || a.isMaintainHeading) {
       const isGray = a.headingColor === "gray" || a.isMaintainHeading;
-      html += `<div class="admin-list-item mn-heading-item" data-idx="${idx}"${isGray ? ' style="background:#9ca3af"' : ''}>
-        <span class="drag-handle"${isGray ? ' style="color:#ffffff"' : ''}>⠿</span>
+      const isGreen = a.headingColor === "green";
+      const hdgBg = isGray ? "#9ca3af" : isGreen ? "#a9d18e" : null;
+      html += `<div class="admin-list-item mn-heading-item" data-idx="${idx}"${hdgBg ? ` style="background:${hdgBg}"` : ''}>
+        <span class="drag-handle"${hdgBg ? ' style="color:#ffffff"' : ''}>⠿</span>
         <textarea class="admin-input mn-heading-input" id="mn-act-name-${idx}" data-idx="${idx}"
-          rows="1" placeholder="Enter Section Heading" style="flex:1${isGray ? ";background:#9ca3af;color:#111827" : ""}">${escHtml(a.name || "")}</textarea>
+          rows="1" placeholder="Enter Section Heading" style="flex:1${hdgBg ? `;background:${hdgBg};color:#111827` : ""}">${escHtml(a.name || "")}</textarea>
         <div style="position:relative">
           <button class="btn-adm-del mn-heading-color-btn" data-idx="${idx}" title="Heading options" style="font-size:1.15rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
-          <div class="mn-heading-color-menu" id="mn-hkm-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:180px;overflow:hidden">
-            <button class="mn-hkm-opt" data-idx="${idx}" data-action="${isGray ? "blue" : "gray"}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">${isGray ? "💙 Change to Blue Colour" : "🩶 Change to Grey Colour"}</button>
+          <div class="mn-heading-color-menu" id="mn-hkm-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:190px;overflow:hidden">
+            <button class="mn-hkm-color-toggle" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">🎨 Change Colour</button>
+            <div class="mn-hkm-color-panel" data-idx="${idx}" style="display:none;padding:.45rem .6rem;border-bottom:1px solid #f3f4f6;gap:.4rem">
+              <button class="mn-hkm-opt" data-idx="${idx}" data-action="blue" style="flex:1;padding:.3rem;background:#dbeafe;border:2px solid ${!isGray && !isGreen ? '#2563eb' : '#93c5fd'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">💙 Blue</button>
+              <button class="mn-hkm-opt" data-idx="${idx}" data-action="gray" style="flex:1;padding:.3rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">🩶 Grey</button>
+              <button class="mn-hkm-opt" data-idx="${idx}" data-action="green" style="flex:1;padding:.3rem;background:#a9d18e;border:2px solid ${isGreen ? '#388e3c' : '#70ad47'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">💚 Green</button>
+            </div>
             <button class="mn-hkm-opt" data-idx="${idx}" data-action="delete" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete</button>
           </div>
         </div>
@@ -7906,9 +7919,11 @@ function renderTargetManageContent(student, target) {
     } else {
       const remarkTypeSelect = buildRemarkTypeControls(a, idx);
       const isGray = a.activityColor === "gray" || a.isMaintainLive;
+      const isGreen = a.activityColor === "green";
+      const actItemStyle = isGray ? ' style="background:#f3f4f6;border:1px solid #d1d5db"' : isGreen ? ' style="background:#e2efda;border:1px solid #a9d18e"' : '';
       const noteRow = a.actNote !== undefined
         ? `<div style="display:flex;align-items:flex-start;gap:.3rem">
-            ${formatButtonsHtml(`mn-act-note-${idx}`)}
+            ${formatButtonsHtml(`mn-act-name-${idx}`)}
             <textarea class="admin-input mn-act-note-input" id="mn-act-note-${idx}" data-idx="${idx}"
               rows="1" placeholder="Enter Note"
               style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.actNote || "")}</textarea>
@@ -7922,7 +7937,7 @@ function renderTargetManageContent(student, target) {
               style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.fixedRemark || "")}</textarea>
           </div>`
         : "";
-      html += `<div class="admin-list-item" data-idx="${idx}"${isGray ? ' style="background:#f3f4f6;border:1px solid #d1d5db"' : ''}>
+      html += `<div class="admin-list-item" data-idx="${idx}"${actItemStyle}>
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
           <div style="display:flex;align-items:flex-start;gap:.3rem">
@@ -7941,7 +7956,12 @@ function renderTargetManageContent(student, target) {
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:250px;overflow:hidden">
             <div style="display:flex;align-items:stretch;border-bottom:1px solid #f3f4f6">
-              <button class="mn-km-opt" data-idx="${idx}" data-action="${isGray ? "color_white" : "color_gray"}" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">${isGray ? "🤍 Change to White Colour" : "🩶 Change to Grey Colour"}</button>
+              <button class="mn-km-color-toggle" data-idx="${idx}" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">🎨 Change Colour</button>
+            </div>
+            <div class="mn-km-color-panel" data-idx="${idx}" style="display:none;padding:.45rem .6rem;border-bottom:1px solid #f3f4f6;gap:.4rem">
+              <button class="mn-km-opt" data-idx="${idx}" data-action="color_white" style="flex:1;padding:.3rem;background:#ffffff;border:2px solid ${!isGray && !isGreen ? '#6b7280' : '#e5e7eb'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">⬜ White</button>
+              <button class="mn-km-opt" data-idx="${idx}" data-action="color_gray" style="flex:1;padding:.3rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">🩶 Grey</button>
+              <button class="mn-km-opt" data-idx="${idx}" data-action="color_green" style="flex:1;padding:.3rem;background:#a9d18e;border:2px solid ${isGreen ? '#388e3c' : '#70ad47'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">💚 Green</button>
             </div>
             <div style="display:flex;align-items:stretch;border-bottom:1px solid #f3f4f6">
               <button class="mn-km-opt" data-idx="${idx}" data-action="master" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">⭐ Mark as Mastered <span style="font-size:.72rem;color:#9ca3af">(Don't use this feature yet)</span></button>
@@ -8207,15 +8227,14 @@ function renderTargetManageContent(student, target) {
       if (!pa) return;
       $("manage-modal-body").querySelectorAll(".mn-kebab-menu").forEach(m => m.style.display = "none");
       if (action === "color_gray") {
-        pa.activityColor = "gray";
-        delete pa.isMaintainLive;
-        await saveTarget();
-        renderTargetManageContent(student, target);
+        pa.activityColor = "gray"; delete pa.isMaintainLive;
+        await saveTarget(); renderTargetManageContent(student, target);
       } else if (action === "color_white") {
-        delete pa.activityColor;
-        delete pa.isMaintainLive;
-        await saveTarget();
-        renderTargetManageContent(student, target);
+        delete pa.activityColor; delete pa.isMaintainLive;
+        await saveTarget(); renderTargetManageContent(student, target);
+      } else if (action === "color_green") {
+        pa.activityColor = "green"; delete pa.isMaintainLive;
+        await saveTarget(); renderTargetManageContent(student, target);
       } else if (action === "master") {
         pa.isCompleted = true;
         delete pa.isArchived;
@@ -8430,19 +8449,14 @@ function renderTargetManageContent(student, target) {
       if (!pa) return;
       $("manage-modal-body").querySelectorAll(".mn-heading-color-menu").forEach(m => m.style.display = "none");
       if (action === "blue") {
-        pa.isHeading = true;
-        delete pa.headingColor;
-        delete pa.isMaintainHeading;
-        target.predefinedActivities = acts;
-        await saveTarget();
-        renderTargetManageContent(student, target);
+        pa.isHeading = true; delete pa.headingColor; delete pa.isMaintainHeading;
+        target.predefinedActivities = acts; await saveTarget(); renderTargetManageContent(student, target);
       } else if (action === "gray") {
-        pa.isHeading = true;
-        pa.headingColor = "gray";
-        delete pa.isMaintainHeading;
-        target.predefinedActivities = acts;
-        await saveTarget();
-        renderTargetManageContent(student, target);
+        pa.isHeading = true; pa.headingColor = "gray"; delete pa.isMaintainHeading;
+        target.predefinedActivities = acts; await saveTarget(); renderTargetManageContent(student, target);
+      } else if (action === "green") {
+        pa.isHeading = true; pa.headingColor = "green"; delete pa.isMaintainHeading;
+        target.predefinedActivities = acts; await saveTarget(); renderTargetManageContent(student, target);
       } else if (action === "delete") {
         if (!confirm(`Delete section heading "${pa.name}"?`)) return;
         const actIdx = acts.indexOf(pa);
@@ -8451,6 +8465,20 @@ function renderTargetManageContent(student, target) {
         await saveTarget();
         renderTargetManageContent(student, target);
       }
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-hkm-color-toggle").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const panel = $("manage-modal-body").querySelector(`.mn-hkm-color-panel[data-idx="${btn.dataset.idx}"]`);
+      if (panel) panel.style.display = panel.style.display === "flex" ? "none" : "flex";
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-km-color-toggle").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const panel = $("manage-modal-body").querySelector(`.mn-km-color-panel[data-idx="${btn.dataset.idx}"]`);
+      if (panel) panel.style.display = panel.style.display === "flex" ? "none" : "flex";
     });
   });
 
@@ -8589,14 +8617,21 @@ function renderTemplateManageContent(template) {
   acts.forEach((a, idx) => {
     if (a.isHeading || a.isMaintainHeading) {
       const isGray = a.headingColor === "gray" || a.isMaintainHeading;
-      html += `<div class="admin-list-item mn-heading-item" data-idx="${idx}"${isGray ? ' style="background:#9ca3af"' : ''}>
-        <span class="drag-handle"${isGray ? ' style="color:#ffffff"' : ''}>⠿</span>
+      const isGreen = a.headingColor === "green";
+      const hdgBg = isGray ? "#9ca3af" : isGreen ? "#a9d18e" : null;
+      html += `<div class="admin-list-item mn-heading-item" data-idx="${idx}"${hdgBg ? ` style="background:${hdgBg}"` : ''}>
+        <span class="drag-handle"${hdgBg ? ' style="color:#ffffff"' : ''}>⠿</span>
         <textarea class="admin-input mn-heading-input" id="mn-act-name-${idx}" data-idx="${idx}"
-          rows="1" placeholder="Enter Section Heading" style="flex:1${isGray ? ";background:#9ca3af;color:#111827" : ""}">${escHtml(a.name || "")}</textarea>
+          rows="1" placeholder="Enter Section Heading" style="flex:1${hdgBg ? `;background:${hdgBg};color:#111827` : ""}">${escHtml(a.name || "")}</textarea>
         <div style="position:relative">
           <button class="btn-adm-del mn-heading-color-btn" data-idx="${idx}" title="Heading options" style="font-size:1.15rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
-          <div class="mn-heading-color-menu" id="mn-hkm-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:180px;overflow:hidden">
-            <button class="mn-hkm-opt" data-idx="${idx}" data-action="${isGray ? "blue" : "gray"}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">${isGray ? "💙 Change to Blue Colour" : "🩶 Change to Grey Colour"}</button>
+          <div class="mn-heading-color-menu" id="mn-hkm-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:190px;overflow:hidden">
+            <button class="mn-hkm-color-toggle" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">🎨 Change Colour</button>
+            <div class="mn-hkm-color-panel" data-idx="${idx}" style="display:none;padding:.45rem .6rem;border-bottom:1px solid #f3f4f6;gap:.4rem">
+              <button class="mn-hkm-opt" data-idx="${idx}" data-action="blue" style="flex:1;padding:.3rem;background:#dbeafe;border:2px solid ${!isGray && !isGreen ? '#2563eb' : '#93c5fd'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">💙 Blue</button>
+              <button class="mn-hkm-opt" data-idx="${idx}" data-action="gray" style="flex:1;padding:.3rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">🩶 Grey</button>
+              <button class="mn-hkm-opt" data-idx="${idx}" data-action="green" style="flex:1;padding:.3rem;background:#a9d18e;border:2px solid ${isGreen ? '#388e3c' : '#70ad47'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">💚 Green</button>
+            </div>
             <button class="mn-hkm-opt" data-idx="${idx}" data-action="delete" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete</button>
           </div>
         </div>
@@ -8631,6 +8666,8 @@ function renderTemplateManageContent(template) {
     } else {
       const remarkTypeSelect = buildRemarkTypeControls(a, idx);
       const isGray = a.activityColor === "gray" || a.isMaintainLive;
+      const isGreen = a.activityColor === "green";
+      const actItemStyle = isGray ? ' style="background:#f3f4f6;border:1px solid #d1d5db"' : isGreen ? ' style="background:#e2efda;border:1px solid #a9d18e"' : '';
       const noteRow = a.actNote !== undefined
         ? `<div style="display:flex;align-items:flex-start;gap:.3rem">
             ${formatButtonsHtml(`mn-act-note-${idx}`)}
@@ -8647,7 +8684,7 @@ function renderTemplateManageContent(template) {
               style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.fixedRemark || "")}</textarea>
           </div>`
         : "";
-      html += `<div class="admin-list-item" data-idx="${idx}"${isGray ? ' style="background:#f3f4f6;border:1px solid #d1d5db"' : ''}>
+      html += `<div class="admin-list-item" data-idx="${idx}"${actItemStyle}>
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
           <div style="display:flex;align-items:flex-start;gap:.3rem">
@@ -8666,7 +8703,12 @@ function renderTemplateManageContent(template) {
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:250px;overflow:hidden">
             <div style="display:flex;align-items:stretch;border-bottom:1px solid #f3f4f6">
-              <button class="mn-km-opt" data-idx="${idx}" data-action="${isGray ? "color_white" : "color_gray"}" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">${isGray ? "🤍 Change to White Colour" : "🩶 Change to Grey Colour"}</button>
+              <button class="mn-km-color-toggle" data-idx="${idx}" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">🎨 Change Colour</button>
+            </div>
+            <div class="mn-km-color-panel" data-idx="${idx}" style="display:none;padding:.45rem .6rem;border-bottom:1px solid #f3f4f6;gap:.4rem">
+              <button class="mn-km-opt" data-idx="${idx}" data-action="color_white" style="flex:1;padding:.3rem;background:#ffffff;border:2px solid ${!isGray && !isGreen ? '#6b7280' : '#e5e7eb'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">⬜ White</button>
+              <button class="mn-km-opt" data-idx="${idx}" data-action="color_gray" style="flex:1;padding:.3rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">🩶 Grey</button>
+              <button class="mn-km-opt" data-idx="${idx}" data-action="color_green" style="flex:1;padding:.3rem;background:#a9d18e;border:2px solid ${isGreen ? '#388e3c' : '#70ad47'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">💚 Green</button>
             </div>
             <div style="display:flex;align-items:stretch">
               <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
@@ -8952,12 +8994,13 @@ function renderTemplateManageContent(template) {
       $("manage-modal-body").querySelectorAll(".mn-heading-color-menu").forEach(m => m.style.display = "none");
       if (action === "blue") {
         pa.isHeading = true; delete pa.headingColor; delete pa.isMaintainHeading;
-        template.predefinedActivities = acts;
-        await saveTemplateFn(); renderTemplateManageContent(template);
+        template.predefinedActivities = acts; await saveTemplateFn(); renderTemplateManageContent(template);
       } else if (action === "gray") {
         pa.isHeading = true; pa.headingColor = "gray"; delete pa.isMaintainHeading;
-        template.predefinedActivities = acts;
-        await saveTemplateFn(); renderTemplateManageContent(template);
+        template.predefinedActivities = acts; await saveTemplateFn(); renderTemplateManageContent(template);
+      } else if (action === "green") {
+        pa.isHeading = true; pa.headingColor = "green"; delete pa.isMaintainHeading;
+        template.predefinedActivities = acts; await saveTemplateFn(); renderTemplateManageContent(template);
       } else if (action === "delete") {
         if (!confirm(`Delete section heading "${pa.name}"?`)) return;
         const actIdx = acts.indexOf(pa);
@@ -8994,12 +9037,13 @@ function renderTemplateManageContent(template) {
       $("manage-modal-body").querySelectorAll(".mn-kebab-menu").forEach(m => m.style.display = "none");
       if (action === "color_gray") {
         pa.activityColor = "gray"; delete pa.isMaintainLive;
-        template.predefinedActivities = acts;
-        await saveTemplateFn(); renderTemplateManageContent(template);
+        template.predefinedActivities = acts; await saveTemplateFn(); renderTemplateManageContent(template);
       } else if (action === "color_white") {
         delete pa.activityColor; delete pa.isMaintainLive;
-        template.predefinedActivities = acts;
-        await saveTemplateFn(); renderTemplateManageContent(template);
+        template.predefinedActivities = acts; await saveTemplateFn(); renderTemplateManageContent(template);
+      } else if (action === "color_green") {
+        pa.activityColor = "green"; delete pa.isMaintainLive;
+        template.predefinedActivities = acts; await saveTemplateFn(); renderTemplateManageContent(template);
       } else if (action === "delete") {
         if (!confirm(`Delete activity "${pa.name}"?`)) return;
         const actIdx = acts.indexOf(pa);
@@ -9007,6 +9051,20 @@ function renderTemplateManageContent(template) {
         template.predefinedActivities = acts;
         await saveTemplateFn(); renderTemplateManageContent(template);
       }
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-hkm-color-toggle").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const panel = $("manage-modal-body").querySelector(`.mn-hkm-color-panel[data-idx="${btn.dataset.idx}"]`);
+      if (panel) panel.style.display = panel.style.display === "flex" ? "none" : "flex";
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-km-color-toggle").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const panel = $("manage-modal-body").querySelector(`.mn-km-color-panel[data-idx="${btn.dataset.idx}"]`);
+      if (panel) panel.style.display = panel.style.display === "flex" ? "none" : "flex";
     });
   });
 

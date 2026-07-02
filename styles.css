@@ -2534,6 +2534,14 @@ tr.view-heading-row.view-gray-row td {
   border-top-color: #6b7280 !important;
   border-bottom-color: #6b7280 !important;
 }
+/* Green (mastered) activity/heading rows */
+tr.view-green-row td { background: #e2efda; }
+tr.view-heading-row.view-green-row td {
+  background: #a9d18e;
+  color: #111827;
+  border-top-color: #70ad47 !important;
+  border-bottom-color: #70ad47 !important;
+}
 
 .view-note-row td {
   background: #fffbeb;
