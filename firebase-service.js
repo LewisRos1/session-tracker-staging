@@ -712,6 +712,12 @@ export async function resequenceIndividualSessions(studentId) {
 
 // ─── EXPORT DATA ─────────────────────────────────────────────
 
+/** Fetch a single session document by ID. Used to get fresh data right before exporting. */
+export async function getSessionById(sessionId) {
+  const snap = await getDoc(doc(db, "sessions", sessionId));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
 /** Fetch recent sessions for a student, newest-first (for session picker). */
 export async function getRecentSessionsForStudent(studentId, maxCount = 60) {
   // No orderBy here on purpose — combining where("studentId") with an

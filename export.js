@@ -3,7 +3,7 @@
 // One .xlsx per student: a Summary sheet + one sheet per target.
 // ============================================================
 
-import { getAllSessionsForStudent, getAllSessionsForGroup, sanitizeKey } from "./firebase-service.js";
+import { getAllSessionsForStudent, getAllSessionsForGroup, sanitizeKey, getSessionById } from "./firebase-service.js";
 
 // Strip HTML tags from remark text (stored as HTML for visual bold support).
 // Line breaks are stored as <br>/<div>/<p> (see app.js's htmlForStorage) —
@@ -1080,9 +1080,15 @@ export async function exportStudentSingleSessionWord(student, session) {
     return;
   }
 
+  // Re-fetch to guarantee we have the latest remarks (avoids stale export if a
+  // select-one or other remark was just edited and the Firestore write was still
+  // in-flight when the session picker fetched its list).
+  const freshSession = await getSessionById(session.id);
+  const sessionToExport = freshSession ?? session;
+
   const allTargets   = getAllTargets(student).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
-  const sessionLabel = session.sessionNumber != null ? `Session ${session.sessionNumber}` : "";
-  const blob = await buildSingleSessionWordBlob(student.name, sessionLabel, allTargets, session);
+  const sessionLabel = sessionToExport.sessionNumber != null ? `Session ${sessionToExport.sessionNumber}` : "";
+  const blob = await buildSingleSessionWordBlob(student.name, sessionLabel, allTargets, sessionToExport);
   downloadBlob(blob, formatExportFilenameWord(student.name, sessionLabel, "Individual", new Date()));
 }
 
@@ -1093,20 +1099,24 @@ export async function exportGroupMemberSingleSessionWord(studentName, groups, se
     return;
   }
 
+  // Re-fetch to guarantee latest remarks (same stale-write race as individual export).
+  const freshSession = await getSessionById(session.id);
+  const sessionToUse = freshSession ?? session;
+
   const filteredRemarks = Object.fromEntries(
-    Object.entries(session.remarks || {}).filter(([, r]) => r.studentName === studentName)
+    Object.entries(sessionToUse.remarks || {}).filter(([, r]) => r.studentName === studentName)
   );
   if (Object.keys(filteredRemarks).length === 0) {
-    alert(`No session data found for ${studentName} on ${fmtDate(session.date)}.`);
+    alert(`No session data found for ${studentName} on ${fmtDate(sessionToUse.date)}.`);
     return;
   }
 
   const studentId      = groups.map(g => g.studentLinks?.[studentName]).find(Boolean);
-  const personalNumber = studentId ? session.attendeePersonalSessionNumbers?.[studentId] : null;
+  const personalNumber = studentId ? sessionToUse.attendeePersonalSessionNumbers?.[studentId] : null;
   const sessionLabel   = personalNumber != null ? `Session ${personalNumber}` : "";
 
   const allTargets      = unionTargetsByName(groups).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
-  const filteredSession = { ...session, remarks: filteredRemarks };
+  const filteredSession = { ...sessionToUse, remarks: filteredRemarks };
   const blob = await buildSingleSessionWordBlob(studentName, sessionLabel, allTargets, filteredSession);
   downloadBlob(blob, formatExportFilenameWord(studentName, sessionLabel, "Group", new Date()));
 }
