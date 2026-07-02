@@ -138,7 +138,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "691";
+const APP_VERSION = "692";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -269,6 +269,29 @@ let _sheetOriginEl = null;
 // renderTargetManageContent saves to the group instead of the student.
 let _groupForTargetEdit = null;
 
+// Tracks in-flight rename-propagation operations so the manage modal can show
+// "Syncing history…" while they run, and warn the boss if one fails silently.
+let _pendingPropagations = 0;
+function _propagationBegin() {
+  _pendingPropagations++;
+  const el = $("manage-sync-indicator");
+  if (el) el.style.display = "inline";
+}
+function _propagationEnd(ok) {
+  _pendingPropagations = Math.max(0, _pendingPropagations - 1);
+  if (_pendingPropagations > 0) return;
+  const el = $("manage-sync-indicator");
+  if (el) el.style.display = "none";
+  if (!ok) {
+    const ai = $("manage-autosave-indicator");
+    if (ai) {
+      ai.textContent = "⚠ Sync failed — run Data Integrity Check";
+      ai.style.color = "#dc2626";
+      setTimeout(() => { if (ai.textContent.startsWith("⚠")) { ai.textContent = ""; ai.style.color = ""; } }, 9000);
+    }
+  }
+}
+
 // Activities are matched to session data by name text (see
 // renameActivityAcrossSessions in firebase-service.js for the full
 // explanation) — call this right after a rename is saved in Edit Target so
@@ -291,12 +314,14 @@ const _renamePropagationQueues = new Map();
 function propagateActivityRename(student, targetName, oldName, newName) {
   if (!oldName || oldName === newName) return;
   const entityId = _groupForTargetEdit ? _groupForTargetEdit.id : student.id;
+  _propagationBegin();
   const prior = _renamePropagationQueues.get(entityId) || Promise.resolve();
   const next = prior
     .then(() => _groupForTargetEdit
       ? renameGroupActivityAcrossSessions(_groupForTargetEdit.id, targetName, oldName, newName)
       : renameActivityAcrossSessions(student.id, targetName, oldName, newName))
-    .catch(err => console.error("propagateActivityRename failed:", err));
+    .then(() => _propagationEnd(true))
+    .catch(err => { console.error("propagateActivityRename failed:", err); _propagationEnd(false); });
   _renamePropagationQueues.set(entityId, next);
 }
 
@@ -308,12 +333,14 @@ function propagateActivityRename(student, targetName, oldName, newName) {
 function propagateTargetRename(student, oldName, newName) {
   if (!oldName || oldName === newName) return;
   const entityId = _groupForTargetEdit ? _groupForTargetEdit.id : student.id;
+  _propagationBegin();
   const prior = _renamePropagationQueues.get(entityId) || Promise.resolve();
   const next = prior
     .then(() => _groupForTargetEdit
       ? renameGroupTargetAcrossSessions(_groupForTargetEdit.id, oldName, newName)
       : renameTargetAcrossSessions(student.id, oldName, newName))
-    .catch(err => console.error("propagateTargetRename failed:", err));
+    .then(() => _propagationEnd(true))
+    .catch(err => { console.error("propagateTargetRename failed:", err); _propagationEnd(false); });
   _renamePropagationQueues.set(entityId, next);
 }
 
@@ -339,12 +366,14 @@ function propagateRemarkOptionRename(student, target, pa, oldOptsStr, newOptsStr
   for (let i = 0; i < removed.length; i++) {
     const oldOpt = removed[i];
     const newOpt = added[i];
+    _propagationBegin();
     const prior = _renamePropagationQueues.get(entityId) || Promise.resolve();
     const next = prior
       .then(() => _groupForTargetEdit
         ? renameGroupRemarkOptionAcrossSessions(_groupForTargetEdit.id, target.name, pa.name, oldOpt, newOpt, !!pa.optionsMulti)
         : renameRemarkOptionAcrossSessions(student.id, target.name, pa.name, oldOpt, newOpt, !!pa.optionsMulti))
-      .catch(err => console.error("propagateRemarkOptionRename failed:", err));
+      .then(() => _propagationEnd(true))
+      .catch(err => { console.error("propagateRemarkOptionRename failed:", err); _propagationEnd(false); });
     _renamePropagationQueues.set(entityId, next);
   }
 }
@@ -1200,6 +1229,11 @@ let _dataIntegrityFindings = [];
 // mapped-score auto-fill that an in-memory guard can't catch across
 // separate devices/tabs/reloads).
 let _dataIntegrityDuplicates = [];
+// Separate from the above: activities whose act.targetName doesn't match ANY
+// current target — most likely from a target rename where propagation didn't
+// complete. The existing scan above only checks within each current target;
+// this catches the "target name itself went missing" shape of the same bug.
+let _dataIntegrityOrphanTargets = [];
 
 async function runDataIntegrityCheck() {
   $("manage-modal-title").textContent = "Data Integrity Check";
@@ -1267,23 +1301,66 @@ async function runDataIntegrityCheck() {
     }
   };
 
+  // Scan for activities stored under a target name that no longer exists in
+  // the config — this is the "failed target rename" shape: the target's own
+  // name was changed but the propagation that updates act.targetName in every
+  // historical session didn't complete, leaving those sessions invisible.
+  const orphanTargets = [];
+  const scanOrphanedTargets = async (who, entityId, isGroup, targets, sessions) => {
+    const validTargetNames = new Set((targets || []).map(t => t.name));
+    const stripEmpty = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
+    const orphanedByName = new Map();
+    for (const session of sessions) {
+      for (const [actId, act] of Object.entries(session.activities || {})) {
+        if (validTargetNames.has(act.targetName)) continue;
+        const remarks = Object.values(session.remarks || {}).filter(r => r.activityId === actId);
+        const hasData = remarks.some(r =>
+          stripEmpty(r.text).length > 0 ||
+          (r.trials || []).filter(t => t !== null && t !== -1).length > 0
+        );
+        if (!hasData) continue;
+        if (!orphanedByName.has(act.targetName)) orphanedByName.set(act.targetName, { count: 0, dates: new Set() });
+        const e = orphanedByName.get(act.targetName);
+        e.count++;
+        e.dates.add(session.date);
+      }
+    }
+    for (const [orphanTargetName, info] of orphanedByName) {
+      let bestMatch = null, bestSim = 0;
+      for (const t of (targets || [])) {
+        const sim = stringSimilarity(orphanTargetName, t.name);
+        if (sim > bestSim) { bestSim = sim; bestMatch = t.name; }
+      }
+      const dates = [...info.dates].sort();
+      orphanTargets.push({
+        who, entityId, isGroup, orphanTargetName,
+        sessionCount: info.count,
+        dateRange: dates.length > 1 ? `${dates[0]} → ${dates[dates.length - 1]}` : dates[0],
+        bestMatch, bestSim, fixed: false
+      });
+    }
+  };
+
   for (const student of state.students) {
     try {
       const sessions = await getAllSessionsForStudent(student.id);
       await scanTargets(student.name, student.id, false, student.targets, sessions);
+      await scanOrphanedTargets(student.name, student.id, false, student.targets, sessions);
     } catch (err) { console.error(`Data integrity scan failed for ${student.name}:`, err); }
   }
   for (const group of state.groups) {
     try {
       const sessions = await getAllSessionsForGroup(group.id);
       await scanTargets(`${group.name} (group)`, group.id, true, group.targets, sessions);
+      await scanOrphanedTargets(`${group.name} (group)`, group.id, true, group.targets, sessions);
     } catch (err) { console.error(`Data integrity scan failed for ${group.name}:`, err); }
   }
 
-  _dataIntegrityFindings  = findings;
-  _dataIntegrityDuplicates = duplicates;
+  _dataIntegrityFindings      = findings;
+  _dataIntegrityDuplicates    = duplicates;
+  _dataIntegrityOrphanTargets = orphanTargets;
 
-  if (findings.length === 0 && duplicates.length === 0) {
+  if (findings.length === 0 && duplicates.length === 0 && orphanTargets.length === 0) {
     $("manage-modal-body").innerHTML = `<p style="padding:1rem">No orphaned or duplicate activity data found. Everything currently matches up.</p>`;
     return;
   }
@@ -1299,10 +1376,29 @@ function renderDataIntegrityReport() {
 
   const dupesOpen   = _dataIntegrityDuplicates.filter(d => !d.merged);
   const dupesMerged = _dataIntegrityDuplicates.filter(d => d.merged);
+  const orphanTgtsOpen   = _dataIntegrityOrphanTargets.filter(f => !f.fixed);
+  const orphanTgtsFixed  = _dataIntegrityOrphanTargets.filter(f => f.fixed);
 
   $("manage-modal-body").innerHTML = `
     <div style="padding:1rem">
-      <p style="margin-bottom:1rem">Scanned everyone's full history — ${findings.length} orphaned activit${findings.length === 1 ? "y" : "ies"} with real recorded data found, plus ${_dataIntegrityDuplicates.length} duplicate activit${_dataIntegrityDuplicates.length === 1 ? "y" : "ies"} within a single session.</p>
+      <p style="margin-bottom:1rem">Scanned everyone's full history — ${findings.length} orphaned activit${findings.length === 1 ? "y" : "ies"} with real recorded data found, ${_dataIntegrityDuplicates.length} duplicate activit${_dataIntegrityDuplicates.length === 1 ? "y" : "ies"} within a single session, and ${orphanTgtsOpen.length + orphanTgtsFixed.length} orphaned target name${orphanTgtsOpen.length + orphanTgtsFixed.length === 1 ? "" : "s"}.</p>
+
+      <h3 style="margin:.5rem 0">Orphaned target names — target renamed but history not updated (${orphanTgtsOpen.length})</h3>
+      <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:.5rem">These sessions have data stored under a target name that no longer exists — most likely from a target rename where the background sync didn't finish before the page was closed. "Re-link" migrates the data to the matching current target so it becomes visible again.</p>
+      ${orphanTgtsOpen.length === 0 ? `<p style="color:var(--text-muted);font-size:.85rem">None found.</p>` : orphanTgtsOpen.map(f => `
+        <div style="border:2px solid #fca5a5;border-radius:8px;padding:.75rem;margin-bottom:.75rem;background:#fef2f2">
+          <div><strong>${escHtml(f.who)}</strong></div>
+          <div style="margin-top:.3rem">Orphaned target: <strong>${escHtml(f.orphanTargetName)}</strong></div>
+          <div style="margin-top:.3rem">Best match: <strong>${escHtml(f.bestMatch || "(no match)")}</strong> <span style="color:var(--text-muted);font-size:.85rem">(${Math.round(f.bestSim * 100)}% similarity)</span></div>
+          <div style="margin-top:.3rem;color:var(--text-muted);font-size:.85rem">Affects ${f.sessionCount} session${f.sessionCount === 1 ? "" : "s"} (${escHtml(f.dateRange || "")})</div>
+          ${f.bestMatch ? `<button class="btn-primary-sm btn-integrity-fix-target" data-ot-idx="${_dataIntegrityOrphanTargets.indexOf(f)}" style="margin-top:.5rem">Re-link to "${escHtml(f.bestMatch)}"</button>` : `<span style="color:var(--text-muted);font-size:.85rem">No current target matches — edit the target name manually in Edit Target first, then re-scan.</span>`}
+        </div>
+      `).join("")}
+
+      ${orphanTgtsFixed.length === 0 ? "" : `
+        <h3 style="margin:1.5rem 0 .5rem;color:#16a34a">Orphaned targets re-linked just now (${orphanTgtsFixed.length})</h3>
+        ${orphanTgtsFixed.map(f => `<div style="padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.85rem">${escHtml(f.who)}: "${escHtml(f.orphanTargetName)}" → "${escHtml(f.bestMatch)}"</div>`).join("")}
+      `}
 
       <h3 style="margin:.5rem 0">Duplicate activities in one session — same name, two records (${dupesOpen.length})</h3>
       <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:.5rem">The name matches the current config fine — the problem is two separate activity records exist for that one name in the same session (usually from a sync race), and only one of them ever shows up on the entry/View screens. Merging moves any remarks off the empty/lesser one onto the one already being displayed, then removes the now-empty duplicate.</p>
@@ -1431,6 +1527,28 @@ function renderDataIntegrityReport() {
         btn.disabled = false;
         btn.dataset.confirming = "";
         btn.textContent = "Delete from all sessions (failed — try again)";
+      }
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".btn-integrity-fix-target").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const f = _dataIntegrityOrphanTargets[Number(btn.dataset.otIdx)];
+      if (!f || f.fixed || !f.bestMatch) return;
+      btn.disabled = true;
+      btn.textContent = "Re-linking…";
+      try {
+        if (f.isGroup) {
+          await renameGroupTargetAcrossSessions(f.entityId, f.orphanTargetName, f.bestMatch);
+        } else {
+          await renameTargetAcrossSessions(f.entityId, f.orphanTargetName, f.bestMatch);
+        }
+        f.fixed = true;
+        renderDataIntegrityReport();
+      } catch (err) {
+        console.error("Orphaned target re-link failed:", err);
+        btn.disabled = false;
+        btn.textContent = `Re-link to "${f.bestMatch}" (failed — try again)`;
       }
     });
   });
@@ -2651,7 +2769,10 @@ async function leaveSession() {
     const fedcHasData = Object.values(data.fedcComments || {}).some(c => stripEmpty(c).length > 0);
     const remarkHasData = Object.values(data.remarks || {}).some(r => {
       const act = (data.activities || {})[r.activityId];
-      if (!act || !currentTargetNames.has(act.targetName)) return false;
+      if (!act) return false;
+      // Count data under ANY targetName — if a target was renamed and the
+      // propagation didn't finish, activities under the old name still contain
+      // real data that must not make this session look "empty" and get deleted.
       return stripEmpty(r.text).length > 0
         || (r.trials || []).some(t => t !== null && t !== -1)
         || stripEmpty(r.masteryNote).length > 0;
@@ -4113,7 +4234,10 @@ async function leaveSessionView() {
     const fedcHasData = Object.values(data.fedcComments || {}).some(c => stripEmpty(c).length > 0);
     const remarkHasData = Object.values(data.remarks || {}).some(r => {
       const act = (data.activities || {})[r.activityId];
-      if (!act || !currentTargetNames.has(act.targetName)) return false;
+      if (!act) return false;
+      // Count data under ANY targetName — if a target was renamed and the
+      // propagation didn't finish, activities under the old name still contain
+      // real data that must not make this session look "empty" and get deleted.
       return stripEmpty(r.text).length > 0
         || (r.trials || []).some(t => t !== null && t !== -1)
         || stripEmpty(r.masteryNote).length > 0;
@@ -5481,7 +5605,8 @@ async function leaveGroupSessionView() {
     const fedcHasData = Object.values(data.fedcComments || {}).some(c => stripEmpty(c).length > 0);
     const remarkHasData = Object.values(data.remarks || {}).some(r => {
       const act = (data.activities || {})[r.activityId];
-      if (!act || !currentTargetNames.has(act.targetName)) return false;
+      if (!act) return false;
+      // Count data under ANY targetName — renamed targets' old-name data is still real.
       return stripEmpty(r.text).length > 0
         || (r.trials || []).some(t => t !== null && t !== -1)
         || stripEmpty(r.masteryNote).length > 0;
