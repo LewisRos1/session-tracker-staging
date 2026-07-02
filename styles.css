@@ -2530,7 +2530,7 @@ div.admin-note-editable:empty::before {
 tr.view-gray-row td { background: #d1d5db; }
 tr.view-heading-row.view-gray-row td {
   background: #9ca3af;
-  color: #111827;
+  color: #ffffff;
   border-top-color: #6b7280 !important;
   border-bottom-color: #6b7280 !important;
 }
@@ -2538,7 +2538,7 @@ tr.view-heading-row.view-gray-row td {
 tr.view-green-row td { background: #e2efda; }
 tr.view-heading-row.view-green-row td {
   background: #a9d18e;
-  color: #111827;
+  color: #1a4731;
   border-top-color: #70ad47 !important;
   border-bottom-color: #70ad47 !important;
 }

@@ -127,7 +127,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "671";
+const APP_VERSION = "672";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2836,22 +2836,29 @@ function renderFedcTarget(target) {
       return;
     }
 
-    // Heading rows — blue or gray based on headingColor property
+    // Heading rows — blue, gray, or green based on headingColor property
     if (pa.isHeading || pa.isMaintainHeading) {
-      const isGray = pa.headingColor === "gray" || pa.isMaintainHeading;
+      const isGray  = pa.headingColor === "gray" || pa.isMaintainHeading;
+      const isGreen = pa.headingColor === "green";
       html += isGray
-        ? `<div class="activity-group-heading" contenteditable="false" style="background:#9ca3af;border-color:#6b7280;color:#111827">${escHtml(pa.name || "")}</div>`
+        ? `<div class="activity-group-heading" contenteditable="false" style="background:#9ca3af;border-color:#6b7280;color:#ffffff">${escHtml(pa.name || "")}</div>`
+        : isGreen
+        ? `<div class="activity-group-heading" contenteditable="false" style="background:#a9d18e;border-color:#70ad47;color:#1a4731">${escHtml(pa.name || "")}</div>`
         : `<div class="activity-group-heading" contenteditable="false">${escHtml(pa.name || "")}</div>`;
       return;
     }
 
     if (pa.isCompleted || pa.isArchived || pa.isStopped) return;
 
-    // Fixed remark activity — shown read-only with gray block styling
+    // Fixed remark activity — shown read-only with color block styling
     const isFixed = pa.fixedRemark !== undefined || pa.isMaintain;
     if (isFixed) {
       const fixedText = pa.fixedRemark ?? pa.maintainRemark ?? "";
-      html += `<div class="entry-block entry-block-predefined" style="background:#f3f4f6;border:1px solid #e5e7eb;border-left:4px solid #d1d5db">
+      const isGreenFixed = pa.activityColor === "green";
+      const fixedStyle = isGreenFixed
+        ? 'style="background:#e2efda;border:1px solid #a9d18e;border-left:4px solid #70ad47"'
+        : 'style="background:#f3f4f6;border:1px solid #e5e7eb;border-left:4px solid #d1d5db"';
+      html += `<div class="entry-block entry-block-predefined" ${fixedStyle}
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Activity</span>
           <span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span>
@@ -2879,8 +2886,12 @@ function renderFedcTarget(target) {
     const isPending  = state.pendingNewRemark?.pendingKey === pendingKey;
     const mappedInfo = pa.isMapped ? resolveMappedScoreDisplay(pa) : null;
 
-    const isGrayActivity = pa.activityColor === "gray" || pa.isMaintainLive;
-    html += `<div class="entry-block entry-block-predefined"${isGrayActivity ? ' style="background:#f3f4f6;border:1px solid #e5e7eb;border-left:4px solid #d1d5db"' : ''}>
+    const isGrayActivity  = pa.activityColor === "gray" || pa.isMaintainLive;
+    const isGreenActivity = pa.activityColor === "green";
+    const activityStyle = isGrayActivity  ? ' style="background:#f3f4f6;border:1px solid #e5e7eb;border-left:4px solid #d1d5db"'
+                        : isGreenActivity ? ' style="background:#e2efda;border:1px solid #a9d18e;border-left:4px solid #70ad47"'
+                        : '';
+    html += `<div class="entry-block entry-block-predefined"${activityStyle}>
       <div class="entry-field" contenteditable="false">
         <span class="field-label">Activity</span>
         <span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span>
@@ -7824,7 +7835,7 @@ function renderTargetManageContent(student, target) {
       html += `<div class="admin-list-item mn-heading-item" data-idx="${idx}"${hdgBg ? ` style="background:${hdgBg}"` : ''}>
         <span class="drag-handle"${hdgBg ? ' style="color:#ffffff"' : ''}>⠿</span>
         <textarea class="admin-input mn-heading-input" id="mn-act-name-${idx}" data-idx="${idx}"
-          rows="1" placeholder="Enter Section Heading" style="flex:1${hdgBg ? `;background:${hdgBg};color:#111827` : ""}">${escHtml(a.name || "")}</textarea>
+          rows="1" placeholder="Enter Section Heading" style="flex:1${hdgBg ? `;background:${hdgBg};color:${isGreen ? '#1a4731' : '#ffffff'}` : ""}">${escHtml(a.name || "")}</textarea>
         <div style="position:relative">
           <button class="btn-adm-del mn-heading-color-btn" data-idx="${idx}" title="Heading options" style="font-size:1.15rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-heading-color-menu" id="mn-hkm-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:190px;overflow:hidden">
@@ -7959,7 +7970,7 @@ function renderTargetManageContent(student, target) {
               <button class="mn-km-color-toggle" data-idx="${idx}" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">🎨 Change Colour</button>
             </div>
             <div class="mn-km-color-panel" data-idx="${idx}" style="display:none;padding:.45rem .6rem;border-bottom:1px solid #f3f4f6;gap:.4rem">
-              <button class="mn-km-opt" data-idx="${idx}" data-action="color_white" style="flex:1;padding:.3rem;background:#ffffff;border:2px solid ${!isGray && !isGreen ? '#6b7280' : '#e5e7eb'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">⬜ White</button>
+              <button class="mn-km-opt" data-idx="${idx}" data-action="color_white" style="flex:1;padding:.3rem;background:#ffffff;border:2px solid ${!isGray && !isGreen ? '#6b7280' : '#e5e7eb'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">🤍 White</button>
               <button class="mn-km-opt" data-idx="${idx}" data-action="color_gray" style="flex:1;padding:.3rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">🩶 Grey</button>
               <button class="mn-km-opt" data-idx="${idx}" data-action="color_green" style="flex:1;padding:.3rem;background:#a9d18e;border:2px solid ${isGreen ? '#388e3c' : '#70ad47'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">💚 Green</button>
             </div>
@@ -8622,7 +8633,7 @@ function renderTemplateManageContent(template) {
       html += `<div class="admin-list-item mn-heading-item" data-idx="${idx}"${hdgBg ? ` style="background:${hdgBg}"` : ''}>
         <span class="drag-handle"${hdgBg ? ' style="color:#ffffff"' : ''}>⠿</span>
         <textarea class="admin-input mn-heading-input" id="mn-act-name-${idx}" data-idx="${idx}"
-          rows="1" placeholder="Enter Section Heading" style="flex:1${hdgBg ? `;background:${hdgBg};color:#111827` : ""}">${escHtml(a.name || "")}</textarea>
+          rows="1" placeholder="Enter Section Heading" style="flex:1${hdgBg ? `;background:${hdgBg};color:${isGreen ? '#1a4731' : '#ffffff'}` : ""}">${escHtml(a.name || "")}</textarea>
         <div style="position:relative">
           <button class="btn-adm-del mn-heading-color-btn" data-idx="${idx}" title="Heading options" style="font-size:1.15rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-heading-color-menu" id="mn-hkm-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:190px;overflow:hidden">
@@ -8706,7 +8717,7 @@ function renderTemplateManageContent(template) {
               <button class="mn-km-color-toggle" data-idx="${idx}" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">🎨 Change Colour</button>
             </div>
             <div class="mn-km-color-panel" data-idx="${idx}" style="display:none;padding:.45rem .6rem;border-bottom:1px solid #f3f4f6;gap:.4rem">
-              <button class="mn-km-opt" data-idx="${idx}" data-action="color_white" style="flex:1;padding:.3rem;background:#ffffff;border:2px solid ${!isGray && !isGreen ? '#6b7280' : '#e5e7eb'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">⬜ White</button>
+              <button class="mn-km-opt" data-idx="${idx}" data-action="color_white" style="flex:1;padding:.3rem;background:#ffffff;border:2px solid ${!isGray && !isGreen ? '#6b7280' : '#e5e7eb'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">🤍 White</button>
               <button class="mn-km-opt" data-idx="${idx}" data-action="color_gray" style="flex:1;padding:.3rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">🩶 Grey</button>
               <button class="mn-km-opt" data-idx="${idx}" data-action="color_green" style="flex:1;padding:.3rem;background:#a9d18e;border:2px solid ${isGreen ? '#388e3c' : '#70ad47'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">💚 Green</button>
             </div>
