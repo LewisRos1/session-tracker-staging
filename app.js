@@ -138,7 +138,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "693";
+const APP_VERSION = "694";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -8545,45 +8545,74 @@ function renderTargetManageContent(student, target) {
           target.predefinedActivities = acts;
           await saveTarget();
           renderTargetManageContent(student, target);
-        } else if (btn.dataset.confirmDelete !== "1") {
+        } else {
           btn.disabled = true;
           btn.textContent = "Checking…";
+          let affected = 0;
           try {
             const allSessions = _groupForTargetEdit
               ? await getAllSessionsForGroup(_groupForTargetEdit.id)
               : await getAllSessionsForStudent(student.id);
-            const affected = allSessions.filter(s =>
+            affected = allSessions.filter(s =>
               Object.values(s.activities || {}).some(a => a.targetName === target.name && a.activityName === pa.name)
             ).length;
-            btn.dataset.confirmDelete = "1";
-            btn.disabled = false;
-            btn.style.background = "#dc2626"; btn.style.color = "#fff"; btn.style.fontSize = ".7rem"; btn.style.whiteSpace = "normal";
-            btn.textContent = affected > 0
-              ? `⚠️ Deletes data from ${affected} past session${affected !== 1 ? "s" : ""}! Tap again to confirm`
-              : "Confirm delete (no past session data found)";
-          } catch {
-            btn.dataset.confirmDelete = "1";
-            btn.disabled = false;
-            btn.style.background = "#dc2626"; btn.style.color = "#fff"; btn.style.fontSize = ".7rem"; btn.style.whiteSpace = "normal";
-            btn.textContent = "⚠️ Permanently erases ALL past data! Tap again to confirm";
+          } catch { affected = -1; }
+          btn.disabled = false;
+          btn.textContent = "🗑️ Delete Activity";
+          if (affected === 0) {
+            if (!confirm(`Delete activity "${pa.name}"? No past session data will be lost.`)) return;
+            const actIdx = acts.indexOf(pa);
+            if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
+            target.predefinedActivities = acts;
+            await saveTarget();
+            renderTargetManageContent(student, target);
+          } else {
+            const confirmWord = affected > 0 ? String(affected) : "DELETE";
+            $("manage-modal").querySelectorAll("[data-del-overlay]").forEach(el => el.remove());
+            const overlay = document.createElement("div");
+            overlay.dataset.delOverlay = "1";
+            overlay.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:200;border-radius:.75rem";
+            overlay.innerHTML = `<div style="background:#fff;padding:1.25rem 1.25rem 1rem;border-radius:.75rem;width:min(280px,90%);box-shadow:0 4px 24px rgba(0,0,0,.25)">
+              <p style="font-size:.85rem;margin:0 0 .5rem;color:#111;font-weight:600">⚠️ Permanently deletes data from <span style="color:#dc2626">${confirmWord} past session${affected !== 1 ? "s" : ""}</span>. This cannot be undone.</p>
+              <p style="font-size:.8rem;margin:0 0 .6rem;color:#6b7280">Type <strong>${confirmWord}</strong> to confirm:</p>
+              <input id="del-type-input" type="text" autocomplete="off" inputmode="numeric"
+                style="width:100%;box-sizing:border-box;padding:.45rem .6rem;border:2px solid #d1d5db;border-radius:.4rem;font-size:1.1rem;text-align:center;outline:none;margin-bottom:.75rem" placeholder="${confirmWord}">
+              <div style="display:flex;gap:.5rem">
+                <button id="del-type-cancel" style="flex:1;padding:.45rem;border:1px solid #d1d5db;border-radius:.4rem;background:#f9fafb;cursor:pointer;font-size:.85rem">Cancel</button>
+                <button id="del-type-ok" disabled style="flex:1;padding:.45rem;border:none;border-radius:.4rem;background:#dc2626;color:#fff;cursor:pointer;font-size:.85rem;opacity:.4">Confirm Delete</button>
+              </div>
+            </div>`;
+            const modalSheet = $("manage-modal").querySelector(".modal-sheet");
+            modalSheet.style.position = "relative";
+            modalSheet.appendChild(overlay);
+            const inp = overlay.querySelector("#del-type-input");
+            const okBtn = overlay.querySelector("#del-type-ok");
+            inp.focus();
+            inp.addEventListener("input", () => {
+              const ok = inp.value === confirmWord;
+              okBtn.disabled = !ok;
+              okBtn.style.opacity = ok ? "1" : ".4";
+            });
+            overlay.querySelector("#del-type-cancel").addEventListener("click", () => overlay.remove());
+            okBtn.addEventListener("click", async () => {
+              overlay.remove();
+              const actIdx = acts.indexOf(pa);
+              if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
+              target.predefinedActivities = acts;
+              await saveTarget();
+              try {
+                if (_groupForTargetEdit) {
+                  await deleteGroupOrphanAcrossSessions(_groupForTargetEdit.id, target.name, pa.name);
+                } else {
+                  await deleteOrphanAcrossSessions(student.id, target.name, pa.name);
+                }
+              } catch (err) {
+                console.error("Failed to purge activity from sessions:", err);
+                alert("Activity removed from config, but failed to delete from past sessions:\n" + err.message);
+              }
+              renderTargetManageContent(student, target);
+            });
           }
-        } else {
-          delete btn.dataset.confirmDelete;
-          const actIdx = acts.indexOf(pa);
-          if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
-          target.predefinedActivities = acts;
-          await saveTarget();
-          try {
-            if (_groupForTargetEdit) {
-              await deleteGroupOrphanAcrossSessions(_groupForTargetEdit.id, target.name, pa.name);
-            } else {
-              await deleteOrphanAcrossSessions(student.id, target.name, pa.name);
-            }
-          } catch (err) {
-            console.error("Failed to purge activity from sessions:", err);
-            alert("Activity removed from config, but failed to delete from past sessions:\n" + err.message);
-          }
-          renderTargetManageContent(student, target);
         }
       }
     });
