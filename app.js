@@ -138,7 +138,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "688";
+const APP_VERSION = "689";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2821,7 +2821,7 @@ function renderTargetContent() {
   }
 
   if (manageBtn) {
-    manageBtn.classList.toggle("hidden", target.isStructured !== true);
+    manageBtn.classList.toggle("hidden", target.isStructured !== true && !target.predefinedActivities?.length);
   }
 
   $("target-type-chip")?.classList.add("hidden");
