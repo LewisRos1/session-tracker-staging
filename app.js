@@ -127,7 +127,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "683";
+const APP_VERSION = "684";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2849,7 +2849,11 @@ function renderFedcTarget(target) {
     if (!isActivityActive(pa, sessionDateForFilter)) return;
     // Note item — render inline in order, styled like a section heading
     if (pa.isNote) {
-      if (pa.text) html += `<div class="activity-note-heading" contenteditable="false">${noteToHtml(pa.text)}</div>`;
+      if (pa.text) {
+        const noteClr = pa.activityColor === "purple" ? ' style="background:#f5f3ff;border-left:4px solid #a78bfa;padding:.35rem .6rem"'
+                      : pa.activityColor === "gray"   ? ' style="background:#f3f4f6;border-left:4px solid #d1d5db;padding:.35rem .6rem"' : '';
+        html += `<div class="activity-note-heading" contenteditable="false"${noteClr}>${noteToHtml(pa.text)}</div>`;
+      }
       return;
     }
 
@@ -7960,7 +7964,15 @@ function renderTargetManageContent(student, target) {
       </div>`;
     } else if (a.isNote) {
       const noteInactive = !isActivityActive(a, todayDateStr());
-      html += `<div class="admin-list-item admin-note-item" data-idx="${idx}"${noteInactive ? ' style="opacity:0.3"' : ''}>
+      const noteExpired  = noteInactive && !!a.activeTo && a.activeTo < todayDateStr();
+      const isNotePurple = a.activityColor === "purple";
+      const isNoteGray   = a.activityColor === "gray";
+      const noteBaseBg   = isNotePurple ? 'background:#f5f3ff;border:1px solid #ddd6fe' : isNoteGray ? 'background:#f3f4f6;border:1px solid #d1d5db' : null;
+      const noteItemStyle = noteExpired
+        ? (noteBaseBg ? ` style="position:relative;${noteBaseBg}"` : ' style="position:relative"')
+        : (noteBaseBg ? ` style="${noteBaseBg}${noteInactive ? ';opacity:0.3' : ''}"` : noteInactive ? ' style="opacity:0.3"' : '');
+      const noteOverlay  = noteExpired ? `<div style="position:absolute;inset:0 2.5rem 0 0;background:rgba(255,255,255,.7);pointer-events:none;z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center"><div style="pointer-events:none;background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.35rem .75rem;text-align:center;font-size:1.17rem;color:#374151;max-width:80%">⏸ This activity's period has ended — tap ⋮ on the right side to adjust the dates and bring it back.</div></div>` : '';
+      html += `<div class="admin-list-item admin-note-item" data-idx="${idx}"${noteItemStyle}>
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.25rem">
           <div style="display:flex;align-items:flex-start;gap:.3rem">
@@ -7968,10 +7980,26 @@ function renderTargetManageContent(student, target) {
             <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
               rows="1" placeholder="Enter Note"
               style="flex:1;overflow-y:hidden;resize:none">${escHtml(stripNoteHtml(a.text || ""))}</textarea>
-            <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
           </div>
-          ${periodSectionHtml(a.activeFrom, a.activeTo, idx, false)}
         </div>
+        <div style="position:relative">
+          <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Note options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
+          <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:200px;overflow:hidden">
+            <div style="display:flex;align-items:stretch;border-bottom:1px solid #f3f4f6">
+              <button class="mn-km-color-toggle" data-idx="${idx}" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">🎨 Change Colour</button>
+            </div>
+            <div class="mn-km-color-panel" data-idx="${idx}" style="display:none;padding:.45rem .6rem;border-bottom:1px solid #f3f4f6;gap:.4rem">
+              <button class="mn-km-opt" data-idx="${idx}" data-action="color_white" style="flex:1;padding:.3rem;background:#ffffff;border:2px solid ${!isNotePurple && !isNoteGray ? '#6b7280' : '#e5e7eb'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">🤍 White</button>
+              <button class="mn-km-opt" data-idx="${idx}" data-action="color_gray" style="flex:1;padding:.3rem;background:#d9d9d9;border:2px solid ${isNoteGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">🩶 Grey</button>
+              <button class="mn-km-opt" data-idx="${idx}" data-action="color_purple" style="flex:1;padding:.3rem;background:#e9d5ff;border:2px solid ${isNotePurple ? '#7c3aed' : '#c4b5fd'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">💜 Purple</button>
+            </div>
+            ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true)}
+            <div style="display:flex;align-items:stretch">
+              <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Note</button>
+            </div>
+          </div>
+        </div>
+        ${noteOverlay}
       </div>`;
     } else if (a.isMaintain) {
       html += `<div class="admin-list-item" data-idx="${idx}" style="background:#f3f4f6;border:1px solid #d1d5db">
@@ -8356,6 +8384,9 @@ function renderTargetManageContent(student, target) {
       } else if (action === "color_green") {
         pa.activityColor = "green"; delete pa.isMaintainLive;
         await saveTarget(); renderTargetManageContent(student, target);
+      } else if (action === "color_purple") {
+        pa.activityColor = "purple"; delete pa.isMaintainLive;
+        await saveTarget(); renderTargetManageContent(student, target);
       } else if (action === "master") {
         pa.isCompleted = true;
         delete pa.isArchived;
@@ -8368,20 +8399,23 @@ function renderTargetManageContent(student, target) {
         await saveTarget();
         renderTargetManageContent(student, target);
       } else if (action === "delete") {
-        if (!confirm(`Permanently delete "${pa.name}" and all its past session data? This cannot be undone.`)) return;
+        const delLabel = pa.isNote ? "this note" : `"${pa.name}" and all its past session data`;
+        if (!confirm(`Permanently delete ${delLabel}? This cannot be undone.`)) return;
         const actIdx = acts.indexOf(pa);
         if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
         target.predefinedActivities = acts;
         await saveTarget();
-        try {
-          if (_groupForTargetEdit) {
-            await deleteGroupOrphanAcrossSessions(_groupForTargetEdit.id, target.name, pa.name);
-          } else {
-            await deleteOrphanAcrossSessions(student.id, target.name, pa.name);
+        if (!pa.isNote) {
+          try {
+            if (_groupForTargetEdit) {
+              await deleteGroupOrphanAcrossSessions(_groupForTargetEdit.id, target.name, pa.name);
+            } else {
+              await deleteOrphanAcrossSessions(student.id, target.name, pa.name);
+            }
+          } catch (err) {
+            console.error("Failed to purge activity from sessions:", err);
+            alert("Activity removed from config, but failed to delete from past sessions:\n" + err.message);
           }
-        } catch (err) {
-          console.error("Failed to purge activity from sessions:", err);
-          alert("Activity removed from config, but failed to delete from past sessions:\n" + err.message);
         }
         renderTargetManageContent(student, target);
       }
@@ -8806,7 +8840,15 @@ function renderTemplateManageContent(template) {
       </div>`;
     } else if (a.isNote) {
       const noteInactive = !isActivityActive(a, todayDateStr());
-      html += `<div class="admin-list-item admin-note-item" data-idx="${idx}"${noteInactive ? ' style="opacity:0.3"' : ''}>
+      const noteExpired  = noteInactive && !!a.activeTo && a.activeTo < todayDateStr();
+      const isNotePurple = a.activityColor === "purple";
+      const isNoteGray   = a.activityColor === "gray";
+      const noteBaseBg   = isNotePurple ? 'background:#f5f3ff;border:1px solid #ddd6fe' : isNoteGray ? 'background:#f3f4f6;border:1px solid #d1d5db' : null;
+      const noteItemStyle = noteExpired
+        ? (noteBaseBg ? ` style="position:relative;${noteBaseBg}"` : ' style="position:relative"')
+        : (noteBaseBg ? ` style="${noteBaseBg}${noteInactive ? ';opacity:0.3' : ''}"` : noteInactive ? ' style="opacity:0.3"' : '');
+      const noteOverlay  = noteExpired ? `<div style="position:absolute;inset:0 2.5rem 0 0;background:rgba(255,255,255,.7);pointer-events:none;z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center"><div style="pointer-events:none;background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.35rem .75rem;text-align:center;font-size:1.17rem;color:#374151;max-width:80%">⏸ This activity's period has ended — tap ⋮ on the right side to adjust the dates and bring it back.</div></div>` : '';
+      html += `<div class="admin-list-item admin-note-item" data-idx="${idx}"${noteItemStyle}>
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.25rem">
           <div style="display:flex;align-items:flex-start;gap:.3rem">
@@ -8814,10 +8856,26 @@ function renderTemplateManageContent(template) {
             <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
               rows="1" placeholder="Enter Note"
               style="flex:1;overflow-y:hidden;resize:none">${escHtml(stripNoteHtml(a.text || ""))}</textarea>
-            <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
           </div>
-          ${periodSectionHtml(a.activeFrom, a.activeTo, idx, false)}
         </div>
+        <div style="position:relative">
+          <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Note options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
+          <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:200px;overflow:hidden">
+            <div style="display:flex;align-items:stretch;border-bottom:1px solid #f3f4f6">
+              <button class="mn-km-color-toggle" data-idx="${idx}" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">🎨 Change Colour</button>
+            </div>
+            <div class="mn-km-color-panel" data-idx="${idx}" style="display:none;padding:.45rem .6rem;border-bottom:1px solid #f3f4f6;gap:.4rem">
+              <button class="mn-km-opt" data-idx="${idx}" data-action="color_white" style="flex:1;padding:.3rem;background:#ffffff;border:2px solid ${!isNotePurple && !isNoteGray ? '#6b7280' : '#e5e7eb'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">🤍 White</button>
+              <button class="mn-km-opt" data-idx="${idx}" data-action="color_gray" style="flex:1;padding:.3rem;background:#d9d9d9;border:2px solid ${isNoteGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">🩶 Grey</button>
+              <button class="mn-km-opt" data-idx="${idx}" data-action="color_purple" style="flex:1;padding:.3rem;background:#e9d5ff;border:2px solid ${isNotePurple ? '#7c3aed' : '#c4b5fd'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">💜 Purple</button>
+            </div>
+            ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true)}
+            <div style="display:flex;align-items:stretch">
+              <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Note</button>
+            </div>
+          </div>
+        </div>
+        ${noteOverlay}
       </div>`;
     } else if (a.isMaintain) {
       html += `<div class="admin-list-item" data-idx="${idx}" style="background:#f3f4f6;border:1px solid #d1d5db">
@@ -9225,8 +9283,11 @@ function renderTemplateManageContent(template) {
       } else if (action === "color_green") {
         pa.activityColor = "green"; delete pa.isMaintainLive;
         template.predefinedActivities = acts; await saveTemplateFn(); renderTemplateManageContent(template);
+      } else if (action === "color_purple") {
+        pa.activityColor = "purple"; delete pa.isMaintainLive;
+        template.predefinedActivities = acts; await saveTemplateFn(); renderTemplateManageContent(template);
       } else if (action === "delete") {
-        if (!confirm(`Delete activity "${pa.name}"?`)) return;
+        if (!confirm(`Delete ${pa.isNote ? "this note" : `activity "${pa.name}"`}?`)) return;
         const actIdx = acts.indexOf(pa);
         if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
         template.predefinedActivities = acts;
@@ -9811,7 +9872,11 @@ function buildGroupItemsByActivity(target, data, attendees) {
   for (const pa of (target.predefinedActivities || [])) {
     if (!isActivityActive(pa, grpSessionDate)) continue;
     if (pa.isNote) {
-      if (pa.text) items.push(`<div class="activity-note-heading" contenteditable="false">${noteToHtml(pa.text)}</div>`);
+      if (pa.text) {
+        const noteClr = pa.activityColor === "purple" ? ' style="background:#f5f3ff;border-left:4px solid #a78bfa;padding:.35rem .6rem"'
+                      : pa.activityColor === "gray"   ? ' style="background:#f3f4f6;border-left:4px solid #d1d5db;padding:.35rem .6rem"' : '';
+        items.push(`<div class="activity-note-heading" contenteditable="false"${noteClr}>${noteToHtml(pa.text)}</div>`);
+      }
       continue;
     }
     if (pa.isHeading) {
