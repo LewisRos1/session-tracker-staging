@@ -127,7 +127,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "685";
+const APP_VERSION = "686";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2850,8 +2850,8 @@ function renderFedcTarget(target) {
     // Note item — render inline in order, styled like a section heading
     if (pa.isNote) {
       if (pa.text) {
-        const noteClr = pa.activityColor === "purple" ? ' style="background:#f5f3ff;border-left:4px solid #a78bfa;padding:.35rem .6rem"'
-                      : pa.activityColor === "gray"   ? ' style="background:#f3f4f6;border-left:4px solid #d1d5db;padding:.35rem .6rem"' : '';
+        const noteClr = (!pa.activityColor || pa.activityColor === "purple") ? ' style="background:#f5f3ff;border-left:4px solid #a78bfa;padding:.35rem .6rem"'
+                      : pa.activityColor === "gray" ? ' style="background:#f3f4f6;border-left:4px solid #d1d5db;padding:.35rem .6rem"' : '';
         html += `<div class="activity-note-heading" contenteditable="false"${noteClr}>${noteToHtml(pa.text)}</div>`;
       }
       return;
@@ -7965,8 +7965,9 @@ function renderTargetManageContent(student, target) {
     } else if (a.isNote) {
       const noteInactive = !isActivityActive(a, todayDateStr());
       const noteExpired  = noteInactive && !!a.activeTo && a.activeTo < todayDateStr();
-      const isNotePurple = a.activityColor === "purple";
+      const isNoteWhite  = a.activityColor === "white";
       const isNoteGray   = a.activityColor === "gray";
+      const isNotePurple = !isNoteWhite && !isNoteGray;
       const noteBaseBg   = isNotePurple ? 'background:#f5f3ff;border:1px solid #ddd6fe' : isNoteGray ? 'background:#f3f4f6;border:1px solid #d1d5db' : null;
       const noteItemStyle = noteExpired
         ? (noteBaseBg ? ` style="position:relative;${noteBaseBg}"` : ' style="position:relative"')
@@ -7989,7 +7990,7 @@ function renderTargetManageContent(student, target) {
               <button class="mn-km-color-toggle" data-idx="${idx}" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">🎨 Change Colour</button>
             </div>
             <div class="mn-km-color-panel" data-idx="${idx}" style="display:none;padding:.45rem .6rem;border-bottom:1px solid #f3f4f6;gap:.4rem">
-              <button class="mn-km-opt" data-idx="${idx}" data-action="color_white" style="flex:1;padding:.3rem;background:#ffffff;border:2px solid ${!isNotePurple && !isNoteGray ? '#6b7280' : '#e5e7eb'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">🤍 White</button>
+              <button class="mn-km-opt" data-idx="${idx}" data-action="color_white" style="flex:1;padding:.3rem;background:#ffffff;border:2px solid ${isNoteWhite ? '#6b7280' : '#e5e7eb'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">🤍 White</button>
               <button class="mn-km-opt" data-idx="${idx}" data-action="color_gray" style="flex:1;padding:.3rem;background:#d9d9d9;border:2px solid ${isNoteGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">🩶 Grey</button>
               <button class="mn-km-opt" data-idx="${idx}" data-action="color_purple" style="flex:1;padding:.3rem;background:#e9d5ff;border:2px solid ${isNotePurple ? '#7c3aed' : '#c4b5fd'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">💜 Purple</button>
             </div>
@@ -8379,7 +8380,8 @@ function renderTargetManageContent(student, target) {
         pa.activityColor = "gray"; delete pa.isMaintainLive;
         await saveTarget(); renderTargetManageContent(student, target);
       } else if (action === "color_white") {
-        delete pa.activityColor; delete pa.isMaintainLive;
+        if (pa.isNote) pa.activityColor = "white"; else delete pa.activityColor;
+        delete pa.isMaintainLive;
         await saveTarget(); renderTargetManageContent(student, target);
       } else if (action === "color_green") {
         pa.activityColor = "green"; delete pa.isMaintainLive;
@@ -8841,8 +8843,9 @@ function renderTemplateManageContent(template) {
     } else if (a.isNote) {
       const noteInactive = !isActivityActive(a, todayDateStr());
       const noteExpired  = noteInactive && !!a.activeTo && a.activeTo < todayDateStr();
-      const isNotePurple = a.activityColor === "purple";
+      const isNoteWhite  = a.activityColor === "white";
       const isNoteGray   = a.activityColor === "gray";
+      const isNotePurple = !isNoteWhite && !isNoteGray;
       const noteBaseBg   = isNotePurple ? 'background:#f5f3ff;border:1px solid #ddd6fe' : isNoteGray ? 'background:#f3f4f6;border:1px solid #d1d5db' : null;
       const noteItemStyle = noteExpired
         ? (noteBaseBg ? ` style="position:relative;${noteBaseBg}"` : ' style="position:relative"')
@@ -8865,7 +8868,7 @@ function renderTemplateManageContent(template) {
               <button class="mn-km-color-toggle" data-idx="${idx}" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">🎨 Change Colour</button>
             </div>
             <div class="mn-km-color-panel" data-idx="${idx}" style="display:none;padding:.45rem .6rem;border-bottom:1px solid #f3f4f6;gap:.4rem">
-              <button class="mn-km-opt" data-idx="${idx}" data-action="color_white" style="flex:1;padding:.3rem;background:#ffffff;border:2px solid ${!isNotePurple && !isNoteGray ? '#6b7280' : '#e5e7eb'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">🤍 White</button>
+              <button class="mn-km-opt" data-idx="${idx}" data-action="color_white" style="flex:1;padding:.3rem;background:#ffffff;border:2px solid ${isNoteWhite ? '#6b7280' : '#e5e7eb'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">🤍 White</button>
               <button class="mn-km-opt" data-idx="${idx}" data-action="color_gray" style="flex:1;padding:.3rem;background:#d9d9d9;border:2px solid ${isNoteGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">🩶 Grey</button>
               <button class="mn-km-opt" data-idx="${idx}" data-action="color_purple" style="flex:1;padding:.3rem;background:#e9d5ff;border:2px solid ${isNotePurple ? '#7c3aed' : '#c4b5fd'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">💜 Purple</button>
             </div>
@@ -9278,7 +9281,8 @@ function renderTemplateManageContent(template) {
         pa.activityColor = "gray"; delete pa.isMaintainLive;
         template.predefinedActivities = acts; await saveTemplateFn(); renderTemplateManageContent(template);
       } else if (action === "color_white") {
-        delete pa.activityColor; delete pa.isMaintainLive;
+        if (pa.isNote) pa.activityColor = "white"; else delete pa.activityColor;
+        delete pa.isMaintainLive;
         template.predefinedActivities = acts; await saveTemplateFn(); renderTemplateManageContent(template);
       } else if (action === "color_green") {
         pa.activityColor = "green"; delete pa.isMaintainLive;
@@ -9873,8 +9877,8 @@ function buildGroupItemsByActivity(target, data, attendees) {
     if (!isActivityActive(pa, grpSessionDate)) continue;
     if (pa.isNote) {
       if (pa.text) {
-        const noteClr = pa.activityColor === "purple" ? ' style="background:#f5f3ff;border-left:4px solid #a78bfa;padding:.35rem .6rem"'
-                      : pa.activityColor === "gray"   ? ' style="background:#f3f4f6;border-left:4px solid #d1d5db;padding:.35rem .6rem"' : '';
+        const noteClr = (!pa.activityColor || pa.activityColor === "purple") ? ' style="background:#f5f3ff;border-left:4px solid #a78bfa;padding:.35rem .6rem"'
+                      : pa.activityColor === "gray" ? ' style="background:#f3f4f6;border-left:4px solid #d1d5db;padding:.35rem .6rem"' : '';
         items.push(`<div class="activity-note-heading" contenteditable="false"${noteClr}>${noteToHtml(pa.text)}</div>`);
       }
       continue;
