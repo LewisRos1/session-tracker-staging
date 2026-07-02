@@ -542,6 +542,12 @@ export async function loadStudentsConfig() {
   return snap.docs.map(d => d.data()).sort((a, b) => (a.order || 0) - (b.order || 0));
 }
 
+/** Fetch a single student's latest config directly from Firestore (bypasses in-memory state). */
+export async function getStudentById(studentId) {
+  const snap = await getDoc(doc(db, "students", studentId));
+  return snap.exists() ? snap.data() : null;
+}
+
 /** Save (upsert) a student config document. */
 export async function saveStudent(student) {
   if (!student.name || !student.name.trim()) {

@@ -3,7 +3,7 @@
 // One .xlsx per student: a Summary sheet + one sheet per target.
 // ============================================================
 
-import { getAllSessionsForStudent, getAllSessionsForGroup, sanitizeKey, getSessionById } from "./firebase-service.js";
+import { getAllSessionsForStudent, getAllSessionsForGroup, sanitizeKey, getSessionById, getStudentById } from "./firebase-service.js";
 
 // Strip HTML tags from remark text (stored as HTML for visual bold support).
 // Line breaks are stored as <br>/<div>/<p> (see app.js's htmlForStorage) —
@@ -850,7 +850,7 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
   // Office theme colours: header = Darker 25%, heading = Dark Blue Text 2 Lighter 90%.
   const HEADER_FILL = "BFBFBF";
   const HEADER_TEXT_COLOR = "000000";
-  const TARGET_FILL = "E9EBF0";
+  const TARGET_FILL = "DEEAF1";
   const TARGET_TEXT_COLOR = "1F3864";
   const NOTE_FILL   = "FFF8ED";
   const NOTE_TEXT_COLOR = "7A5030";
@@ -1106,16 +1106,21 @@ export async function exportStudentSingleSessionWord(student, session) {
     return;
   }
 
-  // Re-fetch to guarantee we have the latest remarks (avoids stale export if a
-  // select-one or other remark was just edited and the Firestore write was still
-  // in-flight when the session picker fetched its list).
-  const freshSession = await getSessionById(session.id);
-  const sessionToExport = freshSession ?? session;
+  // Re-fetch both session AND student config from Firestore to guarantee we
+  // have the latest data. Without this, the student closure captured at
+  // session-picker-open time can hold a stale targets list if targets were
+  // added/duplicated after the picker was opened.
+  const [freshSession, freshStudent] = await Promise.all([
+    getSessionById(session.id),
+    getStudentById(student.id)
+  ]);
+  const sessionToExport  = freshSession  ?? session;
+  const studentToExport  = freshStudent  ?? student;
 
-  const allTargets   = getAllTargets(student).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
+  const allTargets   = getAllTargets(studentToExport).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
   const sessionLabel = sessionToExport.sessionNumber != null ? `Session ${sessionToExport.sessionNumber}` : "";
-  const blob = await buildSingleSessionWordBlob(student.name, sessionLabel, allTargets, sessionToExport);
-  downloadBlob(blob, formatExportFilenameWord(student.name, sessionLabel, "Individual", new Date()));
+  const blob = await buildSingleSessionWordBlob(studentToExport.name, sessionLabel, allTargets, sessionToExport);
+  downloadBlob(blob, formatExportFilenameWord(studentToExport.name, sessionLabel, "Individual", new Date()));
 }
 
 export async function exportGroupMemberSingleSessionWord(studentName, groups, session) {
