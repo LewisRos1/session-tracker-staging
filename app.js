@@ -75,6 +75,15 @@ import {
 // ── SW update detection — must run at parse time, before DOMContentLoaded,
 //   so the listener is in place before the new SW can fire controllerchange.
 if ("serviceWorker" in navigator) {
+  let _reloadQueued = false;
+  function _doUpdateReload() {
+    if (_reloadQueued) return;
+    _reloadQueued = true;
+    sessionStorage.setItem("justUpdated", "1");
+    document.querySelectorAll(".screen").forEach(s => s.classList.toggle("hidden", s.id !== "screen-loading"));
+    document.getElementById("updating-content")?.classList.remove("hidden");
+    setTimeout(() => window.location.reload(), 700);
+  }
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     // Reload whenever the controller changes AND there is now a controller.
     // Previously guarded by hadController (captured at parse time), but that
@@ -82,12 +91,14 @@ if ("serviceWorker" in navigator) {
     // without an active SW (hard refresh, cleared cache, iOS PWA restart) —
     // meaning any subsequent update that session would silently fail to reload.
     // Checking navigator.serviceWorker.controller at event time is always accurate.
-    if (navigator.serviceWorker.controller) {
-      sessionStorage.setItem("justUpdated", "1");
-      document.querySelectorAll(".screen").forEach(s => s.classList.toggle("hidden", s.id !== "screen-loading"));
-      document.getElementById("updating-content")?.classList.remove("hidden");
-      setTimeout(() => window.location.reload(), 700);
-    }
+    if (navigator.serviceWorker.controller) _doUpdateReload();
+  });
+  // Fallback for iOS WebKit where controllerchange can silently miss in standalone
+  // PWA mode. The new SW broadcasts "swActivated" after clients.claim(); if the
+  // version differs from the running app, trigger a reload here instead.
+  navigator.serviceWorker.addEventListener("message", event => {
+    if (event.data?.type === "swActivated" && event.data.version !== APP_VERSION)
+      _doUpdateReload();
   });
 }
 
@@ -127,7 +138,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "687";
+const APP_VERSION = "688";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
