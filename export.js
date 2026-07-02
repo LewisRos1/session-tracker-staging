@@ -922,7 +922,7 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
       new TableRow({
         children: [
           cell("Activity",                  { bold: true, fill: HEADER_FILL, color: HEADER_TEXT_COLOR, align: AlignmentType.CENTER, width: WORD_COL_ACTIVITY }),
-          cell("Observations",  { bold: true, fill: HEADER_FILL, color: HEADER_TEXT_COLOR, align: AlignmentType.CENTER, width: WORD_COL_REMARK }),
+          cell("Highlights of Observation",  { bold: true, fill: HEADER_FILL, color: HEADER_TEXT_COLOR, align: AlignmentType.CENTER, width: WORD_COL_REMARK }),
           cell("Score",                      { bold: true, fill: HEADER_FILL, color: HEADER_TEXT_COLOR, align: AlignmentType.CENTER, width: WORD_COL_SCORE })
         ]
       })
