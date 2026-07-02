@@ -127,7 +127,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "675";
+const APP_VERSION = "676";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2987,7 +2987,45 @@ function renderFedcTarget(target) {
     </div>`;
   }
 
-  html += `<button class="btn-add-activity" contenteditable="false" data-target="${escHtml(target.name)}">+ Add Activity (This activity only appears in this session)</button>`;
+  // Inactive predefined activities section
+  const inactivePas = allPas.filter(pa =>
+    !isActivityActive(pa, sessionDateForFilter) && !pa.isCompleted && !pa.isArchived && !pa.isStopped
+  );
+  if (inactivePas.length > 0) {
+    const inactiveItems = inactivePas.map(pa => {
+      if (pa.isHeading || pa.isMaintainHeading) {
+        const isGrayH  = pa.headingColor === "gray" || pa.isMaintainHeading;
+        const isGreenH = pa.headingColor === "green";
+        return isGrayH
+          ? `<div class="activity-group-heading" contenteditable="false" style="opacity:.5;background:#9ca3af;border-color:#6b7280;color:#ffffff">${escHtml(pa.name || "")}</div>`
+          : isGreenH
+          ? `<div class="activity-group-heading" contenteditable="false" style="opacity:.5;background:#a9d18e;border-color:#70ad47;color:#1a4731">${escHtml(pa.name || "")}</div>`
+          : `<div class="activity-group-heading" contenteditable="false" style="opacity:.5">${escHtml(pa.name || "")}</div>`;
+      }
+      if (pa.isNote) {
+        return pa.text ? `<div class="activity-note-heading" contenteditable="false" style="opacity:.5">${noteToHtml(pa.text)}</div>` : '';
+      }
+      const fixedText = pa.fixedRemark !== undefined ? pa.fixedRemark : pa.isMaintain ? (pa.maintainRemark ?? "") : null;
+      return `<div class="entry-block entry-block-predefined" style="opacity:.5;pointer-events:none">
+        <div class="entry-field" contenteditable="false">
+          <span class="field-label">Activity</span>
+          <span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span>
+        </div>
+        ${fixedText !== null ? `<div class="entry-field" contenteditable="false">
+          <span class="field-label">Remark</span>
+          <span class="field-value-fixed">${escHtml(fixedText)}</span>
+        </div>` : ''}
+      </div>`;
+    }).filter(Boolean).join('');
+    html += `<div style="margin-top:.75rem">
+      <button class="btn-inactive-toggle" contenteditable="false" style="display:flex;align-items:center;gap:.4rem;width:100%;padding:.4rem .6rem;background:none;border:1px dashed #d1d5db;border-radius:.4rem;cursor:pointer;font-size:.8rem;color:#6b7280;text-align:left">
+        <span class="inactive-chevron" style="font-size:.7rem">▶</span> Inactive Activities (${inactivePas.length})
+      </button>
+      <div class="inactive-list" style="display:none;flex-direction:column;gap:.25rem;margin-top:.35rem">
+        ${inactiveItems}
+      </div>
+    </div>`;
+  }
 
   return html;
 }
@@ -3049,8 +3087,6 @@ function renderRegularTarget(target) {
       </div>
     </div>`;
   }
-
-  html += `<button class="btn-add-activity" contenteditable="false" data-target="${escHtml(target.name)}">+ Add Activity (This activity only appears in this session)</button>`;
 
   return html;
 }
@@ -3437,12 +3473,14 @@ function attachTargetListeners(target) {
     });
   });
 
-  // ── New activity input ───────────────────────────────────
-  c.querySelector(".btn-add-activity")?.addEventListener("click", () => {
-    state.pendingNewActivity = { targetName: target.name };
-    state.pendingNewRemark   = null;
-    renderTargetContent();
-    setTimeout(() => $("new-activity-textarea")?.focus(), 50);
+  // ── Inactive activities toggle ───────────────────────────
+  c.querySelector(".btn-inactive-toggle")?.addEventListener("click", () => {
+    const list = c.querySelector(".inactive-list");
+    const chevron = c.querySelector(".inactive-chevron");
+    if (!list) return;
+    const open = list.style.display !== "none";
+    list.style.display = open ? "none" : "flex";
+    if (chevron) chevron.textContent = open ? "▶" : "▼";
   });
 
   $("new-activity-textarea")?.addEventListener("blur", e => {
@@ -6709,6 +6747,42 @@ function isActivityActive(pa, dateStr) {
   return true;
 }
 
+function fmtPeriodDate(d) {
+  if (!d) return null;
+  const [y, m, dy] = d.split("-").map(Number);
+  return `${dy} ${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m-1]} ${y}`;
+}
+
+function periodSectionHtml(activeFrom, activeTo, idx, withBorder) {
+  const fromLabel = activeFrom ? fmtPeriodDate(activeFrom) : '-∞';
+  const toLabel   = activeTo   ? fmtPeriodDate(activeTo)   : '+∞';
+  const fromBg    = activeFrom ? '#ffffff' : '#eff6ff';
+  const toBg      = activeTo   ? '#ffffff' : '#eff6ff';
+  const fromCol   = activeFrom ? '#111827' : '#6b7280';
+  const toCol     = activeTo   ? '#111827' : '#6b7280';
+  const border    = withBorder ? 'border-bottom:1px solid #f3f4f6;' : '';
+  return `<div style="padding:.45rem .6rem;${border}">
+    <div style="font-size:.84rem;color:#374151;margin-bottom:.35rem">📅 Active Period</div>
+    <div style="display:flex;align-items:center;gap:.4rem">
+      <div style="position:relative;flex:1;min-width:0">
+        <button class="mn-period-from-btn" data-idx="${idx}" style="width:100%;padding:.28rem .4rem;border:1px solid #d1d5db;border-radius:.3rem;background:${fromBg};cursor:pointer;font-size:.8rem;color:${fromCol};white-space:nowrap;text-align:center">${fromLabel}</button>
+        <div class="mn-period-from-panel" data-idx="${idx}" style="display:none;position:absolute;top:calc(100% + 3px);left:0;z-index:300;background:#fff;border:1px solid #e5e7eb;border-radius:.45rem;padding:.4rem;box-shadow:0 4px 14px rgba(0,0,0,.12);min-width:175px">
+          <input type="date" class="mn-period-date" data-idx="${idx}" data-which="from" value="${activeFrom||''}" style="width:100%;font-size:.8rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;margin-bottom:.3rem;box-sizing:border-box">
+          <button class="mn-period-inf" data-idx="${idx}" data-which="from" style="width:100%;padding:.25rem;font-size:.78rem;border:1px solid #bfdbfe;border-radius:.3rem;background:#eff6ff;cursor:pointer;color:#1d4ed8">-∞ No Start Date</button>
+        </div>
+      </div>
+      <span style="color:#9ca3af;flex-shrink:0">→</span>
+      <div style="position:relative;flex:1;min-width:0">
+        <button class="mn-period-to-btn" data-idx="${idx}" style="width:100%;padding:.28rem .4rem;border:1px solid #d1d5db;border-radius:.3rem;background:${toBg};cursor:pointer;font-size:.8rem;color:${toCol};white-space:nowrap;text-align:center">${toLabel}</button>
+        <div class="mn-period-to-panel" data-idx="${idx}" style="display:none;position:absolute;top:calc(100% + 3px);right:0;z-index:300;background:#fff;border:1px solid #e5e7eb;border-radius:.45rem;padding:.4rem;box-shadow:0 4px 14px rgba(0,0,0,.12);min-width:175px">
+          <input type="date" class="mn-period-date" data-idx="${idx}" data-which="to" value="${activeTo||''}" style="width:100%;font-size:.8rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;margin-bottom:.3rem;box-sizing:border-box">
+          <button class="mn-period-inf" data-idx="${idx}" data-which="to" style="width:100%;padding:.25rem;font-size:.78rem;border:1px solid #bfdbfe;border-radius:.3rem;background:#eff6ff;cursor:pointer;color:#1d4ed8">+∞ No End Date</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
 // ── Open / close ──────────────────────────────────────────────
 
 function openManageModal(student, targetOrNull, templateOrNull = null, remarkPresetOrNull = null) {
@@ -7861,15 +7935,7 @@ function renderTargetManageContent(student, target) {
               <button class="mn-hkm-opt" data-idx="${idx}" data-action="gray" style="flex:1;padding:.3rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">🩶 Grey</button>
               <button class="mn-hkm-opt" data-idx="${idx}" data-action="green" style="flex:1;padding:.3rem;background:#a9d18e;border:2px solid ${isGreen ? '#388e3c' : '#70ad47'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">💚 Green</button>
             </div>
-            <div style="padding:.45rem .6rem;border-bottom:1px solid #f3f4f6">
-              <div style="font-size:.72rem;color:#6b7280;font-weight:600;margin-bottom:.3rem">📅 Active Period</div>
-              <div style="display:flex;align-items:center;gap:.3rem;flex-wrap:wrap">
-                <input type="date" class="mn-hkm-date-from" data-idx="${idx}" value="${a.activeFrom||''}" style="font-size:.75rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;flex:1;min-width:0">
-                <span style="color:#9ca3af;font-size:.8rem">→</span>
-                <input type="date" class="mn-hkm-date-to" data-idx="${idx}" value="${a.activeTo||''}" style="font-size:.75rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;flex:1;min-width:0">
-                <button class="mn-hkm-date-forever" data-idx="${idx}" title="Set to forever" style="padding:.2rem .4rem;border:1px solid #d1d5db;border-radius:.3rem;background:#f9fafb;cursor:pointer;font-size:.8rem;white-space:nowrap">∞ Forever</button>
-              </div>
-            </div>
+            ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true)}
             <button class="mn-hkm-opt" data-idx="${idx}" data-action="delete" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete</button>
           </div>
         </div>
@@ -7886,13 +7952,7 @@ function renderTargetManageContent(student, target) {
               style="flex:1;overflow-y:hidden;resize:none">${escHtml(stripNoteHtml(a.text || ""))}</textarea>
             <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
           </div>
-          <div style="display:flex;align-items:center;gap:.3rem;flex-wrap:wrap;padding-left:.2rem">
-            <span style="font-size:.72rem;color:#6b7280;font-weight:600">📅</span>
-            <input type="date" class="mn-note-date-from" data-idx="${idx}" value="${a.activeFrom||''}" style="font-size:.75rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;flex:1;min-width:0">
-            <span style="color:#9ca3af;font-size:.8rem">→</span>
-            <input type="date" class="mn-note-date-to" data-idx="${idx}" value="${a.activeTo||''}" style="font-size:.75rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;flex:1;min-width:0">
-            <button class="mn-note-date-forever" data-idx="${idx}" title="Set to forever" style="padding:.2rem .4rem;border:1px solid #d1d5db;border-radius:.3rem;background:#f9fafb;cursor:pointer;font-size:.8rem;white-space:nowrap">∞</button>
-          </div>
+          ${periodSectionHtml(a.activeFrom, a.activeTo, idx, false)}
         </div>
       </div>`;
     } else if (a.isMaintain) {
@@ -7925,8 +7985,10 @@ function renderTargetManageContent(student, target) {
               style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.actNote || "")}</textarea>
           </div>`
         : "";
-      const mappedInactive = !isActivityActive(a, todayDateStr());
-      html += `<div class="admin-list-item" data-idx="${idx}"${mappedInactive ? ' style="opacity:0.45"' : ''}>
+      const actInactive = !isActivityActive(a, todayDateStr());
+      const actExpired  = actInactive && !!a.activeTo && a.activeTo < todayDateStr();
+      const actOverlay  = actExpired ? `<div style="position:absolute;inset:0;background:rgba(255,255,255,.7);pointer-events:none;z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center"><div style="pointer-events:none;background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.35rem .75rem;text-align:center;font-size:.78rem;color:#374151;max-width:80%">⏸ Period has ended — tap ⋮ to adjust the dates and bring it back.</div></div>` : '';
+      html += `<div class="admin-list-item" data-idx="${idx}"${actExpired ? ' style="position:relative"' : actInactive ? ' style="opacity:0.45"' : ''}>
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
           <div style="display:flex;align-items:flex-start;gap:.3rem">
@@ -7950,28 +8012,24 @@ function renderTargetManageContent(student, target) {
         <div style="position:relative">
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:250px;overflow:hidden">
-            <div style="padding:.45rem .6rem;border-bottom:1px solid #f3f4f6">
-              <div style="font-size:.72rem;color:#6b7280;font-weight:600;margin-bottom:.3rem">📅 Active Period</div>
-              <div style="display:flex;align-items:center;gap:.3rem;flex-wrap:wrap">
-                <input type="date" class="mn-km-date-from" data-idx="${idx}" value="${a.activeFrom||''}" style="font-size:.75rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;flex:1;min-width:0">
-                <span style="color:#9ca3af;font-size:.8rem">→</span>
-                <input type="date" class="mn-km-date-to" data-idx="${idx}" value="${a.activeTo||''}" style="font-size:.75rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;flex:1;min-width:0">
-                <button class="mn-km-date-forever" data-idx="${idx}" title="Set to forever" style="padding:.2rem .4rem;border:1px solid #d1d5db;border-radius:.3rem;background:#f9fafb;cursor:pointer;font-size:.8rem;white-space:nowrap">∞ Forever</button>
-              </div>
-            </div>
+            ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true)}
             <div style="display:flex;align-items:stretch">
               <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
               <span title="Permanently removes this activity and all of its session data. This cannot be undone." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
             </div>
           </div>
         </div>
+        ${actOverlay}
       </div>`;
     } else {
       const remarkTypeSelect = buildRemarkTypeControls(a, idx);
       const isGray = a.activityColor === "gray" || a.isMaintainLive;
       const isGreen = a.activityColor === "green";
       const actInactive = !isActivityActive(a, todayDateStr());
-      const actItemStyle = isGray ? ` style="background:#f3f4f6;border:1px solid #d1d5db${actInactive ? ';opacity:0.45' : ''}"` : isGreen ? ` style="background:#e2efda;border:1px solid #a9d18e${actInactive ? ';opacity:0.45' : ''}"` : actInactive ? ' style="opacity:0.45"' : '';
+      const actExpired  = actInactive && !!a.activeTo && a.activeTo < todayDateStr();
+      const actBaseBg   = isGray ? 'background:#f3f4f6;border:1px solid #d1d5db' : isGreen ? 'background:#e2efda;border:1px solid #a9d18e' : null;
+      const actItemStyle = actExpired ? (actBaseBg ? ` style="position:relative;${actBaseBg}"` : ' style="position:relative"') : (actBaseBg ? ` style="${actBaseBg}${actInactive ? ';opacity:0.45' : ''}"` : actInactive ? ' style="opacity:0.45"' : '');
+      const actOverlay  = actExpired ? `<div style="position:absolute;inset:0;background:rgba(255,255,255,.7);pointer-events:none;z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center"><div style="pointer-events:none;background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.35rem .75rem;text-align:center;font-size:.78rem;color:#374151;max-width:80%">⏸ Period has ended — tap ⋮ to adjust the dates and bring it back.</div></div>` : '';
       const noteRow = a.actNote !== undefined
         ? `<div style="display:flex;align-items:flex-start;gap:.3rem">
             ${formatButtonsHtml(`mn-act-name-${idx}`)}
@@ -8014,21 +8072,14 @@ function renderTargetManageContent(student, target) {
               <button class="mn-km-opt" data-idx="${idx}" data-action="color_gray" style="flex:1;padding:.3rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">🩶 Grey</button>
               <button class="mn-km-opt" data-idx="${idx}" data-action="color_green" style="flex:1;padding:.3rem;background:#a9d18e;border:2px solid ${isGreen ? '#388e3c' : '#70ad47'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">💚 Green</button>
             </div>
-            <div style="padding:.45rem .6rem;border-bottom:1px solid #f3f4f6">
-              <div style="font-size:.72rem;color:#6b7280;font-weight:600;margin-bottom:.3rem">📅 Active Period</div>
-              <div style="display:flex;align-items:center;gap:.3rem;flex-wrap:wrap">
-                <input type="date" class="mn-km-date-from" data-idx="${idx}" value="${a.activeFrom||''}" style="font-size:.75rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;flex:1;min-width:0">
-                <span style="color:#9ca3af;font-size:.8rem">→</span>
-                <input type="date" class="mn-km-date-to" data-idx="${idx}" value="${a.activeTo||''}" style="font-size:.75rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;flex:1;min-width:0">
-                <button class="mn-km-date-forever" data-idx="${idx}" title="Set to forever" style="padding:.2rem .4rem;border:1px solid #d1d5db;border-radius:.3rem;background:#f9fafb;cursor:pointer;font-size:.8rem;white-space:nowrap">∞ Forever</button>
-              </div>
-            </div>
+            ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true)}
             <div style="display:flex;align-items:stretch">
               <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
               <span title="Permanently removes this activity and all of its session data. This cannot be undone." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
             </div>
           </div>
         </div>
+        ${actOverlay}
       </div>`;
     }
   });
@@ -8542,14 +8593,33 @@ function renderTargetManageContent(student, target) {
     renderTargetManageContent(student, target);
   };
 
-  $("manage-modal-body").querySelectorAll(".mn-km-date-from,.mn-hkm-date-from,.mn-note-date-from").forEach(inp => {
-    inp.addEventListener("change", () => savePeriodField(+inp.dataset.idx, "activeFrom", inp.value));
+  $("manage-modal-body").querySelectorAll(".mn-period-from-btn").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const panel = $("manage-modal-body").querySelector(`.mn-period-from-panel[data-idx="${btn.dataset.idx}"]`);
+      $("manage-modal-body").querySelectorAll(".mn-period-from-panel,.mn-period-to-panel").forEach(p => { if (p !== panel) p.style.display = "none"; });
+      if (panel) panel.style.display = panel.style.display === "none" ? "block" : "none";
+    });
   });
-  $("manage-modal-body").querySelectorAll(".mn-km-date-to,.mn-hkm-date-to,.mn-note-date-to").forEach(inp => {
-    inp.addEventListener("change", () => savePeriodField(+inp.dataset.idx, "activeTo", inp.value));
+  $("manage-modal-body").querySelectorAll(".mn-period-to-btn").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const panel = $("manage-modal-body").querySelector(`.mn-period-to-panel[data-idx="${btn.dataset.idx}"]`);
+      $("manage-modal-body").querySelectorAll(".mn-period-from-panel,.mn-period-to-panel").forEach(p => { if (p !== panel) p.style.display = "none"; });
+      if (panel) panel.style.display = panel.style.display === "none" ? "block" : "none";
+    });
   });
-  $("manage-modal-body").querySelectorAll(".mn-km-date-forever,.mn-hkm-date-forever,.mn-note-date-forever").forEach(btn => {
-    btn.addEventListener("click", () => savePeriodField(+btn.dataset.idx, "activeTo", null));
+  $("manage-modal-body").querySelectorAll(".mn-period-date").forEach(inp => {
+    inp.addEventListener("change", () => {
+      const field = inp.dataset.which === "from" ? "activeFrom" : "activeTo";
+      savePeriodField(+inp.dataset.idx, field, inp.value);
+    });
+  });
+  $("manage-modal-body").querySelectorAll(".mn-period-inf").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const field = btn.dataset.which === "from" ? "activeFrom" : "activeTo";
+      savePeriodField(+btn.dataset.idx, field, null);
+    });
   });
 
   const getOptsFromDom = idx =>
@@ -8703,15 +8773,7 @@ function renderTemplateManageContent(template) {
               <button class="mn-hkm-opt" data-idx="${idx}" data-action="gray" style="flex:1;padding:.3rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">🩶 Grey</button>
               <button class="mn-hkm-opt" data-idx="${idx}" data-action="green" style="flex:1;padding:.3rem;background:#a9d18e;border:2px solid ${isGreen ? '#388e3c' : '#70ad47'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">💚 Green</button>
             </div>
-            <div style="padding:.45rem .6rem;border-bottom:1px solid #f3f4f6">
-              <div style="font-size:.72rem;color:#6b7280;font-weight:600;margin-bottom:.3rem">📅 Active Period</div>
-              <div style="display:flex;align-items:center;gap:.3rem;flex-wrap:wrap">
-                <input type="date" class="mn-hkm-date-from" data-idx="${idx}" value="${a.activeFrom||''}" style="font-size:.75rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;flex:1;min-width:0">
-                <span style="color:#9ca3af;font-size:.8rem">→</span>
-                <input type="date" class="mn-hkm-date-to" data-idx="${idx}" value="${a.activeTo||''}" style="font-size:.75rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;flex:1;min-width:0">
-                <button class="mn-hkm-date-forever" data-idx="${idx}" title="Set to forever" style="padding:.2rem .4rem;border:1px solid #d1d5db;border-radius:.3rem;background:#f9fafb;cursor:pointer;font-size:.8rem;white-space:nowrap">∞ Forever</button>
-              </div>
-            </div>
+            ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true)}
             <button class="mn-hkm-opt" data-idx="${idx}" data-action="delete" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete</button>
           </div>
         </div>
@@ -8728,13 +8790,7 @@ function renderTemplateManageContent(template) {
               style="flex:1;overflow-y:hidden;resize:none">${escHtml(stripNoteHtml(a.text || ""))}</textarea>
             <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
           </div>
-          <div style="display:flex;align-items:center;gap:.3rem;flex-wrap:wrap;padding-left:.2rem">
-            <span style="font-size:.72rem;color:#6b7280;font-weight:600">📅</span>
-            <input type="date" class="mn-note-date-from" data-idx="${idx}" value="${a.activeFrom||''}" style="font-size:.75rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;flex:1;min-width:0">
-            <span style="color:#9ca3af;font-size:.8rem">→</span>
-            <input type="date" class="mn-note-date-to" data-idx="${idx}" value="${a.activeTo||''}" style="font-size:.75rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;flex:1;min-width:0">
-            <button class="mn-note-date-forever" data-idx="${idx}" title="Set to forever" style="padding:.2rem .4rem;border:1px solid #d1d5db;border-radius:.3rem;background:#f9fafb;cursor:pointer;font-size:.8rem;white-space:nowrap">∞</button>
-          </div>
+          ${periodSectionHtml(a.activeFrom, a.activeTo, idx, false)}
         </div>
       </div>`;
     } else if (a.isMaintain) {
@@ -8760,7 +8816,10 @@ function renderTemplateManageContent(template) {
       const isGray = a.activityColor === "gray" || a.isMaintainLive;
       const isGreen = a.activityColor === "green";
       const actInactive = !isActivityActive(a, todayDateStr());
-      const actItemStyle = isGray ? ` style="background:#f3f4f6;border:1px solid #d1d5db${actInactive ? ';opacity:0.45' : ''}"` : isGreen ? ` style="background:#e2efda;border:1px solid #a9d18e${actInactive ? ';opacity:0.45' : ''}"` : actInactive ? ' style="opacity:0.45"' : '';
+      const actExpired  = actInactive && !!a.activeTo && a.activeTo < todayDateStr();
+      const actBaseBg   = isGray ? 'background:#f3f4f6;border:1px solid #d1d5db' : isGreen ? 'background:#e2efda;border:1px solid #a9d18e' : null;
+      const actItemStyle = actExpired ? (actBaseBg ? ` style="position:relative;${actBaseBg}"` : ' style="position:relative"') : (actBaseBg ? ` style="${actBaseBg}${actInactive ? ';opacity:0.45' : ''}"` : actInactive ? ' style="opacity:0.45"' : '');
+      const actOverlay  = actExpired ? `<div style="position:absolute;inset:0;background:rgba(255,255,255,.7);pointer-events:none;z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center"><div style="pointer-events:none;background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.35rem .75rem;text-align:center;font-size:.78rem;color:#374151;max-width:80%">⏸ Period has ended — tap ⋮ to adjust the dates and bring it back.</div></div>` : '';
       const noteRow = a.actNote !== undefined
         ? `<div style="display:flex;align-items:flex-start;gap:.3rem">
             ${formatButtonsHtml(`mn-act-note-${idx}`)}
@@ -8803,11 +8862,13 @@ function renderTemplateManageContent(template) {
               <button class="mn-km-opt" data-idx="${idx}" data-action="color_gray" style="flex:1;padding:.3rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">🩶 Grey</button>
               <button class="mn-km-opt" data-idx="${idx}" data-action="color_green" style="flex:1;padding:.3rem;background:#a9d18e;border:2px solid ${isGreen ? '#388e3c' : '#70ad47'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">💚 Green</button>
             </div>
+            ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true)}
             <div style="display:flex;align-items:stretch">
               <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
             </div>
           </div>
         </div>
+        ${actOverlay}
       </div>`;
     }
   });
@@ -9169,14 +9230,33 @@ function renderTemplateManageContent(template) {
     renderTemplateManageContent(template);
   };
 
-  $("manage-modal-body").querySelectorAll(".mn-km-date-from,.mn-hkm-date-from,.mn-note-date-from").forEach(inp => {
-    inp.addEventListener("change", () => saveTmplPeriodField(+inp.dataset.idx, "activeFrom", inp.value));
+  $("manage-modal-body").querySelectorAll(".mn-period-from-btn").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const panel = $("manage-modal-body").querySelector(`.mn-period-from-panel[data-idx="${btn.dataset.idx}"]`);
+      $("manage-modal-body").querySelectorAll(".mn-period-from-panel,.mn-period-to-panel").forEach(p => { if (p !== panel) p.style.display = "none"; });
+      if (panel) panel.style.display = panel.style.display === "none" ? "block" : "none";
+    });
   });
-  $("manage-modal-body").querySelectorAll(".mn-km-date-to,.mn-hkm-date-to,.mn-note-date-to").forEach(inp => {
-    inp.addEventListener("change", () => saveTmplPeriodField(+inp.dataset.idx, "activeTo", inp.value));
+  $("manage-modal-body").querySelectorAll(".mn-period-to-btn").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const panel = $("manage-modal-body").querySelector(`.mn-period-to-panel[data-idx="${btn.dataset.idx}"]`);
+      $("manage-modal-body").querySelectorAll(".mn-period-from-panel,.mn-period-to-panel").forEach(p => { if (p !== panel) p.style.display = "none"; });
+      if (panel) panel.style.display = panel.style.display === "none" ? "block" : "none";
+    });
   });
-  $("manage-modal-body").querySelectorAll(".mn-km-date-forever,.mn-hkm-date-forever,.mn-note-date-forever").forEach(btn => {
-    btn.addEventListener("click", () => saveTmplPeriodField(+btn.dataset.idx, "activeTo", null));
+  $("manage-modal-body").querySelectorAll(".mn-period-date").forEach(inp => {
+    inp.addEventListener("change", () => {
+      const field = inp.dataset.which === "from" ? "activeFrom" : "activeTo";
+      saveTmplPeriodField(+inp.dataset.idx, field, inp.value);
+    });
+  });
+  $("manage-modal-body").querySelectorAll(".mn-period-inf").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const field = btn.dataset.which === "from" ? "activeFrom" : "activeTo";
+      saveTmplPeriodField(+btn.dataset.idx, field, null);
+    });
   });
 
   const getTmplOptsFromDom = idx =>
@@ -9678,8 +9758,6 @@ function renderGroupTargetContent() {
     ? buildGroupItemsByStudent(target, data, attendees)
     : buildGroupItemsByActivity(target, data, attendees);
 
-  items.push(`<button class="btn-add-activity btn-group-add-activity" contenteditable="false">+ Add Activity (This activity only appears in this session)</button>`);
-
   const scrollHost = content.closest(".session-body");
   const scrollTop  = scrollHost?.scrollTop;
   const captured = captureActiveEditState(content);
@@ -9720,8 +9798,27 @@ function buildGroupItemsByActivity(target, data, attendees) {
       items.push(renderGroupActivityCard(act.activityName, actId, target, data, attendees));
     });
 
-  if (items.length === 0) {
+  const grpInactivePas = (target.predefinedActivities || []).filter(pa =>
+    !isActivityActive(pa, grpSessionDate) && !pa.isCompleted && !pa.isArchived && !pa.isStopped
+  );
+  if (items.length === 0 && grpInactivePas.length === 0) {
     items.push(`<p class="empty-hint" contenteditable="false" style="padding:1.5rem">No activities yet. Add them under Edit Target.</p>`);
+  }
+  if (grpInactivePas.length > 0) {
+    const grpInactiveHtml = grpInactivePas.map(pa => {
+      if (pa.isHeading || pa.isMaintainHeading) return `<div class="activity-group-heading" contenteditable="false" style="opacity:.5">${escHtml(pa.name || "")}</div>`;
+      if (pa.isNote) return pa.text ? `<div class="activity-note-heading" contenteditable="false" style="opacity:.5">${noteToHtml(pa.text)}</div>` : '';
+      if (!pa.name) return '';
+      return `<div class="entry-block entry-block-predefined" style="opacity:.5;pointer-events:none"><div class="entry-field" contenteditable="false"><span class="field-label">Activity</span><span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span></div></div>`;
+    }).filter(Boolean).join('');
+    items.push(`<div style="margin-top:.75rem">
+      <button class="btn-inactive-toggle" contenteditable="false" style="display:flex;align-items:center;gap:.4rem;width:100%;padding:.4rem .6rem;background:none;border:1px dashed #d1d5db;border-radius:.4rem;cursor:pointer;font-size:.8rem;color:#6b7280;text-align:left">
+        <span class="inactive-chevron" style="font-size:.7rem">▶</span> Inactive Activities (${grpInactivePas.length})
+      </button>
+      <div class="inactive-list" style="display:none;flex-direction:column;gap:.25rem;margin-top:.35rem">
+        ${grpInactiveHtml}
+      </div>
+    </div>`);
   }
   return items;
 }
@@ -10484,11 +10581,14 @@ function attachGroupTargetListeners(target) {
     });
   });
 
-  // + Add Activity (this session only)
-  c.querySelector(".btn-group-add-activity")?.addEventListener("click", async () => {
-    const name = prompt("Activity name (this session only):");
-    if (!name?.trim()) return;
-    await addActivity(state.groupSessionId, target.name, name.trim(), Date.now(), false);
+  // Inactive activities toggle
+  c.querySelector(".btn-inactive-toggle")?.addEventListener("click", () => {
+    const list = c.querySelector(".inactive-list");
+    const chevron = c.querySelector(".inactive-chevron");
+    if (!list) return;
+    const open = list.style.display !== "none";
+    list.style.display = open ? "none" : "flex";
+    if (chevron) chevron.textContent = open ? "▶" : "▼";
   });
 }
 
