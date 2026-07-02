@@ -1069,7 +1069,7 @@ async function buildSingleSessionWordBlob(entityName, sessionLabel, allTargets, 
     styles: {
       default: {
         document: {
-          run: { size: 22, font: "Aptos" },
+          run: { size: 22, font: "Times New Roman" },
           paragraph: { spacing: { line: 360, lineRule: LineRuleType.AUTO } }
         }
       }
