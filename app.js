@@ -127,7 +127,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "678";
+const APP_VERSION = "679";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2871,10 +2871,13 @@ function renderFedcTarget(target) {
     const isFixed = pa.fixedRemark !== undefined || pa.isMaintain;
     if (isFixed) {
       const fixedText = pa.fixedRemark ?? pa.maintainRemark ?? "";
+      const isGrayFixed  = pa.isMaintain || pa.activityColor === "gray";
       const isGreenFixed = pa.activityColor === "green";
-      const fixedStyle = isGreenFixed
+      const fixedStyle   = isGreenFixed
         ? 'style="background:#e2efda;border:1px solid #a9d18e;border-left:4px solid #70ad47"'
-        : 'style="background:#f3f4f6;border:1px solid #e5e7eb;border-left:4px solid #d1d5db"';
+        : isGrayFixed
+        ? 'style="background:#f3f4f6;border:1px solid #e5e7eb;border-left:4px solid #d1d5db"'
+        : '';
       html += `<div class="entry-block entry-block-predefined" ${fixedStyle}>
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Activity</span>
@@ -8057,7 +8060,7 @@ function renderTargetManageContent(student, target) {
         ? `<div style="display:flex;align-items:center;gap:.5rem">
             <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Fixed Remark:</span>
             <textarea class="admin-input mn-fixed-remark-input" id="mn-act-fixed-remark-${idx}" data-idx="${idx}"
-              rows="1" placeholder="Remark shown read-only in sessions"
+              rows="1" placeholder=""
               style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.fixedRemark || "")}</textarea>
           </div>`
         : "";
@@ -8532,6 +8535,7 @@ function renderTargetManageContent(student, target) {
 
   $("manage-modal-body").querySelectorAll(".mn-fixed-remark-input").forEach(input => {
     autoResizeTextarea(input);
+    input.addEventListener("input", () => autoResizeTextarea(input));
     input.addEventListener("blur", async () => {
       const idx = Number(input.dataset.idx);
       if (acts[idx].fixedRemark === input.value) return;
@@ -8854,7 +8858,7 @@ function renderTemplateManageContent(template) {
         ? `<div style="display:flex;align-items:center;gap:.5rem">
             <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Fixed Remark:</span>
             <textarea class="admin-input mn-fixed-remark-input" id="mn-act-fixed-remark-${idx}" data-idx="${idx}"
-              rows="1" placeholder="Remark shown read-only in sessions"
+              rows="1" placeholder=""
               style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.fixedRemark || "")}</textarea>
           </div>`
         : "";
@@ -9134,6 +9138,7 @@ function renderTemplateManageContent(template) {
 
   $("manage-modal-body").querySelectorAll(".mn-fixed-remark-input").forEach(input => {
     autoResizeTextarea(input);
+    input.addEventListener("input", () => autoResizeTextarea(input));
     input.addEventListener("blur", async () => {
       const idx = Number(input.dataset.idx);
       if (acts[idx].fixedRemark === input.value) return;
