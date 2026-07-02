@@ -127,7 +127,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "674";
+const APP_VERSION = "675";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2829,7 +2829,9 @@ function renderFedcTarget(target) {
   const letters = "abcdefghij";
   let lastGroup = null;
   const allPas = target.predefinedActivities || [];
+  const sessionDateForFilter = todayDateStr();
   allPas.forEach((pa, idx) => {
+    if (!isActivityActive(pa, sessionDateForFilter)) return;
     // Note item — render inline in order, styled like a section heading
     if (pa.isNote) {
       if (pa.text) html += `<div class="activity-note-heading" contenteditable="false">${noteToHtml(pa.text)}</div>`;
@@ -4123,6 +4125,7 @@ function buildTargetViewTable(target, data) {
     let no = 0;
     const matchedIds = new Set();
     for (const pa of target.predefinedActivities) {
+      if (!isActivityActive(pa, data.date)) continue;
       if (pa.isHeading || pa.isMaintainHeading) {
         const isGray = pa.headingColor === "gray" || pa.isMaintainHeading;
         const isGreen = pa.headingColor === "green";
@@ -5518,6 +5521,7 @@ function buildGroupTargetViewTable(target, data, attendees) {
     let no = 0;
     const matchedIds = new Set();
     for (const pa of target.predefinedActivities) {
+      if (!isActivityActive(pa, data.date)) continue;
       if (pa.isHeading || pa.isMaintainHeading) {
         const isGray = pa.headingColor === "gray" || pa.isMaintainHeading;
         const isGreenHdg = pa.headingColor === "green";
@@ -6694,6 +6698,17 @@ function cfgId(prefix) {
   return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
 
+function todayDateStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function isActivityActive(pa, dateStr) {
+  if (!dateStr) return true;
+  if (pa.activeFrom && dateStr < pa.activeFrom) return false;
+  if (pa.activeTo   && dateStr > pa.activeTo)   return false;
+  return true;
+}
+
 // ── Open / close ──────────────────────────────────────────────
 
 function openManageModal(student, targetOrNull, templateOrNull = null, remarkPresetOrNull = null) {
@@ -7846,18 +7861,39 @@ function renderTargetManageContent(student, target) {
               <button class="mn-hkm-opt" data-idx="${idx}" data-action="gray" style="flex:1;padding:.3rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">🩶 Grey</button>
               <button class="mn-hkm-opt" data-idx="${idx}" data-action="green" style="flex:1;padding:.3rem;background:#a9d18e;border:2px solid ${isGreen ? '#388e3c' : '#70ad47'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">💚 Green</button>
             </div>
+            <div style="padding:.45rem .6rem;border-bottom:1px solid #f3f4f6">
+              <div style="font-size:.72rem;color:#6b7280;font-weight:600;margin-bottom:.3rem">📅 Active Period</div>
+              <div style="display:flex;align-items:center;gap:.3rem;flex-wrap:wrap">
+                <input type="date" class="mn-hkm-date-from" data-idx="${idx}" value="${a.activeFrom||''}" style="font-size:.75rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;flex:1;min-width:0">
+                <span style="color:#9ca3af;font-size:.8rem">→</span>
+                <input type="date" class="mn-hkm-date-to" data-idx="${idx}" value="${a.activeTo||''}" style="font-size:.75rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;flex:1;min-width:0">
+                <button class="mn-hkm-date-forever" data-idx="${idx}" title="Set to forever" style="padding:.2rem .4rem;border:1px solid #d1d5db;border-radius:.3rem;background:#f9fafb;cursor:pointer;font-size:.8rem;white-space:nowrap">∞ Forever</button>
+              </div>
+            </div>
             <button class="mn-hkm-opt" data-idx="${idx}" data-action="delete" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete</button>
           </div>
         </div>
       </div>`;
     } else if (a.isNote) {
-      html += `<div class="admin-list-item admin-note-item" data-idx="${idx}">
+      const noteInactive = !isActivityActive(a, todayDateStr());
+      html += `<div class="admin-list-item admin-note-item" data-idx="${idx}"${noteInactive ? ' style="opacity:0.45"' : ''}>
         <span class="drag-handle">⠿</span>
-        ${formatButtonsHtml(`mn-act-name-${idx}`)}
-        <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
-          rows="1" placeholder="Enter Note"
-          style="flex:1;overflow-y:hidden;resize:none">${escHtml(stripNoteHtml(a.text || ""))}</textarea>
-        <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
+        <div style="flex:1;display:flex;flex-direction:column;gap:.25rem">
+          <div style="display:flex;align-items:flex-start;gap:.3rem">
+            ${formatButtonsHtml(`mn-act-name-${idx}`)}
+            <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
+              rows="1" placeholder="Enter Note"
+              style="flex:1;overflow-y:hidden;resize:none">${escHtml(stripNoteHtml(a.text || ""))}</textarea>
+            <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:.3rem;flex-wrap:wrap;padding-left:.2rem">
+            <span style="font-size:.72rem;color:#6b7280;font-weight:600">📅</span>
+            <input type="date" class="mn-note-date-from" data-idx="${idx}" value="${a.activeFrom||''}" style="font-size:.75rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;flex:1;min-width:0">
+            <span style="color:#9ca3af;font-size:.8rem">→</span>
+            <input type="date" class="mn-note-date-to" data-idx="${idx}" value="${a.activeTo||''}" style="font-size:.75rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;flex:1;min-width:0">
+            <button class="mn-note-date-forever" data-idx="${idx}" title="Set to forever" style="padding:.2rem .4rem;border:1px solid #d1d5db;border-radius:.3rem;background:#f9fafb;cursor:pointer;font-size:.8rem;white-space:nowrap">∞</button>
+          </div>
+        </div>
       </div>`;
     } else if (a.isMaintain) {
       html += `<div class="admin-list-item" data-idx="${idx}" style="background:#f3f4f6;border:1px solid #d1d5db">
@@ -7889,7 +7925,8 @@ function renderTargetManageContent(student, target) {
               style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.actNote || "")}</textarea>
           </div>`
         : "";
-      html += `<div class="admin-list-item" data-idx="${idx}">
+      const mappedInactive = !isActivityActive(a, todayDateStr());
+      html += `<div class="admin-list-item" data-idx="${idx}"${mappedInactive ? ' style="opacity:0.45"' : ''}>
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
           <div style="display:flex;align-items:flex-start;gap:.3rem">
@@ -7913,13 +7950,14 @@ function renderTargetManageContent(student, target) {
         <div style="position:relative">
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:250px;overflow:hidden">
-            <div style="display:flex;align-items:stretch;border-bottom:1px solid #f3f4f6">
-              <button class="mn-km-opt" data-idx="${idx}" data-action="master" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">⭐ Mark as Mastered <span style="font-size:.72rem;color:#9ca3af">(Don't use this feature yet)</span></button>
-              <span title="Student has achieved this activity. Historical data is kept in the database." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
-            </div>
-            <div style="display:flex;align-items:stretch;border-bottom:1px solid #f3f4f6">
-              <button class="mn-km-opt" data-idx="${idx}" data-action="stop" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">🛑 Stop from now onwards <span style="font-size:.72rem;color:#9ca3af">(Don't use this feature yet)</span></button>
-              <span title="Activity will no longer appear in new sessions. All past session data is preserved." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
+            <div style="padding:.45rem .6rem;border-bottom:1px solid #f3f4f6">
+              <div style="font-size:.72rem;color:#6b7280;font-weight:600;margin-bottom:.3rem">📅 Active Period</div>
+              <div style="display:flex;align-items:center;gap:.3rem;flex-wrap:wrap">
+                <input type="date" class="mn-km-date-from" data-idx="${idx}" value="${a.activeFrom||''}" style="font-size:.75rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;flex:1;min-width:0">
+                <span style="color:#9ca3af;font-size:.8rem">→</span>
+                <input type="date" class="mn-km-date-to" data-idx="${idx}" value="${a.activeTo||''}" style="font-size:.75rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;flex:1;min-width:0">
+                <button class="mn-km-date-forever" data-idx="${idx}" title="Set to forever" style="padding:.2rem .4rem;border:1px solid #d1d5db;border-radius:.3rem;background:#f9fafb;cursor:pointer;font-size:.8rem;white-space:nowrap">∞ Forever</button>
+              </div>
             </div>
             <div style="display:flex;align-items:stretch">
               <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
@@ -7932,7 +7970,8 @@ function renderTargetManageContent(student, target) {
       const remarkTypeSelect = buildRemarkTypeControls(a, idx);
       const isGray = a.activityColor === "gray" || a.isMaintainLive;
       const isGreen = a.activityColor === "green";
-      const actItemStyle = isGray ? ' style="background:#f3f4f6;border:1px solid #d1d5db"' : isGreen ? ' style="background:#e2efda;border:1px solid #a9d18e"' : '';
+      const actInactive = !isActivityActive(a, todayDateStr());
+      const actItemStyle = isGray ? ` style="background:#f3f4f6;border:1px solid #d1d5db${actInactive ? ';opacity:0.45' : ''}"` : isGreen ? ` style="background:#e2efda;border:1px solid #a9d18e${actInactive ? ';opacity:0.45' : ''}"` : actInactive ? ' style="opacity:0.45"' : '';
       const noteRow = a.actNote !== undefined
         ? `<div style="display:flex;align-items:flex-start;gap:.3rem">
             ${formatButtonsHtml(`mn-act-name-${idx}`)}
@@ -7975,13 +8014,14 @@ function renderTargetManageContent(student, target) {
               <button class="mn-km-opt" data-idx="${idx}" data-action="color_gray" style="flex:1;padding:.3rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">🩶 Grey</button>
               <button class="mn-km-opt" data-idx="${idx}" data-action="color_green" style="flex:1;padding:.3rem;background:#a9d18e;border:2px solid ${isGreen ? '#388e3c' : '#70ad47'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">💚 Green</button>
             </div>
-            <div style="display:flex;align-items:stretch;border-bottom:1px solid #f3f4f6">
-              <button class="mn-km-opt" data-idx="${idx}" data-action="master" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">⭐ Mark as Mastered <span style="font-size:.72rem;color:#9ca3af">(Don't use this feature yet)</span></button>
-              <span title="Student has achieved this activity. Historical data is kept in the database." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
-            </div>
-            <div style="display:flex;align-items:stretch;border-bottom:1px solid #f3f4f6">
-              <button class="mn-km-opt" data-idx="${idx}" data-action="stop" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">🛑 Stop from now onwards <span style="font-size:.72rem;color:#9ca3af">(Don't use this feature yet)</span></button>
-              <span title="Activity will no longer appear in new sessions. All past session data is preserved." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
+            <div style="padding:.45rem .6rem;border-bottom:1px solid #f3f4f6">
+              <div style="font-size:.72rem;color:#6b7280;font-weight:600;margin-bottom:.3rem">📅 Active Period</div>
+              <div style="display:flex;align-items:center;gap:.3rem;flex-wrap:wrap">
+                <input type="date" class="mn-km-date-from" data-idx="${idx}" value="${a.activeFrom||''}" style="font-size:.75rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;flex:1;min-width:0">
+                <span style="color:#9ca3af;font-size:.8rem">→</span>
+                <input type="date" class="mn-km-date-to" data-idx="${idx}" value="${a.activeTo||''}" style="font-size:.75rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;flex:1;min-width:0">
+                <button class="mn-km-date-forever" data-idx="${idx}" title="Set to forever" style="padding:.2rem .4rem;border:1px solid #d1d5db;border-radius:.3rem;background:#f9fafb;cursor:pointer;font-size:.8rem;white-space:nowrap">∞ Forever</button>
+              </div>
             </div>
             <div style="display:flex;align-items:stretch">
               <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
@@ -8317,42 +8357,42 @@ function renderTargetManageContent(student, target) {
   });
 
   $("btn-mn-add-act").addEventListener("click", async () => {
-    acts.push({ id: cfgId("a"), name: "", order: acts.length });
+    acts.push({ id: cfgId("a"), name: "", order: acts.length, activeFrom: todayDateStr() });
     target.predefinedActivities = acts;
     await saveTarget();
     renderTargetManageContent(student, target);
   });
 
   $("btn-mn-add-act-note").addEventListener("click", async () => {
-    acts.push({ id: cfgId("a"), name: "", actNote: "", order: acts.length });
+    acts.push({ id: cfgId("a"), name: "", actNote: "", order: acts.length, activeFrom: todayDateStr() });
     target.predefinedActivities = acts;
     await saveTarget();
     renderTargetManageContent(student, target);
   });
 
   $("btn-mn-add-heading").addEventListener("click", async () => {
-    acts.push({ id: cfgId("h"), isHeading: true, name: "", order: acts.length });
+    acts.push({ id: cfgId("h"), isHeading: true, name: "", order: acts.length, activeFrom: todayDateStr() });
     target.predefinedActivities = acts;
     await saveTarget();
     renderTargetManageContent(student, target);
   });
 
   $("btn-mn-add-note").addEventListener("click", async () => {
-    acts.push({ id: cfgId("n"), isNote: true, text: "", order: acts.length });
+    acts.push({ id: cfgId("n"), isNote: true, text: "", order: acts.length, activeFrom: todayDateStr() });
     target.predefinedActivities = acts;
     await saveTarget();
     renderTargetManageContent(student, target);
   });
 
   $("btn-mn-add-mapped").addEventListener("click", async () => {
-    acts.push({ id: cfgId("m"), isMapped: true, name: "", mappedTargetId: null, order: acts.length });
+    acts.push({ id: cfgId("m"), isMapped: true, name: "", mappedTargetId: null, order: acts.length, activeFrom: todayDateStr() });
     target.predefinedActivities = acts;
     await saveTarget();
     renderTargetManageContent(student, target);
   });
 
   $("btn-mn-add-act-note-mapped").addEventListener("click", async () => {
-    acts.push({ id: cfgId("m"), isMapped: true, name: "", actNote: "", mappedTargetId: null, order: acts.length });
+    acts.push({ id: cfgId("m"), isMapped: true, name: "", actNote: "", mappedTargetId: null, order: acts.length, activeFrom: todayDateStr() });
     target.predefinedActivities = acts;
     await saveTarget();
     renderTargetManageContent(student, target);
@@ -8492,6 +8532,24 @@ function renderTargetManageContent(student, target) {
       const panel = $("manage-modal-body").querySelector(`.mn-km-color-panel[data-idx="${btn.dataset.idx}"]`);
       if (panel) panel.style.display = panel.style.display === "flex" ? "none" : "flex";
     });
+  });
+
+  const savePeriodField = async (idx, field, value) => {
+    if (!acts[idx]) return;
+    acts[idx][field] = value || null;
+    target.predefinedActivities = acts;
+    await saveTarget();
+    renderTargetManageContent(student, target);
+  };
+
+  $("manage-modal-body").querySelectorAll(".mn-km-date-from,.mn-hkm-date-from,.mn-note-date-from").forEach(inp => {
+    inp.addEventListener("change", () => savePeriodField(+inp.dataset.idx, "activeFrom", inp.value));
+  });
+  $("manage-modal-body").querySelectorAll(".mn-km-date-to,.mn-hkm-date-to,.mn-note-date-to").forEach(inp => {
+    inp.addEventListener("change", () => savePeriodField(+inp.dataset.idx, "activeTo", inp.value));
+  });
+  $("manage-modal-body").querySelectorAll(".mn-km-date-forever,.mn-hkm-date-forever,.mn-note-date-forever").forEach(btn => {
+    btn.addEventListener("click", () => savePeriodField(+btn.dataset.idx, "activeTo", null));
   });
 
   const getOptsFromDom = idx =>
@@ -8645,18 +8703,39 @@ function renderTemplateManageContent(template) {
               <button class="mn-hkm-opt" data-idx="${idx}" data-action="gray" style="flex:1;padding:.3rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">🩶 Grey</button>
               <button class="mn-hkm-opt" data-idx="${idx}" data-action="green" style="flex:1;padding:.3rem;background:#a9d18e;border:2px solid ${isGreen ? '#388e3c' : '#70ad47'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">💚 Green</button>
             </div>
+            <div style="padding:.45rem .6rem;border-bottom:1px solid #f3f4f6">
+              <div style="font-size:.72rem;color:#6b7280;font-weight:600;margin-bottom:.3rem">📅 Active Period</div>
+              <div style="display:flex;align-items:center;gap:.3rem;flex-wrap:wrap">
+                <input type="date" class="mn-hkm-date-from" data-idx="${idx}" value="${a.activeFrom||''}" style="font-size:.75rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;flex:1;min-width:0">
+                <span style="color:#9ca3af;font-size:.8rem">→</span>
+                <input type="date" class="mn-hkm-date-to" data-idx="${idx}" value="${a.activeTo||''}" style="font-size:.75rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;flex:1;min-width:0">
+                <button class="mn-hkm-date-forever" data-idx="${idx}" title="Set to forever" style="padding:.2rem .4rem;border:1px solid #d1d5db;border-radius:.3rem;background:#f9fafb;cursor:pointer;font-size:.8rem;white-space:nowrap">∞ Forever</button>
+              </div>
+            </div>
             <button class="mn-hkm-opt" data-idx="${idx}" data-action="delete" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete</button>
           </div>
         </div>
       </div>`;
     } else if (a.isNote) {
-      html += `<div class="admin-list-item admin-note-item" data-idx="${idx}">
+      const noteInactive = !isActivityActive(a, todayDateStr());
+      html += `<div class="admin-list-item admin-note-item" data-idx="${idx}"${noteInactive ? ' style="opacity:0.45"' : ''}>
         <span class="drag-handle">⠿</span>
-        ${formatButtonsHtml(`mn-act-name-${idx}`)}
-        <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
-          rows="1" placeholder="Enter Note"
-          style="flex:1;overflow-y:hidden;resize:none">${escHtml(stripNoteHtml(a.text || ""))}</textarea>
-        <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
+        <div style="flex:1;display:flex;flex-direction:column;gap:.25rem">
+          <div style="display:flex;align-items:flex-start;gap:.3rem">
+            ${formatButtonsHtml(`mn-act-name-${idx}`)}
+            <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
+              rows="1" placeholder="Enter Note"
+              style="flex:1;overflow-y:hidden;resize:none">${escHtml(stripNoteHtml(a.text || ""))}</textarea>
+            <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:.3rem;flex-wrap:wrap;padding-left:.2rem">
+            <span style="font-size:.72rem;color:#6b7280;font-weight:600">📅</span>
+            <input type="date" class="mn-note-date-from" data-idx="${idx}" value="${a.activeFrom||''}" style="font-size:.75rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;flex:1;min-width:0">
+            <span style="color:#9ca3af;font-size:.8rem">→</span>
+            <input type="date" class="mn-note-date-to" data-idx="${idx}" value="${a.activeTo||''}" style="font-size:.75rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;flex:1;min-width:0">
+            <button class="mn-note-date-forever" data-idx="${idx}" title="Set to forever" style="padding:.2rem .4rem;border:1px solid #d1d5db;border-radius:.3rem;background:#f9fafb;cursor:pointer;font-size:.8rem;white-space:nowrap">∞</button>
+          </div>
+        </div>
       </div>`;
     } else if (a.isMaintain) {
       html += `<div class="admin-list-item" data-idx="${idx}" style="background:#f3f4f6;border:1px solid #d1d5db">
@@ -8680,7 +8759,8 @@ function renderTemplateManageContent(template) {
       const remarkTypeSelect = buildRemarkTypeControls(a, idx);
       const isGray = a.activityColor === "gray" || a.isMaintainLive;
       const isGreen = a.activityColor === "green";
-      const actItemStyle = isGray ? ' style="background:#f3f4f6;border:1px solid #d1d5db"' : isGreen ? ' style="background:#e2efda;border:1px solid #a9d18e"' : '';
+      const actInactive = !isActivityActive(a, todayDateStr());
+      const actItemStyle = isGray ? ` style="background:#f3f4f6;border:1px solid #d1d5db${actInactive ? ';opacity:0.45' : ''}"` : isGreen ? ` style="background:#e2efda;border:1px solid #a9d18e${actInactive ? ';opacity:0.45' : ''}"` : actInactive ? ' style="opacity:0.45"' : '';
       const noteRow = a.actNote !== undefined
         ? `<div style="display:flex;align-items:flex-start;gap:.3rem">
             ${formatButtonsHtml(`mn-act-note-${idx}`)}
@@ -8888,28 +8968,28 @@ function renderTemplateManageContent(template) {
   });
 
   $("btn-mn-add-act").addEventListener("click", async () => {
-    acts.push({ id: cfgId("a"), name: "", order: acts.length });
+    acts.push({ id: cfgId("a"), name: "", order: acts.length, activeFrom: todayDateStr() });
     template.predefinedActivities = acts;
     await saveTemplateFn();
     renderTemplateManageContent(template);
   });
 
   $("btn-mn-add-act-note").addEventListener("click", async () => {
-    acts.push({ id: cfgId("a"), name: "", actNote: "", order: acts.length });
+    acts.push({ id: cfgId("a"), name: "", actNote: "", order: acts.length, activeFrom: todayDateStr() });
     template.predefinedActivities = acts;
     await saveTemplateFn();
     renderTemplateManageContent(template);
   });
 
   $("btn-mn-add-heading").addEventListener("click", async () => {
-    acts.push({ id: cfgId("h"), isHeading: true, name: "", order: acts.length });
+    acts.push({ id: cfgId("h"), isHeading: true, name: "", order: acts.length, activeFrom: todayDateStr() });
     template.predefinedActivities = acts;
     await saveTemplateFn();
     renderTemplateManageContent(template);
   });
 
   $("btn-mn-add-note").addEventListener("click", async () => {
-    acts.push({ id: cfgId("n"), isNote: true, text: "", order: acts.length });
+    acts.push({ id: cfgId("n"), isNote: true, text: "", order: acts.length, activeFrom: todayDateStr() });
     template.predefinedActivities = acts;
     await saveTemplateFn();
     renderTemplateManageContent(template);
@@ -9079,6 +9159,24 @@ function renderTemplateManageContent(template) {
       const panel = $("manage-modal-body").querySelector(`.mn-km-color-panel[data-idx="${btn.dataset.idx}"]`);
       if (panel) panel.style.display = panel.style.display === "flex" ? "none" : "flex";
     });
+  });
+
+  const saveTmplPeriodField = async (idx, field, value) => {
+    if (!acts[idx]) return;
+    acts[idx][field] = value || null;
+    template.predefinedActivities = acts;
+    await saveTemplateFn();
+    renderTemplateManageContent(template);
+  };
+
+  $("manage-modal-body").querySelectorAll(".mn-km-date-from,.mn-hkm-date-from,.mn-note-date-from").forEach(inp => {
+    inp.addEventListener("change", () => saveTmplPeriodField(+inp.dataset.idx, "activeFrom", inp.value));
+  });
+  $("manage-modal-body").querySelectorAll(".mn-km-date-to,.mn-hkm-date-to,.mn-note-date-to").forEach(inp => {
+    inp.addEventListener("change", () => saveTmplPeriodField(+inp.dataset.idx, "activeTo", inp.value));
+  });
+  $("manage-modal-body").querySelectorAll(".mn-km-date-forever,.mn-hkm-date-forever,.mn-note-date-forever").forEach(btn => {
+    btn.addEventListener("click", () => saveTmplPeriodField(+btn.dataset.idx, "activeTo", null));
   });
 
   const getTmplOptsFromDom = idx =>
@@ -9597,7 +9695,9 @@ function buildGroupItemsByActivity(target, data, attendees) {
   const items = [];
 
   // Predefined activities (with heading and note support)
+  const grpSessionDate = todayDateStr();
   for (const pa of (target.predefinedActivities || [])) {
+    if (!isActivityActive(pa, grpSessionDate)) continue;
     if (pa.isNote) {
       if (pa.text) items.push(`<div class="activity-note-heading" contenteditable="false">${noteToHtml(pa.text)}</div>`);
       continue;
@@ -9639,7 +9739,9 @@ function renderGroupStudentBlock(studentName, target, data) {
   // Section headings/notes aren't tied to a specific student, so they're skipped here —
   // only actual scoreable activities make sense nested under a student.
   const activityEntries = [];
+  const grpStudentDate = todayDateStr();
   for (const pa of (target.predefinedActivities || [])) {
+    if (!isActivityActive(pa, grpStudentDate)) continue;
     if (pa.isNote || pa.isHeading || pa.isMaintainHeading || pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || pa.fixedRemark !== undefined || !pa.name) continue;
     const actId = Object.entries(data.activities || {})
       .find(([, a]) => a.targetName === target.name && a.activityName === pa.name)?.[0] || null;

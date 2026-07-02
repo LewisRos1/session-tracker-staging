@@ -149,6 +149,13 @@ const STYLE_ACT_HEADING = {
   fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFE4F0F8" } },
   font: { bold: true, color: { argb: "FF2A4060" } }
 };
+function isActivityActive(pa, dateStr) {
+  if (!dateStr) return true;
+  if (pa.activeFrom && dateStr < pa.activeFrom) return false;
+  if (pa.activeTo   && dateStr > pa.activeTo)   return false;
+  return true;
+}
+
 // Gray activity rows — "White, Background 1, Darker 5%" (#F2F2F2)
 const STYLE_GRAY_ACT_FILL  = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F2F2" } };
 const STYLE_GREEN_ACT_FILL = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE2EFDA" } };
@@ -1571,6 +1578,7 @@ function getAllActivitiesForTarget(session, target) {
   const stoppedActivities  = [];
 
   for (const pa of (target.predefinedActivities || [])) {
+    if (!isActivityActive(pa, session.date)) continue;
     if (!pa.name && !pa.isNote && !pa.isHeading && !pa.isMaintainHeading) continue;
     if (pa.isNote) {
       result.push({ isNote: true, activityName: pa.text || "" });
