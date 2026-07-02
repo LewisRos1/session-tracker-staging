@@ -127,7 +127,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "672";
+const APP_VERSION = "673";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2858,7 +2858,7 @@ function renderFedcTarget(target) {
       const fixedStyle = isGreenFixed
         ? 'style="background:#e2efda;border:1px solid #a9d18e;border-left:4px solid #70ad47"'
         : 'style="background:#f3f4f6;border:1px solid #e5e7eb;border-left:4px solid #d1d5db"';
-      html += `<div class="entry-block entry-block-predefined" ${fixedStyle}
+      html += `<div class="entry-block entry-block-predefined" ${fixedStyle}>
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Activity</span>
           <span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span>
