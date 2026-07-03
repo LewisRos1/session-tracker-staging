@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "696";
+const APP_VERSION = "697";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -8658,9 +8658,16 @@ function renderTargetManageContent(student, target) {
             const allSessions = _groupForTargetEdit
               ? await getAllSessionsForGroup(_groupForTargetEdit.id)
               : await getAllSessionsForStudent(student.id);
-            affected = allSessions.filter(s =>
-              Object.values(s.activities || {}).some(a => a.targetName === target.name && a.activityName === pa.name)
-            ).length;
+            affected = allSessions.filter(s => {
+              const sActs = s.activities || {}; const sRems = s.remarks || {};
+              const matchIds = Object.entries(sActs).filter(([, a]) => a.targetName === target.name && a.activityName === pa.name).map(([id]) => id);
+              return matchIds.some(actId => Object.values(sRems).some(r =>
+                r.activityId === actId && (
+                  (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
+                  (r.trials || []).some(t => t !== null && t !== -1)
+                )
+              ));
+            }).length;
           } catch { affected = -1; }
           btn.disabled = false;
           btn.textContent = "🗑️ Delete Activity";
