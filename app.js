@@ -56,6 +56,11 @@ import {
   mergeDuplicateActivity,
   deleteOrphanAcrossSessions,
   deleteGroupOrphanAcrossSessions,
+  softDeleteActivityAcrossSessions,
+  getTrashItems,
+  restoreTrashItem,
+  permanentlyDeleteTrashItem,
+  cleanupExpiredTrash,
   reassignGroupStudentAcrossSessions,
   signInWithPin,
   signOutUser,
@@ -138,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "694";
+const APP_VERSION = "695";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -585,6 +590,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadAppData();
     await waitForUpdatingScreenMinimum();
     showHome();
+    cleanupExpiredTrash();
   });
 });
 
@@ -1513,17 +1519,17 @@ function renderDataIntegrityReport() {
         return;
       }
       btn.disabled = true;
-      btn.textContent = "Deleting…";
+      btn.textContent = "Moving to trash…";
       try {
-        if (f.isGroup) {
-          await deleteGroupOrphanAcrossSessions(f.entityId, f.targetName, f.orphanName);
-        } else {
-          await deleteOrphanAcrossSessions(f.entityId, f.targetName, f.orphanName);
-        }
+        await softDeleteActivityAcrossSessions(
+          f.isGroup ? "group" : "student",
+          f.entityId, f.who,
+          f.targetName, f.orphanName
+        );
         f.deleted = true;
         renderDataIntegrityReport();
       } catch (err) {
-        console.error("Orphan delete failed:", err);
+        console.error("Orphan soft-delete failed:", err);
         btn.disabled = false;
         btn.dataset.confirming = "";
         btn.textContent = "Delete from all sessions (failed — try again)";
@@ -1763,6 +1769,7 @@ function renderExportButtons() {
     <div style="display:flex;gap:.6rem;flex-wrap:wrap">
       <button class="export-btn export-btn-all" id="btn-export-all-trials">Backup All Excel (ZIP)</button>
       <button class="export-btn" id="btn-data-integrity-check">🔍 Run Data Integrity Check</button>
+      <button class="export-btn" id="btn-recently-deleted">🗑 Recently Deleted (30 days)</button>
     </div>`;
 
   const wire = (btnId, defaultLabel, includeTrials) => {
@@ -1784,6 +1791,114 @@ function renderExportButtons() {
   };
   wire("btn-export-all-trials", "Backup All Excel (ZIP)", true);
   $("btn-data-integrity-check").addEventListener("click", runDataIntegrityCheck);
+  $("btn-recently-deleted").addEventListener("click", renderRecentlyDeleted);
+}
+
+async function renderRecentlyDeleted() {
+  $("manage-modal-title").textContent = "Recently Deleted (30 days)";
+  $("manage-modal-body").innerHTML = `<p style="padding:1rem;color:var(--text-muted)">Loading…</p>`;
+  $("manage-modal").classList.remove("hidden");
+
+  let items;
+  try { items = await getTrashItems(); }
+  catch (err) {
+    $("manage-modal-body").innerHTML = `<p style="padding:1rem;color:#dc2626">Failed to load trash: ${escHtml(err.message)}<br><br>Make sure the Firestore rules include access to the <code>trash</code> collection.</p>`;
+    return;
+  }
+
+  if (items.length === 0) {
+    $("manage-modal-body").innerHTML = `<p style="padding:1rem;color:var(--text-muted)">No recently deleted items. Anything moved to trash will appear here and be permanently deleted after 30 days.</p>`;
+    return;
+  }
+
+  const now = new Date();
+  const rows = items.map((item, i) => {
+    const deletedDate = new Date(item.deletedAt);
+    const expiresDate = new Date(item.expiresAt);
+    const daysLeft    = Math.max(0, Math.ceil((expiresDate - now) / (1000 * 60 * 60 * 24)));
+    const dateStr     = deletedDate.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    const sessionWord = item.sessionCount === 1 ? "session" : "sessions";
+    return `
+      <div style="border:1px solid #e5e7eb;border-radius:.6rem;padding:.9rem 1rem;margin:.6rem .75rem">
+        <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:.25rem">${escHtml(item.entityName)} · ${escHtml(item.targetName)}</div>
+        <div style="font-weight:600;font-size:.9rem;margin-bottom:.35rem">${escHtml(item.activityName)}</div>
+        <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:.6rem">
+          ${item.sessionCount} ${sessionWord} of data · deleted ${dateStr} ·
+          <span style="color:${daysLeft <= 3 ? "#dc2626" : "#6b7280"}">${daysLeft} day${daysLeft !== 1 ? "s" : ""} left</span>
+        </div>
+        <div style="display:flex;gap:.5rem">
+          <button class="btn-primary-sm btn-trash-restore" data-idx="${i}" style="flex:1">↩ Restore</button>
+          <button class="btn-adm-danger btn-trash-delete" data-idx="${i}" style="flex:1">🗑 Delete permanently</button>
+        </div>
+      </div>`;
+  }).join("");
+
+  $("manage-modal-body").innerHTML = `
+    <p style="padding:.75rem 1rem .25rem;font-size:.8rem;color:var(--text-muted)">
+      ${items.length} item${items.length !== 1 ? "s" : ""} in trash — automatically purged after 30 days.
+    </p>${rows}`;
+
+  $("manage-modal-body").querySelectorAll(".btn-trash-restore").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const item = items[Number(btn.dataset.idx)];
+      if (!item) return;
+      btn.disabled = true;
+      btn.textContent = "Restoring…";
+      try {
+        await restoreTrashItem(item.id);
+        renderRecentlyDeleted();
+      } catch (err) {
+        console.error("Restore failed:", err);
+        btn.disabled = false;
+        btn.textContent = "↩ Restore";
+        alert("Restore failed: " + err.message);
+      }
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".btn-trash-delete").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const item = items[Number(btn.dataset.idx)];
+      if (!item) return;
+      const confirmWord = String(item.sessionCount || "DELETE");
+      $("manage-modal").querySelectorAll("[data-del-overlay]").forEach(el => el.remove());
+      const overlay = document.createElement("div");
+      overlay.dataset.delOverlay = "1";
+      overlay.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:200;border-radius:.75rem";
+      overlay.innerHTML = `<div style="background:#fff;padding:1.25rem 1.25rem 1rem;border-radius:.75rem;width:min(280px,90%);box-shadow:0 4px 24px rgba(0,0,0,.25)">
+        <p style="font-size:.85rem;margin:0 0 .5rem;color:#111;font-weight:600">⚠️ Permanently delete <span style="color:#dc2626">${item.sessionCount} session${item.sessionCount !== 1 ? "s" : ""}</span> of data for "${escHtml(item.activityName)}"? This cannot be undone.</p>
+        <p style="font-size:.8rem;margin:0 0 .6rem;color:#6b7280">Type <strong>${confirmWord}</strong> to confirm:</p>
+        <input id="del-type-input" type="text" autocomplete="off" inputmode="numeric"
+          style="width:100%;box-sizing:border-box;padding:.45rem .6rem;border:2px solid #d1d5db;border-radius:.4rem;font-size:1.1rem;text-align:center;outline:none;margin-bottom:.75rem" placeholder="${confirmWord}">
+        <div style="display:flex;gap:.5rem">
+          <button id="del-type-cancel" style="flex:1;padding:.45rem;border:1px solid #d1d5db;border-radius:.4rem;background:#f9fafb;cursor:pointer;font-size:.85rem">Cancel</button>
+          <button id="del-type-ok" disabled style="flex:1;padding:.45rem;border:none;border-radius:.4rem;background:#dc2626;color:#fff;cursor:pointer;font-size:.85rem;opacity:.4">Delete Forever</button>
+        </div>
+      </div>`;
+      const modalSheet = $("manage-modal").querySelector(".modal-sheet");
+      modalSheet.style.position = "relative";
+      modalSheet.appendChild(overlay);
+      const inp   = overlay.querySelector("#del-type-input");
+      const okBtn = overlay.querySelector("#del-type-ok");
+      inp.focus();
+      inp.addEventListener("input", () => {
+        const ok = inp.value === confirmWord;
+        okBtn.disabled = !ok;
+        okBtn.style.opacity = ok ? "1" : ".4";
+      });
+      overlay.querySelector("#del-type-cancel").addEventListener("click", () => overlay.remove());
+      okBtn.addEventListener("click", async () => {
+        overlay.remove();
+        try {
+          await permanentlyDeleteTrashItem(item.id);
+          renderRecentlyDeleted();
+        } catch (err) {
+          console.error("Permanent delete failed:", err);
+          alert("Permanent delete failed: " + err.message);
+        }
+      });
+    });
+  });
 }
 
 // ============================================================
@@ -8601,14 +8716,15 @@ function renderTargetManageContent(student, target) {
               target.predefinedActivities = acts;
               await saveTarget();
               try {
-                if (_groupForTargetEdit) {
-                  await deleteGroupOrphanAcrossSessions(_groupForTargetEdit.id, target.name, pa.name);
-                } else {
-                  await deleteOrphanAcrossSessions(student.id, target.name, pa.name);
-                }
+                await softDeleteActivityAcrossSessions(
+                  _groupForTargetEdit ? "group" : "student",
+                  _groupForTargetEdit ? _groupForTargetEdit.id   : student.id,
+                  _groupForTargetEdit ? _groupForTargetEdit.name : student.name,
+                  target.name, pa.name
+                );
               } catch (err) {
-                console.error("Failed to purge activity from sessions:", err);
-                alert("Activity removed from config, but failed to delete from past sessions:\n" + err.message);
+                console.error("Failed to move activity to trash:", err);
+                alert("Activity removed from config, but failed to move past session data to trash:\n" + err.message);
               }
               renderTargetManageContent(student, target);
             });
@@ -8636,22 +8752,74 @@ function renderTargetManageContent(student, target) {
       const src = btn.dataset.src;
       const pa = src === "stopped" ? stoppedActs[ci] : masteredActs[ci];
       if (!pa) return;
-      if (!confirm(`Permanently delete "${pa.name}" and all its past session data? This cannot be undone.`)) return;
-      const actIdx = acts.indexOf(pa);
-      if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
-      target.predefinedActivities = acts;
-      await saveTarget();
+      btn.disabled = true;
+      btn.textContent = "Checking…";
+      let affected = 0;
       try {
-        if (_groupForTargetEdit) {
-          await deleteGroupOrphanAcrossSessions(_groupForTargetEdit.id, target.name, pa.name);
-        } else {
-          await deleteOrphanAcrossSessions(student.id, target.name, pa.name);
-        }
-      } catch (err) {
-        console.error("Failed to purge from sessions:", err);
-        alert("Activity removed from config, but failed to delete from past sessions:\n" + err.message);
+        const allSessions = _groupForTargetEdit
+          ? await getAllSessionsForGroup(_groupForTargetEdit.id)
+          : await getAllSessionsForStudent(student.id);
+        affected = allSessions.filter(s =>
+          Object.values(s.activities || {}).some(a => a.targetName === target.name && a.activityName === pa.name)
+        ).length;
+      } catch { affected = -1; }
+      btn.disabled = false;
+      btn.textContent = "🗑️ Delete";
+      if (affected === 0) {
+        if (!confirm(`Delete "${pa.name}"? No past session data will be lost.`)) return;
+        const actIdx = acts.indexOf(pa);
+        if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
+        target.predefinedActivities = acts;
+        await saveTarget();
+        renderTargetManageContent(student, target);
+      } else {
+        const confirmWord = affected > 0 ? String(affected) : "DELETE";
+        $("manage-modal").querySelectorAll("[data-del-overlay]").forEach(el => el.remove());
+        const overlay = document.createElement("div");
+        overlay.dataset.delOverlay = "1";
+        overlay.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:200;border-radius:.75rem";
+        overlay.innerHTML = `<div style="background:#fff;padding:1.25rem 1.25rem 1rem;border-radius:.75rem;width:min(280px,90%);box-shadow:0 4px 24px rgba(0,0,0,.25)">
+          <p style="font-size:.85rem;margin:0 0 .5rem;color:#111;font-weight:600">⚠️ Moves data from <span style="color:#dc2626">${confirmWord} past session${affected !== 1 ? "s" : ""}</span> to trash (recoverable for 30 days).</p>
+          <p style="font-size:.8rem;margin:0 0 .6rem;color:#6b7280">Type <strong>${confirmWord}</strong> to confirm:</p>
+          <input id="del-type-input" type="text" autocomplete="off" inputmode="numeric"
+            style="width:100%;box-sizing:border-box;padding:.45rem .6rem;border:2px solid #d1d5db;border-radius:.4rem;font-size:1.1rem;text-align:center;outline:none;margin-bottom:.75rem" placeholder="${confirmWord}">
+          <div style="display:flex;gap:.5rem">
+            <button id="del-type-cancel" style="flex:1;padding:.45rem;border:1px solid #d1d5db;border-radius:.4rem;background:#f9fafb;cursor:pointer;font-size:.85rem">Cancel</button>
+            <button id="del-type-ok" disabled style="flex:1;padding:.45rem;border:none;border-radius:.4rem;background:#dc2626;color:#fff;cursor:pointer;font-size:.85rem;opacity:.4">Confirm Delete</button>
+          </div>
+        </div>`;
+        const modalSheet = $("manage-modal").querySelector(".modal-sheet");
+        modalSheet.style.position = "relative";
+        modalSheet.appendChild(overlay);
+        const inp = overlay.querySelector("#del-type-input");
+        const okBtn2 = overlay.querySelector("#del-type-ok");
+        inp.focus();
+        inp.addEventListener("input", () => {
+          const ok = inp.value === confirmWord;
+          okBtn2.disabled = !ok;
+          okBtn2.style.opacity = ok ? "1" : ".4";
+        });
+        overlay.querySelector("#del-type-cancel").addEventListener("click", () => overlay.remove());
+        okBtn2.addEventListener("click", async () => {
+          overlay.remove();
+          const actIdx = acts.indexOf(pa);
+          if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
+          target.predefinedActivities = acts;
+          await saveTarget();
+          try {
+            await softDeleteActivityAcrossSessions(
+              _groupForTargetEdit ? "group" : "student",
+              _groupForTargetEdit ? _groupForTargetEdit.id   : student.id,
+              _groupForTargetEdit ? _groupForTargetEdit.name : student.name,
+              target.name, pa.name
+            );
+          } catch (err) {
+            console.error("Failed to move activity to trash:", err);
+            alert("Activity removed from config, but failed to move past session data to trash:\n" + err.message);
+          }
+          renderTargetManageContent(student, target);
+        });
       }
-      renderTargetManageContent(student, target);
     });
   });
 

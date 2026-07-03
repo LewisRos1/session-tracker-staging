@@ -460,6 +460,112 @@ export async function deleteGroupOrphanAcrossSessions(groupId, targetName, activ
   }
 }
 
+// ─── TRASH (SOFT DELETE — 30-DAY RECYCLE BIN) ──────────────────────────────
+
+const TRASH_EXPIRY_DAYS = 30;
+
+export async function softDeleteActivityAcrossSessions(entityType, entityId, entityName, targetName, activityName) {
+  const q = entityType === "group"
+    ? query(collection(db, "sessions"), where("groupId",   "==", entityId))
+    : query(collection(db, "sessions"), where("studentId", "==", entityId));
+  const snap = await getDocs(q);
+
+  const sessionsData   = [];
+  const sessionUpdates = [];
+
+  for (const sessionDoc of snap.docs) {
+    const data    = sessionDoc.data();
+    const acts    = data.activities || {};
+    const remarks = data.remarks    || {};
+
+    const matches = Object.entries(acts).filter(([, a]) =>
+      a.targetName === targetName && a.activityName === activityName
+    );
+    if (matches.length === 0) continue;
+
+    const updates = {};
+    for (const [actId, actRecord] of matches) {
+      const actRemarks = {};
+      for (const [remId, rem] of Object.entries(remarks)) {
+        if (rem.activityId === actId) { actRemarks[remId] = rem; updates[`remarks.${remId}`] = deleteField(); }
+      }
+      updates[`activities.${actId}`] = deleteField();
+
+      const hasData = Object.values(actRemarks).some(r =>
+        (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
+        (r.trials || []).some(t => t !== null && t !== -1)
+      );
+      if (hasData) {
+        sessionsData.push({
+          sessionId: sessionDoc.id,
+          sessionDate: data.date || "",
+          sessionNumber: data.sessionNumber || data.number || 0,
+          activityId: actId,
+          activityRecord: actRecord,
+          remarks: actRemarks
+        });
+      }
+    }
+    if (Object.keys(updates).length > 0) sessionUpdates.push({ sessionId: sessionDoc.id, updates });
+  }
+
+  if (sessionsData.length > 0) {
+    const now       = new Date();
+    const expiresAt = new Date(now.getTime() + TRASH_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+    await addDoc(collection(db, "trash"), {
+      entityType, entityId, entityName,
+      targetName, activityName,
+      deletedAt:    now.toISOString(),
+      expiresAt:    expiresAt.toISOString(),
+      sessionCount: sessionsData.length,
+      sessionsData
+    });
+  }
+
+  for (const { sessionId, updates } of sessionUpdates) {
+    await updateDoc(doc(db, "sessions", sessionId), updates);
+  }
+}
+
+export async function getTrashItems() {
+  const snap = await getDocs(collection(db, "trash"));
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));
+}
+
+export async function restoreTrashItem(trashId) {
+  const trashSnap = await getDoc(doc(db, "trash", trashId));
+  if (!trashSnap.exists()) throw new Error("Trash item not found");
+  const item = trashSnap.data();
+  for (const entry of (item.sessionsData || [])) {
+    const sessionRef  = doc(db, "sessions", entry.sessionId);
+    const sessionSnap = await getDoc(sessionRef);
+    if (!sessionSnap.exists()) continue;
+    const updates = {};
+    updates[`activities.${entry.activityId}`] = entry.activityRecord;
+    for (const [remId, remRecord] of Object.entries(entry.remarks || {})) {
+      updates[`remarks.${remId}`] = remRecord;
+    }
+    await updateDoc(sessionRef, updates);
+  }
+  await deleteDoc(doc(db, "trash", trashId));
+}
+
+export async function permanentlyDeleteTrashItem(trashId) {
+  await deleteDoc(doc(db, "trash", trashId));
+}
+
+export async function cleanupExpiredTrash() {
+  try {
+    const snap = await getDocs(collection(db, "trash"));
+    const now  = new Date().toISOString();
+    for (const d of snap.docs) {
+      if ((d.data().expiresAt || "") <= now) await deleteDoc(d.ref);
+    }
+  } catch { /* silent — trash access may fail before rules are updated */ }
+}
+
 // ─── REMARK OPERATIONS ───────────────────────────────────────
 
 // remId can be supplied by the caller (e.g. to write a remark into local
