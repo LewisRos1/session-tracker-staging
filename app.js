@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "699";
+const APP_VERSION = "700";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3098,7 +3098,10 @@ function renderFedcTarget(target) {
     if (pa.isNote || pa.isExportNote) {
       if (pa.text) {
         const noteClr = ' style="background:#fff7ed;border-left:4px solid #fb923c;padding:.35rem .6rem;color:#92400e"';
-        html += `<div class="activity-note-heading" contenteditable="false"${noteClr}>${noteToHtml(pa.text)}</div>`;
+        const noteTag = pa.isExportNote
+          ? `<div style="font-size:.65rem;color:#c2410c;margin-bottom:.2rem">📄 Included in Word export</div>`
+          : `<div style="font-size:.65rem;color:#9a3412;margin-bottom:.2rem">🔒 For internal use only</div>`;
+        html += `<div class="activity-note-heading" contenteditable="false"${noteClr}>${noteTag}${noteToHtml(pa.text)}</div>`;
       }
       return;
     }
@@ -3270,8 +3273,12 @@ function renderFedcTarget(target) {
           ? `<div class="activity-group-heading" contenteditable="false" style="opacity:.3;background:#a9d18e;border-color:#70ad47;color:#1a4731">${escHtml(pa.name || "")}</div>`
           : `<div class="activity-group-heading" contenteditable="false" style="opacity:.3">${escHtml(pa.name || "")}</div>`;
       }
-      if (pa.isNote) {
-        return pa.text ? `<div class="activity-note-heading" contenteditable="false" style="opacity:.3">${noteToHtml(pa.text)}</div>` : '';
+      if (pa.isNote || pa.isExportNote) {
+        if (!pa.text) return '';
+        const noteTag = pa.isExportNote
+          ? `<div style="font-size:.65rem;color:#c2410c;margin-bottom:.2rem">📄 Included in Word export</div>`
+          : `<div style="font-size:.65rem;color:#9a3412;margin-bottom:.2rem">🔒 For internal use only</div>`;
+        return `<div class="activity-note-heading" contenteditable="false" style="opacity:.3">${noteTag}${noteToHtml(pa.text)}</div>`;
       }
       const fixedText = pa.fixedRemark !== undefined ? pa.fixedRemark : pa.isMaintain ? (pa.maintainRemark ?? "") : null;
       return `<div class="entry-block entry-block-predefined" style="opacity:.3;pointer-events:none">
@@ -8222,13 +8229,15 @@ function renderTargetManageContent(student, target) {
         ? ` style="position:relative;${noteBaseBg}"`
         : ` style="${noteBaseBg}${noteInactive ? ';opacity:0.3' : ''}"`;
       const noteOverlay  = noteExpired ? `<div style="position:absolute;inset:0 2.5rem 0 0;background:rgba(255,255,255,.7);pointer-events:none;z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center"><div style="pointer-events:none;background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.35rem .75rem;text-align:center;font-size:1.17rem;color:#374151;max-width:80%">⏸ This activity's period has ended — tap ⋮ on the right side to adjust the dates and bring it back.</div></div>` : '';
-      const noteTypeLabel = a.isExportNote
-        ? `<span style="font-size:.68rem;font-weight:600;color:#c2410c;background:#ffedd5;border:1px solid #fed7aa;border-radius:.3rem;padding:.1rem .35rem;white-space:nowrap">📄 Word export</span>`
-        : `<span style="font-size:.68rem;color:#9a3412;background:#ffedd5;border:1px solid #fed7aa;border-radius:.3rem;padding:.1rem .35rem;white-space:nowrap">🔒 Internal only</span>`;
       html += `<div class="admin-list-item admin-note-item" data-idx="${idx}"${noteItemStyle}>
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.25rem">
-          <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.1rem">${noteTypeLabel}</div>
+          <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.1rem">
+            <select class="mn-note-type-select" data-idx="${idx}" style="font-size:.74rem;padding:.15rem .3rem;border:1px solid #fed7aa;border-radius:.3rem;background:#ffedd5;color:#9a3412;cursor:pointer">
+              <option value="internal"${a.isNote ? ' selected' : ''}>🔒 For internal use only</option>
+              <option value="export"${a.isExportNote ? ' selected' : ''}>📄 Include in Word export</option>
+            </select>
+          </div>
           <div style="display:flex;align-items:flex-start;gap:.3rem">
             ${formatButtonsHtml(`mn-act-name-${idx}`)}
             <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
@@ -8406,8 +8415,7 @@ function renderTargetManageContent(student, target) {
       <button class="btn-admin-add" id="btn-mn-add-act" style="flex:0 0 auto;width:auto">+ Add Activity</button>
       <button class="btn-admin-add" id="btn-mn-add-act-note" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Note</button>
       <button class="btn-admin-add" id="btn-mn-add-heading" style="flex:0 0 auto;width:auto">+ Add Section Heading</button>
-      <button class="btn-admin-add" id="btn-mn-add-note" style="flex:0 0 auto;width:auto">+ Add Note (For Internal Use)</button>
-      <button class="btn-admin-add" id="btn-mn-add-export-note" style="flex:0 0 auto;width:auto">+ Add Note</button>
+      <button class="btn-admin-add" id="btn-mn-add-note" style="flex:0 0 auto;width:auto">+ Add Note</button>
       <button class="btn-admin-add" id="btn-mn-add-mapped" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Mapped Score</button>
       <button class="btn-admin-add" id="btn-mn-add-act-note-mapped" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Note &amp; Mapped Score</button>
     </div>
@@ -8855,11 +8863,16 @@ function renderTargetManageContent(student, target) {
     renderTargetManageContent(student, target);
   });
 
-  $("btn-mn-add-export-note").addEventListener("click", async () => {
-    acts.push({ id: cfgId("n"), isExportNote: true, text: "", order: acts.length, activeFrom: null });
-    target.predefinedActivities = acts;
-    await saveTarget();
-    renderTargetManageContent(student, target);
+  $("manage-modal-body").querySelectorAll(".mn-note-type-select").forEach(sel => {
+    sel.addEventListener("change", async () => {
+      const idx = Number(sel.dataset.idx);
+      const toExport = sel.value === "export";
+      if (toExport) { delete acts[idx].isNote; acts[idx].isExportNote = true; }
+      else { delete acts[idx].isExportNote; acts[idx].isNote = true; }
+      target.predefinedActivities = acts;
+      await saveTarget();
+      renderTargetManageContent(student, target);
+    });
   });
 
   $("btn-mn-add-mapped").addEventListener("click", async () => {
@@ -9223,13 +9236,15 @@ function renderTemplateManageContent(template) {
         ? ` style="position:relative;${noteBaseBg}"`
         : ` style="${noteBaseBg}${noteInactive ? ';opacity:0.3' : ''}"`;
       const noteOverlay  = noteExpired ? `<div style="position:absolute;inset:0 2.5rem 0 0;background:rgba(255,255,255,.7);pointer-events:none;z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center"><div style="pointer-events:none;background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.35rem .75rem;text-align:center;font-size:1.17rem;color:#374151;max-width:80%">⏸ This activity's period has ended — tap ⋮ on the right side to adjust the dates and bring it back.</div></div>` : '';
-      const noteTypeLabel = a.isExportNote
-        ? `<span style="font-size:.68rem;font-weight:600;color:#c2410c;background:#ffedd5;border:1px solid #fed7aa;border-radius:.3rem;padding:.1rem .35rem;white-space:nowrap">📄 Word export</span>`
-        : `<span style="font-size:.68rem;color:#9a3412;background:#ffedd5;border:1px solid #fed7aa;border-radius:.3rem;padding:.1rem .35rem;white-space:nowrap">🔒 Internal only</span>`;
       html += `<div class="admin-list-item admin-note-item" data-idx="${idx}"${noteItemStyle}>
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.25rem">
-          <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.1rem">${noteTypeLabel}</div>
+          <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.1rem">
+            <select class="mn-note-type-select" data-idx="${idx}" style="font-size:.74rem;padding:.15rem .3rem;border:1px solid #fed7aa;border-radius:.3rem;background:#ffedd5;color:#9a3412;cursor:pointer">
+              <option value="internal"${a.isNote ? ' selected' : ''}>🔒 For internal use only</option>
+              <option value="export"${a.isExportNote ? ' selected' : ''}>📄 Include in Word export</option>
+            </select>
+          </div>
           <div style="display:flex;align-items:flex-start;gap:.3rem">
             ${formatButtonsHtml(`mn-act-name-${idx}`)}
             <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
@@ -9333,8 +9348,7 @@ function renderTemplateManageContent(template) {
       <button class="btn-admin-add" id="btn-mn-add-act" style="flex:0 0 auto;width:auto">+ Add Activity</button>
       <button class="btn-admin-add" id="btn-mn-add-act-note" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Note</button>
       <button class="btn-admin-add" id="btn-mn-add-heading" style="flex:0 0 auto;width:auto">+ Add Section Heading</button>
-      <button class="btn-admin-add" id="btn-mn-add-note" style="flex:0 0 auto;width:auto">+ Add Note (For Internal Use)</button>
-      <button class="btn-admin-add" id="btn-mn-add-export-note" style="flex:0 0 auto;width:auto">+ Add Note</button>
+      <button class="btn-admin-add" id="btn-mn-add-note" style="flex:0 0 auto;width:auto">+ Add Note</button>
     </div>
     <div style="margin-top:2rem;padding-bottom:1.5rem">
       <button class="btn-primary-sm" id="btn-mn-done-template"
@@ -9512,11 +9526,16 @@ function renderTemplateManageContent(template) {
     renderTemplateManageContent(template);
   });
 
-  $("btn-mn-add-export-note").addEventListener("click", async () => {
-    acts.push({ id: cfgId("n"), isExportNote: true, text: "", order: acts.length, activeFrom: null });
-    template.predefinedActivities = acts;
-    await saveTemplateFn();
-    renderTemplateManageContent(template);
+  $("manage-modal-body").querySelectorAll(".mn-note-type-select").forEach(sel => {
+    sel.addEventListener("change", async () => {
+      const idx = Number(sel.dataset.idx);
+      const toExport = sel.value === "export";
+      if (toExport) { delete acts[idx].isNote; acts[idx].isExportNote = true; }
+      else { delete acts[idx].isExportNote; acts[idx].isNote = true; }
+      template.predefinedActivities = acts;
+      await saveTemplateFn();
+      renderTemplateManageContent(template);
+    });
   });
 
   $("manage-modal-body").querySelectorAll(".mn-act-preset").forEach(sel => {
@@ -10257,7 +10276,10 @@ function buildGroupItemsByActivity(target, data, attendees) {
     if (pa.isNote || pa.isExportNote) {
       if (pa.text) {
         const noteClr = ' style="background:#fff7ed;border-left:4px solid #fb923c;padding:.35rem .6rem;color:#92400e"';
-        items.push(`<div class="activity-note-heading" contenteditable="false"${noteClr}>${noteToHtml(pa.text)}</div>`);
+        const noteTag = pa.isExportNote
+          ? `<div style="font-size:.65rem;color:#c2410c;margin-bottom:.2rem">📄 Included in Word export</div>`
+          : `<div style="font-size:.65rem;color:#9a3412;margin-bottom:.2rem">🔒 For internal use only</div>`;
+        items.push(`<div class="activity-note-heading" contenteditable="false"${noteClr}>${noteTag}${noteToHtml(pa.text)}</div>`);
       }
       continue;
     }
@@ -10288,7 +10310,13 @@ function buildGroupItemsByActivity(target, data, attendees) {
   if (grpInactivePas.length > 0) {
     const grpInactiveHtml = grpInactivePas.map(pa => {
       if (pa.isHeading || pa.isMaintainHeading) return `<div class="activity-group-heading" contenteditable="false" style="opacity:.3">${escHtml(pa.name || "")}</div>`;
-      if (pa.isNote) return pa.text ? `<div class="activity-note-heading" contenteditable="false" style="opacity:.3">${noteToHtml(pa.text)}</div>` : '';
+      if (pa.isNote || pa.isExportNote) {
+        if (!pa.text) return '';
+        const noteTag = pa.isExportNote
+          ? `<div style="font-size:.65rem;color:#c2410c;margin-bottom:.2rem">📄 Included in Word export</div>`
+          : `<div style="font-size:.65rem;color:#9a3412;margin-bottom:.2rem">🔒 For internal use only</div>`;
+        return `<div class="activity-note-heading" contenteditable="false" style="opacity:.3">${noteTag}${noteToHtml(pa.text)}</div>`;
+      }
       if (!pa.name) return '';
       return `<div class="entry-block entry-block-predefined" style="opacity:.3;pointer-events:none"><div class="entry-field" contenteditable="false"><span class="field-label">Activity</span><span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span></div></div>`;
     }).filter(Boolean).join('');
