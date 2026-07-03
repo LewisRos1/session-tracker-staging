@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "695";
+const APP_VERSION = "696";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3097,9 +3097,7 @@ function renderFedcTarget(target) {
     // Note item — render inline in order, styled like a section heading
     if (pa.isNote) {
       if (pa.text) {
-        const noteClr = pa.activityColor === "red"  ? ' style="background:#fef2f2;border-left:4px solid #f87171;padding:.35rem .6rem"'
-                      : pa.activityColor === "gray" ? ' style="background:#f3f4f6;border-left:4px solid #d1d5db;padding:.35rem .6rem"'
-                      : ' style="background:#eff6ff;border-left:4px solid #60a5fa;padding:.35rem .6rem"';
+        const noteClr = ' style="background:#fff7ed;border-left:4px solid #fb923c;padding:.35rem .6rem;color:#92400e"';
         html += `<div class="activity-note-heading" contenteditable="false"${noteClr}>${noteToHtml(pa.text)}</div>`;
       }
       return;
@@ -8204,10 +8202,10 @@ function renderTargetManageContent(student, target) {
           <button class="btn-adm-del mn-heading-color-btn" data-idx="${idx}" title="Heading options" style="font-size:1.15rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-heading-color-menu" id="mn-hkm-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:190px;overflow:hidden">
             <button class="mn-hkm-color-toggle" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">🎨 Change Colour</button>
-            <div class="mn-hkm-color-panel" data-idx="${idx}" style="display:none;padding:.45rem .6rem;border-bottom:1px solid #f3f4f6;gap:.4rem">
-              <button class="mn-hkm-opt" data-idx="${idx}" data-action="blue" style="flex:1;padding:.3rem;background:#dbeafe;border:2px solid ${!isGray && !isGreen ? '#2563eb' : '#93c5fd'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">💙 Blue</button>
-              <button class="mn-hkm-opt" data-idx="${idx}" data-action="gray" style="flex:1;padding:.3rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">🩶 Grey</button>
-              <button class="mn-hkm-opt" data-idx="${idx}" data-action="green" style="flex:1;padding:.3rem;background:#a9d18e;border:2px solid ${isGreen ? '#388e3c' : '#70ad47'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">💚 Green</button>
+            <div class="mn-hkm-color-panel" data-idx="${idx}" style="display:none;flex-direction:column;padding:.35rem .6rem;border-bottom:1px solid #f3f4f6;gap:.2rem">
+              <button class="mn-hkm-opt" data-idx="${idx}" data-action="blue" style="padding:.35rem .6rem;background:#dbeafe;border:2px solid ${!isGray && !isGreen ? '#2563eb' : '#93c5fd'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">💙 Blue (Normal)</button>
+              <button class="mn-hkm-opt" data-idx="${idx}" data-action="gray" style="padding:.35rem .6rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🩶 Grey (Maintain)</button>
+              <button class="mn-hkm-opt" data-idx="${idx}" data-action="green" style="padding:.35rem .6rem;background:#a9d18e;border:2px solid ${isGreen ? '#388e3c' : '#70ad47'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">💚 Green (Mastered)</button>
             </div>
             ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true)}
             <button class="mn-hkm-opt" data-idx="${idx}" data-action="delete" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete</button>
@@ -8217,13 +8215,10 @@ function renderTargetManageContent(student, target) {
     } else if (a.isNote) {
       const noteInactive = !isActivityActive(a, todayDateStr());
       const noteExpired  = noteInactive && !!a.activeTo && a.activeTo < todayDateStr();
-      const isNoteRed  = a.activityColor === "red";
-      const isNoteGray = a.activityColor === "gray";
-      const isNoteBlue = !isNoteRed && !isNoteGray;
-      const noteBaseBg = isNoteBlue ? 'background:#eff6ff;border:1px solid #bfdbfe' : isNoteGray ? 'background:#f3f4f6;border:1px solid #d1d5db' : 'background:#fef2f2;border:1px solid #fecaca';
+      const noteBaseBg = 'background:#fff7ed;border:1px solid #fb923c;color:#92400e';
       const noteItemStyle = noteExpired
-        ? (noteBaseBg ? ` style="position:relative;${noteBaseBg}"` : ' style="position:relative"')
-        : (noteBaseBg ? ` style="${noteBaseBg}${noteInactive ? ';opacity:0.3' : ''}"` : noteInactive ? ' style="opacity:0.3"' : '');
+        ? ` style="position:relative;${noteBaseBg}"`
+        : ` style="${noteBaseBg}${noteInactive ? ';opacity:0.3' : ''}"`;
       const noteOverlay  = noteExpired ? `<div style="position:absolute;inset:0 2.5rem 0 0;background:rgba(255,255,255,.7);pointer-events:none;z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center"><div style="pointer-events:none;background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.35rem .75rem;text-align:center;font-size:1.17rem;color:#374151;max-width:80%">⏸ This activity's period has ended — tap ⋮ on the right side to adjust the dates and bring it back.</div></div>` : '';
       html += `<div class="admin-list-item admin-note-item" data-idx="${idx}"${noteItemStyle}>
         <span class="drag-handle">⠿</span>
@@ -8238,14 +8233,6 @@ function renderTargetManageContent(student, target) {
         <div style="position:relative">
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Note options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:200px;overflow:hidden">
-            <div style="display:flex;align-items:stretch;border-bottom:1px solid #f3f4f6">
-              <button class="mn-km-color-toggle" data-idx="${idx}" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">🎨 Change Colour</button>
-            </div>
-            <div class="mn-km-color-panel" data-idx="${idx}" style="display:none;flex-direction:column;padding:.35rem .6rem;border-bottom:1px solid #f3f4f6;gap:.2rem">
-              <button class="mn-km-opt" data-idx="${idx}" data-action="color_red" style="padding:.35rem .6rem;background:#fecaca;border:2px solid ${isNoteRed ? '#dc2626' : '#fca5a5'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">❤️ Red</button>
-              <button class="mn-km-opt" data-idx="${idx}" data-action="color_gray" style="padding:.35rem .6rem;background:#d9d9d9;border:2px solid ${isNoteGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🩶 Grey</button>
-              <button class="mn-km-opt" data-idx="${idx}" data-action="color_blue" style="padding:.35rem .6rem;background:#bfdbfe;border:2px solid ${isNoteBlue ? '#2563eb' : '#93c5fd'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">💙 Blue</button>
-            </div>
             ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true)}
             <div style="display:flex;align-items:stretch">
               <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Note</button>
@@ -8367,9 +8354,9 @@ function renderTargetManageContent(student, target) {
               <button class="mn-km-color-toggle" data-idx="${idx}" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">🎨 Change Colour</button>
             </div>
             <div class="mn-km-color-panel" data-idx="${idx}" style="display:none;flex-direction:column;padding:.35rem .6rem;border-bottom:1px solid #f3f4f6;gap:.2rem">
-              <button class="mn-km-opt" data-idx="${idx}" data-action="color_white" style="padding:.35rem .6rem;background:#ffffff;border:2px solid ${!isGray && !isGreen ? '#6b7280' : '#e5e7eb'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🤍 White</button>
-              <button class="mn-km-opt" data-idx="${idx}" data-action="color_gray" style="padding:.35rem .6rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🩶 Grey</button>
-              <button class="mn-km-opt" data-idx="${idx}" data-action="color_green" style="padding:.35rem .6rem;background:#a9d18e;border:2px solid ${isGreen ? '#388e3c' : '#70ad47'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">💚 Green</button>
+              <button class="mn-km-opt" data-idx="${idx}" data-action="color_white" style="padding:.35rem .6rem;background:#ffffff;border:2px solid ${!isGray && !isGreen ? '#6b7280' : '#e5e7eb'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🤍 White (Normal)</button>
+              <button class="mn-km-opt" data-idx="${idx}" data-action="color_gray" style="padding:.35rem .6rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🩶 Grey (Maintain)</button>
+              <button class="mn-km-opt" data-idx="${idx}" data-action="color_green" style="padding:.35rem .6rem;background:#a9d18e;border:2px solid ${isGreen ? '#388e3c' : '#70ad47'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">💚 Green (Mastered)</button>
             </div>
             ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true)}
             <div style="display:flex;align-items:stretch">
@@ -8628,19 +8615,22 @@ function renderTargetManageContent(student, target) {
       const pa = acts[idx];
       if (!pa) return;
       $("manage-modal-body").querySelectorAll(".mn-kebab-menu").forEach(m => m.style.display = "none");
-      if (action === "color_gray") {
+      if (action === "color_white") {
+        delete pa.activityColor; delete pa.isMaintainLive;
+        await saveTarget(); renderTargetManageContent(student, target); if (state.sessionData) renderTargetContent();
+      } else if (action === "color_gray") {
         pa.activityColor = "gray"; delete pa.isMaintainLive;
-        await saveTarget(); renderTargetManageContent(student, target);
+        await saveTarget(); renderTargetManageContent(student, target); if (state.sessionData) renderTargetContent();
       } else if (action === "color_blue") {
         pa.activityColor = "blue"; delete pa.isMaintainLive;
-        await saveTarget(); renderTargetManageContent(student, target);
+        await saveTarget(); renderTargetManageContent(student, target); if (state.sessionData) renderTargetContent();
       } else if (action === "color_red") {
         if (pa.isNote) pa.activityColor = "red"; else delete pa.activityColor;
         delete pa.isMaintainLive;
-        await saveTarget(); renderTargetManageContent(student, target);
+        await saveTarget(); renderTargetManageContent(student, target); if (state.sessionData) renderTargetContent();
       } else if (action === "color_green") {
         pa.activityColor = "green"; delete pa.isMaintainLive;
-        await saveTarget(); renderTargetManageContent(student, target);
+        await saveTarget(); renderTargetManageContent(student, target); if (state.sessionData) renderTargetContent();
       } else if (action === "master") {
         pa.isCompleted = true;
         delete pa.isArchived;
@@ -8970,13 +8960,13 @@ function renderTargetManageContent(student, target) {
       $("manage-modal-body").querySelectorAll(".mn-heading-color-menu").forEach(m => m.style.display = "none");
       if (action === "blue") {
         pa.isHeading = true; delete pa.headingColor; delete pa.isMaintainHeading;
-        target.predefinedActivities = acts; await saveTarget(); renderTargetManageContent(student, target);
+        target.predefinedActivities = acts; await saveTarget(); renderTargetManageContent(student, target); if (state.sessionData) renderTargetContent();
       } else if (action === "gray") {
         pa.isHeading = true; pa.headingColor = "gray"; delete pa.isMaintainHeading;
-        target.predefinedActivities = acts; await saveTarget(); renderTargetManageContent(student, target);
+        target.predefinedActivities = acts; await saveTarget(); renderTargetManageContent(student, target); if (state.sessionData) renderTargetContent();
       } else if (action === "green") {
         pa.isHeading = true; pa.headingColor = "green"; delete pa.isMaintainHeading;
-        target.predefinedActivities = acts; await saveTarget(); renderTargetManageContent(student, target);
+        target.predefinedActivities = acts; await saveTarget(); renderTargetManageContent(student, target); if (state.sessionData) renderTargetContent();
       } else if (action === "delete") {
         if (!confirm(`Delete section heading "${pa.name}"?`)) return;
         const actIdx = acts.indexOf(pa);
@@ -9192,10 +9182,10 @@ function renderTemplateManageContent(template) {
           <button class="btn-adm-del mn-heading-color-btn" data-idx="${idx}" title="Heading options" style="font-size:1.15rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-heading-color-menu" id="mn-hkm-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:190px;overflow:hidden">
             <button class="mn-hkm-color-toggle" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">🎨 Change Colour</button>
-            <div class="mn-hkm-color-panel" data-idx="${idx}" style="display:none;padding:.45rem .6rem;border-bottom:1px solid #f3f4f6;gap:.4rem">
-              <button class="mn-hkm-opt" data-idx="${idx}" data-action="blue" style="flex:1;padding:.3rem;background:#dbeafe;border:2px solid ${!isGray && !isGreen ? '#2563eb' : '#93c5fd'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">💙 Blue</button>
-              <button class="mn-hkm-opt" data-idx="${idx}" data-action="gray" style="flex:1;padding:.3rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">🩶 Grey</button>
-              <button class="mn-hkm-opt" data-idx="${idx}" data-action="green" style="flex:1;padding:.3rem;background:#a9d18e;border:2px solid ${isGreen ? '#388e3c' : '#70ad47'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:center">💚 Green</button>
+            <div class="mn-hkm-color-panel" data-idx="${idx}" style="display:none;flex-direction:column;padding:.35rem .6rem;border-bottom:1px solid #f3f4f6;gap:.2rem">
+              <button class="mn-hkm-opt" data-idx="${idx}" data-action="blue" style="padding:.35rem .6rem;background:#dbeafe;border:2px solid ${!isGray && !isGreen ? '#2563eb' : '#93c5fd'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">💙 Blue (Normal)</button>
+              <button class="mn-hkm-opt" data-idx="${idx}" data-action="gray" style="padding:.35rem .6rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🩶 Grey (Maintain)</button>
+              <button class="mn-hkm-opt" data-idx="${idx}" data-action="green" style="padding:.35rem .6rem;background:#a9d18e;border:2px solid ${isGreen ? '#388e3c' : '#70ad47'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">💚 Green (Mastered)</button>
             </div>
             ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true)}
             <button class="mn-hkm-opt" data-idx="${idx}" data-action="delete" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete</button>
@@ -9205,13 +9195,10 @@ function renderTemplateManageContent(template) {
     } else if (a.isNote) {
       const noteInactive = !isActivityActive(a, todayDateStr());
       const noteExpired  = noteInactive && !!a.activeTo && a.activeTo < todayDateStr();
-      const isNoteRed  = a.activityColor === "red";
-      const isNoteGray = a.activityColor === "gray";
-      const isNoteBlue = !isNoteRed && !isNoteGray;
-      const noteBaseBg = isNoteBlue ? 'background:#eff6ff;border:1px solid #bfdbfe' : isNoteGray ? 'background:#f3f4f6;border:1px solid #d1d5db' : 'background:#fef2f2;border:1px solid #fecaca';
+      const noteBaseBg = 'background:#fff7ed;border:1px solid #fb923c;color:#92400e';
       const noteItemStyle = noteExpired
-        ? (noteBaseBg ? ` style="position:relative;${noteBaseBg}"` : ' style="position:relative"')
-        : (noteBaseBg ? ` style="${noteBaseBg}${noteInactive ? ';opacity:0.3' : ''}"` : noteInactive ? ' style="opacity:0.3"' : '');
+        ? ` style="position:relative;${noteBaseBg}"`
+        : ` style="${noteBaseBg}${noteInactive ? ';opacity:0.3' : ''}"`;
       const noteOverlay  = noteExpired ? `<div style="position:absolute;inset:0 2.5rem 0 0;background:rgba(255,255,255,.7);pointer-events:none;z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center"><div style="pointer-events:none;background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.35rem .75rem;text-align:center;font-size:1.17rem;color:#374151;max-width:80%">⏸ This activity's period has ended — tap ⋮ on the right side to adjust the dates and bring it back.</div></div>` : '';
       html += `<div class="admin-list-item admin-note-item" data-idx="${idx}"${noteItemStyle}>
         <span class="drag-handle">⠿</span>
@@ -9226,14 +9213,6 @@ function renderTemplateManageContent(template) {
         <div style="position:relative">
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Note options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:200px;overflow:hidden">
-            <div style="display:flex;align-items:stretch;border-bottom:1px solid #f3f4f6">
-              <button class="mn-km-color-toggle" data-idx="${idx}" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">🎨 Change Colour</button>
-            </div>
-            <div class="mn-km-color-panel" data-idx="${idx}" style="display:none;flex-direction:column;padding:.35rem .6rem;border-bottom:1px solid #f3f4f6;gap:.2rem">
-              <button class="mn-km-opt" data-idx="${idx}" data-action="color_red" style="padding:.35rem .6rem;background:#fecaca;border:2px solid ${isNoteRed ? '#dc2626' : '#fca5a5'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">❤️ Red</button>
-              <button class="mn-km-opt" data-idx="${idx}" data-action="color_gray" style="padding:.35rem .6rem;background:#d9d9d9;border:2px solid ${isNoteGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🩶 Grey</button>
-              <button class="mn-km-opt" data-idx="${idx}" data-action="color_blue" style="padding:.35rem .6rem;background:#bfdbfe;border:2px solid ${isNoteBlue ? '#2563eb' : '#93c5fd'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">💙 Blue</button>
-            </div>
             ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true)}
             <div style="display:flex;align-items:stretch">
               <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Note</button>
@@ -9307,9 +9286,9 @@ function renderTemplateManageContent(template) {
               <button class="mn-km-color-toggle" data-idx="${idx}" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">🎨 Change Colour</button>
             </div>
             <div class="mn-km-color-panel" data-idx="${idx}" style="display:none;flex-direction:column;padding:.35rem .6rem;border-bottom:1px solid #f3f4f6;gap:.2rem">
-              <button class="mn-km-opt" data-idx="${idx}" data-action="color_white" style="padding:.35rem .6rem;background:#ffffff;border:2px solid ${!isGray && !isGreen ? '#6b7280' : '#e5e7eb'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🤍 White</button>
-              <button class="mn-km-opt" data-idx="${idx}" data-action="color_gray" style="padding:.35rem .6rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🩶 Grey</button>
-              <button class="mn-km-opt" data-idx="${idx}" data-action="color_green" style="padding:.35rem .6rem;background:#a9d18e;border:2px solid ${isGreen ? '#388e3c' : '#70ad47'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">💚 Green</button>
+              <button class="mn-km-opt" data-idx="${idx}" data-action="color_white" style="padding:.35rem .6rem;background:#ffffff;border:2px solid ${!isGray && !isGreen ? '#6b7280' : '#e5e7eb'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🤍 White (Normal)</button>
+              <button class="mn-km-opt" data-idx="${idx}" data-action="color_gray" style="padding:.35rem .6rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🩶 Grey (Maintain)</button>
+              <button class="mn-km-opt" data-idx="${idx}" data-action="color_green" style="padding:.35rem .6rem;background:#a9d18e;border:2px solid ${isGreen ? '#388e3c' : '#70ad47'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">💚 Green (Mastered)</button>
             </div>
             ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true)}
             <div style="display:flex;align-items:stretch">
@@ -9639,7 +9618,10 @@ function renderTemplateManageContent(template) {
       const pa = acts[idx];
       if (!pa) return;
       $("manage-modal-body").querySelectorAll(".mn-kebab-menu").forEach(m => m.style.display = "none");
-      if (action === "color_gray") {
+      if (action === "color_white") {
+        delete pa.activityColor; delete pa.isMaintainLive;
+        template.predefinedActivities = acts; await saveTemplateFn(); renderTemplateManageContent(template);
+      } else if (action === "color_gray") {
         pa.activityColor = "gray"; delete pa.isMaintainLive;
         template.predefinedActivities = acts; await saveTemplateFn(); renderTemplateManageContent(template);
       } else if (action === "color_blue") {
@@ -10239,9 +10221,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
     if (!isActivityActive(pa, grpSessionDate)) continue;
     if (pa.isNote) {
       if (pa.text) {
-        const noteClr = pa.activityColor === "red"  ? ' style="background:#fef2f2;border-left:4px solid #f87171;padding:.35rem .6rem"'
-                      : pa.activityColor === "gray" ? ' style="background:#f3f4f6;border-left:4px solid #d1d5db;padding:.35rem .6rem"'
-                      : ' style="background:#eff6ff;border-left:4px solid #60a5fa;padding:.35rem .6rem"';
+        const noteClr = ' style="background:#fff7ed;border-left:4px solid #fb923c;padding:.35rem .6rem;color:#92400e"';
         items.push(`<div class="activity-note-heading" contenteditable="false"${noteClr}>${noteToHtml(pa.text)}</div>`);
       }
       continue;
