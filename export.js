@@ -771,6 +771,11 @@ function wordTargetRows(target, session, allTargets) {
     // them out entirely.
     if (act.isNote) continue;
 
+    if (act.isExportNote) {
+      rows.push({ merge: true, isExportNote: true, text: act.activityName || "" });
+      continue;
+    }
+
     if (act.isMasteredSeparator || act.isMastered || act.isStoppedSeparator || act.isStopped) continue;
 
     if (act.isMaintainSeparator) continue;
@@ -941,6 +946,17 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
 
     for (const r of wordTargetRows(target, session, allTargets)) {
       if (r.merge) {
+        if (r.isExportNote) {
+          const noteLines = (r.text || "").split("\n").map(line => {
+            const isBullet = /^\s*•\s?/.test(line);
+            const cleanLine = isBullet ? "• " + line.replace(/^\s*•\s?/, "") : line;
+            return parseInlineMarkupLine(cleanLine);
+          });
+          if (noteLines.length === 0) noteLines.push([{ text: "" }]);
+          tableRows.push(new TableRow({
+            children: [richCell(noteLines, { colSpan: 3, width: WORD_COL_TOTAL, fill: "FFF7ED", align: AlignmentType.LEFT })]
+          }));
+        } else {
         const mergeFill = r.isGrayHeading ? "D9D9D9"
           : r.isGreenHeading ? "A9D18E"
           : (r.style === "heading" ? TARGET_FILL : (r.style === "note" ? NOTE_FILL : null));
@@ -957,6 +973,7 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
             color: mergeColor
           })]
         }));
+        }
       } else {
         const actFill = r.isGray ? "F2F2F2" : r.isGreen ? "E2EFDA" : null;
         const grayFill = actFill;
@@ -1469,6 +1486,19 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
         continue;
       }
 
+      if (act.isExportNote) {
+        noteRows.add(rows.length);
+        const noteText = stripActivityMarkup((act.activityName || "")
+          .replace(/<br\s*\/?>/gi, "\n")
+          .replace(/<\/div>/gi, "\n").replace(/<div>/gi, "")
+          .replace(/<\/p>/gi, "\n").replace(/<p>/gi, "")
+          .replace(/<[^>]*>/g, "")
+          .replace(/\n{3,}/g, "\n\n")
+          .trim());
+        const r = blankRow(); r[1] = `Note: ${noteText}`; rows.push(r);
+        continue;
+      }
+
       if (act.isMaintainHeading) {
         activityHeadingRows.add(rows.length);
         grayRows.add(rows.length);
@@ -1595,9 +1625,13 @@ function getAllActivitiesForTarget(session, target) {
 
   for (const pa of (target.predefinedActivities || [])) {
     if (!isActivityActive(pa, session.date)) continue;
-    if (!pa.name && !pa.isNote && !pa.isHeading && !pa.isMaintainHeading) continue;
+    if (!pa.name && !pa.isNote && !pa.isExportNote && !pa.isHeading && !pa.isMaintainHeading) continue;
     if (pa.isNote) {
       result.push({ isNote: true, activityName: pa.text || "" });
+      continue;
+    }
+    if (pa.isExportNote) {
+      result.push({ isExportNote: true, activityName: pa.text || "" });
       continue;
     }
     if (!pa.name) continue;
@@ -1720,7 +1754,7 @@ function calcDailyAverage(session, target, allTargets = [], visited = new Set())
 
   const avgs = [];
   for (const act of getAllActivitiesForTarget(session, target)) {
-    if (act.isHeading || act.isNote || act.empty || act.isMasteredSeparator || act.isStoppedSeparator || act.isMaintainSeparator || act.isMaintain || act.isMaintainHeading || act.fixedRemark !== undefined) continue;
+    if (act.isHeading || act.isNote || act.isExportNote || act.empty || act.isMasteredSeparator || act.isStoppedSeparator || act.isMaintainSeparator || act.isMaintain || act.isMaintainHeading || act.fixedRemark !== undefined) continue;
     if (act.isMapped) {
       if (getRemarksForActivity(session, act.id).length === 0) continue;
       const a = resolveExportMappedScore(act, session, allTargets, visited);

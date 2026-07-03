@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "698";
+const APP_VERSION = "699";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -425,7 +425,7 @@ let _pendingActsCleanup = null;
 // An activity/note/heading with no text is meaningless — drop it instead of saving it.
 function isEmptyActItem(a) {
   const strip = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
-  if (a.isNote) return strip(a.text).length === 0;
+  if (a.isNote || a.isExportNote) return strip(a.text).length === 0;
   if (a.isMaintain || a.isMaintainHeading) return (a.name || "").trim().length === 0;
   return strip(a.name).length === 0;
 }
@@ -1253,7 +1253,7 @@ async function runDataIntegrityCheck() {
     for (const target of (targets || [])) {
       const validNames = [...new Set(
         (target.predefinedActivities || [])
-          .filter(pa => !pa.isHeading && !pa.isNote)
+          .filter(pa => !pa.isHeading && !pa.isNote && !pa.isExportNote)
           .map(pa => pa.name)
       )];
       const validNameSet = new Set(validNames);
@@ -3095,7 +3095,7 @@ function renderFedcTarget(target) {
   allPas.forEach((pa, idx) => {
     if (!isActivityActive(pa, sessionDateForFilter)) return;
     // Note item — render inline in order, styled like a section heading
-    if (pa.isNote) {
+    if (pa.isNote || pa.isExportNote) {
       if (pa.text) {
         const noteClr = ' style="background:#fff7ed;border-left:4px solid #fb923c;padding:.35rem .6rem;color:#92400e"';
         html += `<div class="activity-note-heading" contenteditable="false"${noteClr}>${noteToHtml(pa.text)}</div>`;
@@ -8144,8 +8144,8 @@ function renderTargetManageContent(student, target) {
   }
 
   const acts = target.predefinedActivities;
-  const masteredActs = acts.filter(a => !a.isHeading && !a.isNote && !a.isMaintain && !a.isMaintainHeading && a.fixedRemark === undefined && a.isCompleted);
-  const stoppedActs  = acts.filter(a => !a.isHeading && !a.isNote && !a.isMaintain && !a.isMaintainHeading && a.fixedRemark === undefined && (a.isArchived || a.isStopped));
+  const masteredActs = acts.filter(a => !a.isHeading && !a.isNote && !a.isExportNote && !a.isMaintain && !a.isMaintainHeading && a.fixedRemark === undefined && a.isCompleted);
+  const stoppedActs  = acts.filter(a => !a.isHeading && !a.isNote && !a.isExportNote && !a.isMaintain && !a.isMaintainHeading && a.fixedRemark === undefined && (a.isArchived || a.isStopped));
   // Other targets this target's mapped-score activities can point at — never
   // itself (self-mapping would make a target's average depend on itself).
   const siblingTargets = (_groupForTargetEdit ? _groupForTargetEdit.targets : student.targets)
@@ -8212,17 +8212,23 @@ function renderTargetManageContent(student, target) {
           </div>
         </div>
       </div>`;
-    } else if (a.isNote) {
+    } else if (a.isNote || a.isExportNote) {
       const noteInactive = !isActivityActive(a, todayDateStr());
       const noteExpired  = noteInactive && !!a.activeTo && a.activeTo < todayDateStr();
-      const noteBaseBg = 'background:#fff7ed;border:1px solid #fb923c;color:#92400e';
+      const noteBaseBg = a.isExportNote
+        ? 'background:#fff7ed;border:1px solid #fb923c;border-left:4px solid #f97316;color:#92400e'
+        : 'background:#fff7ed;border:1px solid #fb923c;color:#92400e';
       const noteItemStyle = noteExpired
         ? ` style="position:relative;${noteBaseBg}"`
         : ` style="${noteBaseBg}${noteInactive ? ';opacity:0.3' : ''}"`;
       const noteOverlay  = noteExpired ? `<div style="position:absolute;inset:0 2.5rem 0 0;background:rgba(255,255,255,.7);pointer-events:none;z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center"><div style="pointer-events:none;background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.35rem .75rem;text-align:center;font-size:1.17rem;color:#374151;max-width:80%">⏸ This activity's period has ended — tap ⋮ on the right side to adjust the dates and bring it back.</div></div>` : '';
+      const noteTypeLabel = a.isExportNote
+        ? `<span style="font-size:.68rem;font-weight:600;color:#c2410c;background:#ffedd5;border:1px solid #fed7aa;border-radius:.3rem;padding:.1rem .35rem;white-space:nowrap">📄 Word export</span>`
+        : `<span style="font-size:.68rem;color:#9a3412;background:#ffedd5;border:1px solid #fed7aa;border-radius:.3rem;padding:.1rem .35rem;white-space:nowrap">🔒 Internal only</span>`;
       html += `<div class="admin-list-item admin-note-item" data-idx="${idx}"${noteItemStyle}>
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.25rem">
+          <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.1rem">${noteTypeLabel}</div>
           <div style="display:flex;align-items:flex-start;gap:.3rem">
             ${formatButtonsHtml(`mn-act-name-${idx}`)}
             <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
@@ -8400,7 +8406,8 @@ function renderTargetManageContent(student, target) {
       <button class="btn-admin-add" id="btn-mn-add-act" style="flex:0 0 auto;width:auto">+ Add Activity</button>
       <button class="btn-admin-add" id="btn-mn-add-act-note" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Note</button>
       <button class="btn-admin-add" id="btn-mn-add-heading" style="flex:0 0 auto;width:auto">+ Add Section Heading</button>
-      <button class="btn-admin-add" id="btn-mn-add-note" style="flex:0 0 auto;width:auto">+ Add Note</button>
+      <button class="btn-admin-add" id="btn-mn-add-note" style="flex:0 0 auto;width:auto">+ Add Note (For Internal Use)</button>
+      <button class="btn-admin-add" id="btn-mn-add-export-note" style="flex:0 0 auto;width:auto">+ Add Note</button>
       <button class="btn-admin-add" id="btn-mn-add-mapped" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Mapped Score</button>
       <button class="btn-admin-add" id="btn-mn-add-act-note-mapped" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Note &amp; Mapped Score</button>
     </div>
@@ -8476,7 +8483,7 @@ function renderTargetManageContent(student, target) {
 
   acts.forEach((a, idx) => {
     const input = $(`mn-act-name-${idx}`);
-    if (a.isNote && input) {
+    if ((a.isNote || a.isExportNote) && input) {
       const resize = () => { input.style.height = "auto"; input.style.height = input.scrollHeight + "px"; };
       resize();
       let noteTimer;
@@ -8489,7 +8496,7 @@ function renderTargetManageContent(student, target) {
     }
     input?.addEventListener("blur", async () => {
       let oldName = null;
-      if (a.isNote) {
+      if (a.isNote || a.isExportNote) {
         const v = input.value;
         if (v === (a.text || "")) return;
         a.text = v;
@@ -8519,7 +8526,7 @@ function renderTargetManageContent(student, target) {
       flashSaved(input);
       if (oldName) propagateActivityRename(student, target.name, oldName, a.name);
     });
-    if (!a.isNote) input?.addEventListener("input", () => autoResizeTextarea(input));
+    if (!a.isNote && !a.isExportNote) input?.addEventListener("input", () => autoResizeTextarea(input));
 
     const noteInput = $(`mn-act-note-${idx}`);
     if (noteInput) {
@@ -8579,7 +8586,7 @@ function renderTargetManageContent(student, target) {
     btn.addEventListener("click", async () => {
       const idx = Number(btn.dataset.idx);
       const item = acts[idx];
-      const label = item?.isHeading ? "section heading" : item?.isMaintainHeading ? "maintain section heading" : item?.isNote ? "reference note" : item?.isMapped ? "mapped-score activity" : item?.isMaintain ? "maintain activity (fixed)" : item?.isMaintainLive ? "maintain activity" : "activity";
+      const label = item?.isHeading ? "section heading" : item?.isMaintainHeading ? "maintain section heading" : item?.isNote ? "internal note" : item?.isExportNote ? "export note" : item?.isMapped ? "mapped-score activity" : item?.isMaintain ? "maintain activity (fixed)" : item?.isMaintainLive ? "maintain activity" : "activity";
       if (!confirm(`Delete this ${label}?`)) return;
       acts.splice(idx, 1);
       acts.forEach((a, i) => a.order = i);
@@ -8643,7 +8650,7 @@ function renderTargetManageContent(student, target) {
         await saveTarget();
         renderTargetManageContent(student, target);
       } else if (action === "delete") {
-        if (pa.isNote) {
+        if (pa.isNote || pa.isExportNote) {
           if (!confirm(`Delete this note?`)) return;
           const actIdx = acts.indexOf(pa);
           if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
@@ -8843,6 +8850,13 @@ function renderTargetManageContent(student, target) {
 
   $("btn-mn-add-note").addEventListener("click", async () => {
     acts.push({ id: cfgId("n"), isNote: true, text: "", order: acts.length, activeFrom: null });
+    target.predefinedActivities = acts;
+    await saveTarget();
+    renderTargetManageContent(student, target);
+  });
+
+  $("btn-mn-add-export-note").addEventListener("click", async () => {
+    acts.push({ id: cfgId("n"), isExportNote: true, text: "", order: acts.length, activeFrom: null });
     target.predefinedActivities = acts;
     await saveTarget();
     renderTargetManageContent(student, target);
@@ -9199,17 +9213,23 @@ function renderTemplateManageContent(template) {
           </div>
         </div>
       </div>`;
-    } else if (a.isNote) {
+    } else if (a.isNote || a.isExportNote) {
       const noteInactive = !isActivityActive(a, todayDateStr());
       const noteExpired  = noteInactive && !!a.activeTo && a.activeTo < todayDateStr();
-      const noteBaseBg = 'background:#fff7ed;border:1px solid #fb923c;color:#92400e';
+      const noteBaseBg = a.isExportNote
+        ? 'background:#fff7ed;border:1px solid #fb923c;border-left:4px solid #f97316;color:#92400e'
+        : 'background:#fff7ed;border:1px solid #fb923c;color:#92400e';
       const noteItemStyle = noteExpired
         ? ` style="position:relative;${noteBaseBg}"`
         : ` style="${noteBaseBg}${noteInactive ? ';opacity:0.3' : ''}"`;
       const noteOverlay  = noteExpired ? `<div style="position:absolute;inset:0 2.5rem 0 0;background:rgba(255,255,255,.7);pointer-events:none;z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center"><div style="pointer-events:none;background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.35rem .75rem;text-align:center;font-size:1.17rem;color:#374151;max-width:80%">⏸ This activity's period has ended — tap ⋮ on the right side to adjust the dates and bring it back.</div></div>` : '';
+      const noteTypeLabel = a.isExportNote
+        ? `<span style="font-size:.68rem;font-weight:600;color:#c2410c;background:#ffedd5;border:1px solid #fed7aa;border-radius:.3rem;padding:.1rem .35rem;white-space:nowrap">📄 Word export</span>`
+        : `<span style="font-size:.68rem;color:#9a3412;background:#ffedd5;border:1px solid #fed7aa;border-radius:.3rem;padding:.1rem .35rem;white-space:nowrap">🔒 Internal only</span>`;
       html += `<div class="admin-list-item admin-note-item" data-idx="${idx}"${noteItemStyle}>
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.25rem">
+          <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.1rem">${noteTypeLabel}</div>
           <div style="display:flex;align-items:flex-start;gap:.3rem">
             ${formatButtonsHtml(`mn-act-name-${idx}`)}
             <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
@@ -9313,7 +9333,8 @@ function renderTemplateManageContent(template) {
       <button class="btn-admin-add" id="btn-mn-add-act" style="flex:0 0 auto;width:auto">+ Add Activity</button>
       <button class="btn-admin-add" id="btn-mn-add-act-note" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Note</button>
       <button class="btn-admin-add" id="btn-mn-add-heading" style="flex:0 0 auto;width:auto">+ Add Section Heading</button>
-      <button class="btn-admin-add" id="btn-mn-add-note" style="flex:0 0 auto;width:auto">+ Add Note</button>
+      <button class="btn-admin-add" id="btn-mn-add-note" style="flex:0 0 auto;width:auto">+ Add Note (For Internal Use)</button>
+      <button class="btn-admin-add" id="btn-mn-add-export-note" style="flex:0 0 auto;width:auto">+ Add Note</button>
     </div>
     <div style="margin-top:2rem;padding-bottom:1.5rem">
       <button class="btn-primary-sm" id="btn-mn-done-template"
@@ -9391,7 +9412,7 @@ function renderTemplateManageContent(template) {
       await saveTemplateFn();
       flashSaved(input);
     });
-    if (!a.isNote) input?.addEventListener("input", () => autoResizeTextarea(input));
+    if (!a.isNote && !a.isExportNote) input?.addEventListener("input", () => autoResizeTextarea(input));
 
     const noteInput = $(`mn-act-note-${idx}`);
     if (noteInput) {
@@ -9486,6 +9507,13 @@ function renderTemplateManageContent(template) {
 
   $("btn-mn-add-note").addEventListener("click", async () => {
     acts.push({ id: cfgId("n"), isNote: true, text: "", order: acts.length, activeFrom: null });
+    template.predefinedActivities = acts;
+    await saveTemplateFn();
+    renderTemplateManageContent(template);
+  });
+
+  $("btn-mn-add-export-note").addEventListener("click", async () => {
+    acts.push({ id: cfgId("n"), isExportNote: true, text: "", order: acts.length, activeFrom: null });
     template.predefinedActivities = acts;
     await saveTemplateFn();
     renderTemplateManageContent(template);
@@ -9642,7 +9670,7 @@ function renderTemplateManageContent(template) {
         pa.activityColor = "green"; delete pa.isMaintainLive;
         template.predefinedActivities = acts; await saveTemplateFn(); renderTemplateManageContent(template);
       } else if (action === "delete") {
-        if (!confirm(`Delete ${pa.isNote ? "this note" : `activity "${pa.name}"`}?`)) return;
+        if (!confirm(`Delete ${(pa.isNote || pa.isExportNote) ? "this note" : `activity "${pa.name}"`}?`)) return;
         const actIdx = acts.indexOf(pa);
         if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
         template.predefinedActivities = acts;
@@ -10226,7 +10254,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
   const grpSessionDate = todayDateStr();
   for (const pa of (target.predefinedActivities || [])) {
     if (!isActivityActive(pa, grpSessionDate)) continue;
-    if (pa.isNote) {
+    if (pa.isNote || pa.isExportNote) {
       if (pa.text) {
         const noteClr = ' style="background:#fff7ed;border-left:4px solid #fb923c;padding:.35rem .6rem;color:#92400e"';
         items.push(`<div class="activity-note-heading" contenteditable="false"${noteClr}>${noteToHtml(pa.text)}</div>`);
@@ -10292,7 +10320,7 @@ function renderGroupStudentBlock(studentName, target, data) {
   const grpStudentDate = todayDateStr();
   for (const pa of (target.predefinedActivities || [])) {
     if (!isActivityActive(pa, grpStudentDate)) continue;
-    if (pa.isNote || pa.isHeading || pa.isMaintainHeading || pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || pa.fixedRemark !== undefined || !pa.name) continue;
+    if (pa.isNote || pa.isExportNote || pa.isHeading || pa.isMaintainHeading || pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || pa.fixedRemark !== undefined || !pa.name) continue;
     const actId = Object.entries(data.activities || {})
       .find(([, a]) => a.targetName === target.name && a.activityName === pa.name)?.[0] || null;
     activityEntries.push({ actId, actName: pa.name, actNote: pa.actNote, pa });
