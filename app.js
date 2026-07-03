@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "701";
+const APP_VERSION = "702";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3099,8 +3099,8 @@ function renderFedcTarget(target) {
       if (pa.text) {
         const noteClr = ' style="background:#fff7ed;border-left:4px solid #fb923c;padding:.35rem .6rem;color:#92400e"';
         const noteTag = pa.isExportNote
-          ? `<div style="font-size:.65rem;color:#c2410c;margin-bottom:.2rem">📄 Included in Word export</div>`
-          : `<div style="font-size:.65rem;color:#9a3412;margin-bottom:.2rem">🔒 For internal use only</div>`;
+          ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.2rem">📄 Included in Word export</div>`
+          : `<div style="font-size:.82rem;color:#9a3412;margin-bottom:.2rem">🔒 This note is for ZORA's use only. Excluded from Word report</div>`;
         html += `<div class="activity-note-heading" contenteditable="false"${noteClr}>${noteTag}${noteToHtml(pa.text)}</div>`;
       }
       return;
@@ -3276,8 +3276,8 @@ function renderFedcTarget(target) {
       if (pa.isNote || pa.isExportNote) {
         if (!pa.text) return '';
         const noteTag = pa.isExportNote
-          ? `<div style="font-size:.65rem;color:#c2410c;margin-bottom:.2rem">📄 Included in Word export</div>`
-          : `<div style="font-size:.65rem;color:#9a3412;margin-bottom:.2rem">🔒 For internal use only</div>`;
+          ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.2rem">📄 Included in Word export</div>`
+          : `<div style="font-size:.82rem;color:#9a3412;margin-bottom:.2rem">🔒 This note is for ZORA's use only. Excluded from Word report</div>`;
         return `<div class="activity-note-heading" contenteditable="false" style="opacity:.3">${noteTag}${noteToHtml(pa.text)}</div>`;
       }
       const fixedText = pa.fixedRemark !== undefined ? pa.fixedRemark : pa.isMaintain ? (pa.maintainRemark ?? "") : null;
@@ -8233,8 +8233,8 @@ function renderTargetManageContent(student, target) {
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.25rem">
           <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.1rem">
-            <select class="mn-note-type-select" data-idx="${idx}" style="font-size:.74rem;padding:.15rem .3rem;border:1px solid #fed7aa;border-radius:.3rem;background:#ffedd5;color:#9a3412;cursor:pointer">
-              <option value="internal"${a.isNote ? ' selected' : ''}>🔒 For internal use only</option>
+            <select class="mn-note-type-select" data-idx="${idx}" style="font-size:.9rem;padding:.2rem .4rem;border:1px solid #fed7aa;border-radius:.3rem;background:#ffedd5;color:#9a3412;cursor:pointer">
+              <option value="internal"${a.isNote ? ' selected' : ''}>🔒 This note is for ZORA's use only. Excluded from Word report</option>
               <option value="export"${a.isExportNote ? ' selected' : ''}>📄 Include in Word export</option>
             </select>
           </div>
@@ -9240,8 +9240,8 @@ function renderTemplateManageContent(template) {
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.25rem">
           <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.1rem">
-            <select class="mn-note-type-select" data-idx="${idx}" style="font-size:.74rem;padding:.15rem .3rem;border:1px solid #fed7aa;border-radius:.3rem;background:#ffedd5;color:#9a3412;cursor:pointer">
-              <option value="internal"${a.isNote ? ' selected' : ''}>🔒 For internal use only</option>
+            <select class="mn-note-type-select" data-idx="${idx}" style="font-size:.9rem;padding:.2rem .4rem;border:1px solid #fed7aa;border-radius:.3rem;background:#ffedd5;color:#9a3412;cursor:pointer">
+              <option value="internal"${a.isNote ? ' selected' : ''}>🔒 This note is for ZORA's use only. Excluded from Word report</option>
               <option value="export"${a.isExportNote ? ' selected' : ''}>📄 Include in Word export</option>
             </select>
           </div>
@@ -10277,8 +10277,8 @@ function buildGroupItemsByActivity(target, data, attendees) {
       if (pa.text) {
         const noteClr = ' style="background:#fff7ed;border-left:4px solid #fb923c;padding:.35rem .6rem;color:#92400e"';
         const noteTag = pa.isExportNote
-          ? `<div style="font-size:.65rem;color:#c2410c;margin-bottom:.2rem">📄 Included in Word export</div>`
-          : `<div style="font-size:.65rem;color:#9a3412;margin-bottom:.2rem">🔒 For internal use only</div>`;
+          ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.2rem">📄 Included in Word export</div>`
+          : `<div style="font-size:.82rem;color:#9a3412;margin-bottom:.2rem">🔒 This note is for ZORA's use only. Excluded from Word report</div>`;
         items.push(`<div class="activity-note-heading" contenteditable="false"${noteClr}>${noteTag}${noteToHtml(pa.text)}</div>`);
       }
       continue;
@@ -10313,8 +10313,8 @@ function buildGroupItemsByActivity(target, data, attendees) {
       if (pa.isNote || pa.isExportNote) {
         if (!pa.text) return '';
         const noteTag = pa.isExportNote
-          ? `<div style="font-size:.65rem;color:#c2410c;margin-bottom:.2rem">📄 Included in Word export</div>`
-          : `<div style="font-size:.65rem;color:#9a3412;margin-bottom:.2rem">🔒 For internal use only</div>`;
+          ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.2rem">📄 Included in Word export</div>`
+          : `<div style="font-size:.82rem;color:#9a3412;margin-bottom:.2rem">🔒 This note is for ZORA's use only. Excluded from Word report</div>`;
         return `<div class="activity-note-heading" contenteditable="false" style="opacity:.3">${noteTag}${noteToHtml(pa.text)}</div>`;
       }
       if (!pa.name) return '';
