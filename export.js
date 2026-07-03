@@ -414,7 +414,7 @@ function addIndividualTargetSheets(wb, allTargets, sessions, studentName, includ
 
     // Col widths: Date | Activity | Remark | Score | [Trials] | Avg Score
     ws.getColumn(1).width     = 6.33;
-    ws.getColumn(2).width     = 40.89;
+    ws.getColumn(2).width     = 50;
     ws.getColumn(3).width     = 62;
     ws.getColumn(4).width     = 6.78;
     if (includeTrials) ws.getColumn(5).width = 16;
@@ -492,6 +492,17 @@ function addIndividualTargetSheets(wb, allTargets, sessions, studentName, includ
         sum + Math.max(1, Math.ceil((seg.length || 1) / 90)), 0);
       ws.getRow(n).height = Math.max(20, visLines * 20);
     }
+
+    // Activity name cells: expand row height if text wraps beyond column width
+    ws.eachRow((row, n) => {
+      if (monthHeaderRows.has(n - 1) || colHeaderRows.has(n - 1) || noteRows.has(n - 1)) return;
+      const bCell = row.getCell(2);
+      const text = typeof bCell.value === "string" ? bCell.value
+        : (bCell.value?.richText?.map(r => r.text).join("") || "");
+      if (!text || text.length <= 50) return;
+      const lines = Math.ceil(text.length / 50);
+      if (!row.height || row.height < lines * 16) row.height = Math.max(20, lines * 16);
+    });
 
     // Session date blocks: col A = date (top+center), last col = avg score (middle+center)
     for (const { startRow, endRow, dateLabel, avgScore } of sessionDateBlocks) {
