@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "702";
+const APP_VERSION = "703";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -7981,6 +7981,7 @@ function initDragSort(listEl, onReorder) {
     const item = e.target.closest('.admin-list-item');
     if (!item) return;
     e.preventDefault();
+    e.stopPropagation();
 
     const rect = item.getBoundingClientRect();
     offsetY = e.clientY - rect.top;
