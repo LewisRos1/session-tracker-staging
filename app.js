@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "706";
+const APP_VERSION = "707";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -8372,7 +8372,19 @@ function renderTargetManageContent(student, target) {
       const actExpired  = actInactive && !!a.activeTo && a.activeTo < _editRef2;
       const actBaseBg   = isGray ? 'background:#f3f4f6;border:1px solid #d1d5db' : isGreen ? 'background:#e2efda;border:1px solid #a9d18e' : null;
       const actItemStyle = actExpired ? (actBaseBg ? ` style="position:relative;${actBaseBg}"` : ' style="position:relative"') : (actBaseBg ? ` style="${actBaseBg}${actInactive ? ';opacity:0.3' : ''}"` : actInactive ? ' style="opacity:0.3"' : '');
-      const actOverlay  = actExpired ? `<div style="position:absolute;inset:0 2.5rem 0 0;background:rgba(255,255,255,.7);pointer-events:none;z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center"><div style="pointer-events:none;background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.35rem .75rem;text-align:center;font-size:1.17rem;color:#374151;max-width:80%">⏸ This activity's period has ended — tap ⋮ on the right side to adjust the dates and bring it back.</div></div>` : '';
+      const actOverlay  = actExpired ? `<div style="position:absolute;inset:0 2.5rem 0 0;background:rgba(255,255,255,.7);z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center">
+        <div style="background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.5rem .75rem;text-align:center;font-size:1rem;color:#374151;max-width:85%">
+          <div>⏸ This activity's period has ended — tap ⋮ on the right side to adjust the dates and bring it back.</div>
+          <div style="display:flex;align-items:center;gap:.5rem;justify-content:center;margin-top:.4rem">
+            <span style="font-size:.84rem;color:#6b7280">Reason:</span>
+            <select class="mn-inactive-reason-select" data-idx="${idx}" style="font-size:.84rem;padding:.2rem .4rem;border:1px solid #d1d5db;border-radius:.3rem;background:white;cursor:pointer">
+              <option value="">— Not specified —</option>
+              <option value="mastered"${a.inactiveReason === 'mastered' ? ' selected' : ''}>Mastered</option>
+              <option value="discontinued"${a.inactiveReason === 'discontinued' ? ' selected' : ''}>Discontinued</option>
+            </select>
+          </div>
+        </div>
+      </div>` : '';
       const noteRow = a.actNote !== undefined
         ? `<div style="display:flex;align-items:flex-start;gap:.3rem">
             ${formatButtonsHtml(`mn-act-name-${idx}`)}
@@ -9353,7 +9365,19 @@ function renderTemplateManageContent(template) {
       const actExpired  = actInactive && !!a.activeTo && a.activeTo < _editRef2;
       const actBaseBg   = isGray ? 'background:#f3f4f6;border:1px solid #d1d5db' : isGreen ? 'background:#e2efda;border:1px solid #a9d18e' : null;
       const actItemStyle = actExpired ? (actBaseBg ? ` style="position:relative;${actBaseBg}"` : ' style="position:relative"') : (actBaseBg ? ` style="${actBaseBg}${actInactive ? ';opacity:0.3' : ''}"` : actInactive ? ' style="opacity:0.3"' : '');
-      const actOverlay  = actExpired ? `<div style="position:absolute;inset:0 2.5rem 0 0;background:rgba(255,255,255,.7);pointer-events:none;z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center"><div style="pointer-events:none;background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.35rem .75rem;text-align:center;font-size:1.17rem;color:#374151;max-width:80%">⏸ This activity's period has ended — tap ⋮ on the right side to adjust the dates and bring it back.</div></div>` : '';
+      const actOverlay  = actExpired ? `<div style="position:absolute;inset:0 2.5rem 0 0;background:rgba(255,255,255,.7);z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center">
+        <div style="background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.5rem .75rem;text-align:center;font-size:1rem;color:#374151;max-width:85%">
+          <div>⏸ This activity's period has ended — tap ⋮ on the right side to adjust the dates and bring it back.</div>
+          <div style="display:flex;align-items:center;gap:.5rem;justify-content:center;margin-top:.4rem">
+            <span style="font-size:.84rem;color:#6b7280">Reason:</span>
+            <select class="mn-inactive-reason-select" data-idx="${idx}" style="font-size:.84rem;padding:.2rem .4rem;border:1px solid #d1d5db;border-radius:.3rem;background:white;cursor:pointer">
+              <option value="">— Not specified —</option>
+              <option value="mastered"${a.inactiveReason === 'mastered' ? ' selected' : ''}>Mastered</option>
+              <option value="discontinued"${a.inactiveReason === 'discontinued' ? ' selected' : ''}>Discontinued</option>
+            </select>
+          </div>
+        </div>
+      </div>` : '';
       const noteRow = a.actNote !== undefined
         ? `<div style="display:flex;align-items:flex-start;gap:.3rem">
             ${formatButtonsHtml(`mn-act-note-${idx}`)}
