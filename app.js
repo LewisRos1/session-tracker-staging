@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "709";
+const APP_VERSION = "710";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3213,7 +3213,7 @@ function renderFedcTarget(target) {
       if (isPending) {
         html += renderPendingRemarkFields(pendingKey, actId, pa.name, idx, target);
       } else {
-        const addLabel = pa.isMapped ? "Score" : pa.manualScore ? "Score" : "Remark &amp; Trials";
+        const addLabel = pa.isMapped ? "Score" : pa.manualScore ? "Remark &amp; Score" : "Remark &amp; Trials";
         html += `<button class="btn-add-remark" contenteditable="false"
           data-pending-key="${escHtml(pendingKey)}"
           data-act-id="${actId || ""}"
