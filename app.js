@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "707";
+const APP_VERSION = "708";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -8503,7 +8503,9 @@ function renderTargetManageContent(student, target) {
     reordered.forEach((a, i) => a.order = i);
     target.predefinedActivities = reordered;
     await saveTarget();
+    const scrollPos = $("manage-modal-body").scrollTop;
     renderTargetManageContent(student, target);
+    $("manage-modal-body").scrollTop = scrollPos;
   });
 
   $("mn-t-name").addEventListener("blur", async () => {
@@ -9462,7 +9464,9 @@ function renderTemplateManageContent(template) {
     reordered.forEach((a, i) => a.order = i);
     template.predefinedActivities = reordered;
     await saveTemplateFn();
+    const scrollPos = $("manage-modal-body").scrollTop;
     renderTemplateManageContent(template);
+    $("manage-modal-body").scrollTop = scrollPos;
   });
 
   $("mn-t-name").addEventListener("blur", async () => {
