@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "704";
+const APP_VERSION = "705";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3097,11 +3097,15 @@ function renderFedcTarget(target) {
     // Note item — render inline in order, styled like a section heading
     if (pa.isNote || pa.isExportNote) {
       if (pa.text) {
-        const noteClr = ' style="background:#fff7ed;border-left:4px solid #fb923c;padding:.35rem .6rem;color:#92400e"';
         const noteTag = pa.isExportNote
-          ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.2rem">📄 Included in Word export</div>`
-          : `<div style="font-size:.82rem;color:#9a3412;margin-bottom:.2rem">🔒 This note is for ZORA's use only. Excluded from Word report</div>`;
-        html += `<div class="activity-note-heading" contenteditable="false"${noteClr}>${noteTag}${noteToHtml(pa.text)}</div>`;
+          ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.25rem">📄 Included in Word export</div>`
+          : `<div style="font-size:.82rem;color:#9a3412;margin-bottom:.25rem">🔒 This note is for ZORA's use only. Excluded from Word report</div>`;
+        html += `<div class="entry-block" contenteditable="false" style="background:#fff7ed;border-left:4px solid #fb923c;">
+          <div class="entry-field">
+            <span class="field-label" style="color:#92400e">Note</span>
+            <div style="flex:1;color:#92400e">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
+          </div>
+        </div>`;
       }
       return;
     }
@@ -3276,9 +3280,14 @@ function renderFedcTarget(target) {
       if (pa.isNote || pa.isExportNote) {
         if (!pa.text) return '';
         const noteTag = pa.isExportNote
-          ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.2rem">📄 Included in Word export</div>`
-          : `<div style="font-size:.82rem;color:#9a3412;margin-bottom:.2rem">🔒 This note is for ZORA's use only. Excluded from Word report</div>`;
-        return `<div class="activity-note-heading" contenteditable="false" style="opacity:.3">${noteTag}${noteToHtml(pa.text)}</div>`;
+          ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.25rem">📄 Included in Word export</div>`
+          : `<div style="font-size:.82rem;color:#9a3412;margin-bottom:.25rem">🔒 This note is for ZORA's use only. Excluded from Word report</div>`;
+        return `<div class="entry-block" contenteditable="false" style="background:#fff7ed;border-left:4px solid #fb923c;opacity:.3">
+          <div class="entry-field">
+            <span class="field-label" style="color:#92400e">Note</span>
+            <div style="flex:1;color:#92400e">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
+          </div>
+        </div>`;
       }
       const fixedText = pa.fixedRemark !== undefined ? pa.fixedRemark : pa.isMaintain ? (pa.maintainRemark ?? "") : null;
       return `<div class="entry-block entry-block-predefined" style="opacity:.3;pointer-events:none">
@@ -8073,8 +8082,12 @@ function autoResizeTextarea(el) {
 // Accepts both legacy *bold* markdown and new HTML from contenteditable.
 function noteToHtml(text) {
   if (!text) return "";
-  if (/<[a-z]/i.test(text)) return text;            // already HTML — use directly
-  return escHtml(text).replace(/\*([\s\S]+?)\*/g, "<strong>$1</strong>");
+  if (/<[a-z]/i.test(text)) return text;
+  return escHtml(text)
+    .replace(/\*_([\s\S]+?)_\*/g, "<strong><u>$1</u></strong>")
+    .replace(/_\*([\s\S]+?)\*_/g, "<strong><u>$1</u></strong>")
+    .replace(/\*([\s\S]+?)\*/g, "<strong>$1</strong>")
+    .replace(/_([\s\S]+?)_/g, "<u>$1</u>");
 }
 
 // Convert stored note text (possibly HTML) to plain text for textarea editing
@@ -8223,9 +8236,7 @@ function renderTargetManageContent(student, target) {
     } else if (a.isNote || a.isExportNote) {
       const noteInactive = !isActivityActive(a, todayDateStr());
       const noteExpired  = noteInactive && !!a.activeTo && a.activeTo < todayDateStr();
-      const noteBaseBg = a.isExportNote
-        ? 'background:#fff7ed;border:1px solid #fb923c;border-left:4px solid #f97316;color:#92400e'
-        : 'background:#fff7ed;border:1px solid #fb923c;color:#92400e';
+      const noteBaseBg = 'background:#fff7ed;border:1px solid #fb923c;color:#92400e';
       const noteItemStyle = noteExpired
         ? ` style="position:relative;${noteBaseBg}"`
         : ` style="${noteBaseBg}${noteInactive ? ';opacity:0.3' : ''}"`;
@@ -9242,9 +9253,7 @@ function renderTemplateManageContent(template) {
     } else if (a.isNote || a.isExportNote) {
       const noteInactive = !isActivityActive(a, todayDateStr());
       const noteExpired  = noteInactive && !!a.activeTo && a.activeTo < todayDateStr();
-      const noteBaseBg = a.isExportNote
-        ? 'background:#fff7ed;border:1px solid #fb923c;border-left:4px solid #f97316;color:#92400e'
-        : 'background:#fff7ed;border:1px solid #fb923c;color:#92400e';
+      const noteBaseBg = 'background:#fff7ed;border:1px solid #fb923c;color:#92400e';
       const noteItemStyle = noteExpired
         ? ` style="position:relative;${noteBaseBg}"`
         : ` style="${noteBaseBg}${noteInactive ? ';opacity:0.3' : ''}"`;
@@ -10300,11 +10309,15 @@ function buildGroupItemsByActivity(target, data, attendees) {
     if (!isActivityActive(pa, grpSessionDate)) continue;
     if (pa.isNote || pa.isExportNote) {
       if (pa.text) {
-        const noteClr = ' style="background:#fff7ed;border-left:4px solid #fb923c;padding:.35rem .6rem;color:#92400e"';
         const noteTag = pa.isExportNote
-          ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.2rem">📄 Included in Word export</div>`
-          : `<div style="font-size:.82rem;color:#9a3412;margin-bottom:.2rem">🔒 This note is for ZORA's use only. Excluded from Word report</div>`;
-        items.push(`<div class="activity-note-heading" contenteditable="false"${noteClr}>${noteTag}${noteToHtml(pa.text)}</div>`);
+          ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.25rem">📄 Included in Word export</div>`
+          : `<div style="font-size:.82rem;color:#9a3412;margin-bottom:.25rem">🔒 This note is for ZORA's use only. Excluded from Word report</div>`;
+        items.push(`<div class="entry-block" contenteditable="false" style="background:#fff7ed;border-left:4px solid #fb923c;">
+          <div class="entry-field">
+            <span class="field-label" style="color:#92400e">Note</span>
+            <div style="flex:1;color:#92400e">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
+          </div>
+        </div>`);
       }
       continue;
     }
@@ -10338,9 +10351,14 @@ function buildGroupItemsByActivity(target, data, attendees) {
       if (pa.isNote || pa.isExportNote) {
         if (!pa.text) return '';
         const noteTag = pa.isExportNote
-          ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.2rem">📄 Included in Word export</div>`
-          : `<div style="font-size:.82rem;color:#9a3412;margin-bottom:.2rem">🔒 This note is for ZORA's use only. Excluded from Word report</div>`;
-        return `<div class="activity-note-heading" contenteditable="false" style="opacity:.3">${noteTag}${noteToHtml(pa.text)}</div>`;
+          ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.25rem">📄 Included in Word export</div>`
+          : `<div style="font-size:.82rem;color:#9a3412;margin-bottom:.25rem">🔒 This note is for ZORA's use only. Excluded from Word report</div>`;
+        return `<div class="entry-block" contenteditable="false" style="background:#fff7ed;border-left:4px solid #fb923c;opacity:.3">
+          <div class="entry-field">
+            <span class="field-label" style="color:#92400e">Note</span>
+            <div style="flex:1;color:#92400e">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
+          </div>
+        </div>`;
       }
       if (!pa.name) return '';
       return `<div class="entry-block entry-block-predefined" style="opacity:.3;pointer-events:none"><div class="entry-field" contenteditable="false"><span class="field-label">Activity</span><span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span></div></div>`;
