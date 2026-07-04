@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "703";
+const APP_VERSION = "704";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -9098,7 +9098,19 @@ function renderTargetManageContent(student, target) {
   };
 
   const wireOptBlur = (input, idx) => {
+    input.addEventListener("focus", () => { input.dataset.originalValue = input.value; });
     input.addEventListener("blur", async () => {
+      const originalValue = input.dataset.originalValue ?? "";
+      const currentValue  = input.value.trim();
+      if (originalValue && currentValue && currentValue !== originalValue) {
+        const proceed = confirm(
+          `⚠️ Rename "${originalValue}" to "${currentValue}"?\n\n` +
+          `This will rewrite ALL past session records where this option was selected. The change cannot be undone.\n\n` +
+          `Tip: If you want to keep "${originalValue}" and add "${currentValue}" as a separate option, press Cancel — then use "+ Add Option" and drag it into position.\n\n` +
+          `Rename anyway?`
+        );
+        if (!proceed) { input.value = originalValue; return; }
+      }
       const oldOptsStr = acts[idx].inlineOptions;
       const newOptsStr = getOptsFromDom(idx).join("/") || null;
       if (newOptsStr === oldOptsStr) return;
@@ -9783,7 +9795,19 @@ function renderTemplateManageContent(template) {
   };
 
   const wireTmplOptBlur = (input, idx) => {
+    input.addEventListener("focus", () => { input.dataset.originalValue = input.value; });
     input.addEventListener("blur", async () => {
+      const originalValue = input.dataset.originalValue ?? "";
+      const currentValue  = input.value.trim();
+      if (originalValue && currentValue && currentValue !== originalValue) {
+        const proceed = confirm(
+          `⚠️ Rename "${originalValue}" to "${currentValue}"?\n\n` +
+          `Any students already using this option in past sessions will keep the old name in their records — only future sessions will use the new name.\n\n` +
+          `Tip: If you want to keep "${originalValue}" and add "${currentValue}" as a separate option, press Cancel — then use "+ Add Option" and drag it into position.\n\n` +
+          `Rename anyway?`
+        );
+        if (!proceed) { input.value = originalValue; return; }
+      }
       const newOptsStr = getTmplOptsFromDom(idx).join("/") || null;
       if (newOptsStr === acts[idx].inlineOptions) return;
       acts[idx].inlineOptions = newOptsStr;
