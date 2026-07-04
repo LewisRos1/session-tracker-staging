@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "705";
+const APP_VERSION = "706";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3091,7 +3091,8 @@ function renderFedcTarget(target) {
   const letters = "abcdefghij";
   let lastGroup = null;
   const allPas = target.predefinedActivities || [];
-  const sessionDateForFilter = todayDateStr();
+  const sessionDateForFilter = state.sessionData?.date || todayDateStr();
+  let actNum = 0;
   allPas.forEach((pa, idx) => {
     if (!isActivityActive(pa, sessionDateForFilter)) return;
     // Note item — render inline in order, styled like a section heading
@@ -3124,6 +3125,7 @@ function renderFedcTarget(target) {
 
     if (pa.isCompleted || pa.isArchived || pa.isStopped) return;
 
+    actNum++;
     // Fixed remark activity — shown read-only with color block styling
     const isFixed = pa.fixedRemark !== undefined || pa.isMaintain;
     if (isFixed) {
@@ -3138,7 +3140,7 @@ function renderFedcTarget(target) {
       html += `<div class="entry-block entry-block-predefined" ${fixedStyle}>
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Activity</span>
-          <span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span>
+          <span class="field-value-fixed"><span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${formatActivityMarkup(pa.name)}</span>
         </div>
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Remark</span>
@@ -3171,7 +3173,7 @@ function renderFedcTarget(target) {
     html += `<div class="entry-block entry-block-predefined"${activityStyle}>
       <div class="entry-field" contenteditable="false">
         <span class="field-label">Activity</span>
-        <span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span>
+        <span class="field-value-fixed"><span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${formatActivityMarkup(pa.name)}</span>
       </div>`;
 
     if (pa.actNote && pa.actNote.trim()) {
@@ -3267,7 +3269,7 @@ function renderFedcTarget(target) {
     !isActivityActive(pa, sessionDateForFilter) && !pa.isCompleted && !pa.isArchived && !pa.isStopped
   );
   if (inactivePas.length > 0) {
-    const inactiveItems = inactivePas.map(pa => {
+    const renderInactiveItem = pa => {
       if (pa.isHeading || pa.isMaintainHeading) {
         const isGrayH  = pa.headingColor === "gray" || pa.isMaintainHeading;
         const isGreenH = pa.headingColor === "green";
@@ -3300,14 +3302,25 @@ function renderFedcTarget(target) {
           <span class="field-value-fixed">${escHtml(fixedText)}</span>
         </div>` : ''}
       </div>`;
-    }).filter(Boolean).join('');
+    };
+    const realInactive = inactivePas.filter(pa => !pa.isNote && !pa.isExportNote && !pa.isHeading && !pa.isMaintainHeading);
+    const masteredPas     = realInactive.filter(pa => pa.inactiveReason === 'mastered');
+    const discontinuedPas = realInactive.filter(pa => pa.inactiveReason === 'discontinued');
+    const otherPas        = realInactive.filter(pa => !pa.inactiveReason);
+    const renderSection = (label, color, pas) => {
+      if (pas.length === 0) return '';
+      const items = pas.map(renderInactiveItem).filter(Boolean).join('');
+      return `<div style="margin-top:.5rem">
+        <button class="btn-inactive-toggle" contenteditable="false" style="display:flex;align-items:center;gap:.4rem;width:100%;padding:.4rem .6rem;background:none;border:1px dashed #d1d5db;border-radius:.4rem;cursor:pointer;font-size:.8rem;color:${color};text-align:left">
+          <span class="inactive-chevron" style="font-size:.7rem">▶</span> ${label} (${pas.length})
+        </button>
+        <div class="inactive-list" style="display:none;flex-direction:column;gap:.25rem;margin-top:.35rem">${items}</div>
+      </div>`;
+    };
     html += `<div style="margin-top:.75rem">
-      <button class="btn-inactive-toggle" contenteditable="false" style="display:flex;align-items:center;gap:.4rem;width:100%;padding:.4rem .6rem;background:none;border:1px dashed #d1d5db;border-radius:.4rem;cursor:pointer;font-size:.8rem;color:#6b7280;text-align:left">
-        <span class="inactive-chevron" style="font-size:.7rem">▶</span> Inactive Activities (${inactivePas.length})
-      </button>
-      <div class="inactive-list" style="display:none;flex-direction:column;gap:.25rem;margin-top:.35rem">
-        ${inactiveItems}
-      </div>
+      ${renderSection('Mastered', '#059669', masteredPas)}
+      ${renderSection('Discontinued', '#dc2626', discontinuedPas)}
+      ${renderSection('Other Inactive', '#6b7280', otherPas)}
     </div>`;
   }
 
@@ -3757,14 +3770,16 @@ function attachTargetListeners(target) {
     });
   });
 
-  // ── Inactive activities toggle ───────────────────────────
-  c.querySelector(".btn-inactive-toggle")?.addEventListener("click", () => {
-    const list = c.querySelector(".inactive-list");
-    const chevron = c.querySelector(".inactive-chevron");
-    if (!list) return;
-    const open = list.style.display !== "none";
-    list.style.display = open ? "none" : "flex";
-    if (chevron) chevron.textContent = open ? "▶" : "▼";
+  // ── Inactive activities toggle (one per section) ────────
+  c.querySelectorAll(".btn-inactive-toggle").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const list = btn.nextElementSibling;
+      const chevron = btn.querySelector(".inactive-chevron");
+      if (!list) return;
+      const open = list.style.display !== "none";
+      list.style.display = open ? "none" : "flex";
+      if (chevron) chevron.textContent = open ? "▶" : "▼";
+    });
   });
 
   $("new-activity-textarea")?.addEventListener("blur", e => {
@@ -8234,8 +8249,9 @@ function renderTargetManageContent(student, target) {
         </div>
       </div>`;
     } else if (a.isNote || a.isExportNote) {
-      const noteInactive = !isActivityActive(a, todayDateStr());
-      const noteExpired  = noteInactive && !!a.activeTo && a.activeTo < todayDateStr();
+      const _editRef3    = state.sessionData?.date || todayDateStr();
+      const noteInactive = !isActivityActive(a, _editRef3);
+      const noteExpired  = noteInactive && !!a.activeTo && a.activeTo < _editRef3;
       const noteBaseBg = 'background:#fff7ed;border:1px solid #fb923c;color:#92400e';
       const noteItemStyle = noteExpired
         ? ` style="position:relative;${noteBaseBg}"`
@@ -8298,9 +8314,22 @@ function renderTargetManageContent(student, target) {
               style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.actNote || "")}</textarea>
           </div>`
         : "";
-      const actInactive = !isActivityActive(a, todayDateStr());
-      const actExpired  = actInactive && !!a.activeTo && a.activeTo < todayDateStr();
-      const actOverlay  = actExpired ? `<div style="position:absolute;inset:0 2.5rem 0 0;background:rgba(255,255,255,.7);pointer-events:none;z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center"><div style="pointer-events:none;background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.35rem .75rem;text-align:center;font-size:1.17rem;color:#374151;max-width:80%">⏸ This activity's period has ended — tap ⋮ on the right side to adjust the dates and bring it back.</div></div>` : '';
+      const _editRef    = state.sessionData?.date || todayDateStr();
+      const actInactive = !isActivityActive(a, _editRef);
+      const actExpired  = actInactive && !!a.activeTo && a.activeTo < _editRef;
+      const actOverlay  = actExpired ? `<div style="position:absolute;inset:0 2.5rem 0 0;background:rgba(255,255,255,.7);z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center">
+        <div style="background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.5rem .75rem;text-align:center;font-size:1rem;color:#374151;max-width:85%">
+          <div>⏸ This activity's period has ended — tap ⋮ on the right side to adjust the dates and bring it back.</div>
+          <div style="display:flex;align-items:center;gap:.5rem;justify-content:center;margin-top:.4rem">
+            <span style="font-size:.84rem;color:#6b7280">Reason:</span>
+            <select class="mn-inactive-reason-select" data-idx="${idx}" style="font-size:.84rem;padding:.2rem .4rem;border:1px solid #d1d5db;border-radius:.3rem;background:white;cursor:pointer">
+              <option value="">— Not specified —</option>
+              <option value="mastered"${a.inactiveReason === 'mastered' ? ' selected' : ''}>Mastered</option>
+              <option value="discontinued"${a.inactiveReason === 'discontinued' ? ' selected' : ''}>Discontinued</option>
+            </select>
+          </div>
+        </div>
+      </div>` : '';
       html += `<div class="admin-list-item" data-idx="${idx}"${actExpired ? ' style="position:relative"' : actInactive ? ' style="opacity:0.3"' : ''}>
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
@@ -8338,8 +8367,9 @@ function renderTargetManageContent(student, target) {
       const remarkTypeSelect = buildRemarkTypeControls(a, idx);
       const isGray = a.activityColor === "gray" || a.isMaintainLive;
       const isGreen = a.activityColor === "green";
-      const actInactive = !isActivityActive(a, todayDateStr());
-      const actExpired  = actInactive && !!a.activeTo && a.activeTo < todayDateStr();
+      const _editRef2   = state.sessionData?.date || todayDateStr();
+      const actInactive = !isActivityActive(a, _editRef2);
+      const actExpired  = actInactive && !!a.activeTo && a.activeTo < _editRef2;
       const actBaseBg   = isGray ? 'background:#f3f4f6;border:1px solid #d1d5db' : isGreen ? 'background:#e2efda;border:1px solid #a9d18e' : null;
       const actItemStyle = actExpired ? (actBaseBg ? ` style="position:relative;${actBaseBg}"` : ' style="position:relative"') : (actBaseBg ? ` style="${actBaseBg}${actInactive ? ';opacity:0.3' : ''}"` : actInactive ? ' style="opacity:0.3"' : '');
       const actOverlay  = actExpired ? `<div style="position:absolute;inset:0 2.5rem 0 0;background:rgba(255,255,255,.7);pointer-events:none;z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center"><div style="pointer-events:none;background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.35rem .75rem;text-align:center;font-size:1.17rem;color:#374151;max-width:80%">⏸ This activity's period has ended — tap ⋮ on the right side to adjust the dates and bring it back.</div></div>` : '';
@@ -8887,6 +8917,16 @@ function renderTargetManageContent(student, target) {
     });
   });
 
+  $("manage-modal-body").querySelectorAll(".mn-inactive-reason-select").forEach(sel => {
+    sel.addEventListener("change", async () => {
+      const idx = Number(sel.dataset.idx);
+      acts[idx].inactiveReason = sel.value || undefined;
+      target.predefinedActivities = acts;
+      await saveTarget();
+      renderTargetManageContent(student, target);
+    });
+  });
+
   $("btn-mn-add-mapped").addEventListener("click", async () => {
     acts.push({ id: cfgId("m"), isMapped: true, name: "", mappedTargetId: null, order: acts.length, activeFrom: null });
     target.predefinedActivities = acts;
@@ -9251,8 +9291,9 @@ function renderTemplateManageContent(template) {
         </div>
       </div>`;
     } else if (a.isNote || a.isExportNote) {
-      const noteInactive = !isActivityActive(a, todayDateStr());
-      const noteExpired  = noteInactive && !!a.activeTo && a.activeTo < todayDateStr();
+      const _editRef3    = state.sessionData?.date || todayDateStr();
+      const noteInactive = !isActivityActive(a, _editRef3);
+      const noteExpired  = noteInactive && !!a.activeTo && a.activeTo < _editRef3;
       const noteBaseBg = 'background:#fff7ed;border:1px solid #fb923c;color:#92400e';
       const noteItemStyle = noteExpired
         ? ` style="position:relative;${noteBaseBg}"`
@@ -9307,8 +9348,9 @@ function renderTemplateManageContent(template) {
       const remarkTypeSelect = buildRemarkTypeControls(a, idx);
       const isGray = a.activityColor === "gray" || a.isMaintainLive;
       const isGreen = a.activityColor === "green";
-      const actInactive = !isActivityActive(a, todayDateStr());
-      const actExpired  = actInactive && !!a.activeTo && a.activeTo < todayDateStr();
+      const _editRef2   = state.sessionData?.date || todayDateStr();
+      const actInactive = !isActivityActive(a, _editRef2);
+      const actExpired  = actInactive && !!a.activeTo && a.activeTo < _editRef2;
       const actBaseBg   = isGray ? 'background:#f3f4f6;border:1px solid #d1d5db' : isGreen ? 'background:#e2efda;border:1px solid #a9d18e' : null;
       const actItemStyle = actExpired ? (actBaseBg ? ` style="position:relative;${actBaseBg}"` : ' style="position:relative"') : (actBaseBg ? ` style="${actBaseBg}${actInactive ? ';opacity:0.3' : ''}"` : actInactive ? ' style="opacity:0.3"' : '');
       const actOverlay  = actExpired ? `<div style="position:absolute;inset:0 2.5rem 0 0;background:rgba(255,255,255,.7);pointer-events:none;z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center"><div style="pointer-events:none;background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.35rem .75rem;text-align:center;font-size:1.17rem;color:#374151;max-width:80%">⏸ This activity's period has ended — tap ⋮ on the right side to adjust the dates and bring it back.</div></div>` : '';
@@ -9554,6 +9596,16 @@ function renderTemplateManageContent(template) {
       const toExport = sel.value === "export";
       if (toExport) { delete acts[idx].isNote; acts[idx].isExportNote = true; }
       else { delete acts[idx].isExportNote; acts[idx].isNote = true; }
+      template.predefinedActivities = acts;
+      await saveTemplateFn();
+      renderTemplateManageContent(template);
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-inactive-reason-select").forEach(sel => {
+    sel.addEventListener("change", async () => {
+      const idx = Number(sel.dataset.idx);
+      acts[idx].inactiveReason = sel.value || undefined;
       template.predefinedActivities = acts;
       await saveTemplateFn();
       renderTemplateManageContent(template);
@@ -10304,7 +10356,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
   const items = [];
 
   // Predefined activities (with heading and note support)
-  const grpSessionDate = todayDateStr();
+  const grpSessionDate = state.sessionData?.date || todayDateStr();
   for (const pa of (target.predefinedActivities || [])) {
     if (!isActivityActive(pa, grpSessionDate)) continue;
     if (pa.isNote || pa.isExportNote) {
@@ -10346,7 +10398,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
     items.push(`<p class="empty-hint" contenteditable="false" style="padding:1.5rem">No activities yet. Add them under Edit Target.</p>`);
   }
   if (grpInactivePas.length > 0) {
-    const grpInactiveHtml = grpInactivePas.map(pa => {
+    const renderGrpInactiveItem = pa => {
       if (pa.isHeading || pa.isMaintainHeading) return `<div class="activity-group-heading" contenteditable="false" style="opacity:.3">${escHtml(pa.name || "")}</div>`;
       if (pa.isNote || pa.isExportNote) {
         if (!pa.text) return '';
@@ -10362,14 +10414,24 @@ function buildGroupItemsByActivity(target, data, attendees) {
       }
       if (!pa.name) return '';
       return `<div class="entry-block entry-block-predefined" style="opacity:.3;pointer-events:none"><div class="entry-field" contenteditable="false"><span class="field-label">Activity</span><span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span></div></div>`;
-    }).filter(Boolean).join('');
+    };
+    const grpReal = grpInactivePas.filter(pa => !pa.isNote && !pa.isExportNote && !pa.isHeading && !pa.isMaintainHeading);
+    const grpMastered     = grpReal.filter(pa => pa.inactiveReason === 'mastered');
+    const grpDiscontinued = grpReal.filter(pa => pa.inactiveReason === 'discontinued');
+    const grpOther        = grpReal.filter(pa => !pa.inactiveReason);
+    const renderGrpSection = (label, color, pas) => {
+      if (pas.length === 0) return '';
+      return `<div style="margin-top:.5rem">
+        <button class="btn-inactive-toggle" contenteditable="false" style="display:flex;align-items:center;gap:.4rem;width:100%;padding:.4rem .6rem;background:none;border:1px dashed #d1d5db;border-radius:.4rem;cursor:pointer;font-size:.8rem;color:${color};text-align:left">
+          <span class="inactive-chevron" style="font-size:.7rem">▶</span> ${label} (${pas.length})
+        </button>
+        <div class="inactive-list" style="display:none;flex-direction:column;gap:.25rem;margin-top:.35rem">${pas.map(renderGrpInactiveItem).filter(Boolean).join('')}</div>
+      </div>`;
+    };
     items.push(`<div style="margin-top:.75rem">
-      <button class="btn-inactive-toggle" contenteditable="false" style="display:flex;align-items:center;gap:.4rem;width:100%;padding:.4rem .6rem;background:none;border:1px dashed #d1d5db;border-radius:.4rem;cursor:pointer;font-size:.8rem;color:#6b7280;text-align:left">
-        <span class="inactive-chevron" style="font-size:.7rem">▶</span> Inactive Activities (${grpInactivePas.length})
-      </button>
-      <div class="inactive-list" style="display:none;flex-direction:column;gap:.25rem;margin-top:.35rem">
-        ${grpInactiveHtml}
-      </div>
+      ${renderGrpSection('Mastered', '#059669', grpMastered)}
+      ${renderGrpSection('Discontinued', '#dc2626', grpDiscontinued)}
+      ${renderGrpSection('Other Inactive', '#6b7280', grpOther)}
     </div>`);
   }
   return items;
@@ -11133,14 +11195,16 @@ function attachGroupTargetListeners(target) {
     });
   });
 
-  // Inactive activities toggle
-  c.querySelector(".btn-inactive-toggle")?.addEventListener("click", () => {
-    const list = c.querySelector(".inactive-list");
-    const chevron = c.querySelector(".inactive-chevron");
-    if (!list) return;
-    const open = list.style.display !== "none";
-    list.style.display = open ? "none" : "flex";
-    if (chevron) chevron.textContent = open ? "▶" : "▼";
+  // Inactive activities toggle (one per section)
+  c.querySelectorAll(".btn-inactive-toggle").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const list = btn.nextElementSibling;
+      const chevron = btn.querySelector(".inactive-chevron");
+      if (!list) return;
+      const open = list.style.display !== "none";
+      list.style.display = open ? "none" : "flex";
+      if (chevron) chevron.textContent = open ? "▶" : "▼";
+    });
   });
 }
 

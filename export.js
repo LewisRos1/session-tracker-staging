@@ -1622,6 +1622,7 @@ function getAllActivitiesForTarget(session, target) {
   const usedIds = new Set();
   const masteredActivities = [];
   const stoppedActivities  = [];
+  let exportActNum = 0;
 
   for (const pa of (target.predefinedActivities || [])) {
     if (!isActivityActive(pa, session.date)) continue;
@@ -1649,24 +1650,27 @@ function getAllActivitiesForTarget(session, target) {
       result.push({ isGreenHeading: true, activityName: pa.name });
       continue;
     }
+    // All remaining paths are real activities — assign sequential number
+    exportActNum++;
+    const numberedName = `${exportActNum}) ${pa.name}`;
     // Fixed remark activities — inline in their natural position (NOT reordered to the bottom)
     if (pa.fixedRemark !== undefined) {
       const isGray = pa.activityColor === "gray" || !!pa.isMaintainLive;
-      result.push({ isMaintain: true, activityName: pa.name, maintainRemark: pa.fixedRemark || "", ...(isGray ? { isGray: true } : {}) });
+      result.push({ isMaintain: true, activityName: numberedName, maintainRemark: pa.fixedRemark || "", ...(isGray ? { isGray: true } : {}) });
       continue;
     }
     if (pa.isMaintain) {
       const isGray = pa.activityColor === "gray" || !!pa.isMaintainLive;
-      result.push({ isMaintain: true, activityName: pa.name, maintainRemark: pa.maintainRemark || "", ...(isGray ? { isGray: true } : {}) });
+      result.push({ isMaintain: true, activityName: numberedName, maintainRemark: pa.maintainRemark || "", ...(isGray ? { isGray: true } : {}) });
       continue;
     }
     if (pa.isCompleted) {
       const sessionAct = sessionActs.find(a => a.activityName === pa.name && a.isPredefined);
       if (sessionAct) {
         usedIds.add(sessionAct.id);
-        masteredActivities.push({ ...sessionAct, isMastered: true });
+        masteredActivities.push({ ...sessionAct, activityName: numberedName, isMastered: true });
       } else {
-        masteredActivities.push({ id: null, activityName: pa.name, isPredefined: true, empty: true, isMastered: true });
+        masteredActivities.push({ id: null, activityName: numberedName, isPredefined: true, empty: true, isMastered: true });
       }
       continue;
     }
@@ -1674,9 +1678,9 @@ function getAllActivitiesForTarget(session, target) {
       const sessionAct = sessionActs.find(a => a.activityName === pa.name && a.isPredefined);
       if (sessionAct) {
         usedIds.add(sessionAct.id);
-        stoppedActivities.push({ ...sessionAct, isStopped: true });
+        stoppedActivities.push({ ...sessionAct, activityName: numberedName, isStopped: true });
       } else {
-        stoppedActivities.push({ id: null, activityName: pa.name, isPredefined: true, empty: true, isStopped: true });
+        stoppedActivities.push({ id: null, activityName: numberedName, isPredefined: true, empty: true, isStopped: true });
       }
       continue;
     }
@@ -1685,10 +1689,10 @@ function getAllActivitiesForTarget(session, target) {
                      : pa.activityColor === "green" ? { isGreen: true } : {};
     if (sessionAct) {
       usedIds.add(sessionAct.id);
-      result.push(pa.isMapped ? { ...sessionAct, isMapped: true, mappedTargetId: pa.mappedTargetId || null, ...colorProps } : { ...sessionAct, ...colorProps });
+      result.push(pa.isMapped ? { ...sessionAct, activityName: numberedName, isMapped: true, mappedTargetId: pa.mappedTargetId || null, ...colorProps } : { ...sessionAct, activityName: numberedName, ...colorProps });
     } else {
       result.push({
-        id: null, activityName: pa.name, isPredefined: true, empty: true,
+        id: null, activityName: numberedName, isPredefined: true, empty: true,
         isMapped: pa.isMapped || false, mappedTargetId: pa.mappedTargetId || null, ...colorProps
       });
     }
