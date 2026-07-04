@@ -1687,13 +1687,14 @@ function getAllActivitiesForTarget(session, target) {
     const sessionAct = sessionActs.find(a => a.activityName === pa.name && a.isPredefined);
     const colorProps = (pa.activityColor === "gray" || pa.isMaintainLive) ? { isGray: true }
                      : pa.activityColor === "green" ? { isGreen: true } : {};
+    const manualScoreProp = pa.manualScore ? { manualScore: true } : {};
     if (sessionAct) {
       usedIds.add(sessionAct.id);
-      result.push(pa.isMapped ? { ...sessionAct, activityName: numberedName, isMapped: true, mappedTargetId: pa.mappedTargetId || null, ...colorProps } : { ...sessionAct, activityName: numberedName, ...colorProps });
+      result.push(pa.isMapped ? { ...sessionAct, activityName: numberedName, isMapped: true, mappedTargetId: pa.mappedTargetId || null, ...colorProps } : { ...sessionAct, activityName: numberedName, ...colorProps, ...manualScoreProp });
     } else {
       result.push({
         id: null, activityName: numberedName, isPredefined: true, empty: true,
-        isMapped: pa.isMapped || false, mappedTargetId: pa.mappedTargetId || null, ...colorProps
+        isMapped: pa.isMapped || false, mappedTargetId: pa.mappedTargetId || null, ...colorProps, ...manualScoreProp
       });
     }
   }
@@ -1739,6 +1740,18 @@ function hasRemarkContent(rem) {
 
 // ─── CALCULATIONS ────────────────────────────────────────────
 
+function parseManualScore(val) {
+  if (!val) return null;
+  const s = String(val).trim();
+  const frac = s.match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/);
+  if (frac) { const d = parseFloat(frac[2]); return d === 0 ? null : parseFloat(frac[1]) / d * 100; }
+  const pct = s.match(/^(\d+(?:\.\d+)?)\s*%$/);
+  if (pct) return parseFloat(pct[1]);
+  const num = s.match(/^(\d+(?:\.\d+)?)$/);
+  if (num) return parseFloat(num[1]);
+  return null;
+}
+
 function calcRemarkAvg(trials, maxPoints) {
   if (!trials || trials.length === 0) return null;
   const valid = trials.filter(t => t !== -1);
@@ -1766,6 +1779,11 @@ function calcDailyAverage(session, target, allTargets = [], visited = new Set())
       continue;
     }
     for (const rem of getRemarksForActivity(session, act.id)) {
+      if (act.manualScore) {
+        const pct = parseManualScore(stripRemarkHtml(rem.text || "").trim());
+        if (pct !== null) avgs.push(pct);
+        continue;
+      }
       const validTrials = (rem.trials || []).filter(t => t !== -1);
       const a = calcRemarkAvg(validTrials, target.maxPoints);
       if (a !== null) avgs.push(a);

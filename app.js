@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "708";
+const APP_VERSION = "709";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3026,7 +3026,13 @@ function calcDaysAverage(target, visited = new Set()) {
       if (mappedPct !== null) avgs.push(mappedPct);
       continue;
     }
+    const manualPa = (target.predefinedActivities || []).find(p => p.manualScore && p.name === act.activityName);
     for (const rem of getRemarksForActivity(act.id)) {
+      if (manualPa) {
+        const pct = parseManualScore(plainTextForEdit(rem.text || "").trim());
+        if (pct !== null) avgs.push(pct);
+        continue;
+      }
       const trials = (rem.trials || []).filter(t => t !== -1);
       if (trials.length === 0) continue;
       avgs.push(trials.reduce((a, b) => a + b, 0) / (trials.length * maxPts) * 100);
@@ -3202,18 +3208,19 @@ function renderFedcTarget(target) {
       }
     } else {
       for (const rem of remarks) {
-        html += renderRemarkFields(rem, target, getActivityInlineOptions(pa), pa.sentenceStarter || null, pa.optionsMulti || false, mappedInfo, pa.remarkHasNote || false);
+        html += renderRemarkFields(rem, target, getActivityInlineOptions(pa), pa.sentenceStarter || null, pa.optionsMulti || false, mappedInfo, pa.remarkHasNote || false, pa.manualScore || false);
       }
       if (isPending) {
         html += renderPendingRemarkFields(pendingKey, actId, pa.name, idx, target);
       } else {
+        const addLabel = pa.isMapped ? "Score" : pa.manualScore ? "Score" : "Remark &amp; Trials";
         html += `<button class="btn-add-remark" contenteditable="false"
           data-pending-key="${escHtml(pendingKey)}"
           data-act-id="${actId || ""}"
           data-pa-name="${escHtml(pa.name)}"
           data-pa-order="${idx}"
           data-is-mapped="${pa.isMapped ? "1" : ""}"
-          data-target="${escHtml(target.name)}">+ Add Remark${pa.isMapped ? "" : " &amp; Trials"}</button>`;
+          data-target="${escHtml(target.name)}">+ Add ${addLabel}</button>`;
       }
     }
 
@@ -3590,8 +3597,26 @@ function toggleBulletSelection(el) {
 
 // ─── REMARK FIELDS ───────────────────────────────────────────
 
-function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false) {
+function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false, manualScore = false) {
   const opts = parseOpts(inlineOptions);
+
+  // Manual Score type: a single text input replaces the full Remark+Trials block
+  if (manualScore) {
+    const currentVal = rem.text ? stripRemarkHtml(rem.text).trim() : "";
+    const parsed = parseManualScore(currentVal);
+    const parsedHint = currentVal && parsed !== null ? `<span style="font-size:.78rem;color:#6b7280;margin-left:.25rem">= ${Math.round(parsed * 10) / 10}%</span>` : "";
+    return `
+    <div class="entry-divider" contenteditable="false"></div>
+    <div class="entry-field" contenteditable="false">
+      <span class="field-label">Score</span>
+      <input type="text" class="field-input remark-text-input" style="max-width:10rem"
+        data-rem-id="${rem.id}" data-saved-html="${escHtml(currentVal)}"
+        placeholder="e.g. 5/20, 25% or 25"
+        value="${escHtml(currentVal)}">${parsedHint}
+      <button class="btn-icon btn-delete-remark" contenteditable="false"
+        data-rem-id="${rem.id}" title="Delete score">🗑</button>
+    </div>`;
+  }
 
   const trials = rem.trials || [];
   const badgesHtml = trials.map((score, idx) =>
@@ -4797,7 +4822,13 @@ function calcViewDayAvg(data, target, visited = new Set()) {
         }
         return;
       }
+      const manualPa = (target.predefinedActivities || []).find(p => p.manualScore && p.name === act.activityName);
       viewGetRemarks(data, actId).forEach(rem => {
+        if (manualPa) {
+          const pct = parseManualScore(plainTextForEdit(rem.text || "").trim());
+          if (pct !== null) avgs.push(pct);
+          return;
+        }
         const trials = (rem.trials || []).filter(t => t !== -1);
         if (!trials.length) return;
         avgs.push(trials.reduce((a, b) => a + b, 0) / (trials.length * (target.maxPoints || 3)) * 100);
@@ -8121,12 +8152,27 @@ function stripNoteHtml(text) {
     .trim();
 }
 
+// Parses a manually-typed score value into a percentage (0–100).
+// Accepts: "5/20" → 25, "25%" → 25, "25" → 25.  Returns null if unparseable.
+function parseManualScore(val) {
+  if (!val) return null;
+  const s = String(val).trim();
+  const frac = s.match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/);
+  if (frac) { const d = parseFloat(frac[2]); return d === 0 ? null : parseFloat(frac[1]) / d * 100; }
+  const pct = s.match(/^(\d+(?:\.\d+)?)\s*%$/);
+  if (pct) return parseFloat(pct[1]);
+  const num = s.match(/^(\d+(?:\.\d+)?)$/);
+  if (num) return parseFloat(num[1]);
+  return null;
+}
+
 // Shared by the normal-activity and mapped-score-activity rows in
 // renderTargetManageContent — both let the boss configure how the Remark
 // field is captured (free text / preset options / sentence starter),
 // independently of where the Score comes from.
 function buildRemarkTypeControls(a, idx) {
   const type = a.fixedRemark !== undefined ? "fixed_remark"
+    : a.manualScore ? "manual_score"
     : a.remarkHasNote ? "starter_fixed_note"
     : (a.sentenceStarter && a.inlineOptions && a.optionsMulti) ? "starter_fixed_multi"
     : (a.sentenceStarter && a.inlineOptions) ? "starter_fixed"
@@ -8136,6 +8182,7 @@ function buildRemarkTypeControls(a, idx) {
   return `<select class="act-preset-select mn-act-preset" data-idx="${idx}">
       <option value="">Free text</option>
       <option value="fixed_remark"${type === "fixed_remark" ? " selected" : ""}>Fixed Remark</option>
+      <option value="manual_score"${type === "manual_score" ? " selected" : ""}>Manual Score</option>
       <option value="fixed"${type === "fixed" ? " selected" : ""}>Select one</option>
       <option value="fixed_multi"${type === "fixed_multi" ? " selected" : ""}>Tick boxes</option>
       <option value="starter"${type === "starter" ? " selected" : ""}>Sentence Starter + Free Text</option>
@@ -8976,20 +9023,44 @@ function renderTargetManageContent(student, target) {
       if (type === "fixed_remark") {
         if (acts[idx].fixedRemark === undefined) acts[idx].fixedRemark = "";
         acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
-        acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false;
+        acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false; delete acts[idx].manualScore;
         target.predefinedActivities = acts;
         await saveTarget();
         renderTargetManageContent(student, target);
+        return;
+      }
+      // Switching to Manual Score — set flag and re-render so type detection updates
+      if (type === "manual_score") {
+        acts[idx].manualScore = true;
+        delete acts[idx].fixedRemark; acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
+        acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false;
+        target.predefinedActivities = acts;
+        await saveTarget();
+        const sp = $("manage-modal-body").scrollTop;
+        renderTargetManageContent(student, target);
+        $("manage-modal-body").scrollTop = sp;
         return;
       }
       // Switching away from Fixed Remark — clear it and re-render to remove the textarea
       if (acts[idx].fixedRemark !== undefined) {
         delete acts[idx].fixedRemark;
         acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
-        acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false;
+        acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false; delete acts[idx].manualScore;
         target.predefinedActivities = acts;
         await saveTarget();
         renderTargetManageContent(student, target);
+        return;
+      }
+      // Switching away from Manual Score
+      if (acts[idx].manualScore) {
+        delete acts[idx].manualScore;
+        acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
+        acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false;
+        target.predefinedActivities = acts;
+        await saveTarget();
+        const sp = $("manage-modal-body").scrollTop;
+        renderTargetManageContent(student, target);
+        $("manage-modal-body").scrollTop = sp;
         return;
       }
       acts[idx].sentenceStarter = null;
@@ -9650,19 +9721,41 @@ function renderTemplateManageContent(template) {
       if (type === "fixed_remark") {
         if (acts[idx].fixedRemark === undefined) acts[idx].fixedRemark = "";
         acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
-        acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false;
+        acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false; delete acts[idx].manualScore;
         template.predefinedActivities = acts;
         await saveTemplateFn();
         renderTemplateManageContent(template);
         return;
       }
+      if (type === "manual_score") {
+        acts[idx].manualScore = true;
+        delete acts[idx].fixedRemark; acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
+        acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false;
+        template.predefinedActivities = acts;
+        await saveTemplateFn();
+        const sp = $("manage-modal-body").scrollTop;
+        renderTemplateManageContent(template);
+        $("manage-modal-body").scrollTop = sp;
+        return;
+      }
       if (acts[idx].fixedRemark !== undefined) {
         delete acts[idx].fixedRemark;
+        acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
+        acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false; delete acts[idx].manualScore;
+        template.predefinedActivities = acts;
+        await saveTemplateFn();
+        renderTemplateManageContent(template);
+        return;
+      }
+      if (acts[idx].manualScore) {
+        delete acts[idx].manualScore;
         acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
         acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false;
         template.predefinedActivities = acts;
         await saveTemplateFn();
+        const sp = $("manage-modal-body").scrollTop;
         renderTemplateManageContent(template);
+        $("manage-modal-body").scrollTop = sp;
         return;
       }
       acts[idx].sentenceStarter = null;
