@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "724";
+const APP_VERSION = "725";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2994,7 +2994,10 @@ $("btn-back").addEventListener("click", leaveSession);
     parseFloat(localStorage.getItem(ZOOM_KEY) || "1") || 1));
 
   function applyZoom() {
-    ["session-body", "group-session-body"].forEach(id => {
+    // Zoom the selector bar + activities directly, not the scroll container
+    // (Safari zoom on overflow-y:auto containers doesn't scale scrollable content)
+    ["target-selector-bar", "target-content",
+     "group-target-selector-bar", "group-target-content"].forEach(id => {
       const el = $(id);
       if (el) el.style.zoom = zoom;
     });
