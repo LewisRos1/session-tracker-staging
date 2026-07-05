@@ -314,27 +314,36 @@ function unionTargetsByName(groups) {
 }
 
 function addBaselineVsCurrentSheet(wb, entityName, allTargets, sortedSessions) {
-  if (sortedSessions.length < 2 ||
-      sortedSessions[0].date === sortedSessions[sortedSessions.length - 1].date) return;
+  // Compare first month of data vs most recent month of data (each as a monthly average).
+  const months = [...new Set(sortedSessions.map(s => s.month))].sort((a, b) => {
+    const [ma, ya] = parseMonth(a); const [mb, yb] = parseMonth(b);
+    return ya !== yb ? ya - yb : ma - mb;
+  });
+  if (months.length < 2) return;
 
-  const firstSession = sortedSessions[0];
-  const lastSession  = sortedSessions[sortedSessions.length - 1];
-  const firstLabel   = fmtDate(firstSession.date);
-  const lastLabel    = fmtDate(lastSession.date);
+  const firstMonth         = months[0];
+  const lastMonth          = months[months.length - 1];
+  const firstMonthSessions = sortedSessions.filter(s => s.month === firstMonth);
+  const lastMonthSessions  = sortedSessions.filter(s => s.month === lastMonth);
 
   const bvcRows    = [];
   const bvcTargets = [];
 
-  bvcRows.push([`${entityName}: Baseline vs Current`, "", ""]);
-  bvcRows.push(["Target", firstLabel, lastLabel]);
+  bvcRows.push([`${entityName}: First Month vs Most Recent Month`, "", ""]);
+  bvcRows.push(["Target", firstMonth, lastMonth]);
 
   for (const target of allTargets) {
-    const snapF  = (firstSession.targetsSnapshot || []).find(t => t.name === target.name);
-    const effF   = snapF ? { ...target, maxPoints: snapF.maxPoints ?? target.maxPoints } : target;
-    const snapL  = (lastSession.targetsSnapshot  || []).find(t => t.name === target.name);
-    const effL   = snapL ? { ...target, maxPoints: snapL.maxPoints ?? target.maxPoints } : target;
-    const scoreF = calcDailyAverage(firstSession, effF, allTargets);
-    const scoreL = calcDailyAverage(lastSession,  effL, allTargets);
+    const monthAvg = sessions => {
+      const vals = sessions.map(s => {
+        const snap = (s.targetsSnapshot || []).find(t => t.name === target.name);
+        const eff  = snap ? { ...target, maxPoints: snap.maxPoints ?? target.maxPoints } : target;
+        return calcDailyAverage(s, eff, allTargets);
+      }).filter(v => v !== null && !isNaN(v));
+      return vals.length > 0 ? avg(vals) : null;
+    };
+
+    const scoreF = monthAvg(firstMonthSessions);
+    const scoreL = monthAvg(lastMonthSessions);
 
     bvcRows.push([
       target.name,
@@ -348,12 +357,12 @@ function addBaselineVsCurrentSheet(wb, entityName, allTargets, sortedSessions) {
     });
   }
 
-  const bvcWs = wb.addWorksheet("Baseline vs Current");
+  const bvcWs = wb.addWorksheet("Monthly Comparison");
   bvcRows.forEach(row => bvcWs.addRow(row));
 
   bvcWs.getColumn(1).width     = 30;
-  bvcWs.getColumn(2).width     = 14;
-  bvcWs.getColumn(3).width     = 14;
+  bvcWs.getColumn(2).width     = 18;
+  bvcWs.getColumn(3).width     = 18;
   bvcWs.getColumn(1).alignment = { vertical: "middle" };
   bvcWs.getColumn(2).alignment = { horizontal: "center", vertical: "middle" };
   bvcWs.getColumn(3).alignment = { horizontal: "center", vertical: "middle" };
@@ -377,17 +386,17 @@ function addBaselineVsCurrentSheet(wb, entityName, allTargets, sortedSessions) {
     const chartTargets = bvcTargets.filter(t => t.first !== null || t.last !== null);
     if (chartTargets.length > 0) {
       const bvcBase64 = renderBaselineChart(
-        `${entityName}: Baseline vs Current`,
-        chartTargets.map(t => wrapLabel(t.name)),
+        `${entityName}: First Month vs Most Recent Month`,
+        chartTargets.map(t => t.name),
         chartTargets.map(t => t.first),
         chartTargets.map(t => t.last),
-        firstLabel,
-        lastLabel
+        firstMonth,
+        lastMonth
       );
       const bvcImgId = wb.addImage({ base64: bvcBase64, extension: "png" });
       bvcWs.addImage(bvcImgId, {
         tl:  { col: 0, row: bvcRows.length + 1 },
-        ext: { width: 605, height: 340 } // 16cm x 9cm at 96dpi
+        ext: { width: 605, height: 370 }
       });
     }
   }
@@ -2068,7 +2077,7 @@ function renderBaselineChart(title, labels, baselineData, currentData, baselineL
   const SCALE   = 3;
   const canvas  = document.createElement("canvas");
   canvas.width  = 605;
-  canvas.height = 340;
+  canvas.height = 380;
   const ctx     = canvas.getContext("2d");
 
   const allValues  = [...baselineData, ...currentData].filter(v => v !== null && v !== undefined);
@@ -2161,7 +2170,7 @@ function renderBaselineChart(title, labels, baselineData, currentData, baselineL
       },
       scales: {
         x: {
-          ticks: { color: "#000000", maxRotation: 0, font: { size: 13 } },
+          ticks: { color: "#000000", maxRotation: 30, autoSkip: false, font: { size: 11 } },
           grid:  { display: false }
         },
         y: {
