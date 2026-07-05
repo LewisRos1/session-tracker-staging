@@ -303,9 +303,9 @@ function addBaselineVsCurrentSheet(wb, entityName, allTargets, sortedSessions) {
 
   for (const target of allTargets) {
     const snapF  = (firstSession.targetsSnapshot || []).find(t => t.name === target.name);
-    const effF   = snapF ? { ...target, maxPoints: snapF.maxPoints } : target;
+    const effF   = snapF ? { ...target, maxPoints: snapF.maxPoints ?? target.maxPoints } : target;
     const snapL  = (lastSession.targetsSnapshot  || []).find(t => t.name === target.name);
-    const effL   = snapL ? { ...target, maxPoints: snapL.maxPoints } : target;
+    const effL   = snapL ? { ...target, maxPoints: snapL.maxPoints ?? target.maxPoints } : target;
     const scoreF = calcDailyAverage(firstSession, effF, allTargets);
     const scoreL = calcDailyAverage(lastSession,  effL, allTargets);
 
@@ -377,7 +377,7 @@ function addChartsSheet(wb, allTargets, sortedSessions) {
     const datesWithData = [];
     for (const session of sortedSessions) {
       const snap  = (session.targetsSnapshot || []).find(t => t.name === target.name);
-      const eff   = snap ? { ...target, maxPoints: snap.maxPoints } : target;
+      const eff   = snap ? { ...target, maxPoints: snap.maxPoints ?? target.maxPoints } : target;
       const score = calcDailyAverage(session, eff, allTargets);
       if (score !== null) { yValues.push(Math.round(score)); datesWithData.push(session.date); }
     }
@@ -1311,10 +1311,10 @@ function buildSummarySheet(allTargets, sessions) {
       const dailyAvgs = monthSessions
         .map(s => {
           const snap = (s.targetsSnapshot || []).find(t => t.name === target.name);
-          const eff  = snap ? { ...target, maxPoints: snap.maxPoints } : target;
+          const eff  = snap ? { ...target, maxPoints: snap.maxPoints ?? target.maxPoints } : target;
           return calcDailyAverage(s, eff, allTargets);
         })
-        .filter(v => v !== null);
+        .filter(v => v !== null && !isNaN(v));
       row.push(dailyAvgs.length > 0 ? pct(avg(dailyAvgs)) : "");
     }
     rows.push(row);
@@ -1359,7 +1359,7 @@ function buildDetailedSummarySheet(allTargets, sessions) {
     for (const target of allTargets) {
       const sessionAvgs = monthSessions.map(session => {
         const snap = (session.targetsSnapshot || []).find(t => t.name === target.name);
-        const eff  = snap ? { ...target, maxPoints: snap.maxPoints } : target;
+        const eff  = snap ? { ...target, maxPoints: snap.maxPoints ?? target.maxPoints } : target;
         return calcDailyAverage(session, eff, allTargets);
       });
       const validAvgs  = sessionAvgs.filter(v => v !== null);
@@ -1410,7 +1410,7 @@ function buildTargetSheet(target, sessions, allTargets, includeTrials) {
       .map(s => {
         const snap = (s.targetsSnapshot || []).find(t => t.name === target.name);
         const eff  = snap
-          ? { ...target, maxPoints: snap.maxPoints, predefinedActivities: snap.predefinedActivities || target.predefinedActivities || [] }
+          ? { ...target, maxPoints: snap.maxPoints ?? target.maxPoints, predefinedActivities: snap.predefinedActivities || target.predefinedActivities || [] }
           : target;
         return calcDailyAverage(s, eff, allTargets);
       })
@@ -1434,7 +1434,7 @@ function buildTargetSheet(target, sessions, allTargets, includeTrials) {
 
     for (const session of monthSessions) {
       const snap = (session.targetsSnapshot || []).find(t => t.name === target.name);
-      const effectiveTarget = snap ? { ...target, maxPoints: snap.maxPoints } : target;
+      const effectiveTarget = snap ? { ...target, maxPoints: snap.maxPoints ?? target.maxPoints } : target;
       appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRows, grayRows, greenRows, session, effectiveTarget, allTargets, includeTrials);
     }
   }
@@ -1756,6 +1756,7 @@ function calcRemarkAvg(trials, maxPoints) {
   if (!trials || trials.length === 0) return null;
   const valid = trials.filter(t => t !== -1);
   if (valid.length === 0) return null;
+  if (!maxPoints) return null;
   return valid.reduce((a, b) => a + b, 0) / (valid.length * maxPoints) * 100;
 }
 
