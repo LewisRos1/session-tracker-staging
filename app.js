@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "726";
+const APP_VERSION = "727";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2994,13 +2994,10 @@ $("btn-back").addEventListener("click", leaveSession);
     parseFloat(localStorage.getItem(ZOOM_KEY) || "1") || 1));
 
   function applyZoom() {
-    // Zoom the selector bar + activities directly, not the scroll container
-    // (Safari zoom on overflow-y:auto containers doesn't scale scrollable content)
-    ["target-selector-bar", "target-content",
-     "group-target-selector-bar", "group-target-content"].forEach(id => {
-      const el = $(id);
-      if (el) el.style.zoom = zoom;
-    });
+    // All sizes in the app use rem, which is relative to html font-size (16px).
+    // Zooming a child element doesn't move the rem baseline, so text stays the
+    // same size. Changing the root font-size is the only way to scale rem values.
+    document.documentElement.style.fontSize = (zoom * 16) + "px";
   }
 
   function setZoom(delta) {
