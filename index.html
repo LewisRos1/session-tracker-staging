@@ -149,10 +149,16 @@
       <div class="btn-goto-session-wrap">
         <button id="btn-entry-goto-session" class="btn-goto-session hidden">🚀 Go To Another Session</button>
       </div>
-      <div class="view-header-right"></div>
+      <div class="view-header-right">
+        <div class="zoom-controls">
+          <button class="btn-zoom" id="btn-zoom-out" title="Zoom out">A−</button>
+          <button class="btn-zoom btn-zoom-reset" id="btn-zoom-reset" title="Reset zoom">A</button>
+          <button class="btn-zoom" id="btn-zoom-in" title="Zoom in">A+</button>
+        </div>
+      </div>
     </header>
 
-    <div class="session-body">
+    <div class="session-body" id="session-body">
       <div class="target-selector">
         <label for="target-select" class="target-label">Target</label>
         <select id="target-select" class="target-dropdown"
@@ -218,9 +224,15 @@
       <div class="btn-goto-session-wrap">
         <button id="btn-group-entry-goto-session" class="btn-goto-session hidden">🚀 Go To Another Session</button>
       </div>
-      <div class="view-header-right"></div>
+      <div class="view-header-right">
+        <div class="zoom-controls">
+          <button class="btn-zoom" id="btn-grp-zoom-out" title="Zoom out">A−</button>
+          <button class="btn-zoom btn-zoom-reset" id="btn-grp-zoom-reset" title="Reset zoom">A</button>
+          <button class="btn-zoom" id="btn-grp-zoom-in" title="Zoom in">A+</button>
+        </div>
+      </div>
     </header>
-    <div class="session-body">
+    <div class="session-body" id="group-session-body">
       <div class="target-selector" id="group-target-selector-bar">
         <label for="group-target-select" class="target-label">Target</label>
         <select id="group-target-select" class="target-dropdown"

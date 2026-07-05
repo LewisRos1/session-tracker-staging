@@ -498,6 +498,26 @@ html, body {
 }
 .btn-goto-session:hover { background: rgba(255,255,255,.22); color: #fff; }
 .btn-goto-session.hidden { display: none; }
+
+.zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: .3rem;
+}
+.btn-zoom {
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.28);
+  border-radius: 5px;
+  padding: .2rem .5rem;
+  font-size: .82rem;
+  font-weight: 700;
+  color: rgba(255,255,255,.85);
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.btn-zoom:hover { background: rgba(255,255,255,.22); color: #fff; }
+.btn-zoom-reset { font-size: .72rem; letter-spacing: .02em; }
 #view-session-meta { font-size: 1rem; font-weight: 400; opacity: 1; }
 
 .session-list-current {

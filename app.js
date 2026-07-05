@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "723";
+const APP_VERSION = "724";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2980,6 +2980,39 @@ function populateTargetDropdown(targets) {
 }
 
 $("btn-back").addEventListener("click", leaveSession);
+
+// ── Session page zoom controls ────────────────────────────────
+// Stored in localStorage so zoom level persists across sessions.
+// Applies CSS zoom to session-body only — header stays fixed size.
+(function initSessionZoom() {
+  const ZOOM_KEY  = "session-zoom";
+  const ZOOM_MIN  = 0.7;
+  const ZOOM_MAX  = 1.5;
+  const ZOOM_STEP = 0.1;
+
+  let zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX,
+    parseFloat(localStorage.getItem(ZOOM_KEY) || "1") || 1));
+
+  function applyZoom() {
+    ["session-body", "group-session-body"].forEach(id => {
+      const el = $(id);
+      if (el) el.style.zoom = zoom;
+    });
+  }
+
+  function setZoom(delta) {
+    zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX,
+      Math.round((zoom + delta) * 10) / 10));
+    localStorage.setItem(ZOOM_KEY, zoom);
+    applyZoom();
+  }
+
+  applyZoom();
+
+  ["btn-zoom-in",     "btn-grp-zoom-in"   ].forEach(id => $( id)?.addEventListener("click", () => setZoom( ZOOM_STEP)));
+  ["btn-zoom-out",    "btn-grp-zoom-out"  ].forEach(id => $( id)?.addEventListener("click", () => setZoom(-ZOOM_STEP)));
+  ["btn-zoom-reset",  "btn-grp-zoom-reset"].forEach(id => $( id)?.addEventListener("click", () => { zoom = 1; localStorage.setItem(ZOOM_KEY, 1); applyZoom(); }));
+})();
 
 // ============================================================
 // TARGET CONTENT RENDERING
