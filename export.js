@@ -173,13 +173,40 @@ const STYLE_NOTE = {
   font: { italic: true, color: { argb: "FF7A5030" } }
 };
 // Activity cell with an attached note: name on its own line, note italicized below it
-function richTextActivityWithNote(name, note) {
-  return {
-    richText: [
-      { text: name },
-      { text: `\nNote: ${note}`, font: STYLE_NOTE.font }
-    ]
-  };
+// Converts *bold* / _underline_ markers in an activity name to ExcelJS richText.
+// Returns a plain string when no markup is present, { richText: [...] } otherwise.
+// An optional plain-text suffix (e.g. " (Mastered ✓)") is appended at the end.
+function buildExcelActivityCell(text, suffix) {
+  const lines = parseInlineMarkup(text || "");
+  const richText = [];
+  let hasFormatting = false;
+  lines.forEach((lineRuns, lineIdx) => {
+    if (lineIdx > 0 && richText.length > 0) richText[richText.length - 1].text += "\n";
+    for (const run of lineRuns) {
+      if (!run.text) continue;
+      const entry = { text: run.text };
+      if (run.bold || run.underline) {
+        entry.font = {};
+        if (run.bold)      entry.font.bold      = true;
+        if (run.underline) entry.font.underline  = true;
+        hasFormatting = true;
+      }
+      richText.push(entry);
+    }
+  });
+  if (suffix) {
+    if (richText.length > 0) richText[richText.length - 1].text += suffix;
+    else richText.push({ text: suffix });
+  }
+  if (!hasFormatting) return richText.map(r => r.text).join("");
+  return { richText };
+}
+
+function richTextActivityWithNote(activityName, note) {
+  const actCell = buildExcelActivityCell(activityName);
+  const noteRun = { text: `\nNote: ${note}`, font: STYLE_NOTE.font };
+  if (typeof actCell === "string") return { richText: [{ text: actCell }, noteRun] };
+  return { richText: [...actCell.richText, noteRun] };
 }
 // Thin border: soft periwinkle-gray for summary sheets
 const CELL_BORDER = {
@@ -366,36 +393,59 @@ function addBaselineVsCurrentSheet(wb, entityName, allTargets, sortedSessions) {
   }
 }
 
-function addChartsSheet(wb, allTargets, sortedSessions) {
+// Two half-year chart sheets: H1 = Jan–Jun, H2 = Jul–Dec.
+// One chart per target, one data point per month (monthly average).
+function addHalfYearChartsSheets(wb, allTargets, sessions) {
   if (typeof Chart === "undefined") return;
 
-  const chartsWs = wb.addWorksheet("Charts");
-  let chartIdx = 0;
+  const H1 = new Set(["January","February","March","April","May","June"]);
+  const H2 = new Set(["July","August","September","October","November","December"]);
 
-  for (const target of allTargets) {
-    const yValues = [];
-    const datesWithData = [];
-    for (const session of sortedSessions) {
-      const snap  = (session.targetsSnapshot || []).find(t => t.name === target.name);
-      const eff   = snap ? { ...target, maxPoints: snap.maxPoints ?? target.maxPoints } : target;
-      const score = calcDailyAverage(session, eff, allTargets);
-      if (score !== null) { yValues.push(Math.round(score)); datesWithData.push(session.date); }
+  const allMonths = [...new Set(sessions.map(s => s.month))].sort((a, b) => {
+    const [ma, ya] = parseMonth(a); const [mb, yb] = parseMonth(b);
+    return ya !== yb ? ya - yb : ma - mb;
+  });
+  const h1Months = allMonths.filter(m => H1.has(m.split(" ")[0]));
+  const h2Months = allMonths.filter(m => H2.has(m.split(" ")[0]));
+
+  function buildSheet(sheetName, halfMonths) {
+    if (halfMonths.length === 0) return;
+    const ws = wb.addWorksheet(sheetName);
+    let chartIdx = 0;
+
+    for (const target of allTargets) {
+      const yValues = [], labels = [];
+
+      for (const month of halfMonths) {
+        const monthSessions = sessions.filter(s => s.month === month);
+        const dailyAvgs = monthSessions.map(s => {
+          const snap = (s.targetsSnapshot || []).find(t => t.name === target.name);
+          const eff  = snap ? { ...target, maxPoints: snap.maxPoints ?? target.maxPoints } : target;
+          return calcDailyAverage(s, eff, allTargets);
+        }).filter(v => v !== null && !isNaN(v));
+
+        if (dailyAvgs.length > 0) {
+          yValues.push(Math.round(avg(dailyAvgs)));
+          labels.push(month.split(" ")[0].slice(0, 3));
+        }
+      }
+
+      if (yValues.length < 1) { chartIdx++; continue; }
+
+      const year = halfMonths[0].split(" ")[1];
+      const dateRange = `${labels[0]}–${labels[labels.length - 1]} ${year}`;
+      const base64 = renderTargetChart(target.name, yValues, dateRange, null, labels);
+      const imgId  = wb.addImage({ base64, extension: "png" });
+
+      const chartRow = Math.floor(chartIdx / 2) * 19;
+      const chartCol = (chartIdx % 2) * 11;
+      ws.addImage(imgId, { tl: { col: chartCol, row: chartRow }, ext: { width: 605, height: 340 } });
+      chartIdx++;
     }
-    if (yValues.length < 2) { chartIdx++; continue; }
-
-    const dateRange = formatDateRange(datesWithData);
-    const base64 = renderTargetChart(target.name, yValues, dateRange, datesWithData);
-    const imgId  = wb.addImage({ base64, extension: "png" });
-
-    const chartRow = Math.floor(chartIdx / 2) * 19;
-    const chartCol = (chartIdx % 2) * 11;
-
-    chartsWs.addImage(imgId, {
-      tl:  { col: chartCol, row: chartRow },
-      ext: { width: 605, height: 340 } // 16cm x 9cm at 96dpi
-    });
-    chartIdx++;
   }
+
+  buildSheet("Charts H1 (Jan–Jun)", h1Months);
+  buildSheet("Charts H2 (Jul–Dec)", h2Months);
 }
 
 function addIndividualTargetSheets(wb, allTargets, sessions, studentName, includeTrials) {
@@ -412,18 +462,26 @@ function addIndividualTargetSheets(wb, allTargets, sessions, studentName, includ
     const ws = wb.addWorksheet(target.name.slice(0, 31));
     rows.forEach(row => ws.addRow(row));
 
-    // Col widths: Date | Activity | Remark | Score | [Trials] | Avg Score
+    // Col widths: Date | Activity | Remark | [Trials |] Score | Avg Score
     ws.getColumn(1).width     = 6.33;
     ws.getColumn(2).width     = 50;
     ws.getColumn(3).width     = 62;
-    ws.getColumn(4).width     = 6.78;
-    if (includeTrials) ws.getColumn(5).width = 16;
+    if (includeTrials) {
+      ws.getColumn(4).width = 16;   // Trials
+      ws.getColumn(5).width = 6.78; // Score
+    } else {
+      ws.getColumn(4).width = 6.78; // Score
+    }
     ws.getColumn(avgCol).width = 8.56;
     ws.getColumn(1).alignment = { horizontal: "center", vertical: "top" };
     ws.getColumn(2).alignment = { wrapText: true, vertical: "top" };
     ws.getColumn(3).alignment = { wrapText: true, vertical: "top" };
-    ws.getColumn(4).alignment = { horizontal: "center", vertical: "top" };
-    if (includeTrials) ws.getColumn(5).alignment = { wrapText: true, horizontal: "center", vertical: "top" };
+    if (includeTrials) {
+      ws.getColumn(4).alignment = { wrapText: true, horizontal: "center", vertical: "top" };
+      ws.getColumn(5).alignment = { horizontal: "center", vertical: "top" };
+    } else {
+      ws.getColumn(4).alignment = { horizontal: "center", vertical: "top" };
+    }
     ws.getColumn(avgCol).alignment = { horizontal: "center", vertical: "top" };
 
     // Month headers: merge A:[last col], White Darker 25%, bold black
@@ -493,15 +551,14 @@ function addIndividualTargetSheets(wb, allTargets, sessions, studentName, includ
       ws.getRow(n).height = Math.max(20, visLines * 20);
     }
 
-    // Activity name cells: expand row height if text wraps beyond column width
+    // Row heights: measure both Activity (col B, 50 char wide) and Remark (col C, 72 char wide)
+    // counting real newlines plus estimated wrap, take the larger of the two.
     ws.eachRow((row, n) => {
       if (monthHeaderRows.has(n - 1) || colHeaderRows.has(n - 1) || noteRows.has(n - 1)) return;
-      const bCell = row.getCell(2);
-      const text = typeof bCell.value === "string" ? bCell.value
-        : (bCell.value?.richText?.map(r => r.text).join("") || "");
-      if (!text || text.length <= 50) return;
-      const lines = Math.ceil(text.length / 50);
-      if (!row.height || row.height < lines * 16) row.height = Math.max(20, lines * 16);
+      const getText = c => { const v = row.getCell(c).value; return typeof v === "string" ? v : (v?.richText?.map(r => r.text).join("") || ""); };
+      const countLines = (t, w) => !t ? 0 : t.split("\n").reduce((s, seg) => s + Math.max(1, Math.ceil((seg.length || 1) / w)), 0);
+      const needed = Math.max(countLines(getText(2), 48), countLines(getText(3), 72), 1);
+      if (needed > 1 && (!row.height || row.height < needed * 15)) row.height = Math.max(20, needed * 15);
     });
 
     // Session date blocks: col A = date (top+center), last col = avg score (middle+center)
@@ -551,7 +608,7 @@ async function buildStudentWorkbook(student, sessions, includeTrials) {
 
   addSummarySheets(wb, allTargets, sessions);
   addBaselineVsCurrentSheet(wb, student.name, allTargets, sortedSessions);
-  addChartsSheet(wb, allTargets, sortedSessions);
+  addHalfYearChartsSheets(wb, allTargets, sortedSessions);
   addIndividualTargetSheets(wb, allTargets, sessions, student.name, includeTrials);
 
   return wb.xlsx.writeBuffer();
@@ -582,7 +639,7 @@ async function buildGroupMemberWorkbook(studentName, allTargets, sessions, inclu
 
   addSummarySheets(wb, sortedTargets, filtered);
   addBaselineVsCurrentSheet(wb, studentName, sortedTargets, sortedSessions);
-  addChartsSheet(wb, sortedTargets, sortedSessions);
+  addHalfYearChartsSheets(wb, sortedTargets, sortedSessions);
   addIndividualTargetSheets(wb, sortedTargets, filtered, studentName, includeTrials);
 
   return wb.xlsx.writeBuffer();
@@ -1429,7 +1486,7 @@ function buildTargetSheet(target, sessions, allTargets, includeTrials) {
 
     colHeaderRows.add(rows.length);
     rows.push(includeTrials
-      ? ["Date", "Activity", "Remark", "Score", "Trials", "Avg Score"]
+      ? ["Date", "Activity", "Remark", "Trials", "Score", "Avg Score"]
       : ["Date", "Activity", "Remark", "Score", "Avg Score"]);
 
     for (const session of monthSessions) {
@@ -1469,7 +1526,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
     for (const act of activities) {
       if (act.isHeading) {
         activityHeadingRows.add(rows.length);
-        const r = blankRow(); r[1] = stripActivityMarkup(act.activityName); rows.push(r);
+        const r = blankRow(); r[1] = buildExcelActivityCell(act.activityName); rows.push(r);
         continue;
       }
 
@@ -1528,9 +1585,8 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
         continue;
       }
       if (act.isStopped) {
-        const name = stripActivityMarkup(act.activityName);
         if (act.empty) {
-          const r = blankRow(); r[1] = name + " (Stopped)"; rows.push(r);
+          const r = blankRow(); r[1] = buildExcelActivityCell(act.activityName, " (Stopped)"); rows.push(r);
           continue;
         }
       }
@@ -1540,15 +1596,16 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
       )?.actNote;
       let activityCell;
       if (actNoteText && actNoteText.trim()) {
-        const base = richTextActivityWithNote(stripActivityMarkup(act.activityName), stripActivityMarkup(actNoteText.trim()));
+        const base = richTextActivityWithNote(act.activityName, stripActivityMarkup(actNoteText.trim()));
         activityCell = act.isMastered
           ? { richText: [...base.richText, { text: " (Mastered ✓)", font: { italic: true, color: { argb: "FF6B7280" } } }] }
           : act.isArchived
           ? { richText: [...base.richText, { text: " (Archived)", font: { italic: true, color: { argb: "FF9CA3AF" } } }] }
           : base;
       } else {
-        const name = stripActivityMarkup(act.activityName);
-        activityCell = act.isMastered ? name + " (Mastered ✓)" : act.isArchived ? name + " (Archived)" : name;
+        activityCell = act.isMastered ? buildExcelActivityCell(act.activityName, " (Mastered ✓)")
+          : act.isArchived ? buildExcelActivityCell(act.activityName, " (Archived)")
+          : buildExcelActivityCell(act.activityName);
       }
 
       if (act.empty) {
@@ -1582,8 +1639,12 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
         const r = blankRow();
         r[1] = firstRemark ? activityCell : "";
         r[2] = buildExcelRemarkCell(rem.text, starter, masteryNote);
-        r[3] = remarkAvg !== null ? pct(remarkAvg) : "";
-        if (includeTrials) r[4] = trialsList(rem.trials);
+        if (includeTrials) {
+          r[3] = trialsList(rem.trials);
+          r[4] = remarkAvg !== null ? pct(remarkAvg) : "";
+        } else {
+          r[3] = remarkAvg !== null ? pct(remarkAvg) : "";
+        }
         rows.push(r);
         firstRemark = false;
       }
@@ -1844,33 +1905,34 @@ function formatDateRange(dates) {
   return                              `${mo[fm - 1]} ${fy} – ${mo[lm - 1]} ${ly}`;
 }
 
-function renderTargetChart(targetName, yValues, dateRange, dates) {
+function renderTargetChart(targetName, yValues, dateRange, dates, customLabels = null) {
   const SCALE   = 3;
   const canvas  = document.createElement("canvas");
   canvas.width  = 605;
   canvas.height = 340;
   const ctx    = canvas.getContext("2d");
   const shortMonths = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  const labels = dates.map(d => {
+  const labels = customLabels || (dates || []).map(d => {
     const [, m, day] = d.split("-").map(Number);
     return `${day} ${shortMonths[m - 1]}`;
   });
   const trend  = linearRegressionValues(yValues);
 
-  // Direction indicator from trendline slope
-  const slopePerSession = trend.length >= 2
-    ? (trend[trend.length - 1] - trend[0]) / (trend.length - 1)
-    : 0;
-  const totalDelta = Math.round(Math.abs(trend[trend.length - 1] - trend[0]));
+  // Direction: compare start-quarter avg vs end-quarter avg (more intuitive than
+  // per-session slope, which shrinks as the dataset grows even for the same total change).
+  const qLen     = Math.max(1, Math.ceil(yValues.length / 4));
+  const startAvg = yValues.slice(0, qLen).reduce((a, b) => a + b, 0) / qLen;
+  const endAvg   = yValues.slice(Math.max(0, yValues.length - qLen)).reduce((a, b) => a + b, 0) / qLen;
+  const qDelta   = Math.round(endAvg - startAvg);
   let dirText, dirColor;
-  if (Math.abs(slopePerSession) <= 1.5) {
+  if (Math.abs(qDelta) <= 8) {
     dirText  = "→  Stable";
     dirColor = "#888888";
-  } else if (slopePerSession > 0) {
-    dirText  = `↑  Trending Up  (+${totalDelta}pp)`;
+  } else if (qDelta > 0) {
+    dirText  = `↑  Trending Up  (+${qDelta}pp)`;
     dirColor = "#2A7A3B";
   } else {
-    dirText  = `↓  Trending Down  (−${totalDelta}pp)`;
+    dirText  = `↓  Trending Down  (${qDelta}pp)`;
     dirColor = "#C0392B";
   }
 
