@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "711";
+const APP_VERSION = "712";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -8136,17 +8136,19 @@ function noteToHtml(text) {
     .replace(/_([\s\S]+?)_/g, "<u>$1</u>");
 }
 
-// Convert stored note text (possibly HTML) to plain text for textarea editing
+// Convert stored note text (possibly HTML) to marker syntax for textarea editing.
+// Plain text already uses *bold* / _underline_ markers — return as-is.
+// HTML (legacy storage) gets converted: <strong>→* <u>→_ so the round-trip is lossless.
 function stripNoteHtml(text) {
   if (!text) return "";
-  if (!/<[a-z]/i.test(text)) {
-    return text.replace(/\*([\s\S]+?)\*/g, "$1");
-  }
+  if (!/<[a-z]/i.test(text)) return text;
   return text
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/div>/gi, "\n").replace(/<div>/gi, "")
     .replace(/<\/p>/gi, "\n").replace(/<p>/gi, "")
-    .replace(/<\/?(strong|b|u|em|i)[^>]*>/gi, "")
+    .replace(/<strong>/gi, "*").replace(/<\/strong>/gi, "*")
+    .replace(/<b>/gi, "*").replace(/<\/b>/gi, "*")
+    .replace(/<u>/gi, "_").replace(/<\/u>/gi, "_")
     .replace(/<[^>]*>/g, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
