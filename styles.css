@@ -2458,21 +2458,23 @@ div.admin-note-editable:empty::before {
 }
 
 .view-table-wrapper {
-  /* Shrink-to-fit instead of a normal block (which sizes to the viewport's
-     available width, not the table's actual rendered width). Without this,
-     when the table needs to be wider than the viewport (and overflows
-     rightward for the shared horizontal scrollbar on .session-view-body to
-     pick up), this wrapper's box — and the border-radius/box-shadow drawn
-     on it — stayed at the narrower viewport width, so the rounded corner
-     and shadow visibly cut off before reaching the table's true right edge. */
+  /* Mobile: inline-block so the wrapper/shadow tracks the overflowing table
+     width (see min-width override in @media max-width:767px below).
+     Desktop: block so the table fills the container and the remark column
+     flexes to fill remaining space, preventing horizontal scroll on normal
+     window sizes. */
   display: inline-block;
   border-radius: var(--radius);
   box-shadow: var(--shadow);
 }
 
+@media (min-width: 768px) {
+  .view-table-wrapper { display: block; }
+}
+
 .view-table {
   width: 100%;
-  min-width: 600px;
+  min-width: 720px;
   table-layout: fixed;
   border-collapse: collapse;
   font-size: .875rem;
@@ -2566,7 +2568,7 @@ tr.view-heading-row.view-green-row td {
 .vcol-no      { width: 36px; text-align: center; white-space: nowrap; }
 .vcol-act     { width: 250px; white-space: pre-wrap; word-break: break-word; }
 .vcol-student { width: 100px; text-align: center; white-space: pre-wrap; word-break: break-word; font-weight: 600; }
-.vcol-rem    { width: 340px; height: 1px; padding: 0; }
+.vcol-rem    { min-width: 140px; height: 1px; padding: 0; }
 .vcol-rem > * { padding: .4rem .6rem; box-sizing: border-box; }
 /* Both empty and pre-filled edit divs are direct children of .vcol-rem.
    min-height:100% resolves to the rendered row height (Chrome table-cell % behaviour);

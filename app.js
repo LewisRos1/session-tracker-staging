@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "712";
+const APP_VERSION = "713";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -184,6 +184,7 @@ const state = {
   viewSessionData:    null,
   fbViewUnsubscribe:    null,
   viewRenderPending:    false,
+  viewClickDelegate:    null,
   // Group sessions
   groups:                  [],
   searchGroup:             "",
@@ -4358,6 +4359,47 @@ async function openSessionView(student, sessionId) {
     renderSessionView();
   }, () => state.viewSessionData);
 
+  if (state.viewClickDelegate) {
+    $("session-view-body").removeEventListener("click", state.viewClickDelegate);
+  }
+  state.viewClickDelegate = e => {
+    const addRemarkBtn = e.target.closest(".view-add-remark-target");
+    if (addRemarkBtn) { showViewAddRemarkPicker(addRemarkBtn.dataset.target); return; }
+
+    const addTrialNewBtn = e.target.closest(".view-add-trial-new");
+    if (addTrialNewBtn) {
+      withViewAction("viewActionsInFlight", "viewRenderPending", isViewBusy, renderSessionView, async () => {
+        let actId = addTrialNewBtn.dataset.actId;
+        if (!actId) {
+          actId = await addActivity(
+            state.viewSessionId, addTrialNewBtn.dataset.targetName, addTrialNewBtn.dataset.actName,
+            Date.now(), addTrialNewBtn.dataset.isPredefined === "true"
+          );
+        }
+        const remId = await addRemark(state.viewSessionId, actId, "", null);
+        await setTrials(state.viewSessionId, remId, [-1]);
+        await waitForSessionData(() => !!state.viewSessionData?.remarks?.[remId]?.trials?.length);
+      })();
+      return;
+    }
+
+    const addTrialBtn = e.target.closest(".view-add-trial");
+    if (addTrialBtn) {
+      const rem = state.viewSessionData?.remarks?.[addTrialBtn.dataset.remId];
+      if (!rem) return;
+      const prevTrials = rem.trials || [];
+      const trials = [...prevTrials, -1];
+      rem.trials = trials;
+      refreshViewTrialRow(addTrialBtn.dataset.remId);
+      trackViewTrialWrite(setTrials(state.viewSessionId, addTrialBtn.dataset.remId, trials).catch(err => {
+        rem.trials = prevTrials;
+        refreshViewTrialRow(addTrialBtn.dataset.remId);
+        alert("Couldn't add trial — check your connection and try again.\n\n" + err.message);
+      }));
+    }
+  };
+  $("session-view-body").addEventListener("click", state.viewClickDelegate);
+
   try {
     state.fbViewUnsubscribe = listenToSession(sessionId, async data => {
       state.viewSessionData = data;
@@ -4388,6 +4430,10 @@ async function leaveSessionView() {
   if (state.fbViewUnsubscribe) { state.fbViewUnsubscribe(); state.fbViewUnsubscribe = null; }
   state.viewRemarkSaver?.cleanup();
   state.viewRemarkSaver = null;
+  if (state.viewClickDelegate) {
+    $("session-view-body")?.removeEventListener("click", state.viewClickDelegate);
+    state.viewClickDelegate = null;
+  }
   const sessionId = state.viewSessionId;
   const data      = state.viewSessionData;
   const student   = state.viewStudent;
@@ -5386,34 +5432,47 @@ function bindViewTrialCellListeners(container) {
     });
   });
 
-  container.querySelectorAll(".view-add-trial").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const rem = state.viewSessionData?.remarks?.[btn.dataset.remId];
-      if (!rem) return;
-      const prevTrials = rem.trials || [];
-      const trials = [...prevTrials, -1];
-      rem.trials = trials;
-      refreshViewTrialRow(btn.dataset.remId);
-      trackViewTrialWrite(setTrials(state.viewSessionId, btn.dataset.remId, trials).catch(err => {
-        rem.trials = prevTrials;
-        refreshViewTrialRow(btn.dataset.remId);
-        alert("Couldn't add trial — check your connection and try again.\n\n" + err.message);
-      }));
-    });
-  });
+  // .view-add-trial is handled by the delegated click handler on
+  // session-view-body set up once in openSessionView.
 }
 
 function showViewAddRemarkPicker(targetName) {
   const data = state.viewSessionData;
-  const choices = Object.entries(data.activities || {})
-    .filter(([actId, a]) => a.targetName === targetName && viewGetRemarks(data, actId).length > 0)
-    .map(([actId, a]) => ({ actId, name: a.activityName }));
+  const target = getViewEffectiveTargets().find(t => t.name === targetName);
+  const dateStr = data?.date;
+
+  const choices = [];
+  if (target?.predefinedActivities?.length > 0) {
+    let no = 0;
+    const matchedIds = new Set();
+    for (const pa of target.predefinedActivities) {
+      if (!isActivityActive(pa, dateStr)) continue;
+      if (pa.isHeading || pa.isMaintainHeading || pa.isNote || pa.isExportNote ||
+          pa.isMaintain || pa.isCompleted || pa.isArchived || pa.isStopped) continue;
+      no++;
+      const entry = Object.entries(data?.activities || {})
+        .find(([, a]) => a.targetName === targetName && a.activityName === pa.name);
+      if (entry && viewGetRemarks(data, entry[0]).length > 0) {
+        matchedIds.add(entry[0]);
+        choices.push({ actId: entry[0], name: pa.name, no });
+      }
+    }
+    Object.entries(data?.activities || {})
+      .filter(([actId, a]) => a.targetName === targetName && viewGetRemarks(data, actId).length > 0 && !matchedIds.has(actId))
+      .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
+      .forEach(([actId, a]) => { no++; choices.push({ actId, name: a.activityName, no }); });
+  } else {
+    Object.entries(data?.activities || {})
+      .filter(([actId, a]) => a.targetName === targetName && viewGetRemarks(data, actId).length > 0)
+      .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
+      .forEach(([actId, a], i) => choices.push({ actId, name: a.activityName, no: i + 1 }));
+  }
 
   $("session-picker-title").textContent = "Add Remark & Trials to which Activity?";
   $("session-picker-list").innerHTML = choices.length
     ? `<div class="choice-list">` + choices.map(c => `
         <button class="choice-btn view-add-remark-choice" data-act-id="${escHtml(c.actId)}">
-          <div class="choice-text"><div class="choice-label">${escHtml(c.name)}</div></div>
+          <div class="choice-text"><div class="choice-label">${escHtml(c.no + ". " + c.name)}</div></div>
         </button>`).join("") + `</div>`
     : `<p class="empty-hint">No activities with a remark yet — use the + under an activity's Trials column to start one.</p>`;
   $("session-picker-modal").classList.remove("hidden");
@@ -5442,9 +5501,9 @@ function attachViewListeners() {
 
   bindViewTrialCellListeners(body);
 
-  body.querySelectorAll(".view-add-remark-target").forEach(btn => {
-    btn.addEventListener("click", () => showViewAddRemarkPicker(btn.dataset.target));
-  });
+  // .view-add-remark-target, .view-add-trial-new, and .view-add-trial are
+  // handled by the delegated click handler on session-view-body set up once
+  // in openSessionView — not here — so they survive renderSessionView() calls.
 
   // ── Sketch board buttons (view screen) ────────────────────
   body.querySelectorAll(".btn-sketch[data-rem-id]").forEach(btn => {
@@ -5524,21 +5583,6 @@ function attachViewListeners() {
       if (!actId) actId = await addActivity(state.viewSessionId, ta.dataset.targetName, ta.dataset.actName, Date.now(), true);
       await addRemark(state.viewSessionId, actId, text, null);
     });
-  });
-
-  body.querySelectorAll(".view-add-trial-new").forEach(btn => {
-    btn.addEventListener("click", withViewAction("viewActionsInFlight", "viewRenderPending", isViewBusy, renderSessionView, async () => {
-      let actId = btn.dataset.actId;
-      if (!actId) {
-        actId = await addActivity(
-          state.viewSessionId, btn.dataset.targetName, btn.dataset.actName, Date.now(),
-          btn.dataset.isPredefined === "true"
-        );
-      }
-      const remId = await addRemark(state.viewSessionId, actId, "", null);
-      await setTrials(state.viewSessionId, remId, [-1]);
-      await waitForSessionData(() => !!state.viewSessionData?.remarks?.[remId]?.trials?.length);
-    }));
   });
 
   // "+ Add Remark" for preset-option/sentence-starter activities with
