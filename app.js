@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "721";
+const APP_VERSION = "722";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3103,10 +3103,10 @@ function renderFedcTarget(target) {
         const noteTag = pa.isExportNote
           ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.25rem">📄 Included in Word export</div>`
           : `<div style="font-size:.82rem;color:#9a3412;margin-bottom:.25rem">🔒 This note is for ZORA's use only. Excluded from Word report</div>`;
-        html += `<div class="entry-block" contenteditable="false" style="background:#fff7ed;border-left:4px solid #fb923c;">
+        html += `<div class="entry-block" contenteditable="false" style="border-left:4px solid #15803d;">
           <div class="entry-field">
-            <span class="field-label" style="color:#92400e">Note</span>
-            <div style="flex:1;color:#92400e;font-size:.93rem;font-weight:600">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
+            <span class="field-label" style="color:#15803d">Note</span>
+            <div style="flex:1;font-size:.93rem;font-weight:600">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
           </div>
         </div>`;
       }
@@ -3287,10 +3287,10 @@ function renderFedcTarget(target) {
         const noteTag = pa.isExportNote
           ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.25rem">📄 Included in Word export</div>`
           : `<div style="font-size:.82rem;color:#9a3412;margin-bottom:.25rem">🔒 This note is for ZORA's use only. Excluded from Word report</div>`;
-        return `<div class="entry-block" contenteditable="false" style="background:#fff7ed;border-left:4px solid #fb923c;opacity:.3">
+        return `<div class="entry-block" contenteditable="false" style="border-left:4px solid #15803d;opacity:.3">
           <div class="entry-field">
-            <span class="field-label" style="color:#92400e">Note</span>
-            <div style="flex:1;color:#92400e;font-size:.93rem;font-weight:600">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
+            <span class="field-label" style="color:#15803d">Note</span>
+            <div style="flex:1;font-size:.93rem;font-weight:600">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
           </div>
         </div>`;
       }
@@ -4538,7 +4538,7 @@ function buildTargetViewTable(target, data) {
         rows += `<tr class="view-heading-row${isGray ? " view-gray-row" : isGreen ? " view-green-row" : ""}"><td colspan="6" contenteditable="false">${escHtml(pa.name)}</td></tr>`;
         continue;
       }
-      if (pa.isNote) {
+      if (pa.isNote || pa.isExportNote) {
         rows += `<tr class="view-note-row"><td colspan="6" contenteditable="false">${noteToHtml(pa.text)}</td></tr>`;
         continue;
       }
@@ -5939,7 +5939,7 @@ function buildGroupTargetViewTable(target, data, attendees) {
         rows += `<tr class="view-heading-row${isGray ? " view-gray-row" : isGreenHdg ? " view-green-row" : ""}"><td colspan="7" contenteditable="false">${escHtml(pa.name)}</td></tr>`;
         continue;
       }
-      if (pa.isNote) {
+      if (pa.isNote || pa.isExportNote) {
         rows += `<tr class="view-note-row"><td colspan="7" contenteditable="false">${noteToHtml(pa.text)}</td></tr>`;
         continue;
       }
@@ -10567,10 +10567,10 @@ function buildGroupItemsByActivity(target, data, attendees) {
         const noteTag = pa.isExportNote
           ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.25rem">📄 Included in Word export</div>`
           : `<div style="font-size:.82rem;color:#9a3412;margin-bottom:.25rem">🔒 This note is for ZORA's use only. Excluded from Word report</div>`;
-        return `<div class="entry-block" contenteditable="false" style="background:#fff7ed;border-left:4px solid #fb923c;opacity:.3">
+        return `<div class="entry-block" contenteditable="false" style="border-left:4px solid #15803d;opacity:.3">
           <div class="entry-field">
-            <span class="field-label" style="color:#92400e">Note</span>
-            <div style="flex:1;color:#92400e;font-size:.93rem;font-weight:600">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
+            <span class="field-label" style="color:#15803d">Note</span>
+            <div style="flex:1;font-size:.93rem;font-weight:600">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
           </div>
         </div>`;
       }

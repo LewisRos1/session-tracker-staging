@@ -1027,8 +1027,9 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
             return parseInlineMarkupLine(cleanLine);
           });
           if (noteLines.length === 0) noteLines.push([{ text: "" }]);
+          const allNoteLines = [[{ text: "Note:", bold: true }], ...noteLines];
           tableRows.push(new TableRow({
-            children: [richCell(noteLines, { colSpan: 3, width: WORD_COL_TOTAL, fill: "FFF7ED", align: AlignmentType.LEFT })]
+            children: [richCell(allNoteLines, { colSpan: 3, width: WORD_COL_TOTAL, align: AlignmentType.LEFT })]
           }));
         } else {
         const mergeFill = r.isGrayHeading ? "D9D9D9"
