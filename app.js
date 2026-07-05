@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "718";
+const APP_VERSION = "719";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3106,7 +3106,7 @@ function renderFedcTarget(target) {
         html += `<div class="entry-block" contenteditable="false" style="background:#fff7ed;border-left:4px solid #fb923c;">
           <div class="entry-field">
             <span class="field-label" style="color:#92400e">Note</span>
-            <div style="flex:1;color:#92400e">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
+            <div style="flex:1;color:#92400e;font-size:.93rem">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
           </div>
         </div>`;
       }
@@ -3290,7 +3290,7 @@ function renderFedcTarget(target) {
         return `<div class="entry-block" contenteditable="false" style="background:#fff7ed;border-left:4px solid #fb923c;opacity:.3">
           <div class="entry-field">
             <span class="field-label" style="color:#92400e">Note</span>
-            <div style="flex:1;color:#92400e">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
+            <div style="flex:1;color:#92400e;font-size:.93rem">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
           </div>
         </div>`;
       }
@@ -8831,7 +8831,7 @@ function renderTargetManageContent(student, target) {
           btn.disabled = false;
           btn.textContent = "🗑️ Delete Activity";
           if (affected === 0) {
-            if (!confirm(`Delete activity "${pa.name}"? No past session data will be lost.`)) return;
+            if (!confirm(`Delete this activity?\nNo session data will be lost.`)) return;
             const actIdx = acts.indexOf(pa);
             if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
             target.predefinedActivities = acts;
@@ -8922,7 +8922,7 @@ function renderTargetManageContent(student, target) {
       btn.disabled = false;
       btn.textContent = "🗑️ Delete";
       if (affected === 0) {
-        if (!confirm(`Delete "${pa.name}"? No past session data will be lost.`)) return;
+        if (!confirm(`Delete this activity?\nNo session data will be lost.`)) return;
         const actIdx = acts.indexOf(pa);
         if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
         target.predefinedActivities = acts;
@@ -10529,7 +10529,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
         items.push(`<div class="entry-block" contenteditable="false" style="background:#fff7ed;border-left:4px solid #fb923c;">
           <div class="entry-field">
             <span class="field-label" style="color:#92400e">Note</span>
-            <div style="flex:1;color:#92400e">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
+            <div style="flex:1;color:#92400e;font-size:.93rem">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
           </div>
         </div>`);
       }
@@ -10570,7 +10570,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
         return `<div class="entry-block" contenteditable="false" style="background:#fff7ed;border-left:4px solid #fb923c;opacity:.3">
           <div class="entry-field">
             <span class="field-label" style="color:#92400e">Note</span>
-            <div style="flex:1;color:#92400e">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
+            <div style="flex:1;color:#92400e;font-size:.93rem">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
           </div>
         </div>`;
       }
