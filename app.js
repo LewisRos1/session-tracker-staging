@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "720";
+const APP_VERSION = "721";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3106,7 +3106,7 @@ function renderFedcTarget(target) {
         html += `<div class="entry-block" contenteditable="false" style="background:#fff7ed;border-left:4px solid #fb923c;">
           <div class="entry-field">
             <span class="field-label" style="color:#92400e">Note</span>
-            <div style="flex:1;color:#92400e;font-size:.93rem">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
+            <div style="flex:1;color:#92400e;font-size:.93rem;font-weight:600">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
           </div>
         </div>`;
       }
@@ -3290,7 +3290,7 @@ function renderFedcTarget(target) {
         return `<div class="entry-block" contenteditable="false" style="background:#fff7ed;border-left:4px solid #fb923c;opacity:.3">
           <div class="entry-field">
             <span class="field-label" style="color:#92400e">Note</span>
-            <div style="flex:1;color:#92400e;font-size:.93rem">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
+            <div style="flex:1;color:#92400e;font-size:.93rem;font-weight:600">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
           </div>
         </div>`;
       }
@@ -10529,7 +10529,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
         items.push(`<div class="entry-block" contenteditable="false" style="background:#fff7ed;border-left:4px solid #fb923c;">
           <div class="entry-field">
             <span class="field-label" style="color:#92400e">Note</span>
-            <div style="flex:1;color:#92400e;font-size:.93rem">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
+            <div style="flex:1;color:#92400e;font-size:.93rem;font-weight:600">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
           </div>
         </div>`);
       }
@@ -10570,7 +10570,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
         return `<div class="entry-block" contenteditable="false" style="background:#fff7ed;border-left:4px solid #fb923c;opacity:.3">
           <div class="entry-field">
             <span class="field-label" style="color:#92400e">Note</span>
-            <div style="flex:1;color:#92400e;font-size:.93rem">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
+            <div style="flex:1;color:#92400e;font-size:.93rem;font-weight:600">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
           </div>
         </div>`;
       }
