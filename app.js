@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "714";
+const APP_VERSION = "715";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -801,25 +801,20 @@ function runOneOffRepairs() {
       .catch(err => console.error("runOneOffRepairs (Caden Tan FEDC 1 Comment) failed:", err));
   }
 
-  // Caden Tan's "Self Regulation" → "Self-Regulation" and "Functional
-  // Communication" → "Two-Way Communication" target renames had the same
-  // missing-propagation bug as the FEDC 1 fix above, just one level up (the
-  // target's own name instead of an activity's) — renameTargetAcrossSessions
-  // didn't exist yet when these renames happened, so every historical
-  // session's activities/remarks/trials for both targets were left stuck
-  // under the old names and looked completely empty (scores included) under
-  // the renamed targets.
+  // Caden Tan's "Self Regulation" → "Self-Regulation" rename had the same
+  // missing-propagation bug as the FEDC 1 fix above. The "Functional
+  // Communication" → "Two-Way Communication" repairs that were here (v602,
+  // v603) are now REVERSED: the target was renamed back to "Functional
+  // Communication" in the student doc, so all session activities that were
+  // previously migrated to "Two-Way Communication" (or the earlier typo
+  // "Two Way Communication") need to come back to "Functional Communication".
   if (caden) {
     renameTargetAcrossSessions(caden.id, "Self Regulation", "Self-Regulation")
       .catch(err => console.error("runOneOffRepairs (Caden Tan Self-Regulation) failed:", err));
-    renameTargetAcrossSessions(caden.id, "Functional Communication", "Two-Way Communication")
-      .catch(err => console.error("runOneOffRepairs (Caden Tan Two-Way Communication) failed:", err));
-    // The first version of this repair (v602) guessed the new name wrong —
-    // "Two Way Communication" (no hyphen) instead of the boss's actual
-    // "Two-Way Communication" — so it already ran once and moved the data
-    // to that wrong name instead of fixing it. Correct it forward.
-    renameTargetAcrossSessions(caden.id, "Two Way Communication", "Two-Way Communication")
-      .catch(err => console.error("runOneOffRepairs (Caden Tan Two-Way Communication typo fix) failed:", err));
+    renameTargetAcrossSessions(caden.id, "Two-Way Communication", "Functional Communication")
+      .catch(err => console.error("runOneOffRepairs (Caden Tan FC restore) failed:", err));
+    renameTargetAcrossSessions(caden.id, "Two Way Communication", "Functional Communication")
+      .catch(err => console.error("runOneOffRepairs (Caden Tan FC restore typo) failed:", err));
   }
 
   migrateAwayFromMasteryType()
