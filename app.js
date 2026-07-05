@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "722";
+const APP_VERSION = "723";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3103,9 +3103,9 @@ function renderFedcTarget(target) {
         const noteTag = pa.isExportNote
           ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.25rem">📄 Included in Word export</div>`
           : `<div style="font-size:.82rem;color:#9a3412;margin-bottom:.25rem">🔒 This note is for ZORA's use only. Excluded from Word report</div>`;
-        html += `<div class="entry-block" contenteditable="false" style="border-left:4px solid #15803d;">
+        html += `<div class="entry-block" contenteditable="false" style="border-left:4px solid #70ad47;">
           <div class="entry-field">
-            <span class="field-label" style="color:#15803d">Note</span>
+            <span class="field-label" style="color:#70ad47">Note</span>
             <div style="flex:1;font-size:.93rem;font-weight:600">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
           </div>
         </div>`;
@@ -3287,9 +3287,9 @@ function renderFedcTarget(target) {
         const noteTag = pa.isExportNote
           ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.25rem">📄 Included in Word export</div>`
           : `<div style="font-size:.82rem;color:#9a3412;margin-bottom:.25rem">🔒 This note is for ZORA's use only. Excluded from Word report</div>`;
-        return `<div class="entry-block" contenteditable="false" style="border-left:4px solid #15803d;opacity:.3">
+        return `<div class="entry-block" contenteditable="false" style="border-left:4px solid #70ad47;opacity:.3">
           <div class="entry-field">
-            <span class="field-label" style="color:#15803d">Note</span>
+            <span class="field-label" style="color:#70ad47">Note</span>
             <div style="flex:1;font-size:.93rem;font-weight:600">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
           </div>
         </div>`;
@@ -10567,9 +10567,9 @@ function buildGroupItemsByActivity(target, data, attendees) {
         const noteTag = pa.isExportNote
           ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.25rem">📄 Included in Word export</div>`
           : `<div style="font-size:.82rem;color:#9a3412;margin-bottom:.25rem">🔒 This note is for ZORA's use only. Excluded from Word report</div>`;
-        return `<div class="entry-block" contenteditable="false" style="border-left:4px solid #15803d;opacity:.3">
+        return `<div class="entry-block" contenteditable="false" style="border-left:4px solid #70ad47;opacity:.3">
           <div class="entry-field">
-            <span class="field-label" style="color:#15803d">Note</span>
+            <span class="field-label" style="color:#70ad47">Note</span>
             <div style="flex:1;font-size:.93rem;font-weight:600">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
           </div>
         </div>`;
