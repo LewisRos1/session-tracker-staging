@@ -314,55 +314,63 @@ function unionTargetsByName(groups) {
 }
 
 function addBaselineVsCurrentSheet(wb, entityName, allTargets, sortedSessions) {
-  // Compare first month of data vs most recent month of data (each as a monthly average).
-  const months = [...new Set(sortedSessions.map(s => s.month))].sort((a, b) => {
+  // Per-target: each target's "first month" is the first month IT has data,
+  // not the global first month. Same for "most recent month".
+  const allMonths = [...new Set(sortedSessions.map(s => s.month))].sort((a, b) => {
     const [ma, ya] = parseMonth(a); const [mb, yb] = parseMonth(b);
     return ya !== yb ? ya - yb : ma - mb;
   });
-  if (months.length < 2) return;
+  if (allMonths.length < 2) return;
 
-  const firstMonth         = months[0];
-  const lastMonth          = months[months.length - 1];
-  const firstMonthSessions = sortedSessions.filter(s => s.month === firstMonth);
-  const lastMonthSessions  = sortedSessions.filter(s => s.month === lastMonth);
+  // Group sessions by month once
+  const sessionsByMonth = {};
+  for (const month of allMonths) sessionsByMonth[month] = sortedSessions.filter(s => s.month === month);
+
+  const monthAvgForTarget = (target, sessions) => {
+    const vals = sessions.map(s => {
+      const snap = (s.targetsSnapshot || []).find(t => t.name === target.name);
+      const eff  = snap ? { ...target, maxPoints: snap.maxPoints ?? target.maxPoints } : target;
+      return calcDailyAverage(s, eff, allTargets);
+    }).filter(v => v !== null && !isNaN(v));
+    return vals.length > 0 ? avg(vals) : null;
+  };
 
   const bvcRows    = [];
   const bvcTargets = [];
 
   bvcRows.push([`${entityName}: First Month vs Most Recent Month`, "", ""]);
-  bvcRows.push(["Target", firstMonth, lastMonth]);
+  bvcRows.push(["Target", "First Month", "Most Recent Month"]);
 
   for (const target of allTargets) {
-    const monthAvg = sessions => {
-      const vals = sessions.map(s => {
-        const snap = (s.targetsSnapshot || []).find(t => t.name === target.name);
-        const eff  = snap ? { ...target, maxPoints: snap.maxPoints ?? target.maxPoints } : target;
-        return calcDailyAverage(s, eff, allTargets);
-      }).filter(v => v !== null && !isNaN(v));
-      return vals.length > 0 ? avg(vals) : null;
-    };
+    let firstMonth = null, lastMonth = null, scoreF = null, scoreL = null;
+    for (const month of allMonths) {
+      const v = monthAvgForTarget(target, sessionsByMonth[month]);
+      if (v !== null) {
+        if (firstMonth === null) { firstMonth = month; scoreF = v; }
+        lastMonth = month;
+        scoreL    = v;
+      }
+    }
 
-    const scoreF = monthAvg(firstMonthSessions);
-    const scoreL = monthAvg(lastMonthSessions);
-
+    const hasComparison = firstMonth !== null && lastMonth !== null && firstMonth !== lastMonth;
     bvcRows.push([
       target.name,
-      scoreF !== null ? pct(scoreF) : "",
-      scoreL !== null ? pct(scoreL) : ""
+      firstMonth && scoreF !== null ? `${firstMonth}: ${pct(scoreF)}` : "",
+      hasComparison && scoreL !== null ? `${lastMonth}: ${pct(scoreL)}` : ""
     ]);
     bvcTargets.push({
       name:  target.name,
-      first: scoreF !== null ? Math.round(scoreF) : null,
-      last:  scoreL !== null ? Math.round(scoreL) : null
+      first: hasComparison && scoreF !== null ? Math.round(scoreF) : null,
+      last:  hasComparison && scoreL !== null ? Math.round(scoreL) : null
     });
   }
 
   const bvcWs = wb.addWorksheet("Monthly Comparison");
   bvcRows.forEach(row => bvcWs.addRow(row));
 
-  bvcWs.getColumn(1).width     = 30;
-  bvcWs.getColumn(2).width     = 18;
-  bvcWs.getColumn(3).width     = 18;
+  bvcWs.getColumn(1).width     = 28;
+  bvcWs.getColumn(2).width     = 24;
+  bvcWs.getColumn(3).width     = 24;
   bvcWs.getColumn(1).alignment = { vertical: "middle" };
   bvcWs.getColumn(2).alignment = { horizontal: "center", vertical: "middle" };
   bvcWs.getColumn(3).alignment = { horizontal: "center", vertical: "middle" };
@@ -390,8 +398,8 @@ function addBaselineVsCurrentSheet(wb, entityName, allTargets, sortedSessions) {
         chartTargets.map(t => t.name),
         chartTargets.map(t => t.first),
         chartTargets.map(t => t.last),
-        firstMonth,
-        lastMonth
+        "First Month Avg",
+        "Most Recent Month Avg"
       );
       const bvcImgId = wb.addImage({ base64: bvcBase64, extension: "png" });
       bvcWs.addImage(bvcImgId, {
@@ -1927,21 +1935,18 @@ function renderTargetChart(targetName, yValues, dateRange, dates, customLabels =
   });
   const trend  = linearRegressionValues(yValues);
 
-  // Direction: compare start-quarter avg vs end-quarter avg (more intuitive than
-  // per-session slope, which shrinks as the dataset grows even for the same total change).
-  const qLen     = Math.max(1, Math.ceil(yValues.length / 4));
-  const startAvg = yValues.slice(0, qLen).reduce((a, b) => a + b, 0) / qLen;
-  const endAvg   = yValues.slice(Math.max(0, yValues.length - qLen)).reduce((a, b) => a + b, 0) / qLen;
-  const qDelta   = Math.round(endAvg - startAvg);
+  // Direction: use the linear regression endpoint difference (slope × (n-1)).
+  // More robust than quarter-average comparison and not sensitive to single-session outliers.
+  const lrDelta  = Math.round(trend[trend.length - 1] - trend[0]);
   let dirText, dirColor;
-  if (Math.abs(qDelta) <= 8) {
+  if (Math.abs(lrDelta) <= 8) {
     dirText  = "→  Stable";
     dirColor = "#888888";
-  } else if (qDelta > 0) {
-    dirText  = `↑  Trending Up  (+${qDelta}pp)`;
+  } else if (lrDelta > 0) {
+    dirText  = "↑  Trending Up";
     dirColor = "#2A7A3B";
   } else {
-    dirText  = `↓  Trending Down  (${qDelta}pp)`;
+    dirText  = "↓  Trending Down";
     dirColor = "#C0392B";
   }
 
@@ -2015,7 +2020,7 @@ function renderTargetChart(targetName, yValues, dateRange, dates, customLabels =
       animation:        false,
       responsive:       false,
       devicePixelRatio: SCALE,
-      layout: { padding: { top: 10, left: 4, right: 22, bottom: 20 } },
+      layout: { padding: { top: 10, left: 18, right: 18, bottom: 20 } },
       plugins: {
         title: {
           display: true,
