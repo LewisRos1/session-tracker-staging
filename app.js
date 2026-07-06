@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "732";
+const APP_VERSION = "733";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3166,7 +3166,7 @@ function renderFedcTarget(target) {
     if (isFixed) {
       const fixedText = pa.fixedRemark ?? pa.maintainRemark ?? "";
       const isGrayFixed  = pa.isMaintain || pa.activityColor === "gray";
-      const isGreenFixed = pa.activityColor === "green";
+      const isGreenFixed = pa.activityColor === "green" || pa.inactiveReason === 'mastered';
       const fixedStyle   = isGreenFixed
         ? 'style="background:#e2efda;border:1px solid #a9d18e;border-left:4px solid #70ad47"'
         : isGrayFixed
@@ -3201,7 +3201,7 @@ function renderFedcTarget(target) {
     const mappedInfo = pa.isMapped ? resolveMappedScoreDisplay(pa) : null;
 
     const isGrayActivity  = pa.activityColor === "gray" || pa.isMaintainLive;
-    const isGreenActivity = pa.activityColor === "green";
+    const isGreenActivity = pa.activityColor === "green" || pa.inactiveReason === 'mastered';
     const activityStyle = isGrayActivity  ? ' style="background:#f3f4f6;border:1px solid #e5e7eb;border-left:4px solid #d1d5db"'
                         : isGreenActivity ? ' style="background:#e2efda;border:1px solid #a9d18e;border-left:4px solid #70ad47"'
                         : '';
@@ -4581,7 +4581,7 @@ function buildTargetViewTable(target, data) {
         if (fixedEntry) matchedIds.add(fixedEntry[0]);
         const fixedText = pa.fixedRemark ?? pa.maintainRemark ?? "";
         const isGrayFixed = pa.activityColor === "gray" || !!pa.isMaintainLive;
-        const isGreenFixed = pa.activityColor === "green";
+        const isGreenFixed = pa.activityColor === "green" || pa.inactiveReason === 'mastered';
         no++;
         rows += `<tr${isGrayFixed ? ' class="view-gray-row"' : isGreenFixed ? ' class="view-green-row"' : ' style="background:#f9fafb"'}>
           <td class="vcol-no" contenteditable="false">${no}</td>
@@ -4684,7 +4684,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
   const remarkHasNote   = paEntry?.remarkHasNote || false;
   const mappedInfo      = paEntry?.isMapped ? resolveViewMappedScoreDisplay(paEntry, data) : null;
   const isGrayAct       = isPredefined && (paEntry?.activityColor === "gray" || paEntry?.isMaintainLive);
-  const isGreenAct      = isPredefined && paEntry?.activityColor === "green";
+  const isGreenAct      = isPredefined && (paEntry?.activityColor === "green" || paEntry?.inactiveReason === 'mastered');
   const rowClass        = isGrayAct ? "view-gray-row" : isGreenAct ? "view-green-row" : "";
 
   if (remarks.length === 0) {
@@ -5981,7 +5981,7 @@ function buildGroupTargetViewTable(target, data, attendees) {
         if (fixedEntry) matchedIds.add(fixedEntry[0]);
         const fixedText = pa.fixedRemark ?? pa.maintainRemark ?? "";
         const isGrayFixed = pa.activityColor === "gray" || !!pa.isMaintainLive;
-        const isGreenFixed2 = pa.activityColor === "green";
+        const isGreenFixed2 = pa.activityColor === "green" || pa.inactiveReason === 'mastered';
         no++;
         rows += `<tr${isGrayFixed ? ' class="view-gray-row"' : isGreenFixed2 ? ' class="view-green-row"' : ' style="background:#f9fafb"'}>
           <td class="vcol-no" contenteditable="false">${no}</td>
@@ -6134,7 +6134,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
   const remarkHasNote   = paEntry?.remarkHasNote || false;
   const opts            = parseOpts(inlineOptions);
   const isGrayAct       = isPredefined && (paEntry?.activityColor === "gray" || paEntry?.isMaintainLive);
-  const isGreenAct      = isPredefined && paEntry?.activityColor === "green";
+  const isGreenAct      = isPredefined && (paEntry?.activityColor === "green" || paEntry?.inactiveReason === 'mastered');
   const rowClass        = isGrayAct ? "view-gray-row" : isGreenAct ? "view-green-row" : "";
 
   if (rounds.length === 0) {
@@ -8475,7 +8475,7 @@ function renderTargetManageContent(student, target) {
     } else {
       const remarkTypeSelect = buildRemarkTypeControls(a, idx);
       const isGray = a.activityColor === "gray" || a.isMaintainLive;
-      const isGreen = a.activityColor === "green";
+      const isGreen = a.activityColor === "green" || a.inactiveReason === 'mastered';
       const _editRef2   = state.sessionData?.date || todayDateStr();
       const actInactive = !isActivityActive(a, _editRef2);
       const actExpired  = actInactive && !!a.activeTo && a.activeTo < _editRef2;
@@ -9448,7 +9448,7 @@ function renderTemplateManageContent(template) {
     } else {
       const remarkTypeSelect = buildRemarkTypeControls(a, idx);
       const isGray = a.activityColor === "gray" || a.isMaintainLive;
-      const isGreen = a.activityColor === "green";
+      const isGreen = a.activityColor === "green" || a.inactiveReason === 'mastered';
       const _editRef2   = state.sessionData?.date || todayDateStr();
       const actInactive = !isActivityActive(a, _editRef2);
       const actExpired  = actInactive && !!a.activeTo && a.activeTo < _editRef2;
