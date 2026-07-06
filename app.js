@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "730";
+const APP_VERSION = "731";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -435,7 +435,7 @@ function isEmptyActItem(a) {
 // their plain <textarea> (see wrapTextareaSelection) rather than through this
 // popup — the popup is only for remarks now, same as it always was.
 function isActivityMarkupField(el) {
-  return el.classList?.contains("mn-act-name-input") || el.classList?.contains("mn-act-note-input");
+  return el.classList?.contains("mn-act-name-input");
 }
 
 function openTextEditorSheet(originEl) {
@@ -8424,14 +8424,7 @@ function renderTargetManageContent(student, target) {
       const mappedOptions = siblingTargets.map(t =>
         `<option value="${escHtml(t.id)}"${a.mappedTargetId === t.id ? " selected" : ""}>${escHtml(t.name)}</option>`
       ).join("");
-      const mappedNoteRow = a.actNote !== undefined
-        ? `<div style="display:flex;align-items:flex-start;gap:.3rem">
-            ${formatButtonsHtml(`mn-act-note-${idx}`)}
-            <textarea class="admin-input mn-act-note-input" id="mn-act-note-${idx}" data-idx="${idx}"
-              rows="1" placeholder="Enter Note"
-              style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.actNote || "")}</textarea>
-          </div>`
-        : "";
+
       const _editRef    = state.sessionData?.date || todayDateStr();
       const actInactive = !isActivityActive(a, _editRef);
       const actExpired  = actInactive && !!a.activeTo && a.activeTo < _editRef;
@@ -8456,7 +8449,6 @@ function renderTargetManageContent(student, target) {
             <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
               rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
           </div>
-          ${mappedNoteRow}
           <div style="display:flex;align-items:center;gap:.5rem">
             <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Remark Type:</span>
             ${buildRemarkTypeControls(a, idx)}
@@ -8503,14 +8495,6 @@ function renderTargetManageContent(student, target) {
           </div>
         </div>
       </div>` : '';
-      const noteRow = a.actNote !== undefined
-        ? `<div style="display:flex;align-items:flex-start;gap:.3rem">
-            ${formatButtonsHtml(`mn-act-name-${idx}`)}
-            <textarea class="admin-input mn-act-note-input" id="mn-act-note-${idx}" data-idx="${idx}"
-              rows="1" placeholder="Enter Note"
-              style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.actNote || "")}</textarea>
-          </div>`
-        : "";
       const fixedRemarkRow = a.fixedRemark !== undefined
         ? `<div style="display:flex;align-items:flex-start;gap:.3rem">
             <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600;padding-top:.3rem">Fixed Remark:</span>
@@ -8528,7 +8512,6 @@ function renderTargetManageContent(student, target) {
             <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
               rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
           </div>
-          ${noteRow}
           <div style="display:flex;align-items:center;gap:.5rem">
             <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Remark Type:</span>
             ${remarkTypeSelect}
@@ -8586,11 +8569,9 @@ function renderTargetManageContent(student, target) {
   html += `
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.25rem">
       <button class="btn-admin-add" id="btn-mn-add-act" style="flex:0 0 auto;width:auto">+ Add Activity</button>
-      <button class="btn-admin-add" id="btn-mn-add-act-note" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Note</button>
       <button class="btn-admin-add" id="btn-mn-add-heading" style="flex:0 0 auto;width:auto">+ Add Section Heading</button>
       <button class="btn-admin-add" id="btn-mn-add-note" style="flex:0 0 auto;width:auto">+ Add Note</button>
       <button class="btn-admin-add" id="btn-mn-add-mapped" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Mapped Score</button>
-      <button class="btn-admin-add" id="btn-mn-add-act-note-mapped" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Note &amp; Mapped Score</button>
     </div>
     <div style="margin-top:2rem;padding-bottom:1.5rem">
       <button class="btn-primary-sm" id="btn-mn-done-target"
@@ -8616,6 +8597,11 @@ function renderTargetManageContent(student, target) {
   };
 
   _pendingActsCleanup = { acts, save: saveTarget };
+
+  if (acts.some(a => a.actNote !== undefined)) {
+    acts.forEach(a => { delete a.actNote; });
+    saveTarget().catch(() => {});
+  }
 
   initDragSort($("mn-act-list"), async newOrder => {
     const reordered = newOrder.map(oldIdx => acts[oldIdx]);
@@ -8710,25 +8696,6 @@ function renderTargetManageContent(student, target) {
       if (oldName) propagateActivityRename(student, target.name, oldName, a.name);
     });
     if (!a.isNote && !a.isExportNote) input?.addEventListener("input", () => autoResizeTextarea(input));
-
-    const noteInput = $(`mn-act-note-${idx}`);
-    if (noteInput) {
-      const resize = () => { noteInput.style.height = "auto"; noteInput.style.height = noteInput.scrollHeight + "px"; };
-      resize();
-      let actNoteTimer;
-      noteInput.addEventListener("input", () => {
-        resize();
-        a.actNote = noteInput.value;
-        clearTimeout(actNoteTimer);
-        actNoteTimer = setTimeout(async () => { await saveTarget(); }, 800);
-      });
-      noteInput.addEventListener("blur", async () => {
-        if (noteInput.value === (a.actNote || "")) return;
-        a.actNote = noteInput.value;
-        await saveTarget();
-        flashSaved(noteInput);
-      });
-    }
 
     const maintainRemarkInput = $(`mn-act-mremark-${idx}`);
     if (maintainRemarkInput) {
@@ -9017,13 +8984,6 @@ function renderTargetManageContent(student, target) {
     renderTargetManageContent(student, target);
   });
 
-  $("btn-mn-add-act-note").addEventListener("click", async () => {
-    acts.push({ id: cfgId("a"), name: "", actNote: "", order: acts.length, activeFrom: null });
-    target.predefinedActivities = acts;
-    await saveTarget();
-    renderTargetManageContent(student, target);
-  });
-
   $("btn-mn-add-heading").addEventListener("click", async () => {
     acts.push({ id: cfgId("h"), isHeading: true, name: "", order: acts.length, activeFrom: null });
     target.predefinedActivities = acts;
@@ -9062,13 +9022,6 @@ function renderTargetManageContent(student, target) {
 
   $("btn-mn-add-mapped").addEventListener("click", async () => {
     acts.push({ id: cfgId("m"), isMapped: true, name: "", mappedTargetId: null, order: acts.length, activeFrom: null });
-    target.predefinedActivities = acts;
-    await saveTarget();
-    renderTargetManageContent(student, target);
-  });
-
-  $("btn-mn-add-act-note-mapped").addEventListener("click", async () => {
-    acts.push({ id: cfgId("m"), isMapped: true, name: "", actNote: "", mappedTargetId: null, order: acts.length, activeFrom: null });
     target.predefinedActivities = acts;
     await saveTarget();
     renderTargetManageContent(student, target);
@@ -9523,14 +9476,6 @@ function renderTemplateManageContent(template) {
           </div>
         </div>
       </div>` : '';
-      const noteRow = a.actNote !== undefined
-        ? `<div style="display:flex;align-items:flex-start;gap:.3rem">
-            ${formatButtonsHtml(`mn-act-note-${idx}`)}
-            <textarea class="admin-input mn-act-note-input" id="mn-act-note-${idx}" data-idx="${idx}"
-              rows="1" placeholder="Enter Note"
-              style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.actNote || "")}</textarea>
-          </div>`
-        : "";
       const fixedRemarkRow = a.fixedRemark !== undefined
         ? `<div style="display:flex;align-items:flex-start;gap:.3rem">
             <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600;padding-top:.3rem">Fixed Remark:</span>
@@ -9548,7 +9493,6 @@ function renderTemplateManageContent(template) {
             <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
               rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
           </div>
-          ${noteRow}
           <div style="display:flex;align-items:center;gap:.5rem">
             <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Remark Type:</span>
             ${remarkTypeSelect}
@@ -9580,7 +9524,6 @@ function renderTemplateManageContent(template) {
   html += `</div>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.25rem">
       <button class="btn-admin-add" id="btn-mn-add-act" style="flex:0 0 auto;width:auto">+ Add Activity</button>
-      <button class="btn-admin-add" id="btn-mn-add-act-note" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Note</button>
       <button class="btn-admin-add" id="btn-mn-add-heading" style="flex:0 0 auto;width:auto">+ Add Section Heading</button>
       <button class="btn-admin-add" id="btn-mn-add-note" style="flex:0 0 auto;width:auto">+ Add Note</button>
     </div>
@@ -9602,6 +9545,11 @@ function renderTemplateManageContent(template) {
   };
 
   _pendingActsCleanup = { acts, save: saveTemplateFn };
+
+  if (acts.some(a => a.actNote !== undefined)) {
+    acts.forEach(a => { delete a.actNote; });
+    saveTemplateFn().catch(() => {});
+  }
 
   initDragSort($("mn-act-list"), async newOrder => {
     const reordered = newOrder.map(oldIdx => acts[oldIdx]);
@@ -9664,25 +9612,6 @@ function renderTemplateManageContent(template) {
     });
     if (!a.isNote && !a.isExportNote) input?.addEventListener("input", () => autoResizeTextarea(input));
 
-    const noteInput = $(`mn-act-note-${idx}`);
-    if (noteInput) {
-      const resize = () => { noteInput.style.height = "auto"; noteInput.style.height = noteInput.scrollHeight + "px"; };
-      resize();
-      let actNoteTimer;
-      noteInput.addEventListener("input", () => {
-        resize();
-        a.actNote = noteInput.value;
-        clearTimeout(actNoteTimer);
-        actNoteTimer = setTimeout(async () => { await saveTemplateFn(); }, 800);
-      });
-      noteInput.addEventListener("blur", async () => {
-        if (noteInput.value === (a.actNote || "")) return;
-        a.actNote = noteInput.value;
-        await saveTemplateFn();
-        flashSaved(noteInput);
-      });
-    }
-
     const maintainRemarkInput = $(`mn-act-mremark-${idx}`);
     if (maintainRemarkInput) {
       const resize = () => { maintainRemarkInput.style.height = "auto"; maintainRemarkInput.style.height = maintainRemarkInput.scrollHeight + "px"; };
@@ -9736,13 +9665,6 @@ function renderTemplateManageContent(template) {
 
   $("btn-mn-add-act").addEventListener("click", async () => {
     acts.push({ id: cfgId("a"), name: "", order: acts.length, activeFrom: null });
-    template.predefinedActivities = acts;
-    await saveTemplateFn();
-    renderTemplateManageContent(template);
-  });
-
-  $("btn-mn-add-act-note").addEventListener("click", async () => {
-    acts.push({ id: cfgId("a"), name: "", actNote: "", order: acts.length, activeFrom: null });
     template.predefinedActivities = acts;
     await saveTemplateFn();
     renderTemplateManageContent(template);
