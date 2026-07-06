@@ -1117,7 +1117,12 @@ input.field-input::placeholder {
   flex-wrap: wrap;
   gap: .35rem;
 }
-.view-remark-multi-btn {
+.view-remark-multi-btn,
+.view-remark-single-btn,
+.view-multi-create-btn,
+.view-group-multi-create-btn,
+.view-single-create-btn,
+.view-group-single-create-btn {
   padding: .3rem .65rem;
   border: 1.5px solid var(--border);
   border-radius: 20px;
@@ -1127,8 +1132,14 @@ input.field-input::placeholder {
   cursor: pointer;
   transition: background .12s, border-color .12s, color .12s;
 }
-.view-remark-multi-btn:hover { border-color: var(--primary); color: var(--primary); }
-.view-remark-multi-btn.active {
+.view-remark-multi-btn:hover,
+.view-remark-single-btn:hover,
+.view-multi-create-btn:hover,
+.view-group-multi-create-btn:hover,
+.view-single-create-btn:hover,
+.view-group-single-create-btn:hover { border-color: var(--primary); color: var(--primary); }
+.view-remark-multi-btn.active,
+.view-remark-single-btn.active {
   background: var(--primary);
   border-color: var(--primary);
   color: var(--white);

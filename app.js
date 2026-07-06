@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "728";
+const APP_VERSION = "729";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4719,12 +4719,11 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
           data-target-name="${escHtml(target.name)}" data-is-predefined="${isPredefined}">${escHtml(opt)}</button>`
       ).join("")}</div>`;
     } else {
-      emptySelHtml = `<select class="view-preset-create-sel"
+      emptySelHtml = `<div class="view-remark-multi-opts" contenteditable="false">${opts.map(opt =>
+        `<button class="view-single-create-btn" data-opt="${escHtml(opt)}"
           data-act-id="${escHtml(actId || "")}" data-act-name="${escHtml(actName)}"
-          data-target-name="${escHtml(target.name)}" data-is-predefined="${isPredefined}">
-        <option value="">— select —</option>
-        ${opts.map(opt => `<option value="${escHtml(opt)}">${escHtml(opt)}</option>`).join("")}
-      </select>`;
+          data-target-name="${escHtml(target.name)}" data-is-predefined="${isPredefined}">${escHtml(opt)}</button>`
+      ).join("")}</div>`;
     }
     const emptyRemCell = sentenceStarter
       ? `<div class="view-starter-wrap" contenteditable="false">
@@ -4800,12 +4799,10 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
           data-rem-id="${escHtml(remId)}" data-opt="${escHtml(opt)}">${escHtml(opt)}</button>`
       ).join("")}</div>`;
     }
-    return `<select class="view-remark-preset-select" data-rem-id="${escHtml(remId)}">
-        <option value="">— select —</option>
-        ${opts.map(opt =>
-          `<option value="${escHtml(opt)}"${remText === opt ? " selected" : ""}>${escHtml(opt)}</option>`
-        ).join("")}
-       </select>`;
+    return `<div class="view-remark-multi-opts" contenteditable="false">${opts.map(opt =>
+      `<button class="view-remark-single-btn${remText === opt ? " active" : ""}"
+        data-rem-id="${escHtml(remId)}" data-opt="${escHtml(opt)}">${escHtml(opt)}</button>`
+    ).join("")}</div>`;
   }
 
   const optSelect = makeViewOpts(rem.id, rem.text)
@@ -5555,14 +5552,17 @@ function attachViewListeners() {
   // out with no guard for an in-flight write, so without this, leaving the
   // screen right after a click could see the OLD value and let
   // cleanupEmptyEntries() delete a remark the boss just set.
-  body.querySelectorAll(".view-remark-preset-select").forEach(sel => {
-    sel.addEventListener("change", withViewAction("viewActionsInFlight", "viewRenderPending", isViewBusy, renderSessionView, async () => {
-      if (!sel.value) return;
-      const rem = state.viewSessionData?.remarks?.[sel.dataset.remId];
+  body.querySelectorAll(".view-remark-single-btn").forEach(btn => {
+    btn.addEventListener("click", withViewAction("viewActionsInFlight", "viewRenderPending", isViewBusy, renderSessionView, async () => {
+      const isActive = btn.classList.contains("active");
+      btn.closest(".view-remark-multi-opts")?.querySelectorAll(".view-remark-single-btn").forEach(b => b.classList.remove("active"));
+      const newText = isActive ? "" : btn.dataset.opt;
+      if (!isActive) btn.classList.add("active");
+      const rem = state.viewSessionData?.remarks?.[btn.dataset.remId];
       const prevText = rem?.text;
-      if (rem) rem.text = sel.value;
+      if (rem) rem.text = newText;
       try {
-        await updateRemarkText(state.viewSessionId, sel.dataset.remId, sel.value);
+        await updateRemarkText(state.viewSessionId, btn.dataset.remId, newText);
       } catch (err) {
         if (rem) rem.text = prevText;
         alert("Couldn't save — check your connection and try again.\n\n" + err.message);
@@ -5654,19 +5654,18 @@ function attachViewListeners() {
     });
   });
 
-  // Inline select/multi for preset activities with no remark yet (replaces "+ Show Selections")
-  body.querySelectorAll(".view-preset-create-sel").forEach(sel => {
-    sel.addEventListener("change", () => {
-      if (!sel.value) return;
+  // Inline single-select for preset activities with no remark yet
+  body.querySelectorAll(".view-single-create-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
       const data = state.viewSessionData;
-      const targetName = sel.dataset.targetName;
-      const actName = sel.dataset.actName;
-      const isPredef = sel.dataset.isPredefined === "true";
-      const isNewAct = !sel.dataset.actId;
-      const actId = sel.dataset.actId || generateId("a");
+      const targetName = btn.dataset.targetName;
+      const actName = btn.dataset.actName;
+      const isPredef = btn.dataset.isPredefined === "true";
+      const isNewAct = !btn.dataset.actId;
+      const actId = btn.dataset.actId || generateId("a");
       const remId = generateId("r");
       const order = Date.now();
-      const val = sel.value;
+      const val = btn.dataset.opt;
       data.activities = data.activities || {};
       data.remarks = data.remarks || {};
       if (isNewAct) data.activities[actId] = { targetName, activityName: actName, order, isPredefined: isPredef };
@@ -6172,12 +6171,11 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
             data-target-name="${escHtml(target.name)}" data-student="${escHtml(studentName)}">${escHtml(opt)}</button>`
         ).join("")}</div>`;
       } else {
-        gSelHtml = `<select class="view-group-preset-create-sel"
+        gSelHtml = `<div class="view-remark-multi-opts" contenteditable="false">${opts.map(opt =>
+          `<button class="view-group-single-create-btn" data-opt="${escHtml(opt)}"
             data-act-id="${escHtml(actId || "")}" data-act-name="${escHtml(actName)}"
-            data-target-name="${escHtml(target.name)}" data-student="${escHtml(studentName)}">
-          <option value="">— select —</option>
-          ${opts.map(opt => `<option value="${escHtml(opt)}">${escHtml(opt)}</option>`).join("")}
-        </select>`;
+            data-target-name="${escHtml(target.name)}" data-student="${escHtml(studentName)}">${escHtml(opt)}</button>`
+        ).join("")}</div>`;
       }
       const gRemCell = sentenceStarter
         ? `<div class="view-starter-wrap" contenteditable="false">
@@ -6251,12 +6249,11 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
               data-target-name="${escHtml(target.name)}" data-student="${escHtml(entry.studentName)}">${escHtml(opt)}</button>`
           ).join("")}</div>`;
         } else {
-          pSelHtml = `<select class="view-group-preset-create-sel"
+          pSelHtml = `<div class="view-remark-multi-opts" contenteditable="false">${opts.map(opt =>
+            `<button class="view-group-single-create-btn" data-opt="${escHtml(opt)}"
               data-act-id="${escHtml(actId || "")}" data-act-name="${escHtml(actName)}"
-              data-target-name="${escHtml(target.name)}" data-student="${escHtml(entry.studentName)}">
-            <option value="">— select —</option>
-            ${opts.map(opt => `<option value="${escHtml(opt)}">${escHtml(opt)}</option>`).join("")}
-          </select>`;
+              data-target-name="${escHtml(target.name)}" data-student="${escHtml(entry.studentName)}">${escHtml(opt)}</button>`
+          ).join("")}</div>`;
         }
         const pRemCell = sentenceStarter
           ? `<div class="view-starter-wrap" contenteditable="false">
@@ -6326,12 +6323,10 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
               data-rem-id="${escHtml(remId)}" data-opt="${escHtml(opt)}">${escHtml(opt)}</button>`
           ).join("")}</div>`;
         }
-        return `<select class="view-remark-preset-select" data-rem-id="${escHtml(remId)}">
-            <option value="">— select —</option>
-            ${opts.map(opt =>
-              `<option value="${escHtml(opt)}"${remText === opt ? " selected" : ""}>${escHtml(opt)}</option>`
-            ).join("")}
-           </select>`;
+        return `<div class="view-remark-multi-opts" contenteditable="false">${opts.map(opt =>
+          `<button class="view-remark-single-btn${remText === opt ? " active" : ""}"
+            data-rem-id="${escHtml(remId)}" data-opt="${escHtml(opt)}">${escHtml(opt)}</button>`
+        ).join("")}</div>`;
       };
 
       const optSelect = makeViewOpts(rem.id, rem.text)
@@ -6563,14 +6558,17 @@ function attachGroupViewListeners() {
   // leaveGroupSessionView()'s cleanup reads a captured snapshot with no guard
   // for an in-flight write, which could otherwise let it delete a remark the
   // boss just set.
-  body.querySelectorAll(".view-remark-preset-select").forEach(sel => {
-    sel.addEventListener("change", wrap(async () => {
-      if (!sel.value) return;
-      const rem = state.viewGroupSessionData?.remarks?.[sel.dataset.remId];
+  body.querySelectorAll(".view-remark-single-btn").forEach(btn => {
+    btn.addEventListener("click", wrap(async () => {
+      const isActive = btn.classList.contains("active");
+      btn.closest(".view-remark-multi-opts")?.querySelectorAll(".view-remark-single-btn").forEach(b => b.classList.remove("active"));
+      const newText = isActive ? "" : btn.dataset.opt;
+      if (!isActive) btn.classList.add("active");
+      const rem = state.viewGroupSessionData?.remarks?.[btn.dataset.remId];
       const prevText = rem?.text;
-      if (rem) rem.text = sel.value;
+      if (rem) rem.text = newText;
       try {
-        await updateRemarkText(sid(), sel.dataset.remId, sel.value);
+        await updateRemarkText(sid(), btn.dataset.remId, newText);
       } catch (err) {
         if (rem) rem.text = prevText;
         alert("Couldn't save — check your connection and try again.\n\n" + err.message);
@@ -6719,18 +6717,17 @@ function attachGroupViewListeners() {
     });
   });
 
-  // Inline select/multi for group preset activities with no remark yet
-  body.querySelectorAll(".view-group-preset-create-sel").forEach(sel => {
-    sel.addEventListener("change", () => {
-      if (!sel.value) return;
+  // Inline single-select for group preset activities with no remark yet
+  body.querySelectorAll(".view-group-single-create-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
       const data = state.viewGroupSessionData;
-      const targetName = sel.dataset.targetName;
-      const actName = sel.dataset.actName;
-      const studentName = sel.dataset.student;
-      const val = sel.value;
+      const targetName = btn.dataset.targetName;
+      const actName = btn.dataset.actName;
+      const studentName = btn.dataset.student;
+      const val = btn.dataset.opt;
       data.activities = data.activities || {};
       data.remarks = data.remarks || {};
-      let actId = sel.dataset.actId || Object.entries(data.activities)
+      let actId = btn.dataset.actId || Object.entries(data.activities)
         .find(([, a]) => a.targetName === targetName && a.activityName === actName)?.[0] || null;
       const isNewAct = !actId;
       const actOrder = Date.now();
