@@ -860,7 +860,7 @@ function wordTargetRows(target, session, allTargets) {
     }
 
     if (act.isMaintain) {
-      rows.push({ cells: [act.activityName, act.maintainRemark || "", ""], actLines: parseInlineMarkup(act.activityName), isGray: act.isGray, isGreen: act.isGreen });
+      rows.push({ cells: [act.activityName, act.maintainRemark || "", ""], actLines: parseInlineMarkup(act.activityName), remarkLines: parseInlineMarkup(act.maintainRemark || ""), isGray: act.isGray, isGreen: act.isGreen });
       continue;
     }
 
@@ -1589,7 +1589,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
       if (act.isMaintain) {
         if (act.isGray) grayRows.add(rows.length);
         if (act.isGreen) greenRows.add(rows.length);
-        const r = blankRow(); r[1] = act.activityName; r[2] = act.maintainRemark || ""; rows.push(r);
+        const r = blankRow(); r[1] = buildExcelActivityCell(act.activityName); r[2] = buildExcelActivityCell(act.maintainRemark || ""); rows.push(r);
         continue;
       }
       if (act.isMasteredSeparator) {

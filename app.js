@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "729";
+const APP_VERSION = "730";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3179,7 +3179,7 @@ function renderFedcTarget(target) {
         </div>
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Remark</span>
-          <span class="field-value-fixed" style="white-space:pre-wrap;color:#111827">${escHtml(fixedText)}</span>
+          <span class="field-value-fixed" style="white-space:pre-wrap;color:#111827">${formatActivityMarkup(fixedText)}</span>
         </div>
       </div>`;
       return;
@@ -3335,7 +3335,7 @@ function renderFedcTarget(target) {
         </div>
         ${fixedText !== null ? `<div class="entry-field" contenteditable="false">
           <span class="field-label">Remark</span>
-          <span class="field-value-fixed">${escHtml(fixedText)}</span>
+          <span class="field-value-fixed" style="white-space:pre-wrap">${formatActivityMarkup(fixedText)}</span>
         </div>` : ''}
       </div>`;
     };
@@ -4586,9 +4586,9 @@ function buildTargetViewTable(target, data) {
         rows += `<tr${isGrayFixed ? ' class="view-gray-row"' : isGreenFixed ? ' class="view-green-row"' : ' style="background:#f9fafb"'}>
           <td class="vcol-no" contenteditable="false">${no}</td>
           <td class="vcol-act" contenteditable="false">${formatActivityMarkup(pa.name)}</td>
-          <td class="vcol-rem" contenteditable="false" style="color:#374151;cursor:pointer"
+          <td class="vcol-rem" contenteditable="false" style="color:#374151;cursor:pointer;white-space:pre-wrap"
             onclick="alert('This is a Fixed Remark — the text is set in Edit Target and cannot be changed here.')"
-            title="Fixed Remark — click for info">${escHtml(fixedText) || "<span style='color:#9ca3af;font-style:italic'>No remark set</span>"}</td>
+            title="Fixed Remark — click for info">${formatActivityMarkup(fixedText) || "<span style='color:#9ca3af;font-style:italic'>No remark set</span>"}</td>
           <td class="vcol-trials" contenteditable="false"><span class="view-mapped-label" style="color:#9ca3af;font-style:italic">Fixed Remark</span></td>
           <td class="vcol-total" contenteditable="false">&nbsp;</td>
           <td class="vcol-score" contenteditable="false">&nbsp;</td>
@@ -5987,7 +5987,7 @@ function buildGroupTargetViewTable(target, data, attendees) {
           <td class="vcol-no" contenteditable="false">${no}</td>
           <td class="vcol-act" contenteditable="false">${formatActivityMarkup(pa.name)}</td>
           <td class="vcol-student" contenteditable="false">—</td>
-          <td class="vcol-rem" contenteditable="false" style="color:#6b7280;font-style:italic">${escHtml(fixedText) || "—"}</td>
+          <td class="vcol-rem" contenteditable="false" style="color:#6b7280;white-space:pre-wrap">${formatActivityMarkup(fixedText) || "—"}</td>
           <td class="vcol-trials" contenteditable="false">—</td>
           <td class="vcol-total" contenteditable="false">—</td>
           <td class="vcol-score" contenteditable="false">—</td>
@@ -8512,8 +8512,9 @@ function renderTargetManageContent(student, target) {
           </div>`
         : "";
       const fixedRemarkRow = a.fixedRemark !== undefined
-        ? `<div style="display:flex;align-items:center;gap:.5rem">
-            <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Fixed Remark:</span>
+        ? `<div style="display:flex;align-items:flex-start;gap:.3rem">
+            <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600;padding-top:.3rem">Fixed Remark:</span>
+            ${formatButtonsHtml(`mn-act-fixed-remark-${idx}`)}
             <textarea class="admin-input mn-fixed-remark-input" id="mn-act-fixed-remark-${idx}" data-idx="${idx}"
               rows="1" placeholder=""
               style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.fixedRemark || "")}</textarea>
@@ -9531,8 +9532,9 @@ function renderTemplateManageContent(template) {
           </div>`
         : "";
       const fixedRemarkRow = a.fixedRemark !== undefined
-        ? `<div style="display:flex;align-items:center;gap:.5rem">
-            <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Fixed Remark:</span>
+        ? `<div style="display:flex;align-items:flex-start;gap:.3rem">
+            <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600;padding-top:.3rem">Fixed Remark:</span>
+            ${formatButtonsHtml(`mn-act-fixed-remark-${idx}`)}
             <textarea class="admin-input mn-fixed-remark-input" id="mn-act-fixed-remark-${idx}" data-idx="${idx}"
               rows="1" placeholder=""
               style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.fixedRemark || "")}</textarea>
