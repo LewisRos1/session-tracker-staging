@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "735";
+const APP_VERSION = "737";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3175,7 +3175,7 @@ function renderFedcTarget(target) {
       html += `<div class="entry-block entry-block-predefined" ${fixedStyle}>
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Activity</span>
-          <span class="field-value-fixed"><span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${formatActivityMarkup(pa.name)}</span>
+          <span class="field-value-fixed"><span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${formatActivityMarkup(pa.name)}${inactiveReasonBadge(pa)}</span>
         </div>
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Remark</span>
@@ -3208,7 +3208,7 @@ function renderFedcTarget(target) {
     html += `<div class="entry-block entry-block-predefined"${activityStyle}>
       <div class="entry-field" contenteditable="false">
         <span class="field-label">Activity</span>
-        <span class="field-value-fixed"><span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${formatActivityMarkup(pa.name)}</span>
+        <span class="field-value-fixed"><span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${formatActivityMarkup(pa.name)}${inactiveReasonBadge(pa)}</span>
       </div>`;
 
     if (pa.actNote && pa.actNote.trim()) {
@@ -7145,6 +7145,14 @@ function todayDateStr() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function inactiveReasonBadge(pa) {
+  if (pa?.inactiveReason === 'mastered')
+    return '<span style="display:inline-flex;align-items:center;background:#d1fae5;border:1px solid #6ee7b7;border-radius:999px;padding:.05rem .45rem;font-size:.7rem;font-weight:700;color:#059669;white-space:nowrap;margin-left:.4rem;vertical-align:middle">● Mastered</span>';
+  if (pa?.inactiveReason === 'discontinued')
+    return '<span style="display:inline-flex;align-items:center;background:#fee2e2;border:1px solid #fca5a5;border-radius:999px;padding:.05rem .45rem;font-size:.7rem;font-weight:700;color:#dc2626;white-space:nowrap;margin-left:.4rem;vertical-align:middle">● Discontinued</span>';
+  return '';
+}
+
 function isActivityActive(pa, dateStr) {
   if (!dateStr) return true;
   if (pa.activeFrom && dateStr < pa.activeFrom) return false;
@@ -7158,7 +7166,7 @@ function fmtPeriodDate(d) {
   return `${dy} ${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m-1]} ${y}`;
 }
 
-function periodSectionHtml(activeFrom, activeTo, idx, withBorder) {
+function periodSectionHtml(activeFrom, activeTo, idx, withBorder, inactiveReason) {
   const fromLabel = activeFrom ? fmtPeriodDate(activeFrom) : '-∞';
   const toLabel   = activeTo   ? fmtPeriodDate(activeTo)   : '+∞';
   const fromBg    = activeFrom ? '#ffffff' : '#eff6ff';
@@ -7166,6 +7174,16 @@ function periodSectionHtml(activeFrom, activeTo, idx, withBorder) {
   const fromCol   = activeFrom ? '#111827' : '#6b7280';
   const toCol     = activeTo   ? '#111827' : '#6b7280';
   const border    = withBorder ? 'border-bottom:1px solid #f3f4f6;' : '';
+  // Show "End Reason" dropdown only for activities (5th arg provided) when activeTo is set
+  const reasonRow = (inactiveReason !== undefined && activeTo) ? `
+    <div style="display:flex;align-items:center;gap:.5rem;margin-top:.35rem">
+      <span style="font-size:.78rem;color:#6b7280;white-space:nowrap">End Reason:</span>
+      <select class="mn-inactive-reason-select" data-idx="${idx}" style="flex:1;font-size:.8rem;padding:.2rem .4rem;border:1px solid #d1d5db;border-radius:.3rem;background:white;cursor:pointer">
+        <option value="">— Not specified —</option>
+        <option value="mastered"${inactiveReason === 'mastered' ? ' selected' : ''}>Mastered</option>
+        <option value="discontinued"${inactiveReason === 'discontinued' ? ' selected' : ''}>Discontinued</option>
+      </select>
+    </div>` : '';
   return `<div style="padding:.45rem .6rem;${border}">
     <div style="font-size:.84rem;color:inherit;margin-bottom:.35rem">📅 Active Period</div>
     <div style="display:flex;align-items:center;gap:.4rem">
@@ -7185,6 +7203,7 @@ function periodSectionHtml(activeFrom, activeTo, idx, withBorder) {
         </div>
       </div>
     </div>
+    ${reasonRow}
   </div>`;
 }
 
@@ -8465,7 +8484,7 @@ function renderTargetManageContent(student, target) {
         <div style="position:relative">
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:250px;overflow:hidden">
-            ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true)}
+            ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true, a.inactiveReason)}
             <div style="display:flex;align-items:stretch">
               <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
               <span title="Permanently removes this activity and all of its session data. This cannot be undone." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
@@ -8529,7 +8548,7 @@ function renderTargetManageContent(student, target) {
               <button class="mn-km-opt" data-idx="${idx}" data-action="color_white" style="padding:.35rem .6rem;background:#ffffff;border:2px solid ${!isGray ? '#6b7280' : '#e5e7eb'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🤍 White (Normal)</button>
               <button class="mn-km-opt" data-idx="${idx}" data-action="color_gray" style="padding:.35rem .6rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🩶 Grey (Maintain)</button>
             </div>
-            ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true)}
+            ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true, a.inactiveReason)}
             <div style="display:flex;align-items:stretch">
               <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
               <span title="Permanently removes this activity and all of its session data. This cannot be undone." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
@@ -9502,7 +9521,7 @@ function renderTemplateManageContent(template) {
               <button class="mn-km-opt" data-idx="${idx}" data-action="color_white" style="padding:.35rem .6rem;background:#ffffff;border:2px solid ${!isGray ? '#6b7280' : '#e5e7eb'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🤍 White (Normal)</button>
               <button class="mn-km-opt" data-idx="${idx}" data-action="color_gray" style="padding:.35rem .6rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🩶 Grey (Maintain)</button>
             </div>
-            ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true)}
+            ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true, a.inactiveReason)}
             <div style="display:flex;align-items:stretch">
               <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
             </div>
@@ -10723,7 +10742,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
     return `<div class="entry-block entry-block-predefined" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">
       <div class="entry-field" contenteditable="false">
         <span class="field-label">Activity</span>
-        <span class="field-value-fixed">${formatActivityMarkup(actName)}</span>
+        <span class="field-value-fixed">${formatActivityMarkup(actName)}${inactiveReasonBadge(paEntry)}</span>
         ${combineToggle}
       </div>
       ${noteRow}
@@ -10790,7 +10809,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
   return `<div class="entry-block entry-block-predefined" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">
     <div class="entry-field" contenteditable="false">
       <span class="field-label">Activity</span>
-      <span class="field-value-fixed">${formatActivityMarkup(actName)}</span>
+      <span class="field-value-fixed">${formatActivityMarkup(actName)}${inactiveReasonBadge(paEntry)}</span>
       ${combineToggle}
     </div>
     ${noteRow}

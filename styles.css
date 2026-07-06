@@ -734,9 +734,6 @@ html, body {
   background: var(--white);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
-  position: sticky;
-  top: 0;
-  z-index: 10;
 }
 
 .target-label {
@@ -2810,11 +2807,6 @@ tr.view-heading-row.view-green-row td {
 .attendance-start-btn:active { background: var(--primary-dark); }
 
 /* ── Group session screen ──────────────────────────────────── */
-#group-target-selector-bar {
-  position: sticky; top: 0; z-index: 10;
-  background: var(--white);
-  border-bottom: 1px solid var(--border);
-}
 
 .group-student-section {
   display: flex;
