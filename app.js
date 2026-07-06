@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "734";
+const APP_VERSION = "735";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -435,7 +435,7 @@ function isEmptyActItem(a) {
 // their plain <textarea> (see wrapTextareaSelection) rather than through this
 // popup — the popup is only for remarks now, same as it always was.
 function isActivityMarkupField(el) {
-  return el.classList?.contains("mn-act-name-input");
+  return el.classList?.contains("mn-act-name-input") || el.classList?.contains("mn-fixed-remark-input");
 }
 
 function openTextEditorSheet(originEl) {
