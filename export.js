@@ -1029,7 +1029,7 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
           if (noteLines.length === 0) noteLines.push([{ text: "" }]);
           const allNoteLines = [[{ text: "Note:", bold: true }], ...noteLines];
           tableRows.push(new TableRow({
-            children: [richCell(allNoteLines, { fill: "E2EFDA", colSpan: 3, width: WORD_COL_TOTAL, align: AlignmentType.LEFT })]
+            children: [richCell(allNoteLines, { fill: "FEF3C7", colSpan: 3, width: WORD_COL_TOTAL, align: AlignmentType.LEFT })]
           }));
         } else {
         const mergeFill = r.isGrayHeading ? "D9D9D9"

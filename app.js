@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "731";
+const APP_VERSION = "732";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3136,9 +3136,9 @@ function renderFedcTarget(target) {
         const noteTag = pa.isExportNote
           ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.25rem">📄 Included in Word export</div>`
           : `<div style="font-size:.82rem;color:#9a3412;margin-bottom:.25rem">🔒 This note is for ZORA's use only. Excluded from Word report</div>`;
-        html += `<div class="entry-block" contenteditable="false" style="border-left:4px solid #70ad47;">
+        html += `<div class="entry-block" contenteditable="false" style="border-left:4px solid #f59e0b;">
           <div class="entry-field">
-            <span class="field-label" style="color:#70ad47">Note</span>
+            <span class="field-label" style="color:#b45309">Note</span>
             <div style="flex:1;font-size:.93rem;font-weight:600">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
           </div>
         </div>`;
@@ -3320,9 +3320,9 @@ function renderFedcTarget(target) {
         const noteTag = pa.isExportNote
           ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.25rem">📄 Included in Word export</div>`
           : `<div style="font-size:.82rem;color:#9a3412;margin-bottom:.25rem">🔒 This note is for ZORA's use only. Excluded from Word report</div>`;
-        return `<div class="entry-block" contenteditable="false" style="border-left:4px solid #70ad47;opacity:.3">
+        return `<div class="entry-block" contenteditable="false" style="border-left:4px solid #f59e0b;opacity:.3">
           <div class="entry-field">
-            <span class="field-label" style="color:#70ad47">Note</span>
+            <span class="field-label" style="color:#b45309">Note</span>
             <div style="flex:1;font-size:.93rem;font-weight:600">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
           </div>
         </div>`;
@@ -8357,9 +8357,8 @@ function renderTargetManageContent(student, target) {
           <div class="mn-heading-color-menu" id="mn-hkm-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:190px;overflow:hidden">
             <button class="mn-hkm-color-toggle" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">🎨 Change Colour</button>
             <div class="mn-hkm-color-panel" data-idx="${idx}" style="display:none;flex-direction:column;padding:.35rem .6rem;border-bottom:1px solid #f3f4f6;gap:.2rem">
-              <button class="mn-hkm-opt" data-idx="${idx}" data-action="blue" style="padding:.35rem .6rem;background:#dbeafe;border:2px solid ${!isGray && !isGreen ? '#2563eb' : '#93c5fd'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">💙 Blue (Normal)</button>
+              <button class="mn-hkm-opt" data-idx="${idx}" data-action="blue" style="padding:.35rem .6rem;background:#dbeafe;border:2px solid ${!isGray ? '#2563eb' : '#93c5fd'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">💙 Blue (Normal)</button>
               <button class="mn-hkm-opt" data-idx="${idx}" data-action="gray" style="padding:.35rem .6rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🩶 Grey (Maintain)</button>
-              <button class="mn-hkm-opt" data-idx="${idx}" data-action="green" style="padding:.35rem .6rem;background:#a9d18e;border:2px solid ${isGreen ? '#388e3c' : '#70ad47'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">💚 Green (Mastered)</button>
             </div>
             ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true)}
             <button class="mn-hkm-opt" data-idx="${idx}" data-action="delete" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete</button>
@@ -8370,7 +8369,7 @@ function renderTargetManageContent(student, target) {
       const _editRef3    = state.sessionData?.date || todayDateStr();
       const noteInactive = !isActivityActive(a, _editRef3);
       const noteExpired  = noteInactive && !!a.activeTo && a.activeTo < _editRef3;
-      const noteBaseBg = 'background:#fff7ed;border:1px solid #fb923c;color:#92400e';
+      const noteBaseBg = 'background:#fffbeb;border:1px solid #f59e0b;color:#78350f';
       const noteItemStyle = noteExpired
         ? ` style="position:relative;${noteBaseBg}"`
         : ` style="${noteBaseBg}${noteInactive ? ';opacity:0.3' : ''}"`;
@@ -8379,7 +8378,7 @@ function renderTargetManageContent(student, target) {
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.25rem">
           <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.1rem">
-            <select class="mn-note-type-select" data-idx="${idx}" style="font-size:.9rem;padding:.2rem .4rem;border:1px solid #fed7aa;border-radius:.3rem;background:#ffedd5;color:#9a3412;cursor:pointer">
+            <select class="mn-note-type-select" data-idx="${idx}" style="font-size:.9rem;padding:.2rem .4rem;border:1px solid #fcd34d;border-radius:.3rem;background:#fef3c7;color:#78350f;cursor:pointer">
               <option value="internal"${a.isNote ? ' selected' : ''}>🔒 This note is for ZORA's use only. Excluded from Word report</option>
               <option value="export"${a.isExportNote ? ' selected' : ''}>📄 Include in Word export</option>
             </select>
@@ -8525,9 +8524,8 @@ function renderTargetManageContent(student, target) {
               <button class="mn-km-color-toggle" data-idx="${idx}" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">🎨 Change Colour</button>
             </div>
             <div class="mn-km-color-panel" data-idx="${idx}" style="display:none;flex-direction:column;padding:.35rem .6rem;border-bottom:1px solid #f3f4f6;gap:.2rem">
-              <button class="mn-km-opt" data-idx="${idx}" data-action="color_white" style="padding:.35rem .6rem;background:#ffffff;border:2px solid ${!isGray && !isGreen ? '#6b7280' : '#e5e7eb'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🤍 White (Normal)</button>
+              <button class="mn-km-opt" data-idx="${idx}" data-action="color_white" style="padding:.35rem .6rem;background:#ffffff;border:2px solid ${!isGray ? '#6b7280' : '#e5e7eb'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🤍 White (Normal)</button>
               <button class="mn-km-opt" data-idx="${idx}" data-action="color_gray" style="padding:.35rem .6rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🩶 Grey (Maintain)</button>
-              <button class="mn-km-opt" data-idx="${idx}" data-action="color_green" style="padding:.35rem .6rem;background:#a9d18e;border:2px solid ${isGreen ? '#388e3c' : '#70ad47'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">💚 Green (Mastered)</button>
             </div>
             ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true)}
             <div style="display:flex;align-items:stretch">
@@ -8546,7 +8544,7 @@ function renderTargetManageContent(student, target) {
     html += `<div style="margin-top:1.25rem">
       <div style="font-size:.75rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;padding:.25rem 0 .5rem">Mastered</div>`;
     masteredActs.forEach((a, ci) => {
-      html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .5rem;background:#f0fdf4;border-radius:.4rem;margin-bottom:.35rem">
+      html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:.35rem">
         <span style="flex:1;font-size:.875rem;color:#374151">${escHtml(a.name || "")}</span>
         <button class="btn-mn-reactivate" data-completed-idx="${ci}" data-src="mastered" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Reactivate</button>
         <button class="btn-adm-del btn-mn-del-completed" data-completed-idx="${ci}" data-src="mastered" title="Delete permanently">🗑</button>
@@ -8784,9 +8782,6 @@ function renderTargetManageContent(student, target) {
       } else if (action === "color_red") {
         if (pa.isNote) pa.activityColor = "red"; else delete pa.activityColor;
         delete pa.isMaintainLive;
-        await saveTarget(); renderTargetManageContent(student, target); if (state.sessionData) renderTargetContent();
-      } else if (action === "color_green") {
-        pa.activityColor = "green"; delete pa.isMaintainLive;
         await saveTarget(); renderTargetManageContent(student, target); if (state.sessionData) renderTargetContent();
       } else if (action === "master") {
         pa.isCompleted = true;
@@ -9160,9 +9155,6 @@ function renderTargetManageContent(student, target) {
       } else if (action === "gray") {
         pa.isHeading = true; pa.headingColor = "gray"; delete pa.isMaintainHeading;
         target.predefinedActivities = acts; await saveTarget(); renderTargetManageContent(student, target); if (state.sessionData) renderTargetContent();
-      } else if (action === "green") {
-        pa.isHeading = true; pa.headingColor = "green"; delete pa.isMaintainHeading;
-        target.predefinedActivities = acts; await saveTarget(); renderTargetManageContent(student, target); if (state.sessionData) renderTargetContent();
       } else if (action === "delete") {
         if (!confirm(`Delete section heading "${pa.name}"?`)) return;
         const actIdx = acts.indexOf(pa);
@@ -9391,9 +9383,8 @@ function renderTemplateManageContent(template) {
           <div class="mn-heading-color-menu" id="mn-hkm-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:190px;overflow:hidden">
             <button class="mn-hkm-color-toggle" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">🎨 Change Colour</button>
             <div class="mn-hkm-color-panel" data-idx="${idx}" style="display:none;flex-direction:column;padding:.35rem .6rem;border-bottom:1px solid #f3f4f6;gap:.2rem">
-              <button class="mn-hkm-opt" data-idx="${idx}" data-action="blue" style="padding:.35rem .6rem;background:#dbeafe;border:2px solid ${!isGray && !isGreen ? '#2563eb' : '#93c5fd'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">💙 Blue (Normal)</button>
+              <button class="mn-hkm-opt" data-idx="${idx}" data-action="blue" style="padding:.35rem .6rem;background:#dbeafe;border:2px solid ${!isGray ? '#2563eb' : '#93c5fd'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">💙 Blue (Normal)</button>
               <button class="mn-hkm-opt" data-idx="${idx}" data-action="gray" style="padding:.35rem .6rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🩶 Grey (Maintain)</button>
-              <button class="mn-hkm-opt" data-idx="${idx}" data-action="green" style="padding:.35rem .6rem;background:#a9d18e;border:2px solid ${isGreen ? '#388e3c' : '#70ad47'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">💚 Green (Mastered)</button>
             </div>
             ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true)}
             <button class="mn-hkm-opt" data-idx="${idx}" data-action="delete" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete</button>
@@ -9404,7 +9395,7 @@ function renderTemplateManageContent(template) {
       const _editRef3    = state.sessionData?.date || todayDateStr();
       const noteInactive = !isActivityActive(a, _editRef3);
       const noteExpired  = noteInactive && !!a.activeTo && a.activeTo < _editRef3;
-      const noteBaseBg = 'background:#fff7ed;border:1px solid #fb923c;color:#92400e';
+      const noteBaseBg = 'background:#fffbeb;border:1px solid #f59e0b;color:#78350f';
       const noteItemStyle = noteExpired
         ? ` style="position:relative;${noteBaseBg}"`
         : ` style="${noteBaseBg}${noteInactive ? ';opacity:0.3' : ''}"`;
@@ -9413,7 +9404,7 @@ function renderTemplateManageContent(template) {
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.25rem">
           <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.1rem">
-            <select class="mn-note-type-select" data-idx="${idx}" style="font-size:.9rem;padding:.2rem .4rem;border:1px solid #fed7aa;border-radius:.3rem;background:#ffedd5;color:#9a3412;cursor:pointer">
+            <select class="mn-note-type-select" data-idx="${idx}" style="font-size:.9rem;padding:.2rem .4rem;border:1px solid #fcd34d;border-radius:.3rem;background:#fef3c7;color:#78350f;cursor:pointer">
               <option value="internal"${a.isNote ? ' selected' : ''}>🔒 This note is for ZORA's use only. Excluded from Word report</option>
               <option value="export"${a.isExportNote ? ' selected' : ''}>📄 Include in Word export</option>
             </select>
@@ -9506,9 +9497,8 @@ function renderTemplateManageContent(template) {
               <button class="mn-km-color-toggle" data-idx="${idx}" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem">🎨 Change Colour</button>
             </div>
             <div class="mn-km-color-panel" data-idx="${idx}" style="display:none;flex-direction:column;padding:.35rem .6rem;border-bottom:1px solid #f3f4f6;gap:.2rem">
-              <button class="mn-km-opt" data-idx="${idx}" data-action="color_white" style="padding:.35rem .6rem;background:#ffffff;border:2px solid ${!isGray && !isGreen ? '#6b7280' : '#e5e7eb'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🤍 White (Normal)</button>
+              <button class="mn-km-opt" data-idx="${idx}" data-action="color_white" style="padding:.35rem .6rem;background:#ffffff;border:2px solid ${!isGray ? '#6b7280' : '#e5e7eb'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🤍 White (Normal)</button>
               <button class="mn-km-opt" data-idx="${idx}" data-action="color_gray" style="padding:.35rem .6rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🩶 Grey (Maintain)</button>
-              <button class="mn-km-opt" data-idx="${idx}" data-action="color_green" style="padding:.35rem .6rem;background:#a9d18e;border:2px solid ${isGreen ? '#388e3c' : '#70ad47'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">💚 Green (Mastered)</button>
             </div>
             ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true)}
             <div style="display:flex;align-items:stretch">
@@ -9825,9 +9815,6 @@ function renderTemplateManageContent(template) {
       } else if (action === "gray") {
         pa.isHeading = true; pa.headingColor = "gray"; delete pa.isMaintainHeading;
         template.predefinedActivities = acts; await saveTemplateFn(); renderTemplateManageContent(template);
-      } else if (action === "green") {
-        pa.isHeading = true; pa.headingColor = "green"; delete pa.isMaintainHeading;
-        template.predefinedActivities = acts; await saveTemplateFn(); renderTemplateManageContent(template);
       } else if (action === "delete") {
         if (!confirm(`Delete section heading "${pa.name}"?`)) return;
         const actIdx = acts.indexOf(pa);
@@ -9874,9 +9861,6 @@ function renderTemplateManageContent(template) {
       } else if (action === "color_red") {
         if (pa.isNote) pa.activityColor = "red"; else delete pa.activityColor;
         delete pa.isMaintainLive;
-        template.predefinedActivities = acts; await saveTemplateFn(); renderTemplateManageContent(template);
-      } else if (action === "color_green") {
-        pa.activityColor = "green"; delete pa.isMaintainLive;
         template.predefinedActivities = acts; await saveTemplateFn(); renderTemplateManageContent(template);
       } else if (action === "delete") {
         if (!confirm(`Delete ${(pa.isNote || pa.isExportNote) ? "this note" : `activity "${pa.name}"`}?`)) return;
@@ -10480,9 +10464,9 @@ function buildGroupItemsByActivity(target, data, attendees) {
         const noteTag = pa.isExportNote
           ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.25rem">📄 Included in Word export</div>`
           : `<div style="font-size:.82rem;color:#9a3412;margin-bottom:.25rem">🔒 This note is for ZORA's use only. Excluded from Word report</div>`;
-        items.push(`<div class="entry-block" contenteditable="false" style="background:#fff7ed;border-left:4px solid #fb923c;">
+        items.push(`<div class="entry-block" contenteditable="false" style="background:#fffbeb;border-left:4px solid #f59e0b;">
           <div class="entry-field">
-            <span class="field-label" style="color:#92400e">Note</span>
+            <span class="field-label" style="color:#b45309">Note</span>
             <div style="flex:1;color:#92400e;font-size:.93rem;font-weight:600">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
           </div>
         </div>`);
@@ -10521,9 +10505,9 @@ function buildGroupItemsByActivity(target, data, attendees) {
         const noteTag = pa.isExportNote
           ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.25rem">📄 Included in Word export</div>`
           : `<div style="font-size:.82rem;color:#9a3412;margin-bottom:.25rem">🔒 This note is for ZORA's use only. Excluded from Word report</div>`;
-        return `<div class="entry-block" contenteditable="false" style="border-left:4px solid #70ad47;opacity:.3">
+        return `<div class="entry-block" contenteditable="false" style="border-left:4px solid #f59e0b;opacity:.3">
           <div class="entry-field">
-            <span class="field-label" style="color:#70ad47">Note</span>
+            <span class="field-label" style="color:#b45309">Note</span>
             <div style="flex:1;font-size:.93rem;font-weight:600">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
           </div>
         </div>`;
