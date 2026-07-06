@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "737";
+const APP_VERSION = "738";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3175,7 +3175,7 @@ function renderFedcTarget(target) {
       html += `<div class="entry-block entry-block-predefined" ${fixedStyle}>
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Activity</span>
-          <span class="field-value-fixed"><span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${formatActivityMarkup(pa.name)}${inactiveReasonBadge(pa)}</span>
+          <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${formatActivityMarkup(pa.name)}</span>
         </div>
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Remark</span>
@@ -3208,7 +3208,7 @@ function renderFedcTarget(target) {
     html += `<div class="entry-block entry-block-predefined"${activityStyle}>
       <div class="entry-field" contenteditable="false">
         <span class="field-label">Activity</span>
-        <span class="field-value-fixed"><span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${formatActivityMarkup(pa.name)}${inactiveReasonBadge(pa)}</span>
+        <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${formatActivityMarkup(pa.name)}</span>
       </div>`;
 
     if (pa.actNote && pa.actNote.trim()) {
@@ -7147,9 +7147,9 @@ function todayDateStr() {
 
 function inactiveReasonBadge(pa) {
   if (pa?.inactiveReason === 'mastered')
-    return '<span style="display:inline-flex;align-items:center;background:#d1fae5;border:1px solid #6ee7b7;border-radius:999px;padding:.05rem .45rem;font-size:.7rem;font-weight:700;color:#059669;white-space:nowrap;margin-left:.4rem;vertical-align:middle">● Mastered</span>';
+    return '<span style="display:inline-flex;align-items:center;background:#d1fae5;border:1px solid #6ee7b7;border-radius:999px;padding:.05rem .45rem;font-size:.7rem;font-weight:700;color:#059669;white-space:nowrap;margin-right:.4rem;vertical-align:middle">● Mastered</span>';
   if (pa?.inactiveReason === 'discontinued')
-    return '<span style="display:inline-flex;align-items:center;background:#fee2e2;border:1px solid #fca5a5;border-radius:999px;padding:.05rem .45rem;font-size:.7rem;font-weight:700;color:#dc2626;white-space:nowrap;margin-left:.4rem;vertical-align:middle">● Discontinued</span>';
+    return '<span style="display:inline-flex;align-items:center;background:#fee2e2;border:1px solid #fca5a5;border-radius:999px;padding:.05rem .45rem;font-size:.7rem;font-weight:700;color:#dc2626;white-space:nowrap;margin-right:.4rem;vertical-align:middle">● Discontinued</span>';
   return '';
 }
 
@@ -10742,7 +10742,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
     return `<div class="entry-block entry-block-predefined" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">
       <div class="entry-field" contenteditable="false">
         <span class="field-label">Activity</span>
-        <span class="field-value-fixed">${formatActivityMarkup(actName)}${inactiveReasonBadge(paEntry)}</span>
+        <span class="field-value-fixed">${inactiveReasonBadge(paEntry)}${formatActivityMarkup(actName)}</span>
         ${combineToggle}
       </div>
       ${noteRow}
