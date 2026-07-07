@@ -889,7 +889,7 @@ function wordTargetRows(target, session, allTargets) {
         continue;
       }
       const subPa = (target.predefinedActivities || []).find(p => p.name === act.activityName);
-      const subStarter = subPa?.sentenceStarter || null;
+      const subStarter = (subPa?.inlineOptions || subPa?.remarkPresetId || subPa?.remarkHasNote) ? (subPa?.sentenceStarter || null) : null;
       let subFirst = true;
       for (const rem of subRemarks) {
         const validTrials = (rem.trials || []).filter(t => t !== -1);
@@ -912,9 +912,8 @@ function wordTargetRows(target, session, allTargets) {
     }
 
     const remarks = getRemarksForActivity(session, act.id).filter(hasRemarkContent);
-    const starter = (target.predefinedActivities || []).find(
-      p => !p.isHeading && !p.isNote && p.name === act.activityName
-    )?.sentenceStarter || null;
+    const _starterPa = (target.predefinedActivities || []).find(p => !p.isHeading && !p.isNote && p.name === act.activityName);
+    const starter = (_starterPa?.inlineOptions || _starterPa?.remarkPresetId || _starterPa?.remarkHasNote) ? (_starterPa?.sentenceStarter || null) : null;
 
     if (remarks.length === 0) {
       rows.push({ cells: [activityLabel, "", ""], actLines: parseInlineMarkup(activityLabel), isGray: act.isGray, isGreen: act.isGreen });
@@ -1666,7 +1665,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
         }
         const subRemarks = getRemarksForActivity(session, act.id).filter(hasRemarkContent);
         const subPa = (target.predefinedActivities || []).find(p => p.name === act.activityName);
-        const subStarter = subPa?.sentenceStarter || null;
+        const subStarter = (subPa?.inlineOptions || subPa?.remarkPresetId || subPa?.remarkHasNote) ? (subPa?.sentenceStarter || null) : null;
         if (subRemarks.length === 0) {
           const r = blankRow(); r[1] = subCell; rows.push(r);
         } else {
@@ -1713,9 +1712,8 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
       }
 
       const remarks = getRemarksForActivity(session, act.id).filter(hasRemarkContent);
-      const starter = (target.predefinedActivities || []).find(
-        p => !p.isHeading && !p.isNote && p.name === act.activityName
-      )?.sentenceStarter || null;
+      const _starterPaX = (target.predefinedActivities || []).find(p => !p.isHeading && !p.isNote && p.name === act.activityName);
+      const starter = (_starterPaX?.inlineOptions || _starterPaX?.remarkPresetId || _starterPaX?.remarkHasNote) ? (_starterPaX?.sentenceStarter || null) : null;
 
       if (remarks.length === 0) {
         if (act.isGray) grayRows.add(rows.length);

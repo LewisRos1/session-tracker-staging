@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "740";
+const APP_VERSION = "741";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3234,7 +3234,7 @@ function renderFedcTarget(target) {
             <span class="field-value-fixed"><span style="color:#0369a1;font-weight:700;margin-right:.25rem">${subLabel})</span>${formatActivityMarkup(sub.name)}</span>
           </div>`;
         for (const rem of subRemarks) {
-          html += renderRemarkFields(rem, target, getActivityInlineOptions(sub), sub.sentenceStarter || null, sub.optionsMulti || false, null, sub.remarkHasNote || false, false);
+          html += renderRemarkFields(rem, target, getActivityInlineOptions(sub), (sub.inlineOptions || sub.remarkPresetId || sub.remarkHasNote) ? (sub.sentenceStarter || null) : null, sub.optionsMulti || false, null, sub.remarkHasNote || false, false);
         }
         if (subPending) {
           html += renderPendingRemarkFields(sub.name, subActId, sub.name, idx, target);
@@ -3296,7 +3296,7 @@ function renderFedcTarget(target) {
       }
     } else {
       for (const rem of remarks) {
-        html += renderRemarkFields(rem, target, getActivityInlineOptions(pa), pa.sentenceStarter || null, pa.optionsMulti || false, mappedInfo, pa.remarkHasNote || false, pa.manualScore || false);
+        html += renderRemarkFields(rem, target, getActivityInlineOptions(pa), (pa.inlineOptions || pa.remarkPresetId || pa.remarkHasNote) ? (pa.sentenceStarter || null) : null, pa.optionsMulti || false, mappedInfo, pa.remarkHasNote || false, pa.manualScore || false);
       }
       if (isPending) {
         html += renderPendingRemarkFields(pendingKey, actId, pa.name, idx, target);
@@ -8328,16 +8328,13 @@ function buildRemarkTypeControls(a, idx) {
     : a.remarkHasNote ? "starter_fixed_note"
     : (a.sentenceStarter && a.inlineOptions && a.optionsMulti) ? "starter_fixed_multi"
     : (a.sentenceStarter && a.inlineOptions) ? "starter_fixed"
-    : a.sentenceStarter ? "starter"
-    : (a.inlineOptions && a.optionsMulti) ? "fixed_multi"
-    : (a.inlineOptions || a.remarkPresetId) ? "fixed" : "";
+    : a.sentenceStarter ? ""
+    : (a.inlineOptions && a.optionsMulti) ? "starter_fixed_multi"
+    : (a.inlineOptions || a.remarkPresetId) ? "starter_fixed" : "";
   return `<select class="act-preset-select mn-act-preset" data-idx="${idx}">
       <option value="">Free text</option>
       <option value="fixed_remark"${type === "fixed_remark" ? " selected" : ""}>Fixed Remark</option>
       <option value="manual_score"${type === "manual_score" ? " selected" : ""}>Manual Score</option>
-      <option value="fixed"${type === "fixed" ? " selected" : ""}>Select one</option>
-      <option value="fixed_multi"${type === "fixed_multi" ? " selected" : ""}>Tick boxes</option>
-      <option value="starter"${type === "starter" ? " selected" : ""}>Sentence Starter + Free Text</option>
       <option value="starter_fixed"${type === "starter_fixed" ? " selected" : ""}>Sentence Starter + Select one</option>
       <option value="starter_fixed_multi"${type === "starter_fixed_multi" ? " selected" : ""}>Sentence Starter + Tick boxes</option>
       <option value="starter_fixed_note"${type === "starter_fixed_note" ? " selected" : ""}>Sentence Starter + Select One + Free Text</option>
@@ -8345,8 +8342,8 @@ function buildRemarkTypeControls(a, idx) {
     <input class="admin-input mn-act-starter-text" data-idx="${idx}"
       placeholder="Starter phrase…"
       value="${escHtml(a.sentenceStarter || "")}"
-      style="${type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note" ? "flex:1;min-width:0;width:auto" : "display:none"}">
-    <div class="mn-opts-container" data-idx="${idx}" style="${type === "fixed" || type === "fixed_multi" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note" ? "flex:1;min-width:0" : "display:none"}">
+      style="${type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note" ? "flex:1;min-width:0;width:auto" : "display:none"}">
+    <div class="mn-opts-container" data-idx="${idx}" style="${type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note" ? "flex:1;min-width:0" : "display:none"}">
       <div class="mn-opts-list">${(() => {
         const optsStr = a.inlineOptions || (a.remarkPresetId ? (state.remarkPresets.find(p=>p.id===a.remarkPresetId)?.options||[]).join("/") : "");
         const displayOpts = parseOpts(optsStr).length > 0 ? parseOpts(optsStr) : [""];
@@ -9268,10 +9265,10 @@ function renderTargetManageContent(student, target) {
       acts[idx].sentenceStarter = null;
       acts[idx].remarkPresetId  = null;
       acts[idx].inlineOptions   = null;
-      acts[idx].optionsMulti    = (type === "fixed_multi" || type === "starter_fixed_multi");
+      acts[idx].optionsMulti    = (type === "starter_fixed_multi");
       acts[idx].remarkHasNote   = (type === "starter_fixed_note");
-      const starterVis = (type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note");
-      const optsVis    = (type === "fixed" || type === "fixed_multi" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note");
+      const starterVis = (type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note");
+      const optsVis    = (type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note");
       starterInput.style.display  = starterVis ? "" : "none";
       starterInput.style.flex     = starterVis ? "1" : "";
       starterInput.style.minWidth = starterVis ? "0" : "";
@@ -9279,8 +9276,8 @@ function renderTargetManageContent(student, target) {
       optsContainer.style.display  = optsVis ? "" : "none";
       optsContainer.style.flex     = optsVis ? "1" : "";
       optsContainer.style.minWidth = optsVis ? "0" : "";
-      if (type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") { starterInput.focus(); }
-      else if (type === "fixed" || type === "fixed_multi") { optsContainer.querySelector(".mn-opt-item")?.focus(); }
+      if (starterVis) { starterInput.focus(); }
+      else if (optsVis) { optsContainer.querySelector(".mn-opt-item")?.focus(); }
       else { target.predefinedActivities = acts; await saveTarget(); }
     });
   });
@@ -9928,10 +9925,10 @@ function renderTemplateManageContent(template) {
       acts[idx].sentenceStarter = null;
       acts[idx].remarkPresetId  = null;
       acts[idx].inlineOptions   = null;
-      acts[idx].optionsMulti    = (type === "fixed_multi" || type === "starter_fixed_multi");
+      acts[idx].optionsMulti    = (type === "starter_fixed_multi");
       acts[idx].remarkHasNote   = (type === "starter_fixed_note");
-      const starterVis = (type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note");
-      const optsVis    = (type === "fixed" || type === "fixed_multi" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note");
+      const starterVis = (type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note");
+      const optsVis    = (type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note");
       starterInput.style.display  = starterVis ? "" : "none";
       starterInput.style.flex     = starterVis ? "1" : "";
       starterInput.style.minWidth = starterVis ? "0" : "";
@@ -9939,8 +9936,8 @@ function renderTemplateManageContent(template) {
       optsContainer.style.display  = optsVis ? "" : "none";
       optsContainer.style.flex     = optsVis ? "1" : "";
       optsContainer.style.minWidth = optsVis ? "0" : "";
-      if (type === "starter" || type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note") { starterInput.focus(); }
-      else if (type === "fixed" || type === "fixed_multi") { optsContainer.querySelector(".mn-opt-item")?.focus(); }
+      if (starterVis) { starterInput.focus(); }
+      else if (optsVis) { optsContainer.querySelector(".mn-opt-item")?.focus(); }
       else { template.predefinedActivities = acts; await saveTemplateFn(); }
     });
   });
