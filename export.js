@@ -1888,11 +1888,17 @@ function getAllActivitiesForTarget(session, target) {
 
   for (const act of sessionActs) {
     if (usedIds.has(act.id)) continue;
-    // Orphaned predefined activity (renamed/converted/deleted from the target's
-    // current setup since this session was recorded) with no actual remark data —
-    // a ghost left behind by editing the target, not real session content. Skip it.
-    // (Orphans that DO have remarks are kept — that's genuine historical data.)
-    if (act.isPredefined && getRemarksForActivity(session, act.id).length === 0) continue;
+    if (act.isPredefined) {
+      // No remark data — ghost entry, skip.
+      if (getRemarksForActivity(session, act.id).length === 0) continue;
+      // Activity is still in the predefined config — it was already rendered by the
+      // main loop above. Duplicate session-activity records (caused by the auto-fill
+      // race) would otherwise leak through here as unnumbered rows.
+      const stillInConfig = (target.predefinedActivities || []).some(
+        p => p.name === act.activityName && !p.isHeading && !p.isNote && !p.isExportNote
+      );
+      if (stillInConfig) continue;
+    }
     result.push(act);
   }
 
