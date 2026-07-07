@@ -13,7 +13,6 @@ import {
   addRemark,
   updateRemarkText,
   updateRemarkNote,
-  updateRemarkGroupValues,
   deleteRemark,
   addTrial,
   deleteTrial,
@@ -144,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "739";
+const APP_VERSION = "740";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3286,19 +3285,7 @@ function renderFedcTarget(target) {
       html += `<div class="activity-note" contenteditable="false">${noteHtml}</div>`;
     }
 
-    // Multiple remark groups
-    if (pa.remarkGroups?.length) {
-      if (remarks.length > 0) {
-        for (const rem of remarks) {
-          html += renderGroupRemarkFields(rem, target, pa.remarkGroups);
-        }
-      } else {
-        html += `<div class="entry-divider" contenteditable="false"></div>
-          <div class="entry-field" style="color:#9ca3af;font-size:.82rem;font-style:italic" contenteditable="false">
-            <span class="field-label">Groups</span>Loading…
-          </div>`;
-      }
-    } else if (pa.predefinedRemarks) {
+    if (pa.predefinedRemarks) {
       for (const predRemName of pa.predefinedRemarks) {
         const rem = actId ? findRemarkByPredefinedKey(actId, predRemName) : null;
         if (rem) {
@@ -3807,52 +3794,6 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
     ${trailingField}`;
 }
 
-function renderGroupRemarkFields(rem, target, remarkGroups) {
-  const groupValues = rem.groupValues || {};
-  const trials = rem.trials || [];
-  const badgesHtml = trials.map((score, tidx) =>
-    `<span class="trial-badge">${score === -1 ? "—" : score}<button class="btn-trial-delete"
-      data-rem-id="${rem.id}" data-idx="${tidx}">×</button></span>`
-  ).join("");
-
-  const groupRows = (remarkGroups || []).map(grp => {
-    const opts = (grp.inlineOptions || "").split(",").map(s => s.trim()).filter(Boolean);
-    const currentVal = groupValues[grp.id] || "";
-    let inputHtml;
-    if (opts.length > 0) {
-      if (grp.optionsMulti) {
-        const sel = currentVal.split(", ").map(s => s.trim()).filter(Boolean);
-        inputHtml = `<div class="remark-preset-opts remark-preset-opts-multi" contenteditable="false">${opts.map(opt =>
-          `<button class="btn-rg-opt${sel.includes(opt) ? " active" : ""}"
-            data-rem-id="${rem.id}" data-grp-id="${grp.id}" data-opt="${escHtml(opt)}" data-multi="1">${escHtml(opt)}</button>`
-        ).join("")}</div>`;
-      } else {
-        inputHtml = `<div class="remark-preset-opts" contenteditable="false">${opts.map(opt =>
-          `<button class="btn-rg-opt${currentVal === opt ? " active" : ""}"
-            data-rem-id="${rem.id}" data-grp-id="${grp.id}" data-opt="${escHtml(opt)}">${escHtml(opt)}</button>`
-        ).join("")}</div>`;
-      }
-    } else {
-      inputHtml = `<span style="font-size:.82rem;color:#9ca3af;font-style:italic">No options configured</span>`;
-    }
-    return `<div class="entry-field" contenteditable="false">
-      <span class="field-label" style="color:#0369a1;font-size:.7rem;text-transform:none;letter-spacing:0;white-space:nowrap">${escHtml(grp.label || "Group")}</span>
-      ${inputHtml}
-    </div>`;
-  }).join("");
-
-  return `
-    <div class="entry-divider" contenteditable="false"></div>
-    ${groupRows}
-    <div class="entry-field" contenteditable="false">
-      <span class="field-label">Trials</span>
-      <div class="trials-row">
-        <div class="trials-badges">${badgesHtml}</div>
-        <button class="btn-add-trial btn-primary-sm" data-rem-id="${rem.id}" data-target="${escHtml(target.name)}">+ Trial</button>
-      </div>
-      <button class="btn-icon btn-delete-remark" contenteditable="false" data-rem-id="${rem.id}" title="Delete">🗑</button>
-    </div>`;
-}
 
 function renderPendingRemarkFields(pendingKey, actId, paName, paOrder, target) {
   return `
@@ -4097,44 +4038,6 @@ function attachTargetListeners(target) {
   });
 
 
-  // ── Group-remark option buttons (single-select) ──────────────
-  c.querySelectorAll(".remark-preset-opts:not(.remark-preset-opts-multi) .btn-rg-opt").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const remId   = btn.dataset.remId;
-      const grpId   = btn.dataset.grpId;
-      const isActive = btn.classList.contains("active");
-      btn.closest(".remark-preset-opts")?.querySelectorAll(".btn-rg-opt").forEach(b => b.classList.remove("active"));
-      const newVal = isActive ? "" : btn.dataset.opt;
-      if (!isActive) btn.classList.add("active");
-      const rem = state.sessionData?.remarks?.[remId];
-      const prevVals = rem ? { ...rem.groupValues } : {};
-      if (rem) { if (!rem.groupValues) rem.groupValues = {}; rem.groupValues[grpId] = newVal; }
-      updateRemarkGroupValues(state.currentSessionId, remId, rem?.groupValues || { [grpId]: newVal }).catch(err => {
-        if (rem) rem.groupValues = prevVals;
-        alert("Couldn't save — check your connection and try again.\n\n" + err.message);
-      });
-    });
-  });
-
-  // ── Group-remark option buttons (multi-select) ──────────────
-  c.querySelectorAll(".remark-preset-opts-multi .btn-rg-opt").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const remId   = btn.dataset.remId;
-      const grpId   = btn.dataset.grpId;
-      btn.classList.toggle("active");
-      const container = btn.closest(".remark-preset-opts-multi");
-      const selected  = [...container.querySelectorAll(".btn-rg-opt.active")].map(b => b.dataset.opt);
-      const newVal    = selected.join(", ");
-      const rem = state.sessionData?.remarks?.[remId];
-      const prevVals = rem ? { ...rem.groupValues } : {};
-      if (rem) { if (!rem.groupValues) rem.groupValues = {}; rem.groupValues[grpId] = newVal; }
-      updateRemarkGroupValues(state.currentSessionId, remId, rem?.groupValues || { [grpId]: newVal }).catch(err => {
-        if (rem) rem.groupValues = prevVals;
-        alert("Couldn't save — check your connection and try again.\n\n" + err.message);
-      });
-    });
-  });
-
   // ── New remark: ✓ Save button or Ctrl/Cmd+Enter saves ───
   c.querySelectorAll(".btn-save-remark").forEach(btn => {
     btn.addEventListener("click", () => saveNewRemark(target));
@@ -4279,7 +4182,6 @@ async function saveNewRemark(target) {
 // there's nothing to pre-select, so they stay collapsed behind "+ Add
 // Remark & Trials" until the boss actually has something to type.
 function isAutoOpenRemarkType(pa) {
-  if (pa.remarkGroups?.length) return true;
   if (pa.remarkHasNote) return true;
   if (pa.sentenceStarter && pa.inlineOptions) return true;
   if (pa.sentenceStarter) return false;
@@ -8423,7 +8325,6 @@ function parseManualScore(val) {
 function buildRemarkTypeControls(a, idx) {
   const type = a.fixedRemark !== undefined ? "fixed_remark"
     : a.manualScore ? "manual_score"
-    : a.remarkGroups?.length ? "multi_group"
     : a.remarkHasNote ? "starter_fixed_note"
     : (a.sentenceStarter && a.inlineOptions && a.optionsMulti) ? "starter_fixed_multi"
     : (a.sentenceStarter && a.inlineOptions) ? "starter_fixed"
@@ -8434,7 +8335,6 @@ function buildRemarkTypeControls(a, idx) {
       <option value="">Free text</option>
       <option value="fixed_remark"${type === "fixed_remark" ? " selected" : ""}>Fixed Remark</option>
       <option value="manual_score"${type === "manual_score" ? " selected" : ""}>Manual Score</option>
-      <option value="multi_group"${type === "multi_group" ? " selected" : ""}>Multiple Remark Groups</option>
       <option value="fixed"${type === "fixed" ? " selected" : ""}>Select one</option>
       <option value="fixed_multi"${type === "fixed_multi" ? " selected" : ""}>Tick boxes</option>
       <option value="starter"${type === "starter" ? " selected" : ""}>Sentence Starter + Free Text</option>
@@ -8681,15 +8581,31 @@ function renderTargetManageContent(student, target) {
       </div>` : '';
 
       if (hasSubActs) {
-        // Parent activity: show sub-activities inline, no remark type picker
+        // Parent activity: show sub-activities inline, each with its own remark type
         const subActsHtml = subActs.map((sub, si) => {
           const subIdx = acts.indexOf(sub);
-          return `<div style="display:flex;align-items:center;gap:.35rem;margin-left:1.25rem">
-            <span style="font-size:.75rem;font-weight:700;color:#0369a1;min-width:1.4rem;flex-shrink:0">${String.fromCharCode(97 + si)})</span>
-            ${formatButtonsHtml(`mn-act-name-${subIdx}`)}
-            <textarea class="admin-input mn-act-name-input" id="mn-act-name-${subIdx}" data-idx="${subIdx}"
-              rows="1" placeholder="Sub-activity name" style="flex:1">${escHtml(sub.name || '')}</textarea>
-            <button class="btn-adm-del mn-del-sub-act" data-idx="${subIdx}" title="Delete sub-activity" style="flex-shrink:0">🗑</button>
+          const subRemarkType = buildRemarkTypeControls(sub, subIdx);
+          const subFixedRemarkRow = sub.fixedRemark !== undefined
+            ? `<div style="display:flex;align-items:flex-start;gap:.3rem;padding-left:1.6rem">
+                <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600;padding-top:.3rem">Fixed Remark:</span>
+                ${formatButtonsHtml(`mn-act-fixed-remark-${subIdx}`)}
+                <textarea class="admin-input mn-fixed-remark-input" id="mn-act-fixed-remark-${subIdx}" data-idx="${subIdx}"
+                  rows="1" placeholder="" style="flex:1;overflow-y:hidden;resize:none">${escHtml(sub.fixedRemark || "")}</textarea>
+              </div>`
+            : "";
+          return `<div style="margin-left:1.25rem;display:flex;flex-direction:column;gap:.3rem;padding:.45rem .55rem;background:#f0f9ff;border:1px solid #bae6fd;border-left:3px solid #60a5fa;border-radius:.35rem">
+            <div style="display:flex;align-items:center;gap:.35rem">
+              <span style="font-size:.75rem;font-weight:700;color:#0369a1;min-width:1.4rem;flex-shrink:0">${String.fromCharCode(97 + si)})</span>
+              ${formatButtonsHtml(`mn-act-name-${subIdx}`)}
+              <textarea class="admin-input mn-act-name-input" id="mn-act-name-${subIdx}" data-idx="${subIdx}"
+                rows="1" placeholder="Sub-activity name" style="flex:1">${escHtml(sub.name || '')}</textarea>
+              <button class="btn-adm-del mn-del-sub-act" data-idx="${subIdx}" title="Delete sub-activity" style="flex-shrink:0">🗑</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:.5rem;padding-left:1.6rem">
+              <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Remark Type:</span>
+              ${subRemarkType}
+            </div>
+            ${subFixedRemarkRow}
           </div>`;
         }).join('');
         html += `<div class="admin-list-item" data-idx="${idx}"${actItemStyle}>
@@ -8700,7 +8616,6 @@ function renderTargetManageContent(student, target) {
               <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
                 rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
             </div>
-            <div style="font-size:.73rem;color:#0369a1;font-weight:600;background:#eff6ff;border:1px solid #dbeafe;border-radius:.3rem;padding:.18rem .45rem;align-self:flex-start">↳ Has sub-activities — no remark</div>
             ${subActsHtml}
             <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.77rem;padding:.2rem .55rem;background:none;border:1px dashed #60a5fa;border-radius:.35rem;cursor:pointer;color:#0369a1;margin-left:1.25rem;align-self:flex-start">+ Add Sub-activity</button>
           </div>
@@ -8727,23 +8642,6 @@ function renderTargetManageContent(student, target) {
                 style="flex:1;overflow-y:hidden;resize:none">${escHtml(a.fixedRemark || "")}</textarea>
             </div>`
           : "";
-        const rgEditorHtml = (a.remarkGroups?.length > 0)
-          ? `<div class="mn-rg-editor" data-idx="${idx}" style="display:flex;flex-direction:column;gap:.25rem;padding:.3rem .45rem;background:#f0f9ff;border:1px solid #bae6fd;border-radius:.4rem">
-              <div style="font-size:.73rem;color:#0369a1;font-weight:700;margin-bottom:.05rem">Remark Groups:</div>
-              ${a.remarkGroups.map((grp, gi) => `
-                <div style="display:flex;align-items:center;gap:.35rem">
-                  <span style="font-size:.72rem;color:#0369a1;font-weight:700;min-width:1.2rem;flex-shrink:0">${gi + 1}.</span>
-                  <input class="admin-input mn-rg-label" data-idx="${idx}" data-gi="${gi}" value="${escHtml(grp.label || '')}" placeholder="Label…" style="flex:0 0 35%;min-width:0;font-size:.8rem;padding:.2rem .35rem">
-                  <input class="admin-input mn-rg-opts" data-idx="${idx}" data-gi="${gi}" value="${escHtml(grp.inlineOptions || '')}" placeholder="Options (comma-separated)…" style="flex:1;min-width:0;font-size:.8rem;padding:.2rem .35rem">
-                  <select class="mn-rg-multi" data-idx="${idx}" data-gi="${gi}" style="font-size:.75rem;padding:.2rem .25rem;border:1px solid #bae6fd;border-radius:.3rem;background:white;cursor:pointer;flex-shrink:0">
-                    <option value="0"${!grp.optionsMulti ? ' selected' : ''}>Single</option>
-                    <option value="1"${grp.optionsMulti ? ' selected' : ''}>Multi</option>
-                  </select>
-                  <button class="mn-rg-del" data-idx="${idx}" data-gi="${gi}" title="Remove group" style="flex-shrink:0;font-size:.85rem;color:#9ca3af;background:none;border:1px solid #e5e7eb;border-radius:.3rem;padding:.15rem .4rem;cursor:pointer">×</button>
-                </div>`).join('')}
-              <button class="mn-rg-add" data-idx="${idx}" style="font-size:.77rem;padding:.2rem .5rem;background:none;border:1px dashed #60a5fa;border-radius:.3rem;cursor:pointer;color:#0369a1;align-self:flex-start">+ Add Group</button>
-            </div>`
-          : "";
         html += `<div class="admin-list-item" data-idx="${idx}"${actItemStyle}>
           <span class="drag-handle">⠿</span>
           <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
@@ -8757,7 +8655,6 @@ function renderTargetManageContent(student, target) {
               ${remarkTypeSelect}
             </div>
             ${fixedRemarkRow}
-            ${rgEditorHtml}
             <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.77rem;padding:.2rem .55rem;background:none;border:1px dashed #d1d5db;border-radius:.35rem;cursor:pointer;color:#9ca3af;align-self:flex-start">↳ Add Sub-activity</button>
           </div>
           <div style="position:relative">
@@ -9317,71 +9214,6 @@ function renderTargetManageContent(student, target) {
     });
   });
 
-  $("manage-modal-body").querySelectorAll(".mn-rg-add").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const idx = Number(btn.dataset.idx);
-      if (!acts[idx].remarkGroups) acts[idx].remarkGroups = [];
-      acts[idx].remarkGroups.push({ id: cfgId("g"), label: `Group ${acts[idx].remarkGroups.length + 1}`, inlineOptions: "", optionsMulti: false });
-      target.predefinedActivities = acts;
-      await saveTarget();
-      const sp = $("manage-modal-body").scrollTop;
-      renderTargetManageContent(student, target);
-      requestAnimationFrame(() => { const b = $("manage-modal-body"); if (b) b.scrollTop = sp; });
-    });
-  });
-
-  $("manage-modal-body").querySelectorAll(".mn-rg-del").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const idx = Number(btn.dataset.idx);
-      const gi  = Number(btn.dataset.gi);
-      if (!acts[idx].remarkGroups) return;
-      acts[idx].remarkGroups.splice(gi, 1);
-      if (!acts[idx].remarkGroups.length) delete acts[idx].remarkGroups;
-      target.predefinedActivities = acts;
-      await saveTarget();
-      const sp = $("manage-modal-body").scrollTop;
-      renderTargetManageContent(student, target);
-      requestAnimationFrame(() => { const b = $("manage-modal-body"); if (b) b.scrollTop = sp; });
-    });
-  });
-
-  $("manage-modal-body").querySelectorAll(".mn-rg-label").forEach(input => {
-    input.addEventListener("blur", async () => {
-      const idx = Number(input.dataset.idx);
-      const gi  = Number(input.dataset.gi);
-      if (!acts[idx].remarkGroups?.[gi]) return;
-      if (acts[idx].remarkGroups[gi].label === input.value.trim()) return;
-      acts[idx].remarkGroups[gi].label = input.value.trim();
-      target.predefinedActivities = acts;
-      await saveTarget();
-      flashSaved(input);
-    });
-  });
-
-  $("manage-modal-body").querySelectorAll(".mn-rg-opts").forEach(input => {
-    input.addEventListener("blur", async () => {
-      const idx = Number(input.dataset.idx);
-      const gi  = Number(input.dataset.gi);
-      if (!acts[idx].remarkGroups?.[gi]) return;
-      if (acts[idx].remarkGroups[gi].inlineOptions === input.value.trim()) return;
-      acts[idx].remarkGroups[gi].inlineOptions = input.value.trim();
-      target.predefinedActivities = acts;
-      await saveTarget();
-      flashSaved(input);
-    });
-  });
-
-  $("manage-modal-body").querySelectorAll(".mn-rg-multi").forEach(sel => {
-    sel.addEventListener("change", async () => {
-      const idx = Number(sel.dataset.idx);
-      const gi  = Number(sel.dataset.gi);
-      if (!acts[idx].remarkGroups?.[gi]) return;
-      acts[idx].remarkGroups[gi].optionsMulti = sel.value === "1";
-      target.predefinedActivities = acts;
-      await saveTarget();
-    });
-  });
-
   $("manage-modal-body").querySelectorAll(".mn-act-preset").forEach(sel => {
     sel.addEventListener("change", async () => {
       const idx = Number(sel.dataset.idx);
@@ -9409,32 +9241,6 @@ function renderTargetManageContent(student, target) {
         const sp = $("manage-modal-body").scrollTop;
         renderTargetManageContent(student, target);
         $("manage-modal-body").scrollTop = sp;
-        return;
-      }
-      // Switching to Multiple Remark Groups
-      if (type === "multi_group") {
-        if (!acts[idx].remarkGroups?.length) {
-          acts[idx].remarkGroups = [{ id: cfgId("g"), label: "Group 1", inlineOptions: "", optionsMulti: false }];
-        }
-        delete acts[idx].fixedRemark; acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
-        acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false; delete acts[idx].manualScore;
-        target.predefinedActivities = acts;
-        await saveTarget();
-        const sp = $("manage-modal-body").scrollTop;
-        renderTargetManageContent(student, target);
-        $("manage-modal-body").scrollTop = sp;
-        return;
-      }
-      // Switching away from Multiple Remark Groups
-      if (acts[idx].remarkGroups?.length) {
-        delete acts[idx].remarkGroups;
-        acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
-        acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false; delete acts[idx].manualScore;
-        target.predefinedActivities = acts;
-        await saveTarget();
-        const sp2 = $("manage-modal-body").scrollTop;
-        renderTargetManageContent(student, target);
-        $("manage-modal-body").scrollTop = sp2;
         return;
       }
       // Switching away from Fixed Remark — clear it and re-render to remove the textarea

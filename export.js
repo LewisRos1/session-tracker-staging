@@ -911,35 +911,6 @@ function wordTargetRows(target, session, allTargets) {
       continue;
     }
 
-    // Multiple remark groups
-    if (act.remarkGroups?.length) {
-      const remarks = getRemarksForActivity(session, act.id);
-      if (remarks.length === 0) {
-        rows.push({ cells: [activityLabel, "", ""], actLines: parseInlineMarkup(activityLabel), isGray: act.isGray, isGreen: act.isGreen });
-        continue;
-      }
-      let actFirst = true;
-      for (const rem of remarks) {
-        const groupValues = rem.groupValues || {};
-        const validTrials = (rem.trials || []).filter(t => t !== -1);
-        const remarkAvg   = calcRemarkAvg(validTrials, target.maxPoints);
-        let grpFirst = true;
-        for (const grp of act.remarkGroups) {
-          const val = groupValues[grp.id] || "";
-          const groupLine = val ? `${grp.label}: ${val}` : `${grp.label}: —`;
-          rows.push({
-            cells: [(actFirst && grpFirst) ? activityLabel : "", "", (actFirst && grpFirst && remarkAvg !== null) ? pct(remarkAvg) : ""],
-            actLines: (actFirst && grpFirst) ? parseInlineMarkup(activityLabel) : null,
-            remarkLines: [{ text: groupLine, bold: false, underline: false }],
-            isGray: act.isGray, isGreen: act.isGreen
-          });
-          grpFirst = false;
-        }
-        actFirst = false;
-      }
-      continue;
-    }
-
     const remarks = getRemarksForActivity(session, act.id).filter(hasRemarkContent);
     const starter = (target.predefinedActivities || []).find(
       p => !p.isHeading && !p.isNote && p.name === act.activityName
@@ -1741,41 +1712,6 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
         continue;
       }
 
-      // Multiple remark groups
-      if (act.remarkGroups?.length) {
-        const rgRemarks = getRemarksForActivity(session, act.id);
-        if (rgRemarks.length === 0) {
-          if (act.isGray) grayRows.add(rows.length);
-          if (act.isGreen) greenRows.add(rows.length);
-          const r = blankRow(); r[1] = activityCell; rows.push(r);
-        } else {
-          let actFirst = true;
-          for (const rem of rgRemarks) {
-            const groupValues = rem.groupValues || {};
-            const validTrials = (rem.trials || []).filter(t => t !== -1);
-            const remarkAvg   = calcRemarkAvg(validTrials, target.maxPoints);
-            let grpFirst = true;
-            for (const grp of act.remarkGroups) {
-              if (act.isGray) grayRows.add(rows.length);
-              if (act.isGreen) greenRows.add(rows.length);
-              const val = groupValues[grp.id] || "";
-              const groupLine = val ? `${grp.label}: ${val}` : `${grp.label}: —`;
-              const r = blankRow();
-              r[1] = (actFirst && grpFirst) ? activityCell : "";
-              r[2] = groupLine;
-              if ((actFirst && grpFirst)) {
-                if (includeTrials) { r[3] = trialsList(rem.trials); r[4] = remarkAvg !== null ? pct(remarkAvg) : ""; }
-                else { r[3] = remarkAvg !== null ? pct(remarkAvg) : ""; }
-              }
-              rows.push(r);
-              grpFirst = false;
-            }
-            actFirst = false;
-          }
-        }
-        continue;
-      }
-
       const remarks = getRemarksForActivity(session, act.id).filter(hasRemarkContent);
       const starter = (target.predefinedActivities || []).find(
         p => !p.isHeading && !p.isNote && p.name === act.activityName
@@ -1935,16 +1871,15 @@ function getAllActivitiesForTarget(session, target) {
     const colorProps = (pa.activityColor === "gray" || pa.isMaintainLive) ? { isGray: true }
                      : pa.activityColor === "green" ? { isGreen: true } : {};
     const manualScoreProp = pa.manualScore ? { manualScore: true } : {};
-    const rgProp = pa.remarkGroups?.length ? { remarkGroups: pa.remarkGroups } : {};
     if (sessionAct) {
       usedIds.add(sessionAct.id);
       result.push(pa.isMapped
         ? { ...sessionAct, activityName: numberedName, isMapped: true, mappedTargetId: pa.mappedTargetId || null, ...colorProps }
-        : { ...sessionAct, activityName: numberedName, ...colorProps, ...manualScoreProp, ...rgProp });
+        : { ...sessionAct, activityName: numberedName, ...colorProps, ...manualScoreProp });
     } else {
       result.push({
         id: null, activityName: numberedName, isPredefined: true, empty: true,
-        isMapped: pa.isMapped || false, mappedTargetId: pa.mappedTargetId || null, ...colorProps, ...manualScoreProp, ...rgProp
+        isMapped: pa.isMapped || false, mappedTargetId: pa.mappedTargetId || null, ...colorProps, ...manualScoreProp
       });
     }
   }

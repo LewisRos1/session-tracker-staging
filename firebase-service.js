@@ -592,12 +592,6 @@ export async function updateRemarkNote(sessionId, remId, note) {
   });
 }
 
-export async function updateRemarkGroupValues(sessionId, remId, groupValues) {
-  await updateDoc(doc(db, "sessions", sessionId), {
-    [`remarks.${remId}.groupValues`]: groupValues
-  });
-}
-
 export async function updateActivityName(sessionId, actId, name) {
   await updateDoc(doc(db, "sessions", sessionId), {
     [`activities.${actId}.activityName`]: name
