@@ -145,7 +145,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "746";
+const APP_VERSION = "747";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3210,7 +3210,7 @@ function renderFedcTarget(target) {
 
     // Parent activity with sub-activities — render as a connected visual group
     const children = subActsByParent.get(pa.name) || [];
-    if (pa.noRemark || children.length > 0) {
+    if (children.length > 0) {
       const isGrayP  = pa.activityColor === "gray" || pa.isMaintainLive;
       const isGreenP = pa.activityColor === "green" || pa.inactiveReason === 'mastered';
       const pBorder  = isGreenP ? 'border:1px solid #a9d18e;border-left:4px solid #70ad47;background:#e2efda;'
@@ -8650,7 +8650,7 @@ function renderTargetManageContent(student, target) {
                 rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
             </div>
             ${subActsHtml}
-            <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.77rem;padding:.2rem .55rem;background:none;border:1px dashed #60a5fa;border-radius:.35rem;cursor:pointer;color:#0369a1;margin-left:1.25rem;align-self:flex-start">+ Add Sub-activity</button>
+            <button class="mn-add-sub-act-btn btn-primary-sm" data-parent-idx="${idx}" style="font-size:.77rem;padding:.25rem .65rem;min-height:unset;margin-left:1.25rem;align-self:flex-start">+ Add Sub-activity</button>
           </div>
           <div style="position:relative">
             <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
@@ -8688,7 +8688,7 @@ function renderTargetManageContent(student, target) {
               ${remarkTypeSelect}
             </div>
             ${fixedRemarkRow}
-            <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.77rem;padding:.2rem .55rem;background:none;border:1.5px dashed #6366f1;border-radius:.35rem;cursor:pointer;color:#4f46e5;font-weight:600;align-self:flex-start">↳ Add Sub-activity</button>
+            <button class="mn-add-sub-act-btn btn-primary-sm" data-parent-idx="${idx}" style="font-size:.77rem;padding:.25rem .65rem;min-height:unset;align-self:flex-start">↳ Add Sub-activity</button>
           </div>
           <div style="position:relative">
             <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
@@ -10781,7 +10781,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
 
     // Parent activity with sub-activities — render as connected group
     const children = grpSubsByParent.get(pa.name) || [];
-    if (pa.noRemark || children.length > 0) {
+    if (children.length > 0) {
       let groupHtml = `<div style="display:flex;flex-direction:column;gap:0">`;
       groupHtml += `<div class="entry-block" style="border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);border-radius:var(--radius) var(--radius) 0 0;border-bottom:none;box-shadow:var(--shadow)">
         <div class="entry-field" contenteditable="false">
