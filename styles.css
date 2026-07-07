@@ -1008,6 +1008,13 @@ input.field-input::placeholder {
   white-space: nowrap;
 }
 
+.trial-badge--option {
+  background: var(--primary);
+  color: var(--white);
+  padding: .2rem .65rem;
+  cursor: default;
+}
+
 .btn-trial-delete {
   background: none;
   border: none;

@@ -625,6 +625,18 @@ export async function deleteTrial(sessionId, remId, trialIndex, currentTrials) {
   });
 }
 
+export async function setOptionScore(sessionId, remId, score) {
+  await updateDoc(doc(db, "sessions", sessionId), {
+    [`remarks.${remId}.optionScore`]: score
+  });
+}
+
+export async function clearOptionScore(sessionId, remId) {
+  await updateDoc(doc(db, "sessions", sessionId), {
+    [`remarks.${remId}.optionScore`]: deleteField()
+  });
+}
+
 export async function setTrials(sessionId, remId, trials) {
   await updateDoc(doc(db, "sessions", sessionId), {
     [`remarks.${remId}.trials`]: trials

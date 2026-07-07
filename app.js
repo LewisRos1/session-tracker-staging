@@ -16,6 +16,8 @@ import {
   deleteRemark,
   addTrial,
   deleteTrial,
+  setOptionScore,
+  clearOptionScore,
   getRecentSessionsForStudent,
   loadStudentsConfig,
   saveStudent,
@@ -143,7 +145,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "744";
+const APP_VERSION = "745";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3063,8 +3065,9 @@ function calcDaysAverage(target, visited = new Set()) {
         continue;
       }
       const trials = (rem.trials || []).filter(t => t !== -1);
-      if (trials.length === 0) continue;
-      avgs.push(trials.reduce((a, b) => a + b, 0) / (trials.length * maxPts) * 100);
+      const allScores = rem.optionScore !== undefined ? [...trials, rem.optionScore] : trials;
+      if (allScores.length === 0) continue;
+      avgs.push(allScores.reduce((a, b) => a + b, 0) / (allScores.length * maxPts) * 100);
     }
   }
   return avgs.length > 0 ? Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length) : null;
@@ -3710,10 +3713,13 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
   }
 
   const trials = rem.trials || [];
-  const badgesHtml = trials.map((score, idx) =>
+  const regularBadges = trials.map((score, idx) =>
     `<span class="trial-badge">${score === -1 ? "—" : score}<button class="btn-trial-delete"
       data-rem-id="${rem.id}" data-idx="${idx}">×</button></span>`
   ).join("");
+  const optBadge = rem.optionScore !== undefined
+    ? `<span class="trial-badge trial-badge--option">${rem.optionScore}</span>` : "";
+  const badgesHtml = regularBadges + optBadge;
 
   const trailingField = mappedInfo
     ? `<div class="entry-field" contenteditable="false">
@@ -4015,19 +4021,34 @@ function attachTargetListeners(target) {
         if (rem) rem.text = prevText;
         alert("Couldn't save — check your connection and try again.\n\n" + err.message);
       });
-      // Auto-add trial if this option has an assigned score
-      if (!isActive && btn.dataset.score !== "") {
+      // Auto-score: set/clear optionScore (separate from manual trials)
+      if (btn.dataset.score !== "") {
         const autoScore = Number(btn.dataset.score);
         if (!isNaN(autoScore)) {
-          const prevTrials = rem?.trials ? [...rem.trials] : [];
-          if (rem) { if (!rem.trials) rem.trials = []; rem.trials.push(autoScore); }
-          renderTargetContent();
-          addTrial(state.currentSessionId, remId, autoScore, prevTrials).catch(err => {
-            if (rem) rem.trials = prevTrials;
+          const prevOptScore = rem?.optionScore;
+          if (!isActive) {
+            if (rem) rem.optionScore = autoScore;
             renderTargetContent();
-            alert("Couldn't save trial — check your connection and try again.\n\n" + err.message);
-          });
+            setOptionScore(state.currentSessionId, remId, autoScore).catch(err => {
+              if (rem) { if (prevOptScore !== undefined) rem.optionScore = prevOptScore; else delete rem.optionScore; }
+              renderTargetContent();
+              alert("Couldn't save — check your connection and try again.\n\n" + err.message);
+            });
+          } else {
+            if (rem) delete rem.optionScore;
+            renderTargetContent();
+            clearOptionScore(state.currentSessionId, remId).catch(err => {
+              if (rem) rem.optionScore = prevOptScore;
+              renderTargetContent();
+              alert("Couldn't save — check your connection and try again.\n\n" + err.message);
+            });
+          }
         }
+      } else if (isActive && rem?.optionScore !== undefined) {
+        // Deselecting a scoreless option — clear any lingering optionScore
+        delete rem.optionScore;
+        renderTargetContent();
+        clearOptionScore(state.currentSessionId, remId).catch(() => {});
       }
     });
   });
@@ -4323,7 +4344,7 @@ async function cleanupEmptyEntries(sessionId, data, targetName, target = null) {
       const realTrials = trials.filter(t => t !== -1);
       const hasText = stripEmpty(r.text).length > 0;
       const hasNote = stripEmpty(r.masteryNote).length > 0;
-      if (!hasText && !hasNote && realTrials.length === 0) {
+      if (!hasText && !hasNote && realTrials.length === 0 && r.optionScore === undefined) {
         emptyIds.push(remId);
       } else if (realTrials.length !== trials.length) {
         await setTrials(sessionId, remId, realTrials);
@@ -4830,8 +4851,9 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
 // refreshViewTrialRow/refreshGroupViewTrialRow (surgical in-place update
 // after a trial add/delete/score change — see the comment on
 // bindViewTrialCellListeners for why those don't go through a full render).
-function calcViewTrialSummary(trials, maxPts) {
+function calcViewTrialSummary(trials, maxPts, optionScore = undefined) {
   const validTrials = (trials || []).filter(t => t !== -1);
+  if (optionScore !== undefined) validTrials.push(optionScore);
   const total       = validTrials.reduce((a, b) => a + b, 0);
   const scorePct    = validTrials.length > 0
     ? Math.round(total / (validTrials.length * maxPts) * 100) + "%" : "";
@@ -4854,7 +4876,7 @@ function buildTrialCellsHtml(rem, maxPts) {
 
 function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false, rowClass = "") {
   const maxPts = target.maxPoints || 3;
-  const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts);
+  const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts, rem.optionScore);
   const trialCells = mappedInfo
     ? `<span class="view-mapped-label">${escHtml(mappedInfo.label)}</span>`
     : `<div class="trial-cells">${buildTrialCellsHtml(rem, maxPts)}</div>`;
@@ -5464,7 +5486,7 @@ function refreshViewTrialRow(remId) {
   const tr   = body.querySelector(`.view-rem-del[data-rem-id="${remId}"]`)?.closest("tr");
   if (!tr) return;
   const maxPts = getViewMaxPtsForRemark(remId);
-  const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts);
+  const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts, rem.optionScore);
   const trialCellsDiv = tr.querySelector(".trial-cells");
   if (trialCellsDiv) {
     trialCellsDiv.innerHTML = buildTrialCellsHtml(rem, maxPts);
@@ -6366,7 +6388,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
 
 function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, combineOpts = null, mappedInfo = null, remarkHasNote = false, rowClass = "") {
   const maxPts = target.maxPoints || 3;
-  const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts);
+  const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts, rem.optionScore);
   const trialCells = mappedInfo
     ? `<span class="view-mapped-label">${escHtml(mappedInfo.label)}</span>`
     : `<div class="trial-cells">${buildTrialCellsHtml(rem, maxPts)}</div>`;
@@ -6470,7 +6492,7 @@ function refreshGroupViewTrialRow(remId) {
   const tr   = body.querySelector(`.view-rem-del[data-rem-id="${remId}"]`)?.closest("tr");
   if (!tr) return;
   const maxPts = getGroupViewMaxPtsForRemark(remId);
-  const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts);
+  const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts, rem.optionScore);
   const trialCellsDiv = tr.querySelector(".trial-cells");
   if (trialCellsDiv) {
     trialCellsDiv.innerHTML = buildTrialCellsHtml(rem, maxPts);
@@ -10897,9 +10919,12 @@ function firstNameOf(name) {
 
 function renderGroupStudentRowCompact(remId, rem, target, mappedInfo = null) {
   const trials = rem.trials || [];
-  const badges = trials.map((t, i) =>
+  const regularBadges = trials.map((t, i) =>
     `<span class="trial-badge">${t === -1 ? "—" : t}<button class="btn-trial-delete btn-group-trial-del" data-rem-id="${remId}" data-idx="${i}">×</button></span>`
   ).join("");
+  const optBadge = rem.optionScore !== undefined
+    ? `<span class="trial-badge trial-badge--option">${rem.optionScore}</span>` : "";
+  const badges = regularBadges + optBadge;
   const trailingField = mappedInfo
     ? `<div class="entry-field" contenteditable="false">
         <span class="field-label">${escHtml(mappedInfo.label)}</span>
@@ -11110,9 +11135,12 @@ function renderGroupStudentTrialsOnlyRow(studentName, remId, rem, target) {
 // shared-activity card instead of a single student's own remark field.
 function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = null, inlineOptions = null, sentenceStarter = null, multiSelect = false, remarkHasNote = false, optionScores = null) {
   const trials = rem.trials || [];
-  const badges = trials.map((t, i) =>
+  const regularBadges = trials.map((t, i) =>
     `<span class="trial-badge">${t === -1 ? "—" : t}<button class="btn-trial-delete btn-group-trial-del" data-rem-id="${remId}" data-idx="${i}">×</button></span>`
   ).join("");
+  const optBadge = rem.optionScore !== undefined
+    ? `<span class="trial-badge trial-badge--option">${rem.optionScore}</span>` : "";
+  const badges = regularBadges + optBadge;
   const trailingField = mappedInfo
     ? `<div class="entry-field" contenteditable="false">
         <span class="field-label">${escHtml(mappedInfo.label)}</span>
@@ -11258,8 +11286,9 @@ function calcGroupStudentDaysAverage(target, data, studentName, visited = new Se
     }
     for (const r of remarksForStudent) {
       const trials = (r.trials || []).filter(t => t !== -1);
-      if (trials.length === 0) continue;
-      avgs.push(trials.reduce((a, b) => a + b, 0) / (trials.length * maxPts) * 100);
+      const allScores = r.optionScore !== undefined ? [...trials, r.optionScore] : trials;
+      if (allScores.length === 0) continue;
+      avgs.push(allScores.reduce((a, b) => a + b, 0) / (allScores.length * maxPts) * 100);
     }
   }
   return avgs.length > 0 ? Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length) : null;
@@ -11343,17 +11372,28 @@ function attachGroupTargetListeners(target) {
         if (rem) rem.text = prevText;
         alert("Couldn't save — check your connection and try again.\n\n" + err.message);
       });
-      // Auto-add trial if this option has an assigned score
-      if (!isActive && btn.dataset.score !== "") {
+      // Auto-score: set/clear optionScore (separate from manual trials)
+      if (btn.dataset.score !== "") {
         const autoScore = Number(btn.dataset.score);
         if (!isNaN(autoScore)) {
-          const prevTrials = rem?.trials ? [...rem.trials] : [];
-          if (rem) { if (!rem.trials) rem.trials = []; rem.trials.push(autoScore); }
-          addTrial(state.groupSessionId, remId, autoScore, prevTrials).catch(err => {
-            if (rem) rem.trials = prevTrials;
-            alert("Couldn't save trial — check your connection and try again.\n\n" + err.message);
-          });
+          const prevOptScore = rem?.optionScore;
+          if (!isActive) {
+            if (rem) rem.optionScore = autoScore;
+            setOptionScore(state.groupSessionId, remId, autoScore).catch(err => {
+              if (rem) { if (prevOptScore !== undefined) rem.optionScore = prevOptScore; else delete rem.optionScore; }
+              alert("Couldn't save — check your connection and try again.\n\n" + err.message);
+            });
+          } else {
+            if (rem) delete rem.optionScore;
+            clearOptionScore(state.groupSessionId, remId).catch(err => {
+              if (rem) rem.optionScore = prevOptScore;
+              alert("Couldn't save — check your connection and try again.\n\n" + err.message);
+            });
+          }
         }
+      } else if (isActive && rem?.optionScore !== undefined) {
+        delete rem.optionScore;
+        clearOptionScore(state.groupSessionId, remId).catch(() => {});
       }
     });
   });

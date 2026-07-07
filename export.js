@@ -892,7 +892,7 @@ function wordTargetRows(target, session, allTargets) {
       const subStarter = (subPa?.inlineOptions || subPa?.remarkPresetId || subPa?.remarkHasNote) ? (subPa?.sentenceStarter || null) : null;
       let subFirst = true;
       for (const rem of subRemarks) {
-        const validTrials = (rem.trials || []).filter(t => t !== -1);
+        const validTrials = allScores(rem);
         const remarkAvg   = calcRemarkAvg(validTrials, target.maxPoints);
         const text        = stripRemarkHtml(rem.text);
         rows.push({
@@ -924,7 +924,7 @@ function wordTargetRows(target, session, allTargets) {
 
     let first = true;
     for (const rem of remarks) {
-      const validTrials = (rem.trials || []).filter(t => t !== -1);
+      const validTrials = allScores(rem);
       const remarkAvg   = act.isMapped ? mappedScore : calcRemarkAvg(validTrials, target.maxPoints);
       const masteryNote = stripRemarkHtml(rem.masteryNote || "");
       const text        = stripRemarkHtml(rem.text);
@@ -1673,12 +1673,12 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
           for (const rem of subRemarks) {
             if (act.isGray) grayRows.add(rows.length);
             if (act.isGreen) greenRows.add(rows.length);
-            const validTrials = (rem.trials || []).filter(t => t !== -1);
+            const validTrials = allScores(rem);
             const remarkAvg   = calcRemarkAvg(validTrials, target.maxPoints);
             const r = blankRow();
             r[1] = subFirst ? subCell : "";
             r[2] = buildExcelRemarkCell(rem.text, subStarter, "");
-            if (includeTrials) { r[3] = trialsList(rem.trials); r[4] = remarkAvg !== null ? pct(remarkAvg) : ""; }
+            if (includeTrials) { r[3] = trialsList(rem.optionScore !== undefined ? [...(rem.trials || []), rem.optionScore] : rem.trials); r[4] = remarkAvg !== null ? pct(remarkAvg) : ""; }
             else { r[3] = remarkAvg !== null ? pct(remarkAvg) : ""; }
             rows.push(r);
             subFirst = false;
@@ -1728,14 +1728,14 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
       for (const rem of remarks) {
         if (act.isGray) grayRows.add(rows.length);
         if (act.isGreen) greenRows.add(rows.length);
-        const validTrials = (rem.trials || []).filter(t => t !== -1);
+        const validTrials = allScores(rem);
         const remarkAvg   = act.isMapped ? mappedScore : calcRemarkAvg(validTrials, target.maxPoints);
         const masteryNote = stripRemarkHtml(rem.masteryNote || "");
         const r = blankRow();
         r[1] = firstRemark ? activityCell : "";
         r[2] = buildExcelRemarkCell(rem.text, starter, masteryNote);
         if (includeTrials) {
-          r[3] = trialsList(rem.trials);
+          r[3] = trialsList(rem.optionScore !== undefined ? [...(rem.trials || []), rem.optionScore] : rem.trials);
           r[4] = remarkAvg !== null ? pct(remarkAvg) : "";
         } else {
           r[3] = remarkAvg !== null ? pct(remarkAvg) : "";
@@ -1917,7 +1917,7 @@ function getRemarksForActivity(session, actId) {
 // appear as rows in Word or Excel exports.
 function hasRemarkContent(rem) {
   const hasText   = stripRemarkHtml(rem.text || "").trim() !== "";
-  const hasTrials = (rem.trials || []).filter(t => t !== -1).length > 0;
+  const hasTrials = allScores(rem).length > 0;
   return hasText || hasTrials;
 }
 
@@ -1933,6 +1933,12 @@ function parseManualScore(val) {
   const num = s.match(/^(\d+(?:\.\d+)?)$/);
   if (num) return parseFloat(num[1]);
   return null;
+}
+
+function allScores(rem) {
+  const valid = (rem.trials || []).filter(t => t !== -1);
+  if (rem.optionScore !== undefined) valid.push(rem.optionScore);
+  return valid;
 }
 
 function calcRemarkAvg(trials, maxPoints) {
@@ -1968,7 +1974,7 @@ function calcDailyAverage(session, target, allTargets = [], visited = new Set())
         if (pct !== null) avgs.push(pct);
         continue;
       }
-      const validTrials = (rem.trials || []).filter(t => t !== -1);
+      const validTrials = allScores(rem);
       const a = calcRemarkAvg(validTrials, target.maxPoints);
       if (a !== null) avgs.push(a);
     }
