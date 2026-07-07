@@ -878,7 +878,9 @@ function wordTargetRows(target, session, allTargets) {
     // Sub-activity: indented lettered label, own remark
     if (act.isSubActivity) {
       const subDisplayName = `    ${act.subLabel}) ${act.activityName}`;
-      const subActLines = [{ text: `    ${act.subLabel}) `, bold: false, underline: false }, ...parseInlineMarkup(act.activityName)];
+      const _nameLines = parseInlineMarkup(act.activityName);
+      const _prefix = { text: `    ${act.subLabel}) ` };
+      const subActLines = _nameLines.length > 0 ? [[_prefix, ..._nameLines[0]], ..._nameLines.slice(1)] : [[_prefix]];
       if (act.empty) {
         rows.push({ cells: [subDisplayName, "", ""], actLines: subActLines, isGray: act.isGray, isGreen: act.isGreen });
         continue;
