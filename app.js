@@ -145,7 +145,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "748";
+const APP_VERSION = "749";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3693,6 +3693,22 @@ function toggleBulletSelection(el) {
 
 function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false, manualScore = false, optionScores = null) {
   const opts = parseOpts(inlineOptions);
+
+  // Sync optionScore with current config whenever the target is re-rendered.
+  // Covers the case where the user selects an option first (before points are
+  // configured), then goes to Edit Target, adds points, and returns — the stored
+  // rem.optionScore would be stale or missing without this sync.
+  if (!multiSelect && optionScores && rem.text && opts.includes(rem.text)) {
+    const cfgScore = optionScores[rem.text];
+    const sid = state.currentSessionId || state.groupSessionId;
+    if (cfgScore !== undefined && rem.optionScore !== cfgScore) {
+      rem.optionScore = cfgScore;
+      if (sid) setOptionScore(sid, rem.id, cfgScore).catch(() => {});
+    } else if (cfgScore === undefined && rem.optionScore !== undefined) {
+      delete rem.optionScore;
+      if (sid) clearOptionScore(sid, rem.id).catch(() => {});
+    }
+  }
 
   // Manual Score type: a single text input replaces the full Remark+Trials block
   if (manualScore) {
