@@ -374,6 +374,12 @@ export async function updateGroupSessionDate(sessionId, newDateStr, groupId) {
 // actId can be supplied by the caller (e.g. to write the activity into local
 // state immediately, before this write reaches the server — see addRemark's
 // matching comment) — otherwise one is generated here.
+export async function adoptOrphanActivity(sessionId, actId, parentActivity, configId = null) {
+  const updates = { [`activities.${actId}.parentActivity`]: parentActivity };
+  if (configId) updates[`activities.${actId}.configId`] = configId;
+  await updateDoc(doc(db, "sessions", sessionId), updates);
+}
+
 export async function addActivity(sessionId, targetName, activityName, order, isPredefined = false, actId = generateId("a"), parentActivity = null, configId = null) {
   const actData = { targetName, activityName, order, isPredefined };
   if (parentActivity) actData.parentActivity = parentActivity;

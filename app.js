@@ -7,6 +7,7 @@ import {
   getOrCreateTodaySession,
   listenToSession,
   addActivity,
+  adoptOrphanActivity,
   deleteActivity,
   updateActivityName,
   updateActivityCombineRemarks,
@@ -145,7 +146,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "766";
+const APP_VERSION = "767";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3224,7 +3225,20 @@ function renderFedcTarget(target) {
         </div>
       </div>`;
       children.forEach((sub, si) => {
-        const subActData = findActivityByName(target.name, sub.name, pa.name, sub.id);
+        let subActData = findActivityByName(target.name, sub.name, pa.name, sub.id);
+        if (!subActData && state.sessionData) {
+          // Orphan adoption: old top-level activity was deleted from config but its
+          // session record still exists. Claim it for this sub-activity by writing
+          // parentActivity (and configId) onto it so future lookups find it correctly.
+          const orphan = Object.entries(state.sessionData.activities || {})
+            .find(([, a]) => a.targetName === target.name && a.activityName === sub.name && !a.parentActivity && !a.configId);
+          if (orphan) {
+            const [oid, odata] = orphan;
+            state.sessionData.activities[oid] = { ...odata, parentActivity: pa.name, ...(sub.id ? { configId: sub.id } : {}) };
+            adoptOrphanActivity(state.currentSessionId, oid, pa.name, sub.id || null).catch(() => {});
+            subActData = { id: oid, ...state.sessionData.activities[oid] };
+          }
+        }
         const subActId   = subActData ? subActData.id : null;
         const subRemarks = subActId ? getRemarksForActivity(subActId) : [];
         const subPending = state.pendingNewRemark?.pendingKey === sub.name;
@@ -10841,10 +10855,20 @@ function buildGroupItemsByActivity(target, data, attendees) {
         </div>
       </div>`;
       children.forEach((sub, si) => {
-        const subActId = Object.entries(data.activities || {}).find(([, a]) =>
+        let subActId = Object.entries(data.activities || {}).find(([, a]) =>
           (sub.id && a.configId === sub.id && a.targetName === target.name) ||
           (a.targetName === target.name && a.activityName === sub.name && a.parentActivity === sub.parentActivity)
         )?.[0] || null;
+        if (!subActId) {
+          const orphan = Object.entries(data.activities || {})
+            .find(([, a]) => a.targetName === target.name && a.activityName === sub.name && !a.parentActivity && !a.configId);
+          if (orphan) {
+            const [oid, odata] = orphan;
+            data.activities[oid] = { ...odata, parentActivity: sub.parentActivity, ...(sub.id ? { configId: sub.id } : {}) };
+            adoptOrphanActivity(state.groupSessionId, oid, sub.parentActivity, sub.id || null).catch(() => {});
+            subActId = oid;
+          }
+        }
         const isLast   = si === children.length - 1;
         const subCard  = renderGroupActivityCard(sub.name, subActId, target, data, attendees, null, null, sub, true, sub.parentActivity, sub.id);
         const subRadius = isLast ? '0 0 var(--radius) var(--radius)' : '0';
