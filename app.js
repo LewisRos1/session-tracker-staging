@@ -145,7 +145,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "762";
+const APP_VERSION = "763";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3520,6 +3520,7 @@ function plainTextForEdit(html) {
   return html
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/?b>/gi, "**")
+    .replace(/<[^>]*>/g, "")
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
     .replace(/&quot;/gi, '"')
