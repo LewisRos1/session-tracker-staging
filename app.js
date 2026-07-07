@@ -146,7 +146,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "767";
+const APP_VERSION = "768";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3248,7 +3248,7 @@ function renderFedcTarget(target) {
         html += `<div class="entry-block" style="border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);border-top:1px solid var(--border);border-radius:${subRadius};box-shadow:var(--shadow)">
           <div class="entry-field" contenteditable="false">
             <span class="field-label">Subactivity</span>
-            <span class="field-value-fixed"><span style="color:var(--primary);font-weight:700;margin-right:.25rem">${subLabel})</span>${formatActivityMarkup(sub.name)}</span>
+            <span class="field-value-fixed"><span style="color:#6b7280;font-weight:700;margin-right:.25rem">${subLabel})</span>${formatActivityMarkup(sub.name)}</span>
           </div>`;
         for (const rem of subRemarks) {
           html += renderRemarkFields(rem, target, getActivityInlineOptions(sub), (sub.inlineOptions || sub.remarkPresetId || sub.remarkHasNote) ? (sub.sentenceStarter || null) : null, sub.optionsMulti || false, null, sub.remarkHasNote || false, false, sub.optionScores || null);
@@ -4718,6 +4718,7 @@ function buildTargetViewTable(target, data) {
   let rows = "";
   if (target.predefinedActivities?.length > 0) {
     let no = 0;
+    const subActLetterIdx = {};
     const matchedIds = new Set();
     for (const pa of target.predefinedActivities) {
       if (!isActivityActive(pa, data.date)) continue;
@@ -4731,6 +4732,17 @@ function buildTargetViewTable(target, data) {
         rows += `<tr class="view-note-row"><td colspan="6" contenteditable="false">${noteToHtml(pa.text)}</td></tr>`;
         continue;
       }
+      const isSub = !!pa.parentActivity;
+      let displayNo;
+      if (isSub) {
+        const parentKey = pa.parentActivity;
+        if (subActLetterIdx[parentKey] === undefined) subActLetterIdx[parentKey] = 0;
+        displayNo = String.fromCharCode(97 + subActLetterIdx[parentKey]) + ")";
+        subActLetterIdx[parentKey]++;
+      } else {
+        no++;
+        displayNo = no;
+      }
       if (pa.fixedRemark !== undefined || pa.isMaintain) {
         const fixedEntry = Object.entries(data.activities || {})
           .find(([, a]) => a.targetName === target.name && a.activityName === pa.name);
@@ -4738,9 +4750,8 @@ function buildTargetViewTable(target, data) {
         const fixedText = pa.fixedRemark ?? pa.maintainRemark ?? "";
         const isGrayFixed = pa.activityColor === "gray" || !!pa.isMaintainLive;
         const isGreenFixed = pa.activityColor === "green" || pa.inactiveReason === 'mastered';
-        no++;
         rows += `<tr${isGrayFixed ? ' class="view-gray-row"' : isGreenFixed ? ' class="view-green-row"' : ' style="background:#f9fafb"'}>
-          <td class="vcol-no" contenteditable="false">${no}</td>
+          <td class="vcol-no" contenteditable="false">${displayNo}</td>
           <td class="vcol-act" contenteditable="false">${formatActivityMarkup(pa.name)}</td>
           <td class="vcol-rem" contenteditable="false" style="color:#374151;cursor:pointer;white-space:pre-wrap"
             onclick="alert('This is a Fixed Remark — the text is set in Edit Target and cannot be changed here.')"
@@ -4751,11 +4762,10 @@ function buildTargetViewTable(target, data) {
         </tr>`;
         continue;
       }
-      no++;
       const entry = Object.entries(data.activities || {})
         .find(([, a]) => a.targetName === target.name && a.activityName === pa.name);
       if (entry) matchedIds.add(entry[0]);
-      rows += viewActivityRows(no, pa.name, entry?.[0] || null, data, target, true);
+      rows += viewActivityRows(displayNo, pa.name, entry?.[0] || null, data, target, true);
     }
     // All unmatched session activities — covers both manually-added activities
     // AND predefined activities recorded under old names before a rename.
@@ -8515,6 +8525,7 @@ function renderTargetManageContent(student, target) {
     <div class="admin-section-title">Activities & Notes</div>
     <div class="admin-list" id="mn-act-list">`;
 
+  let manageActNo = 0;
   acts.forEach((a, idx) => {
     if (a.isCompleted || a.isArchived || a.isStopped) return;
     if (a.isHeading || a.isMaintainHeading) {
@@ -8649,6 +8660,7 @@ function renderTargetManageContent(student, target) {
     } else {
       // Sub-activities are rendered inline within their parent's row — skip them here
       if (a.parentActivity) return;
+      manageActNo++;
 
       const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
       const hasSubActs = subActs.length > 0;
@@ -8705,6 +8717,7 @@ function renderTargetManageContent(student, target) {
           <span class="drag-handle">⠿</span>
           <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
             <div style="display:flex;align-items:flex-start;gap:.3rem">
+              <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;padding-top:.3rem;min-width:1.6rem">${manageActNo})</span>
               ${formatButtonsHtml(`mn-act-name-${idx}`)}
               <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
                 rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
@@ -8739,6 +8752,7 @@ function renderTargetManageContent(student, target) {
           <span class="drag-handle">⠿</span>
           <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
             <div style="display:flex;align-items:flex-start;gap:.3rem">
+              <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;padding-top:.3rem;min-width:1.6rem">${manageActNo})</span>
               ${formatButtonsHtml(`mn-act-name-${idx}`)}
               <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
                 rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
@@ -10873,7 +10887,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
         const subCard  = renderGroupActivityCard(sub.name, subActId, target, data, attendees, null, null, sub, true, sub.parentActivity, sub.id);
         const subRadius = isLast ? '0 0 var(--radius) var(--radius)' : '0';
         groupHtml += `<div style="border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);border-top:1px solid var(--border);border-radius:${subRadius};overflow:hidden">
-          <div style="padding:.4rem .6rem;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted)"><span style="color:var(--primary)">${letters[si]})</span> ${escHtml(sub.name)}</div>
+          <div style="padding:.4rem .6rem;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted)"><span style="color:#6b7280">${letters[si]})</span> ${escHtml(sub.name)}</div>
           ${subCard}
         </div>`;
       });
