@@ -146,7 +146,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "772";
+const APP_VERSION = "773";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4720,6 +4720,9 @@ function buildTargetViewTable(target, data) {
     let no = 0;
     const subActLetterIdx = {};
     const matchedIds = new Set();
+    const parentActNames = new Set(
+      (target.predefinedActivities || []).filter(p => p.parentActivity).map(p => p.parentActivity)
+    );
     for (const pa of target.predefinedActivities) {
       if (!isActivityActive(pa, data.date)) continue;
       if (pa.isHeading || pa.isMaintainHeading) {
@@ -4742,6 +4745,16 @@ function buildTargetViewTable(target, data) {
       } else {
         no++;
         displayNo = no;
+      }
+      if (!isSub && parentActNames.has(pa.name)) {
+        Object.entries(data.activities || {})
+          .filter(([, a]) => a.targetName === target.name && a.activityName === pa.name)
+          .forEach(([id]) => matchedIds.add(id));
+        rows += `<tr style="background:#f3f4f6">
+          <td class="vcol-no" contenteditable="false" style="color:#6b7280">${displayNo}</td>
+          <td class="vcol-act" colspan="5" contenteditable="false" style="font-weight:600">${formatActivityMarkup(pa.name)}</td>
+        </tr>`;
+        continue;
       }
       if (pa.fixedRemark !== undefined || pa.isMaintain) {
         const fixedEntries = Object.entries(data.activities || {})
@@ -6132,6 +6145,9 @@ function buildGroupTargetViewTable(target, data, attendees) {
   if (target.predefinedActivities?.length > 0) {
     let no = 0;
     const matchedIds = new Set();
+    const parentActNamesGrp = new Set(
+      (target.predefinedActivities || []).filter(p => p.parentActivity).map(p => p.parentActivity)
+    );
     for (const pa of target.predefinedActivities) {
       if (!isActivityActive(pa, data.date)) continue;
       if (pa.isHeading || pa.isMaintainHeading) {
@@ -6142,6 +6158,17 @@ function buildGroupTargetViewTable(target, data, attendees) {
       }
       if (pa.isNote || pa.isExportNote) {
         rows += `<tr class="view-note-row"><td colspan="7" contenteditable="false">${noteToHtml(pa.text)}</td></tr>`;
+        continue;
+      }
+      if (!pa.parentActivity && parentActNamesGrp.has(pa.name)) {
+        no++;
+        Object.entries(data.activities || {})
+          .filter(([, a]) => a.targetName === target.name && a.activityName === pa.name)
+          .forEach(([id]) => matchedIds.add(id));
+        rows += `<tr style="background:#f3f4f6">
+          <td class="vcol-no" contenteditable="false" style="color:#6b7280">${no}</td>
+          <td class="vcol-act" colspan="6" contenteditable="false" style="font-weight:600">${formatActivityMarkup(pa.name)}</td>
+        </tr>`;
         continue;
       }
       if (pa.fixedRemark !== undefined || pa.isMaintain) {
