@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "742";
+const APP_VERSION = "743";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3230,12 +3230,12 @@ function renderFedcTarget(target) {
         const subRadius  = isLast ? '0 0 var(--radius) var(--radius)' : '0';
         const subTopBorder = si === 0 ? 'border-top:none' : 'border-top:2px solid #7dd3fc';
         html += `<div class="entry-block" style="border:1px solid #bae6fd;border-left:4px solid #60a5fa;background:#f0f9ff;${subTopBorder};border-radius:${subRadius};box-shadow:var(--shadow)">
-          <div class="entry-field" contenteditable="false" style="background:#dbeafe;border-radius:${si === 0 ? '0' : '0'};margin:-0px">
-            <span class="field-label" style="color:#1d4ed8">Activity</span>
+          <div class="entry-field" contenteditable="false" style="background:#dbeafe">
+            <span class="field-label" style="color:#1d4ed8">Subactivity</span>
             <span class="field-value-fixed"><span style="color:#1d4ed8;font-weight:700;margin-right:.25rem">${subLabel})</span>${formatActivityMarkup(sub.name)}</span>
           </div>`;
         for (const rem of subRemarks) {
-          html += renderRemarkFields(rem, target, getActivityInlineOptions(sub), (sub.inlineOptions || sub.remarkPresetId || sub.remarkHasNote) ? (sub.sentenceStarter || null) : null, sub.optionsMulti || false, null, sub.remarkHasNote || false, false);
+          html += renderRemarkFields(rem, target, getActivityInlineOptions(sub), (sub.inlineOptions || sub.remarkPresetId || sub.remarkHasNote) ? (sub.sentenceStarter || null) : null, sub.optionsMulti || false, null, sub.remarkHasNote || false, false, sub.optionScores || null);
         }
         if (subPending) {
           html += renderPendingRemarkFields(sub.name, subActId, sub.name, idx, target);
@@ -3297,7 +3297,7 @@ function renderFedcTarget(target) {
       }
     } else {
       for (const rem of remarks) {
-        html += renderRemarkFields(rem, target, getActivityInlineOptions(pa), (pa.inlineOptions || pa.remarkPresetId || pa.remarkHasNote) ? (pa.sentenceStarter || null) : null, pa.optionsMulti || false, mappedInfo, pa.remarkHasNote || false, pa.manualScore || false);
+        html += renderRemarkFields(rem, target, getActivityInlineOptions(pa), (pa.inlineOptions || pa.remarkPresetId || pa.remarkHasNote) ? (pa.sentenceStarter || null) : null, pa.optionsMulti || false, mappedInfo, pa.remarkHasNote || false, pa.manualScore || false, pa.optionScores || null);
       }
       if (isPending) {
         html += renderPendingRemarkFields(pendingKey, actId, pa.name, idx, target);
@@ -3688,7 +3688,7 @@ function toggleBulletSelection(el) {
 
 // ─── REMARK FIELDS ───────────────────────────────────────────
 
-function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false, manualScore = false) {
+function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false, manualScore = false, optionScores = null) {
   const opts = parseOpts(inlineOptions);
 
   // Manual Score type: a single text input replaces the full Remark+Trials block
@@ -3741,7 +3741,8 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
     }
     return `<div class="remark-preset-opts" contenteditable="false">${opts.map(opt =>
       `<button class="btn-remark-opt${remText === opt ? " active" : ""}"
-        data-rem-id="${remId}" data-opt="${escHtml(opt)}">${escHtml(opt)}</button>`
+        data-rem-id="${remId}" data-opt="${escHtml(opt)}"
+        data-score="${optionScores?.[opt] !== undefined ? optionScores[opt] : ''}">${escHtml(opt)}</button>`
     ).join("")}</div>`;
   }
 
@@ -4006,9 +4007,6 @@ function attachTargetListeners(target) {
       btn.closest(".remark-preset-opts")?.querySelectorAll(".btn-remark-opt").forEach(b => b.classList.remove("active"));
       const newText = isActive ? "" : btn.dataset.opt;
       if (!isActive) btn.classList.add("active");
-      // Update state.sessionData synchronously, not just the DOM — see
-      // leaveSession()'s cleanup-empty-remarks check, which reads it straight
-      // off a snapshot taken on the way out with no guard for an in-flight write.
       const remId = btn.dataset.remId;
       const rem = state.sessionData?.remarks?.[remId];
       const prevText = rem?.text;
@@ -4017,6 +4015,20 @@ function attachTargetListeners(target) {
         if (rem) rem.text = prevText;
         alert("Couldn't save — check your connection and try again.\n\n" + err.message);
       });
+      // Auto-add trial if this option has an assigned score
+      if (!isActive && btn.dataset.score !== "") {
+        const autoScore = Number(btn.dataset.score);
+        if (!isNaN(autoScore)) {
+          const prevTrials = rem?.trials ? [...rem.trials] : [];
+          if (rem) { if (!rem.trials) rem.trials = []; rem.trials.push(autoScore); }
+          renderTargetContent();
+          addTrial(state.currentSessionId, remId, autoScore, prevTrials).catch(err => {
+            if (rem) rem.trials = prevTrials;
+            renderTargetContent();
+            alert("Couldn't save trial — check your connection and try again.\n\n" + err.message);
+          });
+        }
+      }
     });
   });
 
@@ -8353,6 +8365,7 @@ function buildRemarkTypeControls(a, idx) {
           `<span class="drag-handle" style="cursor:grab;color:#c4c9d4;font-size:1rem;flex-shrink:0;padding:0 .1rem;user-select:none">⠿</span>` +
           `<span class="mn-opt-num" style="font-size:.74rem;color:#9ca3af;min-width:1.2rem;text-align:right;flex-shrink:0">${oi + 1}.</span>` +
           `<input class="admin-input mn-opt-item" data-idx="${idx}" data-oi="${oi}" value="${escHtml(opt)}" placeholder="Enter option…" style="flex:1;padding:.3rem .45rem;font-size:.84rem;min-width:0">` +
+          `<input class="admin-input mn-opt-score" type="number" min="0" step="1" data-idx="${idx}" data-oi="${oi}" value="${escHtml(String(a.optionScores?.[opt] ?? ''))}" placeholder="Pts" title="Auto-score when selected (leave blank for none)" style="width:3.2rem;flex-shrink:0;padding:.3rem .2rem;font-size:.8rem;text-align:center">` +
           `<button class="mn-opt-del" data-idx="${idx}" data-oi="${oi}" title="Remove option" style="flex-shrink:0;padding:.2rem .4rem;font-size:.8rem;color:#9ca3af;background:none;border:1px solid #e5e7eb;border-radius:.3rem;cursor:pointer;line-height:1">×</button>` +
           `</div>`
         ).join("");
@@ -9410,11 +9423,25 @@ function renderTargetManageContent(student, target) {
 
   const renumberOpts = list => {
     list.querySelectorAll(".mn-opt-row").forEach((r, i) => {
-      r.dataset.idx = i; // keep row data-idx in sync for drag-sort
+      r.dataset.idx = i;
       const n = r.querySelector(".mn-opt-num"); if (n) n.textContent = `${i + 1}.`;
       const inp = r.querySelector(".mn-opt-item"); if (inp) inp.dataset.oi = i;
       const del = r.querySelector(".mn-opt-del");  if (del) del.dataset.oi = i;
+      const sc  = r.querySelector(".mn-opt-score"); if (sc) sc.dataset.oi = i;
     });
+  };
+
+  const rebuildOptScores = idx => {
+    const container = $("manage-modal-body").querySelector(`.mn-opts-container[data-idx="${idx}"]`);
+    if (!container) return;
+    const scores = {};
+    container.querySelectorAll(".mn-opt-row").forEach(row => {
+      const text = row.querySelector(".mn-opt-item")?.value?.trim();
+      const sv   = row.querySelector(".mn-opt-score")?.value?.trim();
+      if (text && sv !== "" && sv !== undefined && !isNaN(Number(sv))) scores[text] = Number(sv);
+    });
+    if (Object.keys(scores).length) acts[idx].optionScores = scores;
+    else delete acts[idx].optionScores;
   };
 
   const wireOptDel = (btn, idx) => {
@@ -9425,8 +9452,18 @@ function renderTargetManageContent(student, target) {
       const newOptsStr = getOptsFromDom(idx).join("/") || null;
       acts[idx].inlineOptions = newOptsStr;
       acts[idx].remarkPresetId = null;
+      rebuildOptScores(idx);
       target.predefinedActivities = acts;
       await saveTarget();
+    });
+  };
+
+  const wireOptScore = (input, idx) => {
+    input.addEventListener("blur", async () => {
+      rebuildOptScores(idx);
+      target.predefinedActivities = acts;
+      await saveTarget();
+      flashSaved(input);
     });
   };
 
@@ -9449,6 +9486,7 @@ function renderTargetManageContent(student, target) {
       if (newOptsStr === oldOptsStr) return;
       acts[idx].inlineOptions = newOptsStr;
       acts[idx].remarkPresetId = null;
+      rebuildOptScores(idx);
       target.predefinedActivities = acts;
       await saveTarget();
       propagateRemarkOptionRename(student, target, acts[idx], oldOptsStr, newOptsStr);
@@ -9456,6 +9494,7 @@ function renderTargetManageContent(student, target) {
   };
 
   $("manage-modal-body").querySelectorAll(".mn-opt-item").forEach(inp => wireOptBlur(inp, Number(inp.dataset.idx)));
+  $("manage-modal-body").querySelectorAll(".mn-opt-score").forEach(inp => wireOptScore(inp, Number(inp.dataset.idx)));
   $("manage-modal-body").querySelectorAll(".mn-opt-del").forEach(btn => wireOptDel(btn, Number(btn.dataset.idx)));
 
   $("manage-modal-body").querySelectorAll(".mn-opts-list").forEach(list => {
@@ -9483,9 +9522,11 @@ function renderTargetManageContent(student, target) {
         `<span class="drag-handle" style="cursor:grab;color:#c4c9d4;font-size:1rem;flex-shrink:0;padding:0 .1rem;user-select:none">⠿</span>` +
         `<span class="mn-opt-num" style="font-size:.74rem;color:#9ca3af;min-width:1.2rem;text-align:right;flex-shrink:0">${oi + 1}.</span>` +
         `<input class="admin-input mn-opt-item" data-idx="${idx}" data-oi="${oi}" placeholder="Enter option…" style="flex:1;padding:.3rem .45rem;font-size:.84rem;min-width:0">` +
+        `<input class="admin-input mn-opt-score" type="number" min="0" step="1" data-idx="${idx}" data-oi="${oi}" placeholder="Pts" title="Auto-score when selected (leave blank for none)" style="width:3.2rem;flex-shrink:0;padding:.3rem .2rem;font-size:.8rem;text-align:center">` +
         `<button class="mn-opt-del" data-idx="${idx}" data-oi="${oi}" title="Remove option" style="flex-shrink:0;padding:.2rem .4rem;font-size:.8rem;color:#9ca3af;background:none;border:1px solid #e5e7eb;border-radius:.3rem;cursor:pointer;line-height:1">×</button>`;
       list.appendChild(row);
       wireOptBlur(row.querySelector(".mn-opt-item"), idx);
+      wireOptScore(row.querySelector(".mn-opt-score"), idx);
       wireOptDel(row.querySelector(".mn-opt-del"), idx);
       row.querySelector(".mn-opt-item").focus();
     });
@@ -10911,7 +10952,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
       if (remarks.length === 0) return renderGroupStudentPendingRow(studentName, actId, actName, target, true);
       const mappedInfo = resolveGroupMappedScoreDisplay(mappedPa, target, data, studentName);
       return remarks.map(([remId, rem]) => renderGroupStudentRow(
-        studentName, remId, rem, target, mappedInfo, inlineOptions, sentenceStarter, multiSelect, remarkHasNote
+        studentName, remId, rem, target, mappedInfo, inlineOptions, sentenceStarter, multiSelect, remarkHasNote, paEntry?.optionScores || null
       )).join("");
     }).join("");
     return `<div class="entry-block entry-block-predefined" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">
@@ -10985,7 +11026,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
       bodyHtml = attendees.map(studentName => {
         const entry = byStudent[studentName]?.[i] || null;
         if (entry) return renderGroupStudentRow(
-          studentName, entry[0], entry[1], target, null, inlineOptions, sentenceStarter, multiSelect, remarkHasNote
+          studentName, entry[0], entry[1], target, null, inlineOptions, sentenceStarter, multiSelect, remarkHasNote, paEntry?.optionScores || null
         );
         return isFreeText
           ? renderGroupStudentEmptyRow(studentName, actId, actName, target, isPredefined)
@@ -11061,7 +11102,7 @@ function renderGroupStudentTrialsOnlyRow(studentName, remId, rem, target) {
 // just with .group-remark-input instead of .remark-text-input for the
 // free-text fallback box, since this row is one attendee's slice of a
 // shared-activity card instead of a single student's own remark field.
-function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = null, inlineOptions = null, sentenceStarter = null, multiSelect = false, remarkHasNote = false) {
+function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = null, inlineOptions = null, sentenceStarter = null, multiSelect = false, remarkHasNote = false, optionScores = null) {
   const trials = rem.trials || [];
   const badges = trials.map((t, i) =>
     `<span class="trial-badge">${t === -1 ? "—" : t}<button class="btn-trial-delete btn-group-trial-del" data-rem-id="${remId}" data-idx="${i}">×</button></span>`
@@ -11092,7 +11133,8 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
     }
     return `<div class="remark-preset-opts" contenteditable="false">${opts.map(opt =>
       `<button class="btn-remark-opt${remText === opt ? " active" : ""}"
-        data-rem-id="${remId}" data-opt="${escHtml(opt)}">${escHtml(opt)}</button>`
+        data-rem-id="${remId}" data-opt="${escHtml(opt)}"
+        data-score="${optionScores?.[opt] !== undefined ? optionScores[opt] : ''}">${escHtml(opt)}</button>`
     ).join("")}</div>`;
   }
 
@@ -11295,6 +11337,18 @@ function attachGroupTargetListeners(target) {
         if (rem) rem.text = prevText;
         alert("Couldn't save — check your connection and try again.\n\n" + err.message);
       });
+      // Auto-add trial if this option has an assigned score
+      if (!isActive && btn.dataset.score !== "") {
+        const autoScore = Number(btn.dataset.score);
+        if (!isNaN(autoScore)) {
+          const prevTrials = rem?.trials ? [...rem.trials] : [];
+          if (rem) { if (!rem.trials) rem.trials = []; rem.trials.push(autoScore); }
+          addTrial(state.groupSessionId, remId, autoScore, prevTrials).catch(err => {
+            if (rem) rem.trials = prevTrials;
+            alert("Couldn't save trial — check your connection and try again.\n\n" + err.message);
+          });
+        }
+      }
     });
   });
 
