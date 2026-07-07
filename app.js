@@ -145,7 +145,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "745";
+const APP_VERSION = "746";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3135,7 +3135,7 @@ function renderFedcTarget(target) {
   // Pre-compute active sub-activities per parent for visual grouping
   const subActsByParent = new Map();
   for (const pa of allPas) {
-    if (pa.parentActivity && isActivityActive(pa, sessionDateForFilter) && !pa.isCompleted && !pa.isArchived && !pa.isStopped) {
+    if (pa.parentActivity && pa.name?.trim() && isActivityActive(pa, sessionDateForFilter) && !pa.isCompleted && !pa.isArchived && !pa.isStopped) {
       if (!subActsByParent.has(pa.parentActivity)) subActsByParent.set(pa.parentActivity, []);
       subActsByParent.get(pa.parentActivity).push(pa);
     }
@@ -8688,7 +8688,7 @@ function renderTargetManageContent(student, target) {
               ${remarkTypeSelect}
             </div>
             ${fixedRemarkRow}
-            <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.77rem;padding:.2rem .55rem;background:none;border:1px dashed #d1d5db;border-radius:.35rem;cursor:pointer;color:#9ca3af;align-self:flex-start">↳ Add Sub-activity</button>
+            <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.77rem;padding:.2rem .55rem;background:none;border:1.5px dashed #6366f1;border-radius:.35rem;cursor:pointer;color:#4f46e5;font-weight:600;align-self:flex-start">↳ Add Sub-activity</button>
           </div>
           <div style="position:relative">
             <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
@@ -9211,8 +9211,45 @@ function renderTargetManageContent(student, target) {
       const parentIdx = Number(btn.dataset.parentIdx);
       const parentAct = acts[parentIdx];
       if (!parentAct) return;
+
+      // Sync parent name from textarea — user may not have blurred it yet
+      const nameInput = $("manage-modal-body").querySelector(`.mn-act-name-input[data-idx="${parentIdx}"]`);
+      if (nameInput) {
+        const typedName = nameInput.value.trim();
+        if (typedName !== parentAct.name) parentAct.name = typedName;
+      }
+      if (!parentAct.name) {
+        alert("Please enter an activity name before adding sub-activities.");
+        nameInput?.focus();
+        return;
+      }
+
+      // Check existing subs — all must be named before adding another
+      const existingSubs = acts.filter(a2 => a2.parentActivity === parentAct.name && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
+      const unnamedSub = existingSubs.find(s => !s.name?.trim());
+      if (unnamedSub) {
+        const unnamedIdx = acts.indexOf(unnamedSub);
+        const unnamedInput = $("manage-modal-body").querySelector(`.mn-act-name-input[data-idx="${unnamedIdx}"]`);
+        unnamedInput?.focus();
+        alert("Please name all existing sub-activities before adding another.");
+        return;
+      }
+
+      // Warn if parent has a remark type configured — it won't apply once it has sub-activities
+      if (!existingSubs.length && (parentAct.inlineOptions || parentAct.sentenceStarter || parentAct.fixedRemark !== undefined || parentAct.manualScore)) {
+        const typeLabel = parentAct.fixedRemark !== undefined ? "Fixed Remark" : parentAct.manualScore ? "Manual Score" : "remark options";
+        if (!confirm(`"${parentAct.name}" has a ${typeLabel} configured.\n\nAdding sub-activities removes the remark field from this activity — configure the remark type on each sub-activity instead. The current options will be cleared.\n\nContinue?`)) return;
+        parentAct.sentenceStarter = null;
+        parentAct.remarkPresetId  = null;
+        parentAct.inlineOptions   = null;
+        parentAct.optionsMulti    = false;
+        parentAct.remarkHasNote   = false;
+        delete parentAct.manualScore;
+        delete parentAct.fixedRemark;
+        delete parentAct.optionScores;
+      }
+
       parentAct.noRemark = true;
-      // Insert new sub-activity after last sibling or after parent
       const siblingIdxs = acts.map((a2, i) => a2.parentActivity === parentAct.name ? i : -1).filter(i => i >= 0);
       const insertAfter = siblingIdxs.length > 0 ? Math.max(...siblingIdxs) : parentIdx;
       acts.splice(insertAfter + 1, 0, { id: cfgId("a"), name: "", parentActivity: parentAct.name, order: 0, activeFrom: null });
