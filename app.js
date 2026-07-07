@@ -145,7 +145,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "759";
+const APP_VERSION = "762";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3232,9 +3232,9 @@ function renderFedcTarget(target) {
         const isLast     = si === children.length - 1;
         const subRadius  = isLast ? '0 0 var(--radius) var(--radius)' : '0';
         html += `<div class="entry-block" style="border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);border-top:1px solid var(--border);border-radius:${subRadius};box-shadow:var(--shadow)">
-          <div class="entry-field" contenteditable="false" style="background:#dbeafe">
-            <span class="field-label" style="color:#1d4ed8">Subactivity</span>
-            <span class="field-value-fixed"><span style="color:#1d4ed8;font-weight:700;margin-right:.25rem">${subLabel})</span>${formatActivityMarkup(sub.name)}</span>
+          <div class="entry-field" contenteditable="false">
+            <span class="field-label">Subactivity</span>
+            <span class="field-value-fixed"><span style="color:var(--primary);font-weight:700;margin-right:.25rem">${subLabel})</span>${formatActivityMarkup(sub.name)}</span>
           </div>`;
         for (const rem of subRemarks) {
           html += renderRemarkFields(rem, target, getActivityInlineOptions(sub), (sub.inlineOptions || sub.remarkPresetId || sub.remarkHasNote) ? (sub.sentenceStarter || null) : null, sub.optionsMulti || false, null, sub.remarkHasNote || false, false, sub.optionScores || null);
@@ -8423,7 +8423,7 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
           `<span class="drag-handle" style="cursor:grab;color:#c4c9d4;font-size:1rem;flex-shrink:0;padding:0 .1rem;user-select:none">⠿</span>` +
           `<span class="mn-opt-num" style="font-size:.74rem;color:#9ca3af;min-width:1.2rem;text-align:right;flex-shrink:0">${oi + 1}.</span>` +
           `<input class="admin-input mn-opt-item" data-idx="${idx}" data-oi="${oi}" value="${escHtml(opt)}" placeholder="Enter option…" style="flex:1;padding:.3rem .45rem;font-size:.84rem;min-width:0">` +
-          `<input class="admin-input mn-opt-score" type="number" min="0" max="${maxPts}" step="1" data-idx="${idx}" data-oi="${oi}" value="${escHtml(String(a.optionScores?.[opt] ?? ''))}" placeholder="Pts" title="Auto-score when selected (leave blank for none)" style="width:3.2rem;flex-shrink:0;padding:.3rem .2rem;font-size:.8rem;text-align:center">` +
+          `<input class="admin-input mn-opt-score" type="number" min="0" max="${maxPts}" step="0.5" data-idx="${idx}" data-oi="${oi}" value="${escHtml(String(a.optionScores?.[opt] ?? ''))}" placeholder="Pts" title="Auto-score when selected (leave blank for none)" style="width:3.2rem;flex-shrink:0;padding:.3rem .2rem;font-size:.8rem;text-align:center">` +
           `<button class="mn-opt-del" data-idx="${idx}" data-oi="${oi}" title="Remove option" style="flex-shrink:0;padding:.2rem .4rem;font-size:.8rem;color:#9ca3af;background:none;border:1px solid #e5e7eb;border-radius:.3rem;cursor:pointer;line-height:1">×</button>` +
           `</div>`
         ).join("");
@@ -8686,7 +8686,7 @@ function renderTargetManageContent(student, target) {
                 rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
             </div>
             ${subActsHtml}
-            <button class="mn-add-sub-act-btn btn-primary-sm" data-parent-idx="${idx}" style="font-size:.77rem;padding:.25rem .65rem;min-height:unset;margin-left:1.25rem;align-self:flex-start">+ Add Sub-activity</button>
+            <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.75rem;padding:.2rem .55rem;background:none;border:1px solid #d1d5db;border-radius:.35rem;color:#6b7280;cursor:pointer;margin-left:1.25rem;align-self:flex-start">+ Add Sub-activity</button>
           </div>
           <div style="position:relative">
             <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
@@ -8724,7 +8724,7 @@ function renderTargetManageContent(student, target) {
               ${remarkTypeSelect}
             </div>
             ${fixedRemarkRow}
-            <button class="mn-add-sub-act-btn btn-primary-sm" data-parent-idx="${idx}" style="font-size:.77rem;padding:.25rem .65rem;min-height:unset;align-self:flex-start">↳ Add Sub-activity</button>
+            <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.75rem;padding:.2rem .55rem;background:none;border:1px solid #d1d5db;border-radius:.35rem;color:#6b7280;cursor:pointer;align-self:flex-start">↳ Add Sub-activity</button>
           </div>
           <div style="position:relative">
             <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
@@ -9619,7 +9619,7 @@ function renderTargetManageContent(student, target) {
         `<span class="drag-handle" style="cursor:grab;color:#c4c9d4;font-size:1rem;flex-shrink:0;padding:0 .1rem;user-select:none">⠿</span>` +
         `<span class="mn-opt-num" style="font-size:.74rem;color:#9ca3af;min-width:1.2rem;text-align:right;flex-shrink:0">${oi + 1}.</span>` +
         `<input class="admin-input mn-opt-item" data-idx="${idx}" data-oi="${oi}" placeholder="Enter option…" style="flex:1;padding:.3rem .45rem;font-size:.84rem;min-width:0">` +
-        `<input class="admin-input mn-opt-score" type="number" min="0" step="1" data-idx="${idx}" data-oi="${oi}" placeholder="Pts" title="Auto-score when selected (leave blank for none)" style="width:3.2rem;flex-shrink:0;padding:.3rem .2rem;font-size:.8rem;text-align:center">` +
+        `<input class="admin-input mn-opt-score" type="number" min="0" step="0.5" data-idx="${idx}" data-oi="${oi}" placeholder="Pts" title="Auto-score when selected (leave blank for none)" style="width:3.2rem;flex-shrink:0;padding:.3rem .2rem;font-size:.8rem;text-align:center">` +
         `<button class="mn-opt-del" data-idx="${idx}" data-oi="${oi}" title="Remove option" style="flex-shrink:0;padding:.2rem .4rem;font-size:.8rem;color:#9ca3af;background:none;border:1px solid #e5e7eb;border-radius:.3rem;cursor:pointer;line-height:1">×</button>`;
       list.appendChild(row);
       wireOptBlur(row.querySelector(".mn-opt-item"), idx);
@@ -10831,7 +10831,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
         const subCard  = renderGroupActivityCard(sub.name, subActId, target, data, attendees, null, null, sub, true);
         const subRadius = isLast ? '0 0 var(--radius) var(--radius)' : '0';
         groupHtml += `<div style="border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);border-top:1px solid var(--border);border-radius:${subRadius};overflow:hidden">
-          <div style="padding:.4rem .6rem;font-size:.8rem;font-weight:700;color:#1d4ed8;background:#dbeafe;border-bottom:1px solid #bae6fd">${letters[si]}) ${escHtml(sub.name)}</div>
+          <div style="padding:.4rem .6rem;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted)"><span style="color:var(--primary)">${letters[si]})</span> ${escHtml(sub.name)}</div>
           ${subCard}
         </div>`;
       });
