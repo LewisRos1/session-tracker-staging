@@ -146,7 +146,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "769";
+const APP_VERSION = "770";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -8446,10 +8446,12 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
       <option value="starter_fixed_multi"${type === "starter_fixed_multi" ? " selected" : ""}>Sentence Starter + Tick boxes</option>
       <option value="starter_fixed_note"${type === "starter_fixed_note" ? " selected" : ""}>Sentence Starter + Select One + Free Text</option>
     </select>
-    <input class="admin-input mn-act-starter-text" data-idx="${idx}"
-      placeholder="Starter phrase…"
-      value="${escHtml(a.sentenceStarter || "")}"
-      style="${showStarter ? "" : "display:none"}">
+    <div class="mn-act-starter-wrap" data-idx="${idx}" style="${showStarter ? "display:flex;align-items:center;gap:.5rem" : "display:none"}">
+      <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600;flex-shrink:0">Sentence Starter:</span>
+      <input class="admin-input mn-act-starter-text" data-idx="${idx}"
+        placeholder="Phrase…"
+        value="${escHtml(a.sentenceStarter || "")}">
+    </div>
     <div class="mn-opts-container" data-idx="${idx}" style="${showStarter ? "" : "display:none"}">
       <div class="mn-opts-list">${(() => {
         const optsStr = a.inlineOptions || (a.remarkPresetId ? (state.remarkPresets.find(p=>p.id===a.remarkPresetId)?.options||[]).join("/") : "");
@@ -8457,7 +8459,7 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
         return displayOpts.map((opt, oi) =>
           `<div class="mn-opt-row admin-list-item" data-idx="${oi}" style="display:flex;align-items:center;gap:.3rem;margin-bottom:.25rem">` +
           `<span class="drag-handle" style="cursor:grab;color:#c4c9d4;font-size:1rem;flex-shrink:0;padding:0 .1rem;user-select:none">⠿</span>` +
-          `<span class="mn-opt-num" style="font-size:.74rem;color:#9ca3af;min-width:1.2rem;text-align:right;flex-shrink:0">${oi + 1}.</span>` +
+          `<span class="mn-opt-num" style="font-size:.75rem;color:#6b7280;white-space:nowrap;flex-shrink:0;font-weight:600">Option ${oi + 1}:</span>` +
           `<input class="admin-input mn-opt-item" data-idx="${idx}" data-oi="${oi}" value="${escHtml(opt)}" placeholder="Enter option…" style="flex:1;padding:.3rem .45rem;font-size:.84rem;min-width:0">` +
           `<input class="admin-input mn-opt-score" type="number" min="0" max="${maxPts}" step="0.5" data-idx="${idx}" data-oi="${oi}" value="${escHtml(String(a.optionScores?.[opt] ?? ''))}" placeholder="Pts" title="Auto-score when selected (leave blank for none)" style="width:3.2rem;flex-shrink:0;padding:.3rem .2rem;font-size:.8rem;text-align:center">` +
           `<button class="mn-opt-del" data-idx="${idx}" data-oi="${oi}" title="Remove option" style="flex-shrink:0;padding:.2rem .4rem;font-size:.8rem;color:#9ca3af;background:none;border:1px solid #e5e7eb;border-radius:.3rem;cursor:pointer;line-height:1">×</button>` +
@@ -9367,6 +9369,7 @@ function renderTargetManageContent(student, target) {
     sel.addEventListener("change", async () => {
       const idx = Number(sel.dataset.idx);
       const body = $("manage-modal-body");
+      const starterWrap   = body.querySelector(`.mn-act-starter-wrap[data-idx="${idx}"]`);
       const starterInput  = body.querySelector(`.mn-act-starter-text[data-idx="${idx}"]`);
       const optsContainer = body.querySelector(`.mn-opts-container[data-idx="${idx}"]`);
       const type = sel.value;
@@ -9422,7 +9425,7 @@ function renderTargetManageContent(student, target) {
       acts[idx].remarkHasNote   = (type === "starter_fixed_note");
       const starterVis = usesOpts;
       const optsVis    = usesOpts;
-      starterInput.style.display   = starterVis ? "" : "none";
+      starterWrap.style.display    = starterVis ? "" : "none";
       optsContainer.style.display  = optsVis ? "" : "none";
       if (usesOpts) { acts[idx].inlineOptions = getOptsFromDom(idx).join("/") || null; rebuildOptScores(idx); }
       if (starterVis) { starterInput.focus(); }
@@ -9559,7 +9562,7 @@ function renderTargetManageContent(student, target) {
   const renumberOpts = list => {
     list.querySelectorAll(".mn-opt-row").forEach((r, i) => {
       r.dataset.idx = i;
-      const n = r.querySelector(".mn-opt-num"); if (n) n.textContent = `${i + 1}.`;
+      const n = r.querySelector(".mn-opt-num"); if (n) n.textContent = `Option ${i + 1}:`;
       const inp = r.querySelector(".mn-opt-item"); if (inp) inp.dataset.oi = i;
       const del = r.querySelector(".mn-opt-del");  if (del) del.dataset.oi = i;
       const sc  = r.querySelector(".mn-opt-score"); if (sc) sc.dataset.oi = i;
@@ -9655,7 +9658,7 @@ function renderTargetManageContent(student, target) {
       row.style.cssText = "display:flex;align-items:center;gap:.3rem;margin-bottom:.25rem";
       row.innerHTML =
         `<span class="drag-handle" style="cursor:grab;color:#c4c9d4;font-size:1rem;flex-shrink:0;padding:0 .1rem;user-select:none">⠿</span>` +
-        `<span class="mn-opt-num" style="font-size:.74rem;color:#9ca3af;min-width:1.2rem;text-align:right;flex-shrink:0">${oi + 1}.</span>` +
+        `<span class="mn-opt-num" style="font-size:.75rem;color:#6b7280;white-space:nowrap;flex-shrink:0;font-weight:600">Option ${oi + 1}:</span>` +
         `<input class="admin-input mn-opt-item" data-idx="${idx}" data-oi="${oi}" placeholder="Enter option…" style="flex:1;padding:.3rem .45rem;font-size:.84rem;min-width:0">` +
         `<input class="admin-input mn-opt-score" type="number" min="0" step="0.5" data-idx="${idx}" data-oi="${oi}" placeholder="Pts" title="Auto-score when selected (leave blank for none)" style="width:3.2rem;flex-shrink:0;padding:.3rem .2rem;font-size:.8rem;text-align:center">` +
         `<button class="mn-opt-del" data-idx="${idx}" data-oi="${oi}" title="Remove option" style="flex-shrink:0;padding:.2rem .4rem;font-size:.8rem;color:#9ca3af;background:none;border:1px solid #e5e7eb;border-radius:.3rem;cursor:pointer;line-height:1">×</button>`;
@@ -10059,6 +10062,7 @@ function renderTemplateManageContent(template) {
     sel.addEventListener("change", async () => {
       const idx = Number(sel.dataset.idx);
       const body = $("manage-modal-body");
+      const starterWrap   = body.querySelector(`.mn-act-starter-wrap[data-idx="${idx}"]`);
       const starterInput  = body.querySelector(`.mn-act-starter-text[data-idx="${idx}"]`);
       const optsContainer = body.querySelector(`.mn-opts-container[data-idx="${idx}"]`);
       const type = sel.value;
@@ -10110,7 +10114,7 @@ function renderTemplateManageContent(template) {
       acts[idx].remarkHasNote   = (type === "starter_fixed_note");
       const starterVis = usesOpts;
       const optsVis    = usesOpts;
-      starterInput.style.display   = starterVis ? "" : "none";
+      starterWrap.style.display    = starterVis ? "" : "none";
       optsContainer.style.display  = optsVis ? "" : "none";
       if (usesOpts) {
         acts[idx].inlineOptions = [...body.querySelectorAll(`.mn-opt-item[data-idx="${idx}"]`)].map(i => i.value.trim()).filter(Boolean).join("/") || null;
@@ -10295,7 +10299,7 @@ function renderTemplateManageContent(template) {
   const renumberTmplOpts = list => {
     list.querySelectorAll(".mn-opt-row").forEach((r, i) => {
       r.dataset.idx = i; // keep row data-idx in sync for drag-sort
-      const n = r.querySelector(".mn-opt-num"); if (n) n.textContent = `${i + 1}.`;
+      const n = r.querySelector(".mn-opt-num"); if (n) n.textContent = `Option ${i + 1}:`;
       const inp = r.querySelector(".mn-opt-item"); if (inp) inp.dataset.oi = i;
       const del = r.querySelector(".mn-opt-del");  if (del) del.dataset.oi = i;
     });
@@ -10362,7 +10366,7 @@ function renderTemplateManageContent(template) {
       row.style.cssText = "display:flex;align-items:center;gap:.3rem;margin-bottom:.25rem";
       row.innerHTML =
         `<span class="drag-handle" style="cursor:grab;color:#c4c9d4;font-size:1rem;flex-shrink:0;padding:0 .1rem;user-select:none">⠿</span>` +
-        `<span class="mn-opt-num" style="font-size:.74rem;color:#9ca3af;min-width:1.2rem;text-align:right;flex-shrink:0">${oi + 1}.</span>` +
+        `<span class="mn-opt-num" style="font-size:.75rem;color:#6b7280;white-space:nowrap;flex-shrink:0;font-weight:600">Option ${oi + 1}:</span>` +
         `<input class="admin-input mn-opt-item" data-idx="${idx}" data-oi="${oi}" placeholder="Enter option…" style="flex:1;padding:.3rem .45rem;font-size:.84rem;min-width:0">` +
         `<button class="mn-opt-del" data-idx="${idx}" data-oi="${oi}" title="Remove option" style="flex-shrink:0;padding:.2rem .4rem;font-size:.8rem;color:#9ca3af;background:none;border:1px solid #e5e7eb;border-radius:.3rem;cursor:pointer;line-height:1">×</button>`;
       list.appendChild(row);
