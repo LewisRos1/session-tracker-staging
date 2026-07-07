@@ -145,7 +145,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "765";
+const APP_VERSION = "766";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4266,10 +4266,8 @@ async function autoFillStructuredRemarks(student, sessionId) {
       // configId match is the most precise; fall back to parentActivity/name for legacy data
       const existingAct = (paConfigId && allActs.find(([, a]) => a.configId === paConfigId && a.targetName === target.name))
         || (paParent
-          ? (allActs.find(([, a]) => a.targetName === target.name && a.activityName === pa.name && a.parentActivity === paParent)
-             || allActs.find(([, a]) => a.targetName === target.name && a.activityName === pa.name && !a.parentActivity))
-          : (allActs.find(([, a]) => a.targetName === target.name && a.activityName === pa.name && !a.parentActivity)
-             || allActs.find(([, a]) => a.targetName === target.name && a.activityName === pa.name)));
+          ? allActs.find(([, a]) => a.targetName === target.name && a.activityName === pa.name && a.parentActivity === paParent)
+          : allActs.find(([, a]) => a.targetName === target.name && a.activityName === pa.name && !a.parentActivity));
       let actId = existingAct?.[0] || null;
       if (actId && Object.values(data.remarks || {}).some(r => r.activityId === actId)) continue;
       const key = `${sessionId}:${target.name}:${paConfigId || pa.name}:${paParent || ""}`;
@@ -10843,9 +10841,10 @@ function buildGroupItemsByActivity(target, data, attendees) {
         </div>
       </div>`;
       children.forEach((sub, si) => {
-        const subActId = (Object.entries(data.activities || {}).find(([, a]) => a.targetName === target.name && a.activityName === sub.name && a.parentActivity === sub.parentActivity)
-          || Object.entries(data.activities || {}).find(([, a]) => a.targetName === target.name && a.activityName === sub.name && !a.parentActivity)
-          )?.[0] || null;
+        const subActId = Object.entries(data.activities || {}).find(([, a]) =>
+          (sub.id && a.configId === sub.id && a.targetName === target.name) ||
+          (a.targetName === target.name && a.activityName === sub.name && a.parentActivity === sub.parentActivity)
+        )?.[0] || null;
         const isLast   = si === children.length - 1;
         const subCard  = renderGroupActivityCard(sub.name, subActId, target, data, attendees, null, null, sub, true, sub.parentActivity, sub.id);
         const subRadius = isLast ? '0 0 var(--radius) var(--radius)' : '0';
@@ -11604,7 +11603,6 @@ function attachGroupTargetListeners(target) {
         let actId = btn.dataset.actId
           || (cfgId && allGrpActs.find(([, a]) => a.configId === cfgId && a.targetName === targetName)?.[0])
           || allGrpActs.find(([, a]) => a.targetName === targetName && a.activityName === actName && (paParent ? a.parentActivity === paParent : !a.parentActivity))?.[0]
-          || allGrpActs.find(([, a]) => a.targetName === targetName && a.activityName === actName)?.[0]
           || null;
         if (!actId) {
           actId = await addActivity(state.groupSessionId, targetName, actName, Date.now(), true, undefined, paParent, cfgId);
@@ -11769,7 +11767,6 @@ async function ensureGroupActivityAndRemark(el) {
   let actId = el.dataset.actId
     || (cfgId && allActs.find(([, a]) => a.configId === cfgId && a.targetName === targetName)?.[0])
     || allActs.find(([, a]) => a.targetName === targetName && a.activityName === actName && (paParent ? a.parentActivity === paParent : !a.parentActivity))?.[0]
-    || allActs.find(([, a]) => a.targetName === targetName && a.activityName === actName)?.[0]
     || null;
   if (!actId) {
     actId = await addActivity(state.groupSessionId, targetName, actName, Date.now(), true, undefined, paParent, cfgId);
@@ -12151,17 +12148,14 @@ function findActivityByName(targetName, activityName, parentActivity = null, con
     if (exact) return { id: exact[0], ...exact[1] };
   }
   if (parentActivity) {
+    // Only match records that explicitly belong to this parent — no fallback to
+    // parentActivity-less records, which would grab same-named top-level activity data.
     const exact = entries.find(e => byName(e) && e[1].parentActivity === parentActivity);
-    if (exact) return { id: exact[0], ...exact[1] };
-    // Legacy: sub-activity created before parentActivity field was stored
-    const legacy = entries.find(e => byName(e) && !e[1].parentActivity);
-    return legacy ? { id: legacy[0], ...legacy[1] } : null;
+    return exact ? { id: exact[0], ...exact[1] } : null;
   }
-  // Top-level: prefer entries without parentActivity
+  // Top-level: only match records with no parentActivity set
   const top = entries.find(e => byName(e) && !e[1].parentActivity);
-  if (top) return { id: top[0], ...top[1] };
-  const any = entries.find(byName);
-  return any ? { id: any[0], ...any[1] } : null;
+  return top ? { id: top[0], ...top[1] } : null;
 }
 
 // ─── UTILITIES ───────────────────────────────────────────────
