@@ -897,10 +897,11 @@ function wordTargetRows(target, session, allTargets) {
         const validTrials = allScores(rem);
         const remarkAvg   = calcRemarkAvg(validTrials, target.maxPoints);
         const text        = stripRemarkHtml(rem.text);
+        const subNote     = stripRemarkHtml(rem.masteryNote || "");
         rows.push({
           cells: [subFirst ? subDisplayName : "", "", remarkAvg !== null ? pct(remarkAvg) : ""],
           actLines: subFirst ? subActLines : null,
-          remarkLines: buildRemarkLines(subStarter, text, ""),
+          remarkLines: buildRemarkLines(subStarter, text, subNote),
           isGray: act.isGray, isGreen: act.isGreen
         });
         subFirst = false;
@@ -1679,7 +1680,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
             const remarkAvg   = calcRemarkAvg(validTrials, target.maxPoints);
             const r = blankRow();
             r[1] = subFirst ? subCell : "";
-            r[2] = buildExcelRemarkCell(rem.text, subStarter, "");
+            r[2] = buildExcelRemarkCell(rem.text, subStarter, stripRemarkHtml(rem.masteryNote || ""));
             if (includeTrials) { r[3] = trialsList(rem.optionScore !== undefined ? [...(rem.trials || []), rem.optionScore] : rem.trials); r[4] = remarkAvg !== null ? pct(remarkAvg) : ""; }
             else { r[3] = remarkAvg !== null ? pct(remarkAvg) : ""; }
             rows.push(r);
