@@ -374,9 +374,10 @@ export async function updateGroupSessionDate(sessionId, newDateStr, groupId) {
 // actId can be supplied by the caller (e.g. to write the activity into local
 // state immediately, before this write reaches the server — see addRemark's
 // matching comment) — otherwise one is generated here.
-export async function addActivity(sessionId, targetName, activityName, order, isPredefined = false, actId = generateId("a"), parentActivity = null) {
+export async function addActivity(sessionId, targetName, activityName, order, isPredefined = false, actId = generateId("a"), parentActivity = null, configId = null) {
   const actData = { targetName, activityName, order, isPredefined };
   if (parentActivity) actData.parentActivity = parentActivity;
+  if (configId) actData.configId = configId;
   await updateDoc(doc(db, "sessions", sessionId), {
     [`activities.${actId}`]: actData
   });
