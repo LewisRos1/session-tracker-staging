@@ -1832,6 +1832,8 @@ function getAllActivitiesForTarget(session, target) {
 
     // Parent activity (noRemark) — numbered title, empty remark
     if (pa.noRemark) {
+      const sActNr = sessionActs.find(a => a.activityName === pa.name && a.isPredefined);
+      if (sActNr) usedIds.add(sActNr.id);
       result.push({ id: null, activityName: numberedName, isPredefined: true, noRemark: true, empty: true });
       continue;
     }
@@ -1947,8 +1949,8 @@ function calcRemarkAvg(trials, maxPoints) {
   if (!trials || trials.length === 0) return null;
   const valid = trials.filter(t => t !== -1);
   if (valid.length === 0) return null;
-  if (!maxPoints) return null;
-  return valid.reduce((a, b) => a + b, 0) / (valid.length * maxPoints) * 100;
+  const mp = maxPoints || 3;
+  return valid.reduce((a, b) => a + b, 0) / (valid.length * mp) * 100;
 }
 
 // visited guards against a circular mapping chain recursing forever — direct
