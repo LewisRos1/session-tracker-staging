@@ -145,7 +145,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "757";
+const APP_VERSION = "758";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3231,7 +3231,7 @@ function renderFedcTarget(target) {
         const subLabel   = letters[si];
         const isLast     = si === children.length - 1;
         const subRadius  = isLast ? '0 0 var(--radius) var(--radius)' : '0';
-        html += `<div class="entry-block" style="border:1px solid var(--border);border-left:4px solid #60a5fa;background:var(--white);border-top:1px solid var(--border);border-radius:${subRadius};box-shadow:var(--shadow)">
+        html += `<div class="entry-block" style="border:1px solid var(--border);border-left:4px solid var(--primary);background:var(--white);border-top:1px solid var(--border);border-radius:${subRadius};box-shadow:var(--shadow)">
           <div class="entry-field" contenteditable="false" style="background:#dbeafe">
             <span class="field-label" style="color:#1d4ed8">Subactivity</span>
             <span class="field-value-fixed"><span style="color:#1d4ed8;font-weight:700;margin-right:.25rem">${subLabel})</span>${formatActivityMarkup(sub.name)}</span>
@@ -10830,7 +10830,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
         const isLast   = si === children.length - 1;
         const subCard  = renderGroupActivityCard(sub.name, subActId, target, data, attendees, null, null, sub, true);
         const subRadius = isLast ? '0 0 var(--radius) var(--radius)' : '0';
-        groupHtml += `<div style="border:1px solid var(--border);border-left:4px solid #60a5fa;background:var(--white);border-top:1px solid var(--border);border-radius:${subRadius};overflow:hidden">
+        groupHtml += `<div style="border:1px solid var(--border);border-left:4px solid var(--primary);background:var(--white);border-top:1px solid var(--border);border-radius:${subRadius};overflow:hidden">
           <div style="padding:.4rem .6rem;font-size:.8rem;font-weight:700;color:#1d4ed8;background:#dbeafe;border-bottom:1px solid #bae6fd">${letters[si]}) ${escHtml(sub.name)}</div>
           ${subCard}
         </div>`;
