@@ -146,7 +146,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "768";
+const APP_VERSION = "769";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -8436,7 +8436,9 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
     : a.sentenceStarter ? ""
     : (a.inlineOptions && a.optionsMulti) ? "starter_fixed_multi"
     : (a.inlineOptions || a.remarkPresetId) ? "starter_fixed" : "";
-  return `<select class="act-preset-select mn-act-preset" data-idx="${idx}">
+  const showStarter = type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note";
+  return `<div style="flex:1;display:flex;flex-direction:column;gap:.4rem;min-width:0">
+    <select class="act-preset-select mn-act-preset" data-idx="${idx}">
       <option value="">Free text</option>
       <option value="fixed_remark"${type === "fixed_remark" ? " selected" : ""}>Fixed Remark</option>
       <option value="manual_score"${type === "manual_score" ? " selected" : ""}>Manual Score</option>
@@ -8447,8 +8449,8 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
     <input class="admin-input mn-act-starter-text" data-idx="${idx}"
       placeholder="Starter phrase…"
       value="${escHtml(a.sentenceStarter || "")}"
-      style="${type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note" ? "flex:1;min-width:0;width:auto" : "display:none"}">
-    <div class="mn-opts-container" data-idx="${idx}" style="${type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note" ? "flex:1;min-width:0" : "display:none"}">
+      style="${showStarter ? "" : "display:none"}">
+    <div class="mn-opts-container" data-idx="${idx}" style="${showStarter ? "" : "display:none"}">
       <div class="mn-opts-list">${(() => {
         const optsStr = a.inlineOptions || (a.remarkPresetId ? (state.remarkPresets.find(p=>p.id===a.remarkPresetId)?.options||[]).join("/") : "");
         const displayOpts = parseOpts(optsStr).length > 0 ? parseOpts(optsStr) : [""];
@@ -8466,7 +8468,8 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
         <button class="mn-opt-add" data-idx="${idx}" style="font-size:.78rem;padding:.25rem .6rem;background:none;border:1px solid #d1d5db;border-radius:.35rem;cursor:pointer;color:#6b7280">+ Add Option</button>
         <span title="Renaming an option updates it across all past sessions too. If you rename &quot;A&quot; to &quot;B&quot;, every past session that chose &quot;A&quot; will now show &quot;B&quot;." style="cursor:default;color:#9ca3af;font-size:.8rem">ⓘ</span>
       </div>
-    </div>`;
+    </div>
+  </div>`;
 }
 
 function renderTargetManageContent(student, target) {
@@ -8633,8 +8636,8 @@ function renderTargetManageContent(student, target) {
             <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
               rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
           </div>
-          <div style="display:flex;align-items:center;gap:.5rem">
-            <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Remark Type:</span>
+          <div style="display:flex;align-items:flex-start;gap:.5rem">
+            <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600;padding-top:.3rem">Remark Type:</span>
             ${buildRemarkTypeControls(a, idx, target.maxPoints || 3)}
           </div>
           <div style="display:flex;align-items:center;gap:.5rem">
@@ -8706,8 +8709,8 @@ function renderTargetManageContent(student, target) {
                 rows="1" placeholder="Sub-activity name" style="flex:1">${escHtml(sub.name || '')}</textarea>
               <button class="btn-adm-del mn-del-sub-act" data-idx="${subIdx}" title="Delete sub-activity" style="flex-shrink:0">🗑</button>
             </div>
-            <div style="display:flex;align-items:center;gap:.5rem;padding-left:1.6rem">
-              <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Remark Type:</span>
+            <div style="display:flex;align-items:flex-start;gap:.5rem;padding-left:1.6rem">
+              <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600;padding-top:.3rem">Remark Type:</span>
               ${subRemarkType}
             </div>
             ${subFixedRemarkRow}
@@ -8757,8 +8760,8 @@ function renderTargetManageContent(student, target) {
               <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
                 rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
             </div>
-            <div style="display:flex;align-items:center;gap:.5rem">
-              <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Remark Type:</span>
+            <div style="display:flex;align-items:flex-start;gap:.5rem">
+              <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600;padding-top:.3rem">Remark Type:</span>
               ${remarkTypeSelect}
             </div>
             ${fixedRemarkRow}
@@ -9419,13 +9422,8 @@ function renderTargetManageContent(student, target) {
       acts[idx].remarkHasNote   = (type === "starter_fixed_note");
       const starterVis = usesOpts;
       const optsVis    = usesOpts;
-      starterInput.style.display  = starterVis ? "" : "none";
-      starterInput.style.flex     = starterVis ? "1" : "";
-      starterInput.style.minWidth = starterVis ? "0" : "";
-      starterInput.style.width    = starterVis ? "auto" : "";
+      starterInput.style.display   = starterVis ? "" : "none";
       optsContainer.style.display  = optsVis ? "" : "none";
-      optsContainer.style.flex     = optsVis ? "1" : "";
-      optsContainer.style.minWidth = optsVis ? "0" : "";
       if (usesOpts) { acts[idx].inlineOptions = getOptsFromDom(idx).join("/") || null; rebuildOptScores(idx); }
       if (starterVis) { starterInput.focus(); }
       else if (optsVis) { optsContainer.querySelector(".mn-opt-item")?.focus(); }
@@ -9842,8 +9840,8 @@ function renderTemplateManageContent(template) {
             <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
               rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
           </div>
-          <div style="display:flex;align-items:center;gap:.5rem">
-            <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Remark Type:</span>
+          <div style="display:flex;align-items:flex-start;gap:.5rem">
+            <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600;padding-top:.3rem">Remark Type:</span>
             ${remarkTypeSelect}
           </div>
           ${fixedRemarkRow}
@@ -10112,13 +10110,8 @@ function renderTemplateManageContent(template) {
       acts[idx].remarkHasNote   = (type === "starter_fixed_note");
       const starterVis = usesOpts;
       const optsVis    = usesOpts;
-      starterInput.style.display  = starterVis ? "" : "none";
-      starterInput.style.flex     = starterVis ? "1" : "";
-      starterInput.style.minWidth = starterVis ? "0" : "";
-      starterInput.style.width    = starterVis ? "auto" : "";
+      starterInput.style.display   = starterVis ? "" : "none";
       optsContainer.style.display  = optsVis ? "" : "none";
-      optsContainer.style.flex     = optsVis ? "1" : "";
-      optsContainer.style.minWidth = optsVis ? "0" : "";
       if (usesOpts) {
         acts[idx].inlineOptions = [...body.querySelectorAll(`.mn-opt-item[data-idx="${idx}"]`)].map(i => i.value.trim()).filter(Boolean).join("/") || null;
       }
