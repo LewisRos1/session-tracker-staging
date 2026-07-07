@@ -146,7 +146,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "770";
+const APP_VERSION = "771";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4744,9 +4744,10 @@ function buildTargetViewTable(target, data) {
         displayNo = no;
       }
       if (pa.fixedRemark !== undefined || pa.isMaintain) {
-        const fixedEntry = Object.entries(data.activities || {})
-          .find(([, a]) => a.targetName === target.name && a.activityName === pa.name);
-        if (fixedEntry) matchedIds.add(fixedEntry[0]);
+        const fixedEntries = Object.entries(data.activities || {})
+          .filter(([, a]) => a.targetName === target.name && a.activityName === pa.name);
+        const fixedEntry = fixedEntries[0] || null;
+        fixedEntries.forEach(([id]) => matchedIds.add(id));
         const fixedText = pa.fixedRemark ?? pa.maintainRemark ?? "";
         const isGrayFixed = pa.activityColor === "gray" || !!pa.isMaintainLive;
         const isGreenFixed = pa.activityColor === "green" || pa.inactiveReason === 'mastered';
@@ -4762,9 +4763,10 @@ function buildTargetViewTable(target, data) {
         </tr>`;
         continue;
       }
-      const entry = Object.entries(data.activities || {})
-        .find(([, a]) => a.targetName === target.name && a.activityName === pa.name);
-      if (entry) matchedIds.add(entry[0]);
+      const allEntries = Object.entries(data.activities || {})
+        .filter(([, a]) => a.targetName === target.name && a.activityName === pa.name);
+      const entry = allEntries[0] || null;
+      allEntries.forEach(([id]) => matchedIds.add(id));
       rows += viewActivityRows(displayNo, pa.name, entry?.[0] || null, data, target, true);
     }
     // All unmatched session activities — covers both manually-added activities
@@ -6143,9 +6145,9 @@ function buildGroupTargetViewTable(target, data, attendees) {
         continue;
       }
       if (pa.fixedRemark !== undefined || pa.isMaintain) {
-        const fixedEntry = Object.entries(data.activities || {})
-          .find(([, a]) => a.targetName === target.name && a.activityName === pa.name);
-        if (fixedEntry) matchedIds.add(fixedEntry[0]);
+        const fixedEntries2 = Object.entries(data.activities || {})
+          .filter(([, a]) => a.targetName === target.name && a.activityName === pa.name);
+        fixedEntries2.forEach(([id]) => matchedIds.add(id));
         const fixedText = pa.fixedRemark ?? pa.maintainRemark ?? "";
         const isGrayFixed = pa.activityColor === "gray" || !!pa.isMaintainLive;
         const isGreenFixed2 = pa.activityColor === "green" || pa.inactiveReason === 'mastered';
@@ -6162,10 +6164,11 @@ function buildGroupTargetViewTable(target, data, attendees) {
         continue;
       }
       no++;
-      const entry = Object.entries(data.activities || {})
-        .find(([, a]) => a.targetName === target.name && a.activityName === pa.name);
-      if (entry) matchedIds.add(entry[0]);
-      rows += viewGroupActivityRows(no, pa.name, entry?.[0] || null, data, target, attendees, true);
+      const allEntries2 = Object.entries(data.activities || {})
+        .filter(([, a]) => a.targetName === target.name && a.activityName === pa.name);
+      const entry2 = allEntries2[0] || null;
+      allEntries2.forEach(([id]) => matchedIds.add(id));
+      rows += viewGroupActivityRows(no, pa.name, entry2?.[0] || null, data, target, attendees, true);
     }
     // All unmatched session activities — covers both manually-added activities
     // AND predefined activities recorded under old names before a rename.
