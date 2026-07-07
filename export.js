@@ -869,8 +869,74 @@ function wordTargetRows(target, session, allTargets) {
     // like a plain "+ Add Activity" and drops the note, same reasoning as above.
     const activityLabel = act.activityName;
 
+    // noRemark parent: numbered title, empty remark and score
+    if (act.noRemark) {
+      rows.push({ cells: [activityLabel, "", ""], actLines: parseInlineMarkup(activityLabel), isGray: act.isGray, isGreen: act.isGreen });
+      continue;
+    }
+
+    // Sub-activity: indented lettered label, own remark
+    if (act.isSubActivity) {
+      const subDisplayName = `    ${act.subLabel}) ${act.activityName}`;
+      const subActLines = [{ text: `    ${act.subLabel}) `, bold: false, underline: false }, ...parseInlineMarkup(act.activityName)];
+      if (act.empty) {
+        rows.push({ cells: [subDisplayName, "", ""], actLines: subActLines, isGray: act.isGray, isGreen: act.isGreen });
+        continue;
+      }
+      const subRemarks = getRemarksForActivity(session, act.id).filter(hasRemarkContent);
+      if (subRemarks.length === 0) {
+        rows.push({ cells: [subDisplayName, "", ""], actLines: subActLines, isGray: act.isGray, isGreen: act.isGreen });
+        continue;
+      }
+      const subPa = (target.predefinedActivities || []).find(p => p.name === act.activityName);
+      const subStarter = subPa?.sentenceStarter || null;
+      let subFirst = true;
+      for (const rem of subRemarks) {
+        const validTrials = (rem.trials || []).filter(t => t !== -1);
+        const remarkAvg   = calcRemarkAvg(validTrials, target.maxPoints);
+        const text        = stripRemarkHtml(rem.text);
+        rows.push({
+          cells: [subFirst ? subDisplayName : "", "", remarkAvg !== null ? pct(remarkAvg) : ""],
+          actLines: subFirst ? subActLines : null,
+          remarkLines: buildRemarkLines(subStarter, text, ""),
+          isGray: act.isGray, isGreen: act.isGreen
+        });
+        subFirst = false;
+      }
+      continue;
+    }
+
     if (act.empty) {
       rows.push({ cells: [activityLabel, "", ""], actLines: parseInlineMarkup(activityLabel), isGray: act.isGray, isGreen: act.isGreen });
+      continue;
+    }
+
+    // Multiple remark groups
+    if (act.remarkGroups?.length) {
+      const remarks = getRemarksForActivity(session, act.id);
+      if (remarks.length === 0) {
+        rows.push({ cells: [activityLabel, "", ""], actLines: parseInlineMarkup(activityLabel), isGray: act.isGray, isGreen: act.isGreen });
+        continue;
+      }
+      let actFirst = true;
+      for (const rem of remarks) {
+        const groupValues = rem.groupValues || {};
+        const validTrials = (rem.trials || []).filter(t => t !== -1);
+        const remarkAvg   = calcRemarkAvg(validTrials, target.maxPoints);
+        let grpFirst = true;
+        for (const grp of act.remarkGroups) {
+          const val = groupValues[grp.id] || "";
+          const groupLine = val ? `${grp.label}: ${val}` : `${grp.label}: —`;
+          rows.push({
+            cells: [(actFirst && grpFirst) ? activityLabel : "", "", (actFirst && grpFirst && remarkAvg !== null) ? pct(remarkAvg) : ""],
+            actLines: (actFirst && grpFirst) ? parseInlineMarkup(activityLabel) : null,
+            remarkLines: [{ text: groupLine, bold: false, underline: false }],
+            isGray: act.isGray, isGreen: act.isGreen
+          });
+          grpFirst = false;
+        }
+        actFirst = false;
+      }
       continue;
     }
 
@@ -1609,6 +1675,48 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
         }
       }
 
+      // noRemark parent: numbered title, empty remark
+      if (act.noRemark) {
+        if (act.isGray) grayRows.add(rows.length);
+        if (act.isGreen) greenRows.add(rows.length);
+        const r = blankRow(); r[1] = buildExcelActivityCell(act.activityName); rows.push(r);
+        continue;
+      }
+
+      // Sub-activity: indented lettered label
+      if (act.isSubActivity) {
+        const subLabel = `    ${act.subLabel}) ${act.activityName}`;
+        const subCell  = buildExcelActivityCell(subLabel);
+        if (act.isGray) grayRows.add(rows.length);
+        if (act.isGreen) greenRows.add(rows.length);
+        if (act.empty) {
+          const r = blankRow(); r[1] = subCell; rows.push(r);
+          continue;
+        }
+        const subRemarks = getRemarksForActivity(session, act.id).filter(hasRemarkContent);
+        const subPa = (target.predefinedActivities || []).find(p => p.name === act.activityName);
+        const subStarter = subPa?.sentenceStarter || null;
+        if (subRemarks.length === 0) {
+          const r = blankRow(); r[1] = subCell; rows.push(r);
+        } else {
+          let subFirst = true;
+          for (const rem of subRemarks) {
+            if (act.isGray) grayRows.add(rows.length);
+            if (act.isGreen) greenRows.add(rows.length);
+            const validTrials = (rem.trials || []).filter(t => t !== -1);
+            const remarkAvg   = calcRemarkAvg(validTrials, target.maxPoints);
+            const r = blankRow();
+            r[1] = subFirst ? subCell : "";
+            r[2] = buildExcelRemarkCell(rem.text, subStarter, "");
+            if (includeTrials) { r[3] = trialsList(rem.trials); r[4] = remarkAvg !== null ? pct(remarkAvg) : ""; }
+            else { r[3] = remarkAvg !== null ? pct(remarkAvg) : ""; }
+            rows.push(r);
+            subFirst = false;
+          }
+        }
+        continue;
+      }
+
       const actNoteText = (target.predefinedActivities || []).find(
         p => !p.isHeading && !p.isNote && p.name === act.activityName
       )?.actNote;
@@ -1630,6 +1738,41 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
         if (act.isGray) grayRows.add(rows.length);
         if (act.isGreen) greenRows.add(rows.length);
         const r = blankRow(); r[1] = activityCell; rows.push(r);
+        continue;
+      }
+
+      // Multiple remark groups
+      if (act.remarkGroups?.length) {
+        const rgRemarks = getRemarksForActivity(session, act.id);
+        if (rgRemarks.length === 0) {
+          if (act.isGray) grayRows.add(rows.length);
+          if (act.isGreen) greenRows.add(rows.length);
+          const r = blankRow(); r[1] = activityCell; rows.push(r);
+        } else {
+          let actFirst = true;
+          for (const rem of rgRemarks) {
+            const groupValues = rem.groupValues || {};
+            const validTrials = (rem.trials || []).filter(t => t !== -1);
+            const remarkAvg   = calcRemarkAvg(validTrials, target.maxPoints);
+            let grpFirst = true;
+            for (const grp of act.remarkGroups) {
+              if (act.isGray) grayRows.add(rows.length);
+              if (act.isGreen) greenRows.add(rows.length);
+              const val = groupValues[grp.id] || "";
+              const groupLine = val ? `${grp.label}: ${val}` : `${grp.label}: —`;
+              const r = blankRow();
+              r[1] = (actFirst && grpFirst) ? activityCell : "";
+              r[2] = groupLine;
+              if ((actFirst && grpFirst)) {
+                if (includeTrials) { r[3] = trialsList(rem.trials); r[4] = remarkAvg !== null ? pct(remarkAvg) : ""; }
+                else { r[3] = remarkAvg !== null ? pct(remarkAvg) : ""; }
+              }
+              rows.push(r);
+              grpFirst = false;
+            }
+            actFirst = false;
+          }
+        }
         continue;
       }
 
@@ -1702,6 +1845,7 @@ function getAllActivitiesForTarget(session, target) {
   const masteredActivities = [];
   const stoppedActivities  = [];
   let exportActNum = 0;
+  const subLabelCounters = {};
 
   for (const pa of (target.predefinedActivities || [])) {
     if (!isActivityActive(pa, session.date)) continue;
@@ -1729,9 +1873,33 @@ function getAllActivitiesForTarget(session, target) {
       result.push({ isGreenHeading: true, activityName: pa.name });
       continue;
     }
+
+    // Sub-activity: lettered (a, b, c…), no exportActNum increment
+    if (pa.parentActivity) {
+      if (pa.isCompleted || pa.isArchived || pa.isStopped) continue;
+      const si = subLabelCounters[pa.parentActivity] || 0;
+      subLabelCounters[pa.parentActivity] = si + 1;
+      const subLabel = String.fromCharCode(97 + si);
+      const sessionAct = sessionActs.find(a => a.activityName === pa.name && a.isPredefined);
+      if (sessionAct) {
+        usedIds.add(sessionAct.id);
+        result.push({ ...sessionAct, activityName: pa.name, isSubActivity: true, subLabel });
+      } else {
+        result.push({ id: null, activityName: pa.name, isPredefined: true, empty: true, isSubActivity: true, subLabel });
+      }
+      continue;
+    }
+
     // All remaining paths are real activities — assign sequential number
     exportActNum++;
     const numberedName = `${exportActNum}) ${pa.name}`;
+
+    // Parent activity (noRemark) — numbered title, empty remark
+    if (pa.noRemark) {
+      result.push({ id: null, activityName: numberedName, isPredefined: true, noRemark: true, empty: true });
+      continue;
+    }
+
     // Fixed remark activities — inline in their natural position (NOT reordered to the bottom)
     if (pa.fixedRemark !== undefined) {
       const isGray = pa.activityColor === "gray" || !!pa.isMaintainLive;
@@ -1767,13 +1935,16 @@ function getAllActivitiesForTarget(session, target) {
     const colorProps = (pa.activityColor === "gray" || pa.isMaintainLive) ? { isGray: true }
                      : pa.activityColor === "green" ? { isGreen: true } : {};
     const manualScoreProp = pa.manualScore ? { manualScore: true } : {};
+    const rgProp = pa.remarkGroups?.length ? { remarkGroups: pa.remarkGroups } : {};
     if (sessionAct) {
       usedIds.add(sessionAct.id);
-      result.push(pa.isMapped ? { ...sessionAct, activityName: numberedName, isMapped: true, mappedTargetId: pa.mappedTargetId || null, ...colorProps } : { ...sessionAct, activityName: numberedName, ...colorProps, ...manualScoreProp });
+      result.push(pa.isMapped
+        ? { ...sessionAct, activityName: numberedName, isMapped: true, mappedTargetId: pa.mappedTargetId || null, ...colorProps }
+        : { ...sessionAct, activityName: numberedName, ...colorProps, ...manualScoreProp, ...rgProp });
     } else {
       result.push({
         id: null, activityName: numberedName, isPredefined: true, empty: true,
-        isMapped: pa.isMapped || false, mappedTargetId: pa.mappedTargetId || null, ...colorProps, ...manualScoreProp
+        isMapped: pa.isMapped || false, mappedTargetId: pa.mappedTargetId || null, ...colorProps, ...manualScoreProp, ...rgProp
       });
     }
   }
