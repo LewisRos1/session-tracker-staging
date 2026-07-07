@@ -145,7 +145,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "753";
+const APP_VERSION = "754";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4250,36 +4250,48 @@ function isAutoOpenRemarkType(pa) {
 // Data Integrity Check's duplicate-activity section exists as a backstop.
 async function autoFillStructuredRemarks(student, sessionId) {
   const data = state.sessionData;
-  let count = 0;
+
+  // Collect everything that needs filling first (no await yet)
+  const toFill = [];
   for (const target of (student.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
       if (pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || pa.isMaintainHeading || pa.fixedRemark !== undefined) continue;
       if (!isAutoOpenRemarkType(pa)) continue;
-
       const existingAct = Object.entries(data.activities || {})
         .find(([, a]) => a.targetName === target.name && a.activityName === pa.name);
       let actId = existingAct?.[0] || null;
-
-      if (actId) {
-        const hasRemark = Object.values(data.remarks || {}).some(r => r.activityId === actId);
-        if (hasRemark) continue;
-      }
-
+      if (actId && Object.values(data.remarks || {}).some(r => r.activityId === actId)) continue;
       const key = `${sessionId}:${target.name}:${pa.name}`;
       if (structuredRemarkAutoFillInFlight.has(key)) continue;
       structuredRemarkAutoFillInFlight.add(key);
-      try {
-        if (!actId) {
-          actId = await addActivity(sessionId, target.name, pa.name, pa.order ?? 0, true);
-        }
-        await addRemark(sessionId, actId, "");
-        count++;
-      } finally {
-        structuredRemarkAutoFillInFlight.delete(key);
-      }
+      toFill.push({ target, pa, actId, key });
     }
   }
-  return count;
+  if (toFill.length === 0) return 0;
+
+  // Wave 1: create missing activities in parallel
+  await Promise.all(toFill.map(async item => {
+    if (!item.actId) {
+      try {
+        item.actId = await addActivity(sessionId, item.target.name, item.pa.name, item.pa.order ?? 0, true);
+      } catch (err) {
+        structuredRemarkAutoFillInFlight.delete(item.key);
+        item.actId = null;
+      }
+    }
+  }));
+
+  // Wave 2: add remarks in parallel for all resolved activities
+  await Promise.all(toFill.map(async item => {
+    if (!item.actId) return;
+    try {
+      await addRemark(sessionId, item.actId, "");
+    } finally {
+      structuredRemarkAutoFillInFlight.delete(item.key);
+    }
+  }));
+
+  return toFill.length;
 }
 
 // Auto-create an empty remark for a mapped-score activity as soon as its
@@ -4299,36 +4311,45 @@ const mappedRemarkAutoFillInFlight = new Set();
 
 async function autoFillMappedRemarks(student, sessionId) {
   const data = state.sessionData;
-  let count = 0;
+
+  const toFill = [];
   for (const target of (student.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
       if (pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || pa.isMaintainHeading) continue;
       if (!pa.isMapped) continue;
-
       const existingAct = Object.entries(data.activities || {})
         .find(([, a]) => a.targetName === target.name && a.activityName === pa.name);
       let actId = existingAct?.[0] || null;
-
-      if (actId) {
-        const hasRemark = Object.values(data.remarks || {}).some(r => r.activityId === actId);
-        if (hasRemark) continue;
-      }
-
+      if (actId && Object.values(data.remarks || {}).some(r => r.activityId === actId)) continue;
       const key = `${sessionId}:${target.name}:${pa.name}`;
       if (mappedRemarkAutoFillInFlight.has(key)) continue;
       mappedRemarkAutoFillInFlight.add(key);
-      try {
-        if (!actId) {
-          actId = await addActivity(sessionId, target.name, pa.name, pa.order ?? 0, true);
-        }
-        await addRemark(sessionId, actId, "");
-        count++;
-      } finally {
-        mappedRemarkAutoFillInFlight.delete(key);
-      }
+      toFill.push({ target, pa, actId, key });
     }
   }
-  return count;
+  if (toFill.length === 0) return 0;
+
+  await Promise.all(toFill.map(async item => {
+    if (!item.actId) {
+      try {
+        item.actId = await addActivity(sessionId, item.target.name, item.pa.name, item.pa.order ?? 0, true);
+      } catch (err) {
+        mappedRemarkAutoFillInFlight.delete(item.key);
+        item.actId = null;
+      }
+    }
+  }));
+
+  await Promise.all(toFill.map(async item => {
+    if (!item.actId) return;
+    try {
+      await addRemark(sessionId, item.actId, "");
+    } finally {
+      mappedRemarkAutoFillInFlight.delete(item.key);
+    }
+  }));
+
+  return toFill.length;
 }
 
 // Deletes remarks that have no text, no mastery note, and no valid trials for
