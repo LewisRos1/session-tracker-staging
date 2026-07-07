@@ -146,7 +146,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "773";
+const APP_VERSION = "774";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -8477,7 +8477,7 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
       <option value="starter_fixed_note"${type === "starter_fixed_note" ? " selected" : ""}>Sentence Starter + Select One + Free Text</option>
     </select>
     <div class="mn-act-starter-wrap" data-idx="${idx}" style="${showStarter ? "display:flex;align-items:center;gap:.5rem" : "display:none"}">
-      <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600;flex-shrink:0">Sentence Starter:</span>
+      <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600;flex-shrink:0">Sentence Starter (Optional):</span>
       <input class="admin-input mn-act-starter-text" data-idx="${idx}"
         placeholder="Phrase…"
         value="${escHtml(a.sentenceStarter || "")}">
