@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "741";
+const APP_VERSION = "742";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3228,10 +3228,11 @@ function renderFedcTarget(target) {
         const subLabel   = letters[si];
         const isLast     = si === children.length - 1;
         const subRadius  = isLast ? '0 0 var(--radius) var(--radius)' : '0';
-        html += `<div class="entry-block" style="border:1px solid #bae6fd;border-left:4px solid #60a5fa;background:#f0f9ff;border-top:none;border-radius:${subRadius};box-shadow:var(--shadow)">
-          <div class="entry-field" contenteditable="false">
-            <span class="field-label">Activity</span>
-            <span class="field-value-fixed"><span style="color:#0369a1;font-weight:700;margin-right:.25rem">${subLabel})</span>${formatActivityMarkup(sub.name)}</span>
+        const subTopBorder = si === 0 ? 'border-top:none' : 'border-top:2px solid #7dd3fc';
+        html += `<div class="entry-block" style="border:1px solid #bae6fd;border-left:4px solid #60a5fa;background:#f0f9ff;${subTopBorder};border-radius:${subRadius};box-shadow:var(--shadow)">
+          <div class="entry-field" contenteditable="false" style="background:#dbeafe;border-radius:${si === 0 ? '0' : '0'};margin:-0px">
+            <span class="field-label" style="color:#1d4ed8">Activity</span>
+            <span class="field-value-fixed"><span style="color:#1d4ed8;font-weight:700;margin-right:.25rem">${subLabel})</span>${formatActivityMarkup(sub.name)}</span>
           </div>`;
         for (const rem of subRemarks) {
           html += renderRemarkFields(rem, target, getActivityInlineOptions(sub), (sub.inlineOptions || sub.remarkPresetId || sub.remarkHasNote) ? (sub.sentenceStarter || null) : null, sub.optionsMulti || false, null, sub.remarkHasNote || false, false);
@@ -10686,10 +10687,10 @@ function buildGroupItemsByActivity(target, data, attendees) {
         const subActId = Object.entries(data.activities || {}).find(([, a]) => a.targetName === target.name && a.activityName === sub.name)?.[0] || null;
         const isLast   = si === children.length - 1;
         const subCard  = renderGroupActivityCard(sub.name, subActId, target, data, attendees, null, null, sub, true);
-        // Wrap sub-card in a style override to connect visually
         const subRadius = isLast ? '0 0 var(--radius) var(--radius)' : '0';
-        groupHtml += `<div style="border:1px solid #bae6fd;border-left:4px solid #60a5fa;background:#f0f9ff;border-top:none;border-radius:${subRadius};overflow:hidden">
-          <div style="padding:.4rem .6rem;font-size:.8rem;font-weight:700;color:#0369a1;border-bottom:1px solid #bae6fd">${letters[si]}) ${escHtml(sub.name)}</div>
+        const subTopBorder = si === 0 ? 'border-top:none' : 'border-top:2px solid #7dd3fc';
+        groupHtml += `<div style="border:1px solid #bae6fd;border-left:4px solid #60a5fa;background:#f0f9ff;${subTopBorder};border-radius:${subRadius};overflow:hidden">
+          <div style="padding:.4rem .6rem;font-size:.8rem;font-weight:700;color:#1d4ed8;background:#dbeafe;border-bottom:1px solid #bae6fd">${letters[si]}) ${escHtml(sub.name)}</div>
           ${subCard}
         </div>`;
       });
@@ -10885,7 +10886,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
   // renderGroupStudentEmptyRow) — preset-option/sentence-starter activities
   // have no typeable free text, so those still need the explicit button.
   const inlineOptions   = paEntry ? getActivityInlineOptions(paEntry) : null;
-  const sentenceStarter = paEntry?.sentenceStarter || null;
+  const sentenceStarter = (paEntry?.inlineOptions || paEntry?.remarkPresetId || paEntry?.remarkHasNote) ? (paEntry?.sentenceStarter || null) : null;
   const multiSelect     = paEntry?.optionsMulti || false;
   const remarkHasNote   = paEntry?.remarkHasNote || false;
   const isFreeText      = parseOpts(inlineOptions).length === 0 && !sentenceStarter;
