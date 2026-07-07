@@ -145,7 +145,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "751";
+const APP_VERSION = "752";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3796,9 +3796,9 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
   // hardcoded mastery values), so this reuses the same .mastery-note-input
   // class/rem.masteryNote field to pick up the existing save wiring for free.
   const noteField = remarkHasNote
-    ? `<div class="entry-field" contenteditable="false">
-        <span class="field-label">Notes</span>
-        <button class="btn-sketch" data-rem-id="${rem.id}" aria-label="Open sketch board">✏</button>
+    ? `<div class="entry-field">
+        <span class="field-label" contenteditable="false">Notes</span>
+        <button class="btn-sketch" contenteditable="false" data-rem-id="${rem.id}" aria-label="Open sketch board">✏</button>
         <textarea class="field-input mastery-note-input" rows="1"
           data-rem-id="${rem.id}" placeholder="Notes…"
           data-saved-html="${escHtml(rem.masteryNote || "")}">${escHtml(plainTextForEdit(rem.masteryNote || ""))}</textarea>
