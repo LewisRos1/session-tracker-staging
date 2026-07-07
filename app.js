@@ -145,7 +145,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "755";
+const APP_VERSION = "756";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3233,7 +3233,7 @@ function renderFedcTarget(target) {
         const subRadius  = isLast ? '0 0 var(--radius) var(--radius)' : '0';
         const subTopBorder = si === 0 ? 'border-top:none' : 'border-top:1px solid var(--border)';
         html += `<div class="entry-block" style="border:1px solid var(--border);border-left:4px solid #60a5fa;background:var(--white);${subTopBorder};border-radius:${subRadius};box-shadow:var(--shadow)">
-          <div class="entry-field" contenteditable="false" style="background:var(--white)">
+          <div class="entry-field" contenteditable="false" style="background:#dbeafe">
             <span class="field-label" style="color:#1d4ed8">Subactivity</span>
             <span class="field-value-fixed"><span style="color:#1d4ed8;font-weight:700;margin-right:.25rem">${subLabel})</span>${formatActivityMarkup(sub.name)}</span>
           </div>`;
@@ -10833,7 +10833,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
         const subRadius = isLast ? '0 0 var(--radius) var(--radius)' : '0';
         const subTopBorder = si === 0 ? 'border-top:none' : 'border-top:1px solid var(--border)';
         groupHtml += `<div style="border:1px solid var(--border);border-left:4px solid #60a5fa;background:var(--white);${subTopBorder};border-radius:${subRadius};overflow:hidden">
-          <div style="padding:.4rem .6rem;font-size:.8rem;font-weight:700;color:#1d4ed8;background:var(--white);border-bottom:1px solid var(--border)">${letters[si]}) ${escHtml(sub.name)}</div>
+          <div style="padding:.4rem .6rem;font-size:.8rem;font-weight:700;color:#1d4ed8;background:#dbeafe;border-bottom:1px solid #bae6fd">${letters[si]}) ${escHtml(sub.name)}</div>
           ${subCard}
         </div>`;
       });
