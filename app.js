@@ -146,7 +146,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "771";
+const APP_VERSION = "772";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -9428,7 +9428,7 @@ function renderTargetManageContent(student, target) {
       acts[idx].remarkHasNote   = (type === "starter_fixed_note");
       const starterVis = usesOpts;
       const optsVis    = usesOpts;
-      starterWrap.style.display    = starterVis ? "" : "none";
+      starterWrap.style.display    = starterVis ? "flex" : "none";
       optsContainer.style.display  = optsVis ? "" : "none";
       if (usesOpts) { acts[idx].inlineOptions = getOptsFromDom(idx).join("/") || null; rebuildOptScores(idx); }
       if (starterVis) { starterInput.focus(); }
@@ -10117,7 +10117,7 @@ function renderTemplateManageContent(template) {
       acts[idx].remarkHasNote   = (type === "starter_fixed_note");
       const starterVis = usesOpts;
       const optsVis    = usesOpts;
-      starterWrap.style.display    = starterVis ? "" : "none";
+      starterWrap.style.display    = starterVis ? "flex" : "none";
       optsContainer.style.display  = optsVis ? "" : "none";
       if (usesOpts) {
         acts[idx].inlineOptions = [...body.querySelectorAll(`.mn-opt-item[data-idx="${idx}"]`)].map(i => i.value.trim()).filter(Boolean).join("/") || null;
