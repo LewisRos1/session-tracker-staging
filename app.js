@@ -145,7 +145,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "763";
+const APP_VERSION = "764";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3224,7 +3224,7 @@ function renderFedcTarget(target) {
         </div>
       </div>`;
       children.forEach((sub, si) => {
-        const subActData = findActivityByName(target.name, sub.name);
+        const subActData = findActivityByName(target.name, sub.name, pa.name);
         const subActId   = subActData ? subActData.id : null;
         const subRemarks = subActId ? getRemarksForActivity(subActId) : [];
         const subPending = state.pendingNewRemark?.pendingKey === sub.name;
@@ -3247,6 +3247,7 @@ function renderFedcTarget(target) {
             data-act-id="${subActId || ""}"
             data-pa-name="${escHtml(sub.name)}"
             data-pa-order="${idx}"
+            data-pa-parent="${escHtml(pa.name)}"
             data-target="${escHtml(target.name)}">+ Add Remark &amp; Trials</button>`;
         }
         html += `</div>`;
@@ -4000,7 +4001,7 @@ function attachTargetListeners(target) {
           await autoFillMappedRemarks(state.currentStudent, state.currentSessionId);
           return; // Firestore write will trigger snapshot → re-render
         }
-        if (paName) actId = await ensureFedcActivity(target.name, paName, paOrder);
+        if (paName) actId = await ensureFedcActivity(target.name, paName, paOrder, btn.dataset.paParent || null);
         if (!actId) { btn.disabled = false; return; }
         const initialText = "";
         // Write the remark into local state and render right away instead of
@@ -4257,14 +4258,18 @@ async function autoFillStructuredRemarks(student, sessionId) {
     for (const pa of (target.predefinedActivities || [])) {
       if (pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || pa.isMaintainHeading || pa.fixedRemark !== undefined) continue;
       if (!isAutoOpenRemarkType(pa)) continue;
-      const existingAct = Object.entries(data.activities || {})
-        .find(([, a]) => a.targetName === target.name && a.activityName === pa.name);
+      const paParent = pa.parentActivity || null;
+      const allActs = Object.entries(data.activities || {})
+        .filter(([, a]) => a.targetName === target.name && a.activityName === pa.name);
+      const existingAct = paParent
+        ? (allActs.find(([, a]) => a.parentActivity === paParent) || allActs.find(([, a]) => !a.parentActivity))
+        : (allActs.find(([, a]) => !a.parentActivity) || allActs[0]);
       let actId = existingAct?.[0] || null;
       if (actId && Object.values(data.remarks || {}).some(r => r.activityId === actId)) continue;
-      const key = `${sessionId}:${target.name}:${pa.name}`;
+      const key = `${sessionId}:${target.name}:${pa.name}:${paParent || ""}`;
       if (structuredRemarkAutoFillInFlight.has(key)) continue;
       structuredRemarkAutoFillInFlight.add(key);
-      toFill.push({ target, pa, actId, key });
+      toFill.push({ target, pa, actId, key, paParent });
     }
   }
   if (toFill.length === 0) return 0;
@@ -4273,7 +4278,7 @@ async function autoFillStructuredRemarks(student, sessionId) {
   await Promise.all(toFill.map(async item => {
     if (!item.actId) {
       try {
-        item.actId = await addActivity(sessionId, item.target.name, item.pa.name, item.pa.order ?? 0, true);
+        item.actId = await addActivity(sessionId, item.target.name, item.pa.name, item.pa.order ?? 0, true, undefined, item.paParent);
       } catch (err) {
         structuredRemarkAutoFillInFlight.delete(item.key);
         item.actId = null;
@@ -4396,10 +4401,10 @@ async function cleanupEmptyEntries(sessionId, data, targetName, target = null) {
   }
 }
 
-async function ensureFedcActivity(targetName, activityName, order) {
-  const existing = findActivityByName(targetName, activityName);
+async function ensureFedcActivity(targetName, activityName, order, parentActivity = null) {
+  const existing = findActivityByName(targetName, activityName, parentActivity);
   if (existing) return existing.id;
-  return await addActivity(state.currentSessionId, targetName, activityName, order, true);
+  return await addActivity(state.currentSessionId, targetName, activityName, order, true, undefined, parentActivity);
 }
 
 async function ensurePredefinedRemark(actId, remarkName, initialText = "") {
@@ -8899,6 +8904,8 @@ function renderTargetManageContent(student, target) {
         if (!v || v === a.name) return;
         oldName = a.name;
         a.name = v;
+        // Keep sub-activities pointing to the renamed parent
+        acts.forEach(a2 => { if (a2.parentActivity === oldName) a2.parentActivity = v; });
       }
       await saveTarget();
       flashSaved(input);
@@ -9914,7 +9921,10 @@ function renderTemplateManageContent(template) {
       } else {
         const v = input.value.trim();
         if (!v || v === a.name) return;
+        const oldActName = a.name;
         a.name = v;
+        // Keep sub-activities pointing to the renamed parent
+        acts.forEach(a2 => { if (a2.parentActivity === oldActName) a2.parentActivity = v; });
       }
       await saveTemplateFn();
       flashSaved(input);
@@ -10827,9 +10837,11 @@ function buildGroupItemsByActivity(target, data, attendees) {
         </div>
       </div>`;
       children.forEach((sub, si) => {
-        const subActId = Object.entries(data.activities || {}).find(([, a]) => a.targetName === target.name && a.activityName === sub.name)?.[0] || null;
+        const subActId = (Object.entries(data.activities || {}).find(([, a]) => a.targetName === target.name && a.activityName === sub.name && a.parentActivity === sub.parentActivity)
+          || Object.entries(data.activities || {}).find(([, a]) => a.targetName === target.name && a.activityName === sub.name && !a.parentActivity)
+          )?.[0] || null;
         const isLast   = si === children.length - 1;
-        const subCard  = renderGroupActivityCard(sub.name, subActId, target, data, attendees, null, null, sub, true);
+        const subCard  = renderGroupActivityCard(sub.name, subActId, target, data, attendees, null, null, sub, true, sub.parentActivity);
         const subRadius = isLast ? '0 0 var(--radius) var(--radius)' : '0';
         groupHtml += `<div style="border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);border-top:1px solid var(--border);border-radius:${subRadius};overflow:hidden">
           <div style="padding:.4rem .6rem;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted)"><span style="color:var(--primary)">${letters[si]})</span> ${escHtml(sub.name)}</div>
@@ -11024,7 +11036,7 @@ function renderGroupStudentRowCompact(remId, rem, target, mappedInfo = null) {
     ${trailingField}`;
 }
 
-function renderGroupActivityCard(actName, actId, target, data, attendees, actNote = null, mappedPa = null, paEntry = null, isPredefined = false) {
+function renderGroupActivityCard(actName, actId, target, data, attendees, actNote = null, mappedPa = null, paEntry = null, isPredefined = false, parentActivity = null) {
   // Free-text activities (no preset options, no sentence starter) get a
   // ready-to-type empty box for a pending attendee instead of a "+ Add
   // Remark & Trials" button once the card is already expanded (see
@@ -11094,7 +11106,8 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
       <button class="btn-add-remark btn-group-add-remark-all" contenteditable="false"
         data-act-id="${escHtml(actId || "")}"
         data-act-name="${escHtml(actName)}"
-        data-target="${escHtml(target.name)}">+ Add Remark &amp; Trials</button>
+        data-target="${escHtml(target.name)}"
+        ${parentActivity ? `data-pa-parent="${escHtml(parentActivity)}"` : ""}>+ Add Remark &amp; Trials</button>
     </div>`;
   }
 
@@ -11164,7 +11177,8 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
     <button class="btn-add-remark btn-group-add-remark-more" contenteditable="false"
       data-act-id="${escHtml(actId || "")}"
       data-act-name="${escHtml(actName)}"
-      data-target="${escHtml(target.name)}">+ Add Remark &amp; Trials</button>
+      data-target="${escHtml(target.name)}"
+      ${parentActivity ? `data-pa-parent="${escHtml(parentActivity)}"` : ""}>+ Add Remark &amp; Trials</button>
   </div>`;
 }
 
@@ -11576,10 +11590,13 @@ function attachGroupTargetListeners(target) {
         const actName    = btn.dataset.actName;
         const targetName = btn.dataset.target;
         const data       = state.groupSessionData;
-        let actId = btn.dataset.actId || Object.entries(data.activities || {})
-          .find(([, a]) => a.targetName === targetName && a.activityName === actName)?.[0] || null;
+        const paParent = btn.dataset.paParent || null;
+        let actId = btn.dataset.actId || (Object.entries(data.activities || {})
+          .find(([, a]) => a.targetName === targetName && a.activityName === actName && (paParent ? a.parentActivity === paParent : !a.parentActivity))
+          || Object.entries(data.activities || {}).find(([, a]) => a.targetName === targetName && a.activityName === actName)
+          )?.[0] || null;
         if (!actId) {
-          actId = await addActivity(state.groupSessionId, targetName, actName, Date.now(), true);
+          actId = await addActivity(state.groupSessionId, targetName, actName, Date.now(), true, undefined, paParent);
         }
         const entries = state.groupAttendees
           .filter(studentName => !Object.values(data.remarks || {})
@@ -11733,12 +11750,15 @@ async function ensureGroupActivityAndRemark(el) {
   const studentName = el.dataset.student;
   const actName     = el.dataset.actName;
   const targetName  = el.dataset.target;
+  const paParent    = el.dataset.paParent || null;
   const data        = state.groupSessionData;
 
-  let actId = el.dataset.actId || Object.entries(data.activities || {})
-    .find(([, a]) => a.targetName === targetName && a.activityName === actName)?.[0] || null;
+  let actId = el.dataset.actId || (Object.entries(data.activities || {})
+    .find(([, a]) => a.targetName === targetName && a.activityName === actName && (paParent ? a.parentActivity === paParent : !a.parentActivity))
+    || Object.entries(data.activities || {}).find(([, a]) => a.targetName === targetName && a.activityName === actName)
+  )?.[0] || null;
   if (!actId) {
-    actId = await addActivity(state.groupSessionId, targetName, actName, Date.now(), true);
+    actId = await addActivity(state.groupSessionId, targetName, actName, Date.now(), true, undefined, paParent);
   }
   // Check again in case snapshot already has the remark
   const existing = Object.entries(data.remarks || {})
@@ -12108,11 +12128,21 @@ function getRemarksForActivity(actId) {
     .map(([id, r]) => ({ id, ...r }));
 }
 
-function findActivityByName(targetName, activityName) {
-  const found = Object.entries(state.sessionData?.activities || {}).find(
-    ([, a]) => a.targetName === targetName && a.activityName === activityName
-  );
-  return found ? { id: found[0], ...found[1] } : null;
+function findActivityByName(targetName, activityName, parentActivity = null) {
+  const entries = Object.entries(state.sessionData?.activities || {});
+  const byName = ([, a]) => a.targetName === targetName && a.activityName === activityName;
+  if (parentActivity) {
+    const exact = entries.find(e => byName(e) && e[1].parentActivity === parentActivity);
+    if (exact) return { id: exact[0], ...exact[1] };
+    // Legacy: sub-activity created before parentActivity field was stored
+    const legacy = entries.find(e => byName(e) && !e[1].parentActivity);
+    return legacy ? { id: legacy[0], ...legacy[1] } : null;
+  }
+  // Top-level: prefer entries without parentActivity
+  const top = entries.find(e => byName(e) && !e[1].parentActivity);
+  if (top) return { id: top[0], ...top[1] };
+  const any = entries.find(byName);
+  return any ? { id: any[0], ...any[1] } : null;
 }
 
 // ─── UTILITIES ───────────────────────────────────────────────
