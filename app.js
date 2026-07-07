@@ -143,7 +143,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "743";
+const APP_VERSION = "744";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -8335,7 +8335,7 @@ function parseManualScore(val) {
 // renderTargetManageContent — both let the boss configure how the Remark
 // field is captured (free text / preset options / sentence starter),
 // independently of where the Score comes from.
-function buildRemarkTypeControls(a, idx) {
+function buildRemarkTypeControls(a, idx, maxPts = 3) {
   const type = a.fixedRemark !== undefined ? "fixed_remark"
     : a.manualScore ? "manual_score"
     : a.remarkHasNote ? "starter_fixed_note"
@@ -8365,7 +8365,7 @@ function buildRemarkTypeControls(a, idx) {
           `<span class="drag-handle" style="cursor:grab;color:#c4c9d4;font-size:1rem;flex-shrink:0;padding:0 .1rem;user-select:none">⠿</span>` +
           `<span class="mn-opt-num" style="font-size:.74rem;color:#9ca3af;min-width:1.2rem;text-align:right;flex-shrink:0">${oi + 1}.</span>` +
           `<input class="admin-input mn-opt-item" data-idx="${idx}" data-oi="${oi}" value="${escHtml(opt)}" placeholder="Enter option…" style="flex:1;padding:.3rem .45rem;font-size:.84rem;min-width:0">` +
-          `<input class="admin-input mn-opt-score" type="number" min="0" step="1" data-idx="${idx}" data-oi="${oi}" value="${escHtml(String(a.optionScores?.[opt] ?? ''))}" placeholder="Pts" title="Auto-score when selected (leave blank for none)" style="width:3.2rem;flex-shrink:0;padding:.3rem .2rem;font-size:.8rem;text-align:center">` +
+          `<input class="admin-input mn-opt-score" type="number" min="0" max="${maxPts}" step="1" data-idx="${idx}" data-oi="${oi}" value="${escHtml(String(a.optionScores?.[opt] ?? ''))}" placeholder="Pts" title="Auto-score when selected (leave blank for none)" style="width:3.2rem;flex-shrink:0;padding:.3rem .2rem;font-size:.8rem;text-align:center">` +
           `<button class="mn-opt-del" data-idx="${idx}" data-oi="${oi}" title="Remove option" style="flex-shrink:0;padding:.2rem .4rem;font-size:.8rem;color:#9ca3af;background:none;border:1px solid #e5e7eb;border-radius:.3rem;cursor:pointer;line-height:1">×</button>` +
           `</div>`
         ).join("");
@@ -8542,7 +8542,7 @@ function renderTargetManageContent(student, target) {
           </div>
           <div style="display:flex;align-items:center;gap:.5rem">
             <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Remark Type:</span>
-            ${buildRemarkTypeControls(a, idx)}
+            ${buildRemarkTypeControls(a, idx, target.maxPoints || 3)}
           </div>
           <div style="display:flex;align-items:center;gap:.5rem">
             <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Mapped To Which Target's Average:</span>
@@ -8595,7 +8595,7 @@ function renderTargetManageContent(student, target) {
         // Parent activity: show sub-activities inline, each with its own remark type
         const subActsHtml = subActs.map((sub, si) => {
           const subIdx = acts.indexOf(sub);
-          const subRemarkType = buildRemarkTypeControls(sub, subIdx);
+          const subRemarkType = buildRemarkTypeControls(sub, subIdx, target.maxPoints || 3);
           const subFixedRemarkRow = sub.fixedRemark !== undefined
             ? `<div style="display:flex;align-items:flex-start;gap:.3rem;padding-left:1.6rem">
                 <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600;padding-top:.3rem">Fixed Remark:</span>
@@ -8643,7 +8643,7 @@ function renderTargetManageContent(student, target) {
           ${actOverlay}
         </div>`;
       } else {
-        const remarkTypeSelect = buildRemarkTypeControls(a, idx);
+        const remarkTypeSelect = buildRemarkTypeControls(a, idx, target.maxPoints || 3);
         const fixedRemarkRow = a.fixedRemark !== undefined
           ? `<div style="display:flex;align-items:flex-start;gap:.3rem">
               <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600;padding-top:.3rem">Fixed Remark:</span>
@@ -9196,10 +9196,10 @@ function renderTargetManageContent(student, target) {
       acts.splice(insertAfter + 1, 0, { id: cfgId("a"), name: "", parentActivity: parentAct.name, order: 0, activeFrom: null });
       acts.forEach((a2, i) => a2.order = i);
       target.predefinedActivities = acts;
-      await saveTarget();
       const sp = $("manage-modal-body").scrollTop;
       renderTargetManageContent(student, target);
       requestAnimationFrame(() => { const b = $("manage-modal-body"); if (b) b.scrollTop = sp; });
+      saveTarget();
     });
   });
 
@@ -9276,13 +9276,14 @@ function renderTargetManageContent(student, target) {
         $("manage-modal-body").scrollTop = sp;
         return;
       }
+      const usesOpts = (type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note");
       acts[idx].sentenceStarter = null;
       acts[idx].remarkPresetId  = null;
-      acts[idx].inlineOptions   = null;
+      if (!usesOpts) { acts[idx].inlineOptions = null; delete acts[idx].optionScores; }
       acts[idx].optionsMulti    = (type === "starter_fixed_multi");
       acts[idx].remarkHasNote   = (type === "starter_fixed_note");
-      const starterVis = (type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note");
-      const optsVis    = (type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note");
+      const starterVis = usesOpts;
+      const optsVis    = usesOpts;
       starterInput.style.display  = starterVis ? "" : "none";
       starterInput.style.flex     = starterVis ? "1" : "";
       starterInput.style.minWidth = starterVis ? "0" : "";
@@ -9290,6 +9291,7 @@ function renderTargetManageContent(student, target) {
       optsContainer.style.display  = optsVis ? "" : "none";
       optsContainer.style.flex     = optsVis ? "1" : "";
       optsContainer.style.minWidth = optsVis ? "0" : "";
+      if (usesOpts) { acts[idx].inlineOptions = getOptsFromDom(idx).join("/") || null; rebuildOptScores(idx); }
       if (starterVis) { starterInput.focus(); }
       else if (optsVis) { optsContainer.querySelector(".mn-opt-item")?.focus(); }
       else { target.predefinedActivities = acts; await saveTarget(); }
@@ -9964,13 +9966,14 @@ function renderTemplateManageContent(template) {
         $("manage-modal-body").scrollTop = sp;
         return;
       }
+      const usesOpts = (type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note");
       acts[idx].sentenceStarter = null;
       acts[idx].remarkPresetId  = null;
-      acts[idx].inlineOptions   = null;
+      if (!usesOpts) { acts[idx].inlineOptions = null; delete acts[idx].optionScores; }
       acts[idx].optionsMulti    = (type === "starter_fixed_multi");
       acts[idx].remarkHasNote   = (type === "starter_fixed_note");
-      const starterVis = (type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note");
-      const optsVis    = (type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note");
+      const starterVis = usesOpts;
+      const optsVis    = usesOpts;
       starterInput.style.display  = starterVis ? "" : "none";
       starterInput.style.flex     = starterVis ? "1" : "";
       starterInput.style.minWidth = starterVis ? "0" : "";
@@ -9978,6 +9981,9 @@ function renderTemplateManageContent(template) {
       optsContainer.style.display  = optsVis ? "" : "none";
       optsContainer.style.flex     = optsVis ? "1" : "";
       optsContainer.style.minWidth = optsVis ? "0" : "";
+      if (usesOpts) {
+        acts[idx].inlineOptions = [...body.querySelectorAll(`.mn-opt-item[data-idx="${idx}"]`)].map(i => i.value.trim()).filter(Boolean).join("/") || null;
+      }
       if (starterVis) { starterInput.focus(); }
       else if (optsVis) { optsContainer.querySelector(".mn-opt-item")?.focus(); }
       else { template.predefinedActivities = acts; await saveTemplateFn(); }
