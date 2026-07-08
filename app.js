@@ -146,7 +146,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "780";
+const APP_VERSION = "781";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3218,11 +3218,17 @@ function renderFedcTarget(target) {
                      : isGrayP  ? 'border:1px solid #e5e7eb;border-left:4px solid #d1d5db;background:#f3f4f6;'
                      : 'border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);';
       html += `<div style="display:flex;flex-direction:column;gap:0">`;
+      const pFutureStatus = (pa.masteredOn && sessionDateForFilter < pa.masteredOn)
+        ? `<div contenteditable="false" style="font-size:.75rem;color:#059669;padding:.1rem .75rem .15rem;font-weight:500">⭐ Mastered on ${fmtPeriodDate(pa.masteredOn)}</div>`
+        : (pa.discontinuedOn && sessionDateForFilter < pa.discontinuedOn)
+        ? `<div contenteditable="false" style="font-size:.75rem;color:#dc2626;padding:.1rem .75rem .15rem;font-weight:500">🚩 Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}</div>`
+        : '';
       html += `<div class="entry-block" style="${pBorder}border-radius:var(--radius) var(--radius) 0 0;border-bottom:none;box-shadow:var(--shadow)">
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Activity</span>
           <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${formatActivityMarkup(pa.name)}</span>
         </div>
+        ${pFutureStatus}
       </div>`;
       children.forEach((sub, si) => {
         let subActData = findActivityByName(target.name, sub.name, pa.name, sub.id);
@@ -3289,6 +3295,11 @@ function renderFedcTarget(target) {
         <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${formatActivityMarkup(pa.name)}</span>
       </div>`;
 
+    if (pa.masteredOn && sessionDateForFilter < pa.masteredOn) {
+      html += `<div contenteditable="false" style="font-size:.75rem;color:#059669;padding:.1rem .75rem .15rem;font-weight:500">⭐ Mastered on ${fmtPeriodDate(pa.masteredOn)}</div>`;
+    } else if (pa.discontinuedOn && sessionDateForFilter < pa.discontinuedOn) {
+      html += `<div contenteditable="false" style="font-size:.75rem;color:#dc2626;padding:.1rem .75rem .15rem;font-weight:500">🚩 Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}</div>`;
+    }
     if (pa.actNote && pa.actNote.trim()) {
       html += `<div class="entry-field" contenteditable="false">
         <span class="field-label">Note</span>
