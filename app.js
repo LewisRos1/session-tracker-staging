@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "789";
+const APP_VERSION = "790";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -9228,7 +9228,11 @@ function renderTargetManageContent(student, target) {
               : await getAllSessionsForStudent(student.id);
             affected = allSessions.filter(s => {
               const sActs = s.activities || {}; const sRems = s.remarks || {};
-              const matchIds = Object.entries(sActs).filter(([, a]) => a.targetName === target.name && a.activityName === pa.name).map(([id]) => id);
+              const paPA = pa.parentActivity || null;
+            const matchIds = Object.entries(sActs).filter(([, a]) =>
+              a.targetName === target.name && a.activityName === pa.name &&
+              (paPA === null ? !a.parentActivity : a.parentActivity === paPA)
+            ).map(([id]) => id);
               return matchIds.some(actId => Object.values(sRems).some(r =>
                 r.activityId === actId && (
                   (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
@@ -9293,7 +9297,7 @@ function renderTargetManageContent(student, target) {
                   _groupForTargetEdit ? "group" : "student",
                   _groupForTargetEdit ? _groupForTargetEdit.id   : student.id,
                   _groupForTargetEdit ? _groupForTargetEdit.name : student.name,
-                  target.name, pa.name
+                  target.name, pa.name, pa.parentActivity || null
                 );
               } catch (err) {
                 console.error("Failed to move activity to trash:", err);
@@ -9375,8 +9379,12 @@ function renderTargetManageContent(student, target) {
         const allSessions = _groupForTargetEdit
           ? await getAllSessionsForGroup(_groupForTargetEdit.id)
           : await getAllSessionsForStudent(student.id);
+        const paPA2 = pa.parentActivity || null;
         affected = allSessions.filter(s =>
-          Object.values(s.activities || {}).some(a => a.targetName === target.name && a.activityName === pa.name)
+          Object.values(s.activities || {}).some(a =>
+            a.targetName === target.name && a.activityName === pa.name &&
+            (paPA2 === null ? !a.parentActivity : a.parentActivity === paPA2)
+          )
         ).length;
       } catch { affected = -1; }
       btn.disabled = false;
@@ -9435,7 +9443,7 @@ function renderTargetManageContent(student, target) {
               _groupForTargetEdit ? "group" : "student",
               _groupForTargetEdit ? _groupForTargetEdit.id   : student.id,
               _groupForTargetEdit ? _groupForTargetEdit.name : student.name,
-              target.name, pa.name
+              target.name, pa.name, pa.parentActivity || null
             );
           } catch (err) {
             console.error("Failed to move activity to trash:", err);

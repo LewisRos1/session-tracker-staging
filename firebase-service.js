@@ -480,7 +480,7 @@ export async function deleteGroupOrphanAcrossSessions(groupId, targetName, activ
 
 const TRASH_EXPIRY_DAYS = 30;
 
-export async function softDeleteActivityAcrossSessions(entityType, entityId, entityName, targetName, activityName) {
+export async function softDeleteActivityAcrossSessions(entityType, entityId, entityName, targetName, activityName, paParentActivity = undefined) {
   const q = entityType === "group"
     ? query(collection(db, "sessions"), where("groupId",   "==", entityId))
     : query(collection(db, "sessions"), where("studentId", "==", entityId));
@@ -495,7 +495,10 @@ export async function softDeleteActivityAcrossSessions(entityType, entityId, ent
     const remarks = data.remarks    || {};
 
     const matches = Object.entries(acts).filter(([, a]) =>
-      a.targetName === targetName && a.activityName === activityName
+      a.targetName === targetName && a.activityName === activityName &&
+      (paParentActivity === undefined ? true
+        : paParentActivity === null ? !a.parentActivity
+        : a.parentActivity === paParentActivity)
     );
     if (matches.length === 0) continue;
 
