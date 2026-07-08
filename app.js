@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "787";
+const APP_VERSION = "788";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4859,6 +4859,18 @@ function buildTargetViewTable(target, data) {
           entry = sortByData(candidateEntries.filter(([, a]) => !a.parentActivity))[0] || null;
         }
       }
+      if (entry && pa.id && !entry[1].configId) {
+        entry[1].configId = pa.id;
+        if (isSub && pa.parentActivity && !entry[1].parentActivity) {
+          entry[1].parentActivity = pa.parentActivity;
+        }
+        adoptOrphanActivity(
+          state.viewSessionId,
+          entry[0],
+          isSub ? (pa.parentActivity || null) : null,
+          pa.id
+        ).catch(() => {});
+      }
       if (entry) matchedIds.add(entry[0]);
       rows += viewActivityRows(displayNo, pa.name, entry?.[0] || null, data, target, true, pa);
     }
@@ -6304,6 +6316,18 @@ function buildGroupTargetViewTable(target, data, attendees) {
         } else {
           entry2 = sortByData2(candidateEntries2.filter(([, a]) => !a.parentActivity))[0] || null;
         }
+      }
+      if (entry2 && pa.id && !entry2[1].configId) {
+        entry2[1].configId = pa.id;
+        if (isSub2 && pa.parentActivity && !entry2[1].parentActivity) {
+          entry2[1].parentActivity = pa.parentActivity;
+        }
+        adoptOrphanActivity(
+          state.viewGroupSessionId,
+          entry2[0],
+          isSub2 ? (pa.parentActivity || null) : null,
+          pa.id
+        ).catch(() => {});
       }
       if (entry2) matchedIds.add(entry2[0]);
       rows += viewGroupActivityRows(no, pa.name, entry2?.[0] || null, data, target, attendees, true, pa);
