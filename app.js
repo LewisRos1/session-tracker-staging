@@ -146,7 +146,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "774";
+const APP_VERSION = "775";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -7350,6 +7350,7 @@ function inactiveReasonBadge(pa) {
 
 function isActivityActive(pa, dateStr) {
   if (!dateStr) return true;
+  if (pa.masteredOn || pa.discontinuedOn) return false;
   if (pa.activeFrom && dateStr < pa.activeFrom) return false;
   if (pa.activeTo   && dateStr > pa.activeTo)   return false;
   return true;
@@ -8517,8 +8518,8 @@ function renderTargetManageContent(student, target) {
   }
 
   const acts = target.predefinedActivities;
-  const masteredActs = acts.filter(a => !a.isHeading && !a.isNote && !a.isExportNote && !a.isMaintain && !a.isMaintainHeading && a.fixedRemark === undefined && a.isCompleted);
-  const stoppedActs  = acts.filter(a => !a.isHeading && !a.isNote && !a.isExportNote && !a.isMaintain && !a.isMaintainHeading && a.fixedRemark === undefined && (a.isArchived || a.isStopped));
+  const masteredActs     = acts.filter(a => !a.isHeading && !a.isNote && !a.isExportNote && !a.isMaintain && !a.isMaintainHeading && a.fixedRemark === undefined && (a.masteredOn || a.isCompleted));
+  const discontinuedActs = acts.filter(a => !a.isHeading && !a.isNote && !a.isExportNote && !a.isMaintain && !a.isMaintainHeading && a.fixedRemark === undefined && (a.discontinuedOn || a.isArchived || a.isStopped));
   // Other targets this target's mapped-score activities can point at — never
   // itself (self-mapping would make a target's average depend on itself).
   const siblingTargets = (_groupForTargetEdit ? _groupForTargetEdit.targets : student.targets)
@@ -8562,7 +8563,7 @@ function renderTargetManageContent(student, target) {
 
   let manageActNo = 0;
   acts.forEach((a, idx) => {
-    if (a.isCompleted || a.isArchived || a.isStopped) return;
+    if (a.isCompleted || a.isArchived || a.isStopped || a.masteredOn || a.discontinuedOn) return;
     if (a.isHeading || a.isMaintainHeading) {
       const isGray = a.headingColor === "gray" || a.isMaintainHeading;
       const isGreen = a.headingColor === "green";
@@ -8644,23 +8645,7 @@ function renderTargetManageContent(student, target) {
         `<option value="${escHtml(t.id)}"${a.mappedTargetId === t.id ? " selected" : ""}>${escHtml(t.name)}</option>`
       ).join("");
 
-      const _editRef    = state.sessionData?.date || todayDateStr();
-      const actInactive = !isActivityActive(a, _editRef);
-      const actExpired  = actInactive && !!a.activeTo && a.activeTo < _editRef;
-      const actOverlay  = actExpired ? `<div style="position:absolute;inset:0 2.5rem 0 0;background:rgba(255,255,255,.7);z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center">
-        <div style="background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.5rem .75rem;text-align:center;font-size:1rem;color:#374151;max-width:85%">
-          <div>⏸ This activity's period has ended — tap ⋮ on the right side to adjust the dates and bring it back.</div>
-          <div style="display:flex;align-items:center;gap:.5rem;justify-content:center;margin-top:.4rem">
-            <span style="font-size:.84rem;color:#6b7280">Reason:</span>
-            <select class="mn-inactive-reason-select" data-idx="${idx}" style="font-size:.84rem;padding:.2rem .4rem;border:1px solid #d1d5db;border-radius:.3rem;background:white;cursor:pointer">
-              <option value="">— Not specified —</option>
-              <option value="mastered"${a.inactiveReason === 'mastered' ? ' selected' : ''}>Mastered</option>
-              <option value="discontinued"${a.inactiveReason === 'discontinued' ? ' selected' : ''}>Discontinued</option>
-            </select>
-          </div>
-        </div>
-      </div>` : '';
-      html += `<div class="admin-list-item" data-idx="${idx}"${actExpired ? ' style="position:relative"' : actInactive ? ' style="opacity:0.3"' : ''}>
+      html += `<div class="admin-list-item" data-idx="${idx}">
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
           <div style="display:flex;align-items:flex-start;gap:.3rem">
@@ -8668,6 +8653,7 @@ function renderTargetManageContent(student, target) {
             <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
               rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
           </div>
+          ${a.createdOn ? `<span style="font-size:.72rem;color:#9ca3af">Created on ${fmtPeriodDate(a.createdOn)}</span>` : ''}
           <div style="display:flex;align-items:flex-start;gap:.5rem">
             <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600;padding-top:.3rem">Remark Type:</span>
             ${buildRemarkTypeControls(a, idx, target.maxPoints || 3)}
@@ -8683,42 +8669,26 @@ function renderTargetManageContent(student, target) {
         <div style="position:relative">
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:250px;overflow:hidden">
-            ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true, a.inactiveReason)}
+            <button class="mn-km-mastered" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">✓ Mark as Mastered</button>
+            <button class="mn-km-discontinued" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#dc2626">✗ Mark as Discontinued</button>
             <div style="display:flex;align-items:stretch">
               <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
               <span title="Permanently removes this activity and all of its session data. This cannot be undone." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
             </div>
           </div>
         </div>
-        ${actOverlay}
       </div>`;
     } else {
       // Sub-activities are rendered inline within their parent's row — skip them here
       if (a.parentActivity) return;
       manageActNo++;
 
-      const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
+      const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.isCompleted && !a2.isArchived && !a2.isStopped && !a2.masteredOn && !a2.discontinuedOn);
       const hasSubActs = subActs.length > 0;
       const isGray = a.activityColor === "gray" || a.isMaintainLive;
-      const isGreen = a.activityColor === "green" || a.inactiveReason === 'mastered';
-      const _editRef2   = state.sessionData?.date || todayDateStr();
-      const actInactive = !isActivityActive(a, _editRef2);
-      const actExpired  = actInactive && !!a.activeTo && a.activeTo < _editRef2;
+      const isGreen = a.activityColor === "green";
       const actBaseBg   = isGray ? 'background:#f3f4f6;border:1px solid #d1d5db' : isGreen ? 'background:#e2efda;border:1px solid #a9d18e' : null;
-      const actItemStyle = actExpired ? (actBaseBg ? ` style="position:relative;${actBaseBg}"` : ' style="position:relative"') : (actBaseBg ? ` style="${actBaseBg}${actInactive ? ';opacity:0.3' : ''}"` : actInactive ? ' style="opacity:0.3"' : '');
-      const actOverlay  = actExpired ? `<div style="position:absolute;inset:0 2.5rem 0 0;background:rgba(255,255,255,.7);z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center">
-        <div style="background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.5rem .75rem;text-align:center;font-size:1rem;color:#374151;max-width:85%">
-          <div>⏸ This activity's period has ended — tap ⋮ on the right side to adjust the dates and bring it back.</div>
-          <div style="display:flex;align-items:center;gap:.5rem;justify-content:center;margin-top:.4rem">
-            <span style="font-size:.84rem;color:#6b7280">Reason:</span>
-            <select class="mn-inactive-reason-select" data-idx="${idx}" style="font-size:.84rem;padding:.2rem .4rem;border:1px solid #d1d5db;border-radius:.3rem;background:white;cursor:pointer">
-              <option value="">— Not specified —</option>
-              <option value="mastered"${a.inactiveReason === 'mastered' ? ' selected' : ''}>Mastered</option>
-              <option value="discontinued"${a.inactiveReason === 'discontinued' ? ' selected' : ''}>Discontinued</option>
-            </select>
-          </div>
-        </div>
-      </div>` : '';
+      const actItemStyle = actBaseBg ? ` style="${actBaseBg}"` : '';
 
       if (hasSubActs) {
         // Parent activity: show sub-activities inline, each with its own remark type
@@ -8757,20 +8727,21 @@ function renderTargetManageContent(student, target) {
               <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
                 rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
             </div>
+            ${a.createdOn ? `<span style="font-size:.72rem;color:#9ca3af">Created on ${fmtPeriodDate(a.createdOn)}</span>` : ''}
             ${subActsHtml}
             <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.75rem;padding:.2rem .55rem;background:none;border:1px solid #d1d5db;border-radius:.35rem;color:#6b7280;cursor:pointer;margin-left:1.25rem;align-self:flex-start">+ Add Sub-activity</button>
           </div>
           <div style="position:relative">
             <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
             <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:250px;overflow:hidden">
-              ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true, a.inactiveReason)}
+              <button class="mn-km-mastered" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">✓ Mark as Mastered</button>
+              <button class="mn-km-discontinued" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#dc2626">✗ Mark as Discontinued</button>
               <div style="display:flex;align-items:stretch">
                 <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
                 <span title="Deletes this activity and all its sub-activities." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
               </div>
             </div>
           </div>
-          ${actOverlay}
         </div>`;
       } else {
         const remarkTypeSelect = buildRemarkTypeControls(a, idx, target.maxPoints || 3);
@@ -8792,6 +8763,7 @@ function renderTargetManageContent(student, target) {
               <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
                 rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
             </div>
+            ${a.createdOn ? `<span style="font-size:.72rem;color:#9ca3af">Created on ${fmtPeriodDate(a.createdOn)}</span>` : ''}
             <div style="display:flex;align-items:flex-start;gap:.5rem">
               <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600;padding-top:.3rem">Remark Type:</span>
               ${remarkTypeSelect}
@@ -8809,44 +8781,59 @@ function renderTargetManageContent(student, target) {
                 <button class="mn-km-opt" data-idx="${idx}" data-action="color_white" style="padding:.35rem .6rem;background:#ffffff;border:2px solid ${!isGray ? '#6b7280' : '#e5e7eb'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🤍 White (Normal)</button>
                 <button class="mn-km-opt" data-idx="${idx}" data-action="color_gray" style="padding:.35rem .6rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🩶 Grey (Maintain)</button>
               </div>
-              ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true, a.inactiveReason)}
+              <button class="mn-km-mastered" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">✓ Mark as Mastered</button>
+              <button class="mn-km-discontinued" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#dc2626">✗ Mark as Discontinued</button>
               <div style="display:flex;align-items:stretch">
                 <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
                 <span title="Permanently removes this activity and all of its session data. This cannot be undone." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
               </div>
             </div>
           </div>
-          ${actOverlay}
         </div>`;
       }
     }
   });
 
   html += `</div>`;
+
   if (masteredActs.length > 0) {
     html += `<div style="margin-top:1.25rem">
-      <div style="font-size:.75rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;padding:.25rem 0 .5rem">Mastered</div>`;
+      <button class="mn-collapsed-toggle" data-section="mastered" style="display:flex;align-items:center;gap:.5rem;background:none;border:none;cursor:pointer;width:100%;padding:.25rem 0;font-size:.85rem;font-weight:700;color:#374151">
+        <span class="mn-toggle-arrow" style="font-size:.75rem">▶</span>
+        Mastered (${masteredActs.length})
+      </button>
+      <div id="mn-mastered-section" style="display:none">`;
     masteredActs.forEach((a, ci) => {
+      const dateLabel = a.masteredOn ? `Mastered on ${fmtPeriodDate(a.masteredOn)}` : 'Mastered';
       html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:.35rem">
         <span style="flex:1;font-size:.875rem;color:#374151">${escHtml(a.name || "")}</span>
-        <button class="btn-mn-reactivate" data-completed-idx="${ci}" data-src="mastered" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Reactivate</button>
-        <button class="btn-adm-del btn-mn-del-completed" data-completed-idx="${ci}" data-src="mastered" title="Delete permanently">🗑</button>
+        <span style="font-size:.72rem;color:#059669;white-space:nowrap">${dateLabel}</span>
+        <button class="btn-mn-undo-mastered" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Undo</button>
+        <button class="btn-adm-del btn-mn-del-mastered" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
       </div>`;
     });
-    html += `</div>`;
+    html += `</div></div>`;
   }
-  if (stoppedActs.length > 0) {
-    html += `<div style="margin-top:1.25rem">
-      <div style="font-size:.75rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;padding:.25rem 0 .5rem">Stopped</div>`;
-    stoppedActs.forEach((a, ci) => {
+
+  if (discontinuedActs.length > 0) {
+    html += `<div style="margin-top:.5rem">
+      <button class="mn-collapsed-toggle" data-section="discontinued" style="display:flex;align-items:center;gap:.5rem;background:none;border:none;cursor:pointer;width:100%;padding:.25rem 0;font-size:.85rem;font-weight:700;color:#374151">
+        <span class="mn-toggle-arrow" style="font-size:.75rem">▶</span>
+        Discontinued (${discontinuedActs.length})
+      </button>
+      <div id="mn-discontinued-section" style="display:none">`;
+    discontinuedActs.forEach((a, ci) => {
+      const dateLabel = a.discontinuedOn ? `Discontinued on ${fmtPeriodDate(a.discontinuedOn)}` : 'Discontinued';
       html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:.35rem">
         <span style="flex:1;font-size:.875rem;color:#374151">${escHtml(a.name || "")}</span>
-        <button class="btn-mn-reactivate" data-completed-idx="${ci}" data-src="stopped" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Reactivate</button>
-        <button class="btn-adm-del btn-mn-del-completed" data-completed-idx="${ci}" data-src="stopped" title="Delete permanently">🗑</button>
+        <span style="font-size:.72rem;color:#6b7280;white-space:nowrap">${dateLabel}</span>
+        <button class="btn-mn-undo-discontinued" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Undo</button>
+        <button class="btn-adm-del btn-mn-del-discontinued" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
       </div>`;
     });
-    html += `</div>`;
+    html += `</div></div>`;
   }
+
   html += `
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.25rem">
       <button class="btn-admin-add" id="btn-mn-add-act" style="flex:0 0 auto;width:auto">+ Add Activity</button>
@@ -9168,24 +9155,67 @@ function renderTargetManageContent(student, target) {
     });
   });
 
-  $("manage-modal-body").querySelectorAll(".btn-mn-reactivate").forEach(btn => {
+  $("manage-modal-body").querySelectorAll(".mn-collapsed-toggle").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const section = btn.dataset.section;
+      const panel = $(`mn-${section}-section`);
+      const arrow = btn.querySelector(".mn-toggle-arrow");
+      if (!panel) return;
+      const open = panel.style.display !== "none";
+      panel.style.display = open ? "none" : "block";
+      if (arrow) arrow.textContent = open ? "▶" : "▼";
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-km-mastered").forEach(btn => {
     btn.addEventListener("click", async () => {
-      const ci = Number(btn.dataset.completedIdx);
-      const src = btn.dataset.src;
-      const pa = src === "stopped" ? stoppedActs[ci] : masteredActs[ci];
-      if (!pa) return;
-      if (src === "stopped") { delete pa.isArchived; delete pa.isStopped; } else delete pa.isCompleted;
+      const idx = Number(btn.dataset.idx);
+      if (!acts[idx]) return;
+      acts[idx].masteredOn = todayDateStr();
+      target.predefinedActivities = acts;
       await saveTarget();
       renderTargetManageContent(student, target);
     });
   });
 
-  $("manage-modal-body").querySelectorAll(".btn-mn-del-completed").forEach(btn => {
+  $("manage-modal-body").querySelectorAll(".mn-km-discontinued").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const idx = Number(btn.dataset.idx);
+      if (!acts[idx]) return;
+      acts[idx].discontinuedOn = todayDateStr();
+      target.predefinedActivities = acts;
+      await saveTarget();
+      renderTargetManageContent(student, target);
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".btn-mn-undo-mastered").forEach(btn => {
     btn.addEventListener("click", async () => {
       const ci = Number(btn.dataset.completedIdx);
-      const src = btn.dataset.src;
-      const pa = src === "stopped" ? stoppedActs[ci] : masteredActs[ci];
+      const pa = masteredActs[ci];
       if (!pa) return;
+      delete pa.masteredOn;
+      delete pa.isCompleted;
+      await saveTarget();
+      renderTargetManageContent(student, target);
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".btn-mn-undo-discontinued").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const ci = Number(btn.dataset.completedIdx);
+      const pa = discontinuedActs[ci];
+      if (!pa) return;
+      delete pa.discontinuedOn;
+      delete pa.isArchived;
+      delete pa.isStopped;
+      await saveTarget();
+      renderTargetManageContent(student, target);
+    });
+  });
+
+  const _delSectionAct = async (pa, btn) => {
+    if (!pa) return;
       btn.disabled = true;
       btn.textContent = "Checking…";
       let affected = 0;
@@ -9254,11 +9284,24 @@ function renderTargetManageContent(student, target) {
           renderTargetManageContent(student, target);
         });
       }
+  };
+
+  $("manage-modal-body").querySelectorAll(".btn-mn-del-mastered").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const ci = Number(btn.dataset.completedIdx);
+      await _delSectionAct(masteredActs[ci], btn);
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".btn-mn-del-discontinued").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const ci = Number(btn.dataset.completedIdx);
+      await _delSectionAct(discontinuedActs[ci], btn);
     });
   });
 
   $("btn-mn-add-act").addEventListener("click", async () => {
-    acts.push({ id: cfgId("a"), name: "", order: acts.length, activeFrom: null });
+    acts.push({ id: cfgId("a"), name: "", order: acts.length, createdOn: todayDateStr() });
     target.predefinedActivities = acts;
     await saveTarget();
     renderTargetManageContent(student, target);
@@ -9290,18 +9333,8 @@ function renderTargetManageContent(student, target) {
     });
   });
 
-  $("manage-modal-body").querySelectorAll(".mn-inactive-reason-select").forEach(sel => {
-    sel.addEventListener("change", async () => {
-      const idx = Number(sel.dataset.idx);
-      acts[idx].inactiveReason = sel.value || undefined;
-      target.predefinedActivities = acts;
-      await saveTarget();
-      renderTargetManageContent(student, target);
-    });
-  });
-
   $("btn-mn-add-mapped").addEventListener("click", async () => {
-    acts.push({ id: cfgId("m"), isMapped: true, name: "", mappedTargetId: null, order: acts.length, activeFrom: null });
+    acts.push({ id: cfgId("m"), isMapped: true, name: "", mappedTargetId: null, order: acts.length, createdOn: todayDateStr() });
     target.predefinedActivities = acts;
     await saveTarget();
     renderTargetManageContent(student, target);
@@ -9740,6 +9773,8 @@ function renderTemplateManageContent(template) {
   }
 
   const acts = template.predefinedActivities;
+  const masteredActs     = acts.filter(a => !a.isHeading && !a.isNote && !a.isExportNote && !a.isMaintain && !a.isMaintainHeading && a.fixedRemark === undefined && (a.masteredOn || a.isCompleted));
+  const discontinuedActs = acts.filter(a => !a.isHeading && !a.isNote && !a.isExportNote && !a.isMaintain && !a.isMaintainHeading && a.fixedRemark === undefined && (a.discontinuedOn || a.isArchived || a.isStopped));
 
   let html = `
     <div class="admin-section">
@@ -9758,6 +9793,7 @@ function renderTemplateManageContent(template) {
     <div class="admin-list" id="mn-act-list">`;
 
   acts.forEach((a, idx) => {
+    if (a.masteredOn || a.discontinuedOn || a.isCompleted || a.isArchived || a.isStopped) return;
     if (a.isHeading || a.isMaintainHeading) {
       const isGray = a.headingColor === "gray" || a.isMaintainHeading;
       const isGreen = a.headingColor === "green";
@@ -9837,25 +9873,9 @@ function renderTemplateManageContent(template) {
     } else {
       const remarkTypeSelect = buildRemarkTypeControls(a, idx);
       const isGray = a.activityColor === "gray" || a.isMaintainLive;
-      const isGreen = a.activityColor === "green" || a.inactiveReason === 'mastered';
-      const _editRef2   = state.sessionData?.date || todayDateStr();
-      const actInactive = !isActivityActive(a, _editRef2);
-      const actExpired  = actInactive && !!a.activeTo && a.activeTo < _editRef2;
+      const isGreen = a.activityColor === "green";
       const actBaseBg   = isGray ? 'background:#f3f4f6;border:1px solid #d1d5db' : isGreen ? 'background:#e2efda;border:1px solid #a9d18e' : null;
-      const actItemStyle = actExpired ? (actBaseBg ? ` style="position:relative;${actBaseBg}"` : ' style="position:relative"') : (actBaseBg ? ` style="${actBaseBg}${actInactive ? ';opacity:0.3' : ''}"` : actInactive ? ' style="opacity:0.3"' : '');
-      const actOverlay  = actExpired ? `<div style="position:absolute;inset:0 2.5rem 0 0;background:rgba(255,255,255,.7);z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center">
-        <div style="background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.5rem .75rem;text-align:center;font-size:1rem;color:#374151;max-width:85%">
-          <div>⏸ This activity's period has ended — tap ⋮ on the right side to adjust the dates and bring it back.</div>
-          <div style="display:flex;align-items:center;gap:.5rem;justify-content:center;margin-top:.4rem">
-            <span style="font-size:.84rem;color:#6b7280">Reason:</span>
-            <select class="mn-inactive-reason-select" data-idx="${idx}" style="font-size:.84rem;padding:.2rem .4rem;border:1px solid #d1d5db;border-radius:.3rem;background:white;cursor:pointer">
-              <option value="">— Not specified —</option>
-              <option value="mastered"${a.inactiveReason === 'mastered' ? ' selected' : ''}>Mastered</option>
-              <option value="discontinued"${a.inactiveReason === 'discontinued' ? ' selected' : ''}>Discontinued</option>
-            </select>
-          </div>
-        </div>
-      </div>` : '';
+      const actItemStyle = actBaseBg ? ` style="${actBaseBg}"` : '';
       const fixedRemarkRow = a.fixedRemark !== undefined
         ? `<div style="display:flex;align-items:flex-start;gap:.3rem">
             <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600;padding-top:.3rem">Fixed Remark:</span>
@@ -9873,6 +9893,7 @@ function renderTemplateManageContent(template) {
             <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
               rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
           </div>
+          ${a.createdOn ? `<span style="font-size:.72rem;color:#9ca3af">Created on ${fmtPeriodDate(a.createdOn)}</span>` : ''}
           <div style="display:flex;align-items:flex-start;gap:.5rem">
             <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600;padding-top:.3rem">Remark Type:</span>
             ${remarkTypeSelect}
@@ -9889,18 +9910,58 @@ function renderTemplateManageContent(template) {
               <button class="mn-km-opt" data-idx="${idx}" data-action="color_white" style="padding:.35rem .6rem;background:#ffffff;border:2px solid ${!isGray ? '#6b7280' : '#e5e7eb'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🤍 White (Normal)</button>
               <button class="mn-km-opt" data-idx="${idx}" data-action="color_gray" style="padding:.35rem .6rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🩶 Grey (Maintain)</button>
             </div>
-            ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true, a.inactiveReason)}
+            <button class="mn-km-mastered" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">✓ Mark as Mastered</button>
+            <button class="mn-km-discontinued" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#dc2626">✗ Mark as Discontinued</button>
             <div style="display:flex;align-items:stretch">
               <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
             </div>
           </div>
         </div>
-        ${actOverlay}
       </div>`;
     }
   });
 
-  html += `</div>
+  html += `</div>`;
+
+  if (masteredActs.length > 0) {
+    html += `<div style="margin-top:1.25rem">
+      <button class="mn-collapsed-toggle" data-section="mastered" style="display:flex;align-items:center;gap:.5rem;background:none;border:none;cursor:pointer;width:100%;padding:.25rem 0;font-size:.85rem;font-weight:700;color:#374151">
+        <span class="mn-toggle-arrow" style="font-size:.75rem">▶</span>
+        Mastered (${masteredActs.length})
+      </button>
+      <div id="mn-mastered-section" style="display:none">`;
+    masteredActs.forEach((a, ci) => {
+      const dateLabel = a.masteredOn ? `Mastered on ${fmtPeriodDate(a.masteredOn)}` : 'Mastered';
+      html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:.35rem">
+        <span style="flex:1;font-size:.875rem;color:#374151">${escHtml(a.name || "")}</span>
+        <span style="font-size:.72rem;color:#059669;white-space:nowrap">${dateLabel}</span>
+        <button class="btn-mn-undo-mastered" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Undo</button>
+        <button class="btn-adm-del btn-mn-del-mastered" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  if (discontinuedActs.length > 0) {
+    html += `<div style="margin-top:.5rem">
+      <button class="mn-collapsed-toggle" data-section="discontinued" style="display:flex;align-items:center;gap:.5rem;background:none;border:none;cursor:pointer;width:100%;padding:.25rem 0;font-size:.85rem;font-weight:700;color:#374151">
+        <span class="mn-toggle-arrow" style="font-size:.75rem">▶</span>
+        Discontinued (${discontinuedActs.length})
+      </button>
+      <div id="mn-discontinued-section" style="display:none">`;
+    discontinuedActs.forEach((a, ci) => {
+      const dateLabel = a.discontinuedOn ? `Discontinued on ${fmtPeriodDate(a.discontinuedOn)}` : 'Discontinued';
+      html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:.35rem">
+        <span style="flex:1;font-size:.875rem;color:#374151">${escHtml(a.name || "")}</span>
+        <span style="font-size:.72rem;color:#6b7280;white-space:nowrap">${dateLabel}</span>
+        <button class="btn-mn-undo-discontinued" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Undo</button>
+        <button class="btn-adm-del btn-mn-del-discontinued" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  html += `
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.25rem">
       <button class="btn-admin-add" id="btn-mn-add-act" style="flex:0 0 auto;width:auto">+ Add Activity</button>
       <button class="btn-admin-add" id="btn-mn-add-heading" style="flex:0 0 auto;width:auto">+ Add Section Heading</button>
@@ -10046,7 +10107,7 @@ function renderTemplateManageContent(template) {
   });
 
   $("btn-mn-add-act").addEventListener("click", async () => {
-    acts.push({ id: cfgId("a"), name: "", order: acts.length, activeFrom: null });
+    acts.push({ id: cfgId("a"), name: "", order: acts.length, createdOn: todayDateStr() });
     template.predefinedActivities = acts;
     await saveTemplateFn();
     renderTemplateManageContent(template);
@@ -10072,16 +10133,6 @@ function renderTemplateManageContent(template) {
       const toExport = sel.value === "export";
       if (toExport) { delete acts[idx].isNote; acts[idx].isExportNote = true; }
       else { delete acts[idx].isExportNote; acts[idx].isNote = true; }
-      template.predefinedActivities = acts;
-      await saveTemplateFn();
-      renderTemplateManageContent(template);
-    });
-  });
-
-  $("manage-modal-body").querySelectorAll(".mn-inactive-reason-select").forEach(sel => {
-    sel.addEventListener("change", async () => {
-      const idx = Number(sel.dataset.idx);
-      acts[idx].inactiveReason = sel.value || undefined;
       template.predefinedActivities = acts;
       await saveTemplateFn();
       renderTemplateManageContent(template);
@@ -10275,6 +10326,91 @@ function renderTemplateManageContent(template) {
     btn.addEventListener("click", () => {
       const panel = $("manage-modal-body").querySelector(`.mn-km-color-panel[data-idx="${btn.dataset.idx}"]`);
       if (panel) panel.style.display = panel.style.display === "flex" ? "none" : "flex";
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-collapsed-toggle").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const section = btn.dataset.section;
+      const panel = $(`mn-${section}-section`);
+      const arrow = btn.querySelector(".mn-toggle-arrow");
+      if (!panel) return;
+      const open = panel.style.display !== "none";
+      panel.style.display = open ? "none" : "block";
+      if (arrow) arrow.textContent = open ? "▶" : "▼";
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-km-mastered").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const idx = Number(btn.dataset.idx);
+      if (!acts[idx]) return;
+      acts[idx].masteredOn = todayDateStr();
+      template.predefinedActivities = acts;
+      await saveTemplateFn();
+      renderTemplateManageContent(template);
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-km-discontinued").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const idx = Number(btn.dataset.idx);
+      if (!acts[idx]) return;
+      acts[idx].discontinuedOn = todayDateStr();
+      template.predefinedActivities = acts;
+      await saveTemplateFn();
+      renderTemplateManageContent(template);
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".btn-mn-undo-mastered").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const ci = Number(btn.dataset.completedIdx);
+      const pa = masteredActs[ci];
+      if (!pa) return;
+      delete pa.masteredOn;
+      delete pa.isCompleted;
+      await saveTemplateFn();
+      renderTemplateManageContent(template);
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".btn-mn-undo-discontinued").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const ci = Number(btn.dataset.completedIdx);
+      const pa = discontinuedActs[ci];
+      if (!pa) return;
+      delete pa.discontinuedOn;
+      delete pa.isArchived;
+      delete pa.isStopped;
+      await saveTemplateFn();
+      renderTemplateManageContent(template);
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".btn-mn-del-mastered").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const ci = Number(btn.dataset.completedIdx);
+      const pa = masteredActs[ci];
+      if (!pa || !confirm("Delete this activity permanently?")) return;
+      const actIdx = acts.indexOf(pa);
+      if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
+      template.predefinedActivities = acts;
+      await saveTemplateFn();
+      renderTemplateManageContent(template);
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".btn-mn-del-discontinued").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const ci = Number(btn.dataset.completedIdx);
+      const pa = discontinuedActs[ci];
+      if (!pa || !confirm("Delete this activity permanently?")) return;
+      const actIdx = acts.indexOf(pa);
+      if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
+      template.predefinedActivities = acts;
+      await saveTemplateFn();
+      renderTemplateManageContent(template);
     });
   });
 
