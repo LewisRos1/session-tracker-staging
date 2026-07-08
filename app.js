@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "785";
+const APP_VERSION = "786";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4614,7 +4614,8 @@ async function openSessionView(student, sessionId) {
         if (!actId) {
           actId = await addActivity(
             state.viewSessionId, addTrialNewBtn.dataset.targetName, addTrialNewBtn.dataset.actName,
-            Date.now(), addTrialNewBtn.dataset.isPredefined === "true"
+            Date.now(), addTrialNewBtn.dataset.isPredefined === "true",
+            undefined, addTrialNewBtn.dataset.parentActivity || null, addTrialNewBtn.dataset.configId || null
           );
         }
         const remId = await addRemark(state.viewSessionId, actId, "", null);
@@ -4834,12 +4835,22 @@ function buildTargetViewTable(target, data) {
         continue;
       }
       const candidateEntries = Object.entries(data.activities || {})
-        .filter(([, a]) => a.targetName === target.name && a.activityName === pa.name);
+        .filter(([id, a]) => a.targetName === target.name && a.activityName === pa.name && !matchedIds.has(id));
       let entry = pa.id ? (candidateEntries.find(([, a]) => a.configId === pa.id) || null) : null;
       if (!entry) {
-        entry = isSub
-          ? candidateEntries.find(([, a]) => a.parentActivity === pa.parentActivity) || null
-          : candidateEntries.find(([, a]) => !a.parentActivity) || null;
+        if (isSub) {
+          entry = candidateEntries.find(([, a]) => a.parentActivity === pa.parentActivity) || null;
+          if (!entry) {
+            const hasTopLevelConfig = allPas.some(p =>
+              !p.parentActivity && !p.isHeading && !p.isNote && !p.isExportNote && p.name === pa.name
+            );
+            if (!hasTopLevelConfig) {
+              entry = candidateEntries.find(([, a]) => !a.parentActivity) || null;
+            }
+          }
+        } else {
+          entry = candidateEntries.find(([, a]) => !a.parentActivity) || null;
+        }
       }
       if (entry) matchedIds.add(entry[0]);
       rows += viewActivityRows(displayNo, pa.name, entry?.[0] || null, data, target, true, pa);
@@ -4945,7 +4956,9 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
         ? ""
         : `<button class="view-add-trial-new" data-act-id="${escHtml(actId || "")}"
         data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
-        data-is-predefined="${isPredefined}">+</button>`;
+        data-is-predefined="${isPredefined}"
+        data-parent-activity="${escHtml(paConfig?.parentActivity || "")}"
+        data-config-id="${escHtml(paConfig?.id || "")}">+</button>`;
       return `<tr${rowClass ? ` class="${rowClass}"` : ""}>
         <td class="vcol-no" contenteditable="false">${no}</td>
         <td class="vcol-act" contenteditable="false">${actCell}</td>
@@ -4979,7 +4992,9 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
       ? `<span class="view-mapped-label">${escHtml(mappedInfo.label)}</span>`
       : `<button class="view-add-trial-new" data-act-id="${escHtml(actId || "")}"
           data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
-          data-is-predefined="${isPredefined}">+</button>`;
+          data-is-predefined="${isPredefined}"
+          data-parent-activity="${escHtml(paConfig?.parentActivity || "")}"
+          data-config-id="${escHtml(paConfig?.id || "")}">+</button>`;
     return `<tr${rowClass ? ` class="${rowClass}"` : ""}>
       <td class="vcol-no" contenteditable="false">${no}</td>
       <td class="vcol-act" contenteditable="false">${actCell}</td>
@@ -6259,12 +6274,22 @@ function buildGroupTargetViewTable(target, data, attendees) {
       no++;
       const isSub2 = !!pa.parentActivity;
       const candidateEntries2 = Object.entries(data.activities || {})
-        .filter(([, a]) => a.targetName === target.name && a.activityName === pa.name);
+        .filter(([id, a]) => a.targetName === target.name && a.activityName === pa.name && !matchedIds.has(id));
       let entry2 = pa.id ? (candidateEntries2.find(([, a]) => a.configId === pa.id) || null) : null;
       if (!entry2) {
-        entry2 = isSub2
-          ? candidateEntries2.find(([, a]) => a.parentActivity === pa.parentActivity) || null
-          : candidateEntries2.find(([, a]) => !a.parentActivity) || null;
+        if (isSub2) {
+          entry2 = candidateEntries2.find(([, a]) => a.parentActivity === pa.parentActivity) || null;
+          if (!entry2) {
+            const hasTopLevelConfig2 = allPas.some(p =>
+              !p.parentActivity && !p.isHeading && !p.isNote && !p.isExportNote && p.name === pa.name
+            );
+            if (!hasTopLevelConfig2) {
+              entry2 = candidateEntries2.find(([, a]) => !a.parentActivity) || null;
+            }
+          }
+        } else {
+          entry2 = candidateEntries2.find(([, a]) => !a.parentActivity) || null;
+        }
       }
       if (entry2) matchedIds.add(entry2[0]);
       rows += viewGroupActivityRows(no, pa.name, entry2?.[0] || null, data, target, attendees, true, pa);
