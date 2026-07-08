@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "791";
+const APP_VERSION = "792";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4874,6 +4874,27 @@ function buildTargetViewTable(target, data) {
       if (entry) matchedIds.add(entry[0]);
       rows += viewActivityRows(displayNo, pa.name, entry?.[0] || null, data, target, true, pa);
     }
+    // Silently delete unmatched records that have no meaningful data — these
+    // are empty ghost duplicates from historical bugs. Records with real data
+    // still render below so the user can review and × them manually.
+    for (const [actId, act] of Object.entries(data.activities || {})) {
+      if (act.targetName !== target.name || matchedIds.has(actId)) continue;
+      const remIds = Object.entries(data.remarks || {})
+        .filter(([, r]) => r.activityId === actId).map(([id]) => id);
+      const hasData = remIds.some(remId => {
+        const r = data.remarks[remId];
+        return r && (
+          (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
+          (r.trials || []).some(t => t !== null && t !== -1)
+        );
+      });
+      if (!hasData) {
+        matchedIds.add(actId);
+        delete data.activities[actId];
+        for (const remId of remIds) delete data.remarks[remId];
+        deleteActivity(state.viewSessionId, actId, remIds).catch(() => {});
+      }
+    }
     // All unmatched session activities — covers both manually-added activities
     // AND predefined activities recorded under old names before a rename.
     Object.entries(data.activities || {})
@@ -6331,6 +6352,25 @@ function buildGroupTargetViewTable(target, data, attendees) {
       }
       if (entry2) matchedIds.add(entry2[0]);
       rows += viewGroupActivityRows(no, pa.name, entry2?.[0] || null, data, target, attendees, true, pa);
+    }
+    // Silently delete unmatched records with no meaningful data (empty ghosts).
+    for (const [actId, act] of Object.entries(data.activities || {})) {
+      if (act.targetName !== target.name || matchedIds.has(actId)) continue;
+      const remIds = Object.entries(data.remarks || {})
+        .filter(([, r]) => r.activityId === actId).map(([id]) => id);
+      const hasData = remIds.some(remId => {
+        const r = data.remarks[remId];
+        return r && (
+          (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
+          (r.trials || []).some(t => t !== null && t !== -1)
+        );
+      });
+      if (!hasData) {
+        matchedIds.add(actId);
+        delete data.activities[actId];
+        for (const remId of remIds) delete data.remarks[remId];
+        deleteActivity(state.viewGroupSessionId, actId, remIds).catch(() => {});
+      }
     }
     // All unmatched session activities — covers both manually-added activities
     // AND predefined activities recorded under old names before a rename.
