@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "790";
+const APP_VERSION = "791";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -9222,24 +9222,26 @@ function renderTargetManageContent(student, target) {
           btn.disabled = true;
           btn.textContent = "Checking…";
           let affected = 0;
+          let affectedSessions = [];
           try {
             const allSessions = _groupForTargetEdit
               ? await getAllSessionsForGroup(_groupForTargetEdit.id)
               : await getAllSessionsForStudent(student.id);
-            affected = allSessions.filter(s => {
+            const paPA = pa.parentActivity || null;
+            affectedSessions = allSessions.filter(s => {
               const sActs = s.activities || {}; const sRems = s.remarks || {};
-              const paPA = pa.parentActivity || null;
-            const matchIds = Object.entries(sActs).filter(([, a]) =>
-              a.targetName === target.name && a.activityName === pa.name &&
-              (paPA === null ? !a.parentActivity : a.parentActivity === paPA)
-            ).map(([id]) => id);
+              const matchIds = Object.entries(sActs).filter(([, a]) =>
+                a.targetName === target.name && a.activityName === pa.name &&
+                (paPA === null ? !a.parentActivity : a.parentActivity === paPA)
+              ).map(([id]) => id);
               return matchIds.some(actId => Object.values(sRems).some(r =>
                 r.activityId === actId && (
                   (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
                   (r.trials || []).some(t => t !== null && t !== -1)
                 )
               ));
-            }).length;
+            });
+            affected = affectedSessions.length;
           } catch { affected = -1; }
           btn.disabled = false;
           btn.textContent = "🗑️ Delete Activity";
@@ -9256,8 +9258,17 @@ function renderTargetManageContent(student, target) {
             const overlay = document.createElement("div");
             overlay.dataset.delOverlay = "1";
             overlay.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding-top:1.25rem;z-index:200;border-radius:.75rem;overflow-y:auto";
+            const sessionDateList = affectedSessions.length > 0
+              ? `<p style="font-size:.82rem;margin:.4rem 0 .6rem;color:#374151;font-weight:600">Sessions with data:</p>
+                 <ul style="font-size:.82rem;color:#374151;margin:0 0 .7rem;padding-left:1.2rem;line-height:1.8">${
+                   affectedSessions
+                     .sort((a, b) => (a.date || "").localeCompare(b.date || ""))
+                     .map(s => `<li>Session ${escHtml(String(s.sessionNumber || s.number || "?"))}: ${escHtml(formatDateWithDay(s.date))}</li>`)
+                     .join("")
+                 }</ul>` : "";
             overlay.innerHTML = `<div style="background:#fff;padding:1.25rem;border-radius:.75rem;width:min(320px,92%);box-shadow:0 4px 24px rgba(0,0,0,.25);margin-bottom:1rem">
               <p style="font-size:.88rem;margin:0 0 .6rem;color:#111;font-weight:700">⚠️ If you delete this activity, all data from the past <strong>${confirmWord} session${affected !== 1 ? "s" : ""}</strong> will be permanently lost.</p>
+              ${sessionDateList}
               <p style="font-size:.84rem;margin:0 0 .5rem;color:#374151">We recommend selecting <strong>"Mark as Mastered"</strong> or <strong>"Mark as Discontinued"</strong> instead. Once marked, the activity will no longer appear in new sessions, but it will remain in your previous sessions and your existing data will be preserved.</p>
               <p style="font-size:.84rem;margin:.5rem 0 .3rem;color:#374151;font-weight:600">To proceed without deleting, follow these steps:</p>
               <ol style="font-size:.84rem;color:#374151;margin:.2rem 0 .8rem;padding-left:1.3rem;line-height:1.8">
