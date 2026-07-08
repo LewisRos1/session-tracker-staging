@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "792";
+const APP_VERSION = "793";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -9671,7 +9671,10 @@ function renderTargetManageContent(student, target) {
             ? await getAllSessionsForGroup(_groupForTargetEdit.id)
             : await getAllSessionsForStudent(student.id);
           const _hasData = _allS.some(s =>
-            Object.values(s.activities || {}).some(act => act.targetName === target.name && act.activityName === _a.name)
+            Object.values(s.activities || {}).some(act =>
+              act.targetName === target.name && act.activityName === _a.name &&
+              (_a.id ? act.configId === _a.id : true)
+            )
           );
           if (_hasData) {
             sel.value = _oldVal;
