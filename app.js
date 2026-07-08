@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "788";
+const APP_VERSION = "789";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4848,7 +4848,7 @@ function buildTargetViewTable(target, data) {
         if (isSub) {
           entry = candidateEntries.find(([, a]) => a.parentActivity === pa.parentActivity) || null;
           if (!entry) {
-            const hasTopLevelConfig = allPas.some(p =>
+            const hasTopLevelConfig = (target.predefinedActivities || []).some(p =>
               !p.parentActivity && !p.isHeading && !p.isNote && !p.isExportNote && p.name === pa.name
             );
             if (!hasTopLevelConfig) {
@@ -6306,7 +6306,7 @@ function buildGroupTargetViewTable(target, data, attendees) {
         if (isSub2) {
           entry2 = candidateEntries2.find(([, a]) => a.parentActivity === pa.parentActivity) || null;
           if (!entry2) {
-            const hasTopLevelConfig2 = allPas.some(p =>
+            const hasTopLevelConfig2 = (target.predefinedActivities || []).some(p =>
               !p.parentActivity && !p.isHeading && !p.isNote && !p.isExportNote && p.name === pa.name
             );
             if (!hasTopLevelConfig2) {
