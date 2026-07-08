@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "783";
+const APP_VERSION = "784";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4833,10 +4833,15 @@ function buildTargetViewTable(target, data) {
         </tr>`;
         continue;
       }
-      const allEntries = Object.entries(data.activities || {})
+      const candidateEntries = Object.entries(data.activities || {})
         .filter(([, a]) => a.targetName === target.name && a.activityName === pa.name);
-      const entry = allEntries[0] || null;
-      allEntries.forEach(([id]) => matchedIds.add(id));
+      let entry = pa.id ? (candidateEntries.find(([, a]) => a.configId === pa.id) || null) : null;
+      if (!entry) {
+        entry = isSub
+          ? candidateEntries.find(([, a]) => a.parentActivity === pa.parentActivity) || null
+          : candidateEntries.find(([, a]) => !a.parentActivity) || null;
+      }
+      if (entry) matchedIds.add(entry[0]);
       rows += viewActivityRows(displayNo, pa.name, entry?.[0] || null, data, target, true);
     }
     // All unmatched session activities — covers both manually-added activities
@@ -6248,10 +6253,16 @@ function buildGroupTargetViewTable(target, data, attendees) {
         continue;
       }
       no++;
-      const allEntries2 = Object.entries(data.activities || {})
+      const isSub2 = !!pa.parentActivity;
+      const candidateEntries2 = Object.entries(data.activities || {})
         .filter(([, a]) => a.targetName === target.name && a.activityName === pa.name);
-      const entry2 = allEntries2[0] || null;
-      allEntries2.forEach(([id]) => matchedIds.add(id));
+      let entry2 = pa.id ? (candidateEntries2.find(([, a]) => a.configId === pa.id) || null) : null;
+      if (!entry2) {
+        entry2 = isSub2
+          ? candidateEntries2.find(([, a]) => a.parentActivity === pa.parentActivity) || null
+          : candidateEntries2.find(([, a]) => !a.parentActivity) || null;
+      }
+      if (entry2) matchedIds.add(entry2[0]);
       rows += viewGroupActivityRows(no, pa.name, entry2?.[0] || null, data, target, attendees, true);
     }
     // All unmatched session activities — covers both manually-added activities
