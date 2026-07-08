@@ -8,6 +8,7 @@ import {
   listenToSession,
   addActivity,
   adoptOrphanActivity,
+  revertOrphanActivity,
   deleteActivity,
   updateActivityName,
   updateActivityCombineRemarks,
@@ -146,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "782";
+const APP_VERSION = "783";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3133,6 +3134,28 @@ function renderFedcTarget(target) {
   const sessionDateForFilter = state.sessionData?.date || todayDateStr();
   let actNum = 0;
 
+  // Self-healing: revert records that were wrongly adopted as sub-activity records while
+  // a same-named top-level activity still exists in config. Only reverts when the adopted
+  // record is the sole record for that name (i.e. the top-level activity has no record of
+  // its own) — so we never touch records that legitimately belong to a sub-activity.
+  if (state.sessionData?.activities) {
+    const topLevelNames = new Set(
+      allPas.filter(p => !p.parentActivity && !p.isHeading && !p.isNote && !p.isExportNote).map(p => p.name)
+    );
+    for (const [rid, rec] of Object.entries(state.sessionData.activities)) {
+      if (rec.targetName !== target.name || !rec.parentActivity) continue;
+      if (!topLevelNames.has(rec.activityName)) continue;
+      const hasTopLevelRecord = Object.values(state.sessionData.activities).some(
+        a => a.targetName === target.name && a.activityName === rec.activityName && !a.parentActivity
+      );
+      if (!hasTopLevelRecord) {
+        delete rec.parentActivity;
+        delete rec.configId;
+        revertOrphanActivity(state.currentSessionId, rid).catch(() => {});
+      }
+    }
+  }
+
   // Pre-compute active sub-activities per parent for visual grouping
   const subActsByParent = new Map();
   for (const pa of allPas) {
@@ -3236,13 +3259,20 @@ function renderFedcTarget(target) {
           // Orphan adoption: old top-level activity was deleted from config but its
           // session record still exists. Claim it for this sub-activity by writing
           // parentActivity (and configId) onto it so future lookups find it correctly.
-          const orphan = Object.entries(state.sessionData.activities || {})
-            .find(([, a]) => a.targetName === target.name && a.activityName === sub.name && !a.parentActivity && !a.configId);
-          if (orphan) {
-            const [oid, odata] = orphan;
-            state.sessionData.activities[oid] = { ...odata, parentActivity: pa.name, ...(sub.id ? { configId: sub.id } : {}) };
-            adoptOrphanActivity(state.currentSessionId, oid, pa.name, sub.id || null).catch(() => {});
-            subActData = { id: oid, ...state.sessionData.activities[oid] };
+          // Guard: only adopt if no live top-level predefined activity with this name
+          // still exists — if one does, its record belongs to it, not to this sub-activity.
+          const hasLiveTopLevel = allPas.some(p =>
+            !p.parentActivity && !p.isHeading && !p.isNote && !p.isExportNote && p.name === sub.name
+          );
+          if (!hasLiveTopLevel) {
+            const orphan = Object.entries(state.sessionData.activities || {})
+              .find(([, a]) => a.targetName === target.name && a.activityName === sub.name && !a.parentActivity && !a.configId);
+            if (orphan) {
+              const [oid, odata] = orphan;
+              state.sessionData.activities[oid] = { ...odata, parentActivity: pa.name, ...(sub.id ? { configId: sub.id } : {}) };
+              adoptOrphanActivity(state.currentSessionId, oid, pa.name, sub.id || null).catch(() => {});
+              subActData = { id: oid, ...state.sessionData.activities[oid] };
+            }
           }
         }
         const subActId   = subActData ? subActData.id : null;
@@ -11132,13 +11162,18 @@ function buildGroupItemsByActivity(target, data, attendees) {
           (a.targetName === target.name && a.activityName === sub.name && a.parentActivity === sub.parentActivity)
         )?.[0] || null;
         if (!subActId) {
-          const orphan = Object.entries(data.activities || {})
-            .find(([, a]) => a.targetName === target.name && a.activityName === sub.name && !a.parentActivity && !a.configId);
-          if (orphan) {
-            const [oid, odata] = orphan;
-            data.activities[oid] = { ...odata, parentActivity: sub.parentActivity, ...(sub.id ? { configId: sub.id } : {}) };
-            adoptOrphanActivity(state.groupSessionId, oid, sub.parentActivity, sub.id || null).catch(() => {});
-            subActId = oid;
+          const grpHasLiveTopLevel = allPas.some(p =>
+            !p.parentActivity && !p.isHeading && !p.isNote && !p.isExportNote && p.name === sub.name
+          );
+          if (!grpHasLiveTopLevel) {
+            const orphan = Object.entries(data.activities || {})
+              .find(([, a]) => a.targetName === target.name && a.activityName === sub.name && !a.parentActivity && !a.configId);
+            if (orphan) {
+              const [oid, odata] = orphan;
+              data.activities[oid] = { ...odata, parentActivity: sub.parentActivity, ...(sub.id ? { configId: sub.id } : {}) };
+              adoptOrphanActivity(state.groupSessionId, oid, sub.parentActivity, sub.id || null).catch(() => {});
+              subActId = oid;
+            }
           }
         }
         const isLast   = si === children.length - 1;

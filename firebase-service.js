@@ -380,6 +380,13 @@ export async function adoptOrphanActivity(sessionId, actId, parentActivity, conf
   await updateDoc(doc(db, "sessions", sessionId), updates);
 }
 
+export async function revertOrphanActivity(sessionId, actId) {
+  await updateDoc(doc(db, "sessions", sessionId), {
+    [`activities.${actId}.parentActivity`]: deleteField(),
+    [`activities.${actId}.configId`]:       deleteField()
+  });
+}
+
 export async function addActivity(sessionId, targetName, activityName, order, isPredefined = false, actId = generateId("a"), parentActivity = null, configId = null) {
   const actData = { targetName, activityName, order, isPredefined };
   if (parentActivity) actData.parentActivity = parentActivity;
