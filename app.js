@@ -146,7 +146,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "777";
+const APP_VERSION = "778";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3407,8 +3407,8 @@ function renderFedcTarget(target) {
         </div>`;
       }
       const fixedText = pa.fixedRemark !== undefined ? pa.fixedRemark : pa.isMaintain ? (pa.maintainRemark ?? "") : null;
-      const actLabel = pa.inactiveReason === 'mastered' ? 'Mastered' : pa.inactiveReason === 'discontinued' ? 'Discontinued' : 'Activity';
-      const actLabelStyle = pa.inactiveReason === 'mastered' ? ' style="color:#059669"' : pa.inactiveReason === 'discontinued' ? ' style="color:#dc2626"' : '';
+      const actLabel = (pa.masteredOn || pa.inactiveReason === 'mastered') ? 'Mastered' : (pa.discontinuedOn || pa.inactiveReason === 'discontinued') ? 'Discontinued' : 'Activity';
+      const actLabelStyle = (pa.masteredOn || pa.inactiveReason === 'mastered') ? ' style="color:#059669"' : (pa.discontinuedOn || pa.inactiveReason === 'discontinued') ? ' style="color:#dc2626"' : '';
       return `<div class="entry-block entry-block-predefined" style="opacity:.3;pointer-events:none">
         <div class="entry-field" contenteditable="false">
           <span class="field-label"${actLabelStyle}>${actLabel}</span>
@@ -3421,9 +3421,9 @@ function renderFedcTarget(target) {
       </div>`;
     };
     const realInactive = inactivePas.filter(pa => !pa.isNote && !pa.isExportNote && !pa.isHeading && !pa.isMaintainHeading);
-    const masteredPas     = realInactive.filter(pa => pa.inactiveReason === 'mastered');
-    const discontinuedPas = realInactive.filter(pa => pa.inactiveReason === 'discontinued');
-    const otherPas        = realInactive.filter(pa => !pa.inactiveReason);
+    const masteredPas     = realInactive.filter(pa => pa.masteredOn || pa.inactiveReason === 'mastered');
+    const discontinuedPas = realInactive.filter(pa => pa.discontinuedOn || pa.inactiveReason === 'discontinued');
+    const otherPas        = realInactive.filter(pa => !pa.masteredOn && !pa.discontinuedOn && !pa.inactiveReason);
     const renderSection = (label, color, pas) => {
       if (pas.length === 0) return '';
       const items = pas.map(renderInactiveItem).filter(Boolean).join('');
@@ -11161,14 +11161,14 @@ function buildGroupItemsByActivity(target, data, attendees) {
         </div>`;
       }
       if (!pa.name) return '';
-      const grpActLabel = pa.inactiveReason === 'mastered' ? 'Mastered' : pa.inactiveReason === 'discontinued' ? 'Discontinued' : 'Activity';
-      const grpActLabelStyle = pa.inactiveReason === 'mastered' ? ' style="color:#059669"' : pa.inactiveReason === 'discontinued' ? ' style="color:#dc2626"' : '';
+      const grpActLabel = (pa.masteredOn || pa.inactiveReason === 'mastered') ? 'Mastered' : (pa.discontinuedOn || pa.inactiveReason === 'discontinued') ? 'Discontinued' : 'Activity';
+      const grpActLabelStyle = (pa.masteredOn || pa.inactiveReason === 'mastered') ? ' style="color:#059669"' : (pa.discontinuedOn || pa.inactiveReason === 'discontinued') ? ' style="color:#dc2626"' : '';
       return `<div class="entry-block entry-block-predefined" style="opacity:.3;pointer-events:none"><div class="entry-field" contenteditable="false"><span class="field-label"${grpActLabelStyle}>${grpActLabel}</span><span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span></div></div>`;
     };
     const grpReal = grpInactivePas.filter(pa => !pa.isNote && !pa.isExportNote && !pa.isHeading && !pa.isMaintainHeading);
-    const grpMastered     = grpReal.filter(pa => pa.inactiveReason === 'mastered');
-    const grpDiscontinued = grpReal.filter(pa => pa.inactiveReason === 'discontinued');
-    const grpOther        = grpReal.filter(pa => !pa.inactiveReason);
+    const grpMastered     = grpReal.filter(pa => pa.masteredOn || pa.inactiveReason === 'mastered');
+    const grpDiscontinued = grpReal.filter(pa => pa.discontinuedOn || pa.inactiveReason === 'discontinued');
+    const grpOther        = grpReal.filter(pa => !pa.masteredOn && !pa.discontinuedOn && !pa.inactiveReason);
     const renderGrpSection = (label, color, pas) => {
       if (pas.length === 0) return '';
       return `<div style="margin-top:.5rem">
