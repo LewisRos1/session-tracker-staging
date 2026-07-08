@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "784";
+const APP_VERSION = "785";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4842,7 +4842,7 @@ function buildTargetViewTable(target, data) {
           : candidateEntries.find(([, a]) => !a.parentActivity) || null;
       }
       if (entry) matchedIds.add(entry[0]);
-      rows += viewActivityRows(displayNo, pa.name, entry?.[0] || null, data, target, true);
+      rows += viewActivityRows(displayNo, pa.name, entry?.[0] || null, data, target, true, pa);
     }
     // All unmatched session activities — covers both manually-added activities
     // AND predefined activities recorded under old names before a rename.
@@ -4905,12 +4905,12 @@ function buildTargetViewTable(target, data) {
   </div>`;
 }
 
-function viewActivityRows(no, actName, actId, data, target, isPredefined = true) {
+function viewActivityRows(no, actName, actId, data, target, isPredefined = true, paConfig = null) {
   const remarks = actId ? viewGetRemarks(data, actId) : [];
 
-  const paEntry = isPredefined
+  const paEntry = paConfig || (isPredefined
     ? target.predefinedActivities?.find(pa => pa.name === actName)
-    : null;
+    : null);
 
   const actCell = isPredefined
     ? formatActivityMarkup(actName) + (paEntry?.actNote?.trim() ? `<div class="view-act-note">${formatActivityMarkup(paEntry.actNote)}</div>` : "")
@@ -4938,7 +4938,9 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true)
            data-act-id="${escHtml(actId || "")}"
            data-act-name="${escHtml(actName)}"
            data-target="${escHtml(target.name)}"
-           data-is-predefined="${isPredefined}"></textarea>`;
+           data-is-predefined="${isPredefined}"
+           data-parent-activity="${escHtml(paConfig?.parentActivity || "")}"
+           data-config-id="${escHtml(paConfig?.id || "")}"></textarea>`;
       const addTrialBtn = mappedInfo
         ? ""
         : `<button class="view-add-trial-new" data-act-id="${escHtml(actId || "")}"
@@ -5331,7 +5333,8 @@ function setupViewRemarkSaving(body, getSessionId, counterKey, onIdle, getData) 
           let actId = el.dataset.actId;
           if (!actId) {
             actId = await addActivity(
-              sid, el.dataset.target, el.dataset.actName, Date.now(), el.dataset.isPredefined === "true"
+              sid, el.dataset.target, el.dataset.actName, Date.now(), el.dataset.isPredefined === "true",
+              undefined, el.dataset.parentActivity || null, el.dataset.configId || null
             );
           }
           // Group view's empty boxes are scoped to one attendee (data-student);
@@ -5483,7 +5486,8 @@ function setupEntryRemarkSaving(host, getSessionId, onIdle) {
           let actId = el.dataset.actId;
           if (!actId) {
             actId = await addActivity(
-              sid, el.dataset.target, el.dataset.actName, Date.now(), el.dataset.isPredefined === "true"
+              sid, el.dataset.target, el.dataset.actName, Date.now(), el.dataset.isPredefined === "true",
+              undefined, el.dataset.parentActivity || null, el.dataset.configId || null
             );
           }
           const remId = await addGroupRemark(sid, actId, el.dataset.student, text);
@@ -6263,7 +6267,7 @@ function buildGroupTargetViewTable(target, data, attendees) {
           : candidateEntries2.find(([, a]) => !a.parentActivity) || null;
       }
       if (entry2) matchedIds.add(entry2[0]);
-      rows += viewGroupActivityRows(no, pa.name, entry2?.[0] || null, data, target, attendees, true);
+      rows += viewGroupActivityRows(no, pa.name, entry2?.[0] || null, data, target, attendees, true, pa);
     }
     // All unmatched session activities — covers both manually-added activities
     // AND predefined activities recorded under old names before a rename.
@@ -6326,13 +6330,13 @@ function buildGroupTargetViewTable(target, data, attendees) {
   </div>`;
 }
 
-function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPredefined = true) {
+function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPredefined = true, paConfig = null) {
   const rounds = actId ? viewGroupGetRounds(data, actId, attendees) : [];
   const combineFlagForAct = !!(actId && data.activities?.[actId]?.combineRemarks);
 
-  const paEntry = isPredefined
+  const paEntry = paConfig || (isPredefined
     ? target.predefinedActivities?.find(pa => pa.name === actName)
-    : null;
+    : null);
 
   const actCell = isPredefined
     ? formatActivityMarkup(actName) + (paEntry?.actNote?.trim() ? `<div class="view-act-note">${formatActivityMarkup(paEntry.actNote)}</div>` : "")
@@ -6414,7 +6418,9 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
             data-act-name="${escHtml(actName)}"
             data-target="${escHtml(target.name)}"
             data-is-predefined="${isPredefined}"
-            data-student="${escHtml(studentName)}"></textarea>
+            data-student="${escHtml(studentName)}"
+            data-parent-activity="${escHtml(paConfig?.parentActivity || "")}"
+            data-config-id="${escHtml(paConfig?.id || "")}"></textarea>
         </td>
         <td class="vcol-trials" contenteditable="false">
           <button class="view-group-add-trial-new" data-act-id="${escHtml(actId || "")}"
