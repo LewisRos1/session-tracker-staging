@@ -146,7 +146,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "775";
+const APP_VERSION = "776";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -7362,6 +7362,12 @@ function fmtPeriodDate(d) {
   return `${dy} ${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m-1]} ${y}`;
 }
 
+function presetLabel(val) {
+  return { "": "Free Text", fixed_remark: "Fixed Remark", manual_score: "Manual Score",
+    starter_fixed: "Sentence Starter + Select one", starter_fixed_multi: "Sentence Starter + Tick boxes",
+    starter_fixed_note: "Sentence Starter + Select One + Free Text" }[val] ?? "Free Text";
+}
+
 function periodSectionHtml(activeFrom, activeTo, idx, withBorder, inactiveReason) {
   const fromLabel = activeFrom ? fmtPeriodDate(activeFrom) : '-∞';
   const toLabel   = activeTo   ? fmtPeriodDate(activeTo)   : '+∞';
@@ -9096,7 +9102,7 @@ function renderTargetManageContent(student, target) {
           btn.disabled = false;
           btn.textContent = "🗑️ Delete Activity";
           if (affected === 0) {
-            if (!confirm(`Delete this activity?\nNo session data will be lost.`)) return;
+            if (!confirm(`No past data found for this activity — safe to delete.`)) return;
             const actIdx = acts.indexOf(pa);
             if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
             target.predefinedActivities = acts;
@@ -9107,12 +9113,20 @@ function renderTargetManageContent(student, target) {
             $("manage-modal").querySelectorAll("[data-del-overlay]").forEach(el => el.remove());
             const overlay = document.createElement("div");
             overlay.dataset.delOverlay = "1";
-            overlay.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:200;border-radius:.75rem";
-            overlay.innerHTML = `<div style="background:#fff;padding:1.25rem 1.25rem 1rem;border-radius:.75rem;width:min(280px,90%);box-shadow:0 4px 24px rgba(0,0,0,.25)">
-              <p style="font-size:.85rem;margin:0 0 .5rem;color:#111;font-weight:600">⚠️ Permanently deletes data from <span style="color:#dc2626">${confirmWord} past session${affected !== 1 ? "s" : ""}</span>. This cannot be undone.</p>
-              <p style="font-size:.8rem;margin:0 0 .6rem;color:#6b7280">Type <strong>${confirmWord}</strong> to confirm:</p>
+            overlay.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding-top:1.25rem;z-index:200;border-radius:.75rem;overflow-y:auto";
+            overlay.innerHTML = `<div style="background:#fff;padding:1.25rem;border-radius:.75rem;width:min(320px,92%);box-shadow:0 4px 24px rgba(0,0,0,.25);margin-bottom:1rem">
+              <p style="font-size:.88rem;margin:0 0 .6rem;color:#111;font-weight:700">⚠️ If you delete this activity, all data from the past <strong>${confirmWord} session${affected !== 1 ? "s" : ""}</strong> will be permanently lost.</p>
+              <p style="font-size:.84rem;margin:0 0 .5rem;color:#374151">We recommend selecting <strong>"Mark as Mastered"</strong> or <strong>"Mark as Discontinued"</strong> instead. Once marked, the activity will no longer appear in new sessions, but it will remain in your previous sessions and your existing data will be preserved.</p>
+              <p style="font-size:.84rem;margin:.5rem 0 .3rem;color:#374151;font-weight:600">To proceed without deleting, follow these steps:</p>
+              <ol style="font-size:.84rem;color:#374151;margin:.2rem 0 .8rem;padding-left:1.3rem;line-height:1.8">
+                <li>Tap <strong>Cancel</strong></li>
+                <li>Go to <strong>Edit Target</strong></li>
+                <li>Find the activity and tap the <strong>⋮</strong> button on the right</li>
+                <li>Select <strong>"Mark as Mastered"</strong> or <strong>"Mark as Discontinued"</strong></li>
+              </ol>
+              <p style="font-size:.84rem;margin:0 0 .5rem;color:#374151">Still want to delete? Type <strong>${confirmWord}</strong> to confirm.</p>
               <input id="del-type-input" type="text" autocomplete="off" inputmode="numeric"
-                style="width:100%;box-sizing:border-box;padding:.45rem .6rem;border:2px solid #d1d5db;border-radius:.4rem;font-size:1.1rem;text-align:center;outline:none;margin-bottom:.75rem" placeholder="${confirmWord}">
+                style="width:100%;box-sizing:border-box;padding:.45rem .6rem;border:2px solid #d1d5db;border-radius:.4rem;font-size:1.1rem;text-align:center;outline:none;margin-bottom:.6rem" placeholder="${confirmWord}">
               <div style="display:flex;gap:.5rem">
                 <button id="del-type-cancel" style="flex:1;padding:.45rem;border:1px solid #d1d5db;border-radius:.4rem;background:#f9fafb;cursor:pointer;font-size:.85rem">Cancel</button>
                 <button id="del-type-ok" disabled style="flex:1;padding:.45rem;border:none;border-radius:.4rem;background:#dc2626;color:#fff;cursor:pointer;font-size:.85rem;opacity:.4">Confirm Delete</button>
@@ -9230,7 +9244,7 @@ function renderTargetManageContent(student, target) {
       btn.disabled = false;
       btn.textContent = "🗑️ Delete";
       if (affected === 0) {
-        if (!confirm(`Delete this activity?\nNo session data will be lost.`)) return;
+        if (!confirm(`No past data found for this activity — safe to delete.`)) return;
         const actIdx = acts.indexOf(pa);
         if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
         target.predefinedActivities = acts;
@@ -9241,12 +9255,20 @@ function renderTargetManageContent(student, target) {
         $("manage-modal").querySelectorAll("[data-del-overlay]").forEach(el => el.remove());
         const overlay = document.createElement("div");
         overlay.dataset.delOverlay = "1";
-        overlay.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:200;border-radius:.75rem";
-        overlay.innerHTML = `<div style="background:#fff;padding:1.25rem 1.25rem 1rem;border-radius:.75rem;width:min(280px,90%);box-shadow:0 4px 24px rgba(0,0,0,.25)">
-          <p style="font-size:.85rem;margin:0 0 .5rem;color:#111;font-weight:600">⚠️ Moves data from <span style="color:#dc2626">${confirmWord} past session${affected !== 1 ? "s" : ""}</span> to trash (recoverable for 30 days).</p>
-          <p style="font-size:.8rem;margin:0 0 .6rem;color:#6b7280">Type <strong>${confirmWord}</strong> to confirm:</p>
+        overlay.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding-top:1.25rem;z-index:200;border-radius:.75rem;overflow-y:auto";
+        overlay.innerHTML = `<div style="background:#fff;padding:1.25rem;border-radius:.75rem;width:min(320px,92%);box-shadow:0 4px 24px rgba(0,0,0,.25);margin-bottom:1rem">
+          <p style="font-size:.88rem;margin:0 0 .6rem;color:#111;font-weight:700">⚠️ If you delete this activity, all data from the past <strong>${confirmWord} session${affected !== 1 ? "s" : ""}</strong> will be permanently lost.</p>
+          <p style="font-size:.84rem;margin:0 0 .5rem;color:#374151">We recommend selecting <strong>"Mark as Mastered"</strong> or <strong>"Mark as Discontinued"</strong> instead. Once marked, the activity will no longer appear in new sessions, but it will remain in your previous sessions and your existing data will be preserved.</p>
+          <p style="font-size:.84rem;margin:.5rem 0 .3rem;color:#374151;font-weight:600">To proceed without deleting, follow these steps:</p>
+          <ol style="font-size:.84rem;color:#374151;margin:.2rem 0 .8rem;padding-left:1.3rem;line-height:1.8">
+            <li>Tap <strong>Cancel</strong></li>
+            <li>Go to <strong>Edit Target</strong></li>
+            <li>Find the activity and tap the <strong>⋮</strong> button on the right</li>
+            <li>Select <strong>"Mark as Mastered"</strong> or <strong>"Mark as Discontinued"</strong></li>
+          </ol>
+          <p style="font-size:.84rem;margin:0 0 .5rem;color:#374151">Still want to delete? Type <strong>${confirmWord}</strong> to confirm.</p>
           <input id="del-type-input" type="text" autocomplete="off" inputmode="numeric"
-            style="width:100%;box-sizing:border-box;padding:.45rem .6rem;border:2px solid #d1d5db;border-radius:.4rem;font-size:1.1rem;text-align:center;outline:none;margin-bottom:.75rem" placeholder="${confirmWord}">
+            style="width:100%;box-sizing:border-box;padding:.45rem .6rem;border:2px solid #d1d5db;border-radius:.4rem;font-size:1.1rem;text-align:center;outline:none;margin-bottom:.6rem" placeholder="${confirmWord}">
           <div style="display:flex;gap:.5rem">
             <button id="del-type-cancel" style="flex:1;padding:.45rem;border:1px solid #d1d5db;border-radius:.4rem;background:#f9fafb;cursor:pointer;font-size:.85rem">Cancel</button>
             <button id="del-type-ok" disabled style="flex:1;padding:.45rem;border:none;border-radius:.4rem;background:#dc2626;color:#fff;cursor:pointer;font-size:.85rem;opacity:.4">Confirm Delete</button>
@@ -9436,6 +9458,51 @@ function renderTargetManageContent(student, target) {
       const starterInput  = body.querySelector(`.mn-act-starter-text[data-idx="${idx}"]`);
       const optsContainer = body.querySelector(`.mn-opts-container[data-idx="${idx}"]`);
       const type = sel.value;
+
+      // Block remark type changes if this activity has past session data
+      const _a = acts[idx];
+      if (_a?.name) {
+        const _oldVal = _a.fixedRemark !== undefined ? "fixed_remark"
+          : _a.manualScore ? "manual_score"
+          : _a.remarkHasNote ? "starter_fixed_note"
+          : (_a.sentenceStarter && _a.inlineOptions && _a.optionsMulti) ? "starter_fixed_multi"
+          : (_a.sentenceStarter && _a.inlineOptions) ? "starter_fixed"
+          : (_a.inlineOptions && _a.optionsMulti) ? "starter_fixed_multi"
+          : (_a.inlineOptions || _a.remarkPresetId) ? "starter_fixed" : "";
+        if (_oldVal !== type) {
+          const _allS = _groupForTargetEdit
+            ? await getAllSessionsForGroup(_groupForTargetEdit.id)
+            : await getAllSessionsForStudent(student.id);
+          const _hasData = _allS.some(s =>
+            Object.values(s.activities || {}).some(act => act.targetName === target.name && act.activityName === _a.name)
+          );
+          if (_hasData) {
+            sel.value = _oldVal;
+            $("manage-modal").querySelectorAll("[data-rmk-block]").forEach(el => el.remove());
+            const _ov = document.createElement("div");
+            _ov.dataset.rmkBlock = "1";
+            _ov.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding-top:1.25rem;z-index:200;border-radius:.75rem;overflow-y:auto";
+            _ov.innerHTML = `<div style="background:#fff;padding:1.25rem;border-radius:.75rem;width:min(320px,92%);box-shadow:0 4px 24px rgba(0,0,0,.25);margin-bottom:1rem">
+              <p style="font-size:.88rem;margin:0 0 .6rem;color:#111;font-weight:700">⚠️ You can't change the remark type from <em>${escHtml(presetLabel(_oldVal))}</em> to <em>${escHtml(presetLabel(type))}</em>, as this would affect your previous data.</p>
+              <p style="font-size:.84rem;margin:0 0 .5rem;color:#374151">To keep your existing data intact, we recommend discontinuing the current activity and re-adding it with the same name using your desired remark type. Follow the steps below:</p>
+              <ol style="font-size:.84rem;color:#374151;margin:.3rem 0 .9rem;padding-left:1.3rem;line-height:1.8">
+                <li>Go to <strong>Edit Target</strong></li>
+                <li>Find the activity and tap the <strong>⋮</strong> button on the right</li>
+                <li>Select <strong>Mark as Discontinued</strong></li>
+                <li>Scroll down and tap <strong>+ Add Activity</strong></li>
+                <li>Enter the same activity name and choose your new remark type</li>
+              </ol>
+              <button id="rmk-block-ok" style="width:100%;padding:.55rem;border:none;border-radius:.4rem;background:#374151;color:#fff;cursor:pointer;font-size:.88rem;font-weight:600">OK, got it</button>
+            </div>`;
+            const _ms = $("manage-modal").querySelector(".modal-sheet");
+            _ms.style.position = "relative";
+            _ms.appendChild(_ov);
+            _ov.querySelector("#rmk-block-ok").addEventListener("click", () => _ov.remove());
+            return;
+          }
+        }
+      }
+
       // Switching to Fixed Remark triggers a re-render to show the fixed remark textarea
       if (type === "fixed_remark") {
         if (acts[idx].fixedRemark === undefined) acts[idx].fixedRemark = "";
