@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "793";
+const APP_VERSION = "794";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4326,9 +4326,13 @@ async function autoFillStructuredRemarks(student, sessionId) {
       const paParent = pa.parentActivity || null;
       const paConfigId = pa.id || null;
       const allActs = Object.entries(data.activities || {});
-      // configId match is the most precise; fall back to parentActivity/name for legacy data
-      const existingAct = (paConfigId && allActs.find(([, a]) => a.configId === paConfigId && a.targetName === target.name))
-        || (paParent
+      // If the predefined activity has a configId, only match by configId — do NOT
+      // fall back to name matching. A same-named discontinued activity's records must
+      // not be mistaken for this new activity's records (they'd prevent the remark from
+      // being auto-created and cause the wrong remark-type UI to appear).
+      const existingAct = paConfigId
+        ? allActs.find(([, a]) => a.configId === paConfigId && a.targetName === target.name)
+        : (paParent
           ? allActs.find(([, a]) => a.targetName === target.name && a.activityName === pa.name && a.parentActivity === paParent)
           : allActs.find(([, a]) => a.targetName === target.name && a.activityName === pa.name && !a.parentActivity));
       let actId = existingAct?.[0] || null;
@@ -9031,7 +9035,11 @@ function renderTargetManageContent(student, target) {
       <button class="btn-adm-danger" id="btn-mn-del-target">Delete This Target</button>
     </div>`;
 
+  const _discOpen = $("mn-discontinued-section")?.style.display === "block";
+  const _mastOpen = $("mn-mastered-section")?.style.display === "block";
   $("manage-modal-body").innerHTML = html;
+  if (_discOpen) { const s = $("mn-discontinued-section"); if (s) { s.style.display = "block"; const a = s.previousElementSibling?.querySelector(".mn-toggle-arrow"); if (a) a.textContent = "▼"; } }
+  if (_mastOpen) { const s = $("mn-mastered-section"); if (s) { s.style.display = "block"; const a = s.previousElementSibling?.querySelector(".mn-toggle-arrow"); if (a) a.textContent = "▼"; } }
   $("manage-modal-body").querySelectorAll(".admin-list-item textarea").forEach(autoResizeTextarea);
 
   const saveTarget = async () => {
@@ -10240,7 +10248,11 @@ function renderTemplateManageContent(template) {
       <button class="btn-adm-danger" id="btn-mn-del-template">Delete Template</button>
     </div>`;
 
+  const _tDiscOpen = $("mn-discontinued-section")?.style.display === "block";
+  const _tMastOpen = $("mn-mastered-section")?.style.display === "block";
   $("manage-modal-body").innerHTML = html;
+  if (_tDiscOpen) { const s = $("mn-discontinued-section"); if (s) { s.style.display = "block"; const a = s.previousElementSibling?.querySelector(".mn-toggle-arrow"); if (a) a.textContent = "▼"; } }
+  if (_tMastOpen) { const s = $("mn-mastered-section"); if (s) { s.style.display = "block"; const a = s.previousElementSibling?.querySelector(".mn-toggle-arrow"); if (a) a.textContent = "▼"; } }
   $("manage-modal-body").querySelectorAll(".admin-list-item textarea").forEach(autoResizeTextarea);
 
   const saveTemplateFn = async () => {
