@@ -146,7 +146,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "781";
+const APP_VERSION = "782";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3279,6 +3279,11 @@ function renderFedcTarget(target) {
 
     const pendingKey = pa.name;
     const actData    = findActivityByName(target.name, pa.name, null, pa.id);
+    // Claim unlinked records in local state immediately so the next same-named predefined
+    // activity in the loop can't find and share the same Firestore record.
+    if (actData && pa.id && !actData.configId && state.sessionData?.activities?.[actData.id]) {
+      state.sessionData.activities[actData.id].configId = pa.id;
+    }
     const actId      = actData ? actData.id : null;
     const remarks    = actId ? getRemarksForActivity(actId) : [];
     const isPending  = state.pendingNewRemark?.pendingKey === pendingKey;
@@ -4435,7 +4440,15 @@ async function cleanupEmptyEntries(sessionId, data, targetName, target = null) {
 
 async function ensureFedcActivity(targetName, activityName, order, parentActivity = null, configId = null) {
   const existing = findActivityByName(targetName, activityName, parentActivity, configId);
-  if (existing) return existing.id;
+  if (existing) {
+    // Persist configId to Firestore for any unlinked record adopted by name so future
+    // lookups use exact matching and same-named activities stop sharing Firestore data.
+    if (configId && !existing.configId) {
+      if (state.sessionData?.activities?.[existing.id]) state.sessionData.activities[existing.id].configId = configId;
+      adoptOrphanActivity(state.currentSessionId, existing.id, existing.parentActivity || null, configId).catch(() => {});
+    }
+    return existing.id;
+  }
   return await addActivity(state.currentSessionId, targetName, activityName, order, true, undefined, parentActivity, configId);
 }
 
@@ -11141,8 +11154,11 @@ function buildGroupItemsByActivity(target, data, attendees) {
       continue;
     }
 
-    const actId = Object.entries(data.activities || {})
-      .find(([, a]) => a.targetName === target.name && a.activityName === pa.name)?.[0] || null;
+    const grpAllActs = Object.entries(data.activities || {});
+    const actId = (pa.id && grpAllActs.find(([, a]) => a.configId === pa.id && a.targetName === target.name)?.[0])
+      || grpAllActs.find(([, a]) => a.targetName === target.name && a.activityName === pa.name && !a.parentActivity && !a.configId)?.[0]
+      || null;
+    if (actId && pa.id && !data.activities[actId]?.configId) data.activities[actId].configId = pa.id;
     items.push(renderGroupActivityCard(pa.name, actId, target, data, attendees, pa.actNote, pa.isMapped ? pa : null, pa, true, null, pa.id));
   }
 
@@ -12431,6 +12447,15 @@ function findActivityByName(targetName, activityName, parentActivity = null, con
   if (configId) {
     const exact = entries.find(([, a]) => a.configId === configId && a.targetName === targetName);
     if (exact) return { id: exact[0], ...exact[1] };
+    // No exact match: only adopt an unlinked record (no configId yet).
+    // Records that already have a DIFFERENT configId belong to another config activity
+    // and must NOT be claimed — doing so would cause same-named activities to share data.
+    if (parentActivity) {
+      const adopt = entries.find(e => byName(e) && e[1].parentActivity === parentActivity && !e[1].configId);
+      return adopt ? { id: adopt[0], ...adopt[1] } : null;
+    }
+    const adopt = entries.find(e => byName(e) && !e[1].parentActivity && !e[1].configId);
+    return adopt ? { id: adopt[0], ...adopt[1] } : null;
   }
   if (parentActivity) {
     // Only match records that explicitly belong to this parent — no fallback to
