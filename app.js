@@ -146,7 +146,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "779";
+const APP_VERSION = "780";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3409,12 +3409,13 @@ function renderFedcTarget(target) {
       const fixedText = pa.fixedRemark !== undefined ? pa.fixedRemark : pa.isMaintain ? (pa.maintainRemark ?? "") : null;
       const actLabel = (pa.masteredOn || pa.inactiveReason === 'mastered') ? 'Mastered' : (pa.discontinuedOn || pa.inactiveReason === 'discontinued') ? 'Discontinued' : 'Activity';
       const actLabelStyle = (pa.masteredOn || pa.inactiveReason === 'mastered') ? ' style="color:#059669"' : (pa.discontinuedOn || pa.inactiveReason === 'discontinued') ? ' style="color:#dc2626"' : '';
-      const actDateLabel = pa.masteredOn ? `<span style="font-size:.75rem;color:#059669;margin-left:.5rem;font-weight:400">Mastered on ${fmtPeriodDate(pa.masteredOn)}</span>`
-        : pa.discontinuedOn ? `<span style="font-size:.75rem;color:#dc2626;margin-left:.5rem;font-weight:400">Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}</span>` : '';
-      return `<div class="entry-block entry-block-predefined" style="opacity:.3;pointer-events:none">
+      const actDateLabel = pa.masteredOn ? `<span style="font-size:.75rem;color:#059669;margin-left:auto;font-weight:400;white-space:nowrap">Mastered on ${fmtPeriodDate(pa.masteredOn)}</span>`
+        : pa.discontinuedOn ? `<span style="font-size:.75rem;color:#dc2626;margin-left:auto;font-weight:400;white-space:nowrap">Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}</span>` : '';
+      return `<div class="entry-block entry-block-predefined" style="opacity:.6;pointer-events:none">
         <div class="entry-field" contenteditable="false">
           <span class="field-label"${actLabelStyle}>${actLabel}</span>
-          <span class="field-value-fixed">${formatActivityMarkup(pa.name)}${actDateLabel}</span>
+          <span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span>
+          ${actDateLabel}
         </div>
         ${fixedText !== null ? `<div class="entry-field" contenteditable="false">
           <span class="field-label">Remark</span>
@@ -11166,9 +11167,9 @@ function buildGroupItemsByActivity(target, data, attendees) {
       if (!pa.name) return '';
       const grpActLabel = (pa.masteredOn || pa.inactiveReason === 'mastered') ? 'Mastered' : (pa.discontinuedOn || pa.inactiveReason === 'discontinued') ? 'Discontinued' : 'Activity';
       const grpActLabelStyle = (pa.masteredOn || pa.inactiveReason === 'mastered') ? ' style="color:#059669"' : (pa.discontinuedOn || pa.inactiveReason === 'discontinued') ? ' style="color:#dc2626"' : '';
-      const grpActDateLabel = pa.masteredOn ? `<span style="font-size:.75rem;color:#059669;margin-left:.5rem;font-weight:400">Mastered on ${fmtPeriodDate(pa.masteredOn)}</span>`
-        : pa.discontinuedOn ? `<span style="font-size:.75rem;color:#dc2626;margin-left:.5rem;font-weight:400">Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}</span>` : '';
-      return `<div class="entry-block entry-block-predefined" style="opacity:.3;pointer-events:none"><div class="entry-field" contenteditable="false"><span class="field-label"${grpActLabelStyle}>${grpActLabel}</span><span class="field-value-fixed">${formatActivityMarkup(pa.name)}${grpActDateLabel}</span></div></div>`;
+      const grpActDateLabel = pa.masteredOn ? `<span style="font-size:.75rem;color:#059669;margin-left:auto;font-weight:400;white-space:nowrap">Mastered on ${fmtPeriodDate(pa.masteredOn)}</span>`
+        : pa.discontinuedOn ? `<span style="font-size:.75rem;color:#dc2626;margin-left:auto;font-weight:400;white-space:nowrap">Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}</span>` : '';
+      return `<div class="entry-block entry-block-predefined" style="opacity:.6;pointer-events:none"><div class="entry-field" contenteditable="false"><span class="field-label"${grpActLabelStyle}>${grpActLabel}</span><span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span>${grpActDateLabel}</div></div>`;
     };
     const grpReal = grpInactivePas.filter(pa => !pa.isNote && !pa.isExportNote && !pa.isHeading && !pa.isMaintainHeading);
     const grpMastered     = grpReal.filter(pa => pa.masteredOn || pa.inactiveReason === 'mastered');
