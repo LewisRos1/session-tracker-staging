@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "786";
+const APP_VERSION = "787";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4778,6 +4778,13 @@ function buildTargetViewTable(target, data) {
     let no = 0;
     const subActLetterIdx = {};
     const matchedIds = new Set();
+    const remCountByAct = {};
+    for (const rem of Object.values(data.remarks || {})) {
+      remCountByAct[rem.activityId] = (remCountByAct[rem.activityId] || 0) + 1;
+    }
+    const sortByData = arr => arr.slice().sort(([idA], [idB]) =>
+      ((remCountByAct[idB] || 0) - (remCountByAct[idA] || 0)) || idA.localeCompare(idB)
+    );
     const parentActNames = new Set(
       (target.predefinedActivities || []).filter(p => p.parentActivity).map(p => p.parentActivity)
     );
@@ -4845,11 +4852,11 @@ function buildTargetViewTable(target, data) {
               !p.parentActivity && !p.isHeading && !p.isNote && !p.isExportNote && p.name === pa.name
             );
             if (!hasTopLevelConfig) {
-              entry = candidateEntries.find(([, a]) => !a.parentActivity) || null;
+              entry = sortByData(candidateEntries.filter(([, a]) => !a.parentActivity))[0] || null;
             }
           }
         } else {
-          entry = candidateEntries.find(([, a]) => !a.parentActivity) || null;
+          entry = sortByData(candidateEntries.filter(([, a]) => !a.parentActivity))[0] || null;
         }
       }
       if (entry) matchedIds.add(entry[0]);
@@ -6226,6 +6233,13 @@ function buildGroupTargetViewTable(target, data, attendees) {
   if (target.predefinedActivities?.length > 0) {
     let no = 0;
     const matchedIds = new Set();
+    const remCountByAct2 = {};
+    for (const rem of Object.values(data.remarks || {})) {
+      remCountByAct2[rem.activityId] = (remCountByAct2[rem.activityId] || 0) + 1;
+    }
+    const sortByData2 = arr => arr.slice().sort(([idA], [idB]) =>
+      ((remCountByAct2[idB] || 0) - (remCountByAct2[idA] || 0)) || idA.localeCompare(idB)
+    );
     const parentActNamesGrp = new Set(
       (target.predefinedActivities || []).filter(p => p.parentActivity).map(p => p.parentActivity)
     );
@@ -6284,11 +6298,11 @@ function buildGroupTargetViewTable(target, data, attendees) {
               !p.parentActivity && !p.isHeading && !p.isNote && !p.isExportNote && p.name === pa.name
             );
             if (!hasTopLevelConfig2) {
-              entry2 = candidateEntries2.find(([, a]) => !a.parentActivity) || null;
+              entry2 = sortByData2(candidateEntries2.filter(([, a]) => !a.parentActivity))[0] || null;
             }
           }
         } else {
-          entry2 = candidateEntries2.find(([, a]) => !a.parentActivity) || null;
+          entry2 = sortByData2(candidateEntries2.filter(([, a]) => !a.parentActivity))[0] || null;
         }
       }
       if (entry2) matchedIds.add(entry2[0]);
