@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "794";
+const APP_VERSION = "795";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4793,7 +4793,7 @@ function buildTargetViewTable(target, data) {
       (target.predefinedActivities || []).filter(p => p.parentActivity).map(p => p.parentActivity)
     );
     for (const pa of target.predefinedActivities) {
-      if (!isActivityActive(pa, data.date)) continue;
+      if (!isActivityActiveForView(pa, data.date)) continue;
       if (pa.isHeading || pa.isMaintainHeading) {
         const isGray = pa.headingColor === "gray" || pa.isMaintainHeading;
         const isGreen = pa.headingColor === "green";
@@ -4876,6 +4876,9 @@ function buildTargetViewTable(target, data) {
         ).catch(() => {});
       }
       if (entry) matchedIds.add(entry[0]);
+      if (pa.discontinuedOn) {
+        rows += `<tr><td colspan="6" contenteditable="false" style="font-size:.75rem;color:#dc2626;padding:.15rem .75rem .05rem;font-weight:500;background:#fff">🚩 Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}</td></tr>`;
+      }
       rows += viewActivityRows(displayNo, pa.name, entry?.[0] || null, data, target, true, pa);
     }
     // Silently delete unmatched records that have no meaningful data — these
@@ -6281,7 +6284,7 @@ function buildGroupTargetViewTable(target, data, attendees) {
       (target.predefinedActivities || []).filter(p => p.parentActivity).map(p => p.parentActivity)
     );
     for (const pa of target.predefinedActivities) {
-      if (!isActivityActive(pa, data.date)) continue;
+      if (!isActivityActiveForView(pa, data.date)) continue;
       if (pa.isHeading || pa.isMaintainHeading) {
         const isGray = pa.headingColor === "gray" || pa.isMaintainHeading;
         const isGreenHdg = pa.headingColor === "green";
@@ -6355,6 +6358,9 @@ function buildGroupTargetViewTable(target, data, attendees) {
         ).catch(() => {});
       }
       if (entry2) matchedIds.add(entry2[0]);
+      if (pa.discontinuedOn) {
+        rows += `<tr><td colspan="7" contenteditable="false" style="font-size:.75rem;color:#dc2626;padding:.15rem .75rem .05rem;font-weight:500;background:#fff">🚩 Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}</td></tr>`;
+      }
       rows += viewGroupActivityRows(no, pa.name, entry2?.[0] || null, data, target, attendees, true, pa);
     }
     // Silently delete unmatched records with no meaningful data (empty ghosts).
@@ -7533,6 +7539,17 @@ function isActivityActive(pa, dateStr) {
   if (!dateStr) return true;
   if (pa.masteredOn    && dateStr >= pa.masteredOn)    return false;
   if (pa.discontinuedOn && dateStr >= pa.discontinuedOn) return false;
+  if (pa.activeFrom && dateStr < pa.activeFrom) return false;
+  if (pa.activeTo   && dateStr > pa.activeTo)   return false;
+  return true;
+}
+// View/Edit uses > (strict) instead of >= so sessions on the exact
+// discontinuation/mastery date still show — the user may have entered data
+// that day before deciding to discontinue the activity.
+function isActivityActiveForView(pa, dateStr) {
+  if (!dateStr) return true;
+  if (pa.masteredOn    && dateStr > pa.masteredOn)    return false;
+  if (pa.discontinuedOn && dateStr > pa.discontinuedOn) return false;
   if (pa.activeFrom && dateStr < pa.activeFrom) return false;
   if (pa.activeTo   && dateStr > pa.activeTo)   return false;
   return true;
