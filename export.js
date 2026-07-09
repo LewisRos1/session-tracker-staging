@@ -151,6 +151,8 @@ const STYLE_ACT_HEADING = {
 };
 function isActivityActive(pa, dateStr) {
   if (!dateStr) return true;
+  if (pa.masteredOn     && dateStr >= pa.masteredOn)     return false;
+  if (pa.discontinuedOn && dateStr >= pa.discontinuedOn) return false;
   if (pa.activeFrom && dateStr < pa.activeFrom) return false;
   if (pa.activeTo   && dateStr > pa.activeTo)   return false;
   return true;
