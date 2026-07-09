@@ -1096,16 +1096,19 @@ input.field-input::placeholder {
 }
 
 .btn-remark-opt {
-  padding: .55rem 1.1rem;
+  padding: .4rem .75rem;
   border: 1.5px solid var(--border);
   border-radius: 20px;
   background: var(--surface);
   color: var(--text);
-  font-size: 1rem;
+  font-size: .88rem;
   cursor: pointer;
   transition: background .12s, border-color .12s, color .12s;
-  min-height: 42px;
-  font-weight: 500;
+  min-height: 36px;
+}
+
+.btn-remark-opt--multi {
+  border-radius: .4rem;
 }
 
 .btn-remark-opt:hover { border-color: var(--primary); color: var(--primary); }
@@ -1150,6 +1153,9 @@ input.field-input::placeholder {
   color: var(--white);
   font-weight: 600;
 }
+
+.btn-remark-opt--multi,
+.view-remark-multi-btn--rect { border-radius: .4rem; }
 
 /* ─── GENERIC BUTTONS ────────────────────────────────────── */
 .btn-primary-sm {

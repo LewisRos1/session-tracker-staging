@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "803";
+const APP_VERSION = "804";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3832,7 +3832,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
     if (multiSelect) {
       const sel = (remText || "").split(", ").map(s => s.trim()).filter(Boolean);
       return `<div class="remark-preset-opts remark-preset-opts-multi" contenteditable="false">${opts.map(opt =>
-        `<button class="btn-remark-opt${sel.includes(opt) ? " active" : ""}"
+        `<button class="btn-remark-opt btn-remark-opt--multi${sel.includes(opt) ? " active" : ""}"
           data-rem-id="${remId}" data-opt="${escHtml(opt)}">${escHtml(opt)}</button>`
       ).join("")}${removedBadge}</div>`;
     }
@@ -5121,7 +5121,7 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
     if (multiSelect) {
       const sel = (remText || "").split(", ").map(s => s.trim()).filter(Boolean);
       return `<div class="view-remark-multi-opts" contenteditable="false">${opts.map(opt =>
-        `<button class="view-remark-multi-btn${sel.includes(opt) ? " active" : ""}"
+        `<button class="view-remark-multi-btn view-remark-multi-btn--rect${sel.includes(opt) ? " active" : ""}"
           data-rem-id="${escHtml(remId)}" data-opt="${escHtml(opt)}">${escHtml(opt)}</button>`
       ).join("")}${removedBadge}</div>`;
     }
@@ -11955,7 +11955,7 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
     if (multiSelect) {
       const sel = (remText || "").split(", ").map(s => s.trim()).filter(Boolean);
       return `<div class="remark-preset-opts remark-preset-opts-multi" contenteditable="false">${opts.map(opt =>
-        `<button class="btn-remark-opt${sel.includes(opt) ? " active" : ""}"
+        `<button class="btn-remark-opt btn-remark-opt--multi${sel.includes(opt) ? " active" : ""}"
           data-rem-id="${remId}" data-opt="${escHtml(opt)}">${escHtml(opt)}</button>`
       ).join("")}${removedBadge}</div>`;
     }
