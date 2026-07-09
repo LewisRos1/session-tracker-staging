@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "802";
+const APP_VERSION = "803";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -10081,9 +10081,9 @@ function renderTargetManageContent(student, target) {
     inp.style.borderColor = "#f59e0b";
     const row = inp.closest(".mn-opt-row");
     const msg = document.createElement("span");
-    msg.style.cssText = "font-size:.72rem;color:#f59e0b;white-space:nowrap;flex-shrink:0";
+    msg.style.cssText = "font-size:.88rem;color:#f59e0b;white-space:nowrap;flex-shrink:0;font-weight:700";
     msg.textContent = "Can't rename — use + Add Option or Remove";
-    row.appendChild(msg);
+    row.insertBefore(msg, inp);
     setTimeout(() => { inp.style.borderColor = ""; msg.remove(); delete inp.dataset.msgActive; }, 2500);
   };
 
@@ -10143,12 +10143,12 @@ function renderTargetManageContent(student, target) {
           nameInput.style.background = "#fff5f5";
           if (countdown) countdown.remove();
           const errMsg = document.createElement("span");
-          errMsg.style.cssText = "font-size:.72rem;color:#dc2626;white-space:nowrap;flex-shrink:0";
+          errMsg.style.cssText = "font-size:.88rem;color:#dc2626;white-space:nowrap;flex-shrink:0;font-weight:700";
           errMsg.textContent = existingArchived.includes(newName)
             ? `"${newName}" was removed — use Unremove`
             : `"${newName}" already exists`;
-          row.appendChild(errMsg);
-          setTimeout(() => { list.removeChild(row); renumberOpts(list); }, 2200);
+          row.insertBefore(errMsg, nameInput);
+          setTimeout(() => { list.removeChild(row); renumberOpts(list); }, 10000);
           return;
         }
         nameInput.readOnly = true;
@@ -10986,10 +10986,10 @@ function renderTemplateManageContent(template) {
           nameInput.style.background = "#fff5f5";
           if (countdown) countdown.remove();
           const errMsg = document.createElement("span");
-          errMsg.style.cssText = "font-size:.72rem;color:#dc2626;white-space:nowrap;flex-shrink:0";
+          errMsg.style.cssText = "font-size:.88rem;color:#dc2626;white-space:nowrap;flex-shrink:0;font-weight:700";
           errMsg.textContent = `"${newName}" already exists`;
-          row.appendChild(errMsg);
-          setTimeout(() => { list.removeChild(row); renumberTmplOpts(list); }, 2200);
+          row.insertBefore(errMsg, nameInput);
+          setTimeout(() => { list.removeChild(row); renumberTmplOpts(list); }, 10000);
           return;
         }
         nameInput.readOnly = true;
