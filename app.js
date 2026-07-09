@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "824";
+const APP_VERSION = "825";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3819,7 +3819,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
           <div class="trials-badges">${badgesHtml}</div>
           <button class="btn-add-trial btn-primary-sm"
             data-rem-id="${rem.id}"
-            data-target="${escHtml(target.name)}">+ Trial</button>
+            data-target="${escHtml(target.name)}" onmousedown="event.preventDefault()">+ Trial</button>
         </div>
       </div>`;
 
@@ -3937,7 +3937,7 @@ function renderPredefinedRemarkFields(rem, predRemName, target) {
         <div class="trials-badges">${badgesHtml}</div>
         <button class="btn-add-trial btn-primary-sm"
           data-rem-id="${rem.id}"
-          data-target="${escHtml(target.name)}">+ Trial</button>
+          data-target="${escHtml(target.name)}" onmousedown="event.preventDefault()">+ Trial</button>
       </div>
     </div>`;
 }
@@ -5477,6 +5477,10 @@ function setupViewRemarkSaving(body, getSessionId, counterKey, onIdle, getData) 
         } finally {
           el.dataset.creating = "false";
           state[counterKey]--;
+          // viewActionsInFlight just hit 0; if the Firestore snapshot that
+          // resolved waitForSessionData came in while the counter was still >0
+          // it set viewRenderPending=true but couldn't render — process it now.
+          onIdle?.();
         }
       };
       trackWrite(create());
@@ -11858,7 +11862,7 @@ function renderGroupStudentRowCompact(remId, rem, target, mappedInfo = null) {
         <div class="trials-row">
           <div class="trials-badges">${badges}</div>
           <button class="btn-primary-sm btn-add-trial btn-group-add-trial"
-            data-rem-id="${remId}" data-target="${escHtml(target.name)}">+ Trial</button>
+            data-rem-id="${remId}" data-target="${escHtml(target.name)}" onmousedown="event.preventDefault()">+ Trial</button>
         </div>
       </div>`;
   return `
@@ -12049,7 +12053,7 @@ function renderGroupStudentTrialsOnlyRow(studentName, remId, rem, target) {
       <div class="trials-row">
         <div class="trials-badges">${badges}</div>
         <button class="btn-primary-sm btn-add-trial btn-group-add-trial"
-          data-rem-id="${remId}" data-target="${escHtml(target.name)}">+ Trial</button>
+          data-rem-id="${remId}" data-target="${escHtml(target.name)}" onmousedown="event.preventDefault()">+ Trial</button>
       </div>
     </div>
   </div>`;
@@ -12078,7 +12082,7 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
         <div class="trials-row">
           <div class="trials-badges">${badges}</div>
           <button class="btn-primary-sm btn-add-trial btn-group-add-trial"
-            data-rem-id="${remId}" data-target="${escHtml(target.name)}">+ Trial</button>
+            data-rem-id="${remId}" data-target="${escHtml(target.name)}" onmousedown="event.preventDefault()">+ Trial</button>
         </div>
       </div>`;
 
