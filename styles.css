@@ -1096,15 +1096,16 @@ input.field-input::placeholder {
 }
 
 .btn-remark-opt {
-  padding: .4rem .75rem;
+  padding: .55rem 1.1rem;
   border: 1.5px solid var(--border);
   border-radius: 20px;
   background: var(--surface);
   color: var(--text);
-  font-size: .88rem;
+  font-size: 1rem;
   cursor: pointer;
   transition: background .12s, border-color .12s, color .12s;
-  min-height: 36px;
+  min-height: 42px;
+  font-weight: 500;
 }
 
 .btn-remark-opt:hover { border-color: var(--primary); color: var(--primary); }
