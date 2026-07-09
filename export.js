@@ -1850,7 +1850,7 @@ function getAllActivitiesForTarget(session, target) {
     const _exportStatusPrefix = pa.discontinuedOn ? '(Discontinued) '
       : pa.masteredOn ? '(Mastered) '
       : '';
-    const numberedName = `${_exportStatusPrefix}${exportActNum}) ${pa.name}`;
+    const numberedName = `${exportActNum}) ${_exportStatusPrefix}${pa.name}`;
 
     // Parent activity (noRemark) — numbered title, empty remark
     if (pa.noRemark) {
