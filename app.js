@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "825";
+const APP_VERSION = "826";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -794,6 +794,29 @@ let _ranOneOffRepairs = false;
 function runOneOffRepairs() {
   if (_ranOneOffRepairs) return;
   _ranOneOffRepairs = true;
+
+  // One-time migration: set masteredOn = "2026-06-30" for all old-style mastered
+  // activities (inactiveReason === 'mastered') that have no masteredOn date yet.
+  // Idempotent — skips any activity that already has masteredOn.
+  (async () => {
+    const MASTERED_DEFAULT = "2026-06-30";
+    const applyMigration = async (entities, saveFn) => {
+      for (const entity of entities) {
+        let changed = false;
+        for (const target of (entity.targets || [])) {
+          for (const pa of (target.predefinedActivities || [])) {
+            if (pa.inactiveReason === 'mastered' && !pa.masteredOn) {
+              pa.masteredOn = MASTERED_DEFAULT;
+              changed = true;
+            }
+          }
+        }
+        if (changed) await saveFn(entity);
+      }
+    };
+    await applyMigration(state.students, s => saveStudent(s));
+    await applyMigration(state.groups,   g => saveGroup(g));
+  })().catch(err => console.error("runOneOffRepairs (masteredOn migration) failed:", err));
 
   // Caden Tan's "FEDC 1" target had an activity renamed without the rename
   // propagating to historical sessions, leaving real recorded data stuck
@@ -3205,7 +3228,7 @@ function renderFedcTarget(target) {
     if (isFixed) {
       const fixedText = pa.fixedRemark ?? pa.maintainRemark ?? "";
       const isGrayFixed  = pa.isMaintain || pa.activityColor === "gray";
-      const isGreenFixed = pa.activityColor === "green" || pa.inactiveReason === 'mastered';
+      const isGreenFixed = pa.activityColor === "green";
       const fixedStyle   = isGreenFixed
         ? 'style="background:#e2efda;border:1px solid #a9d18e;border-left:4px solid #70ad47"'
         : isGrayFixed
@@ -3236,7 +3259,7 @@ function renderFedcTarget(target) {
     const children = subActsByParent.get(pa.name) || [];
     if (children.length > 0) {
       const isGrayP  = pa.activityColor === "gray" || pa.isMaintainLive;
-      const isGreenP = pa.activityColor === "green" || pa.inactiveReason === 'mastered';
+      const isGreenP = pa.activityColor === "green";
       const pBorder  = isGreenP ? 'border:1px solid #a9d18e;border-left:4px solid #70ad47;background:#e2efda;'
                      : isGrayP  ? 'border:1px solid #e5e7eb;border-left:4px solid #d1d5db;background:#f3f4f6;'
                      : 'border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);';
@@ -3320,7 +3343,7 @@ function renderFedcTarget(target) {
     const mappedInfo = pa.isMapped ? resolveMappedScoreDisplay(pa) : null;
 
     const isGrayActivity  = pa.activityColor === "gray" || pa.isMaintainLive;
-    const isGreenActivity = pa.activityColor === "green" || pa.inactiveReason === 'mastered';
+    const isGreenActivity = pa.activityColor === "green";
     const activityStyle = isGrayActivity  ? ' style="background:#f3f4f6;border:1px solid #e5e7eb;border-left:4px solid #d1d5db"'
                         : isGreenActivity ? ' style="background:#e2efda;border:1px solid #a9d18e;border-left:4px solid #70ad47"'
                         : '';
@@ -3455,7 +3478,8 @@ function renderFedcTarget(target) {
       const fixedText = pa.fixedRemark !== undefined ? pa.fixedRemark : pa.isMaintain ? (pa.maintainRemark ?? "") : null;
       const actLabel = (pa.masteredOn || pa.inactiveReason === 'mastered') ? 'Mastered' : (pa.discontinuedOn || pa.inactiveReason === 'discontinued') ? 'Discontinued' : 'Activity';
       const actLabelStyle = (pa.masteredOn || pa.inactiveReason === 'mastered') ? ' style="color:#059669"' : (pa.discontinuedOn || pa.inactiveReason === 'discontinued') ? ' style="color:#dc2626"' : '';
-      const actDateLabel = pa.masteredOn ? `<span style="font-size:.75rem;color:#059669;margin-left:auto;font-weight:400;white-space:nowrap">Mastered on ${fmtPeriodDate(pa.masteredOn)}</span>`
+      const _masteredDate = pa.masteredOn || (pa.inactiveReason === 'mastered' ? "2026-06-30" : null);
+      const actDateLabel = _masteredDate ? `<span style="font-size:.75rem;color:#059669;margin-left:auto;font-weight:400;white-space:nowrap">Mastered on ${fmtPeriodDate(_masteredDate)}</span>`
         : pa.discontinuedOn ? `<span style="font-size:.75rem;color:#dc2626;margin-left:auto;font-weight:400;white-space:nowrap">Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}</span>` : '';
       const subActs = allPas.filter(p => p.parentActivity === pa.name && !p.isCompleted && !p.isArchived && !p.isStopped && !p.masteredOn && !p.discontinuedOn);
       const subHtml = subActs.length ? `<div style="display:flex;flex-direction:column;gap:.1rem;padding:.2rem 0 .1rem 1.25rem">
@@ -4845,10 +4869,11 @@ function buildTargetViewTable(target, data) {
         Object.entries(data.activities || {})
           .filter(([, a]) => a.targetName === target.name && a.activityName === pa.name)
           .forEach(([id]) => matchedIds.add(id));
+        const _paMastered = pa.masteredOn || (pa.inactiveReason === 'mastered' ? "2026-06-30" : null);
         const paBadge = pa.discontinuedOn
           ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap">(🚩 ${fmtPeriodDate(pa.discontinuedOn)})</span> `
-          : pa.masteredOn
-          ? `<span style="font-size:.72rem;color:#059669;font-weight:600;white-space:nowrap">(⭐ ${fmtPeriodDate(pa.masteredOn)})</span> `
+          : _paMastered
+          ? `<span style="font-size:.72rem;color:#059669;font-weight:600;white-space:nowrap">(⭐ ${fmtPeriodDate(_paMastered)})</span> `
           : '';
         rows += `<tr style="background:#f3f4f6">
           <td class="vcol-no" contenteditable="false" style="color:#6b7280">${displayNo}</td>
@@ -4863,7 +4888,7 @@ function buildTargetViewTable(target, data) {
         fixedEntries.forEach(([id]) => matchedIds.add(id));
         const fixedText = pa.fixedRemark ?? pa.maintainRemark ?? "";
         const isGrayFixed = pa.activityColor === "gray" || !!pa.isMaintainLive;
-        const isGreenFixed = pa.activityColor === "green" || pa.inactiveReason === 'mastered';
+        const isGreenFixed = pa.activityColor === "green";
         rows += `<tr${isGrayFixed ? ' class="view-gray-row"' : isGreenFixed ? ' class="view-green-row"' : ' style="background:#f9fafb"'}>
           <td class="vcol-no" contenteditable="false">${displayNo}</td>
           <td class="vcol-act" contenteditable="false">${formatActivityMarkup(pa.name)}</td>
@@ -5003,7 +5028,10 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
     ? (target.predefinedActivities || []).find(p => !p.parentActivity && p.name === paEntry.parentActivity)
     : null;
   const _discontinuedOn = paEntry?.discontinuedOn || parentEntry?.discontinuedOn || null;
-  const _masteredOn     = paEntry?.masteredOn     || parentEntry?.masteredOn     || null;
+  const _masteredOn     = paEntry?.masteredOn     || parentEntry?.masteredOn
+    || (paEntry?.inactiveReason === 'mastered' ? "2026-06-30" : null)
+    || (parentEntry?.inactiveReason === 'mastered' ? "2026-06-30" : null)
+    || null;
   const statusBadge = _discontinuedOn
     ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap">(🚩 ${fmtPeriodDate(_discontinuedOn)})</span> `
     : _masteredOn
@@ -5025,7 +5053,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
   const remarkHasNote   = paEntry?.remarkHasNote || false;
   const mappedInfo      = paEntry?.isMapped ? resolveViewMappedScoreDisplay(paEntry, data) : null;
   const isGrayAct       = isPredefined && (paEntry?.activityColor === "gray" || paEntry?.isMaintainLive);
-  const isGreenAct      = isPredefined && (paEntry?.activityColor === "green" || paEntry?.inactiveReason === 'mastered');
+  const isGreenAct      = isPredefined && paEntry?.activityColor === "green";
   const rowClass        = isGrayAct ? "view-gray-row" : isGreenAct ? "view-green-row" : "";
 
   if (remarks.length === 0) {
@@ -6354,10 +6382,11 @@ function buildGroupTargetViewTable(target, data, attendees) {
         Object.entries(data.activities || {})
           .filter(([, a]) => a.targetName === target.name && a.activityName === pa.name)
           .forEach(([id]) => matchedIds.add(id));
+        const _paGrpMastered = pa.masteredOn || (pa.inactiveReason === 'mastered' ? "2026-06-30" : null);
         const paBadgeGrp = pa.discontinuedOn
           ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap">(🚩 ${fmtPeriodDate(pa.discontinuedOn)})</span> `
-          : pa.masteredOn
-          ? `<span style="font-size:.72rem;color:#059669;font-weight:600;white-space:nowrap">(⭐ ${fmtPeriodDate(pa.masteredOn)})</span> `
+          : _paGrpMastered
+          ? `<span style="font-size:.72rem;color:#059669;font-weight:600;white-space:nowrap">(⭐ ${fmtPeriodDate(_paGrpMastered)})</span> `
           : '';
         rows += `<tr style="background:#f3f4f6">
           <td class="vcol-no" contenteditable="false" style="color:#6b7280">${no}</td>
@@ -6371,7 +6400,7 @@ function buildGroupTargetViewTable(target, data, attendees) {
         fixedEntries2.forEach(([id]) => matchedIds.add(id));
         const fixedText = pa.fixedRemark ?? pa.maintainRemark ?? "";
         const isGrayFixed = pa.activityColor === "gray" || !!pa.isMaintainLive;
-        const isGreenFixed2 = pa.activityColor === "green" || pa.inactiveReason === 'mastered';
+        const isGreenFixed2 = pa.activityColor === "green";
         no++;
         rows += `<tr${isGrayFixed ? ' class="view-gray-row"' : isGreenFixed2 ? ' class="view-green-row"' : ' style="background:#f9fafb"'}>
           <td class="vcol-no" contenteditable="false">${no}</td>
@@ -6520,7 +6549,10 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
     ? (target.predefinedActivities || []).find(p => !p.parentActivity && p.name === paEntry.parentActivity)
     : null;
   const _discontinuedOn = paEntry?.discontinuedOn || parentEntry?.discontinuedOn || null;
-  const _masteredOn     = paEntry?.masteredOn     || parentEntry?.masteredOn     || null;
+  const _masteredOn     = paEntry?.masteredOn     || parentEntry?.masteredOn
+    || (paEntry?.inactiveReason === 'mastered' ? "2026-06-30" : null)
+    || (parentEntry?.inactiveReason === 'mastered' ? "2026-06-30" : null)
+    || null;
   const statusBadge = _discontinuedOn
     ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap">(🚩 ${fmtPeriodDate(_discontinuedOn)})</span> `
     : _masteredOn
@@ -6592,7 +6624,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
   const remarkHasNote   = paEntry?.remarkHasNote || false;
   const opts            = parseOpts(inlineOptions);
   const isGrayAct       = isPredefined && (paEntry?.activityColor === "gray" || paEntry?.isMaintainLive);
-  const isGreenAct      = isPredefined && (paEntry?.activityColor === "green" || paEntry?.inactiveReason === 'mastered');
+  const isGreenAct      = isPredefined && paEntry?.activityColor === "green";
   const rowClass        = isGrayAct ? "view-gray-row" : isGreenAct ? "view-green-row" : "";
 
   if (rounds.length === 0) {
@@ -11726,7 +11758,8 @@ function buildGroupItemsByActivity(target, data, attendees) {
       if (!pa.name) return '';
       const grpActLabel = (pa.masteredOn || pa.inactiveReason === 'mastered') ? 'Mastered' : (pa.discontinuedOn || pa.inactiveReason === 'discontinued') ? 'Discontinued' : 'Activity';
       const grpActLabelStyle = (pa.masteredOn || pa.inactiveReason === 'mastered') ? ' style="color:#059669"' : (pa.discontinuedOn || pa.inactiveReason === 'discontinued') ? ' style="color:#dc2626"' : '';
-      const grpActDateLabel = pa.masteredOn ? `<span style="font-size:.75rem;color:#059669;margin-left:auto;font-weight:400;white-space:nowrap">Mastered on ${fmtPeriodDate(pa.masteredOn)}</span>`
+      const _grpMasteredDate = pa.masteredOn || (pa.inactiveReason === 'mastered' ? "2026-06-30" : null);
+      const grpActDateLabel = _grpMasteredDate ? `<span style="font-size:.75rem;color:#059669;margin-left:auto;font-weight:400;white-space:nowrap">Mastered on ${fmtPeriodDate(_grpMasteredDate)}</span>`
         : pa.discontinuedOn ? `<span style="font-size:.75rem;color:#dc2626;margin-left:auto;font-weight:400;white-space:nowrap">Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}</span>` : '';
       const grpSubActs = (target.predefinedActivities || []).filter(p => p.parentActivity === pa.name && !p.isCompleted && !p.isArchived && !p.isStopped && !p.masteredOn && !p.discontinuedOn);
       const grpSubHtml = grpSubActs.length ? `<div style="display:flex;flex-direction:column;gap:.1rem;padding:.2rem 0 .1rem 1.25rem">
