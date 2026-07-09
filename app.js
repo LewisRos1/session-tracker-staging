@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "813";
+const APP_VERSION = "814";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -9068,12 +9068,20 @@ function renderTargetManageContent(student, target) {
       <div id="mn-mastered-section" style="display:none">`;
     masteredActs.forEach((a, ci) => {
       const dateLabel = a.masteredOn ? `Mastered on ${fmtPeriodDate(a.masteredOn)}` : 'Mastered';
-      html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:.35rem">
+      const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
+      html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
         <span style="flex:1;font-size:.875rem;color:#374151">${escHtml(a.name || "")}</span>
         <span style="font-size:.72rem;color:#059669;white-space:nowrap">${dateLabel}</span>
         <button class="btn-mn-undo-mastered" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Undo</button>
         <button class="btn-adm-del btn-mn-del-mastered" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
       </div>`;
+      subActs.forEach((sub, si) => {
+        html += `<div style="display:flex;align-items:center;gap:.4rem;padding:.25rem .5rem .25rem 1.25rem;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem">
+          <span style="font-size:.75rem;color:#059669;flex-shrink:0">${String.fromCharCode(97 + si)})</span>
+          <span style="flex:1;font-size:.8rem;color:#374151">${escHtml(sub.name || "")}</span>
+        </div>`;
+      });
+      if (subActs.length) html += `<div style="margin-bottom:.35rem"></div>`;
     });
     html += `</div></div>`;
   }
@@ -9087,12 +9095,20 @@ function renderTargetManageContent(student, target) {
       <div id="mn-discontinued-section" style="display:none">`;
     discontinuedActs.forEach((a, ci) => {
       const dateLabel = a.discontinuedOn ? `Discontinued on ${fmtPeriodDate(a.discontinuedOn)}` : 'Discontinued';
-      html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:.35rem">
+      const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
+      html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
         <span style="flex:1;font-size:.875rem;color:#374151">${escHtml(a.name || "")}</span>
         <span style="font-size:.72rem;color:#6b7280;white-space:nowrap">${dateLabel}</span>
         <button class="btn-mn-undo-discontinued" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Undo</button>
         <button class="btn-adm-del btn-mn-del-discontinued" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
       </div>`;
+      subActs.forEach((sub, si) => {
+        html += `<div style="display:flex;align-items:center;gap:.4rem;padding:.25rem .5rem .25rem 1.25rem;background:#f9fafb;border:1px solid #f3f4f6;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem">
+          <span style="font-size:.75rem;color:#9ca3af;flex-shrink:0">${String.fromCharCode(97 + si)})</span>
+          <span style="flex:1;font-size:.8rem;color:#6b7280">${escHtml(sub.name || "")}</span>
+        </div>`;
+      });
+      if (subActs.length) html += `<div style="margin-bottom:.35rem"></div>`;
     });
     html += `</div></div>`;
   }
@@ -10401,12 +10417,20 @@ function renderTemplateManageContent(template) {
       <div id="mn-mastered-section" style="display:none">`;
     masteredActs.forEach((a, ci) => {
       const dateLabel = a.masteredOn ? `Mastered on ${fmtPeriodDate(a.masteredOn)}` : 'Mastered';
-      html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:.35rem">
+      const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
+      html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
         <span style="flex:1;font-size:.875rem;color:#374151">${escHtml(a.name || "")}</span>
         <span style="font-size:.72rem;color:#059669;white-space:nowrap">${dateLabel}</span>
         <button class="btn-mn-undo-mastered" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Undo</button>
         <button class="btn-adm-del btn-mn-del-mastered" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
       </div>`;
+      subActs.forEach((sub, si) => {
+        html += `<div style="display:flex;align-items:center;gap:.4rem;padding:.25rem .5rem .25rem 1.25rem;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem">
+          <span style="font-size:.75rem;color:#059669;flex-shrink:0">${String.fromCharCode(97 + si)})</span>
+          <span style="flex:1;font-size:.8rem;color:#374151">${escHtml(sub.name || "")}</span>
+        </div>`;
+      });
+      if (subActs.length) html += `<div style="margin-bottom:.35rem"></div>`;
     });
     html += `</div></div>`;
   }
@@ -10420,12 +10444,20 @@ function renderTemplateManageContent(template) {
       <div id="mn-discontinued-section" style="display:none">`;
     discontinuedActs.forEach((a, ci) => {
       const dateLabel = a.discontinuedOn ? `Discontinued on ${fmtPeriodDate(a.discontinuedOn)}` : 'Discontinued';
-      html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:.35rem">
+      const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
+      html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
         <span style="flex:1;font-size:.875rem;color:#374151">${escHtml(a.name || "")}</span>
         <span style="font-size:.72rem;color:#6b7280;white-space:nowrap">${dateLabel}</span>
         <button class="btn-mn-undo-discontinued" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Undo</button>
         <button class="btn-adm-del btn-mn-del-discontinued" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
       </div>`;
+      subActs.forEach((sub, si) => {
+        html += `<div style="display:flex;align-items:center;gap:.4rem;padding:.25rem .5rem .25rem 1.25rem;background:#f9fafb;border:1px solid #f3f4f6;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem">
+          <span style="font-size:.75rem;color:#9ca3af;flex-shrink:0">${String.fromCharCode(97 + si)})</span>
+          <span style="flex:1;font-size:.8rem;color:#6b7280">${escHtml(sub.name || "")}</span>
+        </div>`;
+      });
+      if (subActs.length) html += `<div style="margin-bottom:.35rem"></div>`;
     });
     html += `</div></div>`;
   }
