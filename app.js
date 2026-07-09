@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "815";
+const APP_VERSION = "816";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3457,6 +3457,10 @@ function renderFedcTarget(target) {
       const actLabelStyle = (pa.masteredOn || pa.inactiveReason === 'mastered') ? ' style="color:#059669"' : (pa.discontinuedOn || pa.inactiveReason === 'discontinued') ? ' style="color:#dc2626"' : '';
       const actDateLabel = pa.masteredOn ? `<span style="font-size:.75rem;color:#059669;margin-left:auto;font-weight:400;white-space:nowrap">Mastered on ${fmtPeriodDate(pa.masteredOn)}</span>`
         : pa.discontinuedOn ? `<span style="font-size:.75rem;color:#dc2626;margin-left:auto;font-weight:400;white-space:nowrap">Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}</span>` : '';
+      const subActs = allPas.filter(p => p.parentActivity === pa.name && !p.isCompleted && !p.isArchived && !p.isStopped && !p.masteredOn && !p.discontinuedOn);
+      const subHtml = subActs.length ? `<div style="display:flex;flex-direction:column;gap:.1rem;padding:.2rem 0 .1rem 1.25rem">
+        ${subActs.map((sub, si) => `<div style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:#9ca3af"><span style="flex-shrink:0">${String.fromCharCode(97 + si)})</span><span>${escHtml(sub.name || '')}</span></div>`).join('')}
+      </div>` : '';
       return `<div class="entry-block entry-block-predefined" style="opacity:.6;pointer-events:none">
         <div class="entry-field" contenteditable="false">
           <span class="field-label"${actLabelStyle}>${actLabel}</span>
@@ -3467,6 +3471,7 @@ function renderFedcTarget(target) {
           <span class="field-label">Remark</span>
           <span class="field-value-fixed" style="white-space:pre-wrap">${formatActivityMarkup(fixedText)}</span>
         </div>` : ''}
+        ${subHtml}
       </div>`;
     };
     const realInactive = inactivePas.filter(pa => !pa.isNote && !pa.isExportNote && !pa.isHeading && !pa.isMaintainHeading);
@@ -4840,9 +4845,14 @@ function buildTargetViewTable(target, data) {
         Object.entries(data.activities || {})
           .filter(([, a]) => a.targetName === target.name && a.activityName === pa.name)
           .forEach(([id]) => matchedIds.add(id));
+        const paBadge = pa.discontinuedOn
+          ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap">(🚩 ${fmtPeriodDate(pa.discontinuedOn)})</span> `
+          : pa.masteredOn
+          ? `<span style="font-size:.72rem;color:#059669;font-weight:600;white-space:nowrap">(⭐ ${fmtPeriodDate(pa.masteredOn)})</span> `
+          : '';
         rows += `<tr style="background:#f3f4f6">
           <td class="vcol-no" contenteditable="false" style="color:#6b7280">${displayNo}</td>
-          <td class="vcol-act" colspan="5" contenteditable="false" style="font-weight:600">${formatActivityMarkup(pa.name)}</td>
+          <td class="vcol-act" colspan="5" contenteditable="false" style="font-weight:600">${paBadge}${formatActivityMarkup(pa.name)}</td>
         </tr>`;
         continue;
       }
@@ -6335,9 +6345,14 @@ function buildGroupTargetViewTable(target, data, attendees) {
         Object.entries(data.activities || {})
           .filter(([, a]) => a.targetName === target.name && a.activityName === pa.name)
           .forEach(([id]) => matchedIds.add(id));
+        const paBadgeGrp = pa.discontinuedOn
+          ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap">(🚩 ${fmtPeriodDate(pa.discontinuedOn)})</span> `
+          : pa.masteredOn
+          ? `<span style="font-size:.72rem;color:#059669;font-weight:600;white-space:nowrap">(⭐ ${fmtPeriodDate(pa.masteredOn)})</span> `
+          : '';
         rows += `<tr style="background:#f3f4f6">
           <td class="vcol-no" contenteditable="false" style="color:#6b7280">${no}</td>
-          <td class="vcol-act" colspan="6" contenteditable="false" style="font-weight:600">${formatActivityMarkup(pa.name)}</td>
+          <td class="vcol-act" colspan="6" contenteditable="false" style="font-weight:600">${paBadgeGrp}${formatActivityMarkup(pa.name)}</td>
         </tr>`;
         continue;
       }
@@ -11643,7 +11658,11 @@ function buildGroupItemsByActivity(target, data, attendees) {
       const grpActLabelStyle = (pa.masteredOn || pa.inactiveReason === 'mastered') ? ' style="color:#059669"' : (pa.discontinuedOn || pa.inactiveReason === 'discontinued') ? ' style="color:#dc2626"' : '';
       const grpActDateLabel = pa.masteredOn ? `<span style="font-size:.75rem;color:#059669;margin-left:auto;font-weight:400;white-space:nowrap">Mastered on ${fmtPeriodDate(pa.masteredOn)}</span>`
         : pa.discontinuedOn ? `<span style="font-size:.75rem;color:#dc2626;margin-left:auto;font-weight:400;white-space:nowrap">Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}</span>` : '';
-      return `<div class="entry-block entry-block-predefined" style="opacity:.6;pointer-events:none"><div class="entry-field" contenteditable="false"><span class="field-label"${grpActLabelStyle}>${grpActLabel}</span><span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span>${grpActDateLabel}</div></div>`;
+      const grpSubActs = (target.predefinedActivities || []).filter(p => p.parentActivity === pa.name && !p.isCompleted && !p.isArchived && !p.isStopped && !p.masteredOn && !p.discontinuedOn);
+      const grpSubHtml = grpSubActs.length ? `<div style="display:flex;flex-direction:column;gap:.1rem;padding:.2rem 0 .1rem 1.25rem">
+        ${grpSubActs.map((sub, si) => `<div style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:#9ca3af"><span style="flex-shrink:0">${String.fromCharCode(97 + si)})</span><span>${escHtml(sub.name || '')}</span></div>`).join('')}
+      </div>` : '';
+      return `<div class="entry-block entry-block-predefined" style="opacity:.6;pointer-events:none"><div class="entry-field" contenteditable="false"><span class="field-label"${grpActLabelStyle}>${grpActLabel}</span><span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span>${grpActDateLabel}</div>${grpSubHtml}</div>`;
     };
     const grpReal = grpInactivePas.filter(pa => !pa.isNote && !pa.isExportNote && !pa.isHeading && !pa.isMaintainHeading);
     const grpMastered     = grpReal.filter(pa => pa.masteredOn || pa.inactiveReason === 'mastered');
