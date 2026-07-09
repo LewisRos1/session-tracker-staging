@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "814";
+const APP_VERSION = "815";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4897,9 +4897,6 @@ function buildTargetViewTable(target, data) {
         ).catch(() => {});
       }
       if (entry) matchedIds.add(entry[0]);
-      if (pa.discontinuedOn) {
-        rows += `<tr><td colspan="6" contenteditable="false" style="font-size:.75rem;color:#dc2626;padding:.15rem .75rem .05rem;font-weight:500;background:#fff">🚩 Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}</td></tr>`;
-      }
       rows += viewActivityRows(displayNo, pa.name, entry?.[0] || null, data, target, true, pa);
     }
     // Silently delete unmatched records that have no meaningful data — these
@@ -4992,8 +4989,14 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
     ? target.predefinedActivities?.find(pa => pa.name === actName)
     : null);
 
+  const statusBadge = paEntry?.discontinuedOn
+    ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap">(🚩 ${fmtPeriodDate(paEntry.discontinuedOn)})</span> `
+    : paEntry?.masteredOn
+    ? `<span style="font-size:.72rem;color:#059669;font-weight:600;white-space:nowrap">(⭐ ${fmtPeriodDate(paEntry.masteredOn)})</span> `
+    : '';
+
   const actCell = isPredefined
-    ? formatActivityMarkup(actName) + (paEntry?.actNote?.trim() ? `<div class="view-act-note">${formatActivityMarkup(paEntry.actNote)}</div>` : "")
+    ? statusBadge + formatActivityMarkup(actName) + (paEntry?.actNote?.trim() ? `<div class="view-act-note">${formatActivityMarkup(paEntry.actNote)}</div>` : "")
     : `<div style="display:flex;align-items:center;gap:.3rem">
         <input class="view-act-edit" type="text" value="${escHtml(actName)}"
           data-act-id="${escHtml(actId || "")}" data-original="${escHtml(actName)}" />
@@ -6398,9 +6401,6 @@ function buildGroupTargetViewTable(target, data, attendees) {
         ).catch(() => {});
       }
       if (entry2) matchedIds.add(entry2[0]);
-      if (pa.discontinuedOn) {
-        rows += `<tr><td colspan="7" contenteditable="false" style="font-size:.75rem;color:#dc2626;padding:.15rem .75rem .05rem;font-weight:500;background:#fff">🚩 Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}</td></tr>`;
-      }
       rows += viewGroupActivityRows(no, pa.name, entry2?.[0] || null, data, target, attendees, true, pa);
     }
     // Silently delete unmatched records with no meaningful data (empty ghosts).
@@ -6492,8 +6492,14 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
     ? target.predefinedActivities?.find(pa => pa.name === actName)
     : null);
 
+  const statusBadge = paEntry?.discontinuedOn
+    ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap">(🚩 ${fmtPeriodDate(paEntry.discontinuedOn)})</span> `
+    : paEntry?.masteredOn
+    ? `<span style="font-size:.72rem;color:#059669;font-weight:600;white-space:nowrap">(⭐ ${fmtPeriodDate(paEntry.masteredOn)})</span> `
+    : '';
+
   const actCell = isPredefined
-    ? formatActivityMarkup(actName) + (paEntry?.actNote?.trim() ? `<div class="view-act-note">${formatActivityMarkup(paEntry.actNote)}</div>` : "")
+    ? statusBadge + formatActivityMarkup(actName) + (paEntry?.actNote?.trim() ? `<div class="view-act-note">${formatActivityMarkup(paEntry.actNote)}</div>` : "")
     : `<div style="display:flex;align-items:center;gap:.3rem">
         <input class="view-act-edit" type="text" value="${escHtml(actName)}"
           data-act-id="${escHtml(actId || "")}" data-original="${escHtml(actName)}" />
