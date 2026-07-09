@@ -1828,19 +1828,29 @@ function getAllActivitiesForTarget(session, target) {
       const si = subLabelCounters[pa.parentActivity] || 0;
       subLabelCounters[pa.parentActivity] = si + 1;
       const subLabel = String.fromCharCode(97 + si);
+      const parentPa = (target.predefinedActivities || []).find(p => !p.parentActivity && p.name === pa.parentActivity);
+      const subStatusPrefix = pa.discontinuedOn ? '(Discontinued) '
+        : pa.masteredOn ? '(Mastered) '
+        : parentPa?.discontinuedOn ? '(Discontinued) '
+        : parentPa?.masteredOn ? '(Mastered) '
+        : '';
+      const subActName = subStatusPrefix + pa.name;
       const sessionAct = sessionActs.find(a => a.activityName === pa.name && a.isPredefined);
       if (sessionAct) {
         usedIds.add(sessionAct.id);
-        result.push({ ...sessionAct, activityName: pa.name, isSubActivity: true, subLabel });
+        result.push({ ...sessionAct, activityName: subActName, isSubActivity: true, subLabel });
       } else {
-        result.push({ id: null, activityName: pa.name, isPredefined: true, empty: true, isSubActivity: true, subLabel });
+        result.push({ id: null, activityName: subActName, isPredefined: true, empty: true, isSubActivity: true, subLabel });
       }
       continue;
     }
 
     // All remaining paths are real activities — assign sequential number
     exportActNum++;
-    const numberedName = `${exportActNum}) ${pa.name}`;
+    const _exportStatusPrefix = pa.discontinuedOn ? '(Discontinued) '
+      : pa.masteredOn ? '(Mastered) '
+      : '';
+    const numberedName = `${_exportStatusPrefix}${exportActNum}) ${pa.name}`;
 
     // Parent activity (noRemark) — numbered title, empty remark
     if (pa.noRemark) {
