@@ -570,14 +570,14 @@ function addIndividualTargetSheets(wb, allTargets, sessions, studentName, includ
       ws.getRow(n).height = Math.max(20, visLines * 20);
     }
 
-    // Row heights: measure both Activity (col B, 50 char wide) and Remark (col C, 72 char wide)
+    // Row heights: measure both Activity (col B, ~50 char wide) and Remark (col C, ~62 char wide)
     // counting real newlines plus estimated wrap, take the larger of the two.
     ws.eachRow((row, n) => {
       if (monthHeaderRows.has(n - 1) || colHeaderRows.has(n - 1) || noteRows.has(n - 1)) return;
       const getText = c => { const v = row.getCell(c).value; return typeof v === "string" ? v : (v?.richText?.map(r => r.text).join("") || ""); };
       const countLines = (t, w) => !t ? 0 : t.split("\n").reduce((s, seg) => s + Math.max(1, Math.ceil((seg.length || 1) / w)), 0);
-      const needed = Math.max(countLines(getText(2), 48), countLines(getText(3), 72), 1);
-      if (needed > 1 && (!row.height || row.height < needed * 15)) row.height = Math.max(20, needed * 15);
+      const needed = Math.max(countLines(getText(2), 46), countLines(getText(3), 58), 1);
+      if (needed > 1 && (!row.height || row.height < needed * 18)) row.height = Math.max(22, needed * 18);
     });
 
     // Session date blocks: col A = date (top+center), last col = avg score (middle+center)
