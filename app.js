@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "798";
+const APP_VERSION = "799";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -10116,7 +10116,7 @@ function renderTargetManageContent(student, target) {
         `<span class="drag-handle" style="cursor:grab;color:#c4c9d4;font-size:1.1rem;flex-shrink:0;padding:0 .15rem;user-select:none">⠿</span>` +
         `<span class="mn-opt-num" style="font-size:.8rem;color:#6b7280;white-space:nowrap;flex-shrink:0;font-weight:600">Option ${oi + 1}:</span>` +
         `<input class="admin-input mn-opt-item" data-idx="${idx}" data-oi="${oi}" placeholder="Enter option name…" style="flex:1;padding:.45rem .6rem;font-size:.95rem;min-width:0;border-color:#f59e0b;background:#fffbeb">` +
-        `<span class="mn-opt-countdown" style="font-size:.72rem;color:#f59e0b;white-space:nowrap;flex-shrink:0;font-weight:600">5s</span>` +
+        `<span class="mn-opt-countdown" style="font-size:.72rem;color:#f59e0b;white-space:nowrap;flex-shrink:0;font-weight:600">Name locks in 10s</span>` +
         `<input class="admin-input mn-opt-score" type="number" min="0" step="0.5" data-idx="${idx}" data-oi="${oi}" placeholder="Pts" style="width:3.8rem;flex-shrink:0;padding:.45rem .3rem;font-size:.9rem;text-align:center">` +
         `<button class="mn-opt-remove" data-idx="${idx}" data-oi="${oi}" data-text="" style="flex-shrink:0;padding:.3rem .65rem;font-size:.82rem;color:#dc2626;background:none;border:1px solid #fca5a5;border-radius:.35rem;cursor:pointer">Remove</button>`;
       list.appendChild(row);
@@ -10167,10 +10167,10 @@ function renderTargetManageContent(student, target) {
         }
       };
 
-      let secondsLeft = 5;
+      let secondsLeft = 10;
       const countdownInterval = setInterval(() => {
         secondsLeft--;
-        if (countdown) countdown.textContent = `${secondsLeft}s`;
+        if (countdown) countdown.textContent = `Name locks in ${secondsLeft}s`;
         if (secondsLeft <= 0) doLock();
       }, 1000);
 
@@ -10958,7 +10958,7 @@ function renderTemplateManageContent(template) {
         `<span class="drag-handle" style="cursor:grab;color:#c4c9d4;font-size:1.1rem;flex-shrink:0;padding:0 .15rem;user-select:none">⠿</span>` +
         `<span class="mn-opt-num" style="font-size:.8rem;color:#6b7280;white-space:nowrap;flex-shrink:0;font-weight:600">Option ${oi + 1}:</span>` +
         `<input class="admin-input mn-opt-item" data-idx="${idx}" data-oi="${oi}" placeholder="Enter option name…" style="flex:1;padding:.45rem .6rem;font-size:.95rem;min-width:0;border-color:#f59e0b;background:#fffbeb">` +
-        `<span class="mn-opt-countdown" style="font-size:.72rem;color:#f59e0b;white-space:nowrap;flex-shrink:0;font-weight:600">5s</span>` +
+        `<span class="mn-opt-countdown" style="font-size:.72rem;color:#f59e0b;white-space:nowrap;flex-shrink:0;font-weight:600">Name locks in 10s</span>` +
         `<button class="mn-opt-remove" data-idx="${idx}" data-oi="${oi}" style="flex-shrink:0;padding:.3rem .65rem;font-size:.82rem;color:#dc2626;background:none;border:1px solid #fca5a5;border-radius:.35rem;cursor:pointer">Remove</button>`;
       list.appendChild(row);
 
@@ -11001,10 +11001,10 @@ function renderTemplateManageContent(template) {
         }
       };
 
-      let secondsLeft = 5;
+      let secondsLeft = 10;
       const countdownInterval = setInterval(() => {
         secondsLeft--;
-        if (countdown) countdown.textContent = `${secondsLeft}s`;
+        if (countdown) countdown.textContent = `Name locks in ${secondsLeft}s`;
         if (secondsLeft <= 0) doLock();
       }, 1000);
 
