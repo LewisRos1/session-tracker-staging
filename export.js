@@ -1788,6 +1788,7 @@ function getAllActivitiesForTarget(session, target) {
 
   for (const pa of (target.predefinedActivities || [])) {
     if (!isActivityActive(pa, session.date)) continue;
+    if ((pa.masteredOn || pa.discontinuedOn) && !sessionActs.some(a => a.activityName === pa.name)) continue;
     if (!pa.name && !pa.isNote && !pa.isExportNote && !pa.isHeading && !pa.isMaintainHeading) continue;
     if (pa.isNote) {
       result.push({ isNote: true, activityName: pa.text || "" });

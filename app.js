@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "807";
+const APP_VERSION = "808";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4803,6 +4803,7 @@ function buildTargetViewTable(target, data) {
     );
     for (const pa of target.predefinedActivities) {
       if (!isActivityActiveForView(pa, data.date)) continue;
+      if ((pa.masteredOn || pa.discontinuedOn) && !Object.values(data.activities || {}).some(a => a.targetName === target.name && a.activityName === pa.name)) continue;
       if (pa.isHeading || pa.isMaintainHeading) {
         const isGray = pa.headingColor === "gray" || pa.isMaintainHeading;
         const isGreen = pa.headingColor === "green";
@@ -6303,6 +6304,7 @@ function buildGroupTargetViewTable(target, data, attendees) {
     );
     for (const pa of target.predefinedActivities) {
       if (!isActivityActiveForView(pa, data.date)) continue;
+      if ((pa.masteredOn || pa.discontinuedOn) && !Object.values(data.activities || {}).some(a => a.targetName === target.name && a.activityName === pa.name)) continue;
       if (pa.isHeading || pa.isMaintainHeading) {
         const isGray = pa.headingColor === "gray" || pa.isMaintainHeading;
         const isGreenHdg = pa.headingColor === "green";
