@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "826";
+const APP_VERSION = "827";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3476,11 +3476,10 @@ function renderFedcTarget(target) {
         </div>`;
       }
       const fixedText = pa.fixedRemark !== undefined ? pa.fixedRemark : pa.isMaintain ? (pa.maintainRemark ?? "") : null;
-      const actLabel = (pa.masteredOn || pa.inactiveReason === 'mastered') ? 'Mastered' : (pa.discontinuedOn || pa.inactiveReason === 'discontinued') ? 'Discontinued' : 'Activity';
-      const actLabelStyle = (pa.masteredOn || pa.inactiveReason === 'mastered') ? ' style="color:#059669"' : (pa.discontinuedOn || pa.inactiveReason === 'discontinued') ? ' style="color:#dc2626"' : '';
       const _masteredDate = pa.masteredOn || (pa.inactiveReason === 'mastered' ? "2026-06-30" : null);
-      const actDateLabel = _masteredDate ? `<span style="font-size:.75rem;color:#059669;margin-left:auto;font-weight:400;white-space:nowrap">Mastered on ${fmtPeriodDate(_masteredDate)}</span>`
-        : pa.discontinuedOn ? `<span style="font-size:.75rem;color:#dc2626;margin-left:auto;font-weight:400;white-space:nowrap">Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}</span>` : '';
+      const actLabel = _masteredDate ? `⭐ Mastered on ${fmtPeriodDate(_masteredDate)}` : (pa.discontinuedOn || pa.inactiveReason === 'discontinued') ? 'Discontinued' : 'Activity';
+      const actLabelStyle = _masteredDate ? ' style="color:#059669"' : (pa.discontinuedOn || pa.inactiveReason === 'discontinued') ? ' style="color:#dc2626"' : '';
+      const actDateLabel = _masteredDate ? '' : pa.discontinuedOn ? `<span style="font-size:.75rem;color:#dc2626;margin-left:auto;font-weight:400;white-space:nowrap">Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}</span>` : '';
       const subActs = allPas.filter(p => p.parentActivity === pa.name && !p.isCompleted && !p.isArchived && !p.isStopped && !p.masteredOn && !p.discontinuedOn);
       const subHtml = subActs.length ? `<div style="display:flex;flex-direction:column;gap:.1rem;padding:.2rem 0 .1rem 1.25rem">
         ${subActs.map((sub, si) => `<div style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:#9ca3af"><span style="flex-shrink:0">${String.fromCharCode(97 + si)})</span><span>${escHtml(sub.name || '')}</span></div>`).join('')}
@@ -7636,8 +7635,10 @@ function todayDateStr() {
 }
 
 function inactiveReasonBadge(pa) {
-  if (pa?.inactiveReason === 'mastered')
-    return '<span style="display:inline-flex;align-items:center;background:#d1fae5;border:1px solid #6ee7b7;border-radius:999px;padding:.05rem .45rem;font-size:.7rem;font-weight:700;color:#059669;white-space:nowrap;margin-right:.4rem;vertical-align:middle">● Mastered</span>';
+  if (pa?.inactiveReason === 'mastered') {
+    const d = pa.masteredOn || "2026-06-30";
+    return `<span style="display:inline-flex;align-items:center;background:#d1fae5;border:1px solid #6ee7b7;border-radius:999px;padding:.05rem .45rem;font-size:.7rem;font-weight:700;color:#059669;white-space:nowrap;margin-right:.4rem;vertical-align:middle">⭐ Mastered on ${fmtPeriodDate(d)}</span>`;
+  }
   if (pa?.inactiveReason === 'discontinued')
     return '<span style="display:inline-flex;align-items:center;background:#fee2e2;border:1px solid #fca5a5;border-radius:999px;padding:.05rem .45rem;font-size:.7rem;font-weight:700;color:#dc2626;white-space:nowrap;margin-right:.4rem;vertical-align:middle">● Discontinued</span>';
   return '';
@@ -11756,11 +11757,10 @@ function buildGroupItemsByActivity(target, data, attendees) {
         </div>`;
       }
       if (!pa.name) return '';
-      const grpActLabel = (pa.masteredOn || pa.inactiveReason === 'mastered') ? 'Mastered' : (pa.discontinuedOn || pa.inactiveReason === 'discontinued') ? 'Discontinued' : 'Activity';
-      const grpActLabelStyle = (pa.masteredOn || pa.inactiveReason === 'mastered') ? ' style="color:#059669"' : (pa.discontinuedOn || pa.inactiveReason === 'discontinued') ? ' style="color:#dc2626"' : '';
       const _grpMasteredDate = pa.masteredOn || (pa.inactiveReason === 'mastered' ? "2026-06-30" : null);
-      const grpActDateLabel = _grpMasteredDate ? `<span style="font-size:.75rem;color:#059669;margin-left:auto;font-weight:400;white-space:nowrap">Mastered on ${fmtPeriodDate(_grpMasteredDate)}</span>`
-        : pa.discontinuedOn ? `<span style="font-size:.75rem;color:#dc2626;margin-left:auto;font-weight:400;white-space:nowrap">Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}</span>` : '';
+      const grpActLabel = _grpMasteredDate ? `⭐ Mastered on ${fmtPeriodDate(_grpMasteredDate)}` : (pa.discontinuedOn || pa.inactiveReason === 'discontinued') ? 'Discontinued' : 'Activity';
+      const grpActLabelStyle = _grpMasteredDate ? ' style="color:#059669"' : (pa.discontinuedOn || pa.inactiveReason === 'discontinued') ? ' style="color:#dc2626"' : '';
+      const grpActDateLabel = _grpMasteredDate ? '' : pa.discontinuedOn ? `<span style="font-size:.75rem;color:#dc2626;margin-left:auto;font-weight:400;white-space:nowrap">Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}</span>` : '';
       const grpSubActs = (target.predefinedActivities || []).filter(p => p.parentActivity === pa.name && !p.isCompleted && !p.isArchived && !p.isStopped && !p.masteredOn && !p.discontinuedOn);
       const grpSubHtml = grpSubActs.length ? `<div style="display:flex;flex-direction:column;gap:.1rem;padding:.2rem 0 .1rem 1.25rem">
         ${grpSubActs.map((sub, si) => `<div style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:#9ca3af"><span style="flex-shrink:0">${String.fromCharCode(97 + si)})</span><span>${escHtml(sub.name || '')}</span></div>`).join('')}
