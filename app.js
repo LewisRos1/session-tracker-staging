@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "797";
+const APP_VERSION = "798";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -10047,6 +10047,7 @@ function renderTargetManageContent(student, target) {
       list.appendChild(row);
       wireOptScore(row.querySelector(".mn-opt-score"), idx);
       wireOptRemove(row.querySelector(".mn-opt-remove"), idx);
+      row.querySelector(".mn-opt-item").addEventListener("click", () => showOptLockedMsg(row.querySelector(".mn-opt-item")));
       updateRemovedSection(idx);
       await saveTarget();
     });
@@ -10072,6 +10073,22 @@ function renderTargetManageContent(student, target) {
       if (list.style.display === "none") { list.style.display = ""; if (arrow) arrow.textContent = "▼"; }
       else { list.style.display = "none"; if (arrow) arrow.textContent = "▶"; }
     });
+  });
+
+  const showOptLockedMsg = inp => {
+    if (inp.dataset.msgActive) return;
+    inp.dataset.msgActive = "1";
+    inp.style.borderColor = "#f59e0b";
+    const row = inp.closest(".mn-opt-row");
+    const msg = document.createElement("span");
+    msg.style.cssText = "font-size:.72rem;color:#f59e0b;white-space:nowrap;flex-shrink:0";
+    msg.textContent = "Can't rename — use + Add Option or Remove";
+    row.appendChild(msg);
+    setTimeout(() => { inp.style.borderColor = ""; msg.remove(); delete inp.dataset.msgActive; }, 2500);
+  };
+
+  $("manage-modal-body").querySelectorAll(".mn-opt-item[readonly]").forEach(inp => {
+    inp.addEventListener("click", () => showOptLockedMsg(inp));
   });
 
   $("manage-modal-body").querySelectorAll(".mn-opts-list").forEach(list => {
@@ -10118,12 +10135,28 @@ function renderTargetManageContent(student, target) {
         locked = true;
         clearInterval(countdownInterval);
         if (!nameInput.value.trim()) { list.removeChild(row); renumberOpts(list); return; }
+        const newName = nameInput.value.trim();
+        const existingActive   = parseOpts(acts[idx].inlineOptions || "");
+        const existingArchived = (acts[idx].archivedOptions || []).map(ao => ao.text);
+        if (existingActive.includes(newName) || existingArchived.includes(newName)) {
+          nameInput.style.borderColor = "#dc2626";
+          nameInput.style.background = "#fff5f5";
+          if (countdown) countdown.remove();
+          const errMsg = document.createElement("span");
+          errMsg.style.cssText = "font-size:.72rem;color:#dc2626;white-space:nowrap;flex-shrink:0";
+          errMsg.textContent = existingArchived.includes(newName)
+            ? `"${newName}" was removed — use Unremove`
+            : `"${newName}" already exists`;
+          row.appendChild(errMsg);
+          setTimeout(() => { list.removeChild(row); renumberOpts(list); }, 2200);
+          return;
+        }
         nameInput.readOnly = true;
         nameInput.style.background = "#f9fafb";
         nameInput.style.borderColor = "";
         nameInput.style.cursor = "default";
         if (countdown) countdown.remove();
-        removeBtn.dataset.text = nameInput.value.trim();
+        removeBtn.dataset.text = newName;
         const newOptsStr = getOptsFromDom(idx).join("/") || null;
         if (newOptsStr !== acts[idx].inlineOptions) {
           acts[idx].inlineOptions = newOptsStr;
@@ -10941,6 +10974,19 @@ function renderTemplateManageContent(template) {
         locked = true;
         clearInterval(countdownInterval);
         if (!nameInput.value.trim()) { list.removeChild(row); renumberTmplOpts(list); return; }
+        const newName = nameInput.value.trim();
+        const existingActive = parseOpts(acts[idx].inlineOptions || "");
+        if (existingActive.includes(newName)) {
+          nameInput.style.borderColor = "#dc2626";
+          nameInput.style.background = "#fff5f5";
+          if (countdown) countdown.remove();
+          const errMsg = document.createElement("span");
+          errMsg.style.cssText = "font-size:.72rem;color:#dc2626;white-space:nowrap;flex-shrink:0";
+          errMsg.textContent = `"${newName}" already exists`;
+          row.appendChild(errMsg);
+          setTimeout(() => { list.removeChild(row); renumberTmplOpts(list); }, 2200);
+          return;
+        }
         nameInput.readOnly = true;
         nameInput.style.background = "#f9fafb";
         nameInput.style.borderColor = "";
