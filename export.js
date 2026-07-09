@@ -1892,17 +1892,9 @@ function getAllActivitiesForTarget(session, target) {
 
   for (const act of sessionActs) {
     if (usedIds.has(act.id)) continue;
-    if (act.isPredefined) {
-      // No remark data — ghost entry, skip.
-      if (getRemarksForActivity(session, act.id).length === 0) continue;
-      // Activity is still in the predefined config — it was already rendered by the
-      // main loop above. Duplicate session-activity records (caused by the auto-fill
-      // race) would otherwise leak through here as unnumbered rows.
-      const stillInConfig = (target.predefinedActivities || []).some(
-        p => p.name === act.activityName && !p.isHeading && !p.isNote && !p.isExportNote
-      );
-      if (stillInConfig) continue;
-    }
+    // Skip all isPredefined records — either already rendered above, or orphaned
+    // from a config activity that has since been removed/discontinued.
+    if (act.isPredefined) continue;
     result.push(act);
   }
 

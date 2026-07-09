@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "808";
+const APP_VERSION = "809";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4802,8 +4802,7 @@ function buildTargetViewTable(target, data) {
       (target.predefinedActivities || []).filter(p => p.parentActivity).map(p => p.parentActivity)
     );
     for (const pa of target.predefinedActivities) {
-      if (!isActivityActiveForView(pa, data.date)) continue;
-      if ((pa.masteredOn || pa.discontinuedOn) && !Object.values(data.activities || {}).some(a => a.targetName === target.name && a.activityName === pa.name)) continue;
+      if (!isActivityActive(pa, data.date)) continue;
       if (pa.isHeading || pa.isMaintainHeading) {
         const isGray = pa.headingColor === "gray" || pa.isMaintainHeading;
         const isGreen = pa.headingColor === "green";
@@ -4912,10 +4911,10 @@ function buildTargetViewTable(target, data) {
         deleteActivity(state.viewSessionId, actId, remIds).catch(() => {});
       }
     }
-    // All unmatched session activities — covers both manually-added activities
-    // AND predefined activities recorded under old names before a rename.
+    // Manually-added (non-predefined) activities not matched above.
+    // Skip isPredefined records — those belonged to a config activity that has since been removed.
     Object.entries(data.activities || {})
-      .filter(([actId, a]) => a.targetName === target.name && !matchedIds.has(actId))
+      .filter(([actId, a]) => a.targetName === target.name && !matchedIds.has(actId) && !a.isPredefined)
       .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
       .forEach(([actId, act]) => {
         no++;
@@ -6303,8 +6302,7 @@ function buildGroupTargetViewTable(target, data, attendees) {
       (target.predefinedActivities || []).filter(p => p.parentActivity).map(p => p.parentActivity)
     );
     for (const pa of target.predefinedActivities) {
-      if (!isActivityActiveForView(pa, data.date)) continue;
-      if ((pa.masteredOn || pa.discontinuedOn) && !Object.values(data.activities || {}).some(a => a.targetName === target.name && a.activityName === pa.name)) continue;
+      if (!isActivityActive(pa, data.date)) continue;
       if (pa.isHeading || pa.isMaintainHeading) {
         const isGray = pa.headingColor === "gray" || pa.isMaintainHeading;
         const isGreenHdg = pa.headingColor === "green";
@@ -6402,10 +6400,10 @@ function buildGroupTargetViewTable(target, data, attendees) {
         deleteActivity(state.viewGroupSessionId, actId, remIds).catch(() => {});
       }
     }
-    // All unmatched session activities — covers both manually-added activities
-    // AND predefined activities recorded under old names before a rename.
+    // Manually-added (non-predefined) activities not matched above.
+    // Skip isPredefined records — those belonged to a config activity that has since been removed.
     Object.entries(data.activities || {})
-      .filter(([actId, a]) => a.targetName === target.name && !matchedIds.has(actId))
+      .filter(([actId, a]) => a.targetName === target.name && !matchedIds.has(actId) && !a.isPredefined)
       .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
       .forEach(([actId, act]) => {
         no++;
