@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "799";
+const APP_VERSION = "800";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -10174,6 +10174,10 @@ function renderTargetManageContent(student, target) {
         if (secondsLeft <= 0) doLock();
       }, 1000);
 
+      nameInput.addEventListener("input", () => {
+        secondsLeft = 10;
+        if (countdown) countdown.textContent = `Name locks in ${secondsLeft}s`;
+      });
       nameInput.addEventListener("blur", doLock, { once: true });
     });
   });
@@ -11008,6 +11012,10 @@ function renderTemplateManageContent(template) {
         if (secondsLeft <= 0) doLock();
       }, 1000);
 
+      nameInput.addEventListener("input", () => {
+        secondsLeft = 10;
+        if (countdown) countdown.textContent = `Name locks in ${secondsLeft}s`;
+      });
       nameInput.addEventListener("blur", doLock, { once: true });
     });
   });
