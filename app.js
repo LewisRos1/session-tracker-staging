@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "816";
+const APP_VERSION = "817";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4999,10 +4999,15 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
     ? target.predefinedActivities?.find(pa => pa.name === actName)
     : null);
 
-  const statusBadge = paEntry?.discontinuedOn
-    ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap">(🚩 ${fmtPeriodDate(paEntry.discontinuedOn)})</span> `
-    : paEntry?.masteredOn
-    ? `<span style="font-size:.72rem;color:#059669;font-weight:600;white-space:nowrap">(⭐ ${fmtPeriodDate(paEntry.masteredOn)})</span> `
+  const parentEntry = paEntry?.parentActivity
+    ? (target.predefinedActivities || []).find(p => !p.parentActivity && p.name === paEntry.parentActivity)
+    : null;
+  const _discontinuedOn = paEntry?.discontinuedOn || parentEntry?.discontinuedOn || null;
+  const _masteredOn     = paEntry?.masteredOn     || parentEntry?.masteredOn     || null;
+  const statusBadge = _discontinuedOn
+    ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap">(🚩 ${fmtPeriodDate(_discontinuedOn)})</span> `
+    : _masteredOn
+    ? `<span style="font-size:.72rem;color:#059669;font-weight:600;white-space:nowrap">(⭐ ${fmtPeriodDate(_masteredOn)})</span> `
     : '';
 
   const actCell = isPredefined
@@ -6507,10 +6512,15 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
     ? target.predefinedActivities?.find(pa => pa.name === actName)
     : null);
 
-  const statusBadge = paEntry?.discontinuedOn
-    ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap">(🚩 ${fmtPeriodDate(paEntry.discontinuedOn)})</span> `
-    : paEntry?.masteredOn
-    ? `<span style="font-size:.72rem;color:#059669;font-weight:600;white-space:nowrap">(⭐ ${fmtPeriodDate(paEntry.masteredOn)})</span> `
+  const parentEntry = paEntry?.parentActivity
+    ? (target.predefinedActivities || []).find(p => !p.parentActivity && p.name === paEntry.parentActivity)
+    : null;
+  const _discontinuedOn = paEntry?.discontinuedOn || parentEntry?.discontinuedOn || null;
+  const _masteredOn     = paEntry?.masteredOn     || parentEntry?.masteredOn     || null;
+  const statusBadge = _discontinuedOn
+    ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap">(🚩 ${fmtPeriodDate(_discontinuedOn)})</span> `
+    : _masteredOn
+    ? `<span style="font-size:.72rem;color:#059669;font-weight:600;white-space:nowrap">(⭐ ${fmtPeriodDate(_masteredOn)})</span> `
     : '';
 
   const actCell = isPredefined
