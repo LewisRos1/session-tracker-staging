@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "811";
+const APP_VERSION = "812";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4815,6 +4815,15 @@ function buildTargetViewTable(target, data) {
         continue;
       }
       const isSub = !!pa.parentActivity;
+      // Skip orphaned sub-activities whose parent was deleted from the predefined config.
+      // Edit Target hides them (line: if (a.parentActivity) return) but they still exist in
+      // predefinedActivities with no flags — check parent presence to exclude them here too.
+      if (isSub) {
+        const parentExists = (target.predefinedActivities || []).some(
+          p => !p.parentActivity && p.name === pa.parentActivity && !p.isCompleted && !p.isArchived && !p.isStopped
+        );
+        if (!parentExists) continue;
+      }
       let displayNo;
       if (isSub) {
         const parentKey = pa.parentActivity;
@@ -6346,8 +6355,14 @@ function buildGroupTargetViewTable(target, data, attendees) {
         </tr>`;
         continue;
       }
-      no++;
       const isSub2 = !!pa.parentActivity;
+      if (isSub2) {
+        const parentExists2 = (target.predefinedActivities || []).some(
+          p => !p.parentActivity && p.name === pa.parentActivity && !p.isCompleted && !p.isArchived && !p.isStopped
+        );
+        if (!parentExists2) continue;
+      }
+      no++;
       const candidateEntries2 = Object.entries(data.activities || {})
         .filter(([id, a]) => a.targetName === target.name && a.activityName === pa.name && !matchedIds.has(id));
       let entry2 = pa.id ? (candidateEntries2.find(([, a]) => a.configId === pa.id) || null) : null;

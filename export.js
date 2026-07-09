@@ -1789,6 +1789,12 @@ function getAllActivitiesForTarget(session, target) {
   for (const pa of (target.predefinedActivities || [])) {
     if (!isActivityActive(pa, session.date)) continue;
     if (pa.isCompleted || pa.isArchived || pa.isStopped) continue;
+    if (pa.parentActivity) {
+      const parentExists = (target.predefinedActivities || []).some(
+        p => !p.parentActivity && p.name === pa.parentActivity && !p.isCompleted && !p.isArchived && !p.isStopped
+      );
+      if (!parentExists) continue;
+    }
     if (!pa.name && !pa.isNote && !pa.isExportNote && !pa.isHeading && !pa.isMaintainHeading) continue;
     if (pa.isNote) {
       result.push({ isNote: true, activityName: pa.text || "" });
