@@ -1892,9 +1892,10 @@ function getAllActivitiesForTarget(session, target) {
 
   for (const act of sessionActs) {
     if (usedIds.has(act.id)) continue;
-    // Skip all isPredefined records — either already rendered above, or orphaned
-    // from a config activity that has since been removed/discontinued.
-    if (act.isPredefined) continue;
+    // Skip isPredefined records and sub-activities (parentActivity set) — either already
+    // rendered above, or orphaned from a config activity that has since been removed.
+    // Sub-activities are never manually entered so they're always orphaned if not matched above.
+    if (act.isPredefined || act.parentActivity) continue;
     result.push(act);
   }
 

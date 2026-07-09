@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "810";
+const APP_VERSION = "811";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4913,9 +4913,10 @@ function buildTargetViewTable(target, data) {
       }
     }
     // Manually-added (non-predefined) activities not matched above.
-    // Skip isPredefined records — those belonged to a config activity that has since been removed.
+    // Skip isPredefined records and sub-activities (parentActivity set) — those belonged to a
+    // config activity that has since been removed. Sub-activities are never manually entered.
     Object.entries(data.activities || {})
-      .filter(([actId, a]) => a.targetName === target.name && !matchedIds.has(actId) && !a.isPredefined)
+      .filter(([actId, a]) => a.targetName === target.name && !matchedIds.has(actId) && !a.isPredefined && !a.parentActivity)
       .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
       .forEach(([actId, act]) => {
         no++;
@@ -6403,9 +6404,10 @@ function buildGroupTargetViewTable(target, data, attendees) {
       }
     }
     // Manually-added (non-predefined) activities not matched above.
-    // Skip isPredefined records — those belonged to a config activity that has since been removed.
+    // Skip isPredefined records and sub-activities (parentActivity set) — those belonged to a
+    // config activity that has since been removed. Sub-activities are never manually entered.
     Object.entries(data.activities || {})
-      .filter(([actId, a]) => a.targetName === target.name && !matchedIds.has(actId) && !a.isPredefined)
+      .filter(([actId, a]) => a.targetName === target.name && !matchedIds.has(actId) && !a.isPredefined && !a.parentActivity)
       .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
       .forEach(([actId, act]) => {
         no++;
