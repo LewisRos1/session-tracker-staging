@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "804";
+const APP_VERSION = "805";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -8701,7 +8701,7 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
       <option value="starter_fixed_note"${type === "starter_fixed_note" ? " selected" : ""}>Sentence Starter + Select One + Free Text</option>
     </select>
     <div class="mn-act-starter-wrap" data-idx="${idx}" style="${showStarter ? "display:flex;align-items:center;gap:.5rem" : "display:none"}">
-      <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600;flex-shrink:0">Sentence Starter (Optional):</span>
+      <span style="font-size:.93rem;color:#374151;white-space:nowrap;font-weight:700;flex-shrink:0">Sentence Starter (Optional):</span>
       <input class="admin-input mn-act-starter-text" data-idx="${idx}"
         placeholder="Phrase…"
         value="${escHtml(a.sentenceStarter || "")}">
@@ -8896,7 +8896,6 @@ function renderTargetManageContent(student, target) {
             <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
               rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
           </div>
-          ${a.createdOn ? `<span style="font-size:.72rem;color:#9ca3af">Created on ${fmtPeriodDate(a.createdOn)}</span>` : ''}
           <div style="display:flex;align-items:flex-start;gap:.5rem">
             <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600;padding-top:.3rem">Remark Type:</span>
             ${buildRemarkTypeControls(a, idx, target.maxPoints || 3)}
@@ -8970,15 +8969,14 @@ function renderTargetManageContent(student, target) {
               <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
                 rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
             </div>
-            ${a.createdOn ? `<span style="font-size:.72rem;color:#9ca3af">Created on ${fmtPeriodDate(a.createdOn)}</span>` : ''}
             ${subActsHtml}
             <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.75rem;padding:.2rem .55rem;background:none;border:1px solid #d1d5db;border-radius:.35rem;color:#6b7280;cursor:pointer;margin-left:1.25rem;align-self:flex-start">+ Add Sub-activity</button>
           </div>
           <div style="position:relative">
             <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
             <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:250px;overflow:hidden">
-              <button class="mn-km-mastered" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">⭐ Mark as Mastered</button>
-              <button class="mn-km-discontinued" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#dc2626">🚩 Mark as Discontinued</button>
+              <button class="mn-km-mastered" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">⭐ Activity Mastered (from ${_refDateLabel} onwards)</button>
+              <button class="mn-km-discontinued" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#dc2626">🚩 Discontinue Activity (from ${_refDateLabel} onwards)</button>
               <div style="display:flex;align-items:stretch">
                 <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
                 <span title="Deletes this activity and all its sub-activities." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
@@ -9006,7 +9004,6 @@ function renderTargetManageContent(student, target) {
               <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
                 rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
             </div>
-            ${a.createdOn ? `<span style="font-size:.72rem;color:#9ca3af">Created on ${fmtPeriodDate(a.createdOn)}</span>` : ''}
             <div style="display:flex;align-items:flex-start;gap:.5rem">
               <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600;padding-top:.3rem">Remark Type:</span>
               ${remarkTypeSelect}
@@ -9024,8 +9021,8 @@ function renderTargetManageContent(student, target) {
                 <button class="mn-km-opt" data-idx="${idx}" data-action="color_white" style="padding:.35rem .6rem;background:#ffffff;border:2px solid ${!isGray ? '#6b7280' : '#e5e7eb'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🤍 White (Normal)</button>
                 <button class="mn-km-opt" data-idx="${idx}" data-action="color_gray" style="padding:.35rem .6rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🩶 Grey (Maintain)</button>
               </div>
-              <button class="mn-km-mastered" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">⭐ Mark as Mastered</button>
-              <button class="mn-km-discontinued" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#dc2626">🚩 Mark as Discontinued</button>
+              <button class="mn-km-mastered" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">⭐ Activity Mastered (from ${_refDateLabel} onwards)</button>
+              <button class="mn-km-discontinued" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#dc2626">🚩 Discontinue Activity (from ${_refDateLabel} onwards)</button>
               <div style="display:flex;align-items:stretch">
                 <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
                 <span title="Permanently removes this activity and all of its session data. This cannot be undone." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
@@ -10343,7 +10340,6 @@ function renderTemplateManageContent(template) {
             <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
               rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
           </div>
-          ${a.createdOn ? `<span style="font-size:.72rem;color:#9ca3af">Created on ${fmtPeriodDate(a.createdOn)}</span>` : ''}
           <div style="display:flex;align-items:flex-start;gap:.5rem">
             <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600;padding-top:.3rem">Remark Type:</span>
             ${remarkTypeSelect}
