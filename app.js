@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "812";
+const APP_VERSION = "813";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4820,7 +4820,9 @@ function buildTargetViewTable(target, data) {
       // predefinedActivities with no flags — check parent presence to exclude them here too.
       if (isSub) {
         const parentExists = (target.predefinedActivities || []).some(
-          p => !p.parentActivity && p.name === pa.parentActivity && !p.isCompleted && !p.isArchived && !p.isStopped
+          p => !p.parentActivity && p.name === pa.parentActivity
+            && isActivityActive(p, data.date)
+            && !p.isCompleted && !p.isArchived && !p.isStopped
         );
         if (!parentExists) continue;
       }
@@ -6358,7 +6360,9 @@ function buildGroupTargetViewTable(target, data, attendees) {
       const isSub2 = !!pa.parentActivity;
       if (isSub2) {
         const parentExists2 = (target.predefinedActivities || []).some(
-          p => !p.parentActivity && p.name === pa.parentActivity && !p.isCompleted && !p.isArchived && !p.isStopped
+          p => !p.parentActivity && p.name === pa.parentActivity
+            && isActivityActive(p, data.date)
+            && !p.isCompleted && !p.isArchived && !p.isStopped
         );
         if (!parentExists2) continue;
       }

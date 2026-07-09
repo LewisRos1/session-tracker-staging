@@ -1791,7 +1791,9 @@ function getAllActivitiesForTarget(session, target) {
     if (pa.isCompleted || pa.isArchived || pa.isStopped) continue;
     if (pa.parentActivity) {
       const parentExists = (target.predefinedActivities || []).some(
-        p => !p.parentActivity && p.name === pa.parentActivity && !p.isCompleted && !p.isArchived && !p.isStopped
+        p => !p.parentActivity && p.name === pa.parentActivity
+          && isActivityActive(p, session.date)
+          && !p.isCompleted && !p.isArchived && !p.isStopped
       );
       if (!parentExists) continue;
     }
