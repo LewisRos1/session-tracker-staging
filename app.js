@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "833";
+const APP_VERSION = "834";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -7635,6 +7635,31 @@ function inactiveReasonBadge(pa) {
   return '';
 }
 
+function showDatePickerDialog({ title, message, confirmLabel }) {
+  return new Promise(resolve => {
+    const today = todayDateStr();
+    const overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center";
+    overlay.innerHTML =
+      `<div style="background:#fff;border-radius:.75rem;padding:1.5rem;max-width:340px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.22)">` +
+      `<div style="font-size:1.05rem;font-weight:700;margin-bottom:.5rem">${title}</div>` +
+      `<div style="font-size:.88rem;color:#6b7280;margin-bottom:1rem">${message}</div>` +
+      `<input type="date" class="dp-date" value="${today}" style="width:100%;box-sizing:border-box;padding:.55rem .7rem;border:1px solid #d1d5db;border-radius:.4rem;font-size:.95rem;margin-bottom:1rem">` +
+      `<div style="display:flex;gap:.6rem;justify-content:flex-end">` +
+      `<button class="dp-cancel" style="padding:.5rem 1rem;border:1px solid #d1d5db;border-radius:.4rem;background:#fff;cursor:pointer;font-size:.9rem">Cancel</button>` +
+      `<button class="dp-confirm" style="padding:.5rem 1rem;border:none;border-radius:.4rem;background:var(--primary);color:#fff;cursor:pointer;font-size:.9rem;font-weight:600">${confirmLabel}</button>` +
+      `</div></div>`;
+    document.body.appendChild(overlay);
+    const dateInput = overlay.querySelector(".dp-date");
+    const finish = val => { overlay.remove(); document.removeEventListener("keydown", onKey); resolve(val); };
+    overlay.querySelector(".dp-cancel").addEventListener("click", () => finish(null));
+    overlay.querySelector(".dp-confirm").addEventListener("click", () => finish(dateInput.value || null));
+    const onKey = e => { if (e.key === "Escape") finish(null); };
+    document.addEventListener("keydown", onKey);
+    dateInput.focus();
+  });
+}
+
 function isActivityActive(pa, dateStr) {
   if (!dateStr) return true;
   if (pa.masteredOn    && dateStr >= pa.masteredOn)    return false;
@@ -8985,8 +9010,8 @@ function renderTargetManageContent(student, target) {
         <div style="position:relative">
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:250px;overflow:hidden">
-            <button class="mn-km-mastered" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">⭐ Activity Mastered<br><span style="font-size:.78rem;color:#6b7280">(from ${_refDateLabel} onwards)</span></button>
-            <button class="mn-km-discontinued" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#dc2626">🚩 Discontinue Activity<br><span style="font-size:.78rem">(from ${_refDateLabel} onwards)</span></button>
+            <button class="mn-km-mastered" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">⭐ Activity Mastered</button>
+            <button class="mn-km-discontinued" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#dc2626">🚩 Discontinue Activity</button>
             <div style="display:flex;align-items:stretch">
               <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
               <span title="Permanently removes this activity and all of its session data. This cannot be undone." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
@@ -9049,8 +9074,8 @@ function renderTargetManageContent(student, target) {
           <div style="position:relative">
             <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
             <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:250px;overflow:hidden">
-              <button class="mn-km-mastered" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">⭐ Activity Mastered<br><span style="font-size:.78rem;color:#6b7280">(from ${_refDateLabel} onwards)</span></button>
-              <button class="mn-km-discontinued" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#dc2626">🚩 Discontinue Activity<br><span style="font-size:.78rem">(from ${_refDateLabel} onwards)</span></button>
+              <button class="mn-km-mastered" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">⭐ Activity Mastered</button>
+              <button class="mn-km-discontinued" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#dc2626">🚩 Discontinue Activity</button>
               <div style="display:flex;align-items:stretch">
                 <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
                 <span title="Deletes this activity and all its sub-activities." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
@@ -9095,8 +9120,8 @@ function renderTargetManageContent(student, target) {
                 <button class="mn-km-opt" data-idx="${idx}" data-action="color_white" style="padding:.35rem .6rem;background:#ffffff;border:2px solid ${!isGray ? '#6b7280' : '#e5e7eb'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🤍 White (Normal)</button>
                 <button class="mn-km-opt" data-idx="${idx}" data-action="color_gray" style="padding:.35rem .6rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🩶 Grey (Maintain)</button>
               </div>
-              <button class="mn-km-mastered" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">⭐ Activity Mastered<br><span style="font-size:.78rem;color:#6b7280">(from ${_refDateLabel} onwards)</span></button>
-              <button class="mn-km-discontinued" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#dc2626">🚩 Discontinue Activity<br><span style="font-size:.78rem">(from ${_refDateLabel} onwards)</span></button>
+              <button class="mn-km-mastered" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">⭐ Activity Mastered</button>
+              <button class="mn-km-discontinued" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#dc2626">🚩 Discontinue Activity</button>
               <div style="display:flex;align-items:stretch">
                 <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
                 <span title="Permanently removes this activity and all of its session data. This cannot be undone." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
@@ -9528,7 +9553,13 @@ function renderTargetManageContent(student, target) {
     btn.addEventListener("click", async () => {
       const idx = Number(btn.dataset.idx);
       if (!acts[idx]) return;
-      acts[idx].masteredOn = _refDate;
+      const date = await showDatePickerDialog({
+        title: "⭐ Activity Mastered",
+        message: "On what date was this activity mastered? It won't appear in sessions from that date onwards.",
+        confirmLabel: "Confirm ⭐"
+      });
+      if (!date) return;
+      acts[idx].masteredOn = date;
       target.predefinedActivities = acts;
       await saveTarget();
       renderTargetManageContent(student, target);
@@ -9539,7 +9570,13 @@ function renderTargetManageContent(student, target) {
     btn.addEventListener("click", async () => {
       const idx = Number(btn.dataset.idx);
       if (!acts[idx]) return;
-      acts[idx].discontinuedOn = _refDate;
+      const date = await showDatePickerDialog({
+        title: "🚩 Discontinue Activity",
+        message: "From what date should this activity be discontinued? It won't appear in sessions from that date onwards.",
+        confirmLabel: "Confirm 🚩"
+      });
+      if (!date) return;
+      acts[idx].discontinuedOn = date;
       target.predefinedActivities = acts;
       await saveTarget();
       renderTargetManageContent(student, target);
@@ -10499,8 +10536,8 @@ function renderTemplateManageContent(template) {
               <button class="mn-km-opt" data-idx="${idx}" data-action="color_white" style="padding:.35rem .6rem;background:#ffffff;border:2px solid ${!isGray ? '#6b7280' : '#e5e7eb'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🤍 White (Normal)</button>
               <button class="mn-km-opt" data-idx="${idx}" data-action="color_gray" style="padding:.35rem .6rem;background:#d9d9d9;border:2px solid ${isGray ? '#6b7280' : '#bfbfbf'};border-radius:.4rem;cursor:pointer;font-size:.75rem;text-align:left">🩶 Grey (Maintain)</button>
             </div>
-            <button class="mn-km-mastered" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">⭐ Activity Mastered<br><span style="font-size:.78rem;color:#6b7280">(from ${_refDateLabel} onwards)</span></button>
-            <button class="mn-km-discontinued" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#dc2626">🚩 Discontinue Activity<br><span style="font-size:.78rem">(from ${_refDateLabel} onwards)</span></button>
+            <button class="mn-km-mastered" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">⭐ Activity Mastered</button>
+            <button class="mn-km-discontinued" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#dc2626">🚩 Discontinue Activity</button>
             <div style="display:flex;align-items:stretch">
               <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
             </div>
@@ -10953,7 +10990,13 @@ function renderTemplateManageContent(template) {
     btn.addEventListener("click", async () => {
       const idx = Number(btn.dataset.idx);
       if (!acts[idx]) return;
-      acts[idx].masteredOn = todayDateStr();
+      const date = await showDatePickerDialog({
+        title: "⭐ Activity Mastered",
+        message: "On what date was this activity mastered? It won't appear in sessions from that date onwards.",
+        confirmLabel: "Confirm ⭐"
+      });
+      if (!date) return;
+      acts[idx].masteredOn = date;
       template.predefinedActivities = acts;
       await saveTemplateFn();
       renderTemplateManageContent(template);
@@ -10964,7 +11007,13 @@ function renderTemplateManageContent(template) {
     btn.addEventListener("click", async () => {
       const idx = Number(btn.dataset.idx);
       if (!acts[idx]) return;
-      acts[idx].discontinuedOn = todayDateStr();
+      const date = await showDatePickerDialog({
+        title: "🚩 Discontinue Activity",
+        message: "From what date should this activity be discontinued? It won't appear in sessions from that date onwards.",
+        confirmLabel: "Confirm 🚩"
+      });
+      if (!date) return;
+      acts[idx].discontinuedOn = date;
       template.predefinedActivities = acts;
       await saveTemplateFn();
       renderTemplateManageContent(template);
