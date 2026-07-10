@@ -375,7 +375,7 @@ function addBaselineVsCurrentSheet(wb, entityName, allTargets, sortedSessions) {
     titleRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
 
     // Column headers
-    const hdrRow = ws.addRow(["Target", "First Available", lastMonth]);
+    const hdrRow = ws.addRow(["Target", "Earliest Month", "Latest Month"]);
     rowOffset++;
     for (let c = 1; c <= 3; c++) {
       hdrRow.getCell(c).fill      = STYLE_COL_HEADER.fill;
@@ -393,17 +393,14 @@ function addBaselineVsCurrentSheet(wb, entityName, allTargets, sortedSessions) {
         if (s !== null) { targetFirstMonth = m; scoreF = s; break; }
       }
       const scoreL = monthAvgForTarget(target, sessionsByMonth[lastMonth] || []);
-      const firstCell = scoreF !== null
-        ? (targetFirstMonth !== firstMonth ? `${pct(scoreF)} (${targetFirstMonth})` : pct(scoreF))
-        : "";
-      ws.addRow([
-        target.name,
-        firstCell,
-        scoreL !== null ? pct(scoreL) : ""
-      ]);
+      // Always show month name in cell so the reader knows which month each % is from
+      const firstCell = scoreF !== null ? `${pct(scoreF)} (${targetFirstMonth})` : "";
+      const lastCell  = scoreL !== null ? `${pct(scoreL)} (${lastMonth})`        : "";
+      ws.addRow([target.name, firstCell, lastCell]);
       rowOffset++;
       if (scoreF !== null && scoreL !== null && targetFirstMonth !== lastMonth) {
-        chartTargets.push({ name: target.name, first: Math.round(scoreF), last: Math.round(scoreL) });
+        chartTargets.push({ name: target.name, first: Math.round(scoreF), last: Math.round(scoreL),
+          firstLabel: targetFirstMonth, lastLabel: lastMonth });
       }
     }
 
@@ -414,8 +411,8 @@ function addBaselineVsCurrentSheet(wb, entityName, allTargets, sortedSessions) {
         chartTargets.map(t => t.name),
         chartTargets.map(t => t.first),
         chartTargets.map(t => t.last),
-        "First Available Avg",
-        `${lastMonth} Avg`
+        "Earliest Month Avg",
+        "Latest Month Avg"
       );
       const imgId = wb.addImage({ base64, extension: "png" });
       ws.addImage(imgId, { tl: { col: 0, row: rowOffset }, ext: { width: 605, height: 370 } });
