@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "839";
+const APP_VERSION = "840";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3584,7 +3584,10 @@ function getActivityInlineOptions(a) {
 }
 
 function parseOpts(str) {
-  return (str || "").split("/").map(s => s.trim()).filter(Boolean);
+  if (!str) return [];
+  // \x1F (Unit Separator) is the current delimiter; "/" is legacy for existing data
+  const sep = str.includes("\x1F") ? "\x1F" : "/";
+  return str.split(sep).map(s => s.trim()).filter(Boolean);
 }
 
 // Converts stored remark text (plain or legacy **bold**) to HTML for contenteditable display
@@ -9935,7 +9938,7 @@ function renderTargetManageContent(student, target) {
       const optsVis    = usesOpts;
       starterWrap.style.display    = starterVis ? "flex" : "none";
       optsContainer.style.display  = optsVis ? "" : "none";
-      if (usesOpts) { acts[idx].inlineOptions = getOptsFromDom(idx).join("/") || null; rebuildOptScores(idx); }
+      if (usesOpts) { acts[idx].inlineOptions = getOptsFromDom(idx).join("\x1F") || null; rebuildOptScores(idx); }
       if (starterVis) { starterInput.focus(); }
       else if (optsVis) { optsContainer.querySelector(".mn-opt-item")?.focus(); }
       else { target.predefinedActivities = acts; await saveTarget(); }
@@ -10126,7 +10129,7 @@ function renderTargetManageContent(student, target) {
       const list = btn.closest(".mn-opts-list");
       list.removeChild(btn.closest(".mn-opt-row"));
       renumberOpts(list);
-      acts[idx].inlineOptions = getOptsFromDom(idx).join("/") || null;
+      acts[idx].inlineOptions = getOptsFromDom(idx).join("\x1F") || null;
       acts[idx].remarkPresetId = null;
       rebuildOptScores(idx);
       target.predefinedActivities = acts;
@@ -10145,7 +10148,7 @@ function renderTargetManageContent(student, target) {
       acts[idx].archivedOptions = (acts[idx].archivedOptions || []).filter(ao => ao.text !== optText);
       const currentOpts = parseOpts(acts[idx].inlineOptions || "");
       currentOpts.push(optText);
-      acts[idx].inlineOptions = currentOpts.join("/") || null;
+      acts[idx].inlineOptions = currentOpts.join("\x1F") || null;
       if (score !== undefined) { acts[idx].optionScores = acts[idx].optionScores || {}; acts[idx].optionScores[optText] = score; }
       target.predefinedActivities = acts;
       // Add row back to active list as readonly
@@ -10229,7 +10232,7 @@ function renderTargetManageContent(student, target) {
       inp.style.cursor = "default";
       const remBtn = inp.closest(".mn-opt-row")?.querySelector(".mn-opt-remove");
       if (remBtn) remBtn.dataset.text = newName;
-      const newOptsStr = getOptsFromDom(idx).join("/") || null;
+      const newOptsStr = getOptsFromDom(idx).join("\x1F") || null;
       if (newOptsStr !== acts[idx].inlineOptions) {
         acts[idx].inlineOptions = newOptsStr;
         acts[idx].remarkPresetId = null;
@@ -10247,7 +10250,7 @@ function renderTargetManageContent(student, target) {
     initDragSort(list, async () => {
       const idx = Number(list.closest(".mn-opts-container").dataset.idx);
       renumberOpts(list);
-      const newOptsStr = getOptsFromDom(idx).join("/") || null;
+      const newOptsStr = getOptsFromDom(idx).join("\x1F") || null;
       acts[idx].inlineOptions = newOptsStr;
       acts[idx].remarkPresetId = null;
       target.predefinedActivities = acts;
@@ -10309,7 +10312,7 @@ function renderTargetManageContent(student, target) {
         nameInput.style.cursor = "default";
         if (countdown) countdown.remove();
         removeBtn.dataset.text = newName;
-        const newOptsStr = getOptsFromDom(idx).join("/") || null;
+        const newOptsStr = getOptsFromDom(idx).join("\x1F") || null;
         if (newOptsStr !== acts[idx].inlineOptions) {
           acts[idx].inlineOptions = newOptsStr;
           acts[idx].remarkPresetId = null;
@@ -10327,14 +10330,10 @@ function renderTargetManageContent(student, target) {
       }, 1000);
 
       nameInput.addEventListener("input", () => {
-        nameInput.value = nameInput.value.replace(/\//g, "-");
         secondsLeft = 30;
         if (countdown) countdown.textContent = `Option name locks in ${secondsLeft}s`;
       });
-      nameInput.addEventListener("keydown", e => {
-        if (e.key === "/") { e.preventDefault(); return; }
-        if (e.key === "Enter") { e.preventDefault(); doLock(); }
-      });
+      nameInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); doLock(); } });
       nameInput.addEventListener("blur", doLock, { once: true });
       row.querySelector(".drag-handle").addEventListener("pointerdown", () => doLock(), { once: true });
     });
@@ -10823,7 +10822,7 @@ function renderTemplateManageContent(template) {
       starterWrap.style.display    = starterVis ? "flex" : "none";
       optsContainer.style.display  = optsVis ? "" : "none";
       if (usesOpts) {
-        acts[idx].inlineOptions = [...body.querySelectorAll(`.mn-opt-item[data-idx="${idx}"]`)].map(i => i.value.trim()).filter(Boolean).join("/") || null;
+        acts[idx].inlineOptions = [...body.querySelectorAll(`.mn-opt-item[data-idx="${idx}"]`)].map(i => i.value.trim()).filter(Boolean).join("\x1F") || null;
       }
       if (starterVis) { starterInput.focus(); }
       else if (optsVis) { optsContainer.querySelector(".mn-opt-item")?.focus(); }
@@ -11117,7 +11116,7 @@ function renderTemplateManageContent(template) {
       const list = btn.closest(".mn-opts-list");
       list.removeChild(btn.closest(".mn-opt-row"));
       renumberTmplOpts(list);
-      acts[idx].inlineOptions = getTmplOptsFromDom(idx).join("/") || null;
+      acts[idx].inlineOptions = getTmplOptsFromDom(idx).join("\x1F") || null;
       acts[idx].remarkPresetId = null;
       template.predefinedActivities = acts;
       await saveTemplateFn();
@@ -11137,7 +11136,7 @@ function renderTemplateManageContent(template) {
       inp.style.cursor = "default";
       const remBtn = inp.closest(".mn-opt-row")?.querySelector(".mn-opt-remove");
       if (remBtn) remBtn.dataset.text = newName;
-      const newOptsStr = getTmplOptsFromDom(idx).join("/") || null;
+      const newOptsStr = getTmplOptsFromDom(idx).join("\x1F") || null;
       if (newOptsStr !== acts[idx].inlineOptions) {
         acts[idx].inlineOptions = newOptsStr;
         acts[idx].remarkPresetId = null;
@@ -11153,7 +11152,7 @@ function renderTemplateManageContent(template) {
     initDragSort(list, async () => {
       const idx = Number(list.closest(".mn-opts-container").dataset.idx);
       renumberTmplOpts(list);
-      const newOptsStr = getTmplOptsFromDom(idx).join("/") || null;
+      const newOptsStr = getTmplOptsFromDom(idx).join("\x1F") || null;
       acts[idx].inlineOptions = newOptsStr;
       acts[idx].remarkPresetId = null;
       template.predefinedActivities = acts;
@@ -11208,7 +11207,7 @@ function renderTemplateManageContent(template) {
         nameInput.style.borderColor = "";
         nameInput.style.cursor = "default";
         if (countdown) countdown.remove();
-        const newOptsStr = getTmplOptsFromDom(idx).join("/") || null;
+        const newOptsStr = getTmplOptsFromDom(idx).join("\x1F") || null;
         if (newOptsStr !== acts[idx].inlineOptions) {
           acts[idx].inlineOptions = newOptsStr;
           acts[idx].remarkPresetId = null;
@@ -11225,14 +11224,10 @@ function renderTemplateManageContent(template) {
       }, 1000);
 
       nameInput.addEventListener("input", () => {
-        nameInput.value = nameInput.value.replace(/\//g, "-");
         secondsLeft = 30;
         if (countdown) countdown.textContent = `Option name locks in ${secondsLeft}s`;
       });
-      nameInput.addEventListener("keydown", e => {
-        if (e.key === "/") { e.preventDefault(); return; }
-        if (e.key === "Enter") { e.preventDefault(); doLock(); }
-      });
+      nameInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); doLock(); } });
       nameInput.addEventListener("blur", doLock, { once: true });
       row.querySelector(".drag-handle").addEventListener("pointerdown", () => doLock(), { once: true });
     });
