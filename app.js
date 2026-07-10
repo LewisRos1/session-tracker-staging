@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "837";
+const APP_VERSION = "838";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -10137,6 +10137,8 @@ function renderTargetManageContent(student, target) {
 
   const wireOptUnremove = (btn, idx) => {
     btn.addEventListener("click", async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
       const optText  = btn.dataset.text;
       const rawScore = btn.dataset.score;
       const score    = rawScore !== "" && !isNaN(Number(rawScore)) ? Number(rawScore) : undefined;
@@ -10322,7 +10324,7 @@ function renderTargetManageContent(student, target) {
       }, 1000);
 
       nameInput.addEventListener("input", () => {
-        secondsLeft = 20;
+        secondsLeft = 30;
         if (countdown) countdown.textContent = `Option name locks in ${secondsLeft}s`;
       });
       nameInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); doLock(); } });
@@ -11215,7 +11217,7 @@ function renderTemplateManageContent(template) {
       }, 1000);
 
       nameInput.addEventListener("input", () => {
-        secondsLeft = 20;
+        secondsLeft = 30;
         if (countdown) countdown.textContent = `Option name locks in ${secondsLeft}s`;
       });
       nameInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); doLock(); } });
