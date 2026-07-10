@@ -375,7 +375,7 @@ function addBaselineVsCurrentSheet(wb, entityName, allTargets, sortedSessions) {
     titleRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
 
     // Column headers
-    const hdrRow = ws.addRow(["Target", firstMonth, lastMonth]);
+    const hdrRow = ws.addRow(["Target", "First Available", lastMonth]);
     rowOffset++;
     for (let c = 1; c <= 3; c++) {
       hdrRow.getCell(c).fill      = STYLE_COL_HEADER.fill;
@@ -385,15 +385,24 @@ function addBaselineVsCurrentSheet(wb, entityName, allTargets, sortedSessions) {
 
     const chartTargets = [];
     for (const target of allTargets) {
-      const scoreF = monthAvgForTarget(target, sessionsByMonth[firstMonth] || []);
-      const scoreL = monthAvgForTarget(target, sessionsByMonth[lastMonth]  || []);
+      // Find the first month in this half-year that has data for this target
+      let targetFirstMonth = null;
+      let scoreF = null;
+      for (const m of months) {
+        const s = monthAvgForTarget(target, sessionsByMonth[m] || []);
+        if (s !== null) { targetFirstMonth = m; scoreF = s; break; }
+      }
+      const scoreL = monthAvgForTarget(target, sessionsByMonth[lastMonth] || []);
+      const firstCell = scoreF !== null
+        ? (targetFirstMonth !== firstMonth ? `${pct(scoreF)} (${targetFirstMonth})` : pct(scoreF))
+        : "";
       ws.addRow([
         target.name,
-        scoreF !== null ? pct(scoreF) : "",
+        firstCell,
         scoreL !== null ? pct(scoreL) : ""
       ]);
       rowOffset++;
-      if (scoreF !== null && scoreL !== null) {
+      if (scoreF !== null && scoreL !== null && targetFirstMonth !== lastMonth) {
         chartTargets.push({ name: target.name, first: Math.round(scoreF), last: Math.round(scoreL) });
       }
     }
@@ -405,7 +414,7 @@ function addBaselineVsCurrentSheet(wb, entityName, allTargets, sortedSessions) {
         chartTargets.map(t => t.name),
         chartTargets.map(t => t.first),
         chartTargets.map(t => t.last),
-        `${firstMonth} Avg`,
+        "First Available Avg",
         `${lastMonth} Avg`
       );
       const imgId = wb.addImage({ base64, extension: "png" });
