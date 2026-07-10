@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "827";
+const APP_VERSION = "828";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3264,17 +3264,11 @@ function renderFedcTarget(target) {
                      : isGrayP  ? 'border:1px solid #e5e7eb;border-left:4px solid #d1d5db;background:#f3f4f6;'
                      : 'border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);';
       html += `<div style="display:flex;flex-direction:column;gap:0">`;
-      const pFutureStatus = (pa.masteredOn && sessionDateForFilter < pa.masteredOn)
-        ? `<div contenteditable="false" style="font-size:.75rem;color:#059669;padding:.1rem .75rem .15rem;font-weight:500">⭐ Mastered on ${fmtPeriodDate(pa.masteredOn)}</div>`
-        : (pa.discontinuedOn && sessionDateForFilter < pa.discontinuedOn)
-        ? `<div contenteditable="false" style="font-size:.75rem;color:#dc2626;padding:.1rem .75rem .15rem;font-weight:500">🚩 Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}</div>`
-        : '';
       html += `<div class="entry-block" style="${pBorder}border-radius:var(--radius) var(--radius) 0 0;border-bottom:none;box-shadow:var(--shadow)">
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Activity</span>
           <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${formatActivityMarkup(pa.name)}</span>
         </div>
-        ${pFutureStatus}
       </div>`;
       children.forEach((sub, si) => {
         let subActData = findActivityByName(target.name, sub.name, pa.name, sub.id);
@@ -3353,11 +3347,6 @@ function renderFedcTarget(target) {
         <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${formatActivityMarkup(pa.name)}</span>
       </div>`;
 
-    if (pa.masteredOn && sessionDateForFilter < pa.masteredOn) {
-      html += `<div contenteditable="false" style="font-size:.75rem;color:#059669;padding:.1rem .75rem .15rem;font-weight:500">⭐ Mastered on ${fmtPeriodDate(pa.masteredOn)}</div>`;
-    } else if (pa.discontinuedOn && sessionDateForFilter < pa.discontinuedOn) {
-      html += `<div contenteditable="false" style="font-size:.75rem;color:#dc2626;padding:.1rem .75rem .15rem;font-weight:500">🚩 Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}</div>`;
-    }
     if (pa.actNote && pa.actNote.trim()) {
       html += `<div class="entry-field" contenteditable="false">
         <span class="field-label">Note</span>
@@ -7635,12 +7624,13 @@ function todayDateStr() {
 }
 
 function inactiveReasonBadge(pa) {
-  if (pa?.inactiveReason === 'mastered') {
-    const d = pa.masteredOn || "2026-06-30";
-    return `<span style="display:inline-flex;align-items:center;background:#d1fae5;border:1px solid #6ee7b7;border-radius:999px;padding:.05rem .45rem;font-size:.7rem;font-weight:700;color:#059669;white-space:nowrap;margin-right:.4rem;vertical-align:middle">⭐ Mastered on ${fmtPeriodDate(d)}</span>`;
+  const masteredDate = pa?.masteredOn || (pa?.inactiveReason === 'mastered' ? "2026-06-30" : null);
+  if (masteredDate)
+    return `<span style="display:inline-flex;align-items:center;background:#d1fae5;border:1px solid #6ee7b7;border-radius:999px;padding:.05rem .45rem;font-size:.7rem;font-weight:700;color:#059669;white-space:nowrap;margin-right:.4rem;vertical-align:middle">⭐ Mastered on ${fmtPeriodDate(masteredDate)}</span>`;
+  if (pa?.discontinuedOn || pa?.inactiveReason === 'discontinued') {
+    const label = pa.discontinuedOn ? `🚩 Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}` : '● Discontinued';
+    return `<span style="display:inline-flex;align-items:center;background:#fee2e2;border:1px solid #fca5a5;border-radius:999px;padding:.05rem .45rem;font-size:.7rem;font-weight:700;color:#dc2626;white-space:nowrap;margin-right:.4rem;vertical-align:middle">${label}</span>`;
   }
-  if (pa?.inactiveReason === 'discontinued')
-    return '<span style="display:inline-flex;align-items:center;background:#fee2e2;border:1px solid #fca5a5;border-radius:999px;padding:.05rem .45rem;font-size:.7rem;font-weight:700;color:#dc2626;white-space:nowrap;margin-right:.4rem;vertical-align:middle">● Discontinued</span>';
   return '';
 }
 
