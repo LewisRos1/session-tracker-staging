@@ -452,10 +452,12 @@ function addHalfYearChartsSheets(wb, allTargets, sessions) {
   function buildSheet(sheetName, halfMonths) {
     if (halfMonths.length === 0) return;
     const ws = wb.addWorksheet(sheetName);
-    const noteCell = ws.addRow(["Trend threshold: ↑ Trending Up / ↓ Trending Down = trend line change > 8pp   |   → Stable = ≤ 8pp"]).getCell(1);
-    noteCell.font = { italic: true, color: { argb: "FF666666" }, size: 10 };
-    ws.addRow([]);
-    const ROW_OFFSET = 2;
+    // Embed legend image instead of a text cell so it can be copy-pasted into Word
+    const legendBase64 = renderThresholdLegend();
+    const legendImgId  = wb.addImage({ base64: legendBase64, extension: "png" });
+    ws.addImage(legendImgId, { tl: { col: 0, row: 0 }, ext: { width: 460, height: 130 } });
+    for (let i = 0; i < 7; i++) ws.addRow([]); // blank rows to make space for legend image
+    const ROW_OFFSET = 7;
     let chartIdx = 0;
 
     for (const target of allTargets) {
@@ -2339,6 +2341,66 @@ function wrapLabel(text, maxChars = 14) {
   }
   if (current) lines.push(current);
   return lines;
+}
+
+function renderThresholdLegend() {
+  const W = 460, H = 130;
+  const canvas = document.createElement("canvas");
+  canvas.width  = W * 2; // 2× for crispness when pasted into Word
+  canvas.height = H * 2;
+  const cx = canvas.getContext("2d");
+  cx.scale(2, 2);
+
+  // White background + outer border
+  cx.fillStyle = "#ffffff";
+  cx.fillRect(0, 0, W, H);
+  cx.strokeStyle = "#d1d5db";
+  cx.lineWidth = 1.5;
+  cx.strokeRect(0.75, 0.75, W - 1.5, H - 1.5);
+
+  // Title bar
+  cx.fillStyle = "#f3f4f6";
+  cx.fillRect(0, 0, W, 30);
+  cx.strokeStyle = "#d1d5db";
+  cx.lineWidth = 1;
+  cx.beginPath(); cx.moveTo(0, 30); cx.lineTo(W, 30); cx.stroke();
+  cx.fillStyle = "#111827";
+  cx.font = "bold 13px sans-serif";
+  cx.textAlign = "left";
+  cx.textBaseline = "middle";
+  cx.fillText("Trend Direction Legend", 14, 15);
+
+  const rows = [
+    { arrow: "↑", label: "Trending Up",  cond: "> +8pp",         color: "#059669" },
+    { arrow: "→", label: "Stable",        cond: "−8pp  to  +8pp", color: "#6b7280" },
+    { arrow: "↓", label: "Trending Down", cond: "< −8pp",         color: "#dc2626" },
+  ];
+
+  const arrowX = 16, labelX = 38, pipeX = 220, condX = 236;
+  const rowH = 30, startY = 30 + 15;
+
+  rows.forEach(({ arrow, label, cond, color }, i) => {
+    const y = startY + i * rowH;
+
+    if (i % 2 === 1) { cx.fillStyle = "#f9fafb"; cx.fillRect(1.5, y - rowH / 2, W - 3, rowH); }
+
+    cx.font = "bold 14px sans-serif";
+    cx.fillStyle = color;
+    cx.textAlign = "left";
+    cx.textBaseline = "middle";
+    cx.fillText(arrow, arrowX, y);
+    cx.fillText(label, labelX, y);
+
+    cx.fillStyle = "#9ca3af";
+    cx.font = "normal 13px sans-serif";
+    cx.fillText("|", pipeX, y);
+
+    cx.fillStyle = "#374151";
+    cx.font = "normal 13px sans-serif";
+    cx.fillText(cond, condX, y);
+  });
+
+  return canvas.toDataURL("image/png").split(",")[1];
 }
 
 function renderBaselineChart(title, labels, baselineData, currentData, baselineLabel, currentLabel) {
