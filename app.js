@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "838";
+const APP_VERSION = "839";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -10172,6 +10172,9 @@ function renderTargetManageContent(student, target) {
 
   const wireOptScore = (input, idx) => {
     input.addEventListener("blur", async () => {
+      const max = Number(input.getAttribute("max"));
+      if (input.value !== "" && max > 0 && Number(input.value) > max) input.value = String(max);
+      if (input.value !== "" && Number(input.value) < 0) input.value = "0";
       rebuildOptScores(idx);
       target.predefinedActivities = acts;
       await saveTarget();
@@ -10266,7 +10269,7 @@ function renderTargetManageContent(student, target) {
         `<span class="mn-opt-num" style="font-size:.8rem;color:#6b7280;white-space:nowrap;flex-shrink:0;font-weight:600">Option ${oi + 1}:</span>` +
         `<span class="mn-opt-countdown" style="font-size:.88rem;color:#f59e0b;white-space:nowrap;flex-shrink:0;font-weight:700">Option name locks in 30s</span>` +
         `<input class="admin-input mn-opt-item" data-idx="${idx}" data-oi="${oi}" placeholder="Enter option name…" style="flex:1;padding:.45rem .6rem;font-size:.95rem;min-width:0;border-color:#f59e0b;background:#fffbeb">` +
-        `<input class="admin-input mn-opt-score" type="number" min="0" step="0.5" data-idx="${idx}" data-oi="${oi}" placeholder="Pts" style="width:3.8rem;flex-shrink:0;padding:.45rem .3rem;font-size:.9rem;text-align:center">` +
+        `<input class="admin-input mn-opt-score" type="number" min="0" max="${target.maxPoints || 3}" step="0.5" data-idx="${idx}" data-oi="${oi}" placeholder="Pts" style="width:3.8rem;flex-shrink:0;padding:.45rem .3rem;font-size:.9rem;text-align:center">` +
         `<button class="mn-opt-remove" data-idx="${idx}" data-oi="${oi}" data-text="" style="flex-shrink:0;padding:.3rem .65rem;font-size:.82rem;color:#dc2626;background:none;border:1px solid #fca5a5;border-radius:.35rem;cursor:pointer">Remove</button>`;
       list.appendChild(row);
 
@@ -10324,11 +10327,16 @@ function renderTargetManageContent(student, target) {
       }, 1000);
 
       nameInput.addEventListener("input", () => {
+        nameInput.value = nameInput.value.replace(/\//g, "-");
         secondsLeft = 30;
         if (countdown) countdown.textContent = `Option name locks in ${secondsLeft}s`;
       });
-      nameInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); doLock(); } });
+      nameInput.addEventListener("keydown", e => {
+        if (e.key === "/") { e.preventDefault(); return; }
+        if (e.key === "Enter") { e.preventDefault(); doLock(); }
+      });
       nameInput.addEventListener("blur", doLock, { once: true });
+      row.querySelector(".drag-handle").addEventListener("pointerdown", () => doLock(), { once: true });
     });
   });
 
@@ -11217,11 +11225,16 @@ function renderTemplateManageContent(template) {
       }, 1000);
 
       nameInput.addEventListener("input", () => {
+        nameInput.value = nameInput.value.replace(/\//g, "-");
         secondsLeft = 30;
         if (countdown) countdown.textContent = `Option name locks in ${secondsLeft}s`;
       });
-      nameInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); doLock(); } });
+      nameInput.addEventListener("keydown", e => {
+        if (e.key === "/") { e.preventDefault(); return; }
+        if (e.key === "Enter") { e.preventDefault(); doLock(); }
+      });
       nameInput.addEventListener("blur", doLock, { once: true });
+      row.querySelector(".drag-handle").addEventListener("pointerdown", () => doLock(), { once: true });
     });
   });
 
