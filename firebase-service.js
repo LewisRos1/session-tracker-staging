@@ -252,13 +252,6 @@ export async function changeSessionNumber(studentId, anchorSessionId, newNumber,
   if (!anchor) throw new Error("That session could not be found.");
   const delta = newNumber - anchor.number;
   if (delta === 0) return;
-  const earliest = sessions.reduce((min, s) => (!min || s.date < min.date) ? s : min, null);
-  if (earliest.number + delta < 1) {
-    throw new Error(
-      `Session ${newNumber} would push this student's earliest recorded session ` +
-      `(${earliest.date}) to Session ${earliest.number + delta}. Choose a different number.`
-    );
-  }
   const CHUNK = 450; // Firestore batch cap is 500 ops
   for (let i = 0; i < sessions.length; i += CHUNK) {
     const batch = writeBatch(db);
