@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "834";
+const APP_VERSION = "835";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -8812,7 +8812,6 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
           `<div class="mn-opt-row admin-list-item" data-idx="${oi}" style="display:flex;align-items:center;gap:.4rem;margin-bottom:.4rem">` +
           `<span class="drag-handle" style="cursor:grab;color:#c4c9d4;font-size:1.1rem;flex-shrink:0;padding:0 .15rem;user-select:none">⠿</span>` +
           `<span class="mn-opt-num" style="font-size:.8rem;color:#6b7280;white-space:nowrap;flex-shrink:0;font-weight:600">Option ${oi + 1}:</span>` +
-          (opt ? `` : `<span class="mn-opt-countdown" style="font-size:.88rem;color:#f59e0b;white-space:nowrap;flex-shrink:0;font-weight:700">Option name locks in 20s</span>`) +
           `<input class="admin-input mn-opt-item" data-idx="${idx}" data-oi="${oi}" value="${escHtml(opt)}" placeholder="Enter option…" ${opt ? `readonly style="flex:1;padding:.45rem .6rem;font-size:.95rem;min-width:0;background:#f9fafb;color:#374151;cursor:default"` : `data-empty-opt="1" style="flex:1;padding:.45rem .6rem;font-size:.95rem;min-width:0"`}>` +
           `<input class="admin-input mn-opt-score" type="number" min="0" max="${maxPts}" step="0.5" data-idx="${idx}" data-oi="${oi}" value="${escHtml(String(a.optionScores?.[opt] ?? ''))}" placeholder="Pts" style="width:3.8rem;flex-shrink:0;padding:.45rem .3rem;font-size:.9rem;text-align:center">` +
           `<button class="mn-opt-remove" data-idx="${idx}" data-oi="${oi}" data-text="${escHtml(opt)}" style="flex-shrink:0;padding:.3rem .65rem;font-size:.82rem;color:#dc2626;background:none;border:1px solid #fca5a5;border-radius:.35rem;cursor:pointer">Remove</button>` +
@@ -10216,31 +10215,21 @@ function renderTargetManageContent(student, target) {
   });
 
   $("manage-modal-body").querySelectorAll(".mn-opt-item[data-empty-opt]").forEach(inp => {
-    const idx = Number(inp.dataset.idx);
-    const countdown = inp.closest(".mn-opt-row")?.querySelector(".mn-opt-countdown");
-    let locked = false;
-    let secondsLeft = 20;
-    let countdownInterval;
-
-    const doLock = () => {
-      if (locked) return;
-      clearInterval(countdownInterval);
+    const saveEmpty = () => {
       const newName = inp.value.trim();
-      if (!newName) { if (countdown) countdown.remove(); return; }
-      locked = true;
+      if (!newName) return;
+      const idx = Number(inp.dataset.idx);
       const existingActive   = parseOpts(acts[idx].inlineOptions || "");
       const existingArchived = (acts[idx].archivedOptions || []).map(ao => ao.text);
       if (existingActive.includes(newName) || existingArchived.includes(newName)) {
         inp.style.borderColor = "#dc2626";
         setTimeout(() => { inp.style.borderColor = ""; }, 2000);
-        locked = false;
         return;
       }
       inp.readOnly = true;
       inp.removeAttribute("data-empty-opt");
       inp.style.background = "#f9fafb";
       inp.style.cursor = "default";
-      if (countdown) countdown.remove();
       const remBtn = inp.closest(".mn-opt-row")?.querySelector(".mn-opt-remove");
       if (remBtn) remBtn.dataset.text = newName;
       const newOptsStr = getOptsFromDom(idx).join("/") || null;
@@ -10253,19 +10242,8 @@ function renderTargetManageContent(student, target) {
       }
       inp.addEventListener("click", () => showOptLockedMsg(inp));
     };
-
-    countdownInterval = setInterval(() => {
-      secondsLeft--;
-      if (countdown) countdown.textContent = `Option name locks in ${secondsLeft}s`;
-      if (secondsLeft <= 0) doLock();
-    }, 1000);
-
-    inp.addEventListener("input", () => {
-      secondsLeft = 20;
-      if (countdown) countdown.textContent = `Option name locks in ${secondsLeft}s`;
-    });
-    inp.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); doLock(); } });
-    inp.addEventListener("blur", doLock, { once: true });
+    inp.addEventListener("blur", saveEmpty, { once: true });
+    inp.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); inp.blur(); } });
   });
 
   $("manage-modal-body").querySelectorAll(".mn-opts-list").forEach(list => {
@@ -11143,30 +11121,14 @@ function renderTemplateManageContent(template) {
   $("manage-modal-body").querySelectorAll(".mn-opt-remove").forEach(btn => wireTmplOptRemove(btn, Number(btn.dataset.idx)));
 
   $("manage-modal-body").querySelectorAll(".mn-opt-item[data-empty-opt]").forEach(inp => {
-    const idx = Number(inp.dataset.idx);
-    const countdown = inp.closest(".mn-opt-row")?.querySelector(".mn-opt-countdown");
-    let locked = false;
-    let secondsLeft = 20;
-    let countdownInterval;
-
-    const doLock = () => {
-      if (locked) return;
-      clearInterval(countdownInterval);
+    const saveTmplEmpty = () => {
       const newName = inp.value.trim();
-      if (!newName) { if (countdown) countdown.remove(); return; }
-      locked = true;
-      const existingActive = parseOpts(acts[idx].inlineOptions || "");
-      if (existingActive.includes(newName)) {
-        inp.style.borderColor = "#dc2626";
-        setTimeout(() => { inp.style.borderColor = ""; }, 2000);
-        locked = false;
-        return;
-      }
+      if (!newName) return;
+      const idx = Number(inp.dataset.idx);
       inp.readOnly = true;
       inp.removeAttribute("data-empty-opt");
       inp.style.background = "#f9fafb";
       inp.style.cursor = "default";
-      if (countdown) countdown.remove();
       const remBtn = inp.closest(".mn-opt-row")?.querySelector(".mn-opt-remove");
       if (remBtn) remBtn.dataset.text = newName;
       const newOptsStr = getTmplOptsFromDom(idx).join("/") || null;
@@ -11177,19 +11139,8 @@ function renderTemplateManageContent(template) {
         saveTemplateFn().catch(() => {});
       }
     };
-
-    countdownInterval = setInterval(() => {
-      secondsLeft--;
-      if (countdown) countdown.textContent = `Option name locks in ${secondsLeft}s`;
-      if (secondsLeft <= 0) doLock();
-    }, 1000);
-
-    inp.addEventListener("input", () => {
-      secondsLeft = 20;
-      if (countdown) countdown.textContent = `Option name locks in ${secondsLeft}s`;
-    });
-    inp.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); doLock(); } });
-    inp.addEventListener("blur", doLock, { once: true });
+    inp.addEventListener("blur", saveTmplEmpty, { once: true });
+    inp.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); inp.blur(); } });
   });
 
   $("manage-modal-body").querySelectorAll(".mn-opts-list").forEach(list => {
