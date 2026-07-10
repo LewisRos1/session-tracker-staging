@@ -248,7 +248,7 @@ function addSummarySheets(wb, allTargets, sessions) {
   const summaryRows = buildSummarySheet(allTargets, sessions);
   const summaryWs   = wb.addWorksheet("Monthly Summary");
   summaryRows.forEach(row => summaryWs.addRow(row));
-  summaryWs.getColumn(1).width = 30;
+  summaryWs.getColumn(1).width = 40;
   const summaryMaxCols = summaryRows[0]?.length || 1;
   for (let c = 2; c <= summaryMaxCols; c++) summaryWs.getColumn(c).width = 12;
   summaryWs.getColumn(1).alignment = { vertical: "middle" };
@@ -269,7 +269,7 @@ function addSummarySheets(wb, allTargets, sessions) {
     buildDetailedSummarySheet(allTargets, sessions);
   const detWs = wb.addWorksheet("Detailed Summary");
   detRows.forEach(row => detWs.addRow(row));
-  detWs.getColumn(1).width = 30;
+  detWs.getColumn(1).width = 40;
   const detMaxCols = Math.max(...detRows.map(r => r.length), 1);
   for (let c = 2; c <= detMaxCols; c++) detWs.getColumn(c).width = 12;
   detWs.getColumn(1).alignment = { vertical: "middle" };
@@ -316,20 +316,22 @@ function unionTargetsByName(groups) {
 }
 
 function addBaselineVsCurrentSheet(wb, entityName, allTargets, sortedSessions) {
-  // Per-target: each target's "first month" is the first month IT has data,
-  // not the global first month. Same for "most recent month".
+  // Compares the first month vs the last month within each calendar half-year
+  // (H1 = Jan–Jun, H2 = Jul–Dec) that has data. A new section is added per
+  // year-half automatically, so 2027 H1/H2 appear without any code changes.
+  const H1_NAMES = new Set(["January","February","March","April","May","June"]);
+
   const allMonths = [...new Set(sortedSessions.map(s => s.month))].sort((a, b) => {
     const [ma, ya] = parseMonth(a); const [mb, yb] = parseMonth(b);
     return ya !== yb ? ya - yb : ma - mb;
   });
   if (allMonths.length < 2) return;
 
-  // Group sessions by month once
   const sessionsByMonth = {};
   for (const month of allMonths) sessionsByMonth[month] = sortedSessions.filter(s => s.month === month);
 
-  const monthAvgForTarget = (target, sessions) => {
-    const vals = sessions.map(s => {
+  const monthAvgForTarget = (target, monthSessions) => {
+    const vals = monthSessions.map(s => {
       const snap = (s.targetsSnapshot || []).find(t => t.name === target.name);
       const eff  = snap ? { ...target, maxPoints: snap.maxPoints ?? target.maxPoints } : target;
       return calcDailyAverage(s, eff, allTargets);
@@ -337,79 +339,90 @@ function addBaselineVsCurrentSheet(wb, entityName, allTargets, sortedSessions) {
     return vals.length > 0 ? avg(vals) : null;
   };
 
-  const bvcRows    = [];
-  const bvcTargets = [];
+  // Group months into half-year buckets (preserving chronological order)
+  const halfYearKeys   = [];
+  const halfYearMonths = {};
+  for (const month of allMonths) {
+    const [name, year] = month.split(" ");
+    const half = H1_NAMES.has(name) ? "H1" : "H2";
+    const key  = `${half} ${year}`;
+    if (!halfYearMonths[key]) { halfYearMonths[key] = []; halfYearKeys.push(key); }
+    halfYearMonths[key].push(month);
+  }
 
-  bvcRows.push([`${entityName}: First Month vs Most Recent Month`, "", ""]);
-  bvcRows.push(["Target", "First Month", "Most Recent Month"]);
+  const ws = wb.addWorksheet("Half-Year Progress");
+  let rowOffset   = 0;
+  let firstSect   = true;
 
-  for (const target of allTargets) {
-    let firstMonth = null, lastMonth = null, scoreF = null, scoreL = null;
-    for (const month of allMonths) {
-      const v = monthAvgForTarget(target, sessionsByMonth[month]);
-      if (v !== null) {
-        if (firstMonth === null) { firstMonth = month; scoreF = v; }
-        lastMonth = month;
-        scoreL    = v;
+  for (const key of halfYearKeys) {
+    const months     = halfYearMonths[key];
+    const firstMonth = months[0];
+    const lastMonth  = months[months.length - 1];
+    if (firstMonth === lastMonth) continue; // need at least 2 distinct months
+
+    const [half, year] = key.split(" ");
+    const range = half === "H1" ? "Jan – Jun" : "Jul – Dec";
+
+    if (!firstSect) { ws.addRow([]); rowOffset++; }
+    firstSect = false;
+
+    // Section title (merged across 3 cols)
+    const titleRow = ws.addRow([`${entityName} — ${key}  (${range} ${year})`, "", ""]);
+    rowOffset++;
+    try { ws.mergeCells(titleRow.number, 1, titleRow.number, 3); } catch (_) {}
+    titleRow.getCell(1).fill      = STYLE_SESSION.fill;
+    titleRow.getCell(1).font      = STYLE_SESSION.font;
+    titleRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
+
+    // Column headers
+    const hdrRow = ws.addRow(["Target", firstMonth, lastMonth]);
+    rowOffset++;
+    for (let c = 1; c <= 3; c++) {
+      hdrRow.getCell(c).fill      = STYLE_COL_HEADER.fill;
+      hdrRow.getCell(c).font      = STYLE_COL_HEADER.font;
+      hdrRow.getCell(c).alignment = STYLE_COL_HEADER.alignment;
+    }
+
+    const chartTargets = [];
+    for (const target of allTargets) {
+      const scoreF = monthAvgForTarget(target, sessionsByMonth[firstMonth] || []);
+      const scoreL = monthAvgForTarget(target, sessionsByMonth[lastMonth]  || []);
+      ws.addRow([
+        target.name,
+        scoreF !== null ? pct(scoreF) : "",
+        scoreL !== null ? pct(scoreL) : ""
+      ]);
+      rowOffset++;
+      if (scoreF !== null && scoreL !== null) {
+        chartTargets.push({ name: target.name, first: Math.round(scoreF), last: Math.round(scoreL) });
       }
     }
 
-    const hasComparison = firstMonth !== null && lastMonth !== null && firstMonth !== lastMonth;
-    bvcRows.push([
-      target.name,
-      firstMonth && scoreF !== null ? `${firstMonth}: ${pct(scoreF)}` : "",
-      hasComparison && scoreL !== null ? `${lastMonth}: ${pct(scoreL)}` : ""
-    ]);
-    bvcTargets.push({
-      name:  target.name,
-      first: hasComparison && scoreF !== null ? Math.round(scoreF) : null,
-      last:  hasComparison && scoreL !== null ? Math.round(scoreL) : null
-    });
-  }
-
-  const bvcWs = wb.addWorksheet("Monthly Comparison");
-  bvcRows.forEach(row => bvcWs.addRow(row));
-
-  bvcWs.getColumn(1).width     = 28;
-  bvcWs.getColumn(2).width     = 24;
-  bvcWs.getColumn(3).width     = 24;
-  bvcWs.getColumn(1).alignment = { vertical: "middle" };
-  bvcWs.getColumn(2).alignment = { horizontal: "center", vertical: "middle" };
-  bvcWs.getColumn(3).alignment = { horizontal: "center", vertical: "middle" };
-
-  try { bvcWs.mergeCells("A1:C1"); } catch (_) {}
-  const bvcTitle     = bvcWs.getRow(1).getCell(1);
-  bvcTitle.fill      = STYLE_SESSION.fill;
-  bvcTitle.font      = STYLE_SESSION.font;
-  bvcTitle.alignment = { horizontal: "center", vertical: "middle" };
-
-  for (let c = 1; c <= 3; c++) {
-    const cell     = bvcWs.getRow(2).getCell(c);
-    cell.fill      = STYLE_COL_HEADER.fill;
-    cell.font      = STYLE_COL_HEADER.font;
-    cell.alignment = STYLE_COL_HEADER.alignment;
-  }
-
-  applyBorders(bvcWs, 3);
-
-  if (typeof Chart !== "undefined") {
-    const chartTargets = bvcTargets.filter(t => t.first !== null || t.last !== null);
-    if (chartTargets.length > 0) {
-      const bvcBase64 = renderBaselineChart(
-        `${entityName}: First Month vs Most Recent Month`,
+    if (typeof Chart !== "undefined" && chartTargets.length > 0) {
+      ws.addRow([]); rowOffset++;
+      const base64 = renderBaselineChart(
+        `${entityName} — ${key}`,
         chartTargets.map(t => t.name),
         chartTargets.map(t => t.first),
         chartTargets.map(t => t.last),
-        "First Month Avg",
-        "Most Recent Month Avg"
+        `${firstMonth} Avg`,
+        `${lastMonth} Avg`
       );
-      const bvcImgId = wb.addImage({ base64: bvcBase64, extension: "png" });
-      bvcWs.addImage(bvcImgId, {
-        tl:  { col: 0, row: bvcRows.length + 1 },
-        ext: { width: 605, height: 370 }
-      });
+      const imgId = wb.addImage({ base64, extension: "png" });
+      ws.addImage(imgId, { tl: { col: 0, row: rowOffset }, ext: { width: 605, height: 370 } });
+      const CHART_ROWS = 22;
+      for (let i = 0; i < CHART_ROWS; i++) ws.addRow([]);
+      rowOffset += CHART_ROWS;
     }
   }
+
+  ws.getColumn(1).width     = 35;
+  ws.getColumn(2).width     = 22;
+  ws.getColumn(3).width     = 22;
+  ws.getColumn(1).alignment = { vertical: "middle" };
+  ws.getColumn(2).alignment = { horizontal: "center", vertical: "middle" };
+  ws.getColumn(3).alignment = { horizontal: "center", vertical: "middle" };
+  applyBorders(ws, 3);
 }
 
 // Two half-year chart sheets: H1 = Jan–Jun, H2 = Jul–Dec.
@@ -430,6 +443,10 @@ function addHalfYearChartsSheets(wb, allTargets, sessions) {
   function buildSheet(sheetName, halfMonths) {
     if (halfMonths.length === 0) return;
     const ws = wb.addWorksheet(sheetName);
+    const noteCell = ws.addRow(["Trend threshold: ↑ Trending Up / ↓ Trending Down = trend line change > 8pp   |   → Stable = ≤ 8pp"]).getCell(1);
+    noteCell.font = { italic: true, color: { argb: "FF666666" }, size: 10 };
+    ws.addRow([]);
+    const ROW_OFFSET = 2;
     let chartIdx = 0;
 
     for (const target of allTargets) {
@@ -456,7 +473,7 @@ function addHalfYearChartsSheets(wb, allTargets, sessions) {
       const base64 = renderTargetChart(target.name, yValues, dateRange, null, labels);
       const imgId  = wb.addImage({ base64, extension: "png" });
 
-      const chartRow = Math.floor(chartIdx / 2) * 19;
+      const chartRow = ROW_OFFSET + Math.floor(chartIdx / 2) * 19;
       const chartCol = (chartIdx % 2) * 11;
       ws.addImage(imgId, { tl: { col: chartCol, row: chartRow }, ext: { width: 605, height: 340 } });
       chartIdx++;
@@ -465,6 +482,81 @@ function addHalfYearChartsSheets(wb, allTargets, sessions) {
 
   buildSheet("Charts H1 (Jan–Jun)", h1Months);
   buildSheet("Charts H2 (Jul–Dec)", h2Months);
+}
+
+// "Trend Summary" sheet: one row per target per half-year with trend line
+// start/end % and direction so AI can read the data without parsing chart images.
+function addTrendSummarySheet(wb, allTargets, sessions) {
+  const H1_NAMES = new Set(["January","February","March","April","May","June"]);
+
+  const allMonths = [...new Set(sessions.map(s => s.month))].sort((a, b) => {
+    const [ma, ya] = parseMonth(a); const [mb, yb] = parseMonth(b);
+    return ya !== yb ? ya - yb : ma - mb;
+  });
+  if (allMonths.length === 0) return;
+
+  const halfYearKeys   = [];
+  const halfYearMonths = {};
+  for (const month of allMonths) {
+    const [name, year] = month.split(" ");
+    const half = H1_NAMES.has(name) ? "H1" : "H2";
+    const key  = `${half} ${year}`;
+    if (!halfYearMonths[key]) { halfYearMonths[key] = []; halfYearKeys.push(key); }
+    halfYearMonths[key].push(month);
+  }
+
+  const ws = wb.addWorksheet("Trend Summary");
+  const hdr = ws.addRow(["Target", "Half-Year", "Trend Start %", "Trend End %", "Change (pp)", "Direction"]);
+  for (let c = 1; c <= 6; c++) {
+    hdr.getCell(c).fill      = STYLE_COL_HEADER.fill;
+    hdr.getCell(c).font      = STYLE_COL_HEADER.font;
+    hdr.getCell(c).alignment = STYLE_COL_HEADER.alignment;
+  }
+
+  for (const key of halfYearKeys) {
+    const months = halfYearMonths[key];
+    for (const target of allTargets) {
+      const yValues = [];
+      for (const month of months) {
+        const monthSessions = sessions.filter(s => s.month === month);
+        const vals = monthSessions.map(s => {
+          const snap = (s.targetsSnapshot || []).find(t => t.name === target.name);
+          const eff  = snap ? { ...target, maxPoints: snap.maxPoints ?? target.maxPoints } : target;
+          return calcDailyAverage(s, eff, allTargets);
+        }).filter(v => v !== null && !isNaN(v));
+        if (vals.length > 0) yValues.push(Math.round(avg(vals)));
+      }
+
+      if (yValues.length < 2) {
+        ws.addRow([target.name, key, "", "", "", yValues.length === 0 ? "No data" : "Single month"]);
+        continue;
+      }
+
+      const trend     = linearRegressionValues(yValues);
+      const tStart    = Math.round(trend[0]);
+      const tEnd      = Math.round(trend[trend.length - 1]);
+      const delta     = tEnd - tStart;
+      const deltaStr  = delta >= 0 ? `+${delta}pp` : `${delta}pp`;
+      const direction = Math.abs(delta) <= 8 ? "Stable" : delta > 0 ? "Trending Up" : "Trending Down";
+      ws.addRow([target.name, key, `${tStart}%`, `${tEnd}%`, deltaStr, direction]);
+    }
+  }
+
+  ws.addRow([]);
+  const noteRow = ws.addRow(["Note: Stable = trend line start→end diff ≤ 8pp  |  Trending Up / Down = diff > 8pp  |  Trend computed via ordinary least squares (OLS) regression on monthly averages"]);
+  noteRow.getCell(1).font = { italic: true, color: { argb: "FF555555" }, size: 10 };
+
+  ws.getColumn(1).width = 35;
+  ws.getColumn(2).width = 12;
+  ws.getColumn(3).width = 14;
+  ws.getColumn(4).width = 14;
+  ws.getColumn(5).width = 14;
+  ws.getColumn(6).width = 16;
+  ws.getColumn(1).alignment = { vertical: "middle" };
+  for (let c = 2; c <= 6; c++) {
+    ws.getColumn(c).alignment = { horizontal: "center", vertical: "middle" };
+  }
+  applyBorders(ws, 6);
 }
 
 function addIndividualTargetSheets(wb, allTargets, sessions, studentName, includeTrials) {
@@ -628,6 +720,7 @@ async function buildStudentWorkbook(student, sessions, includeTrials) {
   addSummarySheets(wb, allTargets, sessions);
   addBaselineVsCurrentSheet(wb, student.name, allTargets, sortedSessions);
   addHalfYearChartsSheets(wb, allTargets, sortedSessions);
+  addTrendSummarySheet(wb, allTargets, sortedSessions);
   addIndividualTargetSheets(wb, allTargets, sessions, student.name, includeTrials);
 
   return wb.xlsx.writeBuffer();
@@ -659,6 +752,7 @@ async function buildGroupMemberWorkbook(studentName, allTargets, sessions, inclu
   addSummarySheets(wb, sortedTargets, filtered);
   addBaselineVsCurrentSheet(wb, studentName, sortedTargets, sortedSessions);
   addHalfYearChartsSheets(wb, sortedTargets, sortedSessions);
+  addTrendSummarySheet(wb, sortedTargets, sortedSessions);
   addIndividualTargetSheets(wb, sortedTargets, filtered, studentName, includeTrials);
 
   return wb.xlsx.writeBuffer();
@@ -2075,14 +2169,15 @@ function renderTargetChart(targetName, yValues, dateRange, dates, customLabels =
   // More robust than quarter-average comparison and not sensitive to single-session outliers.
   const lrDelta  = Math.round(trend[trend.length - 1] - trend[0]);
   let dirText, dirColor;
+  const ppStr = lrDelta >= 0 ? `+${lrDelta}pp` : `${lrDelta}pp`;
   if (Math.abs(lrDelta) <= 8) {
-    dirText  = "→  Stable";
+    dirText  = `→  Stable (${ppStr})`;
     dirColor = "#888888";
   } else if (lrDelta > 0) {
-    dirText  = "↑  Trending Up";
+    dirText  = `↑  Trending Up (${ppStr})`;
     dirColor = "#2A7A3B";
   } else {
-    dirText  = "↓  Trending Down";
+    dirText  = `↓  Trending Down (${ppStr})`;
     dirColor = "#C0392B";
   }
 
@@ -2126,6 +2221,28 @@ function renderTargetChart(targetName, yValues, dateRange, dates, customLabels =
             cx.fillText(value + "%", point.x, point.y + 8);
             cx.restore();
           });
+        }
+      },
+      {
+        id: "trendEndpoints",
+        afterDatasetsDraw(c) {
+          const meta1 = c.getDatasetMeta(1);
+          if (!meta1 || meta1.data.length < 2) return;
+          const { ctx: cx } = c;
+          const trendBlue = "rgba(59,108,181,0.9)";
+          const pts = [
+            { pt: meta1.data[0],                     val: Math.round(trend[0]),                align: "left"  },
+            { pt: meta1.data[meta1.data.length - 1], val: Math.round(trend[trend.length - 1]), align: "right" }
+          ];
+          for (const { pt, val, align } of pts) {
+            cx.save();
+            cx.fillStyle    = trendBlue;
+            cx.font         = "bold 11px sans-serif";
+            cx.textAlign    = align;
+            cx.textBaseline = "bottom";
+            cx.fillText(val + "%", pt.x + (align === "left" ? 4 : -4), pt.y - 4);
+            cx.restore();
+          }
         }
       }
     ],
