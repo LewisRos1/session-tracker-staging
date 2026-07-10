@@ -495,10 +495,10 @@ function addHalfYearChartsSheets(wb, allTargets, sessions) {
   buildSheet("Charts H2 (Jul–Dec)", h2Months);
 }
 
-// "Trend Summary" sheet: one row per target per half-year with trend line
-// start/end % and direction so AI can read the data without parsing chart images.
+// "Trend Summary" sheet: two separate tables (H1 then H2) with legend image at top.
 function addTrendSummarySheet(wb, allTargets, sessions) {
   const H1_NAMES = new Set(["January","February","March","April","May","June"]);
+  const NUM_COLS = 5; // Target | Trend Start % | Trend End % | Change (pp) | Direction
 
   const allMonths = [...new Set(sessions.map(s => s.month))].sort((a, b) => {
     const [ma, ya] = parseMonth(a); const [mb, yb] = parseMonth(b);
@@ -517,15 +517,38 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
   }
 
   const ws = wb.addWorksheet("Trend Summary");
-  const hdr = ws.addRow(["Target", "Half-Year", "Trend Start %", "Trend End %", "Change (pp)", "Direction"]);
-  for (let c = 1; c <= 6; c++) {
-    hdr.getCell(c).fill      = STYLE_COL_HEADER.fill;
-    hdr.getCell(c).font      = STYLE_COL_HEADER.font;
-    hdr.getCell(c).alignment = STYLE_COL_HEADER.alignment;
-  }
+
+  // Legend image at top (same as Charts H1/H2 sheets)
+  const legendBase64 = renderThresholdLegend();
+  const legendImgId  = wb.addImage({ base64: legendBase64, extension: "png" });
+  ws.addImage(legendImgId, { tl: { col: 0, row: 0 }, ext: { width: 460, height: 130 } });
+  for (let i = 0; i < 7; i++) ws.addRow([]); // blank rows to make space for legend image
+
+  let firstSection = true;
 
   for (const key of halfYearKeys) {
     const months = halfYearMonths[key];
+    const [half, year] = key.split(" ");
+    const range = half === "H1" ? "Jan – Jun" : "Jul – Dec";
+
+    if (!firstSection) ws.addRow([]); // blank gap between H1 and H2 tables
+    firstSection = false;
+
+    // Section title (merged across all cols)
+    const titleRow = ws.addRow([`${key}  (${range} ${year})`, "", "", "", ""]);
+    try { ws.mergeCells(titleRow.number, 1, titleRow.number, NUM_COLS); } catch (_) {}
+    titleRow.getCell(1).fill      = STYLE_SESSION.fill;
+    titleRow.getCell(1).font      = STYLE_SESSION.font;
+    titleRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
+
+    // Column header row
+    const hdr = ws.addRow(["Target", "Trend Start %", "Trend End %", "Change (pp)", "Direction"]);
+    for (let c = 1; c <= NUM_COLS; c++) {
+      hdr.getCell(c).fill      = STYLE_COL_HEADER.fill;
+      hdr.getCell(c).font      = STYLE_COL_HEADER.font;
+      hdr.getCell(c).alignment = STYLE_COL_HEADER.alignment;
+    }
+
     for (const target of allTargets) {
       const yValues = [];
       for (const month of months) {
@@ -539,7 +562,9 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
       }
 
       if (yValues.length < 2) {
-        ws.addRow([target.name, key, "", "", "", yValues.length === 0 ? "No data" : "Single month"]);
+        const dirLabel = yValues.length === 0 ? "No data" : "Single month";
+        const r = ws.addRow([target.name, "", "", "", dirLabel]);
+        r.getCell(5).font = { italic: true, color: { argb: "FF9CA3AF" } };
         continue;
       }
 
@@ -549,25 +574,22 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
       const delta     = tEnd - tStart;
       const deltaStr  = delta >= 0 ? `+${delta}pp` : `${delta}pp`;
       const direction = Math.abs(delta) <= 8 ? "Stable" : delta > 0 ? "Trending Up" : "Trending Down";
-      ws.addRow([target.name, key, `${tStart}%`, `${tEnd}%`, deltaStr, direction]);
+      const r         = ws.addRow([target.name, `${tStart}%`, `${tEnd}%`, deltaStr, direction]);
+      const dirColor  = direction === "Trending Up" ? "FF059669" : direction === "Trending Down" ? "FFDC2626" : "FF6B7280";
+      r.getCell(5).font = { bold: true, color: { argb: dirColor } };
     }
   }
 
-  ws.addRow([]);
-  const noteRow = ws.addRow(["Note: Stable = trend line start→end diff ≤ 8pp  |  Trending Up / Down = diff > 8pp  |  Trend computed via ordinary least squares (OLS) regression on monthly averages"]);
-  noteRow.getCell(1).font = { italic: true, color: { argb: "FF555555" }, size: 10 };
-
   ws.getColumn(1).width = 35;
-  ws.getColumn(2).width = 12;
+  ws.getColumn(2).width = 14;
   ws.getColumn(3).width = 14;
   ws.getColumn(4).width = 14;
-  ws.getColumn(5).width = 14;
-  ws.getColumn(6).width = 16;
+  ws.getColumn(5).width = 16;
   ws.getColumn(1).alignment = { vertical: "middle" };
-  for (let c = 2; c <= 6; c++) {
+  for (let c = 2; c <= NUM_COLS; c++) {
     ws.getColumn(c).alignment = { horizontal: "center", vertical: "middle" };
   }
-  applyBorders(ws, 6);
+  applyBorders(ws, NUM_COLS);
 }
 
 function addIndividualTargetSheets(wb, allTargets, sessions, studentName, includeTrials) {
