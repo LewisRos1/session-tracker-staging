@@ -393,9 +393,10 @@ function addBaselineVsCurrentSheet(wb, entityName, allTargets, sortedSessions) {
         if (s !== null) { targetFirstMonth = m; scoreF = s; break; }
       }
       const scoreL = monthAvgForTarget(target, sessionsByMonth[lastMonth] || []);
-      // Always show month name in cell so the reader knows which month each % is from
-      const firstCell = scoreF !== null ? `${pct(scoreF)} (${targetFirstMonth})` : "";
-      const lastCell  = scoreL !== null ? `${pct(scoreL)} (${lastMonth})`        : "";
+      // Always show abbreviated month in cell so the reader knows which month each % is from
+      const abbr = m => { const [n, y] = m.split(" "); return `${n.slice(0, 3)} ${y}`; };
+      const firstCell = scoreF !== null ? `${pct(scoreF)} (${abbr(targetFirstMonth)})` : "";
+      const lastCell  = scoreL !== null ? `${pct(scoreL)} (${abbr(lastMonth)})`        : "";
       ws.addRow([target.name, firstCell, lastCell]);
       rowOffset++;
       if (scoreF !== null && scoreL !== null && targetFirstMonth !== lastMonth) {
