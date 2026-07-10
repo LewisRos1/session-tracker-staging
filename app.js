@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "828";
+const APP_VERSION = "829";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -8572,16 +8572,6 @@ function renderSessionNumberKindSubsection(student, kind, label, sessions, conta
     // sessions is sorted oldest-first, so sessions[0] is the earliest —
     // every session of this kind shifts by the same delta, so that's the
     // one that would go below Session 1 first if the typed number is too low.
-    const earliest = sessions[0];
-    const earliestNewNumber = earliest.number + delta;
-    if (earliestNewNumber < 1) {
-      alert(
-        `If you set this to Session ${newNumber}, ${formatDate(earliest.date)} ` +
-        `(this student's earliest recorded ${kind} session) would become Session ${earliestNewNumber}. ` +
-        `Choose a different number.`
-      );
-      return;
-    }
     try {
       await withSaveFeedback($(id("save")), changeSessionNumber(student.id, sessionId, newNumber, kind));
       // Mirror the same uniform shift locally instead of re-fetching from
