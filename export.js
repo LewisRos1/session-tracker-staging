@@ -455,7 +455,7 @@ function addHalfYearChartsSheets(wb, allTargets, sessions) {
     // Embed legend image instead of a text cell so it can be copy-pasted into Word
     const legendBase64 = renderThresholdLegend();
     const legendImgId  = wb.addImage({ base64: legendBase64, extension: "png" });
-    ws.addImage(legendImgId, { tl: { col: 0, row: 0 }, ext: { width: 460, height: 130 } });
+    ws.addImage(legendImgId, { tl: { col: 0, row: 0 }, ext: { width: 440, height: 130 } });
     for (let i = 0; i < 7; i++) ws.addRow([]); // blank rows to make space for legend image
     const ROW_OFFSET = 7;
     let chartIdx = 0;
@@ -521,7 +521,7 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
   // Legend image at top (same as Charts H1/H2 sheets)
   const legendBase64 = renderThresholdLegend();
   const legendImgId  = wb.addImage({ base64: legendBase64, extension: "png" });
-  ws.addImage(legendImgId, { tl: { col: 0, row: 0 }, ext: { width: 460, height: 130 } });
+  ws.addImage(legendImgId, { tl: { col: 0, row: 0 }, ext: { width: 440, height: 130 } });
   for (let i = 0; i < 7; i++) ws.addRow([]); // blank rows to make space for legend image
 
   let firstSection = true;
@@ -2366,61 +2366,85 @@ function wrapLabel(text, maxChars = 14) {
 }
 
 function renderThresholdLegend() {
-  const W = 460, H = 130;
+  // Table dimensions
+  const COL1 = 240; // Direction column width
+  const COL2 = 200; // Threshold column width
+  const W    = COL1 + COL2;
+  const TITLE_H = 34;
+  const ROW_H   = 32;
+  const ROWS    = 3;
+  const H       = TITLE_H + ROW_H * ROWS;
+
+  const SCALE = 2; // 2× for Word crispness
   const canvas = document.createElement("canvas");
-  canvas.width  = W * 2; // 2× for crispness when pasted into Word
-  canvas.height = H * 2;
+  canvas.width  = W * SCALE;
+  canvas.height = H * SCALE;
   const cx = canvas.getContext("2d");
-  cx.scale(2, 2);
+  cx.scale(SCALE, SCALE);
 
-  // White background + outer border
-  cx.fillStyle = "#ffffff";
-  cx.fillRect(0, 0, W, H);
-  cx.strokeStyle = "#d1d5db";
-  cx.lineWidth = 1.5;
-  cx.strokeRect(0.75, 0.75, W - 1.5, H - 1.5);
-
-  // Title bar
-  cx.fillStyle = "#f3f4f6";
-  cx.fillRect(0, 0, W, 30);
-  cx.strokeStyle = "#d1d5db";
-  cx.lineWidth = 1;
-  cx.beginPath(); cx.moveTo(0, 30); cx.lineTo(W, 30); cx.stroke();
-  cx.fillStyle = "#111827";
-  cx.font = "bold 13px sans-serif";
-  cx.textAlign = "left";
-  cx.textBaseline = "middle";
-  cx.fillText("Trend Direction Legend", 14, 15);
-
+  const BORDER  = "#9ca3af";
+  const GRID    = "#d1d5db";
   const rows = [
-    { arrow: "↑", label: "Trending Up",  cond: "> +8pp",         color: "#059669" },
-    { arrow: "→", label: "Stable",        cond: "−8pp  to  +8pp", color: "#6b7280" },
-    { arrow: "↓", label: "Trending Down", cond: "< −8pp",         color: "#dc2626" },
+    { arrow: "↑", label: "Trending Up",  cond: "> +8pp",        color: "#059669", bg: "#f0fdf4" },
+    { arrow: "→", label: "Stable",        cond: "−8pp to +8pp",  color: "#4b5563", bg: "#f9fafb" },
+    { arrow: "↓", label: "Trending Down", cond: "< −8pp",        color: "#dc2626", bg: "#fff5f5" },
   ];
 
-  const arrowX = 16, labelX = 38, pipeX = 220, condX = 236;
-  const rowH = 30, startY = 30 + 15;
+  // ── Title row ──────────────────────────────────────────────────
+  cx.fillStyle = "#1e293b";
+  cx.fillRect(0, 0, W, TITLE_H);
+  cx.fillStyle = "#ffffff";
+  cx.font = "bold 13px sans-serif";
+  cx.textAlign = "center";
+  cx.textBaseline = "middle";
+  cx.fillText("Trend Direction Legend", W / 2, TITLE_H / 2);
 
-  rows.forEach(({ arrow, label, cond, color }, i) => {
-    const y = startY + i * rowH;
+  // ── Data rows ──────────────────────────────────────────────────
+  rows.forEach(({ arrow, label, cond, color, bg }, i) => {
+    const rowY = TITLE_H + i * ROW_H;
+    const midY = rowY + ROW_H / 2;
 
-    if (i % 2 === 1) { cx.fillStyle = "#f9fafb"; cx.fillRect(1.5, y - rowH / 2, W - 3, rowH); }
+    // Row background
+    cx.fillStyle = bg;
+    cx.fillRect(0, rowY, W, ROW_H);
 
-    cx.font = "bold 14px sans-serif";
+    // Arrow (bold, slightly larger)
+    cx.font = "bold 15px sans-serif";
     cx.fillStyle = color;
-    cx.textAlign = "left";
+    cx.textAlign = "center";
     cx.textBaseline = "middle";
-    cx.fillText(arrow, arrowX, y);
-    cx.fillText(label, labelX, y);
+    cx.fillText(arrow, 20, midY);
 
-    cx.fillStyle = "#9ca3af";
-    cx.font = "normal 13px sans-serif";
-    cx.fillText("|", pipeX, y);
+    // Direction label (bold)
+    cx.font = "bold 13px sans-serif";
+    cx.textAlign = "left";
+    cx.fillText(label, 38, midY);
 
+    // Threshold (normal, dark, centred in col 2)
+    cx.font = "13px sans-serif";
     cx.fillStyle = "#374151";
-    cx.font = "normal 13px sans-serif";
-    cx.fillText(cond, condX, y);
+    cx.textAlign = "center";
+    cx.fillText(cond, COL1 + COL2 / 2, midY);
+
+    // Horizontal row divider
+    cx.strokeStyle = GRID;
+    cx.lineWidth = 1;
+    cx.beginPath();
+    cx.moveTo(0, rowY); cx.lineTo(W, rowY);
+    cx.stroke();
   });
+
+  // ── Vertical column divider ────────────────────────────────────
+  cx.strokeStyle = GRID;
+  cx.lineWidth = 1;
+  cx.beginPath();
+  cx.moveTo(COL1, TITLE_H); cx.lineTo(COL1, H);
+  cx.stroke();
+
+  // ── Outer border ──────────────────────────────────────────────
+  cx.strokeStyle = BORDER;
+  cx.lineWidth = 1.5;
+  cx.strokeRect(0.75, 0.75, W - 1.5, H - 1.5);
 
   return canvas.toDataURL("image/png").split(",")[1];
 }
