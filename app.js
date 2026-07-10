@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "836";
+const APP_VERSION = "837";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -7635,29 +7635,30 @@ function inactiveReasonBadge(pa) {
   return '';
 }
 
-function showDatePickerDialog({ title, message, confirmLabel }) {
+function showAutoDateConfirm({ message, confirmLabel }) {
   return new Promise(resolve => {
-    const today = todayDateStr();
     const overlay = document.createElement("div");
     overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center";
     overlay.innerHTML =
-      `<div style="background:#fff;border-radius:.75rem;padding:1.5rem;max-width:340px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.22)">` +
-      `<div style="font-size:1.05rem;font-weight:700;margin-bottom:.5rem">${title}</div>` +
-      `<div style="font-size:.88rem;color:#6b7280;margin-bottom:1rem">${message}</div>` +
-      `<input type="date" class="dp-date" value="${today}" style="width:100%;box-sizing:border-box;padding:.55rem .7rem;border:1px solid #d1d5db;border-radius:.4rem;font-size:.95rem;margin-bottom:1rem">` +
+      `<div style="background:#fff;border-radius:.75rem;padding:1.5rem;max-width:360px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.22)">` +
+      `<div style="font-size:.92rem;color:#374151;margin-bottom:1.25rem;line-height:1.65">${message}</div>` +
       `<div style="display:flex;gap:.6rem;justify-content:flex-end">` +
       `<button class="dp-cancel" style="padding:.5rem 1rem;border:1px solid #d1d5db;border-radius:.4rem;background:#fff;cursor:pointer;font-size:.9rem">Cancel</button>` +
       `<button class="dp-confirm" style="padding:.5rem 1rem;border:none;border-radius:.4rem;background:var(--primary);color:#fff;cursor:pointer;font-size:.9rem;font-weight:600">${confirmLabel}</button>` +
       `</div></div>`;
     document.body.appendChild(overlay);
-    const dateInput = overlay.querySelector(".dp-date");
     const finish = val => { overlay.remove(); document.removeEventListener("keydown", onKey); resolve(val); };
-    overlay.querySelector(".dp-cancel").addEventListener("click", () => finish(null));
-    overlay.querySelector(".dp-confirm").addEventListener("click", () => finish(dateInput.value || null));
-    const onKey = e => { if (e.key === "Escape") finish(null); };
+    overlay.querySelector(".dp-cancel").addEventListener("click", () => finish(false));
+    overlay.querySelector(".dp-confirm").addEventListener("click", () => finish(true));
+    const onKey = e => { if (e.key === "Escape") finish(false); };
     document.addEventListener("keydown", onKey);
-    dateInput.focus();
   });
+}
+
+function addOneDay(dateStr) {
+  const d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
 }
 
 function isActivityActive(pa, dateStr) {
@@ -9552,13 +9553,32 @@ function renderTargetManageContent(student, target) {
     btn.addEventListener("click", async () => {
       const idx = Number(btn.dataset.idx);
       if (!acts[idx]) return;
-      const date = await showDatePickerDialog({
-        title: "⭐ Activity Mastered",
-        message: "On what date was this activity mastered? It won't appear in sessions from that date onwards.",
+      const pa = acts[idx];
+      const actWord = pa.parentActivity ? "sub-activity" : "activity";
+      const origHtml = btn.innerHTML;
+      btn.disabled = true; btn.textContent = "Checking…";
+      let latestDate = null;
+      try {
+        const allSessions = _groupForTargetEdit
+          ? await getAllSessionsForGroup(_groupForTargetEdit.id)
+          : await getAllSessionsForStudent(student.id);
+        const dates = allSessions
+          .filter(s => Object.values(s.activities || {}).some(a => a.targetName === target.name && a.activityName === pa.name))
+          .map(s => s.date).sort();
+        latestDate = dates[dates.length - 1] || null;
+      } finally {
+        btn.disabled = false; btn.innerHTML = origHtml;
+      }
+      const autoDate = latestDate ? addOneDay(latestDate) : todayDateStr();
+      const latestPart = latestDate
+        ? `The latest data recorded for this ${actWord} is ${fmtPeriodDate(latestDate)}.`
+        : `No previous data was found for this ${actWord}.`;
+      const confirmed = await showAutoDateConfirm({
+        message: `${latestPart} This ${actWord} will be marked as mastered from ${fmtPeriodDate(autoDate)} onwards and will no longer appear in sessions from that date.`,
         confirmLabel: "Confirm ⭐"
       });
-      if (!date) return;
-      acts[idx].masteredOn = date;
+      if (!confirmed) return;
+      acts[idx].masteredOn = autoDate;
       target.predefinedActivities = acts;
       await saveTarget();
       renderTargetManageContent(student, target);
@@ -9569,13 +9589,32 @@ function renderTargetManageContent(student, target) {
     btn.addEventListener("click", async () => {
       const idx = Number(btn.dataset.idx);
       if (!acts[idx]) return;
-      const date = await showDatePickerDialog({
-        title: "🚩 Discontinue Activity",
-        message: "From what date should this activity be discontinued? It won't appear in sessions from that date onwards.",
+      const pa = acts[idx];
+      const actWord = pa.parentActivity ? "sub-activity" : "activity";
+      const origHtml = btn.innerHTML;
+      btn.disabled = true; btn.textContent = "Checking…";
+      let latestDate = null;
+      try {
+        const allSessions = _groupForTargetEdit
+          ? await getAllSessionsForGroup(_groupForTargetEdit.id)
+          : await getAllSessionsForStudent(student.id);
+        const dates = allSessions
+          .filter(s => Object.values(s.activities || {}).some(a => a.targetName === target.name && a.activityName === pa.name))
+          .map(s => s.date).sort();
+        latestDate = dates[dates.length - 1] || null;
+      } finally {
+        btn.disabled = false; btn.innerHTML = origHtml;
+      }
+      const autoDate = latestDate ? addOneDay(latestDate) : todayDateStr();
+      const latestPart = latestDate
+        ? `The latest data recorded for this ${actWord} is ${fmtPeriodDate(latestDate)}.`
+        : `No previous data was found for this ${actWord}.`;
+      const confirmed = await showAutoDateConfirm({
+        message: `${latestPart} This ${actWord} will be discontinued from ${fmtPeriodDate(autoDate)} onwards and will no longer appear in sessions from that date.`,
         confirmLabel: "Confirm 🚩"
       });
-      if (!date) return;
-      acts[idx].discontinuedOn = date;
+      if (!confirmed) return;
+      acts[idx].discontinuedOn = autoDate;
       target.predefinedActivities = acts;
       await saveTarget();
       renderTargetManageContent(student, target);
@@ -9841,53 +9880,6 @@ function renderTargetManageContent(student, target) {
       const starterInput  = body.querySelector(`.mn-act-starter-text[data-idx="${idx}"]`);
       const optsContainer = body.querySelector(`.mn-opts-container[data-idx="${idx}"]`);
       const type = sel.value;
-
-      // Block remark type changes if this activity has past session data
-      const _a = acts[idx];
-      if (_a?.name) {
-        const _oldVal = _a.fixedRemark !== undefined ? "fixed_remark"
-          : _a.manualScore ? "manual_score"
-          : _a.remarkHasNote ? "starter_fixed_note"
-          : (_a.sentenceStarter && _a.inlineOptions && _a.optionsMulti) ? "starter_fixed_multi"
-          : (_a.sentenceStarter && _a.inlineOptions) ? "starter_fixed"
-          : (_a.inlineOptions && _a.optionsMulti) ? "starter_fixed_multi"
-          : (_a.inlineOptions || _a.remarkPresetId) ? "starter_fixed" : "";
-        if (_oldVal !== type) {
-          const _allS = _groupForTargetEdit
-            ? await getAllSessionsForGroup(_groupForTargetEdit.id)
-            : await getAllSessionsForStudent(student.id);
-          const _hasData = _allS.some(s =>
-            Object.values(s.activities || {}).some(act =>
-              act.targetName === target.name && act.activityName === _a.name &&
-              (_a.id ? act.configId === _a.id : true)
-            )
-          );
-          if (_hasData) {
-            sel.value = _oldVal;
-            $("manage-modal").querySelectorAll("[data-rmk-block]").forEach(el => el.remove());
-            const _ov = document.createElement("div");
-            _ov.dataset.rmkBlock = "1";
-            _ov.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding-top:1.25rem;z-index:200;border-radius:.75rem;overflow-y:auto";
-            _ov.innerHTML = `<div style="background:#fff;padding:1.25rem;border-radius:.75rem;width:min(320px,92%);box-shadow:0 4px 24px rgba(0,0,0,.25);margin-bottom:1rem">
-              <p style="font-size:.88rem;margin:0 0 .6rem;color:#111;font-weight:700">⚠️ You can't change the remark type from <em>${escHtml(presetLabel(_oldVal))}</em> to <em>${escHtml(presetLabel(type))}</em>, as this would affect your previous data.</p>
-              <p style="font-size:.84rem;margin:0 0 .5rem;color:#374151">To keep your existing data intact, we recommend discontinuing the current activity and re-adding it with the same name using your desired remark type. Follow the steps below:</p>
-              <ol style="font-size:.84rem;color:#374151;margin:.3rem 0 .9rem;padding-left:1.3rem;line-height:1.8">
-                <li>Go to <strong>Edit Target</strong></li>
-                <li>Find the activity and tap the <strong>⋮</strong> button on the right</li>
-                <li>Select <strong>Mark as Discontinued</strong></li>
-                <li>Scroll down and tap <strong>+ Add Activity</strong></li>
-                <li>Enter the same activity name and choose your new remark type</li>
-              </ol>
-              <button id="rmk-block-ok" style="width:100%;padding:.55rem;border:none;border-radius:.4rem;background:#374151;color:#fff;cursor:pointer;font-size:.88rem;font-weight:600">OK, got it</button>
-            </div>`;
-            const _ms = $("manage-modal").querySelector(".modal-sheet");
-            _ms.style.position = "relative";
-            _ms.appendChild(_ov);
-            _ov.querySelector("#rmk-block-ok").addEventListener("click", () => _ov.remove());
-            return;
-          }
-        }
-      }
 
       // Switching to Fixed Remark triggers a re-render to show the fixed remark textarea
       if (type === "fixed_remark") {
@@ -10968,13 +10960,15 @@ function renderTemplateManageContent(template) {
     btn.addEventListener("click", async () => {
       const idx = Number(btn.dataset.idx);
       if (!acts[idx]) return;
-      const date = await showDatePickerDialog({
-        title: "⭐ Activity Mastered",
-        message: "On what date was this activity mastered? It won't appear in sessions from that date onwards.",
+      const pa = acts[idx];
+      const actWord = pa.parentActivity ? "sub-activity" : "activity";
+      const autoDate = todayDateStr();
+      const confirmed = await showAutoDateConfirm({
+        message: `This ${actWord} will be marked as mastered from ${fmtPeriodDate(autoDate)} onwards and will no longer appear in sessions from that date.`,
         confirmLabel: "Confirm ⭐"
       });
-      if (!date) return;
-      acts[idx].masteredOn = date;
+      if (!confirmed) return;
+      acts[idx].masteredOn = autoDate;
       template.predefinedActivities = acts;
       await saveTemplateFn();
       renderTemplateManageContent(template);
@@ -10985,13 +10979,15 @@ function renderTemplateManageContent(template) {
     btn.addEventListener("click", async () => {
       const idx = Number(btn.dataset.idx);
       if (!acts[idx]) return;
-      const date = await showDatePickerDialog({
-        title: "🚩 Discontinue Activity",
-        message: "From what date should this activity be discontinued? It won't appear in sessions from that date onwards.",
+      const pa = acts[idx];
+      const actWord = pa.parentActivity ? "sub-activity" : "activity";
+      const autoDate = todayDateStr();
+      const confirmed = await showAutoDateConfirm({
+        message: `This ${actWord} will be discontinued from ${fmtPeriodDate(autoDate)} onwards and will no longer appear in sessions from that date.`,
         confirmLabel: "Confirm 🚩"
       });
-      if (!date) return;
-      acts[idx].discontinuedOn = date;
+      if (!confirmed) return;
+      acts[idx].discontinuedOn = autoDate;
       template.predefinedActivities = acts;
       await saveTemplateFn();
       renderTemplateManageContent(template);
