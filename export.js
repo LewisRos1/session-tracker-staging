@@ -671,13 +671,14 @@ function addIndividualTargetSheets(wb, allTargets, sessions, studentName, includ
       ws.getRow(n).height = Math.max(20, visLines * 20);
     }
 
-    // Row heights: measure both Activity (col B, ~50 char wide) and Remark (col C, ~62 char wide)
-    // counting real newlines plus estimated wrap, take the larger of the two.
+    // Row heights: measure both Activity (col B, ~50 ExcelJS wide) and Remark (col C, ~62 ExcelJS wide).
+    // ExcelJS width units are the width of "0" at default font; mixed-case text fits ~15% more chars,
+    // so effective capacities are ~58 and ~72. Use 55/68 (slightly conservative) to avoid false wraps.
     ws.eachRow((row, n) => {
       if (monthHeaderRows.has(n - 1) || colHeaderRows.has(n - 1) || noteRows.has(n - 1)) return;
       const getText = c => { const v = row.getCell(c).value; return typeof v === "string" ? v : (v?.richText?.map(r => r.text).join("") || ""); };
       const countLines = (t, w) => !t ? 0 : t.split("\n").reduce((s, seg) => s + Math.max(1, Math.ceil((seg.length || 1) / w)), 0);
-      const needed = Math.max(countLines(getText(2), 40), countLines(getText(3), 50), 1);
+      const needed = Math.max(countLines(getText(2), 55), countLines(getText(3), 68), 1);
       if (needed > 1 && (!row.height || row.height < needed * 20)) row.height = Math.max(22, needed * 20);
     });
 
