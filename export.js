@@ -493,10 +493,10 @@ function addHalfYearChartsSheets(wb, allTargets, sessions) {
   buildSheet("Charts H2 (Jul–Dec)", h2Months);
 }
 
-// "Trend Summary" sheet: two separate tables (H1 then H2) with legend image at top.
+// "Trendline Summary" sheet: two separate tables (H1 then H2) with legend image at top.
 function addTrendSummarySheet(wb, allTargets, sessions) {
   const H1_NAMES = new Set(["January","February","March","April","May","June"]);
-  const NUM_COLS = 5; // Target | Trend Start % | Trend End % | Change (pp) | Direction
+  const NUM_COLS = 5; // Target | Trendline Start % | Trendline End % | Change (pp) | Direction
 
   const allMonths = [...new Set(sessions.map(s => s.month))].sort((a, b) => {
     const [ma, ya] = parseMonth(a); const [mb, yb] = parseMonth(b);
@@ -514,7 +514,7 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
     halfYearMonths[key].push(month);
   }
 
-  const ws = wb.addWorksheet("Trend Summary");
+  const ws = wb.addWorksheet("Trendline Summary");
 
   // Legend image at top (same as Charts H1/H2 sheets)
   const legendBase64 = renderThresholdLegend();
@@ -540,7 +540,7 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
     titleRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
 
     // Column header row
-    const hdr = ws.addRow(["Target", "Trend Start %", "Trend End %", "Change (pp)", "Direction"]);
+    const hdr = ws.addRow(["Target", "Trendline Start %", "Trendline End %", "Change (pp)", "Direction"]);
     for (let c = 1; c <= NUM_COLS; c++) {
       hdr.getCell(c).fill      = STYLE_COL_HEADER.fill;
       hdr.getCell(c).font      = STYLE_COL_HEADER.font;
@@ -573,7 +573,7 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
       const deltaStr  = delta >= 0 ? `+${delta}pp` : `${delta}pp`;
       const direction = Math.abs(delta) <= 8 ? "Stable" : delta > 0 ? "Trending Up" : "Trending Down";
       const r         = ws.addRow([target.name, `${tStart}%`, `${tEnd}%`, deltaStr, direction]);
-      const dirColor  = direction === "Trending Up" ? "FF059669" : direction === "Trending Down" ? "FFDC2626" : "FF6B7280";
+      const dirColor  = direction === "Trending Up" ? "FF16A34A" : direction === "Trending Down" ? "FFDC2626" : "FF6B7280";
       r.getCell(5).font = { bold: true, color: { argb: dirColor } };
     }
   }
@@ -2404,7 +2404,7 @@ function renderThresholdLegend() {
   const BORDER  = "#9ca3af";
   const GRID    = "#d1d5db";
   const rows = [
-    { arrow: "↑", label: "Trending Up",  cond: "> +8pp",        color: "#059669", bg: "#f0fdf4" },
+    { arrow: "↑", label: "Trending Up",  cond: "> +8pp",        color: "#16a34a", bg: "#dcfce7" },
     { arrow: "→", label: "Stable",        cond: "−8pp to +8pp",  color: "#4b5563", bg: "#f9fafb" },
     { arrow: "↓", label: "Trending Down", cond: "< −8pp",        color: "#dc2626", bg: "#fff5f5" },
   ];
@@ -2416,7 +2416,7 @@ function renderThresholdLegend() {
   cx.font = "bold 13px sans-serif";
   cx.textAlign = "center";
   cx.textBaseline = "middle";
-  cx.fillText("Trend Direction Legend", W / 2, TITLE_H / 2);
+  cx.fillText("Trendline Direction Legend", W / 2, TITLE_H / 2);
 
   // ── Data rows ──────────────────────────────────────────────────
   rows.forEach(({ arrow, label, cond, color, bg }, i) => {
