@@ -1957,10 +1957,10 @@ function getAllActivitiesForTarget(session, target) {
       const parentPa = (target.predefinedActivities || []).find(p => !p.parentActivity && p.name === pa.parentActivity);
       const subStatusPrefix = pa.discontinuedOn ? '(Discontinued) '
         : pa.masteredOn ? '(Mastered) '
-        : pa.maintainedOn ? '(Maintained) '
+        : pa.maintained ? '(Maintained) '
         : parentPa?.discontinuedOn ? '(Discontinued) '
         : parentPa?.masteredOn ? '(Mastered) '
-        : parentPa?.maintainedOn ? '(Maintained) '
+        : parentPa?.maintained ? '(Maintained) '
         : '';
       const subActName = subStatusPrefix + pa.name;
       const sessionAct = sessionActs.find(a => a.activityName === pa.name && a.isPredefined);
@@ -1977,7 +1977,7 @@ function getAllActivitiesForTarget(session, target) {
     exportActNum++;
     const _exportStatusPrefix = pa.discontinuedOn ? '(Discontinued) '
       : pa.masteredOn ? '(Mastered) '
-      : pa.maintainedOn ? '(Maintained) '
+      : pa.maintained ? '(Maintained) '
       : '';
     const numberedName = `${exportActNum}) ${_exportStatusPrefix}${pa.name}`;
 

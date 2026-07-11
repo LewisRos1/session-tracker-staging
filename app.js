@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "848";
+const APP_VERSION = "849";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4862,8 +4862,8 @@ function buildTargetViewTable(target, data) {
           .filter(([, a]) => a.targetName === target.name && a.activityName === pa.name)
           .forEach(([id]) => matchedIds.add(id));
         const _paMastered = pa.masteredOn || (pa.inactiveReason === 'mastered' ? "2026-06-30" : null);
-        const paBadge = pa.maintainedOn
-          ? `<span style="font-size:.72rem;color:#1d4ed8;font-weight:600;white-space:nowrap">(🆗 ${fmtPeriodDate(pa.maintainedOn)})</span> `
+        const paBadge = pa.maintained
+          ? `<span style="font-size:.72rem;color:#1d4ed8;font-weight:600;white-space:nowrap">(🆗 Maintained)</span> `
           : pa.discontinuedOn
           ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap">(🚩 ${fmtPeriodDate(pa.discontinuedOn)})</span> `
           : _paMastered
@@ -5026,9 +5026,9 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
     || (paEntry?.inactiveReason === 'mastered' ? "2026-06-30" : null)
     || (parentEntry?.inactiveReason === 'mastered' ? "2026-06-30" : null)
     || null;
-  const _maintainedOn   = paEntry?.maintainedOn   || parentEntry?.maintainedOn || null;
-  const statusBadge = _maintainedOn
-    ? `<span style="font-size:.72rem;color:#1d4ed8;font-weight:600;white-space:nowrap">(🆗 ${fmtPeriodDate(_maintainedOn)})</span> `
+  const _maintained     = !!(paEntry?.maintained   || parentEntry?.maintained);
+  const statusBadge = _maintained
+    ? `<span style="font-size:.72rem;color:#1d4ed8;font-weight:600;white-space:nowrap">(🆗 Maintained)</span> `
     : _discontinuedOn
     ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap">(🚩 ${fmtPeriodDate(_discontinuedOn)})</span> `
     : _masteredOn
@@ -6380,8 +6380,8 @@ function buildGroupTargetViewTable(target, data, attendees) {
           .filter(([, a]) => a.targetName === target.name && a.activityName === pa.name)
           .forEach(([id]) => matchedIds.add(id));
         const _paGrpMastered = pa.masteredOn || (pa.inactiveReason === 'mastered' ? "2026-06-30" : null);
-        const paBadgeGrp = pa.maintainedOn
-          ? `<span style="font-size:.72rem;color:#1d4ed8;font-weight:600;white-space:nowrap">(🆗 ${fmtPeriodDate(pa.maintainedOn)})</span> `
+        const paBadgeGrp = pa.maintained
+          ? `<span style="font-size:.72rem;color:#1d4ed8;font-weight:600;white-space:nowrap">(🆗 Maintained)</span> `
           : pa.discontinuedOn
           ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap">(🚩 ${fmtPeriodDate(pa.discontinuedOn)})</span> `
           : _paGrpMastered
@@ -6552,9 +6552,9 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
     || (paEntry?.inactiveReason === 'mastered' ? "2026-06-30" : null)
     || (parentEntry?.inactiveReason === 'mastered' ? "2026-06-30" : null)
     || null;
-  const _maintainedOn   = paEntry?.maintainedOn   || parentEntry?.maintainedOn || null;
-  const statusBadge = _maintainedOn
-    ? `<span style="font-size:.72rem;color:#1d4ed8;font-weight:600;white-space:nowrap">(🆗 ${fmtPeriodDate(_maintainedOn)})</span> `
+  const _maintained     = !!(paEntry?.maintained   || parentEntry?.maintained);
+  const statusBadge = _maintained
+    ? `<span style="font-size:.72rem;color:#1d4ed8;font-weight:600;white-space:nowrap">(🆗 Maintained)</span> `
     : _discontinuedOn
     ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap">(🚩 ${fmtPeriodDate(_discontinuedOn)})</span> `
     : _masteredOn
@@ -7645,8 +7645,8 @@ function inactiveReasonBadge(pa) {
     const label = pa.discontinuedOn ? `🚩 Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}` : '● Discontinued';
     return `<span style="display:inline-flex;align-items:center;background:#fee2e2;border:1px solid #fca5a5;border-radius:999px;padding:.05rem .45rem;font-size:.7rem;font-weight:700;color:#dc2626;white-space:nowrap;margin-right:.4rem;vertical-align:middle">${label}</span>`;
   }
-  if (pa?.maintainedOn)
-    return `<span style="display:inline-flex;align-items:center;background:#dbeafe;border:1px solid #93c5fd;border-radius:999px;padding:.05rem .45rem;font-size:.7rem;font-weight:700;color:#1d4ed8;white-space:nowrap;margin-right:.4rem;vertical-align:middle">🆗 Maintained on ${fmtPeriodDate(pa.maintainedOn)}</span>`;
+  if (pa?.maintained)
+    return `<span style="display:inline-flex;align-items:center;background:#dbeafe;border:1px solid #93c5fd;border-radius:999px;padding:.05rem .45rem;font-size:.7rem;font-weight:700;color:#1d4ed8;white-space:nowrap;margin-right:.4rem;vertical-align:middle">🆗 Maintained</span>`;
   return '';
 }
 
@@ -9062,9 +9062,9 @@ function renderTargetManageContent(student, target) {
         const subActsHtml = subActs.map((sub, si) => {
           const subIdx = acts.indexOf(sub);
           const subRemarkType = buildRemarkTypeControls(sub, subIdx, target.maxPoints || 3);
-          const subFixedRemarkRow = sub.maintainedOn
+          const subFixedRemarkRow = sub.maintained
             ? `<div style="display:flex;align-items:center;gap:.4rem;padding:.1rem 0 .1rem 1.6rem">
-                <span style="font-size:.78rem;color:#0369a1;font-weight:600">🆗 Maintained from ${fmtPeriodDate(sub.maintainedOn)}</span>
+                <span style="font-size:.78rem;color:#0369a1;font-weight:600">🆗 Maintained</span>
                 <button class="mn-undo-maintain" data-idx="${subIdx}" style="font-size:.72rem;padding:.15rem .45rem;background:#dbeafe;border:1px solid #93c5fd;border-radius:.3rem;cursor:pointer;color:#1d4ed8">↩ Undo</button>
               </div>`
             : "";
@@ -9083,9 +9083,9 @@ function renderTargetManageContent(student, target) {
             ${subFixedRemarkRow}
           </div>`;
         }).join('');
-        const maintainedRowSub = a.maintainedOn
+        const maintainedRowSub = a.maintained
           ? `<div style="display:flex;align-items:center;gap:.4rem;padding:.1rem 0">
-              <span style="font-size:.78rem;color:#0369a1;font-weight:600">🆗 Maintained from ${fmtPeriodDate(a.maintainedOn)}</span>
+              <span style="font-size:.78rem;color:#0369a1;font-weight:600">🆗 Maintained</span>
               <button class="mn-undo-maintain" data-idx="${idx}" style="font-size:.72rem;padding:.15rem .45rem;background:#dbeafe;border:1px solid #93c5fd;border-radius:.3rem;cursor:pointer;color:#1d4ed8">↩ Undo</button>
             </div>`
           : "";
@@ -9117,9 +9117,9 @@ function renderTargetManageContent(student, target) {
         </div>`;
       } else {
         const remarkTypeSelect = buildRemarkTypeControls(a, idx, target.maxPoints || 3);
-        const maintainedRow = a.maintainedOn
+        const maintainedRow = a.maintained
           ? `<div style="display:flex;align-items:center;gap:.4rem;padding:.1rem 0">
-              <span style="font-size:.78rem;color:#0369a1;font-weight:600">🆗 Maintained from ${fmtPeriodDate(a.maintainedOn)}</span>
+              <span style="font-size:.78rem;color:#0369a1;font-weight:600">🆗 Maintained</span>
               <button class="mn-undo-maintain" data-idx="${idx}" style="font-size:.72rem;padding:.15rem .45rem;background:#dbeafe;border:1px solid #93c5fd;border-radius:.3rem;cursor:pointer;color:#1d4ed8">↩ Undo</button>
             </div>`
           : "";
@@ -9657,30 +9657,12 @@ function renderTargetManageContent(student, target) {
       if (!acts[idx]) return;
       const pa = acts[idx];
       const actWord = pa.parentActivity ? "sub-activity" : "activity";
-      const origHtml = btn.innerHTML;
-      btn.disabled = true; btn.textContent = "Checking…";
-      let latestDate = null;
-      try {
-        const allSessions = _groupForTargetEdit
-          ? await getAllSessionsForGroup(_groupForTargetEdit.id)
-          : await getAllSessionsForStudent(student.id);
-        const dates = allSessions
-          .filter(s => Object.values(s.activities || {}).some(a => a.targetName === target.name && a.activityName === pa.name))
-          .map(s => s.date).sort();
-        latestDate = dates[dates.length - 1] || null;
-      } finally {
-        btn.disabled = false; btn.innerHTML = origHtml;
-      }
-      const autoDate = latestDate ? addOneDay(latestDate) : todayDateStr();
-      const latestPart = latestDate
-        ? `The latest data recorded for this ${actWord} is ${fmtPeriodDate(latestDate)}.`
-        : `No previous data was found for this ${actWord}.`;
       const confirmed = await showAutoDateConfirm({
-        message: `${latestPart} This ${actWord} will be labelled 🆗 Maintained from ${fmtPeriodDate(autoDate)} onwards. It will still appear in sessions and accept remarks.`,
+        message: `This ${actWord} will be labelled 🆗 Maintained. It will still appear in sessions and accept remarks.`,
         confirmLabel: "Confirm 🆗"
       });
       if (!confirmed) return;
-      acts[idx].maintainedOn = autoDate;
+      acts[idx].maintained = true;
       target.predefinedActivities = acts;
       await saveTarget();
       renderTargetManageContent(student, target);
@@ -9691,7 +9673,7 @@ function renderTargetManageContent(student, target) {
     btn.addEventListener("click", async () => {
       const idx = Number(btn.dataset.idx);
       if (!acts[idx]) return;
-      delete acts[idx].maintainedOn;
+      delete acts[idx].maintained;
       target.predefinedActivities = acts;
       await saveTarget();
       renderTargetManageContent(student, target);
@@ -10570,9 +10552,9 @@ function renderTemplateManageContent(template) {
       const isGreen = a.activityColor === "green";
       const actBaseBg   = isGray ? 'background:#f3f4f6;border:1px solid #d1d5db' : isGreen ? 'background:#e2efda;border:1px solid #a9d18e' : null;
       const actItemStyle = actBaseBg ? ` style="${actBaseBg}"` : '';
-      const tmplMaintainedRow = a.maintainedOn
+      const tmplMaintainedRow = a.maintained
         ? `<div style="display:flex;align-items:center;gap:.4rem;padding:.1rem 0">
-            <span style="font-size:.78rem;color:#0369a1;font-weight:600">🆗 Maintained from ${fmtPeriodDate(a.maintainedOn)}</span>
+            <span style="font-size:.78rem;color:#0369a1;font-weight:600">🆗 Maintained</span>
             <button class="mn-undo-maintain" data-idx="${idx}" style="font-size:.72rem;padding:.15rem .45rem;background:#dbeafe;border:1px solid #93c5fd;border-radius:.3rem;cursor:pointer;color:#1d4ed8">↩ Undo</button>
           </div>`
         : "";
@@ -11095,13 +11077,12 @@ function renderTemplateManageContent(template) {
       if (!acts[idx]) return;
       const pa = acts[idx];
       const actWord = pa.parentActivity ? "sub-activity" : "activity";
-      const autoDate = todayDateStr();
       const confirmed = await showAutoDateConfirm({
-        message: `This ${actWord} will be labelled 🆗 Maintained from ${fmtPeriodDate(autoDate)} onwards. It will still appear in sessions and accept remarks.`,
+        message: `This ${actWord} will be labelled 🆗 Maintained. It will still appear in sessions and accept remarks.`,
         confirmLabel: "Confirm 🆗"
       });
       if (!confirmed) return;
-      acts[idx].maintainedOn = autoDate;
+      acts[idx].maintained = true;
       template.predefinedActivities = acts;
       await saveTemplateFn();
       renderTemplateManageContent(template);
@@ -11112,7 +11093,7 @@ function renderTemplateManageContent(template) {
     btn.addEventListener("click", async () => {
       const idx = Number(btn.dataset.idx);
       if (!acts[idx]) return;
-      delete acts[idx].maintainedOn;
+      delete acts[idx].maintained;
       template.predefinedActivities = acts;
       await saveTemplateFn();
       renderTemplateManageContent(template);
