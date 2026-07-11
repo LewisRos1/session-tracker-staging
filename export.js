@@ -166,12 +166,12 @@ const STYLE_GREEN_HDG_FILL = { type: "pattern", pattern: "solid", fgColor: { arg
 const STYLE_GRAY_HDG_FILL = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD9D9D9" } };
 // Mastered / Discontinued separator rows
 const STYLE_MASTERED_SEP = {
-  fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFD1FAE5" } },
-  font: { bold: true, color: { argb: "FF15803D" } }
+  fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FF86EFAC" } },
+  font: { bold: true, color: { argb: "FF14532D" } }
 };
 const STYLE_DISCONTINUED_SEP = {
-  fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFFEE2E2" } },
-  font: { bold: true, color: { argb: "FFDC2626" } }
+  fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFFCA5A5" } },
+  font: { bold: true, color: { argb: "FF7F1D1D" } }
 };
 // Daily Average: near-white blue, soft navy text
 const STYLE_DAILY_AVG = {
