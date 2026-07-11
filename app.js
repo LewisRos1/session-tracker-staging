@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "851";
+const APP_VERSION = "852";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -7673,15 +7673,16 @@ function todayDateStr() {
 }
 
 function inactiveReasonBadge(pa) {
+  const _badgeBase = "display:inline-flex;align-items:center;border-radius:.35rem;padding:.1rem .5rem;font-size:.93rem;font-weight:700;white-space:nowrap;margin-right:.4rem;vertical-align:middle;line-height:1.2";
   const masteredDate = pa?.masteredOn || (pa?.inactiveReason === 'mastered' ? "2026-06-30" : null);
   if (masteredDate)
-    return `<span style="display:inline-flex;align-items:center;background:#d1fae5;border:1px solid #6ee7b7;border-radius:999px;padding:.05rem .45rem;font-size:.7rem;font-weight:700;color:#059669;white-space:nowrap;margin-right:.4rem;vertical-align:middle">⭐ Mastered on ${fmtPeriodDate(masteredDate)}</span>`;
+    return `<span style="${_badgeBase};background:#d1fae5;border:1px solid #6ee7b7;color:#059669">⭐ Mastered on ${fmtPeriodDate(masteredDate)}</span>`;
   if (pa?.discontinuedOn || pa?.inactiveReason === 'discontinued') {
     const label = pa.discontinuedOn ? `🚩 Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}` : '● Discontinued';
-    return `<span style="display:inline-flex;align-items:center;background:#fee2e2;border:1px solid #fca5a5;border-radius:999px;padding:.05rem .45rem;font-size:.7rem;font-weight:700;color:#dc2626;white-space:nowrap;margin-right:.4rem;vertical-align:middle">${label}</span>`;
+    return `<span style="${_badgeBase};background:#fee2e2;border:1px solid #fca5a5;color:#dc2626">${label}</span>`;
   }
   if (pa?.maintained)
-    return `<span style="display:inline-flex;align-items:center;background:#dbeafe;border:1px solid #93c5fd;border-radius:999px;padding:.05rem .45rem;font-size:.7rem;font-weight:700;color:#1d4ed8;white-space:nowrap;margin-right:.4rem;vertical-align:middle">🆗 Maintained</span>`;
+    return `<span style="${_badgeBase};background:#dbeafe;border:1px solid #93c5fd;color:#1d4ed8">🆗 Maintained</span>`;
   return '';
 }
 
