@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "852";
+const APP_VERSION = "853";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4898,7 +4898,7 @@ function buildTargetViewTable(target, data) {
           .forEach(([id]) => matchedIds.add(id));
         const _paMastered = pa.masteredOn || (pa.inactiveReason === 'mastered' ? "2026-06-30" : null);
         const paBadge = pa.maintained
-          ? `<span style="font-size:.72rem;color:#1d4ed8;font-weight:600;white-space:nowrap">(🆗 Maintained)</span> `
+          ? `<span style="font-size:.72rem;color:#6b7280;font-weight:600;white-space:nowrap">(🆗 Maintained)</span> `
           : pa.discontinuedOn
           ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap">(🚩 ${fmtPeriodDate(pa.discontinuedOn)})</span> `
           : _paMastered
@@ -5063,7 +5063,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
     || null;
   const _maintained     = !!(paEntry?.maintained   || parentEntry?.maintained);
   const statusBadge = _maintained
-    ? `<span style="font-size:.72rem;color:#1d4ed8;font-weight:600;white-space:nowrap">(🆗 Maintained)</span> `
+    ? `<span style="font-size:.72rem;color:#6b7280;font-weight:600;white-space:nowrap">(🆗 Maintained)</span> `
     : _discontinuedOn
     ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap">(🚩 ${fmtPeriodDate(_discontinuedOn)})</span> `
     : _masteredOn
@@ -6416,7 +6416,7 @@ function buildGroupTargetViewTable(target, data, attendees) {
           .forEach(([id]) => matchedIds.add(id));
         const _paGrpMastered = pa.masteredOn || (pa.inactiveReason === 'mastered' ? "2026-06-30" : null);
         const paBadgeGrp = pa.maintained
-          ? `<span style="font-size:.72rem;color:#1d4ed8;font-weight:600;white-space:nowrap">(🆗 Maintained)</span> `
+          ? `<span style="font-size:.72rem;color:#6b7280;font-weight:600;white-space:nowrap">(🆗 Maintained)</span> `
           : pa.discontinuedOn
           ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap">(🚩 ${fmtPeriodDate(pa.discontinuedOn)})</span> `
           : _paGrpMastered
@@ -6589,7 +6589,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
     || null;
   const _maintained     = !!(paEntry?.maintained   || parentEntry?.maintained);
   const statusBadge = _maintained
-    ? `<span style="font-size:.72rem;color:#1d4ed8;font-weight:600;white-space:nowrap">(🆗 Maintained)</span> `
+    ? `<span style="font-size:.72rem;color:#6b7280;font-weight:600;white-space:nowrap">(🆗 Maintained)</span> `
     : _discontinuedOn
     ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap">(🚩 ${fmtPeriodDate(_discontinuedOn)})</span> `
     : _masteredOn
@@ -7682,7 +7682,7 @@ function inactiveReasonBadge(pa) {
     return `<span style="${_badgeBase};background:#fee2e2;border:1px solid #fca5a5;color:#dc2626">${label}</span>`;
   }
   if (pa?.maintained)
-    return `<span style="${_badgeBase};background:#dbeafe;border:1px solid #93c5fd;color:#1d4ed8">🆗 Maintained</span>`;
+    return `<span style="${_badgeBase};background:#f3f4f6;border:1px solid #9ca3af;color:#374151">🆗 Maintained</span>`;
   return '';
 }
 
@@ -9100,7 +9100,7 @@ function renderTargetManageContent(student, target) {
           const subRemarkType = buildRemarkTypeControls(sub, subIdx, target.maxPoints || 3);
           const subFixedRemarkRow = sub.maintained
             ? `<div style="display:flex;align-items:center;gap:.4rem;padding:.1rem 0 .1rem 1.6rem">
-                <span style="font-size:.78rem;color:#0369a1;font-weight:600">🆗 Maintained</span>
+                <span style="font-size:.78rem;color:#6b7280;font-weight:600">🆗 Maintained</span>
                 <button class="mn-undo-maintain" data-idx="${subIdx}" style="font-size:.72rem;padding:.15rem .45rem;background:#dbeafe;border:1px solid #93c5fd;border-radius:.3rem;cursor:pointer;color:#1d4ed8">↩ Undo</button>
               </div>`
             : "";
@@ -9121,7 +9121,7 @@ function renderTargetManageContent(student, target) {
         }).join('');
         const maintainedRowSub = a.maintained
           ? `<div style="display:flex;align-items:center;gap:.4rem;padding:.1rem 0">
-              <span style="font-size:.78rem;color:#0369a1;font-weight:600">🆗 Maintained</span>
+              <span style="font-size:.78rem;color:#6b7280;font-weight:600">🆗 Maintained</span>
               <button class="mn-undo-maintain" data-idx="${idx}" style="font-size:.72rem;padding:.15rem .45rem;background:#dbeafe;border:1px solid #93c5fd;border-radius:.3rem;cursor:pointer;color:#1d4ed8">↩ Undo</button>
             </div>`
           : "";
@@ -9155,7 +9155,7 @@ function renderTargetManageContent(student, target) {
         const remarkTypeSelect = buildRemarkTypeControls(a, idx, target.maxPoints || 3);
         const maintainedRow = a.maintained
           ? `<div style="display:flex;align-items:center;gap:.4rem;padding:.1rem 0">
-              <span style="font-size:.78rem;color:#0369a1;font-weight:600">🆗 Maintained</span>
+              <span style="font-size:.78rem;color:#6b7280;font-weight:600">🆗 Maintained</span>
               <button class="mn-undo-maintain" data-idx="${idx}" style="font-size:.72rem;padding:.15rem .45rem;background:#dbeafe;border:1px solid #93c5fd;border-radius:.3rem;cursor:pointer;color:#1d4ed8">↩ Undo</button>
             </div>`
           : "";
@@ -10585,7 +10585,7 @@ function renderTemplateManageContent(template) {
       const actItemStyle = actBaseBg ? ` style="${actBaseBg}"` : '';
       const tmplMaintainedRow = a.maintained
         ? `<div style="display:flex;align-items:center;gap:.4rem;padding:.1rem 0">
-            <span style="font-size:.78rem;color:#0369a1;font-weight:600">🆗 Maintained</span>
+            <span style="font-size:.78rem;color:#6b7280;font-weight:600">🆗 Maintained</span>
             <button class="mn-undo-maintain" data-idx="${idx}" style="font-size:.72rem;padding:.15rem .45rem;background:#dbeafe;border:1px solid #93c5fd;border-radius:.3rem;cursor:pointer;color:#1d4ed8">↩ Undo</button>
           </div>`
         : "";
