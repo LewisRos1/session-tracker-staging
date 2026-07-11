@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "861";
+const APP_VERSION = "862";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4504,6 +4504,12 @@ const maintainedRemarkAutoFillInFlight = new Set();
 
 async function autoFillMaintainedRemarks(student, sessionId) {
   const data = state.sessionData;
+  // Only fill if the session already has at least one real piece of recorded data.
+  // This prevents creating a "ghost" session when the user opens but doesn't record anything.
+  const hasRealData = Object.values(data.remarks || {}).some(r =>
+    (r.text && r.text.trim()) || (r.trials || []).some(t => t >= 0) || r.optionScore !== undefined
+  );
+  if (!hasRealData) return 0;
   const toFill = [];
   for (const target of (student.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
@@ -5422,6 +5428,10 @@ async function autoFillViewMappedRemarks(student, sessionId, data) {
 
 // View/Edit Past Sessions counterpart of autoFillMaintainedRemarks.
 async function autoFillViewMaintainedRemarks(student, sessionId, data) {
+  const hasRealData = Object.values(data.remarks || {}).some(r =>
+    (r.text && r.text.trim()) || (r.trials || []).some(t => t >= 0) || r.optionScore !== undefined
+  );
+  if (!hasRealData) return 0;
   let count = 0;
   for (const target of (student.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
@@ -11758,6 +11768,10 @@ async function autoFillGroupMappedRemarks(group, sessionId, data, targetName, at
 async function autoFillGroupMaintainedRemarks(group, sessionId, data, targetName, attendees) {
   const target = group.targets.find(t => t.name === targetName);
   if (!target) return 0;
+  const hasRealData = Object.values(data.remarks || {}).some(r =>
+    (r.text && r.text.trim()) || (r.trials || []).some(t => t >= 0) || r.optionScore !== undefined
+  );
+  if (!hasRealData) return 0;
   let count = 0;
   for (const pa of (target.predefinedActivities || [])) {
     if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || !pa.name) continue;
