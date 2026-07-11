@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "850";
+const APP_VERSION = "851";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -593,6 +593,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
     await loadAppData();
+    await migrateGrayActivitiesToMaintained();
     await waitForUpdatingScreenMinimum();
     showHome();
     cleanupExpiredTrash();
@@ -605,6 +606,40 @@ function hasLoggedInToday() {
 }
 function markLoggedInToday() {
   localStorage.setItem(LAST_LOGIN_DATE_KEY, getTodayString());
+}
+
+async function migrateGrayActivitiesToMaintained() {
+  const migrateActs = acts => {
+    if (!Array.isArray(acts)) return false;
+    let changed = false;
+    for (const a of acts) {
+      if (a.activityColor === "gray" && !a.maintained
+          && !a.isHeading && !a.isMaintainHeading && !a.isNote && !a.isExportNote) {
+        a.maintained = true;
+        changed = true;
+      }
+    }
+    return changed;
+  };
+  const saves = [];
+  for (const student of (state.students || [])) {
+    let dirty = false;
+    for (const t of (student.targets || [])) {
+      if (migrateActs(t.predefinedActivities)) dirty = true;
+    }
+    if (dirty) saves.push(saveStudent(student));
+  }
+  for (const group of (state.groups || [])) {
+    let dirty = false;
+    for (const t of (group.targets || [])) {
+      if (migrateActs(t.predefinedActivities)) dirty = true;
+    }
+    if (dirty) saves.push(saveGroup(group));
+  }
+  for (const template of (state.templates || [])) {
+    if (migrateActs(template.predefinedActivities)) saves.push(saveTemplate(template));
+  }
+  if (saves.length) await Promise.allSettled(saves);
 }
 
 // Student/template/group/remark-preset config — only fetchable once signed in.
