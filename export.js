@@ -579,8 +579,8 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
   }
 
   ws.getColumn(1).width = 35;
-  ws.getColumn(2).width = 14;
-  ws.getColumn(3).width = 14;
+  ws.getColumn(2).width = 19;
+  ws.getColumn(3).width = 19;
   ws.getColumn(4).width = 14;
   ws.getColumn(5).width = 16;
   ws.getColumn(1).alignment = { vertical: "middle" };
