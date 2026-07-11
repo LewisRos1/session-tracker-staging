@@ -1766,7 +1766,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
       }
       if (act.isStoppedSeparator) {
         activityHeadingRows.add(rows.length);
-        const r = blankRow(); r[1] = "— Stopped tracking —"; rows.push(r);
+        const r = blankRow(); r[1] = act.activityName || "— Discontinued —"; rows.push(r);
         continue;
       }
       if (act.isStopped) {
@@ -1907,8 +1907,9 @@ function getAllActivitiesForTarget(session, target) {
 
   const result = [];
   const usedIds = new Set();
-  const masteredActivities = [];
-  const stoppedActivities  = [];
+  const masteredActivities      = [];
+  const discontinuedActivities  = [];
+  const stoppedActivities       = [];
   let exportActNum = 0;
   const subLabelCounters = {};
 
@@ -1919,7 +1920,7 @@ function getAllActivitiesForTarget(session, target) {
       const parentExists = (target.predefinedActivities || []).some(
         p => !p.parentActivity && p.name === pa.parentActivity
           && isActivityActive(p, session.date)
-          && !p.isCompleted && !p.isArchived && !p.isStopped
+          && !p.isCompleted && !p.isArchived && !p.isStopped && !p.masteredOn && !p.discontinuedOn
       );
       if (!parentExists) continue;
     }
@@ -1973,12 +1974,25 @@ function getAllActivitiesForTarget(session, target) {
       continue;
     }
 
+    // Mastered / discontinued → defer to bottom with x) prefix, don't consume a number
+    if (pa.masteredOn) {
+      const _sAct = sessionActs.find(a => a.activityName === pa.name && a.isPredefined);
+      const _name = `x) (Mastered) ${pa.name}`;
+      if (_sAct) { usedIds.add(_sAct.id); masteredActivities.push({ ..._sAct, activityName: _name }); }
+      else { masteredActivities.push({ id: null, activityName: _name, isPredefined: true, empty: true }); }
+      continue;
+    }
+    if (pa.discontinuedOn) {
+      const _sAct = sessionActs.find(a => a.activityName === pa.name && a.isPredefined);
+      const _name = `x) (Discontinued) ${pa.name}`;
+      if (_sAct) { usedIds.add(_sAct.id); discontinuedActivities.push({ ..._sAct, activityName: _name }); }
+      else { discontinuedActivities.push({ id: null, activityName: _name, isPredefined: true, empty: true }); }
+      continue;
+    }
+
     // All remaining paths are real activities — assign sequential number
     exportActNum++;
-    const _exportStatusPrefix = pa.discontinuedOn ? '(Discontinued) '
-      : pa.masteredOn ? '(Mastered) '
-      : pa.maintained ? '(Maintained) '
-      : '';
+    const _exportStatusPrefix = pa.maintained ? '(Maintained) ' : '';
     const numberedName = `${exportActNum}) ${_exportStatusPrefix}${pa.name}`;
 
     // Parent activity (noRemark) — numbered title, empty remark
@@ -2049,6 +2063,10 @@ function getAllActivitiesForTarget(session, target) {
   if (masteredActivities.length > 0) {
     result.push({ isMasteredSeparator: true, activityName: "— Mastered —" });
     result.push(...masteredActivities);
+  }
+  if (discontinuedActivities.length > 0) {
+    result.push({ isStoppedSeparator: true, activityName: "— Discontinued —" });
+    result.push(...discontinuedActivities);
   }
   if (stoppedActivities.length > 0) {
     result.push({ isStoppedSeparator: true, activityName: "— Stopped tracking —" });
