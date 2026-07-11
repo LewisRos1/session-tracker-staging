@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "863";
+const APP_VERSION = "864";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -13403,3 +13403,29 @@ function renderSessionListRows(sorted, display, today, { isCurrentId, extraLine,
   }
   return html;
 }
+
+// ── One-time migration: backfill discontinuedOn = "2026-06-30" for legacy entries ──
+window._runDiscontinuedMigration = async function() {
+  const students = await loadStudentsConfig();
+  let updatedCount = 0;
+  for (const student of students) {
+    let changed = false;
+    const targets = (student.targets || []).map(t => ({
+      ...t,
+      predefinedActivities: (t.predefinedActivities || []).map(pa => {
+        if (pa.inactiveReason === 'discontinued' && !pa.discontinuedOn) {
+          changed = true;
+          console.log(`  → ${student.name} / ${t.name} / ${pa.name}`);
+          return { ...pa, discontinuedOn: "2026-06-30" };
+        }
+        return pa;
+      })
+    }));
+    if (changed) {
+      await saveStudent({ ...student, targets });
+      updatedCount++;
+      console.log(`✅ Saved: ${student.name}`);
+    }
+  }
+  console.log(`\nMigration done. ${updatedCount} student(s) updated.`);
+};
