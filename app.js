@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "860";
+const APP_VERSION = "861";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2880,6 +2880,10 @@ async function openSession(student, existingSessionId = null, dateStr = null) {
         const mappedFilled = await autoFillMappedRemarks(student, sessionId);
         if (mappedFilled > 0) return;
       } catch (err) { console.error("autoFillMappedRemarks failed:", err); }
+      try {
+        const maintainedFilled = await autoFillMaintainedRemarks(student, sessionId);
+        if (maintainedFilled > 0) return;
+      } catch (err) { console.error("autoFillMaintainedRemarks failed:", err); }
       // Keep score modal trial badges in sync with Firestore
       if (state.scorePicker?.open && state.scorePicker?.remId) {
         renderScoreModalTrials(state.scorePicker.remId);
@@ -3035,6 +3039,7 @@ function populateTargetDropdown(targets) {
       try {
         if (await autoFillStructuredRemarks(state.currentStudent, state.currentSessionId) > 0) return;
         if (await autoFillMappedRemarks(state.currentStudent, state.currentSessionId) > 0) return;
+        if (await autoFillMaintainedRemarks(state.currentStudent, state.currentSessionId) > 0) return;
         renderTargetContent();
       } catch { renderTargetContent(); }
     })();
@@ -4493,6 +4498,42 @@ async function autoFillMappedRemarks(student, sessionId) {
   return toFill.length;
 }
 
+// Auto-create a "Maintain" remark for every maintained activity in the session.
+// Mirrors autoFillMappedRemarks — runs on first load and target switch only.
+const maintainedRemarkAutoFillInFlight = new Set();
+
+async function autoFillMaintainedRemarks(student, sessionId) {
+  const data = state.sessionData;
+  const toFill = [];
+  for (const target of (student.targets || [])) {
+    for (const pa of (target.predefinedActivities || [])) {
+      if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || !pa.name) continue;
+      const existingAct = Object.entries(data.activities || {})
+        .find(([, a]) => a.targetName === target.name && a.activityName === pa.name && !a.parentActivity);
+      let actId = existingAct?.[0] || null;
+      if (actId && Object.values(data.remarks || {}).some(r => r.activityId === actId)) continue;
+      const key = `${sessionId}:${target.name}:${pa.name}:maintained`;
+      if (maintainedRemarkAutoFillInFlight.has(key)) continue;
+      maintainedRemarkAutoFillInFlight.add(key);
+      toFill.push({ target, pa, actId, key });
+    }
+  }
+  if (toFill.length === 0) return 0;
+  await Promise.all(toFill.map(async item => {
+    if (!item.actId) {
+      try {
+        item.actId = await addActivity(sessionId, item.target.name, item.pa.name, item.pa.order ?? 0, true);
+      } catch { maintainedRemarkAutoFillInFlight.delete(item.key); item.actId = null; }
+    }
+  }));
+  await Promise.all(toFill.map(async item => {
+    if (!item.actId) return;
+    try { await addRemark(sessionId, item.actId, "Maintain"); }
+    finally { maintainedRemarkAutoFillInFlight.delete(item.key); }
+  }));
+  return toFill.length;
+}
+
 // Deletes remarks that have no text, no mastery note, and no valid trials for
 // the given target, then removes any activity that is left with no remarks.
 // A "-1" trial is the View/Edit screen's "+" placeholder for a slot that was
@@ -4716,8 +4757,12 @@ async function openSessionView(student, sessionId) {
       state.viewSessionData = data;
       try {
         const filled = await autoFillViewMappedRemarks(student, sessionId, data);
-        if (filled > 0) return; // the write triggers another snapshot, which renders
+        if (filled > 0) return;
       } catch (err) { console.error("autoFillViewMappedRemarks failed:", err); }
+      try {
+        const maintainedFilled = await autoFillViewMaintainedRemarks(student, sessionId, data);
+        if (maintainedFilled > 0) return;
+      } catch (err) { console.error("autoFillViewMaintainedRemarks failed:", err); }
       if (isViewBusy() || state.viewActionsInFlight > 0) { state.viewRenderPending = true; }
       else               { renderSessionView(); }
     });
@@ -5370,6 +5415,29 @@ async function autoFillViewMappedRemarks(student, sessionId, data) {
       } finally {
         mappedRemarkAutoFillInFlight.delete(key);
       }
+    }
+  }
+  return count;
+}
+
+// View/Edit Past Sessions counterpart of autoFillMaintainedRemarks.
+async function autoFillViewMaintainedRemarks(student, sessionId, data) {
+  let count = 0;
+  for (const target of (student.targets || [])) {
+    for (const pa of (target.predefinedActivities || [])) {
+      if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || !pa.name) continue;
+      const existingAct = Object.entries(data.activities || {})
+        .find(([, a]) => a.targetName === target.name && a.activityName === pa.name && !a.parentActivity);
+      let actId = existingAct?.[0] || null;
+      if (actId && Object.values(data.remarks || {}).some(r => r.activityId === actId)) continue;
+      const key = `${sessionId}:${target.name}:${pa.name}:maintained`;
+      if (maintainedRemarkAutoFillInFlight.has(key)) continue;
+      maintainedRemarkAutoFillInFlight.add(key);
+      try {
+        if (!actId) actId = await addActivity(sessionId, target.name, pa.name, pa.order ?? 0, true);
+        await addRemark(sessionId, actId, "Maintain");
+        count++;
+      } finally { maintainedRemarkAutoFillInFlight.delete(key); }
     }
   }
   return count;
@@ -8095,6 +8163,7 @@ async function closeManageModal() {
         try {
           if (await autoFillStructuredRemarks(state.currentStudent, state.currentSessionId) > 0) return;
           if (await autoFillMappedRemarks(state.currentStudent, state.currentSessionId) > 0) return;
+          if (await autoFillMaintainedRemarks(state.currentStudent, state.currentSessionId) > 0) return;
           renderTargetContent();
         } catch { renderTargetContent(); }
       })();
@@ -8117,7 +8186,13 @@ async function closeManageModal() {
           return autoFillGroupStructuredRemarks(
             state.currentGroup, state.groupSessionId, state.groupSessionData,
             state.selectedGroupTargetName, state.groupAttendees
-          ).then(structuredFilled => { if (structuredFilled === 0) renderGroupTargetContent(); });
+          ).then(structuredFilled => {
+            if (structuredFilled > 0) return;
+            return autoFillGroupMaintainedRemarks(
+              state.currentGroup, state.groupSessionId, state.groupSessionData,
+              state.selectedGroupTargetName, state.groupAttendees
+            ).then(mFilled => { if (mFilled === 0) renderGroupTargetContent(); });
+          });
         });
       }).catch(() => renderGroupTargetContent());
     } else if (state.groupSessionId) {
@@ -11517,6 +11592,8 @@ async function openGroupSession(group, dateStr, attendees) {
             if (mappedFilled > 0) return;
             const structuredFilled = await autoFillGroupStructuredRemarks(group, sid, data, state.selectedGroupTargetName, attendees);
             if (structuredFilled > 0) return;
+            const maintainedFilled = await autoFillGroupMaintainedRemarks(group, sid, data, state.selectedGroupTargetName, attendees);
+            if (maintainedFilled > 0) return;
           } catch (err) { console.error("Group session auto-fill failed:", err); }
         }
       }
@@ -11672,6 +11749,33 @@ async function autoFillGroupMappedRemarks(group, sessionId, data, targetName, at
       } finally {
         mappedRemarkAutoFillInFlight.delete(key);
       }
+    }
+  }
+  return count;
+}
+
+// Group-entry counterpart of autoFillMaintainedRemarks.
+async function autoFillGroupMaintainedRemarks(group, sessionId, data, targetName, attendees) {
+  const target = group.targets.find(t => t.name === targetName);
+  if (!target) return 0;
+  let count = 0;
+  for (const pa of (target.predefinedActivities || [])) {
+    if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || !pa.name) continue;
+    const existingAct = Object.entries(data.activities || {})
+      .find(([, a]) => a.targetName === targetName && a.activityName === pa.name);
+    const actId = existingAct?.[0];
+    if (!actId) continue;
+    for (const studentName of attendees) {
+      const hasRemark = Object.values(data.remarks || {})
+        .some(r => r.activityId === actId && r.studentName === studentName);
+      if (hasRemark) continue;
+      const key = `${sessionId}:${targetName}:${pa.name}:${studentName}:maintained`;
+      if (maintainedRemarkAutoFillInFlight.has(key)) continue;
+      maintainedRemarkAutoFillInFlight.add(key);
+      try {
+        await addGroupRemark(sessionId, actId, studentName, "Maintain");
+        count++;
+      } finally { maintainedRemarkAutoFillInFlight.delete(key); }
     }
   }
   return count;
