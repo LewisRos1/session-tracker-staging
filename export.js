@@ -1063,7 +1063,7 @@ function wordTargetRows(target, session, allTargets) {
     }
 
     if (act.empty) {
-      rows.push({ cells: [activityLabel, "", ""], actLines: parseInlineMarkup(activityLabel), isGray: act.isGray, isGreen: act.isGreen });
+      rows.push({ cells: [activityLabel, act.isMaintained ? "Maintain" : "", ""], actLines: parseInlineMarkup(activityLabel), isGray: act.isGray, isGreen: act.isGreen });
       continue;
     }
 
@@ -1072,7 +1072,7 @@ function wordTargetRows(target, session, allTargets) {
     const starter = (_starterPa?.inlineOptions || _starterPa?.remarkPresetId || _starterPa?.remarkHasNote) ? (_starterPa?.sentenceStarter || null) : null;
 
     if (remarks.length === 0) {
-      rows.push({ cells: [activityLabel, "", ""], actLines: parseInlineMarkup(activityLabel), isGray: act.isGray, isGreen: act.isGreen });
+      rows.push({ cells: [activityLabel, act.isMaintained ? "Maintain" : "", ""], actLines: parseInlineMarkup(activityLabel), isGray: act.isGray, isGreen: act.isGreen });
       continue;
     }
 
@@ -1865,7 +1865,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, mastere
       if (act.empty) {
         if (act.isGray) grayRows.add(rows.length);
         if (act.isGreen) greenRows.add(rows.length);
-        const r = blankRow(); r[1] = activityCell; rows.push(r);
+        const r = blankRow(); r[1] = activityCell; if (act.isMaintained) r[2] = "Maintain"; rows.push(r);
         continue;
       }
 
@@ -1876,7 +1876,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, mastere
       if (remarks.length === 0) {
         if (act.isGray) grayRows.add(rows.length);
         if (act.isGreen) greenRows.add(rows.length);
-        const r = blankRow(); r[1] = activityCell; rows.push(r);
+        const r = blankRow(); r[1] = activityCell; if (act.isMaintained) r[2] = "Maintain"; rows.push(r);
         continue;
       }
 
@@ -2068,12 +2068,12 @@ function getAllActivitiesForTarget(session, target) {
     if (sessionAct) {
       usedIds.add(sessionAct.id);
       result.push(pa.isMapped
-        ? { ...sessionAct, activityName: numberedName, isMapped: true, mappedTargetId: pa.mappedTargetId || null, ...colorProps }
-        : { ...sessionAct, activityName: numberedName, ...colorProps, ...manualScoreProp });
+        ? { ...sessionAct, activityName: numberedName, isMapped: true, mappedTargetId: pa.mappedTargetId || null, ...colorProps, isMaintained: !!pa.maintained }
+        : { ...sessionAct, activityName: numberedName, ...colorProps, ...manualScoreProp, isMaintained: !!pa.maintained });
     } else {
       result.push({
         id: null, activityName: numberedName, isPredefined: true, empty: true,
-        isMapped: pa.isMapped || false, mappedTargetId: pa.mappedTargetId || null, ...colorProps, ...manualScoreProp
+        isMapped: pa.isMapped || false, mappedTargetId: pa.mappedTargetId || null, ...colorProps, ...manualScoreProp, isMaintained: !!pa.maintained
       });
     }
   }
