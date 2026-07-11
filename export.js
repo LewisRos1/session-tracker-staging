@@ -1957,8 +1957,10 @@ function getAllActivitiesForTarget(session, target) {
       const parentPa = (target.predefinedActivities || []).find(p => !p.parentActivity && p.name === pa.parentActivity);
       const subStatusPrefix = pa.discontinuedOn ? '(Discontinued) '
         : pa.masteredOn ? '(Mastered) '
+        : pa.maintainedOn ? '(Maintained) '
         : parentPa?.discontinuedOn ? '(Discontinued) '
         : parentPa?.masteredOn ? '(Mastered) '
+        : parentPa?.maintainedOn ? '(Maintained) '
         : '';
       const subActName = subStatusPrefix + pa.name;
       const sessionAct = sessionActs.find(a => a.activityName === pa.name && a.isPredefined);
@@ -1975,6 +1977,7 @@ function getAllActivitiesForTarget(session, target) {
     exportActNum++;
     const _exportStatusPrefix = pa.discontinuedOn ? '(Discontinued) '
       : pa.masteredOn ? '(Mastered) '
+      : pa.maintainedOn ? '(Maintained) '
       : '';
     const numberedName = `${exportActNum}) ${_exportStatusPrefix}${pa.name}`;
 
@@ -2112,7 +2115,7 @@ function calcDailyAverage(session, target, allTargets = [], visited = new Set())
 
   const avgs = [];
   for (const act of getAllActivitiesForTarget(session, target)) {
-    if (act.isHeading || act.isNote || act.isExportNote || act.empty || act.isMasteredSeparator || act.isStoppedSeparator || act.isMaintainSeparator || act.isMaintain || act.isMaintainHeading || act.fixedRemark !== undefined) continue;
+    if (act.isHeading || act.isNote || act.isExportNote || act.empty || act.isMasteredSeparator || act.isStoppedSeparator || act.isMaintainSeparator || act.isMaintain || act.isMaintainHeading) continue;
     if (act.isMapped) {
       if (getRemarksForActivity(session, act.id).length === 0) continue;
       const a = resolveExportMappedScore(act, session, allTargets, visited);
