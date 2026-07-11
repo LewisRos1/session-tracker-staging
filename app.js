@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "853";
+const APP_VERSION = "854";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -7682,7 +7682,7 @@ function inactiveReasonBadge(pa) {
     return `<span style="${_badgeBase};background:#fee2e2;border:1px solid #fca5a5;color:#dc2626">${label}</span>`;
   }
   if (pa?.maintained)
-    return `<span style="${_badgeBase};background:#f3f4f6;border:1px solid #9ca3af;color:#374151">🆗 Maintained</span>`;
+    return `<span style="${_badgeBase};background:#e5e7eb;border:1px solid #9ca3af;color:#374151">🆗 Maintained</span>`;
   return '';
 }
 
