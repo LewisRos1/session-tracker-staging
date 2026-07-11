@@ -164,6 +164,15 @@ const STYLE_GREEN_ACT_FILL = { type: "pattern", pattern: "solid", fgColor: { arg
 const STYLE_GREEN_HDG_FILL = { type: "pattern", pattern: "solid", fgColor: { argb: "FFA9D18E" } };
 // Gray heading rows — "White, Background 1, Darker 15%" (#D9D9D9)
 const STYLE_GRAY_HDG_FILL = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD9D9D9" } };
+// Mastered / Discontinued separator rows
+const STYLE_MASTERED_SEP = {
+  fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFD1FAE5" } },
+  font: { bold: true, color: { argb: "FF15803D" } }
+};
+const STYLE_DISCONTINUED_SEP = {
+  fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFFEE2E2" } },
+  font: { bold: true, color: { argb: "FFDC2626" } }
+};
 // Daily Average: near-white blue, soft navy text
 const STYLE_DAILY_AVG = {
   fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F7FC" } },
@@ -599,7 +608,7 @@ function addIndividualTargetSheets(wb, allTargets, sessions, studentName, includ
   const avgColLet = includeTrials ? "F" : "E";
 
   for (const target of allTargets) {
-    const { rows, monthHeaderRows, colHeaderRows, activityHeadingRows, noteRows, sessionDateBlocks, spacerRows, grayRows, greenRows } =
+    const { rows, monthHeaderRows, colHeaderRows, activityHeadingRows, masteredSepRows, discontinuedSepRows, noteRows, sessionDateBlocks, spacerRows, grayRows, greenRows } =
       buildTargetSheet(target, sessions, allTargets, includeTrials);
     const ws = wb.addWorksheet(target.name.slice(0, 31));
     rows.forEach(row => ws.addRow(row));
@@ -659,6 +668,22 @@ function addIndividualTargetSheets(wb, allTargets, sessions, studentName, includ
       const cell = ws.getRow(n).getCell(2);
       cell.fill      = STYLE_ACT_HEADING.fill;
       cell.font      = STYLE_ACT_HEADING.font;
+      cell.alignment = { vertical: "top" };
+    }
+    for (const rowIdx of masteredSepRows) {
+      const n = rowIdx + 1;
+      try { ws.mergeCells(`B${n}:${headingEndCol}${n}`); } catch (_) {}
+      const cell = ws.getRow(n).getCell(2);
+      cell.fill      = STYLE_MASTERED_SEP.fill;
+      cell.font      = STYLE_MASTERED_SEP.font;
+      cell.alignment = { vertical: "top" };
+    }
+    for (const rowIdx of discontinuedSepRows) {
+      const n = rowIdx + 1;
+      try { ws.mergeCells(`B${n}:${headingEndCol}${n}`); } catch (_) {}
+      const cell = ws.getRow(n).getCell(2);
+      cell.fill      = STYLE_DISCONTINUED_SEP.fill;
+      cell.font      = STYLE_DISCONTINUED_SEP.font;
       cell.alignment = { vertical: "top" };
     }
 
@@ -1640,6 +1665,8 @@ function buildTargetSheet(target, sessions, allTargets, includeTrials) {
   const monthHeaderRows   = new Set();
   const colHeaderRows     = new Set();
   const activityHeadingRows = new Set();
+  const masteredSepRows     = new Set();
+  const discontinuedSepRows = new Set();
   const noteRows          = new Set();
   const grayRows          = new Set();
   const greenRows         = new Set();
@@ -1677,11 +1704,11 @@ function buildTargetSheet(target, sessions, allTargets, includeTrials) {
     for (const session of monthSessions) {
       const snap = (session.targetsSnapshot || []).find(t => t.name === target.name);
       const effectiveTarget = snap ? { ...target, maxPoints: snap.maxPoints ?? target.maxPoints } : target;
-      appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRows, grayRows, greenRows, session, effectiveTarget, allTargets, includeTrials);
+      appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, masteredSepRows, discontinuedSepRows, noteRows, grayRows, greenRows, session, effectiveTarget, allTargets, includeTrials);
     }
   }
 
-  return { rows, monthHeaderRows, colHeaderRows, activityHeadingRows, noteRows, grayRows, greenRows, sessionDateBlocks, spacerRows };
+  return { rows, monthHeaderRows, colHeaderRows, activityHeadingRows, masteredSepRows, discontinuedSepRows, noteRows, grayRows, greenRows, sessionDateBlocks, spacerRows };
 }
 
 // ─── SESSION ROWS ────────────────────────────────────────────
@@ -1695,7 +1722,7 @@ function trialsList(trials) {
   return (trials || []).map(t => (t === -1 ? "—" : t)).join(", ");
 }
 
-function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRows, grayRows, greenRows, session, target, allTargets, includeTrials) {
+function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, masteredSepRows, discontinuedSepRows, noteRows, grayRows, greenRows, session, target, allTargets, includeTrials) {
   const blankRow = () => (includeTrials ? ["", "", "", "", "", ""] : ["", "", "", "", ""]);
   const [, m, d] = session.date.split("-").map(Number);
   const shortMonths = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -1760,12 +1787,12 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, noteRow
         continue;
       }
       if (act.isMasteredSeparator) {
-        activityHeadingRows.add(rows.length);
+        masteredSepRows.add(rows.length);
         const r = blankRow(); r[1] = "— Mastered —"; rows.push(r);
         continue;
       }
       if (act.isStoppedSeparator) {
-        activityHeadingRows.add(rows.length);
+        discontinuedSepRows.add(rows.length);
         const r = blankRow(); r[1] = act.activityName || "— Discontinued —"; rows.push(r);
         continue;
       }
