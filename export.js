@@ -2107,6 +2107,7 @@ function getAllActivitiesForTarget(session, target) {
   for (const act of sessionActs) {
     if (usedIds.has(act.id)) continue;
     if (act.isPredefined || act.parentActivity) continue;
+    if (!act.activityName?.trim()) continue;
     extraNum++;
     extraActivities.push({ ...act, activityName: `${extraNum}) ${act.activityName}` });
   }

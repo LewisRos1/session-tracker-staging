@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "869";
+const APP_VERSION = "870";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3578,18 +3578,7 @@ function renderExtraActivitiesSection(target) {
     }
     html += `</div>`;
   }
-  if (state.pendingNewActivity?.targetName === target.name) {
-    html += `<div class="entry-block">
-      <div class="entry-field">
-        <span class="field-label" contenteditable="false">Activity</span>
-        <input type="text" id="new-activity-textarea" class="field-input"
-          placeholder="Type activity name…" autocomplete="off" />
-        <button class="btn-icon btn-cancel-new-activity" contenteditable="false" title="Cancel">✕</button>
-      </div>
-    </div>`;
-  } else {
-    html += `<button class="btn-add-session-activity" style="display:block;width:100%;margin-top:.6rem;padding:.55rem .9rem;background:transparent;border:1.5px dashed #a5b4fc;border-radius:.5rem;cursor:pointer;font-size:.85rem;color:#6366f1;text-align:center" contenteditable="false">+ Add Activity (only for this session, not saved to the target permanently)</button>`;
-  }
+  html += `<button class="btn-add-session-activity" style="display:block;width:100%;margin-top:.6rem;padding:.55rem .9rem;background:transparent;border:1.5px dashed #a5b4fc;border-radius:.5rem;cursor:pointer;font-size:.85rem;color:#6366f1;text-align:center" contenteditable="false">+ Add Activity (only for this session, not saved to the target permanently)</button>`;
   return html;
 }
 
@@ -4053,27 +4042,17 @@ function attachTargetListeners(target) {
     });
   });
 
-  c.querySelector(".btn-add-session-activity")?.addEventListener("click", () => {
-    state.pendingNewActivity = { targetName: target.name };
-    renderTargetContent();
-  });
-
-  $("new-activity-textarea")?.addEventListener("blur", e => {
-    // Small delay so cancel button click can fire first
+  c.querySelector(".btn-add-session-activity")?.addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    if (btn.disabled) return;
+    btn.disabled = true;
+    const actId = await addActivity(state.currentSessionId, target.name, "", Date.now(), false);
+    // Firestore snapshot fires and re-renders; then focus the new name input
     setTimeout(() => {
-      const input = $("new-activity-textarea");
-      if (!input) return; // already removed by cancel
-      const name = input.value.trim();
-      state.pendingNewActivity = null;
-      if (name) {
-        addActivity(state.currentSessionId, target.name, name, Date.now(), false);
-      } else {
-        renderTargetContent();
-      }
-    }, 150);
+      const input = c.querySelector(`.activity-name-input[data-act-id="${actId}"]`);
+      if (input) input.focus();
+    }, 200);
   });
-
-  c.querySelector(".btn-cancel-new-activity")?.addEventListener("click", cancelPendingActivity);
 
   // ── Delete activity ───────────────────────────────────────
   c.querySelectorAll(".btn-delete-activity").forEach(btn => {
@@ -5037,7 +5016,7 @@ function buildTargetViewTable(target, data) {
     }
     // Manually-added (session-only) extra activities — rendered under an "Extra" heading.
     const extraViewActs = Object.entries(data.activities || {})
-      .filter(([actId, a]) => a.targetName === target.name && !matchedIds.has(actId) && !a.isPredefined && !a.parentActivity)
+      .filter(([actId, a]) => a.targetName === target.name && !matchedIds.has(actId) && !a.isPredefined && !a.parentActivity && a.activityName?.trim())
       .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0));
     if (extraViewActs.length > 0) {
       rows += `<tr class="view-heading-row"><td colspan="6" contenteditable="false">Extra</td></tr>`;
