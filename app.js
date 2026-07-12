@@ -149,7 +149,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "879";
+const APP_VERSION = "880";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3620,6 +3620,9 @@ function renderExtraActivitiesSection(target) {
         <button class="btn-icon btn-cancel-pending-activity" contenteditable="false"
           title="Cancel">✕</button>
       </div>
+      <button class="btn-add-remark btn-add-remark-for-pending" contenteditable="false"
+        data-act-id="${escHtml(_pendingNewActivity.actId)}"
+        data-target="${escHtml(target.name)}">+ Add Remark &amp; Trials</button>
     </div>`;
   }
   for (const act of extraActs) {
@@ -4190,6 +4193,28 @@ function attachTargetListeners(target) {
       e.preventDefault(); // prevent blur from firing and clearing _pendingNewActivity first
       _pendingNewActivity = null;
       renderTargetContent();
+    });
+
+    // "+ Add Remark & Trials" on the pending row: save the activity first (name
+    // required), then immediately open the add-remark form for it.
+    c.querySelector(".btn-add-remark-for-pending")?.addEventListener("click", () => {
+      if (!_pendingNewActivity) return;
+      const name = (_pendingNewActivity.typedName || "").trim();
+      if (!name) {
+        c.querySelector(".pending-activity-name-input")?.focus();
+        return;
+      }
+      const { actId, targetName: tName, order } = _pendingNewActivity;
+      _pendingNewActivity = null;
+      state.sessionData.activities = state.sessionData.activities || {};
+      state.sessionData.activities[actId] = { targetName: tName, activityName: name, order, isPredefined: false };
+      state.pendingNewRemark = { pendingKey: actId };
+      renderTargetContent();
+      addActivity(state.currentSessionId, tName, name, order, false, actId).catch(err => {
+        delete state.sessionData.activities?.[actId];
+        renderTargetContent();
+        alert("Couldn't save activity — check your connection.\n\n" + err.message);
+      });
     });
   }
 
