@@ -149,7 +149,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "877";
+const APP_VERSION = "878";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2854,23 +2854,25 @@ async function openSession(student, existingSessionId = null, dateStr = null) {
 
     state.fbUnsubscribe = listenToSession(sessionId, async data => {
       const firstLoad = state.sessionData === null;
+      // Strip orphan extra activities from EVERY incoming snapshot (empty name
+      // + no substantive remarks) before storing in state — this prevents them
+      // appearing even if a later snapshot fires before the delete write confirms.
+      // _currentNewActivityId exempts the activity the user just created.
+      const orphanActIds = [];
+      const orphanRemIds = [];
+      for (const [actId, act] of Object.entries(data.activities || {})) {
+        if (actId === _currentNewActivityId) continue;
+        if (act.isPredefined || act.parentActivity || (act.activityName || "").trim()) continue;
+        const remEntries = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === actId);
+        if (remEntries.some(([, r]) => remarkHasContent(r))) continue;
+        orphanActIds.push(actId);
+        for (const [remId] of remEntries) orphanRemIds.push(remId);
+        delete data.activities[actId];
+        if (data.remarks) for (const [remId] of remEntries) delete data.remarks[remId];
+      }
       state.sessionData = data;
       if (firstLoad) {
-        // Delete any orphan extra activities (empty name + no substantive
-        // remarks) that accumulated from previous buggy sessions. Runs before
-        // any render so they're never shown.
-        const orphanActIds = [];
-        const orphanRemIds = [];
-        for (const [actId, act] of Object.entries(state.sessionData.activities || {})) {
-          if (act.isPredefined || act.parentActivity || (act.activityName || "").trim()) continue;
-          const remEntries = Object.entries(state.sessionData.remarks || {})
-            .filter(([, r]) => r.activityId === actId);
-          if (remEntries.some(([, r]) => remarkHasContent(r))) continue;
-          orphanActIds.push(actId);
-          for (const [remId] of remEntries) orphanRemIds.push(remId);
-          delete state.sessionData.activities[actId];
-          for (const [remId] of remEntries) delete state.sessionData.remarks[remId];
-        }
+        // Persist the Firestore cleanup once on open, not on every snapshot.
         if (orphanActIds.length > 0) {
           deleteOrphanActivities(sessionId, orphanActIds, orphanRemIds).catch(() => {});
         }
