@@ -149,7 +149,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "878";
+const APP_VERSION = "879";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2855,13 +2855,11 @@ async function openSession(student, existingSessionId = null, dateStr = null) {
     state.fbUnsubscribe = listenToSession(sessionId, async data => {
       const firstLoad = state.sessionData === null;
       // Strip orphan extra activities from EVERY incoming snapshot (empty name
-      // + no substantive remarks) before storing in state — this prevents them
-      // appearing even if a later snapshot fires before the delete write confirms.
-      // _currentNewActivityId exempts the activity the user just created.
+      // + no substantive remarks) before storing in state — prevents pre-existing
+      // orphans from old sessions ever being shown.
       const orphanActIds = [];
       const orphanRemIds = [];
       for (const [actId, act] of Object.entries(data.activities || {})) {
-        if (actId === _currentNewActivityId) continue;
         if (act.isPredefined || act.parentActivity || (act.activityName || "").trim()) continue;
         const remEntries = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === actId);
         if (remEntries.some(([, r]) => remarkHasContent(r))) continue;
@@ -2920,7 +2918,8 @@ async function openSession(student, existingSessionId = null, dateStr = null) {
       // (which is exactly what made "+Add Remark & Trials" look like it
       // wasn't registering when clicked soon after typing elsewhere).
       const isEntryBusy = () => document.activeElement === $("target-select")
-        || state.entryActionsInFlight > 0;
+        || state.entryActionsInFlight > 0
+        || document.activeElement?.classList.contains("pending-activity-name-input");
       if (isEntryBusy()) {
         state.renderPending = true;
       } else {
@@ -2959,6 +2958,7 @@ async function leaveSession() {
   state.currentSessionId   = null;
   state.sessionData        = null;
   state.currentStudent     = null;
+  _pendingNewActivity      = null;
   state.pendingNewActivity = null;
   state.pendingNewRemark   = null;
   state.renderPending      = false;
@@ -3042,6 +3042,7 @@ function populateTargetDropdown(targets) {
     // deleted as if it were never entered.
     await state.entryRemarkSaver?.flush();
     state.selectedTargetName = sel.value;
+    _pendingNewActivity      = null;
     state.pendingNewActivity = null;
     state.pendingNewRemark   = null;
     // Clean up empty entries from the previous target (fire-and-forget)
@@ -3569,7 +3570,9 @@ function renderFedcTarget(target) {
 // Guards against iOS ghost-click (synthesized click ~300ms after touchend
 // landing on the freshly-rebuilt button and creating a second activity).
 let _addActivityInFlight = false;
-let _currentNewActivityId = null;
+// Pending new activity — local only, NOT written to Firestore until the user
+// types a name. Stores { actId, targetName, order, typedName }.
+let _pendingNewActivity = null;
 
 // A remark "has content" if its text (stripped of HTML) or note is non-empty.
 function remarkHasContent(r) {
@@ -3594,14 +3597,31 @@ function renderExtraActivitiesSection(target) {
   const extraActs = getActivitiesForTarget(target.name)
     .filter(a => {
       if (a.isPredefined || a.parentActivity) return false;
-      // Hide orphans (empty name + no substantive remarks) unless it's the
-      // activity the user just created (it starts empty intentionally).
-      if (a.id !== _currentNewActivityId && isOrphanExtraActivity(a)) return false;
+      // Hide any orphan activities (empty name + no substantive remarks) that
+      // slipped through from old sessions — the snapshot stripping should have
+      // removed them already, but this is a belt-and-suspenders guard.
+      if (isOrphanExtraActivity(a)) return false;
       if (seen.has(a.id)) return false;
       seen.add(a.id);
       return true;
     });
   let html = "";
+  // Pending new activity — local only, exists purely in _pendingNewActivity
+  // (never in Firestore until the user types a name).
+  const hasPending = _pendingNewActivity && _pendingNewActivity.targetName === target.name;
+  if (hasPending) {
+    html += `<div class="entry-block" data-pending-act="1">
+      <div class="entry-field">
+        <span class="field-label" contenteditable="false">Activity</span>
+        <input type="text" class="field-input pending-activity-name-input"
+          data-act-id="${escHtml(_pendingNewActivity.actId)}"
+          placeholder="Enter activity name…"
+          value="${escHtml(_pendingNewActivity.typedName || '')}" />
+        <button class="btn-icon btn-cancel-pending-activity" contenteditable="false"
+          title="Cancel">✕</button>
+      </div>
+    </div>`;
+  }
   for (const act of extraActs) {
     const isPending = state.pendingNewRemark?.pendingKey === act.id;
     const remarks   = getRemarksForActivity(act.id);
@@ -3628,7 +3648,10 @@ function renderExtraActivitiesSection(target) {
     }
     html += `</div>`;
   }
-  html += `<button class="btn-add-session-activity" style="display:block;margin-top:.6rem;padding:.55rem .9rem;background:transparent;border:1.5px dashed #a5b4fc;border-radius:.5rem;cursor:pointer;font-size:.85rem;color:#6366f1;margin-left:auto;margin-right:auto" contenteditable="false">+ Add Activity (only for this session, not saved to the target permanently)</button>`;
+  // Hide the add button while a pending input is visible for this target
+  if (!hasPending) {
+    html += `<button class="btn-add-session-activity" style="display:block;margin-top:.6rem;padding:.55rem .9rem;background:transparent;border:1.5px dashed #a5b4fc;border-radius:.5rem;cursor:pointer;font-size:.85rem;color:#6366f1;margin-left:auto;margin-right:auto" contenteditable="false">+ Add Activity (only for this session, not saved to the target permanently)</button>`;
+  }
   return html;
 }
 
@@ -4094,8 +4117,6 @@ function attachTargetListeners(target) {
 
   const addActBtn = c.querySelector(".btn-add-session-activity");
   if (addActBtn) {
-    // Same mousedown guard as btn-add-remark: prevents a blur-triggered
-    // re-render from destroying this button before "click" fires.
     addActBtn.addEventListener("mousedown", () => {
       state.entryActionsInFlight++;
       let released = false;
@@ -4114,41 +4135,61 @@ function attachTargetListeners(target) {
 
     addActBtn.addEventListener("click", (e) => {
       if (_addActivityInFlight) return;
-      const btn = e.currentTarget;
-      if (btn.disabled) return;
-      btn.disabled = true;
       _addActivityInFlight = true;
-      // Collect orphans (empty name + no substantive remarks) including their
-      // remark records, to delete atomically alongside the new activity.
-      const orphans = getActivitiesForTarget(target.name).filter(isOrphanExtraActivity);
-      const orphanActIds = orphans.map(o => o.id);
-      const orphanRemIds = orphans.flatMap(o => getRemarksForActivity(o.id).map(r => r.id));
-      for (const o of orphans) {
-        delete state.sessionData.activities[o.id];
-        for (const r of getRemarksForActivity(o.id)) delete (state.sessionData.remarks || {})[r.id];
-      }
-      // Optimistic local update.
-      const actId = generateId("a");
-      const order = Date.now();
-      _currentNewActivityId = actId;
-      state.sessionData.activities = state.sessionData.activities || {};
-      state.sessionData.activities[actId] = {
-        targetName: target.name, activityName: "", order, isPredefined: false
-      };
+      // Create a local-only pending input — NO Firestore write until the user
+      // types a name. This eliminates orphan activities entirely.
+      _pendingNewActivity = { actId: generateId("a"), targetName: target.name, order: Date.now(), typedName: "" };
       renderTargetContent();
-      const input = c.querySelector(`.activity-name-input[data-act-id="${actId}"]`);
-      if (input) input.focus();
+      c.querySelector(".pending-activity-name-input")?.focus();
       setTimeout(() => { _addActivityInFlight = false; }, 600);
-      // Single atomic write — deletes all orphans (activities + their remarks)
-      // AND creates the new activity in one updateDoc so only one Firestore
-      // snapshot fires, preventing the race that was showing 2 activity cards.
-      addActivityWithCleanup(state.currentSessionId, orphanActIds, orphanRemIds, actId, target.name, "", order).catch(err => {
-        _addActivityInFlight = false;
-        _currentNewActivityId = null;
+    });
+  }
+
+  // Pending activity name input — save to Firestore only when user commits a name.
+  const pendingInput = c.querySelector(".pending-activity-name-input");
+  if (pendingInput) {
+    // Keep typedName in sync so it survives Firestore-triggered re-renders.
+    pendingInput.addEventListener("input", () => {
+      if (_pendingNewActivity) _pendingNewActivity.typedName = pendingInput.value;
+    });
+
+    pendingInput.addEventListener("blur", () => {
+      if (!_pendingNewActivity) return;
+      const name = (_pendingNewActivity.typedName || "").trim();
+      if (!name) {
+        _pendingNewActivity = null;
+        // Defer render if a button's mousedown guard is active
+        if (state.entryActionsInFlight > 0) {
+          state.renderPending = true;
+        } else {
+          setTimeout(() => {
+            if (state.entryActionsInFlight > 0) state.renderPending = true;
+            else renderTargetContent();
+          }, 0);
+        }
+        return;
+      }
+      const { actId, targetName: tName, order } = _pendingNewActivity;
+      _pendingNewActivity = null;
+      state.sessionData.activities = state.sessionData.activities || {};
+      state.sessionData.activities[actId] = { targetName: tName, activityName: name, order, isPredefined: false };
+      renderTargetContent();
+      addActivity(state.currentSessionId, tName, name, order, false, actId).catch(err => {
         delete state.sessionData.activities?.[actId];
         renderTargetContent();
-        alert("Couldn't add activity — check your connection.\n\n" + err.message);
+        alert("Couldn't save activity — check your connection.\n\n" + err.message);
       });
+    });
+
+    pendingInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); pendingInput.blur(); }
+      if (e.key === "Escape") { e.preventDefault(); _pendingNewActivity = null; renderTargetContent(); }
+    });
+
+    c.querySelector(".btn-cancel-pending-activity")?.addEventListener("mousedown", (e) => {
+      e.preventDefault(); // prevent blur from firing and clearing _pendingNewActivity first
+      _pendingNewActivity = null;
+      renderTargetContent();
     });
   }
 
@@ -5885,7 +5926,7 @@ function setupEntryRemarkSaving(host, getSessionId, onIdle) {
 // <textarea>/<input> elements expose selectionStart/selectionEnd directly,
 // so this no longer needs any manual Range/offset math.
 const EDITABLE_BOX_SELECTOR =
-  ".remark-text-input, .mastery-note-input, .activity-name-input, .predef-remark-input-live, .group-remark-input, .group-remark-input-combined, " +
+  ".remark-text-input, .mastery-note-input, .activity-name-input, .pending-activity-name-input, .predef-remark-input-live, .group-remark-input, .group-remark-input-combined, " +
   ".view-remark-edit, .view-mastery-note, .view-act-edit, .view-starter-input";
 
 function captureActiveEditState(host) {
