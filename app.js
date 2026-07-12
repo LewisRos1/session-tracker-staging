@@ -149,7 +149,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "880";
+const APP_VERSION = "881";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3457,39 +3457,9 @@ function renderFedcTarget(target) {
     html += `</div>`;
   });
 
-  // One-off activities added just for this session (white, same as free-form)
-  const manualActivities = getActivitiesForTarget(target.name).filter(a => !a.isPredefined);
-  for (const act of manualActivities) {
-    const pendingKey = act.id;
-    const isPending  = state.pendingNewRemark?.pendingKey === pendingKey;
-    const remarks    = getRemarksForActivity(act.id);
-
-    html += `<div class="entry-block" data-act-id="${act.id}">
-      <div class="entry-field">
-        <span class="field-label" contenteditable="false">Activity</span>
-        <input type="text" class="field-input activity-name-input"
-          data-act-id="${act.id}"
-          data-original="${escHtml(act.activityName)}"
-          data-saved-html="${escHtml(act.activityName)}" value="${escHtml(act.activityName)}" />
-        <button class="btn-icon btn-delete-activity" contenteditable="false"
-          data-act-id="${act.id}" title="Delete activity">🗑</button>
-      </div>`;
-
-    for (const rem of remarks) {
-      html += renderRemarkFields(rem, target);
-    }
-    if (isPending) {
-      html += renderPendingRemarkFields(pendingKey, act.id, null, null, target);
-    } else {
-      html += `<button class="btn-add-remark" contenteditable="false"
-        data-pending-key="${escHtml(pendingKey)}"
-        data-act-id="${act.id}"
-        data-target="${escHtml(target.name)}">+ Add Remark &amp; Trials</button>`;
-    }
-    html += `</div>`;
-  }
-
-  // Extra (session-only) activities + add button
+  // Extra (session-only) activities + add button (renderExtraActivitiesSection
+  // handles all non-predefined activities, the pending-name input, and the
+  // "+ Add Activity" button — no separate manualActivities loop needed here).
   html += renderExtraActivitiesSection(target);
 
   // Inactive predefined activities section
