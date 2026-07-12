@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "864";
+const APP_VERSION = "865";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2836,6 +2836,7 @@ async function openSession(student, existingSessionId = null, dateStr = null) {
   state.entryRemarkSaver?.cleanup();
   state.entryRemarkSaver = setupEntryRemarkSaving($("target-content"), () => state.currentSessionId, () => {
     if (!state.renderPending || state.entryActionsInFlight > 0) return;
+    if (document.activeElement === $("target-select")) return;
     state.renderPending = false;
     renderTargetContent();
   });
@@ -5763,9 +5764,15 @@ function setupEntryRemarkSaving(host, getSessionId, onIdle) {
   const onInput = e => {
     if (e.target.tagName === "TEXTAREA") autoResizeTextarea(e.target);
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => { flush(); onIdle?.(); }, 700);
+    // Defer onIdle one tick so document.activeElement has settled to the
+    // newly-focused element before the callback checks it.
+    saveTimer = setTimeout(() => { flush(); setTimeout(() => onIdle?.(), 0); }, 700);
   };
-  const onFocusOut = () => { flush(); onIdle?.(); };
+  // Same deferral for focusout: the browser moves activeElement from the
+  // blurring element to the focusing one *after* focusout fires, so calling
+  // onIdle synchronously here would see the wrong activeElement and could
+  // fire renderTargetContent() while the target dropdown is opening.
+  const onFocusOut = () => { flush(); setTimeout(() => onIdle?.(), 0); };
 
   host.addEventListener("input", onInput);
   host.addEventListener("focusout", onFocusOut);
@@ -11562,6 +11569,7 @@ async function openGroupSession(group, dateStr, attendees) {
   state.entryGroupRemarkSaver?.cleanup();
   state.entryGroupRemarkSaver = setupEntryRemarkSaving($("group-target-content"), () => state.groupSessionId, () => {
     if (!state.groupRenderPending || state.entryGroupActionsInFlight > 0) return;
+    if (document.activeElement === $("group-target-select")) return;
     state.groupRenderPending = false;
     renderGroupTargetContent();
   });
