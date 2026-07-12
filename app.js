@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "867";
+const APP_VERSION = "868";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3588,7 +3588,7 @@ function renderExtraActivitiesSection(target) {
       </div>
     </div>`;
   } else {
-    html += `<button class="btn-add-session-activity" style="display:block;width:100%;margin-top:.6rem;padding:.55rem .9rem;background:transparent;border:1.5px dashed #a5b4fc;border-radius:.5rem;cursor:pointer;font-size:.85rem;color:#6366f1;text-align:center" contenteditable="false">+ Add Activity (session only)</button>`;
+    html += `<button class="btn-add-session-activity" style="display:block;width:100%;margin-top:.6rem;padding:.55rem .9rem;background:transparent;border:1.5px dashed #a5b4fc;border-radius:.5rem;cursor:pointer;font-size:.85rem;color:#6366f1;text-align:center" contenteditable="false">+ Add Activity (only for this session — not saved to the target permanently)</button>`;
   }
   return html;
 }
