@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // APP.JS — Main application controller
 // ============================================================
 
@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "873";
+const APP_VERSION = "874";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4579,9 +4579,15 @@ async function cleanupEmptyEntries(sessionId, data, targetName, target = null) {
   const autoOpenNames = new Set((target?.predefinedActivities || []).filter(pa => isAutoOpenRemarkType(pa)).map(pa => pa.name));
   const acts = Object.entries(data.activities || {})
     .filter(([, a]) => a.targetName === targetName && !mappedNames.has(a.activityName) && !autoOpenNames.has(a.activityName));
-  for (const [actId] of acts) {
+  const stripEmpty = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
+  for (const [actId, act] of acts) {
     const rems = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === actId);
-    const stripEmpty = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
+    // Extra (session-only) activities with no name AND no remarks are orphans
+    // from abandoned "+Add Activity" presses - clean them up here.
+    if (rems.length === 0 && !act.isPredefined && !stripEmpty(act.activityName)) {
+      await deleteActivity(sessionId, actId, []);
+      continue;
+    }
     const emptyIds = [];
     for (const [remId, r] of rems) {
       const trials     = r.trials || [];
