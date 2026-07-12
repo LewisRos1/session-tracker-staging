@@ -149,7 +149,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "881";
+const APP_VERSION = "882";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3587,6 +3587,9 @@ function renderExtraActivitiesSection(target) {
           data-act-id="${escHtml(_pendingNewActivity.actId)}"
           placeholder="Enter activity name…"
           value="${escHtml(_pendingNewActivity.typedName || '')}" />
+        <button class="btn-confirm-pending-activity" contenteditable="false"
+          style="padding:.25rem .6rem;background:#6366f1;color:#fff;border:none;border-radius:.35rem;cursor:pointer;font-size:.82rem;font-weight:600;flex-shrink:0"
+          title="Save activity">Done</button>
         <button class="btn-icon btn-cancel-pending-activity" contenteditable="false"
           title="Cancel">✕</button>
       </div>
@@ -4164,6 +4167,28 @@ function attachTargetListeners(target) {
       _pendingNewActivity = null;
       renderTargetContent();
     });
+
+    const confirmBtn = c.querySelector(".btn-confirm-pending-activity");
+    if (confirmBtn) {
+      confirmBtn.addEventListener("mousedown", (e) => {
+        e.preventDefault(); // prevent blur from stealing the click
+      });
+      confirmBtn.addEventListener("click", () => {
+        if (!_pendingNewActivity) return;
+        const name = (_pendingNewActivity.typedName || "").trim();
+        if (!name) { c.querySelector(".pending-activity-name-input")?.focus(); return; }
+        const { actId, targetName: tName, order } = _pendingNewActivity;
+        _pendingNewActivity = null;
+        state.sessionData.activities = state.sessionData.activities || {};
+        state.sessionData.activities[actId] = { targetName: tName, activityName: name, order, isPredefined: false };
+        renderTargetContent();
+        addActivity(state.currentSessionId, tName, name, order, false, actId).catch(err => {
+          delete state.sessionData.activities?.[actId];
+          renderTargetContent();
+          alert("Couldn't save activity — check your connection.\n\n" + err.message);
+        });
+      });
+    }
 
     // "+ Add Remark & Trials" on the pending row: save the activity first (name
     // required), then immediately open the add-remark form for it.
