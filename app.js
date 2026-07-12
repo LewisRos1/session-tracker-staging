@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "872";
+const APP_VERSION = "873";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3544,6 +3544,9 @@ function renderFedcTarget(target) {
 }
 
 // ─── EXTRA ACTIVITIES (session-only) ─────────────────────────
+// Guards against iOS ghost-click (synthesized click ~300ms after touchend
+// landing on the freshly-rebuilt button and creating a second activity).
+let _addActivityInFlight = false;
 
 // Renders non-predefined (session-only) activities + the "Add Activity" button.
 // Used by both renderFedcTarget (appended after predefined activities) and
@@ -4063,9 +4066,11 @@ function attachTargetListeners(target) {
     });
 
     addActBtn.addEventListener("click", (e) => {
+      if (_addActivityInFlight) return;
       const btn = e.currentTarget;
       if (btn.disabled) return;
       btn.disabled = true;
+      _addActivityInFlight = true;
       // Optimistic update — same pattern as btn-add-remark so there is no
       // async gap where a Firestore snapshot can rebuild the DOM and a
       // synthesized touch-click can fire on the new button.
@@ -4077,7 +4082,11 @@ function attachTargetListeners(target) {
       renderTargetContent();
       const input = c.querySelector(`.activity-name-input[data-act-id="${actId}"]`);
       if (input) input.focus();
+      // Reset flag after 600 ms — long enough to absorb any iOS ghost click
+      // (~300 ms after touchend) but short enough to allow a second genuine tap.
+      setTimeout(() => { _addActivityInFlight = false; }, 600);
       addActivity(state.currentSessionId, target.name, "", Date.now(), false, actId).catch(err => {
+        _addActivityInFlight = false;
         delete state.sessionData.activities?.[actId];
         renderTargetContent();
         alert("Couldn't add activity — check your connection.\n\n" + err.message);
