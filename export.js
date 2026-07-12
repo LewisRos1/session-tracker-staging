@@ -173,6 +173,10 @@ const STYLE_DISCONTINUED_SEP = {
   fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFFCA5A5" } },
   font: { bold: true, color: { argb: "FF7F1D1D" } }
 };
+const STYLE_EXTRA_SEP = {
+  fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFE0E7FF" } },
+  font: { bold: true, color: { argb: "FF3730A3" } }
+};
 // Daily Average: near-white blue, soft navy text
 const STYLE_DAILY_AVG = {
   fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F7FC" } },
@@ -608,7 +612,7 @@ function addIndividualTargetSheets(wb, allTargets, sessions, studentName, includ
   const avgColLet = includeTrials ? "F" : "E";
 
   for (const target of allTargets) {
-    const { rows, monthHeaderRows, colHeaderRows, activityHeadingRows, masteredSepRows, discontinuedSepRows, noteRows, sessionDateBlocks, spacerRows, grayRows, greenRows } =
+    const { rows, monthHeaderRows, colHeaderRows, activityHeadingRows, masteredSepRows, discontinuedSepRows, extraSepRows, noteRows, sessionDateBlocks, spacerRows, grayRows, greenRows } =
       buildTargetSheet(target, sessions, allTargets, includeTrials);
     const ws = wb.addWorksheet(target.name.slice(0, 31));
     rows.forEach(row => ws.addRow(row));
@@ -684,6 +688,14 @@ function addIndividualTargetSheets(wb, allTargets, sessions, studentName, includ
       const cell = ws.getRow(n).getCell(2);
       cell.fill      = STYLE_DISCONTINUED_SEP.fill;
       cell.font      = STYLE_DISCONTINUED_SEP.font;
+      cell.alignment = { vertical: "top" };
+    }
+    for (const rowIdx of extraSepRows) {
+      const n = rowIdx + 1;
+      try { ws.mergeCells(`B${n}:${headingEndCol}${n}`); } catch (_) {}
+      const cell = ws.getRow(n).getCell(2);
+      cell.fill      = STYLE_EXTRA_SEP.fill;
+      cell.font      = STYLE_EXTRA_SEP.font;
       cell.alignment = { vertical: "top" };
     }
 
@@ -1004,6 +1016,10 @@ function wordTargetRows(target, session, allTargets) {
     }
 
     if (act.isMasteredSeparator || act.isMastered || act.isStoppedSeparator || act.isStopped) continue;
+    if (act.isExtraSeparator) {
+      rows.push({ merge: true, text: "Extra", style: "heading" });
+      continue;
+    }
 
     if (act.isMaintainSeparator) continue;
 
@@ -1668,6 +1684,7 @@ function buildTargetSheet(target, sessions, allTargets, includeTrials) {
   const activityHeadingRows = new Set();
   const masteredSepRows     = new Set();
   const discontinuedSepRows = new Set();
+  const extraSepRows        = new Set();
   const noteRows          = new Set();
   const grayRows          = new Set();
   const greenRows         = new Set();
@@ -1705,11 +1722,11 @@ function buildTargetSheet(target, sessions, allTargets, includeTrials) {
     for (const session of monthSessions) {
       const snap = (session.targetsSnapshot || []).find(t => t.name === target.name);
       const effectiveTarget = snap ? { ...target, maxPoints: snap.maxPoints ?? target.maxPoints } : target;
-      appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, masteredSepRows, discontinuedSepRows, noteRows, grayRows, greenRows, session, effectiveTarget, allTargets, includeTrials);
+      appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, masteredSepRows, discontinuedSepRows, extraSepRows, noteRows, grayRows, greenRows, session, effectiveTarget, allTargets, includeTrials);
     }
   }
 
-  return { rows, monthHeaderRows, colHeaderRows, activityHeadingRows, masteredSepRows, discontinuedSepRows, noteRows, grayRows, greenRows, sessionDateBlocks, spacerRows };
+  return { rows, monthHeaderRows, colHeaderRows, activityHeadingRows, masteredSepRows, discontinuedSepRows, extraSepRows, noteRows, grayRows, greenRows, sessionDateBlocks, spacerRows };
 }
 
 // ─── SESSION ROWS ────────────────────────────────────────────
@@ -1723,7 +1740,7 @@ function trialsList(trials) {
   return (trials || []).map(t => (t === -1 ? "—" : t)).join(", ");
 }
 
-function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, masteredSepRows, discontinuedSepRows, noteRows, grayRows, greenRows, session, target, allTargets, includeTrials) {
+function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, masteredSepRows, discontinuedSepRows, extraSepRows, noteRows, grayRows, greenRows, session, target, allTargets, includeTrials) {
   const blankRow = () => (includeTrials ? ["", "", "", "", "", ""] : ["", "", "", "", ""]);
   const [, m, d] = session.date.split("-").map(Number);
   const shortMonths = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -1795,6 +1812,11 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, mastere
       if (act.isStoppedSeparator) {
         discontinuedSepRows.add(rows.length);
         const r = blankRow(); r[1] = act.activityName || "— Discontinued —"; rows.push(r);
+        continue;
+      }
+      if (act.isExtraSeparator) {
+        extraSepRows.add(rows.length);
+        const r = blankRow(); r[1] = "— Extra —"; rows.push(r);
         continue;
       }
       if (act.isStopped) {
@@ -2079,13 +2101,14 @@ function getAllActivitiesForTarget(session, target) {
     }
   }
 
+  // Collect non-predefined (session-only) activities, numbered from 1)
+  const extraActivities = [];
+  let extraNum = 0;
   for (const act of sessionActs) {
     if (usedIds.has(act.id)) continue;
-    // Skip isPredefined records and sub-activities (parentActivity set) — either already
-    // rendered above, or orphaned from a config activity that has since been removed.
-    // Sub-activities are never manually entered so they're always orphaned if not matched above.
     if (act.isPredefined || act.parentActivity) continue;
-    result.push(act);
+    extraNum++;
+    extraActivities.push({ ...act, activityName: `${extraNum}) ${act.activityName}` });
   }
 
   if (masteredActivities.length > 0) {
@@ -2099,6 +2122,10 @@ function getAllActivitiesForTarget(session, target) {
   if (stoppedActivities.length > 0) {
     result.push({ isStoppedSeparator: true, activityName: "— Stopped tracking —" });
     result.push(...stoppedActivities);
+  }
+  if (extraActivities.length > 0) {
+    result.push({ isExtraSeparator: true, activityName: "— Extra —" });
+    result.push(...extraActivities);
   }
 
   return result;

@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "866";
+const APP_VERSION = "867";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3466,17 +3466,8 @@ function renderFedcTarget(target) {
     html += `</div>`;
   }
 
-  // Pending new one-off activity
-  if (state.pendingNewActivity?.targetName === target.name) {
-    html += `<div class="entry-block">
-      <div class="entry-field">
-        <span class="field-label" contenteditable="false">Activity</span>
-        <input type="text" id="new-activity-textarea" class="field-input"
-          placeholder="Type activity name… (Ctrl+Enter to save)" />
-        <button class="btn-icon btn-cancel-new-activity" contenteditable="false" title="Cancel">✕</button>
-      </div>
-    </div>`;
-  }
+  // Extra (session-only) activities + add button
+  html += renderExtraActivitiesSection(target);
 
   // Inactive predefined activities section
   const inactivePas = allPas.filter(pa =>
@@ -3552,12 +3543,60 @@ function renderFedcTarget(target) {
   return html;
 }
 
+// ─── EXTRA ACTIVITIES (session-only) ─────────────────────────
+
+// Renders non-predefined (session-only) activities + the "Add Activity" button.
+// Used by both renderFedcTarget (appended after predefined activities) and
+// renderRegularTarget (which has nothing else to render).
+function renderExtraActivitiesSection(target) {
+  const extraActs = getActivitiesForTarget(target.name)
+    .filter(a => !a.isPredefined && !a.parentActivity);
+  let html = "";
+  for (const act of extraActs) {
+    const isPending = state.pendingNewRemark?.pendingKey === act.id;
+    const remarks   = getRemarksForActivity(act.id);
+    html += `<div class="entry-block" data-act-id="${escHtml(act.id)}">
+      <div class="entry-field">
+        <span class="field-label" contenteditable="false">Activity</span>
+        <input type="text" class="field-input activity-name-input"
+          data-act-id="${escHtml(act.id)}"
+          data-original="${escHtml(act.activityName)}"
+          data-saved-html="${escHtml(act.activityName)}" value="${escHtml(act.activityName)}" />
+        <button class="btn-icon btn-delete-activity" contenteditable="false"
+          data-act-id="${escHtml(act.id)}" title="Delete activity">🗑</button>
+      </div>`;
+    for (const rem of remarks) {
+      html += renderRemarkFields(rem, target);
+    }
+    if (isPending) {
+      html += renderPendingRemarkFields(act.id, act.id, null, null, target);
+    } else {
+      html += `<button class="btn-add-remark" contenteditable="false"
+        data-pending-key="${escHtml(act.id)}"
+        data-act-id="${escHtml(act.id)}"
+        data-target="${escHtml(target.name)}">+ Add Remark &amp; Trials</button>`;
+    }
+    html += `</div>`;
+  }
+  if (state.pendingNewActivity?.targetName === target.name) {
+    html += `<div class="entry-block">
+      <div class="entry-field">
+        <span class="field-label" contenteditable="false">Activity</span>
+        <input type="text" id="new-activity-textarea" class="field-input"
+          placeholder="Type activity name…" autocomplete="off" />
+        <button class="btn-icon btn-cancel-new-activity" contenteditable="false" title="Cancel">✕</button>
+      </div>
+    </div>`;
+  } else {
+    html += `<button class="btn-add-session-activity" style="display:block;width:100%;margin-top:.6rem;padding:.55rem .9rem;background:transparent;border:1.5px dashed #a5b4fc;border-radius:.5rem;cursor:pointer;font-size:.85rem;color:#6366f1;text-align:center" contenteditable="false">+ Add Activity (session only)</button>`;
+  }
+  return html;
+}
+
 // ─── REGULAR TARGET ──────────────────────────────────────────
 
 function renderRegularTarget(target) {
-  const activities = getActivitiesForTarget(target.name);
   let html = "";
-
   if (target.notes?.length > 0) {
     html += `<div class="target-notes" contenteditable="false">`;
     for (const n of target.notes) {
@@ -3565,52 +3604,7 @@ function renderRegularTarget(target) {
     }
     html += `</div>`;
   }
-
-  for (const act of activities) {
-    const pendingKey = act.id;
-    const isPending  = state.pendingNewRemark?.pendingKey === pendingKey;
-    const remarks    = getRemarksForActivity(act.id);
-
-    html += `<div class="entry-block" data-act-id="${act.id}">
-      <div class="entry-field">
-        <span class="field-label" contenteditable="false">Activity</span>
-        <input type="text" class="field-input activity-name-input"
-          data-act-id="${act.id}"
-          data-original="${escHtml(act.activityName)}"
-          data-saved-html="${escHtml(act.activityName)}" value="${escHtml(act.activityName)}" />
-        <button class="btn-icon btn-delete-activity" contenteditable="false"
-          data-act-id="${act.id}" title="Delete activity">🗑</button>
-      </div>`;
-
-    for (const rem of remarks) {
-      html += renderRemarkFields(rem, target);
-    }
-
-    if (isPending) {
-      html += renderPendingRemarkFields(pendingKey, act.id, null, null, target);
-    } else {
-      html += `<button class="btn-add-remark" contenteditable="false"
-        data-pending-key="${escHtml(pendingKey)}"
-        data-act-id="${act.id}"
-        data-target="${escHtml(target.name)}">+ Add Remark &amp; Trials</button>`;
-    }
-
-    html += `</div>`;
-  }
-
-  // Pending new activity block
-  if (state.pendingNewActivity?.targetName === target.name) {
-    html += `<div class="entry-block">
-      <div class="entry-field">
-        <span class="field-label" contenteditable="false">Activity</span>
-        <input type="text" id="new-activity-textarea" class="field-input"
-          placeholder="Type activity name… (Ctrl+Enter to save)" />
-        <button class="btn-icon btn-cancel-new-activity" contenteditable="false" title="Cancel">✕</button>
-      </div>
-    </div>`;
-  }
-
-  return html;
+  return html + renderExtraActivitiesSection(target);
 }
 
 // Returns the inline options string for an activity (new inlineOptions field,
@@ -4057,6 +4051,11 @@ function attachTargetListeners(target) {
       list.style.display = open ? "none" : "flex";
       if (chevron) chevron.textContent = open ? "▶" : "▼";
     });
+  });
+
+  c.querySelector(".btn-add-session-activity")?.addEventListener("click", () => {
+    state.pendingNewActivity = { targetName: target.name };
+    renderTargetContent();
   });
 
   $("new-activity-textarea")?.addEventListener("blur", e => {
@@ -5036,16 +5035,18 @@ function buildTargetViewTable(target, data) {
         deleteActivity(state.viewSessionId, actId, remIds).catch(() => {});
       }
     }
-    // Manually-added (non-predefined) activities not matched above.
-    // Skip isPredefined records and sub-activities (parentActivity set) — those belonged to a
-    // config activity that has since been removed. Sub-activities are never manually entered.
-    Object.entries(data.activities || {})
+    // Manually-added (session-only) extra activities — rendered under an "Extra" heading.
+    const extraViewActs = Object.entries(data.activities || {})
       .filter(([actId, a]) => a.targetName === target.name && !matchedIds.has(actId) && !a.isPredefined && !a.parentActivity)
-      .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
-      .forEach(([actId, act]) => {
-        no++;
-        rows += viewActivityRows(no, act.activityName, actId, data, target, false);
+      .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0));
+    if (extraViewActs.length > 0) {
+      rows += `<tr class="view-heading-row"><td colspan="6" contenteditable="false">Extra</td></tr>`;
+      let extraNo = 0;
+      extraViewActs.forEach(([actId, act]) => {
+        extraNo++;
+        rows += viewActivityRows(extraNo, act.activityName, actId, data, target, false);
       });
+    }
   } else {
     let no = 0;
     Object.entries(data.activities || {})
