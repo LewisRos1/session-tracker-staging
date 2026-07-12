@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "871";
+const APP_VERSION = "872";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4042,17 +4042,48 @@ function attachTargetListeners(target) {
     });
   });
 
-  c.querySelector(".btn-add-session-activity")?.addEventListener("click", async (e) => {
-    const btn = e.currentTarget;
-    if (btn.disabled) return;
-    btn.disabled = true;
-    const actId = await addActivity(state.currentSessionId, target.name, "", Date.now(), false);
-    // Firestore snapshot fires and re-renders; then focus the new name input
-    setTimeout(() => {
+  const addActBtn = c.querySelector(".btn-add-session-activity");
+  if (addActBtn) {
+    // Same mousedown guard as btn-add-remark: prevents a blur-triggered
+    // re-render from destroying this button before "click" fires.
+    addActBtn.addEventListener("mousedown", () => {
+      state.entryActionsInFlight++;
+      let released = false;
+      const release = () => {
+        if (released) return;
+        released = true;
+        state.entryActionsInFlight = Math.max(0, state.entryActionsInFlight - 1);
+        if (state.entryActionsInFlight === 0 && state.renderPending) {
+          state.renderPending = false;
+          renderTargetContent();
+        }
+      };
+      addActBtn.addEventListener("click", release, { once: true });
+      setTimeout(release, 600);
+    });
+
+    addActBtn.addEventListener("click", (e) => {
+      const btn = e.currentTarget;
+      if (btn.disabled) return;
+      btn.disabled = true;
+      // Optimistic update — same pattern as btn-add-remark so there is no
+      // async gap where a Firestore snapshot can rebuild the DOM and a
+      // synthesized touch-click can fire on the new button.
+      const actId = generateId("a");
+      state.sessionData.activities = state.sessionData.activities || {};
+      state.sessionData.activities[actId] = {
+        targetName: target.name, activityName: "", order: Date.now(), isPredefined: false
+      };
+      renderTargetContent();
       const input = c.querySelector(`.activity-name-input[data-act-id="${actId}"]`);
       if (input) input.focus();
-    }, 200);
-  });
+      addActivity(state.currentSessionId, target.name, "", Date.now(), false, actId).catch(err => {
+        delete state.sessionData.activities?.[actId];
+        renderTargetContent();
+        alert("Couldn't add activity — check your connection.\n\n" + err.message);
+      });
+    });
+  }
 
   // ── Delete activity ───────────────────────────────────────
   c.querySelectorAll(".btn-delete-activity").forEach(btn => {
