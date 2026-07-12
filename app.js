@@ -149,7 +149,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "882";
+const APP_VERSION = "883";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3576,28 +3576,7 @@ function renderExtraActivitiesSection(target) {
       return true;
     });
   let html = "";
-  // Pending new activity — local only, exists purely in _pendingNewActivity
-  // (never in Firestore until the user types a name).
   const hasPending = _pendingNewActivity && _pendingNewActivity.targetName === target.name;
-  if (hasPending) {
-    html += `<div class="entry-block" data-pending-act="1">
-      <div class="entry-field">
-        <span class="field-label" contenteditable="false">Activity</span>
-        <input type="text" class="field-input pending-activity-name-input"
-          data-act-id="${escHtml(_pendingNewActivity.actId)}"
-          placeholder="Enter activity name…"
-          value="${escHtml(_pendingNewActivity.typedName || '')}" />
-        <button class="btn-confirm-pending-activity" contenteditable="false"
-          style="padding:.25rem .6rem;background:#6366f1;color:#fff;border:none;border-radius:.35rem;cursor:pointer;font-size:.82rem;font-weight:600;flex-shrink:0"
-          title="Save activity">Done</button>
-        <button class="btn-icon btn-cancel-pending-activity" contenteditable="false"
-          title="Cancel">✕</button>
-      </div>
-      <button class="btn-add-remark btn-add-remark-for-pending" contenteditable="false"
-        data-act-id="${escHtml(_pendingNewActivity.actId)}"
-        data-target="${escHtml(target.name)}">+ Add Remark &amp; Trials</button>
-    </div>`;
-  }
   for (const act of extraActs) {
     const isPending = state.pendingNewRemark?.pendingKey === act.id;
     const remarks   = getRemarksForActivity(act.id);
@@ -3624,8 +3603,26 @@ function renderExtraActivitiesSection(target) {
     }
     html += `</div>`;
   }
-  // Hide the add button while a pending input is visible for this target
-  if (!hasPending) {
+  // Pending input always at the bottom, replacing the "+ Add Activity" button
+  if (hasPending) {
+    html += `<div class="entry-block" data-pending-act="1">
+      <div class="entry-field">
+        <span class="field-label" contenteditable="false">Activity</span>
+        <input type="text" class="field-input pending-activity-name-input"
+          data-act-id="${escHtml(_pendingNewActivity.actId)}"
+          placeholder="Enter activity name…"
+          value="${escHtml(_pendingNewActivity.typedName || '')}" />
+        <button class="btn-confirm-pending-activity" contenteditable="false"
+          style="padding:.25rem .6rem;background:#6366f1;color:#fff;border:none;border-radius:.35rem;cursor:pointer;font-size:.82rem;font-weight:600;flex-shrink:0"
+          title="Save activity">Done</button>
+        <button class="btn-icon btn-cancel-pending-activity" contenteditable="false"
+          title="Cancel">✕</button>
+      </div>
+      <button class="btn-add-remark btn-add-remark-for-pending" contenteditable="false"
+        data-act-id="${escHtml(_pendingNewActivity.actId)}"
+        data-target="${escHtml(target.name)}">+ Add Remark &amp; Trials</button>
+    </div>`;
+  } else {
     html += `<button class="btn-add-session-activity" style="display:block;margin-top:.6rem;padding:.55rem .9rem;background:transparent;border:1.5px dashed #a5b4fc;border-radius:.5rem;cursor:pointer;font-size:.85rem;color:#6366f1;margin-left:auto;margin-right:auto" contenteditable="false">+ Add Activity (only for this session, not saved to the target permanently)</button>`;
   }
   return html;
