@@ -149,7 +149,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "883";
+const APP_VERSION = "884";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -8123,12 +8123,12 @@ function showGroupAddTargetPicker(group) {
 function showGroupDupFromCurrent(group) {
   const sorted = sortTargetsByOrder(group.targets);
   $("manage-modal-body").innerHTML = `
-    <div class="admin-section-title" style="margin-bottom:.5rem">Choose a target to duplicate</div>
+    <div class="admin-section-title" style="margin-bottom:.5rem">Choose targets to duplicate</div>
     <div class="admin-list">
       ${sorted.map(t => `
         <label class="admin-list-item" style="cursor:pointer;gap:.75rem">
-          <input type="radio" name="gdup-target" class="gdup-target-radio" data-target-id="${escHtml(t.id)}"
-            style="width:18px;height:18px;flex-shrink:0;cursor:pointer" />
+          <input type="checkbox" class="gdup-target-cb" data-target-id="${escHtml(t.id)}"
+            style="width:20px;height:20px;flex-shrink:0;cursor:pointer" />
           <span class="admin-item-name">${escHtml(t.name)}</span>
         </label>`).join("")}
     </div>
@@ -8137,24 +8137,30 @@ function showGroupDupFromCurrent(group) {
 
   $("btn-gdup-back").addEventListener("click", () => showGroupAddTargetPicker(group));
   $("btn-gdup-confirm").addEventListener("click", async () => {
-    const radio = $("manage-modal-body").querySelector(".gdup-target-radio:checked");
-    if (!radio) { alert("Select a target to duplicate."); return; }
-    const source = group.targets.find(t => t.id === radio.dataset.targetId);
-    if (!source) return;
+    const checked = [...$("manage-modal-body").querySelectorAll(".gdup-target-cb:checked")];
+    if (!checked.length) { alert("Select at least one target to duplicate."); return; }
+    const sources = checked.map(cb => group.targets.find(t => t.id === cb.dataset.targetId)).filter(Boolean);
+    const existing = new Set(group.targets.map(t => t.name));
+    const conflicts = sources.filter(s => existing.has(s.name + " (duplicate)"));
+    if (conflicts.length) {
+      alert(`Cannot duplicate — a target named "${conflicts[0].name} (duplicate)" already exists. Rename it first via Edit Target, then try again.`);
+      return;
+    }
     $("manage-modal").classList.add("hidden");
-    const name = prompt("Name for the duplicate:", source.name + " (duplicate)");
-    if (!name?.trim()) { $("manage-modal").classList.remove("hidden"); showGroupAddTargetPicker(group); return; }
-    const copy = JSON.parse(JSON.stringify(source));
-    copy.id = cfgId("gt"); copy.name = name.trim(); copy.order = group.targets.length;
-    group.targets.push(copy);
+    let lastAdded = null;
+    for (const source of sources) {
+      const copy = JSON.parse(JSON.stringify(source));
+      copy.id = cfgId("gt"); copy.name = source.name + " (duplicate)"; copy.order = group.targets.length;
+      group.targets.push(copy);
+      lastAdded = copy;
+    }
     const gi = state.groups.findIndex(g => g.id === group.id);
     if (gi >= 0) state.groups[gi] = group;
     await state.entryGroupRemarkSaver?.flush();
     await saveGroup(group);
-    state.selectedGroupTargetName = copy.name;
+    if (lastAdded) state.selectedGroupTargetName = lastAdded.name;
     populateGroupTargetDropdown(group.targets);
     renderGroupTargetContent();
-    openGroupManageModal(group, copy);
   });
 }
 
@@ -8186,12 +8192,12 @@ function showGroupDupFromOtherPickTarget(group, sourceGroup) {
   const sorted = sortTargetsByOrder(sourceGroup.targets || []);
   if (!sorted.length) { alert(`${sourceGroup.name} has no targets.`); showGroupAddTargetPicker(group); return; }
   $("manage-modal-body").innerHTML = `
-    <div class="admin-section-title" style="margin-bottom:.5rem">Choose a target from ${escHtml(sourceGroup.name)}</div>
+    <div class="admin-section-title" style="margin-bottom:.5rem">Choose targets from ${escHtml(sourceGroup.name)}</div>
     <div class="admin-list">
       ${sorted.map(t => `
         <label class="admin-list-item" style="cursor:pointer;gap:.75rem">
-          <input type="radio" name="gother-target" class="gother-target-radio" data-target-id="${escHtml(t.id)}"
-            style="width:18px;height:18px;flex-shrink:0;cursor:pointer" />
+          <input type="checkbox" class="gother-target-cb" data-target-id="${escHtml(t.id)}"
+            style="width:20px;height:20px;flex-shrink:0;cursor:pointer" />
           <span class="admin-item-name">${escHtml(t.name)}</span>
         </label>`).join("")}
     </div>
@@ -8200,24 +8206,30 @@ function showGroupDupFromOtherPickTarget(group, sourceGroup) {
 
   $("btn-gdup-back").addEventListener("click", () => showGroupDupFromOther(group, state.groups.filter(g => g.id !== group.id && g.targets?.length > 0)));
   $("btn-gother-dup").addEventListener("click", async () => {
-    const radio = $("manage-modal-body").querySelector(".gother-target-radio:checked");
-    if (!radio) { alert("Select a target."); return; }
-    const source = sorted.find(t => t.id === radio.dataset.targetId);
-    if (!source) return;
+    const checked = [...$("manage-modal-body").querySelectorAll(".gother-target-cb:checked")];
+    if (!checked.length) { alert("Select at least one target."); return; }
+    const sources = checked.map(cb => sorted.find(t => t.id === cb.dataset.targetId)).filter(Boolean);
+    const existing = new Set(group.targets.map(t => t.name));
+    const conflicts = sources.filter(s => existing.has(s.name + " (duplicate)"));
+    if (conflicts.length) {
+      alert(`Cannot duplicate — a target named "${conflicts[0].name} (duplicate)" already exists. Rename it first via Edit Target, then try again.`);
+      return;
+    }
     $("manage-modal").classList.add("hidden");
-    const name = prompt("Name for the duplicate:", source.name + " (duplicate)");
-    if (!name?.trim()) { $("manage-modal").classList.remove("hidden"); showGroupAddTargetPicker(group); return; }
-    const copy = JSON.parse(JSON.stringify(source));
-    copy.id = cfgId("gt"); copy.name = name.trim(); copy.order = group.targets.length; copy.isStructured = true;
-    group.targets.push(copy);
+    let lastAdded = null;
+    for (const source of sources) {
+      const copy = JSON.parse(JSON.stringify(source));
+      copy.id = cfgId("gt"); copy.name = source.name + " (duplicate)"; copy.order = group.targets.length; copy.isStructured = true;
+      group.targets.push(copy);
+      lastAdded = copy;
+    }
     const gi = state.groups.findIndex(g => g.id === group.id);
     if (gi >= 0) state.groups[gi] = group;
     await state.entryGroupRemarkSaver?.flush();
     await saveGroup(group);
-    state.selectedGroupTargetName = copy.name;
+    if (lastAdded) state.selectedGroupTargetName = lastAdded.name;
     populateGroupTargetDropdown(group.targets);
     renderGroupTargetContent();
-    openGroupManageModal(group, copy);
   });
 }
 
@@ -8502,12 +8514,12 @@ function showAddTargetPicker(student) {
 function showDupFromCurrentStudent(student) {
   const sorted = sortTargetsByOrder(student.targets);
   $("manage-modal-body").innerHTML = `
-    <div class="admin-section-title" style="margin-bottom:.5rem">Choose a target to duplicate</div>
+    <div class="admin-section-title" style="margin-bottom:.5rem">Choose targets to duplicate</div>
     <div class="admin-list">
       ${sorted.map(t => `
         <label class="admin-list-item" style="cursor:pointer;gap:.75rem">
-          <input type="radio" name="dup-target" class="dup-target-radio" data-target-id="${escHtml(t.id)}"
-            style="width:18px;height:18px;flex-shrink:0;cursor:pointer" />
+          <input type="checkbox" class="dup-target-cb" data-target-id="${escHtml(t.id)}"
+            style="width:20px;height:20px;flex-shrink:0;cursor:pointer" />
           <span class="admin-item-name">${escHtml(t.name)}</span>
         </label>`).join("")}
     </div>
@@ -8519,27 +8531,33 @@ function showDupFromCurrentStudent(student) {
   $("btn-dup-back").addEventListener("click", () => showAddTargetPicker(student));
 
   $("btn-confirm-duplicate").addEventListener("click", async () => {
-    const radio = $("manage-modal-body").querySelector(".dup-target-radio:checked");
-    if (!radio) { alert("Select a target to duplicate."); return; }
-    const source = student.targets.find(t => t.id === radio.dataset.targetId);
-    if (!source) return;
+    const checked = [...$("manage-modal-body").querySelectorAll(".dup-target-cb:checked")];
+    if (!checked.length) { alert("Select at least one target to duplicate."); return; }
+    const sources = checked.map(cb => student.targets.find(t => t.id === cb.dataset.targetId)).filter(Boolean);
+    const existing = new Set(student.targets.map(t => t.name));
+    const conflicts = sources.filter(s => existing.has(s.name + " (duplicate)"));
+    if (conflicts.length) {
+      alert(`Cannot duplicate — a target named "${conflicts[0].name} (duplicate)" already exists. Rename it first via Edit Target, then try again.`);
+      return;
+    }
     $("manage-modal").classList.add("hidden");
-    const name = prompt("Name for the duplicate:", source.name + " (duplicate)");
-    if (!name?.trim()) { $("manage-modal").classList.remove("hidden"); showAddTargetPicker(student); return; }
-    const copy = JSON.parse(JSON.stringify(source));
-    copy.id    = cfgId("t");
-    copy.name  = name.trim();
-    copy.order = student.targets.length;
-    copy.templateId = null;
-    student.targets.push(copy);
+    let lastAdded = null;
+    for (const source of sources) {
+      const copy = JSON.parse(JSON.stringify(source));
+      copy.id         = cfgId("t");
+      copy.name       = source.name + " (duplicate)";
+      copy.order      = student.targets.length;
+      copy.templateId = null;
+      student.targets.push(copy);
+      lastAdded = copy;
+    }
     const si = state.students.findIndex(s => s.id === student.id);
     if (si >= 0) state.students[si] = student;
     await state.entryRemarkSaver?.flush();
     await saveStudent(student);
-    state.selectedTargetName = copy.name;
+    if (lastAdded) state.selectedTargetName = lastAdded.name;
     populateTargetDropdown(student.targets);
     renderTargetContent();
-    openManageModal(student, copy);
   });
 }
 
@@ -8600,12 +8618,12 @@ function showDupFromOtherStudent_pickTarget(student, sourceStudent) {
     return;
   }
   $("manage-modal-body").innerHTML = `
-    <div class="admin-section-title" style="margin-bottom:.5rem">Choose a target from ${escHtml(sourceStudent.name)}</div>
+    <div class="admin-section-title" style="margin-bottom:.5rem">Choose targets from ${escHtml(sourceStudent.name)}</div>
     <div class="admin-list">
       ${sorted.map(t => `
         <label class="admin-list-item" style="cursor:pointer;gap:.75rem">
-          <input type="radio" name="other-target" class="other-target-radio" data-target-id="${escHtml(t.id)}"
-            style="width:18px;height:18px;flex-shrink:0;cursor:pointer" />
+          <input type="checkbox" class="other-target-cb" data-target-id="${escHtml(t.id)}"
+            style="width:20px;height:20px;flex-shrink:0;cursor:pointer" />
           <span class="admin-item-name">${escHtml(t.name)}</span>
         </label>`).join("")}
     </div>
@@ -8619,28 +8637,34 @@ function showDupFromOtherStudent_pickTarget(student, sourceStudent) {
   });
 
   $("btn-confirm-other-dup").addEventListener("click", async () => {
-    const radio = $("manage-modal-body").querySelector(".other-target-radio:checked");
-    if (!radio) { alert("Select a target to duplicate."); return; }
-    const source = sourceStudent.targets.find(t => t.id === radio.dataset.targetId);
-    if (!source) return;
+    const checked = [...$("manage-modal-body").querySelectorAll(".other-target-cb:checked")];
+    if (!checked.length) { alert("Select at least one target to duplicate."); return; }
+    const sources = checked.map(cb => sourceStudent.targets.find(t => t.id === cb.dataset.targetId)).filter(Boolean);
+    const existing = new Set(student.targets.map(t => t.name));
+    const conflicts = sources.filter(s => existing.has(s.name + " (duplicate)"));
+    if (conflicts.length) {
+      alert(`Cannot duplicate — a target named "${conflicts[0].name} (duplicate)" already exists. Rename it first via Edit Target, then try again.`);
+      return;
+    }
     $("manage-modal").classList.add("hidden");
-    const name = prompt("Name for the duplicate:", source.name + " (duplicate)");
-    if (!name?.trim()) { $("manage-modal").classList.remove("hidden"); showAddTargetPicker(student); return; }
-    const copy = JSON.parse(JSON.stringify(source));
-    copy.id         = cfgId("t");
-    copy.name       = name.trim();
-    copy.order      = student.targets.length;
-    copy.templateId = null;
-    copy.isStructured = true;
-    student.targets.push(copy);
+    let lastAdded = null;
+    for (const source of sources) {
+      const copy = JSON.parse(JSON.stringify(source));
+      copy.id           = cfgId("t");
+      copy.name         = source.name + " (duplicate)";
+      copy.order        = student.targets.length;
+      copy.templateId   = null;
+      copy.isStructured = true;
+      student.targets.push(copy);
+      lastAdded = copy;
+    }
     const si = state.students.findIndex(s => s.id === student.id);
     if (si >= 0) state.students[si] = student;
     await state.entryRemarkSaver?.flush();
     await saveStudent(student);
-    state.selectedTargetName = copy.name;
+    if (lastAdded) state.selectedTargetName = lastAdded.name;
     populateTargetDropdown(student.targets);
     renderTargetContent();
-    openManageModal(student, copy);
   });
 }
 
