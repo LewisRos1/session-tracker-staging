@@ -7,6 +7,7 @@ import {
   getOrCreateTodaySession,
   listenToSession,
   addActivity,
+  addActivityWithCleanup,
   adoptOrphanActivity,
   revertOrphanActivity,
   deleteActivity,
@@ -147,7 +148,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "875";
+const APP_VERSION = "876";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3547,6 +3548,7 @@ function renderFedcTarget(target) {
 // Guards against iOS ghost-click (synthesized click ~300ms after touchend
 // landing on the freshly-rebuilt button and creating a second activity).
 let _addActivityInFlight = false;
+let _currentNewActivityId = null;
 
 // Renders non-predefined (session-only) activities + the "Add Activity" button.
 // Used by both renderFedcTarget (appended after predefined activities) and
@@ -3556,6 +3558,11 @@ function renderExtraActivitiesSection(target) {
   const extraActs = getActivitiesForTarget(target.name)
     .filter(a => {
       if (a.isPredefined || a.parentActivity) return false;
+      // Hide empty-name/no-remark orphans restored by Firestore snapshots
+      // unless this is the activity we just created (it starts empty intentionally).
+      if (a.id !== _currentNewActivityId
+          && !a.activityName?.trim()
+          && getRemarksForActivity(a.id).length === 0) return false;
       if (seen.has(a.id)) return false;
       seen.add(a.id);
       return true;
@@ -4077,34 +4084,31 @@ function attachTargetListeners(target) {
       if (btn.disabled) return;
       btn.disabled = true;
       _addActivityInFlight = true;
-      // Wipe any orphan extra activities (empty name + no remarks) from local
-      // state before creating the new one — they accumulate when previous
-      // clicks weren't followed up with a name or remark, and the Firestore
-      // cleanup only runs on target-switch/leave.
+      // Collect orphans (empty name + no remarks) to delete alongside the new add.
       const orphans = getActivitiesForTarget(target.name)
         .filter(a => !a.isPredefined && !a.parentActivity
           && !a.activityName?.trim()
           && getRemarksForActivity(a.id).length === 0);
-      for (const o of orphans) {
-        delete state.sessionData.activities[o.id];
-        deleteActivity(state.currentSessionId, o.id, []).catch(() => {});
-      }
-      // Optimistic update — same pattern as btn-add-remark so there is no
-      // async gap where a Firestore snapshot can rebuild the DOM and a
-      // synthesized touch-click can fire on the new button.
+      const orphanIds = orphans.map(o => o.id);
+      for (const o of orphans) delete state.sessionData.activities[o.id];
+      // Optimistic local update.
       const actId = generateId("a");
+      const order = Date.now();
+      _currentNewActivityId = actId;
       state.sessionData.activities = state.sessionData.activities || {};
       state.sessionData.activities[actId] = {
-        targetName: target.name, activityName: "", order: Date.now(), isPredefined: false
+        targetName: target.name, activityName: "", order, isPredefined: false
       };
       renderTargetContent();
       const input = c.querySelector(`.activity-name-input[data-act-id="${actId}"]`);
       if (input) input.focus();
-      // Reset flag after 600 ms — long enough to absorb any iOS ghost click
-      // (~300 ms after touchend) but short enough to allow a second genuine tap.
       setTimeout(() => { _addActivityInFlight = false; }, 600);
-      addActivity(state.currentSessionId, target.name, "", Date.now(), false, actId).catch(err => {
+      // Single atomic write — deletes all orphans AND creates the new activity
+      // in one updateDoc so only one Firestore snapshot fires, preventing the
+      // race that was showing 2 activity cards.
+      addActivityWithCleanup(state.currentSessionId, orphanIds, actId, target.name, "", order).catch(err => {
         _addActivityInFlight = false;
+        _currentNewActivityId = null;
         delete state.sessionData.activities?.[actId];
         renderTargetContent();
         alert("Couldn't add activity — check your connection.\n\n" + err.message);

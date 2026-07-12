@@ -398,6 +398,17 @@ export async function deleteActivity(sessionId, actId, remarkIds) {
   await updateDoc(doc(db, "sessions", sessionId), updates);
 }
 
+// Atomically delete orphan activities AND create the new one in a single
+// updateDoc so only one Firestore snapshot fires — preventing the race where
+// separate delete/add snapshots briefly show 2 activities at once.
+export async function addActivityWithCleanup(sessionId, orphanIds, actId, targetName, activityName, order) {
+  const updates = {};
+  for (const id of orphanIds) updates[`activities.${id}`] = deleteField();
+  updates[`activities.${actId}`] = { targetName, activityName, order, isPredefined: false };
+  await updateDoc(doc(db, "sessions", sessionId), updates);
+  return actId;
+}
+
 // An activity can occasionally get created TWICE within the same session
 // under the exact same (targetName, activityName) — not a rename/typo
 // problem (the name matches the current config perfectly either way), but
