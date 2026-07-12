@@ -147,7 +147,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "874";
+const APP_VERSION = "875";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3552,8 +3552,14 @@ let _addActivityInFlight = false;
 // Used by both renderFedcTarget (appended after predefined activities) and
 // renderRegularTarget (which has nothing else to render).
 function renderExtraActivitiesSection(target) {
+  const seen = new Set();
   const extraActs = getActivitiesForTarget(target.name)
-    .filter(a => !a.isPredefined && !a.parentActivity);
+    .filter(a => {
+      if (a.isPredefined || a.parentActivity) return false;
+      if (seen.has(a.id)) return false;
+      seen.add(a.id);
+      return true;
+    });
   let html = "";
   for (const act of extraActs) {
     const isPending = state.pendingNewRemark?.pendingKey === act.id;
@@ -4071,6 +4077,18 @@ function attachTargetListeners(target) {
       if (btn.disabled) return;
       btn.disabled = true;
       _addActivityInFlight = true;
+      // Wipe any orphan extra activities (empty name + no remarks) from local
+      // state before creating the new one — they accumulate when previous
+      // clicks weren't followed up with a name or remark, and the Firestore
+      // cleanup only runs on target-switch/leave.
+      const orphans = getActivitiesForTarget(target.name)
+        .filter(a => !a.isPredefined && !a.parentActivity
+          && !a.activityName?.trim()
+          && getRemarksForActivity(a.id).length === 0);
+      for (const o of orphans) {
+        delete state.sessionData.activities[o.id];
+        deleteActivity(state.currentSessionId, o.id, []).catch(() => {});
+      }
       // Optimistic update — same pattern as btn-add-remark so there is no
       // async gap where a Firestore snapshot can rebuild the DOM and a
       // synthesized touch-click can fire on the new button.
