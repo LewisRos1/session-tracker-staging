@@ -398,15 +398,25 @@ export async function deleteActivity(sessionId, actId, remarkIds) {
   await updateDoc(doc(db, "sessions", sessionId), updates);
 }
 
-// Atomically delete orphan activities AND create the new one in a single
-// updateDoc so only one Firestore snapshot fires — preventing the race where
-// separate delete/add snapshots briefly show 2 activities at once.
-export async function addActivityWithCleanup(sessionId, orphanIds, actId, targetName, activityName, order) {
+// Atomically delete orphan activities (+ their remark records) AND create the
+// new one in a single updateDoc so only one Firestore snapshot fires.
+export async function addActivityWithCleanup(sessionId, orphanActIds, orphanRemIds, actId, targetName, activityName, order) {
   const updates = {};
-  for (const id of orphanIds) updates[`activities.${id}`] = deleteField();
+  for (const id of orphanActIds) updates[`activities.${id}`] = deleteField();
+  for (const id of orphanRemIds) updates[`remarks.${id}`] = deleteField();
   updates[`activities.${actId}`] = { targetName, activityName, order, isPredefined: false };
   await updateDoc(doc(db, "sessions", sessionId), updates);
   return actId;
+}
+
+// Batch-delete orphan activities and their remark records in one write.
+// Used on session open to clear out pre-existing orphans before first render.
+export async function deleteOrphanActivities(sessionId, actIds, remIds) {
+  if (!actIds.length) return;
+  const updates = {};
+  for (const id of actIds) updates[`activities.${id}`] = deleteField();
+  for (const id of remIds) updates[`remarks.${id}`] = deleteField();
+  await updateDoc(doc(db, "sessions", sessionId), updates);
 }
 
 // An activity can occasionally get created TWICE within the same session

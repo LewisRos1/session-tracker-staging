@@ -8,6 +8,7 @@ import {
   listenToSession,
   addActivity,
   addActivityWithCleanup,
+  deleteOrphanActivities,
   adoptOrphanActivity,
   revertOrphanActivity,
   deleteActivity,
@@ -148,7 +149,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "876";
+const APP_VERSION = "877";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2855,6 +2856,24 @@ async function openSession(student, existingSessionId = null, dateStr = null) {
       const firstLoad = state.sessionData === null;
       state.sessionData = data;
       if (firstLoad) {
+        // Delete any orphan extra activities (empty name + no substantive
+        // remarks) that accumulated from previous buggy sessions. Runs before
+        // any render so they're never shown.
+        const orphanActIds = [];
+        const orphanRemIds = [];
+        for (const [actId, act] of Object.entries(state.sessionData.activities || {})) {
+          if (act.isPredefined || act.parentActivity || (act.activityName || "").trim()) continue;
+          const remEntries = Object.entries(state.sessionData.remarks || {})
+            .filter(([, r]) => r.activityId === actId);
+          if (remEntries.some(([, r]) => remarkHasContent(r))) continue;
+          orphanActIds.push(actId);
+          for (const [remId] of remEntries) orphanRemIds.push(remId);
+          delete state.sessionData.activities[actId];
+          for (const [remId] of remEntries) delete state.sessionData.remarks[remId];
+        }
+        if (orphanActIds.length > 0) {
+          deleteOrphanActivities(sessionId, orphanActIds, orphanRemIds).catch(() => {});
+        }
         const eff = getEffectiveTargets();
         state.selectedTargetName = (preservedTargetName && eff.some(t => t.name === preservedTargetName))
           ? preservedTargetName
@@ -3550,6 +3569,21 @@ function renderFedcTarget(target) {
 let _addActivityInFlight = false;
 let _currentNewActivityId = null;
 
+// A remark "has content" if its text (stripped of HTML) or note is non-empty.
+function remarkHasContent(r) {
+  return ((r.remarkText || "").replace(/<[^>]*>/g, "").replace(/&[a-z]+;/gi, " ").trim()) ||
+    ((r.note || "").trim());
+}
+
+// An extra (session-only) activity is an orphan if it has no name and none of
+// its remarks contain any actual content. Empty-name activities with empty
+// remark records (from "+Add Remark & Trials" being clicked then abandoned)
+// still qualify as orphans.
+function isOrphanExtraActivity(a) {
+  if (a.isPredefined || a.parentActivity || (a.activityName || "").trim()) return false;
+  return !getRemarksForActivity(a.id).some(remarkHasContent);
+}
+
 // Renders non-predefined (session-only) activities + the "Add Activity" button.
 // Used by both renderFedcTarget (appended after predefined activities) and
 // renderRegularTarget (which has nothing else to render).
@@ -3558,11 +3592,9 @@ function renderExtraActivitiesSection(target) {
   const extraActs = getActivitiesForTarget(target.name)
     .filter(a => {
       if (a.isPredefined || a.parentActivity) return false;
-      // Hide empty-name/no-remark orphans restored by Firestore snapshots
-      // unless this is the activity we just created (it starts empty intentionally).
-      if (a.id !== _currentNewActivityId
-          && !a.activityName?.trim()
-          && getRemarksForActivity(a.id).length === 0) return false;
+      // Hide orphans (empty name + no substantive remarks) unless it's the
+      // activity the user just created (it starts empty intentionally).
+      if (a.id !== _currentNewActivityId && isOrphanExtraActivity(a)) return false;
       if (seen.has(a.id)) return false;
       seen.add(a.id);
       return true;
@@ -4084,13 +4116,15 @@ function attachTargetListeners(target) {
       if (btn.disabled) return;
       btn.disabled = true;
       _addActivityInFlight = true;
-      // Collect orphans (empty name + no remarks) to delete alongside the new add.
-      const orphans = getActivitiesForTarget(target.name)
-        .filter(a => !a.isPredefined && !a.parentActivity
-          && !a.activityName?.trim()
-          && getRemarksForActivity(a.id).length === 0);
-      const orphanIds = orphans.map(o => o.id);
-      for (const o of orphans) delete state.sessionData.activities[o.id];
+      // Collect orphans (empty name + no substantive remarks) including their
+      // remark records, to delete atomically alongside the new activity.
+      const orphans = getActivitiesForTarget(target.name).filter(isOrphanExtraActivity);
+      const orphanActIds = orphans.map(o => o.id);
+      const orphanRemIds = orphans.flatMap(o => getRemarksForActivity(o.id).map(r => r.id));
+      for (const o of orphans) {
+        delete state.sessionData.activities[o.id];
+        for (const r of getRemarksForActivity(o.id)) delete (state.sessionData.remarks || {})[r.id];
+      }
       // Optimistic local update.
       const actId = generateId("a");
       const order = Date.now();
@@ -4103,10 +4137,10 @@ function attachTargetListeners(target) {
       const input = c.querySelector(`.activity-name-input[data-act-id="${actId}"]`);
       if (input) input.focus();
       setTimeout(() => { _addActivityInFlight = false; }, 600);
-      // Single atomic write — deletes all orphans AND creates the new activity
-      // in one updateDoc so only one Firestore snapshot fires, preventing the
-      // race that was showing 2 activity cards.
-      addActivityWithCleanup(state.currentSessionId, orphanIds, actId, target.name, "", order).catch(err => {
+      // Single atomic write — deletes all orphans (activities + their remarks)
+      // AND creates the new activity in one updateDoc so only one Firestore
+      // snapshot fires, preventing the race that was showing 2 activity cards.
+      addActivityWithCleanup(state.currentSessionId, orphanActIds, orphanRemIds, actId, target.name, "", order).catch(err => {
         _addActivityInFlight = false;
         _currentNewActivityId = null;
         delete state.sessionData.activities?.[actId];
