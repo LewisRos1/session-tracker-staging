@@ -27,6 +27,7 @@ import {
   saveStudent,
   deleteStudentConfig,
   setStudentWordExportReady,
+  setStudentExcelExportReady,
   loadTemplates,
   saveTemplate,
   deleteTemplate,
@@ -149,7 +150,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "884";
+const APP_VERSION = "885";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1075,6 +1076,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
             <col style="width:14%">
             <col style="width:14%">
             <col style="width:110px">
+            <col style="width:130px">
             <col style="width:160px">
             <col style="width:150px">
           </colgroup>
@@ -1084,6 +1086,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
               <th>First Name</th>
               <th>Last Name</th>
               <th style="white-space:normal">Ready for Word Export</th>
+              <th style="white-space:normal">Ready for Excel Export</th>
               <th style="white-space:normal">Latest Individual Session Recorded</th>
               <th style="white-space:normal">Latest Group Session Recorded</th>
             </tr>
@@ -1100,6 +1103,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
                     ${s.readyForWordExport ? "✓ Ready" : "No"}
                   </button>
                 </td>
+                <td class="reg-excel-export-cell" data-id="${escHtml(s.id)}" style="text-align:center">…</td>
                 <td class="reg-indiv-num" data-id="${escHtml(s.id)}" style="text-align:center">…</td>
                 <td class="reg-group-num" data-id="${escHtml(s.id)}" style="text-align:center">…</td>
               </tr>`).join("")}
@@ -1158,6 +1162,46 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
       const groupCell = body.querySelector(`.reg-group-num[data-id="${s.id}"]`);
       if (indivCell) indivCell.textContent = latestNumber(indiv) || "—";
       if (groupCell) groupCell.textContent = latestNumber(group) || "—";
+
+      const excelCell = body.querySelector(`.reg-excel-export-cell[data-id="${s.id}"]`);
+      if (!excelCell) return;
+      const hasIndiv = indiv.length > 0;
+      const hasGroup = group.length > 0;
+      if (!hasIndiv && !hasGroup) { excelCell.textContent = "—"; return; }
+      excelCell.innerHTML = "";
+      const makeBtn = (type, isReady) => {
+        const btn = document.createElement("button");
+        btn.className = "btn-excel-export-ready" + (isReady ? " is-ready" : "");
+        btn.dataset.id   = s.id;
+        btn.dataset.type = type;
+        btn.dataset.ready = isReady ? "1" : "0";
+        btn.textContent = (type === "indiv" ? "Indiv: " : "Group: ") + (isReady ? "✓ Ready" : "No");
+        btn.addEventListener("click", async e => {
+          e.stopPropagation();
+          const currentlyReady = btn.dataset.ready === "1";
+          const action = currentlyReady ? "mark as NOT ready" : "mark as READY";
+          const label = type === "indiv" ? "Individual" : "Group";
+          if (!confirm(`Are you sure you want to ${action} for Excel export (${label})?\n\n${s.name}`)) return;
+          const newReady = !currentlyReady;
+          btn.disabled = true;
+          try {
+            await setStudentExcelExportReady(s.id, type, newReady);
+            if (type === "indiv") s.readyForExcelExportIndiv = newReady;
+            else s.readyForExcelExportGroup = newReady;
+            btn.dataset.ready = newReady ? "1" : "0";
+            btn.textContent = (type === "indiv" ? "Indiv: " : "Group: ") + (newReady ? "✓ Ready" : "No");
+            btn.classList.toggle("is-ready", newReady);
+          } finally {
+            btn.disabled = false;
+          }
+        });
+        return btn;
+      };
+      const wrap = document.createElement("div");
+      wrap.style.cssText = "display:flex;flex-direction:column;gap:4px;align-items:center";
+      if (hasIndiv) wrap.appendChild(makeBtn("indiv", !!s.readyForExcelExportIndiv));
+      if (hasGroup) wrap.appendChild(makeBtn("group", !!s.readyForExcelExportGroup));
+      excelCell.appendChild(wrap);
     });
   });
 }

@@ -717,6 +717,12 @@ export async function setStudentWordExportReady(studentId, ready) {
   await updateDoc(doc(db, "students", studentId), { readyForWordExport: ready });
 }
 
+/** Toggle a "Ready for Excel Export" flag (type = 'indiv' | 'group') on a student document. */
+export async function setStudentExcelExportReady(studentId, type, ready) {
+  const field = type === "indiv" ? "readyForExcelExportIndiv" : "readyForExcelExportGroup";
+  await updateDoc(doc(db, "students", studentId), { [field]: ready });
+}
+
 /**
  * Remove all activities, remarks, and FEDC comments for a deleted target
  * from every session belonging to that student.
