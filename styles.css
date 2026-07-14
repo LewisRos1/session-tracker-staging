@@ -2541,8 +2541,9 @@ div.admin-note-editable:empty::before {
   color: var(--text);
 }
 
-/* ─── Ready for Word Export badge (student database) ───────── */
-.btn-word-export-ready {
+/* ─── Ready for Word/Excel Export badges (student database) ─── */
+.btn-word-export-ready,
+.btn-excel-export-ready {
   font-size: .75rem;
   font-weight: 600;
   padding: .25rem .6rem;
@@ -2554,13 +2555,17 @@ div.admin-note-editable:empty::before {
   white-space: nowrap;
   transition: background .15s;
 }
-.btn-word-export-ready:hover { background: #dc2626; }
-.btn-word-export-ready.is-ready {
+.btn-word-export-ready:hover,
+.btn-excel-export-ready:hover { background: #dc2626; }
+.btn-word-export-ready.is-ready,
+.btn-excel-export-ready.is-ready {
   background: #22c55e;
   color: #fff;
 }
-.btn-word-export-ready.is-ready:hover { background: #16a34a; }
-.btn-word-export-ready:disabled { opacity: .5; cursor: not-allowed; }
+.btn-word-export-ready.is-ready:hover,
+.btn-excel-export-ready.is-ready:hover { background: #16a34a; }
+.btn-word-export-ready:disabled,
+.btn-excel-export-ready:disabled { opacity: .5; cursor: not-allowed; }
 
 .view-heading-row td {
   background: var(--primary-light);

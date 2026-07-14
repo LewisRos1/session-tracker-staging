@@ -150,7 +150,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "886";
+const APP_VERSION = "887";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1075,10 +1075,10 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
             <col style="width:42px">
             <col style="width:14%">
             <col style="width:14%">
-            <col style="width:110px">
-            <col style="width:130px">
+            <col style="width:100px">
             <col style="width:160px">
-            <col style="width:150px">
+            <col style="width:100px">
+            <col style="width:100px">
           </colgroup>
           <thead>
             <tr>
