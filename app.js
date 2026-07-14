@@ -150,7 +150,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "885";
+const APP_VERSION = "886";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1198,7 +1198,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
         return btn;
       };
       const wrap = document.createElement("div");
-      wrap.style.cssText = "display:flex;flex-direction:column;gap:4px;align-items:center";
+      wrap.style.cssText = "display:flex;flex-direction:row;gap:4px;align-items:center;justify-content:center";
       if (hasIndiv) wrap.appendChild(makeBtn("indiv", !!s.readyForExcelExportIndiv));
       if (hasGroup) wrap.appendChild(makeBtn("group", !!s.readyForExcelExportGroup));
       excelCell.appendChild(wrap);
