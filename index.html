@@ -28,9 +28,27 @@
 <body>
 
   <!-- ══════════════════════════════════════════════════════
+       LOADING SCREEN (default; shown while Firebase restores auth)
+       ══════════════════════════════════════════════════════ -->
+  <div id="screen-loading" class="screen active">
+    <div class="pin-container">
+      <div class="pin-logo">🧩</div>
+      <h1 class="pin-title">Session Tracker</h1>
+      <p class="loading-text">Loading…</p>
+      <div id="updating-content" class="hidden">
+        <p class="updating-title">App Updating…</p>
+        <div class="updating-progress-track">
+          <div id="updating-progress-bar"></div>
+        </div>
+        <span id="updating-percent">0%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
        PIN SCREEN
        ══════════════════════════════════════════════════════ -->
-  <div id="screen-pin" class="screen active">
+  <div id="screen-pin" class="screen hidden">
     <div class="pin-container">
       <div class="pin-logo">🧩</div>
       <h1 class="pin-title">Session Tracker</h1>
