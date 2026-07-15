@@ -510,12 +510,14 @@ html, body {
 .date-picker-day-taken  { cursor: default; }
 .date-taken-dot, .day-dot-spacer {
   display: block;
-  width: .3rem; height: .3rem;
-  border-radius: 50%;
+  height: 1rem;
+  line-height: 1;
+  font-size: .75rem;
+  text-align: center;
   flex-shrink: 0;
 }
-.date-taken-dot { background: var(--primary); }
-.date-picker-day-current .date-taken-dot { background: #fff; }
+.date-taken-dot { color: var(--primary); }
+.date-picker-day-current .date-taken-dot { color: #fff; }
 .day-dot-spacer { background: transparent; }
 .date-picker-subtitle {
   font-size: 1rem;
