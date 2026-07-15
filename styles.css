@@ -522,9 +522,10 @@ html, body {
 .date-picker-day-taken  { cursor: default; }
 .date-taken-dot, .day-dot-spacer {
   display: block;
-  height: 1.2rem;
+  height: 1.5rem;
   line-height: 1;
-  font-size: 1rem;
+  font-size: 1.5rem;
+  font-weight: 700;
   text-align: center;
   flex-shrink: 0;
 }
