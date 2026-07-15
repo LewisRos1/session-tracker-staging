@@ -1970,7 +1970,10 @@ function getAllActivitiesForTarget(session, target) {
   const claimAct = pa => {
     const byId = pa.id ? sessionActs.find(a => a.configId === pa.id && !usedIds.has(a.id)) : null;
     if (byId) return byId;
-    return sessionActs.find(a => a.activityName === pa.name && a.isPredefined && !usedIds.has(a.id)) || null;
+    // Name fallback only for records with NO configId (legacy/imported).
+    // Records that already have a configId pointing to a different PA must not
+    // be stolen by another PA that happens to share the same name.
+    return sessionActs.find(a => a.activityName === pa.name && a.isPredefined && !a.configId && !usedIds.has(a.id)) || null;
   };
 
   for (const pa of (target.predefinedActivities || [])) {
