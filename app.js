@@ -150,7 +150,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "896";
+const APP_VERSION = "897";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -989,7 +989,7 @@ async function migrateAwayFromMasteryType() {
   }
 }
 
-$("btn-logout").addEventListener("click", () => {
+$("btn-logout")?.addEventListener("click", () => {
   signOutUser();
 });
 
