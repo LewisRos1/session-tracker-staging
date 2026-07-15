@@ -24,37 +24,19 @@
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <!-- Chart.js (chart images for Excel export) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-  <!-- docx (Word export for single-session daily notes) -->
-  <script src="https://cdn.jsdelivr.net/npm/docx@8/build/index.umd.min.js"></script>
 </head>
 <body>
-
-  <!-- Shown by default until the code determines whether you're already
-       signed in — avoids a flash of the PIN screen for already-logged-in
-       staff every time the app loads. Also reused to show "App Updating…"
-       across a SW-update-triggered reload (see controllerchange below) so
-       it reads as one continuous, intentional transition instead of the
-       app silently bouncing back to the home screen with no explanation. -->
-  <div id="screen-loading" class="screen">
-    <div id="updating-content" class="updating-content hidden">
-      <div class="pin-logo">🧩</div>
-      <p class="updating-text">App Updating</p>
-      <div class="updating-progress"><div id="updating-progress-bar" class="updating-progress-bar"></div></div>
-      <span id="updating-percent" class="updating-percent">0%</span>
-    </div>
-  </div>
 
   <!-- ══════════════════════════════════════════════════════
        PIN SCREEN
        ══════════════════════════════════════════════════════ -->
-  <div id="screen-pin" class="screen hidden">
+  <div id="screen-pin" class="screen active">
     <div class="pin-container">
       <div class="pin-logo">🧩</div>
       <h1 class="pin-title">Session Tracker</h1>
       <p class="pin-subtitle">Enter PIN to continue</p>
       <div class="pin-dots" id="pin-dots"></div>
       <div id="pin-error" class="pin-error hidden">Incorrect PIN. Try again.</div>
-      <div id="pin-status" class="pin-status hidden">Logging In<span class="pin-status-dot">.</span><span class="pin-status-dot">.</span><span class="pin-status-dot">.</span></div>
       <div class="pin-keypad" id="pin-keypad">
         <button class="pin-key" data-key="1">1</button>
         <button class="pin-key" data-key="2">2</button>
@@ -80,15 +62,8 @@
     <header class="app-header">
       <h1>Session Tracker</h1>
       <span id="app-version" class="app-version"></span>
-      <button id="btn-logout" class="btn-logout">Log Out</button>
     </header>
     <main class="home-main">
-      <section>
-        <div class="section-header">
-          <h2 class="section-title">Student Database</h2>
-        </div>
-        <div id="student-database-button"></div>
-      </section>
       <section>
         <div class="section-header">
           <h2 class="section-title">Individual Sessions</h2>
@@ -127,7 +102,7 @@
       </section>
       <section>
         <div class="section-header">
-          <h2 class="section-title">FOR IT USE</h2>
+          <h2 class="section-title">EXPORT ALL <span style="font-size:.7em;font-weight:400;color:var(--text-muted)">(For Lewis use only, he will backup all data every Saturday)</span></h2>
         </div>
         <div id="export-all-button"></div>
       </section>
@@ -138,45 +113,32 @@
        SESSION SCREEN
        ══════════════════════════════════════════════════════ -->
   <div id="screen-session" class="screen hidden">
-    <header class="session-header session-header-view">
-      <div class="view-header-left">
-        <button class="btn-back" id="btn-back" aria-label="Back to home">←</button>
-        <div class="session-info">
-          <span class="session-student-name" id="session-student-name"></span>
-          <span class="session-meta"         id="session-meta"></span>
-        </div>
-      </div>
-      <div class="btn-goto-session-wrap">
-        <button id="btn-entry-goto-session" class="btn-goto-session hidden">🚀 Go To Another Session</button>
-      </div>
-      <div class="view-header-right">
-        <div class="zoom-controls">
-          <button class="btn-zoom" id="btn-zoom-out" title="Zoom out">A−</button>
-          <button class="btn-zoom btn-zoom-reset" id="btn-zoom-reset" title="Reset zoom">A</button>
-          <button class="btn-zoom" id="btn-zoom-in" title="Zoom in">A+</button>
-        </div>
+    <header class="session-header">
+      <button class="btn-back" id="btn-back" aria-label="Back to home">←</button>
+      <div class="session-info">
+        <span class="session-student-name" id="session-student-name"></span>
+        <span class="session-meta"         id="session-meta"></span>
       </div>
     </header>
 
-    <div class="target-selector" id="target-selector-bar">
-      <label for="target-select" class="target-label">Target</label>
-      <select id="target-select" class="target-dropdown"
-        data-gramm="false" data-gramm_editor="false" data-enable-grammarly="false">
-        <option value="">— select —</option>
-      </select>
-      <div class="target-type-chip hidden" id="target-type-chip">
-        <span class="target-type-label">Type</span>
-        <span class="target-type-value" id="target-type-badge"></span>
+    <div class="session-body">
+      <div class="target-selector">
+        <label for="target-select" class="target-label">Target</label>
+        <select id="target-select" class="target-dropdown"
+          data-gramm="false" data-gramm_editor="false" data-enable-grammarly="false">
+          <option value="">— select —</option>
+        </select>
+        <div class="target-type-chip hidden" id="target-type-chip">
+          <span class="target-type-label">Type</span>
+          <span class="target-type-value" id="target-type-badge"></span>
+        </div>
+        <div class="days-average-chip">
+          <span class="days-average-label">Target's Avg</span>
+          <span class="days-average-value" id="days-average-value">—</span>
+        </div>
+        <button id="btn-manage-targets" class="btn-manage-targets hidden">Edit Target</button>
       </div>
-      <div class="days-average-chip">
-        <span class="days-average-label">Target's Avg</span>
-        <span class="days-average-value" id="days-average-value">—</span>
-      </div>
-      <button id="btn-reorder-targets" class="btn-manage-targets hidden">↕ Rearrange Targets</button>
-      <button id="btn-manage-targets" class="btn-manage-targets hidden">Edit Target</button>
-    </div>
 
-    <div class="session-body" id="session-body">
       <div id="target-content" class="target-content">
         <!-- populated by JS -->
       </div>
@@ -204,7 +166,7 @@
         <button id="btn-delete-session" class="btn-delete-session hidden">Delete Session</button>
       </div>
     </header>
-    <div class="session-view-body" id="session-view-body">
+    <div class="session-view-body" id="session-view-body" contenteditable="true">
       <!-- populated by JS -->
     </div>
   </div>
@@ -213,36 +175,23 @@
        GROUP SESSION SCREEN
        ══════════════════════════════════════════════════════ -->
   <div id="screen-group-session" class="screen hidden">
-    <header class="session-header session-header-view">
-      <div class="view-header-left">
-        <button class="btn-back" id="btn-group-back" aria-label="Back to home">←</button>
-        <div class="session-info">
-          <span class="session-student-name" id="group-session-name"></span>
-          <span class="session-meta"         id="group-session-meta"></span>
-        </div>
-      </div>
-      <div class="btn-goto-session-wrap">
-        <button id="btn-group-entry-goto-session" class="btn-goto-session hidden">🚀 Go To Another Session</button>
-      </div>
-      <div class="view-header-right">
-        <div class="zoom-controls">
-          <button class="btn-zoom" id="btn-grp-zoom-out" title="Zoom out">A−</button>
-          <button class="btn-zoom btn-zoom-reset" id="btn-grp-zoom-reset" title="Reset zoom">A</button>
-          <button class="btn-zoom" id="btn-grp-zoom-in" title="Zoom in">A+</button>
-        </div>
+    <header class="session-header">
+      <button class="btn-back" id="btn-group-back" aria-label="Back to home">←</button>
+      <div class="session-info">
+        <span class="session-student-name" id="group-session-name"></span>
+        <span class="session-meta"         id="group-session-meta"></span>
       </div>
     </header>
-    <div class="target-selector" id="group-target-selector-bar">
-      <label for="group-target-select" class="target-label">Target</label>
-      <select id="group-target-select" class="target-dropdown"
-        data-gramm="false" data-gramm_editor="false" data-enable-grammarly="false">
-        <option value="">— select —</option>
-      </select>
-      <div id="group-avg-chips" style="display:flex;gap:.4rem;align-items:center"></div>
-      <button id="btn-group-reorder-targets" class="btn-manage-targets hidden">↕ Rearrange Targets</button>
-      <button id="btn-group-manage-targets" class="btn-manage-targets hidden">Edit Target</button>
-    </div>
-    <div class="session-body" id="group-session-body">
+    <div class="session-body">
+      <div class="target-selector" id="group-target-selector-bar">
+        <label for="group-target-select" class="target-label">Target</label>
+        <select id="group-target-select" class="target-dropdown"
+          data-gramm="false" data-gramm_editor="false" data-enable-grammarly="false">
+          <option value="">— select —</option>
+        </select>
+        <div id="group-avg-chips" style="display:flex;gap:.4rem;align-items:center"></div>
+        <button id="btn-group-manage-targets" class="btn-manage-targets hidden">Edit Target</button>
+      </div>
       <div id="group-target-content" class="target-content"></div>
     </div>
   </div>
@@ -266,24 +215,7 @@
         <button id="btn-group-delete-session" class="btn-delete-session hidden">Delete Session</button>
       </div>
     </header>
-    <div class="session-view-body" id="group-session-view-body">
-      <!-- populated by JS -->
-    </div>
-  </div>
-
-  <!-- ══════════════════════════════════════════════════════
-       STUDENT DATABASE SCREEN
-       ══════════════════════════════════════════════════════ -->
-  <div id="screen-student-registry" class="screen hidden">
-    <header class="session-header session-header-view">
-      <div class="view-header-left">
-        <button class="btn-back" id="btn-student-registry-back" aria-label="Back to home">←</button>
-        <div class="session-info">
-          <span class="session-student-name">Student Database</span>
-        </div>
-      </div>
-    </header>
-    <div class="session-view-body" id="student-registry-body">
+    <div class="session-view-body" id="group-session-view-body" contenteditable="true">
       <!-- populated by JS -->
     </div>
   </div>
@@ -334,7 +266,6 @@
         <div class="modal-header-left">
           <span class="modal-title" id="manage-modal-title">Manage</span>
           <span class="autosave-indicator" id="manage-autosave-indicator"></span>
-          <span id="manage-sync-indicator" style="display:none;font-size:.8rem;color:var(--text-muted);margin-left:.4rem">⏳ Syncing history…</span>
         </div>
         <button class="modal-close" id="manage-modal-close" aria-label="Close">✕</button>
       </div>

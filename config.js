@@ -5,11 +5,7 @@
 
 export const CONFIG = {
 
-  // The actual PIN is no longer stored here — it's the password on a real
-  // Firebase Auth account now (see signInWithPin in firebase-service.js),
-  // checked by Firebase's servers instead of compared inside this
-  // downloadable file. This just tells the keypad UI how many dots to show.
-  PIN_LENGTH: 8,
+  PIN: "0108",
 
   SCORE_LABELS: {
     3: {
