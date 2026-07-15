@@ -150,7 +150,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "893";
+const APP_VERSION = "894";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -488,19 +488,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Register SW immediately — don't wait for Firebase so updates are never blocked.
   registerServiceWorker();
-
-  // Picks the "App Updating…" message back up on the fresh page (it was
-  // already showing on the old page right before this reload happened) —
-  // #screen-loading is already the default-visible screen at this point,
-  // so this just reveals its content; initPin()/showHome() naturally hides
-  // the whole thing once sign-in state is known.
-  if (sessionStorage.getItem("justUpdated")) {
-    sessionStorage.removeItem("justUpdated");
-    $("updating-content")?.classList.remove("hidden");
-    updatingScreenShownAt = Date.now();
-    animateUpdatingProgress();
-  }
-
 
   // On iOS, relatedTarget is always null and pointerdown may not fire for <select>.
   // Use both pointerdown and touchstart (touchstart fires reliably before focusout on iOS).
@@ -1198,7 +1185,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
         return btn;
       };
       const wrap = document.createElement("div");
-      wrap.style.cssText = "display:flex;flex-direction:column;gap:4px;align-items:center";
+      wrap.style.cssText = "display:flex;flex-direction:row;gap:4px;align-items:center;justify-content:center;flex-wrap:wrap";
       if (hasIndiv) wrap.appendChild(makeBtn("indiv", !!s.readyForExcelExportIndiv));
       if (hasGroup) wrap.appendChild(makeBtn("group", !!s.readyForExcelExportGroup));
       excelCell.appendChild(wrap);
