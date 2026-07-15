@@ -1400,7 +1400,7 @@ input.field-input::placeholder {
   align-items: center;
   justify-content: center;
   gap: .1rem;
-  padding: .9rem .4rem;
+  padding: .55rem .4rem;
   border: 1.5px solid var(--border);
   border-radius: 12px;
   background: var(--bg-card);
@@ -1413,6 +1413,7 @@ input.field-input::placeholder {
 }
 .mgb-month { font-size: 1rem; font-weight: 700; color: var(--text-main); }
 .mgb-year  { font-size: .72rem; color: var(--text-muted); }
+.mgb-pickdate-label { font-size: .95rem; font-weight: 600; color: var(--primary); }
 
 .btn-picker-back {
   display: inline-flex;
