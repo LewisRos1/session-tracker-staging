@@ -150,7 +150,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "887";
+const APP_VERSION = "886";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1075,10 +1075,10 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
             <col style="width:42px">
             <col style="width:14%">
             <col style="width:14%">
-            <col style="width:100px">
+            <col style="width:110px">
+            <col style="width:130px">
             <col style="width:160px">
-            <col style="width:100px">
-            <col style="width:100px">
+            <col style="width:150px">
           </colgroup>
           <thead>
             <tr>
@@ -1198,7 +1198,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
         return btn;
       };
       const wrap = document.createElement("div");
-      wrap.style.cssText = "display:flex;flex-direction:row;gap:4px;align-items:center;justify-content:center";
+      wrap.style.cssText = "display:flex;flex-direction:column;gap:4px;align-items:center";
       if (hasIndiv) wrap.appendChild(makeBtn("indiv", !!s.readyForExcelExportIndiv));
       if (hasGroup) wrap.appendChild(makeBtn("group", !!s.readyForExcelExportGroup));
       excelCell.appendChild(wrap);
@@ -4693,9 +4693,18 @@ async function autoFillMaintainedRemarks(student, sessionId) {
   for (const target of (student.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
       if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || !pa.name) continue;
-      const existingAct = Object.entries(data.activities || {})
-        .find(([, a]) => a.targetName === target.name && a.activityName === pa.name && !a.parentActivity);
-      let actId = existingAct?.[0] || null;
+      // Match by name OR by configId so a character-level name mismatch never spawns a duplicate.
+      const allMatches = Object.entries(data.activities || {})
+        .filter(([, a]) => a.targetName === target.name && !a.parentActivity &&
+                           (a.activityName === pa.name || (pa.id && a.configId === pa.id)));
+      // Prefer the activity that has configId set (the original predefined one).
+      const canonical = allMatches.find(([, a]) => pa.id && a.configId === pa.id) || allMatches[0] || null;
+      // Delete any name-only duplicates that lack configId — leftovers from the old bug.
+      for (const [dupeActId] of allMatches.filter(([aid]) => aid !== canonical?.[0] && !data.activities[aid]?.configId)) {
+        const dupeRemIds = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === dupeActId).map(([rid]) => rid);
+        deleteActivity(sessionId, dupeActId, dupeRemIds);
+      }
+      let actId = canonical?.[0] || null;
       if (actId && Object.values(data.remarks || {}).some(r => r.activityId === actId)) continue;
       const key = `${sessionId}:${target.name}:${pa.name}:maintained`;
       if (maintainedRemarkAutoFillInFlight.has(key)) continue;
@@ -5623,9 +5632,15 @@ async function autoFillViewMaintainedRemarks(student, sessionId, data) {
   for (const target of (student.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
       if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || !pa.name) continue;
-      const existingAct = Object.entries(data.activities || {})
-        .find(([, a]) => a.targetName === target.name && a.activityName === pa.name && !a.parentActivity);
-      let actId = existingAct?.[0] || null;
+      const allMatches = Object.entries(data.activities || {})
+        .filter(([, a]) => a.targetName === target.name && !a.parentActivity &&
+                           (a.activityName === pa.name || (pa.id && a.configId === pa.id)));
+      const canonical = allMatches.find(([, a]) => pa.id && a.configId === pa.id) || allMatches[0] || null;
+      for (const [dupeActId] of allMatches.filter(([aid]) => aid !== canonical?.[0] && !data.activities[aid]?.configId)) {
+        const dupeRemIds = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === dupeActId).map(([rid]) => rid);
+        deleteActivity(sessionId, dupeActId, dupeRemIds);
+      }
+      let actId = canonical?.[0] || null;
       if (actId && Object.values(data.remarks || {}).some(r => r.activityId === actId)) continue;
       const key = `${sessionId}:${target.name}:${pa.name}:maintained`;
       if (maintainedRemarkAutoFillInFlight.has(key)) continue;
@@ -11994,7 +12009,7 @@ async function autoFillGroupMaintainedRemarks(group, sessionId, data, targetName
   for (const pa of (target.predefinedActivities || [])) {
     if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || !pa.name) continue;
     const existingAct = Object.entries(data.activities || {})
-      .find(([, a]) => a.targetName === targetName && a.activityName === pa.name);
+      .find(([, a]) => a.targetName === targetName && (a.activityName === pa.name || (pa.id && a.configId === pa.id)));
     const actId = existingAct?.[0];
     if (!actId) continue;
     for (const studentName of attendees) {
