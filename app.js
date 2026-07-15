@@ -150,7 +150,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "904";
+const APP_VERSION = "905";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2225,7 +2225,7 @@ function renderSessionsForMonth(student, month, monthSessions, byMonth, today, s
 // screen — if that date has no session yet, one is created blank (and will
 // be auto-deleted on the way out, same as any other empty session, if
 // nothing ends up typed into it).
-function renderPickDateCalendar(student, sessions, byMonth, today, displayDate) {
+function renderPickDateCalendar(student, sessions, byMonth, today, displayDate, { backFn, onSelect } = {}) {
   const sessionIdByDate = new Map(sessions.map(s => [s.date, s.id]));
   const [y, m] = displayDate.split("-").map(Number);
   const monthLabel = new Date(y, m - 1, 1).toLocaleString("default", { month: "long", year: "numeric" });
@@ -2269,15 +2269,15 @@ function renderPickDateCalendar(student, sessions, byMonth, today, displayDate) 
   $("session-picker-title").textContent = "Pick a Date";
   $("session-picker-list").innerHTML = html;
 
-  $("session-picker-list").querySelector(".btn-picker-back").addEventListener("click", () =>
-    renderMonthGrid(student, byMonth, today, sessions)
-  );
+  const _backFn = backFn ?? (() => renderMonthGrid(student, byMonth, today, sessions));
+
+  $("session-picker-list").querySelector(".btn-picker-back").addEventListener("click", () => _backFn());
   $("session-picker-list").querySelector(".btn-date-prev").addEventListener("click", () => {
-    renderPickDateCalendar(student, sessions, byMonth, today, prevM);
+    renderPickDateCalendar(student, sessions, byMonth, today, prevM, { backFn, onSelect });
   });
   if (canNext) {
     $("session-picker-list").querySelector(".btn-date-next").addEventListener("click", () => {
-      renderPickDateCalendar(student, sessions, byMonth, today, nextM);
+      renderPickDateCalendar(student, sessions, byMonth, today, nextM, { backFn, onSelect });
     });
   }
   $("session-picker-list").querySelectorAll(".date-picker-day:not([disabled])").forEach(btn => {
@@ -2285,7 +2285,8 @@ function renderPickDateCalendar(student, sessions, byMonth, today, displayDate) 
       closeSessionPicker();
       const ds = btn.dataset.date;
       const sessionId = sessionIdByDate.get(ds) || await getOrCreateSessionForDate(student.id, ds, student.targets);
-      openSessionView(student, sessionId);
+      if (onSelect) onSelect(student, sessionId);
+      else openSessionView(student, sessionId);
     });
   });
 }
@@ -2578,15 +2579,18 @@ async function showGoToAnotherSessionForEntry(student) {
 
   const currentMonth = state.sessionData?.month;
   if (currentMonth && byMonth.has(currentMonth)) {
-    renderGoToSessionsForMonthEntry(student, currentMonth, byMonth.get(currentMonth), byMonth, today);
+    renderGoToSessionsForMonthEntry(student, currentMonth, byMonth.get(currentMonth), byMonth, today, sessions);
   } else {
-    renderGoToMonthGridEntry(student, byMonth, today);
+    renderGoToMonthGridEntry(student, byMonth, today, sessions);
   }
 }
 
-function renderGoToMonthGridEntry(student, byMonth, today) {
+function renderGoToMonthGridEntry(student, byMonth, today, sessions) {
   $("session-picker-title").textContent = student.name;
-  let html = `<div class="month-grid">`;
+  let html = `<div class="month-grid">
+    <button class="month-grid-btn month-grid-btn-pickdate" data-action="pick-date">
+      <span class="mgb-pickdate-label">Pick A Date</span>
+    </button>`;
   for (const month of byMonth.keys()) {
     const [name, year] = month.split(" ");
     html += `<button class="month-grid-btn" data-month="${escHtml(month)}">
@@ -2596,15 +2600,24 @@ function renderGoToMonthGridEntry(student, byMonth, today) {
   }
   html += `</div>`;
   $("session-picker-list").innerHTML = html;
-  $("session-picker-list").querySelectorAll(".month-grid-btn").forEach(btn => {
+
+  $("session-picker-list").querySelector('[data-action="pick-date"]').addEventListener("click", () => {
+    const mostRecent = sessions.reduce((max, s) => (s.date > max ? s.date : max), sessions[0].date);
+    renderPickDateCalendar(student, sessions, byMonth, today, `${mostRecent.slice(0, 7)}-01`, {
+      backFn: () => renderGoToMonthGridEntry(student, byMonth, today, sessions),
+      onSelect: (s, sessionId) => openSession(s, sessionId)
+    });
+  });
+
+  $("session-picker-list").querySelectorAll(".month-grid-btn[data-month]").forEach(btn => {
     btn.addEventListener("click", () => {
       const month = btn.dataset.month;
-      renderGoToSessionsForMonthEntry(student, month, byMonth.get(month), byMonth, today);
+      renderGoToSessionsForMonthEntry(student, month, byMonth.get(month), byMonth, today, sessions);
     });
   });
 }
 
-function renderGoToSessionsForMonthEntry(student, month, monthSessions, byMonth, today) {
+function renderGoToSessionsForMonthEntry(student, month, monthSessions, byMonth, today, sessions) {
   $("session-picker-title").textContent = month;
   const sorted  = [...monthSessions].sort((a, b) => a.date.localeCompare(b.date));
   const display = [...sorted].reverse();
@@ -2613,7 +2626,7 @@ function renderGoToSessionsForMonthEntry(student, month, monthSessions, byMonth,
   const list = $("session-picker-list");
   list.innerHTML = html;
   list.querySelector(".btn-picker-back").addEventListener("click", () => {
-    renderGoToMonthGridEntry(student, byMonth, today);
+    renderGoToMonthGridEntry(student, byMonth, today, sessions);
   });
   list.querySelectorAll(".session-list-item").forEach(item => {
     item.addEventListener("click", () => {
