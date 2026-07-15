@@ -150,7 +150,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "886";
+const APP_VERSION = "887";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3332,7 +3332,8 @@ function renderFedcTarget(target) {
 
     actNum++;
     // Fixed remark activity — shown read-only with color block styling
-    const isFixed = pa.fixedRemark !== undefined || pa.isMaintain;
+    // pa.maintained supersedes the old fixedRemark/isMaintain flags — treat as free text.
+    const isFixed = (pa.fixedRemark !== undefined || pa.isMaintain) && !pa.maintained;
     if (isFixed) {
       const fixedText = pa.fixedRemark ?? pa.maintainRemark ?? "";
       const isGrayFixed  = pa.isMaintain || pa.activityColor === "gray";
@@ -5155,7 +5156,7 @@ function buildTargetViewTable(target, data) {
         </tr>`;
         continue;
       }
-      if (pa.fixedRemark !== undefined || pa.isMaintain) {
+      if ((pa.fixedRemark !== undefined || pa.isMaintain) && !pa.maintained) {
         const fixedEntries = Object.entries(data.activities || {})
           .filter(([, a]) => a.targetName === target.name && a.activityName === pa.name);
         const fixedEntry = fixedEntries[0] || null;
@@ -6714,7 +6715,7 @@ function buildGroupTargetViewTable(target, data, attendees) {
         </tr>`;
         continue;
       }
-      if (pa.fixedRemark !== undefined || pa.isMaintain) {
+      if ((pa.fixedRemark !== undefined || pa.isMaintain) && !pa.maintained) {
         const fixedEntries2 = Object.entries(data.activities || {})
           .filter(([, a]) => a.targetName === target.name && a.activityName === pa.name);
         fixedEntries2.forEach(([id]) => matchedIds.add(id));
