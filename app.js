@@ -150,7 +150,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "894";
+const APP_VERSION = "895";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1029,6 +1029,8 @@ function renderStudentDatabaseButton() {
 function openStudentRegistryScreen(opts = {}) {
   showScreen("screen-student-registry");
   renderStudentRegistryBody(opts);
+  const backBtn = $("btn-student-registry-back");
+  if (backBtn) backBtn.onclick = showHome;
 }
 
 // Full-page Student Database screen — table of every registered student
@@ -5016,7 +5018,7 @@ async function leaveSessionView() {
 }
 
 $("btn-view-back").addEventListener("click", leaveSessionView);
-$("btn-student-registry-back").addEventListener("click", showHome);
+$("btn-student-registry-back")?.addEventListener("click", showHome);
 
 function renderSessionView() {
   const data    = state.viewSessionData;
