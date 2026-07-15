@@ -6,6 +6,7 @@
 export const CONFIG = {
 
   PIN: "0108",
+  PIN_LENGTH: 8,
 
   SCORE_LABELS: {
     3: {
