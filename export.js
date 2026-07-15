@@ -1963,6 +1963,16 @@ function getAllActivitiesForTarget(session, target) {
   let exportActNum = 0;
   const subLabelCounters = {};
 
+  // Match a session activity to a predefined activity config.
+  // Prefer configId (exact PA identity) over name so that two PAs with the same
+  // name (e.g. an old discontinued free-text one and a new select-one one) never
+  // both claim the same session record.  Also excludes already-claimed records.
+  const claimAct = pa => {
+    const byId = pa.id ? sessionActs.find(a => a.configId === pa.id && !usedIds.has(a.id)) : null;
+    if (byId) return byId;
+    return sessionActs.find(a => a.activityName === pa.name && a.isPredefined && !usedIds.has(a.id)) || null;
+  };
+
   for (const pa of (target.predefinedActivities || [])) {
     if (!isActivityActive(pa, session.date)) continue;
     if (pa.isCompleted || pa.isArchived || pa.isStopped) continue;
@@ -2014,7 +2024,7 @@ function getAllActivitiesForTarget(session, target) {
         : parentPa?.maintained ? '(Maintained) '
         : '';
       const subActName = subStatusPrefix + pa.name;
-      const sessionAct = sessionActs.find(a => a.activityName === pa.name && a.isPredefined);
+      const sessionAct = claimAct(pa);
       if (sessionAct) {
         usedIds.add(sessionAct.id);
         result.push({ ...sessionAct, activityName: subActName, isSubActivity: true, subLabel });
@@ -2026,14 +2036,14 @@ function getAllActivitiesForTarget(session, target) {
 
     // Mastered / discontinued → defer to bottom with x) prefix, don't consume a number
     if (pa.masteredOn) {
-      const _sAct = sessionActs.find(a => a.activityName === pa.name && a.isPredefined);
+      const _sAct = claimAct(pa);
       const _name = `x) (Mastered) ${pa.name}`;
       if (_sAct) { usedIds.add(_sAct.id); masteredActivities.push({ ..._sAct, activityName: _name }); }
       else { masteredActivities.push({ id: null, activityName: _name, isPredefined: true, empty: true }); }
       continue;
     }
     if (pa.discontinuedOn) {
-      const _sAct = sessionActs.find(a => a.activityName === pa.name && a.isPredefined);
+      const _sAct = claimAct(pa);
       const _name = `x) (Discontinued) ${pa.name}`;
       if (_sAct) { usedIds.add(_sAct.id); discontinuedActivities.push({ ..._sAct, activityName: _name }); }
       else { discontinuedActivities.push({ id: null, activityName: _name, isPredefined: true, empty: true }); }
@@ -2047,7 +2057,7 @@ function getAllActivitiesForTarget(session, target) {
 
     // Parent activity (noRemark) — numbered title, empty remark
     if (pa.noRemark) {
-      const sActNr = sessionActs.find(a => a.activityName === pa.name && a.isPredefined);
+      const sActNr = claimAct(pa);
       if (sActNr) usedIds.add(sActNr.id);
       result.push({ id: null, activityName: numberedName, isPredefined: true, noRemark: true, empty: true });
       continue;
@@ -2065,7 +2075,7 @@ function getAllActivitiesForTarget(session, target) {
       continue;
     }
     if (pa.isCompleted) {
-      const sessionAct = sessionActs.find(a => a.activityName === pa.name && a.isPredefined);
+      const sessionAct = claimAct(pa);
       if (sessionAct) {
         usedIds.add(sessionAct.id);
         masteredActivities.push({ ...sessionAct, activityName: numberedName, isMastered: true });
@@ -2075,7 +2085,7 @@ function getAllActivitiesForTarget(session, target) {
       continue;
     }
     if (pa.isArchived || pa.isStopped) {
-      const sessionAct = sessionActs.find(a => a.activityName === pa.name && a.isPredefined);
+      const sessionAct = claimAct(pa);
       if (sessionAct) {
         usedIds.add(sessionAct.id);
         stoppedActivities.push({ ...sessionAct, activityName: numberedName, isStopped: true });
@@ -2084,7 +2094,7 @@ function getAllActivitiesForTarget(session, target) {
       }
       continue;
     }
-    const sessionAct = sessionActs.find(a => a.activityName === pa.name && a.isPredefined);
+    const sessionAct = claimAct(pa);
     const colorProps = (pa.activityColor === "gray" || pa.isMaintainLive) ? { isGray: true }
                      : pa.activityColor === "green" ? { isGreen: true } : {};
     const manualScoreProp = pa.manualScore ? { manualScore: true } : {};
