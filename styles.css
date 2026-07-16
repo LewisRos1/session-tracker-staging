@@ -2085,12 +2085,12 @@ div.admin-note-editable:empty::before {
 .view-mastery-note {
   font-size: .85rem;
   font-family: var(--font);
-  color: var(--text-muted);
+  color: var(--text);
   padding: .15rem .3rem;
   border: 1px solid transparent;
   border-radius: 4px;
 }
-.view-mastery-note:focus { border-color: var(--border); color: var(--text); }
+.view-mastery-note:focus { border-color: var(--border); }
 
 .remark-mastery-opts {
   display: flex;
