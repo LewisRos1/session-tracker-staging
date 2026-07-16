@@ -2083,6 +2083,7 @@ div.admin-note-editable:empty::before {
 /* view table note: no border box, just subtle */
 .view-mastery-note {
   font-size: .82rem;
+  font-family: var(--font);
   color: var(--text-muted);
   padding: .15rem .3rem;
   border: 1px solid transparent;
