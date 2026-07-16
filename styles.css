@@ -1667,6 +1667,31 @@ textarea.admin-input { resize: vertical; min-height: 60px; line-height: 1.45; }
   line-height: 1.4;
 }
 .btn-note-fmt:hover { background: var(--primary-light); border-color: var(--primary); }
+
+/* ─── B / U / • format buttons next to activity name/notes ── */
+.fmt-btn-group {
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+  flex-shrink: 0;
+}
+.btn-fmt {
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  cursor: pointer;
+  font-size: .82rem;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.btn-fmt:hover { background: var(--primary-light); border-color: var(--primary); }
+.btn-fmt-bold { font-weight: 700; }
+.btn-fmt-underline { text-decoration: underline; }
 div.admin-note-editable {
   min-height: 3rem;
   line-height: 1.45;
