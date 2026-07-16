@@ -150,7 +150,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "930";
+const APP_VERSION = "931";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -5419,11 +5419,32 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
           data-target-name="${escHtml(target.name)}" data-is-predefined="${isPredefined}">${escHtml(opt)}</button>`
       ).join("")}</div>`;
     }
-    const emptyRemCell = sentenceStarter
-      ? `<div class="view-starter-wrap" contenteditable="false">
-          <span class="view-starter-prefix">${escHtml(sentenceStarter)}</span>${emptySelHtml}
-        </div>`
-      : emptySelHtml;
+    const noteEmptyHtml = remarkHasNote
+      ? `<textarea class="view-mastery-note view-mastery-note-empty" rows="1"
+           data-act-id="${escHtml(actId || "")}" data-act-name="${escHtml(actName)}"
+           data-target="${escHtml(target.name)}" data-is-predefined="${isPredefined}"
+           data-parent-activity="${escHtml(paConfig?.parentActivity || "")}"
+           data-config-id="${escHtml(paConfig?.id || "")}"
+           placeholder="Notes…"></textarea>`
+      : "";
+    let emptyRemCell;
+    if (sentenceStarter && remarkHasNote) {
+      emptyRemCell = `<div class="view-starter-wrap view-starter-wrap-note" contenteditable="false">
+        <div class="view-starter-top-row"><span class="view-starter-prefix">${escHtml(sentenceStarter)}</span>${emptySelHtml}</div>
+        ${noteEmptyHtml}
+      </div>`;
+    } else if (sentenceStarter) {
+      emptyRemCell = `<div class="view-starter-wrap" contenteditable="false">
+        <span class="view-starter-prefix">${escHtml(sentenceStarter)}</span>${emptySelHtml}
+      </div>`;
+    } else if (remarkHasNote) {
+      emptyRemCell = `<div class="view-starter-wrap view-starter-wrap-note" contenteditable="false">
+        <div class="view-starter-top-row">${emptySelHtml}</div>
+        ${noteEmptyHtml}
+      </div>`;
+    } else {
+      emptyRemCell = emptySelHtml;
+    }
     const emptyTrialBtn = mappedInfo
       ? `<span class="view-mapped-label">${escHtml(mappedInfo.label)}</span>`
       : `<button class="view-add-trial-new" data-act-id="${escHtml(actId || "")}"
@@ -5853,6 +5874,45 @@ function setupViewRemarkSaving(body, getSessionId, counterKey, onIdle, getData) 
           // viewActionsInFlight just hit 0; if the Firestore snapshot that
           // resolved waitForSessionData came in while the counter was still >0
           // it set viewRenderPending=true but couldn't render — process it now.
+          onIdle?.();
+        }
+      };
+      trackWrite(create());
+    });
+
+    // Notes textarea typed before any selection button is clicked (empty-state
+    // note-only path). Creates a remark with empty text then sets its masteryNote.
+    body.querySelectorAll(".view-mastery-note-empty").forEach(el => {
+      const noteText = el.value.trim();
+      if (!noteText || el.dataset.creating === "true" || el.dataset.remId) return;
+      el.dataset.creating = "true";
+      state[counterKey]++;
+      const create = async () => {
+        try {
+          let actId = el.dataset.actId;
+          if (!actId) {
+            actId = await addActivity(
+              sid, el.dataset.target, el.dataset.actName, Date.now(), el.dataset.isPredefined === "true",
+              undefined, el.dataset.parentActivity || null, el.dataset.configId || null
+            );
+          }
+          const studentName = el.dataset.student;
+          const remId = studentName
+            ? await addGroupRemark(sid, actId, studentName, "")
+            : await addRemark(sid, actId, "");
+          await updateRemarkNote(sid, remId, htmlForStorage(noteText));
+          el.dataset.actId     = actId;
+          el.dataset.remId     = remId;
+          el.dataset.savedHtml = htmlForStorage(noteText);
+          await waitForSessionData(() => {
+            const d = getData?.();
+            return !!d?.activities?.[actId] && !!d?.remarks?.[remId];
+          });
+        } catch (err) {
+          alert("Couldn't save note — check your connection and try again.\n\n" + err.message);
+        } finally {
+          el.dataset.creating = "false";
+          state[counterKey]--;
           onIdle?.();
         }
       };
@@ -7056,11 +7116,31 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
             data-target-name="${escHtml(target.name)}" data-student="${escHtml(studentName)}">${escHtml(opt)}</button>`
         ).join("")}</div>`;
       }
-      const gRemCell = sentenceStarter
-        ? `<div class="view-starter-wrap" contenteditable="false">
-            <span class="view-starter-prefix">${escHtml(sentenceStarter)}</span>${gSelHtml}
-          </div>`
-        : gSelHtml;
+      const gNoteEmptyHtml = remarkHasNote
+        ? `<textarea class="view-mastery-note view-mastery-note-empty" rows="1"
+             data-act-id="${escHtml(actId || "")}" data-act-name="${escHtml(actName)}"
+             data-target="${escHtml(target.name)}" data-is-predefined="${isPredefined}"
+             data-student="${escHtml(studentName)}"
+             placeholder="Notes…"></textarea>`
+        : "";
+      let gRemCell;
+      if (sentenceStarter && remarkHasNote) {
+        gRemCell = `<div class="view-starter-wrap view-starter-wrap-note" contenteditable="false">
+          <div class="view-starter-top-row"><span class="view-starter-prefix">${escHtml(sentenceStarter)}</span>${gSelHtml}</div>
+          ${gNoteEmptyHtml}
+        </div>`;
+      } else if (sentenceStarter) {
+        gRemCell = `<div class="view-starter-wrap" contenteditable="false">
+          <span class="view-starter-prefix">${escHtml(sentenceStarter)}</span>${gSelHtml}
+        </div>`;
+      } else if (remarkHasNote) {
+        gRemCell = `<div class="view-starter-wrap view-starter-wrap-note" contenteditable="false">
+          <div class="view-starter-top-row">${gSelHtml}</div>
+          ${gNoteEmptyHtml}
+        </div>`;
+      } else {
+        gRemCell = gSelHtml;
+      }
       return `<tr${rowClass ? ` class="${rowClass}"` : ""}>
         <td class="vcol-no" contenteditable="false">${idx === 0 ? no : ""}</td>
         <td class="vcol-act" contenteditable="false">${idx === 0 ? actCellWithToggle : ""}</td>
@@ -7134,11 +7214,31 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
               data-target-name="${escHtml(target.name)}" data-student="${escHtml(entry.studentName)}">${escHtml(opt)}</button>`
           ).join("")}</div>`;
         }
-        const pRemCell = sentenceStarter
-          ? `<div class="view-starter-wrap" contenteditable="false">
-              <span class="view-starter-prefix">${escHtml(sentenceStarter)}</span>${pSelHtml}
-            </div>`
-          : pSelHtml;
+        const pNoteEmptyHtml = remarkHasNote
+          ? `<textarea class="view-mastery-note view-mastery-note-empty" rows="1"
+               data-act-id="${escHtml(actId || "")}" data-act-name="${escHtml(actName)}"
+               data-target="${escHtml(target.name)}" data-is-predefined="${isPredefined}"
+               data-student="${escHtml(entry.studentName)}"
+               placeholder="Notes…"></textarea>`
+          : "";
+        let pRemCell;
+        if (sentenceStarter && remarkHasNote) {
+          pRemCell = `<div class="view-starter-wrap view-starter-wrap-note" contenteditable="false">
+            <div class="view-starter-top-row"><span class="view-starter-prefix">${escHtml(sentenceStarter)}</span>${pSelHtml}</div>
+            ${pNoteEmptyHtml}
+          </div>`;
+        } else if (sentenceStarter) {
+          pRemCell = `<div class="view-starter-wrap" contenteditable="false">
+            <span class="view-starter-prefix">${escHtml(sentenceStarter)}</span>${pSelHtml}
+          </div>`;
+        } else if (remarkHasNote) {
+          pRemCell = `<div class="view-starter-wrap view-starter-wrap-note" contenteditable="false">
+            <div class="view-starter-top-row">${pSelHtml}</div>
+            ${pNoteEmptyHtml}
+          </div>`;
+        } else {
+          pRemCell = pSelHtml;
+        }
         html += `<tr${rowClass ? ` class="${rowClass}"` : ""}>
           <td class="vcol-no" contenteditable="false">${noVal !== null ? noVal : ""}</td>
           <td class="vcol-act" contenteditable="false">${actVal !== null ? actVal : ""}</td>
