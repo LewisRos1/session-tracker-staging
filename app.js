@@ -150,7 +150,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "931";
+const APP_VERSION = "932";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -8519,16 +8519,15 @@ async function closeManageModal() {
     for (let i = acts.length - 1; i >= 0; i--) {
       if (isEmptyActItem(acts[i])) acts.splice(i, 1);
     }
-    if (acts.length !== before) {
-      acts.forEach((a, i) => a.order = i);
-      // Awaited (not fire-and-forget) so this finishes before the screen
-      // refreshes below, and a failed save is surfaced instead of silently
-      // leaving the empty item sitting in Firestore.
-      try {
-        await save();
-      } catch (err) {
-        alert("Couldn't save — check your connection and try again.\n\n" + err.message);
-      }
+    if (acts.length !== before) acts.forEach((a, i) => a.order = i);
+    // Always save on close — not just when empty items were removed. Any
+    // in-memory change (e.g. changing the remark type dropdown) that didn't
+    // happen to trigger a blur on the starter/option inputs would otherwise
+    // silently fail to persist to Firestore.
+    try {
+      await save();
+    } catch (err) {
+      alert("Couldn't save — check your connection and try again.\n\n" + err.message);
     }
   }
   // If a brand-new group was being created but has no students, remove it.
