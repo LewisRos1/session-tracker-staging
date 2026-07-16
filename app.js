@@ -150,7 +150,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "922";
+const APP_VERSION = "923";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -5398,7 +5398,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
       return `<tr${rowClass ? ` class="${rowClass}"` : ""}>
         <td class="vcol-no" contenteditable="false">${no}</td>
         <td class="vcol-act" contenteditable="false">${actCell}</td>
-        <td class="vcol-rem">${emptyCell}</td>
+        <td class="vcol-rem" contenteditable="false">${emptyCell}</td>
         <td class="vcol-trials" contenteditable="false">${emptyTrialsContent}</td>
         <td class="vcol-total" contenteditable="false">&nbsp;</td>
         <td class="vcol-score" contenteditable="false">${emptyScoreContent}</td>
@@ -5434,7 +5434,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
     return `<tr${rowClass ? ` class="${rowClass}"` : ""}>
       <td class="vcol-no" contenteditable="false">${no}</td>
       <td class="vcol-act" contenteditable="false">${actCell}</td>
-      <td class="vcol-rem">${emptyRemCell}</td>
+      <td class="vcol-rem" contenteditable="false">${emptyRemCell}</td>
       <td class="vcol-trials" contenteditable="false">${emptyTrialBtn}</td>
       <td class="vcol-total" contenteditable="false">&nbsp;</td>
       <td class="vcol-score" contenteditable="false">${mappedInfo ? (mappedInfo.pct !== null ? mappedInfo.pct + "%" : "—") : "&nbsp;"}</td>
@@ -5541,7 +5541,7 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
   return `<tr${rowClass ? ` class="${rowClass}"` : ""}>
     <td class="vcol-no" contenteditable="false">${no !== null ? no : ""}</td>
     <td class="vcol-act" contenteditable="false">${actName !== null ? actName : ""}</td>
-    <td class="vcol-rem">${remarkCell}</td>
+    <td class="vcol-rem" contenteditable="false">${remarkCell}</td>
     <td class="vcol-trials" contenteditable="false">${trialCells}</td>
     <td class="vcol-total" contenteditable="false">${totalCell}</td>
     <td class="vcol-score" contenteditable="false">
@@ -6991,7 +6991,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
         <td class="vcol-no" contenteditable="false">${idx === 0 ? no : ""}</td>
         <td class="vcol-act" contenteditable="false">${idx === 0 ? actCellWithToggle : ""}</td>
         <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(studentName)}</td>
-        <td class="vcol-rem">
+        <td class="vcol-rem" contenteditable="false">
           <textarea class="view-remark-edit view-remark-empty" rows="1"
             data-act-id="${escHtml(actId || "")}"
             data-act-name="${escHtml(actName)}"
@@ -7036,7 +7036,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
         <td class="vcol-no" contenteditable="false">${idx === 0 ? no : ""}</td>
         <td class="vcol-act" contenteditable="false">${idx === 0 ? actCellWithToggle : ""}</td>
         <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(studentName)}</td>
-        <td class="vcol-rem">${gRemCell}</td>
+        <td class="vcol-rem" contenteditable="false">${gRemCell}</td>
         <td class="vcol-trials" contenteditable="false">
           <button class="view-group-add-trial-new" data-act-id="${escHtml(actId || "")}"
             data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
@@ -7071,7 +7071,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
             <td class="vcol-no" contenteditable="false">${noVal !== null ? noVal : ""}</td>
             <td class="vcol-act" contenteditable="false">${actVal !== null ? actVal : ""}</td>
             <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(entry.studentName)}</td>
-            <td class="vcol-rem">
+            <td class="vcol-rem" contenteditable="false">
               <textarea class="view-remark-edit view-remark-empty" rows="1"
                 data-act-id="${escHtml(actId || "")}"
                 data-act-name="${escHtml(actName)}"
@@ -7156,7 +7156,7 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
       // Combined round — one shared plain-text box across remIds (mirrors the live
       // group session editor's "Combined Remarks" mode, which is free-text only).
       const idList = combineOpts.combinedRemIds.join(",");
-      remarkTd = `<td class="vcol-rem" rowspan="${combineOpts.rowspan}">
+      remarkTd = `<td class="vcol-rem" contenteditable="false" rowspan="${combineOpts.rowspan}">
         <textarea class="view-remark-edit group-remark-input-combined" rows="1"
           data-rem-ids="${idList}"
           data-saved-html="${escHtml(combineOpts.sharedText || "")}">${escHtml(plainTextForEdit(combineOpts.sharedText))}</textarea>
@@ -7205,7 +7205,7 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
       } else {
         remarkCell = optSelect;
       }
-      remarkTd = `<td class="vcol-rem">${remarkCell}</td>`;
+      remarkTd = `<td class="vcol-rem" contenteditable="false">${remarkCell}</td>`;
     }
   }
 
