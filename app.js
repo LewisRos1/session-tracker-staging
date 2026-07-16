@@ -150,7 +150,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "911";
+const APP_VERSION = "912";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -9377,7 +9377,7 @@ function renderTargetManageContent(student, target) {
               rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
           </div>
           <div style="display:flex;align-items:flex-start;gap:.5rem">
-            <span style="font-size:1rem;color:#374151;white-space:nowrap;font-weight:700;padding-top:.3rem">Remark Type:</span>
+            <span style="font-size:.93rem;color:#374151;white-space:nowrap;font-weight:700;padding-top:.3rem">Remark Type:</span>
             ${buildRemarkTypeControls(a, idx, target.maxPoints || 3)}
           </div>
           <div style="display:flex;align-items:center;gap:.5rem">
@@ -9435,7 +9435,7 @@ function renderTargetManageContent(student, target) {
               <button class="btn-adm-del mn-del-sub-act" data-idx="${subIdx}" title="Delete sub-activity" style="flex-shrink:0">🗑</button>
             </div>
             <div style="display:flex;align-items:flex-start;gap:.5rem;padding-left:1.6rem">
-              <span style="font-size:1rem;color:#374151;white-space:nowrap;font-weight:700;padding-top:.3rem">Remark Type:</span>
+              <span style="font-size:.93rem;color:#374151;white-space:nowrap;font-weight:700;padding-top:.3rem">Remark Type:</span>
               ${subRemarkType}
             </div>
             ${subFixedRemarkRow}
@@ -9483,7 +9483,7 @@ function renderTargetManageContent(student, target) {
                 rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
             </div>
             <div style="display:flex;align-items:flex-start;gap:.5rem">
-              <span style="font-size:1rem;color:#374151;white-space:nowrap;font-weight:700;padding-top:.3rem">Remark Type:</span>
+              <span style="font-size:.93rem;color:#374151;white-space:nowrap;font-weight:700;padding-top:.3rem">Remark Type:</span>
               ${remarkTypeSelect}
             </div>
             ${maintainedRow}
@@ -10908,7 +10908,7 @@ function renderTemplateManageContent(template) {
               rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
           </div>
           <div style="display:flex;align-items:flex-start;gap:.5rem">
-            <span style="font-size:1rem;color:#374151;white-space:nowrap;font-weight:700;padding-top:.3rem">Remark Type:</span>
+            <span style="font-size:.93rem;color:#374151;white-space:nowrap;font-weight:700;padding-top:.3rem">Remark Type:</span>
             ${remarkTypeSelect}
           </div>
         </div>

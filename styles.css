@@ -1553,7 +1553,7 @@ input.field-input::placeholder {
 
 /* ─── Compact per-activity remark preset selector ────────── */
 .act-preset-select {
-  font-size: 1rem;
+  font-size: .93rem;
   color: var(--text);
   background: transparent;
   border: 1px solid var(--border);
