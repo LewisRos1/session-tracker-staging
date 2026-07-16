@@ -1699,6 +1699,12 @@ textarea.admin-input { resize: vertical; min-height: 60px; line-height: 1.45; }
   flex-shrink: 0;
   align-self: flex-end;
 }
+/* Textarea next to a fmt-btn-group must be at least as tall as the 3-button
+   column (3×2rem + 2×0.15rem gap = 6.3rem) so it never looks smaller. CSS
+   min-height wins over the explicit height set by autoResizeTextarea. */
+.fmt-btn-group + textarea {
+  min-height: 6.3rem;
+}
 .btn-fmt {
   width: 2rem;
   height: 2rem;
