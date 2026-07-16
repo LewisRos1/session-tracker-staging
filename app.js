@@ -150,7 +150,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "919";
+const APP_VERSION = "920";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -5365,13 +5365,19 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
         data-is-predefined="${isPredefined}"
         data-parent-activity="${escHtml(paConfig?.parentActivity || "")}"
         data-config-id="${escHtml(paConfig?.id || "")}">+</button>`;
+      const emptyTrialsContent = mappedInfo
+        ? `<span class="view-mapped-label">${escHtml(mappedInfo.label)}</span>`
+        : (addTrialBtn || "&nbsp;");
+      const emptyScoreContent = mappedInfo
+        ? (mappedInfo.pct !== null ? mappedInfo.pct + "%" : "—")
+        : "&nbsp;";
       return `<tr${rowClass ? ` class="${rowClass}"` : ""}>
         <td class="vcol-no" contenteditable="false">${no}</td>
         <td class="vcol-act" contenteditable="false">${actCell}</td>
         <td class="vcol-rem">${emptyCell}</td>
-        <td class="vcol-trials" contenteditable="false">${addTrialBtn || "&nbsp;"}</td>
+        <td class="vcol-trials" contenteditable="false">${emptyTrialsContent}</td>
         <td class="vcol-total" contenteditable="false">&nbsp;</td>
-        <td class="vcol-score" contenteditable="false">&nbsp;</td>
+        <td class="vcol-score" contenteditable="false">${emptyScoreContent}</td>
       </tr>`;
     }
     // opts.length > 0 — show actual select/multi UI directly (no button)
@@ -5617,25 +5623,9 @@ async function autoFillViewMappedRemarks(student, sessionId, data) {
         const dupeRemIds = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === dupeActId).map(([rid]) => rid);
         deleteActivity(sessionId, dupeActId, dupeRemIds);
       }
-      let actId = canonicalV?.[0] || null;
-
-      if (actId) {
-        const hasRemark = Object.values(data.remarks || {}).some(r => r.activityId === actId);
-        if (hasRemark) continue;
-      }
-
-      const key = `${sessionId}:${target.name}:${pa.name}`;
-      if (mappedRemarkAutoFillInFlight.has(key)) continue;
-      mappedRemarkAutoFillInFlight.add(key);
-      try {
-        if (!actId) {
-          actId = await addActivity(sessionId, target.name, pa.name, pa.order ?? 0, true);
-        }
-        await addRemark(sessionId, actId, "");
-        count++;
-      } finally {
-        mappedRemarkAutoFillInFlight.delete(key);
-      }
+      // No longer create empty remarks — the view screen now renders the mapped
+      // score even when no remark exists, so the empty-remark creation step is
+      // unnecessary and was the source of the 5-second delay + paste-disappears bug.
     }
   }
   return count;
