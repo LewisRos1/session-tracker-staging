@@ -1037,6 +1037,31 @@ input.field-input::placeholder {
   color: var(--white);
   font-weight: 600;
 }
+.view-remark-single-btn,
+.view-single-create-btn,
+.view-group-single-create-btn,
+.view-multi-create-btn,
+.view-group-multi-create-btn {
+  padding: .3rem .65rem;
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: .85rem;
+  cursor: pointer;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.view-remark-single-btn:hover,
+.view-single-create-btn:hover,
+.view-group-single-create-btn:hover,
+.view-multi-create-btn:hover,
+.view-group-multi-create-btn:hover { border-color: var(--primary); color: var(--primary); }
+.view-remark-single-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--white);
+  font-weight: 600;
+}
 
 /* ─── GENERIC BUTTONS ────────────────────────────────────── */
 .btn-primary-sm {
