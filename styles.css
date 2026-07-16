@@ -1396,11 +1396,10 @@ input.field-input::placeholder {
 }
 
 .month-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 6rem));
+  display: flex;
+  flex-wrap: wrap;
   gap: .5rem;
   padding: .25rem 0;
-  justify-content: start;
 }
 
 .month-grid-btn {
@@ -1409,7 +1408,7 @@ input.field-input::placeholder {
   align-items: center;
   justify-content: center;
   gap: .1rem;
-  padding: .5rem 1.5rem;
+  padding: .5rem 2rem;
   min-height: 3.4rem;
   border: 1.5px solid var(--border);
   border-radius: 12px;
@@ -1423,7 +1422,6 @@ input.field-input::placeholder {
 }
 .mgb-month { font-size: 1rem; font-weight: 700; color: var(--text-main); }
 .mgb-year  { font-size: .72rem; color: var(--text-muted); }
-.month-grid-btn-pickdate { grid-column: 1 / -1; }
 .mgb-pickdate-label { font-size: .95rem; font-weight: 600; color: var(--primary); }
 
 .btn-picker-back {
