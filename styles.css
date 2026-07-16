@@ -2120,6 +2120,18 @@ div.admin-note-editable:empty::before {
   align-items: center;
   gap: .3rem;
 }
+/* When a note textarea is present, stack starter row + notes vertically */
+.view-starter-wrap-note {
+  flex-direction: column;
+  align-items: stretch;
+  gap: .4rem;
+}
+.view-starter-top-row {
+  display: flex;
+  align-items: center;
+  gap: .3rem;
+  flex-wrap: wrap;
+}
 .view-starter-prefix {
   font-size: .8rem;
   color: var(--text-muted);
