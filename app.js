@@ -150,7 +150,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "913";
+const APP_VERSION = "914";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -5334,7 +5334,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
   const multiSelect     = paEntry?.optionsMulti || false;
   const remarkHasNote   = paEntry?.remarkHasNote || false;
   const mappedInfo      = paEntry?.isMapped ? resolveViewMappedScoreDisplay(paEntry, data) : null;
-  const isGrayAct       = isPredefined && (paEntry?.activityColor === "gray" || paEntry?.isMaintainLive);
+  const isGrayAct       = isPredefined && (_maintained || paEntry?.activityColor === "gray" || paEntry?.isMaintainLive);
   const isGreenAct      = isPredefined && paEntry?.activityColor === "green";
   const rowClass        = isGrayAct ? "view-gray-row" : isGreenAct ? "view-green-row" : "";
 
@@ -6949,7 +6949,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
   const multiSelect     = paEntry?.optionsMulti || false;
   const remarkHasNote   = paEntry?.remarkHasNote || false;
   const opts            = parseOpts(inlineOptions);
-  const isGrayAct       = isPredefined && (paEntry?.activityColor === "gray" || paEntry?.isMaintainLive);
+  const isGrayAct       = isPredefined && (_maintained || paEntry?.activityColor === "gray" || paEntry?.isMaintainLive);
   const isGreenAct      = isPredefined && paEntry?.activityColor === "green";
   const rowClass        = isGrayAct ? "view-gray-row" : isGreenAct ? "view-green-row" : "";
 
