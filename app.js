@@ -150,7 +150,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "921";
+const APP_VERSION = "922";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3489,6 +3489,17 @@ function renderFedcTarget(target) {
       }
       if (isPending) {
         html += renderPendingRemarkFields(pendingKey, actId, pa.name, idx, target);
+      } else if (pa.maintained && remarks.length === 0) {
+        // Pre-render "Maintain" as a read-only placeholder. autoFillMaintainedRemarks
+        // will write it to Firestore once the session has real data. Showing it here
+        // immediately means: (1) the boss knows the auto-fill is coming (no empty-box
+        // confusion), and (2) when the Firestore write triggers a re-render, the label
+        // was already visible so there is no layout jerk.
+        html += `<div class="entry-divider" contenteditable="false"></div>
+        <div class="entry-field" contenteditable="false">
+          <span class="field-label">Remark</span>
+          <span class="field-value-fixed" style="color:#9ca3af;font-style:italic">Maintain</span>
+        </div>`;
       } else {
         const addLabel = pa.isMapped ? "Score" : pa.manualScore ? "Remark &amp; Score" : "Remark &amp; Trials";
         html += `<button class="btn-add-remark" contenteditable="false"
@@ -5350,6 +5361,19 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
   if (remarks.length === 0) {
     const opts = parseOpts(inlineOptions);
     const showEmpty = opts.length === 0;
+    if (showEmpty && _maintained) {
+      // Static placeholder — mirrors the live-entry behaviour. The auto-fill will
+      // write the real remark when the session has data; until then this signals
+      // the boss that "Maintain" is expected here, not that the cell is blank.
+      return `<tr${rowClass ? ` class="${rowClass}"` : ""}>
+        <td class="vcol-no" contenteditable="false">${no}</td>
+        <td class="vcol-act" contenteditable="false">${actCell}</td>
+        <td class="vcol-rem" contenteditable="false"><span style="color:#9ca3af;font-style:italic">Maintain</span></td>
+        <td class="vcol-trials" contenteditable="false">&nbsp;</td>
+        <td class="vcol-total" contenteditable="false">&nbsp;</td>
+        <td class="vcol-score" contenteditable="false">&nbsp;</td>
+      </tr>`;
+    }
     if (showEmpty) {
       const emptyCell = `<textarea class="view-remark-edit view-remark-empty" rows="1"
            data-act-id="${escHtml(actId || "")}"
