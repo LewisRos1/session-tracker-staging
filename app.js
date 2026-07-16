@@ -150,7 +150,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "924";
+const APP_VERSION = "925";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -6044,21 +6044,50 @@ function captureActiveEditState(host) {
   if (el.tagName !== "TEXTAREA" && el.tagName !== "INPUT") return null;
   if (!el.matches(EDITABLE_BOX_SELECTOR)) return null;
   const idAttr = el.dataset.remId ? "remId" : el.dataset.actId ? "actId" : el.dataset.remIds ? "remIds" : null;
-  if (!idAttr) return null;
-  return {
-    className: el.className,
-    idAttr,
-    idValue: el.dataset[idAttr],
-    value: el.value,
-    selectionStart: el.selectionStart,
-    selectionEnd: el.selectionEnd
-  };
+  if (idAttr) {
+    return {
+      className: el.className,
+      idAttr,
+      idValue: el.dataset[idAttr],
+      value: el.value,
+      selectionStart: el.selectionStart,
+      selectionEnd: el.selectionEnd
+    };
+  }
+  // No ID attrs yet (view-remark-empty for a predefined activity that has never had
+  // a Firestore activity record). Match by target+actName so a snapshot-triggered
+  // re-render (e.g. from an auto-fill for a different activity) can still restore focus.
+  if (el.classList.contains("view-remark-empty") && el.dataset.actName) {
+    return {
+      className: el.className,
+      compositeKey: `${el.dataset.target}::${el.dataset.actName}`,
+      value: el.value,
+      selectionStart: el.selectionStart,
+      selectionEnd: el.selectionEnd
+    };
+  }
+  return null;
 }
 
 function restoreActiveEditState(host, captured) {
   if (!captured) return;
-  const el = [...host.querySelectorAll(`.${captured.className.split(" ").join(".")}`)]
-    .find(e => e.dataset[captured.idAttr] === captured.idValue);
+  let el;
+  if (captured.compositeKey) {
+    // No-ID case: find the matching empty textarea by target+actName.
+    el = [...host.querySelectorAll(".view-remark-empty")]
+      .find(e => `${e.dataset.target}::${e.dataset.actName}` === captured.compositeKey);
+  } else {
+    // Normal case: try the exact class first (fastest, works when class didn't change).
+    el = [...host.querySelectorAll(`.${captured.className.split(" ").join(".")}`)]
+      .find(e => e.dataset[captured.idAttr] === captured.idValue);
+    // Fallback: class may have changed, e.g. view-remark-empty → view-remark-edit
+    // when flush() created the remark and the re-render shows it as non-empty.
+    // Search all editable boxes by the ID attribute alone.
+    if (!el) {
+      el = [...host.querySelectorAll(EDITABLE_BOX_SELECTOR)]
+        .find(e => captured.idAttr && e.dataset[captured.idAttr] === captured.idValue);
+    }
+  }
   if (!el) return;
   el.value = captured.value;
   if (el.tagName === "TEXTAREA") autoResizeTextarea(el);
