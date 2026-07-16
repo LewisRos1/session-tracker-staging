@@ -150,7 +150,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "917";
+const APP_VERSION = "918";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4645,9 +4645,15 @@ async function autoFillMappedRemarks(student, sessionId) {
     for (const pa of (target.predefinedActivities || [])) {
       if (pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || pa.isMaintainHeading) continue;
       if (!pa.isMapped) continue;
-      const existingAct = Object.entries(data.activities || {})
-        .find(([, a]) => a.targetName === target.name && a.activityName === pa.name);
-      let actId = existingAct?.[0] || null;
+      const allMatches = Object.entries(data.activities || {})
+        .filter(([, a]) => a.targetName === target.name &&
+                           (a.activityName === pa.name || (pa.id && a.configId === pa.id)));
+      const canonical = allMatches.find(([, a]) => pa.id && a.configId === pa.id) || allMatches[0] || null;
+      for (const [dupeActId] of allMatches.filter(([aid]) => aid !== canonical?.[0] && !data.activities[aid]?.configId)) {
+        const dupeRemIds = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === dupeActId).map(([rid]) => rid);
+        deleteActivity(sessionId, dupeActId, dupeRemIds);
+      }
+      let actId = canonical?.[0] || null;
       if (actId && Object.values(data.remarks || {}).some(r => r.activityId === actId)) continue;
       const key = `${sessionId}:${target.name}:${pa.name}`;
       if (mappedRemarkAutoFillInFlight.has(key)) continue;
@@ -5599,9 +5605,15 @@ async function autoFillViewMappedRemarks(student, sessionId, data) {
       if (pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || pa.isMaintainHeading) continue;
       if (!pa.isMapped) continue;
 
-      const existingAct = Object.entries(data.activities || {})
-        .find(([, a]) => a.targetName === target.name && a.activityName === pa.name);
-      let actId = existingAct?.[0] || null;
+      const allMatchesV = Object.entries(data.activities || {})
+        .filter(([, a]) => a.targetName === target.name &&
+                           (a.activityName === pa.name || (pa.id && a.configId === pa.id)));
+      const canonicalV = allMatchesV.find(([, a]) => pa.id && a.configId === pa.id) || allMatchesV[0] || null;
+      for (const [dupeActId] of allMatchesV.filter(([aid]) => aid !== canonicalV?.[0] && !data.activities[aid]?.configId)) {
+        const dupeRemIds = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === dupeActId).map(([rid]) => rid);
+        deleteActivity(sessionId, dupeActId, dupeRemIds);
+      }
+      let actId = canonicalV?.[0] || null;
 
       if (actId) {
         const hasRemark = Object.values(data.remarks || {}).some(r => r.activityId === actId);
