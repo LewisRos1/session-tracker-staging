@@ -1600,11 +1600,11 @@ function mergeAndCenterRows(ws, rowIndices, numCols) {
 
 function buildSummarySheet(allTargets, sessions) {
   const monthSet = new Set(sessions.map(s => s.month));
-  const months   = [...monthSet].sort((a, b) => {
+  const months   = fillMonthGaps([...monthSet].sort((a, b) => {
     const [ma, ya] = parseMonth(a);
     const [mb, yb] = parseMonth(b);
     return ya !== yb ? ya - yb : ma - mb;
-  });
+  }));
 
   const rows = [];
   rows.push(["Target", ...months]);
@@ -1633,11 +1633,11 @@ function buildSummarySheet(allTargets, sessions) {
 // Last column of each month block = Monthly Avg.
 
 function buildDetailedSummarySheet(allTargets, sessions) {
-  const months = [...new Set(sessions.map(s => s.month))].sort((a, b) => {
+  const months = fillMonthGaps([...new Set(sessions.map(s => s.month))].sort((a, b) => {
     const [ma, ya] = parseMonth(a);
     const [mb, yb] = parseMonth(b);
     return ya !== yb ? ya - yb : ma - mb;
-  });
+  }));
 
   const rows = [];
   const monthHeaderRows = new Set();
@@ -1689,6 +1689,24 @@ function parseMonth(monthStr) {
   return [names.indexOf(name) + 1, parseInt(year, 10)];
 }
 
+// Expand a sorted list of month strings to include every month between
+// the first and last, inserting any gaps (e.g. adds "February 2026"
+// when sessions jump from January to March).
+function fillMonthGaps(sortedMonths) {
+  if (sortedMonths.length === 0) return sortedMonths;
+  const names = ["January","February","March","April","May","June",
+                 "July","August","September","October","November","December"];
+  const [m0, y0] = parseMonth(sortedMonths[0]);
+  const [mN, yN] = parseMonth(sortedMonths[sortedMonths.length - 1]);
+  const result = [];
+  let m = m0, y = y0;
+  while (y < yN || (y === yN && m <= mN)) {
+    result.push(`${names[m - 1]} ${y}`);
+    if (++m > 12) { m = 1; y++; }
+  }
+  return result;
+}
+
 // ─── TARGET DETAIL SHEET ─────────────────────────────────────
 
 function buildTargetSheet(target, sessions, allTargets, includeTrials) {
@@ -1698,6 +1716,16 @@ function buildTargetSheet(target, sessions, allTargets, includeTrials) {
     if (!byMonth.has(s.month)) byMonth.set(s.month, []);
     byMonth.get(s.month).push(s);
   }
+
+  // Fill any month gaps (e.g. Feb when sessions jump Jan→Mar) with empty arrays
+  const allFilledMonths = fillMonthGaps(
+    [...byMonth.keys()].sort((a, b) => {
+      const [ma, ya] = parseMonth(a);
+      const [mb, yb] = parseMonth(b);
+      return ya !== yb ? ya - yb : ma - mb;
+    })
+  );
+  for (const m of allFilledMonths) { if (!byMonth.has(m)) byMonth.set(m, []); }
 
   const rows              = [];
   const monthHeaderRows   = new Set();
@@ -1713,7 +1741,8 @@ function buildTargetSheet(target, sessions, allTargets, includeTrials) {
   const spacerRows        = new Set(); // blank rows that should have no borders
   let firstMonth = true;
 
-  for (const [month, monthSessions] of byMonth) {
+  for (const month of allFilledMonths) {
+    const monthSessions = byMonth.get(month);
     const dailyAvgsForMonth = monthSessions
       .map(s => {
         const snap = (s.targetsSnapshot || []).find(t => t.name === target.name);
