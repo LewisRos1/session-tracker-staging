@@ -150,7 +150,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "918";
+const APP_VERSION = "919";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3185,7 +3185,8 @@ function calcDaysAverage(target, visited = new Set()) {
   const avgs = [];
   const maxPts = target.maxPoints || 3;
   for (const act of getActivitiesForTarget(target.name)) {
-    const pa = (target.predefinedActivities || []).find(p => p.isMapped && p.name === act.activityName);
+    const pa = (target.predefinedActivities || []).find(p => p.isMapped &&
+        (p.name === act.activityName || (act.configId && p.id === act.configId)));
     if (pa) {
       if (getRemarksForActivity(act.id).length === 0) continue;
       const mappedPct = resolveMappedScoreDisplay(pa, visited).pct;
@@ -5305,8 +5306,10 @@ function buildTargetViewTable(target, data) {
 function viewActivityRows(no, actName, actId, data, target, isPredefined = true, paConfig = null) {
   const remarks = actId ? viewGetRemarks(data, actId) : [];
 
+  const actConfigId = actId ? data.activities?.[actId]?.configId : null;
   const paEntry = paConfig || (isPredefined
-    ? target.predefinedActivities?.find(pa => pa.name === actName)
+    ? (target.predefinedActivities?.find(pa => pa.name === actName) ||
+       (actConfigId ? target.predefinedActivities?.find(pa => pa.id === actConfigId) : null))
     : null);
 
   const parentEntry = paEntry?.parentActivity
@@ -5545,7 +5548,8 @@ function calcViewDayAvg(data, target, visited = new Set()) {
   Object.entries(data.activities || {})
     .filter(([, a]) => a.targetName === target.name)
     .forEach(([actId, act]) => {
-      const pa = (target.predefinedActivities || []).find(p => p.isMapped && p.name === act.activityName);
+      const pa = (target.predefinedActivities || []).find(p => p.isMapped &&
+          (p.name === act.activityName || (act.configId && p.id === act.configId)));
       if (pa) {
         const mappedTarget = pa.mappedTargetId
           ? (state.viewGroup?.targets || state.viewStudent?.targets || []).find(t => t.id === pa.mappedTargetId)
@@ -6876,8 +6880,10 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
   const rounds = actId ? viewGroupGetRounds(data, actId, attendees) : [];
   const combineFlagForAct = !!(actId && data.activities?.[actId]?.combineRemarks);
 
+  const grpActConfigId = actId ? data.activities?.[actId]?.configId : null;
   const paEntry = paConfig || (isPredefined
-    ? target.predefinedActivities?.find(pa => pa.name === actName)
+    ? (target.predefinedActivities?.find(pa => pa.name === actName) ||
+       (grpActConfigId ? target.predefinedActivities?.find(pa => pa.id === grpActConfigId) : null))
     : null);
 
   const parentEntry = paEntry?.parentActivity
@@ -12767,7 +12773,8 @@ function calcGroupStudentDaysAverage(target, data, studentName, visited = new Se
   for (const [actId, act] of actsForTarget) {
     const remarksForStudent = Object.values(data.remarks || {})
       .filter(r => r.activityId === actId && r.studentName === studentName);
-    const pa = (target.predefinedActivities || []).find(p => p.isMapped && p.name === act.activityName);
+    const pa = (target.predefinedActivities || []).find(p => p.isMapped &&
+        (p.name === act.activityName || (act.configId && p.id === act.configId)));
     if (pa) {
       if (remarksForStudent.length === 0) continue;
       const mappedPct = resolveGroupMappedScoreDisplay(pa, target, data, studentName, visited).pct;
