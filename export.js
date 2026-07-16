@@ -976,8 +976,29 @@ function parseInlineMarkupLine(line) {
     if (m.index > lastIndex) runs.push({ text: line.slice(lastIndex, m.index) });
     if (m[1] !== undefined) runs.push({ text: m[1], bold: true, underline: true });
     else if (m[2] !== undefined) runs.push({ text: m[2], bold: true, underline: true });
-    else if (m[3] !== undefined) runs.push({ text: m[3], bold: true });
-    else runs.push({ text: m[4], underline: true });
+    else if (m[3] !== undefined) {
+      // Bold-only match: second-pass for nested _underline_ inside
+      const inner = m[3];
+      const uRe = /_(.+?)_/g; let uLast = 0, um;
+      while ((um = uRe.exec(inner)) !== null) {
+        if (um.index > uLast) runs.push({ text: inner.slice(uLast, um.index), bold: true });
+        runs.push({ text: um[1], bold: true, underline: true });
+        uLast = uRe.lastIndex;
+      }
+      if (uLast < inner.length) runs.push({ text: inner.slice(uLast), bold: true });
+    } else {
+      // Underline-only match: second-pass for nested *bold* inside
+      // (handles e.g. "_*Social Skills* _" where a stray space prevents the
+      // combined _*...*_ regex from matching at the outer level)
+      const inner = m[4];
+      const bRe = /\*(.+?)\*/g; let bLast = 0, bm;
+      while ((bm = bRe.exec(inner)) !== null) {
+        if (bm.index > bLast) runs.push({ text: inner.slice(bLast, bm.index), underline: true });
+        runs.push({ text: bm[1], bold: true, underline: true });
+        bLast = bRe.lastIndex;
+      }
+      if (bLast < inner.length) runs.push({ text: inner.slice(bLast), underline: true });
+    }
     lastIndex = re.lastIndex;
   }
   if (lastIndex < line.length) runs.push({ text: line.slice(lastIndex) });
