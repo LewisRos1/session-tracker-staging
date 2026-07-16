@@ -1747,7 +1747,7 @@ function buildTargetSheet(target, sessions, allTargets, includeTrials) {
       .map(s => {
         const snap = (s.targetsSnapshot || []).find(t => t.name === target.name);
         const eff  = snap
-          ? { ...target, maxPoints: snap.maxPoints ?? target.maxPoints, predefinedActivities: snap.predefinedActivities || target.predefinedActivities || [] }
+          ? { ...target, maxPoints: snap.maxPoints ?? target.maxPoints, predefinedActivities: (snap.predefinedActivities && snap.predefinedActivities.length > 0) ? snap.predefinedActivities : (target.predefinedActivities || []) }
           : target;
         return calcDailyAverage(s, eff, allTargets);
       })
