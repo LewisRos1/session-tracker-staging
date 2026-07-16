@@ -1553,12 +1553,12 @@ input.field-input::placeholder {
 
 /* ─── Compact per-activity remark preset selector ────────── */
 .act-preset-select {
-  font-size: .75rem;
-  color: var(--text-muted);
+  font-size: 1rem;
+  color: var(--text);
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: .15rem .35rem;
+  padding: .4rem .6rem;
   cursor: pointer;
   max-width: 100%;
 }
@@ -1674,6 +1674,7 @@ textarea.admin-input { resize: vertical; min-height: 60px; line-height: 1.45; }
   flex-direction: column;
   gap: .15rem;
   flex-shrink: 0;
+  align-self: flex-end;
 }
 .btn-fmt {
   width: 2rem;

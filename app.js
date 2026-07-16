@@ -150,7 +150,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "910";
+const APP_VERSION = "911";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -9377,7 +9377,7 @@ function renderTargetManageContent(student, target) {
               rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
           </div>
           <div style="display:flex;align-items:flex-start;gap:.5rem">
-            <span style="font-size:.88rem;color:#6b7280;white-space:nowrap;font-weight:600;padding-top:.3rem">Remark Type:</span>
+            <span style="font-size:1rem;color:#374151;white-space:nowrap;font-weight:700;padding-top:.3rem">Remark Type:</span>
             ${buildRemarkTypeControls(a, idx, target.maxPoints || 3)}
           </div>
           <div style="display:flex;align-items:center;gap:.5rem">
@@ -9435,7 +9435,7 @@ function renderTargetManageContent(student, target) {
               <button class="btn-adm-del mn-del-sub-act" data-idx="${subIdx}" title="Delete sub-activity" style="flex-shrink:0">🗑</button>
             </div>
             <div style="display:flex;align-items:flex-start;gap:.5rem;padding-left:1.6rem">
-              <span style="font-size:.88rem;color:#6b7280;white-space:nowrap;font-weight:600;padding-top:.3rem">Remark Type:</span>
+              <span style="font-size:1rem;color:#374151;white-space:nowrap;font-weight:700;padding-top:.3rem">Remark Type:</span>
               ${subRemarkType}
             </div>
             ${subFixedRemarkRow}
@@ -9453,7 +9453,7 @@ function renderTargetManageContent(student, target) {
             </div>
             ${subActsHtml}
             ${maintainedRowSub}
-            <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:var(--primary);border:1px solid var(--primary);border-radius:.35rem;color:#fff;cursor:pointer;margin-left:1.25rem;align-self:flex-start">+ Add Sub-activity</button>
+            <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:var(--primary);border:1px solid var(--primary);border-radius:.35rem;color:#fff;cursor:pointer;margin-left:1.25rem;margin-top:.6rem;align-self:flex-start">+ Add Sub-activity</button>
           </div>
           <div style="position:relative">
             <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
@@ -9483,11 +9483,11 @@ function renderTargetManageContent(student, target) {
                 rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
             </div>
             <div style="display:flex;align-items:flex-start;gap:.5rem">
-              <span style="font-size:.88rem;color:#6b7280;white-space:nowrap;font-weight:600;padding-top:.3rem">Remark Type:</span>
+              <span style="font-size:1rem;color:#374151;white-space:nowrap;font-weight:700;padding-top:.3rem">Remark Type:</span>
               ${remarkTypeSelect}
             </div>
             ${maintainedRow}
-            <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:var(--primary);border:1px solid var(--primary);border-radius:.35rem;color:#fff;cursor:pointer;align-self:flex-start">↳ Add Sub-activity</button>
+            <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:var(--primary);border:1px solid var(--primary);border-radius:.35rem;color:#fff;cursor:pointer;margin-top:.6rem;align-self:flex-start">↳ Add Sub-activity</button>
           </div>
           <div style="position:relative">
             <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
@@ -10908,7 +10908,7 @@ function renderTemplateManageContent(template) {
               rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
           </div>
           <div style="display:flex;align-items:flex-start;gap:.5rem">
-            <span style="font-size:.88rem;color:#6b7280;white-space:nowrap;font-weight:600;padding-top:.3rem">Remark Type:</span>
+            <span style="font-size:1rem;color:#374151;white-space:nowrap;font-weight:700;padding-top:.3rem">Remark Type:</span>
             ${remarkTypeSelect}
           </div>
         </div>
