@@ -2631,7 +2631,7 @@ div.admin-note-editable:empty::before {
 .view-comment-edit:focus { border-color: var(--primary); background: #fff; }
 
 /* Gray / green row tints for maintained / mastered activities */
-.view-gray-row td  { background: #f3f4f6; }
+.view-gray-row td  { background: #e5e7eb; }
 .view-green-row td { background: #e2efda; }
 .view-gray-row  .view-remark-edit,
 .view-gray-row  .view-remark-empty { background: #e5e7eb; border-color: #d1d5db; }
