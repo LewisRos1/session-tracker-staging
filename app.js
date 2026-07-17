@@ -153,7 +153,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "940";
+const APP_VERSION = "941";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1952,30 +1952,39 @@ function renderHalfYearReportsSection() {
   const container = $("half-year-report-section");
   if (!container) return;
 
-  const students = state.students.filter(s => !s.type || s.type === "individual");
+  // Same filter as Individual Sessions: exclude assessment + unassigned
+  const students = state.students
+    .filter(s => s.type !== "assessment" && s.type !== "unassigned")
+    .sort((a, b) => a.name.localeCompare(b.name));
   const currentYear = new Date().getFullYear();
 
   container.innerHTML = `
-    <div style="display:flex;flex-wrap:wrap;gap:.6rem;align-items:flex-end;padding:.25rem 0">
-      <select id="hyr-student-select" class="admin-input" style="flex:2;min-width:160px">
+    <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+      <select id="hyr-student-select" class="admin-input" style="flex:1;min-width:180px">
         <option value="">— Select student —</option>
         ${students.map(s => `<option value="${escHtml(s.id)}">${escHtml(s.name)}</option>`).join("")}
       </select>
-      <select id="hyr-period-select" class="admin-input" style="width:90px">
+      <select id="hyr-period-select" class="admin-input" style="width:130px;flex-shrink:0">
         <option value="H1">H1 (Jan–Jun)</option>
         <option value="H2">H2 (Jul–Dec)</option>
       </select>
-      <input id="hyr-year-input" type="number" class="admin-input" value="${currentYear}" min="2020" max="2099" style="width:80px;text-align:center" />
-      <button id="hyr-btn-generate" class="btn-primary" style="white-space:nowrap">Generate Report</button>
+      <input id="hyr-year-input" type="number" class="admin-input"
+        value="${currentYear}" min="2020" max="2099"
+        style="width:76px;flex-shrink:0;text-align:center" />
+      <button id="hyr-btn-generate" class="btn-add-section"
+        style="font-size:.9rem;padding:.45rem 1.1rem;min-height:38px">
+        Generate Report
+      </button>
     </div>
-    <div style="display:flex;gap:.5rem;margin-top:.5rem">
-      <button id="hyr-btn-edit-prompt" class="export-btn" style="font-size:.78rem">✏ Edit Prompt</button>
-      <button id="hyr-btn-set-key" class="export-btn" style="font-size:.78rem">🔑 Set API Key</button>
+    <div style="text-align:right;margin-top:.4rem">
+      <button id="hyr-btn-settings"
+        style="font-size:.75rem;color:var(--text-muted);background:none;border:none;cursor:pointer;padding:.15rem .3rem;letter-spacing:.01em">
+        ⚙ Settings
+      </button>
     </div>`;
 
   $("hyr-btn-generate").addEventListener("click", hyrGenerate);
-  $("hyr-btn-edit-prompt").addEventListener("click", hyrOpenPromptEditor);
-  $("hyr-btn-set-key").addEventListener("click", hyrOpenKeyEntry);
+  $("hyr-btn-settings").addEventListener("click", hyrOpenSettings);
 }
 
 async function hyrGenerate() {
@@ -2274,58 +2283,42 @@ function hyrDownloadWord(reportText, studentName, period, year) {
   });
 }
 
-async function hyrOpenPromptEditor() {
+async function hyrOpenSettings() {
   const config = await getHyrConfig();
-  const currentPrompt = config.prompt || HYR_DEFAULT_PROMPT;
+  const hasKey = !!(config.apiKey);
 
-  $("manage-modal-title").textContent = "Edit Report Prompt";
+  $("manage-modal-title").textContent = "Report Generator Settings";
   $("manage-modal-body").innerHTML = `
-    <div style="padding:.75rem 1rem">
-      <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:.75rem">
-        This prompt is sent to Claude with every report. Edit it to refine the writing style or structure.
-      </p>
-      <textarea id="hyr-prompt-textarea" class="admin-input" rows="20"
-        style="width:100%;font-family:monospace;font-size:.8rem;resize:vertical"
-      >${escHtml(currentPrompt)}</textarea>
-      <div style="display:flex;gap:.6rem;margin-top:.75rem">
-        <button id="hyr-btn-save-prompt" class="btn-primary" style="flex:1">Save Prompt</button>
-        <button id="hyr-btn-reset-prompt" class="export-btn" style="flex:1">Reset to Default</button>
+    <div style="padding:.75rem 1rem;display:flex;flex-direction:column;gap:1rem">
+
+      <div style="border:1.5px solid var(--border);border-radius:.6rem;padding:.85rem 1rem">
+        <div style="font-weight:600;font-size:.9rem;margin-bottom:.3rem">🔑 Anthropic API Key</div>
+        <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:.65rem">
+          ${hasKey ? "✅ API key is saved. Paste a new one below to replace it." : "No key saved yet. Get yours from console.anthropic.com → API Keys."}
+        </div>
+        <input id="hyr-key-input" type="password" class="admin-input" placeholder="sk-ant-api03-…"
+          style="font-family:monospace;font-size:.85rem;margin-bottom:.5rem" />
+        <div style="display:flex;gap:.6rem;align-items:center;margin-bottom:.6rem">
+          <input type="checkbox" id="hyr-key-show" />
+          <label for="hyr-key-show" style="font-size:.82rem;cursor:pointer">Show key</label>
+        </div>
+        <button id="hyr-btn-save-key" class="btn-add-section" style="width:100%;text-align:center">Save API Key</button>
       </div>
-    </div>`;
-  $("manage-modal").classList.remove("hidden");
 
-  $("hyr-btn-save-prompt").addEventListener("click", async () => {
-    const btn = $("hyr-btn-save-prompt");
-    const newPrompt = $("hyr-prompt-textarea").value.trim();
-    if (!newPrompt) return;
-    btn.disabled = true; btn.textContent = "Saving…";
-    _hyrConfig = null;
-    await saveHalfYearReportConfig({ ...config, prompt: newPrompt });
-    _hyrConfig = await loadHalfYearReportConfig();
-    flashSaved(btn);
-    btn.disabled = false; btn.textContent = "Save Prompt";
-  });
-
-  $("hyr-btn-reset-prompt").addEventListener("click", () => {
-    $("hyr-prompt-textarea").value = HYR_DEFAULT_PROMPT;
-  });
-}
-
-async function hyrOpenKeyEntry() {
-  $("manage-modal-title").textContent = "Set Anthropic API Key";
-  $("manage-modal-body").innerHTML = `
-    <div style="padding:.75rem 1rem">
-      <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:.75rem">
-        Your Anthropic API key is stored in Firestore and never exposed in the app's source code.
-        Get your key from <strong>console.anthropic.com → API Keys</strong>.
-      </p>
-      <input id="hyr-key-input" type="password" class="admin-input" placeholder="sk-ant-api03-…"
-        style="width:100%;font-family:monospace;font-size:.85rem;margin-bottom:.75rem" />
-      <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.75rem">
-        <input type="checkbox" id="hyr-key-show" />
-        <label for="hyr-key-show" style="font-size:.82rem">Show key</label>
+      <div style="border:1.5px solid var(--border);border-radius:.6rem;padding:.85rem 1rem">
+        <div style="font-weight:600;font-size:.9rem;margin-bottom:.3rem">✏ Report Prompt</div>
+        <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:.65rem">
+          This is what Claude is instructed to do when generating a report. Refine it to improve the writing style.
+        </div>
+        <textarea id="hyr-prompt-textarea" class="admin-input" rows="14"
+          style="font-family:monospace;font-size:.78rem;resize:vertical"
+        >${escHtml(config.prompt || HYR_DEFAULT_PROMPT)}</textarea>
+        <div style="display:flex;gap:.5rem;margin-top:.6rem">
+          <button id="hyr-btn-save-prompt" class="btn-add-section" style="flex:1;text-align:center">Save Prompt</button>
+          <button id="hyr-btn-reset-prompt" class="export-btn" style="flex:1;text-align:center;font-size:.85rem">Reset to Default</button>
+        </div>
       </div>
-      <button id="hyr-btn-save-key" class="btn-primary" style="width:100%">Save API Key</button>
+
     </div>`;
   $("manage-modal").classList.remove("hidden");
 
@@ -2336,16 +2329,30 @@ async function hyrOpenKeyEntry() {
   $("hyr-btn-save-key").addEventListener("click", async () => {
     const btn = $("hyr-btn-save-key");
     const key = $("hyr-key-input").value.trim();
-    if (!key.startsWith("sk-ant-")) { alert("That doesn't look like a valid Anthropic key. It should start with sk-ant-"); return; }
+    if (!key) { alert("Please paste your Anthropic API key first."); return; }
+    if (!key.startsWith("sk-ant-")) { alert("That doesn't look like a valid Anthropic key — it should start with sk-ant-"); return; }
     btn.disabled = true; btn.textContent = "Saving…";
-    const config = await getHyrConfig();
     _hyrConfig = null;
     await saveHalfYearReportConfig({ ...config, apiKey: key });
     _hyrConfig = await loadHalfYearReportConfig();
-    flashSaved(btn);
     btn.disabled = false; btn.textContent = "Save API Key";
-    $("manage-modal").classList.add("hidden");
-    alert("API key saved!");
+    flashSaved(btn);
+  });
+
+  $("hyr-btn-save-prompt").addEventListener("click", async () => {
+    const btn = $("hyr-btn-save-prompt");
+    const newPrompt = $("hyr-prompt-textarea").value.trim();
+    if (!newPrompt) return;
+    btn.disabled = true; btn.textContent = "Saving…";
+    _hyrConfig = null;
+    await saveHalfYearReportConfig({ ...config, prompt: newPrompt });
+    _hyrConfig = await loadHalfYearReportConfig();
+    btn.disabled = false; btn.textContent = "Save Prompt";
+    flashSaved(btn);
+  });
+
+  $("hyr-btn-reset-prompt").addEventListener("click", () => {
+    $("hyr-prompt-textarea").value = HYR_DEFAULT_PROMPT;
   });
 }
 
