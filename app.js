@@ -153,7 +153,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "959";
+const APP_VERSION = "960";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2345,12 +2345,15 @@ function hyrDrawSummaryChart(chartData, studentName, period, year) {
 }
 
 function hyrDrawLineChart(targetName, labels, values, period, year) {
-  const W = 580, H = 290;
-  const PAD = { top: 52, right: 24, bottom: 48, left: 50 };
+  const SCALE = 2;
+  const W = 580, H = 300;
+  const PAD = { top: 52, right: 20, bottom: 38, left: 22 };
   const cW = W - PAD.left - PAD.right, cH = H - PAD.top - PAD.bottom;
+
   const canvas = document.createElement("canvas");
-  canvas.width = W; canvas.height = H;
+  canvas.width = W * SCALE; canvas.height = H * SCALE;
   const ctx = canvas.getContext("2d");
+  ctx.scale(SCALE, SCALE);
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
 
   const rangeLabel = period === "H1" ? "Jan–Jun" : "Jul–Dec";
@@ -2360,36 +2363,41 @@ function hyrDrawLineChart(targetName, labels, values, period, year) {
   const pts = labels.map((label, i) => ({ label, v: values[i], i })).filter(p => p.v !== null && p.v !== undefined);
   if (pts.length === 0) return null;
 
-  const allV = pts.map(p => p.v);
-  const minV = Math.max(0,   Math.floor((Math.min(...allV) - 12) / 10) * 10);
-  const maxV = Math.min(100, Math.ceil ((Math.max(...allV) + 12) / 10) * 10);
-  const range = maxV - minV || 20;
-  const toY = v => PAD.top + cH - ((v - minV) / range) * cH;
+  // Fixed 0–100 Y range; Y-axis labels hidden (data point labels carry the values)
+  const toY = v => PAD.top + cH * (1 - v / 100);
   const toX = i => PAD.left + (labels.length > 1 ? (i / (labels.length - 1)) * cW : cW / 2);
 
+  // Gridlines at 0, 20, 40, 60, 80, 100 — no labels
   ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
-  for (let v = minV; v <= maxV; v += 10) {
+  for (let v = 0; v <= 100; v += 20) {
     const y = toY(v);
     ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + cW, y); ctx.stroke();
-    ctx.fillStyle = "#9ca3af"; ctx.font = "10px sans-serif"; ctx.textAlign = "right";
-    ctx.fillText(v + "%", PAD.left - 5, y + 4);
   }
 
+  // Linear regression for trendline
   const xs = pts.map(p => p.i), ys = pts.map(p => p.v), np = pts.length;
   const sX = xs.reduce((a,b)=>a+b,0), sY = ys.reduce((a,b)=>a+b,0);
   const sXY = xs.reduce((a,x,i)=>a+x*ys[i],0), sX2 = xs.reduce((a,x)=>a+x*x,0);
   const denom = np*sX2 - sX*sX;
   const slope = denom ? (np*sXY - sX*sY) / denom : 0;
   const intercept = (sY - slope*sX) / np;
-  const trendY = i => Math.max(minV, Math.min(maxV, slope*i + intercept));
+  const trendAt = i => Math.max(0, Math.min(100, slope*i + intercept));
+  const tStartVal = Math.round(trendAt(xs[0]));
+  const tEndVal   = Math.round(trendAt(xs[xs.length - 1]));
 
+  // Dashed trendline
   ctx.strokeStyle = "#b0bec5"; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
   ctx.beginPath();
-  ctx.moveTo(toX(xs[0]), toY(trendY(xs[0])));
-  ctx.lineTo(toX(xs[xs.length-1]), toY(trendY(xs[xs.length-1])));
-  ctx.stroke();
-  ctx.setLineDash([]);
+  ctx.moveTo(toX(xs[0]), toY(trendAt(xs[0])));
+  ctx.lineTo(toX(xs[xs.length-1]), toY(trendAt(xs[xs.length-1])));
+  ctx.stroke(); ctx.setLineDash([]);
 
+  // Trendline endpoint value labels (below the trendline points)
+  ctx.fillStyle = "#6b7280"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText(tStartVal + "%", toX(xs[0]), toY(trendAt(xs[0])) + 13);
+  ctx.fillText(tEndVal + "%",   toX(xs[xs.length-1]), toY(trendAt(xs[xs.length-1])) + 13);
+
+  // Trend annotation subtitle
   const ppChange = Math.round(ys[ys.length-1] - ys[0]);
   const ppStr = (ppChange >= 0 ? "+" : "") + ppChange + "pp";
   const icon  = ppChange > 8 ? "↑" : ppChange < -8 ? "↓" : "→";
@@ -2397,11 +2405,13 @@ function hyrDrawLineChart(targetName, labels, values, period, year) {
   ctx.fillStyle = "#6b7280"; ctx.font = "italic 11px sans-serif"; ctx.textAlign = "center";
   ctx.fillText(`${icon} ${tLabel} (${ppStr})`, W / 2, 40);
 
+  // Data line
   ctx.strokeStyle = "#4472c4"; ctx.lineWidth = 2.5;
   ctx.beginPath();
   pts.forEach((p, idx) => { const x=toX(p.i), y=toY(p.v); idx===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
   ctx.stroke();
 
+  // Data point dots + value labels above
   pts.forEach(p => {
     const x = toX(p.i), y = toY(p.v);
     ctx.fillStyle = "#4472c4"; ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI*2); ctx.fill();
@@ -2409,9 +2419,13 @@ function hyrDrawLineChart(targetName, labels, values, period, year) {
     ctx.fillText(p.v + "%", x, y - 9);
   });
 
+  // Month labels on X-axis
   ctx.fillStyle = "#374151"; ctx.font = "11px sans-serif"; ctx.textAlign = "center";
-  labels.forEach((label, i) => ctx.fillText(label, toX(i), PAD.top + cH + 18));
-  ctx.fillStyle = "#6b7280"; ctx.fillText("Date", W / 2, PAD.top + cH + 36);
+  labels.forEach((label, i) => ctx.fillText(label, toX(i), PAD.top + cH + 16));
+
+  // Thin border around entire canvas
+  ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1;
+  ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
 
   return canvas.toDataURL("image/png").split(",")[1];
 }
@@ -2544,6 +2558,7 @@ function hyrDownloadWord(reportText, studentName, period, year, chartData = {}) 
         }));
         paragraphs.push(new Paragraph({
           children: [new ImageRun({ data: b64ToUint8(summaryB64), transformation: { width: 480, height: 272 }, type: "png" })],
+          alignment: AlignmentType.CENTER,
           spacing: { after: 200 }
         }));
         summaryDone = true;
@@ -2556,7 +2571,8 @@ function hyrDownloadWord(reportText, studentName, period, year, chartData = {}) 
       if (chart) {
         const lb64 = hyrDrawLineChart(chart.tName, chart.labels, chart.values, period, year);
         if (lb64) paragraphs.push(new Paragraph({
-          children: [new ImageRun({ data: b64ToUint8(lb64), transformation: { width: 480, height: 240 }, type: "png" })],
+          children: [new ImageRun({ data: b64ToUint8(lb64), transformation: { width: 480, height: 249 }, type: "png" })],
+          alignment: AlignmentType.CENTER,
           spacing: { after: 120 }
         }));
       }
