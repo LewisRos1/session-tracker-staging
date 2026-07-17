@@ -78,7 +78,9 @@ import {
   getGroupSessionsForStudent,
   getAllSessionsForStudent,
   getAllSessionsForGroup,
-  changeSessionNumber
+  changeSessionNumber,
+  loadHalfYearReportConfig,
+  saveHalfYearReportConfig
 } from "./firebase-service.js";
 import {
   exportStudentData, exportAllStudents, exportGroupMemberData,
@@ -151,7 +153,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "939";
+const APP_VERSION = "940";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -814,6 +816,7 @@ async function showHome() {
   renderAssessmentStudentButtons();
   renderTemplateButtons();
   renderExportButtons();
+  renderHalfYearReportsSection();
   renderStudentDatabaseButton();
   runOneOffRepairs();
 }
@@ -1894,6 +1897,456 @@ function renderExportButtons() {
   wire("btn-export-all-trials", "Backup All Excel (ZIP)", true);
   $("btn-data-integrity-check").addEventListener("click", runDataIntegrityCheck);
   $("btn-recently-deleted").addEventListener("click", renderRecentlyDeleted);
+}
+
+// ─── HALF YEAR REPORTS ───────────────────────────────────────
+
+const HYR_DEFAULT_PROMPT = `You are a professional therapy report writer for a child development therapy centre. Write a warm, professional, and parent-friendly half-year progress report based on the session data provided.
+
+SCORING SCALE:
+3 = Independent, 2 = Partial Prompt, 1 = Fully Prompted, 0 = No Response
+83% or above means the child is working independently on that activity.
+
+REPORT STRUCTURE:
+
+1. Introduction
+   - State the reporting period (e.g. January–June 2026)
+   - Briefly describe the program and the targets covered
+
+2. An Overview
+   - A summary paragraph covering the child's overall performance across all targets during this period
+   - Highlight key themes, general progress, and standout achievements
+
+3. Progress and Achievement (write one section per target in the order provided)
+   For each target:
+   - Summarise the child's performance and trends over the 6 months
+   - Reference monthly averages and notable improvements or dips
+   - Draw on the therapist's session remarks to provide specific, concrete examples
+   - Mention any milestones reached (e.g. first time achieving independence on an activity)
+
+4. Areas to Continue to Build On
+   - 3–5 bullet points identifying specific skills or activities that need continued focus
+   - Be constructive and encouraging; give concrete examples where possible
+
+5. Closing
+   - 2–3 warm sentences closing the report
+   - Express the team's commitment to the child's continued growth
+
+WRITING STYLE:
+- Warm, professional, and encouraging
+- Parent-friendly language (minimal jargon; explain any technical terms briefly)
+- Third person throughout (refer to the child by name)
+- Focus on month-to-month trends and overall trajectory, not individual sessions
+- Use flowing paragraphs for all sections except section 4 (bullet points)
+- Do NOT reference graphs, charts, or tables — write a text-only narrative
+- The finished report should be suitable for sharing directly with parents`;
+
+let _hyrConfig = null;
+
+async function getHyrConfig() {
+  if (!_hyrConfig) _hyrConfig = await loadHalfYearReportConfig();
+  return _hyrConfig;
+}
+
+function renderHalfYearReportsSection() {
+  const container = $("half-year-report-section");
+  if (!container) return;
+
+  const students = state.students.filter(s => !s.type || s.type === "individual");
+  const currentYear = new Date().getFullYear();
+
+  container.innerHTML = `
+    <div style="display:flex;flex-wrap:wrap;gap:.6rem;align-items:flex-end;padding:.25rem 0">
+      <select id="hyr-student-select" class="admin-input" style="flex:2;min-width:160px">
+        <option value="">— Select student —</option>
+        ${students.map(s => `<option value="${escHtml(s.id)}">${escHtml(s.name)}</option>`).join("")}
+      </select>
+      <select id="hyr-period-select" class="admin-input" style="width:90px">
+        <option value="H1">H1 (Jan–Jun)</option>
+        <option value="H2">H2 (Jul–Dec)</option>
+      </select>
+      <input id="hyr-year-input" type="number" class="admin-input" value="${currentYear}" min="2020" max="2099" style="width:80px;text-align:center" />
+      <button id="hyr-btn-generate" class="btn-primary" style="white-space:nowrap">Generate Report</button>
+    </div>
+    <div style="display:flex;gap:.5rem;margin-top:.5rem">
+      <button id="hyr-btn-edit-prompt" class="export-btn" style="font-size:.78rem">✏ Edit Prompt</button>
+      <button id="hyr-btn-set-key" class="export-btn" style="font-size:.78rem">🔑 Set API Key</button>
+    </div>`;
+
+  $("hyr-btn-generate").addEventListener("click", hyrGenerate);
+  $("hyr-btn-edit-prompt").addEventListener("click", hyrOpenPromptEditor);
+  $("hyr-btn-set-key").addEventListener("click", hyrOpenKeyEntry);
+}
+
+async function hyrGenerate() {
+  const studentId = $("hyr-student-select")?.value;
+  const period    = $("hyr-period-select")?.value || "H1";
+  const year      = parseInt($("hyr-year-input")?.value) || new Date().getFullYear();
+
+  if (!studentId) { alert("Please select a student first."); return; }
+
+  const student = state.students.find(s => s.id === studentId);
+  if (!student) return;
+
+  const btn = $("hyr-btn-generate");
+  btn.disabled = true;
+  btn.textContent = "Generating…";
+
+  try {
+    const config = await getHyrConfig();
+    const apiKey = config.apiKey || "";
+    if (!apiKey) {
+      alert("No API key saved. Tap '🔑 Set API Key' first.");
+      return;
+    }
+
+    const systemPrompt = config.prompt || HYR_DEFAULT_PROMPT;
+    const dataText = await hyrCollectData(student, period, year);
+
+    const periodLabel = period === "H1"
+      ? `January–June ${year}`
+      : `July–December ${year}`;
+
+    const userMessage = `Please write a half-year progress report for the following student.\n\nStudent: ${student.name}\nReporting Period: ${periodLabel}\n\n${dataText}`;
+
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-5",
+        max_tokens: 8192,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userMessage }]
+      })
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error?.message || `API error ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    const reportText = data.content?.[0]?.text || "";
+    if (!reportText) throw new Error("Empty response from Claude.");
+
+    hyrShowPreview(reportText, student.name, period, year);
+
+  } catch (err) {
+    alert("Failed to generate report:\n" + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Generate Report";
+  }
+}
+
+async function hyrCollectData(student, period, year) {
+  const [startMonth, endMonth] = period === "H1" ? [1, 6] : [7, 12];
+  const shortMonths = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+  const allSessions = await getAllSessionsForStudent(student.id);
+  const sessions = allSessions.filter(s => {
+    const [y, m] = s.date.split("-").map(Number);
+    return y === year && m >= startMonth && m <= endMonth;
+  });
+
+  if (sessions.length === 0) {
+    return `No sessions recorded for this student in ${period} ${year}.`;
+  }
+
+  // Group sessions by target name, then by month
+  const targets = student.targets || [];
+  const targetMap = {};
+
+  for (const sess of sessions) {
+    const [, m] = sess.date.split("-").map(Number);
+    const monthLabel = shortMonths[m - 1];
+
+    const targetNames = new Set([
+      ...targets.map(t => t.name),
+      ...(sess.targetsSnapshot || []).map(t => t.name)
+    ]);
+
+    for (const tName of targetNames) {
+      if (!targetMap[tName]) targetMap[tName] = {};
+      if (!targetMap[tName][monthLabel]) targetMap[tName][monthLabel] = [];
+      targetMap[tName][monthLabel].push(sess);
+    }
+  }
+
+  // For each target compute monthly averages and collect sample remarks
+  const lines = [];
+
+  for (const target of targets) {
+    const tName = target.name;
+    const tData = targetMap[tName];
+    if (!tData) continue;
+
+    lines.push(`=== TARGET: ${tName} ===`);
+
+    // Monthly averages
+    const monthlyAvgs = [];
+    for (let m = startMonth; m <= endMonth; m++) {
+      const mLabel = shortMonths[m - 1];
+      const mSessions = tData[mLabel] || [];
+      if (mSessions.length === 0) { monthlyAvgs.push(`${mLabel}: no data`); continue; }
+
+      const avgs = [];
+      for (const sess of mSessions) {
+        const avg = hyrCalcDailyAvg(sess, target);
+        if (avg !== null) avgs.push(avg);
+      }
+      if (avgs.length === 0) { monthlyAvgs.push(`${mLabel}: no data`); continue; }
+      const monthAvg = Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length);
+      monthlyAvgs.push(`${mLabel}: ${monthAvg}%`);
+    }
+    lines.push(`Monthly averages: ${monthlyAvgs.join(", ")}`);
+
+    // Per-activity summary
+    const actNames = new Set();
+    for (const mSessions of Object.values(tData)) {
+      for (const sess of mSessions) {
+        for (const act of Object.values(sess.activities || {})) {
+          if (act.targetName === tName || act.target === tName) actNames.add(act.name);
+        }
+      }
+    }
+    // Also include predefined activities from target config
+    for (const pa of (target.predefinedActivities || [])) {
+      if (!pa.masteredOn && !pa.discontinuedOn && !pa.isCompleted && !pa.isArchived && !pa.isStopped) {
+        actNames.add(pa.name);
+      }
+    }
+
+    if (actNames.size > 0) {
+      lines.push("Activities:");
+      for (const actName of actNames) {
+        // Collect all remarks for this activity across all sessions, sorted by date
+        const allRemarks = [];
+        for (const sess of sessions) {
+          const sessAct = Object.values(sess.activities || {}).find(
+            a => a.name === actName && (a.targetName === tName || a.target === tName)
+          );
+          if (!sessAct) continue;
+          const remarks = Object.values(sess.remarks || {})
+            .filter(r => r.activityId === sessAct.id)
+            .filter(r => r.text || (r.trials || []).length > 0);
+          for (const rem of remarks) {
+            const trials = (rem.trials || []).filter(t => t !== -1);
+            if (rem.optionScore !== undefined) trials.push(rem.optionScore);
+            const avg = trials.length > 0 ? Math.round(trials.reduce((a, b) => a + b, 0) / (trials.length * (target.maxPoints || 3)) * 100) : null;
+            allRemarks.push({ date: sess.date, text: hyrStripHtml(rem.text || ""), avg });
+          }
+        }
+        allRemarks.sort((a, b) => a.date.localeCompare(b.date));
+
+        if (allRemarks.length === 0) {
+          lines.push(`  • ${actName}: no data recorded`);
+          continue;
+        }
+
+        // Overall average
+        const scored = allRemarks.filter(r => r.avg !== null);
+        const overallAvg = scored.length > 0
+          ? Math.round(scored.reduce((a, b) => a + b.avg, 0) / scored.length)
+          : null;
+
+        // First and last month samples
+        const firstRem = allRemarks[0];
+        const lastRem  = allRemarks[allRemarks.length - 1];
+        const [, fm] = firstRem.date.split("-").map(Number);
+        const [, lm] = lastRem.date.split("-").map(Number);
+
+        let actLine = `  • ${actName}`;
+        if (overallAvg !== null) actLine += ` (overall avg ${overallAvg}%)`;
+        lines.push(actLine);
+
+        if (firstRem.text) {
+          lines.push(`    - Early (${shortMonths[fm - 1]}): "${firstRem.text.substring(0, 200).trim()}"`);
+        }
+        if (lastRem !== firstRem && lastRem.text) {
+          lines.push(`    - Recent (${shortMonths[lm - 1]}): "${lastRem.text.substring(0, 200).trim()}"`);
+        }
+      }
+    }
+    lines.push("");
+  }
+
+  return lines.join("\n");
+}
+
+function hyrCalcDailyAvg(sess, target) {
+  const mp = target.maxPoints || 3;
+  const scores = [];
+  for (const rem of Object.values(sess.remarks || {})) {
+    const trials = (rem.trials || []).filter(t => t !== -1);
+    if (rem.optionScore !== undefined) trials.push(rem.optionScore);
+    scores.push(...trials);
+  }
+  if (scores.length === 0) return null;
+  return scores.reduce((a, b) => a + b, 0) / (scores.length * mp) * 100;
+}
+
+function hyrStripHtml(s) {
+  return (s || "")
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<\/div>/gi, " ").replace(/<div>/gi, "")
+    .replace(/<\/p>/gi, " ").replace(/<p>/gi, "")
+    .replace(/<[^>]*>/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ")
+    .trim();
+}
+
+function hyrShowPreview(reportText, studentName, period, year) {
+  const periodLabel = period === "H1" ? `Jan–Jun ${year}` : `Jul–Dec ${year}`;
+  $("hyr-preview-title").textContent = `${studentName} — ${periodLabel}`;
+  $("hyr-preview-body").textContent = reportText;
+  $("hyr-preview-modal").classList.remove("hidden");
+
+  $("hyr-preview-close").onclick = () => $("hyr-preview-modal").classList.add("hidden");
+  $("hyr-preview-backdrop").onclick = () => $("hyr-preview-modal").classList.add("hidden");
+
+  $("hyr-btn-download-word").onclick = () => hyrDownloadWord(reportText, studentName, period, year);
+  $("hyr-btn-regenerate").onclick = () => {
+    $("hyr-preview-modal").classList.add("hidden");
+    hyrGenerate();
+  };
+}
+
+function hyrDownloadWord(reportText, studentName, period, year) {
+  const periodLabel = period === "H1" ? `January–June ${year}` : `July–December ${year}`;
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = window.docx;
+
+  const paragraphs = [];
+
+  // Title
+  paragraphs.push(new Paragraph({
+    children: [new TextRun({ text: `${studentName} — Half Year Report`, bold: true, size: 28 })],
+    heading: HeadingLevel.HEADING_1,
+    alignment: AlignmentType.CENTER,
+    spacing: { after: 120 }
+  }));
+  paragraphs.push(new Paragraph({
+    children: [new TextRun({ text: periodLabel, size: 22, color: "555555" })],
+    alignment: AlignmentType.CENTER,
+    spacing: { after: 400 }
+  }));
+
+  // Body paragraphs — split on double newlines
+  const blocks = reportText.split(/\n{2,}/);
+  for (const block of blocks) {
+    const trimmed = block.trim();
+    if (!trimmed) continue;
+
+    // Detect section headings: short lines ending without punctuation or all-caps
+    const lines = trimmed.split("\n");
+    if (lines.length === 1 && trimmed.length < 80 && /^[A-Z1-9]/.test(trimmed) && !/[.,:;]$/.test(trimmed)) {
+      paragraphs.push(new Paragraph({
+        children: [new TextRun({ text: trimmed, bold: true, size: 24 })],
+        heading: HeadingLevel.HEADING_2,
+        spacing: { before: 300, after: 100 }
+      }));
+    } else {
+      // Multi-line block or bullet — render line by line
+      for (const line of lines) {
+        const t = line.trim();
+        if (!t) continue;
+        paragraphs.push(new Paragraph({
+          children: [new TextRun({ text: t, size: 22 })],
+          spacing: { after: 140 }
+        }));
+      }
+    }
+  }
+
+  const doc = new Document({ sections: [{ properties: {}, children: paragraphs }] });
+
+  Packer.toBlob(doc).then(blob => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${studentName} Half Year Report ${period} ${year}.docx`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+}
+
+async function hyrOpenPromptEditor() {
+  const config = await getHyrConfig();
+  const currentPrompt = config.prompt || HYR_DEFAULT_PROMPT;
+
+  $("manage-modal-title").textContent = "Edit Report Prompt";
+  $("manage-modal-body").innerHTML = `
+    <div style="padding:.75rem 1rem">
+      <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:.75rem">
+        This prompt is sent to Claude with every report. Edit it to refine the writing style or structure.
+      </p>
+      <textarea id="hyr-prompt-textarea" class="admin-input" rows="20"
+        style="width:100%;font-family:monospace;font-size:.8rem;resize:vertical"
+      >${escHtml(currentPrompt)}</textarea>
+      <div style="display:flex;gap:.6rem;margin-top:.75rem">
+        <button id="hyr-btn-save-prompt" class="btn-primary" style="flex:1">Save Prompt</button>
+        <button id="hyr-btn-reset-prompt" class="export-btn" style="flex:1">Reset to Default</button>
+      </div>
+    </div>`;
+  $("manage-modal").classList.remove("hidden");
+
+  $("hyr-btn-save-prompt").addEventListener("click", async () => {
+    const btn = $("hyr-btn-save-prompt");
+    const newPrompt = $("hyr-prompt-textarea").value.trim();
+    if (!newPrompt) return;
+    btn.disabled = true; btn.textContent = "Saving…";
+    _hyrConfig = null;
+    await saveHalfYearReportConfig({ ...config, prompt: newPrompt });
+    _hyrConfig = await loadHalfYearReportConfig();
+    flashSaved(btn);
+    btn.disabled = false; btn.textContent = "Save Prompt";
+  });
+
+  $("hyr-btn-reset-prompt").addEventListener("click", () => {
+    $("hyr-prompt-textarea").value = HYR_DEFAULT_PROMPT;
+  });
+}
+
+async function hyrOpenKeyEntry() {
+  $("manage-modal-title").textContent = "Set Anthropic API Key";
+  $("manage-modal-body").innerHTML = `
+    <div style="padding:.75rem 1rem">
+      <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:.75rem">
+        Your Anthropic API key is stored in Firestore and never exposed in the app's source code.
+        Get your key from <strong>console.anthropic.com → API Keys</strong>.
+      </p>
+      <input id="hyr-key-input" type="password" class="admin-input" placeholder="sk-ant-api03-…"
+        style="width:100%;font-family:monospace;font-size:.85rem;margin-bottom:.75rem" />
+      <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.75rem">
+        <input type="checkbox" id="hyr-key-show" />
+        <label for="hyr-key-show" style="font-size:.82rem">Show key</label>
+      </div>
+      <button id="hyr-btn-save-key" class="btn-primary" style="width:100%">Save API Key</button>
+    </div>`;
+  $("manage-modal").classList.remove("hidden");
+
+  $("hyr-key-show").addEventListener("change", e => {
+    $("hyr-key-input").type = e.target.checked ? "text" : "password";
+  });
+
+  $("hyr-btn-save-key").addEventListener("click", async () => {
+    const btn = $("hyr-btn-save-key");
+    const key = $("hyr-key-input").value.trim();
+    if (!key.startsWith("sk-ant-")) { alert("That doesn't look like a valid Anthropic key. It should start with sk-ant-"); return; }
+    btn.disabled = true; btn.textContent = "Saving…";
+    const config = await getHyrConfig();
+    _hyrConfig = null;
+    await saveHalfYearReportConfig({ ...config, apiKey: key });
+    _hyrConfig = await loadHalfYearReportConfig();
+    flashSaved(btn);
+    btn.disabled = false; btn.textContent = "Save API Key";
+    $("manage-modal").classList.add("hidden");
+    alert("API key saved!");
+  });
 }
 
 async function renderRecentlyDeleted() {
@@ -8624,6 +9077,7 @@ async function closeManageModal() {
   renderAssessmentStudentButtons();
   renderTemplateButtons();
   renderExportButtons();
+  renderHalfYearReportsSection();
   renderGroupButtons();
   // Manage Student can be opened from on top of the Student Database page
   // (clicking a row there) — refresh its table too, otherwise a rename or

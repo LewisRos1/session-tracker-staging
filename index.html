@@ -124,6 +124,12 @@
       </section>
       <section>
         <div class="section-header">
+          <h2 class="section-title">Half Year Reports</h2>
+        </div>
+        <div id="half-year-report-section"></div>
+      </section>
+      <section>
+        <div class="section-header">
           <h2 class="section-title">EXPORT ALL <span style="font-size:.7em;font-weight:400;color:var(--text-muted)">(For Lewis use only, he will backup all data every Saturday)</span></h2>
         </div>
         <div id="export-all-button"></div>
@@ -311,6 +317,26 @@
       </div>
       <div id="manage-modal-body" class="manage-modal-body">
         <!-- populated by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       HALF YEAR REPORT PREVIEW MODAL
+       ══════════════════════════════════════════════════════ -->
+  <div id="hyr-preview-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop" id="hyr-preview-backdrop"></div>
+    <div class="modal-sheet" style="max-height:90vh;display:flex;flex-direction:column">
+      <div class="modal-header">
+        <div class="modal-header-left">
+          <span class="modal-title" id="hyr-preview-title">Half Year Report</span>
+        </div>
+        <button class="modal-close" id="hyr-preview-close" aria-label="Close">✕</button>
+      </div>
+      <div id="hyr-preview-body" style="flex:1;overflow-y:auto;padding:1rem 1.25rem;white-space:pre-wrap;font-size:.9rem;line-height:1.6;color:var(--text-main)"></div>
+      <div style="padding:.75rem 1.25rem;display:flex;gap:.6rem;border-top:1px solid var(--border)">
+        <button id="hyr-btn-download-word" class="btn-primary" style="flex:1">⬇ Download as Word</button>
+        <button id="hyr-btn-regenerate" class="export-btn" style="flex:1">↺ Regenerate</button>
       </div>
     </div>
   </div>

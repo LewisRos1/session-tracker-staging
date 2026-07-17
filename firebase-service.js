@@ -965,6 +965,17 @@ export async function deleteTemplate(templateId) {
   await deleteDoc(doc(db, "templates", templateId));
 }
 
+// ─── HALF YEAR REPORT CONFIG ─────────────────────────────────
+
+export async function loadHalfYearReportConfig() {
+  const snap = await getDoc(doc(db, "config", "halfYearReport"));
+  return snap.exists() ? snap.data() : {};
+}
+
+export async function saveHalfYearReportConfig(data) {
+  await setDoc(doc(db, "config", "halfYearReport"), data, { merge: true });
+}
+
 // ─── REMARK PRESETS ──────────────────────────────────────────
 
 export async function loadRemarkPresets() {
