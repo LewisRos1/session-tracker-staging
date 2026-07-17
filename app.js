@@ -153,7 +153,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "961";
+const APP_VERSION = "962";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1917,6 +1917,7 @@ CRITICAL RULES:
 - Do NOT simply describe what the numbers show — the charts already do that. Instead, interpret and explain.
 - Do NOT pad the report with empty phrases like "showed great enthusiasm" or "demonstrated effort" unless there is specific evidence in the remarks to support it.
 - Every claim must be grounded in the data or session remarks provided.
+- NEVER use em dashes (—) anywhere in the report. Use commas, full stops, or rewrite the sentence instead. This is non-negotiable.
 
 REPORT STRUCTURE:
 
@@ -1941,10 +1942,11 @@ REPORT STRUCTURE:
    - Give an honest clinical summary: are they on track for independence? Behind expectations? Progressing well?
    - Do NOT say "as shown in the chart" or reference any visual
 
-4. Areas to Continue to Build On
+4. Recommended Focus Areas
    - 3–5 bullet points of specific skills or activities that need continued focus
-   - Be direct — if something has not improved or is regressing, name it
+   - Be direct. If something has not improved or is regressing, name it.
    - Include practical suggestions where possible
+   - Use "•" as the bullet character for each point (not "-")
 
 5. Closing
    - 2–3 sentences that are honest and forward-looking
@@ -2364,8 +2366,8 @@ function hyrDrawSummaryChart(chartData, studentName, period, year) {
 
 function hyrDrawLineChart(targetName, labels, values, period, year) {
   const SCALE = 2;
-  const W = 580, H = 300;
-  const PAD = { top: 52, right: 20, bottom: 38, left: 22 };
+  const W = 580, H = 310;
+  const PAD = { top: 72, right: 20, bottom: 38, left: 22 };
   const cW = W - PAD.left - PAD.right, cH = H - PAD.top - PAD.bottom;
 
   const canvas = document.createElement("canvas");
@@ -2474,6 +2476,7 @@ function hyrMdToHtml(text, chartData = {}, studentName = "", period = "H1", year
   for (const line of lines) {
     const t = line.trim();
     if (!t || t === "---") { closeP(); continue; }
+    if (t.startsWith("• ")) { closeP(); html += `<p style="margin:.3rem 0 .3rem 1.4rem;line-height:1.6;text-indent:-1.1rem">${inlineHtml(t)}</p>`; continue; }
     if (t.startsWith("### ")) { closeP(); html += `<h3 style="margin:.9rem 0 .3rem;font-size:1rem">${inlineHtml(t.slice(4))}</h3>`; continue; }
     if (t.startsWith("## "))  {
       closeP();
@@ -2601,6 +2604,13 @@ function hyrDownloadWord(reportText, studentName, period, year, chartData = {}) 
         children: [new TextRun({ text: t.slice(4), bold: true, size: 22 })],
         heading: HeadingLevel.HEADING_3,
         spacing: { before: 200, after: 80, ...LINE_SPACING }
+      }));
+    } else if (t.startsWith("• ")) {
+      paragraphs.push(new Paragraph({
+        children: [new TextRun({ text: "• ", size: 22 }), ...inlineRuns(t.slice(2))],
+        alignment: AlignmentType.BOTH,
+        indent: { left: 360, hanging: 240 },
+        spacing: { after: 100, ...LINE_SPACING }
       }));
     } else {
       paragraphs.push(new Paragraph({
