@@ -151,7 +151,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "938";
+const APP_VERSION = "939";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -443,7 +443,7 @@ function isEmptyActItem(a) {
 // their plain <textarea> (see wrapTextareaSelection) rather than through this
 // popup — the popup is only for remarks now, same as it always was.
 function isActivityMarkupField(el) {
-  return el.classList?.contains("mn-act-name-input") || el.classList?.contains("mn-fixed-remark-input");
+  return el.classList?.contains("mn-act-name-input") || el.classList?.contains("mn-fixed-remark-input") || el.classList?.contains("mn-inactive-name-input");
 }
 
 function openTextEditorSheet(originEl) {
@@ -9708,7 +9708,12 @@ function renderTargetManageContent(student, target) {
       const dateLabel = a.masteredOn ? `Mastered on ${fmtPeriodDate(a.masteredOn)}` : 'Mastered';
       const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
       html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
-        <textarea class="admin-input mn-inactive-name-input" data-inactive-type="mastered" data-inactive-idx="${ci}" rows="1" style="flex:1;overflow-y:hidden;resize:none;min-height:unset">${escHtml(a.name || "")}</textarea>
+        <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
+          <div style="display:flex;align-items:flex-start;gap:.3rem">
+            ${formatButtonsHtml(`mn-inactive-mastered-${ci}`)}
+            <textarea class="admin-input mn-inactive-name-input" id="mn-inactive-mastered-${ci}" data-inactive-type="mastered" data-inactive-idx="${ci}" rows="1" style="flex:1;overflow-y:hidden;resize:none;min-height:unset">${escHtml(a.name || "")}</textarea>
+          </div>
+        </div>
         <span style="font-size:.72rem;color:#059669;white-space:nowrap;padding-top:.45rem">${dateLabel}</span>
         <button class="btn-mn-undo-mastered" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap;flex-shrink:0">↩ Undo</button>
         <button class="btn-adm-del btn-mn-del-mastered" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
@@ -9735,7 +9740,12 @@ function renderTargetManageContent(student, target) {
       const dateLabel = a.discontinuedOn ? `Discontinued on ${fmtPeriodDate(a.discontinuedOn)}` : 'Discontinued';
       const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
       html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
-        <textarea class="admin-input mn-inactive-name-input" data-inactive-type="discontinued" data-inactive-idx="${ci}" rows="1" style="flex:1;overflow-y:hidden;resize:none;min-height:unset">${escHtml(a.name || "")}</textarea>
+        <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
+          <div style="display:flex;align-items:flex-start;gap:.3rem">
+            ${formatButtonsHtml(`mn-inactive-disc-${ci}`)}
+            <textarea class="admin-input mn-inactive-name-input" id="mn-inactive-disc-${ci}" data-inactive-type="discontinued" data-inactive-idx="${ci}" rows="1" style="flex:1;overflow-y:hidden;resize:none;min-height:unset">${escHtml(a.name || "")}</textarea>
+          </div>
+        </div>
         <span style="font-size:.72rem;color:#6b7280;white-space:nowrap;padding-top:.45rem">${dateLabel}</span>
         <button class="btn-mn-undo-discontinued" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap;flex-shrink:0">↩ Undo</button>
         <button class="btn-adm-del btn-mn-del-discontinued" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
@@ -11148,7 +11158,12 @@ function renderTemplateManageContent(template) {
       const dateLabel = a.masteredOn ? `Mastered on ${fmtPeriodDate(a.masteredOn)}` : 'Mastered';
       const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
       html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
-        <textarea class="admin-input mn-inactive-name-input" data-inactive-type="mastered" data-inactive-idx="${ci}" rows="1" style="flex:1;overflow-y:hidden;resize:none;min-height:unset">${escHtml(a.name || "")}</textarea>
+        <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
+          <div style="display:flex;align-items:flex-start;gap:.3rem">
+            ${formatButtonsHtml(`mn-inactive-mastered-${ci}`)}
+            <textarea class="admin-input mn-inactive-name-input" id="mn-inactive-mastered-${ci}" data-inactive-type="mastered" data-inactive-idx="${ci}" rows="1" style="flex:1;overflow-y:hidden;resize:none;min-height:unset">${escHtml(a.name || "")}</textarea>
+          </div>
+        </div>
         <span style="font-size:.72rem;color:#059669;white-space:nowrap;padding-top:.45rem">${dateLabel}</span>
         <button class="btn-mn-undo-mastered" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap;flex-shrink:0">↩ Undo</button>
         <button class="btn-adm-del btn-mn-del-mastered" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
@@ -11175,7 +11190,12 @@ function renderTemplateManageContent(template) {
       const dateLabel = a.discontinuedOn ? `Discontinued on ${fmtPeriodDate(a.discontinuedOn)}` : 'Discontinued';
       const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
       html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
-        <textarea class="admin-input mn-inactive-name-input" data-inactive-type="discontinued" data-inactive-idx="${ci}" rows="1" style="flex:1;overflow-y:hidden;resize:none;min-height:unset">${escHtml(a.name || "")}</textarea>
+        <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
+          <div style="display:flex;align-items:flex-start;gap:.3rem">
+            ${formatButtonsHtml(`mn-inactive-disc-${ci}`)}
+            <textarea class="admin-input mn-inactive-name-input" id="mn-inactive-disc-${ci}" data-inactive-type="discontinued" data-inactive-idx="${ci}" rows="1" style="flex:1;overflow-y:hidden;resize:none;min-height:unset">${escHtml(a.name || "")}</textarea>
+          </div>
+        </div>
         <span style="font-size:.72rem;color:#6b7280;white-space:nowrap;padding-top:.45rem">${dateLabel}</span>
         <button class="btn-mn-undo-discontinued" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap;flex-shrink:0">↩ Undo</button>
         <button class="btn-adm-del btn-mn-del-discontinued" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
