@@ -151,7 +151,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "937";
+const APP_VERSION = "938";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -9708,9 +9708,9 @@ function renderTargetManageContent(student, target) {
       const dateLabel = a.masteredOn ? `Mastered on ${fmtPeriodDate(a.masteredOn)}` : 'Mastered';
       const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
       html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
-        <textarea class="mn-inactive-name-input" data-inactive-type="mastered" data-inactive-idx="${ci}" rows="1" style="flex:1;font-size:.875rem;color:#374151;background:transparent;border:none;resize:none;overflow-y:hidden;padding:0;font-family:inherit;line-height:1.4;outline:none;min-width:0">${escHtml(a.name || "")}</textarea>
-        <span style="font-size:.72rem;color:#059669;white-space:nowrap;padding-top:2px">${dateLabel}</span>
-        <button class="btn-mn-undo-mastered" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Undo</button>
+        <textarea class="admin-input mn-inactive-name-input" data-inactive-type="mastered" data-inactive-idx="${ci}" rows="1" style="flex:1;overflow-y:hidden;resize:none;min-height:unset">${escHtml(a.name || "")}</textarea>
+        <span style="font-size:.72rem;color:#059669;white-space:nowrap;padding-top:.45rem">${dateLabel}</span>
+        <button class="btn-mn-undo-mastered" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap;flex-shrink:0">↩ Undo</button>
         <button class="btn-adm-del btn-mn-del-mastered" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
       </div>`;
       subActs.forEach((sub, si) => {
@@ -9735,9 +9735,9 @@ function renderTargetManageContent(student, target) {
       const dateLabel = a.discontinuedOn ? `Discontinued on ${fmtPeriodDate(a.discontinuedOn)}` : 'Discontinued';
       const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
       html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
-        <textarea class="mn-inactive-name-input" data-inactive-type="discontinued" data-inactive-idx="${ci}" rows="1" style="flex:1;font-size:.875rem;color:#374151;background:transparent;border:none;resize:none;overflow-y:hidden;padding:0;font-family:inherit;line-height:1.4;outline:none;min-width:0">${escHtml(a.name || "")}</textarea>
-        <span style="font-size:.72rem;color:#6b7280;white-space:nowrap;padding-top:2px">${dateLabel}</span>
-        <button class="btn-mn-undo-discontinued" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Undo</button>
+        <textarea class="admin-input mn-inactive-name-input" data-inactive-type="discontinued" data-inactive-idx="${ci}" rows="1" style="flex:1;overflow-y:hidden;resize:none;min-height:unset">${escHtml(a.name || "")}</textarea>
+        <span style="font-size:.72rem;color:#6b7280;white-space:nowrap;padding-top:.45rem">${dateLabel}</span>
+        <button class="btn-mn-undo-discontinued" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap;flex-shrink:0">↩ Undo</button>
         <button class="btn-adm-del btn-mn-del-discontinued" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
       </div>`;
       subActs.forEach((sub, si) => {
@@ -11148,9 +11148,9 @@ function renderTemplateManageContent(template) {
       const dateLabel = a.masteredOn ? `Mastered on ${fmtPeriodDate(a.masteredOn)}` : 'Mastered';
       const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
       html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
-        <textarea class="mn-inactive-name-input" data-inactive-type="mastered" data-inactive-idx="${ci}" rows="1" style="flex:1;font-size:.875rem;color:#374151;background:transparent;border:none;resize:none;overflow-y:hidden;padding:0;font-family:inherit;line-height:1.4;outline:none;min-width:0">${escHtml(a.name || "")}</textarea>
-        <span style="font-size:.72rem;color:#059669;white-space:nowrap;padding-top:2px">${dateLabel}</span>
-        <button class="btn-mn-undo-mastered" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Undo</button>
+        <textarea class="admin-input mn-inactive-name-input" data-inactive-type="mastered" data-inactive-idx="${ci}" rows="1" style="flex:1;overflow-y:hidden;resize:none;min-height:unset">${escHtml(a.name || "")}</textarea>
+        <span style="font-size:.72rem;color:#059669;white-space:nowrap;padding-top:.45rem">${dateLabel}</span>
+        <button class="btn-mn-undo-mastered" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap;flex-shrink:0">↩ Undo</button>
         <button class="btn-adm-del btn-mn-del-mastered" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
       </div>`;
       subActs.forEach((sub, si) => {
@@ -11175,9 +11175,9 @@ function renderTemplateManageContent(template) {
       const dateLabel = a.discontinuedOn ? `Discontinued on ${fmtPeriodDate(a.discontinuedOn)}` : 'Discontinued';
       const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
       html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
-        <textarea class="mn-inactive-name-input" data-inactive-type="discontinued" data-inactive-idx="${ci}" rows="1" style="flex:1;font-size:.875rem;color:#374151;background:transparent;border:none;resize:none;overflow-y:hidden;padding:0;font-family:inherit;line-height:1.4;outline:none;min-width:0">${escHtml(a.name || "")}</textarea>
-        <span style="font-size:.72rem;color:#6b7280;white-space:nowrap;padding-top:2px">${dateLabel}</span>
-        <button class="btn-mn-undo-discontinued" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Undo</button>
+        <textarea class="admin-input mn-inactive-name-input" data-inactive-type="discontinued" data-inactive-idx="${ci}" rows="1" style="flex:1;overflow-y:hidden;resize:none;min-height:unset">${escHtml(a.name || "")}</textarea>
+        <span style="font-size:.72rem;color:#6b7280;white-space:nowrap;padding-top:.45rem">${dateLabel}</span>
+        <button class="btn-mn-undo-discontinued" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap;flex-shrink:0">↩ Undo</button>
         <button class="btn-adm-del btn-mn-del-discontinued" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
       </div>`;
       subActs.forEach((sub, si) => {
