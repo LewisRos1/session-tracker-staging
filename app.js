@@ -151,7 +151,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "934";
+const APP_VERSION = "935";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -489,6 +489,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Register SW immediately — don't wait for Firebase so updates are never blocked.
   registerServiceWorker();
+
+  // If auth never resolves (e.g. Firebase CDN unreachable on iOS after cache clear),
+  // show a reload button after 10 s so the user isn't trapped on the loading screen.
+  setTimeout(() => {
+    if (document.getElementById("screen-loading")?.classList.contains("active")) {
+      document.getElementById("btn-loading-reload")?.classList.remove("hidden");
+    }
+  }, 10000);
 
   // On iOS, relatedTarget is always null and pointerdown may not fire for <select>.
   // Use both pointerdown and touchstart (touchstart fires reliably before focusout on iOS).
