@@ -153,7 +153,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "948";
+const APP_VERSION = "949";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2033,12 +2033,6 @@ async function hyrGenerate() {
 
   try {
     const config = await getHyrConfig();
-    const apiKey = config.apiKey || "";
-    if (!apiKey) {
-      alert("No API key saved. Scroll down to the 'FOR LEWIS (IT) USE' section and tap '⚙️ Settings (for AI Report)' to add it.");
-      return;
-    }
-
     const systemPrompt = config.prompt || HYR_DEFAULT_PROMPT;
     const dataText = await hyrCollectData(student, period, year);
 
@@ -2048,13 +2042,9 @@ async function hyrGenerate() {
 
     const userMessage = `Please write a half-year progress report for the following student.\n\nStudent: ${student.name}\nReporting Period: ${periodLabel}\n\n${dataText}`;
 
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    const resp = await fetch("https://session-tracker-ai.wang-loys22.workers.dev", {
       method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json"
-      },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({
         model: "claude-sonnet-5",
         max_tokens: 8192,
@@ -2315,28 +2305,10 @@ function hyrDownloadWord(reportText, studentName, period, year) {
 
 async function hyrOpenSettings() {
   const config = await getHyrConfig();
-  const hasKey = !!(config.apiKey);
 
   $("manage-modal-title").textContent = "Report Generator Settings";
   $("manage-modal-body").innerHTML = `
     <div style="padding:.75rem 1rem;display:flex;flex-direction:column;gap:1rem">
-
-      <div style="border:1.5px solid var(--border);border-radius:.6rem;padding:.85rem 1rem">
-        <div style="font-weight:600;font-size:.9rem;margin-bottom:.3rem">🔑 Anthropic API Key</div>
-        <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:.65rem">
-          ${hasKey ? "✅ API key is saved. Current value shown below — clear it and paste the new one to replace." : "No key saved yet. Get yours from console.anthropic.com → API Keys."}
-        </div>
-        <input id="hyr-key-input" type="text" class="admin-input"
-          placeholder="sk-ant-api03-…"
-          value="${escHtml(config.apiKey || "")}"
-          style="font-family:monospace;font-size:.85rem;margin-bottom:.5rem"
-          autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" />
-        <div style="display:flex;gap:.6rem;align-items:center;margin-bottom:.6rem">
-          <input type="checkbox" id="hyr-key-show" checked />
-          <label for="hyr-key-show" style="font-size:.82rem;cursor:pointer">Show key</label>
-        </div>
-        <button id="hyr-btn-save-key" class="btn-add-section" style="width:100%;text-align:center">Save API Key</button>
-      </div>
 
       <div style="border:1.5px solid var(--border);border-radius:.6rem;padding:.85rem 1rem">
         <div style="font-weight:600;font-size:.9rem;margin-bottom:.3rem">✏ Report Prompt</div>
@@ -2354,34 +2326,6 @@ async function hyrOpenSettings() {
 
     </div>`;
   $("manage-modal").classList.remove("hidden");
-
-  $("hyr-key-show").addEventListener("change", e => {
-    $("hyr-key-input").type = e.target.checked ? "text" : "password";
-  });
-  // Field starts as text (checked) — switch to password immediately so value is hidden by default
-  $("hyr-key-input").type = "password";
-  $("hyr-key-show").checked = false;
-
-  $("hyr-btn-save-key").addEventListener("click", async () => {
-    const btn = $("hyr-btn-save-key");
-    const key = $("hyr-key-input").value.trim();
-    if (!key) { alert("Please paste your Anthropic API key first."); return; }
-    if (!key.startsWith("sk-ant-") || key.length < 40) {
-      alert("That doesn't look like a valid Anthropic key.\n\nIt should start with \"sk-ant-\" and be very long. Please copy it again from console.anthropic.com → API Keys.");
-      return;
-    }
-    btn.disabled = true; btn.textContent = "Saving…";
-    try {
-      _hyrConfig = null;
-      await saveHalfYearReportConfig({ ...config, apiKey: key });
-      _hyrConfig = await loadHalfYearReportConfig();
-      btn.disabled = false; btn.textContent = "Save API Key";
-      flashSaved(btn);
-    } catch (err) {
-      btn.disabled = false; btn.textContent = "Save API Key";
-      alert("Failed to save API key: " + err.message + "\n\nThis is likely a Firestore permissions issue. Ask Lewis to add the 'config' collection to the Firestore rules.");
-    }
-  });
 
   $("hyr-btn-save-prompt").addEventListener("click", async () => {
     const btn = $("hyr-btn-save-prompt");
