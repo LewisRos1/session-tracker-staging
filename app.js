@@ -150,7 +150,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "932";
+const APP_VERSION = "933";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -8515,6 +8515,22 @@ async function closeManageModal() {
   if (_pendingActsCleanup) {
     const { acts, save } = _pendingActsCleanup;
     _pendingActsCleanup = null;
+    // Flush any text that's sitting in still-focused inputs without having
+    // triggered a blur (e.g. user clicks X without first clicking elsewhere).
+    // Covers: activity name, note/heading text, and sentence starter.
+    acts.forEach((a, i) => {
+      const nameEl    = $(`mn-act-name-${i}`);
+      const starterEl = $("manage-modal-body")?.querySelector(`.mn-act-starter-text[data-idx="${i}"]`);
+      if (nameEl) {
+        if (a.isNote || a.isExportNote) {
+          a.text = nameEl.value;
+        } else {
+          const v = nameEl.value.trim();
+          if (v) a.name = v;
+        }
+      }
+      if (starterEl) a.sentenceStarter = starterEl.value.trim() || null;
+    });
     const before = acts.length;
     for (let i = acts.length - 1; i >= 0; i--) {
       if (isEmptyActItem(acts[i])) acts.splice(i, 1);
@@ -8522,8 +8538,8 @@ async function closeManageModal() {
     if (acts.length !== before) acts.forEach((a, i) => a.order = i);
     // Always save on close — not just when empty items were removed. Any
     // in-memory change (e.g. changing the remark type dropdown) that didn't
-    // happen to trigger a blur on the starter/option inputs would otherwise
-    // silently fail to persist to Firestore.
+    // happen to trigger a blur on the inputs would otherwise silently fail
+    // to persist to Firestore.
     try {
       await save();
     } catch (err) {
