@@ -153,7 +153,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "945";
+const APP_VERSION = "946";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1959,12 +1959,19 @@ function renderHalfYearReportsSection() {
     .filter(s => s.type !== "assessment" && s.type !== "unassigned")
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  // Year dropdown: only show years from app launch up to current year (no future years)
-  const currentYear = new Date().getFullYear();
-  const startYear = 2024;
-  const yearOptions = [];
+  // Combined period dropdown: show "YYYY H1" / "YYYY H2" up to current month only
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1; // 1-based
+  const startYear = 2026; // first year the app had real data
+  const periodOptions = [];
   for (let y = currentYear; y >= startYear; y--) {
-    yearOptions.push(`<option value="${y}">${y}</option>`);
+    // H2 (Jul–Dec): only available if month >= 7 for current year, or past year
+    if (y < currentYear || currentMonth >= 7) {
+      periodOptions.push(`<option value="${y}-H2">${y} H2 (Jul–Dec)</option>`);
+    }
+    // H1 (Jan–Jun): always available for any year up to current
+    periodOptions.push(`<option value="${y}-H1">${y} H1 (Jan–Jun)</option>`);
   }
 
   container.innerHTML = `
@@ -1973,12 +1980,8 @@ function renderHalfYearReportsSection() {
         <option value="">— Select Student —</option>
         ${students.map(s => `<option value="${escHtml(s.id)}">${escHtml(s.name)}</option>`).join("")}
       </select>
-      <select id="hyr-period-select" class="admin-input" style="width:130px;flex-shrink:0;background:#fff;font-family:inherit;font-size:1rem">
-        <option value="H1">H1 (Jan–Jun)</option>
-        <option value="H2">H2 (Jul–Dec)</option>
-      </select>
-      <select id="hyr-year-select" class="admin-input" style="width:90px;flex-shrink:0;background:#fff;font-family:inherit;font-size:1rem">
-        ${yearOptions.join("")}
+      <select id="hyr-period-select" class="admin-input" style="width:160px;flex-shrink:0;background:#fff;font-family:inherit;font-size:1rem">
+        ${periodOptions.join("")}
       </select>
       <button id="hyr-btn-generate" class="btn-add-section"
         style="font-size:.9rem;padding:.45rem 1.1rem;min-height:38px">
@@ -1991,8 +1994,9 @@ function renderHalfYearReportsSection() {
 
 async function hyrGenerate() {
   const studentId = $("hyr-student-select")?.value;
-  const period    = $("hyr-period-select")?.value || "H1";
-  const year      = parseInt($("hyr-year-select")?.value) || new Date().getFullYear();
+  const periodVal = $("hyr-period-select")?.value || "2026-H1";
+  const [yearStr, period] = periodVal.split("-");
+  const year = parseInt(yearStr) || new Date().getFullYear();
 
   if (!studentId) { alert("Please select a student first."); return; }
 
@@ -2299,7 +2303,8 @@ async function hyrOpenSettings() {
           ${hasKey ? "✅ API key is saved. Paste a new one below to replace it." : "No key saved yet. Get yours from console.anthropic.com → API Keys."}
         </div>
         <input id="hyr-key-input" type="password" class="admin-input" placeholder="sk-ant-api03-…"
-          style="font-family:monospace;font-size:.85rem;margin-bottom:.5rem" />
+          style="font-family:monospace;font-size:.85rem;margin-bottom:.5rem"
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
         <div style="display:flex;gap:.6rem;align-items:center;margin-bottom:.6rem">
           <input type="checkbox" id="hyr-key-show" />
           <label for="hyr-key-show" style="font-size:.82rem;cursor:pointer">Show key</label>
