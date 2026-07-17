@@ -153,7 +153,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "942";
+const APP_VERSION = "943";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2007,7 +2007,7 @@ async function hyrGenerate() {
     const config = await getHyrConfig();
     const apiKey = config.apiKey || "";
     if (!apiKey) {
-      alert("No API key saved. Tap '🔑 Set API Key' first.");
+      alert("No API key saved. Scroll down to the 'FOR LEWIS (IT) USE' section and tap '⚙ Settings (for AI Report)' to add it.");
       return;
     }
 
