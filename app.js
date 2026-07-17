@@ -153,7 +153,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "941";
+const APP_VERSION = "942";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1875,6 +1875,7 @@ function renderExportButtons() {
       <button class="export-btn export-btn-all" id="btn-export-all-trials">Backup All Excel (ZIP)</button>
       <button class="export-btn" id="btn-data-integrity-check">🔍 Run Data Integrity Check</button>
       <button class="export-btn" id="btn-recently-deleted">🗑 Recently Deleted (30 days)</button>
+      <button class="export-btn" id="btn-hyr-settings">⚙ Settings (for AI Report)</button>
     </div>`;
 
   const wire = (btnId, defaultLabel, includeTrials) => {
@@ -1897,6 +1898,7 @@ function renderExportButtons() {
   wire("btn-export-all-trials", "Backup All Excel (ZIP)", true);
   $("btn-data-integrity-check").addEventListener("click", runDataIntegrityCheck);
   $("btn-recently-deleted").addEventListener("click", renderRecentlyDeleted);
+  $("btn-hyr-settings").addEventListener("click", hyrOpenSettings);
 }
 
 // ─── HALF YEAR REPORTS ───────────────────────────────────────
@@ -1956,41 +1958,41 @@ function renderHalfYearReportsSection() {
   const students = state.students
     .filter(s => s.type !== "assessment" && s.type !== "unassigned")
     .sort((a, b) => a.name.localeCompare(b.name));
+
+  // Year dropdown: only show years from app launch up to current year (no future years)
   const currentYear = new Date().getFullYear();
+  const startYear = 2024;
+  const yearOptions = [];
+  for (let y = currentYear; y >= startYear; y--) {
+    yearOptions.push(`<option value="${y}">${y}</option>`);
+  }
 
   container.innerHTML = `
     <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
-      <select id="hyr-student-select" class="admin-input" style="flex:1;min-width:180px">
-        <option value="">— Select student —</option>
+      <select id="hyr-student-select" class="admin-input" style="flex:1;min-width:180px;background:#fff">
+        <option value="">— Select Student —</option>
         ${students.map(s => `<option value="${escHtml(s.id)}">${escHtml(s.name)}</option>`).join("")}
       </select>
-      <select id="hyr-period-select" class="admin-input" style="width:130px;flex-shrink:0">
+      <select id="hyr-period-select" class="admin-input" style="width:130px;flex-shrink:0;background:#fff">
         <option value="H1">H1 (Jan–Jun)</option>
         <option value="H2">H2 (Jul–Dec)</option>
       </select>
-      <input id="hyr-year-input" type="number" class="admin-input"
-        value="${currentYear}" min="2020" max="2099"
-        style="width:76px;flex-shrink:0;text-align:center" />
+      <select id="hyr-year-select" class="admin-input" style="width:90px;flex-shrink:0;background:#fff">
+        ${yearOptions.join("")}
+      </select>
       <button id="hyr-btn-generate" class="btn-add-section"
         style="font-size:.9rem;padding:.45rem 1.1rem;min-height:38px">
         Generate Report
       </button>
-    </div>
-    <div style="text-align:right;margin-top:.4rem">
-      <button id="hyr-btn-settings"
-        style="font-size:.75rem;color:var(--text-muted);background:none;border:none;cursor:pointer;padding:.15rem .3rem;letter-spacing:.01em">
-        ⚙ Settings
-      </button>
     </div>`;
 
   $("hyr-btn-generate").addEventListener("click", hyrGenerate);
-  $("hyr-btn-settings").addEventListener("click", hyrOpenSettings);
 }
 
 async function hyrGenerate() {
   const studentId = $("hyr-student-select")?.value;
   const period    = $("hyr-period-select")?.value || "H1";
-  const year      = parseInt($("hyr-year-input")?.value) || new Date().getFullYear();
+  const year      = parseInt($("hyr-year-select")?.value) || new Date().getFullYear();
 
   if (!studentId) { alert("Please select a student first."); return; }
 
