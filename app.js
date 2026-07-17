@@ -153,7 +153,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "947";
+const APP_VERSION = "948";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1954,25 +1954,9 @@ function renderHalfYearReportsSection() {
   const container = $("half-year-report-section");
   if (!container) return;
 
-  // Same filter as Individual Sessions: exclude assessment + unassigned
   const students = state.students
     .filter(s => s.type !== "assessment" && s.type !== "unassigned")
     .sort((a, b) => a.name.localeCompare(b.name));
-
-  // Combined period dropdown: show "YYYY H1" / "YYYY H2" up to current month only
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1; // 1-based
-  const startYear = 2026; // first year the app had real data
-  const periodOptions = [];
-  for (let y = currentYear; y >= startYear; y--) {
-    // H2 (Jul–Dec): only available if month >= 7 for current year, or past year
-    if (y < currentYear || currentMonth >= 7) {
-      periodOptions.push(`<option value="${y}-H2">${y} H2 (Jul–Dec)</option>`);
-    }
-    // H1 (Jan–Jun): always available for any year up to current
-    periodOptions.push(`<option value="${y}-H1">${y} H1 (Jan–Jun)</option>`);
-  }
 
   container.innerHTML = `
     <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
@@ -1980,14 +1964,54 @@ function renderHalfYearReportsSection() {
         <option value="">— Select Student —</option>
         ${students.map(s => `<option value="${escHtml(s.id)}">${escHtml(s.name)}</option>`).join("")}
       </select>
-      <select id="hyr-period-select" class="admin-input" style="width:160px;flex-shrink:0;background:#fff;font-family:inherit;font-size:1rem">
-        ${periodOptions.join("")}
-      </select>
+      <span id="hyr-period-loading" style="font-size:.85rem;color:var(--text-muted);display:none">Checking sessions…</span>
+      <select id="hyr-period-select" class="admin-input" style="width:170px;flex-shrink:0;background:#fff;font-family:inherit;font-size:1rem;display:none"></select>
       <button id="hyr-btn-generate" class="btn-add-section"
-        style="font-size:.9rem;padding:.45rem 1.1rem;min-height:38px">
+        style="font-size:.9rem;padding:.45rem 1.1rem;min-height:38px;display:none">
         Generate Report
       </button>
     </div>`;
+
+  $("hyr-student-select").addEventListener("change", async e => {
+    const studentId = e.target.value;
+    const periodSel = $("hyr-period-select");
+    const genBtn    = $("hyr-btn-generate");
+    const loading   = $("hyr-period-loading");
+
+    periodSel.style.display = "none";
+    genBtn.style.display    = "none";
+    loading.style.display   = "none";
+    if (!studentId) return;
+
+    loading.style.display = "";
+    try {
+      const sessions = await getAllSessionsForStudent(studentId);
+      const periodsWithData = new Set();
+      for (const sess of sessions) {
+        const [y, m] = sess.date.split("-").map(Number);
+        periodsWithData.add(`${y}-${m <= 6 ? "H1" : "H2"}`);
+      }
+      loading.style.display = "none";
+      if (periodsWithData.size === 0) {
+        periodSel.innerHTML = `<option value="">No sessions found</option>`;
+        periodSel.style.display = "";
+        return;
+      }
+      const opts = [...periodsWithData]
+        .sort((a, b) => b.localeCompare(a))
+        .map(p => {
+          const [y, h] = p.split("-");
+          return `<option value="${p}">${y} ${h} (${h === "H1" ? "Jan–Jun" : "Jul–Dec"})</option>`;
+        });
+      periodSel.innerHTML = opts.join("");
+      periodSel.style.display = "";
+      genBtn.style.display = "";
+    } catch (err) {
+      loading.style.display = "none";
+      periodSel.innerHTML = `<option value="">Error loading sessions</option>`;
+      periodSel.style.display = "";
+    }
+  });
 
   $("hyr-btn-generate").addEventListener("click", hyrGenerate);
 }
