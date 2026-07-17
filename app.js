@@ -153,7 +153,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "958";
+const APP_VERSION = "959";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2242,20 +2242,24 @@ async function hyrCollectData(student, period, year) {
 }
 
 function hyrCalcDailyAvg(sess, target) {
-  const mp = target.maxPoints || 3;
-  const scores = [];
-  for (const [actKey, act] of Object.entries(sess.activities || {})) {
-    if (act.targetName !== target.name && act.target !== target.name) continue;
-    const actId = act.id || actKey;
+  // Mirror export.js calcDailyAverage exactly: average of per-remark averages
+  const snap = (sess.targetsSnapshot || []).find(t => t.name === target.name);
+  const mp = ((snap ? (snap.maxPoints ?? target.maxPoints) : target.maxPoints) || 3);
+  const sessionActs = Object.entries(sess.activities || {})
+    .filter(([, a]) => a.targetName === target.name)
+    .map(([id, a]) => ({ id, ...a }));
+  const avgs = [];
+  for (const act of sessionActs) {
+    if (act.isHeading || act.isNote || act.empty) continue;
     for (const rem of Object.values(sess.remarks || {})) {
-      if (rem.activityId !== actId) continue;
+      if (rem.activityId !== act.id) continue;
       const trials = (rem.trials || []).filter(t => t !== -1);
       if (rem.optionScore !== undefined) trials.push(rem.optionScore);
-      scores.push(...trials);
+      if (trials.length === 0) continue;
+      avgs.push(trials.reduce((a, b) => a + b, 0) / (trials.length * mp) * 100);
     }
   }
-  if (scores.length === 0) return null;
-  return scores.reduce((a, b) => a + b, 0) / (scores.length * mp) * 100;
+  return avgs.length > 0 ? avgs.reduce((a, b) => a + b, 0) / avgs.length : null;
 }
 
 function hyrStripHtml(s) {
