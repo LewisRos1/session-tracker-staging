@@ -153,7 +153,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "954";
+const APP_VERSION = "955";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1916,8 +1916,9 @@ REPORT STRUCTURE:
    - Briefly describe the program and the targets covered
 
 2. An Overview
-   - A summary paragraph covering the child's overall performance across all targets during this period
-   - Highlight key themes, general progress, and standout achievements
+   - A short summary (3–4 sentences) of the child's overall performance during this period
+   - Do NOT cite specific percentages here — those belong in the per-target sections below
+   - Instead, describe the general trajectory (improving / consistent / variable), name which specific targets showed the most growth, and note any overarching themes across the session period
 
 3. Progress and Achievement (write one section per target in the order provided)
    For each target:
@@ -2235,8 +2236,14 @@ async function hyrCollectData(student, period, year) {
 
 function hyrCalcDailyAvg(sess, target) {
   const mp = target.maxPoints || 3;
+  const targetActIds = new Set(
+    Object.values(sess.activities || {})
+      .filter(a => a.targetName === target.name || a.target === target.name)
+      .map(a => a.id)
+  );
   const scores = [];
   for (const rem of Object.values(sess.remarks || {})) {
+    if (!targetActIds.has(rem.activityId)) continue;
     const trials = (rem.trials || []).filter(t => t !== -1);
     if (rem.optionScore !== undefined) trials.push(rem.optionScore);
     scores.push(...trials);
