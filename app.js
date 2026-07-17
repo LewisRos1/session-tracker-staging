@@ -153,7 +153,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "956";
+const APP_VERSION = "957";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2270,64 +2270,145 @@ function hyrStripHtml(s) {
     .trim();
 }
 
-function hyrDrawBarChart(targetName, labels, values) {
-  const W = 580, H = 240;
-  const PAD = { top: 28, right: 16, bottom: 38, left: 44 };
-  const cW = W - PAD.left - PAD.right;
-  const cH = H - PAD.top - PAD.bottom;
+function hyrDrawSummaryChart(chartData, studentName, period, year) {
+  const entries = Object.entries(chartData).map(([name, {labels, values}]) => {
+    const nonNull = values.map((v, i) => (v !== null && v !== undefined) ? { v, label: labels[i] } : null).filter(Boolean);
+    return { name, earliest: nonNull[0] || null, latest: nonNull[nonNull.length - 1] || null };
+  }).filter(e => e.earliest || e.latest);
+  if (entries.length === 0) return null;
 
+  const W = 580, H = 330;
+  const PAD = { top: 52, right: 20, bottom: 74, left: 44 };
+  const cW = W - PAD.left - PAD.right, cH = H - PAD.top - PAD.bottom;
   const canvas = document.createElement("canvas");
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
 
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#1f2937"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText(`${studentName} — ${period} ${year}`, W / 2, 28);
 
-  // Grid lines + Y labels
-  ctx.font = "11px sans-serif";
   for (const pct of [0, 25, 50, 75, 100]) {
     const y = PAD.top + cH - (pct / 100) * cH;
     ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + cW, y); ctx.stroke();
-    ctx.fillStyle = "#9ca3af"; ctx.textAlign = "right";
+    ctx.fillStyle = "#9ca3af"; ctx.font = "10px sans-serif"; ctx.textAlign = "right";
     ctx.fillText(pct + "%", PAD.left - 5, y + 4);
   }
 
-  // 83% independence threshold line
-  const indY = PAD.top + cH - 0.83 * cH;
-  ctx.strokeStyle = "#10b981"; ctx.lineWidth = 1.5;
-  ctx.setLineDash([5, 4]);
-  ctx.beginPath(); ctx.moveTo(PAD.left, indY); ctx.lineTo(PAD.left + cW, indY); ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = "#10b981"; ctx.font = "10px sans-serif"; ctx.textAlign = "left";
-  ctx.fillText("83% (independent)", PAD.left + 4, indY - 4);
+  const GREY = "#a3a3a3", BLUE = "#5b9bd5";
+  const n = entries.length;
+  const groupW = cW / n;
+  const barPad = Math.max(6, groupW * 0.12), barGap = 3;
+  const barW = (groupW - barPad * 2 - barGap) / 2;
 
-  // Bars
-  const n = labels.length;
-  const gap = 10;
-  const barW = (cW - gap * (n + 1)) / n;
-  ctx.font = "bold 12px sans-serif";
-  for (let i = 0; i < n; i++) {
-    const x = PAD.left + gap + i * (barW + gap);
-    const v = values[i];
-    if (v !== null && v !== undefined) {
-      const bH = (v / 100) * cH;
-      const by = PAD.top + cH - bH;
-      ctx.fillStyle = v >= 83 ? "#10b981" : "#6366f1";
-      ctx.fillRect(x, by, barW, bH);
-      ctx.fillStyle = "#111827"; ctx.textAlign = "center";
-      ctx.fillText(v + "%", x + barW / 2, by - 4);
-    } else {
-      ctx.fillStyle = "#f3f4f6";
-      ctx.fillRect(x, PAD.top, barW, cH);
-      ctx.fillStyle = "#d1d5db"; ctx.font = "11px sans-serif"; ctx.textAlign = "center";
-      ctx.fillText("—", x + barW / 2, PAD.top + cH / 2 + 4);
-      ctx.font = "bold 12px sans-serif";
+  entries.forEach((entry, i) => {
+    const gx = PAD.left + i * groupW + barPad;
+    ctx.font = "bold 11px sans-serif";
+
+    if (entry.earliest) {
+      const bH = (entry.earliest.v / 100) * cH, by = PAD.top + cH - bH;
+      ctx.fillStyle = GREY; ctx.fillRect(gx, by, barW, bH);
+      ctx.fillStyle = "#374151"; ctx.textAlign = "center";
+      ctx.fillText(entry.earliest.v + "%", gx + barW / 2, by - 4);
     }
-    ctx.fillStyle = "#374151"; ctx.font = "12px sans-serif"; ctx.textAlign = "center";
-    ctx.fillText(labels[i], x + barW / 2, PAD.top + cH + 18);
-    ctx.font = "bold 12px sans-serif";
+    if (entry.latest) {
+      const bH = (entry.latest.v / 100) * cH, by = PAD.top + cH - bH, bx = gx + barW + barGap;
+      ctx.fillStyle = BLUE; ctx.fillRect(bx, by, barW, bH);
+      ctx.fillStyle = "#374151"; ctx.textAlign = "center";
+      ctx.fillText(entry.latest.v + "%", bx + barW / 2, by - 4);
+    }
+
+    const midX = PAD.left + i * groupW + groupW / 2;
+    ctx.fillStyle = "#374151"; ctx.font = "11px sans-serif"; ctx.textAlign = "center";
+    const maxW = groupW - 8, words = entry.name.split(" ");
+    let l1 = "", l2 = "";
+    for (const w of words) {
+      if (!l1 || ctx.measureText(l1 + " " + w).width <= maxW) l1 = l1 ? l1 + " " + w : w;
+      else l2 = l2 ? l2 + " " + w : w;
+    }
+    ctx.fillText(l1, midX, PAD.top + cH + 16);
+    if (l2) ctx.fillText(l2, midX, PAD.top + cH + 30);
+  });
+
+  const lY = H - 12, lX = W / 2 - 118;
+  ctx.fillStyle = GREY; ctx.fillRect(lX, lY - 10, 14, 10);
+  ctx.fillStyle = "#374151"; ctx.font = "11px sans-serif"; ctx.textAlign = "left";
+  ctx.fillText("Earliest Month Avg", lX + 18, lY);
+  ctx.fillStyle = BLUE; ctx.fillRect(lX + 138, lY - 10, 14, 10);
+  ctx.fillText("Latest Month Avg", lX + 156, lY);
+
+  return canvas.toDataURL("image/png").split(",")[1];
+}
+
+function hyrDrawLineChart(targetName, labels, values, period, year) {
+  const W = 580, H = 290;
+  const PAD = { top: 52, right: 24, bottom: 48, left: 50 };
+  const cW = W - PAD.left - PAD.right, cH = H - PAD.top - PAD.bottom;
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
+
+  const rangeLabel = period === "H1" ? "Jan–Jun" : "Jul–Dec";
+  ctx.fillStyle = "#1f2937"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText(`${targetName}  (${rangeLabel} ${year})`, W / 2, 24);
+
+  const pts = labels.map((label, i) => ({ label, v: values[i], i })).filter(p => p.v !== null && p.v !== undefined);
+  if (pts.length === 0) return null;
+
+  const allV = pts.map(p => p.v);
+  const minV = Math.max(0,   Math.floor((Math.min(...allV) - 12) / 10) * 10);
+  const maxV = Math.min(100, Math.ceil ((Math.max(...allV) + 12) / 10) * 10);
+  const range = maxV - minV || 20;
+  const toY = v => PAD.top + cH - ((v - minV) / range) * cH;
+  const toX = i => PAD.left + (labels.length > 1 ? (i / (labels.length - 1)) * cW : cW / 2);
+
+  ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
+  for (let v = minV; v <= maxV; v += 10) {
+    const y = toY(v);
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + cW, y); ctx.stroke();
+    ctx.fillStyle = "#9ca3af"; ctx.font = "10px sans-serif"; ctx.textAlign = "right";
+    ctx.fillText(v + "%", PAD.left - 5, y + 4);
   }
+
+  const xs = pts.map(p => p.i), ys = pts.map(p => p.v), np = pts.length;
+  const sX = xs.reduce((a,b)=>a+b,0), sY = ys.reduce((a,b)=>a+b,0);
+  const sXY = xs.reduce((a,x,i)=>a+x*ys[i],0), sX2 = xs.reduce((a,x)=>a+x*x,0);
+  const denom = np*sX2 - sX*sX;
+  const slope = denom ? (np*sXY - sX*sY) / denom : 0;
+  const intercept = (sY - slope*sX) / np;
+  const trendY = i => Math.max(minV, Math.min(maxV, slope*i + intercept));
+
+  ctx.strokeStyle = "#b0bec5"; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
+  ctx.beginPath();
+  ctx.moveTo(toX(xs[0]), toY(trendY(xs[0])));
+  ctx.lineTo(toX(xs[xs.length-1]), toY(trendY(xs[xs.length-1])));
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  const ppChange = Math.round(ys[ys.length-1] - ys[0]);
+  const ppStr = (ppChange >= 0 ? "+" : "") + ppChange + "pp";
+  const icon  = ppChange > 8 ? "↑" : ppChange < -8 ? "↓" : "→";
+  const tLabel = ppChange > 8 ? "Trending Up" : ppChange < -8 ? "Trending Down" : "Stable";
+  ctx.fillStyle = "#6b7280"; ctx.font = "italic 11px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText(`${icon} ${tLabel} (${ppStr})`, W / 2, 40);
+
+  ctx.strokeStyle = "#4472c4"; ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  pts.forEach((p, idx) => { const x=toX(p.i), y=toY(p.v); idx===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+  ctx.stroke();
+
+  pts.forEach(p => {
+    const x = toX(p.i), y = toY(p.v);
+    ctx.fillStyle = "#4472c4"; ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#1f2937"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(p.v + "%", x, y - 9);
+  });
+
+  ctx.fillStyle = "#374151"; ctx.font = "11px sans-serif"; ctx.textAlign = "center";
+  labels.forEach((label, i) => ctx.fillText(label, toX(i), PAD.top + cH + 18));
+  ctx.fillStyle = "#6b7280"; ctx.fillText("Date", W / 2, PAD.top + cH + 36);
 
   return canvas.toDataURL("image/png").split(",")[1];
 }
@@ -2340,7 +2421,11 @@ function hyrChartForHeading(heading, chartData) {
   return null;
 }
 
-function hyrMdToHtml(text, chartData = {}) {
+function hyrMdToHtml(text, chartData = {}, studentName = "", period = "H1", year = "") {
+  const summaryB64 = Object.keys(chartData).length > 0
+    ? hyrDrawSummaryChart(chartData, studentName, period, year) : null;
+  let summaryDone = false;
+
   const lines = text.split("\n");
   let html = "";
   let inP = false;
@@ -2358,11 +2443,16 @@ function hyrMdToHtml(text, chartData = {}) {
     if (t.startsWith("## "))  {
       closeP();
       const heading = t.slice(3);
-      html += `<h2 style="margin:1.2rem 0 .4rem;font-size:1.1rem">${inlineHtml(heading)}</h2>`;
       const chart = hyrChartForHeading(heading, chartData);
+      if (chart && !summaryDone && summaryB64) {
+        html += `<h2 style="margin:1.5rem 0 .5rem;font-size:1.1rem">Half-Year Progress Overview</h2>`;
+        html += `<img src="data:image/png;base64,${summaryB64}" style="width:100%;max-width:540px;margin:.4rem 0 1rem;display:block">`;
+        summaryDone = true;
+      }
+      html += `<h2 style="margin:1.2rem 0 .4rem;font-size:1.1rem">${inlineHtml(heading)}</h2>`;
       if (chart) {
-        const b64 = hyrDrawBarChart(chart.tName, chart.labels, chart.values);
-        html += `<img src="data:image/png;base64,${b64}" style="width:100%;max-width:520px;margin:.5rem 0 .75rem;display:block;border-radius:4px">`;
+        const lb64 = hyrDrawLineChart(chart.tName, chart.labels, chart.values, period, year);
+        if (lb64) html += `<img src="data:image/png;base64,${lb64}" style="width:100%;max-width:540px;margin:.4rem 0 .75rem;display:block">`;
       }
       continue;
     }
@@ -2378,7 +2468,7 @@ function hyrMdToHtml(text, chartData = {}) {
 function hyrShowPreview(reportText, studentName, period, year, chartData = {}) {
   const periodLabel = period === "H1" ? `Jan–Jun ${year}` : `Jul–Dec ${year}`;
   $("hyr-preview-title").textContent = `${studentName} — ${periodLabel}`;
-  $("hyr-preview-body").innerHTML = hyrMdToHtml(reportText, chartData);
+  $("hyr-preview-body").innerHTML = hyrMdToHtml(reportText, chartData, studentName, period, year);
   $("hyr-preview-modal").classList.remove("hidden");
 
   $("hyr-preview-close").onclick = () => $("hyr-preview-modal").classList.add("hidden");
@@ -2426,6 +2516,10 @@ function hyrDownloadWord(reportText, studentName, period, year, chartData = {}) 
     );
   }
 
+  const summaryB64 = Object.keys(chartData).length > 0
+    ? hyrDrawSummaryChart(chartData, studentName, period, year) : null;
+  let summaryDone = false;
+
   for (const line of reportText.split("\n")) {
     const t = line.trim();
     if (!t || t === "---") continue;
@@ -2438,16 +2532,28 @@ function hyrDownloadWord(reportText, studentName, period, year, chartData = {}) 
       }));
     } else if (t.startsWith("## ")) {
       const heading = t.slice(3);
+      const chart = hyrChartForHeading(heading, chartData);
+      if (chart && !summaryDone && summaryB64) {
+        paragraphs.push(new Paragraph({
+          children: [new TextRun({ text: "Half-Year Progress Overview", bold: true, size: 24 })],
+          heading: HeadingLevel.HEADING_2,
+          spacing: { before: 280, after: 120 }
+        }));
+        paragraphs.push(new Paragraph({
+          children: [new ImageRun({ data: b64ToUint8(summaryB64), transformation: { width: 480, height: 272 }, type: "png" })],
+          spacing: { after: 200 }
+        }));
+        summaryDone = true;
+      }
       paragraphs.push(new Paragraph({
         children: [new TextRun({ text: heading, bold: true, size: 24 })],
         heading: HeadingLevel.HEADING_2,
         spacing: { before: 280, after: 120 }
       }));
-      const chart = hyrChartForHeading(heading, chartData);
       if (chart) {
-        const imgData = b64ToUint8(hyrDrawBarChart(chart.tName, chart.labels, chart.values));
-        paragraphs.push(new Paragraph({
-          children: [new ImageRun({ data: imgData, transformation: { width: 480, height: 199 }, type: "png" })],
+        const lb64 = hyrDrawLineChart(chart.tName, chart.labels, chart.values, period, year);
+        if (lb64) paragraphs.push(new Paragraph({
+          children: [new ImageRun({ data: b64ToUint8(lb64), transformation: { width: 480, height: 240 }, type: "png" })],
           spacing: { after: 120 }
         }));
       }
