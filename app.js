@@ -7,6 +7,7 @@ import {
   getOrCreateTodaySession,
   listenToSession,
   addActivity,
+  addAutoFillActivityAndRemark,
   addActivityWithCleanup,
   deleteOrphanActivities,
   adoptOrphanActivity,
@@ -150,7 +151,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "933";
+const APP_VERSION = "934";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3440,8 +3441,13 @@ function renderFedcTarget(target) {
     const actData    = findActivityByName(target.name, pa.name, null, pa.id);
     // Claim unlinked records in local state immediately so the next same-named predefined
     // activity in the loop can't find and share the same Firestore record.
+    // Also persist the configId to Firestore so future session opens can find this
+    // activity by configId (not just by name), preventing duplicate activity creation.
     if (actData && pa.id && !actData.configId && state.sessionData?.activities?.[actData.id]) {
       state.sessionData.activities[actData.id].configId = pa.id;
+      if (state.currentSessionId) {
+        adoptOrphanActivity(state.currentSessionId, actData.id, actData.parentActivity || null, pa.id).catch(() => {});
+      }
     }
     const actId      = actData ? actData.id : null;
     const remarks    = actId ? getRemarksForActivity(actId) : [];
@@ -4609,23 +4615,20 @@ async function autoFillStructuredRemarks(student, sessionId) {
   }
   if (toFill.length === 0) return 0;
 
-  // Wave 1: create missing activities in parallel
+  // Single wave: for items that need a brand-new activity, create the activity
+  // AND its empty placeholder remark in ONE atomic Firestore write so no
+  // intermediate snapshot can arrive showing "+Add Remark & Trials" between
+  // the two operations. For existing activities (actId already known) only a
+  // remark write is needed — no between-write gap risk there.
   await Promise.all(toFill.map(async item => {
-    if (!item.actId) {
-      try {
-        item.actId = await addActivity(sessionId, item.target.name, item.pa.name, item.pa.order ?? 0, true, undefined, item.paParent, item.paConfigId);
-      } catch (err) {
-        structuredRemarkAutoFillInFlight.delete(item.key);
-        item.actId = null;
-      }
-    }
-  }));
-
-  // Wave 2: add remarks in parallel for all resolved activities
-  await Promise.all(toFill.map(async item => {
-    if (!item.actId) return;
     try {
-      await addRemark(sessionId, item.actId, "");
+      if (!item.actId) {
+        await addAutoFillActivityAndRemark(sessionId, item.target.name, item.pa.name, item.pa.order ?? 0, item.paParent, item.paConfigId);
+      } else {
+        await addRemark(sessionId, item.actId, "");
+      }
+    } catch {
+      // silent — auto-fill is best-effort; the next session open will retry
     } finally {
       structuredRemarkAutoFillInFlight.delete(item.key);
     }

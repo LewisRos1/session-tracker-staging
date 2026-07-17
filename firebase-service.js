@@ -390,6 +390,23 @@ export async function addActivity(sessionId, targetName, activityName, order, is
   return actId;
 }
 
+// Creates an auto-fill predefined activity AND its empty placeholder remark
+// in a single Firestore write so no intermediate snapshot can arrive between
+// the two — which would cause "+Add Remark & Trials" to flash briefly before
+// the remark landed in a second snapshot.
+export async function addAutoFillActivityAndRemark(sessionId, targetName, activityName, order, parentActivity = null, configId = null) {
+  const actId = generateId("a");
+  const remId = generateId("r");
+  const actData = { targetName, activityName, order, isPredefined: true };
+  if (parentActivity) actData.parentActivity = parentActivity;
+  if (configId) actData.configId = configId;
+  await updateDoc(doc(db, "sessions", sessionId), {
+    [`activities.${actId}`]: actData,
+    [`remarks.${remId}`]: { activityId: actId, text: "", trials: [], order: Date.now() }
+  });
+  return actId;
+}
+
 export async function deleteActivity(sessionId, actId, remarkIds) {
   const updates = { [`activities.${actId}`]: deleteField() };
   for (const remId of remarkIds) {
