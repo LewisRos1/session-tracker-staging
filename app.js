@@ -153,7 +153,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "957";
+const APP_VERSION = "958";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2243,17 +2243,16 @@ async function hyrCollectData(student, period, year) {
 
 function hyrCalcDailyAvg(sess, target) {
   const mp = target.maxPoints || 3;
-  const targetActIds = new Set(
-    Object.values(sess.activities || {})
-      .filter(a => a.targetName === target.name || a.target === target.name)
-      .map(a => a.id)
-  );
   const scores = [];
-  for (const rem of Object.values(sess.remarks || {})) {
-    if (!targetActIds.has(rem.activityId)) continue;
-    const trials = (rem.trials || []).filter(t => t !== -1);
-    if (rem.optionScore !== undefined) trials.push(rem.optionScore);
-    scores.push(...trials);
+  for (const [actKey, act] of Object.entries(sess.activities || {})) {
+    if (act.targetName !== target.name && act.target !== target.name) continue;
+    const actId = act.id || actKey;
+    for (const rem of Object.values(sess.remarks || {})) {
+      if (rem.activityId !== actId) continue;
+      const trials = (rem.trials || []).filter(t => t !== -1);
+      if (rem.optionScore !== undefined) trials.push(rem.optionScore);
+      scores.push(...trials);
+    }
   }
   if (scores.length === 0) return null;
   return scores.reduce((a, b) => a + b, 0) / (scores.length * mp) * 100;
