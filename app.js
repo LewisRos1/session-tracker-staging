@@ -151,7 +151,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "936";
+const APP_VERSION = "937";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -9767,8 +9767,8 @@ function renderTargetManageContent(student, target) {
   const _discOpen = $("mn-discontinued-section")?.style.display === "block";
   const _mastOpen = $("mn-mastered-section")?.style.display === "block";
   $("manage-modal-body").innerHTML = html;
-  if (_discOpen) { const s = $("mn-discontinued-section"); if (s) { s.style.display = "block"; const a = s.previousElementSibling?.querySelector(".mn-toggle-arrow"); if (a) a.textContent = "▼"; } }
-  if (_mastOpen) { const s = $("mn-mastered-section"); if (s) { s.style.display = "block"; const a = s.previousElementSibling?.querySelector(".mn-toggle-arrow"); if (a) a.textContent = "▼"; } }
+  if (_discOpen) { const s = $("mn-discontinued-section"); if (s) { s.style.display = "block"; const a = s.previousElementSibling?.querySelector(".mn-toggle-arrow"); if (a) a.textContent = "▼"; s.querySelectorAll(".mn-inactive-name-input").forEach(autoResizeTextarea); } }
+  if (_mastOpen) { const s = $("mn-mastered-section"); if (s) { s.style.display = "block"; const a = s.previousElementSibling?.querySelector(".mn-toggle-arrow"); if (a) a.textContent = "▼"; s.querySelectorAll(".mn-inactive-name-input").forEach(autoResizeTextarea); } }
   $("manage-modal-body").querySelectorAll(".admin-list-item textarea").forEach(autoResizeTextarea);
 
   const saveTarget = async () => {
@@ -10108,6 +10108,7 @@ function renderTargetManageContent(student, target) {
       const open = panel.style.display !== "none";
       panel.style.display = open ? "none" : "block";
       if (arrow) arrow.textContent = open ? "▶" : "▼";
+      if (!open) panel.querySelectorAll(".mn-inactive-name-input").forEach(autoResizeTextarea);
     });
   });
 
@@ -10240,7 +10241,6 @@ function renderTargetManageContent(student, target) {
   });
 
   $("manage-modal-body").querySelectorAll(".mn-inactive-name-input").forEach(el => {
-    autoResizeTextarea(el);
     el.addEventListener("input", () => autoResizeTextarea(el));
     el.addEventListener("blur", async () => {
       const type = el.dataset.inactiveType;
@@ -11571,6 +11571,7 @@ function renderTemplateManageContent(template) {
       const open = panel.style.display !== "none";
       panel.style.display = open ? "none" : "block";
       if (arrow) arrow.textContent = open ? "▶" : "▼";
+      if (!open) panel.querySelectorAll(".mn-inactive-name-input").forEach(autoResizeTextarea);
     });
   });
 
@@ -11669,7 +11670,6 @@ function renderTemplateManageContent(template) {
   });
 
   $("manage-modal-body").querySelectorAll(".mn-inactive-name-input").forEach(el => {
-    autoResizeTextarea(el);
     el.addEventListener("input", () => autoResizeTextarea(el));
     el.addEventListener("blur", async () => {
       const type = el.dataset.inactiveType;
