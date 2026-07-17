@@ -153,7 +153,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "952";
+const APP_VERSION = "953";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2230,10 +2230,35 @@ function hyrStripHtml(s) {
     .trim();
 }
 
+function hyrMdToHtml(text) {
+  const lines = text.split("\n");
+  let html = "";
+  let inP = false;
+  const closeP = () => { if (inP) { html += "</p>"; inP = false; } };
+  const inlineHtml = s => {
+    s = s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    s = s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    s = s.replace(/\*(.+?)\*/g, "<em>$1</em>");
+    return s;
+  };
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t || t === "---") { closeP(); continue; }
+    if (t.startsWith("### ")) { closeP(); html += `<h3 style="margin:.9rem 0 .3rem;font-size:1rem">${inlineHtml(t.slice(4))}</h3>`; continue; }
+    if (t.startsWith("## "))  { closeP(); html += `<h2 style="margin:1.2rem 0 .4rem;font-size:1.1rem">${inlineHtml(t.slice(3))}</h2>`; continue; }
+    if (t.startsWith("# "))   { closeP(); html += `<h1 style="margin:1.4rem 0 .5rem;font-size:1.25rem">${inlineHtml(t.slice(2))}</h1>`; continue; }
+    if (!inP) { html += `<p style="margin:.6rem 0;line-height:1.6">`; inP = true; }
+    else html += "<br>";
+    html += inlineHtml(t);
+  }
+  closeP();
+  return html;
+}
+
 function hyrShowPreview(reportText, studentName, period, year) {
   const periodLabel = period === "H1" ? `Jan–Jun ${year}` : `Jul–Dec ${year}`;
   $("hyr-preview-title").textContent = `${studentName} — ${periodLabel}`;
-  $("hyr-preview-body").textContent = reportText;
+  $("hyr-preview-body").innerHTML = hyrMdToHtml(reportText);
   $("hyr-preview-modal").classList.remove("hidden");
 
   $("hyr-preview-close").onclick = () => $("hyr-preview-modal").classList.add("hidden");
@@ -2265,30 +2290,42 @@ function hyrDownloadWord(reportText, studentName, period, year) {
     spacing: { after: 400 }
   }));
 
-  // Body paragraphs — split on double newlines
-  const blocks = reportText.split(/\n{2,}/);
-  for (const block of blocks) {
-    const trimmed = block.trim();
-    if (!trimmed) continue;
+  // Parse inline markdown (**bold**) into TextRun objects
+  function inlineRuns(text, baseSize = 22) {
+    return text.split(/(\*\*[^*]+\*\*)/g).filter(p => p).map(p =>
+      (p.startsWith("**") && p.endsWith("**"))
+        ? new TextRun({ text: p.slice(2, -2), bold: true, size: baseSize })
+        : new TextRun({ text: p, size: baseSize })
+    );
+  }
 
-    // Detect section headings: short lines ending without punctuation or all-caps
-    const lines = trimmed.split("\n");
-    if (lines.length === 1 && trimmed.length < 80 && /^[A-Z1-9]/.test(trimmed) && !/[.,:;]$/.test(trimmed)) {
+  for (const line of reportText.split("\n")) {
+    const t = line.trim();
+    if (!t || t === "---") continue;
+
+    if (t.startsWith("# ")) {
       paragraphs.push(new Paragraph({
-        children: [new TextRun({ text: trimmed, bold: true, size: 24 })],
+        children: [new TextRun({ text: t.slice(2), bold: true, size: 26 })],
+        heading: HeadingLevel.HEADING_1,
+        spacing: { before: 320, after: 160 }
+      }));
+    } else if (t.startsWith("## ")) {
+      paragraphs.push(new Paragraph({
+        children: [new TextRun({ text: t.slice(3), bold: true, size: 24 })],
         heading: HeadingLevel.HEADING_2,
-        spacing: { before: 300, after: 100 }
+        spacing: { before: 280, after: 120 }
+      }));
+    } else if (t.startsWith("### ")) {
+      paragraphs.push(new Paragraph({
+        children: [new TextRun({ text: t.slice(4), bold: true, size: 22 })],
+        heading: HeadingLevel.HEADING_3,
+        spacing: { before: 200, after: 80 }
       }));
     } else {
-      // Multi-line block or bullet — render line by line
-      for (const line of lines) {
-        const t = line.trim();
-        if (!t) continue;
-        paragraphs.push(new Paragraph({
-          children: [new TextRun({ text: t, size: 22 })],
-          spacing: { after: 140 }
-        }));
-      }
+      paragraphs.push(new Paragraph({
+        children: inlineRuns(t),
+        spacing: { after: 140 }
+      }));
     }
   }
 
