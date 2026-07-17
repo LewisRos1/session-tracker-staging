@@ -153,7 +153,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "953";
+const APP_VERSION = "954";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1970,6 +1970,12 @@ function renderHalfYearReportsSection() {
         style="font-size:.9rem;padding:.45rem 1.1rem;min-height:38px;display:none">
         Generate Report
       </button>
+    </div>
+    <div id="hyr-progress" style="display:none;margin-top:.85rem">
+      <div style="background:#e5e7eb;border-radius:99px;height:6px;overflow:hidden">
+        <div id="hyr-progress-bar" style="height:100%;background:var(--primary);width:0%;transition:width .5s ease"></div>
+      </div>
+      <div id="hyr-progress-label" style="font-size:.82rem;color:var(--text-muted);margin-top:.45rem;text-align:center"></div>
     </div>`;
 
   $("hyr-student-select").addEventListener("change", async e => {
@@ -2028,13 +2034,26 @@ async function hyrGenerate() {
   if (!student) return;
 
   const btn = $("hyr-btn-generate");
+  const progress = $("hyr-progress");
+  const bar      = $("hyr-progress-bar");
+  const label    = $("hyr-progress-label");
+
+  const setProgress = (pct, text) => {
+    bar.style.width = pct + "%";
+    label.textContent = text;
+  };
+
   btn.disabled = true;
   btn.textContent = "Generating…";
+  progress.style.display = "";
+  setProgress(10, "Collecting session data…");
 
   try {
     const config = await getHyrConfig();
     const systemPrompt = config.prompt || HYR_DEFAULT_PROMPT;
     const dataText = await hyrCollectData(student, period, year);
+
+    setProgress(35, "Sending to AI…");
 
     const periodLabel = period === "H1"
       ? `January–June ${year}`
@@ -2053,6 +2072,8 @@ async function hyrGenerate() {
       })
     });
 
+    setProgress(80, "Writing report…");
+
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
       throw new Error(err.error?.message || `API error ${resp.status}`);
@@ -2062,6 +2083,9 @@ async function hyrGenerate() {
     const reportText = data.content?.[0]?.text || "";
     if (!reportText) throw new Error("Empty response from Claude.");
 
+    setProgress(100, "Done!");
+    await new Promise(r => setTimeout(r, 400));
+
     hyrShowPreview(reportText, student.name, period, year);
 
   } catch (err) {
@@ -2069,6 +2093,8 @@ async function hyrGenerate() {
   } finally {
     btn.disabled = false;
     btn.textContent = "Generate Report";
+    progress.style.display = "none";
+    bar.style.width = "0%";
   }
 }
 
