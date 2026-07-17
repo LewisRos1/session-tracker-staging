@@ -151,7 +151,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "935";
+const APP_VERSION = "936";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -9707,9 +9707,9 @@ function renderTargetManageContent(student, target) {
     masteredActs.forEach((a, ci) => {
       const dateLabel = a.masteredOn ? `Mastered on ${fmtPeriodDate(a.masteredOn)}` : 'Mastered';
       const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
-      html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
-        <span style="flex:1;font-size:.875rem;color:#374151">${escHtml(a.name || "")}</span>
-        <span style="font-size:.72rem;color:#059669;white-space:nowrap">${dateLabel}</span>
+      html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
+        <textarea class="mn-inactive-name-input" data-inactive-type="mastered" data-inactive-idx="${ci}" rows="1" style="flex:1;font-size:.875rem;color:#374151;background:transparent;border:none;resize:none;overflow-y:hidden;padding:0;font-family:inherit;line-height:1.4;outline:none;min-width:0">${escHtml(a.name || "")}</textarea>
+        <span style="font-size:.72rem;color:#059669;white-space:nowrap;padding-top:2px">${dateLabel}</span>
         <button class="btn-mn-undo-mastered" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Undo</button>
         <button class="btn-adm-del btn-mn-del-mastered" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
       </div>`;
@@ -9734,9 +9734,9 @@ function renderTargetManageContent(student, target) {
     discontinuedActs.forEach((a, ci) => {
       const dateLabel = a.discontinuedOn ? `Discontinued on ${fmtPeriodDate(a.discontinuedOn)}` : 'Discontinued';
       const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
-      html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
-        <span style="flex:1;font-size:.875rem;color:#374151">${escHtml(a.name || "")}</span>
-        <span style="font-size:.72rem;color:#6b7280;white-space:nowrap">${dateLabel}</span>
+      html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
+        <textarea class="mn-inactive-name-input" data-inactive-type="discontinued" data-inactive-idx="${ci}" rows="1" style="flex:1;font-size:.875rem;color:#374151;background:transparent;border:none;resize:none;overflow-y:hidden;padding:0;font-family:inherit;line-height:1.4;outline:none;min-width:0">${escHtml(a.name || "")}</textarea>
+        <span style="font-size:.72rem;color:#6b7280;white-space:nowrap;padding-top:2px">${dateLabel}</span>
         <button class="btn-mn-undo-discontinued" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Undo</button>
         <button class="btn-adm-del btn-mn-del-discontinued" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
       </div>`;
@@ -10236,6 +10236,25 @@ function renderTargetManageContent(student, target) {
       delete pa.isStopped;
       await saveTarget();
       renderTargetManageContent(student, target);
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-inactive-name-input").forEach(el => {
+    autoResizeTextarea(el);
+    el.addEventListener("input", () => autoResizeTextarea(el));
+    el.addEventListener("blur", async () => {
+      const type = el.dataset.inactiveType;
+      const ci = parseInt(el.dataset.inactiveIdx, 10);
+      const a = type === "mastered" ? masteredActs[ci] : discontinuedActs[ci];
+      if (!a) return;
+      const v = el.value.trim();
+      if (!v || v === a.name) return;
+      const oldName = a.name;
+      a.name = v;
+      acts.forEach(a2 => { if (a2.parentActivity === oldName) a2.parentActivity = v; });
+      await saveTarget();
+      flashSaved(el);
+      propagateActivityRename(student, target.name, oldName, v);
     });
   });
 
@@ -11128,9 +11147,9 @@ function renderTemplateManageContent(template) {
     masteredActs.forEach((a, ci) => {
       const dateLabel = a.masteredOn ? `Mastered on ${fmtPeriodDate(a.masteredOn)}` : 'Mastered';
       const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
-      html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
-        <span style="flex:1;font-size:.875rem;color:#374151">${escHtml(a.name || "")}</span>
-        <span style="font-size:.72rem;color:#059669;white-space:nowrap">${dateLabel}</span>
+      html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
+        <textarea class="mn-inactive-name-input" data-inactive-type="mastered" data-inactive-idx="${ci}" rows="1" style="flex:1;font-size:.875rem;color:#374151;background:transparent;border:none;resize:none;overflow-y:hidden;padding:0;font-family:inherit;line-height:1.4;outline:none;min-width:0">${escHtml(a.name || "")}</textarea>
+        <span style="font-size:.72rem;color:#059669;white-space:nowrap;padding-top:2px">${dateLabel}</span>
         <button class="btn-mn-undo-mastered" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Undo</button>
         <button class="btn-adm-del btn-mn-del-mastered" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
       </div>`;
@@ -11155,9 +11174,9 @@ function renderTemplateManageContent(template) {
     discontinuedActs.forEach((a, ci) => {
       const dateLabel = a.discontinuedOn ? `Discontinued on ${fmtPeriodDate(a.discontinuedOn)}` : 'Discontinued';
       const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
-      html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
-        <span style="flex:1;font-size:.875rem;color:#374151">${escHtml(a.name || "")}</span>
-        <span style="font-size:.72rem;color:#6b7280;white-space:nowrap">${dateLabel}</span>
+      html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
+        <textarea class="mn-inactive-name-input" data-inactive-type="discontinued" data-inactive-idx="${ci}" rows="1" style="flex:1;font-size:.875rem;color:#374151;background:transparent;border:none;resize:none;overflow-y:hidden;padding:0;font-family:inherit;line-height:1.4;outline:none;min-width:0">${escHtml(a.name || "")}</textarea>
+        <span style="font-size:.72rem;color:#6b7280;white-space:nowrap;padding-top:2px">${dateLabel}</span>
         <button class="btn-mn-undo-discontinued" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Undo</button>
         <button class="btn-adm-del btn-mn-del-discontinued" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
       </div>`;
@@ -11646,6 +11665,24 @@ function renderTemplateManageContent(template) {
       delete pa.isStopped;
       await saveTemplateFn();
       renderTemplateManageContent(template);
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-inactive-name-input").forEach(el => {
+    autoResizeTextarea(el);
+    el.addEventListener("input", () => autoResizeTextarea(el));
+    el.addEventListener("blur", async () => {
+      const type = el.dataset.inactiveType;
+      const ci = parseInt(el.dataset.inactiveIdx, 10);
+      const a = type === "mastered" ? masteredActs[ci] : discontinuedActs[ci];
+      if (!a) return;
+      const v = el.value.trim();
+      if (!v || v === a.name) return;
+      const oldName = a.name;
+      a.name = v;
+      acts.forEach(a2 => { if (a2.parentActivity === oldName) a2.parentActivity = v; });
+      await saveTemplateFn();
+      flashSaved(el);
     });
   });
 
