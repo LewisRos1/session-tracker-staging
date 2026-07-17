@@ -153,7 +153,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "955";
+const APP_VERSION = "956";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1921,11 +1921,12 @@ REPORT STRUCTURE:
    - Instead, describe the general trajectory (improving / consistent / variable), name which specific targets showed the most growth, and note any overarching themes across the session period
 
 3. Progress and Achievement (write one section per target in the order provided)
-   For each target:
-   - Summarise the child's performance and trends over the 6 months
-   - Reference monthly averages and notable improvements or dips
-   - Draw on the therapist's session remarks to provide specific, concrete examples
-   - Mention any milestones reached (e.g. first time achieving independence on an activity)
+   IMPORTANT: Use the exact target name as the ## heading (e.g. ## Self-Regulation). Do not number, prefix, or modify the name.
+   A bar chart of monthly averages will be inserted after each heading for the reader — write text that explains and interprets that chart:
+   - Open with a sentence describing the overall monthly trend (e.g. "X showed a steady upward trend, rising from 72% in January to 88% by June")
+   - Describe any dips or plateaus and what may have contributed (reference remarks if available)
+   - Draw on specific session remarks to give concrete, real-world examples of what the numbers mean in practice
+   - Mention any milestones (e.g. first session reaching independence on an activity)
 
 4. Areas to Continue to Build On
    - 3–5 bullet points identifying specific skills or activities that need continued focus
@@ -2052,7 +2053,7 @@ async function hyrGenerate() {
   try {
     const config = await getHyrConfig();
     const systemPrompt = config.prompt || HYR_DEFAULT_PROMPT;
-    const dataText = await hyrCollectData(student, period, year);
+    const { text: dataText, chartData } = await hyrCollectData(student, period, year);
 
     setProgress(35, "Sending to AI…");
 
@@ -2087,7 +2088,7 @@ async function hyrGenerate() {
     setProgress(100, "Done!");
     await new Promise(r => setTimeout(r, 400));
 
-    hyrShowPreview(reportText, student.name, period, year);
+    hyrShowPreview(reportText, student.name, period, year, chartData);
 
   } catch (err) {
     alert("Failed to generate report:\n" + err.message);
@@ -2110,7 +2111,7 @@ async function hyrCollectData(student, period, year) {
   });
 
   if (sessions.length === 0) {
-    return `No sessions recorded for this student in ${period} ${year}.`;
+    return { text: `No sessions recorded for this student in ${period} ${year}.`, chartData: {} };
   }
 
   // Group sessions by target name, then by month
@@ -2135,6 +2136,7 @@ async function hyrCollectData(student, period, year) {
 
   // For each target compute monthly averages and collect sample remarks
   const lines = [];
+  const chartData = {};
 
   for (const target of targets) {
     const tName = target.name;
@@ -2144,21 +2146,26 @@ async function hyrCollectData(student, period, year) {
     lines.push(`=== TARGET: ${tName} ===`);
 
     // Monthly averages
+    const chartLabels = [];
+    const chartValues = [];
     const monthlyAvgs = [];
     for (let m = startMonth; m <= endMonth; m++) {
       const mLabel = shortMonths[m - 1];
+      chartLabels.push(mLabel);
       const mSessions = tData[mLabel] || [];
-      if (mSessions.length === 0) { monthlyAvgs.push(`${mLabel}: no data`); continue; }
+      if (mSessions.length === 0) { monthlyAvgs.push(`${mLabel}: no data`); chartValues.push(null); continue; }
 
       const avgs = [];
       for (const sess of mSessions) {
         const avg = hyrCalcDailyAvg(sess, target);
         if (avg !== null) avgs.push(avg);
       }
-      if (avgs.length === 0) { monthlyAvgs.push(`${mLabel}: no data`); continue; }
+      if (avgs.length === 0) { monthlyAvgs.push(`${mLabel}: no data`); chartValues.push(null); continue; }
       const monthAvg = Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length);
       monthlyAvgs.push(`${mLabel}: ${monthAvg}%`);
+      chartValues.push(monthAvg);
     }
+    chartData[tName] = { labels: chartLabels, values: chartValues };
     lines.push(`Monthly averages: ${monthlyAvgs.join(", ")}`);
 
     // Per-activity summary
@@ -2231,7 +2238,7 @@ async function hyrCollectData(student, period, year) {
     lines.push("");
   }
 
-  return lines.join("\n");
+  return { text: lines.join("\n"), chartData };
 }
 
 function hyrCalcDailyAvg(sess, target) {
@@ -2263,7 +2270,77 @@ function hyrStripHtml(s) {
     .trim();
 }
 
-function hyrMdToHtml(text) {
+function hyrDrawBarChart(targetName, labels, values) {
+  const W = 580, H = 240;
+  const PAD = { top: 28, right: 16, bottom: 38, left: 44 };
+  const cW = W - PAD.left - PAD.right;
+  const cH = H - PAD.top - PAD.bottom;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, W, H);
+
+  // Grid lines + Y labels
+  ctx.font = "11px sans-serif";
+  for (const pct of [0, 25, 50, 75, 100]) {
+    const y = PAD.top + cH - (pct / 100) * cH;
+    ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + cW, y); ctx.stroke();
+    ctx.fillStyle = "#9ca3af"; ctx.textAlign = "right";
+    ctx.fillText(pct + "%", PAD.left - 5, y + 4);
+  }
+
+  // 83% independence threshold line
+  const indY = PAD.top + cH - 0.83 * cH;
+  ctx.strokeStyle = "#10b981"; ctx.lineWidth = 1.5;
+  ctx.setLineDash([5, 4]);
+  ctx.beginPath(); ctx.moveTo(PAD.left, indY); ctx.lineTo(PAD.left + cW, indY); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = "#10b981"; ctx.font = "10px sans-serif"; ctx.textAlign = "left";
+  ctx.fillText("83% (independent)", PAD.left + 4, indY - 4);
+
+  // Bars
+  const n = labels.length;
+  const gap = 10;
+  const barW = (cW - gap * (n + 1)) / n;
+  ctx.font = "bold 12px sans-serif";
+  for (let i = 0; i < n; i++) {
+    const x = PAD.left + gap + i * (barW + gap);
+    const v = values[i];
+    if (v !== null && v !== undefined) {
+      const bH = (v / 100) * cH;
+      const by = PAD.top + cH - bH;
+      ctx.fillStyle = v >= 83 ? "#10b981" : "#6366f1";
+      ctx.fillRect(x, by, barW, bH);
+      ctx.fillStyle = "#111827"; ctx.textAlign = "center";
+      ctx.fillText(v + "%", x + barW / 2, by - 4);
+    } else {
+      ctx.fillStyle = "#f3f4f6";
+      ctx.fillRect(x, PAD.top, barW, cH);
+      ctx.fillStyle = "#d1d5db"; ctx.font = "11px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText("—", x + barW / 2, PAD.top + cH / 2 + 4);
+      ctx.font = "bold 12px sans-serif";
+    }
+    ctx.fillStyle = "#374151"; ctx.font = "12px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(labels[i], x + barW / 2, PAD.top + cH + 18);
+    ctx.font = "bold 12px sans-serif";
+  }
+
+  return canvas.toDataURL("image/png").split(",")[1];
+}
+
+function hyrChartForHeading(heading, chartData) {
+  const lower = heading.toLowerCase();
+  for (const [tName, data] of Object.entries(chartData || {})) {
+    if (lower.includes(tName.toLowerCase())) return { tName, ...data };
+  }
+  return null;
+}
+
+function hyrMdToHtml(text, chartData = {}) {
   const lines = text.split("\n");
   let html = "";
   let inP = false;
@@ -2278,7 +2355,17 @@ function hyrMdToHtml(text) {
     const t = line.trim();
     if (!t || t === "---") { closeP(); continue; }
     if (t.startsWith("### ")) { closeP(); html += `<h3 style="margin:.9rem 0 .3rem;font-size:1rem">${inlineHtml(t.slice(4))}</h3>`; continue; }
-    if (t.startsWith("## "))  { closeP(); html += `<h2 style="margin:1.2rem 0 .4rem;font-size:1.1rem">${inlineHtml(t.slice(3))}</h2>`; continue; }
+    if (t.startsWith("## "))  {
+      closeP();
+      const heading = t.slice(3);
+      html += `<h2 style="margin:1.2rem 0 .4rem;font-size:1.1rem">${inlineHtml(heading)}</h2>`;
+      const chart = hyrChartForHeading(heading, chartData);
+      if (chart) {
+        const b64 = hyrDrawBarChart(chart.tName, chart.labels, chart.values);
+        html += `<img src="data:image/png;base64,${b64}" style="width:100%;max-width:520px;margin:.5rem 0 .75rem;display:block;border-radius:4px">`;
+      }
+      continue;
+    }
     if (t.startsWith("# "))   { closeP(); html += `<h1 style="margin:1.4rem 0 .5rem;font-size:1.25rem">${inlineHtml(t.slice(2))}</h1>`; continue; }
     if (!inP) { html += `<p style="margin:.6rem 0;line-height:1.6">`; inP = true; }
     else html += "<br>";
@@ -2288,25 +2375,32 @@ function hyrMdToHtml(text) {
   return html;
 }
 
-function hyrShowPreview(reportText, studentName, period, year) {
+function hyrShowPreview(reportText, studentName, period, year, chartData = {}) {
   const periodLabel = period === "H1" ? `Jan–Jun ${year}` : `Jul–Dec ${year}`;
   $("hyr-preview-title").textContent = `${studentName} — ${periodLabel}`;
-  $("hyr-preview-body").innerHTML = hyrMdToHtml(reportText);
+  $("hyr-preview-body").innerHTML = hyrMdToHtml(reportText, chartData);
   $("hyr-preview-modal").classList.remove("hidden");
 
   $("hyr-preview-close").onclick = () => $("hyr-preview-modal").classList.add("hidden");
   $("hyr-preview-backdrop").onclick = () => $("hyr-preview-modal").classList.add("hidden");
 
-  $("hyr-btn-download-word").onclick = () => hyrDownloadWord(reportText, studentName, period, year);
+  $("hyr-btn-download-word").onclick = () => hyrDownloadWord(reportText, studentName, period, year, chartData);
   $("hyr-btn-regenerate").onclick = () => {
     $("hyr-preview-modal").classList.add("hidden");
     hyrGenerate();
   };
 }
 
-function hyrDownloadWord(reportText, studentName, period, year) {
+function hyrDownloadWord(reportText, studentName, period, year, chartData = {}) {
   const periodLabel = period === "H1" ? `January–June ${year}` : `July–December ${year}`;
-  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = window.docx;
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun } = window.docx;
+
+  function b64ToUint8(b64) {
+    const bin = atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return arr;
+  }
 
   const paragraphs = [];
 
@@ -2343,11 +2437,20 @@ function hyrDownloadWord(reportText, studentName, period, year) {
         spacing: { before: 320, after: 160 }
       }));
     } else if (t.startsWith("## ")) {
+      const heading = t.slice(3);
       paragraphs.push(new Paragraph({
-        children: [new TextRun({ text: t.slice(3), bold: true, size: 24 })],
+        children: [new TextRun({ text: heading, bold: true, size: 24 })],
         heading: HeadingLevel.HEADING_2,
         spacing: { before: 280, after: 120 }
       }));
+      const chart = hyrChartForHeading(heading, chartData);
+      if (chart) {
+        const imgData = b64ToUint8(hyrDrawBarChart(chart.tName, chart.labels, chart.values));
+        paragraphs.push(new Paragraph({
+          children: [new ImageRun({ data: imgData, transformation: { width: 480, height: 199 }, type: "png" })],
+          spacing: { after: 120 }
+        }));
+      }
     } else if (t.startsWith("### ")) {
       paragraphs.push(new Paragraph({
         children: [new TextRun({ text: t.slice(4), bold: true, size: 22 })],
