@@ -153,7 +153,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "960";
+const APP_VERSION = "961";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1903,47 +1903,60 @@ function renderExportButtons() {
 
 // ─── HALF YEAR REPORTS ───────────────────────────────────────
 
-const HYR_DEFAULT_PROMPT = `You are a professional therapy report writer for a child development therapy centre. Write a warm, professional, and parent-friendly half-year progress report based on the session data provided.
+const HYR_DEFAULT_PROMPT = `You are a professional therapy report writer for a child development therapy centre. Write an honest, clinically grounded, parent-friendly half-year progress report based on the session data provided.
 
 SCORING SCALE:
 3 = Independent, 2 = Partial Prompt, 1 = Fully Prompted, 0 = No Response
-83% or above means the child is working independently on that activity.
+- 90%+   : Consistently independent — performing without support
+- 83–89% : Working independently — largely independent, occasional minor support
+- 70–82% : Partial independence — inconsistent, still requires regular prompting
+- Below 70%: Needs significant support — not yet independent on this skill
+
+CRITICAL RULES:
+- Be HONEST. If the child is struggling, say so clearly. Do not soften poor performance with vague encouragement.
+- Do NOT simply describe what the numbers show — the charts already do that. Instead, interpret and explain.
+- Do NOT pad the report with empty phrases like "showed great enthusiasm" or "demonstrated effort" unless there is specific evidence in the remarks to support it.
+- Every claim must be grounded in the data or session remarks provided.
 
 REPORT STRUCTURE:
 
 1. Introduction
    - State the reporting period (e.g. January–June 2026)
-   - Briefly describe the program and the targets covered
+   - Briefly name the targets worked on
 
 2. An Overview
-   - A short summary (3–4 sentences) of the child's overall performance during this period
-   - Do NOT cite specific percentages here — those belong in the per-target sections below
-   - Instead, describe the general trajectory (improving / consistent / variable), name which specific targets showed the most growth, and note any overarching themes across the session period
+   - 3–5 sentences giving an honest overall picture of the half-year
+   - Do NOT cite specific percentages here
+   - Name which targets showed genuine growth and which showed decline, stagnation, or concern
+   - Be balanced and direct — parents need an accurate picture, not a cheerful summary
 
-3. Progress and Achievement (write one section per target in the order provided)
-   IMPORTANT: Use the exact target name as the ## heading (e.g. ## Self-Regulation). Do not number, prefix, or modify the name.
-   A bar chart of monthly averages will be inserted after each heading for the reader — write text that explains and interprets that chart:
-   - Open with a sentence describing the overall monthly trend (e.g. "X showed a steady upward trend, rising from 72% in January to 88% by June")
-   - Describe any dips or plateaus and what may have contributed (reference remarks if available)
-   - Draw on specific session remarks to give concrete, real-world examples of what the numbers mean in practice
-   - Mention any milestones (e.g. first session reaching independence on an activity)
+3. Progress and Achievement (one section per target, in the order provided)
+   IMPORTANT: Use the exact target name as the ## heading (e.g. ## Self-Regulation). Do not number, prefix, or modify it.
+   A line chart will be inserted after each heading — your text must go beyond what the chart shows:
+   - Identify WHAT drove the trend: which specific activities or skills improved or deteriorated, and WHY
+   - If performance dropped in a month, name a plausible reason based on the remarks (e.g. difficulty with a particular skill, need for more prompting on specific tasks)
+   - If performance improved, identify what specifically changed — a skill that clicked, a behaviour that stabilised, or consistent effort on a particular activity
+   - Quote or closely reference specific session remarks to make it concrete (e.g. "Session notes from March noted that...")
+   - Name activities the child excelled at and activities the child consistently struggled with
+   - Give an honest clinical summary: are they on track for independence? Behind expectations? Progressing well?
+   - Do NOT say "as shown in the chart" or reference any visual
 
 4. Areas to Continue to Build On
-   - 3–5 bullet points identifying specific skills or activities that need continued focus
-   - Be constructive and encouraging; give concrete examples where possible
+   - 3–5 bullet points of specific skills or activities that need continued focus
+   - Be direct — if something has not improved or is regressing, name it
+   - Include practical suggestions where possible
 
 5. Closing
-   - 2–3 warm sentences closing the report
-   - Express the team's commitment to the child's continued growth
+   - 2–3 sentences that are honest and forward-looking
+   - Acknowledge genuine progress where it exists; set realistic expectations for what comes next
+   - Do not end with hollow reassurances
 
 WRITING STYLE:
-- Warm, professional, and encouraging
-- Parent-friendly language (minimal jargon; explain any technical terms briefly)
-- Third person throughout (refer to the child by name)
-- Focus on month-to-month trends and overall trajectory, not individual sessions
-- Use flowing paragraphs for all sections except section 4 (bullet points)
-- Do NOT reference graphs, charts, or tables — write a text-only narrative
-- The finished report should be suitable for sharing directly with parents`;
+- Professional, honest, and parent-friendly (explain jargon briefly)
+- Third person throughout (use the child's name, not "the child")
+- Flowing paragraphs for all sections except section 4 (bullet points)
+- Do NOT reference graphs, charts, tables, or any visual element
+- The report must be useful to a parent — they should finish reading knowing exactly where their child stands, what is going well, and what still needs work`;
 
 let _hyrConfig = null;
 
@@ -2280,12 +2293,14 @@ function hyrDrawSummaryChart(chartData, studentName, period, year) {
   }).filter(e => e.earliest || e.latest);
   if (entries.length === 0) return null;
 
+  const SCALE = 2;
   const W = 580, H = 330;
   const PAD = { top: 52, right: 20, bottom: 74, left: 44 };
   const cW = W - PAD.left - PAD.right, cH = H - PAD.top - PAD.bottom;
   const canvas = document.createElement("canvas");
-  canvas.width = W; canvas.height = H;
+  canvas.width = W * SCALE; canvas.height = H * SCALE;
   const ctx = canvas.getContext("2d");
+  ctx.scale(SCALE, SCALE);
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
 
   ctx.fillStyle = "#1f2937"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "center";
@@ -2340,6 +2355,9 @@ function hyrDrawSummaryChart(chartData, studentName, period, year) {
   ctx.fillText("Earliest Month Avg", lX + 18, lY);
   ctx.fillStyle = BLUE; ctx.fillRect(lX + 138, lY - 10, 14, 10);
   ctx.fillText("Latest Month Avg", lX + 156, lY);
+
+  ctx.strokeStyle = "#000000"; ctx.lineWidth = 1;
+  ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
 
   return canvas.toDataURL("image/png").split(",")[1];
 }
@@ -2424,7 +2442,7 @@ function hyrDrawLineChart(targetName, labels, values, period, year) {
   labels.forEach((label, i) => ctx.fillText(label, toX(i), PAD.top + cH + 16));
 
   // Thin border around entire canvas
-  ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1;
+  ctx.strokeStyle = "#000000"; ctx.lineWidth = 1;
   ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
 
   return canvas.toDataURL("image/png").split(",")[1];
@@ -2511,17 +2529,19 @@ function hyrDownloadWord(reportText, studentName, period, year, chartData = {}) 
 
   const paragraphs = [];
 
+  const LINE_SPACING = { line: 276, lineRule: "auto" };
+
   // Title
   paragraphs.push(new Paragraph({
     children: [new TextRun({ text: `${studentName} — Half Year Report`, bold: true, size: 28 })],
     heading: HeadingLevel.HEADING_1,
     alignment: AlignmentType.CENTER,
-    spacing: { after: 120 }
+    spacing: { after: 120, ...LINE_SPACING }
   }));
   paragraphs.push(new Paragraph({
     children: [new TextRun({ text: periodLabel, size: 22, color: "555555" })],
     alignment: AlignmentType.CENTER,
-    spacing: { after: 400 }
+    spacing: { after: 400, ...LINE_SPACING }
   }));
 
   // Parse inline markdown (**bold**) into TextRun objects
@@ -2545,7 +2565,7 @@ function hyrDownloadWord(reportText, studentName, period, year, chartData = {}) 
       paragraphs.push(new Paragraph({
         children: [new TextRun({ text: t.slice(2), bold: true, size: 26 })],
         heading: HeadingLevel.HEADING_1,
-        spacing: { before: 320, after: 160 }
+        spacing: { before: 560, after: 160, ...LINE_SPACING }
       }));
     } else if (t.startsWith("## ")) {
       const heading = t.slice(3);
@@ -2554,10 +2574,10 @@ function hyrDownloadWord(reportText, studentName, period, year, chartData = {}) 
         paragraphs.push(new Paragraph({
           children: [new TextRun({ text: "Half-Year Progress Overview", bold: true, size: 24 })],
           heading: HeadingLevel.HEADING_2,
-          spacing: { before: 280, after: 120 }
+          spacing: { before: 480, after: 120, ...LINE_SPACING }
         }));
         paragraphs.push(new Paragraph({
-          children: [new ImageRun({ data: b64ToUint8(summaryB64), transformation: { width: 480, height: 272 }, type: "png" })],
+          children: [new ImageRun({ data: b64ToUint8(summaryB64), transformation: { width: 601, height: 341 }, type: "png" })],
           alignment: AlignmentType.CENTER,
           spacing: { after: 200 }
         }));
@@ -2566,12 +2586,12 @@ function hyrDownloadWord(reportText, studentName, period, year, chartData = {}) 
       paragraphs.push(new Paragraph({
         children: [new TextRun({ text: heading, bold: true, size: 24 })],
         heading: HeadingLevel.HEADING_2,
-        spacing: { before: 280, after: 120 }
+        spacing: { before: 480, after: 120, ...LINE_SPACING }
       }));
       if (chart) {
         const lb64 = hyrDrawLineChart(chart.tName, chart.labels, chart.values, period, year);
         if (lb64) paragraphs.push(new Paragraph({
-          children: [new ImageRun({ data: b64ToUint8(lb64), transformation: { width: 480, height: 249 }, type: "png" })],
+          children: [new ImageRun({ data: b64ToUint8(lb64), transformation: { width: 601, height: 311 }, type: "png" })],
           alignment: AlignmentType.CENTER,
           spacing: { after: 120 }
         }));
@@ -2580,12 +2600,13 @@ function hyrDownloadWord(reportText, studentName, period, year, chartData = {}) 
       paragraphs.push(new Paragraph({
         children: [new TextRun({ text: t.slice(4), bold: true, size: 22 })],
         heading: HeadingLevel.HEADING_3,
-        spacing: { before: 200, after: 80 }
+        spacing: { before: 200, after: 80, ...LINE_SPACING }
       }));
     } else {
       paragraphs.push(new Paragraph({
         children: inlineRuns(t),
-        spacing: { after: 140 }
+        alignment: AlignmentType.BOTH,
+        spacing: { after: 140, ...LINE_SPACING }
       }));
     }
   }
