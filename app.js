@@ -153,7 +153,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "944";
+const APP_VERSION = "945";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1874,8 +1874,8 @@ function renderExportButtons() {
     <div style="display:flex;gap:.6rem;flex-wrap:wrap">
       <button class="export-btn export-btn-all" id="btn-export-all-trials">Backup All Excel (ZIP)</button>
       <button class="export-btn" id="btn-data-integrity-check">🔍 Run Data Integrity Check</button>
-      <button class="export-btn" id="btn-recently-deleted">🗑 Recently Deleted (30 days)</button>
-      <button class="export-btn" id="btn-hyr-settings">⚙ Settings (for AI Report)</button>
+      <button class="export-btn" id="btn-recently-deleted">🗑️ Recently Deleted (30 days)</button>
+      <button class="export-btn" id="btn-hyr-settings">⚙️ Settings (for AI Report)</button>
     </div>`;
 
   const wire = (btnId, defaultLabel, includeTrials) => {
@@ -1969,15 +1969,15 @@ function renderHalfYearReportsSection() {
 
   container.innerHTML = `
     <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
-      <select id="hyr-student-select" class="admin-input" style="flex:1;min-width:180px;background:#fff">
+      <select id="hyr-student-select" class="admin-input" style="flex:1;min-width:180px;background:#fff;font-family:inherit;font-size:1rem">
         <option value="">— Select Student —</option>
         ${students.map(s => `<option value="${escHtml(s.id)}">${escHtml(s.name)}</option>`).join("")}
       </select>
-      <select id="hyr-period-select" class="admin-input" style="width:130px;flex-shrink:0;background:#fff">
+      <select id="hyr-period-select" class="admin-input" style="width:130px;flex-shrink:0;background:#fff;font-family:inherit;font-size:1rem">
         <option value="H1">H1 (Jan–Jun)</option>
         <option value="H2">H2 (Jul–Dec)</option>
       </select>
-      <select id="hyr-year-select" class="admin-input" style="width:90px;flex-shrink:0;background:#fff">
+      <select id="hyr-year-select" class="admin-input" style="width:90px;flex-shrink:0;background:#fff;font-family:inherit;font-size:1rem">
         ${yearOptions.join("")}
       </select>
       <button id="hyr-btn-generate" class="btn-add-section"
@@ -2007,7 +2007,7 @@ async function hyrGenerate() {
     const config = await getHyrConfig();
     const apiKey = config.apiKey || "";
     if (!apiKey) {
-      alert("No API key saved. Scroll down to the 'FOR LEWIS (IT) USE' section and tap '⚙ Settings (for AI Report)' to add it.");
+      alert("No API key saved. Scroll down to the 'FOR LEWIS (IT) USE' section and tap '⚙️ Settings (for AI Report)' to add it.");
       return;
     }
 
