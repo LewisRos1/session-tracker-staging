@@ -153,7 +153,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "951";
+const APP_VERSION = "952";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2046,7 +2046,7 @@ async function hyrGenerate() {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        model: "claude-3-haiku-20240307",
+        model: "claude-haiku-4-5-20251001",
         max_tokens: 8192,
         system: systemPrompt,
         messages: [{ role: "user", content: userMessage }]
