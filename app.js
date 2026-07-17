@@ -153,7 +153,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "943";
+const APP_VERSION = "944";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2332,13 +2332,17 @@ async function hyrOpenSettings() {
     const btn = $("hyr-btn-save-key");
     const key = $("hyr-key-input").value.trim();
     if (!key) { alert("Please paste your Anthropic API key first."); return; }
-    if (!key.startsWith("sk-ant-")) { alert("That doesn't look like a valid Anthropic key — it should start with sk-ant-"); return; }
     btn.disabled = true; btn.textContent = "Saving…";
-    _hyrConfig = null;
-    await saveHalfYearReportConfig({ ...config, apiKey: key });
-    _hyrConfig = await loadHalfYearReportConfig();
-    btn.disabled = false; btn.textContent = "Save API Key";
-    flashSaved(btn);
+    try {
+      _hyrConfig = null;
+      await saveHalfYearReportConfig({ ...config, apiKey: key });
+      _hyrConfig = await loadHalfYearReportConfig();
+      btn.disabled = false; btn.textContent = "Save API Key";
+      flashSaved(btn);
+    } catch (err) {
+      btn.disabled = false; btn.textContent = "Save API Key";
+      alert("Failed to save API key: " + err.message + "\n\nThis is likely a Firestore permissions issue. Ask Lewis to add the 'config' collection to the Firestore rules.");
+    }
   });
 
   $("hyr-btn-save-prompt").addEventListener("click", async () => {
