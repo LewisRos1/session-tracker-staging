@@ -153,7 +153,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "946";
+const APP_VERSION = "947";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2300,13 +2300,15 @@ async function hyrOpenSettings() {
       <div style="border:1.5px solid var(--border);border-radius:.6rem;padding:.85rem 1rem">
         <div style="font-weight:600;font-size:.9rem;margin-bottom:.3rem">🔑 Anthropic API Key</div>
         <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:.65rem">
-          ${hasKey ? "✅ API key is saved. Paste a new one below to replace it." : "No key saved yet. Get yours from console.anthropic.com → API Keys."}
+          ${hasKey ? "✅ API key is saved. Current value shown below — clear it and paste the new one to replace." : "No key saved yet. Get yours from console.anthropic.com → API Keys."}
         </div>
-        <input id="hyr-key-input" type="password" class="admin-input" placeholder="sk-ant-api03-…"
+        <input id="hyr-key-input" type="text" class="admin-input"
+          placeholder="sk-ant-api03-…"
+          value="${escHtml(config.apiKey || "")}"
           style="font-family:monospace;font-size:.85rem;margin-bottom:.5rem"
-          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+          autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" />
         <div style="display:flex;gap:.6rem;align-items:center;margin-bottom:.6rem">
-          <input type="checkbox" id="hyr-key-show" />
+          <input type="checkbox" id="hyr-key-show" checked />
           <label for="hyr-key-show" style="font-size:.82rem;cursor:pointer">Show key</label>
         </div>
         <button id="hyr-btn-save-key" class="btn-add-section" style="width:100%;text-align:center">Save API Key</button>
@@ -2332,11 +2334,18 @@ async function hyrOpenSettings() {
   $("hyr-key-show").addEventListener("change", e => {
     $("hyr-key-input").type = e.target.checked ? "text" : "password";
   });
+  // Field starts as text (checked) — switch to password immediately so value is hidden by default
+  $("hyr-key-input").type = "password";
+  $("hyr-key-show").checked = false;
 
   $("hyr-btn-save-key").addEventListener("click", async () => {
     const btn = $("hyr-btn-save-key");
     const key = $("hyr-key-input").value.trim();
     if (!key) { alert("Please paste your Anthropic API key first."); return; }
+    if (!key.startsWith("sk-ant-") || key.length < 40) {
+      alert("That doesn't look like a valid Anthropic key.\n\nIt should start with \"sk-ant-\" and be very long. Please copy it again from console.anthropic.com → API Keys.");
+      return;
+    }
     btn.disabled = true; btn.textContent = "Saving…";
     try {
       _hyrConfig = null;
