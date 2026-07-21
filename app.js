@@ -155,7 +155,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1001";
+const APP_VERSION = "1002";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1982,15 +1982,15 @@ function renderHalfYearReportsSection() {
         ${students.map(s => `<option value="${escHtml(s.id)}">${escHtml(s.name)}</option>`).join("")}
       </select>
       <span id="hyr-period-loading" style="font-size:.85rem;color:var(--text-muted);display:none">Checking sessions…</span>
-      <select id="hyr-period-select" class="admin-input" style="width:170px;flex-shrink:0;background:#fff;font-family:inherit;font-size:1rem;display:none"></select>
+      <select id="hyr-period-select" class="admin-input" style="min-width:190px;flex-shrink:0;background:#fff;font-family:inherit;font-size:1rem;display:none"></select>
       <button id="hyr-btn-generate" class="btn-add-section"
-        style="font-size:.9rem;padding:.45rem 1.1rem;min-height:38px;display:none">
+        style="font-size:.9rem;padding:.45rem 1.1rem;min-height:38px;white-space:nowrap;display:none">
         Generate Report
       </button>
     </div>
-    <div id="hyr-breakdown-section" style="display:none;margin-top:.75rem;padding:.6rem .75rem;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb">
-      <div style="font-size:.83rem;font-weight:600;color:var(--text-muted);margin-bottom:.4rem">Include activity breakdown chart for:</div>
-      <div id="hyr-breakdown-targets" style="display:flex;flex-wrap:wrap;gap:.3rem .75rem"></div>
+    <div id="hyr-breakdown-section" style="display:none;margin-top:.75rem;padding:.75rem 1rem;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb">
+      <div style="font-size:1rem;font-weight:600;color:var(--text-muted);margin-bottom:.55rem">Include activity breakdown chart for:</div>
+      <div id="hyr-breakdown-targets" style="display:flex;flex-wrap:wrap;gap:.45rem 1rem"></div>
     </div>
     <div id="hyr-progress" style="display:none;margin-top:.85rem">
       <div style="background:#e5e7eb;border-radius:99px;height:6px;overflow:hidden">
@@ -2021,13 +2021,13 @@ function renderHalfYearReportsSection() {
       if (activeTargets.length > 0) {
         const savedBdPreset = student.hyrBreakdownTargets;
         bdTargets.innerHTML = activeTargets.map(t => {
-          const isChecked = !savedBdPreset || savedBdPreset.length === 0 || savedBdPreset.includes(t.name);
-          return `<label style="display:flex;align-items:center;gap:.3rem;font-size:.83rem;cursor:pointer;white-space:nowrap">
-            <input type="checkbox" class="hyr-breakdown-check" value="${escHtml(t.name)}" ${isChecked ? "checked" : ""} style="cursor:pointer">
+          const isChecked = savedBdPreset && savedBdPreset.includes(t.name);
+          return `<label style="display:flex;align-items:center;gap:.4rem;font-size:1rem;cursor:pointer;white-space:nowrap">
+            <input type="checkbox" class="hyr-breakdown-check" value="${escHtml(t.name)}" ${isChecked ? "checked" : ""} style="cursor:pointer;width:1.05rem;height:1.05rem">
             ${escHtml(t.name)}
           </label>`;
         }).join("") +
-        `<div style="width:100%;margin-top:.3rem;font-size:.73rem;color:var(--text-muted);font-style:italic">Selection saved as a preset.</div>`;
+        `<div style="width:100%;margin-top:.4rem;font-size:.83rem;color:var(--text-muted);font-style:italic">Selection saved as a preset.</div>`;
         bdSection.style.display = "";
       }
     }
@@ -2100,10 +2100,8 @@ async function hyrGenerate() {
       Array.from(document.querySelectorAll(".hyr-breakdown-check:checked")).map(el => el.value)
     );
 
-    // Save the preset: empty array means "all checked" (saves storage, handles new targets automatically)
-    const allBdNames = Array.from(document.querySelectorAll(".hyr-breakdown-check")).map(el => el.value);
-    const selectedArr = Array.from(selectedBreakdownTargets);
-    student.hyrBreakdownTargets = selectedArr.length === allBdNames.length ? [] : selectedArr;
+    // Save exactly which targets were checked as the preset
+    student.hyrBreakdownTargets = Array.from(selectedBreakdownTargets);
     saveStudent(student).catch(() => {});
 
     setProgress(35, "Sending to AI…");
