@@ -605,10 +605,34 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
 
 function renderActivityBreakdownChart(targetName, activityData, periodLabel) {
   if (!activityData || activityData.length === 0) return null;
-  const SCALE = 2, R = 7, ROW_H = 46, SECTION_H = 28;
-  const PAD = { top: 52, right: 88, bottom: 72, left: 210 };
-  const W = 620;
-  const totalContentH = activityData.reduce((s, a) => s + (a.isSectionHeader ? SECTION_H : ROW_H), 0);
+  const SCALE = 2, R = 7, SECTION_H = 28;
+  const PAD = { top: 52, right: 88, bottom: 72, left: 250 };
+  const W = 700;
+  const LABEL_MAX_W = PAD.left - 16;
+  const LINE_H = 13, ROW_PAD_V = 8, MIN_ROW_H = 36;
+
+  // Pre-compute wrapped label lines and dynamic row heights using a temp canvas
+  const tmpCtx = document.createElement("canvas").getContext("2d");
+  tmpCtx.font = "11px sans-serif";
+  const wrapText = (text, maxW) => {
+    const words = (text || "").split(" ");
+    const lines = []; let cur = "";
+    for (const w of words) {
+      const test = cur ? cur + " " + w : w;
+      if (tmpCtx.measureText(test).width > maxW && cur) { lines.push(cur); cur = w; }
+      else cur = test;
+    }
+    if (cur) lines.push(cur);
+    return lines.length ? lines : [""];
+  };
+  for (const act of activityData) {
+    if (!act.isSectionHeader) {
+      act._lines = wrapText(act.name || "", LABEL_MAX_W);
+      act._rowH = Math.max(MIN_ROW_H, act._lines.length * LINE_H + ROW_PAD_V * 2);
+    }
+  }
+
+  const totalContentH = activityData.reduce((s, a) => s + (a.isSectionHeader ? SECTION_H : a._rowH), 0);
   const H = PAD.top + totalContentH + PAD.bottom;
   const canvas = document.createElement("canvas");
   canvas.width = W * SCALE; canvas.height = H * SCALE;
@@ -622,7 +646,7 @@ function renderActivityBreakdownChart(targetName, activityData, periodLabel) {
   ctx.font = "bold 13px sans-serif"; ctx.fillStyle = "#111"; ctx.textAlign = "left";
   ctx.fillText(`${targetName} — Progress (${periodLabel})`, 10, 28);
 
-  // Row backgrounds (track cumulative y)
+  // Row backgrounds
   let yPos = PAD.top;
   let dataRowIdx = 0;
   for (const act of activityData) {
@@ -630,8 +654,8 @@ function renderActivityBreakdownChart(targetName, activityData, periodLabel) {
       ctx.fillStyle = "#e5e7eb"; ctx.fillRect(0, yPos, W, SECTION_H);
       yPos += SECTION_H;
     } else {
-      if (dataRowIdx % 2 === 0) { ctx.fillStyle = "#f9fafb"; ctx.fillRect(0, yPos, W, ROW_H); }
-      dataRowIdx++; yPos += ROW_H;
+      if (dataRowIdx % 2 === 0) { ctx.fillStyle = "#f9fafb"; ctx.fillRect(0, yPos, W, act._rowH); }
+      dataRowIdx++; yPos += act._rowH;
     }
   }
 
@@ -651,15 +675,15 @@ function renderActivityBreakdownChart(targetName, activityData, periodLabel) {
       yPos += SECTION_H;
       continue;
     }
-    const cy = yPos + ROW_H / 2;
-    yPos += ROW_H;
+    const rowH = act._rowH;
+    const cy = yPos + rowH / 2;
+    yPos += rowH;
 
-    ctx.font = "11px sans-serif";
-    let name = act.name || "";
-    while (ctx.measureText(name).width > PAD.left - 16 && name.length > 4) name = name.slice(0, -1);
-    if (name !== (act.name || "")) name = name.slice(0, -1) + "…";
-    ctx.fillStyle = "#374151"; ctx.textAlign = "right";
-    ctx.fillText(name, PAD.left - 10, cy + 4);
+    // Draw wrapped label lines, vertically centred in the row
+    ctx.font = "11px sans-serif"; ctx.fillStyle = "#374151"; ctx.textAlign = "right";
+    const totalTextH = act._lines.length * LINE_H;
+    const textStartY = cy - totalTextH / 2 + LINE_H - 3;
+    act._lines.forEach((line, li) => ctx.fillText(line, PAD.left - 10, textStartY + li * LINE_H));
 
     const eAvg = act.earliestAvg != null ? Math.round(act.earliestAvg) : null;
     const lAvg = act.latestAvg != null ? Math.round(act.latestAvg) : null;
