@@ -2281,9 +2281,9 @@ function getAllActivitiesForTarget(session, target) {
       const sessionAct = claimAct(pa);
       if (sessionAct) {
         usedIds.add(sessionAct.id);
-        result.push({ ...sessionAct, activityName: subActName, isSubActivity: true, subLabel, activityDisplayDetails: pa.details || null, activityTitleBold: !!pa.isBold, activityTitleUnderline: !!pa.isUnderline });
+        result.push({ ...sessionAct, activityName: subActName, isSubActivity: true, subLabel, activityDisplayDetails: pa.title ? (pa.name || null) : null, activityTitleBold: !!pa.isBold, activityTitleUnderline: !!pa.isUnderline });
       } else {
-        result.push({ id: null, activityName: subActName, isPredefined: true, empty: true, isSubActivity: true, subLabel, activityDisplayDetails: pa.details || null, activityTitleBold: !!pa.isBold, activityTitleUnderline: !!pa.isUnderline });
+        result.push({ id: null, activityName: subActName, isPredefined: true, empty: true, isSubActivity: true, subLabel, activityDisplayDetails: pa.title ? (pa.name || null) : null, activityTitleBold: !!pa.isBold, activityTitleUnderline: !!pa.isUnderline });
       }
       continue;
     }
@@ -2309,7 +2309,7 @@ function getAllActivitiesForTarget(session, target) {
     const _exportStatusPrefix = pa.maintained ? '(Maintained) ' : '';
     const _paDisplayBase = pa.title || pa.name;
     const numberedName = `${exportActNum}) ${_exportStatusPrefix}${_paDisplayBase}`;
-    const paExtraProps = { activityDisplayDetails: pa.details || null, activityTitleBold: !!pa.isBold, activityTitleUnderline: !!pa.isUnderline };
+    const paExtraProps = { activityDisplayDetails: pa.title ? (pa.name || null) : null, activityTitleBold: !!pa.isBold, activityTitleUnderline: !!pa.isUnderline };
 
     // Parent activity (noRemark) — numbered title, empty remark
     if (pa.noRemark) {
