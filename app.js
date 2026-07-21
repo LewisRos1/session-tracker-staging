@@ -153,7 +153,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "965";
+const APP_VERSION = "967";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1986,6 +1986,10 @@ function renderHalfYearReportsSection() {
         Generate Report
       </button>
     </div>
+    <div id="hyr-breakdown-section" style="display:none;margin-top:.75rem;padding:.6rem .75rem;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb">
+      <div style="font-size:.83rem;font-weight:600;color:var(--text-muted);margin-bottom:.4rem">Include activity breakdown chart for:</div>
+      <div id="hyr-breakdown-targets" style="display:flex;flex-wrap:wrap;gap:.3rem .75rem"></div>
+    </div>
     <div id="hyr-progress" style="display:none;margin-top:.85rem">
       <div style="background:#e5e7eb;border-radius:99px;height:6px;overflow:hidden">
         <div id="hyr-progress-bar" style="height:100%;background:var(--primary);width:0%;transition:width .5s ease"></div>
@@ -1998,11 +2002,30 @@ function renderHalfYearReportsSection() {
     const periodSel = $("hyr-period-select");
     const genBtn    = $("hyr-btn-generate");
     const loading   = $("hyr-period-loading");
+    const bdSection = $("hyr-breakdown-section");
+    const bdTargets = $("hyr-breakdown-targets");
 
     periodSel.style.display = "none";
     genBtn.style.display    = "none";
     loading.style.display   = "none";
+    bdSection.style.display = "none";
+    bdTargets.innerHTML     = "";
     if (!studentId) return;
+
+    // Populate activity breakdown target checkboxes
+    const student = state.students.find(s => s.id === studentId);
+    if (student) {
+      const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
+      if (activeTargets.length > 0) {
+        bdTargets.innerHTML = activeTargets.map(t =>
+          `<label style="display:flex;align-items:center;gap:.3rem;font-size:.83rem;cursor:pointer;white-space:nowrap">
+            <input type="checkbox" class="hyr-breakdown-check" value="${escHtml(t.name)}" style="cursor:pointer">
+            ${escHtml(t.name)}
+          </label>`
+        ).join("");
+        bdSection.style.display = "";
+      }
+    }
 
     loading.style.display = "";
     try {
@@ -2067,7 +2090,10 @@ async function hyrGenerate() {
   try {
     const config = await getHyrConfig();
     const systemPrompt = config.prompt || HYR_DEFAULT_PROMPT;
-    const { text: dataText, chartData } = await hyrCollectData(student, period, year);
+    const { text: dataText, chartData, breakdownData } = await hyrCollectData(student, period, year);
+    const selectedBreakdownTargets = new Set(
+      Array.from(document.querySelectorAll(".hyr-breakdown-check:checked")).map(el => el.value)
+    );
 
     setProgress(35, "Sending to AI…");
 
@@ -2102,7 +2128,7 @@ async function hyrGenerate() {
     setProgress(100, "Done!");
     await new Promise(r => setTimeout(r, 400));
 
-    hyrShowPreview(reportText, student.name, period, year, chartData);
+    hyrShowPreview(reportText, student.name, period, year, chartData, breakdownData, selectedBreakdownTargets);
 
   } catch (err) {
     alert("Failed to generate report:\n" + err.message);
@@ -2151,6 +2177,7 @@ async function hyrCollectData(student, period, year) {
   // For each target compute monthly averages and collect sample remarks
   const lines = [];
   const chartData = {};
+  const breakdownData = {};
 
   for (const target of targets) {
     const tName = target.name;
@@ -2187,7 +2214,7 @@ async function hyrCollectData(student, period, year) {
     for (const mSessions of Object.values(tData)) {
       for (const sess of mSessions) {
         for (const act of Object.values(sess.activities || {})) {
-          if (act.targetName === tName || act.target === tName) actNames.add(act.name);
+          if ((act.targetName === tName || act.target === tName) && act.activityName) actNames.add(act.activityName);
         }
       }
     }
@@ -2198,18 +2225,22 @@ async function hyrCollectData(student, period, year) {
       }
     }
 
+    breakdownData[tName] = [];
     if (actNames.size > 0) {
       lines.push("Activities:");
       for (const actName of actNames) {
         // Collect all remarks for this activity across all sessions, sorted by date
         const allRemarks = [];
         for (const sess of sessions) {
-          const sessAct = Object.values(sess.activities || {}).find(
-            a => a.name === actName && (a.targetName === tName || a.target === tName)
+          // Use map key as ID fallback to match hyrCalcDailyAvg
+          const sessActEntry = Object.entries(sess.activities || {}).find(
+            ([, a]) => a.activityName === actName && (a.targetName === tName || a.target === tName)
           );
-          if (!sessAct) continue;
+          if (!sessActEntry) continue;
+          const [sessActKey, sessAct] = sessActEntry;
+          const sessActId = sessAct.id || sessActKey;
           const remarks = Object.values(sess.remarks || {})
-            .filter(r => r.activityId === sessAct.id)
+            .filter(r => r.activityId === sessActId)
             .filter(r => r.text || (r.trials || []).length > 0);
           for (const rem of remarks) {
             const trials = (rem.trials || []).filter(t => t !== -1);
@@ -2219,6 +2250,28 @@ async function hyrCollectData(student, period, year) {
           }
         }
         allRemarks.sort((a, b) => a.date.localeCompare(b.date));
+
+        // Per-month averages for activity breakdown chart
+        const actMonthlyAvgs = {};
+        for (const rem of allRemarks) {
+          if (rem.avg === null) continue;
+          const [, m] = rem.date.split("-").map(Number);
+          const mLabel = shortMonths[m - 1];
+          if (!actMonthlyAvgs[mLabel]) actMonthlyAvgs[mLabel] = [];
+          actMonthlyAvgs[mLabel].push(rem.avg);
+        }
+        let actEarliest = null, actLatest = null;
+        for (let m = startMonth; m <= endMonth; m++) {
+          const mLabel = shortMonths[m - 1];
+          const scores = actMonthlyAvgs[mLabel];
+          if (!scores || scores.length === 0) continue;
+          const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+          if (actEarliest === null) actEarliest = { label: mLabel, avg };
+          actLatest = { label: mLabel, avg };
+        }
+        if (actEarliest !== null) {
+          breakdownData[tName].push({ name: actName, earliest: actEarliest, latest: actLatest });
+        }
 
         if (allRemarks.length === 0) {
           lines.push(`  • ${actName}: no data recorded`);
@@ -2252,7 +2305,7 @@ async function hyrCollectData(student, period, year) {
     lines.push("");
   }
 
-  return { text: lines.join("\n"), chartData };
+  return { text: lines.join("\n"), chartData, breakdownData };
 }
 
 function hyrCalcDailyAvg(sess, target) {
@@ -2363,6 +2416,76 @@ function hyrDrawSummaryChart(chartData, studentName, period, year) {
   return canvas.toDataURL("image/png").split(",")[1];
 }
 
+function hyrDrawActivityBreakdown(targetName, activities, period, year) {
+  if (!activities || activities.length === 0) return null;
+  const SCALE = 2;
+  const ROW_H = 44, BAR_H = 14, BAR_GAP = 8;
+  const PAD = { top: 50, right: 70, bottom: 55, left: 210 };
+  const W = 600;
+  const H = PAD.top + activities.length * ROW_H + PAD.bottom;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W * SCALE; canvas.height = H * SCALE;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(SCALE, SCALE);
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
+
+  const rangeLabel = period === "H1" ? "Jan–Jun" : "Jul–Dec";
+  ctx.fillStyle = "#1f2937"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText(`Activity Comparison — ${targetName}  (${rangeLabel} ${year})`, W / 2, 26);
+
+  const cW = W - PAD.left - PAD.right;
+  const GREY = "#a3a3a3", BLUE = "#5b9bd5";
+
+  // Vertical gridlines at 0, 25, 50, 75, 100
+  ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
+  for (const v of [0, 25, 50, 75, 100]) {
+    const x = PAD.left + (v / 100) * cW;
+    ctx.beginPath(); ctx.moveTo(x, PAD.top); ctx.lineTo(x, PAD.top + activities.length * ROW_H); ctx.stroke();
+    ctx.fillStyle = "#9ca3af"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(v + "%", x, PAD.top + activities.length * ROW_H + 16);
+  }
+
+  activities.forEach((act, idx) => {
+    const groupTop = PAD.top + idx * ROW_H + (ROW_H - (BAR_H * 2 + BAR_GAP)) / 2;
+
+    // Activity name (truncate if too long)
+    let name = act.name || "";
+    ctx.font = "11px sans-serif";
+    const maxNameW = PAD.left - 12;
+    while (ctx.measureText(name).width > maxNameW && name.length > 4) name = name.slice(0, -1);
+    if (name !== act.name) name = name.slice(0, -1) + "…";
+    ctx.fillStyle = "#374151"; ctx.textAlign = "right";
+    ctx.fillText(name, PAD.left - 8, groupTop + BAR_H - 2);
+
+    // Earliest bar (grey)
+    const eW = (act.earliest.avg / 100) * cW;
+    ctx.fillStyle = GREY; ctx.fillRect(PAD.left, groupTop, eW, BAR_H);
+    ctx.fillStyle = "#374151"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "left";
+    ctx.fillText(`${act.earliest.avg}% (${act.earliest.label})`, PAD.left + eW + 4, groupTop + BAR_H - 3);
+
+    // Latest bar (blue)
+    const lW = (act.latest.avg / 100) * cW;
+    ctx.fillStyle = BLUE; ctx.fillRect(PAD.left, groupTop + BAR_H + BAR_GAP, lW, BAR_H);
+    ctx.fillStyle = "#374151"; ctx.textAlign = "left";
+    ctx.fillText(`${act.latest.avg}% (${act.latest.label})`, PAD.left + lW + 4, groupTop + BAR_H + BAR_GAP + BAR_H - 3);
+  });
+
+  // Legend
+  const lY = H - 14, lX = W / 2 - 112;
+  ctx.fillStyle = GREY; ctx.fillRect(lX, lY - 10, 14, 10);
+  ctx.fillStyle = "#374151"; ctx.font = "11px sans-serif"; ctx.textAlign = "left";
+  ctx.fillText("Earliest Month Avg", lX + 18, lY);
+  ctx.fillStyle = BLUE; ctx.fillRect(lX + 140, lY - 10, 14, 10);
+  ctx.fillText("Latest Month Avg", lX + 158, lY);
+
+  // Border
+  ctx.strokeStyle = "#000000"; ctx.lineWidth = 1;
+  ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
+
+  return canvas.toDataURL("image/png").split(",")[1];
+}
+
 function hyrDrawLineChart(targetName, labels, values, period, year) {
   const SCALE = 2;
   const W = 580, H = 310;
@@ -2457,7 +2580,7 @@ function hyrChartForHeading(heading, chartData) {
   return null;
 }
 
-function hyrMdToHtml(text, chartData = {}, studentName = "", period = "H1", year = "") {
+function hyrMdToHtml(text, chartData = {}, studentName = "", period = "H1", year = "", breakdownData = {}, selectedBreakdownTargets = new Set()) {
   const summaryB64 = Object.keys(chartData).length > 0
     ? hyrDrawSummaryChart(chartData, studentName, period, year) : null;
   let summaryDone = false;
@@ -2490,7 +2613,11 @@ function hyrMdToHtml(text, chartData = {}, studentName = "", period = "H1", year
       html += `<h2 style="margin:1.2rem 0 .4rem;font-size:1.1rem">${inlineHtml(heading)}</h2>`;
       if (chart) {
         const lb64 = hyrDrawLineChart(chart.tName, chart.labels, chart.values, period, year);
-        if (lb64) html += `<img src="data:image/png;base64,${lb64}" style="width:100%;max-width:540px;margin:.4rem 0 .75rem;display:block">`;
+        if (lb64) html += `<img src="data:image/png;base64,${lb64}" style="width:100%;max-width:540px;margin:.4rem 0 .5rem;display:block">`;
+        if (selectedBreakdownTargets.has(chart.tName) && breakdownData[chart.tName]?.length) {
+          const ab64 = hyrDrawActivityBreakdown(chart.tName, breakdownData[chart.tName], period, year);
+          if (ab64) html += `<img src="data:image/png;base64,${ab64}" style="width:100%;max-width:540px;margin:.25rem 0 .75rem;display:block">`;
+        }
       }
       continue;
     }
@@ -2503,10 +2630,10 @@ function hyrMdToHtml(text, chartData = {}, studentName = "", period = "H1", year
   return html;
 }
 
-function hyrShowPreview(reportText, studentName, period, year, chartData = {}) {
+function hyrShowPreview(reportText, studentName, period, year, chartData = {}, breakdownData = {}, selectedBreakdownTargets = new Set()) {
   const periodLabel = period === "H1" ? `Jan–Jun ${year}` : `Jul–Dec ${year}`;
   $("hyr-preview-title").textContent = `${studentName} — ${periodLabel}`;
-  $("hyr-preview-body").innerHTML = hyrMdToHtml(reportText, chartData, studentName, period, year);
+  $("hyr-preview-body").innerHTML = hyrMdToHtml(reportText, chartData, studentName, period, year, breakdownData, selectedBreakdownTargets);
   $("hyr-preview-modal").classList.remove("hidden");
 
   $("hyr-preview-close").onclick = () => $("hyr-preview-modal").classList.add("hidden");
@@ -2519,7 +2646,7 @@ function hyrShowPreview(reportText, studentName, period, year, chartData = {}) {
   };
 }
 
-function hyrDownloadWord(reportText, studentName, period, year, chartData = {}) {
+function hyrDownloadWord(reportText, studentName, period, year, chartData = {}, breakdownData = {}, selectedBreakdownTargets = new Set()) {
   const periodLabel = period === "H1" ? `January–June ${year}` : `July–December ${year}`;
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun } = window.docx;
 
@@ -2600,8 +2727,20 @@ function hyrDownloadWord(reportText, studentName, period, year, chartData = {}) 
         if (lb64) paragraphs.push(new Paragraph({
           children: [new ImageRun({ data: b64ToUint8(lb64), transformation: { width: 601, height: 311 }, type: "png" })],
           alignment: AlignmentType.CENTER,
-          spacing: { after: 120 }
+          spacing: { after: chart && selectedBreakdownTargets.has(chart.tName) ? 60 : 120 }
         }));
+        if (chart && selectedBreakdownTargets.has(chart.tName) && breakdownData[chart.tName]?.length) {
+          const ab64 = hyrDrawActivityBreakdown(chart.tName, breakdownData[chart.tName], period, year);
+          if (ab64) {
+            const nActs = breakdownData[chart.tName].length;
+            const abH = Math.round(601 * (50 + nActs * 44 + 55) / 600);
+            paragraphs.push(new Paragraph({
+              children: [new ImageRun({ data: b64ToUint8(ab64), transformation: { width: 601, height: abH }, type: "png" })],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 120 }
+            }));
+          }
+        }
       }
     } else if (t.startsWith("### ")) {
       paragraphs.push(new Paragraph({

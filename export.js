@@ -603,6 +603,141 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
   applyBorders(ws, NUM_COLS);
 }
 
+function renderActivityBreakdownChart(targetName, activityData, periodLabel) {
+  if (!activityData || activityData.length === 0) return null;
+  const SCALE = 2;
+  const ROW_H = 44, BAR_H = 14, BAR_GAP = 8;
+  const PAD = { top: 50, right: 80, bottom: 55, left: 210 };
+  const W = 600;
+  const nActs = activityData.length;
+  const H = PAD.top + nActs * ROW_H + PAD.bottom;
+  const canvas = document.createElement("canvas");
+  canvas.width = W * SCALE; canvas.height = H * SCALE;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(SCALE, SCALE);
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
+  const cW = W - PAD.left - PAD.right;
+  const toX = v => PAD.left + (v / 100) * cW;
+
+  ctx.font = "bold 13px sans-serif"; ctx.fillStyle = "#111"; ctx.textAlign = "left";
+  ctx.fillText(`${targetName} — Activity Comparison (${periodLabel})`, 10, 28);
+
+  ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
+  for (const v of [0, 25, 50, 75, 100]) {
+    const x = toX(v);
+    ctx.beginPath(); ctx.moveTo(x, PAD.top - 8); ctx.lineTo(x, H - PAD.bottom); ctx.stroke();
+    ctx.fillStyle = "#6b7280"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(v + "%", x, H - PAD.bottom + 14);
+  }
+
+  for (let i = 0; i < nActs; i++) {
+    const act = activityData[i];
+    const rowY = PAD.top + i * ROW_H;
+    const bar1Y = rowY + ROW_H / 2 - BAR_H - BAR_GAP / 2;
+    const bar2Y = rowY + ROW_H / 2 + BAR_GAP / 2;
+    ctx.fillStyle = "#111"; ctx.font = "11px sans-serif"; ctx.textAlign = "right";
+    const lbl = act.name.length > 30 ? act.name.slice(0, 28) + "…" : act.name;
+    ctx.fillText(lbl, PAD.left - 8, rowY + ROW_H / 2 + 4);
+    if (act.earliestAvg !== null) {
+      const bW = Math.max(2, (act.earliestAvg / 100) * cW);
+      ctx.fillStyle = "#9ca3af"; ctx.fillRect(toX(0), bar1Y, bW, BAR_H);
+      ctx.fillStyle = "#374151"; ctx.font = "10px sans-serif"; ctx.textAlign = "left";
+      ctx.fillText(`${Math.round(act.earliestAvg)}%`, toX(0) + bW + 4, bar1Y + BAR_H - 2);
+    }
+    if (act.latestAvg !== null) {
+      const bW = Math.max(2, (act.latestAvg / 100) * cW);
+      ctx.fillStyle = "#3b82f6"; ctx.fillRect(toX(0), bar2Y, bW, BAR_H);
+      ctx.fillStyle = "#1e3a5f"; ctx.font = "10px sans-serif"; ctx.textAlign = "left";
+      ctx.fillText(`${Math.round(act.latestAvg)}%`, toX(0) + bW + 4, bar2Y + BAR_H - 2);
+    }
+  }
+
+  const legY = H - PAD.bottom + 28;
+  ctx.fillStyle = "#9ca3af"; ctx.fillRect(PAD.left, legY, 16, 10);
+  ctx.fillStyle = "#374151"; ctx.font = "10px sans-serif"; ctx.textAlign = "left";
+  ctx.fillText("Earliest month", PAD.left + 20, legY + 9);
+  ctx.fillStyle = "#3b82f6"; ctx.fillRect(PAD.left + 120, legY, 16, 10);
+  ctx.fillStyle = "#374151"; ctx.fillText("Latest month", PAD.left + 140, legY + 9);
+
+  ctx.strokeStyle = "#000000"; ctx.lineWidth = 1;
+  ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
+  return canvas.toDataURL("image/png").split(",")[1];
+}
+
+function addActivityBreakdownSheet(wb, allTargets, sessions) {
+  const allMonths = [...new Set(sessions.map(s => s.month))].sort((a, b) => {
+    const [ma, ya] = parseMonth(a); const [mb, yb] = parseMonth(b);
+    return ya !== yb ? ya - yb : ma - mb;
+  });
+  if (allMonths.length === 0) return;
+
+  const periodLabel = allMonths.length > 0
+    ? `${allMonths[0].split(" ")[0].slice(0, 3)}–${allMonths[allMonths.length - 1].split(" ")[0].slice(0, 3)} ${allMonths[0].split(" ")[1]}`
+    : "";
+
+  const ws = wb.addWorksheet("Activity Breakdown");
+  let rowOffset = 0;
+
+  for (const target of allTargets) {
+    const actNameSet = new Set();
+    for (const pa of (target.predefinedActivities || [])) {
+      if (!pa.name || pa.isHeading || pa.isNote || pa.isCompleted || pa.isArchived || pa.isStopped || pa.masteredOn || pa.discontinuedOn) continue;
+      actNameSet.add(pa.name);
+    }
+    for (const sess of sessions) {
+      for (const [, a] of Object.entries(sess.activities || {})) {
+        if ((a.targetName === target.name || a.target === target.name) && a.activityName && !a.isHeading && !a.isNote) {
+          actNameSet.add(a.activityName);
+        }
+      }
+    }
+    if (actNameSet.size === 0) continue;
+
+    const activityData = [];
+    for (const actName of actNameSet) {
+      const monthBuckets = {};
+      for (const sess of sessions) {
+        const actEntry = Object.entries(sess.activities || {}).find(
+          ([, a]) => a.activityName === actName && (a.targetName === target.name || a.target === target.name)
+        );
+        if (!actEntry) continue;
+        const [actKey, act] = actEntry;
+        const actId = act.id || actKey;
+        const snap = (sess.targetsSnapshot || []).find(t => t.name === target.name);
+        const mp = (snap ? (snap.maxPoints ?? target.maxPoints) : target.maxPoints) || 3;
+        for (const [, rem] of getRemarksForActivity(sess, actId)) {
+          const scores = allScores(rem);
+          if (scores.length === 0) continue;
+          const pct = scores.reduce((a, b) => a + b, 0) / (scores.length * mp) * 100;
+          if (!monthBuckets[sess.month]) monthBuckets[sess.month] = [];
+          monthBuckets[sess.month].push(pct);
+        }
+      }
+      let earliest = null, latest = null;
+      for (const month of allMonths) {
+        const scores = monthBuckets[month];
+        if (!scores || scores.length === 0) continue;
+        const mAvg = scores.reduce((a, b) => a + b, 0) / scores.length;
+        if (earliest === null) earliest = { label: month.split(" ")[0].slice(0, 3), avg: mAvg };
+        latest = { label: month.split(" ")[0].slice(0, 3), avg: mAvg };
+      }
+      if (earliest !== null) {
+        activityData.push({ name: actName, earliestLabel: earliest.label, earliestAvg: earliest.avg, latestLabel: latest.label, latestAvg: latest.avg });
+      }
+    }
+    if (activityData.length === 0) continue;
+
+    const base64 = renderActivityBreakdownChart(target.name, activityData, periodLabel);
+    if (!base64) continue;
+    const chartH = 50 + activityData.length * 44 + 55;
+    const imgId = wb.addImage({ base64, extension: "png" });
+    ws.addImage(imgId, { tl: { col: 0, row: rowOffset }, ext: { width: 600, height: chartH } });
+    const rowsNeeded = Math.ceil(chartH / 20) + 3;
+    for (let r = rowOffset; r < rowOffset + rowsNeeded; r++) ws.addRow([]);
+    rowOffset += rowsNeeded;
+  }
+}
+
 function addIndividualTargetSheets(wb, allTargets, sessions, studentName, includeTrials) {
   // Date | Activity | Remark | Score | [Trials] | Avg Score — Trials is an
   // optional extra column, so the avg-score column's letter/index shifts
@@ -790,6 +925,7 @@ async function buildStudentWorkbook(student, sessions, includeTrials) {
   addBaselineVsCurrentSheet(wb, student.name, allTargets, sortedSessions);
   addHalfYearChartsSheets(wb, allTargets, sortedSessions);
   addTrendSummarySheet(wb, allTargets, sortedSessions);
+  addActivityBreakdownSheet(wb, allTargets, sortedSessions);
   addIndividualTargetSheets(wb, allTargets, sessions, student.name, includeTrials);
 
   return wb.xlsx.writeBuffer();
@@ -822,6 +958,7 @@ async function buildGroupMemberWorkbook(studentName, allTargets, sessions, inclu
   addBaselineVsCurrentSheet(wb, studentName, sortedTargets, sortedSessions);
   addHalfYearChartsSheets(wb, sortedTargets, sortedSessions);
   addTrendSummarySheet(wb, sortedTargets, sortedSessions);
+  addActivityBreakdownSheet(wb, sortedTargets, sortedSessions);
   addIndividualTargetSheets(wb, sortedTargets, filtered, studentName, includeTrials);
 
   return wb.xlsx.writeBuffer();
