@@ -155,7 +155,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1004";
+const APP_VERSION = "1005";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2825,14 +2825,15 @@ async function hyrOpenSettings() {
     <div style="padding:2rem 1rem;display:flex;flex-direction:column;align-items:center;gap:.75rem">
       <div style="font-size:.9rem;color:var(--text-muted)">Enter password to continue</div>
       <input id="hyr-settings-pw" type="password" class="admin-input"
-        style="width:180px;text-align:center;font-size:1.1rem;letter-spacing:.15em"
-        placeholder="••••" autocomplete="off">
+        style="width:200px;text-align:center;font-size:1rem"
+        placeholder="Enter password" autocomplete="new-password">
       <div id="hyr-settings-pw-err" style="font-size:.8rem;color:#dc2626;display:none">Incorrect password</div>
     </div>`;
   $("manage-modal").classList.remove("hidden");
 
   const pwInput = $("hyr-settings-pw");
-  pwInput.focus();
+  pwInput.value = "";
+  setTimeout(() => { pwInput.value = ""; pwInput.focus(); }, 50);
   pwInput.addEventListener("keydown", async e => {
     if (e.key !== "Enter") return;
     if (pwInput.value !== "0823") {
