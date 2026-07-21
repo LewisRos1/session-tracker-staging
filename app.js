@@ -154,7 +154,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "981";
+const APP_VERSION = "982";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -6220,7 +6220,7 @@ function buildTargetViewTable(target, data) {
           : '';
         rows += `<tr style="background:#f3f4f6">
           <td class="vcol-no" contenteditable="false" style="color:#6b7280">${displayNo}</td>
-          <td class="vcol-act" colspan="5" contenteditable="false" style="font-weight:600">${paBadge}${formatActivityMarkup(paDisplayName(pa))}</td>
+          <td class="vcol-act" colspan="5" contenteditable="false" style="font-weight:600">${paBadge}${paDisplayHtml(pa)}</td>
         </tr>`;
         continue;
       }
@@ -6234,7 +6234,7 @@ function buildTargetViewTable(target, data) {
         const isGreenFixed = pa.activityColor === "green";
         rows += `<tr${isGrayFixed ? ' class="view-gray-row"' : isGreenFixed ? ' class="view-green-row"' : ' style="background:#f9fafb"'}>
           <td class="vcol-no" contenteditable="false">${displayNo}</td>
-          <td class="vcol-act" contenteditable="false">${formatActivityMarkup(paDisplayName(pa))}</td>
+          <td class="vcol-act" contenteditable="false">${paDisplayHtml(pa)}</td>
           <td class="vcol-rem" contenteditable="false" style="color:#374151;cursor:pointer;white-space:pre-wrap"
             onclick="alert('This is a Fixed Remark — the text is set in Edit Target and cannot be changed here.')"
             title="Fixed Remark — click for info">${formatActivityMarkup(fixedText) || "<span style='color:#9ca3af;font-style:italic'>No remark set</span>"}</td>
@@ -6389,7 +6389,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
     : '';
 
   const actCell = isPredefined
-    ? statusBadge + formatActivityMarkup(actName) + (paEntry?.actNote?.trim() ? `<div class="view-act-note">${formatActivityMarkup(paEntry.actNote)}</div>` : "")
+    ? statusBadge + (paEntry ? paDisplayHtml(paEntry) : formatActivityMarkup(actName)) + (paEntry?.actNote?.trim() ? `<div class="view-act-note">${formatActivityMarkup(paEntry.actNote)}</div>` : "")
     : `<div style="display:flex;align-items:center;gap:.3rem">
         <input class="view-act-edit" type="text" value="${escHtml(actName)}"
           data-act-id="${escHtml(actId || "")}" data-original="${escHtml(actName)}" />
@@ -7891,7 +7891,7 @@ function buildGroupTargetViewTable(target, data, attendees) {
           : '';
         rows += `<tr style="background:#f3f4f6">
           <td class="vcol-no" contenteditable="false" style="color:#6b7280">${no}</td>
-          <td class="vcol-act" colspan="6" contenteditable="false" style="font-weight:600">${paBadgeGrp}${formatActivityMarkup(paDisplayName(pa))}</td>
+          <td class="vcol-act" colspan="6" contenteditable="false" style="font-weight:600">${paBadgeGrp}${paDisplayHtml(pa)}</td>
         </tr>`;
         continue;
       }
@@ -7905,7 +7905,7 @@ function buildGroupTargetViewTable(target, data, attendees) {
         no++;
         rows += `<tr${isGrayFixed ? ' class="view-gray-row"' : isGreenFixed2 ? ' class="view-green-row"' : ' style="background:#f9fafb"'}>
           <td class="vcol-no" contenteditable="false">${no}</td>
-          <td class="vcol-act" contenteditable="false">${formatActivityMarkup(paDisplayName(pa))}</td>
+          <td class="vcol-act" contenteditable="false">${paDisplayHtml(pa)}</td>
           <td class="vcol-student" contenteditable="false">—</td>
           <td class="vcol-rem" contenteditable="false" style="color:#6b7280;white-space:pre-wrap">${formatActivityMarkup(fixedText) || "—"}</td>
           <td class="vcol-trials" contenteditable="false">—</td>
@@ -8066,7 +8066,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
     : '';
 
   const actCell = isPredefined
-    ? statusBadge + formatActivityMarkup(actName) + (paEntry?.actNote?.trim() ? `<div class="view-act-note">${formatActivityMarkup(paEntry.actNote)}</div>` : "")
+    ? statusBadge + (paEntry ? paDisplayHtml(paEntry) : formatActivityMarkup(actName)) + (paEntry?.actNote?.trim() ? `<div class="view-act-note">${formatActivityMarkup(paEntry.actNote)}</div>` : "")
     : `<div style="display:flex;align-items:center;gap:.3rem">
         <input class="view-act-edit" type="text" value="${escHtml(actName)}"
           data-act-id="${escHtml(actId || "")}" data-original="${escHtml(actName)}" />
