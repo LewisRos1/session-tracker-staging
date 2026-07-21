@@ -154,7 +154,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "975";
+const APP_VERSION = "976";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -11009,13 +11009,13 @@ function renderTargetManageContent(student, target) {
       detailsInput.addEventListener("input", () => resizeD());
       detailsInput.addEventListener("blur", async () => {
         const v = detailsInput.value.trim();
-        if (!v || v === (a.name || "")) return;
+        if (v === (a.name || "")) return;
         const oldName = a.name;
         a.name = v;
         acts.forEach(a2 => { if (a2.parentActivity === oldName) a2.parentActivity = v; });
         await saveTarget();
         flashSaved(detailsInput);
-        if (oldName) propagateActivityRename(student, target.name, oldName, v);
+        if (oldName && v) propagateActivityRename(student, target.name, oldName, v);
       });
     }
 
@@ -12478,7 +12478,7 @@ function renderTemplateManageContent(template) {
       tmDetailsInput.addEventListener("input", () => resizeTD());
       tmDetailsInput.addEventListener("blur", async () => {
         const v = tmDetailsInput.value.trim();
-        if (!v || v === (a.name || "")) return;
+        if (v === (a.name || "")) return;
         const oldName = a.name;
         a.name = v;
         acts.forEach(a2 => { if (a2.parentActivity === oldName) a2.parentActivity = v; });
