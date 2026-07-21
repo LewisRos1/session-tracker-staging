@@ -154,7 +154,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "982";
+const APP_VERSION = "983";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4778,14 +4778,17 @@ function paDisplayName(pa) {
 // Returns the HTML to display a predefined activity's title (with checkbox-style
 // bold/underline from pa.isBold/pa.isUnderline) and optional details below.
 function paDisplayHtml(pa) {
-  const title = paDisplayName(pa);
-  let style = "";
-  if (pa.isBold) style += "font-weight:700;";
-  if (pa.isUnderline) style += "text-decoration:underline;";
-  let html = style
-    ? `<span style="${style}">${formatActivityMarkup(title)}</span>`
-    : formatActivityMarkup(title);
-  const detailsText = pa.title ? pa.name : null;
+  const titleText = (pa.title || "").trim();
+  let html = "";
+  if (titleText) {
+    let style = "";
+    if (pa.isBold) style += "font-weight:700;";
+    if (pa.isUnderline) style += "text-decoration:underline;";
+    html = style
+      ? `<span style="${style}">${formatActivityMarkup(titleText)}</span>`
+      : formatActivityMarkup(titleText);
+  }
+  const detailsText = (pa.name || "").trim();
   if (detailsText) {
     html += `<span style="display:block;margin-top:.1rem;font-weight:400;text-decoration:none">${formatActivityMarkup(detailsText)}</span>`;
   }
