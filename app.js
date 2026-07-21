@@ -153,7 +153,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "968";
+const APP_VERSION = "969";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2418,71 +2418,83 @@ function hyrDrawSummaryChart(chartData, studentName, period, year) {
 
 function hyrDrawActivityBreakdown(targetName, activities, period, year) {
   if (!activities || activities.length === 0) return null;
-  const SCALE = 2;
-  const ROW_H = 44, BAR_H = 14, BAR_GAP = 8;
-  const PAD = { top: 50, right: 70, bottom: 55, left: 210 };
-  const W = 600;
-  const H = PAD.top + activities.length * ROW_H + PAD.bottom;
-
+  const SCALE = 2, R = 7, ROW_H = 46;
+  const PAD = { top: 52, right: 88, bottom: 62, left: 210 };
+  const W = 620, nActs = activities.length;
+  const H = PAD.top + nActs * ROW_H + PAD.bottom;
   const canvas = document.createElement("canvas");
   canvas.width = W * SCALE; canvas.height = H * SCALE;
   const ctx = canvas.getContext("2d");
   ctx.scale(SCALE, SCALE);
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
-
-  const rangeLabel = period === "H1" ? "Jan–Jun" : "Jul–Dec";
-  ctx.fillStyle = "#1f2937"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(`Activity Comparison — ${targetName}  (${rangeLabel} ${year})`, W / 2, 26);
-
   const cW = W - PAD.left - PAD.right;
-  const GREY = "#a3a3a3", BLUE = "#5b9bd5";
+  const toX = v => PAD.left + (v / 100) * cW;
+  const plotBottom = PAD.top + nActs * ROW_H;
+  const rangeLabel = period === "H1" ? "Jan–Jun" : "Jul–Dec";
 
-  // Vertical gridlines at 0, 25, 50, 75, 100
-  ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
-  for (const v of [0, 25, 50, 75, 100]) {
-    const x = PAD.left + (v / 100) * cW;
-    ctx.beginPath(); ctx.moveTo(x, PAD.top); ctx.lineTo(x, PAD.top + activities.length * ROW_H); ctx.stroke();
-    ctx.fillStyle = "#9ca3af"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
-    ctx.fillText(v + "%", x, PAD.top + activities.length * ROW_H + 16);
+  ctx.font = "bold 13px sans-serif"; ctx.fillStyle = "#111"; ctx.textAlign = "left";
+  ctx.fillText(`${targetName} — Activity Comparison (${rangeLabel} ${year})`, 10, 28);
+
+  for (let i = 0; i < nActs; i++) {
+    if (i % 2 === 0) { ctx.fillStyle = "#f9fafb"; ctx.fillRect(0, PAD.top + i * ROW_H, W, ROW_H); }
   }
 
-  activities.forEach((act, idx) => {
-    const groupTop = PAD.top + idx * ROW_H + (ROW_H - (BAR_H * 2 + BAR_GAP)) / 2;
+  ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
+  for (const v of [0, 25, 50, 75, 100]) {
+    const x = toX(v);
+    ctx.beginPath(); ctx.moveTo(x, PAD.top); ctx.lineTo(x, plotBottom); ctx.stroke();
+    ctx.fillStyle = "#9ca3af"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(v + "%", x, plotBottom + 14);
+  }
 
-    // Activity name (truncate if too long)
-    let name = act.name || "";
+  activities.forEach((act, i) => {
+    const cy = PAD.top + i * ROW_H + ROW_H / 2;
     ctx.font = "11px sans-serif";
-    const maxNameW = PAD.left - 12;
-    while (ctx.measureText(name).width > maxNameW && name.length > 4) name = name.slice(0, -1);
-    if (name !== act.name) name = name.slice(0, -1) + "…";
+    let name = act.name || "";
+    while (ctx.measureText(name).width > PAD.left - 16 && name.length > 4) name = name.slice(0, -1);
+    if (name !== (act.name || "")) name = name.slice(0, -1) + "…";
     ctx.fillStyle = "#374151"; ctx.textAlign = "right";
-    ctx.fillText(name, PAD.left - 8, groupTop + BAR_H - 2);
+    ctx.fillText(name, PAD.left - 10, cy + 4);
 
-    // Earliest bar (grey)
-    const eW = (act.earliest.avg / 100) * cW;
-    ctx.fillStyle = GREY; ctx.fillRect(PAD.left, groupTop, eW, BAR_H);
-    ctx.fillStyle = "#374151"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "left";
-    ctx.fillText(`${act.earliest.avg}% (${act.earliest.label})`, PAD.left + eW + 4, groupTop + BAR_H - 3);
+    const eAvg = act.earliest?.avg != null ? Math.round(act.earliest.avg) : null;
+    const lAvg = act.latest?.avg != null ? Math.round(act.latest.avg) : null;
+    if (eAvg === null && lAvg === null) return;
 
-    // Latest bar (blue)
-    const lW = (act.latest.avg / 100) * cW;
-    ctx.fillStyle = BLUE; ctx.fillRect(PAD.left, groupTop + BAR_H + BAR_GAP, lW, BAR_H);
-    ctx.fillStyle = "#374151"; ctx.textAlign = "left";
-    ctx.fillText(`${act.latest.avg}% (${act.latest.label})`, PAD.left + lW + 4, groupTop + BAR_H + BAR_GAP + BAR_H - 3);
+    const eX = eAvg !== null ? toX(eAvg) : null;
+    const lX = lAvg !== null ? toX(lAvg) : null;
+
+    if (eX !== null && lX !== null) {
+      const diff = lAvg - eAvg;
+      ctx.strokeStyle = diff > 8 ? "#22c55e" : diff < -8 ? "#ef4444" : "#d1d5db";
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(eX, cy); ctx.lineTo(lX, cy); ctx.stroke();
+    }
+    if (eX !== null) {
+      ctx.beginPath(); ctx.arc(eX, cy, R, 0, Math.PI * 2);
+      ctx.fillStyle = "#9ca3af"; ctx.fill(); ctx.strokeStyle = "#6b7280"; ctx.lineWidth = 1; ctx.stroke();
+      ctx.font = "bold 10px sans-serif"; ctx.fillStyle = "#6b7280"; ctx.textAlign = "center";
+      ctx.fillText(`${eAvg}%`, eX, cy - R - 4);
+    }
+    if (lX !== null) {
+      ctx.beginPath(); ctx.arc(lX, cy, R, 0, Math.PI * 2);
+      ctx.fillStyle = "#3b82f6"; ctx.fill(); ctx.strokeStyle = "#1d4ed8"; ctx.lineWidth = 1; ctx.stroke();
+      ctx.font = "bold 10px sans-serif"; ctx.fillStyle = "#1d4ed8"; ctx.textAlign = "center";
+      ctx.fillText(`${lAvg}%`, lX, cy + R + 13);
+    }
   });
 
-  // Legend
-  const lY = H - 14, lX = W / 2 - 112;
-  ctx.fillStyle = GREY; ctx.fillRect(lX, lY - 10, 14, 10);
-  ctx.fillStyle = "#374151"; ctx.font = "11px sans-serif"; ctx.textAlign = "left";
-  ctx.fillText("Earliest Month Avg", lX + 18, lY);
-  ctx.fillStyle = BLUE; ctx.fillRect(lX + 140, lY - 10, 14, 10);
-  ctx.fillText("Latest Month Avg", lX + 158, lY);
+  const legY = plotBottom + 38;
+  const dot = (x, color, stroke) => { ctx.beginPath(); ctx.arc(x, legY - 4, 6, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); };
+  const line = (x, color) => { ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(x, legY - 4); ctx.lineTo(x + 18, legY - 4); ctx.stroke(); };
+  ctx.font = "10px sans-serif"; ctx.fillStyle = "#374151"; ctx.textAlign = "left";
+  const lx = PAD.left;
+  dot(lx + 6, "#9ca3af", "#6b7280"); ctx.fillText("Earliest month", lx + 16, legY);
+  dot(lx + 118, "#3b82f6", "#1d4ed8"); ctx.fillText("Latest month", lx + 128, legY);
+  line(lx + 230, "#22c55e"); ctx.fillText("Improved (>+8pp)", lx + 252, legY);
+  line(lx + 360, "#ef4444"); ctx.fillText("Declined (>−8pp)", lx + 382, legY);
 
-  // Border
   ctx.strokeStyle = "#000000"; ctx.lineWidth = 1;
   ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
-
   return canvas.toDataURL("image/png").split(",")[1];
 }
 
@@ -2733,7 +2745,7 @@ function hyrDownloadWord(reportText, studentName, period, year, chartData = {}, 
           const ab64 = hyrDrawActivityBreakdown(chart.tName, breakdownData[chart.tName], period, year);
           if (ab64) {
             const nActs = breakdownData[chart.tName].length;
-            const abH = Math.round(601 * (50 + nActs * 44 + 55) / 600);
+            const abH = Math.round(601 * (52 + nActs * 46 + 62) / 620);
             paragraphs.push(new Paragraph({
               children: [new ImageRun({ data: b64ToUint8(ab64), transformation: { width: 601, height: abH }, type: "png" })],
               alignment: AlignmentType.CENTER,

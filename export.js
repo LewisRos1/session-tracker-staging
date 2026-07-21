@@ -605,11 +605,9 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
 
 function renderActivityBreakdownChart(targetName, activityData, periodLabel) {
   if (!activityData || activityData.length === 0) return null;
-  const SCALE = 2;
-  const ROW_H = 44, BAR_H = 14, BAR_GAP = 8;
-  const PAD = { top: 50, right: 80, bottom: 55, left: 210 };
-  const W = 600;
-  const nActs = activityData.length;
+  const SCALE = 2, R = 7, ROW_H = 46;
+  const PAD = { top: 52, right: 88, bottom: 62, left: 210 };
+  const W = 620, nActs = activityData.length;
   const H = PAD.top + nActs * ROW_H + PAD.bottom;
   const canvas = document.createElement("canvas");
   canvas.width = W * SCALE; canvas.height = H * SCALE;
@@ -618,46 +616,72 @@ function renderActivityBreakdownChart(targetName, activityData, periodLabel) {
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
   const cW = W - PAD.left - PAD.right;
   const toX = v => PAD.left + (v / 100) * cW;
+  const plotBottom = PAD.top + nActs * ROW_H;
 
   ctx.font = "bold 13px sans-serif"; ctx.fillStyle = "#111"; ctx.textAlign = "left";
   ctx.fillText(`${targetName} — Activity Comparison (${periodLabel})`, 10, 28);
 
+  for (let i = 0; i < nActs; i++) {
+    if (i % 2 === 0) { ctx.fillStyle = "#f9fafb"; ctx.fillRect(0, PAD.top + i * ROW_H, W, ROW_H); }
+  }
+
   ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
   for (const v of [0, 25, 50, 75, 100]) {
     const x = toX(v);
-    ctx.beginPath(); ctx.moveTo(x, PAD.top - 8); ctx.lineTo(x, H - PAD.bottom); ctx.stroke();
-    ctx.fillStyle = "#6b7280"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
-    ctx.fillText(v + "%", x, H - PAD.bottom + 14);
+    ctx.beginPath(); ctx.moveTo(x, PAD.top); ctx.lineTo(x, plotBottom); ctx.stroke();
+    ctx.fillStyle = "#9ca3af"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(v + "%", x, plotBottom + 14);
   }
 
   for (let i = 0; i < nActs; i++) {
     const act = activityData[i];
-    const rowY = PAD.top + i * ROW_H;
-    const bar1Y = rowY + ROW_H / 2 - BAR_H - BAR_GAP / 2;
-    const bar2Y = rowY + ROW_H / 2 + BAR_GAP / 2;
-    ctx.fillStyle = "#111"; ctx.font = "11px sans-serif"; ctx.textAlign = "right";
-    const lbl = act.name.length > 30 ? act.name.slice(0, 28) + "…" : act.name;
-    ctx.fillText(lbl, PAD.left - 8, rowY + ROW_H / 2 + 4);
-    if (act.earliestAvg !== null) {
-      const bW = Math.max(2, (act.earliestAvg / 100) * cW);
-      ctx.fillStyle = "#9ca3af"; ctx.fillRect(toX(0), bar1Y, bW, BAR_H);
-      ctx.fillStyle = "#374151"; ctx.font = "10px sans-serif"; ctx.textAlign = "left";
-      ctx.fillText(`${Math.round(act.earliestAvg)}%`, toX(0) + bW + 4, bar1Y + BAR_H - 2);
+    const cy = PAD.top + i * ROW_H + ROW_H / 2;
+    ctx.font = "11px sans-serif";
+    let name = act.name || "";
+    while (ctx.measureText(name).width > PAD.left - 16 && name.length > 4) name = name.slice(0, -1);
+    if (name !== (act.name || "")) name = name.slice(0, -1) + "…";
+    ctx.fillStyle = "#374151"; ctx.textAlign = "right";
+    ctx.fillText(name, PAD.left - 10, cy + 4);
+
+    const eAvg = act.earliestAvg != null ? Math.round(act.earliestAvg) : null;
+    const lAvg = act.latestAvg != null ? Math.round(act.latestAvg) : null;
+    if (eAvg === null && lAvg === null) continue;
+
+    const eX = eAvg !== null ? toX(eAvg) : null;
+    const lX = lAvg !== null ? toX(lAvg) : null;
+
+    if (eX !== null && lX !== null) {
+      const diff = lAvg - eAvg;
+      ctx.strokeStyle = diff > 8 ? "#22c55e" : diff < -8 ? "#ef4444" : "#d1d5db";
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(eX, cy); ctx.lineTo(lX, cy); ctx.stroke();
     }
-    if (act.latestAvg !== null) {
-      const bW = Math.max(2, (act.latestAvg / 100) * cW);
-      ctx.fillStyle = "#3b82f6"; ctx.fillRect(toX(0), bar2Y, bW, BAR_H);
-      ctx.fillStyle = "#1e3a5f"; ctx.font = "10px sans-serif"; ctx.textAlign = "left";
-      ctx.fillText(`${Math.round(act.latestAvg)}%`, toX(0) + bW + 4, bar2Y + BAR_H - 2);
+
+    if (eX !== null) {
+      ctx.beginPath(); ctx.arc(eX, cy, R, 0, Math.PI * 2);
+      ctx.fillStyle = "#9ca3af"; ctx.fill();
+      ctx.strokeStyle = "#6b7280"; ctx.lineWidth = 1; ctx.stroke();
+      ctx.font = "bold 10px sans-serif"; ctx.fillStyle = "#6b7280"; ctx.textAlign = "center";
+      ctx.fillText(`${eAvg}%`, eX, cy - R - 4);
+    }
+    if (lX !== null) {
+      ctx.beginPath(); ctx.arc(lX, cy, R, 0, Math.PI * 2);
+      ctx.fillStyle = "#3b82f6"; ctx.fill();
+      ctx.strokeStyle = "#1d4ed8"; ctx.lineWidth = 1; ctx.stroke();
+      ctx.font = "bold 10px sans-serif"; ctx.fillStyle = "#1d4ed8"; ctx.textAlign = "center";
+      ctx.fillText(`${lAvg}%`, lX, cy + R + 13);
     }
   }
 
-  const legY = H - PAD.bottom + 28;
-  ctx.fillStyle = "#9ca3af"; ctx.fillRect(PAD.left, legY, 16, 10);
-  ctx.fillStyle = "#374151"; ctx.font = "10px sans-serif"; ctx.textAlign = "left";
-  ctx.fillText("Earliest month", PAD.left + 20, legY + 9);
-  ctx.fillStyle = "#3b82f6"; ctx.fillRect(PAD.left + 120, legY, 16, 10);
-  ctx.fillStyle = "#374151"; ctx.fillText("Latest month", PAD.left + 140, legY + 9);
+  const legY = plotBottom + 38;
+  const dot = (x, color, stroke) => { ctx.beginPath(); ctx.arc(x, legY - 4, 6, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); };
+  const line = (x, color) => { ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(x, legY - 4); ctx.lineTo(x + 18, legY - 4); ctx.stroke(); };
+  ctx.font = "10px sans-serif"; ctx.fillStyle = "#374151"; ctx.textAlign = "left";
+  const lx = PAD.left;
+  dot(lx + 6, "#9ca3af", "#6b7280"); ctx.fillText("Earliest month", lx + 16, legY);
+  dot(lx + 118, "#3b82f6", "#1d4ed8"); ctx.fillText("Latest month", lx + 128, legY);
+  line(lx + 230, "#22c55e"); ctx.fillText("Improved (>+8pp)", lx + 252, legY);
+  line(lx + 360, "#ef4444"); ctx.fillText("Declined (>−8pp)", lx + 382, legY);
 
   ctx.strokeStyle = "#000000"; ctx.lineWidth = 1;
   ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
@@ -729,9 +753,9 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
 
     const base64 = renderActivityBreakdownChart(target.name, activityData, periodLabel);
     if (!base64) continue;
-    const chartH = 50 + activityData.length * 44 + 55;
+    const chartH = 52 + activityData.length * 46 + 62;
     const imgId = wb.addImage({ base64, extension: "png" });
-    ws.addImage(imgId, { tl: { col: 0, row: rowOffset }, ext: { width: 600, height: chartH } });
+    ws.addImage(imgId, { tl: { col: 0, row: rowOffset }, ext: { width: 620, height: chartH } });
     const rowsNeeded = Math.ceil(chartH / 20) + 3;
     for (let r = rowOffset; r < rowOffset + rowsNeeded; r++) ws.addRow([]);
     rowOffset += rowsNeeded;
