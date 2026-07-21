@@ -155,7 +155,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1012";
+const APP_VERSION = "1013";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -10466,20 +10466,23 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
         value="${escHtml(a.sentenceStarter || "")}">
     </div>
     <div class="mn-opts-container" data-idx="${idx}" style="${showStarter ? "" : "display:none"}">
-      <div class="mn-opts-list">${(() => {
-        const optsStr = a.inlineOptions || (a.remarkPresetId ? (state.remarkPresets.find(p=>p.id===a.remarkPresetId)?.options||[]).join("/") : "");
-        const displayOpts = parseOpts(optsStr).length > 0 ? parseOpts(optsStr) : [""];
-        return displayOpts.map((opt, oi) =>
-          `<div class="mn-opt-row admin-list-item" data-idx="${oi}" style="display:flex;align-items:center;gap:.4rem;margin-bottom:.4rem">` +
-          `<span class="drag-handle" style="cursor:grab;color:#c4c9d4;font-size:1.1rem;flex-shrink:0;padding:0 .15rem;user-select:none">⠿</span>` +
-          `<span class="mn-opt-num" style="font-size:.8rem;color:#6b7280;white-space:nowrap;flex-shrink:0;font-weight:600">Option ${oi + 1}:</span>` +
-          `<input class="admin-input mn-opt-item" data-idx="${idx}" data-oi="${oi}" value="${escHtml(opt)}" placeholder="Enter option…" ${opt ? `readonly style="flex:1;padding:.45rem .6rem;font-size:.95rem;min-width:0;background:#f9fafb;color:#374151;cursor:default"` : `data-empty-opt="1" style="flex:1;padding:.45rem .6rem;font-size:.95rem;min-width:0"`}>` +
-          `<input class="admin-input mn-opt-score" type="number" min="0" max="${maxPts}" step="0.5" data-idx="${idx}" data-oi="${oi}" value="${escHtml(String(a.optionScores?.[opt] ?? ''))}" placeholder="Pts" style="width:3.8rem;flex-shrink:0;padding:.45rem .3rem;font-size:.9rem;text-align:center">` +
-          `<button class="mn-opt-remove" data-idx="${idx}" data-oi="${oi}" data-text="${escHtml(opt)}" style="flex-shrink:0;padding:.3rem .65rem;font-size:.82rem;color:#dc2626;background:none;border:1px solid #fca5a5;border-radius:.35rem;cursor:pointer">Remove</button>` +
-          `</div>`
-        ).join("");
-      })()}</div>
-      <button class="mn-opt-add" data-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:var(--primary);border:1px solid var(--primary);border-radius:.35rem;cursor:pointer;color:#fff;margin-top:.25rem">+ Add Option</button>
+      <div style="border:1px solid #e5e7eb;border-radius:.45rem;overflow:hidden;margin-bottom:.4rem">
+        <div style="padding:.3rem .6rem;font-size:.78rem;font-weight:600;color:#6b7280;background:#f3f4f6;border-bottom:1px solid #e5e7eb">Options</div>
+        <div class="mn-opts-list" style="padding:.3rem .4rem .1rem">${(() => {
+          const optsStr = a.inlineOptions || (a.remarkPresetId ? (state.remarkPresets.find(p=>p.id===a.remarkPresetId)?.options||[]).join("/") : "");
+          const displayOpts = parseOpts(optsStr).length > 0 ? parseOpts(optsStr) : [""];
+          return displayOpts.map((opt, oi) =>
+            `<div class="mn-opt-row" data-idx="${oi}" style="display:flex;align-items:center;gap:.4rem;margin-bottom:.35rem">` +
+            `<span class="drag-handle" style="cursor:grab;color:#c4c9d4;font-size:1.1rem;flex-shrink:0;padding:0 .15rem;user-select:none">⠿</span>` +
+            `<span class="mn-opt-num" style="display:none"></span>` +
+            `<input class="admin-input mn-opt-item" data-idx="${idx}" data-oi="${oi}" value="${escHtml(opt)}" placeholder="Enter option…" ${opt ? `readonly style="flex:1;padding:.45rem .6rem;font-size:.95rem;min-width:0;background:#f9fafb;color:#374151;cursor:default"` : `data-empty-opt="1" style="flex:1;padding:.45rem .6rem;font-size:.95rem;min-width:0"`}>` +
+            `<input class="admin-input mn-opt-score" type="number" min="0" max="${maxPts}" step="0.5" data-idx="${idx}" data-oi="${oi}" value="${escHtml(String(a.optionScores?.[opt] ?? ''))}" placeholder="Pts" style="width:3.8rem;flex-shrink:0;padding:.45rem .3rem;font-size:.9rem;text-align:center">` +
+            `<button class="mn-opt-remove" data-idx="${idx}" data-oi="${oi}" data-text="${escHtml(opt)}" title="Remove option">🗑</button>` +
+            `</div>`
+          ).join("");
+        })()}</div>
+      </div>
+      <button class="mn-opt-add" data-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:#f9fafb;border:1px solid #d1d5db;border-radius:.35rem;cursor:pointer;color:#374151;margin-top:.25rem">+ Add Option</button>
       ${(() => {
         const archived = a.archivedOptions || [];
         return `<div class="mn-removed-section" data-idx="${idx}" style="margin-top:.5rem${archived.length === 0 ? ";display:none" : ""}">
@@ -10730,9 +10733,15 @@ function renderTargetManageContent(student, target) {
               </div>
               <div>
                 <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Details <span title="Shown in session screen only, not in the chart" style="cursor:help;font-style:normal">ℹ️</span></div>
-                <div style="margin-bottom:.22rem">${formatButtonsHtml(`mn-act-details-${subIdx}`)}</div>
-                <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subIdx}" data-idx="${subIdx}"
-                  rows="2" placeholder="" style="width:100%;box-sizing:border-box;display:block">${escHtml(sub.name || '')}</textarea>
+                <div style="border:1px solid var(--border);border-radius:.45rem;overflow:hidden">
+                  <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid var(--border)">
+                    <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${subIdx}" title="Bold (Ctrl+B)">B</button>
+                    <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${subIdx}" title="Underline (Ctrl+U)">U</button>
+                    <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${subIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
+                  </div>
+                  <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subIdx}" data-idx="${subIdx}"
+                    rows="2" placeholder="" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:vertical">${escHtml(sub.name || '')}</textarea>
+                </div>
               </div>
               <div>
                 <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.28rem">Remark Type</div>
@@ -10755,13 +10764,19 @@ function renderTargetManageContent(student, target) {
               </div>
               <div>
                 <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Details <span title="Shown in session screen only, not in the chart" style="cursor:help">ℹ️</span></div>
-                <div style="margin-bottom:.22rem">${formatButtonsHtml(`mn-act-details-${idx}`)}</div>
-                <textarea class="admin-input mn-act-details-input" id="mn-act-details-${idx}" data-idx="${idx}"
-                  rows="2" placeholder="" style="width:100%;box-sizing:border-box;display:block">${escHtml(a.name || '')}</textarea>
+                <div style="border:1px solid var(--border);border-radius:.45rem;overflow:hidden">
+                  <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid var(--border)">
+                    <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${idx}" title="Bold (Ctrl+B)">B</button>
+                    <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${idx}" title="Underline (Ctrl+U)">U</button>
+                    <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${idx}" title="Bullet (Ctrl+Shift+L)">•</button>
+                  </div>
+                  <textarea class="admin-input mn-act-details-input" id="mn-act-details-${idx}" data-idx="${idx}"
+                    rows="2" placeholder="" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:vertical">${escHtml(a.name || '')}</textarea>
+                </div>
               </div>
               ${subActsHtml}
               ${maintainedRowSub}
-              <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:var(--primary);border:1px solid var(--primary);border-radius:.35rem;color:#fff;cursor:pointer;align-self:flex-start">+ Add Sub-activity</button>
+              <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:#f9fafb;border:1px solid #d1d5db;border-radius:.35rem;color:#374151;cursor:pointer;align-self:flex-start">+ Add Sub-activity</button>
             </div>
           </div>
           <div style="position:relative">
@@ -10794,16 +10809,22 @@ function renderTargetManageContent(student, target) {
               </div>
               <div>
                 <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Details <span title="Shown in session screen only, not in the chart" style="cursor:help">ℹ️</span></div>
-                <div style="margin-bottom:.22rem">${formatButtonsHtml(`mn-act-details-${idx}`)}</div>
-                <textarea class="admin-input mn-act-details-input" id="mn-act-details-${idx}" data-idx="${idx}"
-                  rows="2" placeholder="" style="width:100%;box-sizing:border-box;display:block">${escHtml(a.name || '')}</textarea>
+                <div style="border:1px solid var(--border);border-radius:.45rem;overflow:hidden">
+                  <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid var(--border)">
+                    <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${idx}" title="Bold (Ctrl+B)">B</button>
+                    <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${idx}" title="Underline (Ctrl+U)">U</button>
+                    <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${idx}" title="Bullet (Ctrl+Shift+L)">•</button>
+                  </div>
+                  <textarea class="admin-input mn-act-details-input" id="mn-act-details-${idx}" data-idx="${idx}"
+                    rows="2" placeholder="" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:vertical">${escHtml(a.name || '')}</textarea>
+                </div>
               </div>
               <div>
                 <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.28rem">Remark Type</div>
                 ${remarkTypeSelect}
               </div>
               ${maintainedRow}
-              <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:var(--primary);border:1px solid var(--primary);border-radius:.35rem;color:#fff;cursor:pointer;align-self:flex-start">↳ Add Sub-activity</button>
+              <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:#f9fafb;border:1px solid #d1d5db;border-radius:.35rem;color:#374151;cursor:pointer;align-self:flex-start">↳ Add Sub-activity</button>
             </div>
           </div>
           <div style="position:relative">
@@ -12073,16 +12094,16 @@ function renderTargetManageContent(student, target) {
       const list = btn.closest(".mn-opts-container").querySelector(".mn-opts-list");
       const oi = list.querySelectorAll(".mn-opt-row").length;
       const row = document.createElement("div");
-      row.className = "mn-opt-row admin-list-item";
+      row.className = "mn-opt-row";
       row.dataset.idx = String(oi);
-      row.style.cssText = "display:flex;align-items:center;gap:.4rem;margin-bottom:.4rem";
+      row.style.cssText = "display:flex;align-items:center;gap:.4rem;margin-bottom:.35rem";
       row.innerHTML =
         `<span class="drag-handle" style="cursor:grab;color:#c4c9d4;font-size:1.1rem;flex-shrink:0;padding:0 .15rem;user-select:none">⠿</span>` +
-        `<span class="mn-opt-num" style="font-size:.8rem;color:#6b7280;white-space:nowrap;flex-shrink:0;font-weight:600">Option ${oi + 1}:</span>` +
-        `<span class="mn-opt-countdown" style="font-size:.88rem;color:#f59e0b;white-space:nowrap;flex-shrink:0;font-weight:700">Option name locks in 30s</span>` +
+        `<span class="mn-opt-num" style="display:none"></span>` +
+        `<span class="mn-opt-countdown" style="font-size:.88rem;color:#f59e0b;white-space:nowrap;flex-shrink:0;font-weight:700">Locks in 30s</span>` +
         `<input class="admin-input mn-opt-item" data-idx="${idx}" data-oi="${oi}" placeholder="Enter option name…" style="flex:1;padding:.45rem .6rem;font-size:.95rem;min-width:0;border-color:#f59e0b;background:#fffbeb">` +
         `<input class="admin-input mn-opt-score" type="number" min="0" max="${target.maxPoints || 3}" step="0.5" data-idx="${idx}" data-oi="${oi}" placeholder="Pts" style="width:3.8rem;flex-shrink:0;padding:.45rem .3rem;font-size:.9rem;text-align:center">` +
-        `<button class="mn-opt-remove" data-idx="${idx}" data-oi="${oi}" data-text="" style="flex-shrink:0;padding:.3rem .65rem;font-size:.82rem;color:#dc2626;background:none;border:1px solid #fca5a5;border-radius:.35rem;cursor:pointer">Remove</button>`;
+        `<button class="mn-opt-remove" data-idx="${idx}" data-oi="${oi}" data-text="" title="Remove option">🗑</button>`;
       list.appendChild(row);
 
       const nameInput  = row.querySelector(".mn-opt-item");
@@ -13099,15 +13120,15 @@ function renderTemplateManageContent(template) {
       const list = btn.closest(".mn-opts-container").querySelector(".mn-opts-list");
       const oi = list.querySelectorAll(".mn-opt-row").length;
       const row = document.createElement("div");
-      row.className = "mn-opt-row admin-list-item";
+      row.className = "mn-opt-row";
       row.dataset.idx = String(oi);
-      row.style.cssText = "display:flex;align-items:center;gap:.4rem;margin-bottom:.4rem";
+      row.style.cssText = "display:flex;align-items:center;gap:.4rem;margin-bottom:.35rem";
       row.innerHTML =
         `<span class="drag-handle" style="cursor:grab;color:#c4c9d4;font-size:1.1rem;flex-shrink:0;padding:0 .15rem;user-select:none">⠿</span>` +
-        `<span class="mn-opt-num" style="font-size:.8rem;color:#6b7280;white-space:nowrap;flex-shrink:0;font-weight:600">Option ${oi + 1}:</span>` +
-        `<span class="mn-opt-countdown" style="font-size:.88rem;color:#f59e0b;white-space:nowrap;flex-shrink:0;font-weight:700">Option name locks in 30s</span>` +
+        `<span class="mn-opt-num" style="display:none"></span>` +
+        `<span class="mn-opt-countdown" style="font-size:.88rem;color:#f59e0b;white-space:nowrap;flex-shrink:0;font-weight:700">Locks in 30s</span>` +
         `<input class="admin-input mn-opt-item" data-idx="${idx}" data-oi="${oi}" placeholder="Enter option name…" style="flex:1;padding:.45rem .6rem;font-size:.95rem;min-width:0;border-color:#f59e0b;background:#fffbeb">` +
-        `<button class="mn-opt-remove" data-idx="${idx}" data-oi="${oi}" style="flex-shrink:0;padding:.3rem .65rem;font-size:.82rem;color:#dc2626;background:none;border:1px solid #fca5a5;border-radius:.35rem;cursor:pointer">Remove</button>`;
+        `<button class="mn-opt-remove" data-idx="${idx}" data-oi="${oi}" title="Remove option">🗑</button>`;
       list.appendChild(row);
 
       const nameInput = row.querySelector(".mn-opt-item");

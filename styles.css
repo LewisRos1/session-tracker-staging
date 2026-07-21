@@ -1698,6 +1698,18 @@ textarea.admin-input { resize: vertical; min-height: 60px; line-height: 1.45; }
   gap: .25rem;
   flex-shrink: 0;
 }
+.mn-opt-remove {
+  color: #9ca3af;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: .3rem .35rem;
+  border-radius: .3rem;
+  font-size: 1rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.mn-opt-remove:hover { color: #dc2626; background: #fee2e2; }
 .btn-fmt {
   width: 2rem;
   height: 2rem;
