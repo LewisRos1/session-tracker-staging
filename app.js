@@ -155,7 +155,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1025";
+const APP_VERSION = "1026";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2234,10 +2234,30 @@ async function hyrCollectData(student, period, year) {
       }
     }
     // Also include predefined activities from target config
+    const paKeyToAliases  = {};  // canonical display name → [legacy activityName variants]
+    const paKeyToConfigId = {};  // canonical display name → pa.id
+    const hyrLegacyToKey  = {};  // legacy pa.name (details text) → canonical display name
     for (const pa of (target.predefinedActivities || [])) {
       if (!pa.masteredOn && !pa.discontinuedOn && !pa.isCompleted && !pa.isArchived && !pa.isStopped) {
-        actNames.add(pa.name);
-        actDisplayNames[pa.name] = pa.title || pa.name;
+        const key = pa.title || pa.name;
+        if (!key) continue;
+        if (pa.id) paKeyToConfigId[key] = pa.id;
+        actNames.add(key);
+        actDisplayNames[key] = key;
+        if (pa.title && pa.name && pa.title !== pa.name) {
+          if (!paKeyToAliases[key]) paKeyToAliases[key] = [];
+          paKeyToAliases[key].push(pa.name);
+          hyrLegacyToKey[pa.name] = key;
+        }
+      }
+    }
+    // Consolidate any legacy names added from session data into the canonical key
+    for (const [legName, key] of Object.entries(hyrLegacyToKey)) {
+      if (actNames.has(legName)) {
+        actNames.delete(legName);
+        delete actDisplayNames[legName];
+        if (!paKeyToAliases[key]) paKeyToAliases[key] = [];
+        if (!paKeyToAliases[key].includes(legName)) paKeyToAliases[key].push(legName);
       }
     }
 
@@ -2247,10 +2267,13 @@ async function hyrCollectData(student, period, year) {
       for (const actName of actNames) {
         // Collect all remarks for this activity across all sessions, sorted by date
         const allRemarks = [];
+        const hyrAliases  = paKeyToAliases[actName] || [];
+        const hyrConfigId = paKeyToConfigId[actName];
         for (const sess of sessions) {
           // Use map key as ID fallback to match hyrCalcDailyAvg
           const sessActEntry = Object.entries(sess.activities || {}).find(
-            ([, a]) => a.activityName === actName && (a.targetName === tName || a.target === tName)
+            ([, a]) => (a.activityName === actName || hyrAliases.includes(a.activityName) || (hyrConfigId && a.configId === hyrConfigId)) &&
+                       (a.targetName === tName || a.target === tName)
           );
           if (!sessActEntry) continue;
           const [sessActKey, sessAct] = sessActEntry;
