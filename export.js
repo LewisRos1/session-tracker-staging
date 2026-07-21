@@ -674,14 +674,15 @@ function renderActivityBreakdownChart(targetName, activityData, periodLabel) {
   }
 
   const legY = plotBottom + 38;
-  const dot = (x, color, stroke) => { ctx.beginPath(); ctx.arc(x, legY - 4, 6, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); };
-  const line = (x, color) => { ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(x, legY - 4); ctx.lineTo(x + 18, legY - 4); ctx.stroke(); };
   ctx.font = "10px sans-serif"; ctx.fillStyle = "#374151"; ctx.textAlign = "left";
-  const lx = PAD.left;
-  dot(lx + 6, "#9ca3af", "#6b7280"); ctx.fillText("Earliest month", lx + 16, legY);
-  dot(lx + 118, "#3b82f6", "#1d4ed8"); ctx.fillText("Latest month", lx + 128, legY);
-  line(lx + 230, "#22c55e"); ctx.fillText("Improved (>+8pp)", lx + 252, legY);
-  line(lx + 360, "#ef4444"); ctx.fillText("Declined (>−8pp)", lx + 382, legY);
+  // Centre 4 items across full chart width (estimated total ~430px)
+  let lx = Math.round((W - 430) / 2);
+  const drawDot = (color, stroke) => { ctx.beginPath(); ctx.arc(lx + 6, legY - 4, 6, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); };
+  const drawLine = (color) => { ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(lx, legY - 4); ctx.lineTo(lx + 18, legY - 4); ctx.stroke(); };
+  drawDot("#9ca3af", "#6b7280"); ctx.fillStyle = "#374151"; ctx.fillText("Earliest month", lx + 16, legY); lx += 106;
+  drawDot("#3b82f6", "#1d4ed8"); ctx.fillStyle = "#374151"; ctx.fillText("Latest month", lx + 16, legY); lx += 100;
+  drawLine("#22c55e"); ctx.fillStyle = "#374151"; ctx.fillText("Improved (>+8pp)", lx + 22, legY); lx += 118;
+  drawLine("#ef4444"); ctx.fillStyle = "#374151"; ctx.fillText("Declined (>−8pp)", lx + 22, legY);
 
   ctx.strokeStyle = "#000000"; ctx.lineWidth = 1;
   ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
