@@ -95,11 +95,6 @@ if ("serviceWorker" in navigator) {
   let _reloadQueued = false;
   function _doUpdateReload() {
     if (_reloadQueued) return;
-    // Only auto-reload if the loading screen is still showing AND has been
-    // stuck for more than 10 seconds. Skips interrupting active app use.
-    const loadingEl = document.getElementById("screen-loading");
-    const isStuck = loadingEl?.classList.contains("active") && (Date.now() - _swPageLoadTime) > 10000;
-    if (!isStuck) return;
     _reloadQueued = true;
     sessionStorage.setItem("justUpdated", "1");
     document.querySelectorAll(".screen").forEach(s => s.classList.toggle("hidden", s.id !== "screen-loading"));
@@ -160,7 +155,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "996";
+const APP_VERSION = "997";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
