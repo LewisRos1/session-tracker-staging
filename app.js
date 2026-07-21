@@ -155,7 +155,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1000";
+const APP_VERSION = "1001";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2019,12 +2019,15 @@ function renderHalfYearReportsSection() {
     if (student) {
       const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
       if (activeTargets.length > 0) {
-        bdTargets.innerHTML = activeTargets.map(t =>
-          `<label style="display:flex;align-items:center;gap:.3rem;font-size:.83rem;cursor:pointer;white-space:nowrap">
-            <input type="checkbox" class="hyr-breakdown-check" value="${escHtml(t.name)}" style="cursor:pointer">
+        const savedBdPreset = student.hyrBreakdownTargets;
+        bdTargets.innerHTML = activeTargets.map(t => {
+          const isChecked = !savedBdPreset || savedBdPreset.length === 0 || savedBdPreset.includes(t.name);
+          return `<label style="display:flex;align-items:center;gap:.3rem;font-size:.83rem;cursor:pointer;white-space:nowrap">
+            <input type="checkbox" class="hyr-breakdown-check" value="${escHtml(t.name)}" ${isChecked ? "checked" : ""} style="cursor:pointer">
             ${escHtml(t.name)}
-          </label>`
-        ).join("");
+          </label>`;
+        }).join("") +
+        `<div style="width:100%;margin-top:.3rem;font-size:.73rem;color:var(--text-muted);font-style:italic">Selection saved as a preset.</div>`;
         bdSection.style.display = "";
       }
     }
@@ -2096,6 +2099,12 @@ async function hyrGenerate() {
     const selectedBreakdownTargets = new Set(
       Array.from(document.querySelectorAll(".hyr-breakdown-check:checked")).map(el => el.value)
     );
+
+    // Save the preset: empty array means "all checked" (saves storage, handles new targets automatically)
+    const allBdNames = Array.from(document.querySelectorAll(".hyr-breakdown-check")).map(el => el.value);
+    const selectedArr = Array.from(selectedBreakdownTargets);
+    student.hyrBreakdownTargets = selectedArr.length === allBdNames.length ? [] : selectedArr;
+    saveStudent(student).catch(() => {});
 
     setProgress(35, "Sending to AI…");
 
