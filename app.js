@@ -14,6 +14,7 @@ import {
   revertOrphanActivity,
   deleteActivity,
   updateActivityName,
+  updateActivityTitle,
   updateActivityCombineRemarks,
   addRemark,
   updateRemarkText,
@@ -153,7 +154,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "972";
+const APP_VERSION = "973";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2211,10 +2212,16 @@ async function hyrCollectData(student, period, year) {
 
     // Per-activity summary
     const actNames = new Set();
+    const actDisplayNames = {}; // activityName (raw Firestore key) → display label
     for (const mSessions of Object.values(tData)) {
       for (const sess of mSessions) {
         for (const act of Object.values(sess.activities || {})) {
-          if ((act.targetName === tName || act.target === tName) && act.activityName) actNames.add(act.activityName);
+          if ((act.targetName === tName || act.target === tName) && act.activityName) {
+            actNames.add(act.activityName);
+            if (!actDisplayNames[act.activityName]) {
+              actDisplayNames[act.activityName] = act.activityTitle || act.activityName;
+            }
+          }
         }
       }
     }
@@ -2222,6 +2229,7 @@ async function hyrCollectData(student, period, year) {
     for (const pa of (target.predefinedActivities || [])) {
       if (!pa.masteredOn && !pa.discontinuedOn && !pa.isCompleted && !pa.isArchived && !pa.isStopped) {
         actNames.add(pa.name);
+        actDisplayNames[pa.name] = pa.title || pa.name;
       }
     }
 
@@ -2270,7 +2278,7 @@ async function hyrCollectData(student, period, year) {
           actLatest = { label: mLabel, avg };
         }
         if (actEarliest !== null) {
-          breakdownData[tName].push({ name: actName, earliest: actEarliest, latest: actLatest });
+          breakdownData[tName].push({ name: actDisplayNames[actName] || actName, earliest: actEarliest, latest: actLatest });
         }
 
         if (allRemarks.length === 0) {
@@ -4306,7 +4314,7 @@ function renderFedcTarget(target) {
       html += `<div class="entry-block entry-block-predefined" ${fixedStyle}>
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Activity</span>
-          <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${formatActivityMarkup(pa.name)}</span>
+          <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${paDisplayHtml(pa)}</span>
         </div>
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Remark</span>
@@ -4336,7 +4344,7 @@ function renderFedcTarget(target) {
       html += `<div class="entry-block" style="${pBorder}border-radius:var(--radius) var(--radius) 0 0;border-bottom:none;box-shadow:var(--shadow)">
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Activity</span>
-          <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${formatActivityMarkup(pa.name)}</span>
+          <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${paDisplayHtml(pa)}</span>
         </div>
       </div>`;
       children.forEach((sub, si) => {
@@ -4523,7 +4531,7 @@ function renderFedcTarget(target) {
       return `<div class="entry-block entry-block-predefined" style="opacity:.6;pointer-events:none">
         <div class="entry-field" contenteditable="false">
           <span class="field-label"${actLabelStyle}>${actLabel}</span>
-          <span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span>
+          <span class="field-value-fixed">${paDisplayHtml(pa)}</span>
           ${actDateLabel}
         </div>
         ${fixedText !== null ? `<div class="entry-field" contenteditable="false">
@@ -4562,7 +4570,7 @@ function renderFedcTarget(target) {
 // landing on the freshly-rebuilt button and creating a second activity).
 let _addActivityInFlight = false;
 // Pending new activity — local only, NOT written to Firestore until the user
-// types a name. Stores { actId, targetName, order, typedName }.
+// types a name. Stores { actId, targetName, order, typedName, typedDetails, pendingIsBold, pendingIsUnderline }.
 let _pendingNewActivity = null;
 
 // A remark "has content" if its text (stripped of HTML) or note is non-empty.
@@ -4576,7 +4584,7 @@ function remarkHasContent(r) {
 // remark records (from "+Add Remark & Trials" being clicked then abandoned)
 // still qualify as orphans.
 function isOrphanExtraActivity(a) {
-  if (a.isPredefined || a.parentActivity || (a.activityName || "").trim()) return false;
+  if (a.isPredefined || a.parentActivity || (a.activityName || "").trim() || (a.activityTitle || "").trim()) return false;
   return !getRemarksForActivity(a.id).some(remarkHasContent);
 }
 
@@ -4601,15 +4609,36 @@ function renderExtraActivitiesSection(target) {
   for (const act of extraActs) {
     const isPending = state.pendingNewRemark?.pendingKey === act.id;
     const remarks   = getRemarksForActivity(act.id);
+    const titleStyle = `${act.activityIsBold ? 'font-weight:700;' : ''}${act.activityIsUnderline ? 'text-decoration:underline;' : ''}`;
     html += `<div class="entry-block" data-act-id="${escHtml(act.id)}">
-      <div class="entry-field">
-        <span class="field-label" contenteditable="false">Activity</span>
-        <input type="text" class="field-input activity-name-input"
-          data-act-id="${escHtml(act.id)}"
-          data-original="${escHtml(act.activityName)}"
-          data-saved-html="${escHtml(act.activityName)}" value="${escHtml(act.activityName)}" />
+      <div class="entry-field" style="align-items:flex-start">
+        <span class="field-label" contenteditable="false" style="padding-top:.3rem">Activity</span>
+        <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
+          <div style="display:flex;align-items:center;gap:.4rem">
+            <span style="font-size:.76rem;color:#9ca3af;flex-shrink:0;min-width:3rem">Title</span>
+            <input type="text" class="field-input activity-title-input"
+              data-act-id="${escHtml(act.id)}"
+              data-saved-html="${escHtml(act.activityTitle || '')}"
+              placeholder="Chart / report label"
+              value="${escHtml(act.activityTitle || '')}"
+              style="flex:1;${titleStyle}" />
+            <label style="display:flex;align-items:center;gap:.15rem;font-size:.78rem;cursor:pointer;flex-shrink:0;user-select:none" title="Bold">
+              <input type="checkbox" class="activity-bold-cb" data-act-id="${escHtml(act.id)}"${act.activityIsBold ? ' checked' : ''}><b>B</b>
+            </label>
+            <label style="display:flex;align-items:center;gap:.15rem;font-size:.78rem;cursor:pointer;flex-shrink:0;user-select:none" title="Underline">
+              <input type="checkbox" class="activity-underline-cb" data-act-id="${escHtml(act.id)}"${act.activityIsUnderline ? ' checked' : ''}><u>U</u>
+            </label>
+          </div>
+          <div style="display:flex;align-items:center;gap:.4rem">
+            <span style="font-size:.76rem;color:#9ca3af;flex-shrink:0;min-width:3rem">Details</span>
+            <input type="text" class="field-input activity-name-input"
+              data-act-id="${escHtml(act.id)}"
+              data-original="${escHtml(act.activityName)}"
+              data-saved-html="${escHtml(act.activityName)}" value="${escHtml(act.activityName)}" />
+          </div>
+        </div>
         <button class="btn-icon btn-delete-activity" contenteditable="false"
-          data-act-id="${escHtml(act.id)}" title="Delete activity">🗑</button>
+          data-act-id="${escHtml(act.id)}" title="Delete activity" style="align-self:flex-start">🗑</button>
       </div>`;
     for (const rem of remarks) {
       html += renderRemarkFields(rem, target);
@@ -4626,18 +4655,40 @@ function renderExtraActivitiesSection(target) {
   }
   // Pending input always at the bottom, replacing the "+ Add Activity" button
   if (hasPending) {
+    const pendTitleStyle = `${_pendingNewActivity.pendingIsBold ? 'font-weight:700;' : ''}${_pendingNewActivity.pendingIsUnderline ? 'text-decoration:underline;' : ''}`;
     html += `<div class="entry-block" data-pending-act="1">
-      <div class="entry-field">
-        <span class="field-label" contenteditable="false">Activity</span>
-        <input type="text" class="field-input pending-activity-name-input"
-          data-act-id="${escHtml(_pendingNewActivity.actId)}"
-          placeholder="Enter activity name…"
-          value="${escHtml(_pendingNewActivity.typedName || '')}" />
-        <button class="btn-confirm-pending-activity" contenteditable="false"
-          style="padding:.25rem .6rem;background:#6366f1;color:#fff;border:none;border-radius:.35rem;cursor:pointer;font-size:.82rem;font-weight:600;flex-shrink:0"
-          title="Save activity">Done</button>
-        <button class="btn-icon btn-cancel-pending-activity" contenteditable="false"
-          title="Cancel">✕</button>
+      <div class="entry-field" style="align-items:flex-start">
+        <span class="field-label" contenteditable="false" style="padding-top:.3rem">Activity</span>
+        <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
+          <div style="display:flex;align-items:center;gap:.4rem">
+            <span style="font-size:.76rem;color:#9ca3af;flex-shrink:0;min-width:3rem">Title</span>
+            <input type="text" class="field-input pending-activity-name-input"
+              data-act-id="${escHtml(_pendingNewActivity.actId)}"
+              placeholder="Chart / report label"
+              value="${escHtml(_pendingNewActivity.typedName || '')}"
+              style="flex:1;${pendTitleStyle}" />
+            <label style="display:flex;align-items:center;gap:.15rem;font-size:.78rem;cursor:pointer;flex-shrink:0;user-select:none" title="Bold">
+              <input type="checkbox" class="pending-bold-cb"${_pendingNewActivity.pendingIsBold ? ' checked' : ''}><b>B</b>
+            </label>
+            <label style="display:flex;align-items:center;gap:.15rem;font-size:.78rem;cursor:pointer;flex-shrink:0;user-select:none" title="Underline">
+              <input type="checkbox" class="pending-underline-cb"${_pendingNewActivity.pendingIsUnderline ? ' checked' : ''}><u>U</u>
+            </label>
+          </div>
+          <div style="display:flex;align-items:center;gap:.4rem">
+            <span style="font-size:.76rem;color:#9ca3af;flex-shrink:0;min-width:3rem">Details</span>
+            <input type="text" class="field-input pending-activity-details-input"
+              data-act-id="${escHtml(_pendingNewActivity.actId)}"
+              placeholder="Description (optional)"
+              value="${escHtml(_pendingNewActivity.typedDetails || '')}" />
+          </div>
+          <div style="display:flex;gap:.4rem;justify-content:flex-end">
+            <button class="btn-confirm-pending-activity" contenteditable="false"
+              style="padding:.25rem .6rem;background:#6366f1;color:#fff;border:none;border-radius:.35rem;cursor:pointer;font-size:.82rem;font-weight:600"
+              title="Save activity">Done</button>
+            <button class="btn-icon btn-cancel-pending-activity" contenteditable="false"
+              title="Cancel">✕</button>
+          </div>
+        </div>
       </div>
       <button class="btn-add-remark btn-add-remark-for-pending" contenteditable="false"
         data-act-id="${escHtml(_pendingNewActivity.actId)}"
@@ -4717,6 +4768,27 @@ function formatActivityMarkup(text) {
   return escHtml(text || "")
     .replace(/\*(.+?)\*/g, "<b>$1</b>")
     .replace(/_(.+?)_/g, "<u>$1</u>");
+}
+
+// Returns the display name for a predefined activity: pa.title if set, else pa.name.
+function paDisplayName(pa) {
+  return pa.title || pa.name;
+}
+
+// Returns the HTML to display a predefined activity's title (with checkbox-style
+// bold/underline from pa.isBold/pa.isUnderline) and optional details below.
+function paDisplayHtml(pa) {
+  const title = paDisplayName(pa);
+  let style = "";
+  if (pa.isBold) style += "font-weight:700;";
+  if (pa.isUnderline) style += "text-decoration:underline;";
+  let html = style
+    ? `<span style="${style}">${formatActivityMarkup(title)}</span>`
+    : formatActivityMarkup(title);
+  if (pa.details) {
+    html += `<span style="display:block;font-size:.85em;color:#6b7280;margin-top:.1rem;font-weight:400;text-decoration:none">${formatActivityMarkup(pa.details)}</span>`;
+  }
+  return html;
 }
 
 // A "word" for cursor-with-no-selection formatting — letters/digits/'/- so
@@ -5088,12 +5160,30 @@ function attachTargetListeners(target) {
   // per session-open by setupEntryEnterKeyDelegation, see openSession).
   c.querySelectorAll("textarea.field-input").forEach(autoResizeTextarea);
 
-  // Activity name (.activity-name-input) is saved by the shared merged-editing
-  // host — see setupEntryRemarkSaving. Just revert-if-emptied here (Ctrl+Enter
-  // is handled by the delegated keydown listener above).
+  // Activity name (.activity-name-input) and title (.activity-title-input) are saved
+  // by the shared merged-editing host — see setupEntryRemarkSaving.
   c.querySelectorAll(".activity-name-input").forEach(input => {
     input.addEventListener("blur", () => {
       if (!input.value.trim()) input.value = input.dataset.original;
+    });
+  });
+
+  // Bold/underline checkboxes for activity title — immediate Firestore write + visual update.
+  c.querySelectorAll(".activity-bold-cb, .activity-underline-cb").forEach(cb => {
+    cb.addEventListener("change", async () => {
+      const actId = cb.dataset.actId;
+      const boldCb = c.querySelector(`.activity-bold-cb[data-act-id="${actId}"]`);
+      const underlineCb = c.querySelector(`.activity-underline-cb[data-act-id="${actId}"]`);
+      const titleInput = c.querySelector(`.activity-title-input[data-act-id="${actId}"]`);
+      const isBold = boldCb?.checked ?? false;
+      const isUnderline = underlineCb?.checked ?? false;
+      if (titleInput) {
+        titleInput.style.fontWeight = isBold ? "700" : "";
+        titleInput.style.textDecoration = isUnderline ? "underline" : "";
+      }
+      const act = state.sessionData?.activities?.[actId];
+      if (act) { act.activityIsBold = isBold; act.activityIsUnderline = isUnderline; }
+      await updateActivityTitle(state.currentSessionId, actId, titleInput?.value?.trim() || "", isBold, isUnderline);
     });
   });
 
@@ -5132,25 +5222,64 @@ function attachTargetListeners(target) {
       _addActivityInFlight = true;
       // Create a local-only pending input — NO Firestore write until the user
       // types a name. This eliminates orphan activities entirely.
-      _pendingNewActivity = { actId: generateId("a"), targetName: target.name, order: Date.now(), typedName: "" };
+      _pendingNewActivity = { actId: generateId("a"), targetName: target.name, order: Date.now(), typedName: "", typedDetails: "", pendingIsBold: false, pendingIsUnderline: false };
       renderTargetContent();
       c.querySelector(".pending-activity-name-input")?.focus();
       setTimeout(() => { _addActivityInFlight = false; }, 600);
     });
   }
 
-  // Pending activity name input — save to Firestore only when user commits a name.
+  // Pending activity inputs — save to Firestore only when user commits a title.
+  // Title input (pending-activity-name-input) is required; Details optional.
   const pendingInput = c.querySelector(".pending-activity-name-input");
   if (pendingInput) {
-    // Keep typedName in sync so it survives Firestore-triggered re-renders.
+    // Keep typed values in sync so they survive Firestore-triggered re-renders.
     pendingInput.addEventListener("input", () => {
       if (_pendingNewActivity) _pendingNewActivity.typedName = pendingInput.value;
     });
+    c.querySelector(".pending-activity-details-input")?.addEventListener("input", (e) => {
+      if (_pendingNewActivity) _pendingNewActivity.typedDetails = e.target.value;
+    });
+    c.querySelector(".pending-bold-cb")?.addEventListener("change", (e) => {
+      if (_pendingNewActivity) {
+        _pendingNewActivity.pendingIsBold = e.target.checked;
+        pendingInput.style.fontWeight = e.target.checked ? "700" : "";
+      }
+    });
+    c.querySelector(".pending-underline-cb")?.addEventListener("change", (e) => {
+      if (_pendingNewActivity) {
+        _pendingNewActivity.pendingIsUnderline = e.target.checked;
+        pendingInput.style.textDecoration = e.target.checked ? "underline" : "";
+      }
+    });
+
+    // Helper: commit pending activity to Firestore
+    const commitPending = (openRemark = false) => {
+      if (!_pendingNewActivity) return;
+      const title   = (_pendingNewActivity.typedName || "").trim();
+      const details = (_pendingNewActivity.typedDetails || "").trim();
+      if (!title) { pendingInput.focus(); return; }
+      const { actId, targetName: tName, order, pendingIsBold, pendingIsUnderline } = _pendingNewActivity;
+      _pendingNewActivity = null;
+      state.sessionData.activities = state.sessionData.activities || {};
+      state.sessionData.activities[actId] = {
+        targetName: tName, activityName: details, activityTitle: title,
+        activityIsBold: pendingIsBold || false, activityIsUnderline: pendingIsUnderline || false,
+        order, isPredefined: false
+      };
+      if (openRemark) state.pendingNewRemark = { pendingKey: actId };
+      renderTargetContent();
+      addActivity(state.currentSessionId, tName, details, order, false, actId, null, null, title, pendingIsBold || false, pendingIsUnderline || false).catch(err => {
+        delete state.sessionData.activities?.[actId];
+        renderTargetContent();
+        alert("Couldn't save activity — check your connection.\n\n" + err.message);
+      });
+    };
 
     pendingInput.addEventListener("blur", () => {
       if (!_pendingNewActivity) return;
-      const name = (_pendingNewActivity.typedName || "").trim();
-      if (!name) {
+      const title = (_pendingNewActivity.typedName || "").trim();
+      if (!title) {
         _pendingNewActivity = null;
         // Defer render if a button's mousedown guard is active
         if (state.entryActionsInFlight > 0) {
@@ -5163,16 +5292,7 @@ function attachTargetListeners(target) {
         }
         return;
       }
-      const { actId, targetName: tName, order } = _pendingNewActivity;
-      _pendingNewActivity = null;
-      state.sessionData.activities = state.sessionData.activities || {};
-      state.sessionData.activities[actId] = { targetName: tName, activityName: name, order, isPredefined: false };
-      renderTargetContent();
-      addActivity(state.currentSessionId, tName, name, order, false, actId).catch(err => {
-        delete state.sessionData.activities?.[actId];
-        renderTargetContent();
-        alert("Couldn't save activity — check your connection.\n\n" + err.message);
-      });
+      commitPending(false);
     });
 
     pendingInput.addEventListener("keydown", (e) => {
@@ -5191,44 +5311,12 @@ function attachTargetListeners(target) {
       confirmBtn.addEventListener("mousedown", (e) => {
         e.preventDefault(); // prevent blur from stealing the click
       });
-      confirmBtn.addEventListener("click", () => {
-        if (!_pendingNewActivity) return;
-        const name = (_pendingNewActivity.typedName || "").trim();
-        if (!name) { c.querySelector(".pending-activity-name-input")?.focus(); return; }
-        const { actId, targetName: tName, order } = _pendingNewActivity;
-        _pendingNewActivity = null;
-        state.sessionData.activities = state.sessionData.activities || {};
-        state.sessionData.activities[actId] = { targetName: tName, activityName: name, order, isPredefined: false };
-        renderTargetContent();
-        addActivity(state.currentSessionId, tName, name, order, false, actId).catch(err => {
-          delete state.sessionData.activities?.[actId];
-          renderTargetContent();
-          alert("Couldn't save activity — check your connection.\n\n" + err.message);
-        });
-      });
+      confirmBtn.addEventListener("click", () => commitPending(false));
     }
 
-    // "+ Add Remark & Trials" on the pending row: save the activity first (name
+    // "+ Add Remark & Trials" on the pending row: save the activity first (title
     // required), then immediately open the add-remark form for it.
-    c.querySelector(".btn-add-remark-for-pending")?.addEventListener("click", () => {
-      if (!_pendingNewActivity) return;
-      const name = (_pendingNewActivity.typedName || "").trim();
-      if (!name) {
-        c.querySelector(".pending-activity-name-input")?.focus();
-        return;
-      }
-      const { actId, targetName: tName, order } = _pendingNewActivity;
-      _pendingNewActivity = null;
-      state.sessionData.activities = state.sessionData.activities || {};
-      state.sessionData.activities[actId] = { targetName: tName, activityName: name, order, isPredefined: false };
-      state.pendingNewRemark = { pendingKey: actId };
-      renderTargetContent();
-      addActivity(state.currentSessionId, tName, name, order, false, actId).catch(err => {
-        delete state.sessionData.activities?.[actId];
-        renderTargetContent();
-        alert("Couldn't save activity — check your connection.\n\n" + err.message);
-      });
-    });
+    c.querySelector(".btn-add-remark-for-pending")?.addEventListener("click", () => commitPending(true));
   }
 
   // ── Delete activity ───────────────────────────────────────
@@ -6131,7 +6219,7 @@ function buildTargetViewTable(target, data) {
           : '';
         rows += `<tr style="background:#f3f4f6">
           <td class="vcol-no" contenteditable="false" style="color:#6b7280">${displayNo}</td>
-          <td class="vcol-act" colspan="5" contenteditable="false" style="font-weight:600">${paBadge}${formatActivityMarkup(pa.name)}</td>
+          <td class="vcol-act" colspan="5" contenteditable="false" style="font-weight:600">${paBadge}${formatActivityMarkup(paDisplayName(pa))}</td>
         </tr>`;
         continue;
       }
@@ -6145,7 +6233,7 @@ function buildTargetViewTable(target, data) {
         const isGreenFixed = pa.activityColor === "green";
         rows += `<tr${isGrayFixed ? ' class="view-gray-row"' : isGreenFixed ? ' class="view-green-row"' : ' style="background:#f9fafb"'}>
           <td class="vcol-no" contenteditable="false">${displayNo}</td>
-          <td class="vcol-act" contenteditable="false">${formatActivityMarkup(pa.name)}</td>
+          <td class="vcol-act" contenteditable="false">${formatActivityMarkup(paDisplayName(pa))}</td>
           <td class="vcol-rem" contenteditable="false" style="color:#374151;cursor:pointer;white-space:pre-wrap"
             onclick="alert('This is a Fixed Remark — the text is set in Edit Target and cannot be changed here.')"
             title="Fixed Remark — click for info">${formatActivityMarkup(fixedText) || "<span style='color:#9ca3af;font-style:italic'>No remark set</span>"}</td>
@@ -6942,6 +7030,17 @@ function setupEntryRemarkSaving(host, getSessionId, onIdle) {
         if (!name) return; // don't persist an emptied-out name; blur reverts the box visually
         el.dataset.original = name;
         return updateActivityName(sid, el.dataset.actId, name);
+      });
+
+    diffAndSave(".activity-title-input[data-act-id]", el => el.value.trim(),
+      (el, title) => {
+        const actId = el.dataset.actId;
+        const boldCb = host.querySelector(`.activity-bold-cb[data-act-id="${actId}"]`);
+        const underlineCb = host.querySelector(`.activity-underline-cb[data-act-id="${actId}"]`);
+        if (state.sessionData?.activities?.[actId]) {
+          state.sessionData.activities[actId].activityTitle = title;
+        }
+        return updateActivityTitle(sid, actId, title, boldCb?.checked ?? false, underlineCb?.checked ?? false);
       });
 
     diffAndSave(".predef-remark-input-live[data-rem-id]", el => el.value.trim(),
@@ -7791,7 +7890,7 @@ function buildGroupTargetViewTable(target, data, attendees) {
           : '';
         rows += `<tr style="background:#f3f4f6">
           <td class="vcol-no" contenteditable="false" style="color:#6b7280">${no}</td>
-          <td class="vcol-act" colspan="6" contenteditable="false" style="font-weight:600">${paBadgeGrp}${formatActivityMarkup(pa.name)}</td>
+          <td class="vcol-act" colspan="6" contenteditable="false" style="font-weight:600">${paBadgeGrp}${formatActivityMarkup(paDisplayName(pa))}</td>
         </tr>`;
         continue;
       }
@@ -7805,7 +7904,7 @@ function buildGroupTargetViewTable(target, data, attendees) {
         no++;
         rows += `<tr${isGrayFixed ? ' class="view-gray-row"' : isGreenFixed2 ? ' class="view-green-row"' : ' style="background:#f9fafb"'}>
           <td class="vcol-no" contenteditable="false">${no}</td>
-          <td class="vcol-act" contenteditable="false">${formatActivityMarkup(pa.name)}</td>
+          <td class="vcol-act" contenteditable="false">${formatActivityMarkup(paDisplayName(pa))}</td>
           <td class="vcol-student" contenteditable="false">—</td>
           <td class="vcol-rem" contenteditable="false" style="color:#6b7280;white-space:pre-wrap">${formatActivityMarkup(fixedText) || "—"}</td>
           <td class="vcol-trials" contenteditable="false">—</td>
@@ -10570,6 +10669,25 @@ function renderTargetManageContent(student, target) {
                 rows="1" placeholder="Sub-activity name" style="flex:1">${escHtml(sub.name || '')}</textarea>
               <button class="btn-adm-del mn-del-sub-act" data-idx="${subIdx}" title="Delete sub-activity" style="flex-shrink:0">🗑</button>
             </div>
+            <div style="display:flex;align-items:center;gap:.35rem;padding-left:1.6rem">
+              <span style="font-size:.75rem;color:#9ca3af;min-width:3rem;flex-shrink:0">Title</span>
+              <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subIdx}" data-idx="${subIdx}"
+                placeholder="Chart / report label"
+                value="${escHtml(sub.title || '')}"
+                style="flex:1${sub.isBold ? ';font-weight:700' : ''}${sub.isUnderline ? ';text-decoration:underline' : ''}" />
+              <label style="display:flex;align-items:center;gap:.15rem;font-size:.78rem;cursor:pointer;flex-shrink:0;user-select:none" title="Bold">
+                <input type="checkbox" class="mn-act-bold-cb" data-idx="${subIdx}"${sub.isBold ? ' checked' : ''}><b>B</b>
+              </label>
+              <label style="display:flex;align-items:center;gap:.15rem;font-size:.78rem;cursor:pointer;flex-shrink:0;user-select:none" title="Underline">
+                <input type="checkbox" class="mn-act-underline-cb" data-idx="${subIdx}"${sub.isUnderline ? ' checked' : ''}><u>U</u>
+              </label>
+            </div>
+            <div style="display:flex;align-items:center;gap:.35rem;padding-left:1.6rem">
+              <span style="font-size:.75rem;color:#9ca3af;min-width:3rem;flex-shrink:0">Details</span>
+              ${formatButtonsHtml(`mn-act-details-${subIdx}`)}
+              <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subIdx}" data-idx="${subIdx}"
+                rows="1" placeholder="Description (optional)" style="flex:1">${escHtml(sub.details || '')}</textarea>
+            </div>
             <div style="display:flex;align-items:flex-start;gap:.5rem;padding-left:1.6rem">
               <span style="font-size:.93rem;color:#374151;white-space:nowrap;font-weight:700;padding-top:.3rem">Remark Type:</span>
               ${subRemarkType}
@@ -10586,6 +10704,25 @@ function renderTargetManageContent(student, target) {
               ${formatButtonsHtml(`mn-act-name-${idx}`)}
               <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
                 rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
+            </div>
+            <div style="display:flex;align-items:center;gap:.35rem">
+              <span style="font-size:.75rem;color:#9ca3af;min-width:3rem;flex-shrink:0">Title</span>
+              <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
+                placeholder="Chart / report label"
+                value="${escHtml(a.title || '')}"
+                style="flex:1${a.isBold ? ';font-weight:700' : ''}${a.isUnderline ? ';text-decoration:underline' : ''}" />
+              <label style="display:flex;align-items:center;gap:.15rem;font-size:.78rem;cursor:pointer;flex-shrink:0;user-select:none" title="Bold">
+                <input type="checkbox" class="mn-act-bold-cb" data-idx="${idx}"${a.isBold ? ' checked' : ''}><b>B</b>
+              </label>
+              <label style="display:flex;align-items:center;gap:.15rem;font-size:.78rem;cursor:pointer;flex-shrink:0;user-select:none" title="Underline">
+                <input type="checkbox" class="mn-act-underline-cb" data-idx="${idx}"${a.isUnderline ? ' checked' : ''}><u>U</u>
+              </label>
+            </div>
+            <div style="display:flex;align-items:center;gap:.35rem">
+              <span style="font-size:.75rem;color:#9ca3af;min-width:3rem;flex-shrink:0">Details</span>
+              ${formatButtonsHtml(`mn-act-details-${idx}`)}
+              <textarea class="admin-input mn-act-details-input" id="mn-act-details-${idx}" data-idx="${idx}"
+                rows="1" placeholder="Description (optional)" style="flex:1">${escHtml(a.details || '')}</textarea>
             </div>
             ${subActsHtml}
             ${maintainedRowSub}
@@ -10617,6 +10754,25 @@ function renderTargetManageContent(student, target) {
               ${formatButtonsHtml(`mn-act-name-${idx}`)}
               <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
                 rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
+            </div>
+            <div style="display:flex;align-items:center;gap:.35rem">
+              <span style="font-size:.75rem;color:#9ca3af;min-width:3rem;flex-shrink:0">Title</span>
+              <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
+                placeholder="Chart / report label"
+                value="${escHtml(a.title || '')}"
+                style="flex:1${a.isBold ? ';font-weight:700' : ''}${a.isUnderline ? ';text-decoration:underline' : ''}" />
+              <label style="display:flex;align-items:center;gap:.15rem;font-size:.78rem;cursor:pointer;flex-shrink:0;user-select:none" title="Bold">
+                <input type="checkbox" class="mn-act-bold-cb" data-idx="${idx}"${a.isBold ? ' checked' : ''}><b>B</b>
+              </label>
+              <label style="display:flex;align-items:center;gap:.15rem;font-size:.78rem;cursor:pointer;flex-shrink:0;user-select:none" title="Underline">
+                <input type="checkbox" class="mn-act-underline-cb" data-idx="${idx}"${a.isUnderline ? ' checked' : ''}><u>U</u>
+              </label>
+            </div>
+            <div style="display:flex;align-items:center;gap:.35rem">
+              <span style="font-size:.75rem;color:#9ca3af;min-width:3rem;flex-shrink:0">Details</span>
+              ${formatButtonsHtml(`mn-act-details-${idx}`)}
+              <textarea class="admin-input mn-act-details-input" id="mn-act-details-${idx}" data-idx="${idx}"
+                rows="1" placeholder="Description (optional)" style="flex:1">${escHtml(a.details || '')}</textarea>
             </div>
             <div style="display:flex;align-items:flex-start;gap:.5rem">
               <span style="font-size:.93rem;color:#374151;white-space:nowrap;font-weight:700;padding-top:.3rem">Remark Type:</span>
@@ -10846,6 +11002,50 @@ function renderTargetManageContent(student, target) {
       if (oldName) propagateActivityRename(student, target.name, oldName, a.name);
     });
     if (!a.isNote && !a.isExportNote) input?.addEventListener("input", () => autoResizeTextarea(input));
+
+    // Title input save (mn-act-title-${idx})
+    const titleInput = $(`mn-act-title-${idx}`);
+    if (titleInput && !a.isNote && !a.isExportNote && !a.isHeading && !a.isMaintainHeading) {
+      titleInput.addEventListener("blur", async () => {
+        const v = titleInput.value.trim();
+        if (v === (a.title || "")) return;
+        a.title = v;
+        await saveTarget();
+        flashSaved(titleInput);
+      });
+    }
+
+    // Details textarea save (mn-act-details-${idx})
+    const detailsInput = $(`mn-act-details-${idx}`);
+    if (detailsInput && !a.isNote && !a.isExportNote && !a.isHeading && !a.isMaintainHeading) {
+      const resizeD = () => { detailsInput.style.height = "auto"; detailsInput.style.height = detailsInput.scrollHeight + "px"; };
+      resizeD();
+      detailsInput.addEventListener("input", () => resizeD());
+      detailsInput.addEventListener("blur", async () => {
+        const v = detailsInput.value.trim();
+        if (v === (a.details || "")) return;
+        a.details = v;
+        await saveTarget();
+        flashSaved(detailsInput);
+      });
+    }
+
+    // Bold/Underline checkboxes for title
+    const boldCb = $("manage-modal-body")?.querySelector(`.mn-act-bold-cb[data-idx="${idx}"]`);
+    const underlineCb = $("manage-modal-body")?.querySelector(`.mn-act-underline-cb[data-idx="${idx}"]`);
+    if (boldCb && underlineCb && !a.isNote && !a.isExportNote && !a.isHeading && !a.isMaintainHeading) {
+      [boldCb, underlineCb].forEach(cb => {
+        cb.addEventListener("change", async () => {
+          a.isBold = boldCb.checked;
+          a.isUnderline = underlineCb.checked;
+          if (titleInput) {
+            titleInput.style.fontWeight = a.isBold ? "700" : "";
+            titleInput.style.textDecoration = a.isUnderline ? "underline" : "";
+          }
+          await saveTarget();
+        });
+      });
+    }
 
     const maintainRemarkInput = $(`mn-act-mremark-${idx}`);
     if (maintainRemarkInput) {
@@ -12072,6 +12272,25 @@ function renderTemplateManageContent(template) {
             <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
               rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
           </div>
+          <div style="display:flex;align-items:center;gap:.35rem">
+            <span style="font-size:.75rem;color:#9ca3af;min-width:3rem;flex-shrink:0">Title</span>
+            <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
+              placeholder="Chart / report label"
+              value="${escHtml(a.title || '')}"
+              style="flex:1${a.isBold ? ';font-weight:700' : ''}${a.isUnderline ? ';text-decoration:underline' : ''}" />
+            <label style="display:flex;align-items:center;gap:.15rem;font-size:.78rem;cursor:pointer;flex-shrink:0;user-select:none" title="Bold">
+              <input type="checkbox" class="mn-act-bold-cb" data-idx="${idx}"${a.isBold ? ' checked' : ''}><b>B</b>
+            </label>
+            <label style="display:flex;align-items:center;gap:.15rem;font-size:.78rem;cursor:pointer;flex-shrink:0;user-select:none" title="Underline">
+              <input type="checkbox" class="mn-act-underline-cb" data-idx="${idx}"${a.isUnderline ? ' checked' : ''}><u>U</u>
+            </label>
+          </div>
+          <div style="display:flex;align-items:center;gap:.35rem">
+            <span style="font-size:.75rem;color:#9ca3af;min-width:3rem;flex-shrink:0">Details</span>
+            ${formatButtonsHtml(`mn-act-details-${idx}`)}
+            <textarea class="admin-input mn-act-details-input" id="mn-act-details-${idx}" data-idx="${idx}"
+              rows="1" placeholder="Description (optional)" style="flex:1">${escHtml(a.details || '')}</textarea>
+          </div>
           <div style="display:flex;align-items:flex-start;gap:.5rem">
             <span style="font-size:.93rem;color:#374151;white-space:nowrap;font-weight:700;padding-top:.3rem">Remark Type:</span>
             ${remarkTypeSelect}
@@ -12256,6 +12475,47 @@ function renderTemplateManageContent(template) {
       flashSaved(input);
     });
     if (!a.isNote && !a.isExportNote) input?.addEventListener("input", () => autoResizeTextarea(input));
+
+    const tmTitleInput = $(`mn-act-title-${idx}`);
+    if (tmTitleInput && !a.isNote && !a.isExportNote && !a.isHeading && !a.isMaintainHeading && !a.isMaintain) {
+      tmTitleInput.addEventListener("blur", async () => {
+        const v = tmTitleInput.value.trim();
+        if (v === (a.title || "")) return;
+        a.title = v;
+        await saveTemplateFn();
+        flashSaved(tmTitleInput);
+      });
+    }
+
+    const tmDetailsInput = $(`mn-act-details-${idx}`);
+    if (tmDetailsInput && !a.isNote && !a.isExportNote && !a.isHeading && !a.isMaintainHeading && !a.isMaintain) {
+      const resizeTD = () => { tmDetailsInput.style.height = "auto"; tmDetailsInput.style.height = tmDetailsInput.scrollHeight + "px"; };
+      resizeTD();
+      tmDetailsInput.addEventListener("input", () => resizeTD());
+      tmDetailsInput.addEventListener("blur", async () => {
+        const v = tmDetailsInput.value.trim();
+        if (v === (a.details || "")) return;
+        a.details = v;
+        await saveTemplateFn();
+        flashSaved(tmDetailsInput);
+      });
+    }
+
+    const tmBoldCb = $("manage-modal-body")?.querySelector(`.mn-act-bold-cb[data-idx="${idx}"]`);
+    const tmUnderlineCb = $("manage-modal-body")?.querySelector(`.mn-act-underline-cb[data-idx="${idx}"]`);
+    if (tmBoldCb && tmUnderlineCb && !a.isNote && !a.isExportNote && !a.isHeading && !a.isMaintainHeading && !a.isMaintain) {
+      [tmBoldCb, tmUnderlineCb].forEach(cb => {
+        cb.addEventListener("change", async () => {
+          a.isBold = tmBoldCb.checked;
+          a.isUnderline = tmUnderlineCb.checked;
+          if (tmTitleInput) {
+            tmTitleInput.style.fontWeight = a.isBold ? "700" : "";
+            tmTitleInput.style.textDecoration = a.isUnderline ? "underline" : "";
+          }
+          await saveTemplateFn();
+        });
+      });
+    }
 
     const maintainRemarkInput = $(`mn-act-mremark-${idx}`);
     if (maintainRemarkInput) {
@@ -13380,7 +13640,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
       groupHtml += `<div class="entry-block" style="border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);border-radius:var(--radius) var(--radius) 0 0;border-bottom:none;box-shadow:var(--shadow)">
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Activity</span>
-          <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem"></span>${formatActivityMarkup(pa.name)}</span>
+          <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem"></span>${paDisplayHtml(pa)}</span>
         </div>
       </div>`;
       children.forEach((sub, si) => {
@@ -13463,7 +13723,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
       const grpSubHtml = grpSubActs.length ? `<div style="display:flex;flex-direction:column;gap:.1rem;padding:.2rem 0 .1rem 1.25rem">
         ${grpSubActs.map((sub, si) => `<div style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:#9ca3af"><span style="flex-shrink:0">${String.fromCharCode(97 + si)})</span><span>${escHtml(sub.name || '')}</span></div>`).join('')}
       </div>` : '';
-      return `<div class="entry-block entry-block-predefined" style="opacity:.6;pointer-events:none"><div class="entry-field" contenteditable="false"><span class="field-label"${grpActLabelStyle}>${grpActLabel}</span><span class="field-value-fixed">${formatActivityMarkup(pa.name)}</span>${grpActDateLabel}</div>${grpSubHtml}</div>`;
+      return `<div class="entry-block entry-block-predefined" style="opacity:.6;pointer-events:none"><div class="entry-field" contenteditable="false"><span class="field-label"${grpActLabelStyle}>${grpActLabel}</span><span class="field-value-fixed">${paDisplayHtml(pa)}</span>${grpActDateLabel}</div>${grpSubHtml}</div>`;
     };
     const grpReal = grpInactivePas.filter(pa => !pa.isNote && !pa.isExportNote && !pa.isHeading && !pa.isMaintainHeading);
     const grpMastered     = grpReal.filter(pa => pa.masteredOn || pa.inactiveReason === 'mastered');

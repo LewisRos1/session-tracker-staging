@@ -725,14 +725,20 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
 
   for (const target of allTargets) {
     const actNameSet = new Set();
+    // Build display-name map: activityName (raw Firestore key) → chart label
+    const actDisplayNameMap = {};
     for (const pa of (target.predefinedActivities || [])) {
       if (!pa.name || pa.isHeading || pa.isNote || pa.isCompleted || pa.isArchived || pa.isStopped || pa.masteredOn || pa.discontinuedOn) continue;
       actNameSet.add(pa.name);
+      actDisplayNameMap[pa.name] = pa.title || pa.name;
     }
     for (const sess of sessions) {
       for (const [, a] of Object.entries(sess.activities || {})) {
         if ((a.targetName === target.name || a.target === target.name) && a.activityName && !a.isHeading && !a.isNote) {
           actNameSet.add(a.activityName);
+          if (!actDisplayNameMap[a.activityName]) {
+            actDisplayNameMap[a.activityName] = a.activityTitle || a.activityName;
+          }
         }
       }
     }
@@ -767,7 +773,7 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
         latest = { label: month.split(" ")[0].slice(0, 3), avg: mAvg };
       }
       if (earliest !== null) {
-        activityData.push({ name: actName, earliestLabel: earliest.label, earliestAvg: earliest.avg, latestLabel: latest.label, latestAvg: latest.avg });
+        activityData.push({ name: actDisplayNameMap[actName] || actName, earliestLabel: earliest.label, earliestAvg: earliest.avg, latestLabel: latest.label, latestAvg: latest.avg });
       }
     }
     if (activityData.length === 0) continue;
@@ -1188,6 +1194,19 @@ function parseInlineMarkupLine(line) {
   return runs;
 }
 
+// Builds actLines for the Word activity cell: handles checkbox-style bold/underline
+// on the title, and appends a details line below if activityDisplayDetails is set.
+function buildActLines(act, label) {
+  const titleBold = act.activityTitleBold || act.activityIsBold || false;
+  const titleUnderline = act.activityTitleUnderline || act.activityIsUnderline || false;
+  const titleLines = (titleBold || titleUnderline)
+    ? label.split("\n").map(line => [{ text: line, bold: titleBold, underline: titleUnderline }])
+    : parseInlineMarkup(label);
+  const details = act.activityDisplayDetails;
+  if (details) return [...titleLines, ...parseInlineMarkup(details)];
+  return titleLines;
+}
+
 function wordTargetRows(target, session, allTargets) {
   const rows = [];
   const activities = getAllActivitiesForTarget(session, target);
@@ -1232,7 +1251,7 @@ function wordTargetRows(target, session, allTargets) {
     }
 
     if (act.isMaintain) {
-      rows.push({ cells: [act.activityName, act.maintainRemark || "", ""], actLines: parseInlineMarkup(act.activityName), remarkLines: parseInlineMarkup(act.maintainRemark || ""), isGray: act.isGray, isGreen: act.isGreen });
+      rows.push({ cells: [act.activityName, act.maintainRemark || "", ""], actLines: buildActLines(act, act.activityName), remarkLines: parseInlineMarkup(act.maintainRemark || ""), isGray: act.isGray, isGreen: act.isGreen });
       continue;
     }
 
@@ -1243,14 +1262,14 @@ function wordTargetRows(target, session, allTargets) {
 
     // noRemark parent: numbered title, empty remark and score
     if (act.noRemark) {
-      rows.push({ cells: [activityLabel, "", ""], actLines: parseInlineMarkup(activityLabel), isGray: act.isGray, isGreen: act.isGreen });
+      rows.push({ cells: [activityLabel, "", ""], actLines: buildActLines(act, activityLabel), isGray: act.isGray, isGreen: act.isGreen });
       continue;
     }
 
     // Sub-activity: indented lettered label, own remark
     if (act.isSubActivity) {
       const subDisplayName = `    ${act.subLabel}) ${act.activityName}`;
-      const _nameLines = parseInlineMarkup(act.activityName);
+      const _nameLines = buildActLines(act, act.activityName);
       const _prefix = { text: `    ${act.subLabel}) ` };
       const subActLines = _nameLines.length > 0 ? [[_prefix, ..._nameLines[0]], ..._nameLines.slice(1)] : [[_prefix]];
       if (act.empty) {
@@ -1282,7 +1301,7 @@ function wordTargetRows(target, session, allTargets) {
     }
 
     if (act.empty) {
-      rows.push({ cells: [activityLabel, act.isMaintained ? "Maintain" : "", ""], actLines: parseInlineMarkup(activityLabel), isGray: act.isGray, isGreen: act.isGreen });
+      rows.push({ cells: [activityLabel, act.isMaintained ? "Maintain" : "", ""], actLines: buildActLines(act, activityLabel), isGray: act.isGray, isGreen: act.isGreen });
       continue;
     }
 
@@ -1291,7 +1310,7 @@ function wordTargetRows(target, session, allTargets) {
     const starter = (_starterPa?.inlineOptions || _starterPa?.remarkPresetId || _starterPa?.remarkHasNote) ? (_starterPa?.sentenceStarter || null) : null;
 
     if (remarks.length === 0) {
-      rows.push({ cells: [activityLabel, act.isMaintained ? "Maintain" : "", ""], actLines: parseInlineMarkup(activityLabel), isGray: act.isGray, isGreen: act.isGreen });
+      rows.push({ cells: [activityLabel, act.isMaintained ? "Maintain" : "", ""], actLines: buildActLines(act, activityLabel), isGray: act.isGray, isGreen: act.isGreen });
       continue;
     }
 
@@ -1305,7 +1324,7 @@ function wordTargetRows(target, session, allTargets) {
       const text        = stripRemarkHtml(rem.text);
       rows.push({
         cells: [first ? activityLabel : "", "", remarkAvg !== null ? pct(remarkAvg) : ""],
-        actLines: first ? parseInlineMarkup(activityLabel) : null,
+        actLines: first ? buildActLines(act, activityLabel) : null,
         remarkLines: buildRemarkLines(starter, text, masteryNote),
         isGray: act.isGray,
         isGreen: act.isGreen
@@ -2258,13 +2277,13 @@ function getAllActivitiesForTarget(session, target) {
         : parentPa?.masteredOn ? '(Mastered) '
         : parentPa?.maintained ? '(Maintained) '
         : '';
-      const subActName = subStatusPrefix + pa.name;
+      const subActName = subStatusPrefix + (pa.title || pa.name);
       const sessionAct = claimAct(pa);
       if (sessionAct) {
         usedIds.add(sessionAct.id);
-        result.push({ ...sessionAct, activityName: subActName, isSubActivity: true, subLabel });
+        result.push({ ...sessionAct, activityName: subActName, isSubActivity: true, subLabel, activityDisplayDetails: pa.details || null, activityTitleBold: !!pa.isBold, activityTitleUnderline: !!pa.isUnderline });
       } else {
-        result.push({ id: null, activityName: subActName, isPredefined: true, empty: true, isSubActivity: true, subLabel });
+        result.push({ id: null, activityName: subActName, isPredefined: true, empty: true, isSubActivity: true, subLabel, activityDisplayDetails: pa.details || null, activityTitleBold: !!pa.isBold, activityTitleUnderline: !!pa.isUnderline });
       }
       continue;
     }
@@ -2272,14 +2291,14 @@ function getAllActivitiesForTarget(session, target) {
     // Mastered / discontinued → defer to bottom with x) prefix, don't consume a number
     if (pa.masteredOn) {
       const _sAct = claimAct(pa);
-      const _name = `x) (Mastered) ${pa.name}`;
+      const _name = `x) (Mastered) ${pa.title || pa.name}`;
       if (_sAct) { usedIds.add(_sAct.id); masteredActivities.push({ ..._sAct, activityName: _name }); }
       else { masteredActivities.push({ id: null, activityName: _name, isPredefined: true, empty: true }); }
       continue;
     }
     if (pa.discontinuedOn) {
       const _sAct = claimAct(pa);
-      const _name = `x) (Discontinued) ${pa.name}`;
+      const _name = `x) (Discontinued) ${pa.title || pa.name}`;
       if (_sAct) { usedIds.add(_sAct.id); discontinuedActivities.push({ ..._sAct, activityName: _name }); }
       else { discontinuedActivities.push({ id: null, activityName: _name, isPredefined: true, empty: true }); }
       continue;
@@ -2288,34 +2307,36 @@ function getAllActivitiesForTarget(session, target) {
     // All remaining paths are real activities — assign sequential number
     exportActNum++;
     const _exportStatusPrefix = pa.maintained ? '(Maintained) ' : '';
-    const numberedName = `${exportActNum}) ${_exportStatusPrefix}${pa.name}`;
+    const _paDisplayBase = pa.title || pa.name;
+    const numberedName = `${exportActNum}) ${_exportStatusPrefix}${_paDisplayBase}`;
+    const paExtraProps = { activityDisplayDetails: pa.details || null, activityTitleBold: !!pa.isBold, activityTitleUnderline: !!pa.isUnderline };
 
     // Parent activity (noRemark) — numbered title, empty remark
     if (pa.noRemark) {
       const sActNr = claimAct(pa);
       if (sActNr) usedIds.add(sActNr.id);
-      result.push({ id: null, activityName: numberedName, isPredefined: true, noRemark: true, empty: true });
+      result.push({ id: null, activityName: numberedName, isPredefined: true, noRemark: true, empty: true, ...paExtraProps });
       continue;
     }
 
     // Fixed remark activities — inline in their natural position (NOT reordered to the bottom)
     if (pa.fixedRemark !== undefined) {
       const isGray = pa.activityColor === "gray" || !!pa.isMaintainLive;
-      result.push({ isMaintain: true, activityName: numberedName, maintainRemark: pa.fixedRemark || "", ...(isGray ? { isGray: true } : {}) });
+      result.push({ isMaintain: true, activityName: numberedName, maintainRemark: pa.fixedRemark || "", ...(isGray ? { isGray: true } : {}), ...paExtraProps });
       continue;
     }
     if (pa.isMaintain) {
       const isGray = pa.activityColor === "gray" || !!pa.isMaintainLive;
-      result.push({ isMaintain: true, activityName: numberedName, maintainRemark: pa.maintainRemark || "", ...(isGray ? { isGray: true } : {}) });
+      result.push({ isMaintain: true, activityName: numberedName, maintainRemark: pa.maintainRemark || "", ...(isGray ? { isGray: true } : {}), ...paExtraProps });
       continue;
     }
     if (pa.isCompleted) {
       const sessionAct = claimAct(pa);
       if (sessionAct) {
         usedIds.add(sessionAct.id);
-        masteredActivities.push({ ...sessionAct, activityName: numberedName, isMastered: true });
+        masteredActivities.push({ ...sessionAct, activityName: numberedName, isMastered: true, ...paExtraProps });
       } else {
-        masteredActivities.push({ id: null, activityName: numberedName, isPredefined: true, empty: true, isMastered: true });
+        masteredActivities.push({ id: null, activityName: numberedName, isPredefined: true, empty: true, isMastered: true, ...paExtraProps });
       }
       continue;
     }
@@ -2323,9 +2344,9 @@ function getAllActivitiesForTarget(session, target) {
       const sessionAct = claimAct(pa);
       if (sessionAct) {
         usedIds.add(sessionAct.id);
-        stoppedActivities.push({ ...sessionAct, activityName: numberedName, isStopped: true });
+        stoppedActivities.push({ ...sessionAct, activityName: numberedName, isStopped: true, ...paExtraProps });
       } else {
-        stoppedActivities.push({ id: null, activityName: numberedName, isPredefined: true, empty: true, isStopped: true });
+        stoppedActivities.push({ id: null, activityName: numberedName, isPredefined: true, empty: true, isStopped: true, ...paExtraProps });
       }
       continue;
     }
@@ -2336,12 +2357,12 @@ function getAllActivitiesForTarget(session, target) {
     if (sessionAct) {
       usedIds.add(sessionAct.id);
       result.push(pa.isMapped
-        ? { ...sessionAct, activityName: numberedName, isMapped: true, mappedTargetId: pa.mappedTargetId || null, ...colorProps, isMaintained: !!pa.maintained }
-        : { ...sessionAct, activityName: numberedName, ...colorProps, ...manualScoreProp, isMaintained: !!pa.maintained });
+        ? { ...sessionAct, activityName: numberedName, isMapped: true, mappedTargetId: pa.mappedTargetId || null, ...colorProps, isMaintained: !!pa.maintained, ...paExtraProps }
+        : { ...sessionAct, activityName: numberedName, ...colorProps, ...manualScoreProp, isMaintained: !!pa.maintained, ...paExtraProps });
     } else {
       result.push({
         id: null, activityName: numberedName, isPredefined: true, empty: true,
-        isMapped: pa.isMapped || false, mappedTargetId: pa.mappedTargetId || null, ...colorProps, ...manualScoreProp, isMaintained: !!pa.maintained
+        isMapped: pa.isMapped || false, mappedTargetId: pa.mappedTargetId || null, ...colorProps, ...manualScoreProp, isMaintained: !!pa.maintained, ...paExtraProps
       });
     }
   }
@@ -2354,7 +2375,10 @@ function getAllActivitiesForTarget(session, target) {
     if (act.isPredefined || act.parentActivity) continue;
     if (!act.activityName?.trim()) continue;
     extraNum++;
-    extraActivities.push({ ...act, activityName: `${extraNum}) ${act.activityName}` });
+    // If activityTitle is set, use it as the label; the old activityName becomes Details
+    const extraLabel = act.activityTitle || act.activityName;
+    const extraDetails = act.activityTitle ? act.activityName : null;
+    extraActivities.push({ ...act, activityName: `${extraNum}) ${extraLabel}`, activityDisplayDetails: extraDetails });
   }
 
   if (masteredActivities.length > 0) {

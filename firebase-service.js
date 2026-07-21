@@ -380,10 +380,13 @@ export async function revertOrphanActivity(sessionId, actId) {
   });
 }
 
-export async function addActivity(sessionId, targetName, activityName, order, isPredefined = false, actId = generateId("a"), parentActivity = null, configId = null) {
+export async function addActivity(sessionId, targetName, activityName, order, isPredefined = false, actId = generateId("a"), parentActivity = null, configId = null, activityTitle = "", activityIsBold = false, activityIsUnderline = false) {
   const actData = { targetName, activityName, order, isPredefined };
   if (parentActivity) actData.parentActivity = parentActivity;
   if (configId) actData.configId = configId;
+  if (activityTitle) actData.activityTitle = activityTitle;
+  if (activityIsBold) actData.activityIsBold = true;
+  if (activityIsUnderline) actData.activityIsUnderline = true;
   await updateDoc(doc(db, "sessions", sessionId), {
     [`activities.${actId}`]: actData
   });
@@ -645,6 +648,14 @@ export async function updateRemarkNote(sessionId, remId, note) {
 export async function updateActivityName(sessionId, actId, name) {
   await updateDoc(doc(db, "sessions", sessionId), {
     [`activities.${actId}.activityName`]: name
+  });
+}
+
+export async function updateActivityTitle(sessionId, actId, title, isBold, isUnderline) {
+  await updateDoc(doc(db, "sessions", sessionId), {
+    [`activities.${actId}.activityTitle`]: title,
+    [`activities.${actId}.activityIsBold`]: isBold || false,
+    [`activities.${actId}.activityIsUnderline`]: isUnderline || false
   });
 }
 
