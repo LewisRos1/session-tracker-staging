@@ -155,7 +155,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1018";
+const APP_VERSION = "1019";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -10466,8 +10466,8 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
         value="${escHtml(a.sentenceStarter || "")}">
     </div>
     <div class="mn-opts-container" data-idx="${idx}" style="${showStarter ? "" : "display:none"}">
+      <div class="mn-opts-type-label" data-idx="${idx}" style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">${type === "starter_fixed_multi" ? "Checkboxes" : "Multiple Options"}</div>
       <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden;margin-bottom:.4rem">
-        <div style="padding:.3rem .6rem;font-size:.78rem;font-weight:600;color:#6b7280;background:#f3f4f6;border-bottom:1px solid #b8bcc4">Options</div>
         <div class="mn-opts-list" style="padding:.3rem .4rem .1rem">${(() => {
           const optsStr = a.inlineOptions || (a.remarkPresetId ? (state.remarkPresets.find(p=>p.id===a.remarkPresetId)?.options||[]).join("/") : "");
           const displayOpts = parseOpts(optsStr).length > 0 ? parseOpts(optsStr) : [""];
@@ -11806,6 +11806,8 @@ function renderTargetManageContent(student, target) {
       const optsVis    = usesOpts;
       starterWrap.style.cssText    = starterVis ? "display:flex;flex-direction:column;gap:.3rem" : "display:none";
       optsContainer.style.display  = optsVis ? "" : "none";
+      const typeLabel = optsContainer.querySelector(".mn-opts-type-label");
+      if (typeLabel) typeLabel.textContent = type === "starter_fixed_multi" ? "Checkboxes" : "Multiple Options";
       if (usesOpts) { acts[idx].inlineOptions = getOptsFromDom(idx).join("\x1F") || null; rebuildOptScores(idx); }
       if (starterVis) { starterInput.focus(); }
       else if (optsVis) { optsContainer.querySelector(".mn-opt-item")?.focus(); }
@@ -12764,6 +12766,8 @@ function renderTemplateManageContent(template) {
       const optsVis    = usesOpts;
       starterWrap.style.cssText    = starterVis ? "display:flex;flex-direction:column;gap:.3rem" : "display:none";
       optsContainer.style.display  = optsVis ? "" : "none";
+      const tmplTypeLabel = optsContainer.querySelector(".mn-opts-type-label");
+      if (tmplTypeLabel) tmplTypeLabel.textContent = type === "starter_fixed_multi" ? "Checkboxes" : "Multiple Options";
       if (usesOpts) {
         acts[idx].inlineOptions = [...body.querySelectorAll(`.mn-opt-item[data-idx="${idx}"]`)].map(i => i.value.trim()).filter(Boolean).join("\x1F") || null;
       }
