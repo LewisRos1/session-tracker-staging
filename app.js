@@ -155,7 +155,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1015";
+const APP_VERSION = "1016";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -10461,7 +10461,7 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
     <div class="mn-act-starter-wrap" data-idx="${idx}" style="${showStarter ? "display:flex;flex-direction:column;gap:.3rem" : "display:none"}">
       <span style="font-size:.95rem;color:#374151;font-weight:700">Sentence Starter</span>
       <input class="admin-input mn-act-starter-text" data-idx="${idx}"
-        placeholder="Phrase…"
+        placeholder="Enter Sentence Starter Here (Optional)"
         style="width:100%;min-width:0;box-sizing:border-box"
         value="${escHtml(a.sentenceStarter || "")}">
     </div>
@@ -10734,7 +10734,7 @@ function renderTargetManageContent(student, target) {
                       <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${subIdx}" title="Underline (Ctrl+U)">U</button>
                     </div>
                     <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subIdx}" data-idx="${subIdx}"
-                      placeholder="" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+                      placeholder="Enter Activity Title Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
                   </div>
                   <button class="btn-adm-del mn-del-sub-act" data-idx="${subIdx}" title="Delete sub-activity" style="flex-shrink:0;margin-top:.35rem">🗑</button>
                 </div>
@@ -10748,7 +10748,7 @@ function renderTargetManageContent(student, target) {
                     <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${subIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
                   </div>
                   <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subIdx}" data-idx="${subIdx}"
-                    rows="2" placeholder="" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(sub.name || '')}</textarea>
+                    rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(sub.name || '')}</textarea>
                 </div>
               </div>
               <div>
@@ -10773,7 +10773,7 @@ function renderTargetManageContent(student, target) {
                     <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${idx}" title="Underline (Ctrl+U)">U</button>
                   </div>
                   <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
-                    placeholder="" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+                    placeholder="Enter Activity Title Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
                 </div>
               </div>
               <div>
@@ -10785,7 +10785,7 @@ function renderTargetManageContent(student, target) {
                     <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${idx}" title="Bullet (Ctrl+Shift+L)">•</button>
                   </div>
                   <textarea class="admin-input mn-act-details-input" id="mn-act-details-${idx}" data-idx="${idx}"
-                    rows="2" placeholder="" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(a.name || '')}</textarea>
+                    rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(a.name || '')}</textarea>
                 </div>
               </div>
               ${subActsHtml}
@@ -10824,7 +10824,7 @@ function renderTargetManageContent(student, target) {
                     <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${idx}" title="Underline (Ctrl+U)">U</button>
                   </div>
                   <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
-                    placeholder="" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+                    placeholder="Enter Activity Title Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
                 </div>
               </div>
               <div>
@@ -10836,7 +10836,7 @@ function renderTargetManageContent(student, target) {
                     <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${idx}" title="Bullet (Ctrl+Shift+L)">•</button>
                   </div>
                   <textarea class="admin-input mn-act-details-input" id="mn-act-details-${idx}" data-idx="${idx}"
-                    rows="2" placeholder="" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(a.name || '')}</textarea>
+                    rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(a.name || '')}</textarea>
                 </div>
               </div>
               <div>
