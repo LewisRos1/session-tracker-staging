@@ -762,6 +762,8 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
     }
 
     let activeIdx = 0, masteredIdx = 0, discontinuedIdx = 0;
+    const parentSectionIdx = {}; // standalone pa.name → its section counter value (for sub-act labels)
+    const parentSubCount   = {}; // parent pa.name → how many sub-acts have been labelled so far
     for (const pa of (target.predefinedActivities || [])) {
       if (!pa.name || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || pa.isMaintain
           || pa.isCompleted) continue;
@@ -780,15 +782,27 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
 
       if (!isActive && !isMastered && !isDiscontinued) continue;
 
-      let sectionIdx;
-      let dnMap;
-      if (isActive)        { sectionIdx = ++activeIdx;       dnMap = activeDNMap;       }
-      else if (isMastered) { sectionIdx = ++masteredIdx;     dnMap = masteredDNMap;     }
-      else                 { sectionIdx = ++discontinuedIdx; dnMap = discontinuedDNMap; }
+      const dnMap = isActive ? activeDNMap : isMastered ? masteredDNMap : discontinuedDNMap;
 
-      const displayName = pa.parentActivity
-        ? (pa.name || `<Sub-Activity ${sectionIdx}>`)
-        : ((pa.title && pa.title.trim()) ? pa.title.trim() : `<Activity ${sectionIdx}>`);
+      let displayName;
+      if (pa.parentActivity) {
+        // Sub-activity: does NOT increment the section counter.
+        // Unnamed ones use parent's index + letter suffix (a, b, c…).
+        const pIdx   = parentSectionIdx[pa.parentActivity];
+        const letterN = parentSubCount[pa.parentActivity] ?? 0;
+        parentSubCount[pa.parentActivity] = letterN + 1;
+        const letter = String.fromCharCode(97 + letterN);
+        displayName = pa.name || (pIdx != null ? `<Activity ${pIdx}${letter}>` : `<Sub-Activity ${letter}>`);
+      } else {
+        // Standalone activity: increment the section counter.
+        let sectionIdx;
+        if (isActive)        { sectionIdx = ++activeIdx; }
+        else if (isMastered) { sectionIdx = ++masteredIdx; }
+        else                 { sectionIdx = ++discontinuedIdx; }
+        displayName = (pa.title && pa.title.trim()) ? pa.title.trim() : `<Activity ${sectionIdx}>`;
+        parentSectionIdx[pa.name] = sectionIdx;
+      }
+
       dnMap[pa.name] = displayName;
 
       if (isActive)            { actStatusMap[pa.name] = "active";       activeNames.push(pa.name); }

@@ -155,7 +155,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "997";
+const APP_VERSION = "998";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
