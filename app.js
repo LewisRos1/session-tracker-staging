@@ -155,7 +155,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1010";
+const APP_VERSION = "1011";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -10459,7 +10459,7 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
       <option value="starter_fixed_note"${type === "starter_fixed_note" ? " selected" : ""}>Sentence Starter + Select One + Free Text</option>
     </select>
     <div class="mn-act-starter-wrap" data-idx="${idx}" style="${showStarter ? "display:flex;align-items:center;gap:.5rem" : "display:none"}">
-      <span style="font-size:.93rem;color:#374151;white-space:nowrap;font-weight:700;flex-shrink:0;min-width:150px">Sentence Starter:</span>
+      <span style="font-size:.93rem;color:#374151;white-space:nowrap;font-weight:700;flex-shrink:0">Sentence Starter:</span>
       <input class="admin-input mn-act-starter-text" data-idx="${idx}"
         placeholder="Phrase…"
         style="flex:1;min-width:0"
@@ -10717,22 +10717,25 @@ function renderTargetManageContent(student, target) {
                 <button class="mn-undo-maintain" data-idx="${subIdx}" style="font-size:.72rem;padding:.15rem .45rem;background:#dbeafe;border:1px solid #93c5fd;border-radius:.3rem;cursor:pointer;color:#1d4ed8">↩ Undo</button>
               </div>`
             : "";
-          return `<div style="margin-left:1.25rem;display:flex;gap:.4rem;align-items:flex-start;padding:.45rem .55rem;background:#f0f9ff;border:1px solid #bae6fd;border-left:3px solid #60a5fa;border-radius:.35rem">
-            <span style="font-size:.75rem;font-weight:700;color:#0369a1;flex-shrink:0;min-width:1.4rem;padding-top:.4rem">${String.fromCharCode(97 + si)})</span>
-            <div style="flex:1;display:flex;flex-direction:column;gap:.45rem">
-              <div style="display:flex;align-items:center;gap:.5rem">
-                <span style="font-size:.93rem;color:#374151;font-weight:700;white-space:nowrap;flex-shrink:0;min-width:150px">Activity Title: <span style="font-size:.72rem;color:#9ca3af;font-weight:400">(chart)</span></span>
-                <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subIdx}" data-idx="${subIdx}"
-                  placeholder="" value="${escHtml(sub.title || '')}" style="flex:1" />
-                <button class="btn-adm-del mn-del-sub-act" data-idx="${subIdx}" title="Delete sub-activity" style="flex-shrink:0">🗑</button>
+          return `<div style="margin-left:1.25rem;display:flex;gap:.4rem;align-items:flex-start;padding:.5rem .6rem;background:#f0f9ff;border:1px solid #bae6fd;border-left:3px solid #60a5fa;border-radius:.35rem">
+            <span style="font-size:.75rem;font-weight:700;color:#0369a1;flex-shrink:0;min-width:1.4rem;padding-top:.2rem">${String.fromCharCode(97 + si)})</span>
+            <div style="flex:1;display:flex;flex-direction:column;gap:.55rem">
+              <div>
+                <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title <span title="Shown in the Activity Breakdown chart" style="cursor:help;font-style:normal">ℹ️</span></div>
+                <div style="display:flex;gap:.4rem;align-items:center">
+                  <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subIdx}" data-idx="${subIdx}"
+                    placeholder="" value="${escHtml(sub.title || '')}" style="flex:1" />
+                  <button class="btn-adm-del mn-del-sub-act" data-idx="${subIdx}" title="Delete sub-activity" style="flex-shrink:0">🗑</button>
+                </div>
               </div>
-              <div style="display:flex;align-items:flex-start;gap:.5rem">
-                <span style="font-size:.93rem;color:#374151;font-weight:700;white-space:nowrap;flex-shrink:0;min-width:150px;padding-top:.3rem">Activity Details: <span style="font-size:.72rem;color:#9ca3af;font-weight:400">(session only)</span></span>
+              <div>
+                <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Details <span title="Shown in session screen only, not in the chart" style="cursor:help;font-style:normal">ℹ️</span></div>
+                <div style="margin-bottom:.22rem">${formatButtonsHtml(`mn-act-details-${subIdx}`)}</div>
                 <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subIdx}" data-idx="${subIdx}"
-                  rows="1" placeholder="" style="flex:1">${escHtml(sub.name || '')}</textarea>
+                  rows="2" placeholder="" style="width:100%;box-sizing:border-box;display:block">${escHtml(sub.name || '')}</textarea>
               </div>
-              <div style="display:flex;align-items:flex-start;gap:.5rem">
-                <span style="font-size:.93rem;color:#374151;font-weight:700;white-space:nowrap;flex-shrink:0;min-width:150px;padding-top:.3rem">Remark Type:</span>
+              <div>
+                <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.28rem">Remark Type</div>
                 ${subRemarkType}
               </div>
               ${subFixedRemarkRow}
@@ -10742,22 +10745,23 @@ function renderTargetManageContent(student, target) {
         const maintainedRowSub = "";
         html += `<div class="admin-list-item" data-idx="${idx}"${actItemStyle}>
           <span class="drag-handle">⠿</span>
-          <div style="flex:1;display:flex;gap:.4rem;align-items:flex-start">
-            <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;min-width:1.6rem;padding-top:.4rem">${manageActNo})</span>
-            <div style="flex:1;display:flex;flex-direction:column;gap:.45rem">
-              <div style="display:flex;align-items:center;gap:.5rem">
-                <span style="font-size:.93rem;color:#374151;font-weight:700;white-space:nowrap;flex-shrink:0;min-width:150px">Activity Title: <span style="font-size:.72rem;color:#9ca3af;font-weight:400">(chart)</span></span>
+          <div style="flex:1;display:flex;gap:.5rem;align-items:flex-start">
+            <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;min-width:1.6rem;padding-top:.2rem">${manageActNo})</span>
+            <div style="flex:1;display:flex;flex-direction:column;gap:.55rem">
+              <div>
+                <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title <span title="Shown in the Activity Breakdown chart" style="cursor:help">ℹ️</span></div>
                 <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
-                  placeholder="" value="${escHtml(a.title || '')}" style="flex:1" />
+                  placeholder="" value="${escHtml(a.title || '')}" style="width:100%;box-sizing:border-box;display:block" />
               </div>
-              <div style="display:flex;align-items:flex-start;gap:.5rem">
-                <span style="font-size:.93rem;color:#374151;font-weight:700;white-space:nowrap;flex-shrink:0;min-width:150px;padding-top:.3rem">Activity Details: <span style="font-size:.72rem;color:#9ca3af;font-weight:400">(session only)</span></span>
+              <div>
+                <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Details <span title="Shown in session screen only, not in the chart" style="cursor:help">ℹ️</span></div>
+                <div style="margin-bottom:.22rem">${formatButtonsHtml(`mn-act-details-${idx}`)}</div>
                 <textarea class="admin-input mn-act-details-input" id="mn-act-details-${idx}" data-idx="${idx}"
-                  rows="1" placeholder="" style="flex:1">${escHtml(a.name || '')}</textarea>
+                  rows="2" placeholder="" style="width:100%;box-sizing:border-box;display:block">${escHtml(a.name || '')}</textarea>
               </div>
               ${subActsHtml}
               ${maintainedRowSub}
-              <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:var(--primary);border:1px solid var(--primary);border-radius:.35rem;color:#fff;cursor:pointer;margin-top:.2rem;align-self:flex-start">+ Add Sub-activity</button>
+              <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:var(--primary);border:1px solid var(--primary);border-radius:.35rem;color:#fff;cursor:pointer;align-self:flex-start">+ Add Sub-activity</button>
             </div>
           </div>
           <div style="position:relative">
@@ -10780,25 +10784,26 @@ function renderTargetManageContent(student, target) {
         const maintainedRow = "";
         html += `<div class="admin-list-item" data-idx="${idx}"${actItemStyle}>
           <span class="drag-handle">⠿</span>
-          <div style="flex:1;display:flex;gap:.4rem;align-items:flex-start">
-            <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;min-width:1.6rem;padding-top:.4rem">${manageActNo})</span>
-            <div style="flex:1;display:flex;flex-direction:column;gap:.45rem">
-              <div style="display:flex;align-items:center;gap:.5rem">
-                <span style="font-size:.93rem;color:#374151;font-weight:700;white-space:nowrap;flex-shrink:0;min-width:150px">Activity Title: <span style="font-size:.72rem;color:#9ca3af;font-weight:400">(chart)</span></span>
+          <div style="flex:1;display:flex;gap:.5rem;align-items:flex-start">
+            <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;min-width:1.6rem;padding-top:.2rem">${manageActNo})</span>
+            <div style="flex:1;display:flex;flex-direction:column;gap:.55rem">
+              <div>
+                <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title <span title="Shown in the Activity Breakdown chart" style="cursor:help">ℹ️</span></div>
                 <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
-                  placeholder="" value="${escHtml(a.title || '')}" style="flex:1" />
+                  placeholder="" value="${escHtml(a.title || '')}" style="width:100%;box-sizing:border-box;display:block" />
               </div>
-              <div style="display:flex;align-items:flex-start;gap:.5rem">
-                <span style="font-size:.93rem;color:#374151;font-weight:700;white-space:nowrap;flex-shrink:0;min-width:150px;padding-top:.3rem">Activity Details: <span style="font-size:.72rem;color:#9ca3af;font-weight:400">(session only)</span></span>
+              <div>
+                <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Details <span title="Shown in session screen only, not in the chart" style="cursor:help">ℹ️</span></div>
+                <div style="margin-bottom:.22rem">${formatButtonsHtml(`mn-act-details-${idx}`)}</div>
                 <textarea class="admin-input mn-act-details-input" id="mn-act-details-${idx}" data-idx="${idx}"
-                  rows="1" placeholder="" style="flex:1">${escHtml(a.name || '')}</textarea>
+                  rows="2" placeholder="" style="width:100%;box-sizing:border-box;display:block">${escHtml(a.name || '')}</textarea>
               </div>
-              <div style="display:flex;align-items:flex-start;gap:.5rem">
-                <span style="font-size:.93rem;color:#374151;font-weight:700;white-space:nowrap;flex-shrink:0;min-width:150px;padding-top:.3rem">Remark Type:</span>
+              <div>
+                <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.28rem">Remark Type</div>
                 ${remarkTypeSelect}
               </div>
               ${maintainedRow}
-              <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:var(--primary);border:1px solid var(--primary);border-radius:.35rem;color:#fff;cursor:pointer;margin-top:.2rem;align-self:flex-start">↳ Add Sub-activity</button>
+              <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:var(--primary);border:1px solid var(--primary);border-radius:.35rem;color:#fff;cursor:pointer;align-self:flex-start">↳ Add Sub-activity</button>
             </div>
           </div>
           <div style="position:relative">
