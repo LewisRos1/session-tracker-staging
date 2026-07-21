@@ -154,7 +154,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "984";
+const APP_VERSION = "985";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4778,14 +4778,9 @@ function paDisplayName(pa) {
 // Returns the HTML to display a predefined activity's title (with checkbox-style
 // bold/underline from pa.isBold/pa.isUnderline) and optional details below.
 function paDisplayHtml(pa) {
-  // pa.title === null/undefined → old-style activity (title field never existed):
-  //   show pa.name as the single primary line (backward compat).
-  // pa.title === "" → new-style with blank title (user left it empty):
-  //   show nothing on line 1, pa.name as details on line 2.
-  // pa.title is non-empty → show title on line 1, pa.name as details on line 2.
-  const newStyle = pa.title != null;
-  const titleText = newStyle ? (pa.title || "").trim() : (pa.name || "").trim();
-  const detailsText = newStyle ? (pa.name || "").trim() : "";
+  // pa.title → first line only (empty = nothing shown on line 1).
+  // pa.name  → always the details/second line when non-empty.
+  const titleText = (pa.title || "").trim();
   let html = "";
   if (titleText) {
     let style = "";
@@ -4795,6 +4790,7 @@ function paDisplayHtml(pa) {
       ? `<span style="${style}">${formatActivityMarkup(titleText)}</span>`
       : formatActivityMarkup(titleText);
   }
+  const detailsText = (pa.name || "").trim();
   if (detailsText) {
     html += `<span style="display:block;margin-top:.1rem;font-weight:400;text-decoration:none">${formatActivityMarkup(detailsText)}</span>`;
   }
