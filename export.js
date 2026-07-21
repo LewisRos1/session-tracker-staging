@@ -705,7 +705,7 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
         const actId = act.id || actKey;
         const snap = (sess.targetsSnapshot || []).find(t => t.name === target.name);
         const mp = (snap ? (snap.maxPoints ?? target.maxPoints) : target.maxPoints) || 3;
-        for (const [, rem] of getRemarksForActivity(sess, actId)) {
+        for (const rem of getRemarksForActivity(sess, actId)) {
           const scores = allScores(rem);
           if (scores.length === 0) continue;
           const pct = scores.reduce((a, b) => a + b, 0) / (scores.length * mp) * 100;
