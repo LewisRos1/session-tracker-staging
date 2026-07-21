@@ -155,7 +155,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1014";
+const APP_VERSION = "1015";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -10481,8 +10481,10 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
             `</div>`
           ).join("");
         })()}</div>
+        <div style="padding:.25rem .4rem .4rem;border-top:1px solid #e5e7eb">
+          <button class="mn-opt-add" data-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:#f9fafb;border:1px solid #d1d5db;border-radius:.35rem;cursor:pointer;color:#374151">+ Add Option</button>
+        </div>
       </div>
-      <button class="mn-opt-add" data-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:#f9fafb;border:1px solid #d1d5db;border-radius:.35rem;cursor:pointer;color:#374151;margin-top:.25rem">+ Add Option</button>
       ${(() => {
         const archived = a.archivedOptions || [];
         return `<div class="mn-removed-section" data-idx="${idx}" style="margin-top:.5rem${archived.length === 0 ? ";display:none" : ""}">
@@ -10726,8 +10728,8 @@ function renderTargetManageContent(student, target) {
               <div>
                 <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title</div>
                 <div style="display:flex;gap:.4rem;align-items:flex-start">
-                  <div style="border:1px solid var(--border);border-radius:.45rem;overflow:hidden;flex:1">
-                    <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid var(--border)">
+                  <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden;flex:1">
+                    <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
                       <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${subIdx}" title="Bold (Ctrl+B)">B</button>
                       <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${subIdx}" title="Underline (Ctrl+U)">U</button>
                     </div>
@@ -10739,8 +10741,8 @@ function renderTargetManageContent(student, target) {
               </div>
               <div>
                 <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Details</div>
-                <div style="border:1px solid var(--border);border-radius:.45rem;overflow:hidden">
-                  <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid var(--border)">
+                <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
+                  <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
                     <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${subIdx}" title="Bold (Ctrl+B)">B</button>
                     <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${subIdx}" title="Underline (Ctrl+U)">U</button>
                     <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${subIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
@@ -10765,8 +10767,8 @@ function renderTargetManageContent(student, target) {
             <div style="flex:1;display:flex;flex-direction:column;gap:.55rem">
               <div>
                 <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title</div>
-                <div style="border:1px solid var(--border);border-radius:.45rem;overflow:hidden">
-                  <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid var(--border)">
+                <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
+                  <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
                     <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${idx}" title="Bold (Ctrl+B)">B</button>
                     <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${idx}" title="Underline (Ctrl+U)">U</button>
                   </div>
@@ -10776,8 +10778,8 @@ function renderTargetManageContent(student, target) {
               </div>
               <div>
                 <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Details</div>
-                <div style="border:1px solid var(--border);border-radius:.45rem;overflow:hidden">
-                  <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid var(--border)">
+                <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
+                  <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
                     <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${idx}" title="Bold (Ctrl+B)">B</button>
                     <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${idx}" title="Underline (Ctrl+U)">U</button>
                     <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${idx}" title="Bullet (Ctrl+Shift+L)">•</button>
@@ -10816,8 +10818,8 @@ function renderTargetManageContent(student, target) {
             <div style="flex:1;display:flex;flex-direction:column;gap:.55rem">
               <div>
                 <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title</div>
-                <div style="border:1px solid var(--border);border-radius:.45rem;overflow:hidden">
-                  <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid var(--border)">
+                <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
+                  <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
                     <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${idx}" title="Bold (Ctrl+B)">B</button>
                     <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${idx}" title="Underline (Ctrl+U)">U</button>
                   </div>
@@ -10827,8 +10829,8 @@ function renderTargetManageContent(student, target) {
               </div>
               <div>
                 <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Details</div>
-                <div style="border:1px solid var(--border);border-radius:.45rem;overflow:hidden">
-                  <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid var(--border)">
+                <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
+                  <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
                     <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${idx}" title="Bold (Ctrl+B)">B</button>
                     <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${idx}" title="Underline (Ctrl+U)">U</button>
                     <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${idx}" title="Bullet (Ctrl+Shift+L)">•</button>
@@ -11784,7 +11786,7 @@ function renderTargetManageContent(student, target) {
       acts[idx].remarkHasNote   = (type === "starter_fixed_note");
       const starterVis = usesOpts;
       const optsVis    = usesOpts;
-      starterWrap.style.display    = starterVis ? "flex" : "none";
+      starterWrap.style.cssText    = starterVis ? "display:flex;flex-direction:column;gap:.3rem" : "display:none";
       optsContainer.style.display  = optsVis ? "" : "none";
       if (usesOpts) { acts[idx].inlineOptions = getOptsFromDom(idx).join("\x1F") || null; rebuildOptScores(idx); }
       if (starterVis) { starterInput.focus(); }
@@ -12742,7 +12744,7 @@ function renderTemplateManageContent(template) {
       acts[idx].remarkHasNote   = (type === "starter_fixed_note");
       const starterVis = usesOpts;
       const optsVis    = usesOpts;
-      starterWrap.style.display    = starterVis ? "flex" : "none";
+      starterWrap.style.cssText    = starterVis ? "display:flex;flex-direction:column;gap:.3rem" : "display:none";
       optsContainer.style.display  = optsVis ? "" : "none";
       if (usesOpts) {
         acts[idx].inlineOptions = [...body.querySelectorAll(`.mn-opt-item[data-idx="${idx}"]`)].map(i => i.value.trim()).filter(Boolean).join("\x1F") || null;
