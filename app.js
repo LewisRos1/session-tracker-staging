@@ -155,7 +155,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1019";
+const APP_VERSION = "1020";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -447,7 +447,7 @@ function isEmptyActItem(a) {
 // their plain <textarea> (see wrapTextareaSelection) rather than through this
 // popup — the popup is only for remarks now, same as it always was.
 function isActivityMarkupField(el) {
-  return el.classList?.contains("mn-act-name-input") || el.classList?.contains("mn-fixed-remark-input") || el.classList?.contains("mn-inactive-name-input");
+  return el.classList?.contains("mn-act-name-input") || el.classList?.contains("mn-act-title-input") || el.classList?.contains("mn-act-details-input") || el.classList?.contains("mn-fixed-remark-input") || el.classList?.contains("mn-inactive-name-input");
 }
 
 function openTextEditorSheet(originEl) {
@@ -10898,19 +10898,34 @@ function renderTargetManageContent(student, target) {
       const dateLabel = a.masteredOn ? `Mastered on ${fmtPeriodDate(a.masteredOn)}` : 'Mastered';
       const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
       html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
-        <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
-          <div style="display:flex;align-items:center;gap:.3rem">
-            ${formatButtonsHtml(`mn-act-title-${globalIdx}`)}
-            <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${globalIdx}" data-idx="${globalIdx}" placeholder="Activity Title" value="${escHtml(a.title || '')}" style="flex:1${a.isBold ? ';font-weight:700' : ''}${a.isUnderline ? ';text-decoration:underline' : ''}" />
+        <div style="flex:1;display:flex;flex-direction:column;gap:.4rem">
+          <div>
+            <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Title</div>
+            <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
+              <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${globalIdx}" title="Bold (Ctrl+B)">B</button>
+                <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${globalIdx}" title="Underline (Ctrl+U)">U</button>
+              </div>
+              <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${globalIdx}" data-idx="${globalIdx}" placeholder="Enter Activity Title Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+            </div>
           </div>
-          <div style="display:flex;align-items:center;gap:.35rem;padding-left:1.6rem">
-            ${formatButtonsHtml(`mn-act-details-${globalIdx}`)}
-            <textarea class="admin-input mn-act-details-input" id="mn-act-details-${globalIdx}" data-idx="${globalIdx}" rows="1" placeholder="Activity Details" style="flex:1">${escHtml(a.name || '')}</textarea>
+          <div>
+            <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Details</div>
+            <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
+              <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${globalIdx}" title="Bold (Ctrl+B)">B</button>
+                <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${globalIdx}" title="Underline (Ctrl+U)">U</button>
+                <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${globalIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
+              </div>
+              <textarea class="admin-input mn-act-details-input" id="mn-act-details-${globalIdx}" data-idx="${globalIdx}" rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(a.name || '')}</textarea>
+            </div>
           </div>
         </div>
-        <span style="font-size:.72rem;color:#059669;white-space:nowrap;padding-top:.45rem">${dateLabel}</span>
-        <button class="btn-mn-undo-mastered" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap;flex-shrink:0">↩ Undo</button>
-        <button class="btn-adm-del btn-mn-del-mastered" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.3rem;flex-shrink:0">
+          <span style="font-size:.72rem;color:#059669;white-space:nowrap">${dateLabel}</span>
+          <button class="btn-mn-undo-mastered" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Undo</button>
+          <button class="btn-adm-del btn-mn-del-mastered" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
+        </div>
       </div>`;
       subActs.forEach((sub, si) => {
         html += `<div style="display:flex;align-items:center;gap:.4rem;padding:.25rem .5rem .25rem 1.25rem;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem">
@@ -10935,19 +10950,34 @@ function renderTargetManageContent(student, target) {
       const dateLabel = a.discontinuedOn ? `Discontinued on ${fmtPeriodDate(a.discontinuedOn)}` : 'Discontinued';
       const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
       html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
-        <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
-          <div style="display:flex;align-items:center;gap:.3rem">
-            ${formatButtonsHtml(`mn-act-title-${globalIdx}`)}
-            <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${globalIdx}" data-idx="${globalIdx}" placeholder="Activity Title" value="${escHtml(a.title || '')}" style="flex:1${a.isBold ? ';font-weight:700' : ''}${a.isUnderline ? ';text-decoration:underline' : ''}" />
+        <div style="flex:1;display:flex;flex-direction:column;gap:.4rem">
+          <div>
+            <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Title</div>
+            <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
+              <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${globalIdx}" title="Bold (Ctrl+B)">B</button>
+                <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${globalIdx}" title="Underline (Ctrl+U)">U</button>
+              </div>
+              <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${globalIdx}" data-idx="${globalIdx}" placeholder="Enter Activity Title Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+            </div>
           </div>
-          <div style="display:flex;align-items:center;gap:.35rem;padding-left:1.6rem">
-            ${formatButtonsHtml(`mn-act-details-${globalIdx}`)}
-            <textarea class="admin-input mn-act-details-input" id="mn-act-details-${globalIdx}" data-idx="${globalIdx}" rows="1" placeholder="Activity Details" style="flex:1">${escHtml(a.name || '')}</textarea>
+          <div>
+            <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Details</div>
+            <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
+              <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${globalIdx}" title="Bold (Ctrl+B)">B</button>
+                <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${globalIdx}" title="Underline (Ctrl+U)">U</button>
+                <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${globalIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
+              </div>
+              <textarea class="admin-input mn-act-details-input" id="mn-act-details-${globalIdx}" data-idx="${globalIdx}" rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(a.name || '')}</textarea>
+            </div>
           </div>
         </div>
-        <span style="font-size:.72rem;color:#6b7280;white-space:nowrap;padding-top:.45rem">${dateLabel}</span>
-        <button class="btn-mn-undo-discontinued" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap;flex-shrink:0">↩ Undo</button>
-        <button class="btn-adm-del btn-mn-del-discontinued" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.3rem;flex-shrink:0">
+          <span style="font-size:.72rem;color:#6b7280;white-space:nowrap">${dateLabel}</span>
+          <button class="btn-mn-undo-discontinued" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Undo</button>
+          <button class="btn-adm-del btn-mn-del-discontinued" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
+        </div>
       </div>`;
       subActs.forEach((sub, si) => {
         html += `<div style="display:flex;align-items:center;gap:.4rem;padding:.25rem .5rem .25rem 1.25rem;background:#f9fafb;border:1px solid #f3f4f6;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem">
@@ -12422,19 +12452,34 @@ function renderTemplateManageContent(template) {
       const dateLabel = a.masteredOn ? `Mastered on ${fmtPeriodDate(a.masteredOn)}` : 'Mastered';
       const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
       html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
-        <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
-          <div style="display:flex;align-items:center;gap:.3rem">
-            ${formatButtonsHtml(`mn-act-title-${globalIdx}`)}
-            <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${globalIdx}" data-idx="${globalIdx}" placeholder="Activity Title" value="${escHtml(a.title || '')}" style="flex:1${a.isBold ? ';font-weight:700' : ''}${a.isUnderline ? ';text-decoration:underline' : ''}" />
+        <div style="flex:1;display:flex;flex-direction:column;gap:.4rem">
+          <div>
+            <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Title</div>
+            <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
+              <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${globalIdx}" title="Bold (Ctrl+B)">B</button>
+                <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${globalIdx}" title="Underline (Ctrl+U)">U</button>
+              </div>
+              <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${globalIdx}" data-idx="${globalIdx}" placeholder="Enter Activity Title Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+            </div>
           </div>
-          <div style="display:flex;align-items:center;gap:.35rem;padding-left:1.6rem">
-            ${formatButtonsHtml(`mn-act-details-${globalIdx}`)}
-            <textarea class="admin-input mn-act-details-input" id="mn-act-details-${globalIdx}" data-idx="${globalIdx}" rows="1" placeholder="Activity Details" style="flex:1">${escHtml(a.name || '')}</textarea>
+          <div>
+            <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Details</div>
+            <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
+              <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${globalIdx}" title="Bold (Ctrl+B)">B</button>
+                <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${globalIdx}" title="Underline (Ctrl+U)">U</button>
+                <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${globalIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
+              </div>
+              <textarea class="admin-input mn-act-details-input" id="mn-act-details-${globalIdx}" data-idx="${globalIdx}" rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(a.name || '')}</textarea>
+            </div>
           </div>
         </div>
-        <span style="font-size:.72rem;color:#059669;white-space:nowrap;padding-top:.45rem">${dateLabel}</span>
-        <button class="btn-mn-undo-mastered" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap;flex-shrink:0">↩ Undo</button>
-        <button class="btn-adm-del btn-mn-del-mastered" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.3rem;flex-shrink:0">
+          <span style="font-size:.72rem;color:#059669;white-space:nowrap">${dateLabel}</span>
+          <button class="btn-mn-undo-mastered" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Undo</button>
+          <button class="btn-adm-del btn-mn-del-mastered" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
+        </div>
       </div>`;
       subActs.forEach((sub, si) => {
         html += `<div style="display:flex;align-items:center;gap:.4rem;padding:.25rem .5rem .25rem 1.25rem;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem">
@@ -12459,19 +12504,34 @@ function renderTemplateManageContent(template) {
       const dateLabel = a.discontinuedOn ? `Discontinued on ${fmtPeriodDate(a.discontinuedOn)}` : 'Discontinued';
       const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
       html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
-        <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
-          <div style="display:flex;align-items:center;gap:.3rem">
-            ${formatButtonsHtml(`mn-act-title-${globalIdx}`)}
-            <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${globalIdx}" data-idx="${globalIdx}" placeholder="Activity Title" value="${escHtml(a.title || '')}" style="flex:1${a.isBold ? ';font-weight:700' : ''}${a.isUnderline ? ';text-decoration:underline' : ''}" />
+        <div style="flex:1;display:flex;flex-direction:column;gap:.4rem">
+          <div>
+            <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Title</div>
+            <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
+              <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${globalIdx}" title="Bold (Ctrl+B)">B</button>
+                <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${globalIdx}" title="Underline (Ctrl+U)">U</button>
+              </div>
+              <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${globalIdx}" data-idx="${globalIdx}" placeholder="Enter Activity Title Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+            </div>
           </div>
-          <div style="display:flex;align-items:center;gap:.35rem;padding-left:1.6rem">
-            ${formatButtonsHtml(`mn-act-details-${globalIdx}`)}
-            <textarea class="admin-input mn-act-details-input" id="mn-act-details-${globalIdx}" data-idx="${globalIdx}" rows="1" placeholder="Activity Details" style="flex:1">${escHtml(a.name || '')}</textarea>
+          <div>
+            <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Details</div>
+            <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
+              <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${globalIdx}" title="Bold (Ctrl+B)">B</button>
+                <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${globalIdx}" title="Underline (Ctrl+U)">U</button>
+                <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${globalIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
+              </div>
+              <textarea class="admin-input mn-act-details-input" id="mn-act-details-${globalIdx}" data-idx="${globalIdx}" rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(a.name || '')}</textarea>
+            </div>
           </div>
         </div>
-        <span style="font-size:.72rem;color:#6b7280;white-space:nowrap;padding-top:.45rem">${dateLabel}</span>
-        <button class="btn-mn-undo-discontinued" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap;flex-shrink:0">↩ Undo</button>
-        <button class="btn-adm-del btn-mn-del-discontinued" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.3rem;flex-shrink:0">
+          <span style="font-size:.72rem;color:#6b7280;white-space:nowrap">${dateLabel}</span>
+          <button class="btn-mn-undo-discontinued" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Undo</button>
+          <button class="btn-adm-del btn-mn-del-discontinued" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
+        </div>
       </div>`;
       subActs.forEach((sub, si) => {
         html += `<div style="display:flex;align-items:center;gap:.4rem;padding:.25rem .5rem .25rem 1.25rem;background:#f9fafb;border:1px solid #f3f4f6;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem">
