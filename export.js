@@ -1334,11 +1334,6 @@ function wordTargetRows(target, session, allTargets) {
   const rows = [];
   const activities = getAllActivitiesForTarget(session, target);
 
-  if (activities.length === 0) {
-    rows.push({ merge: true, text: "(no data recorded)" });
-    return rows;
-  }
-
   for (const act of activities) {
     if (act.isHeading) {
       rows.push({ merge: true, text: act.activityName, style: "heading" });
@@ -2124,10 +2119,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, mastere
 
   const activities = getAllActivitiesForTarget(session, target);
 
-  if (activities.length === 0) {
-    const r = blankRow(); r[1] = "(no data recorded)"; rows.push(r);
-  } else {
-    for (const act of activities) {
+  for (const act of activities) {
       if (act.isHeading) {
         activityHeadingRows.add(rows.length);
         const r = blankRow(); r[1] = buildExcelActivityCell(act.activityName); rows.push(r);
@@ -2304,7 +2296,6 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, mastere
       const commentText = (session.fedcComments || {})[sanitizeKey(target.name)] || "";
       if (commentText) { const r = blankRow(); r[1] = "Comment"; r[2] = commentText; rows.push(r); }
     }
-  }
 
   const daily = calcDailyAverage(session, target, allTargets);
   sessionDateBlocks.push({
