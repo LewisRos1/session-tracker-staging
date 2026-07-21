@@ -1260,9 +1260,9 @@ function wordTargetRows(target, session, allTargets) {
     // like a plain "+ Add Activity" and drops the note, same reasoning as above.
     const activityLabel = act.activityName;
 
-    // noRemark parent: merged header row spanning all 3 columns
+    // noRemark parent: numbered title, empty remark and score
     if (act.noRemark) {
-      rows.push({ merge: true, noRemark: true, text: activityLabel, actLines: buildActLines(act, activityLabel), isGray: act.isGray, isGreen: act.isGreen });
+      rows.push({ cells: [activityLabel, "", ""], actLines: buildActLines(act, activityLabel), isGray: act.isGray, isGreen: act.isGreen });
       continue;
     }
 
@@ -1460,13 +1460,6 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
           const allNoteLines = [[{ text: "Note:", bold: true }], ...noteLines];
           tableRows.push(new TableRow({
             children: [richCell(allNoteLines, { fill: "FEF3C7", colSpan: 3, width: WORD_COL_TOTAL, align: AlignmentType.LEFT })]
-          }));
-        } else if (r.noRemark) {
-          const parentFill = null;
-          tableRows.push(new TableRow({
-            children: [richCell(r.actLines || [[{ text: r.text }]], {
-              colSpan: 3, width: WORD_COL_TOTAL, fill: parentFill, align: AlignmentType.LEFT
-            })]
           }));
         } else {
         const mergeFill = r.isGrayHeading ? "D9D9D9"
