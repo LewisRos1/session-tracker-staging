@@ -155,7 +155,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1003";
+const APP_VERSION = "1004";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1976,15 +1976,15 @@ function renderHalfYearReportsSection() {
     .sort((a, b) => a.name.localeCompare(b.name));
 
   container.innerHTML = `
-    <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
-      <select id="hyr-student-select" class="admin-input" style="flex:1;min-width:180px;background:#fff;font-family:inherit;font-size:1rem">
+    <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:nowrap">
+      <select id="hyr-student-select" class="admin-input" style="flex:1;min-width:0;background:#fff;font-family:inherit;font-size:1rem">
         <option value="">— Select Student —</option>
         ${students.map(s => `<option value="${escHtml(s.id)}">${escHtml(s.name)}</option>`).join("")}
       </select>
-      <span id="hyr-period-loading" style="font-size:.85rem;color:var(--text-muted);display:none">Checking sessions…</span>
-      <select id="hyr-period-select" class="admin-input" style="min-width:190px;flex-shrink:0;background:#fff;font-family:inherit;font-size:1rem;display:none"></select>
+      <span id="hyr-period-loading" style="font-size:.85rem;color:var(--text-muted);white-space:nowrap;display:none">Checking…</span>
+      <select id="hyr-period-select" class="admin-input" style="width:175px;flex-shrink:0;background:#fff;font-family:inherit;font-size:1rem;display:none"></select>
       <button id="hyr-btn-generate" class="btn-add-section"
-        style="font-size:.9rem;padding:.45rem 1.1rem;min-height:38px;white-space:nowrap;display:none">
+        style="font-size:.9rem;padding:.45rem 1.1rem;min-height:38px;white-space:nowrap;flex-shrink:0;display:none">
         Generate Report
       </button>
     </div>
