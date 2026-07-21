@@ -154,7 +154,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "983";
+const APP_VERSION = "984";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4778,7 +4778,14 @@ function paDisplayName(pa) {
 // Returns the HTML to display a predefined activity's title (with checkbox-style
 // bold/underline from pa.isBold/pa.isUnderline) and optional details below.
 function paDisplayHtml(pa) {
-  const titleText = (pa.title || "").trim();
+  // pa.title === null/undefined → old-style activity (title field never existed):
+  //   show pa.name as the single primary line (backward compat).
+  // pa.title === "" → new-style with blank title (user left it empty):
+  //   show nothing on line 1, pa.name as details on line 2.
+  // pa.title is non-empty → show title on line 1, pa.name as details on line 2.
+  const newStyle = pa.title != null;
+  const titleText = newStyle ? (pa.title || "").trim() : (pa.name || "").trim();
+  const detailsText = newStyle ? (pa.name || "").trim() : "";
   let html = "";
   if (titleText) {
     let style = "";
@@ -4788,7 +4795,6 @@ function paDisplayHtml(pa) {
       ? `<span style="${style}">${formatActivityMarkup(titleText)}</span>`
       : formatActivityMarkup(titleText);
   }
-  const detailsText = (pa.name || "").trim();
   if (detailsText) {
     html += `<span style="display:block;margin-top:.1rem;font-weight:400;text-decoration:none">${formatActivityMarkup(detailsText)}</span>`;
   }
@@ -9583,6 +9589,7 @@ async function closeManageModal() {
     acts.forEach((a, i) => {
       const nameEl    = $(`mn-act-name-${i}`);
       const detailsEl = $(`mn-act-details-${i}`);
+      const titleEl   = $(`mn-act-title-${i}`);
       const starterEl = $("manage-modal-body")?.querySelector(`.mn-act-starter-text[data-idx="${i}"]`);
       if (nameEl) {
         if (a.isNote || a.isExportNote) {
@@ -9593,6 +9600,9 @@ async function closeManageModal() {
         }
       } else if (detailsEl && !a.isNote && !a.isExportNote && !a.isHeading && !a.isMaintainHeading && !a.isMaintain) {
         a.name = detailsEl.value.trim();
+      }
+      if (titleEl && !a.isNote && !a.isExportNote && !a.isHeading && !a.isMaintainHeading && !a.isMaintain) {
+        a.title = titleEl.value.trim();
       }
       if (starterEl) a.sentenceStarter = starterEl.value.trim() || null;
     });
