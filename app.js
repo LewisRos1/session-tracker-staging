@@ -160,7 +160,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "990";
+const APP_VERSION = "991";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -9601,7 +9601,9 @@ async function closeManageModal() {
           if (v) a.name = v;
         }
       } else if (detailsEl && !a.isNote && !a.isExportNote && !a.isHeading && !a.isMaintainHeading && !a.isMaintain) {
-        a.name = detailsEl.value.trim();
+        const dv = detailsEl.value.trim();
+        const tv = titleEl ? titleEl.value.trim() : "";
+        if (dv || tv) a.name = dv;
       }
       if (titleEl && !a.isNote && !a.isExportNote && !a.isHeading && !a.isMaintainHeading && !a.isMaintain) {
         a.title = titleEl.value.trim();
