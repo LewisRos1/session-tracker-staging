@@ -1462,7 +1462,7 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
             children: [richCell(allNoteLines, { fill: "FEF3C7", colSpan: 3, width: WORD_COL_TOTAL, align: AlignmentType.LEFT })]
           }));
         } else if (r.noRemark) {
-          const parentFill = r.isGray ? "F2F2F2" : r.isGreen ? "E2EFDA" : "EFF6FF";
+          const parentFill = null;
           tableRows.push(new TableRow({
             children: [richCell(r.actLines || [[{ text: r.text }]], {
               colSpan: 3, width: WORD_COL_TOTAL, fill: parentFill, align: AlignmentType.LEFT
