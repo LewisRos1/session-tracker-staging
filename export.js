@@ -799,7 +799,9 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
         if (isActive)        { sectionIdx = ++activeIdx; }
         else if (isMastered) { sectionIdx = ++masteredIdx; }
         else                 { sectionIdx = ++discontinuedIdx; }
-        displayName = (pa.title && pa.title.trim()) ? pa.title.trim() : `<Activity ${sectionIdx}>`;
+        displayName = (pa.title && pa.title.trim()) ? pa.title.trim()
+                    : (pa.name  && pa.name.trim())  ? pa.name.trim()
+                    : `<Activity ${sectionIdx}>`;
         parentSectionIdx[pa.name] = sectionIdx;
       }
 
