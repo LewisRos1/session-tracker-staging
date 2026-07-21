@@ -1694,18 +1694,9 @@ textarea.admin-input { resize: vertical; min-height: 60px; line-height: 1.45; }
 /* ─── B / U / • format buttons next to activity name/notes ── */
 .fmt-btn-group {
   display: flex;
-  flex-direction: column;
-  gap: .15rem;
+  flex-direction: row;
+  gap: .25rem;
   flex-shrink: 0;
-  align-self: flex-end;
-}
-/* Textarea next to a fmt-btn-group must be at least as tall as the 3-button
-   column (3×2rem + 2×0.15rem gap = 6.3rem).
-   Needs specificity (0,3,1) to beat the "min-height:unset" rule on line above
-   (.admin-list-item:not(.admin-note-item) textarea.admin-input = (0,3,1)).
-   Equal specificity → later rule in source wins, so this must stay here. */
-.admin-list-item .fmt-btn-group + textarea.admin-input {
-  min-height: 6.3rem;
 }
 .btn-fmt {
   width: 2rem;
