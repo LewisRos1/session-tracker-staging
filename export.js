@@ -752,27 +752,36 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
     const actStatusMap = {};
     // Track ordered lists for each section
     const activeNames = [], masteredNames = [], discontinuedNames = [];
+    // Pre-build parent map so sub-activities inherit discontinued/mastered status
+    const parentPaMap = {};
+    for (const pa of (target.predefinedActivities || [])) {
+      if (!pa.parentActivity && pa.name) parentPaMap[pa.name] = pa;
+    }
 
     let paIdx = 0;
     for (const pa of (target.predefinedActivities || [])) {
       if (!pa.name || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || pa.isMaintain
-          || pa.isCompleted || pa.isArchived || pa.isStopped) continue;
+          || pa.isCompleted) continue;
       paIdx++;
 
-      const masteredMonth    = dateToMonthLabel(pa.masteredOn);
-      const discontinuedMonth = dateToMonthLabel(pa.discontinuedOn);
+      const parentPa = pa.parentActivity ? parentPaMap[pa.parentActivity] : null;
+      const effectiveMasteredOn     = pa.masteredOn     || parentPa?.masteredOn;
+      const effectiveDiscontinuedOn = pa.discontinuedOn || parentPa?.discontinuedOn;
+      const effectiveArchived       = pa.isArchived || pa.isStopped || parentPa?.isArchived || parentPa?.isStopped;
 
-      const isActive       = !pa.masteredOn && !pa.discontinuedOn;
-      const isMastered     = !!pa.masteredOn && monthInPeriod(masteredMonth);
-      const isDiscontinued = !!pa.discontinuedOn && monthInPeriod(discontinuedMonth);
+      const masteredMonth     = dateToMonthLabel(effectiveMasteredOn);
+      const discontinuedMonth = dateToMonthLabel(effectiveDiscontinuedOn);
+
+      const isActive       = !effectiveMasteredOn && !effectiveDiscontinuedOn && !effectiveArchived;
+      const isMastered     = !!effectiveMasteredOn && monthInPeriod(masteredMonth);
+      const isDiscontinued = !effectiveMasteredOn && (effectiveArchived || (!!effectiveDiscontinuedOn && monthInPeriod(discontinuedMonth)));
 
       if (!isActive && !isMastered && !isDiscontinued) continue;
 
-      // Chart label: pa.title (if set), "<Activity N>" (if title explicitly blank), pa.name (old-style)
-      const displayName = pa.title ? pa.title : (pa.title === "" ? `<Activity ${paIdx}>` : pa.name);
+      const displayName = (pa.title && pa.title.trim()) ? pa.title.trim() : `<Activity ${paIdx}>`;
       actDisplayNameMap[pa.name] = displayName;
 
-      if (isActive)       { actStatusMap[pa.name] = "active";       activeNames.push(pa.name); }
+      if (isActive)            { actStatusMap[pa.name] = "active";       activeNames.push(pa.name); }
       else if (isMastered)     { actStatusMap[pa.name] = "mastered";     masteredNames.push(pa.name); }
       else if (isDiscontinued) { actStatusMap[pa.name] = "discontinued"; discontinuedNames.push(pa.name); }
     }
