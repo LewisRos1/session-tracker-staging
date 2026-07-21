@@ -153,7 +153,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "962";
+const APP_VERSION = "963";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -497,6 +497,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   setTimeout(() => {
     if (document.getElementById("screen-loading")?.classList.contains("active")) {
       document.getElementById("btn-loading-reload")?.classList.remove("hidden");
+      document.getElementById("btn-loading-reload-hint")?.classList.remove("hidden");
     }
   }, 10000);
 
