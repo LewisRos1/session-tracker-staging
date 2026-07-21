@@ -155,7 +155,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1013";
+const APP_VERSION = "1014";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -10454,15 +10454,15 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
     <select class="act-preset-select mn-act-preset" data-idx="${idx}">
       <option value="">Free text</option>
       <option value="manual_score"${type === "manual_score" ? " selected" : ""}>Manual Score</option>
-      <option value="starter_fixed"${type === "starter_fixed" ? " selected" : ""}>Sentence Starter + Select one</option>
-      <option value="starter_fixed_multi"${type === "starter_fixed_multi" ? " selected" : ""}>Sentence Starter + Tick boxes</option>
-      <option value="starter_fixed_note"${type === "starter_fixed_note" ? " selected" : ""}>Sentence Starter + Select One + Free Text</option>
+      <option value="starter_fixed"${type === "starter_fixed" ? " selected" : ""}>Sentence Starter + Multiple Options</option>
+      <option value="starter_fixed_multi"${type === "starter_fixed_multi" ? " selected" : ""}>Sentence Starter + Checkboxes</option>
+      <option value="starter_fixed_note"${type === "starter_fixed_note" ? " selected" : ""}>Sentence Starter + Multiple Options + Free Text</option>
     </select>
-    <div class="mn-act-starter-wrap" data-idx="${idx}" style="${showStarter ? "display:flex;align-items:center;gap:.5rem" : "display:none"}">
-      <span style="font-size:.85rem;color:#374151;white-space:nowrap;font-weight:700;flex-shrink:0">Sentence Starter:</span>
+    <div class="mn-act-starter-wrap" data-idx="${idx}" style="${showStarter ? "display:flex;flex-direction:column;gap:.3rem" : "display:none"}">
+      <span style="font-size:.95rem;color:#374151;font-weight:700">Sentence Starter</span>
       <input class="admin-input mn-act-starter-text" data-idx="${idx}"
         placeholder="Phrase…"
-        style="flex:1;min-width:0"
+        style="width:100%;min-width:0;box-sizing:border-box"
         value="${escHtml(a.sentenceStarter || "")}">
     </div>
     <div class="mn-opts-container" data-idx="${idx}" style="${showStarter ? "" : "display:none"}">
@@ -10724,15 +10724,21 @@ function renderTargetManageContent(student, target) {
             <span style="font-size:.75rem;font-weight:700;color:#0369a1;flex-shrink:0;min-width:1.4rem;padding-top:.2rem">${String.fromCharCode(97 + si)})</span>
             <div style="flex:1;display:flex;flex-direction:column;gap:.55rem">
               <div>
-                <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title <span title="Shown in the Activity Breakdown chart" style="cursor:help;font-style:normal">ℹ️</span></div>
-                <div style="display:flex;gap:.4rem;align-items:center">
-                  <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subIdx}" data-idx="${subIdx}"
-                    placeholder="" value="${escHtml(sub.title || '')}" style="flex:1" />
-                  <button class="btn-adm-del mn-del-sub-act" data-idx="${subIdx}" title="Delete sub-activity" style="flex-shrink:0">🗑</button>
+                <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title</div>
+                <div style="display:flex;gap:.4rem;align-items:flex-start">
+                  <div style="border:1px solid var(--border);border-radius:.45rem;overflow:hidden;flex:1">
+                    <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid var(--border)">
+                      <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${subIdx}" title="Bold (Ctrl+B)">B</button>
+                      <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${subIdx}" title="Underline (Ctrl+U)">U</button>
+                    </div>
+                    <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subIdx}" data-idx="${subIdx}"
+                      placeholder="" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+                  </div>
+                  <button class="btn-adm-del mn-del-sub-act" data-idx="${subIdx}" title="Delete sub-activity" style="flex-shrink:0;margin-top:.35rem">🗑</button>
                 </div>
               </div>
               <div>
-                <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Details <span title="Shown in session screen only, not in the chart" style="cursor:help;font-style:normal">ℹ️</span></div>
+                <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Details</div>
                 <div style="border:1px solid var(--border);border-radius:.45rem;overflow:hidden">
                   <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid var(--border)">
                     <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${subIdx}" title="Bold (Ctrl+B)">B</button>
@@ -10740,11 +10746,11 @@ function renderTargetManageContent(student, target) {
                     <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${subIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
                   </div>
                   <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subIdx}" data-idx="${subIdx}"
-                    rows="2" placeholder="" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:vertical">${escHtml(sub.name || '')}</textarea>
+                    rows="2" placeholder="" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(sub.name || '')}</textarea>
                 </div>
               </div>
               <div>
-                <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.28rem">Remark Type</div>
+                <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Remark Type</div>
                 ${subRemarkType}
               </div>
               ${subFixedRemarkRow}
@@ -10758,12 +10764,18 @@ function renderTargetManageContent(student, target) {
             <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;min-width:1.6rem;padding-top:.2rem">${manageActNo})</span>
             <div style="flex:1;display:flex;flex-direction:column;gap:.55rem">
               <div>
-                <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title <span title="Shown in the Activity Breakdown chart" style="cursor:help">ℹ️</span></div>
-                <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
-                  placeholder="" value="${escHtml(a.title || '')}" style="width:100%;box-sizing:border-box;display:block" />
+                <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title</div>
+                <div style="border:1px solid var(--border);border-radius:.45rem;overflow:hidden">
+                  <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid var(--border)">
+                    <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${idx}" title="Bold (Ctrl+B)">B</button>
+                    <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${idx}" title="Underline (Ctrl+U)">U</button>
+                  </div>
+                  <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
+                    placeholder="" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+                </div>
               </div>
               <div>
-                <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Details <span title="Shown in session screen only, not in the chart" style="cursor:help">ℹ️</span></div>
+                <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Details</div>
                 <div style="border:1px solid var(--border);border-radius:.45rem;overflow:hidden">
                   <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid var(--border)">
                     <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${idx}" title="Bold (Ctrl+B)">B</button>
@@ -10771,7 +10783,7 @@ function renderTargetManageContent(student, target) {
                     <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${idx}" title="Bullet (Ctrl+Shift+L)">•</button>
                   </div>
                   <textarea class="admin-input mn-act-details-input" id="mn-act-details-${idx}" data-idx="${idx}"
-                    rows="2" placeholder="" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:vertical">${escHtml(a.name || '')}</textarea>
+                    rows="2" placeholder="" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(a.name || '')}</textarea>
                 </div>
               </div>
               ${subActsHtml}
@@ -10803,12 +10815,18 @@ function renderTargetManageContent(student, target) {
             <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;min-width:1.6rem;padding-top:.2rem">${manageActNo})</span>
             <div style="flex:1;display:flex;flex-direction:column;gap:.55rem">
               <div>
-                <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title <span title="Shown in the Activity Breakdown chart" style="cursor:help">ℹ️</span></div>
-                <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
-                  placeholder="" value="${escHtml(a.title || '')}" style="width:100%;box-sizing:border-box;display:block" />
+                <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title</div>
+                <div style="border:1px solid var(--border);border-radius:.45rem;overflow:hidden">
+                  <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid var(--border)">
+                    <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${idx}" title="Bold (Ctrl+B)">B</button>
+                    <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${idx}" title="Underline (Ctrl+U)">U</button>
+                  </div>
+                  <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
+                    placeholder="" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+                </div>
               </div>
               <div>
-                <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Details <span title="Shown in session screen only, not in the chart" style="cursor:help">ℹ️</span></div>
+                <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Details</div>
                 <div style="border:1px solid var(--border);border-radius:.45rem;overflow:hidden">
                   <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid var(--border)">
                     <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${idx}" title="Bold (Ctrl+B)">B</button>
@@ -10816,11 +10834,11 @@ function renderTargetManageContent(student, target) {
                     <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${idx}" title="Bullet (Ctrl+Shift+L)">•</button>
                   </div>
                   <textarea class="admin-input mn-act-details-input" id="mn-act-details-${idx}" data-idx="${idx}"
-                    rows="2" placeholder="" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:vertical">${escHtml(a.name || '')}</textarea>
+                    rows="2" placeholder="" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(a.name || '')}</textarea>
                 </div>
               </div>
               <div>
-                <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.28rem">Remark Type</div>
+                <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Remark Type</div>
                 ${remarkTypeSelect}
               </div>
               ${maintainedRow}
