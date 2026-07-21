@@ -941,6 +941,131 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
   }
 }
 
+function addActivityScoreSheet(wb, allTargets, sessions) {
+  const allMonths = [...new Set(sessions.map(s => s.month).filter(Boolean))].sort((a, b) => {
+    const [ma, ya] = parseMonth(a); const [mb, yb] = parseMonth(b);
+    return ya !== yb ? ya - yb : ma - mb;
+  });
+  if (allMonths.length === 0) return;
+
+  const ws = wb.addWorksheet("Score Reference");
+  ws.getColumn(1).width = 32;
+  ws.getColumn(2).width = 52;
+  for (let c = 3; c <= 2 + allMonths.length; c++) ws.getColumn(c).width = 11;
+
+  // Header row
+  const hdr = ws.addRow([
+    "Target", "Activity",
+    ...allMonths.map(m => `${m.split(" ")[0].slice(0,3)} ${m.split(" ")[1]}`)
+  ]);
+  hdr.height = 22;
+  hdr.eachCell((cell, col) => {
+    cell.fill = STYLE_COL_HEADER.fill;
+    cell.font = STYLE_COL_HEADER.font;
+    cell.alignment = col <= 2
+      ? { horizontal: "left",   vertical: "middle" }
+      : { horizontal: "center", vertical: "middle" };
+  });
+
+  for (const target of allTargets) {
+    const predefined = target.predefinedActivities || [];
+
+    // Same alias maps as buildSummarySheet so legacy activityName variants are found
+    const paKeyToAliases = {};
+    for (const pa of predefined) {
+      const key = pa.title || pa.name;
+      if (!key) continue;
+      if (pa.title && pa.name && pa.title !== pa.name) {
+        if (!paKeyToAliases[key]) paKeyToAliases[key] = [];
+        paKeyToAliases[key].push(pa.name);
+      }
+    }
+
+    const activities = predefined.filter(pa =>
+      (pa.name || pa.title) &&
+      !pa.isHeading && !pa.isNote && !pa.isExportNote && !pa.isMaintainHeading
+    );
+    if (activities.length === 0) continue;
+
+    // Target header row
+    const tRow = ws.addRow([target.name, `(${activities.length} activities)`, ...allMonths.map(() => "")]);
+    tRow.height = 18;
+    tRow.getCell(1).font = { bold: true, color: { argb: "FF1e3a5f" } };
+    tRow.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFdbe9f7" } };
+    tRow.getCell(2).font = { italic: true, color: { argb: "FF555555" } };
+    tRow.getCell(2).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFdbe9f7" } };
+    for (let c = 3; c <= 2 + allMonths.length; c++) {
+      tRow.getCell(c).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFdbe9f7" } };
+    }
+
+    let actNum = 0;
+    const subCounters = {};
+    for (const pa of activities) {
+      const paKey = pa.title || pa.name;
+      const aliases = paKeyToAliases[paKey] || [];
+
+      // Monthly score buckets: for each session, find the record for this activity
+      const monthBuckets = {};
+      for (const sess of sessions) {
+        // Try name / alias match first, then configId fallback
+        let actEntry = Object.entries(sess.activities || {}).find(
+          ([, a]) => (a.activityName === paKey || aliases.includes(a.activityName)) &&
+                     (a.targetName === target.name || a.target === target.name)
+        );
+        if (!actEntry && pa.id) {
+          actEntry = Object.entries(sess.activities || {}).find(
+            ([, a]) => a.configId === pa.id &&
+                       (a.targetName === target.name || a.target === target.name)
+          );
+        }
+        if (!actEntry) continue;
+
+        const [actKey, act] = actEntry;
+        const actId = act.id || actKey;
+        const snap = (sess.targetsSnapshot || []).find(t => t.name === target.name);
+        const mp = (snap ? (snap.maxPoints ?? target.maxPoints) : target.maxPoints) || 3;
+        for (const rem of getRemarksForActivity(sess, actId)) {
+          const scores = allScores(rem);
+          if (scores.length === 0) continue;
+          const pct = scores.reduce((a, b) => a + b, 0) / (scores.length * mp) * 100;
+          if (!monthBuckets[sess.month]) monthBuckets[sess.month] = [];
+          monthBuckets[sess.month].push(pct);
+        }
+      }
+
+      // Build display name matching the website's numbering
+      let displayName;
+      if (pa.parentActivity) {
+        const n = subCounters[pa.parentActivity] || 0;
+        subCounters[pa.parentActivity] = n + 1;
+        displayName = `    ${String.fromCharCode(97 + n)}) ${(pa.title || pa.name || "").trim()}`;
+      } else {
+        actNum++;
+        const status = (pa.isCompleted || pa.masteredOn)     ? " — Mastered"
+                     : (pa.isArchived || pa.isStopped || pa.discontinuedOn) ? " — Discontinued"
+                     : pa.isMaintain                          ? " — Maintained"
+                     : "";
+        displayName = `${actNum}) ${(pa.title || pa.name || "").trim()}${status}`;
+      }
+
+      const monthAvgs = allMonths.map(m => {
+        const b = monthBuckets[m];
+        if (!b || b.length === 0) return null;
+        return Math.round(b.reduce((x, y) => x + y, 0) / b.length);
+      });
+
+      const row = ws.addRow(["", displayName, ...monthAvgs.map(v => v === null ? "" : `${v}%`)]);
+      row.getCell(2).alignment = { wrapText: true, vertical: "top" };
+      for (let ci = 0; ci < allMonths.length; ci++) {
+        const cell = row.getCell(3 + ci);
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+      }
+    }
+  }
+
+  applyBorders(ws, 2 + allMonths.length);
+}
+
 function addIndividualTargetSheets(wb, allTargets, sessions, studentName, includeTrials) {
   // Date | Activity | Remark | Score | [Trials] | Avg Score — Trials is an
   // optional extra column, so the avg-score column's letter/index shifts
@@ -1129,6 +1254,7 @@ async function buildStudentWorkbook(student, sessions, includeTrials) {
   addHalfYearChartsSheets(wb, allTargets, sortedSessions);
   addTrendSummarySheet(wb, allTargets, sortedSessions);
   addActivityBreakdownSheet(wb, allTargets, sortedSessions);
+  addActivityScoreSheet(wb, allTargets, sortedSessions);
   addIndividualTargetSheets(wb, allTargets, sessions, student.name, includeTrials);
 
   return wb.xlsx.writeBuffer();
@@ -1162,6 +1288,7 @@ async function buildGroupMemberWorkbook(studentName, allTargets, sessions, inclu
   addHalfYearChartsSheets(wb, sortedTargets, sortedSessions);
   addTrendSummarySheet(wb, sortedTargets, sortedSessions);
   addActivityBreakdownSheet(wb, sortedTargets, sortedSessions);
+  addActivityScoreSheet(wb, sortedTargets, sortedSessions);
   addIndividualTargetSheets(wb, sortedTargets, filtered, studentName, includeTrials);
 
   return wb.xlsx.writeBuffer();
