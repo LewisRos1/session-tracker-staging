@@ -611,6 +611,9 @@ function renderActivityBreakdownChart(targetName, activityData, periodLabel) {
   const LABEL_MAX_W = PAD.left - 16;
   const LINE_H = 13, ROW_PAD_V = 8, MIN_ROW_H = 36;
 
+  // Strip leading letter-prefix like "d) " or "e) " added for ordering on the website
+  const stripPrefix = name => name.replace(/^[a-zA-Z]\)\s*/, "");
+
   // Pre-compute wrapped label lines and dynamic row heights using a temp canvas
   const tmpCtx = document.createElement("canvas").getContext("2d");
   tmpCtx.font = "11px sans-serif";
@@ -627,7 +630,7 @@ function renderActivityBreakdownChart(targetName, activityData, periodLabel) {
   };
   for (const act of activityData) {
     if (!act.isSectionHeader) {
-      act._lines = wrapText(act.name || "", LABEL_MAX_W);
+      act._lines = wrapText(stripPrefix(act.name || ""), LABEL_MAX_W);
       act._rowH = Math.max(MIN_ROW_H, act._lines.length * LINE_H + ROW_PAD_V * 2);
     }
   }
