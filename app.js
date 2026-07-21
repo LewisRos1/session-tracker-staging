@@ -160,7 +160,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "995";
+const APP_VERSION = "996";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4797,7 +4797,7 @@ function paDisplayHtml(pa, showPlaceholder = false) {
       ? `<span style="${style}">${formatActivityMarkup(titleText)}</span>`
       : formatActivityMarkup(titleText);
   } else if (showPlaceholder) {
-    html = `<span style="font-style:italic;color:#9ca3af;font-size:.85rem">&lt;Please give this activity a name in Edit Target&gt;</span>`;
+    html = `<span style="font-style:italic;color:#9ca3af;font-size:.85rem">&lt;Please give this activity a title in Edit Target&gt;</span>`;
   }
   const detailsText = (pa.name || "").trim();
   if (detailsText) {
