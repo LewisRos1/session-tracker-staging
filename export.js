@@ -787,6 +787,23 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
     for (const pa of (target.predefinedActivities || [])) {
       if (!pa.parentActivity && (pa.name || pa.title)) parentPaMap[pa.title || pa.name] = pa;
     }
+    // When a user moves an activity name from pa.name → pa.title, some session records
+    // still carry activityName = old pa.name, or a combined "title + details" string from
+    // before the title field existed. Build alias maps so buildEntry merges those records
+    // into the correct predefined entry instead of showing them as duplicate extra rows.
+    const paKeyToAliases  = {};  // paKey (display title) → [legacy activityName values]
+    const paLegacyToKey   = {};  // exact legacy pa.name → paKey
+    const paConfigIdToKey = {};  // pa.id → paKey (most reliable redirect)
+    for (const pa of (target.predefinedActivities || [])) {
+      const key = pa.title || pa.name;
+      if (!key) continue;
+      if (pa.id) paConfigIdToKey[pa.id] = key;
+      if (pa.title && pa.name && pa.title !== pa.name) {
+        if (!paKeyToAliases[key]) paKeyToAliases[key] = [];
+        paKeyToAliases[key].push(pa.name);
+        paLegacyToKey[pa.name] = key;
+      }
+    }
 
     let activeIdx = 0, masteredIdx = 0, discontinuedIdx = 0;
     const parentSectionIdx = {}; // standalone pa.name → its section counter value (for sub-act labels)
@@ -845,6 +862,16 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
         if ((a.targetName === target.name || a.target === target.name) && a.activityName && !a.isHeading && !a.isNote) {
           if (!activeDNMap[a.activityName] && !masteredDNMap[a.activityName] && !discontinuedDNMap[a.activityName]
               && !actDisplayNameMap[a.activityName]) {
+            // Redirect to predefined activity via configId (most reliable) or exact legacy pa.name match
+            const paKey = (a.configId && paConfigIdToKey[a.configId]) || paLegacyToKey[a.activityName];
+            if (paKey) {
+              if (!paKeyToAliases[paKey]) paKeyToAliases[paKey] = [];
+              if (!paKeyToAliases[paKey].includes(a.activityName)) paKeyToAliases[paKey].push(a.activityName);
+              const status = actStatusMap[paKey] || "active";
+              const targetDNMap = status === "mastered" ? masteredDNMap : status === "discontinued" ? discontinuedDNMap : activeDNMap;
+              targetDNMap[a.activityName] = targetDNMap[paKey] || paKey;
+              continue;
+            }
             actDisplayNameMap[a.activityName] = a.activityTitle || a.activityName;
             actStatusMap[a.activityName] = "active";
             extraNames.push(a.activityName);
@@ -857,11 +884,12 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
     if (allNames.length === 0) continue;
 
     // Build score data for each activity name; dnMap supplies the display label.
-    const buildEntry = (actName, dnMap) => {
+    // aliases lets buildEntry find records stored under legacy activityName variants.
+    const buildEntry = (actName, dnMap, aliases = []) => {
       const monthBuckets = {};
       for (const sess of sessions) {
         const actEntry = Object.entries(sess.activities || {}).find(
-          ([, a]) => a.activityName === actName && (a.targetName === target.name || a.target === target.name)
+          ([, a]) => (a.activityName === actName || aliases.includes(a.activityName)) && (a.targetName === target.name || a.target === target.name)
         );
         if (!actEntry) continue;
         const [actKey, act] = actEntry;
@@ -888,9 +916,9 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
       return { name: dnMap[actName] || actName, earliestLabel: earliest.label, earliestAvg: earliest.avg, latestLabel: latest.label, latestAvg: latest.avg };
     };
 
-    const activeData       = activeNames.map(n => buildEntry(n, activeDNMap)).filter(Boolean);
-    const masteredData     = masteredNames.map(n => buildEntry(n, masteredDNMap)).filter(Boolean);
-    const discontinuedData = discontinuedNames.map(n => buildEntry(n, discontinuedDNMap)).filter(Boolean);
+    const activeData       = activeNames.map(n => buildEntry(n, activeDNMap, paKeyToAliases[n] || [])).filter(Boolean);
+    const masteredData     = masteredNames.map(n => buildEntry(n, masteredDNMap, paKeyToAliases[n] || [])).filter(Boolean);
+    const discontinuedData = discontinuedNames.map(n => buildEntry(n, discontinuedDNMap, paKeyToAliases[n] || [])).filter(Boolean);
     const extraData        = extraNames.map(n => buildEntry(n, actDisplayNameMap)).filter(Boolean);
 
     const activityData = [
