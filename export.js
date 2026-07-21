@@ -611,8 +611,8 @@ function renderActivityBreakdownChart(targetName, activityData, periodLabel) {
   const LABEL_MAX_W = PAD.left - 16;
   const LINE_H = 13, ROW_PAD_V = 8, MIN_ROW_H = 36;
 
-  // Strip leading letter-prefix like "d) " or "e) " added for ordering on the website
-  const stripPrefix = name => name.replace(/^[a-zA-Z]\)\s*/, "");
+  // Strip leading letter-prefix and markdown bold/underline markers from chart labels
+  const stripPrefix = name => name.replace(/^[a-zA-Z]\)\s*/, "").replace(/\*/g, "").replace(/_/g, "");
 
   // Pre-compute wrapped label lines and dynamic row heights using a temp canvas
   const tmpCtx = document.createElement("canvas").getContext("2d");
