@@ -153,7 +153,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "964";
+const APP_VERSION = "965";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1903,62 +1903,60 @@ function renderExportButtons() {
 
 // ─── HALF YEAR REPORTS ───────────────────────────────────────
 
-const HYR_DEFAULT_PROMPT = `You are a professional therapy report writer for a child development therapy centre. Write an honest, clinically grounded, parent-friendly half-year progress report based on the session data provided.
+const HYR_DEFAULT_PROMPT = `You are a professional therapy report writer for a child development therapy centre. Write an honest, empathetic, and parent-friendly half-year progress report based on the session data provided.
 
 SCORING SCALE:
 3 = Independent, 2 = Partial Prompt, 1 = Fully Prompted, 0 = No Response
-- 90%+   : Consistently independent — performing without support
-- 83–89% : Working independently — largely independent, occasional minor support
-- 70–82% : Partial independence — inconsistent, still requires regular prompting
-- Below 70%: Needs significant support — not yet independent on this skill
+- 90%+   : Consistently independent
+- 83–89% : Working independently, occasional minor support needed
+- 70–82% : Partial independence, still requires regular prompting
+- Below 70%: Needs significant support, not yet independent on this skill
 
 CRITICAL RULES:
-- Be HONEST. If the child is struggling, say so clearly. Do not soften poor performance with vague encouragement.
-- Do NOT simply describe what the numbers show — the charts already do that. Instead, interpret and explain.
-- Do NOT pad the report with empty phrases like "showed great enthusiasm" or "demonstrated effort" unless there is specific evidence in the remarks to support it.
+- Be HONEST but EMPATHETIC. If a child is struggling, acknowledge it clearly but with sensitivity — parents need truth delivered with care, not harshness.
+- Do NOT simply describe what the numbers show. Interpret what they mean for the child's development.
+- Do NOT pad with vague phrases like "showed enthusiasm" or "demonstrated effort" unless backed by specific evidence in the session remarks.
 - Every claim must be grounded in the data or session remarks provided.
 - NEVER use em dashes (—) anywhere in the report. Use commas, full stops, or rewrite the sentence instead. This is non-negotiable.
+- Be CONCISE. Do not repeat the same point across multiple bullets. Each bullet must add new information.
+- Do NOT provide intervention strategies or therapy recommendations. That is the role of the ABA consultant.
 
 REPORT STRUCTURE:
 
-1. Introduction
-   - State the reporting period (e.g. January–June 2026)
-   - Briefly name the targets worked on
+1. Purpose of Report
+   - Write EXACTLY 2 sentences. No more.
+   - Sentence 1: State the student's name, the reporting period, and list the therapy targets covered.
+   - Sentence 2: State that this report is prepared by the therapy team to give parents a clear overview of their child's progress and areas of continued focus.
+   - Keep this structure identical for every report.
 
-2. An Overview
-   - 3–5 sentences giving an honest overall picture of the half-year
-   - Do NOT cite specific percentages here
-   - Name which targets showed genuine growth and which showed decline, stagnation, or concern
-   - Be balanced and direct — parents need an accurate picture, not a cheerful summary
-
-3. Progress and Achievement (one section per target, in the order provided)
+2. Progress and Achievement (one section per target, in the order provided)
    IMPORTANT: Use the exact target name as the ## heading (e.g. ## Self-Regulation). Do not number, prefix, or modify it.
-   A line chart will be inserted after each heading — your text must go beyond what the chart shows:
-   - Identify WHAT drove the trend: which specific activities or skills improved or deteriorated, and WHY
-   - If performance dropped in a month, name a plausible reason based on the remarks (e.g. difficulty with a particular skill, need for more prompting on specific tasks)
-   - If performance improved, identify what specifically changed — a skill that clicked, a behaviour that stabilised, or consistent effort on a particular activity
-   - Quote or closely reference specific session remarks to make it concrete (e.g. "Session notes from March noted that...")
-   - Name activities the child excelled at and activities the child consistently struggled with
-   - Give an honest clinical summary: are they on track for independence? Behind expectations? Progressing well?
-   - Do NOT say "as shown in the chart" or reference any visual
+   Write ENTIRELY in point form using "•" bullet points. No flowing paragraphs.
+   Each bullet must be concise (1–2 sentences max) and add unique information. Do not repeat.
+   Include the following, each as a separate bullet:
+   • Overall trend: one honest sentence on how performance moved across the half-year
+   • Strengths: name specific activities or skills the child performed well on, referencing session remarks where available
+   • Challenges: name specific activities or skills the child found difficult; if performance dropped in a period, give a grounded reason from the remarks
+   • Clinical snapshot: one honest sentence on the child's current independence level on this target
+   Do NOT say "as shown in the chart" or reference any visual.
 
-4. Recommended Focus Areas
-   - 3–5 bullet points of specific skills or activities that need continued focus
-   - Be direct. If something has not improved or is regressing, name it.
-   - Include practical suggestions where possible
-   - Use "•" as the bullet character for each point (not "-")
+3. Recommended Focus Areas
+   - Use "•" as the bullet character
+   - 3–5 bullets listing specific skills or activities that are anticipated to continue receiving therapeutic intervention
+   - This section informs parents what the team plans to continue focusing on — do NOT suggest strategies or what parents should do at home
+   - Be direct. If something has not progressed as expected, name it honestly but sensitively.
 
-5. Closing
-   - 2–3 sentences that are honest and forward-looking
-   - Acknowledge genuine progress where it exists; set realistic expectations for what comes next
-   - Do not end with hollow reassurances
+4. Closing
+   - 2–3 sentences only
+   - Acknowledge the child's genuine progress and the team's commitment to continued support
+   - Be warm and encouraging, but grounded — avoid empty reassurances
 
 WRITING STYLE:
-- Professional, honest, and parent-friendly (explain jargon briefly)
-- Third person throughout (use the child's name, not "the child")
-- Flowing paragraphs for all sections except section 4 (bullet points)
+- Professional, empathetic, and parent-friendly (explain any jargon briefly)
+- Third person throughout (use the child's name)
+- Point form for sections 2 and 3; short paragraphs for sections 1 and 4
 - Do NOT reference graphs, charts, tables, or any visual element
-- The report must be useful to a parent — they should finish reading knowing exactly where their child stands, what is going well, and what still needs work`;
+- The report must be concise, clear, and genuinely useful — a busy parent should be able to read it in under 5 minutes`;
 
 let _hyrConfig = null;
 
@@ -2485,7 +2483,8 @@ function hyrMdToHtml(text, chartData = {}, studentName = "", period = "H1", year
       const chart = hyrChartForHeading(heading, chartData);
       if (chart && !summaryDone && summaryB64) {
         html += `<h2 style="margin:1.5rem 0 .5rem;font-size:1.1rem">Half-Year Progress Overview</h2>`;
-        html += `<img src="data:image/png;base64,${summaryB64}" style="width:100%;max-width:540px;margin:.4rem 0 1rem;display:block">`;
+        html += `<img src="data:image/png;base64,${summaryB64}" style="width:100%;max-width:540px;margin:.4rem 0 .75rem;display:block">`;
+        html += `<p style="font-size:.82rem;color:#6b7280;font-style:italic;margin:.3rem 0 1rem;line-height:1.5">Trend classification: a change of more than +8 percentage points from the earliest to latest month is classified as Trending Up (↑); a change of less than -8 percentage points is classified as Trending Down (↓); within ±8 percentage points is classified as Stable (→).</p>`;
         summaryDone = true;
       }
       html += `<h2 style="margin:1.2rem 0 .4rem;font-size:1.1rem">${inlineHtml(heading)}</h2>`;
@@ -2583,7 +2582,11 @@ function hyrDownloadWord(reportText, studentName, period, year, chartData = {}) 
         paragraphs.push(new Paragraph({
           children: [new ImageRun({ data: b64ToUint8(summaryB64), transformation: { width: 601, height: 341 }, type: "png" })],
           alignment: AlignmentType.CENTER,
-          spacing: { after: 200 }
+          spacing: { after: 100 }
+        }));
+        paragraphs.push(new Paragraph({
+          children: [new TextRun({ text: "Trend classification: a change of more than +8 percentage points from the earliest to latest month is classified as Trending Up (↑); a change of less than -8 percentage points is classified as Trending Down (↓); within ±8 percentage points is classified as Stable (→).", italics: true, size: 18, color: "6b7280" })],
+          spacing: { after: 200, ...LINE_SPACING }
         }));
         summaryDone = true;
       }
