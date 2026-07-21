@@ -758,11 +758,10 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
       if (!pa.parentActivity && pa.name) parentPaMap[pa.name] = pa;
     }
 
-    let paIdx = 0;
+    let activeIdx = 0, masteredIdx = 0, discontinuedIdx = 0;
     for (const pa of (target.predefinedActivities || [])) {
       if (!pa.name || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || pa.isMaintain
           || pa.isCompleted) continue;
-      paIdx++;
 
       const parentPa = pa.parentActivity ? parentPaMap[pa.parentActivity] : null;
       const effectiveMasteredOn     = pa.masteredOn     || parentPa?.masteredOn;
@@ -778,9 +777,14 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
 
       if (!isActive && !isMastered && !isDiscontinued) continue;
 
+      let sectionIdx;
+      if (isActive)            { sectionIdx = ++activeIdx; }
+      else if (isMastered)     { sectionIdx = ++masteredIdx; }
+      else                     { sectionIdx = ++discontinuedIdx; }
+
       const displayName = pa.parentActivity
-        ? (pa.name || `<Sub-Activity ${paIdx}>`)
-        : ((pa.title && pa.title.trim()) ? pa.title.trim() : `<Activity ${paIdx}>`);
+        ? (pa.name || `<Sub-Activity ${sectionIdx}>`)
+        : ((pa.title && pa.title.trim()) ? pa.title.trim() : `<Activity ${sectionIdx}>`);
       actDisplayNameMap[pa.name] = displayName;
 
       if (isActive)            { actStatusMap[pa.name] = "active";       activeNames.push(pa.name); }

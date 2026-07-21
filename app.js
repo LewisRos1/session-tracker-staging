@@ -160,7 +160,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "993";
+const APP_VERSION = "994";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4502,7 +4502,7 @@ function renderFedcTarget(target) {
     !isActivityActive(pa, sessionDateForFilter) && !pa.isCompleted && !pa.isArchived && !pa.isStopped
   );
   if (inactivePas.length > 0) {
-    const renderInactiveItem = pa => {
+    const renderInactiveItem = (pa, num) => {
       if (pa.isHeading || pa.isMaintainHeading) {
         const isGrayH  = pa.headingColor === "gray" || pa.isMaintainHeading;
         const isGreenH = pa.headingColor === "green";
@@ -4527,18 +4527,19 @@ function renderFedcTarget(target) {
       const fixedText = pa.fixedRemark !== undefined ? pa.fixedRemark : pa.isMaintain ? (pa.maintainRemark ?? "") : null;
       const _masteredDate = pa.masteredOn || (pa.inactiveReason === 'mastered' ? "2026-06-30" : null);
       const _isDiscontinued = pa.discontinuedOn || pa.inactiveReason === 'discontinued';
-      const actLabel = _masteredDate ? `⭐ Mastered on ${fmtPeriodDate(_masteredDate)}` : _isDiscontinued ? (pa.discontinuedOn ? `🚩 Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}` : '🚩 Discontinued') : 'Activity';
-      const actLabelStyle = _masteredDate ? ' style="color:#059669"' : _isDiscontinued ? ' style="color:#dc2626"' : '';
-      const actDateLabel = '';
+      const statusBadge = _masteredDate
+        ? `<span style="font-size:.72rem;color:#059669;font-weight:600;white-space:nowrap;display:block;margin-bottom:.1rem">⭐ Mastered on ${fmtPeriodDate(_masteredDate)}</span>`
+        : _isDiscontinued
+        ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap;display:block;margin-bottom:.1rem">🚩 ${pa.discontinuedOn ? `Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}` : 'Discontinued'}</span>`
+        : '';
       const subActs = allPas.filter(p => p.parentActivity === pa.name && !p.isCompleted && !p.isArchived && !p.isStopped && !p.masteredOn && !p.discontinuedOn);
       const subHtml = subActs.length ? `<div style="display:flex;flex-direction:column;gap:.1rem;padding:.2rem 0 .1rem 1.25rem">
         ${subActs.map((sub, si) => `<div style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:#9ca3af"><span style="flex-shrink:0">${String.fromCharCode(97 + si)})</span><span>${escHtml(sub.name || '')}</span></div>`).join('')}
       </div>` : '';
       return `<div class="entry-block entry-block-predefined" style="opacity:.6;pointer-events:none">
         <div class="entry-field" contenteditable="false">
-          <span class="field-label"${actLabelStyle}>${actLabel}</span>
-          <span class="field-value-fixed">${paDisplayHtml(pa)}</span>
-          ${actDateLabel}
+          <span class="field-label">ACTIVITY ${num})</span>
+          <span class="field-value-fixed">${statusBadge}${paDisplayHtml(pa)}</span>
         </div>
         ${fixedText !== null ? `<div class="entry-field" contenteditable="false">
           <span class="field-label">Remark</span>
@@ -4553,7 +4554,7 @@ function renderFedcTarget(target) {
     const otherPas        = realInactive.filter(pa => !pa.masteredOn && !pa.discontinuedOn && !pa.inactiveReason);
     const renderSection = (label, color, pas) => {
       if (pas.length === 0) return '';
-      const items = pas.map(renderInactiveItem).filter(Boolean).join('');
+      const items = pas.map((pa, i) => renderInactiveItem(pa, i + 1)).filter(Boolean).join('');
       return `<div style="margin-top:.5rem">
         <button class="btn-inactive-toggle" contenteditable="false" style="display:flex;align-items:center;gap:.4rem;width:100%;padding:.4rem .6rem;background:none;border:1px dashed #d1d5db;border-radius:.4rem;cursor:pointer;font-size:.8rem;color:${color};text-align:left">
           <span class="inactive-chevron" style="font-size:.7rem">▶</span> ${label} (${pas.length})
@@ -10810,13 +10811,18 @@ function renderTargetManageContent(student, target) {
       </button>
       <div id="mn-mastered-section" style="display:none">`;
     masteredActs.forEach((a, ci) => {
+      const globalIdx = acts.indexOf(a);
       const dateLabel = a.masteredOn ? `Mastered on ${fmtPeriodDate(a.masteredOn)}` : 'Mastered';
       const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
       html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
-          <div style="display:flex;align-items:flex-start;gap:.3rem">
-            ${formatButtonsHtml(`mn-inactive-mastered-${ci}`)}
-            <textarea class="admin-input mn-inactive-name-input" id="mn-inactive-mastered-${ci}" data-inactive-type="mastered" data-inactive-idx="${ci}" rows="1" style="flex:1;overflow-y:hidden;resize:none;min-height:unset">${escHtml(a.name || "")}</textarea>
+          <div style="display:flex;align-items:center;gap:.3rem">
+            ${formatButtonsHtml(`mn-act-title-${globalIdx}`)}
+            <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${globalIdx}" data-idx="${globalIdx}" placeholder="Activity Title" value="${escHtml(a.title || '')}" style="flex:1${a.isBold ? ';font-weight:700' : ''}${a.isUnderline ? ';text-decoration:underline' : ''}" />
+          </div>
+          <div style="display:flex;align-items:center;gap:.35rem;padding-left:1.6rem">
+            ${formatButtonsHtml(`mn-act-details-${globalIdx}`)}
+            <textarea class="admin-input mn-act-details-input" id="mn-act-details-${globalIdx}" data-idx="${globalIdx}" rows="1" placeholder="Activity Details" style="flex:1">${escHtml(a.name || '')}</textarea>
           </div>
         </div>
         <span style="font-size:.72rem;color:#059669;white-space:nowrap;padding-top:.45rem">${dateLabel}</span>
@@ -10842,13 +10848,18 @@ function renderTargetManageContent(student, target) {
       </button>
       <div id="mn-discontinued-section" style="display:none">`;
     discontinuedActs.forEach((a, ci) => {
+      const globalIdx = acts.indexOf(a);
       const dateLabel = a.discontinuedOn ? `Discontinued on ${fmtPeriodDate(a.discontinuedOn)}` : 'Discontinued';
       const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
       html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
-          <div style="display:flex;align-items:flex-start;gap:.3rem">
-            ${formatButtonsHtml(`mn-inactive-disc-${ci}`)}
-            <textarea class="admin-input mn-inactive-name-input" id="mn-inactive-disc-${ci}" data-inactive-type="discontinued" data-inactive-idx="${ci}" rows="1" style="flex:1;overflow-y:hidden;resize:none;min-height:unset">${escHtml(a.name || "")}</textarea>
+          <div style="display:flex;align-items:center;gap:.3rem">
+            ${formatButtonsHtml(`mn-act-title-${globalIdx}`)}
+            <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${globalIdx}" data-idx="${globalIdx}" placeholder="Activity Title" value="${escHtml(a.title || '')}" style="flex:1${a.isBold ? ';font-weight:700' : ''}${a.isUnderline ? ';text-decoration:underline' : ''}" />
+          </div>
+          <div style="display:flex;align-items:center;gap:.35rem;padding-left:1.6rem">
+            ${formatButtonsHtml(`mn-act-details-${globalIdx}`)}
+            <textarea class="admin-input mn-act-details-input" id="mn-act-details-${globalIdx}" data-idx="${globalIdx}" rows="1" placeholder="Activity Details" style="flex:1">${escHtml(a.name || '')}</textarea>
           </div>
         </div>
         <span style="font-size:.72rem;color:#6b7280;white-space:nowrap;padding-top:.45rem">${dateLabel}</span>
@@ -10882,8 +10893,8 @@ function renderTargetManageContent(student, target) {
   const _discOpen = $("mn-discontinued-section")?.style.display === "block";
   const _mastOpen = $("mn-mastered-section")?.style.display === "block";
   $("manage-modal-body").innerHTML = html;
-  if (_discOpen) { const s = $("mn-discontinued-section"); if (s) { s.style.display = "block"; const a = s.previousElementSibling?.querySelector(".mn-toggle-arrow"); if (a) a.textContent = "▼"; s.querySelectorAll(".mn-inactive-name-input").forEach(autoResizeTextarea); } }
-  if (_mastOpen) { const s = $("mn-mastered-section"); if (s) { s.style.display = "block"; const a = s.previousElementSibling?.querySelector(".mn-toggle-arrow"); if (a) a.textContent = "▼"; s.querySelectorAll(".mn-inactive-name-input").forEach(autoResizeTextarea); } }
+  if (_discOpen) { const s = $("mn-discontinued-section"); if (s) { s.style.display = "block"; const a = s.previousElementSibling?.querySelector(".mn-toggle-arrow"); if (a) a.textContent = "▼"; s.querySelectorAll(".mn-act-details-input").forEach(autoResizeTextarea); } }
+  if (_mastOpen) { const s = $("mn-mastered-section"); if (s) { s.style.display = "block"; const a = s.previousElementSibling?.querySelector(".mn-toggle-arrow"); if (a) a.textContent = "▼"; s.querySelectorAll(".mn-act-details-input").forEach(autoResizeTextarea); } }
   $("manage-modal-body").querySelectorAll(".admin-list-item textarea").forEach(autoResizeTextarea);
 
   const saveTarget = async () => {
@@ -12322,13 +12333,18 @@ function renderTemplateManageContent(template) {
       </button>
       <div id="mn-mastered-section" style="display:none">`;
     masteredActs.forEach((a, ci) => {
+      const globalIdx = acts.indexOf(a);
       const dateLabel = a.masteredOn ? `Mastered on ${fmtPeriodDate(a.masteredOn)}` : 'Mastered';
       const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
       html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
-          <div style="display:flex;align-items:flex-start;gap:.3rem">
-            ${formatButtonsHtml(`mn-inactive-mastered-${ci}`)}
-            <textarea class="admin-input mn-inactive-name-input" id="mn-inactive-mastered-${ci}" data-inactive-type="mastered" data-inactive-idx="${ci}" rows="1" style="flex:1;overflow-y:hidden;resize:none;min-height:unset">${escHtml(a.name || "")}</textarea>
+          <div style="display:flex;align-items:center;gap:.3rem">
+            ${formatButtonsHtml(`mn-act-title-${globalIdx}`)}
+            <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${globalIdx}" data-idx="${globalIdx}" placeholder="Activity Title" value="${escHtml(a.title || '')}" style="flex:1${a.isBold ? ';font-weight:700' : ''}${a.isUnderline ? ';text-decoration:underline' : ''}" />
+          </div>
+          <div style="display:flex;align-items:center;gap:.35rem;padding-left:1.6rem">
+            ${formatButtonsHtml(`mn-act-details-${globalIdx}`)}
+            <textarea class="admin-input mn-act-details-input" id="mn-act-details-${globalIdx}" data-idx="${globalIdx}" rows="1" placeholder="Activity Details" style="flex:1">${escHtml(a.name || '')}</textarea>
           </div>
         </div>
         <span style="font-size:.72rem;color:#059669;white-space:nowrap;padding-top:.45rem">${dateLabel}</span>
@@ -12354,13 +12370,18 @@ function renderTemplateManageContent(template) {
       </button>
       <div id="mn-discontinued-section" style="display:none">`;
     discontinuedActs.forEach((a, ci) => {
+      const globalIdx = acts.indexOf(a);
       const dateLabel = a.discontinuedOn ? `Discontinued on ${fmtPeriodDate(a.discontinuedOn)}` : 'Discontinued';
       const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
       html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
-          <div style="display:flex;align-items:flex-start;gap:.3rem">
-            ${formatButtonsHtml(`mn-inactive-disc-${ci}`)}
-            <textarea class="admin-input mn-inactive-name-input" id="mn-inactive-disc-${ci}" data-inactive-type="discontinued" data-inactive-idx="${ci}" rows="1" style="flex:1;overflow-y:hidden;resize:none;min-height:unset">${escHtml(a.name || "")}</textarea>
+          <div style="display:flex;align-items:center;gap:.3rem">
+            ${formatButtonsHtml(`mn-act-title-${globalIdx}`)}
+            <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${globalIdx}" data-idx="${globalIdx}" placeholder="Activity Title" value="${escHtml(a.title || '')}" style="flex:1${a.isBold ? ';font-weight:700' : ''}${a.isUnderline ? ';text-decoration:underline' : ''}" />
+          </div>
+          <div style="display:flex;align-items:center;gap:.35rem;padding-left:1.6rem">
+            ${formatButtonsHtml(`mn-act-details-${globalIdx}`)}
+            <textarea class="admin-input mn-act-details-input" id="mn-act-details-${globalIdx}" data-idx="${globalIdx}" rows="1" placeholder="Activity Details" style="flex:1">${escHtml(a.name || '')}</textarea>
           </div>
         </div>
         <span style="font-size:.72rem;color:#6b7280;white-space:nowrap;padding-top:.45rem">${dateLabel}</span>
@@ -13700,7 +13721,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
     items.push(`<p class="empty-hint" contenteditable="false" style="padding:1.5rem">No activities yet. Add them under Edit Target.</p>`);
   }
   if (grpInactivePas.length > 0) {
-    const renderGrpInactiveItem = pa => {
+    const renderGrpInactiveItem = (pa, num) => {
       if (pa.isHeading || pa.isMaintainHeading) return `<div class="activity-group-heading" contenteditable="false" style="opacity:.3">${escHtml(pa.name || "")}</div>`;
       if (pa.isNote || pa.isExportNote) {
         if (!pa.text) return '';
@@ -13717,14 +13738,16 @@ function buildGroupItemsByActivity(target, data, attendees) {
       if (!pa.name) return '';
       const _grpMasteredDate = pa.masteredOn || (pa.inactiveReason === 'mastered' ? "2026-06-30" : null);
       const _grpIsDiscontinued = pa.discontinuedOn || pa.inactiveReason === 'discontinued';
-      const grpActLabel = _grpMasteredDate ? `⭐ Mastered on ${fmtPeriodDate(_grpMasteredDate)}` : _grpIsDiscontinued ? (pa.discontinuedOn ? `🚩 Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}` : '🚩 Discontinued') : 'Activity';
-      const grpActLabelStyle = _grpMasteredDate ? ' style="color:#059669"' : _grpIsDiscontinued ? ' style="color:#dc2626"' : '';
-      const grpActDateLabel = '';
+      const grpStatusBadge = _grpMasteredDate
+        ? `<span style="font-size:.72rem;color:#059669;font-weight:600;white-space:nowrap;display:block;margin-bottom:.1rem">⭐ Mastered on ${fmtPeriodDate(_grpMasteredDate)}</span>`
+        : _grpIsDiscontinued
+        ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap;display:block;margin-bottom:.1rem">🚩 ${pa.discontinuedOn ? `Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}` : 'Discontinued'}</span>`
+        : '';
       const grpSubActs = (target.predefinedActivities || []).filter(p => p.parentActivity === pa.name && !p.isCompleted && !p.isArchived && !p.isStopped && !p.masteredOn && !p.discontinuedOn);
       const grpSubHtml = grpSubActs.length ? `<div style="display:flex;flex-direction:column;gap:.1rem;padding:.2rem 0 .1rem 1.25rem">
         ${grpSubActs.map((sub, si) => `<div style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:#9ca3af"><span style="flex-shrink:0">${String.fromCharCode(97 + si)})</span><span>${escHtml(sub.name || '')}</span></div>`).join('')}
       </div>` : '';
-      return `<div class="entry-block entry-block-predefined" style="opacity:.6;pointer-events:none"><div class="entry-field" contenteditable="false"><span class="field-label"${grpActLabelStyle}>${grpActLabel}</span><span class="field-value-fixed">${paDisplayHtml(pa)}</span>${grpActDateLabel}</div>${grpSubHtml}</div>`;
+      return `<div class="entry-block entry-block-predefined" style="opacity:.6;pointer-events:none"><div class="entry-field" contenteditable="false"><span class="field-label">ACTIVITY ${num})</span><span class="field-value-fixed">${grpStatusBadge}${paDisplayHtml(pa)}</span></div>${grpSubHtml}</div>`;
     };
     const grpReal = grpInactivePas.filter(pa => !pa.isNote && !pa.isExportNote && !pa.isHeading && !pa.isMaintainHeading);
     const grpMastered     = grpReal.filter(pa => pa.masteredOn || pa.inactiveReason === 'mastered');
@@ -13736,7 +13759,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
         <button class="btn-inactive-toggle" contenteditable="false" style="display:flex;align-items:center;gap:.4rem;width:100%;padding:.4rem .6rem;background:none;border:1px dashed #d1d5db;border-radius:.4rem;cursor:pointer;font-size:.8rem;color:${color};text-align:left">
           <span class="inactive-chevron" style="font-size:.7rem">▶</span> ${label} (${pas.length})
         </button>
-        <div class="inactive-list" style="display:none;flex-direction:column;gap:.25rem;margin-top:.35rem">${pas.map(renderGrpInactiveItem).filter(Boolean).join('')}</div>
+        <div class="inactive-list" style="display:none;flex-direction:column;gap:.25rem;margin-top:.35rem">${pas.map((pa, i) => renderGrpInactiveItem(pa, i + 1)).filter(Boolean).join('')}</div>
       </div>`;
     };
     items.push(`<div style="margin-top:.75rem">
