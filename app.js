@@ -155,7 +155,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1002";
+const APP_VERSION = "1003";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1877,7 +1877,7 @@ function renderExportButtons() {
       <button class="export-btn export-btn-all" id="btn-export-all-trials">Backup All Excel (ZIP)</button>
       <button class="export-btn" id="btn-data-integrity-check">🔍 Run Data Integrity Check</button>
       <button class="export-btn" id="btn-recently-deleted">🗑️ Recently Deleted (30 days)</button>
-      <button class="export-btn" id="btn-hyr-settings">⚙️ Settings (for AI Report)</button>
+      <button class="export-btn" id="btn-hyr-settings">✏️ Prompt for AI Report</button>
     </div>`;
 
   const wire = (btnId, defaultLabel, includeTrials) => {
@@ -2820,43 +2820,72 @@ function hyrDownloadWord(reportText, studentName, period, year, chartData = {}, 
 }
 
 async function hyrOpenSettings() {
-  const config = await getHyrConfig();
-
-  $("manage-modal-title").textContent = "Report Generator Settings";
+  $("manage-modal-title").textContent = "Prompt for AI Report";
   $("manage-modal-body").innerHTML = `
-    <div style="padding:.75rem 1rem;display:flex;flex-direction:column;gap:1rem">
-
-      <div style="border:1.5px solid var(--border);border-radius:.6rem;padding:.85rem 1rem">
-        <div style="font-weight:600;font-size:.9rem;margin-bottom:.3rem">✏ Report Prompt</div>
-        <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:.65rem">
-          This is what Claude is instructed to do when generating a report. Refine it to improve the writing style.
-        </div>
-        <textarea id="hyr-prompt-textarea" class="admin-input" rows="14"
-          style="font-family:monospace;font-size:.78rem;resize:vertical"
-        >${escHtml(config.prompt || HYR_DEFAULT_PROMPT)}</textarea>
-        <div style="display:flex;gap:.5rem;margin-top:.6rem">
-          <button id="hyr-btn-save-prompt" class="btn-add-section" style="flex:1;text-align:center">Save Prompt</button>
-          <button id="hyr-btn-reset-prompt" class="export-btn" style="flex:1;text-align:center;font-size:.85rem">Reset to Default</button>
-        </div>
-      </div>
-
+    <div style="padding:2rem 1rem;display:flex;flex-direction:column;align-items:center;gap:.75rem">
+      <div style="font-size:.9rem;color:var(--text-muted)">Enter password to continue</div>
+      <input id="hyr-settings-pw" type="password" class="admin-input"
+        style="width:180px;text-align:center;font-size:1.1rem;letter-spacing:.15em"
+        placeholder="••••" autocomplete="off">
+      <div id="hyr-settings-pw-err" style="font-size:.8rem;color:#dc2626;display:none">Incorrect password</div>
     </div>`;
   $("manage-modal").classList.remove("hidden");
 
-  $("hyr-btn-save-prompt").addEventListener("click", async () => {
-    const btn = $("hyr-btn-save-prompt");
-    const newPrompt = $("hyr-prompt-textarea").value.trim();
-    if (!newPrompt) return;
-    btn.disabled = true; btn.textContent = "Saving…";
-    _hyrConfig = null;
-    await saveHalfYearReportConfig({ ...config, prompt: newPrompt });
-    _hyrConfig = await loadHalfYearReportConfig();
-    btn.disabled = false; btn.textContent = "Save Prompt";
-    flashSaved(btn);
+  const pwInput = $("hyr-settings-pw");
+  pwInput.focus();
+  pwInput.addEventListener("keydown", async e => {
+    if (e.key !== "Enter") return;
+    if (pwInput.value !== "0823") {
+      $("hyr-settings-pw-err").style.display = "";
+      pwInput.value = "";
+      return;
+    }
+    await hyrShowPromptEditor();
   });
+}
 
-  $("hyr-btn-reset-prompt").addEventListener("click", () => {
-    $("hyr-prompt-textarea").value = HYR_DEFAULT_PROMPT;
+async function hyrShowPromptEditor() {
+  const config = await getHyrConfig();
+
+  $("manage-modal-title").textContent = "Prompt for AI Report";
+  $("manage-modal-body").innerHTML = `
+    <div style="padding:.75rem 1rem;display:flex;flex-direction:column;gap:1rem">
+      <div style="border:1.5px solid var(--border);border-radius:.6rem;padding:.85rem 1rem">
+        <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:.65rem">
+          This is what Claude is instructed to do when generating a report. Edits are saved automatically.
+        </div>
+        <textarea id="hyr-prompt-textarea" class="admin-input" rows="18"
+          style="font-family:monospace;font-size:.78rem;resize:vertical"
+        >${escHtml(config.prompt || HYR_DEFAULT_PROMPT)}</textarea>
+        <div id="hyr-autosave-status" style="font-size:.75rem;color:var(--text-muted);margin-top:.4rem;text-align:right;min-height:1em"></div>
+      </div>
+    </div>`;
+
+  let saveTimer = null;
+  $("hyr-prompt-textarea").addEventListener("input", () => {
+    const status = $("hyr-autosave-status");
+    status.textContent = "Unsaved changes…";
+    status.style.color = "var(--text-muted)";
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(async () => {
+      const newPrompt = $("hyr-prompt-textarea")?.value.trim();
+      if (!newPrompt) return;
+      status.textContent = "Saving…";
+      try {
+        _hyrConfig = null;
+        await saveHalfYearReportConfig({ ...config, prompt: newPrompt });
+        _hyrConfig = await loadHalfYearReportConfig();
+        if ($("hyr-autosave-status")) {
+          $("hyr-autosave-status").textContent = "Saved ✓";
+          $("hyr-autosave-status").style.color = "#16a34a";
+        }
+      } catch {
+        if ($("hyr-autosave-status")) {
+          $("hyr-autosave-status").textContent = "Save failed";
+          $("hyr-autosave-status").style.color = "#dc2626";
+        }
+      }
+    }, 900);
   });
 }
 
