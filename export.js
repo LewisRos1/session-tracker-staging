@@ -2338,7 +2338,12 @@ function getAllActivitiesForTarget(session, target) {
     // Name fallback only for records with NO configId (legacy/imported).
     // Records that already have a configId pointing to a different PA must not
     // be stolen by another PA that happens to share the same name.
-    return sessionActs.find(a => a.activityName === pa.name && a.isPredefined && !a.configId && !usedIds.has(a.id)) || null;
+    // Also try pa.title as a fallback: if the activity name was moved from the
+    // Details field (pa.name) to the Title field (pa.title), historical session
+    // records still carry the old name in activityName.
+    const byName = pa.name ? sessionActs.find(a => a.activityName === pa.name && a.isPredefined && !a.configId && !usedIds.has(a.id)) : null;
+    if (byName) return byName;
+    return pa.title ? sessionActs.find(a => a.activityName === pa.title && a.isPredefined && !a.configId && !usedIds.has(a.id)) : null;
   };
 
   for (const pa of (target.predefinedActivities || [])) {

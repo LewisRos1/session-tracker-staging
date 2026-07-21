@@ -155,7 +155,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1021";
+const APP_VERSION = "1022";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -5694,8 +5694,8 @@ async function autoFillStructuredRemarks(student, sessionId) {
       const existingAct = paConfigId
         ? allActs.find(([, a]) => a.configId === paConfigId && a.targetName === target.name)
         : (paParent
-          ? allActs.find(([, a]) => a.targetName === target.name && a.activityName === pa.name && a.parentActivity === paParent)
-          : allActs.find(([, a]) => a.targetName === target.name && a.activityName === pa.name && !a.parentActivity));
+          ? allActs.find(([, a]) => a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title)) && a.parentActivity === paParent)
+          : allActs.find(([, a]) => a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title)) && !a.parentActivity));
       let actId = existingAct?.[0] || null;
       if (actId && Object.values(data.remarks || {}).some(r => r.activityId === actId)) continue;
       const key = `${sessionId}:${target.name}:${paConfigId || pa.name}:${paParent || ""}`;
@@ -5753,7 +5753,7 @@ async function autoFillMappedRemarks(student, sessionId) {
       if (!pa.isMapped) continue;
       const allMatches = Object.entries(data.activities || {})
         .filter(([, a]) => a.targetName === target.name &&
-                           (a.activityName === pa.name || (pa.id && a.configId === pa.id)));
+                           (a.activityName === pa.name || (pa.title && a.activityName === pa.title) || (pa.id && a.configId === pa.id)));
       const canonical = allMatches.find(([, a]) => pa.id && a.configId === pa.id) || allMatches[0] || null;
       for (const [dupeActId] of allMatches.filter(([aid]) => aid !== canonical?.[0] && !data.activities[aid]?.configId)) {
         const dupeRemIds = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === dupeActId).map(([rid]) => rid);
@@ -5811,7 +5811,7 @@ async function autoFillMaintainedRemarks(student, sessionId) {
       // Match by name OR by configId so a character-level name mismatch never spawns a duplicate.
       const allMatches = Object.entries(data.activities || {})
         .filter(([, a]) => a.targetName === target.name && !a.parentActivity &&
-                           (a.activityName === pa.name || (pa.id && a.configId === pa.id)));
+                           (a.activityName === pa.name || (pa.title && a.activityName === pa.title) || (pa.id && a.configId === pa.id)));
       // Prefer the activity that has configId set (the original predefined one).
       const canonical = allMatches.find(([, a]) => pa.id && a.configId === pa.id) || allMatches[0] || null;
       // Delete any name-only duplicates that lack configId — leftovers from the old bug.
@@ -6254,7 +6254,7 @@ function buildTargetViewTable(target, data) {
       }
       if (!isSub && parentActNames.has(pa.name)) {
         Object.entries(data.activities || {})
-          .filter(([, a]) => a.targetName === target.name && a.activityName === pa.name)
+          .filter(([, a]) => a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title)))
           .forEach(([id]) => matchedIds.add(id));
         const _paMastered = pa.masteredOn || (pa.inactiveReason === 'mastered' ? "2026-06-30" : null);
         const paBadge = pa.maintained
@@ -6272,7 +6272,7 @@ function buildTargetViewTable(target, data) {
       }
       if ((pa.fixedRemark !== undefined || pa.isMaintain) && !pa.maintained) {
         const fixedEntries = Object.entries(data.activities || {})
-          .filter(([, a]) => a.targetName === target.name && a.activityName === pa.name);
+          .filter(([, a]) => a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title)));
         const fixedEntry = fixedEntries[0] || null;
         fixedEntries.forEach(([id]) => matchedIds.add(id));
         const fixedText = pa.fixedRemark ?? pa.maintainRemark ?? "";
@@ -6291,7 +6291,7 @@ function buildTargetViewTable(target, data) {
         continue;
       }
       const candidateEntries = Object.entries(data.activities || {})
-        .filter(([id, a]) => a.targetName === target.name && a.activityName === pa.name && !matchedIds.has(id));
+        .filter(([id, a]) => a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title)) && !matchedIds.has(id));
       let entry = pa.id ? (candidateEntries.find(([, a]) => a.configId === pa.id) || null) : null;
       if (!entry) {
         if (isSub) {
@@ -6756,7 +6756,7 @@ async function autoFillViewMappedRemarks(student, sessionId, data) {
 
       const allMatchesV = Object.entries(data.activities || {})
         .filter(([, a]) => a.targetName === target.name &&
-                           (a.activityName === pa.name || (pa.id && a.configId === pa.id)));
+                           (a.activityName === pa.name || (pa.title && a.activityName === pa.title) || (pa.id && a.configId === pa.id)));
       const canonicalV = allMatchesV.find(([, a]) => pa.id && a.configId === pa.id) || allMatchesV[0] || null;
       for (const [dupeActId] of allMatchesV.filter(([aid]) => aid !== canonicalV?.[0] && !data.activities[aid]?.configId)) {
         const dupeRemIds = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === dupeActId).map(([rid]) => rid);
@@ -6782,7 +6782,7 @@ async function autoFillViewMaintainedRemarks(student, sessionId, data) {
       if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || !pa.name) continue;
       const allMatches = Object.entries(data.activities || {})
         .filter(([, a]) => a.targetName === target.name && !a.parentActivity &&
-                           (a.activityName === pa.name || (pa.id && a.configId === pa.id)));
+                           (a.activityName === pa.name || (pa.title && a.activityName === pa.title) || (pa.id && a.configId === pa.id)));
       const canonical = allMatches.find(([, a]) => pa.id && a.configId === pa.id) || allMatches[0] || null;
       for (const [dupeActId] of allMatches.filter(([aid]) => aid !== canonical?.[0] && !data.activities[aid]?.configId)) {
         const dupeRemIds = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === dupeActId).map(([rid]) => rid);
@@ -6829,7 +6829,7 @@ async function autoFillViewGroupMappedRemarks(group, sessionId, data) {
       if (pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || pa.isMaintainHeading) continue;
       if (!pa.isMapped) continue;
       const existingAct = Object.entries(data.activities || {})
-        .find(([, a]) => a.targetName === target.name && a.activityName === pa.name);
+        .find(([, a]) => a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title)));
       let actId = existingAct?.[0] || null;
 
       for (const studentName of attendees) {
@@ -7412,7 +7412,7 @@ function showViewAddRemarkPicker(targetName) {
           pa.isMaintain || pa.isCompleted || pa.isArchived || pa.isStopped) continue;
       no++;
       const entry = Object.entries(data?.activities || {})
-        .find(([, a]) => a.targetName === targetName && a.activityName === pa.name);
+        .find(([, a]) => a.targetName === targetName && (a.activityName === pa.name || (pa.title && a.activityName === pa.title)));
       if (entry && viewGetRemarks(data, entry[0]).length > 0) {
         matchedIds.add(entry[0]);
         choices.push({ actId: entry[0], name: pa.name, no });
@@ -7925,7 +7925,7 @@ function buildGroupTargetViewTable(target, data, attendees) {
       if (!pa.parentActivity && parentActNamesGrp.has(pa.name)) {
         no++;
         Object.entries(data.activities || {})
-          .filter(([, a]) => a.targetName === target.name && a.activityName === pa.name)
+          .filter(([, a]) => a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title)))
           .forEach(([id]) => matchedIds.add(id));
         const _paGrpMastered = pa.masteredOn || (pa.inactiveReason === 'mastered' ? "2026-06-30" : null);
         const paBadgeGrp = pa.maintained
@@ -7943,7 +7943,7 @@ function buildGroupTargetViewTable(target, data, attendees) {
       }
       if ((pa.fixedRemark !== undefined || pa.isMaintain) && !pa.maintained) {
         const fixedEntries2 = Object.entries(data.activities || {})
-          .filter(([, a]) => a.targetName === target.name && a.activityName === pa.name);
+          .filter(([, a]) => a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title)));
         fixedEntries2.forEach(([id]) => matchedIds.add(id));
         const fixedText = pa.fixedRemark ?? pa.maintainRemark ?? "";
         const isGrayFixed = pa.activityColor === "gray" || !!pa.isMaintainLive;
@@ -7971,7 +7971,7 @@ function buildGroupTargetViewTable(target, data, attendees) {
       }
       no++;
       const candidateEntries2 = Object.entries(data.activities || {})
-        .filter(([id, a]) => a.targetName === target.name && a.activityName === pa.name && !matchedIds.has(id));
+        .filter(([id, a]) => a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title)) && !matchedIds.has(id));
       let entry2 = pa.id ? (candidateEntries2.find(([, a]) => a.configId === pa.id) || null) : null;
       if (!entry2) {
         if (isSub2) {
@@ -11297,7 +11297,7 @@ function renderTargetManageContent(student, target) {
             affectedSessions = allSessions.filter(s => {
               const sActs = s.activities || {}; const sRems = s.remarks || {};
               const matchIds = Object.entries(sActs).filter(([, a]) =>
-                a.targetName === target.name && a.activityName === pa.name &&
+                a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title)) &&
                 (paPA === null ? !a.parentActivity : a.parentActivity === paPA)
               ).map(([id]) => id);
               return matchIds.some(actId => Object.values(sRems).some(r =>
@@ -11415,7 +11415,7 @@ function renderTargetManageContent(student, target) {
           ? await getAllSessionsForGroup(_groupForTargetEdit.id)
           : await getAllSessionsForStudent(student.id);
         const dates = allSessions
-          .filter(s => Object.values(s.activities || {}).some(a => a.targetName === target.name && a.activityName === pa.name))
+          .filter(s => Object.values(s.activities || {}).some(a => a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title))))
           .map(s => s.date).sort();
         latestDate = dates[dates.length - 1] || null;
       } finally {
@@ -11451,7 +11451,7 @@ function renderTargetManageContent(student, target) {
           ? await getAllSessionsForGroup(_groupForTargetEdit.id)
           : await getAllSessionsForStudent(student.id);
         const dates = allSessions
-          .filter(s => Object.values(s.activities || {}).some(a => a.targetName === target.name && a.activityName === pa.name))
+          .filter(s => Object.values(s.activities || {}).some(a => a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title))))
           .map(s => s.date).sort();
         latestDate = dates[dates.length - 1] || null;
       } finally {
@@ -13634,7 +13634,7 @@ async function autoFillGroupMaintainedRemarks(group, sessionId, data, targetName
   for (const pa of (target.predefinedActivities || [])) {
     if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || !pa.name) continue;
     const existingAct = Object.entries(data.activities || {})
-      .find(([, a]) => a.targetName === targetName && (a.activityName === pa.name || (pa.id && a.configId === pa.id)));
+      .find(([, a]) => a.targetName === targetName && (a.activityName === pa.name || (pa.title && a.activityName === pa.title) || (pa.id && a.configId === pa.id)));
     const actId = existingAct?.[0];
     if (!actId) continue;
     for (const studentName of attendees) {
