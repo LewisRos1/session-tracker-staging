@@ -778,7 +778,9 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
 
       if (!isActive && !isMastered && !isDiscontinued) continue;
 
-      const displayName = (pa.title && pa.title.trim()) ? pa.title.trim() : `<Activity ${paIdx}>`;
+      const displayName = pa.parentActivity
+        ? (pa.name || `<Sub-Activity ${paIdx}>`)
+        : ((pa.title && pa.title.trim()) ? pa.title.trim() : `<Activity ${paIdx}>`);
       actDisplayNameMap[pa.name] = displayName;
 
       if (isActive)            { actStatusMap[pa.name] = "active";       activeNames.push(pa.name); }
