@@ -153,7 +153,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "963";
+const APP_VERSION = "964";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -497,7 +497,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   setTimeout(() => {
     if (document.getElementById("screen-loading")?.classList.contains("active")) {
       document.getElementById("btn-loading-reload")?.classList.remove("hidden");
-      document.getElementById("btn-loading-reload-hint")?.classList.remove("hidden");
     }
   }, 10000);
 
@@ -2027,7 +2026,7 @@ function renderHalfYearReportsSection() {
           const [y, h] = p.split("-");
           return `<option value="${p}">${y} ${h} (${h === "H1" ? "Jan–Jun" : "Jul–Dec"})</option>`;
         });
-      periodSel.innerHTML = opts.join("");
+      periodSel.innerHTML = `<option value="">— Select Semester —</option>` + opts.join("");
       periodSel.style.display = "";
       genBtn.style.display = "";
     } catch (err) {
@@ -2047,6 +2046,7 @@ async function hyrGenerate() {
   const year = parseInt(yearStr) || new Date().getFullYear();
 
   if (!studentId) { alert("Please select a student first."); return; }
+  if (!periodVal) { alert("Please select a semester first."); return; }
 
   const student = state.students.find(s => s.id === studentId);
   if (!student) return;
