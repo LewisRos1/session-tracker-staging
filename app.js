@@ -155,7 +155,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1022";
+const APP_VERSION = "1023";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4386,7 +4386,7 @@ function renderFedcTarget(target) {
         </div>
       </div>`;
       children.forEach((sub, si) => {
-        let subActData = findActivityByName(target.name, sub.name, pa.name, sub.id);
+        let subActData = findActivityByName(target.name, sub.title || sub.name, pa.title || pa.name, sub.id);
         if (!subActData && state.sessionData) {
           // Orphan adoption: old top-level activity was deleted from config but its
           // session record still exists. Claim it for this sub-activity by writing
@@ -4439,8 +4439,8 @@ function renderFedcTarget(target) {
       return;
     }
 
-    const pendingKey = pa.name;
-    const actData    = findActivityByName(target.name, pa.name, null, pa.id);
+    const pendingKey = pa.name || pa.title;
+    const actData    = findActivityByName(target.name, pa.name || pa.title, null, pa.id);
     // Claim unlinked records in local state immediately so the next same-named predefined
     // activity in the loop can't find and share the same Firestore record.
     // Also persist the configId to Firestore so future session opens can find this
@@ -5807,7 +5807,7 @@ async function autoFillMaintainedRemarks(student, sessionId) {
   const toFill = [];
   for (const target of (student.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
-      if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || !pa.name) continue;
+      if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || (!pa.name && !pa.title)) continue;
       // Match by name OR by configId so a character-level name mismatch never spawns a duplicate.
       const allMatches = Object.entries(data.activities || {})
         .filter(([, a]) => a.targetName === target.name && !a.parentActivity &&
@@ -6779,7 +6779,7 @@ async function autoFillViewMaintainedRemarks(student, sessionId, data) {
   let count = 0;
   for (const target of (student.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
-      if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || !pa.name) continue;
+      if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || (!pa.name && !pa.title)) continue;
       const allMatches = Object.entries(data.activities || {})
         .filter(([, a]) => a.targetName === target.name && !a.parentActivity &&
                            (a.activityName === pa.name || (pa.title && a.activityName === pa.title) || (pa.id && a.configId === pa.id)));
@@ -13632,7 +13632,7 @@ async function autoFillGroupMaintainedRemarks(group, sessionId, data, targetName
   if (!hasRealData) return 0;
   let count = 0;
   for (const pa of (target.predefinedActivities || [])) {
-    if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || !pa.name) continue;
+    if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || (!pa.name && !pa.title)) continue;
     const existingAct = Object.entries(data.activities || {})
       .find(([, a]) => a.targetName === targetName && (a.activityName === pa.name || (pa.title && a.activityName === pa.title) || (pa.id && a.configId === pa.id)));
     const actId = existingAct?.[0];
@@ -13882,7 +13882,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
           </div>
         </div>`;
       }
-      if (!pa.name) return '';
+      if (!pa.name && !pa.title) return '';
       const _grpMasteredDate = pa.masteredOn || (pa.inactiveReason === 'mastered' ? "2026-06-30" : null);
       const _grpIsDiscontinued = pa.discontinuedOn || pa.inactiveReason === 'discontinued';
       const grpStatusBadge = _grpMasteredDate
@@ -13934,10 +13934,10 @@ function renderGroupStudentBlock(studentName, target, data) {
   const grpStudentDate = todayDateStr();
   for (const pa of (target.predefinedActivities || [])) {
     if (!isActivityActive(pa, grpStudentDate)) continue;
-    if (pa.isNote || pa.isExportNote || pa.isHeading || pa.isMaintainHeading || pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || !pa.name) continue;
+    if (pa.isNote || pa.isExportNote || pa.isHeading || pa.isMaintainHeading || pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || (!pa.name && !pa.title)) continue;
     const actId = Object.entries(data.activities || {})
-      .find(([, a]) => a.targetName === target.name && a.activityName === pa.name)?.[0] || null;
-    activityEntries.push({ actId, actName: pa.name, actNote: pa.actNote, pa });
+      .find(([, a]) => a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title)))?.[0] || null;
+    activityEntries.push({ actId, actName: pa.title || pa.name, actNote: pa.actNote, pa });
   }
   Object.entries(data.activities || {})
     .filter(([, a]) => a.targetName === target.name && !a.isPredefined)

@@ -785,14 +785,14 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
     // Pre-build parent map so sub-activities inherit discontinued/mastered status
     const parentPaMap = {};
     for (const pa of (target.predefinedActivities || [])) {
-      if (!pa.parentActivity && pa.name) parentPaMap[pa.name] = pa;
+      if (!pa.parentActivity && (pa.name || pa.title)) parentPaMap[pa.title || pa.name] = pa;
     }
 
     let activeIdx = 0, masteredIdx = 0, discontinuedIdx = 0;
     const parentSectionIdx = {}; // standalone pa.name → its section counter value (for sub-act labels)
     const parentSubCount   = {}; // parent pa.name → how many sub-acts have been labelled so far
     for (const pa of (target.predefinedActivities || [])) {
-      if (!pa.name || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || pa.isMaintain
+      if ((!pa.name && !pa.title) || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || pa.isMaintain
           || pa.isCompleted) continue;
 
       const parentPa = pa.parentActivity ? parentPaMap[pa.parentActivity] : null;
@@ -819,22 +819,23 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
         const letterN = parentSubCount[pa.parentActivity] ?? 0;
         parentSubCount[pa.parentActivity] = letterN + 1;
         const letter = String.fromCharCode(97 + letterN);
-        displayName = pa.name || (pIdx != null ? `<Activity ${pIdx}${letter}>` : `<Sub-Activity ${letter}>`);
+        displayName = pa.title || pa.name || (pIdx != null ? `<Activity ${pIdx}${letter}>` : `<Sub-Activity ${letter}>`);
       } else {
         // Standalone activity: increment the section counter.
         let sectionIdx;
         if (isActive)        { sectionIdx = ++activeIdx; }
         else if (isMastered) { sectionIdx = ++masteredIdx; }
         else                 { sectionIdx = ++discontinuedIdx; }
-        displayName = (pa.title && pa.title.trim()) ? pa.title.trim() : `<Activity ${sectionIdx}>`;
-        parentSectionIdx[pa.name] = sectionIdx;
+        displayName = (pa.title && pa.title.trim()) ? pa.title.trim() : (pa.name && pa.name.trim()) ? pa.name.trim() : `<Activity ${sectionIdx}>`;
+        parentSectionIdx[pa.title || pa.name] = sectionIdx;
       }
 
-      dnMap[pa.name] = displayName;
+      const paKey = pa.title || pa.name;
+      dnMap[paKey] = displayName;
 
-      if (isActive)            { actStatusMap[pa.name] = "active";       activeNames.push(pa.name); }
-      else if (isMastered)     { actStatusMap[pa.name] = "mastered";     masteredNames.push(pa.name); }
-      else if (isDiscontinued) { actStatusMap[pa.name] = "discontinued"; discontinuedNames.push(pa.name); }
+      if (isActive)            { actStatusMap[paKey] = "active";       activeNames.push(paKey); }
+      else if (isMastered)     { actStatusMap[paKey] = "mastered";     masteredNames.push(paKey); }
+      else if (isDiscontinued) { actStatusMap[paKey] = "discontinued"; discontinuedNames.push(paKey); }
     }
 
     // Extra activities from session data not in predefined
@@ -2357,7 +2358,7 @@ function getAllActivitiesForTarget(session, target) {
       );
       if (!parentExists) continue;
     }
-    if (!pa.name && !pa.isNote && !pa.isExportNote && !pa.isHeading && !pa.isMaintainHeading) continue;
+    if (!pa.name && !pa.title && !pa.isNote && !pa.isExportNote && !pa.isHeading && !pa.isMaintainHeading) continue;
     if (pa.isNote) {
       result.push({ isNote: true, activityName: pa.text || "" });
       continue;
@@ -2366,19 +2367,19 @@ function getAllActivitiesForTarget(session, target) {
       result.push({ isExportNote: true, activityName: pa.text || "" });
       continue;
     }
-    if (!pa.name) continue;
+    if (!pa.name && !pa.title) continue;
     if (pa.isHeading && !pa.headingColor && !pa.isMaintainHeading) {
-      result.push({ isHeading: true, activityName: pa.name });
+      result.push({ isHeading: true, activityName: pa.title || pa.name });
       continue;
     }
     // Gray headings — inline in their natural position
     if ((pa.isHeading && pa.headingColor === "gray") || pa.isMaintainHeading) {
-      result.push({ isMaintainHeading: true, activityName: pa.name, isGray: true });
+      result.push({ isMaintainHeading: true, activityName: pa.title || pa.name, isGray: true });
       continue;
     }
     // Green headings — inline in their natural position
     if (pa.isHeading && pa.headingColor === "green") {
-      result.push({ isGreenHeading: true, activityName: pa.name });
+      result.push({ isGreenHeading: true, activityName: pa.title || pa.name });
       continue;
     }
 
