@@ -155,7 +155,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1016";
+const APP_VERSION = "1017";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -10451,7 +10451,7 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
     : (a.inlineOptions || a.remarkPresetId) ? "starter_fixed" : "";
   const showStarter = type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note";
   return `<div style="flex:1;display:flex;flex-direction:column;gap:.4rem;min-width:0">
-    <select class="act-preset-select mn-act-preset" data-idx="${idx}">
+    <select class="act-preset-select mn-act-preset" data-idx="${idx}" style="border-color:#b8bcc4">
       <option value="">Free text</option>
       <option value="manual_score"${type === "manual_score" ? " selected" : ""}>Manual Score</option>
       <option value="starter_fixed"${type === "starter_fixed" ? " selected" : ""}>Sentence Starter + Multiple Options</option>
@@ -10462,12 +10462,12 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
       <span style="font-size:.95rem;color:#374151;font-weight:700">Sentence Starter</span>
       <input class="admin-input mn-act-starter-text" data-idx="${idx}"
         placeholder="Enter Sentence Starter Here (Optional)"
-        style="width:100%;min-width:0;box-sizing:border-box"
+        style="width:100%;min-width:0;box-sizing:border-box;border-color:#b8bcc4"
         value="${escHtml(a.sentenceStarter || "")}">
     </div>
     <div class="mn-opts-container" data-idx="${idx}" style="${showStarter ? "" : "display:none"}">
-      <div style="border:1px solid #e5e7eb;border-radius:.45rem;overflow:hidden;margin-bottom:.4rem">
-        <div style="padding:.3rem .6rem;font-size:.78rem;font-weight:600;color:#6b7280;background:#f3f4f6;border-bottom:1px solid #e5e7eb">Options</div>
+      <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden;margin-bottom:.4rem">
+        <div style="padding:.3rem .6rem;font-size:.78rem;font-weight:600;color:#6b7280;background:#f3f4f6;border-bottom:1px solid #b8bcc4">Options</div>
         <div class="mn-opts-list" style="padding:.3rem .4rem .1rem">${(() => {
           const optsStr = a.inlineOptions || (a.remarkPresetId ? (state.remarkPresets.find(p=>p.id===a.remarkPresetId)?.options||[]).join("/") : "");
           const displayOpts = parseOpts(optsStr).length > 0 ? parseOpts(optsStr) : [""];
@@ -10481,7 +10481,7 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
             `</div>`
           ).join("");
         })()}</div>
-        <div style="padding:.25rem .4rem .4rem;border-top:1px solid #e5e7eb">
+        <div style="padding:.25rem .4rem .4rem;border-top:1px solid #b8bcc4">
           <button class="mn-opt-add" data-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:#f9fafb;border:1px solid #d1d5db;border-radius:.35rem;cursor:pointer;color:#374151">+ Add Option</button>
         </div>
       </div>
