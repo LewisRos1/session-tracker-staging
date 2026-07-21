@@ -155,7 +155,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1008";
+const APP_VERSION = "1009";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -10720,6 +10720,7 @@ function renderTargetManageContent(student, target) {
           return `<div style="margin-left:1.25rem;display:flex;flex-direction:column;gap:.3rem;padding:.45rem .55rem;background:#f0f9ff;border:1px solid #bae6fd;border-left:3px solid #60a5fa;border-radius:.35rem">
             <div style="display:flex;align-items:center;gap:.35rem">
               <span style="font-size:.75rem;font-weight:700;color:#0369a1;flex-shrink:0;min-width:1.4rem">${String.fromCharCode(97 + si)})</span>
+              <span style="font-size:.93rem;color:#374151;white-space:nowrap;font-weight:700;flex-shrink:0">Activity Title:</span>
               <label style="display:flex;align-items:center;gap:.15rem;font-size:.78rem;cursor:pointer;flex-shrink:0;user-select:none" title="Bold">
                 <input type="checkbox" class="mn-act-bold-cb" data-idx="${subIdx}"${sub.isBold ? ' checked' : ''}><b>B</b>
               </label>
@@ -10727,16 +10728,19 @@ function renderTargetManageContent(student, target) {
                 <input type="checkbox" class="mn-act-underline-cb" data-idx="${subIdx}"${sub.isUnderline ? ' checked' : ''}><u>U</u>
               </label>
               <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subIdx}" data-idx="${subIdx}"
-                placeholder="Activity Title"
+                placeholder=""
                 value="${escHtml(sub.title || '')}"
                 style="flex:1${sub.isBold ? ';font-weight:700' : ''}${sub.isUnderline ? ';text-decoration:underline' : ''}" />
               <button class="btn-adm-del mn-del-sub-act" data-idx="${subIdx}" title="Delete sub-activity" style="flex-shrink:0">🗑</button>
             </div>
-            <div style="display:flex;align-items:center;gap:.35rem;padding-left:1.6rem">
+            <div style="padding-left:1.6rem;font-size:.76rem;color:#9ca3af;margin-top:-.05rem">Shown in the Activity Breakdown chart</div>
+            <div style="display:flex;align-items:center;gap:.35rem;padding-left:1.6rem;margin-top:.2rem">
+              <span style="font-size:.93rem;color:#374151;white-space:nowrap;font-weight:700;flex-shrink:0">Activity Details:</span>
               ${formatButtonsHtml(`mn-act-details-${subIdx}`)}
               <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subIdx}" data-idx="${subIdx}"
-                rows="1" placeholder="Activity Details" style="flex:1">${escHtml(sub.name || '')}</textarea>
+                rows="1" placeholder="" style="flex:1">${escHtml(sub.name || '')}</textarea>
             </div>
+            <div style="padding-left:1.6rem;font-size:.76rem;color:#9ca3af;margin-top:-.05rem">Shown in session screen only, not in the chart</div>
             <div style="display:flex;align-items:flex-start;gap:.5rem;padding-left:1.6rem">
               <span style="font-size:.93rem;color:#374151;white-space:nowrap;font-weight:700;padding-top:.3rem">Remark Type:</span>
               ${subRemarkType}
@@ -10750,6 +10754,7 @@ function renderTargetManageContent(student, target) {
           <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
             <div style="display:flex;align-items:center;gap:.35rem">
               <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;min-width:1.6rem">${manageActNo})</span>
+              <span style="font-size:.93rem;color:#374151;white-space:nowrap;font-weight:700;flex-shrink:0">Activity Title:</span>
               <label style="display:flex;align-items:center;gap:.15rem;font-size:.78rem;cursor:pointer;flex-shrink:0;user-select:none" title="Bold">
                 <input type="checkbox" class="mn-act-bold-cb" data-idx="${idx}"${a.isBold ? ' checked' : ''}><b>B</b>
               </label>
@@ -10757,15 +10762,18 @@ function renderTargetManageContent(student, target) {
                 <input type="checkbox" class="mn-act-underline-cb" data-idx="${idx}"${a.isUnderline ? ' checked' : ''}><u>U</u>
               </label>
               <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
-                placeholder="Activity Title"
+                placeholder=""
                 value="${escHtml(a.title || '')}"
                 style="flex:1${a.isBold ? ';font-weight:700' : ''}${a.isUnderline ? ';text-decoration:underline' : ''}" />
             </div>
-            <div style="display:flex;align-items:center;gap:.35rem;padding-left:1.6rem">
+            <div style="padding-left:1.6rem;font-size:.76rem;color:#9ca3af;margin-top:-.05rem">Shown in the Activity Breakdown chart</div>
+            <div style="display:flex;align-items:center;gap:.35rem;padding-left:1.6rem;margin-top:.2rem">
+              <span style="font-size:.93rem;color:#374151;white-space:nowrap;font-weight:700;flex-shrink:0">Activity Details:</span>
               ${formatButtonsHtml(`mn-act-details-${idx}`)}
               <textarea class="admin-input mn-act-details-input" id="mn-act-details-${idx}" data-idx="${idx}"
-                rows="1" placeholder="Activity Details" style="flex:1">${escHtml(a.name || '')}</textarea>
+                rows="1" placeholder="" style="flex:1">${escHtml(a.name || '')}</textarea>
             </div>
+            <div style="padding-left:1.6rem;font-size:.76rem;color:#9ca3af;margin-top:-.05rem">Shown in session screen only, not in the chart</div>
             ${subActsHtml}
             ${maintainedRowSub}
             <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:var(--primary);border:1px solid var(--primary);border-radius:.35rem;color:#fff;cursor:pointer;margin-left:1.25rem;margin-top:.6rem;align-self:flex-start">+ Add Sub-activity</button>
@@ -10793,6 +10801,7 @@ function renderTargetManageContent(student, target) {
           <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
             <div style="display:flex;align-items:center;gap:.35rem">
               <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;min-width:1.6rem">${manageActNo})</span>
+              <span style="font-size:.93rem;color:#374151;white-space:nowrap;font-weight:700;flex-shrink:0">Activity Title:</span>
               <label style="display:flex;align-items:center;gap:.15rem;font-size:.78rem;cursor:pointer;flex-shrink:0;user-select:none" title="Bold">
                 <input type="checkbox" class="mn-act-bold-cb" data-idx="${idx}"${a.isBold ? ' checked' : ''}><b>B</b>
               </label>
@@ -10800,16 +10809,19 @@ function renderTargetManageContent(student, target) {
                 <input type="checkbox" class="mn-act-underline-cb" data-idx="${idx}"${a.isUnderline ? ' checked' : ''}><u>U</u>
               </label>
               <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
-                placeholder="Activity Title"
+                placeholder=""
                 value="${escHtml(a.title || '')}"
                 style="flex:1${a.isBold ? ';font-weight:700' : ''}${a.isUnderline ? ';text-decoration:underline' : ''}" />
             </div>
-            <div style="display:flex;align-items:center;gap:.35rem;padding-left:1.6rem">
+            <div style="padding-left:1.6rem;font-size:.76rem;color:#9ca3af;margin-top:-.05rem">Shown in the Activity Breakdown chart</div>
+            <div style="display:flex;align-items:center;gap:.35rem;padding-left:1.6rem;margin-top:.2rem">
+              <span style="font-size:.93rem;color:#374151;white-space:nowrap;font-weight:700;flex-shrink:0">Activity Details:</span>
               ${formatButtonsHtml(`mn-act-details-${idx}`)}
               <textarea class="admin-input mn-act-details-input" id="mn-act-details-${idx}" data-idx="${idx}"
-                rows="1" placeholder="Activity Details" style="flex:1">${escHtml(a.name || '')}</textarea>
+                rows="1" placeholder="" style="flex:1">${escHtml(a.name || '')}</textarea>
             </div>
-            <div style="display:flex;align-items:flex-start;gap:.5rem">
+            <div style="padding-left:1.6rem;font-size:.76rem;color:#9ca3af;margin-top:-.05rem">Shown in session screen only, not in the chart</div>
+            <div style="display:flex;align-items:flex-start;gap:.5rem;margin-top:.2rem">
               <span style="font-size:.93rem;color:#374151;white-space:nowrap;font-weight:700;padding-top:.3rem">Remark Type:</span>
               ${remarkTypeSelect}
             </div>
