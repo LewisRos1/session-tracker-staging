@@ -160,7 +160,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "994";
+const APP_VERSION = "995";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4350,7 +4350,7 @@ function renderFedcTarget(target) {
       html += `<div class="entry-block" style="${pBorder}border-radius:var(--radius) var(--radius) 0 0;border-bottom:none;box-shadow:var(--shadow)">
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Activity</span>
-          <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${paDisplayHtml(pa)}</span>
+          <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${paDisplayHtml(pa, true)}</span>
         </div>
       </div>`;
       children.forEach((sub, si) => {
@@ -4432,7 +4432,7 @@ function renderFedcTarget(target) {
     html += `<div class="entry-block entry-block-predefined"${activityStyle}>
       <div class="entry-field" contenteditable="false">
         <span class="field-label">Activity</span>
-        <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${paDisplayHtml(pa)}</span>
+        <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${paDisplayHtml(pa, true)}</span>
       </div>`;
 
     if (pa.actNote && pa.actNote.trim()) {
@@ -4539,7 +4539,7 @@ function renderFedcTarget(target) {
       return `<div class="entry-block entry-block-predefined" style="opacity:.6;pointer-events:none">
         <div class="entry-field" contenteditable="false">
           <span class="field-label">ACTIVITY ${num})</span>
-          <span class="field-value-fixed">${statusBadge}${paDisplayHtml(pa)}</span>
+          <span class="field-value-fixed">${statusBadge}${paDisplayHtml(pa, true)}</span>
         </div>
         ${fixedText !== null ? `<div class="entry-field" contenteditable="false">
           <span class="field-label">Remark</span>
@@ -4784,8 +4784,8 @@ function paDisplayName(pa) {
 
 // Returns the HTML to display a predefined activity's title (with checkbox-style
 // bold/underline from pa.isBold/pa.isUnderline) and optional details below.
-function paDisplayHtml(pa) {
-  // pa.title → first line only (empty = nothing shown on line 1).
+function paDisplayHtml(pa, showPlaceholder = false) {
+  // pa.title → first line only (empty = nothing shown on line 1, or placeholder on session screen).
   // pa.name  → always the details/second line when non-empty.
   const titleText = (pa.title || "").trim();
   let html = "";
@@ -4796,6 +4796,8 @@ function paDisplayHtml(pa) {
     html = style
       ? `<span style="${style}">${formatActivityMarkup(titleText)}</span>`
       : formatActivityMarkup(titleText);
+  } else if (showPlaceholder) {
+    html = `<span style="font-style:italic;color:#9ca3af;font-size:.85rem">&lt;Please give this activity a name in Edit Target&gt;</span>`;
   }
   const detailsText = (pa.name || "").trim();
   if (detailsText) {
@@ -13662,7 +13664,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
       groupHtml += `<div class="entry-block" style="border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);border-radius:var(--radius) var(--radius) 0 0;border-bottom:none;box-shadow:var(--shadow)">
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Activity</span>
-          <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem"></span>${paDisplayHtml(pa)}</span>
+          <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem"></span>${paDisplayHtml(pa, true)}</span>
         </div>
       </div>`;
       children.forEach((sub, si) => {
@@ -13747,7 +13749,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
       const grpSubHtml = grpSubActs.length ? `<div style="display:flex;flex-direction:column;gap:.1rem;padding:.2rem 0 .1rem 1.25rem">
         ${grpSubActs.map((sub, si) => `<div style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:#9ca3af"><span style="flex-shrink:0">${String.fromCharCode(97 + si)})</span><span>${escHtml(sub.name || '')}</span></div>`).join('')}
       </div>` : '';
-      return `<div class="entry-block entry-block-predefined" style="opacity:.6;pointer-events:none"><div class="entry-field" contenteditable="false"><span class="field-label">ACTIVITY ${num})</span><span class="field-value-fixed">${grpStatusBadge}${paDisplayHtml(pa)}</span></div>${grpSubHtml}</div>`;
+      return `<div class="entry-block entry-block-predefined" style="opacity:.6;pointer-events:none"><div class="entry-field" contenteditable="false"><span class="field-label">ACTIVITY ${num})</span><span class="field-value-fixed">${grpStatusBadge}${paDisplayHtml(pa, true)}</span></div>${grpSubHtml}</div>`;
     };
     const grpReal = grpInactivePas.filter(pa => !pa.isNote && !pa.isExportNote && !pa.isHeading && !pa.isMaintainHeading);
     const grpMastered     = grpReal.filter(pa => pa.masteredOn || pa.inactiveReason === 'mastered');

@@ -748,8 +748,11 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
   let rowOffset = 0;
 
   for (const target of allTargets) {
-    const actDisplayNameMap = {};
+    const actDisplayNameMap = {};  // only for extraNames fallback
     const actStatusMap = {};
+    // Per-section display name maps so the same pa.name in multiple sections
+    // gets the correct section-specific counter (avoids last-write-wins overwrite).
+    const activeDNMap = {}, masteredDNMap = {}, discontinuedDNMap = {};
     // Track ordered lists for each section
     const activeNames = [], masteredNames = [], discontinuedNames = [];
     // Pre-build parent map so sub-activities inherit discontinued/mastered status
@@ -778,14 +781,15 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
       if (!isActive && !isMastered && !isDiscontinued) continue;
 
       let sectionIdx;
-      if (isActive)            { sectionIdx = ++activeIdx; }
-      else if (isMastered)     { sectionIdx = ++masteredIdx; }
-      else                     { sectionIdx = ++discontinuedIdx; }
+      let dnMap;
+      if (isActive)        { sectionIdx = ++activeIdx;       dnMap = activeDNMap;       }
+      else if (isMastered) { sectionIdx = ++masteredIdx;     dnMap = masteredDNMap;     }
+      else                 { sectionIdx = ++discontinuedIdx; dnMap = discontinuedDNMap; }
 
       const displayName = pa.parentActivity
         ? (pa.name || `<Sub-Activity ${sectionIdx}>`)
         : ((pa.title && pa.title.trim()) ? pa.title.trim() : `<Activity ${sectionIdx}>`);
-      actDisplayNameMap[pa.name] = displayName;
+      dnMap[pa.name] = displayName;
 
       if (isActive)            { actStatusMap[pa.name] = "active";       activeNames.push(pa.name); }
       else if (isMastered)     { actStatusMap[pa.name] = "mastered";     masteredNames.push(pa.name); }
@@ -797,7 +801,8 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
     for (const sess of sessions) {
       for (const [, a] of Object.entries(sess.activities || {})) {
         if ((a.targetName === target.name || a.target === target.name) && a.activityName && !a.isHeading && !a.isNote) {
-          if (!actDisplayNameMap[a.activityName]) {
+          if (!activeDNMap[a.activityName] && !masteredDNMap[a.activityName] && !discontinuedDNMap[a.activityName]
+              && !actDisplayNameMap[a.activityName]) {
             actDisplayNameMap[a.activityName] = a.activityTitle || a.activityName;
             actStatusMap[a.activityName] = "active";
             extraNames.push(a.activityName);
@@ -809,8 +814,8 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
     const allNames = [...activeNames, ...masteredNames, ...discontinuedNames, ...extraNames];
     if (allNames.length === 0) continue;
 
-    // Build score data for each activity name
-    const buildEntry = actName => {
+    // Build score data for each activity name; dnMap supplies the display label.
+    const buildEntry = (actName, dnMap) => {
       const monthBuckets = {};
       for (const sess of sessions) {
         const actEntry = Object.entries(sess.activities || {}).find(
@@ -838,13 +843,13 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
         latest = { label: month.split(" ")[0].slice(0, 3), avg: mAvg };
       }
       if (earliest === null) return null;
-      return { name: actDisplayNameMap[actName] || actName, earliestLabel: earliest.label, earliestAvg: earliest.avg, latestLabel: latest.label, latestAvg: latest.avg };
+      return { name: dnMap[actName] || actName, earliestLabel: earliest.label, earliestAvg: earliest.avg, latestLabel: latest.label, latestAvg: latest.avg };
     };
 
-    const activeData = activeNames.map(buildEntry).filter(Boolean);
-    const masteredData = masteredNames.map(buildEntry).filter(Boolean);
-    const discontinuedData = discontinuedNames.map(buildEntry).filter(Boolean);
-    const extraData = extraNames.map(buildEntry).filter(Boolean);
+    const activeData       = activeNames.map(n => buildEntry(n, activeDNMap)).filter(Boolean);
+    const masteredData     = masteredNames.map(n => buildEntry(n, masteredDNMap)).filter(Boolean);
+    const discontinuedData = discontinuedNames.map(n => buildEntry(n, discontinuedDNMap)).filter(Boolean);
+    const extraData        = extraNames.map(n => buildEntry(n, actDisplayNameMap)).filter(Boolean);
 
     const activityData = [
       ...activeData,
