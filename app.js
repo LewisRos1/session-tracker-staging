@@ -154,7 +154,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "974";
+const APP_VERSION = "975";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4378,7 +4378,7 @@ function renderFedcTarget(target) {
         html += `<div class="entry-block" style="border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);border-top:1px solid var(--border);border-radius:${subRadius};box-shadow:var(--shadow)">
           <div class="entry-field" contenteditable="false">
             <span class="field-label">Subactivity</span>
-            <span class="field-value-fixed"><span style="color:#6b7280;font-weight:700;margin-right:.25rem">${subLabel})</span>${formatActivityMarkup(sub.name)}</span>
+            <span class="field-value-fixed"><span style="color:#6b7280;font-weight:700;margin-right:.25rem">${subLabel})</span>${paDisplayHtml(sub)}</span>
           </div>`;
         for (const rem of subRemarks) {
           html += renderRemarkFields(rem, target, getActivityInlineOptions(sub), (sub.inlineOptions || sub.remarkPresetId || sub.remarkHasNote) ? (sub.sentenceStarter || null) : null, sub.optionsMulti || false, null, sub.remarkHasNote || false, false, sub.optionScores || null);
@@ -4426,7 +4426,7 @@ function renderFedcTarget(target) {
     html += `<div class="entry-block entry-block-predefined"${activityStyle}>
       <div class="entry-field" contenteditable="false">
         <span class="field-label">Activity</span>
-        <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${formatActivityMarkup(pa.name)}</span>
+        <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${paDisplayHtml(pa)}</span>
       </div>`;
 
     if (pa.actNote && pa.actNote.trim()) {
@@ -4787,7 +4787,7 @@ function paDisplayHtml(pa) {
     : formatActivityMarkup(title);
   const detailsText = pa.title ? pa.name : null;
   if (detailsText) {
-    html += `<span style="display:block;font-size:.85em;color:#6b7280;margin-top:.1rem;font-weight:400;text-decoration:none">${formatActivityMarkup(detailsText)}</span>`;
+    html += `<span style="display:block;color:#6b7280;margin-top:.1rem;font-weight:400;text-decoration:none">${formatActivityMarkup(detailsText)}</span>`;
   }
   return html;
 }
@@ -10666,16 +10666,16 @@ function renderTargetManageContent(student, target) {
             <div style="display:flex;align-items:center;gap:.35rem">
               <span style="font-size:.75rem;font-weight:700;color:#0369a1;flex-shrink:0;min-width:1.4rem">${String.fromCharCode(97 + si)})</span>
               <span style="font-size:.75rem;color:#9ca3af;flex-shrink:0;min-width:2.6rem">Title</span>
-              <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subIdx}" data-idx="${subIdx}"
-                placeholder="Chart / report label"
-                value="${escHtml(sub.title || '')}"
-                style="flex:1${sub.isBold ? ';font-weight:700' : ''}${sub.isUnderline ? ';text-decoration:underline' : ''}" />
               <label style="display:flex;align-items:center;gap:.15rem;font-size:.78rem;cursor:pointer;flex-shrink:0;user-select:none" title="Bold">
                 <input type="checkbox" class="mn-act-bold-cb" data-idx="${subIdx}"${sub.isBold ? ' checked' : ''}><b>B</b>
               </label>
               <label style="display:flex;align-items:center;gap:.15rem;font-size:.78rem;cursor:pointer;flex-shrink:0;user-select:none" title="Underline">
                 <input type="checkbox" class="mn-act-underline-cb" data-idx="${subIdx}"${sub.isUnderline ? ' checked' : ''}><u>U</u>
               </label>
+              <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subIdx}" data-idx="${subIdx}"
+                placeholder="Chart / report label"
+                value="${escHtml(sub.title || '')}"
+                style="flex:1${sub.isBold ? ';font-weight:700' : ''}${sub.isUnderline ? ';text-decoration:underline' : ''}" />
               <button class="btn-adm-del mn-del-sub-act" data-idx="${subIdx}" title="Delete sub-activity" style="flex-shrink:0">🗑</button>
             </div>
             <div style="display:flex;align-items:center;gap:.35rem;padding-left:1.6rem">
@@ -10698,16 +10698,16 @@ function renderTargetManageContent(student, target) {
             <div style="display:flex;align-items:center;gap:.35rem">
               <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;min-width:1.6rem">${manageActNo})</span>
               <span style="font-size:.75rem;color:#9ca3af;flex-shrink:0;min-width:2.6rem">Title</span>
-              <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
-                placeholder="Chart / report label"
-                value="${escHtml(a.title || '')}"
-                style="flex:1${a.isBold ? ';font-weight:700' : ''}${a.isUnderline ? ';text-decoration:underline' : ''}" />
               <label style="display:flex;align-items:center;gap:.15rem;font-size:.78rem;cursor:pointer;flex-shrink:0;user-select:none" title="Bold">
                 <input type="checkbox" class="mn-act-bold-cb" data-idx="${idx}"${a.isBold ? ' checked' : ''}><b>B</b>
               </label>
               <label style="display:flex;align-items:center;gap:.15rem;font-size:.78rem;cursor:pointer;flex-shrink:0;user-select:none" title="Underline">
                 <input type="checkbox" class="mn-act-underline-cb" data-idx="${idx}"${a.isUnderline ? ' checked' : ''}><u>U</u>
               </label>
+              <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
+                placeholder="Chart / report label"
+                value="${escHtml(a.title || '')}"
+                style="flex:1${a.isBold ? ';font-weight:700' : ''}${a.isUnderline ? ';text-decoration:underline' : ''}" />
             </div>
             <div style="display:flex;align-items:center;gap:.35rem">
               <span style="font-size:.75rem;color:#9ca3af;min-width:4.2rem;flex-shrink:0;padding-left:1.6rem">Details</span>
@@ -10743,16 +10743,16 @@ function renderTargetManageContent(student, target) {
             <div style="display:flex;align-items:center;gap:.35rem">
               <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;min-width:1.6rem">${manageActNo})</span>
               <span style="font-size:.75rem;color:#9ca3af;flex-shrink:0;min-width:2.6rem">Title</span>
-              <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
-                placeholder="Chart / report label"
-                value="${escHtml(a.title || '')}"
-                style="flex:1${a.isBold ? ';font-weight:700' : ''}${a.isUnderline ? ';text-decoration:underline' : ''}" />
               <label style="display:flex;align-items:center;gap:.15rem;font-size:.78rem;cursor:pointer;flex-shrink:0;user-select:none" title="Bold">
                 <input type="checkbox" class="mn-act-bold-cb" data-idx="${idx}"${a.isBold ? ' checked' : ''}><b>B</b>
               </label>
               <label style="display:flex;align-items:center;gap:.15rem;font-size:.78rem;cursor:pointer;flex-shrink:0;user-select:none" title="Underline">
                 <input type="checkbox" class="mn-act-underline-cb" data-idx="${idx}"${a.isUnderline ? ' checked' : ''}><u>U</u>
               </label>
+              <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
+                placeholder="Chart / report label"
+                value="${escHtml(a.title || '')}"
+                style="flex:1${a.isBold ? ';font-weight:700' : ''}${a.isUnderline ? ';text-decoration:underline' : ''}" />
             </div>
             <div style="display:flex;align-items:center;gap:.35rem">
               <span style="font-size:.75rem;color:#9ca3af;min-width:4.2rem;flex-shrink:0;padding-left:1.6rem">Details</span>
@@ -12258,16 +12258,16 @@ function renderTemplateManageContent(template) {
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
           <div style="display:flex;align-items:center;gap:.35rem">
             <span style="font-size:.75rem;color:#9ca3af;flex-shrink:0;min-width:3rem">Title</span>
-            <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
-              placeholder="Chart / report label"
-              value="${escHtml(a.title || '')}"
-              style="flex:1${a.isBold ? ';font-weight:700' : ''}${a.isUnderline ? ';text-decoration:underline' : ''}" />
             <label style="display:flex;align-items:center;gap:.15rem;font-size:.78rem;cursor:pointer;flex-shrink:0;user-select:none" title="Bold">
               <input type="checkbox" class="mn-act-bold-cb" data-idx="${idx}"${a.isBold ? ' checked' : ''}><b>B</b>
             </label>
             <label style="display:flex;align-items:center;gap:.15rem;font-size:.78rem;cursor:pointer;flex-shrink:0;user-select:none" title="Underline">
               <input type="checkbox" class="mn-act-underline-cb" data-idx="${idx}"${a.isUnderline ? ' checked' : ''}><u>U</u>
             </label>
+            <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
+              placeholder="Chart / report label"
+              value="${escHtml(a.title || '')}"
+              style="flex:1${a.isBold ? ';font-weight:700' : ''}${a.isUnderline ? ';text-decoration:underline' : ''}" />
           </div>
           <div style="display:flex;align-items:center;gap:.35rem">
             <span style="font-size:.75rem;color:#9ca3af;min-width:3rem;flex-shrink:0">Details</span>
