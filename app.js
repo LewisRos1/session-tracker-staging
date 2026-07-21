@@ -154,7 +154,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "979";
+const APP_VERSION = "980";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -439,7 +439,7 @@ function isEmptyActItem(a) {
   const strip = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
   if (a.isNote || a.isExportNote) return strip(a.text).length === 0;
   if (a.isMaintain || a.isMaintainHeading) return (a.name || "").trim().length === 0;
-  return strip(a.name).length === 0;
+  return strip(a.name).length === 0 && strip(a.title || "").length === 0;
 }
 
 // Activity Name / Notes (actNote) fields format bold/underline directly in
@@ -9579,6 +9579,7 @@ async function closeManageModal() {
     // Covers: activity name, note/heading text, and sentence starter.
     acts.forEach((a, i) => {
       const nameEl    = $(`mn-act-name-${i}`);
+      const detailsEl = $(`mn-act-details-${i}`);
       const starterEl = $("manage-modal-body")?.querySelector(`.mn-act-starter-text[data-idx="${i}"]`);
       if (nameEl) {
         if (a.isNote || a.isExportNote) {
@@ -9587,6 +9588,8 @@ async function closeManageModal() {
           const v = nameEl.value.trim();
           if (v) a.name = v;
         }
+      } else if (detailsEl && !a.isNote && !a.isExportNote && !a.isHeading && !a.isMaintainHeading && !a.isMaintain) {
+        a.name = detailsEl.value.trim();
       }
       if (starterEl) a.sentenceStarter = starterEl.value.trim() || null;
     });
