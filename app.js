@@ -155,7 +155,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1017";
+const APP_VERSION = "1018";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -10666,23 +10666,41 @@ function renderTargetManageContent(student, target) {
 
       html += `<div class="admin-list-item" data-idx="${idx}">
         <span class="drag-handle">⠿</span>
-        <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
-          <div style="display:flex;align-items:flex-start;gap:.3rem">
-            ${formatButtonsHtml(`mn-act-name-${idx}`)}
-            <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
-              rows="1" placeholder="Enter Activity" style="flex:1">${escHtml(a.name || "")}</textarea>
-          </div>
-          <div style="display:flex;align-items:flex-start;gap:.5rem">
-            <span style="font-size:.93rem;color:#374151;white-space:nowrap;font-weight:700;padding-top:.3rem">Remark Type:</span>
-            ${buildRemarkTypeControls(a, idx, target.maxPoints || 3)}
-          </div>
-          <div style="display:flex;align-items:center;gap:.5rem">
-            <span style="font-size:.75rem;color:#6b7280;white-space:nowrap;font-weight:600">Mapped To Which Target's Average:</span>
-            <select class="admin-input mn-mapped-target-select" data-idx="${idx}" style="flex:1">
-              <option value="">— select target —</option>
-              ${mappedOptions}
-            </select>
-          </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:.55rem">
+            <div>
+              <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title</div>
+              <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
+                <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                  <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${idx}" title="Bold (Ctrl+B)">B</button>
+                  <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${idx}" title="Underline (Ctrl+U)">U</button>
+                </div>
+                <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
+                  placeholder="Enter Activity Title Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+              </div>
+            </div>
+            <div>
+              <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Details</div>
+              <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
+                <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                  <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${idx}" title="Bold (Ctrl+B)">B</button>
+                  <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${idx}" title="Underline (Ctrl+U)">U</button>
+                  <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${idx}" title="Bullet (Ctrl+Shift+L)">•</button>
+                </div>
+                <textarea class="admin-input mn-act-details-input" id="mn-act-details-${idx}" data-idx="${idx}"
+                  rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(a.name || '')}</textarea>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Remark Type</div>
+              ${buildRemarkTypeControls(a, idx, target.maxPoints || 3)}
+            </div>
+            <div style="display:flex;align-items:center;gap:.5rem">
+              <span style="font-size:.85rem;color:#6b7280;white-space:nowrap;font-weight:600">Mapped To Which Target's Average:</span>
+              <select class="admin-input mn-mapped-target-select" data-idx="${idx}" style="flex:1;border-color:#b8bcc4">
+                <option value="">— select target —</option>
+                ${mappedOptions}
+              </select>
+            </div>
         </div>
         <div style="position:relative">
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
