@@ -612,7 +612,7 @@ function renderActivityBreakdownChart(targetName, activityData, periodLabel) {
   const LINE_H = 13, ROW_PAD_V = 8, MIN_ROW_H = 36;
 
   // Strip leading letter-prefix and markdown bold/underline markers from chart labels
-  const stripPrefix = name => name.replace(/^[a-zA-Z]\)\s*/, "").replace(/\*/g, "").replace(/_/g, "");
+  const stripPrefix = name => name.replace(/\*/g, "").replace(/_/g, "");
 
   // Pre-compute wrapped label lines and dynamic row heights using a temp canvas
   const tmpCtx = document.createElement("canvas").getContext("2d");
@@ -836,14 +836,17 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
         const letterN = parentSubCount[pa.parentActivity] ?? 0;
         parentSubCount[pa.parentActivity] = letterN + 1;
         const letter = String.fromCharCode(97 + letterN);
-        displayName = pa.title || pa.name || (pIdx != null ? `<Activity ${pIdx}${letter}>` : `<Sub-Activity ${letter}>`);
+        const subBase = (pa.title || pa.name || "").trim();
+        displayName = pIdx != null
+          ? `${pIdx}) ${letter}) ${subBase || `<Sub ${letter}>`}`
+          : `${letter}) ${subBase || `<Sub-Activity ${letter}>`}`;
       } else {
         // Standalone activity: increment the section counter.
         let sectionIdx;
         if (isActive)        { sectionIdx = ++activeIdx; }
         else if (isMastered) { sectionIdx = ++masteredIdx; }
         else                 { sectionIdx = ++discontinuedIdx; }
-        displayName = (pa.title && pa.title.trim()) ? pa.title.trim() : (pa.name && pa.name.trim()) ? pa.name.trim() : `<Activity ${sectionIdx}>`;
+        displayName = `${sectionIdx}) ${pa.title?.trim() || pa.name?.trim() || `<Activity ${sectionIdx}>`}`;
         parentSectionIdx[pa.title || pa.name] = sectionIdx;
       }
 
