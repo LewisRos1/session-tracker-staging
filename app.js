@@ -155,7 +155,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1032";
+const APP_VERSION = "1033";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1089,7 +1089,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
               <th>First Name</th>
               <th>Last Name</th>
               <th style="white-space:normal">Ready for Word Export</th>
-              <th style="white-space:normal">Ready for Excel Export</th>
+              <th style="white-space:normal">Imported Excel data to Website</th>
               <th style="white-space:normal">Latest Individual Session Recorded</th>
               <th style="white-space:normal">Latest Group Session Recorded</th>
             </tr>
@@ -4406,6 +4406,7 @@ function renderFedcTarget(target) {
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Activity</span>
           <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${paDisplayHtml(pa, true)}</span>
+          ${pa.id ? `<button class="btn-icon btn-edit-activity-pencil" contenteditable="false" data-pa-id="${escHtml(pa.id)}" title="Edit in Edit Target" style="flex-shrink:0;font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
         </div>
       </div>`;
       children.forEach((sub, si) => {
@@ -4488,6 +4489,7 @@ function renderFedcTarget(target) {
       <div class="entry-field" contenteditable="false">
         <span class="field-label">Activity</span>
         <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${paDisplayHtml(pa, true)}</span>
+        ${pa.id ? `<button class="btn-icon btn-edit-activity-pencil" contenteditable="false" data-pa-id="${escHtml(pa.id)}" title="Edit in Edit Target" style="flex-shrink:0;font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
       </div>`;
 
     if (pa.actNote && pa.actNote.trim()) {
@@ -5587,6 +5589,24 @@ function attachTargetListeners(target) {
   // Ghost (.predef-remark-input) and live (.predef-remark-input-live) predefined
   // remark inputs are also saved by the shared merged-editing host — see above.
   // Enter is handled by the delegated keydown listener at the top of this function.
+
+  // ── Pencil: open Edit Target and scroll to this activity ──
+  c.querySelectorAll(".btn-edit-activity-pencil").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const paId = btn.dataset.paId;
+      const student = state.currentStudent;
+      const tgt = student?.targets?.find(t => t.name === state.selectedTargetName);
+      if (!student || !tgt) return;
+      openManageModal(student, tgt);
+      setTimeout(() => {
+        const el = $("manage-modal-body")?.querySelector(`.entry-block[data-act-id="${CSS.escape(paId)}"]`);
+        if (!el) return;
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("activity-cfg-blink");
+        el.addEventListener("animationend", () => el.classList.remove("activity-cfg-blink"), { once: true });
+      }, 80);
+    });
+  });
 
   // ── Init predefined remark + open score picker ────────────
   c.querySelectorAll(".btn-init-predef-remark").forEach(btn => {
@@ -14729,6 +14749,7 @@ function attachGroupTargetListeners(target) {
   // Delete a single round (student-grouped layout)
   c.querySelectorAll(".btn-group-del-student-remark").forEach(btn => {
     btn.addEventListener("click", () => {
+      if (!confirm("Delete this remark and its trials?")) return;
       const remId = btn.dataset.remId;
       const rem = state.groupSessionData?.remarks?.[remId];
       if (!rem) return;
