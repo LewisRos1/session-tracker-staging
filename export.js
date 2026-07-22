@@ -603,7 +603,7 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
   applyBorders(ws, NUM_COLS);
 }
 
-function renderActivityBreakdownChart(targetName, activityData, periodLabel) {
+export function renderActivityBreakdownChart(targetName, activityData, periodLabel) {
   if (!activityData || activityData.length === 0) return null;
   const SCALE = 2, R = 7, SECTION_H = 28;
   const PAD = { top: 52, right: 148, bottom: 72, left: 250 };

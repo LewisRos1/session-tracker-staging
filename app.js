@@ -85,7 +85,8 @@ import {
 } from "./firebase-service.js";
 import {
   exportStudentData, exportAllStudents, exportGroupMemberData,
-  exportStudentSingleSessionWord, exportGroupMemberSingleSessionWord
+  exportStudentSingleSessionWord, exportGroupMemberSingleSessionWord,
+  renderActivityBreakdownChart
 } from "./export.js";
 
 // ── SW update detection — must run at parse time, before DOMContentLoaded,
@@ -155,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1035";
+const APP_VERSION = "1036";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2309,7 +2310,8 @@ async function hyrCollectData(student, period, year) {
           actLatest = { label: mLabel, avg };
         }
         if (actEarliest !== null) {
-          breakdownData[tName].push({ name: actDisplayNames[actName] || actName, earliest: actEarliest, latest: actLatest });
+          const monthCount = Object.values(actMonthlyAvgs).filter(s => s.length > 0).length;
+          breakdownData[tName].push({ name: actDisplayNames[actName] || actName, earliest: actEarliest, latest: actLatest, monthCount });
         }
 
         if (allRemarks.length === 0) {
@@ -2453,6 +2455,17 @@ function hyrDrawSummaryChart(chartData, studentName, period, year) {
   ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
 
   return canvas.toDataURL("image/png").split(",")[1];
+}
+
+function hyrToActivityData(acts) {
+  return (acts || []).map(act => ({
+    name: act.name,
+    earliestLabel: act.earliest?.label,
+    earliestAvg: act.earliest?.avg,
+    latestLabel: act.latest?.label,
+    latestAvg: act.latest?.avg,
+    monthCount: act.monthCount || null
+  }));
 }
 
 function hyrDrawActivityBreakdown(targetName, activities, period, year) {
@@ -2660,6 +2673,7 @@ function hyrMdToHtml(text, chartData = {}, studentName = "", period = "H1", year
     s = s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     s = s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     s = s.replace(/\*(.+?)\*/g, "<em>$1</em>");
+    s = s.replace(/_([^_]+)_/g, "<em>$1</em>");
     return s;
   };
   for (const line of lines) {
@@ -2682,8 +2696,9 @@ function hyrMdToHtml(text, chartData = {}, studentName = "", period = "H1", year
         const lb64 = hyrDrawLineChart(chart.tName, chart.labels, chart.values, period, year);
         if (lb64) html += `<img src="data:image/png;base64,${lb64}" style="width:100%;max-width:540px;margin:.4rem 0 .5rem;display:block">`;
         if (selectedBreakdownTargets.has(chart.tName) && breakdownData[chart.tName]?.length) {
-          const ab64 = hyrDrawActivityBreakdown(chart.tName, breakdownData[chart.tName], period, year);
-          if (ab64) html += `<img src="data:image/png;base64,${ab64}" style="width:100%;max-width:540px;margin:.25rem 0 .75rem;display:block">`;
+          const rangeLabel = period === "H1" ? `Jan–Jun ${year}` : `Jul–Dec ${year}`;
+          const abResult = renderActivityBreakdownChart(chart.tName, hyrToActivityData(breakdownData[chart.tName]), rangeLabel);
+          if (abResult) html += `<img src="data:image/png;base64,${abResult.base64}" style="width:100%;max-width:600px;margin:.25rem 0 .75rem;display:block">`;
         }
       }
       continue;
@@ -2706,7 +2721,7 @@ function hyrShowPreview(reportText, studentName, period, year, chartData = {}, b
   $("hyr-preview-close").onclick = () => $("hyr-preview-modal").classList.add("hidden");
   $("hyr-preview-backdrop").onclick = () => $("hyr-preview-modal").classList.add("hidden");
 
-  $("hyr-btn-download-word").onclick = () => hyrDownloadWord(reportText, studentName, period, year, chartData);
+  $("hyr-btn-download-word").onclick = () => hyrDownloadWord(reportText, studentName, period, year, chartData, breakdownData, selectedBreakdownTargets);
   $("hyr-btn-regenerate").onclick = () => {
     $("hyr-preview-modal").classList.add("hidden");
     hyrGenerate();
@@ -2741,13 +2756,19 @@ function hyrDownloadWord(reportText, studentName, period, year, chartData = {}, 
     spacing: { after: 400, ...LINE_SPACING }
   }));
 
-  // Parse inline markdown (**bold**) into TextRun objects
+  // Parse inline markdown (**bold**, _italic_) into TextRun objects
   function inlineRuns(text, baseSize = 22) {
-    return text.split(/(\*\*[^*]+\*\*)/g).filter(p => p).map(p =>
-      (p.startsWith("**") && p.endsWith("**"))
-        ? new TextRun({ text: p.slice(2, -2), bold: true, size: baseSize })
-        : new TextRun({ text: p, size: baseSize })
-    );
+    const runs = [];
+    const re = /(\*\*[^*]+\*\*|_[^_]+_)/g;
+    let lastIdx = 0, m;
+    while ((m = re.exec(text)) !== null) {
+      if (m.index > lastIdx) runs.push(new TextRun({ text: text.slice(lastIdx, m.index), size: baseSize }));
+      if (m[0].startsWith("**")) runs.push(new TextRun({ text: m[0].slice(2, -2), bold: true, size: baseSize }));
+      else runs.push(new TextRun({ text: m[0].slice(1, -1), italics: true, size: baseSize }));
+      lastIdx = m.index + m[0].length;
+    }
+    if (lastIdx < text.length) runs.push(new TextRun({ text: text.slice(lastIdx), size: baseSize }));
+    return runs;
   }
 
   const summaryB64 = Object.keys(chartData).length > 0
@@ -2797,12 +2818,12 @@ function hyrDownloadWord(reportText, studentName, period, year, chartData = {}, 
           spacing: { after: chart && selectedBreakdownTargets.has(chart.tName) ? 60 : 120 }
         }));
         if (chart && selectedBreakdownTargets.has(chart.tName) && breakdownData[chart.tName]?.length) {
-          const ab64 = hyrDrawActivityBreakdown(chart.tName, breakdownData[chart.tName], period, year);
-          if (ab64) {
-            const nActs = breakdownData[chart.tName].length;
-            const abH = Math.round(601 * (52 + nActs * 46 + 72) / 620);
+          const rangeLabel = period === "H1" ? `Jan–Jun ${year}` : `Jul–Dec ${year}`;
+          const abResult = renderActivityBreakdownChart(chart.tName, hyrToActivityData(breakdownData[chart.tName]), rangeLabel);
+          if (abResult) {
+            const abH = Math.round(601 * abResult.height / 760);
             paragraphs.push(new Paragraph({
-              children: [new ImageRun({ data: b64ToUint8(ab64), transformation: { width: 601, height: abH }, type: "png" })],
+              children: [new ImageRun({ data: b64ToUint8(abResult.base64), transformation: { width: 601, height: abH }, type: "png" })],
               alignment: AlignmentType.CENTER,
               spacing: { after: 120 }
             }));
