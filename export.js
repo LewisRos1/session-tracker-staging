@@ -560,7 +560,8 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
       hdr.getCell(c).alignment = STYLE_COL_HEADER.alignment;
     }
 
-    for (const target of allTargets) {
+    // Compute all rows first, then sort highest delta → lowest
+    const trendRows = allTargets.map(target => {
       const yValues = [];
       for (const month of months) {
         const monthSessions = sessions.filter(s => s.month === month);
@@ -571,21 +572,27 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
         }).filter(v => v !== null && !isNaN(v));
         if (vals.length > 0) yValues.push(Math.round(avg(vals)));
       }
-
       if (yValues.length < 2) {
-        const dirLabel = yValues.length === 0 ? "No data" : "Single month";
-        const r = ws.addRow([target.name, "", "", "", dirLabel]);
+        return { name: target.name, noData: true, single: yValues.length === 1, delta: -Infinity };
+      }
+      const trend  = linearRegressionValues(yValues);
+      const tStart = Math.round(trend[0]);
+      const tEnd   = Math.round(trend[trend.length - 1]);
+      const delta  = tEnd - tStart;
+      return { name: target.name, tStart, tEnd, delta, noData: false };
+    });
+    trendRows.sort((a, b) => b.delta - a.delta); // highest → lowest; no-data rows (-Infinity) sink to bottom
+
+    for (const row of trendRows) {
+      if (row.noData) {
+        const dirLabel = row.single ? "Single month" : "No data";
+        const r = ws.addRow([row.name, "", "", "", dirLabel]);
         r.getCell(5).font = { italic: true, color: { argb: "FF9CA3AF" } };
         continue;
       }
-
-      const trend     = linearRegressionValues(yValues);
-      const tStart    = Math.round(trend[0]);
-      const tEnd      = Math.round(trend[trend.length - 1]);
-      const delta     = tEnd - tStart;
-      const deltaStr  = delta >= 0 ? `+${delta}pp` : `${delta}pp`;
-      const direction = Math.abs(delta) <= 8 ? "Stable" : delta > 0 ? "Trending Up" : "Trending Down";
-      const r         = ws.addRow([target.name, `${tStart}%`, `${tEnd}%`, deltaStr, direction]);
+      const deltaStr  = row.delta >= 0 ? `+${row.delta}pp` : `${row.delta}pp`;
+      const direction = Math.abs(row.delta) <= 8 ? "Stable" : row.delta > 0 ? "Trending Up" : "Trending Down";
+      const r         = ws.addRow([row.name, `${row.tStart}%`, `${row.tEnd}%`, deltaStr, direction]);
       const dirColor  = direction === "Trending Up" ? "FF16A34A" : direction === "Trending Down" ? "FFDC2626" : "FF6B7280";
       r.getCell(5).font = { bold: true, color: { argb: dirColor } };
     }
