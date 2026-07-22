@@ -155,7 +155,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1034";
+const APP_VERSION = "1035";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1982,7 +1982,7 @@ function renderHalfYearReportsSection() {
         ${students.map(s => `<option value="${escHtml(s.id)}">${escHtml(s.name)}</option>`).join("")}
       </select>
       <span id="hyr-period-loading" style="font-size:.85rem;color:var(--text-muted);white-space:nowrap;display:none">Checking…</span>
-      <select id="hyr-period-select" class="admin-input" style="width:175px;flex-shrink:0;background:#fff;font-family:inherit;font-size:1rem;display:none"></select>
+      <select id="hyr-period-select" class="admin-input" style="width:200px;flex-shrink:0;background:#fff;font-family:inherit;font-size:1rem;padding-right:2rem;display:none"></select>
       <button id="hyr-btn-generate" class="btn-add-section"
         style="font-size:.9rem;padding:.45rem 1.1rem;min-height:38px;white-space:nowrap;flex-shrink:0;display:none">
         Generate Report
