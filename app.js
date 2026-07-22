@@ -155,7 +155,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1030";
+const APP_VERSION = "1031";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -6259,7 +6259,7 @@ function buildTargetViewTable(target, data) {
       // predefinedActivities with no flags — check parent presence to exclude them here too.
       if (isSub) {
         const parentExists = (target.predefinedActivities || []).some(
-          p => !p.parentActivity && p.name === pa.parentActivity
+          p => !p.parentActivity && (p.name === pa.parentActivity || (p.title && p.title === pa.parentActivity))
             && isActivityActive(p, data.date)
             && !p.isCompleted && !p.isArchived && !p.isStopped
         );
@@ -6275,7 +6275,7 @@ function buildTargetViewTable(target, data) {
         no++;
         displayNo = no;
       }
-      if (!isSub && parentActNames.has(pa.name)) {
+      if (!isSub && (parentActNames.has(pa.name) || (pa.title && parentActNames.has(pa.title)))) {
         Object.entries(data.activities || {})
           .filter(([, a]) => a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title)))
           .forEach(([id]) => matchedIds.add(id));
@@ -6314,11 +6314,23 @@ function buildTargetViewTable(target, data) {
         continue;
       }
       const candidateEntries = Object.entries(data.activities || {})
-        .filter(([id, a]) => a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title)) && !matchedIds.has(id));
+        .filter(([id, a]) => a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title) || (pa.id && a.configId === pa.id)) && !matchedIds.has(id));
       let entry = pa.id ? (candidateEntries.find(([, a]) => a.configId === pa.id) || null) : null;
       if (!entry) {
         if (isSub) {
           entry = candidateEntries.find(([, a]) => a.parentActivity === pa.parentActivity) || null;
+          if (!entry && pa.parentActivity) {
+            // After migration, pa.parentActivity may have been updated to the parent's new pa.name
+            // (details text), but old session records still store the old display name (pa.title).
+            // Find the parent config entry and try the opposite name variant as the lookup key.
+            const parentPa = (target.predefinedActivities || []).find(
+              p => !p.parentActivity && (p.name === pa.parentActivity || (p.title && p.title === pa.parentActivity))
+            );
+            if (parentPa) {
+              const altKey = parentPa.name === pa.parentActivity ? parentPa.title : parentPa.name;
+              if (altKey) entry = candidateEntries.find(([, a]) => a.parentActivity === altKey) || null;
+            }
+          }
           if (!entry) {
             const hasTopLevelConfig = (target.predefinedActivities || []).some(p =>
               !p.parentActivity && !p.isHeading && !p.isNote && !p.isExportNote && p.name === pa.name
@@ -6441,7 +6453,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
     : null);
 
   const parentEntry = paEntry?.parentActivity
-    ? (target.predefinedActivities || []).find(p => !p.parentActivity && p.name === paEntry.parentActivity)
+    ? (target.predefinedActivities || []).find(p => !p.parentActivity && (p.name === paEntry.parentActivity || (p.title && p.title === paEntry.parentActivity)))
     : null;
   const _discontinuedOn = paEntry?.discontinuedOn || parentEntry?.discontinuedOn || null;
   const _masteredOn     = paEntry?.masteredOn     || parentEntry?.masteredOn
@@ -8118,7 +8130,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
     : null);
 
   const parentEntry = paEntry?.parentActivity
-    ? (target.predefinedActivities || []).find(p => !p.parentActivity && p.name === paEntry.parentActivity)
+    ? (target.predefinedActivities || []).find(p => !p.parentActivity && (p.name === paEntry.parentActivity || (p.title && p.title === paEntry.parentActivity)))
     : null;
   const _discontinuedOn = paEntry?.discontinuedOn || parentEntry?.discontinuedOn || null;
   const _masteredOn     = paEntry?.masteredOn     || parentEntry?.masteredOn
