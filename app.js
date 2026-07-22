@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1041";
+const APP_VERSION = "1042";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2082,14 +2082,16 @@ ${dataText}
 Provide ONLY the following sections using EXACTLY these markers. No extra text outside the markers.
 
 ===EXECUTIVE_SUMMARY===
-Write 2–3 sentences summing up ${firstName}'s overall progress this term in plain everyday English. Do not name specific targets, mention numbers, or reference months. Be warm and encouraging while being honest about how the term went overall.
+Write exactly 5 sentences summing up ${firstName}'s overall progress this term in plain everyday English. Do not name specific targets, mention numbers, or reference months. Be warm and encouraging while being honest about how the term went overall.
 ===END===
 
 ${targetsWithData.map(r => `===OBSERVATION: ${r.name}===
-Write 2 to 3 bullets for ${firstName}'s parents about this target. Use this framework:
-• The Good: One specific thing ${firstName} is doing well — a real skill or behaviour they show in sessions.
-• The Bad: One honest challenge — name the exact situation, trigger, or level of support that causes difficulty. Be warm, not alarming.
-• Extra: (Optional) Only add a 3rd bullet if there is genuinely useful extra context — a pattern, something affecting this target, or a reassurance. Skip if not needed.
+Write 2 to 3 bullets for ${firstName}'s parents about this target. Use a professional bold label followed by non-bold content:
+• **Progress:** One specific thing ${firstName} is doing well — a real skill or behaviour they show in sessions.
+• **Challenge:** One honest challenge — name the exact situation, trigger, or level of support that causes difficulty. Be warm, not alarming.
+• **Note:** (Optional) Only add a 3rd bullet if there is genuinely useful extra context — a pattern, something affecting this target, or a reassurance. Skip if not needed.
+
+IMPORTANT: The label MUST be wrapped in ** for bold (e.g. **Progress:** **Challenge:** **Note:**). The content after the colon is NOT bold.
 
 STRICT RULES — follow every one:
 - NO numbers, percentages, or month references. Parents see those in the graph.
@@ -2101,10 +2103,10 @@ STRICT RULES — follow every one:
 
 ${qualitativeWithData.map(r => `===OBSERVED: ${r.name}===
 Write 2 bullets about ${r.name} based on what was observed in sessions and any notes or remarks recorded.
-• The Good: Something positive noticed about this skill area.
-• The Bad: Something still developing or difficult — explained kindly.
+• **Observed:** Something positive noticed about this skill area.
+• **Still developing:** Something still developing or difficult — explained kindly.
 
-Same rules: plain English, no jargon, no numbers, warm tone.
+Same rules: plain English, no jargon, no numbers, warm tone. Labels in ** bold.
 ===END===`).join("\n\n")}
 
 ===ACTION_PLAN===
@@ -2347,6 +2349,61 @@ async function hyrCollectData(student, period, year) {
         }
       }
     }
+
+    // Collect mastered/discontinued activities for breakdown chart section headers
+    const masteredBreakdown = [], discontinuedBreakdown = [];
+    for (const pa of (target.predefinedActivities || [])) {
+      const isMastered = !!pa.masteredOn;
+      const isDiscont = !!(pa.discontinuedOn || pa.isCompleted || pa.isArchived || pa.isStopped) && !isMastered;
+      if (!isMastered && !isDiscont) continue;
+      const paKey = pa.title || pa.name;
+      if (!paKey) continue;
+      const paAliases = (pa.title && pa.name && pa.title !== pa.name) ? [pa.name] : [];
+      const paMonthly = {};
+      for (const sess of sessions) {
+        const entry = Object.entries(sess.activities || {}).find(
+          ([, a]) => (a.activityName === paKey || paAliases.includes(a.activityName) || (pa.id && a.configId === pa.id)) &&
+                     (a.targetName === tName || a.target === tName)
+        );
+        if (!entry) continue;
+        const [sKey, sAct] = entry;
+        const sId = sAct.id || sKey;
+        for (const rem of Object.values(sess.remarks || {}).filter(r => r.activityId === sId)) {
+          const trials = (rem.trials || []).filter(t => t !== -1);
+          if (rem.optionScore !== undefined) trials.push(rem.optionScore);
+          if (!trials.length) continue;
+          const avg = Math.round(trials.reduce((a, b) => a + b, 0) / (trials.length * (target.maxPoints || 3)) * 100);
+          const [, m] = sess.date.split("-").map(Number);
+          const mLabel = shortMonths[m - 1];
+          if (!paMonthly[mLabel]) paMonthly[mLabel] = [];
+          paMonthly[mLabel].push(avg);
+        }
+      }
+      let earliest = null, latest = null;
+      for (let m = startMonth; m <= endMonth; m++) {
+        const mLabel = shortMonths[m - 1];
+        const scores = paMonthly[mLabel];
+        if (!scores?.length) continue;
+        const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+        if (earliest === null) earliest = { label: mLabel, avg };
+        latest = { label: mLabel, avg };
+      }
+      if (earliest !== null) {
+        const mc = Object.values(paMonthly).filter(s => s.length > 0).length;
+        const ent = { name: paKey, earliest, latest, monthCount: mc };
+        if (isMastered) masteredBreakdown.push(ent);
+        else discontinuedBreakdown.push(ent);
+      }
+    }
+    if (masteredBreakdown.length) {
+      breakdownData[tName].push({ isSectionHeader: true, label: "Mastered" });
+      breakdownData[tName].push(...masteredBreakdown);
+    }
+    if (discontinuedBreakdown.length) {
+      breakdownData[tName].push({ isSectionHeader: true, label: "Discontinued" });
+      breakdownData[tName].push(...discontinuedBreakdown);
+    }
+
     lines.push("");
   }
 
@@ -2503,14 +2560,17 @@ function hyrDrawSummaryChart(chartData, studentName, period, year) {
 }
 
 function hyrToActivityData(acts) {
-  return (acts || []).map(act => ({
-    name: act.name,
-    earliestLabel: act.earliest?.label,
-    earliestAvg: act.earliest?.avg,
-    latestLabel: act.latest?.label,
-    latestAvg: act.latest?.avg,
-    monthCount: act.monthCount || null
-  }));
+  return (acts || []).map(act => {
+    if (act.isSectionHeader) return { isSectionHeader: true, label: act.label };
+    return {
+      name: act.name,
+      earliestLabel: act.earliest?.label,
+      earliestAvg: act.earliest?.avg,
+      latestLabel: act.latest?.label,
+      latestAvg: act.latest?.avg,
+      monthCount: act.monthCount || null
+    };
+  });
 }
 
 function hyrDrawActivityBreakdown(targetName, activities, period, year) {
@@ -2700,55 +2760,71 @@ function hyrDrawLineChart(targetName, labels, values, period, year) {
 function hyrDrawStartEndChart(chartTrendRows) {
   const n = chartTrendRows.length;
   if (n === 0) return null;
-  const W = 760, NAME_W = 175, BAR_H = 17, BAR_GAP = 5, GROUP_GAP = 22;
-  const GROUP_H = BAR_H * 2 + BAR_GAP;
-  const PAD_TOP = 52, PAD_BTM = 32, PAD_RIGHT = 70;
-  const CHART_W = W - NAME_W - PAD_RIGHT;
-  const H = PAD_TOP + n * (GROUP_H + GROUP_GAP) - GROUP_GAP + PAD_BTM;
+  const W = 700, PAD_L = 70, PAD_R = 30, PAD_TOP = 50, PAD_BTM = 90;
+  const CHART_H = 260, CHART_W = W - PAD_L - PAD_R;
+  const BOTTOM_Y = PAD_TOP + CHART_H;
+  const H = PAD_TOP + CHART_H + PAD_BTM;
+  const slotW = CHART_W / n;
+  const BAR_W = Math.max(8, Math.min(32, Math.floor(slotW / 2 - 5)));
+
   const canvas = document.createElement("canvas");
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext("2d");
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
 
   // Legend
-  ctx.fillStyle = "#9ca3af"; ctx.fillRect(NAME_W, 14, 20, 11);
-  ctx.fillStyle = "#374151"; ctx.font = "12px sans-serif"; ctx.textAlign = "left";
-  ctx.fillText("Trendline Start", NAME_W + 25, 24);
-  ctx.fillStyle = "#22c55e"; ctx.fillRect(NAME_W + 150, 14, 20, 11);
-  ctx.fillStyle = "#374151"; ctx.fillText("Trendline End (Improving)", NAME_W + 175, 24);
-  ctx.fillStyle = "#ef4444"; ctx.fillRect(NAME_W + 370, 14, 20, 11);
-  ctx.fillStyle = "#374151"; ctx.fillText("Trendline End (Declining)", NAME_W + 395, 24);
-  ctx.fillStyle = "#60a5fa"; ctx.fillRect(NAME_W + 590, 14, 20, 11);
-  ctx.fillStyle = "#374151"; ctx.fillText("Stable", NAME_W + 615, 24);
-
-  // Grid lines & x-axis labels
-  ctx.textAlign = "center";
-  for (const tick of [0, 20, 40, 60, 80, 100]) {
-    const x = NAME_W + (tick / 100) * CHART_W;
-    ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(x, PAD_TOP - 10); ctx.lineTo(x, H - PAD_BTM + 4); ctx.stroke();
-    ctx.fillStyle = "#9ca3af"; ctx.font = "11px sans-serif";
-    ctx.fillText(tick + "%", x, H - PAD_BTM + 16);
+  const leg = [
+    { color: "#9ca3af", label: "Start" },
+    { color: "#22c55e", label: "Improving" },
+    { color: "#ef4444", label: "Declining" },
+    { color: "#60a5fa", label: "Stable" }
+  ];
+  let lx = PAD_L;
+  ctx.font = "11px sans-serif";
+  for (const { color, label } of leg) {
+    ctx.fillStyle = color; ctx.fillRect(lx, 15, 14, 10);
+    ctx.fillStyle = "#374151"; ctx.textAlign = "left";
+    ctx.fillText(label, lx + 18, 24);
+    lx += 18 + ctx.measureText(label).width + 20;
   }
 
+  // Y-axis grid & labels
+  for (const tick of [0, 20, 40, 60, 80, 100]) {
+    const y = BOTTOM_Y - (tick / 100) * CHART_H;
+    ctx.strokeStyle = tick === 0 ? "#9ca3af" : "#e5e7eb"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(W - PAD_R, y); ctx.stroke();
+    ctx.fillStyle = "#9ca3af"; ctx.font = "11px sans-serif"; ctx.textAlign = "right";
+    ctx.fillText(tick + "%", PAD_L - 6, y + 4);
+  }
+
+  // Bars
   for (let i = 0; i < n; i++) {
     const r = chartTrendRows[i];
-    const groupY = PAD_TOP + i * (GROUP_H + GROUP_GAP);
-    // Target name
-    ctx.fillStyle = "#374151"; ctx.font = "13px sans-serif"; ctx.textAlign = "right";
-    const name = r.name.length > 22 ? r.name.slice(0, 21) + "…" : r.name;
-    ctx.fillText(name, NAME_W - 10, groupY + BAR_H - 3);
-    // Start bar
-    const sw = Math.max(2, (r.tStart / 100) * CHART_W);
-    ctx.fillStyle = "#9ca3af"; ctx.fillRect(NAME_W, groupY, sw, BAR_H);
-    ctx.fillStyle = "#6b7280"; ctx.font = "11px sans-serif"; ctx.textAlign = "left";
-    ctx.fillText(r.tStart + "%", NAME_W + sw + 4, groupY + BAR_H - 3);
-    // End bar
-    const ew = Math.max(2, (r.tEnd / 100) * CHART_W);
+    const centerX = PAD_L + (i + 0.5) * slotW;
+
+    // Start bar (grey) — left of center
+    const sH = Math.max(2, (r.tStart / 100) * CHART_H);
+    const sX = centerX - BAR_W - 2;
+    ctx.fillStyle = "#9ca3af"; ctx.fillRect(sX, BOTTOM_Y - sH, BAR_W, sH);
+    ctx.fillStyle = "#6b7280"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(r.tStart + "%", sX + BAR_W / 2, BOTTOM_Y - sH - 4);
+
+    // End bar (colored) — right of center
     const ec = r.direction === "Trending Up" ? "#22c55e" : r.direction === "Trending Down" ? "#ef4444" : "#60a5fa";
-    ctx.fillStyle = ec; ctx.fillRect(NAME_W, groupY + BAR_H + BAR_GAP, ew, BAR_H);
-    ctx.fillStyle = "#1f2937"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
-    ctx.fillText(r.tEnd + "%", NAME_W + ew + 4, groupY + BAR_H + BAR_GAP + BAR_H - 3);
+    const eH = Math.max(2, (r.tEnd / 100) * CHART_H);
+    const eX = centerX + 2;
+    ctx.fillStyle = ec; ctx.fillRect(eX, BOTTOM_Y - eH, BAR_W, eH);
+    ctx.fillStyle = "#1f2937"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(r.tEnd + "%", eX + BAR_W / 2, BOTTOM_Y - eH - 4);
+
+    // Target name rotated -45°
+    const name = r.name.length > 17 ? r.name.slice(0, 16) + "…" : r.name;
+    ctx.save();
+    ctx.translate(centerX, BOTTOM_Y + 7);
+    ctx.rotate(-Math.PI / 4);
+    ctx.fillStyle = "#374151"; ctx.font = "12px sans-serif"; ctx.textAlign = "right";
+    ctx.fillText(name, 0, 0);
+    ctx.restore();
   }
   return { base64: canvas.toDataURL("image/png").split(",")[1], height: H };
 }
@@ -2756,47 +2832,60 @@ function hyrDrawStartEndChart(chartTrendRows) {
 function hyrDrawNetChangeChart(chartTrendRows) {
   const n = chartTrendRows.length;
   if (n === 0) return null;
-  const W = 760, NAME_W = 175, BAR_H = 24, BAR_GAP = 20;
-  const PAD_TOP = 36, PAD_BTM = 32, PAD_RIGHT = 70;
-  const CHART_W = W - NAME_W - PAD_RIGHT;
-  const H = PAD_TOP + n * (BAR_H + BAR_GAP) - BAR_GAP + PAD_BTM;
+  const W = 700, PAD_L = 70, PAD_R = 30, PAD_TOP = 36, PAD_BTM = 90;
+  const CHART_H = 240, CHART_W = W - PAD_L - PAD_R;
+  const H = PAD_TOP + CHART_H + PAD_BTM;
+  const slotW = CHART_W / n;
+  const BAR_W = Math.max(8, Math.min(40, Math.floor(slotW - 16)));
   const maxAbs = Math.max(...chartTrendRows.map(r => Math.abs(r.delta)), 10);
-  const CENTER_X = NAME_W + CHART_W / 2;
+  const CENTER_Y = PAD_TOP + CHART_H / 2;
+  const BOTTOM_Y = PAD_TOP + CHART_H;
+
   const canvas = document.createElement("canvas");
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext("2d");
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
 
-  // Centre line & grid
-  ctx.strokeStyle = "#374151"; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(CENTER_X, PAD_TOP - 10); ctx.lineTo(CENTER_X, H - PAD_BTM + 4); ctx.stroke();
-
+  // Y-axis grid
   for (const tick of [-maxAbs, -Math.round(maxAbs / 2), 0, Math.round(maxAbs / 2), maxAbs]) {
-    const x = CENTER_X + (tick / maxAbs) * (CHART_W / 2);
-    ctx.strokeStyle = tick === 0 ? "#374151" : "#e5e7eb"; ctx.lineWidth = tick === 0 ? 1.5 : 1;
-    ctx.beginPath(); ctx.moveTo(x, PAD_TOP - 10); ctx.lineTo(x, H - PAD_BTM + 4); ctx.stroke();
-    ctx.fillStyle = "#9ca3af"; ctx.font = "11px sans-serif"; ctx.textAlign = "center";
-    ctx.fillText((tick > 0 ? "+" : "") + tick + "pp", x, H - PAD_BTM + 16);
+    const y = CENTER_Y - (tick / maxAbs) * (CHART_H / 2);
+    ctx.strokeStyle = tick === 0 ? "#374151" : "#e5e7eb";
+    ctx.lineWidth = tick === 0 ? 1.5 : 1;
+    ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(W - PAD_R, y); ctx.stroke();
+    ctx.fillStyle = "#9ca3af"; ctx.font = "11px sans-serif"; ctx.textAlign = "right";
+    ctx.fillText((tick > 0 ? "+" : "") + tick + "pp", PAD_L - 6, y + 4);
   }
 
   for (let i = 0; i < n; i++) {
     const r = chartTrendRows[i];
-    const y = PAD_TOP + i * (BAR_H + BAR_GAP);
-    ctx.fillStyle = "#374151"; ctx.font = "13px sans-serif"; ctx.textAlign = "right";
-    const name = r.name.length > 22 ? r.name.slice(0, 21) + "…" : r.name;
-    ctx.fillText(name, NAME_W - 10, y + BAR_H - 5);
-    const barW = Math.max(3, Math.abs(r.delta / maxAbs) * (CHART_W / 2));
+    const centerX = PAD_L + (i + 0.5) * slotW;
+    const barX = centerX - BAR_W / 2;
+    const barH = Math.max(3, (Math.abs(r.delta) / maxAbs) * (CHART_H / 2));
     const barColor = r.delta > 0 ? "#22c55e" : r.delta < 0 ? "#ef4444" : "#9ca3af";
     const deltaLabel = (r.delta >= 0 ? "+" : "") + r.delta + "pp";
-    if (r.delta >= 0) {
-      ctx.fillStyle = barColor; ctx.fillRect(CENTER_X, y, barW, BAR_H);
-      ctx.fillStyle = "#1f2937"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "left";
-      ctx.fillText(deltaLabel, CENTER_X + barW + 5, y + BAR_H - 5);
+
+    if (r.delta > 0) {
+      ctx.fillStyle = barColor; ctx.fillRect(barX, CENTER_Y - barH, BAR_W, barH);
+      ctx.fillStyle = "#1f2937"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText(deltaLabel, centerX, CENTER_Y - barH - 5);
+    } else if (r.delta < 0) {
+      ctx.fillStyle = barColor; ctx.fillRect(barX, CENTER_Y, BAR_W, barH);
+      ctx.fillStyle = "#1f2937"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText(deltaLabel, centerX, CENTER_Y + barH + 14);
     } else {
-      ctx.fillStyle = barColor; ctx.fillRect(CENTER_X - barW, y, barW, BAR_H);
-      ctx.fillStyle = "#1f2937"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "right";
-      ctx.fillText(deltaLabel, CENTER_X - barW - 5, y + BAR_H - 5);
+      ctx.fillStyle = barColor; ctx.fillRect(barX, CENTER_Y - 1, BAR_W, 2);
+      ctx.fillStyle = "#6b7280"; ctx.font = "11px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText("0pp", centerX, CENTER_Y - 6);
     }
+
+    // Target name rotated -45°
+    const name = r.name.length > 17 ? r.name.slice(0, 16) + "…" : r.name;
+    ctx.save();
+    ctx.translate(centerX, BOTTOM_Y + 7);
+    ctx.rotate(-Math.PI / 4);
+    ctx.fillStyle = "#374151"; ctx.font = "12px sans-serif"; ctx.textAlign = "right";
+    ctx.fillText(name, 0, 0);
+    ctx.restore();
   }
   return { base64: canvas.toDataURL("image/png").split(",")[1], height: H };
 }
@@ -2843,7 +2932,9 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
 
   const obsHtml = (obs) => (obs || "").split("\n").map(line => {
     const t = line.trim();
-    return t.startsWith("•") ? `<p style="margin:.3rem 0 .3rem 1.4rem;line-height:1.6;text-indent:-1rem">${esc(t)}</p>` : "";
+    if (!t.startsWith("•")) return "";
+    const html = esc(t).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    return `<p style="margin:.3rem 0 .3rem 1.4rem;line-height:1.6;text-indent:-1rem">${html}</p>`;
   }).join("");
 
   const targetBlock = (r, i) => {
@@ -2879,41 +2970,38 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
 
   // Section 1
   h += `<h2 style="${SECTION_H2}">Section 1: Executive Overview</h2>`;
-  h += `<p style="margin:.5rem 0 1.25rem;line-height:1.7">${esc(parsed.executiveSummary || "")}</p>`;
 
   if (chartTrendRows.length) {
+    h += `<p style="margin:.5rem 0 .75rem;line-height:1.7">The charts below compare where each therapy target was at the start of this term versus where it ended (Chart 1: Start &amp; End), and how much each target changed overall in percentage points (Chart 2: Net Change).</p>`;
     const seResult = hyrDrawStartEndChart(chartTrendRows);
     const ncResult = hyrDrawNetChangeChart(chartTrendRows);
     if (seResult) h += `<img src="data:image/png;base64,${seResult.base64}" style="width:100%;max-width:700px;display:block;margin:.5rem 0 1.25rem">`;
-    if (ncResult) h += `<img src="data:image/png;base64,${ncResult.base64}" style="width:100%;max-width:700px;display:block;margin:.5rem 0 .5rem">`;
+    if (ncResult) h += `<img src="data:image/png;base64,${ncResult.base64}" style="width:100%;max-width:700px;display:block;margin:.5rem 0 1.25rem">`;
   }
-  h += `<p style="font-size:.8rem;color:#9ca3af;font-style:italic;margin:.25rem 0 .5rem">*Trends are calculated across a 6-month period to account for normal session-to-session fluctuations.</p>`;
-  if (noDataNames.length) {
-    h += `<p style="font-size:.85rem;color:#9ca3af;margin:.5rem 0">${esc(noDataNames.join(", "))} ${noDataNames.length === 1 ? "has" : "have"} no percentage scores and ${noDataNames.length === 1 ? "is" : "are"} not shown in the charts above.</p>`;
-  }
+  h += `<p style="margin:.75rem 0 .5rem;line-height:1.7">${esc(parsed.executiveSummary || "")}</p>`;
 
   h += `<hr style="margin:2rem 0">`;
 
-  // Section 2: Biggest Wins & Mastered Skills
-  h += `<h2 style="${SECTION_H2}">Section 2: Biggest Wins &amp; Mastered Skills</h2>`;
-  h += `<h3 style="${SECTION_H3}">2a) Biggest Wins — Trending Up</h3>`;
+  // Section 2: Most Improved & Strengths
+  h += `<h2 style="${SECTION_H2}">Section 2: Most Improved &amp; Strengths</h2>`;
+  h += `<h3 style="${SECTION_H3}">2a) Most Improved (Trending Up)</h3>`;
   h += sectionTargets(categorized.mostImproved);
-  h += `<div style="margin-top:2rem"><h3 style="${SECTION_H3}">2b) Mastered Skills — High &amp; Stable</h3></div>`;
+  h += `<div style="margin-top:2rem"><h3 style="${SECTION_H3}">2b) Strengths (Above 80% and Stable)</h3></div>`;
   h += sectionTargets(categorized.strengths);
 
   h += `<hr style="margin:2rem 0">`;
 
-  // Section 3: Needs Extra Help & Still Building
-  h += `<h2 style="${SECTION_H2}">Section 3: Needs Extra Help &amp; Still Building</h2>`;
-  h += `<h3 style="${SECTION_H3}">3a) Needs Extra Help — Trending Down</h3>`;
+  // Section 3: Needs Extra Support & Developing
+  h += `<h2 style="${SECTION_H2}">Section 3: Needs Extra Support &amp; Developing Skills</h2>`;
+  h += `<h3 style="${SECTION_H3}">3a) Needs Extra Support (Trending Down)</h3>`;
   h += sectionTargets(categorized.needsSupport);
-  h += `<div style="margin-top:2rem"><h3 style="${SECTION_H3}">3b) Still Building — Below 80%, Stable</h3></div>`;
+  h += `<div style="margin-top:2rem"><h3 style="${SECTION_H3}">3b) Developing (Below 80% and Stable)</h3></div>`;
   h += sectionTargets(categorized.emerging);
 
   // Section 4: Observed Skills (qualitative)
   if (categorized.qualitative.length) {
     h += `<hr style="margin:2rem 0">`;
-    h += `<h2 style="${SECTION_H2}">Section 4: Observed Skills</h2>`;
+    h += `<h2 style="${SECTION_H2}">Section 4: Observed Skills (No Quantitative Data)</h2>`;
     categorized.qualitative.forEach(r => {
       const hasObs = !!parsed.observed[r.name];
       h += `<div style="margin-top:2rem">
@@ -2928,11 +3016,12 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   // Section 5: Next Term Action Plan (table)
   const planSection = categorized.qualitative.length ? "5" : "4";
   h += `<h2 style="${SECTION_H2}">Section ${planSection}: Next Term Action Plan</h2>`;
+  h += `<p style="margin:.5rem 0 1rem;line-height:1.7">The table below outlines the priority areas for ${esc(firstName)}'s next term. These focus areas were identified based on ${esc(firstName)}'s progress this period and the therapy team's observations. The Strategy / Support column can be filled in together with the therapy team at your next review.</p>`;
   if (parsed.actionPlanRows.length) {
-    const rows = parsed.actionPlanRows.map(r =>
-      `<tr><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;font-weight:600;vertical-align:top;width:25%">${esc(r.skill)}</td><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;vertical-align:top;line-height:1.6">${esc(r.goal)}</td><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;width:20%"></td></tr>`
+    const rows = parsed.actionPlanRows.map((r, idx) =>
+      `<tr><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;text-align:center;width:5%;color:#6b7280">${idx + 1}</td><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;font-weight:600;vertical-align:top;width:23%">${esc(r.skill)}</td><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;vertical-align:top;line-height:1.6">${esc(r.goal)}</td><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;width:22%"></td></tr>`
     ).join("");
-    h += `<table style="width:100%;border-collapse:collapse;font-size:.9rem;margin:.75rem 0"><thead><tr style="background:#f3f4f6"><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:left;font-weight:700">Skill / Area</th><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:left;font-weight:700">Next Term Goal</th><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:left;font-weight:700">Strategy / Support</th></tr></thead><tbody>${rows}</tbody></table>`;
+    h += `<table style="width:100%;border-collapse:collapse;font-size:.9rem;margin:.75rem 0"><thead><tr style="background:#f3f4f6"><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700;width:5%">No.</th><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:left;font-weight:700">Skill / Area</th><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:left;font-weight:700">Next Term Goal</th><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:left;font-weight:700">Strategy / Support</th></tr></thead><tbody>${rows}</tbody></table>`;
   }
 
   // Section 6: Appendix
@@ -2977,7 +3066,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   const ROMAN = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"];
 
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun, LevelFormat,
-          Table, TableRow, TableCell, WidthType } = window.docx;
+          Table, TableRow, TableCell, WidthType, PageOrientation, SectionType } = window.docx;
   const BULLET_REF = "hyr-bullets";
   const LS = { line: 276, lineRule: "auto" };
 
@@ -3014,6 +3103,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
 
   function mkCell(text, opts = {}) {
     return new TableCell({
+      width: opts.pct !== undefined ? { size: opts.pct, type: WidthType.PERCENTAGE } : undefined,
       children: [new Paragraph({
         children: [new TextRun({ text, bold: opts.bold, size: opts.size || 20, color: opts.color, italics: opts.italics })],
         alignment: opts.align || AlignmentType.LEFT,
@@ -3072,62 +3162,52 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
 
   // ── Section 1: Executive Overview ──────────────────────────
   paragraphs.push(mkPara("Section 1: Executive Overview", { heading: HeadingLevel.HEADING_1, before: 560, after: 200, pageBreak: true, size: 32, bold: true }));
-  paragraphs.push(mkPara(parsed.executiveSummary || "", { after: 280 }));
 
   // Two overview charts (sorted ascending: red→green)
   const chartTrendRows = [...trendRows.filter(r => !r.noData)].sort((a, b) => a.delta - b.delta);
+  paragraphs.push(mkPara("The charts below compare where each therapy target was at the start of this term versus where it ended (Chart 1: Start & End), and how much each target changed overall in percentage points (Chart 2: Net Change).", { after: 200 }));
   const seResult = hyrDrawStartEndChart(chartTrendRows);
   const ncResult = hyrDrawNetChangeChart(chartTrendRows);
   if (seResult) {
-    const seH = Math.round(601 * seResult.height / 760);
+    const seH = Math.round(520 * seResult.height / 700);
     paragraphs.push(new Paragraph({
-      children: [new ImageRun({ data: b64ToUint8(seResult.base64), transformation: { width: 601, height: seH }, type: "png" })],
+      children: [new ImageRun({ data: b64ToUint8(seResult.base64), transformation: { width: 520, height: seH }, type: "png" })],
       alignment: AlignmentType.CENTER, spacing: { after: 200 }
     }));
   }
   if (ncResult) {
-    const ncH = Math.round(601 * ncResult.height / 760);
+    const ncH = Math.round(520 * ncResult.height / 700);
     paragraphs.push(new Paragraph({
-      children: [new ImageRun({ data: b64ToUint8(ncResult.base64), transformation: { width: 601, height: ncH }, type: "png" })],
-      alignment: AlignmentType.CENTER, spacing: { after: 80 }
+      children: [new ImageRun({ data: b64ToUint8(ncResult.base64), transformation: { width: 520, height: ncH }, type: "png" })],
+      alignment: AlignmentType.CENTER, spacing: { after: 200 }
     }));
   }
-  paragraphs.push(new Paragraph({
-    children: [new TextRun({ text: "*Trends are calculated across a 6-month period to account for normal session-to-session fluctuations.", italics: true, size: 17, color: "9ca3af" })],
-    spacing: { before: 60, after: 80, ...LS }
-  }));
-  const noDataNames = categorized.qualitative.map(r => r.name);
-  if (noDataNames.length) {
-    paragraphs.push(new Paragraph({
-      children: [new TextRun({ text: `${noDataNames.join(", ")} ${noDataNames.length === 1 ? "has" : "have"} no percentage scores and ${noDataNames.length === 1 ? "is" : "are"} not shown in the charts above.`, italics: true, size: 18, color: "9ca3af" })],
-      spacing: { before: 0, after: 160, ...LS }
-    }));
-  }
+  paragraphs.push(mkPara(parsed.executiveSummary || "", { after: 280 }));
 
-  // ── Section 2: Biggest Wins & Mastered Skills ───────────────
-  paragraphs.push(mkPara("Section 2: Biggest Wins & Mastered Skills", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
-  paragraphs.push(mkPara("2a) Biggest Wins — Trending Up", { heading: HeadingLevel.HEADING_2, before: 160, after: 80, size: 26, bold: true }));
+  // ── Section 2: Most Improved & Strengths ───────────────────
+  paragraphs.push(mkPara("Section 2: Most Improved & Strengths", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
+  paragraphs.push(mkPara("2a) Most Improved (Trending Up)", { heading: HeadingLevel.HEADING_2, before: 160, after: 80, size: 26, bold: true }));
   if (categorized.mostImproved.length) paragraphs.push(...targetSectionParas(categorized.mostImproved));
   else paragraphs.push(mkPara("No targets in this category.", { italics: true, color: "9CA3AF" }));
   paragraphs.push(new Paragraph({ children: [], spacing: { before: 400, after: 0 } }));
-  paragraphs.push(mkPara("2b) Mastered Skills — High & Stable", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
+  paragraphs.push(mkPara("2b) Strengths (Above 80% and Stable)", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
   if (categorized.strengths.length) paragraphs.push(...targetSectionParas(categorized.strengths));
   else paragraphs.push(mkPara("No targets in this category.", { italics: true, color: "9CA3AF" }));
 
-  // ── Section 3: Needs Extra Help & Still Building ────────────
-  paragraphs.push(mkPara("Section 3: Needs Extra Help & Still Building", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
-  paragraphs.push(mkPara("3a) Needs Extra Help — Trending Down", { heading: HeadingLevel.HEADING_2, before: 160, after: 80, size: 26, bold: true }));
+  // ── Section 3: Needs Extra Support & Developing ────────────
+  paragraphs.push(mkPara("Section 3: Needs Extra Support & Developing Skills", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
+  paragraphs.push(mkPara("3a) Needs Extra Support (Trending Down)", { heading: HeadingLevel.HEADING_2, before: 160, after: 80, size: 26, bold: true }));
   if (categorized.needsSupport.length) paragraphs.push(...targetSectionParas(categorized.needsSupport));
   else paragraphs.push(mkPara("No targets in this category.", { italics: true, color: "9CA3AF" }));
   paragraphs.push(new Paragraph({ children: [], spacing: { before: 400, after: 0 } }));
-  paragraphs.push(mkPara("3b) Still Building — Below 80%, Stable", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
+  paragraphs.push(mkPara("3b) Developing (Below 80% and Stable)", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
   if (categorized.emerging.length) paragraphs.push(...targetSectionParas(categorized.emerging));
   else paragraphs.push(mkPara("No targets in this category.", { italics: true, color: "9CA3AF" }));
 
   // ── Section 4: Observed Skills (qualitative) ────────────────
   let nextSectionNum = 4;
   if (categorized.qualitative.length) {
-    paragraphs.push(mkPara("Section 4: Observed Skills", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
+    paragraphs.push(mkPara("Section 4: Observed Skills (No Quantitative Data)", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
     categorized.qualitative.forEach(r => {
       paragraphs.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
       paragraphs.push(new Paragraph({ children: [new TextRun({ text: r.name, bold: true, size: 24 })], spacing: { before: 0, after: 80, ...LS } }));
@@ -3144,45 +3224,66 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     nextSectionNum = 5;
   }
 
-  // ── Section: Next Term Action Plan ─────────────────────────
-  paragraphs.push(mkPara(`Section ${nextSectionNum}: Next Term Action Plan`, { heading: HeadingLevel.HEADING_1, before: 560, after: 200, pageBreak: true, size: 32, bold: true }));
+  // ── Section: Next Term Action Plan (landscape) ─────────────
+  const actionPlanParas = [];
+  actionPlanParas.push(mkPara(`Section ${nextSectionNum}: Next Term Action Plan`, { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
+  actionPlanParas.push(mkPara(
+    `The table below outlines the priority areas for ${firstName}'s next term. These focus areas were identified based on ${firstName}'s progress this period and the therapy team's observations. The Strategy / Support column can be filled in together with the therapy team at your next review.`,
+    { after: 220 }
+  ));
   if (parsed.actionPlanRows?.length) {
     const HDR = "f3f4f6";
     const headerRow = new TableRow({ tableHeader: true, children: [
-      mkCell("Skill / Area", { bold: true, bg: HDR, size: 20 }),
-      mkCell("Next Term Goal", { bold: true, bg: HDR, size: 20 }),
-      mkCell("Strategy / Support", { bold: true, bg: HDR, size: 20 })
+      mkCell("No.", { bold: true, bg: HDR, size: 20, align: AlignmentType.CENTER, pct: 6 }),
+      mkCell("Skill / Area", { bold: true, bg: HDR, size: 20, pct: 22 }),
+      mkCell("Next Term Goal", { bold: true, bg: HDR, size: 20, pct: 40 }),
+      mkCell("Strategy / Support", { bold: true, bg: HDR, size: 20, pct: 32 })
     ]});
-    const dataRows = parsed.actionPlanRows.map(r => new TableRow({ children: [
-      mkCell(r.skill || "", {}),
-      mkCell(r.goal || "", {}),
-      mkCell("", {})
+    const dataRows = parsed.actionPlanRows.map((r, idx) => new TableRow({ children: [
+      mkCell(String(idx + 1), { align: AlignmentType.CENTER, pct: 6 }),
+      mkCell(r.skill || "", { pct: 22 }),
+      mkCell(r.goal || "", { pct: 40 }),
+      mkCell("", { pct: 32 })
     ]}));
-    paragraphs.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...dataRows] }));
+    actionPlanParas.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...dataRows] }));
   }
 
-  // ── Section: Appendix ──────────────────────────────────────
+  // ── Section: Appendix (portrait) ───────────────────────────
+  const appendixParas = [];
   const appendixTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped && breakdownData[t.name]?.length);
   if (appendixTargets.length) {
-    paragraphs.push(mkPara(`Section ${nextSectionNum + 1}: Appendix — Activity Breakdown Charts`, { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
+    appendixParas.push(mkPara(`Section ${nextSectionNum + 1}: Appendix — Activity Breakdown Charts`, { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
     const rangeLabel = period === "H1" ? `Jan–Jun ${year}` : `Jul–Dec ${year}`;
     for (const target of appendixTargets) {
       const abResult = renderActivityBreakdownChart(target.name, hyrToActivityData(breakdownData[target.name]), rangeLabel);
       if (abResult) {
-        const abH = Math.round(601 * abResult.height / 760);
-        paragraphs.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
-        paragraphs.push(mkPara(target.name, { heading: HeadingLevel.HEADING_2, before: 0, after: 100, size: 24, bold: true }));
-        paragraphs.push(new Paragraph({
-          children: [new ImageRun({ data: b64ToUint8(abResult.base64), transformation: { width: 601, height: abH }, type: "png" })],
+        const abH = Math.round(520 * abResult.height / 760);
+        appendixParas.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
+        appendixParas.push(mkPara(target.name, { heading: HeadingLevel.HEADING_2, before: 0, after: 100, size: 24, bold: true }));
+        appendixParas.push(new Paragraph({
+          children: [new ImageRun({ data: b64ToUint8(abResult.base64), transformation: { width: 520, height: abH }, type: "png" })],
           alignment: AlignmentType.CENTER, spacing: { after: 240 }
         }));
       }
     }
   }
 
+  const landscapeProps = {
+    type: SectionType?.NEXT_PAGE ?? "nextPage",
+    page: { size: { orientation: PageOrientation?.LANDSCAPE ?? "landscape" } }
+  };
+  const portraitProps = {
+    type: SectionType?.NEXT_PAGE ?? "nextPage",
+    page: { size: { orientation: PageOrientation?.PORTRAIT ?? "portrait" } }
+  };
+
+  const docSections = [{ properties: {}, children: paragraphs }];
+  if (actionPlanParas.length) docSections.push({ properties: landscapeProps, children: actionPlanParas });
+  if (appendixParas.length) docSections.push({ properties: portraitProps, children: appendixParas });
+
   const doc = new Document({
     numbering: { config: [{ reference: BULLET_REF, levels: [{ level: 0, format: LevelFormat?.BULLET ?? "bullet", text: "•", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } }, run: { size: 22 } } }] }] },
-    sections: [{ properties: {}, children: paragraphs }]
+    sections: docSections
   });
 
   Packer.toBlob(doc).then(blob => {
