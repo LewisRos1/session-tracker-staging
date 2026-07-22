@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1039";
+const APP_VERSION = "1040";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1989,10 +1989,6 @@ function renderHalfYearReportsSection() {
         Generate Report
       </button>
     </div>
-    <div id="hyr-breakdown-section" style="display:none;margin-top:.75rem;padding:.75rem 1rem;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb">
-      <div style="font-size:1rem;font-weight:600;color:var(--text-muted);margin-bottom:.55rem">Include activity breakdown chart for:</div>
-      <div id="hyr-breakdown-targets" style="display:flex;flex-wrap:wrap;gap:.45rem 1rem"></div>
-    </div>
     <div id="hyr-progress" style="display:none;margin-top:.85rem">
       <div style="background:#e5e7eb;border-radius:99px;height:6px;overflow:hidden">
         <div id="hyr-progress-bar" style="height:100%;background:var(--primary);width:0%;transition:width .5s ease"></div>
@@ -2005,33 +2001,11 @@ function renderHalfYearReportsSection() {
     const periodSel = $("hyr-period-select");
     const genBtn    = $("hyr-btn-generate");
     const loading   = $("hyr-period-loading");
-    const bdSection = $("hyr-breakdown-section");
-    const bdTargets = $("hyr-breakdown-targets");
 
     periodSel.style.display = "none";
     genBtn.style.display    = "none";
     loading.style.display   = "none";
-    bdSection.style.display = "none";
-    bdTargets.innerHTML     = "";
     if (!studentId) return;
-
-    // Populate activity breakdown target checkboxes
-    const student = state.students.find(s => s.id === studentId);
-    if (student) {
-      const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
-      if (activeTargets.length > 0) {
-        const savedBdPreset = student.hyrBreakdownTargets;
-        bdTargets.innerHTML = activeTargets.map(t => {
-          const isChecked = savedBdPreset && savedBdPreset.includes(t.name);
-          return `<label style="display:flex;align-items:center;gap:.4rem;font-size:1rem;cursor:pointer;white-space:nowrap">
-            <input type="checkbox" class="hyr-breakdown-check" value="${escHtml(t.name)}" ${isChecked ? "checked" : ""} style="cursor:pointer;width:1.05rem;height:1.05rem">
-            ${escHtml(t.name)}
-          </label>`;
-        }).join("") +
-        `<div style="width:100%;margin-top:.4rem;font-size:.83rem;color:var(--text-muted);font-style:italic">Selection saved as a preset.</div>`;
-        bdSection.style.display = "";
-      }
-    }
 
     loading.style.display = "";
     try {
@@ -2068,13 +2042,12 @@ function renderHalfYearReportsSection() {
 
 async function hyrGenerate() {
   const studentId = $("hyr-student-select")?.value;
-  const periodVal = $("hyr-period-select")?.value || "2026-H1";
-  const [yearStr, period] = periodVal.split("-");
-  const year = parseInt(yearStr) || new Date().getFullYear();
-
+  const periodVal = $("hyr-period-select")?.value;
   if (!studentId) { alert("Please select a student first."); return; }
   if (!periodVal) { alert("Please select a semester first."); return; }
 
+  const [yearStr, period] = periodVal.split("-");
+  const year = parseInt(yearStr) || new Date().getFullYear();
   const student = state.students.find(s => s.id === studentId);
   if (!student) return;
 
@@ -2082,36 +2055,47 @@ async function hyrGenerate() {
   const progress = $("hyr-progress");
   const bar      = $("hyr-progress-bar");
   const label    = $("hyr-progress-label");
+  const setProgress = (pct, text) => { bar.style.width = pct + "%"; label.textContent = text; };
 
-  const setProgress = (pct, text) => {
-    bar.style.width = pct + "%";
-    label.textContent = text;
-  };
-
-  btn.disabled = true;
-  btn.textContent = "Generating…";
-  progress.style.display = "";
+  btn.disabled = true; btn.textContent = "Generating…"; progress.style.display = "";
   setProgress(10, "Collecting session data…");
 
   try {
-    const config = await getHyrConfig();
-    const systemPrompt = config.prompt || HYR_DEFAULT_PROMPT;
-    const { text: dataText, chartData, breakdownData } = await hyrCollectData(student, period, year);
-    const selectedBreakdownTargets = new Set(
-      Array.from(document.querySelectorAll(".hyr-breakdown-check:checked")).map(el => el.value)
-    );
-
-    // Save exactly which targets were checked as the preset
-    student.hyrBreakdownTargets = Array.from(selectedBreakdownTargets);
-    saveStudent(student).catch(() => {});
+    const { text: dataText, chartData, breakdownData, trendRows, categorized } = await hyrCollectData(student, period, year);
 
     setProgress(35, "Sending to AI…");
 
-    const periodLabel = period === "H1"
-      ? `January–June ${year}`
-      : `July–December ${year}`;
+    const periodLabel = period === "H1" ? `January–June ${year}` : `July–December ${year}`;
+    const firstName   = student.name.split(" ")[0];
+    const targetsWithData = trendRows.filter(r => !r.noData);
 
-    const userMessage = `Please write a half-year progress report for the following student.\n\nStudent: ${student.name}\nReporting Period: ${periodLabel}\n\n${dataText}`;
+    const aiPrompt = `You are writing structured content for a therapy progress report.
+
+Student: ${student.name}
+Reporting Period: ${periodLabel}
+
+TRENDLINE ANALYSIS:
+${trendRows.map(r => r.noData
+  ? `• ${r.name}: No data`
+  : `• ${r.name}: ${r.tStart}% → ${r.tEnd}% (${r.delta >= 0 ? "+" : ""}${r.delta}pp, ${r.direction})`
+).join("\n")}
+
+SESSION OBSERVATION DATA:
+${dataText}
+
+Provide ONLY the following sections using EXACTLY these markers (no extra text outside the markers):
+
+===EXECUTIVE_SUMMARY===
+Write exactly 3 sentences summarising ${firstName}'s overall progress trajectory for ${periodLabel}. Focus on the overall direction across all targets. Do not name specific targets by name.
+===END===
+
+${targetsWithData.map(r => `===OBSERVATION: ${r.name}===
+Write 2–3 concise bullet points (each starting with "• ") observing ${r.name} performance based on session remarks. Be specific and clinical.
+===END===`).join("\n\n")}
+
+===ACTION_PLAN===
+List 3–5 specific skills or areas for ${firstName} to work on next term. Use bullet points starting with "• ". Do not suggest strategies or methods.
+===END===`;
 
     const resp = await fetch("https://session-tracker-ai.wang-loys22.workers.dev", {
       method: "POST",
@@ -2119,8 +2103,8 @@ async function hyrGenerate() {
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
         max_tokens: 8192,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userMessage }]
+        system: "You are a professional therapy report writer. Follow the requested format exactly.",
+        messages: [{ role: "user", content: aiPrompt }]
       })
     });
 
@@ -2135,18 +2119,18 @@ async function hyrGenerate() {
     const reportText = data.content?.[0]?.text || "";
     if (!reportText) throw new Error("Empty response from Claude.");
 
+    const parsed = hyrParseAiResponse(reportText);
+
     setProgress(100, "Done!");
     await new Promise(r => setTimeout(r, 400));
 
-    hyrShowPreview(reportText, student.name, period, year, chartData, breakdownData, selectedBreakdownTargets);
+    hyrShowPreview(student, period, year, trendRows, categorized, parsed, breakdownData, chartData);
 
   } catch (err) {
     alert("Failed to generate report:\n" + err.message);
   } finally {
-    btn.disabled = false;
-    btn.textContent = "Generate Report";
-    progress.style.display = "none";
-    bar.style.width = "0%";
+    btn.disabled = false; btn.textContent = "Generate Report";
+    progress.style.display = "none"; bar.style.width = "0%";
   }
 }
 
@@ -2161,7 +2145,11 @@ async function hyrCollectData(student, period, year) {
   });
 
   if (sessions.length === 0) {
-    return { text: `No sessions recorded for this student in ${period} ${year}.`, chartData: {} };
+    return {
+      text: `No sessions recorded for this student in ${period} ${year}.`,
+      chartData: {}, breakdownData: {}, trendRows: [],
+      categorized: { mostImproved: [], strengths: [], qualitative: [], needsSupport: [], emerging: [] }
+    };
   }
 
   // Group sessions by target name, then by month
@@ -2346,7 +2334,48 @@ async function hyrCollectData(student, period, year) {
     lines.push("");
   }
 
-  return { text: lines.join("\n"), chartData, breakdownData };
+  // Compute trendlines and categorize every target
+  const trendRows = [];
+  for (const target of targets) {
+    const cd = chartData[target.name];
+    if (!cd) {
+      trendRows.push({ name: target.name, noData: true, delta: -Infinity, labels: [], values: [] });
+      continue;
+    }
+    const nonNull = cd.values.filter(v => v !== null && v !== undefined);
+    if (nonNull.length < 2) {
+      trendRows.push({ name: target.name, noData: true, delta: -Infinity, labels: cd.labels, values: cd.values });
+      continue;
+    }
+    const { tStart, tEnd } = hyrLinearTrend(nonNull);
+    const delta = tEnd - tStart;
+    const direction = Math.abs(delta) <= 8 ? "Stable" : delta > 0 ? "Trending Up" : "Trending Down";
+    trendRows.push({ name: target.name, tStart, tEnd, delta, direction, labels: cd.labels, values: cd.values, noData: false });
+  }
+  trendRows.sort((a, b) => (b.delta ?? -Infinity) - (a.delta ?? -Infinity));
+
+  const categorized = {
+    mostImproved: trendRows.filter(r => !r.noData && r.delta > 8),
+    strengths:    trendRows.filter(r => !r.noData && Math.abs(r.delta) <= 8 && r.tEnd >= 80),
+    qualitative:  trendRows.filter(r => r.noData),
+    needsSupport: trendRows.filter(r => !r.noData && r.delta < -8),
+    emerging:     trendRows.filter(r => !r.noData && Math.abs(r.delta) <= 8 && r.tEnd < 80),
+  };
+
+  return { text: lines.join("\n"), chartData, breakdownData, trendRows, categorized };
+}
+
+function hyrLinearTrend(values) {
+  const n = values.length;
+  const xs = values.map((_, i) => i);
+  const sX = xs.reduce((a, b) => a + b, 0), sY = values.reduce((a, b) => a + b, 0);
+  const sXY = xs.reduce((a, x, i) => a + x * values[i], 0), sX2 = xs.reduce((a, x) => a + x * x, 0);
+  const denom = n * sX2 - sX * sX;
+  if (!denom) return { tStart: Math.round(values[0]), tEnd: Math.round(values[n - 1]) };
+  const slope = (n * sXY - sX * sY) / denom;
+  const intercept = (sY - slope * sX) / n;
+  const clamp = v => Math.round(Math.max(0, Math.min(100, v)));
+  return { tStart: clamp(intercept), tEnd: clamp(slope * (n - 1) + intercept) };
 }
 
 function hyrCalcDailyAvg(sess, target) {
@@ -2652,86 +2681,155 @@ function hyrDrawLineChart(targetName, labels, values, period, year) {
   return canvas.toDataURL("image/png").split(",")[1];
 }
 
-function hyrChartForHeading(heading, chartData) {
-  const lower = heading.toLowerCase();
-  for (const [tName, data] of Object.entries(chartData || {})) {
-    if (lower.includes(tName.toLowerCase())) return { tName, ...data };
+function hyrParseAiResponse(text) {
+  const out = { executiveSummary: "", observations: {}, actionPlan: "" };
+  const exec = text.match(/===EXECUTIVE_SUMMARY===\s*([\s\S]*?)\s*===END===/);
+  if (exec) out.executiveSummary = exec[1].trim();
+  for (const m of text.matchAll(/===OBSERVATION:\s*([^=]+?)===\s*([\s\S]*?)\s*===END===/g)) {
+    out.observations[m[1].trim()] = m[2].trim();
   }
-  return null;
+  const plan = text.match(/===ACTION_PLAN===\s*([\s\S]*?)\s*===END===/);
+  if (plan) out.actionPlan = plan[1].trim();
+  return out;
 }
 
-function hyrMdToHtml(text, chartData = {}, studentName = "", period = "H1", year = "", breakdownData = {}, selectedBreakdownTargets = new Set()) {
-  const summaryB64 = Object.keys(chartData).length > 0
-    ? hyrDrawSummaryChart(chartData, studentName, period, year) : null;
-  let summaryDone = false;
+function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, parsed, breakdownData) {
+  const periodLabel = period === "H1" ? `January–June ${year}` : `July–December ${year}`;
+  const firstName   = student.name.split(" ")[0];
+  const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
+  const tNames     = activeTargets.map(t => t.name);
+  const n          = tNames.length;
+  const targetList = n <= 1 ? (tNames[0] || "") : tNames.slice(0, -1).join(", ") + " and " + tNames[n - 1];
+  const halfText   = period === "H1" ? "first" : "second";
+  const monthRange = period === "H1" ? "January to June" : "July to December";
+  const ROMAN = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"];
 
-  const lines = text.split("\n");
-  let html = "";
-  let inP = false;
-  const closeP = () => { if (inP) { html += "</p>"; inP = false; } };
-  const inlineHtml = s => {
-    s = s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    s = s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-    s = s.replace(/\*(.+?)\*/g, "<em>$1</em>");
-    s = s.replace(/_([^_]+)_/g, "<em>$1</em>");
-    return s;
+  const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const dirColor = d => d === "Trending Up" ? "#16a34a" : d === "Trending Down" ? "#dc2626" : "#6b7280";
+  const deltaFmt = r => `${r.delta >= 0 ? "+" : ""}${r.delta}pp`;
+
+  const trendTableHtml = () => {
+    const rows = trendRows.map(r => {
+      if (r.noData) return `<tr><td style="text-align:left;padding:.4rem .6rem">${esc(r.name)}</td><td></td><td></td><td></td><td style="color:#9ca3af;font-style:italic;padding:.4rem .6rem">No data</td></tr>`;
+      const dc = dirColor(r.direction);
+      return `<tr><td style="text-align:left;padding:.4rem .6rem">${esc(r.name)}</td><td style="padding:.4rem .6rem">${r.tStart}%</td><td style="padding:.4rem .6rem">${r.tEnd}%</td><td style="padding:.4rem .6rem">${deltaFmt(r)}</td><td style="color:${dc};font-weight:600;padding:.4rem .6rem">${esc(r.direction)}</td></tr>`;
+    }).join("");
+    return `<table style="width:100%;border-collapse:collapse;font-size:.9rem;margin:.75rem 0"><thead><tr style="background:#dce6f1"><th style="text-align:left;padding:.45rem .6rem">Target</th><th style="padding:.45rem .6rem">Trendline Start</th><th style="padding:.45rem .6rem">Trendline End</th><th style="padding:.45rem .6rem">Net Change (pp)</th><th style="padding:.45rem .6rem">Status</th></tr></thead><tbody>${rows}</tbody></table>`;
   };
-  for (const line of lines) {
-    const t = line.trim();
-    if (!t || t === "---") { closeP(); continue; }
-    if (t.startsWith("• ")) { closeP(); html += `<p style="margin:.3rem 0 .3rem 1.4rem;line-height:1.6;text-indent:-1.1rem">${inlineHtml(t)}</p>`; continue; }
-    if (t.startsWith("### ")) { closeP(); html += `<h3 style="margin:.9rem 0 .3rem;font-size:1rem">${inlineHtml(t.slice(4))}</h3>`; continue; }
-    if (t.startsWith("## "))  {
-      closeP();
-      const heading = t.slice(3);
-      const chart = hyrChartForHeading(heading, chartData);
-      if (chart && !summaryDone && summaryB64) {
-        html += `<h2 style="margin:1.5rem 0 .5rem;font-size:1.1rem">Half-Year Progress Overview</h2>`;
-        html += `<img src="data:image/png;base64,${summaryB64}" style="width:100%;max-width:540px;margin:.4rem 0 .75rem;display:block">`;
-        html += `<p style="font-size:.82rem;color:#6b7280;font-style:italic;margin:.3rem 0 1rem;line-height:1.5">Trend classification: a change of more than +8 percentage points from the earliest to latest month is classified as Trending Up (↑); a change of less than -8 percentage points is classified as Trending Down (↓); within ±8 percentage points is classified as Stable (→).</p>`;
-        summaryDone = true;
-      }
-      html += `<h2 style="margin:1.2rem 0 .4rem;font-size:1.1rem">${inlineHtml(heading)}</h2>`;
-      if (chart) {
-        const lb64 = hyrDrawLineChart(chart.tName, chart.labels, chart.values, period, year);
-        if (lb64) html += `<img src="data:image/png;base64,${lb64}" style="width:100%;max-width:540px;margin:.4rem 0 .5rem;display:block">`;
-        if (selectedBreakdownTargets.has(chart.tName) && breakdownData[chart.tName]?.length) {
-          const rangeLabel = period === "H1" ? `Jan–Jun ${year}` : `Jul–Dec ${year}`;
-          const abResult = renderActivityBreakdownChart(chart.tName, hyrToActivityData(breakdownData[chart.tName]), rangeLabel);
-          if (abResult) html += `<img src="data:image/png;base64,${abResult.base64}" style="width:100%;max-width:600px;margin:.25rem 0 .75rem;display:block">`;
-        }
-      }
-      continue;
-    }
-    if (t.startsWith("# "))   { closeP(); html += `<h1 style="margin:1.4rem 0 .5rem;font-size:1.25rem">${inlineHtml(t.slice(2))}</h1>`; continue; }
-    if (!inP) { html += `<p style="margin:.6rem 0;line-height:1.6">`; inP = true; }
-    else html += "<br>";
-    html += inlineHtml(t);
+
+  const targetSectionHtml = (rows) => rows.map((r, i) => {
+    const header = `${ROMAN[i] || i + 1}. ${esc(r.name)} &nbsp;&nbsp;[${r.tStart}% ➔ ${r.tEnd}% | ${deltaFmt(r)} (${esc(r.direction)})]`;
+    const lb64 = hyrDrawLineChart(r.name, r.labels, r.values, period, year);
+    const chartImg = lb64 ? `<img src="data:image/png;base64,${lb64}" style="width:100%;max-width:540px;display:block;margin:.5rem 0">` : "";
+    const obsHtml = (parsed.observations[r.name] || "").split("\n").map(line => {
+      const t = line.trim();
+      return t.startsWith("•") ? `<p style="margin:.25rem 0 .25rem 1.4rem;text-indent:-1rem">${esc(t)}</p>` : "";
+    }).join("");
+    return `<div style="margin-bottom:1.25rem"><p style="font-weight:600;margin:.5rem 0">${header}</p>${chartImg}${obsHtml}</div>`;
+  }).join("");
+
+  let h = "";
+
+  // Cover
+  h += `<div style="text-align:center;padding:2rem 0 1.5rem;border-bottom:2px solid #e5e7eb;margin-bottom:1.5rem">
+    <div style="font-size:1.4rem;font-weight:700;color:#1f2937;margin-bottom:.4rem">Half-Year Progress Report</div>
+    <div style="font-size:1.1rem;color:#374151;margin-bottom:.2rem">${esc(student.name)}</div>
+    <div style="color:#6b7280;font-size:.9rem">${esc(periodLabel)}</div>
+  </div>`;
+  h += `<p style="margin:.4rem 0"><b>Student:</b> ${esc(student.name)}</p>`;
+  h += `<p style="margin:.4rem 0;line-height:1.6"><b>Purpose of Report:</b> This report documents ${esc(student.name)}'s progress across the ${halfText} half of ${year} (${monthRange}) in ${n} key therapy target${n !== 1 ? "s" : ""}: ${esc(targetList)}. The therapy team has prepared this report to give you a clear overview of ${esc(firstName)}'s development and the areas we will continue to focus on in the coming months.</p>`;
+
+  h += `<hr style="margin:1.5rem 0">`;
+
+  // Section 1
+  h += `<h2 style="font-size:1.1rem;margin:1rem 0 .5rem">Section 1: Executive Overview</h2>`;
+  h += `<p style="margin:.5rem 0;line-height:1.6">To provide an accurate picture of each child's progress, a linear trendline was applied to the monthly average scores for each monitored target. Directly comparing the first and last month of the period can be misleading — a strong January and a strong June might conceal a significant dip in between. The trendline captures the overall direction of progress across all months in the reporting period, offering a more reliable and complete view of each child's developmental trajectory.</p>`;
+  h += trendTableHtml();
+  h += `<p style="font-size:.82rem;color:#6b7280;margin:.5rem 0;font-style:italic">Classification: <b>Trending Up (↑)</b> = Net Change &gt; +8pp &nbsp;|&nbsp; <b>Stable (→)</b> = Net Change within ±8pp &nbsp;|&nbsp; <b>Trending Down (↓)</b> = Net Change &lt; −8pp</p>`;
+  h += `<h3 style="font-size:1rem;margin:.9rem 0 .3rem">Executive Summary</h3>`;
+  h += `<p style="margin:.5rem 0;line-height:1.6">${esc(parsed.executiveSummary || "")}</p>`;
+
+  h += `<hr style="margin:1.5rem 0">`;
+
+  // Section 2
+  h += `<h2 style="font-size:1.1rem;margin:1rem 0 .5rem">Section 2: Most Improved &amp; Strengths</h2>`;
+  h += `<h3 style="font-size:1rem;margin:.7rem 0 .3rem">2a) Most Improved — Trending Up (Net Change &gt; +8pp)</h3>`;
+  h += categorized.mostImproved.length ? targetSectionHtml(categorized.mostImproved) : `<p style="color:#9ca3af;font-style:italic">No targets in this category.</p>`;
+  h += `<h3 style="font-size:1rem;margin:.7rem 0 .3rem">2b) Strengths — High &amp; Stable (Trendline End ≥80%, Stable)</h3>`;
+  h += categorized.strengths.length ? targetSectionHtml(categorized.strengths) : `<p style="color:#9ca3af;font-style:italic">No targets in this category.</p>`;
+
+  h += `<hr style="margin:1.5rem 0">`;
+
+  // Qualitative Targets
+  if (categorized.qualitative.length) {
+    h += `<h2 style="font-size:1.1rem;margin:1rem 0 .5rem">Qualitative Targets (No Numerical Data)</h2>`;
+    categorized.qualitative.forEach(r => {
+      h += `<p style="margin:.3rem 0;font-weight:600">${esc(r.name)}</p>`;
+      h += `<p style="color:#6b7280;font-size:.9rem;margin:.1rem 0 .5rem">No numerical data recorded for this target during ${esc(periodLabel)}.</p>`;
+    });
+    h += `<hr style="margin:1.5rem 0">`;
   }
-  closeP();
-  return html;
+
+  // Section 3
+  h += `<h2 style="font-size:1.1rem;margin:1rem 0 .5rem">Section 3: Needs Extra Support &amp; Emerging Skills</h2>`;
+  h += `<h3 style="font-size:1rem;margin:.7rem 0 .3rem">3a) Needs Extra Support — Trending Down (Net Change &lt; −8pp)</h3>`;
+  h += categorized.needsSupport.length ? targetSectionHtml(categorized.needsSupport) : `<p style="color:#9ca3af;font-style:italic">No targets in this category.</p>`;
+  h += `<h3 style="font-size:1rem;margin:.7rem 0 .3rem">3b) Emerging Skills — Stable but Below 80%</h3>`;
+  h += categorized.emerging.length ? targetSectionHtml(categorized.emerging) : `<p style="color:#9ca3af;font-style:italic">No targets in this category.</p>`;
+
+  h += `<hr style="margin:1.5rem 0">`;
+
+  // Section 4
+  h += `<h2 style="font-size:1.1rem;margin:1rem 0 .5rem">Section 4: Next Term Action Plan</h2>`;
+  (parsed.actionPlan || "").split("\n").forEach(line => {
+    const t = line.trim();
+    if (t) h += `<p style="margin:.25rem 0 .25rem 1.4rem;text-indent:-1rem">${esc(t)}</p>`;
+  });
+
+  // Section 5 — Appendix
+  const appendixTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped && breakdownData[t.name]?.length);
+  if (appendixTargets.length) {
+    h += `<hr style="margin:1.5rem 0">`;
+    h += `<h2 style="font-size:1.1rem;margin:1rem 0 .5rem">Section 5: Appendix — Activity Breakdown Charts</h2>`;
+    const rangeLabel = period === "H1" ? `Jan–Jun ${year}` : `Jul–Dec ${year}`;
+    for (const target of appendixTargets) {
+      const result = renderActivityBreakdownChart(target.name, hyrToActivityData(breakdownData[target.name]), rangeLabel);
+      if (result) {
+        h += `<h3 style="font-size:.95rem;margin:.75rem 0 .25rem">${esc(target.name)}</h3>`;
+        h += `<img src="data:image/png;base64,${result.base64}" style="width:100%;max-width:600px;display:block;margin:.25rem 0 1rem">`;
+      }
+    }
+  }
+
+  return h;
 }
 
-function hyrShowPreview(reportText, studentName, period, year, chartData = {}, breakdownData = {}, selectedBreakdownTargets = new Set()) {
+function hyrShowPreview(student, period, year, trendRows, categorized, parsed, breakdownData, chartData) {
   const periodLabel = period === "H1" ? `Jan–Jun ${year}` : `Jul–Dec ${year}`;
-  $("hyr-preview-title").textContent = `${studentName} — ${periodLabel}`;
-  $("hyr-preview-body").innerHTML = hyrMdToHtml(reportText, chartData, studentName, period, year, breakdownData, selectedBreakdownTargets);
+  $("hyr-preview-title").textContent = `${student.name} — ${periodLabel}`;
+  $("hyr-preview-body").innerHTML = hyrBuildPreviewHtml(student, period, year, trendRows, categorized, parsed, breakdownData);
   $("hyr-preview-modal").classList.remove("hidden");
-
   $("hyr-preview-close").onclick = () => $("hyr-preview-modal").classList.add("hidden");
   $("hyr-preview-backdrop").onclick = () => $("hyr-preview-modal").classList.add("hidden");
-
-  $("hyr-btn-download-word").onclick = () => hyrDownloadWord(reportText, studentName, period, year, chartData, breakdownData, selectedBreakdownTargets);
-  $("hyr-btn-regenerate").onclick = () => {
-    $("hyr-preview-modal").classList.add("hidden");
-    hyrGenerate();
-  };
+  $("hyr-btn-download-word").onclick = () => hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData);
+  $("hyr-btn-regenerate").onclick = () => { $("hyr-preview-modal").classList.add("hidden"); hyrGenerate(); };
 }
 
-function hyrDownloadWord(reportText, studentName, period, year, chartData = {}, breakdownData = {}, selectedBreakdownTargets = new Set()) {
+function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData) {
   const periodLabel = period === "H1" ? `January–June ${year}` : `July–December ${year}`;
-  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun, LevelFormat } = window.docx;
+  const firstName   = student.name.split(" ")[0];
+  const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
+  const n = activeTargets.length;
+  const tNames = activeTargets.map(t => t.name);
+  const targetList = n <= 1 ? (tNames[0] || "") : tNames.slice(0, -1).join(", ") + " and " + tNames[n - 1];
+  const halfText   = period === "H1" ? "first" : "second";
+  const monthRange = period === "H1" ? "January to June" : "July to December";
+  const ROMAN = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"];
+
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun, LevelFormat,
+          Table, TableRow, TableCell, WidthType } = window.docx;
   const BULLET_REF = "hyr-bullets";
+  const LS = { line: 276, lineRule: "auto" };
 
   function b64ToUint8(b64) {
     const bin = atob(b64);
@@ -2740,142 +2838,181 @@ function hyrDownloadWord(reportText, studentName, period, year, chartData = {}, 
     return arr;
   }
 
-  const paragraphs = [];
-
-  const LINE_SPACING = { line: 276, lineRule: "auto" };
-
-  // Title
-  paragraphs.push(new Paragraph({
-    children: [new TextRun({ text: `${studentName} — Half Year Report`, bold: true, size: 28 })],
-    heading: HeadingLevel.HEADING_1,
-    alignment: AlignmentType.CENTER,
-    spacing: { after: 120, ...LINE_SPACING }
-  }));
-  paragraphs.push(new Paragraph({
-    children: [new TextRun({ text: periodLabel, size: 22, color: "555555" })],
-    alignment: AlignmentType.CENTER,
-    spacing: { after: 400, ...LINE_SPACING }
-  }));
-
-  // Parse inline markdown (**bold**, _italic_) into TextRun objects
-  function inlineRuns(text, baseSize = 22) {
-    const runs = [];
-    const re = /(\*\*[^*]+\*\*|_[^_]+_)/g;
-    let lastIdx = 0, m;
-    while ((m = re.exec(text)) !== null) {
-      if (m.index > lastIdx) runs.push(new TextRun({ text: text.slice(lastIdx, m.index), size: baseSize }));
-      if (m[0].startsWith("**")) runs.push(new TextRun({ text: m[0].slice(2, -2), bold: true, size: baseSize }));
-      else runs.push(new TextRun({ text: m[0].slice(1, -1), italics: true, size: baseSize }));
-      lastIdx = m.index + m[0].length;
-    }
-    if (lastIdx < text.length) runs.push(new TextRun({ text: text.slice(lastIdx), size: baseSize }));
-    return runs;
+  function mkPara(text, opts = {}) {
+    return new Paragraph({
+      children: [new TextRun({ text, bold: opts.bold, italics: opts.italics, size: opts.size || 22, color: opts.color })],
+      heading: opts.heading,
+      alignment: opts.align || AlignmentType.LEFT,
+      spacing: { before: opts.before || 0, after: opts.after || 140, ...LS },
+      pageBreakBefore: opts.pageBreak || false
+    });
   }
 
-  const summaryB64 = Object.keys(chartData).length > 0
-    ? hyrDrawSummaryChart(chartData, studentName, period, year) : null;
-  let summaryDone = false;
+  function bulletPara(text) {
+    const runs = [];
+    const re = /(\*\*[^*]+\*\*|_[^_]+_)/g;
+    let idx = 0, m;
+    while ((m = re.exec(text)) !== null) {
+      if (m.index > idx) runs.push(new TextRun({ text: text.slice(idx, m.index), size: 22 }));
+      if (m[0].startsWith("**")) runs.push(new TextRun({ text: m[0].slice(2, -2), bold: true, size: 22 }));
+      else runs.push(new TextRun({ text: m[0].slice(1, -1), italics: true, size: 22 }));
+      idx = m.index + m[0].length;
+    }
+    if (idx < text.length) runs.push(new TextRun({ text: text.slice(idx), size: 22 }));
+    return new Paragraph({ children: runs, numbering: { reference: BULLET_REF, level: 0 }, alignment: AlignmentType.BOTH, spacing: { after: 100, ...LS } });
+  }
 
-  for (const line of reportText.split("\n")) {
+  function mkTrendTable() {
+    const mkCell = (text, opts = {}) => new TableCell({
+      children: [new Paragraph({
+        children: [new TextRun({ text, bold: opts.bold, color: opts.color, size: 20, italics: opts.italics })],
+        alignment: opts.align || AlignmentType.CENTER,
+        spacing: { before: 60, after: 60 }
+      })],
+      shading: opts.bg ? { fill: opts.bg } : undefined
+    });
+    const HDR = "dce6f1";
+    const headerRow = new TableRow({ tableHeader: true, children: [
+      mkCell("Target", { bold: true, bg: HDR, align: AlignmentType.LEFT }),
+      mkCell("Trendline Start", { bold: true, bg: HDR }),
+      mkCell("Trendline End", { bold: true, bg: HDR }),
+      mkCell("Net Change (pp)", { bold: true, bg: HDR }),
+      mkCell("Status", { bold: true, bg: HDR })
+    ]});
+    const dataRows = trendRows.map(r => {
+      if (r.noData) return new TableRow({ children: [
+        mkCell(r.name, { align: AlignmentType.LEFT }), mkCell(""), mkCell(""), mkCell(""),
+        mkCell("No data", { color: "9CA3AF", italics: true })
+      ]});
+      const dc = r.direction === "Trending Up" ? "16A34A" : r.direction === "Trending Down" ? "DC2626" : "6B7280";
+      const deltaStr = `${r.delta >= 0 ? "+" : ""}${r.delta}`;
+      return new TableRow({ children: [
+        mkCell(r.name, { align: AlignmentType.LEFT }),
+        mkCell(`${r.tStart}%`), mkCell(`${r.tEnd}%`), mkCell(deltaStr),
+        mkCell(r.direction, { color: dc, bold: true })
+      ]});
+    });
+    return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...dataRows] });
+  }
+
+  function targetSectionParas(rows) {
+    const paras = [];
+    rows.forEach((r, i) => {
+      const deltaStr = `${r.delta >= 0 ? "+" : ""}${r.delta}pp`;
+      paras.push(new Paragraph({
+        children: [new TextRun({ text: `${ROMAN[i] || i + 1}. ${r.name}   [${r.tStart}% ➔ ${r.tEnd}% | ${deltaStr} (${r.direction})]`, bold: true, size: 22 })],
+        spacing: { before: 200, after: 100, ...LS }
+      }));
+      const lb64 = hyrDrawLineChart(r.name, r.labels, r.values, period, year);
+      if (lb64) paras.push(new Paragraph({
+        children: [new ImageRun({ data: b64ToUint8(lb64), transformation: { width: 540, height: 280 }, type: "png" })],
+        alignment: AlignmentType.CENTER, spacing: { after: 80 }
+      }));
+      (parsed.observations[r.name] || "").split("\n").forEach(line => {
+        const t = line.trim();
+        if (t.startsWith("•")) paras.push(bulletPara(t.slice(1).trim()));
+      });
+    });
+    return paras;
+  }
+
+  const paragraphs = [];
+
+  // ── Cover Page ──────────────────────────────────────────────
+  paragraphs.push(new Paragraph({
+    children: [new TextRun({ text: "Half-Year Progress Report", bold: true, size: 36 })],
+    alignment: AlignmentType.CENTER, spacing: { before: 1440, after: 200 }
+  }));
+  paragraphs.push(new Paragraph({
+    children: [new TextRun({ text: student.name, size: 28, bold: true })],
+    alignment: AlignmentType.CENTER, spacing: { after: 120 }
+  }));
+  paragraphs.push(new Paragraph({
+    children: [new TextRun({ text: periodLabel, size: 24, color: "555555" })],
+    alignment: AlignmentType.CENTER, spacing: { after: 960 }
+  }));
+  paragraphs.push(mkPara(`Student: ${student.name}`, { after: 80 }));
+  paragraphs.push(mkPara(`Date of Report: ${new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}`, { after: 200 }));
+  paragraphs.push(mkPara(
+    `Purpose of Report: This report documents ${student.name}'s progress across the ${halfText} half of ${year} (${monthRange}) in ${n} key therapy target${n !== 1 ? "s" : ""}: ${targetList}. The therapy team has prepared this report to give you a clear overview of ${firstName}'s development and the areas we will continue to focus on in the coming months.`,
+    { after: 400 }
+  ));
+
+  // ── Section 1: Executive Overview ──────────────────────────
+  paragraphs.push(mkPara("Section 1: Executive Overview", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true }));
+  paragraphs.push(mkPara(
+    "To provide an accurate picture of each child's progress, a linear trendline was applied to the monthly average scores for each monitored target. Directly comparing the first and last month of the period can be misleading — a strong January and a strong June might conceal a significant dip in between. The trendline captures the overall direction of progress across all months in the reporting period, offering a more reliable and complete view of each child's developmental trajectory.",
+    { after: 200 }
+  ));
+  paragraphs.push(mkTrendTable());
+  paragraphs.push(new Paragraph({
+    children: [new TextRun({ text: "Classification: Trending Up (↑) = Net Change > +8pp  |  Stable (→) = Net Change within ±8pp  |  Trending Down (↓) = Net Change < −8pp", italics: true, size: 18, color: "6b7280" })],
+    spacing: { before: 100, after: 200, ...LS }
+  }));
+  paragraphs.push(mkPara("Executive Summary", { heading: HeadingLevel.HEADING_2, before: 200, after: 120 }));
+  paragraphs.push(mkPara(parsed.executiveSummary || "", { after: 200 }));
+
+  // ── Section 2: Most Improved & Strengths ───────────────────
+  paragraphs.push(mkPara("Section 2: Most Improved & Strengths", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true }));
+  paragraphs.push(mkPara("2a) Most Improved — Trending Up (Net Change > +8pp)", { heading: HeadingLevel.HEADING_2, before: 200, after: 120 }));
+  if (categorized.mostImproved.length) paragraphs.push(...targetSectionParas(categorized.mostImproved));
+  else paragraphs.push(mkPara("No targets in this category.", { italics: true, color: "9CA3AF" }));
+  paragraphs.push(mkPara("2b) Strengths — High & Stable (Trendline End ≥80%, Stable)", { heading: HeadingLevel.HEADING_2, before: 300, after: 120 }));
+  if (categorized.strengths.length) paragraphs.push(...targetSectionParas(categorized.strengths));
+  else paragraphs.push(mkPara("No targets in this category.", { italics: true, color: "9CA3AF" }));
+
+  // ── Qualitative Targets ─────────────────────────────────────
+  if (categorized.qualitative.length) {
+    paragraphs.push(mkPara("Qualitative Targets (No Numerical Data)", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true }));
+    categorized.qualitative.forEach(r => {
+      paragraphs.push(new Paragraph({ children: [new TextRun({ text: r.name, bold: true, size: 22 })], spacing: { before: 200, after: 60 } }));
+      paragraphs.push(mkPara(`No numerical data was recorded for ${r.name} during ${periodLabel}.`, { italics: true, color: "9CA3AF", after: 160 }));
+    });
+  }
+
+  // ── Section 3: Needs Extra Support & Emerging Skills ───────
+  paragraphs.push(mkPara("Section 3: Needs Extra Support & Emerging Skills", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true }));
+  paragraphs.push(mkPara("3a) Needs Extra Support — Trending Down (Net Change < −8pp)", { heading: HeadingLevel.HEADING_2, before: 200, after: 120 }));
+  if (categorized.needsSupport.length) paragraphs.push(...targetSectionParas(categorized.needsSupport));
+  else paragraphs.push(mkPara("No targets in this category.", { italics: true, color: "9CA3AF" }));
+  paragraphs.push(mkPara("3b) Emerging Skills — Stable but Below 80%", { heading: HeadingLevel.HEADING_2, before: 300, after: 120 }));
+  if (categorized.emerging.length) paragraphs.push(...targetSectionParas(categorized.emerging));
+  else paragraphs.push(mkPara("No targets in this category.", { italics: true, color: "9CA3AF" }));
+
+  // ── Section 4: Next Term Action Plan ───────────────────────
+  paragraphs.push(mkPara("Section 4: Next Term Action Plan", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true }));
+  (parsed.actionPlan || "").split("\n").forEach(line => {
     const t = line.trim();
-    if (!t || t === "---") continue;
+    if (t.startsWith("•")) paragraphs.push(bulletPara(t.slice(1).trim()));
+  });
 
-    if (t.startsWith("# ")) {
-      paragraphs.push(new Paragraph({
-        children: [new TextRun({ text: t.slice(2), bold: true, size: 26 })],
-        heading: HeadingLevel.HEADING_1,
-        spacing: { before: 560, after: 160, ...LINE_SPACING }
-      }));
-    } else if (t.startsWith("## ")) {
-      const heading = t.slice(3);
-      const chart = hyrChartForHeading(heading, chartData);
-      if (chart && !summaryDone && summaryB64) {
+  // ── Section 5: Appendix ─────────────────────────────────────
+  const appendixTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped && breakdownData[t.name]?.length);
+  if (appendixTargets.length) {
+    paragraphs.push(mkPara("Section 5: Appendix — Activity Breakdown Charts", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true }));
+    const rangeLabel = period === "H1" ? `Jan–Jun ${year}` : `Jul–Dec ${year}`;
+    for (const target of appendixTargets) {
+      const abResult = renderActivityBreakdownChart(target.name, hyrToActivityData(breakdownData[target.name]), rangeLabel);
+      if (abResult) {
+        const abH = Math.round(601 * abResult.height / 760);
+        paragraphs.push(mkPara(target.name, { heading: HeadingLevel.HEADING_2, before: 200, after: 120 }));
         paragraphs.push(new Paragraph({
-          children: [new TextRun({ text: "Half-Year Progress Overview", bold: true, size: 24 })],
-          heading: HeadingLevel.HEADING_2,
-          spacing: { before: 480, after: 120, ...LINE_SPACING }
+          children: [new ImageRun({ data: b64ToUint8(abResult.base64), transformation: { width: 601, height: abH }, type: "png" })],
+          alignment: AlignmentType.CENTER, spacing: { after: 240 }
         }));
-        paragraphs.push(new Paragraph({
-          children: [new ImageRun({ data: b64ToUint8(summaryB64), transformation: { width: 601, height: 341 }, type: "png" })],
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 100 }
-        }));
-        paragraphs.push(new Paragraph({
-          children: [new TextRun({ text: "Trend classification: a change of more than +8 percentage points from the earliest to latest month is classified as Trending Up (↑); a change of less than -8 percentage points is classified as Trending Down (↓); within ±8 percentage points is classified as Stable (→).", italics: true, size: 18, color: "6b7280" })],
-          spacing: { after: 200, ...LINE_SPACING }
-        }));
-        summaryDone = true;
       }
-      paragraphs.push(new Paragraph({
-        children: [new TextRun({ text: heading, bold: true, size: 24 })],
-        heading: HeadingLevel.HEADING_2,
-        spacing: { before: 480, after: 120, ...LINE_SPACING }
-      }));
-      if (chart) {
-        const lb64 = hyrDrawLineChart(chart.tName, chart.labels, chart.values, period, year);
-        if (lb64) paragraphs.push(new Paragraph({
-          children: [new ImageRun({ data: b64ToUint8(lb64), transformation: { width: 601, height: 311 }, type: "png" })],
-          alignment: AlignmentType.CENTER,
-          spacing: { after: chart && selectedBreakdownTargets.has(chart.tName) ? 60 : 120 }
-        }));
-        if (chart && selectedBreakdownTargets.has(chart.tName) && breakdownData[chart.tName]?.length) {
-          const rangeLabel = period === "H1" ? `Jan–Jun ${year}` : `Jul–Dec ${year}`;
-          const abResult = renderActivityBreakdownChart(chart.tName, hyrToActivityData(breakdownData[chart.tName]), rangeLabel);
-          if (abResult) {
-            const abH = Math.round(601 * abResult.height / 760);
-            paragraphs.push(new Paragraph({
-              children: [new ImageRun({ data: b64ToUint8(abResult.base64), transformation: { width: 601, height: abH }, type: "png" })],
-              alignment: AlignmentType.CENTER,
-              spacing: { after: 120 }
-            }));
-          }
-        }
-      }
-    } else if (t.startsWith("### ")) {
-      paragraphs.push(new Paragraph({
-        children: [new TextRun({ text: t.slice(4), bold: true, size: 22 })],
-        heading: HeadingLevel.HEADING_3,
-        spacing: { before: 200, after: 80, ...LINE_SPACING }
-      }));
-    } else if (t.startsWith("• ")) {
-      paragraphs.push(new Paragraph({
-        children: inlineRuns(t.slice(2)),
-        numbering: { reference: BULLET_REF, level: 0 },
-        alignment: AlignmentType.BOTH,
-        spacing: { after: 100, ...LINE_SPACING }
-      }));
-    } else {
-      paragraphs.push(new Paragraph({
-        children: inlineRuns(t),
-        alignment: AlignmentType.BOTH,
-        spacing: { after: 140, ...LINE_SPACING }
-      }));
     }
   }
 
   const doc = new Document({
-    numbering: {
-      config: [{
-        reference: BULLET_REF,
-        levels: [{
-          level: 0,
-          format: LevelFormat?.BULLET ?? "bullet",
-          text: "•",
-          alignment: AlignmentType.LEFT,
-          style: {
-            paragraph: { indent: { left: 720, hanging: 360 } },
-            run: { size: 22 }
-          }
-        }]
-      }]
-    },
+    numbering: { config: [{ reference: BULLET_REF, levels: [{ level: 0, format: LevelFormat?.BULLET ?? "bullet", text: "•", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } }, run: { size: 22 } } }] }] },
     sections: [{ properties: {}, children: paragraphs }]
   });
 
   Packer.toBlob(doc).then(blob => {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `${studentName} Half Year Report ${period} ${year}.docx`;
+    a.download = `${student.name} Half Year Report ${period} ${year}.docx`;
     a.click();
     URL.revokeObjectURL(a.href);
   });
