@@ -553,7 +553,7 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
     titleRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
 
     // Column header row
-    const hdr = ws.addRow(["Target", "Trendline Start %", "Trendline End %", "Change (pp)", "Direction"]);
+    const hdr = ws.addRow(["Target", "Trendline Start", "Trendline End", "Net Change (pp)", "Status"]);
     for (let c = 1; c <= NUM_COLS; c++) {
       hdr.getCell(c).fill      = STYLE_COL_HEADER.fill;
       hdr.getCell(c).font      = STYLE_COL_HEADER.font;
@@ -590,7 +590,7 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
         r.getCell(5).font = { italic: true, color: { argb: "FF9CA3AF" } };
         continue;
       }
-      const deltaStr  = row.delta >= 0 ? `+${row.delta}pp` : `${row.delta}pp`;
+      const deltaStr  = row.delta >= 0 ? `+${row.delta}` : `${row.delta}`;
       const direction = Math.abs(row.delta) <= 8 ? "Stable" : row.delta > 0 ? "Trending Up" : "Trending Down";
       const r         = ws.addRow([row.name, `${row.tStart}%`, `${row.tEnd}%`, deltaStr, direction]);
       const dirColor  = direction === "Trending Up" ? "FF16A34A" : direction === "Trending Down" ? "FFDC2626" : "FF6B7280";
