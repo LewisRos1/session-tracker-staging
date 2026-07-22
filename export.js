@@ -739,7 +739,7 @@ function renderActivityBreakdownChart(targetName, activityData, periodLabel) {
 
   ctx.strokeStyle = "#000000"; ctx.lineWidth = 1;
   ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
-  return canvas.toDataURL("image/png").split(",")[1];
+  return { base64: canvas.toDataURL("image/png").split(",")[1], height: H };
 }
 
 function addActivityBreakdownSheet(wb, allTargets, sessions) {
@@ -872,6 +872,11 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
               targetDNMap[a.activityName] = targetDNMap[paKey] || paKey;
               continue;
             }
+            // Skip orphaned predefined records: isPredefined=true means the record was created
+            // from a predefined activity config entry — if it got here it means the config name
+            // has since changed and we have no way to match it back. Showing it as a separate
+            // row would create duplicates. Non-predefined records are genuinely user-added extras.
+            if (a.isPredefined) continue;
             actDisplayNameMap[a.activityName] = a.activityTitle || a.activityName;
             actStatusMap[a.activityName] = "active";
             extraNames.push(a.activityName);
@@ -929,10 +934,9 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
     ];
     if (activityData.filter(a => !a.isSectionHeader).length === 0) continue;
 
-    const base64 = renderActivityBreakdownChart(target.name, activityData, periodLabel);
-    if (!base64) continue;
-    const SECTION_H = 28, ROW_H = 46;
-    const chartH = 52 + activityData.reduce((s, a) => s + (a.isSectionHeader ? SECTION_H : ROW_H), 0) + 72;
+    const chartResult = renderActivityBreakdownChart(target.name, activityData, periodLabel);
+    if (!chartResult) continue;
+    const { base64, height: chartH } = chartResult;
     const imgId = wb.addImage({ base64, extension: "png" });
     ws.addImage(imgId, { tl: { col: 0, row: rowOffset }, ext: { width: 620, height: chartH } });
     const rowsNeeded = Math.ceil(chartH / 20) + 3;
