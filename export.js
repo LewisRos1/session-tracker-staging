@@ -606,8 +606,9 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
 function renderActivityBreakdownChart(targetName, activityData, periodLabel) {
   if (!activityData || activityData.length === 0) return null;
   const SCALE = 2, R = 7, SECTION_H = 28;
-  const PAD = { top: 52, right: 88, bottom: 72, left: 250 };
-  const W = 700;
+  const PAD = { top: 52, right: 148, bottom: 72, left: 250 };
+  const W = 760;
+  const MONTHS_COL_X = 664, MONTHS_COL_W = 56;
   const LABEL_MAX_W = PAD.left - 16;
   const LINE_H = 13, ROW_PAD_V = 8, MIN_ROW_H = 36;
 
@@ -649,6 +650,14 @@ function renderActivityBreakdownChart(targetName, activityData, periodLabel) {
   ctx.font = "bold 13px sans-serif"; ctx.fillStyle = "#111"; ctx.textAlign = "left";
   ctx.fillText(`${targetName} — Progress (${periodLabel})`, 10, 28);
 
+  // Column headers
+  ctx.font = "bold 9.5px sans-serif"; ctx.fillStyle = "#6b7280";
+  ctx.textAlign = "right";  ctx.fillText("Activity",  PAD.left - 10, PAD.top - 7);
+  ctx.textAlign = "center"; ctx.fillText("Progress",  PAD.left + cW / 2, PAD.top - 7);
+  ctx.textAlign = "center"; ctx.fillText("Months",    MONTHS_COL_X + MONTHS_COL_W / 2, PAD.top - 7);
+  ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 0.5;
+  ctx.beginPath(); ctx.moveTo(0, PAD.top - 1); ctx.lineTo(W, PAD.top - 1); ctx.stroke();
+
   // Row backgrounds
   let yPos = PAD.top;
   let dataRowIdx = 0;
@@ -668,6 +677,9 @@ function renderActivityBreakdownChart(targetName, activityData, periodLabel) {
     const x = toX(v);
     ctx.beginPath(); ctx.moveTo(x, PAD.top); ctx.lineTo(x, plotBottom); ctx.stroke();
   }
+  // Months column separator
+  ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 0.5;
+  ctx.beginPath(); ctx.moveTo(MONTHS_COL_X, PAD.top - 1); ctx.lineTo(MONTHS_COL_X, plotBottom); ctx.stroke();
 
   // Activity rows
   yPos = PAD.top;
@@ -722,6 +734,12 @@ function renderActivityBreakdownChart(targetName, activityData, periodLabel) {
         if (eAvg === null || lAvg >= eAvg) { ctx.textAlign = "left"; ctx.fillText(`${lAvg}%`, lX + R + 3, cy + 4); }
         else { ctx.textAlign = "right"; ctx.fillText(`${lAvg}%`, lX - R - 3, cy + 4); }
       }
+    }
+
+    // Month count in Months column
+    if (act.monthCount != null) {
+      ctx.font = "11px sans-serif"; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
+      ctx.fillText(String(act.monthCount), MONTHS_COL_X + MONTHS_COL_W / 2, cy + 4);
     }
   }
 
@@ -937,7 +955,8 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
         latest = { label: month.split(" ")[0].slice(0, 3), avg: mAvg };
       }
       if (earliest === null) return null;
-      return { name: dnMap[actName] || actName, earliestLabel: earliest.label, earliestAvg: earliest.avg, latestLabel: latest.label, latestAvg: latest.avg };
+      const monthCount = Object.values(monthBuckets).filter(b => b.length > 0).length;
+      return { name: dnMap[actName] || actName, earliestLabel: earliest.label, earliestAvg: earliest.avg, latestLabel: latest.label, latestAvg: latest.avg, monthCount };
     };
 
     const activeData       = activeNames.map(n => buildEntry(n, activeDNMap, paKeyToAliases[n] || [])).filter(Boolean);
@@ -957,7 +976,7 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
     if (!chartResult) continue;
     const { base64, height: chartH } = chartResult;
     const imgId = wb.addImage({ base64, extension: "png" });
-    ws.addImage(imgId, { tl: { col: 0, row: rowOffset }, ext: { width: 620, height: chartH } });
+    ws.addImage(imgId, { tl: { col: 0, row: rowOffset }, ext: { width: 673, height: chartH } });
     const rowsNeeded = Math.ceil(chartH / 20) + 3;
     for (let r = rowOffset; r < rowOffset + rowsNeeded; r++) ws.addRow([]);
     rowOffset += rowsNeeded;
