@@ -155,7 +155,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1033";
+const APP_VERSION = "1034";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -5598,13 +5598,22 @@ function attachTargetListeners(target) {
       const tgt = student?.targets?.find(t => t.name === state.selectedTargetName);
       if (!student || !tgt) return;
       openManageModal(student, tgt);
-      setTimeout(() => {
-        const el = $("manage-modal-body")?.querySelector(`.entry-block[data-act-id="${CSS.escape(paId)}"]`);
-        if (!el) return;
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      // Modal renders synchronously; rAF lets the browser paint first so
+      // scrollIntoView has real layout dimensions to work with.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (!paId) return;
+        const acts = tgt.predefinedActivities || [];
+        const idx = acts.findIndex(a => a.id === paId);
+        if (idx < 0) return;
+        const modalBody = $("manage-modal-body");
+        const el = modalBody?.querySelector(`.admin-list-item[data-idx="${idx}"]`);
+        if (!el || !modalBody) return;
+        // Scroll the modal body so the element lands ~120px from the top
+        const elOffsetTop = el.offsetTop;
+        modalBody.scrollTop = elOffsetTop - 120;
         el.classList.add("activity-cfg-blink");
         el.addEventListener("animationend", () => el.classList.remove("activity-cfg-blink"), { once: true });
-      }, 80);
+      }));
     });
   });
 
