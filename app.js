@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1036";
+const APP_VERSION = "1037";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2730,7 +2730,8 @@ function hyrShowPreview(reportText, studentName, period, year, chartData = {}, b
 
 function hyrDownloadWord(reportText, studentName, period, year, chartData = {}, breakdownData = {}, selectedBreakdownTargets = new Set()) {
   const periodLabel = period === "H1" ? `January–June ${year}` : `July–December ${year}`;
-  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun } = window.docx;
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun, LevelFormat } = window.docx;
+  const BULLET_REF = "hyr-bullets";
 
   function b64ToUint8(b64) {
     const bin = atob(b64);
@@ -2838,9 +2839,9 @@ function hyrDownloadWord(reportText, studentName, period, year, chartData = {}, 
       }));
     } else if (t.startsWith("• ")) {
       paragraphs.push(new Paragraph({
-        children: [new TextRun({ text: "• ", size: 22 }), ...inlineRuns(t.slice(2))],
+        children: inlineRuns(t.slice(2)),
+        numbering: { reference: BULLET_REF, level: 0 },
         alignment: AlignmentType.BOTH,
-        indent: { left: 360, hanging: 240 },
         spacing: { after: 100, ...LINE_SPACING }
       }));
     } else {
@@ -2852,7 +2853,24 @@ function hyrDownloadWord(reportText, studentName, period, year, chartData = {}, 
     }
   }
 
-  const doc = new Document({ sections: [{ properties: {}, children: paragraphs }] });
+  const doc = new Document({
+    numbering: {
+      config: [{
+        reference: BULLET_REF,
+        levels: [{
+          level: 0,
+          format: LevelFormat?.BULLET ?? "bullet",
+          text: "•",
+          alignment: AlignmentType.LEFT,
+          style: {
+            paragraph: { indent: { left: 720, hanging: 360 } },
+            run: { size: 22 }
+          }
+        }]
+      }]
+    },
+    sections: [{ properties: {}, children: paragraphs }]
+  });
 
   Packer.toBlob(doc).then(blob => {
     const a = document.createElement("a");
