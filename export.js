@@ -794,6 +794,7 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
     const paKeyToAliases  = {};  // paKey (display title) → [legacy activityName values]
     const paLegacyToKey   = {};  // exact legacy pa.name → paKey
     const paConfigIdToKey = {};  // pa.id → paKey (most reliable redirect)
+    const paKeySearchText = {};  // paKey → lowercase combined title+name for fuzzy orphan matching
     for (const pa of (target.predefinedActivities || [])) {
       const key = pa.title || pa.name;
       if (!key) continue;
@@ -803,6 +804,7 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
         paKeyToAliases[key].push(pa.name);
         paLegacyToKey[pa.name] = key;
       }
+      paKeySearchText[key] = ((pa.title || "") + " " + (pa.name || "")).toLowerCase();
     }
 
     let activeIdx = 0, masteredIdx = 0, discontinuedIdx = 0;
@@ -874,6 +876,20 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
               const targetDNMap = status === "mastered" ? masteredDNMap : status === "discontinued" ? discontinuedDNMap : activeDNMap;
               targetDNMap[a.activityName] = targetDNMap[paKey] || paKey;
               continue;
+            }
+            // Skip records with an unrecognised configId — created from a predefined activity
+            // config that has since been deleted or restructured with a new pa.id.
+            if (a.configId && !paConfigIdToKey[a.configId]) continue;
+            // Fuzzy word-overlap: if ≥50% of the record's significant words (4+ chars) match
+            // text in any predefined activity's combined title+name, it's likely an orphaned
+            // predefined record whose name changed beyond what the alias maps can reach.
+            // Minimum 5 words required to avoid false-positives on short user-added extras.
+            const actWords = a.activityName.toLowerCase().match(/\b[a-z]{4,}\b/g);
+            if (actWords && actWords.length >= 5) {
+              const isOrphanedPredefined = Object.values(paKeySearchText).some(
+                text => actWords.filter(w => text.includes(w)).length / actWords.length >= 0.5
+              );
+              if (isOrphanedPredefined) continue;
             }
             // Skip orphaned predefined records: isPredefined=true means the record was created
             // from a predefined activity config entry — if it got here it means the config name
