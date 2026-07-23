@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1050";
+const APP_VERSION = "1051";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3197,14 +3197,6 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     `This report documents ${student.name}'s progress across the ${halfText} half of ${year} (${monthRange}) in ${n} key therapy target${n !== 1 ? "s" : ""}: ${targetList}. The therapy team has prepared this report to give you a clear overview of ${firstName}'s development and the areas we will continue to focus on in the coming months.`,
     { after: 400 }
   ));
-
-  // ── Table of Contents ───────────────────────────────────────
-  paragraphs.push(mkPara("Table of Contents", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
-  const TOCClass = window.docx.TableOfContents;
-  if (TOCClass) {
-    try { paragraphs.push(new TOCClass("Table of Contents", { hyperlink: true, headingStyleRange: "1-2" })); } catch (_) {}
-  }
-  paragraphs.push(mkPara("(If the table of contents appears blank, right-click it in Word and choose \"Update Field\".)", { italics: true, color: "9ca3af", after: 0 }));
 
   // ── Section 1: Executive Overview ──────────────────────────
   paragraphs.push(mkPara("Section 1: Executive Overview", { heading: HeadingLevel.HEADING_1, before: 560, after: 200, pageBreak: true, size: 32, bold: true }));
