@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1064";
+const APP_VERSION = "1065";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2784,9 +2784,14 @@ function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd
   // Trendline endpoint value labels — use pre-computed values if available
   const dispStart = tStart ?? tStartVal;
   const dispEnd   = tEnd   ?? tEndVal;
+  // Collision-aware placement: if trend is within 10pts of the actual data value,
+  // push the label below both dots to avoid overlapping the data label above the dot.
+  const safeTrendY = (tY, dY, tV, dV) => Math.abs(tV - dV) <= 10 ? Math.max(dY, tY) + 20 : tY + 13;
+  const tYS = toY(trendAt(xs[0]));
+  const tYE = toY(trendAt(xs[xs.length - 1]));
   ctx.fillStyle = "#6b7280"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(dispStart + "%", toX(xs[0]), toY(trendAt(xs[0])) + 13);
-  ctx.fillText(dispEnd + "%",   toX(xs[xs.length-1]), toY(trendAt(xs[xs.length-1])) + 13);
+  ctx.fillText(dispStart + "%", toX(xs[0]),             safeTrendY(tYS, toY(pts[0].v),             dispStart, pts[0].v));
+  ctx.fillText(dispEnd   + "%", toX(xs[xs.length - 1]), safeTrendY(tYE, toY(pts[pts.length - 1].v), dispEnd,   pts[pts.length - 1].v));
 
   // Trend annotation subtitle — use pre-computed delta/direction if available
   const dispDelta = delta ?? Math.round(tStartVal !== tEndVal ? tEndVal - tStartVal : ys[ys.length-1] - ys[0]);
@@ -2794,8 +2799,8 @@ function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd
   const ptStr  = (dispDelta >= 0 ? "+" : "") + dispDelta + " points";
   const icon   = dispDir === "Trending Up" ? "↑" : dispDir === "Trending Down" ? "↓" : "→";
   const rngStr = (tStart != null && tEnd != null) ? ` (${tStart}% → ${tEnd}%)` : "";
-  ctx.fillStyle = "#6b7280"; ctx.font = "italic 10px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(`${icon} ${dispDir} | ${ptStr}${rngStr}`, W / 2, 40);
+  ctx.fillStyle = "#6b7280"; ctx.font = "italic 13px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText(`${icon} ${dispDir} | ${ptStr}${rngStr}`, W / 2, 42);
 
   // Data line
   ctx.strokeStyle = "#4472c4"; ctx.lineWidth = 2.5;
