@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1060";
+const APP_VERSION = "1061";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3080,14 +3080,14 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
     return `*${n} - not charted (insufficient data)`;
   });
   if (unchartedNotes.length) {
-    h += `<p style="font-size:.8rem;color:#9ca3af;font-style:italic;margin:0 0 1.25rem">${unchartedNotes.map(esc).join(" &nbsp;&bull;&nbsp; ")}</p>`;
+    h += `<p style="font-size:11pt;color:#9ca3af;font-style:italic;margin:0 0 1.25rem">${unchartedNotes.map(esc).join(" &nbsp;&bull;&nbsp; ")}</p>`;
   }
   if (parsed.biggestWins?.length || parsed.keyFocusAreas?.length) {
     const fmtKI = s => { const c = s.replace(/\*\*/g, ""); const i = c.indexOf(': '); return i > 0 ? `<strong>${esc(c.slice(0,i))}</strong>: ${esc(c.slice(i+2))}` : esc(c); };
     const bwItems = (parsed.biggestWins || []).map(s => `<li style="margin:.5rem 0;line-height:1.6">${fmtKI(s)}</li>`).join("");
     const kfItems = (parsed.keyFocusAreas || []).map(s => `<li style="margin:.5rem 0;line-height:1.6">${fmtKI(s)}</li>`).join("");
     h += `<p style="margin:1.25rem 0 .75rem;line-height:1.7">Below are the top 4 most important wins and the 4 most critical focus areas that ${esc(firstName)} needs support with going into next term.</p>`;
-    h += `<table style="width:100%;border-collapse:collapse;font-size:.93rem;margin:1.25rem 0"><tbody>
+    h += `<table style="width:100%;border-collapse:collapse;font-size:11pt;margin:1.25rem 0"><tbody>
       <tr><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;font-weight:700;text-align:center;vertical-align:middle;width:28%;white-space:nowrap">Biggest Wins</td><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;vertical-align:top"><ol style="margin:0;padding-left:1.4rem">${bwItems}</ol></td></tr>
       <tr><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;font-weight:700;text-align:center;vertical-align:middle;white-space:nowrap">Key Focus Areas</td><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;vertical-align:top"><ol style="margin:0;padding-left:1.4rem">${kfItems}</ol></td></tr>
       <tr><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;font-weight:700;text-align:center;vertical-align:middle;white-space:nowrap">Strategy for Next Term</td><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;min-height:3rem"></td></tr>
@@ -3328,7 +3328,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   }).join("    ");
   if (wUncNotes) {
     paragraphs.push(new Paragraph({
-      children: [new TextRun({ text: wUncNotes, size: 16, italics: true, color: "9CA3AF" })],
+      children: [new TextRun({ text: wUncNotes, size: 22, italics: true, color: "9CA3AF" })],
       alignment: AlignmentType.CENTER, spacing: { before: 0, after: 200 }
     }));
   }
@@ -3338,7 +3338,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
       width: { size: 28, type: WidthType.PERCENTAGE },
       verticalAlign: VerticalAlign.CENTER,
       margins: { top: 100, bottom: 100, left: 150, right: 150 },
-      children: [new Paragraph({ children: [new TextRun({ text, bold: true, size: 20 })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })]
+      children: [new Paragraph({ children: [new TextRun({ text, bold: true, size: 22 })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })]
     });
     const mkKiNumberedCell = (items, numRef = KI_NUM_REF) => new TableCell({
       width: { size: 72, type: WidthType.PERCENTAGE },
@@ -3348,11 +3348,11 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
             const c = s.replace(/\*\*/g, "");
             const ci = c.indexOf(': ');
             const runs = ci > 0
-              ? [new TextRun({ text: c.slice(0, ci), bold: true, size: 20 }), new TextRun({ text: ': ' + c.slice(ci + 2), size: 20 })]
-              : [new TextRun({ text: c, size: 20 })];
+              ? [new TextRun({ text: c.slice(0, ci), bold: true, size: 22 }), new TextRun({ text: ': ' + c.slice(ci + 2), size: 22 })]
+              : [new TextRun({ text: c, size: 22 })];
             return new Paragraph({ children: runs, numbering: { reference: numRef, level: 0 }, alignment: AlignmentType.BOTH, spacing: { before: 40, after: 120, ...LS } });
           })
-        : [new Paragraph({ children: [new TextRun({ text: "", size: 20 })], spacing: { before: 80, after: 80 } })]
+        : [new Paragraph({ children: [new TextRun({ text: "", size: 22 })], spacing: { before: 80, after: 80 } })]
     });
     kiRows.push(new TableRow({ children: [mkKiLabelCell("Biggest Wins"), mkKiNumberedCell(parsed.biggestWins || [], KI_NUM_REF)] }));
     kiRows.push(new TableRow({ children: [mkKiLabelCell("Key Focus Areas"), mkKiNumberedCell(parsed.keyFocusAreas || [], KI_NUM_REF_2)] }));
