@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1043";
+const APP_VERSION = "1044";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2073,6 +2073,10 @@ async function hyrGenerate() {
 
     const aiPrompt = `You are writing a half-year progress report for parents. Keep everything warm, honest, and easy to read.
 
+GLOBAL RULES (apply to every section):
+- Be honest and sympathetic. Do NOT say positive things that are not supported by the data — false reassurance misleads parents and damages trust. Be kind in how you say things, not in what you choose to leave out.
+- NEVER use the em dash symbol (—) anywhere in the report. Use a comma, a full stop, or rewrite the sentence instead.
+
 Student: ${student.name}
 Reporting Period: ${periodLabel}
 
@@ -2086,9 +2090,11 @@ Write exactly 5 sentences summing up ${firstName}'s overall progress this term i
 ===END===
 
 ===KEY_INSIGHTS===
-Based on all session data and observations, write two short statements:
-ROW: Biggest Win | [One sentence — the single most impressive success or breakthrough ${firstName} showed this term. Name the specific skill.]
+Based on all session data and observations, write exactly 4 rows:
+ROW: Biggest Win | [One sentence — the most impressive success or breakthrough ${firstName} showed this term. Name the specific skill. Honest — only if genuinely supported by the data.]
+ROW: Biggest Win | [One sentence — a second meaningful success from a different area. Must be real, not a filler.]
 ROW: Key Focus Area | [One sentence — the most important area that still needs work next term. Be specific about what is difficult.]
+ROW: Key Focus Area | [One sentence — a second important area to focus on next term.]
 ===END===
 
 ${targetsWithData.map(r => `===OBSERVATION: ${r.name}===
@@ -2796,6 +2802,7 @@ function hyrDrawOverviewChart(chartTrendRows) {
   const NET_CTR_Y = BTM_Y0 + BTM_H / 2;
 
   const C_START  = "#7dd3fc";  // sky blue — start bar
+  const C_END    = "#a78bfa";  // violet — end bar
   const C_UP     = "#22c55e";  // green — trending up
   const C_DOWN   = "#ef4444";  // red — trending down
   const C_STABLE = "#9ca3af";  // gray — stable
@@ -2807,7 +2814,7 @@ function hyrDrawOverviewChart(chartTrendRows) {
 
   // Legend
   ctx.font = "11px sans-serif";
-  const leg = [{ color: C_START, label: "Start" }, { color: C_UP, label: "Trending Up" }, { color: C_DOWN, label: "Trending Down" }, { color: C_STABLE, label: "Stable" }];
+  const leg = [{ color: C_START, label: "Start" }, { color: C_END, label: "End" }, { color: C_DOWN, label: "Trending Down" }, { color: C_STABLE, label: "Stable" }, { color: C_UP, label: "Trending Up" }];
   let lx = PAD_L;
   for (const { color, label } of leg) {
     ctx.fillStyle = color; ctx.fillRect(lx, 14, 14, 10);
@@ -2846,7 +2853,7 @@ function hyrDrawOverviewChart(chartTrendRows) {
   for (let i = 0; i < n; i++) {
     const r = chartTrendRows[i];
     const cx = PAD_L + (i + 0.5) * slotW;
-    const ec = r.direction === "Trending Up" ? C_UP : r.direction === "Trending Down" ? C_DOWN : C_STABLE;
+    const dc = r.direction === "Trending Up" ? C_UP : r.direction === "Trending Down" ? C_DOWN : C_STABLE;
 
     // Top: Start bar (sky blue) left of center
     const sH = Math.max(2, (r.tStart / 100) * TOP_H);
@@ -2855,23 +2862,23 @@ function hyrDrawOverviewChart(chartTrendRows) {
     ctx.fillStyle = "#374151"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
     ctx.fillText(r.tStart + "%", sX + BAR_W / 2, TOP_BTM_Y - sH - 4);
 
-    // Top: End bar (direction color) right of center
+    // Top: End bar (violet) right of center
     const eH = Math.max(2, (r.tEnd / 100) * TOP_H);
     const eX = cx + 2;
-    ctx.fillStyle = ec; ctx.fillRect(eX, TOP_BTM_Y - eH, BAR_W, eH);
+    ctx.fillStyle = C_END; ctx.fillRect(eX, TOP_BTM_Y - eH, BAR_W, eH);
     ctx.fillStyle = "#1f2937"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "center";
     ctx.fillText(r.tEnd + "%", eX + BAR_W / 2, TOP_BTM_Y - eH - 4);
 
-    // Bottom: Net change bar
+    // Bottom: Net change bar — color by direction, not by delta sign
     const barH = Math.max(3, (Math.abs(r.delta) / maxAbs) * (BTM_H / 2));
     const barX = cx - BAR_W / 2;
     const dl   = (r.delta >= 0 ? "+" : "") + r.delta + "pp";
     if (r.delta > 0) {
-      ctx.fillStyle = C_UP; ctx.fillRect(barX, NET_CTR_Y - barH, BAR_W, barH);
+      ctx.fillStyle = dc; ctx.fillRect(barX, NET_CTR_Y - barH, BAR_W, barH);
       ctx.fillStyle = "#1f2937"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "center";
       ctx.fillText(dl, cx, NET_CTR_Y - barH - 4);
     } else if (r.delta < 0) {
-      ctx.fillStyle = C_DOWN; ctx.fillRect(barX, NET_CTR_Y, BAR_W, barH);
+      ctx.fillStyle = dc; ctx.fillRect(barX, NET_CTR_Y, BAR_W, barH);
       ctx.fillStyle = "#1f2937"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "center";
       ctx.fillText(dl, cx, NET_CTR_Y + barH + 13);
     } else {
@@ -2893,7 +2900,7 @@ function hyrDrawOverviewChart(chartTrendRows) {
 }
 
 function hyrParseAiResponse(text) {
-  const out = { executiveSummary: "", biggestWin: "", keyFocusArea: "", observations: {}, observed: {}, actionPlanRows: [] };
+  const out = { executiveSummary: "", biggestWins: [], keyFocusAreas: [], observations: {}, observed: {}, actionPlanRows: [] };
   const exec = text.match(/===EXECUTIVE_SUMMARY===\s*([\s\S]*?)\s*===END===/);
   if (exec) out.executiveSummary = exec[1].trim();
   const ki = text.match(/===KEY_INSIGHTS===\s*([\s\S]*?)\s*===END===/);
@@ -2904,8 +2911,8 @@ function hyrParseAiResponse(text) {
         const parts = t.slice(4).split("|");
         if (parts.length >= 2) {
           const key = parts[0].trim(), val = parts[1].trim();
-          if (key === "Biggest Win") out.biggestWin = val;
-          else if (key === "Key Focus Area") out.keyFocusArea = val;
+          if (key === "Biggest Win") out.biggestWins.push(val);
+          else if (key === "Key Focus Area") out.keyFocusAreas.push(val);
         }
       }
     }
@@ -2992,13 +2999,15 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
     const ovResult = hyrDrawOverviewChart(chartTrendRows);
     if (ovResult) h += `<img src="data:image/png;base64,${ovResult.base64}" style="width:100%;max-width:700px;display:block;margin:.5rem 0 1.25rem">`;
   }
-  h += `<p style="margin:.5rem 0 1rem;line-height:1.7;color:#4b5563;font-size:.9rem"><em>Each target appears once. The left (sky blue) bar shows the trendline value at the start of the term, and the right bar shows the trendline value at the end — colour reflects the overall direction. The bottom half shows the net change in percentage points. We use trendlines rather than raw monthly scores to smooth out the normal ups and downs across sessions and give a truer picture of overall progress.</em></p>`;
-  if (parsed.biggestWin || parsed.keyFocusArea) {
-    h += `<div style="margin:1.25rem 0;padding:.85rem 1.1rem;background:#f9fafb;border-left:4px solid #6366f1;border-radius:4px">`;
-    if (parsed.biggestWin)    h += `<p style="margin:0 0 .5rem;line-height:1.6"><strong>Biggest Win:</strong> ${esc(parsed.biggestWin)}</p>`;
-    if (parsed.keyFocusArea)  h += `<p style="margin:0 0 .5rem;line-height:1.6"><strong>Key Focus Area:</strong> ${esc(parsed.keyFocusArea)}</p>`;
-    h += `<p style="margin:0;line-height:1.6"><strong>Strategy for Next Term:</strong></p>`;
-    h += `</div>`;
+  h += `<p style="margin:.5rem 0 1rem;line-height:1.7;color:#4b5563;font-size:.9rem"><em>Each target appears once. The left (sky blue) bar shows the trendline value at the start of the term, and the right bar (violet) shows the trendline value at the end. The bottom half shows the net change in percentage points, coloured by direction. We use trendlines rather than raw monthly scores to smooth out the normal ups and downs across sessions and give a truer picture of overall progress.</em></p>`;
+  if (parsed.biggestWins?.length || parsed.keyFocusAreas?.length) {
+    const bwBullets = (parsed.biggestWins || []).map(s => `<li style="margin:.2rem 0;line-height:1.6">${esc(s)}</li>`).join("");
+    const kfBullets = (parsed.keyFocusAreas || []).map(s => `<li style="margin:.2rem 0;line-height:1.6">${esc(s)}</li>`).join("");
+    h += `<table style="width:100%;border-collapse:collapse;font-size:.93rem;margin:1.25rem 0"><tbody>
+      <tr><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;font-weight:700;vertical-align:top;width:28%;white-space:nowrap">Biggest Wins</td><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;vertical-align:top"><ul style="margin:0;padding-left:1.2rem">${bwBullets}</ul></td></tr>
+      <tr><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;font-weight:700;vertical-align:top;white-space:nowrap">Key Focus Areas</td><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;vertical-align:top"><ul style="margin:0;padding-left:1.2rem">${kfBullets}</ul></td></tr>
+      <tr><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;font-weight:700;vertical-align:top;white-space:nowrap">Strategy for Next Term</td><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;min-height:3rem"></td></tr>
+    </tbody></table>`;
   }
 
   h += `<hr style="margin:2rem 0">`;
@@ -3203,12 +3212,37 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     }));
   }
   paragraphs.push(mkPara(
-    "Each target appears once. The left (sky blue) bar shows the trendline value at the start of the term, and the right bar shows the trendline value at the end — colour reflects the overall direction. The bottom half shows the net change in percentage points. We use trendlines rather than raw monthly scores to smooth out the normal ups and downs across sessions and give a truer picture of overall progress.",
+    "Each target appears once. The left (sky blue) bar shows the trendline value at the start of the term, and the right bar (violet) shows the trendline value at the end. The bottom half shows the net change in percentage points, coloured by direction. We use trendlines rather than raw monthly scores to smooth out the normal ups and downs across sessions and give a truer picture of overall progress.",
     { after: 200, italics: true, color: "4b5563" }
   ));
-  if (parsed.biggestWin) paragraphs.push(mkPara(`Biggest Win: ${parsed.biggestWin}`, { after: 100, bold: false }));
-  if (parsed.keyFocusArea) paragraphs.push(mkPara(`Key Focus Area: ${parsed.keyFocusArea}`, { after: 100, bold: false }));
-  paragraphs.push(mkPara("Strategy for Next Term:", { after: 280 }));
+  if ((parsed.biggestWins?.length || parsed.keyFocusAreas?.length)) {
+    const HDR_KI = "f9fafb";
+    const kiRows = [];
+    const bwText = (parsed.biggestWins || []).map((s, i) => `${i + 1}. ${s}`).join("\n");
+    const kfText = (parsed.keyFocusAreas || []).map((s, i) => `${i + 1}. ${s}`).join("\n");
+    const mkKiCell = (text, bold) => new TableCell({
+      width: bold ? { size: 28, type: WidthType.PERCENTAGE } : { size: 72, type: WidthType.PERCENTAGE },
+      children: [new Paragraph({ children: [new TextRun({ text, bold, size: 20 })], spacing: { before: 80, after: 80 } })]
+    });
+    const mkKiMultiCell = (lines, bold) => new TableCell({
+      width: bold ? { size: 28, type: WidthType.PERCENTAGE } : { size: 72, type: WidthType.PERCENTAGE },
+      children: lines.map(l => new Paragraph({ children: [new TextRun({ text: l, size: 20 })], spacing: { before: 40, after: 40 } }))
+    });
+    kiRows.push(new TableRow({ children: [
+      mkKiMultiCell(["Biggest Wins"], true),
+      mkKiMultiCell((parsed.biggestWins || []).map((s, i) => `${i + 1}. ${s}`), false)
+    ]}));
+    kiRows.push(new TableRow({ children: [
+      mkKiMultiCell(["Key Focus Areas"], true),
+      mkKiMultiCell((parsed.keyFocusAreas || []).map((s, i) => `${i + 1}. ${s}`), false)
+    ]}));
+    kiRows.push(new TableRow({ children: [
+      mkKiMultiCell(["Strategy for Next Term"], true),
+      mkKiMultiCell([""], false)
+    ]}));
+    paragraphs.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: kiRows }));
+    paragraphs.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
+  }
 
   // ── Section 2: Most Improved & Strengths ───────────────────
   paragraphs.push(mkPara("Section 2: Most Improved & Strengths", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
