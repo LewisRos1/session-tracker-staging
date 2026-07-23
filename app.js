@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1061";
+const APP_VERSION = "1062";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3250,7 +3250,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
            : undefined,
       margins: { top: 100, bottom: 100, left: 150, right: 150 },
       children: [new Paragraph({
-        children: [new TextRun({ text, bold: opts.bold, size: opts.size || 20, color: opts.color, italics: opts.italics })],
+        children: [new TextRun({ text, bold: opts.bold, size: opts.size || 22, color: opts.color, italics: opts.italics })],
         alignment: opts.align || AlignmentType.LEFT,
         spacing: { before: 80, after: 80 }
       })],
@@ -3413,10 +3413,10 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     const HDR = "f3f4f6";
     // No.=634, Target=2088, Details=5616, Strategy=5616 DXA (total 13954 = 9.69")
     const headerRow = new TableRow({ tableHeader: true, children: [
-      mkCell("No.", { bold: true, bg: HDR, size: 20, align: AlignmentType.CENTER, dxa: 634 }),
-      mkCell("Target", { bold: true, bg: HDR, size: 20, dxa: 2088, align: AlignmentType.CENTER }),
-      mkCell("Details", { bold: true, bg: HDR, size: 20, dxa: 5616, align: AlignmentType.CENTER }),
-      mkCell("Strategy for Next Term", { bold: true, bg: HDR, size: 20, dxa: 5616, align: AlignmentType.CENTER })
+      mkCell("No.", { bold: true, bg: HDR, size: 22, align: AlignmentType.CENTER, dxa: 634 }),
+      mkCell("Target", { bold: true, bg: HDR, size: 22, dxa: 2088, align: AlignmentType.CENTER }),
+      mkCell("Details", { bold: true, bg: HDR, size: 22, dxa: 5616, align: AlignmentType.CENTER }),
+      mkCell("Strategy for Next Term", { bold: true, bg: HDR, size: 22, dxa: 5616, align: AlignmentType.CENTER })
     ]});
     const dataRows = parsed.actionPlanRows.map((r, idx) => new TableRow({ children: [
       mkCell(String(idx + 1), { align: AlignmentType.CENTER, dxa: 634 }),
@@ -3425,8 +3425,8 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
         width: { size: 5616, type: WidthType.DXA },
         margins: { top: 100, bottom: 100, left: 150, right: 150 },
         children: (r.points || []).length
-          ? (r.points || []).map((p, pi) => new Paragraph({ children: [new TextRun({ text: `${pi + 1}. ${p}`, size: 20 })], spacing: { before: 40, after: 80, ...LS } }))
-          : [new Paragraph({ children: [new TextRun({ text: "", size: 20 })], spacing: { before: 80, after: 80 } })]
+          ? (r.points || []).map((p, pi) => new Paragraph({ children: [new TextRun({ text: `${pi + 1}. ${p}`, size: 22 })], spacing: { before: 40, after: 80, ...LS } }))
+          : [new Paragraph({ children: [new TextRun({ text: "", size: 22 })], spacing: { before: 80, after: 80 } })]
       }),
       mkCell("", { dxa: 5616 })
     ]}));
@@ -3441,13 +3441,13 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     appendixParas.push(mkPara("6.1 How the Sections are Categorized", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
     const HDR2 = "f3f4f6";
     const catHeaderRow = new TableRow({ tableHeader: true, children: [
-      mkCell("Section",  { bold: true, bg: HDR2, size: 20, pct: 28, align: AlignmentType.CENTER }),
-      mkCell("Criteria", { bold: true, bg: HDR2, size: 20, pct: 72, align: AlignmentType.CENTER })
+      mkCell("Section",  { bold: true, bg: HDR2, size: 22, pct: 28, align: AlignmentType.CENTER }),
+      mkCell("Criteria", { bold: true, bg: HDR2, size: 22, pct: 72, align: AlignmentType.CENTER })
     ]});
     // Parse **bold** markers into mixed TextRun arrays for criteria cells
     const richCritCell = (runs, pct) => {
       const children = [];
-      for (const [txt, bd] of runs) children.push(new TextRun({ text: txt, bold: bd, size: 20 }));
+      for (const [txt, bd] of runs) children.push(new TextRun({ text: txt, bold: bd, size: 22 }));
       return new TableCell({ width: { size: pct, type: WidthType.PERCENTAGE }, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: [new Paragraph({ children, spacing: { before: 80, after: 80 } })] });
     };
     const catData = [
@@ -3509,8 +3509,8 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   const doc = new Document({
     numbering: { config: [
       { reference: BULLET_REF, levels: [{ level: 0, format: LevelFormat?.BULLET ?? "bullet", text: "", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } }, run: { fonts: { ascii: "Wingdings", hAnsi: "Wingdings", hint: "default" }, size: 22 } } }] },
-      { reference: KI_NUM_REF,   levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 480, hanging: 240 } }, run: { size: 20 } } }] },
-      { reference: KI_NUM_REF_2, levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 480, hanging: 240 } }, run: { size: 20 } } }] }
+      { reference: KI_NUM_REF,   levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 480, hanging: 240 } }, run: { size: 22 } } }] },
+      { reference: KI_NUM_REF_2, levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 480, hanging: 240 } }, run: { size: 22 } } }] }
     ] },
     sections: docSections
   });
