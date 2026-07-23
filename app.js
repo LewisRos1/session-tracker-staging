@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1048";
+const APP_VERSION = "1049";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2689,9 +2689,9 @@ function hyrDrawActivityBreakdown(targetName, activities, period, year) {
   drawDot(lx + 6, legY1, "#9ca3af", "#6b7280"); ctx.fillStyle = "#374151"; ctx.fillText("Earliest month", lx + 16, legY1); lx += 106;
   drawDot(lx + 6, legY1, "#3b82f6", "#1d4ed8"); ctx.fillStyle = "#374151"; ctx.fillText("Latest month",   lx + 16, legY1);
   lx = Math.round((W - 378) / 2);
-  drawLegLine(lx, legY2, "#22c55e"); ctx.fillStyle = "#374151"; ctx.fillText("Improved (>+8pp)", lx + 22, legY2); lx += 128;
-  drawLegLine(lx, legY2, "#d1d5db"); ctx.fillStyle = "#374151"; ctx.fillText("Stable (±8pp)",    lx + 22, legY2); lx += 110;
-  drawLegLine(lx, legY2, "#ef4444"); ctx.fillStyle = "#374151"; ctx.fillText("Declined (<−8pp)", lx + 22, legY2);
+  drawLegLine(lx, legY2, "#22c55e"); ctx.fillStyle = "#374151"; ctx.fillText("Improved (>+8 pts)", lx + 22, legY2); lx += 136;
+  drawLegLine(lx, legY2, "#d1d5db"); ctx.fillStyle = "#374151"; ctx.fillText("Stable (±8 pts)",    lx + 22, legY2); lx += 116;
+  drawLegLine(lx, legY2, "#ef4444"); ctx.fillStyle = "#374151"; ctx.fillText("Declined (<−8 pts)", lx + 22, legY2);
 
   ctx.strokeStyle = "#000000"; ctx.lineWidth = 1;
   ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
@@ -2756,7 +2756,7 @@ function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd
   // Trend annotation subtitle — use pre-computed delta/direction if available
   const dispDelta = delta ?? Math.round(tStartVal !== tEndVal ? tEndVal - tStartVal : ys[ys.length-1] - ys[0]);
   const dispDir   = direction ?? (dispDelta > 8 ? "Trending Up" : dispDelta < -8 ? "Trending Down" : "Stable");
-  const ppStr = (dispDelta >= 0 ? "+" : "") + dispDelta + "pp";
+  const ppStr = (dispDelta >= 0 ? "+" : "") + dispDelta + " pts";
   const icon  = dispDir === "Trending Up" ? "↑" : dispDir === "Trending Down" ? "↓" : "→";
   ctx.fillStyle = "#6b7280"; ctx.font = "italic 11px sans-serif"; ctx.textAlign = "center";
   ctx.fillText(`${icon} ${dispDir} (${ppStr})`, W / 2, 40);
@@ -2839,7 +2839,7 @@ function hyrDrawOverviewChart(chartTrendRows) {
   // Separator
   ctx.fillStyle = "#f3f4f6"; ctx.fillRect(PAD_L, TOP_BTM_Y + 4, CHART_W, MID_GAP - 8);
   ctx.fillStyle = "#6b7280"; ctx.font = "10px sans-serif"; ctx.textAlign = "left";
-  ctx.fillText("Net Change (pp)", PAD_L, TOP_BTM_Y + MID_GAP / 2 + 4);
+  ctx.fillText("Net Change (pts)", PAD_L, TOP_BTM_Y + MID_GAP / 2 + 4);
 
   // Bottom chart y-axis
   for (const tick of [-maxAbs, -Math.round(maxAbs / 2), 0, Math.round(maxAbs / 2), maxAbs]) {
@@ -2847,7 +2847,7 @@ function hyrDrawOverviewChart(chartTrendRows) {
     ctx.strokeStyle = tick === 0 ? "#374151" : "#e5e7eb"; ctx.lineWidth = tick === 0 ? 1.5 : 1;
     ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(W - PAD_R, y); ctx.stroke();
     ctx.fillStyle = "#9ca3af"; ctx.font = "10px sans-serif"; ctx.textAlign = "right";
-    ctx.fillText((tick > 0 ? "+" : "") + tick + "pp", PAD_L - 5, y + 4);
+    ctx.fillText((tick > 0 ? "+" : "") + tick + " pts", PAD_L - 5, y + 4);
   }
 
   for (let i = 0; i < n; i++) {
@@ -2872,7 +2872,7 @@ function hyrDrawOverviewChart(chartTrendRows) {
     // Bottom: Net change bar — color by direction, not by delta sign
     const barH = Math.max(3, (Math.abs(r.delta) / maxAbs) * (BTM_H / 2));
     const barX = cx - BAR_W / 2;
-    const dl   = (r.delta >= 0 ? "+" : "") + r.delta + "pp";
+    const dl   = (r.delta >= 0 ? "+" : "") + r.delta + " pts";
     if (r.delta > 0) {
       ctx.fillStyle = dc; ctx.fillRect(barX, NET_CTR_Y - barH, BAR_W, barH);
       ctx.fillStyle = "#1f2937"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "center";
@@ -2884,7 +2884,7 @@ function hyrDrawOverviewChart(chartTrendRows) {
     } else {
       ctx.fillStyle = C_STABLE; ctx.fillRect(barX, NET_CTR_Y - 1, BAR_W, 2);
       ctx.fillStyle = "#6b7280"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
-      ctx.fillText("0pp", cx, NET_CTR_Y - 5);
+      ctx.fillText("0 pts", cx, NET_CTR_Y - 5);
     }
 
     // Shared x-axis label rotated -45°
@@ -2948,7 +2948,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   const ROMAN = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"];
 
   const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const deltaFmt = r => `${r.delta >= 0 ? "+" : ""}${r.delta}pp`;
+  const deltaFmt = r => `${r.delta >= 0 ? "+" : ""}${r.delta} points`;
 
   const SECTION_H2 = `font-size:1.45rem;font-weight:800;color:#111827;margin:2rem 0 .6rem;letter-spacing:-.01em`;
   const SECTION_H3 = `font-size:1.1rem;font-weight:700;color:#1f2937;margin:1.5rem 0 .4rem`;
@@ -3154,7 +3154,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   function targetSectionParas(rows, obsKey = "observations") {
     const paras = [];
     rows.forEach((r, i) => {
-      const deltaStr = `${r.delta >= 0 ? "+" : ""}${r.delta}pp`;
+      const deltaStr = `${r.delta >= 0 ? "+" : ""}${r.delta} points`;
       // Empty line before each target
       paras.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
       paras.push(new Paragraph({
