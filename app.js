@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1057";
+const APP_VERSION = "1058";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2097,15 +2097,15 @@ Write exactly 5 sentences summing up ${firstName}'s overall progress this term i
 ===END===
 
 ===KEY_INSIGHTS===
-Based on all session data and observations, write exactly 8 rows:
-ROW: Biggest Win | [One sentence — the most impressive success or breakthrough ${firstName} showed this term. Name the specific skill. Honest — only if genuinely supported by the data.]
-ROW: Biggest Win | [One sentence — a second meaningful success from a different area. Must be real, not a filler.]
-ROW: Biggest Win | [One sentence — a third win or positive sign from another area. If fewer than 3 genuine wins exist, name the smallest real positive — do not invent one.]
-ROW: Biggest Win | [One sentence — a fourth observation of genuine progress. Must be data-backed, not filler.]
-ROW: Key Focus Area | [One sentence — the most important area that still needs work next term. Be specific about what is difficult.]
-ROW: Key Focus Area | [One sentence — a second important area to focus on next term.]
-ROW: Key Focus Area | [One sentence — a third area or skill that needs continued practice next term. Be specific.]
-ROW: Key Focus Area | [One sentence — a fourth area to address. Name the specific skill and why it needs attention.]
+Based on all session data and observations, write exactly 8 rows in this format — short, scannable, memorable:
+ROW: Biggest Win | [2-4 word bold label]: [One short sentence — the specific achievement. Must be data-backed. If no genuine win exists, name the smallest real positive.]
+ROW: Biggest Win | [2-4 word bold label]: [One short sentence — a second genuine success from a different area. Must be real, not filler.]
+ROW: Biggest Win | [2-4 word bold label]: [One short sentence — a third win. Only real positives — do not invent.]
+ROW: Biggest Win | [2-4 word bold label]: [One short sentence — a fourth data-backed achievement.]
+ROW: Key Focus Area | [2-4 word bold label]: [One short sentence — what specifically is difficult and why it needs focus next term.]
+ROW: Key Focus Area | [2-4 word bold label]: [One short sentence — a second area that needs work, with a specific detail.]
+ROW: Key Focus Area | [2-4 word bold label]: [One short sentence — a third area to address next term. Be specific.]
+ROW: Key Focus Area | [2-4 word bold label]: [One short sentence — a fourth focus area with a specific detail.]
 ===END===
 
 ${targetsWithData.map(r => `===OBSERVATION: ${r.name}===
@@ -2134,11 +2134,15 @@ Same rules: plain English, no jargon, no numbers, warm tone. Labels in ** bold.
 ===END===`).join("\n\n")}
 
 ===ACTION_PLAN===
-These are the ${bottom5Names.length} areas where ${firstName} currently has the lowest scores (listed from weakest to strongest): ${bottom5Names.join(", ")}.
+These are the areas where ${firstName} has the lowest scores this term: ${bottom5Names.join(", ")}.
 
-Write exactly ${bottom5Names.length} rows, one for each target above, in the same order. For each row, give a brief, warm explanation of what ${firstName} finds difficult in that area and why it is a priority for next term. Do not add extra targets or change the order.
-Format each row EXACTLY as:
-ROW: [Target Name] | [Brief description — the context behind the focus, not a strategy]
+Write one block for each target above, in the same order. Each block: 2 to 3 short bullet points describing what ${firstName} specifically finds difficult in that area. Keep each point to one brief sentence. No strategies — just the specific difficulties.
+
+Format EXACTLY as (one block per target):
+TARGET: [exact target name]
+• [Specific difficulty]
+• [Specific difficulty]
+• [Optional third difficulty]
 ===END===`;
 
     const resp = await fetch("https://session-tracker-ai.wang-loys22.workers.dev", {
@@ -2968,13 +2972,18 @@ function hyrParseAiResponse(text) {
   }
   const plan = text.match(/===ACTION_PLAN===\s*([\s\S]*?)\s*===END===/);
   if (plan) {
+    let cur = null;
     for (const line of plan[1].split("\n")) {
       const t = line.trim();
-      if (t.startsWith("ROW:")) {
-        const parts = t.slice(4).split("|");
-        if (parts.length >= 2) out.actionPlanRows.push({ skill: parts[0].trim(), goal: parts[1].trim() });
+      if (t.startsWith("TARGET:")) {
+        if (cur) out.actionPlanRows.push(cur);
+        cur = { target: t.slice(7).trim(), points: [] };
+      } else if (cur && (t.startsWith("•") || t.startsWith("-") || t.startsWith("*"))) {
+        const pt = t.replace(/^[•\-\*]\s*/, "").trim();
+        if (pt) cur.points.push(pt);
       }
     }
+    if (cur) out.actionPlanRows.push(cur);
   }
   return out;
 }
@@ -3042,19 +3051,23 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
     const ovResult = hyrDrawOverviewChart(chartTrendRows, ovTitle);
     if (ovResult) h += `<img src="data:image/png;base64,${ovResult.base64}" style="width:100%;max-width:700px;display:block;margin:.5rem 0 .3rem">`;
   }
-  const unchartedNotes = [
-    ...unchartedQual.map(n => `*${n} - not charted (qualitative target)`),
-    ...unchartedNoData.map(n => `*${n} - not charted (insufficient data)`)
-  ];
+  const qualSet = new Set(unchartedQual), noDataSet = new Set(unchartedNoData);
+  const allUncNames = [...new Set([...unchartedQual, ...unchartedNoData])];
+  const unchartedNotes = allUncNames.map(n => {
+    if (qualSet.has(n) && noDataSet.has(n)) return `*${n} - not charted (qualitative target/insufficient data)`;
+    if (qualSet.has(n)) return `*${n} - not charted (qualitative target)`;
+    return `*${n} - not charted (insufficient data)`;
+  });
   if (unchartedNotes.length) {
     h += `<p style="font-size:.8rem;color:#9ca3af;font-style:italic;margin:0 0 1.25rem">${unchartedNotes.map(esc).join(" &nbsp;&bull;&nbsp; ")}</p>`;
   }
   if (parsed.biggestWins?.length || parsed.keyFocusAreas?.length) {
-    const bwItems = (parsed.biggestWins || []).map(s => `<li style="margin:.4rem 0;line-height:1.6">${esc(s)}</li>`).join("");
-    const kfItems = (parsed.keyFocusAreas || []).map(s => `<li style="margin:.4rem 0;line-height:1.6">${esc(s)}</li>`).join("");
+    const fmtKI = s => { const i = s.indexOf(': '); return i > 0 ? `<strong>${esc(s.slice(0,i))}</strong>: ${esc(s.slice(i+2))}` : esc(s); };
+    const bwItems = (parsed.biggestWins || []).map(s => `<li style="margin:.5rem 0;line-height:1.6">${fmtKI(s)}</li>`).join("");
+    const kfItems = (parsed.keyFocusAreas || []).map(s => `<li style="margin:.5rem 0;line-height:1.6">${fmtKI(s)}</li>`).join("");
     h += `<table style="width:100%;border-collapse:collapse;font-size:.93rem;margin:1.25rem 0"><tbody>
-      <tr><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;font-weight:700;text-align:center;vertical-align:middle;width:28%;white-space:nowrap">Biggest Wins</td><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;vertical-align:top;text-align:justify"><ol style="margin:0;padding-left:1.4rem">${bwItems}</ol></td></tr>
-      <tr><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;font-weight:700;text-align:center;vertical-align:middle;white-space:nowrap">Key Focus Areas</td><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;vertical-align:top;text-align:justify"><ol style="margin:0;padding-left:1.4rem">${kfItems}</ol></td></tr>
+      <tr><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;font-weight:700;text-align:center;vertical-align:middle;width:28%;white-space:nowrap">Biggest Wins</td><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;vertical-align:top"><ol style="margin:0;padding-left:1.4rem">${bwItems}</ol></td></tr>
+      <tr><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;font-weight:700;text-align:center;vertical-align:middle;white-space:nowrap">Key Focus Areas</td><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;vertical-align:top"><ol style="margin:0;padding-left:1.4rem">${kfItems}</ol></td></tr>
       <tr><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;font-weight:700;text-align:center;vertical-align:middle;white-space:nowrap">Strategy for Next Term</td><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;min-height:3rem"></td></tr>
     </tbody></table>`;
   }
@@ -3097,10 +3110,22 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   h += `<h2 style="${SECTION_H2}">Section ${planSection}: Next Term Action Plan</h2>`;
   h += `<p style="margin:.5rem 0 1rem;line-height:1.7">The table below highlights the areas where ${esc(firstName)} has the most room for improvement this term. These skills will be the key focus going into the next term, where the therapy team will continue to target each area through structured activities and guided practice.</p>`;
   if (parsed.actionPlanRows.length) {
-    const rows = parsed.actionPlanRows.map((r, idx) =>
-      `<tr><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;text-align:center;width:7.6%;color:#6b7280">${idx + 1}</td><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;font-weight:600;vertical-align:top;width:25%">${esc(r.skill)}</td><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;vertical-align:top;line-height:1.6">${esc(r.goal)}</td></tr>`
-    ).join("");
-    h += `<table style="width:100%;border-collapse:collapse;font-size:.9rem;margin:.75rem 0"><thead><tr style="background:#f3f4f6"><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700;width:7.6%">No.</th><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700;width:25%">Skill / Area</th><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700">Details &amp; Strategy for Next Term</th></tr></thead><tbody>${rows}</tbody></table>`;
+    const rows = parsed.actionPlanRows.map((r, idx) => {
+      const pts = (r.points || []).map(p => `<li style="margin:.25rem 0">${esc(p)}</li>`).join("");
+      return `<tr>
+        <td style="padding:.55rem .75rem;border:1px solid #e5e7eb;text-align:center;width:7.6%;color:#6b7280">${idx + 1}</td>
+        <td style="padding:.55rem .75rem;border:1px solid #e5e7eb;font-weight:600;vertical-align:top;text-align:center;width:25%">${esc(r.target || "")}</td>
+        <td style="padding:.55rem .75rem;border:1px solid #e5e7eb;vertical-align:top"><ul style="margin:0;padding-left:1.2rem;line-height:1.6">${pts}</ul></td>
+        <td style="padding:.55rem .75rem;border:1px solid #e5e7eb;vertical-align:top"></td>
+      </tr>`;
+    }).join("");
+    h += `<table style="width:100%;border-collapse:collapse;font-size:.9rem;margin:.75rem 0">
+      <thead><tr style="background:#f3f4f6">
+        <th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700;width:7.6%">No.</th>
+        <th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700;width:25%">Target</th>
+        <th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700">Details</th>
+        <th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700">Strategy for Next Term</th>
+      </tr></thead><tbody>${rows}</tbody></table>`;
   }
 
   // Section 6: Appendix
@@ -3264,10 +3289,14 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
       alignment: AlignmentType.CENTER, spacing: { after: 60 }
     }));
   }
-  const wUncNotes = [
-    ...categorized.qualitative.map(r => `*${r.name} - not charted (qualitative target)`),
-    ...trendRows.filter(r => r.noData).map(r => `*${r.name} - not charted (insufficient data)`)
-  ].join("    ");
+  const wQualSet  = new Set(categorized.qualitative.map(r => r.name));
+  const wNDSet    = new Set(trendRows.filter(r => r.noData).map(r => r.name));
+  const wAllNames = [...new Set([...wQualSet, ...wNDSet])];
+  const wUncNotes = wAllNames.map(n => {
+    if (wQualSet.has(n) && wNDSet.has(n)) return `*${n} - not charted (qualitative target/insufficient data)`;
+    if (wQualSet.has(n)) return `*${n} - not charted (qualitative target)`;
+    return `*${n} - not charted (insufficient data)`;
+  }).join("    ");
   if (wUncNotes) {
     paragraphs.push(new Paragraph({
       children: [new TextRun({ text: wUncNotes, size: 16, italics: true, color: "9CA3AF" })],
@@ -3286,7 +3315,13 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
       width: { size: 72, type: WidthType.PERCENTAGE },
       margins: { top: 100, bottom: 100, left: 150, right: 150 },
       children: items.length
-        ? items.map(s => new Paragraph({ children: [new TextRun({ text: s, size: 20 })], numbering: { reference: numRef, level: 0 }, alignment: AlignmentType.BOTH, spacing: { before: 40, after: 120, ...LS } }))
+        ? items.map(s => {
+            const ci = s.indexOf(': ');
+            const runs = ci > 0
+              ? [new TextRun({ text: s.slice(0, ci), bold: true, size: 20 }), new TextRun({ text: ': ' + s.slice(ci + 2), size: 20 })]
+              : [new TextRun({ text: s, size: 20 })];
+            return new Paragraph({ children: runs, numbering: { reference: numRef, level: 0 }, alignment: AlignmentType.BOTH, spacing: { before: 40, after: 120, ...LS } });
+          })
         : [new Paragraph({ children: [new TextRun({ text: "", size: 20 })], spacing: { before: 80, after: 80 } })]
     });
     kiRows.push(new TableRow({ children: [mkKiLabelCell("Biggest Wins"), mkKiNumberedCell(parsed.biggestWins || [], KI_NUM_REF)] }));
@@ -3345,18 +3380,26 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   ));
   if (parsed.actionPlanRows?.length) {
     const HDR = "f3f4f6";
-    // Column widths: No.=0.44" (634 DXA), Skill/Area=1.45" (2088 DXA), Details & Strategy=3.9" (5616 DXA)
+    // No.=634, Target=2088, Details=5616, Strategy=5616 DXA (total 13954 = 9.69")
     const headerRow = new TableRow({ tableHeader: true, children: [
       mkCell("No.", { bold: true, bg: HDR, size: 20, align: AlignmentType.CENTER, dxa: 634 }),
-      mkCell("Skill / Area", { bold: true, bg: HDR, size: 20, dxa: 2088, align: AlignmentType.CENTER }),
-      mkCell("Details & Strategy for Next Term", { bold: true, bg: HDR, size: 20, dxa: 5616, align: AlignmentType.CENTER })
+      mkCell("Target", { bold: true, bg: HDR, size: 20, dxa: 2088, align: AlignmentType.CENTER }),
+      mkCell("Details", { bold: true, bg: HDR, size: 20, dxa: 5616, align: AlignmentType.CENTER }),
+      mkCell("Strategy for Next Term", { bold: true, bg: HDR, size: 20, dxa: 5616, align: AlignmentType.CENTER })
     ]});
     const dataRows = parsed.actionPlanRows.map((r, idx) => new TableRow({ children: [
       mkCell(String(idx + 1), { align: AlignmentType.CENTER, dxa: 634 }),
-      mkCell(r.skill || "", { dxa: 2088, align: AlignmentType.CENTER }),
-      mkCell(r.goal || "", { dxa: 5616 })
+      mkCell(r.target || "", { dxa: 2088, align: AlignmentType.CENTER }),
+      new TableCell({
+        width: { size: 5616, type: WidthType.DXA },
+        margins: { top: 100, bottom: 100, left: 150, right: 150 },
+        children: (r.points || []).length
+          ? (r.points || []).map(p => new Paragraph({ children: [new TextRun({ text: p, size: 20 })], style: "List Bullet", spacing: { before: 40, after: 80 } }))
+          : [new Paragraph({ children: [new TextRun({ text: "", size: 20 })], spacing: { before: 80, after: 80 } })]
+      }),
+      mkCell("", { dxa: 5616 })
     ]}));
-    actionPlanParas.push(new Table({ width: { size: 8338, type: WidthType.DXA }, rows: [headerRow, ...dataRows] }));
+    actionPlanParas.push(new Table({ width: { size: 13954, type: WidthType.DXA }, rows: [headerRow, ...dataRows] }));
   }
 
   // ── Section: Appendix (portrait) ───────────────────────────
