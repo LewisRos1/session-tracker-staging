@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1063";
+const APP_VERSION = "1064";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3090,11 +3090,11 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
     const kfItems = (parsed.keyFocusAreas || []).map(s => `<li style="margin:.5rem 0;line-height:1.6">${fmtKI(s)}</li>`).join("");
     h += `<p style="margin:1.25rem 0 .75rem;line-height:1.7">Below are the top 4 most important wins and the 4 most critical focus areas that ${esc(firstName)} needs support with going into next term (${esc(nextMonthRange)} ${nextTermYear}).</p>`;
     h += `<table style="width:100%;border-collapse:collapse;font-size:11pt;margin:1.25rem 0">
-      <thead><tr style="background:#f3f4f6">
+      <tbody>
+      <tr style="background:#f3f4f6">
         <th style="padding:.6rem .85rem;border:1px solid #e5e7eb;text-align:center;font-weight:700;width:28%">Category</th>
         <th style="padding:.6rem .85rem;border:1px solid #e5e7eb;text-align:center;font-weight:700">Top 4 Highlights</th>
-      </tr></thead>
-      <tbody>
+      </tr>
       <tr><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;font-weight:700;text-align:center;vertical-align:middle;width:28%;white-space:nowrap">Biggest Wins</td><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;vertical-align:top"><ol style="margin:0;padding-left:1.4rem">${bwItems}</ol></td></tr>
       <tr><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;font-weight:700;text-align:center;vertical-align:middle;white-space:nowrap">Key Focus Areas</td><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;vertical-align:top"><ol style="margin:0;padding-left:1.4rem">${kfItems}</ol></td></tr>
       <tr><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;font-weight:700;text-align:center;vertical-align:middle;white-space:nowrap">Strategy for Next Term</td><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;min-height:3rem"></td></tr>
@@ -3338,7 +3338,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   if (wUncNotes) {
     paragraphs.push(new Paragraph({
       children: [new TextRun({ text: wUncNotes, size: 22, italics: true, color: "9CA3AF" })],
-      alignment: AlignmentType.CENTER, spacing: { before: 0, after: 200 }
+      alignment: AlignmentType.CENTER, spacing: { before: 0, after: 440 }
     }));
   }
   if ((parsed.biggestWins?.length || parsed.keyFocusAreas?.length)) {
@@ -3363,7 +3363,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
           })
         : [new Paragraph({ children: [new TextRun({ text: "", size: 22 })], spacing: { before: 80, after: 80 } })]
     });
-    kiRows.push(new TableRow({ tableHeader: true, children: [
+    kiRows.push(new TableRow({ children: [
       new TableCell({ width: { size: 28, type: WidthType.PERCENTAGE }, shading: { fill: "f3f4f6" }, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: [new Paragraph({ children: [new TextRun({ text: "Category", bold: true, size: 22 })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })] }),
       new TableCell({ width: { size: 72, type: WidthType.PERCENTAGE }, shading: { fill: "f3f4f6" }, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: [new Paragraph({ children: [new TextRun({ text: "Top 4 Highlights", bold: true, size: 22 })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })] })
     ]}));
