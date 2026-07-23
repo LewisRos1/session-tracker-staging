@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1065";
+const APP_VERSION = "1066";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2880,8 +2880,8 @@ function hyrDrawOverviewChart(chartTrendRows, title) {
     ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(W - PAD_R, y); ctx.stroke();
   }
 
-  // Separator band (labels on y-axis now)
-  ctx.fillStyle = "#f3f4f6"; ctx.fillRect(PAD_L, TOP_BTM_Y + 4, CHART_W, MID_GAP - 8);
+  // Separator band — white to keep clean separation
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(PAD_L, TOP_BTM_Y + 4, CHART_W, MID_GAP - 8);
 
   // Bottom gridlines
   for (const tick of [-maxAbs, -Math.round(maxAbs / 2), 0, Math.round(maxAbs / 2), maxAbs]) {
