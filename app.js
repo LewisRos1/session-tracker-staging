@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1062";
+const APP_VERSION = "1063";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3014,7 +3014,9 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   const n          = tNames.length;
   const targetList = n <= 1 ? (tNames[0] || "") : tNames.slice(0, -1).join(", ") + " and " + tNames[n - 1];
   const halfText   = period === "H1" ? "first" : "second";
-  const monthRange = period === "H1" ? "January to June" : "July to December";
+  const monthRange     = period === "H1" ? "January to June" : "July to December";
+  const nextMonthRange = period === "H1" ? "July to December" : "January to June";
+  const nextTermYear   = period === "H1" ? year : year + 1;
   const ROMAN = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"];
 
   const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -3068,7 +3070,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
     const ovTitle  = `${firstName} - ${monthRange} ${year} Progress`;
     const ovResult = hyrDrawOverviewChart(chartTrendRows, ovTitle);
     if (ovResult) {
-      h += `<p style="margin:.5rem 0 .75rem;line-height:1.7">The chart below shows an overview of ${esc(firstName)}'s overall progress across all targets this term.</p>`;
+      h += `<p style="margin:.5rem 0 .75rem;line-height:1.7">The chart below shows an overview of ${esc(firstName)}'s overall progress across all targets this term (${esc(monthRange)} ${year}).</p>`;
       h += `<img src="data:image/png;base64,${ovResult.base64}" style="width:100%;max-width:700px;display:block;margin:.5rem 0 .3rem">`;
     }
   }
@@ -3086,8 +3088,13 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
     const fmtKI = s => { const c = s.replace(/\*\*/g, ""); const i = c.indexOf(': '); return i > 0 ? `<strong>${esc(c.slice(0,i))}</strong>: ${esc(c.slice(i+2))}` : esc(c); };
     const bwItems = (parsed.biggestWins || []).map(s => `<li style="margin:.5rem 0;line-height:1.6">${fmtKI(s)}</li>`).join("");
     const kfItems = (parsed.keyFocusAreas || []).map(s => `<li style="margin:.5rem 0;line-height:1.6">${fmtKI(s)}</li>`).join("");
-    h += `<p style="margin:1.25rem 0 .75rem;line-height:1.7">Below are the top 4 most important wins and the 4 most critical focus areas that ${esc(firstName)} needs support with going into next term.</p>`;
-    h += `<table style="width:100%;border-collapse:collapse;font-size:11pt;margin:1.25rem 0"><tbody>
+    h += `<p style="margin:1.25rem 0 .75rem;line-height:1.7">Below are the top 4 most important wins and the 4 most critical focus areas that ${esc(firstName)} needs support with going into next term (${esc(nextMonthRange)} ${nextTermYear}).</p>`;
+    h += `<table style="width:100%;border-collapse:collapse;font-size:11pt;margin:1.25rem 0">
+      <thead><tr style="background:#f3f4f6">
+        <th style="padding:.6rem .85rem;border:1px solid #e5e7eb;text-align:center;font-weight:700;width:28%">Category</th>
+        <th style="padding:.6rem .85rem;border:1px solid #e5e7eb;text-align:center;font-weight:700">Top 4 Highlights</th>
+      </tr></thead>
+      <tbody>
       <tr><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;font-weight:700;text-align:center;vertical-align:middle;width:28%;white-space:nowrap">Biggest Wins</td><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;vertical-align:top"><ol style="margin:0;padding-left:1.4rem">${bwItems}</ol></td></tr>
       <tr><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;font-weight:700;text-align:center;vertical-align:middle;white-space:nowrap">Key Focus Areas</td><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;vertical-align:top"><ol style="margin:0;padding-left:1.4rem">${kfItems}</ol></td></tr>
       <tr><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;font-weight:700;text-align:center;vertical-align:middle;white-space:nowrap">Strategy for Next Term</td><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;min-height:3rem"></td></tr>
@@ -3202,7 +3209,9 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   const tNames = activeTargets.map(t => t.name);
   const targetList = n <= 1 ? (tNames[0] || "") : tNames.slice(0, -1).join(", ") + " and " + tNames[n - 1];
   const halfText   = period === "H1" ? "first" : "second";
-  const monthRange = period === "H1" ? "January to June" : "July to December";
+  const monthRange     = period === "H1" ? "January to June" : "July to December";
+  const nextMonthRange = period === "H1" ? "July to December" : "January to June";
+  const nextTermYear   = period === "H1" ? year : year + 1;
   const ROMAN = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"];
 
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun, LevelFormat,
@@ -3311,7 +3320,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   const ovTitle = `${firstName} - ${monthRange} ${year} Progress`;
   const ovResult = hyrDrawOverviewChart(chartTrendRows, ovTitle);
   if (ovResult) {
-    paragraphs.push(mkPara(`The chart below shows an overview of ${firstName}'s overall progress across all targets this term.`, { after: 160 }));
+    paragraphs.push(mkPara(`The chart below shows an overview of ${firstName}'s overall progress across all targets this term (${monthRange} ${year}).`, { after: 160 }));
     const ovH = Math.round(520 * ovResult.height / 700);
     paragraphs.push(new Paragraph({
       children: [new ImageRun({ data: b64ToUint8(ovResult.base64), transformation: { width: 520, height: ovH }, type: "png" })],
@@ -3354,10 +3363,14 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
           })
         : [new Paragraph({ children: [new TextRun({ text: "", size: 22 })], spacing: { before: 80, after: 80 } })]
     });
+    kiRows.push(new TableRow({ tableHeader: true, children: [
+      new TableCell({ width: { size: 28, type: WidthType.PERCENTAGE }, shading: { fill: "f3f4f6" }, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: [new Paragraph({ children: [new TextRun({ text: "Category", bold: true, size: 22 })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })] }),
+      new TableCell({ width: { size: 72, type: WidthType.PERCENTAGE }, shading: { fill: "f3f4f6" }, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: [new Paragraph({ children: [new TextRun({ text: "Top 4 Highlights", bold: true, size: 22 })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })] })
+    ]}));
     kiRows.push(new TableRow({ children: [mkKiLabelCell("Biggest Wins"), mkKiNumberedCell(parsed.biggestWins || [], KI_NUM_REF)] }));
     kiRows.push(new TableRow({ children: [mkKiLabelCell("Key Focus Areas"), mkKiNumberedCell(parsed.keyFocusAreas || [], KI_NUM_REF_2)] }));
     kiRows.push(new TableRow({ children: [mkKiLabelCell("Strategy for Next Term"), mkKiNumberedCell([], KI_NUM_REF)] }));
-    paragraphs.push(mkPara(`Below are the top 4 most important wins and the 4 most critical focus areas that ${firstName} needs support with going into next term.`, { after: 160 }));
+    paragraphs.push(mkPara(`Below are the top 4 most important wins and the 4 most critical focus areas that ${firstName} needs support with going into next term (${nextMonthRange} ${nextTermYear}).`, { after: 160 }));
     paragraphs.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: kiRows }));
     paragraphs.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
   }
