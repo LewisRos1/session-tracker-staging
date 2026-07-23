@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1066";
+const APP_VERSION = "1067";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3368,7 +3368,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
           })
         : [new Paragraph({ children: [new TextRun({ text: "", size: 22 })], spacing: { before: 80, after: 80 } })]
     });
-    kiRows.push(new TableRow({ children: [
+    kiRows.push(new TableRow({ tableHeader: true, children: [
       new TableCell({ width: { size: 28, type: WidthType.PERCENTAGE }, shading: { fill: "f3f4f6" }, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: [new Paragraph({ children: [new TextRun({ text: "Category", bold: true, size: 22 })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })] }),
       new TableCell({ width: { size: 72, type: WidthType.PERCENTAGE }, shading: { fill: "f3f4f6" }, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: [new Paragraph({ children: [new TextRun({ text: "Top 4 Highlights", bold: true, size: 22 })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })] })
     ]}));
