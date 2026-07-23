@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1042";
+const APP_VERSION = "1043";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2085,13 +2085,19 @@ Provide ONLY the following sections using EXACTLY these markers. No extra text o
 Write exactly 5 sentences summing up ${firstName}'s overall progress this term in plain everyday English. Do not name specific targets, mention numbers, or reference months. Be warm and encouraging while being honest about how the term went overall.
 ===END===
 
-${targetsWithData.map(r => `===OBSERVATION: ${r.name}===
-Write 2 to 3 bullets for ${firstName}'s parents about this target. Use a professional bold label followed by non-bold content:
-• **Progress:** One specific thing ${firstName} is doing well — a real skill or behaviour they show in sessions.
-• **Challenge:** One honest challenge — name the exact situation, trigger, or level of support that causes difficulty. Be warm, not alarming.
-• **Note:** (Optional) Only add a 3rd bullet if there is genuinely useful extra context — a pattern, something affecting this target, or a reassurance. Skip if not needed.
+===KEY_INSIGHTS===
+Based on all session data and observations, write two short statements:
+ROW: Biggest Win | [One sentence — the single most impressive success or breakthrough ${firstName} showed this term. Name the specific skill.]
+ROW: Key Focus Area | [One sentence — the most important area that still needs work next term. Be specific about what is difficult.]
+===END===
 
-IMPORTANT: The label MUST be wrapped in ** for bold (e.g. **Progress:** **Challenge:** **Note:**). The content after the colon is NOT bold.
+${targetsWithData.map(r => `===OBSERVATION: ${r.name}===
+Write 2 to 3 bullets for ${firstName}'s parents about this target. Format each bullet with a bold label followed by plain (not bold) content. Use these labels:
+• **Strengths:** One specific thing ${firstName} is doing well — a real skill or behaviour they show in sessions.
+• **Weakness:** One honest challenge — name the exact situation, trigger, or level of support that causes difficulty. Be warm, not alarming.
+• **Note:** (Optional) Only add a 3rd bullet if there is genuinely useful extra context. Skip if not needed.
+
+IMPORTANT: The label MUST be wrapped in ** for bold (e.g. **Strengths:** **Weakness:** **Note:**). The content after the colon is NOT bold.
 
 STRICT RULES — follow every one:
 - NO numbers, percentages, or month references. Parents see those in the graph.
@@ -2102,17 +2108,18 @@ STRICT RULES — follow every one:
 ===END===`).join("\n\n")}
 
 ${qualitativeWithData.map(r => `===OBSERVED: ${r.name}===
-Write 2 bullets about ${r.name} based on what was observed in sessions and any notes or remarks recorded.
-• **Observed:** Something positive noticed about this skill area.
-• **Still developing:** Something still developing or difficult — explained kindly.
+Write 2 to 3 bullets about ${r.name} based on what was observed in sessions and any notes or remarks recorded.
+• **Strengths:** Something positive noticed about this skill area — a real behaviour, moment, or improvement.
+• **Weakness:** Something still developing or difficult — explained kindly with a specific example if possible.
+• **Note:** (Optional) Only add if there is genuinely useful extra context. Skip if not needed.
 
 Same rules: plain English, no jargon, no numbers, warm tone. Labels in ** bold.
 ===END===`).join("\n\n")}
 
 ===ACTION_PLAN===
-List 3–5 priorities for ${firstName} next term. Each one is a skill or area to focus on — not a strategy or method. If similar activities share the same need, group them under one theme.
+List 3–5 priorities for ${firstName} next term. Each one is a skill or area to focus on.
 Format each row EXACTLY as:
-ROW: [Skill or Area] | [Plain English description of the goal for next term]
+ROW: [Skill or Area] | [Brief description of what ${firstName} is finding difficult or why this is a priority — the context behind the focus, not a strategy]
 ===END===`;
 
     const resp = await fetch("https://session-tracker-ai.wang-loys22.workers.dev", {
@@ -2269,6 +2276,7 @@ async function hyrCollectData(student, period, year) {
     }
 
     breakdownData[tName] = [];
+    const bdMap = {};
     if (actNames.size > 0) {
       lines.push("Activities:");
       for (const actName of actNames) {
@@ -2317,7 +2325,8 @@ async function hyrCollectData(student, period, year) {
         }
         if (actEarliest !== null) {
           const monthCount = Object.values(actMonthlyAvgs).filter(s => s.length > 0).length;
-          breakdownData[tName].push({ name: actDisplayNames[actName] || actName, earliest: actEarliest, latest: actLatest, monthCount });
+          const dispName = actDisplayNames[actName] || actName;
+          bdMap[dispName] = { earliest: actEarliest, latest: actLatest, monthCount };
         }
 
         if (allRemarks.length === 0) {
@@ -2350,19 +2359,18 @@ async function hyrCollectData(student, period, year) {
       }
     }
 
-    // Collect mastered/discontinued activities for breakdown chart section headers
-    const masteredBreakdown = [], discontinuedBreakdown = [];
-    for (const pa of (target.predefinedActivities || [])) {
-      const isMastered = !!pa.masteredOn;
-      const isDiscont = !!(pa.discontinuedOn || pa.isCompleted || pa.isArchived || pa.isStopped) && !isMastered;
-      if (!isMastered && !isDiscont) continue;
+    // Build breakdown chart from predefined activities only (numbered, in order)
+    const paSessionData = pa => {
       const paKey = pa.title || pa.name;
-      if (!paKey) continue;
-      const paAliases = (pa.title && pa.name && pa.title !== pa.name) ? [pa.name] : [];
-      const paMonthly = {};
+      if (!paKey) return null;
+      // Try bdMap first (already computed from actNames loop)
+      if (bdMap[paKey]) return bdMap[paKey];
+      // Fall back: compute from sessions (needed for mastered/discontinued)
+      const aliases = (pa.title && pa.name && pa.title !== pa.name) ? [pa.name] : [];
+      const monthly = {};
       for (const sess of sessions) {
         const entry = Object.entries(sess.activities || {}).find(
-          ([, a]) => (a.activityName === paKey || paAliases.includes(a.activityName) || (pa.id && a.configId === pa.id)) &&
+          ([, a]) => (a.activityName === paKey || aliases.includes(a.activityName) || (pa.id && a.configId === pa.id)) &&
                      (a.targetName === tName || a.target === tName)
         );
         if (!entry) continue;
@@ -2375,25 +2383,38 @@ async function hyrCollectData(student, period, year) {
           const avg = Math.round(trials.reduce((a, b) => a + b, 0) / (trials.length * (target.maxPoints || 3)) * 100);
           const [, m] = sess.date.split("-").map(Number);
           const mLabel = shortMonths[m - 1];
-          if (!paMonthly[mLabel]) paMonthly[mLabel] = [];
-          paMonthly[mLabel].push(avg);
+          if (!monthly[mLabel]) monthly[mLabel] = [];
+          monthly[mLabel].push(avg);
         }
       }
       let earliest = null, latest = null;
       for (let m = startMonth; m <= endMonth; m++) {
         const mLabel = shortMonths[m - 1];
-        const scores = paMonthly[mLabel];
+        const scores = monthly[mLabel];
         if (!scores?.length) continue;
         const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
         if (earliest === null) earliest = { label: mLabel, avg };
         latest = { label: mLabel, avg };
       }
-      if (earliest !== null) {
-        const mc = Object.values(paMonthly).filter(s => s.length > 0).length;
-        const ent = { name: paKey, earliest, latest, monthCount: mc };
-        if (isMastered) masteredBreakdown.push(ent);
-        else discontinuedBreakdown.push(ent);
-      }
+      if (earliest === null) return null;
+      return { earliest, latest, monthCount: Object.values(monthly).filter(s => s.length > 0).length };
+    };
+
+    let bdSeq = 0;
+    const masteredBreakdown = [], discontinuedBreakdown = [];
+    for (const pa of (target.predefinedActivities || [])) {
+      const paKey = pa.title || pa.name;
+      if (!paKey) continue;
+      const isMastered = !!pa.masteredOn;
+      const isDiscont = !!(pa.discontinuedOn || pa.isCompleted || pa.isArchived || pa.isStopped) && !isMastered;
+      const isActive = !isMastered && !isDiscont;
+      const bd = paSessionData(pa);
+      if (!bd) continue;
+      bdSeq++;
+      const ent = { name: `${bdSeq}) ${paKey}`, earliest: bd.earliest, latest: bd.latest, monthCount: bd.monthCount };
+      if (isActive) breakdownData[tName].push(ent);
+      else if (isMastered) masteredBreakdown.push(ent);
+      else discontinuedBreakdown.push(ent);
     }
     if (masteredBreakdown.length) {
       breakdownData[tName].push({ isSectionHeader: true, label: "Mastered" });
@@ -2671,7 +2692,7 @@ function hyrDrawActivityBreakdown(targetName, activities, period, year) {
   return canvas.toDataURL("image/png").split(",")[1];
 }
 
-function hyrDrawLineChart(targetName, labels, values, period, year) {
+function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd, delta, direction) {
   const SCALE = 2;
   const W = 580, H = 310;
   const PAD = { top: 72, right: 20, bottom: 38, left: 22 };
@@ -2685,7 +2706,7 @@ function hyrDrawLineChart(targetName, labels, values, period, year) {
 
   const rangeLabel = period === "H1" ? "Jan–Jun" : "Jul–Dec";
   ctx.fillStyle = "#1f2937"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(`${targetName}  (${rangeLabel} ${year})`, W / 2, 24);
+  ctx.fillText(`${(targetName || "").trim()}  (${rangeLabel} ${year})`, W / 2, 24);
 
   const pts = labels.map((label, i) => ({ label, v: values[i], i })).filter(p => p.v !== null && p.v !== undefined);
   if (pts.length === 0) return null;
@@ -2719,18 +2740,20 @@ function hyrDrawLineChart(targetName, labels, values, period, year) {
   ctx.lineTo(toX(xs[xs.length-1]), toY(trendAt(xs[xs.length-1])));
   ctx.stroke(); ctx.setLineDash([]);
 
-  // Trendline endpoint value labels (below the trendline points)
+  // Trendline endpoint value labels — use pre-computed values if available
+  const dispStart = tStart ?? tStartVal;
+  const dispEnd   = tEnd   ?? tEndVal;
   ctx.fillStyle = "#6b7280"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(tStartVal + "%", toX(xs[0]), toY(trendAt(xs[0])) + 13);
-  ctx.fillText(tEndVal + "%",   toX(xs[xs.length-1]), toY(trendAt(xs[xs.length-1])) + 13);
+  ctx.fillText(dispStart + "%", toX(xs[0]), toY(trendAt(xs[0])) + 13);
+  ctx.fillText(dispEnd + "%",   toX(xs[xs.length-1]), toY(trendAt(xs[xs.length-1])) + 13);
 
-  // Trend annotation subtitle
-  const ppChange = Math.round(ys[ys.length-1] - ys[0]);
-  const ppStr = (ppChange >= 0 ? "+" : "") + ppChange + "pp";
-  const icon  = ppChange > 8 ? "↑" : ppChange < -8 ? "↓" : "→";
-  const tLabel = ppChange > 8 ? "Trending Up" : ppChange < -8 ? "Trending Down" : "Stable";
+  // Trend annotation subtitle — use pre-computed delta/direction if available
+  const dispDelta = delta ?? Math.round(tStartVal !== tEndVal ? tEndVal - tStartVal : ys[ys.length-1] - ys[0]);
+  const dispDir   = direction ?? (dispDelta > 8 ? "Trending Up" : dispDelta < -8 ? "Trending Down" : "Stable");
+  const ppStr = (dispDelta >= 0 ? "+" : "") + dispDelta + "pp";
+  const icon  = dispDir === "Trending Up" ? "↑" : dispDir === "Trending Down" ? "↓" : "→";
   ctx.fillStyle = "#6b7280"; ctx.font = "italic 11px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(`${icon} ${tLabel} (${ppStr})`, W / 2, 40);
+  ctx.fillText(`${icon} ${dispDir} (${ppStr})`, W / 2, 40);
 
   // Data line
   ctx.strokeStyle = "#4472c4"; ctx.lineWidth = 2.5;
@@ -2757,15 +2780,25 @@ function hyrDrawLineChart(targetName, labels, values, period, year) {
   return canvas.toDataURL("image/png").split(",")[1];
 }
 
-function hyrDrawStartEndChart(chartTrendRows) {
+function hyrDrawOverviewChart(chartTrendRows) {
   const n = chartTrendRows.length;
   if (n === 0) return null;
-  const W = 700, PAD_L = 70, PAD_R = 30, PAD_TOP = 50, PAD_BTM = 90;
-  const CHART_H = 260, CHART_W = W - PAD_L - PAD_R;
-  const BOTTOM_Y = PAD_TOP + CHART_H;
-  const H = PAD_TOP + CHART_H + PAD_BTM;
+  const W = 700, PAD_L = 70, PAD_R = 30, PAD_TOP = 52, PAD_BTM = 92;
+  const TOP_H = 200, MID_GAP = 38, BTM_H = 160;
+  const CHART_W = W - PAD_L - PAD_R;
+  const H = PAD_TOP + TOP_H + MID_GAP + BTM_H + PAD_BTM;
   const slotW = CHART_W / n;
-  const BAR_W = Math.max(8, Math.min(32, Math.floor(slotW / 2 - 5)));
+  const BAR_W = Math.max(8, Math.min(28, Math.floor(slotW / 2 - 4)));
+  const maxAbs = Math.max(...chartTrendRows.map(r => Math.abs(r.delta)), 10);
+  const TOP_BTM_Y = PAD_TOP + TOP_H;
+  const BTM_Y0    = PAD_TOP + TOP_H + MID_GAP;
+  const BTM_BTM_Y = BTM_Y0 + BTM_H;
+  const NET_CTR_Y = BTM_Y0 + BTM_H / 2;
+
+  const C_START  = "#7dd3fc";  // sky blue — start bar
+  const C_UP     = "#22c55e";  // green — trending up
+  const C_DOWN   = "#ef4444";  // red — trending down
+  const C_STABLE = "#9ca3af";  // gray — stable
 
   const canvas = document.createElement("canvas");
   canvas.width = W; canvas.height = H;
@@ -2773,115 +2806,84 @@ function hyrDrawStartEndChart(chartTrendRows) {
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
 
   // Legend
-  const leg = [
-    { color: "#9ca3af", label: "Start" },
-    { color: "#22c55e", label: "Improving" },
-    { color: "#ef4444", label: "Declining" },
-    { color: "#60a5fa", label: "Stable" }
-  ];
-  let lx = PAD_L;
   ctx.font = "11px sans-serif";
+  const leg = [{ color: C_START, label: "Start" }, { color: C_UP, label: "Trending Up" }, { color: C_DOWN, label: "Trending Down" }, { color: C_STABLE, label: "Stable" }];
+  let lx = PAD_L;
   for (const { color, label } of leg) {
-    ctx.fillStyle = color; ctx.fillRect(lx, 15, 14, 10);
+    ctx.fillStyle = color; ctx.fillRect(lx, 14, 14, 10);
     ctx.fillStyle = "#374151"; ctx.textAlign = "left";
-    ctx.fillText(label, lx + 18, 24);
-    lx += 18 + ctx.measureText(label).width + 20;
+    ctx.fillText(label, lx + 18, 23);
+    lx += 18 + Math.ceil(ctx.measureText(label).width) + 22;
   }
 
-  // Y-axis grid & labels
+  // Top sub-chart label
+  ctx.fillStyle = "#6b7280"; ctx.font = "10px sans-serif"; ctx.textAlign = "left";
+  ctx.fillText("Start vs End (trendline)", PAD_L, PAD_TOP - 6);
+
+  // Top chart y-axis
   for (const tick of [0, 20, 40, 60, 80, 100]) {
-    const y = BOTTOM_Y - (tick / 100) * CHART_H;
+    const y = TOP_BTM_Y - (tick / 100) * TOP_H;
     ctx.strokeStyle = tick === 0 ? "#9ca3af" : "#e5e7eb"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(W - PAD_R, y); ctx.stroke();
-    ctx.fillStyle = "#9ca3af"; ctx.font = "11px sans-serif"; ctx.textAlign = "right";
-    ctx.fillText(tick + "%", PAD_L - 6, y + 4);
+    ctx.fillStyle = "#9ca3af"; ctx.font = "10px sans-serif"; ctx.textAlign = "right";
+    ctx.fillText(tick + "%", PAD_L - 5, y + 4);
   }
 
-  // Bars
-  for (let i = 0; i < n; i++) {
-    const r = chartTrendRows[i];
-    const centerX = PAD_L + (i + 0.5) * slotW;
+  // Separator
+  ctx.fillStyle = "#f3f4f6"; ctx.fillRect(PAD_L, TOP_BTM_Y + 4, CHART_W, MID_GAP - 8);
+  ctx.fillStyle = "#6b7280"; ctx.font = "10px sans-serif"; ctx.textAlign = "left";
+  ctx.fillText("Net Change (pp)", PAD_L, TOP_BTM_Y + MID_GAP / 2 + 4);
 
-    // Start bar (grey) — left of center
-    const sH = Math.max(2, (r.tStart / 100) * CHART_H);
-    const sX = centerX - BAR_W - 2;
-    ctx.fillStyle = "#9ca3af"; ctx.fillRect(sX, BOTTOM_Y - sH, BAR_W, sH);
-    ctx.fillStyle = "#6b7280"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
-    ctx.fillText(r.tStart + "%", sX + BAR_W / 2, BOTTOM_Y - sH - 4);
-
-    // End bar (colored) — right of center
-    const ec = r.direction === "Trending Up" ? "#22c55e" : r.direction === "Trending Down" ? "#ef4444" : "#60a5fa";
-    const eH = Math.max(2, (r.tEnd / 100) * CHART_H);
-    const eX = centerX + 2;
-    ctx.fillStyle = ec; ctx.fillRect(eX, BOTTOM_Y - eH, BAR_W, eH);
-    ctx.fillStyle = "#1f2937"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "center";
-    ctx.fillText(r.tEnd + "%", eX + BAR_W / 2, BOTTOM_Y - eH - 4);
-
-    // Target name rotated -45°
-    const name = r.name.length > 17 ? r.name.slice(0, 16) + "…" : r.name;
-    ctx.save();
-    ctx.translate(centerX, BOTTOM_Y + 7);
-    ctx.rotate(-Math.PI / 4);
-    ctx.fillStyle = "#374151"; ctx.font = "12px sans-serif"; ctx.textAlign = "right";
-    ctx.fillText(name, 0, 0);
-    ctx.restore();
-  }
-  return { base64: canvas.toDataURL("image/png").split(",")[1], height: H };
-}
-
-function hyrDrawNetChangeChart(chartTrendRows) {
-  const n = chartTrendRows.length;
-  if (n === 0) return null;
-  const W = 700, PAD_L = 70, PAD_R = 30, PAD_TOP = 36, PAD_BTM = 90;
-  const CHART_H = 240, CHART_W = W - PAD_L - PAD_R;
-  const H = PAD_TOP + CHART_H + PAD_BTM;
-  const slotW = CHART_W / n;
-  const BAR_W = Math.max(8, Math.min(40, Math.floor(slotW - 16)));
-  const maxAbs = Math.max(...chartTrendRows.map(r => Math.abs(r.delta)), 10);
-  const CENTER_Y = PAD_TOP + CHART_H / 2;
-  const BOTTOM_Y = PAD_TOP + CHART_H;
-
-  const canvas = document.createElement("canvas");
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext("2d");
-  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
-
-  // Y-axis grid
+  // Bottom chart y-axis
   for (const tick of [-maxAbs, -Math.round(maxAbs / 2), 0, Math.round(maxAbs / 2), maxAbs]) {
-    const y = CENTER_Y - (tick / maxAbs) * (CHART_H / 2);
-    ctx.strokeStyle = tick === 0 ? "#374151" : "#e5e7eb";
-    ctx.lineWidth = tick === 0 ? 1.5 : 1;
+    const y = NET_CTR_Y - (tick / maxAbs) * (BTM_H / 2);
+    ctx.strokeStyle = tick === 0 ? "#374151" : "#e5e7eb"; ctx.lineWidth = tick === 0 ? 1.5 : 1;
     ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(W - PAD_R, y); ctx.stroke();
-    ctx.fillStyle = "#9ca3af"; ctx.font = "11px sans-serif"; ctx.textAlign = "right";
-    ctx.fillText((tick > 0 ? "+" : "") + tick + "pp", PAD_L - 6, y + 4);
+    ctx.fillStyle = "#9ca3af"; ctx.font = "10px sans-serif"; ctx.textAlign = "right";
+    ctx.fillText((tick > 0 ? "+" : "") + tick + "pp", PAD_L - 5, y + 4);
   }
 
   for (let i = 0; i < n; i++) {
     const r = chartTrendRows[i];
-    const centerX = PAD_L + (i + 0.5) * slotW;
-    const barX = centerX - BAR_W / 2;
-    const barH = Math.max(3, (Math.abs(r.delta) / maxAbs) * (CHART_H / 2));
-    const barColor = r.delta > 0 ? "#22c55e" : r.delta < 0 ? "#ef4444" : "#9ca3af";
-    const deltaLabel = (r.delta >= 0 ? "+" : "") + r.delta + "pp";
+    const cx = PAD_L + (i + 0.5) * slotW;
+    const ec = r.direction === "Trending Up" ? C_UP : r.direction === "Trending Down" ? C_DOWN : C_STABLE;
 
+    // Top: Start bar (sky blue) left of center
+    const sH = Math.max(2, (r.tStart / 100) * TOP_H);
+    const sX = cx - BAR_W - 2;
+    ctx.fillStyle = C_START; ctx.fillRect(sX, TOP_BTM_Y - sH, BAR_W, sH);
+    ctx.fillStyle = "#374151"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(r.tStart + "%", sX + BAR_W / 2, TOP_BTM_Y - sH - 4);
+
+    // Top: End bar (direction color) right of center
+    const eH = Math.max(2, (r.tEnd / 100) * TOP_H);
+    const eX = cx + 2;
+    ctx.fillStyle = ec; ctx.fillRect(eX, TOP_BTM_Y - eH, BAR_W, eH);
+    ctx.fillStyle = "#1f2937"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(r.tEnd + "%", eX + BAR_W / 2, TOP_BTM_Y - eH - 4);
+
+    // Bottom: Net change bar
+    const barH = Math.max(3, (Math.abs(r.delta) / maxAbs) * (BTM_H / 2));
+    const barX = cx - BAR_W / 2;
+    const dl   = (r.delta >= 0 ? "+" : "") + r.delta + "pp";
     if (r.delta > 0) {
-      ctx.fillStyle = barColor; ctx.fillRect(barX, CENTER_Y - barH, BAR_W, barH);
-      ctx.fillStyle = "#1f2937"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "center";
-      ctx.fillText(deltaLabel, centerX, CENTER_Y - barH - 5);
+      ctx.fillStyle = C_UP; ctx.fillRect(barX, NET_CTR_Y - barH, BAR_W, barH);
+      ctx.fillStyle = "#1f2937"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText(dl, cx, NET_CTR_Y - barH - 4);
     } else if (r.delta < 0) {
-      ctx.fillStyle = barColor; ctx.fillRect(barX, CENTER_Y, BAR_W, barH);
-      ctx.fillStyle = "#1f2937"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "center";
-      ctx.fillText(deltaLabel, centerX, CENTER_Y + barH + 14);
+      ctx.fillStyle = C_DOWN; ctx.fillRect(barX, NET_CTR_Y, BAR_W, barH);
+      ctx.fillStyle = "#1f2937"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText(dl, cx, NET_CTR_Y + barH + 13);
     } else {
-      ctx.fillStyle = barColor; ctx.fillRect(barX, CENTER_Y - 1, BAR_W, 2);
-      ctx.fillStyle = "#6b7280"; ctx.font = "11px sans-serif"; ctx.textAlign = "center";
-      ctx.fillText("0pp", centerX, CENTER_Y - 6);
+      ctx.fillStyle = C_STABLE; ctx.fillRect(barX, NET_CTR_Y - 1, BAR_W, 2);
+      ctx.fillStyle = "#6b7280"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText("0pp", cx, NET_CTR_Y - 5);
     }
 
-    // Target name rotated -45°
-    const name = r.name.length > 17 ? r.name.slice(0, 16) + "…" : r.name;
+    // Shared x-axis label rotated -45°
+    const name = (r.name.trim()).length > 17 ? r.name.trim().slice(0, 16) + "…" : r.name.trim();
     ctx.save();
-    ctx.translate(centerX, BOTTOM_Y + 7);
+    ctx.translate(cx, BTM_BTM_Y + 8);
     ctx.rotate(-Math.PI / 4);
     ctx.fillStyle = "#374151"; ctx.font = "12px sans-serif"; ctx.textAlign = "right";
     ctx.fillText(name, 0, 0);
@@ -2891,9 +2893,23 @@ function hyrDrawNetChangeChart(chartTrendRows) {
 }
 
 function hyrParseAiResponse(text) {
-  const out = { executiveSummary: "", observations: {}, observed: {}, actionPlanRows: [] };
+  const out = { executiveSummary: "", biggestWin: "", keyFocusArea: "", observations: {}, observed: {}, actionPlanRows: [] };
   const exec = text.match(/===EXECUTIVE_SUMMARY===\s*([\s\S]*?)\s*===END===/);
   if (exec) out.executiveSummary = exec[1].trim();
+  const ki = text.match(/===KEY_INSIGHTS===\s*([\s\S]*?)\s*===END===/);
+  if (ki) {
+    for (const line of ki[1].split("\n")) {
+      const t = line.trim();
+      if (t.startsWith("ROW:")) {
+        const parts = t.slice(4).split("|");
+        if (parts.length >= 2) {
+          const key = parts[0].trim(), val = parts[1].trim();
+          if (key === "Biggest Win") out.biggestWin = val;
+          else if (key === "Key Focus Area") out.keyFocusArea = val;
+        }
+      }
+    }
+  }
   for (const m of text.matchAll(/===OBSERVATION:\s*([^=]+?)===\s*([\s\S]*?)\s*===END===/g)) {
     out.observations[m[1].trim()] = m[2].trim();
   }
@@ -2939,10 +2955,10 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
 
   const targetBlock = (r, i) => {
     const badge = `[${r.tStart}% ➔ ${r.tEnd}% | ${deltaFmt(r)}]`;
-    const lb64 = hyrDrawLineChart(r.name, r.labels, r.values, period, year);
+    const lb64 = hyrDrawLineChart(r.name, r.labels, r.values, period, year, r.tStart, r.tEnd, r.delta, r.direction);
     const chartImg = lb64 ? `<img src="data:image/png;base64,${lb64}" style="width:100%;max-width:540px;display:block;margin:.5rem 0 .75rem">` : "";
     return `<div style="margin-top:2rem">
-      <p style="font-weight:700;font-size:1rem;margin:0 0 .15rem">${ROMAN[i] || i + 1}. ${esc(r.name)} <span style="font-weight:400;color:#6b7280;font-size:.9rem">${esc(badge)}</span></p>
+      <p style="font-weight:700;font-size:1rem;margin:0 0 .15rem">${ROMAN[i] || i + 1}. ${esc(r.name.trim())} <span style="font-weight:400;color:#6b7280;font-size:.9rem">${esc(badge)}</span></p>
       ${chartImg}
       ${obsHtml(parsed.observations[r.name])}
     </div>`;
@@ -2971,31 +2987,36 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   // Section 1
   h += `<h2 style="${SECTION_H2}">Section 1: Executive Overview</h2>`;
 
-  if (chartTrendRows.length) {
-    h += `<p style="margin:.5rem 0 .75rem;line-height:1.7">The charts below compare where each therapy target was at the start of this term versus where it ended (Chart 1: Start &amp; End), and how much each target changed overall in percentage points (Chart 2: Net Change).</p>`;
-    const seResult = hyrDrawStartEndChart(chartTrendRows);
-    const ncResult = hyrDrawNetChangeChart(chartTrendRows);
-    if (seResult) h += `<img src="data:image/png;base64,${seResult.base64}" style="width:100%;max-width:700px;display:block;margin:.5rem 0 1.25rem">`;
-    if (ncResult) h += `<img src="data:image/png;base64,${ncResult.base64}" style="width:100%;max-width:700px;display:block;margin:.5rem 0 1.25rem">`;
-  }
   h += `<p style="margin:.75rem 0 .5rem;line-height:1.7">${esc(parsed.executiveSummary || "")}</p>`;
+  if (chartTrendRows.length) {
+    const ovResult = hyrDrawOverviewChart(chartTrendRows);
+    if (ovResult) h += `<img src="data:image/png;base64,${ovResult.base64}" style="width:100%;max-width:700px;display:block;margin:.5rem 0 1.25rem">`;
+  }
+  h += `<p style="margin:.5rem 0 1rem;line-height:1.7;color:#4b5563;font-size:.9rem"><em>Each target appears once. The left (sky blue) bar shows the trendline value at the start of the term, and the right bar shows the trendline value at the end — colour reflects the overall direction. The bottom half shows the net change in percentage points. We use trendlines rather than raw monthly scores to smooth out the normal ups and downs across sessions and give a truer picture of overall progress.</em></p>`;
+  if (parsed.biggestWin || parsed.keyFocusArea) {
+    h += `<div style="margin:1.25rem 0;padding:.85rem 1.1rem;background:#f9fafb;border-left:4px solid #6366f1;border-radius:4px">`;
+    if (parsed.biggestWin)    h += `<p style="margin:0 0 .5rem;line-height:1.6"><strong>Biggest Win:</strong> ${esc(parsed.biggestWin)}</p>`;
+    if (parsed.keyFocusArea)  h += `<p style="margin:0 0 .5rem;line-height:1.6"><strong>Key Focus Area:</strong> ${esc(parsed.keyFocusArea)}</p>`;
+    h += `<p style="margin:0;line-height:1.6"><strong>Strategy for Next Term:</strong></p>`;
+    h += `</div>`;
+  }
 
   h += `<hr style="margin:2rem 0">`;
 
   // Section 2: Most Improved & Strengths
   h += `<h2 style="${SECTION_H2}">Section 2: Most Improved &amp; Strengths</h2>`;
-  h += `<h3 style="${SECTION_H3}">2a) Most Improved (Trending Up)</h3>`;
+  h += `<h3 style="${SECTION_H3}">2a) Most Improved</h3>`;
   h += sectionTargets(categorized.mostImproved);
-  h += `<div style="margin-top:2rem"><h3 style="${SECTION_H3}">2b) Strengths (Above 80% and Stable)</h3></div>`;
+  h += `<div style="margin-top:2rem"><h3 style="${SECTION_H3}">2b) Strong &amp; Steady</h3></div>`;
   h += sectionTargets(categorized.strengths);
 
   h += `<hr style="margin:2rem 0">`;
 
   // Section 3: Needs Extra Support & Developing
   h += `<h2 style="${SECTION_H2}">Section 3: Needs Extra Support &amp; Developing Skills</h2>`;
-  h += `<h3 style="${SECTION_H3}">3a) Needs Extra Support (Trending Down)</h3>`;
+  h += `<h3 style="${SECTION_H3}">3a) Needs Extra Support</h3>`;
   h += sectionTargets(categorized.needsSupport);
-  h += `<div style="margin-top:2rem"><h3 style="${SECTION_H3}">3b) Developing (Below 80% and Stable)</h3></div>`;
+  h += `<div style="margin-top:2rem"><h3 style="${SECTION_H3}">3b) Developing</h3></div>`;
   h += sectionTargets(categorized.emerging);
 
   // Section 4: Observed Skills (qualitative)
@@ -3021,7 +3042,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
     const rows = parsed.actionPlanRows.map((r, idx) =>
       `<tr><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;text-align:center;width:5%;color:#6b7280">${idx + 1}</td><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;font-weight:600;vertical-align:top;width:23%">${esc(r.skill)}</td><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;vertical-align:top;line-height:1.6">${esc(r.goal)}</td><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;width:22%"></td></tr>`
     ).join("");
-    h += `<table style="width:100%;border-collapse:collapse;font-size:.9rem;margin:.75rem 0"><thead><tr style="background:#f3f4f6"><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700;width:5%">No.</th><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:left;font-weight:700">Skill / Area</th><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:left;font-weight:700">Next Term Goal</th><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:left;font-weight:700">Strategy / Support</th></tr></thead><tbody>${rows}</tbody></table>`;
+    h += `<table style="width:100%;border-collapse:collapse;font-size:.9rem;margin:.75rem 0"><thead><tr style="background:#f3f4f6"><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700;width:5%">No.</th><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:left;font-weight:700">Skill / Area</th><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:left;font-weight:700">Details</th><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:left;font-weight:700">Strategy for Next Term</th></tr></thead><tbody>${rows}</tbody></table>`;
   }
 
   // Section 6: Appendix
@@ -3029,7 +3050,15 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   const appendixTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped && breakdownData[t.name]?.length);
   if (appendixTargets.length) {
     h += `<hr style="margin:2rem 0">`;
-    h += `<h2 style="${SECTION_H2}">Section ${appendixSection}: Appendix — Activity Breakdown Charts</h2>`;
+    h += `<h2 style="${SECTION_H2}">Section ${appendixSection}: Appendix</h2>`;
+    h += `<h3 style="${SECTION_H3}">How We Categorise the Sections</h3>`;
+    h += `<table style="width:100%;border-collapse:collapse;font-size:.88rem;margin:.75rem 0 1.5rem"><thead><tr style="background:#f3f4f6"><th style="padding:.45rem .75rem;border:1px solid #e5e7eb;text-align:left;font-weight:700;width:28%">Section</th><th style="padding:.45rem .75rem;border:1px solid #e5e7eb;text-align:left;font-weight:700">Criteria</th></tr></thead><tbody>
+      <tr><td style="padding:.45rem .75rem;border:1px solid #e5e7eb;font-weight:600">2a) Most Improved</td><td style="padding:.45rem .75rem;border:1px solid #e5e7eb">Trendline improved by more than +8 percentage points (pp) this term</td></tr>
+      <tr><td style="padding:.45rem .75rem;border:1px solid #e5e7eb;font-weight:600">2b) Strong &amp; Steady</td><td style="padding:.45rem .75rem;border:1px solid #e5e7eb">Trendline end above 80% AND change within ±8pp (stable performance at a high level)</td></tr>
+      <tr><td style="padding:.45rem .75rem;border:1px solid #e5e7eb;font-weight:600">3a) Needs Extra Support</td><td style="padding:.45rem .75rem;border:1px solid #e5e7eb">Trendline declined by more than −8pp this term</td></tr>
+      <tr><td style="padding:.45rem .75rem;border:1px solid #e5e7eb;font-weight:600">3b) Developing</td><td style="padding:.45rem .75rem;border:1px solid #e5e7eb">Trendline end below 80% AND change within ±8pp (still building the skill)</td></tr>
+    </tbody></table>`;
+    h += `<h3 style="${SECTION_H3}">Activity Breakdown Charts</h3>`;
     const rangeLabel = period === "H1" ? `Jan–Jun ${year}` : `Jul–Dec ${year}`;
     for (const target of appendixTargets) {
       const result = renderActivityBreakdownChart(target.name, hyrToActivityData(breakdownData[target.name]), rangeLabel);
@@ -3121,12 +3150,12 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
       paras.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
       paras.push(new Paragraph({
         children: [
-          new TextRun({ text: `${ROMAN[i] || i + 1}. ${r.name}`, bold: true, size: 24 }),
+          new TextRun({ text: `${ROMAN[i] || i + 1}. ${r.name.trim()}`, bold: true, size: 24 }),
           new TextRun({ text: `   [${r.tStart}% ➔ ${r.tEnd}% | ${deltaStr}]`, size: 20, color: "6b7280" })
         ],
         spacing: { before: 0, after: 100, ...LS }
       }));
-      const lb64 = hyrDrawLineChart(r.name, r.labels, r.values, period, year);
+      const lb64 = hyrDrawLineChart(r.name, r.labels, r.values, period, year, r.tStart, r.tEnd, r.delta, r.direction);
       if (lb64) paras.push(new Paragraph({
         children: [new ImageRun({ data: b64ToUint8(lb64), transformation: { width: 540, height: 280 }, type: "png" })],
         alignment: AlignmentType.CENTER, spacing: { after: 100 }
@@ -3163,44 +3192,41 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   // ── Section 1: Executive Overview ──────────────────────────
   paragraphs.push(mkPara("Section 1: Executive Overview", { heading: HeadingLevel.HEADING_1, before: 560, after: 200, pageBreak: true, size: 32, bold: true }));
 
-  // Two overview charts (sorted ascending: red→green)
   const chartTrendRows = [...trendRows.filter(r => !r.noData)].sort((a, b) => a.delta - b.delta);
-  paragraphs.push(mkPara("The charts below compare where each therapy target was at the start of this term versus where it ended (Chart 1: Start & End), and how much each target changed overall in percentage points (Chart 2: Net Change).", { after: 200 }));
-  const seResult = hyrDrawStartEndChart(chartTrendRows);
-  const ncResult = hyrDrawNetChangeChart(chartTrendRows);
-  if (seResult) {
-    const seH = Math.round(520 * seResult.height / 700);
+  paragraphs.push(mkPara(parsed.executiveSummary || "", { after: 200 }));
+  const ovResult = hyrDrawOverviewChart(chartTrendRows);
+  if (ovResult) {
+    const ovH = Math.round(520 * ovResult.height / 700);
     paragraphs.push(new Paragraph({
-      children: [new ImageRun({ data: b64ToUint8(seResult.base64), transformation: { width: 520, height: seH }, type: "png" })],
-      alignment: AlignmentType.CENTER, spacing: { after: 200 }
+      children: [new ImageRun({ data: b64ToUint8(ovResult.base64), transformation: { width: 520, height: ovH }, type: "png" })],
+      alignment: AlignmentType.CENTER, spacing: { after: 160 }
     }));
   }
-  if (ncResult) {
-    const ncH = Math.round(520 * ncResult.height / 700);
-    paragraphs.push(new Paragraph({
-      children: [new ImageRun({ data: b64ToUint8(ncResult.base64), transformation: { width: 520, height: ncH }, type: "png" })],
-      alignment: AlignmentType.CENTER, spacing: { after: 200 }
-    }));
-  }
-  paragraphs.push(mkPara(parsed.executiveSummary || "", { after: 280 }));
+  paragraphs.push(mkPara(
+    "Each target appears once. The left (sky blue) bar shows the trendline value at the start of the term, and the right bar shows the trendline value at the end — colour reflects the overall direction. The bottom half shows the net change in percentage points. We use trendlines rather than raw monthly scores to smooth out the normal ups and downs across sessions and give a truer picture of overall progress.",
+    { after: 200, italics: true, color: "4b5563" }
+  ));
+  if (parsed.biggestWin) paragraphs.push(mkPara(`Biggest Win: ${parsed.biggestWin}`, { after: 100, bold: false }));
+  if (parsed.keyFocusArea) paragraphs.push(mkPara(`Key Focus Area: ${parsed.keyFocusArea}`, { after: 100, bold: false }));
+  paragraphs.push(mkPara("Strategy for Next Term:", { after: 280 }));
 
   // ── Section 2: Most Improved & Strengths ───────────────────
   paragraphs.push(mkPara("Section 2: Most Improved & Strengths", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
-  paragraphs.push(mkPara("2a) Most Improved (Trending Up)", { heading: HeadingLevel.HEADING_2, before: 160, after: 80, size: 26, bold: true }));
+  paragraphs.push(mkPara("2a) Most Improved", { heading: HeadingLevel.HEADING_2, before: 160, after: 80, size: 26, bold: true }));
   if (categorized.mostImproved.length) paragraphs.push(...targetSectionParas(categorized.mostImproved));
   else paragraphs.push(mkPara("No targets in this category.", { italics: true, color: "9CA3AF" }));
   paragraphs.push(new Paragraph({ children: [], spacing: { before: 400, after: 0 } }));
-  paragraphs.push(mkPara("2b) Strengths (Above 80% and Stable)", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
+  paragraphs.push(mkPara("2b) Strong & Steady", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
   if (categorized.strengths.length) paragraphs.push(...targetSectionParas(categorized.strengths));
   else paragraphs.push(mkPara("No targets in this category.", { italics: true, color: "9CA3AF" }));
 
   // ── Section 3: Needs Extra Support & Developing ────────────
   paragraphs.push(mkPara("Section 3: Needs Extra Support & Developing Skills", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
-  paragraphs.push(mkPara("3a) Needs Extra Support (Trending Down)", { heading: HeadingLevel.HEADING_2, before: 160, after: 80, size: 26, bold: true }));
+  paragraphs.push(mkPara("3a) Needs Extra Support", { heading: HeadingLevel.HEADING_2, before: 160, after: 80, size: 26, bold: true }));
   if (categorized.needsSupport.length) paragraphs.push(...targetSectionParas(categorized.needsSupport));
   else paragraphs.push(mkPara("No targets in this category.", { italics: true, color: "9CA3AF" }));
   paragraphs.push(new Paragraph({ children: [], spacing: { before: 400, after: 0 } }));
-  paragraphs.push(mkPara("3b) Developing (Below 80% and Stable)", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
+  paragraphs.push(mkPara("3b) Developing", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
   if (categorized.emerging.length) paragraphs.push(...targetSectionParas(categorized.emerging));
   else paragraphs.push(mkPara("No targets in this category.", { italics: true, color: "9CA3AF" }));
 
@@ -3236,8 +3262,8 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     const headerRow = new TableRow({ tableHeader: true, children: [
       mkCell("No.", { bold: true, bg: HDR, size: 20, align: AlignmentType.CENTER, pct: 6 }),
       mkCell("Skill / Area", { bold: true, bg: HDR, size: 20, pct: 22 }),
-      mkCell("Next Term Goal", { bold: true, bg: HDR, size: 20, pct: 40 }),
-      mkCell("Strategy / Support", { bold: true, bg: HDR, size: 20, pct: 32 })
+      mkCell("Details", { bold: true, bg: HDR, size: 20, pct: 40 }),
+      mkCell("Strategy for Next Term", { bold: true, bg: HDR, size: 20, pct: 32 })
     ]});
     const dataRows = parsed.actionPlanRows.map((r, idx) => new TableRow({ children: [
       mkCell(String(idx + 1), { align: AlignmentType.CENTER, pct: 6 }),
@@ -3252,7 +3278,25 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   const appendixParas = [];
   const appendixTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped && breakdownData[t.name]?.length);
   if (appendixTargets.length) {
-    appendixParas.push(mkPara(`Section ${nextSectionNum + 1}: Appendix — Activity Breakdown Charts`, { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
+    appendixParas.push(mkPara(`Section ${nextSectionNum + 1}: Appendix`, { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
+    appendixParas.push(mkPara("How We Categorise the Sections", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
+    const HDR2 = "f3f4f6";
+    const catHeaderRow = new TableRow({ tableHeader: true, children: [
+      mkCell("Section", { bold: true, bg: HDR2, size: 20, pct: 28 }),
+      mkCell("Criteria", { bold: true, bg: HDR2, size: 20, pct: 72 })
+    ]});
+    const catRows = [
+      ["2a) Most Improved",       "Trendline improved by more than +8 percentage points (pp) this term"],
+      ["2b) Strong & Steady",     "Trendline end above 80% AND change within ±8pp (stable performance at a high level)"],
+      ["3a) Needs Extra Support", "Trendline declined by more than −8pp this term"],
+      ["3b) Developing",          "Trendline end below 80% AND change within ±8pp (still building the skill)"]
+    ].map(([sec, crit]) => new TableRow({ children: [
+      mkCell(sec,  { pct: 28, bold: true }),
+      mkCell(crit, { pct: 72 })
+    ]}));
+    appendixParas.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [catHeaderRow, ...catRows] }));
+    appendixParas.push(new Paragraph({ children: [], spacing: { before: 400, after: 0 } }));
+    appendixParas.push(mkPara("Activity Breakdown Charts", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
     const rangeLabel = period === "H1" ? `Jan–Jun ${year}` : `Jul–Dec ${year}`;
     for (const target of appendixTargets) {
       const abResult = renderActivityBreakdownChart(target.name, hyrToActivityData(breakdownData[target.name]), rangeLabel);
