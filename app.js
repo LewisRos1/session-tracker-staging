@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1052";
+const APP_VERSION = "1053";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2121,7 +2121,7 @@ ${qualitativeWithData.map(r => `===OBSERVED: ${r.name}===
 Write 2 to 3 bullets about ${r.name} based on what was observed in sessions and any notes or remarks recorded.
 • **Strengths:** Something positive noticed about this skill area — a real behaviour, moment, or improvement.
 • **Weaknesses:** Something still developing or difficult — explained kindly with a specific example if possible.
-• **Note:** (Optional) Only add if there is genuinely useful extra context. Skip if not needed.
+• **Note:** One practical observation about ${r.name} — a pattern, habit, or insight that parents would find helpful when supporting ${firstName} at home.
 
 Same rules: plain English, no jargon, no numbers, warm tone. Labels in ** bold.
 ===END===`).join("\n\n")}
@@ -2760,10 +2760,11 @@ function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd
   // Trend annotation subtitle — use pre-computed delta/direction if available
   const dispDelta = delta ?? Math.round(tStartVal !== tEndVal ? tEndVal - tStartVal : ys[ys.length-1] - ys[0]);
   const dispDir   = direction ?? (dispDelta > 8 ? "Trending Up" : dispDelta < -8 ? "Trending Down" : "Stable");
-  const ppStr = (dispDelta >= 0 ? "+" : "") + dispDelta + " pts";
-  const icon  = dispDir === "Trending Up" ? "↑" : dispDir === "Trending Down" ? "↓" : "→";
+  const ptStr  = (dispDelta >= 0 ? "+" : "") + dispDelta + " points";
+  const icon   = dispDir === "Trending Up" ? "↑" : dispDir === "Trending Down" ? "↓" : "→";
+  const rngStr = (tStart != null && tEnd != null) ? ` | ${tStart}% → ${tEnd}%` : "";
   ctx.fillStyle = "#6b7280"; ctx.font = "italic 11px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(`${icon} ${dispDir} (${ppStr})`, W / 2, 40);
+  ctx.fillText(`${icon} ${dispDir} | ${ptStr}${rngStr}`, W / 2, 40);
 
   // Data line
   ctx.strokeStyle = "#4472c4"; ctx.lineWidth = 2.5;
@@ -2793,7 +2794,7 @@ function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd
 function hyrDrawOverviewChart(chartTrendRows) {
   const n = chartTrendRows.length;
   if (n === 0) return null;
-  const W = 700, PAD_L = 70, PAD_R = 30, PAD_TOP = 52, PAD_BTM = 92;
+  const W = 700, PAD_L = 30, PAD_R = 20, PAD_TOP = 36, PAD_BTM = 140;
   const TOP_H = 200, MID_GAP = 38, BTM_H = 160;
   const CHART_W = W - PAD_L - PAD_R;
   const H = PAD_TOP + TOP_H + MID_GAP + BTM_H + PAD_BTM;
@@ -2805,54 +2806,38 @@ function hyrDrawOverviewChart(chartTrendRows) {
   const BTM_BTM_Y = BTM_Y0 + BTM_H;
   const NET_CTR_Y = BTM_Y0 + BTM_H / 2;
 
-  const C_START  = "#7dd3fc";  // sky blue — start bar
-  const C_END    = "#a78bfa";  // violet — end bar
-  const C_UP     = "#22c55e";  // green — trending up
-  const C_DOWN   = "#ef4444";  // red — trending down
-  const C_STABLE = "#9ca3af";  // gray — stable
+  const C_START  = "#7dd3fc";
+  const C_END    = "#a78bfa";
+  const C_UP     = "#22c55e";
+  const C_DOWN   = "#ef4444";
+  const C_STABLE = "#9ca3af";
 
   const canvas = document.createElement("canvas");
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext("2d");
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
 
-  // Legend
-  ctx.font = "13px sans-serif";
-  const leg = [{ color: C_START, label: "Start" }, { color: C_END, label: "End" }, { color: C_DOWN, label: "Trending Down" }, { color: C_STABLE, label: "Stable" }, { color: C_UP, label: "Trending Up" }];
-  let lx = PAD_L;
-  for (const { color, label } of leg) {
-    ctx.fillStyle = color; ctx.fillRect(lx, 12, 14, 12);
-    ctx.fillStyle = "#111827"; ctx.textAlign = "left";
-    ctx.fillText(label, lx + 20, 24);
-    lx += 20 + Math.ceil(ctx.measureText(label).width) + 22;
-  }
+  // Title
+  ctx.fillStyle = "#111827"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText("Overall Performance (%)", W / 2, 22);
 
-  // Top sub-chart label (with highlight background matching Net Change section)
-  ctx.fillStyle = "#f3f4f6"; ctx.fillRect(PAD_L, PAD_TOP - 22, CHART_W, 18);
-  ctx.fillStyle = "#111827"; ctx.font = "12px sans-serif"; ctx.textAlign = "left";
-  ctx.fillText("Start vs End (Trendline)", PAD_L + 4, PAD_TOP - 7);
-
-  // Top chart y-axis
+  // Top gridlines (no y-axis labels)
   for (const tick of [0, 20, 40, 60, 80, 100]) {
     const y = TOP_BTM_Y - (tick / 100) * TOP_H;
     ctx.strokeStyle = tick === 0 ? "#9ca3af" : "#e5e7eb"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(W - PAD_R, y); ctx.stroke();
-    ctx.fillStyle = "#374151"; ctx.font = "12px sans-serif"; ctx.textAlign = "right";
-    ctx.fillText(tick + "%", PAD_L - 5, y + 4);
   }
 
   // Separator
   ctx.fillStyle = "#f3f4f6"; ctx.fillRect(PAD_L, TOP_BTM_Y + 4, CHART_W, MID_GAP - 8);
-  ctx.fillStyle = "#111827"; ctx.font = "12px sans-serif"; ctx.textAlign = "left";
+  ctx.fillStyle = "#111827"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "left";
   ctx.fillText("Net Change (pts)", PAD_L + 4, TOP_BTM_Y + MID_GAP / 2 + 4);
 
-  // Bottom chart y-axis
+  // Bottom gridlines (no y-axis labels)
   for (const tick of [-maxAbs, -Math.round(maxAbs / 2), 0, Math.round(maxAbs / 2), maxAbs]) {
     const y = NET_CTR_Y - (tick / maxAbs) * (BTM_H / 2);
     ctx.strokeStyle = tick === 0 ? "#374151" : "#e5e7eb"; ctx.lineWidth = tick === 0 ? 1.5 : 1;
     ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(W - PAD_R, y); ctx.stroke();
-    ctx.fillStyle = "#374151"; ctx.font = "12px sans-serif"; ctx.textAlign = "right";
-    ctx.fillText((tick > 0 ? "+" : "") + tick + " pts", PAD_L - 5, y + 4);
   }
 
   for (let i = 0; i < n; i++) {
@@ -2860,24 +2845,24 @@ function hyrDrawOverviewChart(chartTrendRows) {
     const cx = PAD_L + (i + 0.5) * slotW;
     const dc = r.direction === "Trending Up" ? C_UP : r.direction === "Trending Down" ? C_DOWN : C_STABLE;
 
-    // Top: Start bar (sky blue) left of center
+    // Start bar
     const sH = Math.max(2, (r.tStart / 100) * TOP_H);
     const sX = cx - BAR_W - 2;
     ctx.fillStyle = C_START; ctx.fillRect(sX, TOP_BTM_Y - sH, BAR_W, sH);
     ctx.fillStyle = "#111827"; ctx.font = "12px sans-serif"; ctx.textAlign = "center";
-    ctx.fillText(r.tStart + "%", sX + BAR_W / 2, TOP_BTM_Y - sH - 4);
+    ctx.fillText(String(r.tStart), sX + BAR_W / 2, TOP_BTM_Y - sH - 4);
 
-    // Top: End bar (violet) right of center
+    // End bar
     const eH = Math.max(2, (r.tEnd / 100) * TOP_H);
     const eX = cx + 2;
     ctx.fillStyle = C_END; ctx.fillRect(eX, TOP_BTM_Y - eH, BAR_W, eH);
     ctx.fillStyle = "#111827"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center";
-    ctx.fillText(r.tEnd + "%", eX + BAR_W / 2, TOP_BTM_Y - eH - 4);
+    ctx.fillText(String(r.tEnd), eX + BAR_W / 2, TOP_BTM_Y - eH - 4);
 
-    // Bottom: Net change bar — color by direction, not by delta sign
+    // Net change bar
     const barH = Math.max(3, (Math.abs(r.delta) / maxAbs) * (BTM_H / 2));
     const barX = cx - BAR_W / 2;
-    const dl   = (r.delta >= 0 ? "+" : "") + r.delta + " pts";
+    const dl = (r.delta >= 0 ? "+" : "") + r.delta;
     if (r.delta > 0) {
       ctx.fillStyle = dc; ctx.fillRect(barX, NET_CTR_Y - barH, BAR_W, barH);
       ctx.fillStyle = "#111827"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center";
@@ -2889,11 +2874,11 @@ function hyrDrawOverviewChart(chartTrendRows) {
     } else {
       ctx.fillStyle = C_STABLE; ctx.fillRect(barX, NET_CTR_Y - 1, BAR_W, 2);
       ctx.fillStyle = "#374151"; ctx.font = "12px sans-serif"; ctx.textAlign = "center";
-      ctx.fillText("0 pts", cx, NET_CTR_Y - 5);
+      ctx.fillText("0", cx, NET_CTR_Y - 5);
     }
 
-    // Shared x-axis label rotated -45°
-    const name = (r.name.trim()).length > 17 ? r.name.trim().slice(0, 16) + "…" : r.name.trim();
+    // X-axis label
+    const name = r.name.trim().length > 17 ? r.name.trim().slice(0, 16) + "…" : r.name.trim();
     ctx.save();
     ctx.translate(cx, BTM_BTM_Y + 8);
     ctx.rotate(-Math.PI / 4);
@@ -2901,6 +2886,31 @@ function hyrDrawOverviewChart(chartTrendRows) {
     ctx.fillText(name, 0, 0);
     ctx.restore();
   }
+
+  // Legend — 2 rows, centered, below x-axis labels
+  const LEG = [
+    [{ color: C_START, label: "Term Start" }, { color: C_END, label: "Term End" }, { color: C_DOWN, label: "Trending Down (<-8 pts)" }],
+    [{ color: C_STABLE, label: "Stable (±8 pts)" }, { color: C_UP, label: "Trending Up (>+8 pts)" }]
+  ];
+  ctx.font = "11px sans-serif";
+  const BOX = 14, GAP = 5, SPC = 18, ROW_H = 22;
+  const legY0 = BTM_BTM_Y + 84;
+  LEG.forEach((row, ri) => {
+    const rowW = row.reduce((acc, { label }) => acc + BOX + GAP + Math.ceil(ctx.measureText(label).width) + SPC, 0) - SPC;
+    let lx = PAD_L + (CHART_W - rowW) / 2;
+    const ly = legY0 + ri * ROW_H;
+    row.forEach(({ color, label }) => {
+      ctx.fillStyle = color; ctx.fillRect(lx, ly - BOX + 2, BOX, BOX);
+      ctx.fillStyle = "#374151"; ctx.textAlign = "left";
+      ctx.fillText(label, lx + BOX + GAP, ly);
+      lx += BOX + GAP + Math.ceil(ctx.measureText(label).width) + SPC;
+    });
+  });
+
+  // Border
+  ctx.strokeStyle = "#000000"; ctx.lineWidth = 1;
+  ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
+
   return { base64: canvas.toDataURL("image/png").split(",")[1], height: H };
 }
 
@@ -2966,11 +2976,10 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   }).join("");
 
   const targetBlock = (r, i) => {
-    const badge = `[${r.tStart}% ➔ ${r.tEnd}% | ${deltaFmt(r)}]`;
     const lb64 = hyrDrawLineChart(r.name, r.labels, r.values, period, year, r.tStart, r.tEnd, r.delta, r.direction);
     const chartImg = lb64 ? `<img src="data:image/png;base64,${lb64}" style="width:100%;max-width:540px;display:block;margin:.5rem 0 .75rem">` : "";
     return `<div style="margin-top:2rem">
-      <p style="font-weight:700;font-size:1rem;margin:0 0 .15rem">${ROMAN[i] || i + 1}. ${esc(r.name.trim())} <span style="font-weight:400;color:#6b7280;font-size:.9rem">${esc(badge)}</span></p>
+      <p style="font-weight:700;font-size:1rem;margin:0 0 .15rem">${ROMAN[i] || i + 1}. ${esc(r.name.trim())}</p>
       ${chartImg}
       ${obsHtml(parsed.observations[r.name])}
     </div>`;
@@ -3108,8 +3117,9 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
 
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun, LevelFormat,
           Table, TableRow, TableCell, WidthType, PageOrientation, SectionType, Footer, PageNumber, VerticalAlign } = window.docx;
-  const BULLET_REF = "hyr-bullets";
-  const KI_NUM_REF = "hyr-ki-numbered";
+  const BULLET_REF   = "hyr-bullets";
+  const KI_NUM_REF   = "hyr-ki-numbered";
+  const KI_NUM_REF_2 = "hyr-ki-numbered-2";
   const LS = { line: 276, lineRule: "auto" };
 
   function b64ToUint8(b64) {
@@ -3140,12 +3150,13 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
       idx = m.index + m[0].length;
     }
     if (idx < text.length) runs.push(new TextRun({ text: text.slice(idx), size: 22 }));
-    return new Paragraph({ children: runs, numbering: { reference: BULLET_REF, level: 0 }, alignment: AlignmentType.BOTH, spacing: { after: 100, ...LS } });
+    return new Paragraph({ children: runs, style: "List Bullet", alignment: AlignmentType.BOTH, spacing: { after: 100, ...LS } });
   }
 
   function mkCell(text, opts = {}) {
     return new TableCell({
       width: opts.pct !== undefined ? { size: opts.pct, type: WidthType.PERCENTAGE } : undefined,
+      margins: { top: 100, bottom: 100, left: 150, right: 150 },
       children: [new Paragraph({
         children: [new TextRun({ text, bold: opts.bold, size: opts.size || 20, color: opts.color, italics: opts.italics })],
         alignment: opts.align || AlignmentType.LEFT,
@@ -3163,8 +3174,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
       paras.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
       paras.push(new Paragraph({
         children: [
-          new TextRun({ text: `${ROMAN[i] || i + 1}. ${r.name.trim()}`, bold: true, size: 24 }),
-          new TextRun({ text: ` [${r.tStart}% → ${r.tEnd}% | ${deltaStr}]`, size: 20, color: "6b7280" })
+          new TextRun({ text: `${ROMAN[i] || i + 1}. ${r.name.trim()}`, bold: true, size: 24 })
         ],
         spacing: { before: 0, after: 100, ...LS }
       }));
@@ -3219,17 +3229,19 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     const mkKiLabelCell = (text) => new TableCell({
       width: { size: 28, type: WidthType.PERCENTAGE },
       verticalAlign: VerticalAlign.CENTER,
+      margins: { top: 100, bottom: 100, left: 150, right: 150 },
       children: [new Paragraph({ children: [new TextRun({ text, bold: true, size: 20 })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })]
     });
-    const mkKiNumberedCell = (items) => new TableCell({
+    const mkKiNumberedCell = (items, numRef = KI_NUM_REF) => new TableCell({
       width: { size: 72, type: WidthType.PERCENTAGE },
+      margins: { top: 100, bottom: 100, left: 150, right: 150 },
       children: items.length
-        ? items.map(s => new Paragraph({ children: [new TextRun({ text: s, size: 20 })], numbering: { reference: KI_NUM_REF, level: 0 }, alignment: AlignmentType.BOTH, spacing: { before: 40, after: 120, ...LS } }))
+        ? items.map(s => new Paragraph({ children: [new TextRun({ text: s, size: 20 })], numbering: { reference: numRef, level: 0 }, alignment: AlignmentType.BOTH, spacing: { before: 40, after: 120, ...LS } }))
         : [new Paragraph({ children: [new TextRun({ text: "", size: 20 })], spacing: { before: 80, after: 80 } })]
     });
-    kiRows.push(new TableRow({ children: [mkKiLabelCell("Biggest Wins"), mkKiNumberedCell(parsed.biggestWins || [])] }));
-    kiRows.push(new TableRow({ children: [mkKiLabelCell("Key Focus Areas"), mkKiNumberedCell(parsed.keyFocusAreas || [])] }));
-    kiRows.push(new TableRow({ children: [mkKiLabelCell("Strategy for Next Term"), mkKiNumberedCell([])] }));
+    kiRows.push(new TableRow({ children: [mkKiLabelCell("Biggest Wins"), mkKiNumberedCell(parsed.biggestWins || [], KI_NUM_REF)] }));
+    kiRows.push(new TableRow({ children: [mkKiLabelCell("Key Focus Areas"), mkKiNumberedCell(parsed.keyFocusAreas || [], KI_NUM_REF_2)] }));
+    kiRows.push(new TableRow({ children: [mkKiLabelCell("Strategy for Next Term"), mkKiNumberedCell([], KI_NUM_REF)] }));
     paragraphs.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: kiRows }));
     paragraphs.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
   }
@@ -3291,7 +3303,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     ]});
     const dataRows = parsed.actionPlanRows.map((r, idx) => new TableRow({ children: [
       mkCell(String(idx + 1), { align: AlignmentType.CENTER, pct: 6 }),
-      mkCell(r.skill || "", { pct: 22 }),
+      mkCell(r.skill || "", { pct: 22, align: AlignmentType.CENTER }),
       mkCell(r.goal || "", { pct: 40 }),
       mkCell("", { pct: 32 })
     ]}));
@@ -3313,7 +3325,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     const richCritCell = (runs, pct) => {
       const children = [];
       for (const [txt, bd] of runs) children.push(new TextRun({ text: txt, bold: bd, size: 20 }));
-      return new TableCell({ width: { size: pct, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children, spacing: { before: 80, after: 80 } })] });
+      return new TableCell({ width: { size: pct, type: WidthType.PERCENTAGE }, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: [new Paragraph({ children, spacing: { before: 80, after: 80 } })] });
     };
     const catData = [
       ["2.1 Most Improved",       [["Gained ", false], ["more than 8 points", true], [" over the term.", false]]],
@@ -3322,7 +3334,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
       ["3.2 Developing",          [["Ending score ", false], ["under 80%", true], [" with stable progress (within ", false], ["±8 points", true], [" over the term).", false]]]
     ];
     const catRows = catData.map(([sec, runs]) => new TableRow({ children: [
-      mkCell(sec, { pct: 28, bold: true }),
+      mkCell(sec, { pct: 28, bold: true, align: AlignmentType.CENTER }),
       richCritCell(runs, 72)
     ]}));
     appendixParas.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [catHeaderRow, ...catRows] }));
@@ -3368,7 +3380,8 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   const doc = new Document({
     numbering: { config: [
       { reference: BULLET_REF, levels: [{ level: 0, format: LevelFormat?.BULLET ?? "bullet", text: "", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } }, run: { fonts: { ascii: "Wingdings", hAnsi: "Wingdings", hint: "default" }, size: 22 } } }] },
-      { reference: KI_NUM_REF, levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 480, hanging: 240 } }, run: { size: 20 } } }] }
+      { reference: KI_NUM_REF,   levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 480, hanging: 240 } }, run: { size: 20 } } }] },
+      { reference: KI_NUM_REF_2, levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 480, hanging: 240 } }, run: { size: 20 } } }] }
     ] },
     sections: docSections
   });
