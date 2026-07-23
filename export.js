@@ -753,7 +753,7 @@ function drawOverviewChart(chartTrendRows, title) {
   return { base64: canvas.toDataURL("image/png").split(",")[1], height: H };
 }
 
-export function renderActivityBreakdownChart(targetName, activityData, periodLabel) {
+export function renderActivityBreakdownChart(targetName, activityData, periodLabel, chartTitle = null) {
   if (!activityData || activityData.length === 0) return null;
   const SCALE = 2, R = 7, SECTION_H = 28;
   const PAD = { top: 52, right: 148, bottom: 72, left: 250 };
@@ -798,7 +798,7 @@ export function renderActivityBreakdownChart(targetName, activityData, periodLab
   const plotBottom = PAD.top + totalContentH;
 
   ctx.font = "bold 13px sans-serif"; ctx.fillStyle = "#111"; ctx.textAlign = "left";
-  ctx.fillText(`${targetName} — Progress (${periodLabel})`, 10, 28);
+  ctx.fillText(chartTitle || `${targetName} — Progress (${periodLabel})`, 10, 28);
 
   // Column headers
   ctx.font = "bold 9.5px sans-serif"; ctx.fillStyle = "#6b7280";

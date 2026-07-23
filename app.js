@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1058";
+const APP_VERSION = "1059";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2617,6 +2617,24 @@ function hyrToActivityData(acts) {
   });
 }
 
+function paginateActivities(actData, maxPerPage = 15) {
+  const pages = [];
+  let curPage = [], curCount = 0, pendingHeader = null;
+  for (const item of actData) {
+    if (item.isSectionHeader) {
+      pendingHeader = item;
+    } else {
+      if (curCount >= maxPerPage) {
+        pages.push(curPage); curPage = []; curCount = 0; pendingHeader = null;
+      }
+      if (pendingHeader) { curPage.push(pendingHeader); pendingHeader = null; }
+      curPage.push(item); curCount++;
+    }
+  }
+  if (curPage.length > 0) pages.push(curPage);
+  return pages;
+}
+
 function hyrDrawActivityBreakdown(targetName, activities, period, year) {
   if (!activities || activities.length === 0) return null;
   const SCALE = 2, R = 7, ROW_H = 46;
@@ -3144,11 +3162,17 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
     h += `<h3 style="${SECTION_H3}">6.2 Activity Breakdown Charts</h3>`;
     const rangeLabel = period === "H1" ? `Jan–Jun ${year}` : `Jul–Dec ${year}`;
     for (const target of appendixTargets) {
-      const result = renderActivityBreakdownChart(target.name, hyrToActivityData(breakdownData[target.name]), rangeLabel);
-      if (result) {
-        h += `<div style="margin-top:1.5rem"><p style="font-weight:700;font-size:.95rem;margin:0 0 .35rem">${esc(target.name)}</p>`;
-        h += `<img src="data:image/png;base64,${result.base64}" style="width:100%;max-width:600px;display:block;margin:.25rem 0 1rem"></div>`;
-      }
+      const actData = hyrToActivityData(breakdownData[target.name]);
+      const pages = paginateActivities(actData);
+      pages.forEach((pageData, pageIdx) => {
+        const pageSuffix = pages.length > 1 ? ` (Page ${pageIdx + 1})` : "";
+        const chartTitle = `${target.name}${pageSuffix} - Progress (${rangeLabel})`;
+        const result = renderActivityBreakdownChart(target.name, pageData, rangeLabel, chartTitle);
+        if (result) {
+          h += `<div style="margin-top:1.5rem"><p style="font-weight:700;font-size:.95rem;margin:0 0 .35rem">${esc(chartTitle)}</p>`;
+          h += `<img src="data:image/png;base64,${result.base64}" style="width:100%;max-width:600px;display:block;margin:.25rem 0 1rem"></div>`;
+        }
+      });
     }
   }
 
@@ -3434,16 +3458,22 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     appendixParas.push(mkPara("6.2 Activity Breakdown Charts", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
     const rangeLabel = period === "H1" ? `Jan–Jun ${year}` : `Jul–Dec ${year}`;
     for (const target of appendixTargets) {
-      const abResult = renderActivityBreakdownChart(target.name, hyrToActivityData(breakdownData[target.name]), rangeLabel);
-      if (abResult) {
-        const abH = Math.round(520 * abResult.height / 760);
-        appendixParas.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
-        appendixParas.push(mkPara(target.name, { heading: HeadingLevel.HEADING_2, before: 0, after: 100, size: 24, bold: true }));
-        appendixParas.push(new Paragraph({
-          children: [new ImageRun({ data: b64ToUint8(abResult.base64), transformation: { width: 520, height: abH }, type: "png" })],
-          alignment: AlignmentType.CENTER, spacing: { after: 240 }
-        }));
-      }
+      const actData = hyrToActivityData(breakdownData[target.name]);
+      const pages = paginateActivities(actData);
+      pages.forEach((pageData, pageIdx) => {
+        const pageSuffix = pages.length > 1 ? ` (Page ${pageIdx + 1})` : "";
+        const chartTitle = `${target.name}${pageSuffix} - Progress (${rangeLabel})`;
+        const abResult = renderActivityBreakdownChart(target.name, pageData, rangeLabel, chartTitle);
+        if (abResult) {
+          const abH = Math.round(600 * abResult.height / 760);
+          appendixParas.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
+          appendixParas.push(mkPara(chartTitle, { heading: HeadingLevel.HEADING_2, before: 0, after: 100, size: 24, bold: true }));
+          appendixParas.push(new Paragraph({
+            children: [new ImageRun({ data: b64ToUint8(abResult.base64), transformation: { width: 600, height: abH }, type: "png" })],
+            alignment: AlignmentType.CENTER, spacing: { after: 240 }
+          }));
+        }
+      });
     }
   }
 
