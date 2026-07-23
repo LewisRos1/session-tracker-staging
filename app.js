@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1047";
+const APP_VERSION = "1048";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3061,11 +3061,11 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
     h += `<hr style="margin:2rem 0">`;
     h += `<h2 style="${SECTION_H2}">Section ${appendixSection}: Appendix</h2>`;
     h += `<h3 style="${SECTION_H3}">6.1 How the Sections are Categorized</h3>`;
-    h += `<table style="width:100%;border-collapse:collapse;font-size:.88rem;margin:.75rem 0 1.5rem"><thead><tr style="background:#f3f4f6"><th style="padding:.45rem .75rem;border:1px solid #e5e7eb;text-align:left;font-weight:700;width:28%">Section</th><th style="padding:.45rem .75rem;border:1px solid #e5e7eb;text-align:left;font-weight:700">Criteria</th></tr></thead><tbody>
-      <tr><td style="padding:.45rem .75rem;border:1px solid #e5e7eb;font-weight:600">2.1 Most Improved</td><td style="padding:.45rem .75rem;border:1px solid #e5e7eb">Trendline improved by more than +8 percentage points (pp) this term</td></tr>
-      <tr><td style="padding:.45rem .75rem;border:1px solid #e5e7eb;font-weight:600">2.2 Strong &amp; Steady</td><td style="padding:.45rem .75rem;border:1px solid #e5e7eb">Trendline end above 80% AND change within ±8pp (stable performance at a high level)</td></tr>
-      <tr><td style="padding:.45rem .75rem;border:1px solid #e5e7eb;font-weight:600">3.1 Needs Extra Support</td><td style="padding:.45rem .75rem;border:1px solid #e5e7eb">Trendline declined by more than −8pp this term</td></tr>
-      <tr><td style="padding:.45rem .75rem;border:1px solid #e5e7eb;font-weight:600">3.2 Developing</td><td style="padding:.45rem .75rem;border:1px solid #e5e7eb">Trendline end below 80% AND change within ±8pp (still building the skill)</td></tr>
+    h += `<table style="width:100%;border-collapse:collapse;font-size:.88rem;margin:.75rem 0 1.5rem"><thead><tr style="background:#f3f4f6"><th style="padding:.45rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700;width:28%">Section</th><th style="padding:.45rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700">Criteria</th></tr></thead><tbody>
+      <tr><td style="padding:.45rem .75rem;border:1px solid #e5e7eb;font-weight:600">2.1 Most Improved</td><td style="padding:.45rem .75rem;border:1px solid #e5e7eb">Gained <strong>more than 8 points</strong> over the term.</td></tr>
+      <tr><td style="padding:.45rem .75rem;border:1px solid #e5e7eb;font-weight:600">2.2 Strong &amp; Steady</td><td style="padding:.45rem .75rem;border:1px solid #e5e7eb">Ending score <strong>80% or above</strong> with stable progress (within <strong>±8 points</strong> over the term).</td></tr>
+      <tr><td style="padding:.45rem .75rem;border:1px solid #e5e7eb;font-weight:600">3.1 Needs Extra Support</td><td style="padding:.45rem .75rem;border:1px solid #e5e7eb">Dropped by <strong>more than 8 points</strong> over the term.</td></tr>
+      <tr><td style="padding:.45rem .75rem;border:1px solid #e5e7eb;font-weight:600">3.2 Developing</td><td style="padding:.45rem .75rem;border:1px solid #e5e7eb">Ending score <strong>under 80%</strong> with stable progress (within <strong>±8 points</strong> over the term).</td></tr>
     </tbody></table>`;
     h += `<h3 style="${SECTION_H3}">6.2 Activity Breakdown Charts</h3>`;
     const rangeLabel = period === "H1" ? `Jan–Jun ${year}` : `Jul–Dec ${year}`;
@@ -3324,17 +3324,24 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     appendixParas.push(mkPara("6.1 How the Sections are Categorized", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
     const HDR2 = "f3f4f6";
     const catHeaderRow = new TableRow({ tableHeader: true, children: [
-      mkCell("Section", { bold: true, bg: HDR2, size: 20, pct: 28 }),
-      mkCell("Criteria", { bold: true, bg: HDR2, size: 20, pct: 72 })
+      mkCell("Section",  { bold: true, bg: HDR2, size: 20, pct: 28, align: AlignmentType.CENTER }),
+      mkCell("Criteria", { bold: true, bg: HDR2, size: 20, pct: 72, align: AlignmentType.CENTER })
     ]});
-    const catRows = [
-      ["2.1 Most Improved",       "Trendline improved by more than +8 percentage points (pp) this term"],
-      ["2.2 Strong & Steady",     "Trendline end above 80% AND change within ±8pp (stable performance at a high level)"],
-      ["3.1 Needs Extra Support", "Trendline declined by more than −8pp this term"],
-      ["3.2 Developing",          "Trendline end below 80% AND change within ±8pp (still building the skill)"]
-    ].map(([sec, crit]) => new TableRow({ children: [
-      mkCell(sec,  { pct: 28, bold: true }),
-      mkCell(crit, { pct: 72 })
+    // Parse **bold** markers into mixed TextRun arrays for criteria cells
+    const richCritCell = (runs, pct) => {
+      const children = [];
+      for (const [txt, bd] of runs) children.push(new TextRun({ text: txt, bold: bd, size: 20 }));
+      return new TableCell({ width: { size: pct, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children, spacing: { before: 80, after: 80 } })] });
+    };
+    const catData = [
+      ["2.1 Most Improved",       [["Gained ", false], ["more than 8 points", true], [" over the term.", false]]],
+      ["2.2 Strong & Steady",     [["Ending score ", false], ["80% or above", true], [" with stable progress (within ", false], ["±8 points", true], [" over the term).", false]]],
+      ["3.1 Needs Extra Support", [["Dropped by ", false], ["more than 8 points", true], [" over the term.", false]]],
+      ["3.2 Developing",          [["Ending score ", false], ["under 80%", true], [" with stable progress (within ", false], ["±8 points", true], [" over the term).", false]]]
+    ];
+    const catRows = catData.map(([sec, runs]) => new TableRow({ children: [
+      mkCell(sec, { pct: 28, bold: true }),
+      richCritCell(runs, 72)
     ]}));
     appendixParas.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [catHeaderRow, ...catRows] }));
     appendixParas.push(new Paragraph({ children: [], spacing: { before: 400, after: 0 } }));
