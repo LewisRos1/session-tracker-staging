@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1055";
+const APP_VERSION = "1056";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2071,6 +2071,13 @@ async function hyrGenerate() {
 
     const qualitativeWithData = categorized.qualitative.filter(r => !!chartData[r.name]);
 
+    const qualNames = new Set(categorized.qualitative.map(r => r.name));
+    const bottom5Targets = trendRows
+      .filter(r => !r.noData && !qualNames.has(r.name))
+      .sort((a, b) => (a.tEnd ?? 0) - (b.tEnd ?? 0))
+      .slice(0, 5);
+    const bottom5Names = bottom5Targets.map(r => r.name);
+
     const aiPrompt = `You are writing a half-year progress report for parents. Keep everything warm, honest, and easy to read.
 
 GLOBAL RULES (apply to every section):
@@ -2127,9 +2134,11 @@ Same rules: plain English, no jargon, no numbers, warm tone. Labels in ** bold.
 ===END===`).join("\n\n")}
 
 ===ACTION_PLAN===
-List 3–5 priorities for ${firstName} next term. Each one is a skill or area to focus on.
+These are the ${bottom5Names.length} areas where ${firstName} currently has the lowest scores (listed from weakest to strongest): ${bottom5Names.join(", ")}.
+
+Write exactly ${bottom5Names.length} rows, one for each target above, in the same order. For each row, give a brief, warm explanation of what ${firstName} finds difficult in that area and why it is a priority for next term. Do not add extra targets or change the order.
 Format each row EXACTLY as:
-ROW: [Skill or Area] | [Brief description of what ${firstName} is finding difficult or why this is a priority — the context behind the focus, not a strategy]
+ROW: [Target Name] | [Brief description — the context behind the focus, not a strategy]
 ===END===`;
 
     const resp = await fetch("https://session-tracker-ai.wang-loys22.workers.dev", {
@@ -3081,12 +3090,12 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   // Section 5: Next Term Action Plan (table)
   const planSection = categorized.qualitative.length ? "5" : "4";
   h += `<h2 style="${SECTION_H2}">Section ${planSection}: Next Term Action Plan</h2>`;
-  h += `<p style="margin:.5rem 0 1rem;line-height:1.7">The table below outlines the priority areas for ${esc(firstName)}'s next term, based on ${esc(firstName)}'s progress this period and the therapy team's observations. The strategies for each focus area will be implemented in the upcoming term.</p>`;
+  h += `<p style="margin:.5rem 0 1rem;line-height:1.7">The table below highlights the areas where ${esc(firstName)} has the most room for improvement this term. These skills will be the key focus going into the next term, where the therapy team will continue to target each area through structured activities and guided practice.</p>`;
   if (parsed.actionPlanRows.length) {
     const rows = parsed.actionPlanRows.map((r, idx) =>
-      `<tr><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;text-align:center;width:5%;color:#6b7280">${idx + 1}</td><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;font-weight:600;vertical-align:top;width:23%">${esc(r.skill)}</td><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;vertical-align:top;line-height:1.6">${esc(r.goal)}</td><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;width:22%"></td></tr>`
+      `<tr><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;text-align:center;width:7.6%;color:#6b7280">${idx + 1}</td><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;font-weight:600;vertical-align:top;width:25%">${esc(r.skill)}</td><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;vertical-align:top;line-height:1.6">${esc(r.goal)}</td></tr>`
     ).join("");
-    h += `<table style="width:100%;border-collapse:collapse;font-size:.9rem;margin:.75rem 0"><thead><tr style="background:#f3f4f6"><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700;width:5%">No.</th><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700">Skill / Area</th><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700">Details</th><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700">Strategy for Next Term</th></tr></thead><tbody>${rows}</tbody></table>`;
+    h += `<table style="width:100%;border-collapse:collapse;font-size:.9rem;margin:.75rem 0"><thead><tr style="background:#f3f4f6"><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700;width:7.6%">No.</th><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700;width:25%">Skill / Area</th><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700">Details &amp; Strategy for Next Term</th></tr></thead><tbody>${rows}</tbody></table>`;
   }
 
   // Section 6: Appendix
@@ -3178,7 +3187,9 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
 
   function mkCell(text, opts = {}) {
     return new TableCell({
-      width: opts.pct !== undefined ? { size: opts.pct, type: WidthType.PERCENTAGE } : undefined,
+      width: opts.dxa !== undefined ? { size: opts.dxa, type: WidthType.DXA }
+           : opts.pct !== undefined ? { size: opts.pct, type: WidthType.PERCENTAGE }
+           : undefined,
       margins: { top: 100, bottom: 100, left: 150, right: 150 },
       children: [new Paragraph({
         children: [new TextRun({ text, bold: opts.bold, size: opts.size || 20, color: opts.color, italics: opts.italics })],
@@ -3324,24 +3335,23 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   const actionPlanParas = [];
   actionPlanParas.push(mkPara(`Section ${nextSectionNum}: Next Term Action Plan`, { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
   actionPlanParas.push(mkPara(
-    `The table below outlines the priority areas for ${firstName}'s next term, based on ${firstName}'s progress this period and the therapy team's observations. The strategies for each focus area will be implemented in the upcoming term.`,
+    `The table below highlights the areas where ${firstName} has the most room for improvement this term. These skills will be the key focus going into the next term, where the therapy team will continue to target each area through structured activities and guided practice.`,
     { after: 220 }
   ));
   if (parsed.actionPlanRows?.length) {
     const HDR = "f3f4f6";
+    // Column widths: No.=0.44" (634 DXA), Skill/Area=1.45" (2088 DXA), Details & Strategy=3.9" (5616 DXA)
     const headerRow = new TableRow({ tableHeader: true, children: [
-      mkCell("No.", { bold: true, bg: HDR, size: 20, align: AlignmentType.CENTER, pct: 6 }),
-      mkCell("Skill / Area", { bold: true, bg: HDR, size: 20, pct: 22, align: AlignmentType.CENTER }),
-      mkCell("Details", { bold: true, bg: HDR, size: 20, pct: 40, align: AlignmentType.CENTER }),
-      mkCell("Strategy for Next Term", { bold: true, bg: HDR, size: 20, pct: 32, align: AlignmentType.CENTER })
+      mkCell("No.", { bold: true, bg: HDR, size: 20, align: AlignmentType.CENTER, dxa: 634 }),
+      mkCell("Skill / Area", { bold: true, bg: HDR, size: 20, dxa: 2088, align: AlignmentType.CENTER }),
+      mkCell("Details & Strategy for Next Term", { bold: true, bg: HDR, size: 20, dxa: 5616, align: AlignmentType.CENTER })
     ]});
     const dataRows = parsed.actionPlanRows.map((r, idx) => new TableRow({ children: [
-      mkCell(String(idx + 1), { align: AlignmentType.CENTER, pct: 6 }),
-      mkCell(r.skill || "", { pct: 22, align: AlignmentType.CENTER }),
-      mkCell(r.goal || "", { pct: 40 }),
-      mkCell("", { pct: 32 })
+      mkCell(String(idx + 1), { align: AlignmentType.CENTER, dxa: 634 }),
+      mkCell(r.skill || "", { dxa: 2088, align: AlignmentType.CENTER }),
+      mkCell(r.goal || "", { dxa: 5616 })
     ]}));
-    actionPlanParas.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...dataRows] }));
+    actionPlanParas.push(new Table({ width: { size: 8338, type: WidthType.DXA }, rows: [headerRow, ...dataRows] }));
   }
 
   // ── Section: Appendix (portrait) ───────────────────────────
