@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1046";
+const APP_VERSION = "1047";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3060,14 +3060,14 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   if (appendixTargets.length) {
     h += `<hr style="margin:2rem 0">`;
     h += `<h2 style="${SECTION_H2}">Section ${appendixSection}: Appendix</h2>`;
-    h += `<h3 style="${SECTION_H3}">How We Categorise the Sections</h3>`;
+    h += `<h3 style="${SECTION_H3}">6.1 How the Sections are Categorized</h3>`;
     h += `<table style="width:100%;border-collapse:collapse;font-size:.88rem;margin:.75rem 0 1.5rem"><thead><tr style="background:#f3f4f6"><th style="padding:.45rem .75rem;border:1px solid #e5e7eb;text-align:left;font-weight:700;width:28%">Section</th><th style="padding:.45rem .75rem;border:1px solid #e5e7eb;text-align:left;font-weight:700">Criteria</th></tr></thead><tbody>
       <tr><td style="padding:.45rem .75rem;border:1px solid #e5e7eb;font-weight:600">2.1 Most Improved</td><td style="padding:.45rem .75rem;border:1px solid #e5e7eb">Trendline improved by more than +8 percentage points (pp) this term</td></tr>
       <tr><td style="padding:.45rem .75rem;border:1px solid #e5e7eb;font-weight:600">2.2 Strong &amp; Steady</td><td style="padding:.45rem .75rem;border:1px solid #e5e7eb">Trendline end above 80% AND change within ±8pp (stable performance at a high level)</td></tr>
       <tr><td style="padding:.45rem .75rem;border:1px solid #e5e7eb;font-weight:600">3.1 Needs Extra Support</td><td style="padding:.45rem .75rem;border:1px solid #e5e7eb">Trendline declined by more than −8pp this term</td></tr>
       <tr><td style="padding:.45rem .75rem;border:1px solid #e5e7eb;font-weight:600">3.2 Developing</td><td style="padding:.45rem .75rem;border:1px solid #e5e7eb">Trendline end below 80% AND change within ±8pp (still building the skill)</td></tr>
     </tbody></table>`;
-    h += `<h3 style="${SECTION_H3}">Activity Breakdown Charts</h3>`;
+    h += `<h3 style="${SECTION_H3}">6.2 Activity Breakdown Charts</h3>`;
     const rangeLabel = period === "H1" ? `Jan–Jun ${year}` : `Jul–Dec ${year}`;
     for (const target of appendixTargets) {
       const result = renderActivityBreakdownChart(target.name, hyrToActivityData(breakdownData[target.name]), rangeLabel);
@@ -3321,7 +3321,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   const appendixTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped && breakdownData[t.name]?.length);
   if (appendixTargets.length) {
     appendixParas.push(mkPara(`Section ${nextSectionNum + 1}: Appendix`, { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
-    appendixParas.push(mkPara("How We Categorise the Sections", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
+    appendixParas.push(mkPara("6.1 How the Sections are Categorized", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
     const HDR2 = "f3f4f6";
     const catHeaderRow = new TableRow({ tableHeader: true, children: [
       mkCell("Section", { bold: true, bg: HDR2, size: 20, pct: 28 }),
@@ -3338,7 +3338,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     ]}));
     appendixParas.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [catHeaderRow, ...catRows] }));
     appendixParas.push(new Paragraph({ children: [], spacing: { before: 400, after: 0 } }));
-    appendixParas.push(mkPara("Activity Breakdown Charts", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
+    appendixParas.push(mkPara("6.2 Activity Breakdown Charts", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
     const rangeLabel = period === "H1" ? `Jan–Jun ${year}` : `Jul–Dec ${year}`;
     for (const target of appendixTargets) {
       const abResult = renderActivityBreakdownChart(target.name, hyrToActivityData(breakdownData[target.name]), rangeLabel);
