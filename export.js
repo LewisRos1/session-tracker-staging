@@ -721,15 +721,15 @@ function drawOverviewChart(chartTrendRows, title) {
     ctx.restore();
   }
 
-  // Legend — 2 rows, centered (17px to fit all items)
+  // Legend — 2 rows: row1=term colours, row2=trend directions
   const LEG_R1 = [
     { color: C_START, label: "Term Start" },
-    { color: C_END, label: "Term End" },
-    { color: C_DOWN, label: "Trending Down (<-8 pts)" }
+    { color: C_END,   label: "Term End" }
   ];
   const LEG_R2 = [
+    { color: C_DOWN,   label: "Trending Down (<-8 pts)" },
     { color: C_STABLE, label: "Stable (±8 pts)" },
-    { color: C_UP, label: "Trending Up (>+8 pts)" }
+    { color: C_UP,     label: "Trending Up (>+8 pts)" }
   ];
   ctx.font = "17px sans-serif";
   const BOX = 14, GAP = 5, SPC = 16, ROW_H = 26;

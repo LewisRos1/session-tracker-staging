@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1059";
+const APP_VERSION = "1060";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2098,14 +2098,14 @@ Write exactly 5 sentences summing up ${firstName}'s overall progress this term i
 
 ===KEY_INSIGHTS===
 Based on all session data and observations, write exactly 8 rows in this format — short, scannable, memorable:
-ROW: Biggest Win | [2-4 word bold label]: [One short sentence — the specific achievement. Must be data-backed. If no genuine win exists, name the smallest real positive.]
-ROW: Biggest Win | [2-4 word bold label]: [One short sentence — a second genuine success from a different area. Must be real, not filler.]
-ROW: Biggest Win | [2-4 word bold label]: [One short sentence — a third win. Only real positives — do not invent.]
-ROW: Biggest Win | [2-4 word bold label]: [One short sentence — a fourth data-backed achievement.]
-ROW: Key Focus Area | [2-4 word bold label]: [One short sentence — what specifically is difficult and why it needs focus next term.]
-ROW: Key Focus Area | [2-4 word bold label]: [One short sentence — a second area that needs work, with a specific detail.]
-ROW: Key Focus Area | [2-4 word bold label]: [One short sentence — a third area to address next term. Be specific.]
-ROW: Key Focus Area | [2-4 word bold label]: [One short sentence — a fourth focus area with a specific detail.]
+ROW: Biggest Win | [2-4 word label — write it directly, no ** markers]: [One short sentence — the specific achievement. Must be data-backed. If no genuine win exists, name the smallest real positive.]
+ROW: Biggest Win | [2-4 word label — write it directly, no ** markers]: [One short sentence — a second genuine success from a different area. Must be real, not filler.]
+ROW: Biggest Win | [2-4 word label — write it directly, no ** markers]: [One short sentence — a third win. Only real positives — do not invent.]
+ROW: Biggest Win | [2-4 word label — write it directly, no ** markers]: [One short sentence — a fourth data-backed achievement.]
+ROW: Key Focus Area | [2-4 word label — write it directly, no ** markers]: [One short sentence — what specifically is difficult and why it needs focus next term.]
+ROW: Key Focus Area | [2-4 word label — write it directly, no ** markers]: [One short sentence — a second area that needs work, with a specific detail.]
+ROW: Key Focus Area | [2-4 word label — write it directly, no ** markers]: [One short sentence — a third area to address next term. Be specific.]
+ROW: Key Focus Area | [2-4 word label — write it directly, no ** markers]: [One short sentence — a fourth focus area with a specific detail.]
 ===END===
 
 ${targetsWithData.map(r => `===OBSERVATION: ${r.name}===
@@ -2932,15 +2932,15 @@ function hyrDrawOverviewChart(chartTrendRows, title) {
     ctx.restore();
   }
 
-  // Legend — 2 rows, centered (17px to fit all items)
+  // Legend — 2 rows: row1=term colours, row2=trend directions
   const LEG_R1 = [
     { color: C_START, label: "Term Start" },
-    { color: C_END, label: "Term End" },
-    { color: C_DOWN, label: "Trending Down (<-8 pts)" }
+    { color: C_END,   label: "Term End" }
   ];
   const LEG_R2 = [
+    { color: C_DOWN,   label: "Trending Down (<-8 pts)" },
     { color: C_STABLE, label: "Stable (±8 pts)" },
-    { color: C_UP, label: "Trending Up (>+8 pts)" }
+    { color: C_UP,     label: "Trending Up (>+8 pts)" }
   ];
   ctx.font = "17px sans-serif";
   const BOX = 14, GAP = 5, SPC = 16, ROW_H = 26;
@@ -3067,7 +3067,10 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   if (chartTrendRows.length) {
     const ovTitle  = `${firstName} - ${monthRange} ${year} Progress`;
     const ovResult = hyrDrawOverviewChart(chartTrendRows, ovTitle);
-    if (ovResult) h += `<img src="data:image/png;base64,${ovResult.base64}" style="width:100%;max-width:700px;display:block;margin:.5rem 0 .3rem">`;
+    if (ovResult) {
+      h += `<p style="margin:.5rem 0 .75rem;line-height:1.7">The chart below shows an overview of ${esc(firstName)}'s overall progress across all targets this term.</p>`;
+      h += `<img src="data:image/png;base64,${ovResult.base64}" style="width:100%;max-width:700px;display:block;margin:.5rem 0 .3rem">`;
+    }
   }
   const qualSet = new Set(unchartedQual), noDataSet = new Set(unchartedNoData);
   const allUncNames = [...new Set([...unchartedQual, ...unchartedNoData])];
@@ -3080,9 +3083,10 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
     h += `<p style="font-size:.8rem;color:#9ca3af;font-style:italic;margin:0 0 1.25rem">${unchartedNotes.map(esc).join(" &nbsp;&bull;&nbsp; ")}</p>`;
   }
   if (parsed.biggestWins?.length || parsed.keyFocusAreas?.length) {
-    const fmtKI = s => { const i = s.indexOf(': '); return i > 0 ? `<strong>${esc(s.slice(0,i))}</strong>: ${esc(s.slice(i+2))}` : esc(s); };
+    const fmtKI = s => { const c = s.replace(/\*\*/g, ""); const i = c.indexOf(': '); return i > 0 ? `<strong>${esc(c.slice(0,i))}</strong>: ${esc(c.slice(i+2))}` : esc(c); };
     const bwItems = (parsed.biggestWins || []).map(s => `<li style="margin:.5rem 0;line-height:1.6">${fmtKI(s)}</li>`).join("");
     const kfItems = (parsed.keyFocusAreas || []).map(s => `<li style="margin:.5rem 0;line-height:1.6">${fmtKI(s)}</li>`).join("");
+    h += `<p style="margin:1.25rem 0 .75rem;line-height:1.7">Below are the top 4 most important wins and the 4 most critical focus areas that ${esc(firstName)} needs support with going into next term.</p>`;
     h += `<table style="width:100%;border-collapse:collapse;font-size:.93rem;margin:1.25rem 0"><tbody>
       <tr><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;font-weight:700;text-align:center;vertical-align:middle;width:28%;white-space:nowrap">Biggest Wins</td><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;vertical-align:top"><ol style="margin:0;padding-left:1.4rem">${bwItems}</ol></td></tr>
       <tr><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;font-weight:700;text-align:center;vertical-align:middle;white-space:nowrap">Key Focus Areas</td><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;vertical-align:top"><ol style="margin:0;padding-left:1.4rem">${kfItems}</ol></td></tr>
@@ -3112,10 +3116,10 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   if (categorized.qualitative.length) {
     h += `<hr style="margin:2rem 0">`;
     h += `<h2 style="${SECTION_H2}">Section 4: Observed Skills (No Quantitative Data)</h2>`;
-    categorized.qualitative.forEach(r => {
+    categorized.qualitative.forEach((r, i) => {
       const hasObs = !!parsed.observed[r.name];
       h += `<div style="margin-top:2rem">
-        <p style="font-weight:700;font-size:1rem;margin:0 0 .35rem">${esc(r.name)}</p>
+        <p style="font-weight:700;font-size:1rem;margin:0 0 .35rem">${ROMAN[i] || i + 1}. ${esc(r.name)}</p>
         ${hasObs ? obsHtml(parsed.observed[r.name]) : `<p style="color:#9ca3af;font-style:italic">Tracked via session notes — no percentage scores recorded this period.</p>`}
       </div>`;
     });
@@ -3133,7 +3137,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
       return `<tr>
         <td style="padding:.55rem .75rem;border:1px solid #e5e7eb;text-align:center;width:7.6%;color:#6b7280">${idx + 1}</td>
         <td style="padding:.55rem .75rem;border:1px solid #e5e7eb;font-weight:600;vertical-align:top;text-align:center;width:25%">${esc(r.target || "")}</td>
-        <td style="padding:.55rem .75rem;border:1px solid #e5e7eb;vertical-align:top"><ul style="margin:0;padding-left:1.2rem;line-height:1.6">${pts}</ul></td>
+        <td style="padding:.55rem .75rem;border:1px solid #e5e7eb;vertical-align:top"><ol style="margin:0;padding-left:1.2rem;line-height:1.6">${pts}</ol></td>
         <td style="padding:.55rem .75rem;border:1px solid #e5e7eb;vertical-align:top"></td>
       </tr>`;
     }).join("");
@@ -3307,6 +3311,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   const ovTitle = `${firstName} - ${monthRange} ${year} Progress`;
   const ovResult = hyrDrawOverviewChart(chartTrendRows, ovTitle);
   if (ovResult) {
+    paragraphs.push(mkPara(`The chart below shows an overview of ${firstName}'s overall progress across all targets this term.`, { after: 160 }));
     const ovH = Math.round(520 * ovResult.height / 700);
     paragraphs.push(new Paragraph({
       children: [new ImageRun({ data: b64ToUint8(ovResult.base64), transformation: { width: 520, height: ovH }, type: "png" })],
@@ -3340,10 +3345,11 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
       margins: { top: 100, bottom: 100, left: 150, right: 150 },
       children: items.length
         ? items.map(s => {
-            const ci = s.indexOf(': ');
+            const c = s.replace(/\*\*/g, "");
+            const ci = c.indexOf(': ');
             const runs = ci > 0
-              ? [new TextRun({ text: s.slice(0, ci), bold: true, size: 20 }), new TextRun({ text: ': ' + s.slice(ci + 2), size: 20 })]
-              : [new TextRun({ text: s, size: 20 })];
+              ? [new TextRun({ text: c.slice(0, ci), bold: true, size: 20 }), new TextRun({ text: ': ' + c.slice(ci + 2), size: 20 })]
+              : [new TextRun({ text: c, size: 20 })];
             return new Paragraph({ children: runs, numbering: { reference: numRef, level: 0 }, alignment: AlignmentType.BOTH, spacing: { before: 40, after: 120, ...LS } });
           })
         : [new Paragraph({ children: [new TextRun({ text: "", size: 20 })], spacing: { before: 80, after: 80 } })]
@@ -3351,6 +3357,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     kiRows.push(new TableRow({ children: [mkKiLabelCell("Biggest Wins"), mkKiNumberedCell(parsed.biggestWins || [], KI_NUM_REF)] }));
     kiRows.push(new TableRow({ children: [mkKiLabelCell("Key Focus Areas"), mkKiNumberedCell(parsed.keyFocusAreas || [], KI_NUM_REF_2)] }));
     kiRows.push(new TableRow({ children: [mkKiLabelCell("Strategy for Next Term"), mkKiNumberedCell([], KI_NUM_REF)] }));
+    paragraphs.push(mkPara(`Below are the top 4 most important wins and the 4 most critical focus areas that ${firstName} needs support with going into next term.`, { after: 160 }));
     paragraphs.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: kiRows }));
     paragraphs.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
   }
@@ -3379,9 +3386,9 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   let nextSectionNum = 4;
   if (categorized.qualitative.length) {
     paragraphs.push(mkPara("Section 4: Observed Skills (No Quantitative Data)", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
-    categorized.qualitative.forEach(r => {
+    categorized.qualitative.forEach((r, i) => {
       paragraphs.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
-      paragraphs.push(new Paragraph({ children: [new TextRun({ text: r.name, bold: true, size: 24 })], spacing: { before: 0, after: 80, ...LS } }));
+      paragraphs.push(new Paragraph({ children: [new TextRun({ text: `${ROMAN[i] || i + 1}. ${r.name}`, bold: true, size: 24 })], spacing: { before: 0, after: 80, ...LS } }));
       const obs = parsed.observed?.[r.name];
       if (obs) {
         obs.split("\n").forEach(line => {
@@ -3418,7 +3425,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
         width: { size: 5616, type: WidthType.DXA },
         margins: { top: 100, bottom: 100, left: 150, right: 150 },
         children: (r.points || []).length
-          ? (r.points || []).map(p => new Paragraph({ children: [new TextRun({ text: p, size: 20 })], style: "List Bullet", spacing: { before: 40, after: 80 } }))
+          ? (r.points || []).map((p, pi) => new Paragraph({ children: [new TextRun({ text: `${pi + 1}. ${p}`, size: 20 })], spacing: { before: 40, after: 80, ...LS } }))
           : [new Paragraph({ children: [new TextRun({ text: "", size: 20 })], spacing: { before: 80, after: 80 } })]
       }),
       mkCell("", { dxa: 5616 })
