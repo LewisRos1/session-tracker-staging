@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1054";
+const APP_VERSION = "1055";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2762,8 +2762,8 @@ function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd
   const dispDir   = direction ?? (dispDelta > 8 ? "Trending Up" : dispDelta < -8 ? "Trending Down" : "Stable");
   const ptStr  = (dispDelta >= 0 ? "+" : "") + dispDelta + " points";
   const icon   = dispDir === "Trending Up" ? "↑" : dispDir === "Trending Down" ? "↓" : "→";
-  const rngStr = (tStart != null && tEnd != null) ? ` | ${tStart}% → ${tEnd}%` : "";
-  ctx.fillStyle = "#6b7280"; ctx.font = "italic 11px sans-serif"; ctx.textAlign = "center";
+  const rngStr = (tStart != null && tEnd != null) ? ` (${tStart}% → ${tEnd}%)` : "";
+  ctx.fillStyle = "#6b7280"; ctx.font = "italic 10px sans-serif"; ctx.textAlign = "center";
   ctx.fillText(`${icon} ${dispDir} | ${ptStr}${rngStr}`, W / 2, 40);
 
   // Data line
@@ -2791,10 +2791,10 @@ function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd
   return canvas.toDataURL("image/png").split(",")[1];
 }
 
-function hyrDrawOverviewChart(chartTrendRows) {
+function hyrDrawOverviewChart(chartTrendRows, title) {
   const n = chartTrendRows.length;
   if (n === 0) return null;
-  const W = 700, PAD_L = 30, PAD_R = 20, PAD_TOP = 36, PAD_BTM = 140;
+  const W = 700, PAD_L = 55, PAD_R = 20, PAD_TOP = 36, PAD_BTM = 104;
   const TOP_H = 200, MID_GAP = 38, BTM_H = 160;
   const CHART_W = W - PAD_L - PAD_R;
   const H = PAD_TOP + TOP_H + MID_GAP + BTM_H + PAD_BTM;
@@ -2817,23 +2817,37 @@ function hyrDrawOverviewChart(chartTrendRows) {
   const ctx = canvas.getContext("2d");
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
 
-  // Title
-  ctx.fillStyle = "#111827"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText("Overall Performance (%)", W / 2, 22);
+  // Chart title
+  if (title) {
+    ctx.fillStyle = "#111827"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(title, W / 2, 22);
+  }
 
-  // Top gridlines (no y-axis labels)
+  // Rotated y-axis labels
+  ctx.save();
+  ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "center";
+  ctx.translate(13, PAD_TOP + TOP_H / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText("Overall Performance (%)", 0, 0);
+  ctx.restore();
+  ctx.save();
+  ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "center";
+  ctx.translate(13, BTM_Y0 + BTM_H / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText("Net Change (pts)", 0, 0);
+  ctx.restore();
+
+  // Top gridlines
   for (const tick of [0, 20, 40, 60, 80, 100]) {
     const y = TOP_BTM_Y - (tick / 100) * TOP_H;
     ctx.strokeStyle = tick === 0 ? "#9ca3af" : "#e5e7eb"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(W - PAD_R, y); ctx.stroke();
   }
 
-  // Separator
+  // Separator band (labels on y-axis now)
   ctx.fillStyle = "#f3f4f6"; ctx.fillRect(PAD_L, TOP_BTM_Y + 4, CHART_W, MID_GAP - 8);
-  ctx.fillStyle = "#111827"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "left";
-  ctx.fillText("Net Change (pts)", PAD_L + 4, TOP_BTM_Y + MID_GAP / 2 + 4);
 
-  // Bottom gridlines (no y-axis labels)
+  // Bottom gridlines
   for (const tick of [-maxAbs, -Math.round(maxAbs / 2), 0, Math.round(maxAbs / 2), maxAbs]) {
     const y = NET_CTR_Y - (tick / maxAbs) * (BTM_H / 2);
     ctx.strokeStyle = tick === 0 ? "#374151" : "#e5e7eb"; ctx.lineWidth = tick === 0 ? 1.5 : 1;
@@ -2887,24 +2901,24 @@ function hyrDrawOverviewChart(chartTrendRows) {
     ctx.restore();
   }
 
-  // Legend — 2 rows, centered, below x-axis labels
+  // Legend — 1 row, centered
   const LEG = [
-    [{ color: C_START, label: "Term Start" }, { color: C_END, label: "Term End" }, { color: C_DOWN, label: "Trending Down (<-8 pts)" }],
-    [{ color: C_STABLE, label: "Stable (±8 pts)" }, { color: C_UP, label: "Trending Up (>+8 pts)" }]
+    { color: C_START, label: "Term Start" },
+    { color: C_END, label: "Term End" },
+    { color: C_DOWN, label: "Trending Down (<-8 pts)" },
+    { color: C_STABLE, label: "Stable (±8 pts)" },
+    { color: C_UP, label: "Trending Up (>+8 pts)" }
   ];
   ctx.font = "11px sans-serif";
-  const BOX = 14, GAP = 5, SPC = 18, ROW_H = 22;
-  const legY0 = BTM_BTM_Y + 84;
-  LEG.forEach((row, ri) => {
-    const rowW = row.reduce((acc, { label }) => acc + BOX + GAP + Math.ceil(ctx.measureText(label).width) + SPC, 0) - SPC;
-    let lx = PAD_L + (CHART_W - rowW) / 2;
-    const ly = legY0 + ri * ROW_H;
-    row.forEach(({ color, label }) => {
-      ctx.fillStyle = color; ctx.fillRect(lx, ly - BOX + 2, BOX, BOX);
-      ctx.fillStyle = "#374151"; ctx.textAlign = "left";
-      ctx.fillText(label, lx + BOX + GAP, ly);
-      lx += BOX + GAP + Math.ceil(ctx.measureText(label).width) + SPC;
-    });
+  const BOX = 12, GAP = 4, SPC = 14;
+  const legY = BTM_BTM_Y + 80;
+  const legRowW = LEG.reduce((acc, { label }) => acc + BOX + GAP + Math.ceil(ctx.measureText(label).width) + SPC, 0) - SPC;
+  let lx = PAD_L + (CHART_W - legRowW) / 2;
+  LEG.forEach(({ color, label }) => {
+    ctx.fillStyle = color; ctx.fillRect(lx, legY - BOX + 2, BOX, BOX);
+    ctx.fillStyle = "#374151"; ctx.textAlign = "left";
+    ctx.fillText(label, lx + BOX + GAP, legY);
+    lx += BOX + GAP + Math.ceil(ctx.measureText(label).width) + SPC;
   });
 
   // Border
@@ -2990,8 +3004,9 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
     : `<p style="color:#9ca3af;font-style:italic;margin-top:.5rem">No targets in this category.</p>`;
 
   // Charts for Section 1 (sorted ascending by delta: red→green)
-  const chartTrendRows = [...trendRows.filter(r => !r.noData)].sort((a, b) => a.delta - b.delta);
-  const noDataNames = categorized.qualitative.map(r => r.name);
+  const chartTrendRows  = [...trendRows.filter(r => !r.noData)].sort((a, b) => a.delta - b.delta);
+  const unchartedQual   = categorized.qualitative.map(r => r.name);
+  const unchartedNoData = trendRows.filter(r => r.noData).map(r => r.name);
 
   let h = "";
 
@@ -3009,8 +3024,16 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   h += `<h2 style="${SECTION_H2}">Section 1: Executive Overview</h2>`;
 
   if (chartTrendRows.length) {
-    const ovResult = hyrDrawOverviewChart(chartTrendRows);
-    if (ovResult) h += `<img src="data:image/png;base64,${ovResult.base64}" style="width:100%;max-width:700px;display:block;margin:.5rem 0 1.25rem">`;
+    const ovTitle  = `${firstName} - ${monthRange} ${year} Progress`;
+    const ovResult = hyrDrawOverviewChart(chartTrendRows, ovTitle);
+    if (ovResult) h += `<img src="data:image/png;base64,${ovResult.base64}" style="width:100%;max-width:700px;display:block;margin:.5rem 0 .3rem">`;
+  }
+  const unchartedNotes = [
+    ...unchartedQual.map(n => `*${n} - not charted (qualitative target)`),
+    ...unchartedNoData.map(n => `*${n} - not charted (insufficient data)`)
+  ];
+  if (unchartedNotes.length) {
+    h += `<p style="font-size:.8rem;color:#9ca3af;font-style:italic;margin:0 0 1.25rem">${unchartedNotes.map(esc).join(" &nbsp;&bull;&nbsp; ")}</p>`;
   }
   if (parsed.biggestWins?.length || parsed.keyFocusAreas?.length) {
     const bwItems = (parsed.biggestWins || []).map(s => `<li style="margin:.4rem 0;line-height:1.6">${esc(s)}</li>`).join("");
@@ -3216,12 +3239,23 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   paragraphs.push(mkPara("Section 1: Executive Overview", { heading: HeadingLevel.HEADING_1, before: 560, after: 200, pageBreak: true, size: 32, bold: true }));
 
   const chartTrendRows = [...trendRows.filter(r => !r.noData)].sort((a, b) => a.delta - b.delta);
-  const ovResult = hyrDrawOverviewChart(chartTrendRows);
+  const ovTitle = `${firstName} - ${monthRange} ${year} Progress`;
+  const ovResult = hyrDrawOverviewChart(chartTrendRows, ovTitle);
   if (ovResult) {
     const ovH = Math.round(520 * ovResult.height / 700);
     paragraphs.push(new Paragraph({
       children: [new ImageRun({ data: b64ToUint8(ovResult.base64), transformation: { width: 520, height: ovH }, type: "png" })],
-      alignment: AlignmentType.CENTER, spacing: { after: 160 }
+      alignment: AlignmentType.CENTER, spacing: { after: 60 }
+    }));
+  }
+  const wUncNotes = [
+    ...categorized.qualitative.map(r => `*${r.name} - not charted (qualitative target)`),
+    ...trendRows.filter(r => r.noData).map(r => `*${r.name} - not charted (insufficient data)`)
+  ].join("    ");
+  if (wUncNotes) {
+    paragraphs.push(new Paragraph({
+      children: [new TextRun({ text: wUncNotes, size: 16, italics: true, color: "9CA3AF" })],
+      alignment: AlignmentType.CENTER, spacing: { before: 0, after: 200 }
     }));
   }
   if ((parsed.biggestWins?.length || parsed.keyFocusAreas?.length)) {

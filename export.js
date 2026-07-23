@@ -601,7 +601,7 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
     const chartRows = [...trendRows.filter(r => !r.noData)].sort((a, b) => a.delta - b.delta);
     if (chartRows.length > 0) {
       ws.addRow([]); // blank gap before chart
-      const ovResult = drawOverviewChart(chartRows);
+      const ovResult = drawOverviewChart(chartRows, `${range} ${year} Progress`);
       if (ovResult) {
         const ovImgId = wb.addImage({ base64: ovResult.base64, extension: "png" });
         const imgRow0 = ws.lastRow.number - 1; // 0-indexed row for image placement
@@ -624,10 +624,10 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
   applyBorders(ws, NUM_COLS);
 }
 
-function drawOverviewChart(chartTrendRows) {
+function drawOverviewChart(chartTrendRows, title) {
   const n = chartTrendRows.length;
   if (n === 0) return null;
-  const W = 700, PAD_L = 30, PAD_R = 20, PAD_TOP = 36, PAD_BTM = 140;
+  const W = 700, PAD_L = 55, PAD_R = 20, PAD_TOP = 36, PAD_BTM = 104;
   const TOP_H = 200, MID_GAP = 38, BTM_H = 160;
   const CHART_W = W - PAD_L - PAD_R;
   const H = PAD_TOP + TOP_H + MID_GAP + BTM_H + PAD_BTM;
@@ -645,23 +645,37 @@ function drawOverviewChart(chartTrendRows) {
   const ctx = canvas.getContext("2d");
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
 
-  // Title
-  ctx.fillStyle = "#111827"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText("Overall Performance (%)", W / 2, 22);
+  // Chart title
+  if (title) {
+    ctx.fillStyle = "#111827"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(title, W / 2, 22);
+  }
 
-  // Top gridlines (no y-axis labels)
+  // Rotated y-axis labels
+  ctx.save();
+  ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "center";
+  ctx.translate(13, PAD_TOP + TOP_H / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText("Overall Performance (%)", 0, 0);
+  ctx.restore();
+  ctx.save();
+  ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "center";
+  ctx.translate(13, BTM_Y0 + BTM_H / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText("Net Change (pts)", 0, 0);
+  ctx.restore();
+
+  // Top gridlines
   for (const tick of [0, 20, 40, 60, 80, 100]) {
     const y = TOP_BTM_Y - (tick / 100) * TOP_H;
     ctx.strokeStyle = tick === 0 ? "#9ca3af" : "#e5e7eb"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(W - PAD_R, y); ctx.stroke();
   }
 
-  // Separator
+  // Separator band
   ctx.fillStyle = "#f3f4f6"; ctx.fillRect(PAD_L, TOP_BTM_Y + 4, CHART_W, MID_GAP - 8);
-  ctx.fillStyle = "#111827"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "left";
-  ctx.fillText("Net Change (pts)", PAD_L + 4, TOP_BTM_Y + MID_GAP / 2 + 4);
 
-  // Bottom gridlines (no y-axis labels)
+  // Bottom gridlines
   for (const tick of [-maxAbs, -Math.round(maxAbs / 2), 0, Math.round(maxAbs / 2), maxAbs]) {
     const y = NET_CTR_Y - (tick / maxAbs) * (BTM_H / 2);
     ctx.strokeStyle = tick === 0 ? "#374151" : "#e5e7eb"; ctx.lineWidth = tick === 0 ? 1.5 : 1;
@@ -707,24 +721,24 @@ function drawOverviewChart(chartTrendRows) {
     ctx.restore();
   }
 
-  // Legend — 2 rows, centered
+  // Legend — 1 row, centered
   const LEG = [
-    [{ color: C_START, label: "Term Start" }, { color: C_END, label: "Term End" }, { color: C_DOWN, label: "Trending Down (<-8 pts)" }],
-    [{ color: C_STABLE, label: "Stable (±8 pts)" }, { color: C_UP, label: "Trending Up (>+8 pts)" }]
+    { color: C_START, label: "Term Start" },
+    { color: C_END, label: "Term End" },
+    { color: C_DOWN, label: "Trending Down (<-8 pts)" },
+    { color: C_STABLE, label: "Stable (±8 pts)" },
+    { color: C_UP, label: "Trending Up (>+8 pts)" }
   ];
   ctx.font = "11px sans-serif";
-  const BOX = 14, GAP = 5, SPC = 18, ROW_H = 22;
-  const legY0 = BTM_BTM_Y + 84;
-  LEG.forEach((row, ri) => {
-    const rowW = row.reduce((acc, { label }) => acc + BOX + GAP + Math.ceil(ctx.measureText(label).width) + SPC, 0) - SPC;
-    let lx = PAD_L + (CHART_W - rowW) / 2;
-    const ly = legY0 + ri * ROW_H;
-    row.forEach(({ color, label }) => {
-      ctx.fillStyle = color; ctx.fillRect(lx, ly - BOX + 2, BOX, BOX);
-      ctx.fillStyle = "#374151"; ctx.textAlign = "left";
-      ctx.fillText(label, lx + BOX + GAP, ly);
-      lx += BOX + GAP + Math.ceil(ctx.measureText(label).width) + SPC;
-    });
+  const BOX = 12, GAP = 4, SPC = 14;
+  const legY = BTM_BTM_Y + 80;
+  const legRowW = LEG.reduce((acc, { label }) => acc + BOX + GAP + Math.ceil(ctx.measureText(label).width) + SPC, 0) - SPC;
+  let lx = PAD_L + (CHART_W - legRowW) / 2;
+  LEG.forEach(({ color, label }) => {
+    ctx.fillStyle = color; ctx.fillRect(lx, legY - BOX + 2, BOX, BOX);
+    ctx.fillStyle = "#374151"; ctx.textAlign = "left";
+    ctx.fillText(label, lx + BOX + GAP, legY);
+    lx += BOX + GAP + Math.ceil(ctx.measureText(label).width) + SPC;
   });
 
   // Border
