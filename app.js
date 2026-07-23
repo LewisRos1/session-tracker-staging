@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1044";
+const APP_VERSION = "1045";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2100,10 +2100,10 @@ ROW: Key Focus Area | [One sentence — a second important area to focus on next
 ${targetsWithData.map(r => `===OBSERVATION: ${r.name}===
 Write 2 to 3 bullets for ${firstName}'s parents about this target. Format each bullet with a bold label followed by plain (not bold) content. Use these labels:
 • **Strengths:** One specific thing ${firstName} is doing well — a real skill or behaviour they show in sessions.
-• **Weakness:** One honest challenge — name the exact situation, trigger, or level of support that causes difficulty. Be warm, not alarming.
+• **Weaknesses:** One honest challenge — name the exact situation, trigger, or level of support that causes difficulty. Be warm, not alarming.
 • **Note:** (Optional) Only add a 3rd bullet if there is genuinely useful extra context. Skip if not needed.
 
-IMPORTANT: The label MUST be wrapped in ** for bold (e.g. **Strengths:** **Weakness:** **Note:**). The content after the colon is NOT bold.
+IMPORTANT: The label MUST be wrapped in ** for bold (e.g. **Strengths:** **Weaknesses:** **Note:**). The content after the colon is NOT bold.
 
 STRICT RULES — follow every one:
 - NO numbers, percentages, or month references. Parents see those in the graph.
@@ -2116,7 +2116,7 @@ STRICT RULES — follow every one:
 ${qualitativeWithData.map(r => `===OBSERVED: ${r.name}===
 Write 2 to 3 bullets about ${r.name} based on what was observed in sessions and any notes or remarks recorded.
 • **Strengths:** Something positive noticed about this skill area — a real behaviour, moment, or improvement.
-• **Weakness:** Something still developing or difficult — explained kindly with a specific example if possible.
+• **Weaknesses:** Something still developing or difficult — explained kindly with a specific example if possible.
 • **Note:** (Optional) Only add if there is genuinely useful extra context. Skip if not needed.
 
 Same rules: plain English, no jargon, no numbers, warm tone. Labels in ** bold.
@@ -3051,7 +3051,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
     const rows = parsed.actionPlanRows.map((r, idx) =>
       `<tr><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;text-align:center;width:5%;color:#6b7280">${idx + 1}</td><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;font-weight:600;vertical-align:top;width:23%">${esc(r.skill)}</td><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;vertical-align:top;line-height:1.6">${esc(r.goal)}</td><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;width:22%"></td></tr>`
     ).join("");
-    h += `<table style="width:100%;border-collapse:collapse;font-size:.9rem;margin:.75rem 0"><thead><tr style="background:#f3f4f6"><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700;width:5%">No.</th><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:left;font-weight:700">Skill / Area</th><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:left;font-weight:700">Details</th><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:left;font-weight:700">Strategy for Next Term</th></tr></thead><tbody>${rows}</tbody></table>`;
+    h += `<table style="width:100%;border-collapse:collapse;font-size:.9rem;margin:.75rem 0"><thead><tr style="background:#f3f4f6"><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700;width:5%">No.</th><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700">Skill / Area</th><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700">Details</th><th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700">Strategy for Next Term</th></tr></thead><tbody>${rows}</tbody></table>`;
   }
 
   // Section 6: Appendix
@@ -3160,7 +3160,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
       paras.push(new Paragraph({
         children: [
           new TextRun({ text: `${ROMAN[i] || i + 1}. ${r.name.trim()}`, bold: true, size: 24 }),
-          new TextRun({ text: `   [${r.tStart}% ➔ ${r.tEnd}% | ${deltaStr}]`, size: 20, color: "6b7280" })
+          new TextRun({ text: ` [${r.tStart}% → ${r.tEnd}% | ${deltaStr}]`, size: 20, color: "6b7280" })
         ],
         spacing: { before: 0, after: 100, ...LS }
       }));
@@ -3295,9 +3295,9 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     const HDR = "f3f4f6";
     const headerRow = new TableRow({ tableHeader: true, children: [
       mkCell("No.", { bold: true, bg: HDR, size: 20, align: AlignmentType.CENTER, pct: 6 }),
-      mkCell("Skill / Area", { bold: true, bg: HDR, size: 20, pct: 22 }),
-      mkCell("Details", { bold: true, bg: HDR, size: 20, pct: 40 }),
-      mkCell("Strategy for Next Term", { bold: true, bg: HDR, size: 20, pct: 32 })
+      mkCell("Skill / Area", { bold: true, bg: HDR, size: 20, pct: 22, align: AlignmentType.CENTER }),
+      mkCell("Details", { bold: true, bg: HDR, size: 20, pct: 40, align: AlignmentType.CENTER }),
+      mkCell("Strategy for Next Term", { bold: true, bg: HDR, size: 20, pct: 32, align: AlignmentType.CENTER })
     ]});
     const dataRows = parsed.actionPlanRows.map((r, idx) => new TableRow({ children: [
       mkCell(String(idx + 1), { align: AlignmentType.CENTER, pct: 6 }),
