@@ -627,7 +627,7 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
 function drawOverviewChart(chartTrendRows, title) {
   const n = chartTrendRows.length;
   if (n === 0) return null;
-  const W = 700, PAD_L = 55, PAD_R = 20, PAD_TOP = 36, PAD_BTM = 104;
+  const W = 700, PAD_L = 55, PAD_R = 20, PAD_TOP = 55, PAD_BTM = 215;
   const TOP_H = 200, MID_GAP = 38, BTM_H = 160;
   const CHART_W = W - PAD_L - PAD_R;
   const H = PAD_TOP + TOP_H + MID_GAP + BTM_H + PAD_BTM;
@@ -647,20 +647,20 @@ function drawOverviewChart(chartTrendRows, title) {
 
   // Chart title
   if (title) {
-    ctx.fillStyle = "#111827"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "center";
-    ctx.fillText(title, W / 2, 22);
+    ctx.fillStyle = "#111827"; ctx.font = "bold 19px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(title, W / 2, 30);
   }
 
   // Rotated y-axis labels
   ctx.save();
-  ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "center";
-  ctx.translate(13, PAD_TOP + TOP_H / 2);
+  ctx.fillStyle = "#374151"; ctx.font = "bold 17px sans-serif"; ctx.textAlign = "center";
+  ctx.translate(38, PAD_TOP + TOP_H / 2);
   ctx.rotate(-Math.PI / 2);
   ctx.fillText("Overall Performance (%)", 0, 0);
   ctx.restore();
   ctx.save();
-  ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "center";
-  ctx.translate(13, BTM_Y0 + BTM_H / 2);
+  ctx.fillStyle = "#374151"; ctx.font = "bold 17px sans-serif"; ctx.textAlign = "center";
+  ctx.translate(38, BTM_Y0 + BTM_H / 2);
   ctx.rotate(-Math.PI / 2);
   ctx.fillText("Net Change (pts)", 0, 0);
   ctx.restore();
@@ -689,56 +689,61 @@ function drawOverviewChart(chartTrendRows, title) {
     const sH = Math.max(2, (r.tStart / 100) * TOP_H);
     const sX = cx - BAR_W - 2;
     ctx.fillStyle = C_START; ctx.fillRect(sX, TOP_BTM_Y - sH, BAR_W, sH);
-    ctx.fillStyle = "#111827"; ctx.font = "12px sans-serif"; ctx.textAlign = "center";
+    ctx.fillStyle = "#111827"; ctx.font = "18px sans-serif"; ctx.textAlign = "center";
     ctx.fillText(String(r.tStart), sX + BAR_W / 2, TOP_BTM_Y - sH - 4);
     const eH = Math.max(2, (r.tEnd / 100) * TOP_H);
     const eX = cx + 2;
     ctx.fillStyle = C_END; ctx.fillRect(eX, TOP_BTM_Y - eH, BAR_W, eH);
-    ctx.fillStyle = "#111827"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center";
+    ctx.fillStyle = "#111827"; ctx.font = "bold 18px sans-serif"; ctx.textAlign = "center";
     ctx.fillText(String(r.tEnd), eX + BAR_W / 2, TOP_BTM_Y - eH - 4);
     const barH = Math.max(3, (Math.abs(r.delta) / maxAbs) * (BTM_H / 2));
     const barX = cx - BAR_W / 2;
     const dl = (r.delta >= 0 ? "+" : "") + r.delta;
     if (r.delta > 0) {
       ctx.fillStyle = dc; ctx.fillRect(barX, NET_CTR_Y - barH, BAR_W, barH);
-      ctx.fillStyle = "#111827"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center";
+      ctx.fillStyle = "#111827"; ctx.font = "bold 18px sans-serif"; ctx.textAlign = "center";
       ctx.fillText(dl, cx, NET_CTR_Y - barH - 4);
     } else if (r.delta < 0) {
       ctx.fillStyle = dc; ctx.fillRect(barX, NET_CTR_Y, BAR_W, barH);
-      ctx.fillStyle = "#111827"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center";
-      ctx.fillText(dl, cx, NET_CTR_Y + barH + 13);
+      ctx.fillStyle = "#111827"; ctx.font = "bold 18px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText(dl, cx, NET_CTR_Y + barH + 20);
     } else {
       ctx.fillStyle = C_STABLE; ctx.fillRect(barX, NET_CTR_Y - 1, BAR_W, 2);
-      ctx.fillStyle = "#374151"; ctx.font = "12px sans-serif"; ctx.textAlign = "center";
+      ctx.fillStyle = "#374151"; ctx.font = "18px sans-serif"; ctx.textAlign = "center";
       ctx.fillText("0", cx, NET_CTR_Y - 5);
     }
     const name = r.name.trim().length > 17 ? r.name.trim().slice(0, 16) + "…" : r.name.trim();
     ctx.save();
     ctx.translate(cx, BTM_BTM_Y + 8);
     ctx.rotate(-Math.PI / 4);
-    ctx.fillStyle = "#111827"; ctx.font = "12px sans-serif"; ctx.textAlign = "right";
+    ctx.fillStyle = "#111827"; ctx.font = "18px sans-serif"; ctx.textAlign = "right";
     ctx.fillText(name, 0, 0);
     ctx.restore();
   }
 
-  // Legend — 1 row, centered
-  const LEG = [
+  // Legend — 2 rows, centered (17px to fit all items)
+  const LEG_R1 = [
     { color: C_START, label: "Term Start" },
     { color: C_END, label: "Term End" },
-    { color: C_DOWN, label: "Trending Down (<-8 pts)" },
+    { color: C_DOWN, label: "Trending Down (<-8 pts)" }
+  ];
+  const LEG_R2 = [
     { color: C_STABLE, label: "Stable (±8 pts)" },
     { color: C_UP, label: "Trending Up (>+8 pts)" }
   ];
-  ctx.font = "11px sans-serif";
-  const BOX = 12, GAP = 4, SPC = 14;
-  const legY = BTM_BTM_Y + 80;
-  const legRowW = LEG.reduce((acc, { label }) => acc + BOX + GAP + Math.ceil(ctx.measureText(label).width) + SPC, 0) - SPC;
-  let lx = PAD_L + (CHART_W - legRowW) / 2;
-  LEG.forEach(({ color, label }) => {
-    ctx.fillStyle = color; ctx.fillRect(lx, legY - BOX + 2, BOX, BOX);
-    ctx.fillStyle = "#374151"; ctx.textAlign = "left";
-    ctx.fillText(label, lx + BOX + GAP, legY);
-    lx += BOX + GAP + Math.ceil(ctx.measureText(label).width) + SPC;
+  ctx.font = "17px sans-serif";
+  const BOX = 14, GAP = 5, SPC = 16, ROW_H = 26;
+  const legY0 = BTM_BTM_Y + 158;
+  [LEG_R1, LEG_R2].forEach((row, ri) => {
+    const rowW = row.reduce((acc, { label }) => acc + BOX + GAP + Math.ceil(ctx.measureText(label).width) + SPC, 0) - SPC;
+    let lx = PAD_L + (CHART_W - rowW) / 2;
+    const ly = legY0 + ri * ROW_H;
+    row.forEach(({ color, label }) => {
+      ctx.fillStyle = color; ctx.fillRect(lx, ly - BOX + 2, BOX, BOX);
+      ctx.fillStyle = "#374151"; ctx.textAlign = "left";
+      ctx.fillText(label, lx + BOX + GAP, ly);
+      lx += BOX + GAP + Math.ceil(ctx.measureText(label).width) + SPC;
+    });
   });
 
   // Border
