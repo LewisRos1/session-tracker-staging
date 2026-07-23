@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1053";
+const APP_VERSION = "1054";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -5002,11 +5002,11 @@ function renderFedcTarget(target) {
           html += renderPendingRemarkFields(sub.name, subActId, sub.name, idx, target);
         } else {
           html += `<button class="btn-add-remark" contenteditable="false"
-            data-pending-key="${escHtml(sub.name)}"
+            data-pending-key="${escHtml(sub.name || sub.title)}"
             data-act-id="${subActId || ""}"
-            data-pa-name="${escHtml(sub.name)}"
+            data-pa-name="${escHtml(sub.name || sub.title)}"
             data-pa-order="${idx}"
-            data-pa-parent="${escHtml(pa.name)}"
+            data-pa-parent="${escHtml(pa.name || pa.title)}"
             data-cfg-id="${escHtml(sub.id || "")}"
             data-target="${escHtml(target.name)}">+ Add Remark &amp; Trials</button>`;
         }
@@ -5091,7 +5091,7 @@ function renderFedcTarget(target) {
         html += `<button class="btn-add-remark" contenteditable="false"
           data-pending-key="${escHtml(pendingKey)}"
           data-act-id="${actId || ""}"
-          data-pa-name="${escHtml(pa.name)}"
+          data-pa-name="${escHtml(pa.name || pa.title)}"
           data-pa-order="${idx}"
           data-is-mapped="${pa.isMapped ? "1" : ""}"
           data-cfg-id="${escHtml(pa.id || "")}"
