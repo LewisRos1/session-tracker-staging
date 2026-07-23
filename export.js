@@ -553,7 +553,7 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
     titleRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
 
     // Column header row
-    const hdr = ws.addRow(["Target", "Trendline Start", "Trendline End", "Net Change (pp)", "Status"]);
+    const hdr = ws.addRow(["Target", "Trendline Start", "Trendline End", "Net Change (pts)", "Status"]);
     for (let c = 1; c <= NUM_COLS; c++) {
       hdr.getCell(c).fill      = STYLE_COL_HEADER.fill;
       hdr.getCell(c).font      = STYLE_COL_HEADER.font;
@@ -579,7 +579,8 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
       const tStart = Math.round(trend[0]);
       const tEnd   = Math.round(trend[trend.length - 1]);
       const delta  = tEnd - tStart;
-      return { name: target.name, tStart, tEnd, delta, noData: false };
+      const direction = Math.abs(delta) <= 8 ? "Stable" : delta > 0 ? "Trending Up" : "Trending Down";
+      return { name: target.name, tStart, tEnd, delta, direction, noData: false };
     });
     trendRows.sort((a, b) => b.delta - a.delta); // highest → lowest; no-data rows (-Infinity) sink to bottom
 
@@ -590,11 +591,24 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
         r.getCell(5).font = { italic: true, color: { argb: "FF9CA3AF" } };
         continue;
       }
-      const deltaStr  = row.delta >= 0 ? `+${row.delta}` : `${row.delta}`;
-      const direction = Math.abs(row.delta) <= 8 ? "Stable" : row.delta > 0 ? "Trending Up" : "Trending Down";
-      const r         = ws.addRow([row.name, `${row.tStart}%`, `${row.tEnd}%`, deltaStr, direction]);
-      const dirColor  = direction === "Trending Up" ? "FF16A34A" : direction === "Trending Down" ? "FFDC2626" : "FF6B7280";
+      const deltaStr = row.delta >= 0 ? `+${row.delta}` : `${row.delta}`;
+      const r        = ws.addRow([row.name, `${row.tStart}%`, `${row.tEnd}%`, deltaStr, row.direction]);
+      const dirColor = row.direction === "Trending Up" ? "FF16A34A" : row.direction === "Trending Down" ? "FFDC2626" : "FF6B7280";
       r.getCell(5).font = { bold: true, color: { argb: dirColor } };
+    }
+
+    // Overview bar chart for this period
+    const chartRows = [...trendRows.filter(r => !r.noData)].sort((a, b) => a.delta - b.delta);
+    if (chartRows.length > 0) {
+      ws.addRow([]); // blank gap before chart
+      const ovResult = drawOverviewChart(chartRows);
+      if (ovResult) {
+        const ovImgId = wb.addImage({ base64: ovResult.base64, extension: "png" });
+        const imgRow0 = ws.lastRow.number - 1; // 0-indexed row for image placement
+        ws.addImage(ovImgId, { tl: { col: 0, row: imgRow0 }, ext: { width: 700, height: ovResult.height } });
+        const spacingRows = Math.ceil(ovResult.height / 18) + 2;
+        for (let i = 0; i < spacingRows; i++) ws.addRow([]);
+      }
     }
   }
 
@@ -608,6 +622,101 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
     ws.getColumn(c).alignment = { horizontal: "center", vertical: "middle" };
   }
   applyBorders(ws, NUM_COLS);
+}
+
+function drawOverviewChart(chartTrendRows) {
+  const n = chartTrendRows.length;
+  if (n === 0) return null;
+  const W = 700, PAD_L = 70, PAD_R = 30, PAD_TOP = 52, PAD_BTM = 92;
+  const TOP_H = 200, MID_GAP = 38, BTM_H = 160;
+  const CHART_W = W - PAD_L - PAD_R;
+  const H = PAD_TOP + TOP_H + MID_GAP + BTM_H + PAD_BTM;
+  const slotW = CHART_W / n;
+  const BAR_W = Math.max(8, Math.min(28, Math.floor(slotW / 2 - 4)));
+  const maxAbs = Math.max(...chartTrendRows.map(r => Math.abs(r.delta)), 10);
+  const TOP_BTM_Y = PAD_TOP + TOP_H;
+  const BTM_Y0    = PAD_TOP + TOP_H + MID_GAP;
+  const BTM_BTM_Y = BTM_Y0 + BTM_H;
+  const NET_CTR_Y = BTM_Y0 + BTM_H / 2;
+  const C_START = "#7dd3fc", C_END = "#a78bfa", C_UP = "#22c55e", C_DOWN = "#ef4444", C_STABLE = "#9ca3af";
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
+
+  ctx.font = "11px sans-serif";
+  const leg = [{ color: C_START, label: "Start" }, { color: C_END, label: "End" }, { color: C_DOWN, label: "Trending Down" }, { color: C_STABLE, label: "Stable" }, { color: C_UP, label: "Trending Up" }];
+  let lx = PAD_L;
+  for (const { color, label } of leg) {
+    ctx.fillStyle = color; ctx.fillRect(lx, 14, 14, 10);
+    ctx.fillStyle = "#374151"; ctx.textAlign = "left";
+    ctx.fillText(label, lx + 18, 23);
+    lx += 18 + Math.ceil(ctx.measureText(label).width) + 22;
+  }
+
+  ctx.fillStyle = "#6b7280"; ctx.font = "10px sans-serif"; ctx.textAlign = "left";
+  ctx.fillText("Start vs End (trendline)", PAD_L, PAD_TOP - 6);
+
+  for (const tick of [0, 20, 40, 60, 80, 100]) {
+    const y = TOP_BTM_Y - (tick / 100) * TOP_H;
+    ctx.strokeStyle = tick === 0 ? "#9ca3af" : "#e5e7eb"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(W - PAD_R, y); ctx.stroke();
+    ctx.fillStyle = "#9ca3af"; ctx.font = "10px sans-serif"; ctx.textAlign = "right";
+    ctx.fillText(tick + "%", PAD_L - 5, y + 4);
+  }
+
+  ctx.fillStyle = "#f3f4f6"; ctx.fillRect(PAD_L, TOP_BTM_Y + 4, CHART_W, MID_GAP - 8);
+  ctx.fillStyle = "#6b7280"; ctx.font = "10px sans-serif"; ctx.textAlign = "left";
+  ctx.fillText("Net Change (pts)", PAD_L, TOP_BTM_Y + MID_GAP / 2 + 4);
+
+  for (const tick of [-maxAbs, -Math.round(maxAbs / 2), 0, Math.round(maxAbs / 2), maxAbs]) {
+    const y = NET_CTR_Y - (tick / maxAbs) * (BTM_H / 2);
+    ctx.strokeStyle = tick === 0 ? "#374151" : "#e5e7eb"; ctx.lineWidth = tick === 0 ? 1.5 : 1;
+    ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(W - PAD_R, y); ctx.stroke();
+    ctx.fillStyle = "#9ca3af"; ctx.font = "10px sans-serif"; ctx.textAlign = "right";
+    ctx.fillText((tick > 0 ? "+" : "") + tick + " pts", PAD_L - 5, y + 4);
+  }
+
+  for (let i = 0; i < n; i++) {
+    const r = chartTrendRows[i];
+    const cx = PAD_L + (i + 0.5) * slotW;
+    const dc = r.direction === "Trending Up" ? C_UP : r.direction === "Trending Down" ? C_DOWN : C_STABLE;
+    const sH = Math.max(2, (r.tStart / 100) * TOP_H);
+    const sX = cx - BAR_W - 2;
+    ctx.fillStyle = C_START; ctx.fillRect(sX, TOP_BTM_Y - sH, BAR_W, sH);
+    ctx.fillStyle = "#374151"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(r.tStart + "%", sX + BAR_W / 2, TOP_BTM_Y - sH - 4);
+    const eH = Math.max(2, (r.tEnd / 100) * TOP_H);
+    const eX = cx + 2;
+    ctx.fillStyle = C_END; ctx.fillRect(eX, TOP_BTM_Y - eH, BAR_W, eH);
+    ctx.fillStyle = "#1f2937"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(r.tEnd + "%", eX + BAR_W / 2, TOP_BTM_Y - eH - 4);
+    const barH = Math.max(3, (Math.abs(r.delta) / maxAbs) * (BTM_H / 2));
+    const barX = cx - BAR_W / 2;
+    const dl   = (r.delta >= 0 ? "+" : "") + r.delta + " pts";
+    if (r.delta > 0) {
+      ctx.fillStyle = dc; ctx.fillRect(barX, NET_CTR_Y - barH, BAR_W, barH);
+      ctx.fillStyle = "#1f2937"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText(dl, cx, NET_CTR_Y - barH - 4);
+    } else if (r.delta < 0) {
+      ctx.fillStyle = dc; ctx.fillRect(barX, NET_CTR_Y, BAR_W, barH);
+      ctx.fillStyle = "#1f2937"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText(dl, cx, NET_CTR_Y + barH + 13);
+    } else {
+      ctx.fillStyle = C_STABLE; ctx.fillRect(barX, NET_CTR_Y - 1, BAR_W, 2);
+      ctx.fillStyle = "#6b7280"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText("0 pts", cx, NET_CTR_Y - 5);
+    }
+    const name = r.name.trim().length > 17 ? r.name.trim().slice(0, 16) + "…" : r.name.trim();
+    ctx.save();
+    ctx.translate(cx, BTM_BTM_Y + 8);
+    ctx.rotate(-Math.PI / 4);
+    ctx.fillStyle = "#374151"; ctx.font = "12px sans-serif"; ctx.textAlign = "right";
+    ctx.fillText(name, 0, 0);
+    ctx.restore();
+  }
+  return { base64: canvas.toDataURL("image/png").split(",")[1], height: H };
 }
 
 export function renderActivityBreakdownChart(targetName, activityData, periodLabel) {
@@ -757,10 +866,10 @@ export function renderActivityBreakdownChart(targetName, activityData, periodLab
   let lx = Math.round((W - 206) / 2);
   drawDot(lx + 6, legY1, "#9ca3af", "#6b7280"); ctx.fillStyle = "#374151"; ctx.fillText("Earliest month", lx + 16, legY1); lx += 106;
   drawDot(lx + 6, legY1, "#3b82f6", "#1d4ed8"); ctx.fillStyle = "#374151"; ctx.fillText("Latest month",   lx + 16, legY1);
-  lx = Math.round((W - 378) / 2);
-  drawLegLine(lx, legY2, "#ef4444"); ctx.fillStyle = "#374151"; ctx.fillText("Declined (<−8pp)", lx + 22, legY2); lx += 128;
-  drawLegLine(lx, legY2, "#d1d5db"); ctx.fillStyle = "#374151"; ctx.fillText("Stable (±8pp)",    lx + 22, legY2); lx += 110;
-  drawLegLine(lx, legY2, "#22c55e"); ctx.fillStyle = "#374151"; ctx.fillText("Improved (>+8pp)", lx + 22, legY2);
+  lx = Math.round((W - 406) / 2);
+  drawLegLine(lx, legY2, "#ef4444"); ctx.fillStyle = "#374151"; ctx.fillText("Declined (<−8 pts)", lx + 22, legY2); lx += 136;
+  drawLegLine(lx, legY2, "#d1d5db"); ctx.fillStyle = "#374151"; ctx.fillText("Stable (±8 pts)",    lx + 22, legY2); lx += 116;
+  drawLegLine(lx, legY2, "#22c55e"); ctx.fillStyle = "#374151"; ctx.fillText("Improved (>+8 pts)", lx + 22, legY2);
 
   ctx.strokeStyle = "#000000"; ctx.lineWidth = 1;
   ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
@@ -2913,7 +3022,7 @@ function renderTargetChart(targetName, yValues, dateRange, dates, customLabels =
   // More robust than quarter-average comparison and not sensitive to single-session outliers.
   const lrDelta  = Math.round(trend[trend.length - 1] - trend[0]);
   let dirText, dirColor;
-  const ppStr = lrDelta >= 0 ? `+${lrDelta}pp` : `${lrDelta}pp`;
+  const ppStr = lrDelta >= 0 ? `+${lrDelta} pts` : `${lrDelta} pts`;
   if (Math.abs(lrDelta) <= 8) {
     dirText  = `→  Stable (${ppStr})`;
     dirColor = "#888888";
