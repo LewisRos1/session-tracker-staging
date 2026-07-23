@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1045";
+const APP_VERSION = "1046";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3012,20 +3012,20 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
 
   h += `<hr style="margin:2rem 0">`;
 
-  // Section 2: Most Improved & Strengths
-  h += `<h2 style="${SECTION_H2}">Section 2: Most Improved &amp; Strengths</h2>`;
-  h += `<h3 style="${SECTION_H3}">2a) Most Improved</h3>`;
+  // Section 2: Celebrating Progress
+  h += `<h2 style="${SECTION_H2}">Section 2: Celebrating Progress</h2>`;
+  h += `<h3 style="${SECTION_H3}">2.1 Most Improved</h3>`;
   h += sectionTargets(categorized.mostImproved);
-  h += `<div style="margin-top:2rem"><h3 style="${SECTION_H3}">2b) Strong &amp; Steady</h3></div>`;
+  h += `<div style="margin-top:2rem"><h3 style="${SECTION_H3}">2.2 Strong &amp; Steady</h3></div>`;
   h += sectionTargets(categorized.strengths);
 
   h += `<hr style="margin:2rem 0">`;
 
-  // Section 3: Needs Extra Support & Developing
-  h += `<h2 style="${SECTION_H2}">Section 3: Needs Extra Support &amp; Developing Skills</h2>`;
-  h += `<h3 style="${SECTION_H3}">3a) Needs Extra Support</h3>`;
+  // Section 3: Priority Focus Areas
+  h += `<h2 style="${SECTION_H2}">Section 3: Priority Focus Areas</h2>`;
+  h += `<h3 style="${SECTION_H3}">3.1 Needs Extra Support</h3>`;
   h += sectionTargets(categorized.needsSupport);
-  h += `<div style="margin-top:2rem"><h3 style="${SECTION_H3}">3b) Developing</h3></div>`;
+  h += `<div style="margin-top:2rem"><h3 style="${SECTION_H3}">3.2 Developing</h3></div>`;
   h += sectionTargets(categorized.emerging);
 
   // Section 4: Observed Skills (qualitative)
@@ -3046,7 +3046,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   // Section 5: Next Term Action Plan (table)
   const planSection = categorized.qualitative.length ? "5" : "4";
   h += `<h2 style="${SECTION_H2}">Section ${planSection}: Next Term Action Plan</h2>`;
-  h += `<p style="margin:.5rem 0 1rem;line-height:1.7">The table below outlines the priority areas for ${esc(firstName)}'s next term. These focus areas were identified based on ${esc(firstName)}'s progress this period and the therapy team's observations. The Strategy / Support column can be filled in together with the therapy team at your next review.</p>`;
+  h += `<p style="margin:.5rem 0 1rem;line-height:1.7">The table below outlines the priority areas for ${esc(firstName)}'s next term, based on ${esc(firstName)}'s progress this period and the therapy team's observations. The strategies for each focus area will be implemented in the upcoming term.</p>`;
   if (parsed.actionPlanRows.length) {
     const rows = parsed.actionPlanRows.map((r, idx) =>
       `<tr><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;text-align:center;width:5%;color:#6b7280">${idx + 1}</td><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;font-weight:600;vertical-align:top;width:23%">${esc(r.skill)}</td><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;vertical-align:top;line-height:1.6">${esc(r.goal)}</td><td style="padding:.55rem .75rem;border:1px solid #e5e7eb;width:22%"></td></tr>`
@@ -3062,10 +3062,10 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
     h += `<h2 style="${SECTION_H2}">Section ${appendixSection}: Appendix</h2>`;
     h += `<h3 style="${SECTION_H3}">How We Categorise the Sections</h3>`;
     h += `<table style="width:100%;border-collapse:collapse;font-size:.88rem;margin:.75rem 0 1.5rem"><thead><tr style="background:#f3f4f6"><th style="padding:.45rem .75rem;border:1px solid #e5e7eb;text-align:left;font-weight:700;width:28%">Section</th><th style="padding:.45rem .75rem;border:1px solid #e5e7eb;text-align:left;font-weight:700">Criteria</th></tr></thead><tbody>
-      <tr><td style="padding:.45rem .75rem;border:1px solid #e5e7eb;font-weight:600">2a) Most Improved</td><td style="padding:.45rem .75rem;border:1px solid #e5e7eb">Trendline improved by more than +8 percentage points (pp) this term</td></tr>
-      <tr><td style="padding:.45rem .75rem;border:1px solid #e5e7eb;font-weight:600">2b) Strong &amp; Steady</td><td style="padding:.45rem .75rem;border:1px solid #e5e7eb">Trendline end above 80% AND change within ±8pp (stable performance at a high level)</td></tr>
-      <tr><td style="padding:.45rem .75rem;border:1px solid #e5e7eb;font-weight:600">3a) Needs Extra Support</td><td style="padding:.45rem .75rem;border:1px solid #e5e7eb">Trendline declined by more than −8pp this term</td></tr>
-      <tr><td style="padding:.45rem .75rem;border:1px solid #e5e7eb;font-weight:600">3b) Developing</td><td style="padding:.45rem .75rem;border:1px solid #e5e7eb">Trendline end below 80% AND change within ±8pp (still building the skill)</td></tr>
+      <tr><td style="padding:.45rem .75rem;border:1px solid #e5e7eb;font-weight:600">2.1 Most Improved</td><td style="padding:.45rem .75rem;border:1px solid #e5e7eb">Trendline improved by more than +8 percentage points (pp) this term</td></tr>
+      <tr><td style="padding:.45rem .75rem;border:1px solid #e5e7eb;font-weight:600">2.2 Strong &amp; Steady</td><td style="padding:.45rem .75rem;border:1px solid #e5e7eb">Trendline end above 80% AND change within ±8pp (stable performance at a high level)</td></tr>
+      <tr><td style="padding:.45rem .75rem;border:1px solid #e5e7eb;font-weight:600">3.1 Needs Extra Support</td><td style="padding:.45rem .75rem;border:1px solid #e5e7eb">Trendline declined by more than −8pp this term</td></tr>
+      <tr><td style="padding:.45rem .75rem;border:1px solid #e5e7eb;font-weight:600">3.2 Developing</td><td style="padding:.45rem .75rem;border:1px solid #e5e7eb">Trendline end below 80% AND change within ±8pp (still building the skill)</td></tr>
     </tbody></table>`;
     h += `<h3 style="${SECTION_H3}">Activity Breakdown Charts</h3>`;
     const rangeLabel = period === "H1" ? `Jan–Jun ${year}` : `Jul–Dec ${year}`;
@@ -3104,7 +3104,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   const ROMAN = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"];
 
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun, LevelFormat,
-          Table, TableRow, TableCell, WidthType, PageOrientation, SectionType } = window.docx;
+          Table, TableRow, TableCell, WidthType, PageOrientation, SectionType, Footer, PageNumber } = window.docx;
   const BULLET_REF = "hyr-bullets";
   const LS = { line: 276, lineRule: "auto" };
 
@@ -3198,6 +3198,14 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     { after: 400 }
   ));
 
+  // ── Table of Contents ───────────────────────────────────────
+  paragraphs.push(mkPara("Table of Contents", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
+  const TOCClass = window.docx.TableOfContents;
+  if (TOCClass) {
+    try { paragraphs.push(new TOCClass("Table of Contents", { hyperlink: true, headingStyleRange: "1-2" })); } catch (_) {}
+  }
+  paragraphs.push(mkPara("(If the table of contents appears blank, right-click it in Word and choose \"Update Field\".)", { italics: true, color: "9ca3af", after: 0 }));
+
   // ── Section 1: Executive Overview ──────────────────────────
   paragraphs.push(mkPara("Section 1: Executive Overview", { heading: HeadingLevel.HEADING_1, before: 560, after: 200, pageBreak: true, size: 32, bold: true }));
 
@@ -3244,23 +3252,23 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     paragraphs.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
   }
 
-  // ── Section 2: Most Improved & Strengths ───────────────────
-  paragraphs.push(mkPara("Section 2: Most Improved & Strengths", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
-  paragraphs.push(mkPara("2a) Most Improved", { heading: HeadingLevel.HEADING_2, before: 160, after: 80, size: 26, bold: true }));
+  // ── Section 2: Celebrating Progress ────────────────────────
+  paragraphs.push(mkPara("Section 2: Celebrating Progress", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
+  paragraphs.push(mkPara("2.1 Most Improved", { heading: HeadingLevel.HEADING_2, before: 160, after: 80, size: 26, bold: true }));
   if (categorized.mostImproved.length) paragraphs.push(...targetSectionParas(categorized.mostImproved));
   else paragraphs.push(mkPara("No targets in this category.", { italics: true, color: "9CA3AF" }));
   paragraphs.push(new Paragraph({ children: [], spacing: { before: 400, after: 0 } }));
-  paragraphs.push(mkPara("2b) Strong & Steady", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
+  paragraphs.push(mkPara("2.2 Strong & Steady", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
   if (categorized.strengths.length) paragraphs.push(...targetSectionParas(categorized.strengths));
   else paragraphs.push(mkPara("No targets in this category.", { italics: true, color: "9CA3AF" }));
 
-  // ── Section 3: Needs Extra Support & Developing ────────────
-  paragraphs.push(mkPara("Section 3: Needs Extra Support & Developing Skills", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
-  paragraphs.push(mkPara("3a) Needs Extra Support", { heading: HeadingLevel.HEADING_2, before: 160, after: 80, size: 26, bold: true }));
+  // ── Section 3: Priority Focus Areas ────────────────────────
+  paragraphs.push(mkPara("Section 3: Priority Focus Areas", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
+  paragraphs.push(mkPara("3.1 Needs Extra Support", { heading: HeadingLevel.HEADING_2, before: 160, after: 80, size: 26, bold: true }));
   if (categorized.needsSupport.length) paragraphs.push(...targetSectionParas(categorized.needsSupport));
   else paragraphs.push(mkPara("No targets in this category.", { italics: true, color: "9CA3AF" }));
   paragraphs.push(new Paragraph({ children: [], spacing: { before: 400, after: 0 } }));
-  paragraphs.push(mkPara("3b) Developing", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
+  paragraphs.push(mkPara("3.2 Developing", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
   if (categorized.emerging.length) paragraphs.push(...targetSectionParas(categorized.emerging));
   else paragraphs.push(mkPara("No targets in this category.", { italics: true, color: "9CA3AF" }));
 
@@ -3288,7 +3296,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   const actionPlanParas = [];
   actionPlanParas.push(mkPara(`Section ${nextSectionNum}: Next Term Action Plan`, { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
   actionPlanParas.push(mkPara(
-    `The table below outlines the priority areas for ${firstName}'s next term. These focus areas were identified based on ${firstName}'s progress this period and the therapy team's observations. The Strategy / Support column can be filled in together with the therapy team at your next review.`,
+    `The table below outlines the priority areas for ${firstName}'s next term, based on ${firstName}'s progress this period and the therapy team's observations. The strategies for each focus area will be implemented in the upcoming term.`,
     { after: 220 }
   ));
   if (parsed.actionPlanRows?.length) {
@@ -3320,10 +3328,10 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
       mkCell("Criteria", { bold: true, bg: HDR2, size: 20, pct: 72 })
     ]});
     const catRows = [
-      ["2a) Most Improved",       "Trendline improved by more than +8 percentage points (pp) this term"],
-      ["2b) Strong & Steady",     "Trendline end above 80% AND change within ±8pp (stable performance at a high level)"],
-      ["3a) Needs Extra Support", "Trendline declined by more than −8pp this term"],
-      ["3b) Developing",          "Trendline end below 80% AND change within ±8pp (still building the skill)"]
+      ["2.1 Most Improved",       "Trendline improved by more than +8 percentage points (pp) this term"],
+      ["2.2 Strong & Steady",     "Trendline end above 80% AND change within ±8pp (stable performance at a high level)"],
+      ["3.1 Needs Extra Support", "Trendline declined by more than −8pp this term"],
+      ["3.2 Developing",          "Trendline end below 80% AND change within ±8pp (still building the skill)"]
     ].map(([sec, crit]) => new TableRow({ children: [
       mkCell(sec,  { pct: 28, bold: true }),
       mkCell(crit, { pct: 72 })
@@ -3346,6 +3354,15 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     }
   }
 
+  const pageFooter = Footer ? new Footer({
+    children: [new Paragraph({
+      children: [new TextRun({ children: [PageNumber.CURRENT], size: 20, color: "555555" })],
+      alignment: AlignmentType.RIGHT,
+      spacing: { before: 80, after: 80 }
+    })]
+  }) : undefined;
+  const footers = pageFooter ? { default: pageFooter } : undefined;
+
   const landscapeProps = {
     type: SectionType?.NEXT_PAGE ?? "nextPage",
     page: { size: { orientation: PageOrientation?.LANDSCAPE ?? "landscape" } }
@@ -3355,9 +3372,9 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     page: { size: { orientation: PageOrientation?.PORTRAIT ?? "portrait" } }
   };
 
-  const docSections = [{ properties: {}, children: paragraphs }];
-  if (actionPlanParas.length) docSections.push({ properties: landscapeProps, children: actionPlanParas });
-  if (appendixParas.length) docSections.push({ properties: portraitProps, children: appendixParas });
+  const docSections = [{ properties: {}, footers, children: paragraphs }];
+  if (actionPlanParas.length) docSections.push({ properties: landscapeProps, footers, children: actionPlanParas });
+  if (appendixParas.length) docSections.push({ properties: portraitProps, footers, children: appendixParas });
 
   const doc = new Document({
     numbering: { config: [{ reference: BULLET_REF, levels: [{ level: 0, format: LevelFormat?.BULLET ?? "bullet", text: "•", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } }, run: { size: 22 } } }] }] },
