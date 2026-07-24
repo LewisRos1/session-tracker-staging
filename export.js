@@ -754,17 +754,16 @@ function drawOverviewChart(chartTrendRows, title) {
 
 export function renderActivityBreakdownChart(targetName, activityData, periodLabel, chartTitle = null) {
   if (!activityData || activityData.length === 0) return null;
-  const SCALE = 2, R = 7, SECTION_H = 28;
-  const PAD = { top: 52, right: 148, bottom: 72, left: 250 };
+  const SCALE = 2, SECTION_H = 28;
+  const C_START = "#7dd3fc", C_END = "#a78bfa";
+  const BAR_H = 14, BAR_GAP = 4, BARS_H = 2 * BAR_H + BAR_GAP;
+  const PAD = { top: 52, right: 50, bottom: 52, left: 250 };
   const W = 760;
-  const MONTHS_COL_X = 664, MONTHS_COL_W = 56;
   const LABEL_MAX_W = PAD.left - 16;
-  const LINE_H = 13, ROW_PAD_V = 8, MIN_ROW_H = 36;
+  const LINE_H = 13, ROW_PAD_V = 10, MIN_ROW_H = BARS_H + ROW_PAD_V * 2;
 
-  // Strip leading letter-prefix and markdown bold/underline markers from chart labels
   const stripPrefix = name => name.replace(/\*/g, "").replace(/_/g, "");
 
-  // Pre-compute wrapped label lines and dynamic row heights using a temp canvas
   const tmpCtx = document.createElement("canvas").getContext("2d");
   tmpCtx.font = "11px sans-serif";
   const wrapText = (text, maxW) => {
@@ -793,42 +792,32 @@ export function renderActivityBreakdownChart(targetName, activityData, periodLab
   ctx.scale(SCALE, SCALE);
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
   const cW = W - PAD.left - PAD.right;
-  const toX = v => PAD.left + (v / 100) * cW;
   const plotBottom = PAD.top + totalContentH;
 
+  // Title
   ctx.font = "bold 13px sans-serif"; ctx.fillStyle = "#111"; ctx.textAlign = "left";
   ctx.fillText(chartTitle || `${targetName} — Progress (${periodLabel})`, 10, 28);
 
   // Column headers
   ctx.font = "bold 9.5px sans-serif"; ctx.fillStyle = "#6b7280";
-  ctx.textAlign = "right";  ctx.fillText("Activity",  PAD.left - 10, PAD.top - 7);
-  ctx.textAlign = "center"; ctx.fillText("Progress",  PAD.left + cW / 2, PAD.top - 7);
-  ctx.textAlign = "center"; ctx.fillText("Months",    MONTHS_COL_X + MONTHS_COL_W / 2, PAD.top - 7);
+  ctx.textAlign = "right"; ctx.fillText("Activity", PAD.left - 10, PAD.top - 7);
+  ctx.textAlign = "center"; ctx.fillText("Overall Performance (%)", PAD.left + cW / 2, PAD.top - 7);
   ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 0.5;
   ctx.beginPath(); ctx.moveTo(0, PAD.top - 1); ctx.lineTo(W, PAD.top - 1); ctx.stroke();
 
   // Row backgrounds
-  let yPos = PAD.top;
-  let dataRowIdx = 0;
+  let yPos = PAD.top, dataRowIdx = 0;
   for (const act of activityData) {
-    if (act.isSectionHeader) {
-      ctx.fillStyle = "#e5e7eb"; ctx.fillRect(0, yPos, W, SECTION_H);
-      yPos += SECTION_H;
-    } else {
-      if (dataRowIdx % 2 === 0) { ctx.fillStyle = "#f9fafb"; ctx.fillRect(0, yPos, W, act._rowH); }
-      dataRowIdx++; yPos += act._rowH;
-    }
+    if (act.isSectionHeader) { ctx.fillStyle = "#e5e7eb"; ctx.fillRect(0, yPos, W, SECTION_H); yPos += SECTION_H; }
+    else { if (dataRowIdx % 2 === 0) { ctx.fillStyle = "#f9fafb"; ctx.fillRect(0, yPos, W, act._rowH); } dataRowIdx++; yPos += act._rowH; }
   }
 
   // Gridlines
   ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
   for (const v of [0, 25, 50, 75, 100]) {
-    const x = toX(v);
+    const x = PAD.left + (v / 100) * cW;
     ctx.beginPath(); ctx.moveTo(x, PAD.top); ctx.lineTo(x, plotBottom); ctx.stroke();
   }
-  // Months column separator
-  ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 0.5;
-  ctx.beginPath(); ctx.moveTo(MONTHS_COL_X, PAD.top - 1); ctx.lineTo(MONTHS_COL_X, plotBottom); ctx.stroke();
 
   // Activity rows
   yPos = PAD.top;
@@ -836,73 +825,54 @@ export function renderActivityBreakdownChart(targetName, activityData, periodLab
     if (act.isSectionHeader) {
       ctx.font = "bold 11px sans-serif"; ctx.fillStyle = "#374151"; ctx.textAlign = "left";
       ctx.fillText(act.label, 10, yPos + SECTION_H / 2 + 4);
-      yPos += SECTION_H;
-      continue;
+      yPos += SECTION_H; continue;
     }
     const rowH = act._rowH;
     const cy = yPos + rowH / 2;
     yPos += rowH;
 
-    // Draw wrapped label lines, vertically centred in the row
+    // Wrapped label centred in row
     ctx.font = "11px sans-serif"; ctx.fillStyle = "#374151"; ctx.textAlign = "right";
     const totalTextH = act._lines.length * LINE_H;
     const textStartY = cy - totalTextH / 2 + LINE_H - 3;
     act._lines.forEach((line, li) => ctx.fillText(line, PAD.left - 10, textStartY + li * LINE_H));
 
     const eAvg = act.earliestAvg != null ? Math.round(act.earliestAvg) : null;
-    const lAvg = act.latestAvg != null ? Math.round(act.latestAvg) : null;
+    const lAvg = act.latestAvg  != null ? Math.round(act.latestAvg)  : null;
     if (eAvg === null && lAvg === null) continue;
 
-    const eX = eAvg !== null ? toX(eAvg) : null;
-    const lX = lAvg !== null ? toX(lAvg) : null;
-    ctx.font = "bold 10px sans-serif";
+    // Two horizontal bars centered in the row
+    const bar1Y = cy - BAR_GAP / 2 - BAR_H;
+    const bar2Y = cy + BAR_GAP / 2;
 
-    if (eAvg !== null && lAvg !== null && eAvg === lAvg) {
-      ctx.beginPath(); ctx.arc(lX, cy, R, 0, Math.PI * 2);
-      ctx.fillStyle = "#3b82f6"; ctx.fill(); ctx.strokeStyle = "#1d4ed8"; ctx.lineWidth = 1; ctx.stroke();
-      ctx.fillStyle = "#1d4ed8"; ctx.textAlign = "left";
-      ctx.fillText(`${lAvg}%`, lX + R + 3, cy + 4);
-    } else {
-      if (eX !== null && lX !== null) {
-        const diff = lAvg - eAvg;
-        ctx.strokeStyle = diff > 8 ? "#22c55e" : diff < -8 ? "#ef4444" : "#d1d5db";
-        ctx.lineWidth = 2.5;
-        ctx.beginPath(); ctx.moveTo(eX, cy); ctx.lineTo(lX, cy); ctx.stroke();
-      }
-      if (eX !== null) {
-        ctx.beginPath(); ctx.arc(eX, cy, R, 0, Math.PI * 2);
-        ctx.fillStyle = "#9ca3af"; ctx.fill(); ctx.strokeStyle = "#6b7280"; ctx.lineWidth = 1; ctx.stroke();
-        ctx.fillStyle = "#6b7280";
-        if (lAvg === null || eAvg <= lAvg) { ctx.textAlign = "right"; ctx.fillText(`${eAvg}%`, eX - R - 3, cy + 4); }
-        else { ctx.textAlign = "left"; ctx.fillText(`${eAvg}%`, eX + R + 3, cy + 4); }
-      }
-      if (lX !== null) {
-        ctx.beginPath(); ctx.arc(lX, cy, R, 0, Math.PI * 2);
-        ctx.fillStyle = "#3b82f6"; ctx.fill(); ctx.strokeStyle = "#1d4ed8"; ctx.lineWidth = 1; ctx.stroke();
-        ctx.fillStyle = "#1d4ed8";
-        if (eAvg === null || lAvg >= eAvg) { ctx.textAlign = "left"; ctx.fillText(`${lAvg}%`, lX + R + 3, cy + 4); }
-        else { ctx.textAlign = "right"; ctx.fillText(`${lAvg}%`, lX - R - 3, cy + 4); }
-      }
+    if (eAvg !== null) {
+      const bW = Math.max(2, (eAvg / 100) * cW);
+      ctx.fillStyle = C_START; ctx.fillRect(PAD.left, bar1Y, bW, BAR_H);
+      ctx.fillStyle = "#111827"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
+      ctx.fillText(`${eAvg}%`, PAD.left + bW + 4, bar1Y + BAR_H - 2);
     }
-
-    // Month count in Months column
-    if (act.monthCount != null) {
-      ctx.font = "11px sans-serif"; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
-      ctx.fillText(String(act.monthCount), MONTHS_COL_X + MONTHS_COL_W / 2, cy + 4);
+    if (lAvg !== null) {
+      const bW = Math.max(2, (lAvg / 100) * cW);
+      ctx.fillStyle = C_END; ctx.fillRect(PAD.left, bar2Y, bW, BAR_H);
+      ctx.fillStyle = "#111827"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
+      ctx.fillText(`${lAvg}%`, PAD.left + bW + 4, bar2Y + BAR_H - 2);
     }
   }
 
-  ctx.font = "10px sans-serif"; ctx.textAlign = "left";
-  const legY1 = plotBottom + 26, legY2 = plotBottom + 48;
-  const drawDot = (x, y, color, stroke) => { ctx.beginPath(); ctx.arc(x, y - 4, 6, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); };
-  const drawLegLine = (x, y, color) => { ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(x, y - 4); ctx.lineTo(x + 18, y - 4); ctx.stroke(); };
-  let lx = Math.round((W - 206) / 2);
-  drawDot(lx + 6, legY1, "#9ca3af", "#6b7280"); ctx.fillStyle = "#374151"; ctx.fillText("Earliest month", lx + 16, legY1); lx += 106;
-  drawDot(lx + 6, legY1, "#3b82f6", "#1d4ed8"); ctx.fillStyle = "#374151"; ctx.fillText("Latest month",   lx + 16, legY1);
-  lx = Math.round((W - 406) / 2);
-  drawLegLine(lx, legY2, "#ef4444"); ctx.fillStyle = "#374151"; ctx.fillText("Declined (<−8 points)", lx + 22, legY2); lx += 136;
-  drawLegLine(lx, legY2, "#d1d5db"); ctx.fillStyle = "#374151"; ctx.fillText("Stable (±8 points)",    lx + 22, legY2); lx += 116;
-  drawLegLine(lx, legY2, "#22c55e"); ctx.fillStyle = "#374151"; ctx.fillText("Improved (>+8 points)", lx + 22, legY2);
+  // Legend (single row, centered)
+  const BOX = 12, LG = 6, LR = 20;
+  ctx.font = "11px sans-serif";
+  const eTxt = "Earliest Month", lTxt = "Latest Month";
+  const totalLegW = BOX + LG + ctx.measureText(eTxt).width + LR + BOX + LG + ctx.measureText(lTxt).width;
+  let lx = Math.round((W - totalLegW) / 2);
+  const legY = plotBottom + 30;
+  ctx.fillStyle = C_START; ctx.fillRect(lx, legY - BOX + 2, BOX, BOX);
+  lx += BOX + LG;
+  ctx.fillStyle = "#374151"; ctx.textAlign = "left"; ctx.fillText(eTxt, lx, legY);
+  lx += ctx.measureText(eTxt).width + LR;
+  ctx.fillStyle = C_END; ctx.fillRect(lx, legY - BOX + 2, BOX, BOX);
+  lx += BOX + LG;
+  ctx.fillStyle = "#374151"; ctx.fillText(lTxt, lx, legY);
 
   ctx.strokeStyle = "#000000"; ctx.lineWidth = 1;
   ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
