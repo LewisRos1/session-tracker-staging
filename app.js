@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1079";
+const APP_VERSION = "1080";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3337,7 +3337,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   });
   if (wAllNames.length) paragraphs.push(new Paragraph({ children: [], spacing: { before: 200, after: 0 } }));
 
-  paragraphs.push(mkPara("Top Wins, Focus Areas & Strategies", { heading: HeadingLevel.HEADING_2, before: 280, after: 120, size: 26, bold: true, keepNext: true }));
+  paragraphs.push(mkPara("Top Wins, Focus Areas, Recommendations & Strategies", { heading: HeadingLevel.HEADING_2, before: 280, after: 120, size: 26, bold: true, keepNext: true }));
   if ((parsed.biggestWins?.length || parsed.keyFocusAreas?.length)) {
     const mkKiColorCell = (text, fill, textColor) => new TableCell({
       width: { size: 28, type: WidthType.PERCENTAGE },
