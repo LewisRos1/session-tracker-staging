@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1092";
+const APP_VERSION = "1093";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3167,23 +3167,23 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
     const endBarY = cy + 3;
     const rightEdge = W - PAD_R;
     ctx.fillStyle = C_START; ctx.fillRect(PERF_X, startBarY, sW, BAR_HP);
-    ctx.font = "16px sans-serif";
+    ctx.font = "16px sans-serif"; ctx.fillStyle = "#111827";
     const sLabel = String(Math.round(r.tStart));
     if (PERF_X + sW + 4 + ctx.measureText(sLabel).width > rightEdge) {
-      ctx.fillStyle = "#ffffff"; ctx.textAlign = "right";
+      ctx.textAlign = "right";
       ctx.fillText(sLabel, PERF_X + sW - 3, startBarY + BAR_HP - 1);
     } else {
-      ctx.fillStyle = "#111827"; ctx.textAlign = "left";
+      ctx.textAlign = "left";
       ctx.fillText(sLabel, PERF_X + sW + 4, startBarY + BAR_HP - 1);
     }
     ctx.fillStyle = C_END; ctx.fillRect(PERF_X, endBarY, eW, BAR_HP);
-    ctx.font = "bold 16px sans-serif";
+    ctx.font = "bold 16px sans-serif"; ctx.fillStyle = "#111827";
     const eLabel = String(Math.round(r.tEnd));
     if (PERF_X + eW + 4 + ctx.measureText(eLabel).width > rightEdge) {
-      ctx.fillStyle = "#ffffff"; ctx.textAlign = "right";
+      ctx.textAlign = "right";
       ctx.fillText(eLabel, PERF_X + eW - 3, endBarY + BAR_HP - 1);
     } else {
-      ctx.fillStyle = "#111827"; ctx.textAlign = "left";
+      ctx.textAlign = "left";
       ctx.fillText(eLabel, PERF_X + eW + 4, endBarY + BAR_HP - 1);
     }
 
@@ -3574,7 +3574,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   paragraphs.push(new Paragraph({ children: [], spacing: { before: 0, after: 280 } }));
   paragraphs.push(mkPara("Overall Progress", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true }));
   const chartTrendRows = [...trendRows.filter(r => !r.noData)].sort((a, b) => b.delta - a.delta);
-  const ovTitle = `${firstName} - ${monthRange} ${year} Progress`;
+  const ovTitle = `${firstName} (${monthRange} ${year} Progress)`;
   const ovDrawFn = hyrDrawOverviewChartC;
   const ovNativeW = 700;
   const ovResult = ovDrawFn(chartTrendRows, ovTitle);
