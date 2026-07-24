@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1085";
+const APP_VERSION = "1086";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1984,12 +1984,7 @@ function renderHalfYearReportsSection() {
       </select>
       <span id="hyr-period-loading" style="font-size:.85rem;color:var(--text-muted);white-space:nowrap;display:none">Checking…</span>
       <select id="hyr-period-select" class="admin-input" style="width:200px;flex-shrink:0;background:#fff;font-family:inherit;font-size:1rem;padding-right:2rem;display:none"></select>
-      <select id="hyr-chart-style" class="admin-input" style="width:190px;flex-shrink:0;background:#fff;font-family:inherit;font-size:.9rem;display:none">
-        <option value="A">Chart: Diagonal labels</option>
-        <option value="B">Chart: 2-line labels</option>
-        <option value="C">Chart: Horizontal bars</option>
-      </select>
-      <button id="hyr-btn-generate" class="btn-add-section"
+<button id="hyr-btn-generate" class="btn-add-section"
         style="font-size:.9rem;padding:.45rem 1.1rem;min-height:38px;white-space:nowrap;flex-shrink:0;display:none">
         Generate Report
       </button>
@@ -2009,7 +2004,6 @@ function renderHalfYearReportsSection() {
 
     periodSel.style.display = "none";
     genBtn.style.display    = "none";
-    $("hyr-chart-style").style.display = "none";
     loading.style.display   = "none";
     if (!studentId) return;
 
@@ -2036,7 +2030,6 @@ function renderHalfYearReportsSection() {
       periodSel.innerHTML = `<option value="">— Select Semester —</option>` + opts.join("");
       periodSel.style.display = "";
       genBtn.style.display = "";
-      $("hyr-chart-style").style.display = "";
     } catch (err) {
       loading.style.display = "none";
       periodSel.innerHTML = `<option value="">Error loading sessions</option>`;
@@ -2050,7 +2043,6 @@ function renderHalfYearReportsSection() {
 async function hyrGenerate() {
   const studentId  = $("hyr-student-select")?.value;
   const periodVal  = $("hyr-period-select")?.value;
-  const chartStyle = $("hyr-chart-style")?.value || "A";
   if (!studentId) { alert("Please select a student first."); return; }
   if (!periodVal) { alert("Please select a semester first."); return; }
 
@@ -2180,7 +2172,7 @@ TARGET: [exact target name]
     setProgress(100, "Done!");
     await new Promise(r => setTimeout(r, 400));
 
-    hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData, chartData, chartStyle);
+    hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData, chartData);
 
   } catch (err) {
     alert("Failed to generate report:\n" + err.message);
@@ -3437,7 +3429,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
 }
 
 
-function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData, chartData, chartStyle = "A") {
+function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData, chartData) {
   const periodLabel = period === "H1" ? `January–June ${year}` : `July–December ${year}`;
   const firstName   = student.name.split(" ")[0];
   const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
@@ -3556,10 +3548,8 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   paragraphs.push(mkPara("Overall Progress", { heading: HeadingLevel.HEADING_2, before: 280, after: 120, size: 26, bold: true }));
   const chartTrendRows = [...trendRows.filter(r => !r.noData)].sort((a, b) => a.delta - b.delta);
   const ovTitle = `${firstName} - ${monthRange} ${year} Progress`;
-  const ovDrawFn = chartStyle === "B" ? hyrDrawOverviewChartB
-                 : chartStyle === "C" ? hyrDrawOverviewChartC
-                 : hyrDrawOverviewChart;
-  const ovNativeW = chartStyle === "B" ? 920 : 700;
+  const ovDrawFn = hyrDrawOverviewChartC;
+  const ovNativeW = 700;
   const ovResult = ovDrawFn(chartTrendRows, ovTitle);
   if (ovResult) {
     const ovDocW = 520;
