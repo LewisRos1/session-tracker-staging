@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1091";
+const APP_VERSION = "1092";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3159,18 +3159,33 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
     ctx.fillStyle = "#111827"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center";
     ctx.fillText(dl, deltaCX, bY + BAR_TH + 16);
 
-    // Performance bars: start = normal, end = bold
+    // Performance bars: start = normal, end = bold; labels flip inside bar if they'd overflow
     const BAR_HP = 16;
     const sW = Math.max(2, (r.tStart / 100) * PERF_W);
     const eW = Math.max(2, (r.tEnd / 100) * PERF_W);
     const startBarY = cy - BAR_HP - 3;
     const endBarY = cy + 3;
+    const rightEdge = W - PAD_R;
     ctx.fillStyle = C_START; ctx.fillRect(PERF_X, startBarY, sW, BAR_HP);
-    ctx.fillStyle = "#111827"; ctx.font = "16px sans-serif"; ctx.textAlign = "left";
-    ctx.fillText(String(r.tStart), PERF_X + sW + 4, startBarY + BAR_HP - 1);
+    ctx.font = "16px sans-serif";
+    const sLabel = String(Math.round(r.tStart));
+    if (PERF_X + sW + 4 + ctx.measureText(sLabel).width > rightEdge) {
+      ctx.fillStyle = "#ffffff"; ctx.textAlign = "right";
+      ctx.fillText(sLabel, PERF_X + sW - 3, startBarY + BAR_HP - 1);
+    } else {
+      ctx.fillStyle = "#111827"; ctx.textAlign = "left";
+      ctx.fillText(sLabel, PERF_X + sW + 4, startBarY + BAR_HP - 1);
+    }
     ctx.fillStyle = C_END; ctx.fillRect(PERF_X, endBarY, eW, BAR_HP);
-    ctx.fillStyle = "#111827"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "left";
-    ctx.fillText(String(r.tEnd), PERF_X + eW + 4, endBarY + BAR_HP - 1);
+    ctx.font = "bold 16px sans-serif";
+    const eLabel = String(Math.round(r.tEnd));
+    if (PERF_X + eW + 4 + ctx.measureText(eLabel).width > rightEdge) {
+      ctx.fillStyle = "#ffffff"; ctx.textAlign = "right";
+      ctx.fillText(eLabel, PERF_X + eW - 3, endBarY + BAR_HP - 1);
+    } else {
+      ctx.fillStyle = "#111827"; ctx.textAlign = "left";
+      ctx.fillText(eLabel, PERF_X + eW + 4, endBarY + BAR_HP - 1);
+    }
 
     // Row separator
     if (i < n - 1) {
@@ -3431,14 +3446,24 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
 
 
 function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData, chartData) {
-  const periodLabel = period === "H1" ? `January–June ${year}` : `July–December ${year}`;
   const firstName   = student.name.split(" ")[0];
   const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
   const n = activeTargets.length;
   const tNames = activeTargets.map(t => t.name);
   const targetList = n <= 1 ? (tNames[0] || "") : tNames.slice(0, -1).join(", ") + " and " + tNames[n - 1];
   const halfText   = period === "H1" ? "first" : "second";
-  const monthRange     = period === "H1" ? "January to June" : "July to December";
+  const FULL_MONTH_NAMES = { Jan:"January",Feb:"February",Mar:"March",Apr:"April",May:"May",Jun:"June",Jul:"July",Aug:"August",Sep:"September",Oct:"October",Nov:"November",Dec:"December" };
+  const halfEndName = period === "H1" ? "June" : "December";
+  const halfStartDefault = period === "H1" ? "January" : "July";
+  let _firstLabel = null;
+  for (let i = 0; i < 6 && !_firstLabel; i++) {
+    for (const row of trendRows) {
+      if (row.labels?.[i] && row.values?.[i] !== null && row.values?.[i] !== undefined) { _firstLabel = row.labels[i]; break; }
+    }
+  }
+  const firstMonthName = FULL_MONTH_NAMES[_firstLabel] || halfStartDefault;
+  const monthRange = `${firstMonthName} to ${halfEndName}`;
+  const periodLabel = `${firstMonthName}–${halfEndName} ${year}`;
   const nextMonthRange = period === "H1" ? "July to December" : "January to June";
   const nextTermYear   = period === "H1" ? year : year + 1;
   const ROMAN = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"];
