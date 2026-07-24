@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1094";
+const APP_VERSION = "1095";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3553,7 +3553,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
 
   paragraphs.push(mkPara(
     `This report documents ${student.name}'s progress across the ${halfText} half of ${year} (${monthRange}) in ${n} key therapy target${n !== 1 ? "s" : ""}: ${targetList}. The therapy team has prepared this report to give you a clear overview of ${firstName}'s development and the areas that need continued attention.`,
-    { after: 280 }
+    { after: 280, align: AlignmentType.JUSTIFIED }
   ));
 
   paragraphs.push(new Paragraph({ children: [], spacing: { before: 0, after: 280 } }));
@@ -3631,10 +3631,10 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   const richCritCell = (runs, pct) => {
     const children = [];
     for (const [txt, bd] of runs) children.push(new TextRun({ text: txt, bold: bd, size: 22 }));
-    return new TableCell({ width: { size: pct, type: WidthType.PERCENTAGE }, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: [new Paragraph({ children, spacing: { before: 80, after: 80 } })] });
+    return new TableCell({ width: { size: pct, type: WidthType.PERCENTAGE }, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: [new Paragraph({ children, alignment: AlignmentType.JUSTIFIED, spacing: { before: 80, after: 80 } })] });
   };
   paragraphs.push(mkPara("Section 2: Progress by Category", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
-  paragraphs.push(mkPara(`Each of ${firstName}'s targets has been placed into one of four categories based on their progress this term (${monthRange} ${year}).`, { after: 280 }));
+  paragraphs.push(mkPara(`Each of ${firstName}'s targets has been placed into one of four categories based on their progress this term (${monthRange} ${year}).`, { after: 280, align: AlignmentType.JUSTIFIED }));
   paragraphs.push(mkPara("Summary of Targets", { heading: HeadingLevel.HEADING_2, before: 280, after: 120, size: 26, bold: true }));
   const catData = [
     { label: "2.1 Most Improved",       runs: [["Gained ", false], ["more than 8 points", true], [" over the term.", false]],          targets: categorized.mostImproved },
@@ -3652,7 +3652,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     richCritCell(runs, 43),
     new TableCell({ width: { size: 35, type: WidthType.PERCENTAGE }, margins: { top: 80, bottom: 80, left: 150, right: 150 },
       children: targets.length
-        ? targets.map(t => new Paragraph({ children: [new TextRun({ text: `• ${t.name}`, size: 22 })], spacing: { before: 40, after: 40 } }))
+        ? targets.map(t => new Paragraph({ children: [new TextRun({ text: `• ${t.name}`, size: 22 })], alignment: AlignmentType.JUSTIFIED, spacing: { before: 40, after: 40 } }))
         : [new Paragraph({ children: [new TextRun({ text: "No targets in this category", size: 22, italics: true, color: "9CA3AF" })], spacing: { before: 80, after: 80 } })]
     })
   ]}));
@@ -3706,7 +3706,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   actionPlanParas.push(mkPara(`Section ${nextSectionNum}: Focus Areas`, { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
   actionPlanParas.push(mkPara(
     `The table below highlights the areas where ${firstName} has the most room for improvement this term, along with recommendations for supporting their progress in each one.`,
-    { after: 220 }
+    { after: 220, align: AlignmentType.JUSTIFIED }
   ));
   const AP_NUM_REFS = (parsed.actionPlanRows || []).map((_, i) => `hyr-ap-row-${i}`);
   if (parsed.actionPlanRows?.length) {
@@ -3725,7 +3725,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
         width: { size: 5616, type: WidthType.DXA },
         margins: { top: 100, bottom: 100, left: 150, right: 150 },
         children: (r.points || []).length
-          ? (r.points || []).map(p => new Paragraph({ children: [new TextRun({ text: p, size: 22 })], numbering: { reference: AP_NUM_REFS[idx], level: 0 }, spacing: { before: 40, after: 80, ...LS } }))
+          ? (r.points || []).map(p => new Paragraph({ children: [new TextRun({ text: p, size: 22 })], numbering: { reference: AP_NUM_REFS[idx], level: 0 }, alignment: AlignmentType.JUSTIFIED, spacing: { before: 40, after: 80, ...LS } }))
           : [new Paragraph({ children: [new TextRun({ text: "", size: 22 })], spacing: { before: 80, after: 80 } })]
       }),
       mkCell("", { dxa: 5616 })
