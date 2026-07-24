@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1074";
+const APP_VERSION = "1075";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3229,7 +3229,8 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
       heading: opts.heading,
       alignment: opts.align || AlignmentType.LEFT,
       spacing: { before: opts.before || 0, after: opts.after || 140, ...LS },
-      pageBreakBefore: opts.pageBreak || false
+      pageBreakBefore: opts.pageBreak || false,
+      keepNext: opts.keepNext || false
     });
   }
 
@@ -3307,18 +3308,8 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   // ── Section 1: Executive Overview ──────────────────────────
   paragraphs.push(mkPara("Section 1: Executive Overview", { heading: HeadingLevel.HEADING_1, before: 560, after: 200, pageBreak: true, size: 32, bold: true }));
 
-  // Executive summary intro — split scored vs qualitative targets
-  const qualTargetNames = new Set(categorized.qualitative.map(r => r.name));
-  const scoredTargets   = activeTargets.filter(t => !qualTargetNames.has(t.name));
-  const qualTargetsArr  = activeTargets.filter(t => qualTargetNames.has(t.name));
-  const scoredN    = scoredTargets.length;
-  const scoredList = scoredN <= 1 ? (scoredTargets[0]?.name || "") : scoredTargets.slice(0, -1).map(t => t.name).join(", ") + " and " + scoredTargets[scoredTargets.length - 1].name;
-  const qualList   = qualTargetsArr.map(t => t.name).join(" and ");
-  const introTargetPhrase = scoredN && qualTargetsArr.length
-    ? `${scoredN} scored therapy target${scoredN !== 1 ? "s" : ""} (${scoredList}) plus a qualitative ${qualList}`
-    : `${n} therapy target${n !== 1 ? "s" : ""}: ${targetList}`;
   paragraphs.push(mkPara(
-    `This report documents ${firstName}'s progress across the ${halfText} half of ${year} (${monthRange}) in ${introTargetPhrase}. The therapy team has prepared this report to give you a clear overview of ${firstName}'s development and the areas that need continued attention.`,
+    `This report documents ${student.name}'s progress across the ${halfText} half of ${year} (${monthRange}) in ${n} key therapy target${n !== 1 ? "s" : ""}: ${targetList}. The therapy team has prepared this report to give you a clear overview of ${firstName}'s development and the areas that need continued attention.`,
     { after: 280 }
   ));
 
@@ -3347,7 +3338,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   });
   if (wAllNames.length) paragraphs.push(new Paragraph({ children: [], spacing: { before: 200, after: 0 } }));
 
-  paragraphs.push(mkPara("Top Wins, Focus Areas & Strategies", { heading: HeadingLevel.HEADING_2, before: 280, after: 120, size: 26, bold: true }));
+  paragraphs.push(mkPara("Top Wins, Focus Areas & Strategies", { heading: HeadingLevel.HEADING_2, before: 280, after: 120, size: 26, bold: true, keepNext: true }));
   if ((parsed.biggestWins?.length || parsed.keyFocusAreas?.length)) {
     const mkKiColorCell = (text, fill, textColor) => new TableCell({
       width: { size: 28, type: WidthType.PERCENTAGE },
@@ -3373,7 +3364,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     const kiRows = [
       new TableRow({ tableHeader: true, children: [mkKiColorCell("Biggest Wins",    "d1fae5", "16a34a"), mkKiNumberedCell(parsed.biggestWins    || [], KI_NUM_REF)] }),
       new TableRow({                    children: [mkKiColorCell("Key Focus Areas",  "fef3c7", "d97706"), mkKiNumberedCell(parsed.keyFocusAreas  || [], KI_NUM_REF_2)] }),
-      new TableRow({                    children: [mkKiColorCell("Strategy",         "dbeafe", "2563eb"), mkKiNumberedCell([],                         KI_NUM_REF)] })
+      new TableRow({                    children: [mkKiColorCell("Strategies",       "dbeafe", "2563eb"), mkKiNumberedCell([],                         KI_NUM_REF)] })
     ];
     paragraphs.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: kiRows }));
     paragraphs.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
