@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1070";
+const APP_VERSION = "1071";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3378,45 +3378,29 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     return new TableCell({ width: { size: pct, type: WidthType.PERCENTAGE }, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: [new Paragraph({ children, spacing: { before: 80, after: 80 } })] });
   };
   paragraphs.push(mkPara("Section 2: Progress by Category", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
-  paragraphs.push(mkPara(`This section groups ${firstName}'s quantitative targets by how they performed this term (${monthRange} ${year}), using the criteria below.`, { after: 280 }));
-  paragraphs.push(mkPara("How the categories are defined", { heading: HeadingLevel.HEADING_2, before: 280, after: 120, size: 26, bold: true }));
-  const catData = [
-    ["2.1 Most Improved",       [["Gained ", false], ["more than 8 points", true], [" over the term.", false]]],
-    ["2.2 Strong & Steady",     [["Ending score ", false], ["80% or above", true], [" with stable progress (within ", false], ["±8 points", true], [" over the term).", false]]],
-    ["2.3 Developing",          [["Ending score ", false], ["under 80%", true], [" with stable progress (within ", false], ["±8 points", true], [" over the term).", false]]],
-    ["2.4 Needs Extra Support", [["Dropped by ", false], ["more than 8 points", true], [" over the term.", false]]]
-  ];
-  const catHeaderRow = new TableRow({ tableHeader: true, children: [
-    mkCell("Category", { bold: true, bg: HDR2, size: 22, pct: 30, align: AlignmentType.CENTER }),
-    mkCell("Criteria",  { bold: true, bg: HDR2, size: 22, pct: 70, align: AlignmentType.CENTER })
-  ]});
-  const catRows = catData.map(([sec, runs]) => new TableRow({ children: [
-    mkCell(sec, { pct: 30, bold: true, align: AlignmentType.CENTER }),
-    richCritCell(runs, 70)
-  ]}));
-  paragraphs.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [catHeaderRow, ...catRows] }));
-  paragraphs.push(new Paragraph({ children: [], spacing: { before: 400, after: 0 } }));
-  // Summary of Targets
+  paragraphs.push(mkPara(`Each of ${firstName}'s targets has been placed into one of four categories based on their progress this term (${monthRange} ${year}).`, { after: 280 }));
   paragraphs.push(mkPara("Summary of Targets", { heading: HeadingLevel.HEADING_2, before: 280, after: 120, size: 26, bold: true }));
-  const summaryHeaderRow = new TableRow({ tableHeader: true, children: [
-    mkCell("Category", { bold: true, bg: HDR2, size: 22, pct: 30, align: AlignmentType.CENTER }),
-    mkCell("Targets",  { bold: true, bg: HDR2, size: 22, pct: 70, align: AlignmentType.CENTER })
-  ]});
-  const summaryCategories = [
-    { label: "2.1 Most Improved",       targets: categorized.mostImproved },
-    { label: "2.2 Strong & Steady",     targets: categorized.strengths },
-    { label: "2.3 Developing",          targets: categorized.emerging },
-    { label: "2.4 Needs Extra Support", targets: categorized.needsSupport }
+  const catData = [
+    { label: "2.1 Most Improved",       runs: [["Gained ", false], ["more than 8 points", true], [" over the term.", false]],          targets: categorized.mostImproved },
+    { label: "2.2 Strong & Steady",     runs: [["Ending score ", false], ["80% or above", true], [" with stable progress (within ", false], ["±8 points", true], [" over the term).", false]], targets: categorized.strengths },
+    { label: "2.3 Developing",          runs: [["Ending score ", false], ["under 80%", true], [" with stable progress (within ", false], ["±8 points", true], [" over the term).", false]],  targets: categorized.emerging },
+    { label: "2.4 Needs Extra Support", runs: [["Dropped by ", false], ["more than 8 points", true], [" over the term.", false]],        targets: categorized.needsSupport }
   ];
-  const summaryRows = summaryCategories.map(({ label, targets }) => new TableRow({ children: [
-    mkCell(label, { pct: 30, bold: true }),
-    new TableCell({ width: { size: 70, type: WidthType.PERCENTAGE }, margins: { top: 80, bottom: 80, left: 150, right: 150 },
+  const combinedHeaderRow = new TableRow({ tableHeader: true, children: [
+    mkCell("Category", { bold: true, bg: HDR2, size: 22, pct: 22, align: AlignmentType.CENTER }),
+    mkCell("Criteria",  { bold: true, bg: HDR2, size: 22, pct: 43, align: AlignmentType.CENTER }),
+    mkCell("Targets",   { bold: true, bg: HDR2, size: 22, pct: 35, align: AlignmentType.CENTER })
+  ]});
+  const combinedRows = catData.map(({ label, runs, targets }) => new TableRow({ children: [
+    mkCell(label, { pct: 22, bold: true, align: AlignmentType.CENTER }),
+    richCritCell(runs, 43),
+    new TableCell({ width: { size: 35, type: WidthType.PERCENTAGE }, margins: { top: 80, bottom: 80, left: 150, right: 150 },
       children: targets.length
         ? targets.map(t => new Paragraph({ children: [new TextRun({ text: `• ${t.name}`, size: 22 })], spacing: { before: 40, after: 40 } }))
         : [new Paragraph({ children: [new TextRun({ text: "No targets in this category", size: 22, italics: true, color: "9CA3AF" })], spacing: { before: 80, after: 80 } })]
     })
   ]}));
-  paragraphs.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [summaryHeaderRow, ...summaryRows] }));
+  paragraphs.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [combinedHeaderRow, ...combinedRows] }));
   paragraphs.push(new Paragraph({ children: [], spacing: { before: 400, after: 0 } }));
   // Colored band headings + target details
   const catBandPara = (text, fill, textColor) => new Paragraph({
