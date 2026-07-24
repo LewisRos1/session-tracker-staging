@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1072";
+const APP_VERSION = "1073";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3093,7 +3093,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
     const fmtKI = s => { const c = s.replace(/\*\*/g, ""); const i = c.indexOf(': '); return i > 0 ? `<strong>${esc(c.slice(0,i))}</strong>: ${esc(c.slice(i+2))}` : esc(c); };
     const bwItems = (parsed.biggestWins || []).map(s => `<li style="margin:.5rem 0;line-height:1.6">${fmtKI(s)}</li>`).join("");
     const kfItems = (parsed.keyFocusAreas || []).map(s => `<li style="margin:.5rem 0;line-height:1.6">${fmtKI(s)}</li>`).join("");
-    h += `<p style="margin:1.25rem 0 .75rem;line-height:1.7">Below are the top 4 most important wins and the 4 most critical focus areas that ${esc(firstName)} needs support with going into next term (${esc(nextMonthRange)} ${nextTermYear}).</p>`;
+    h += `<p style="margin:1.25rem 0 .75rem;line-height:1.7">Below are the top 4 most important wins and the 4 most critical focus areas that ${esc(firstName)} needs support with.</p>`;
     h += `<table style="width:100%;border-collapse:collapse;font-size:11pt;margin:1.25rem 0">
       <tbody>
       <tr style="background:#f3f4f6">
@@ -3365,7 +3365,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     kiRows.push(new TableRow({ children: [mkKiLabelCell("Biggest Wins"), mkKiNumberedCell(parsed.biggestWins || [], KI_NUM_REF)] }));
     kiRows.push(new TableRow({ children: [mkKiLabelCell("Key Focus Areas"), mkKiNumberedCell(parsed.keyFocusAreas || [], KI_NUM_REF_2)] }));
     kiRows.push(new TableRow({ children: [mkKiLabelCell("Strategy for Next Term"), mkKiNumberedCell([], KI_NUM_REF)] }));
-    paragraphs.push(mkPara(`Below are the top 4 most important wins and the 4 most critical focus areas that ${firstName} needs support with going into next term (${nextMonthRange} ${nextTermYear}).`, { after: 160 }));
+    paragraphs.push(mkPara(`Below are the top 4 most important wins and the 4 most critical focus areas that ${firstName} needs support with.`, { after: 160 }));
     paragraphs.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: kiRows }));
     paragraphs.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
   }
