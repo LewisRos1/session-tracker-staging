@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1081";
+const APP_VERSION = "1082";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2425,7 +2425,12 @@ async function hyrCollectData(student, period, year) {
 
     let activeNum = 0, masteredNum = 0, discontNum = 0;
     const masteredBreakdown = [], discontinuedBreakdown = [];
+    let pendingActiveHeader = null;
     for (const pa of (target.predefinedActivities || [])) {
+      if (pa.isHeading || pa.isMaintainHeading) {
+        if (pa.name?.trim()) pendingActiveHeader = { isSectionHeader: true, label: pa.name.trim() };
+        continue;
+      }
       const paKey = pa.title || pa.name;
       if (!paKey) continue;
       const isMastered = !!pa.masteredOn;
@@ -2435,8 +2440,10 @@ async function hyrCollectData(student, period, year) {
       if (!bd) continue;
       const num = isActive ? ++activeNum : isMastered ? ++masteredNum : ++discontNum;
       const ent = { name: `${num}) ${paKey}`, earliest: bd.earliest, latest: bd.latest, monthCount: bd.monthCount };
-      if (isActive) breakdownData[tName].push(ent);
-      else if (isMastered) masteredBreakdown.push(ent);
+      if (isActive) {
+        if (pendingActiveHeader) { breakdownData[tName].push(pendingActiveHeader); pendingActiveHeader = null; }
+        breakdownData[tName].push(ent);
+      } else if (isMastered) masteredBreakdown.push(ent);
       else discontinuedBreakdown.push(ent);
     }
     if (masteredBreakdown.length) {
