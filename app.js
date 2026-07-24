@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1096";
+const APP_VERSION = "1097";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2742,8 +2742,8 @@ function hyrDrawActivityBreakdown(targetName, activities, period, year) {
 
 function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd, delta, direction) {
   const SCALE = 2;
-  const W = 580, H = 310;
-  const PAD = { top: 72, right: 20, bottom: 38, left: 22 };
+  const W = 580, H = 330;
+  const PAD = { top: 92, right: 20, bottom: 38, left: 22 };
   const cW = W - PAD.left - PAD.right, cH = H - PAD.top - PAD.bottom;
 
   const canvas = document.createElement("canvas");
