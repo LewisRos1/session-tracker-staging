@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1080";
+const APP_VERSION = "1081";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2423,7 +2423,7 @@ async function hyrCollectData(student, period, year) {
       return { earliest, latest, monthCount: Object.values(monthly).filter(s => s.length > 0).length };
     };
 
-    let bdSeq = 0;
+    let activeNum = 0, masteredNum = 0, discontNum = 0;
     const masteredBreakdown = [], discontinuedBreakdown = [];
     for (const pa of (target.predefinedActivities || [])) {
       const paKey = pa.title || pa.name;
@@ -2433,8 +2433,8 @@ async function hyrCollectData(student, period, year) {
       const isActive = !isMastered && !isDiscont;
       const bd = paSessionData(pa);
       if (!bd) continue;
-      bdSeq++;
-      const ent = { name: `${bdSeq}) ${paKey}`, earliest: bd.earliest, latest: bd.latest, monthCount: bd.monthCount };
+      const num = isActive ? ++activeNum : isMastered ? ++masteredNum : ++discontNum;
+      const ent = { name: `${num}) ${paKey}`, earliest: bd.earliest, latest: bd.latest, monthCount: bd.monthCount };
       if (isActive) breakdownData[tName].push(ent);
       else if (isMastered) masteredBreakdown.push(ent);
       else discontinuedBreakdown.push(ent);
