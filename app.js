@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1093";
+const APP_VERSION = "1094";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3072,7 +3072,7 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
   // Perf -15% from previous (285*0.85≈242); freed space to name+delta
   const NAME_W = 247;
   const DELTA_W = 196;
-  const PAD_R = 15;
+  const PAD_R = 32;
   const PERF_X = NAME_W + DELTA_W;       // 443
   const PERF_W = W - PERF_X - PAD_R;    // 242
   const deltaCX = NAME_W + DELTA_W / 2; // 345
@@ -3165,27 +3165,12 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
     const eW = Math.max(2, (r.tEnd / 100) * PERF_W);
     const startBarY = cy - BAR_HP - 3;
     const endBarY = cy + 3;
-    const rightEdge = W - PAD_R;
     ctx.fillStyle = C_START; ctx.fillRect(PERF_X, startBarY, sW, BAR_HP);
-    ctx.font = "16px sans-serif"; ctx.fillStyle = "#111827";
-    const sLabel = String(Math.round(r.tStart));
-    if (PERF_X + sW + 4 + ctx.measureText(sLabel).width > rightEdge) {
-      ctx.textAlign = "right";
-      ctx.fillText(sLabel, PERF_X + sW - 3, startBarY + BAR_HP - 1);
-    } else {
-      ctx.textAlign = "left";
-      ctx.fillText(sLabel, PERF_X + sW + 4, startBarY + BAR_HP - 1);
-    }
+    ctx.fillStyle = "#111827"; ctx.font = "16px sans-serif"; ctx.textAlign = "left";
+    ctx.fillText(String(Math.round(r.tStart)), PERF_X + sW + 4, startBarY + BAR_HP - 1);
     ctx.fillStyle = C_END; ctx.fillRect(PERF_X, endBarY, eW, BAR_HP);
-    ctx.font = "bold 16px sans-serif"; ctx.fillStyle = "#111827";
-    const eLabel = String(Math.round(r.tEnd));
-    if (PERF_X + eW + 4 + ctx.measureText(eLabel).width > rightEdge) {
-      ctx.textAlign = "right";
-      ctx.fillText(eLabel, PERF_X + eW - 3, endBarY + BAR_HP - 1);
-    } else {
-      ctx.textAlign = "left";
-      ctx.fillText(eLabel, PERF_X + eW + 4, endBarY + BAR_HP - 1);
-    }
+    ctx.fillStyle = "#111827"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "left";
+    ctx.fillText(String(Math.round(r.tEnd)), PERF_X + eW + 4, endBarY + BAR_HP - 1);
 
     // Row separator
     if (i < n - 1) {
