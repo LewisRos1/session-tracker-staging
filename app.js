@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1078";
+const APP_VERSION = "1079";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3139,9 +3139,9 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
 
   h += `<hr style="margin:2rem 0">`;
 
-  // Section 5: Areas for Continued Focus (table)
+  // Section 5: Focus Areas (table)
   const planSection = categorized.qualitative.length ? "5" : "4";
-  h += `<h2 style="${SECTION_H2}">Section ${planSection}: Areas for Continued Focus</h2>`;
+  h += `<h2 style="${SECTION_H2}">Section ${planSection}: Focus Areas</h2>`;
   h += `<p style="margin:.5rem 0 1rem;line-height:1.7">The table below highlights the areas where ${esc(firstName)} has the most room for improvement this term, along with recommendations for supporting their progress in each one.</p>`;
   if (parsed.actionPlanRows.length) {
     const rows = parsed.actionPlanRows.map((r, idx) => {
@@ -3444,9 +3444,9 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     nextSectionNum = 4;
   }
 
-  // ── Section: Areas for Continued Focus (landscape) ─────────────
+  // ── Section: Focus Areas (landscape) ─────────────
   const actionPlanParas = [];
-  actionPlanParas.push(mkPara(`Section ${nextSectionNum}: Areas for Continued Focus`, { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
+  actionPlanParas.push(mkPara(`Section ${nextSectionNum}: Focus Areas`, { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
   actionPlanParas.push(mkPara(
     `The table below highlights the areas where ${firstName} has the most room for improvement this term, along with recommendations for supporting their progress in each one.`,
     { after: 220 }
