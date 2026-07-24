@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1076";
+const APP_VERSION = "1077";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3429,7 +3429,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   if (categorized.qualitative.length) {
     paragraphs.push(mkPara("Section 3: Observed Skills (No Quantitative Data)", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
     categorized.qualitative.forEach((r, i) => {
-      paragraphs.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
+      if (i > 0) paragraphs.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
       paragraphs.push(new Paragraph({ children: [new TextRun({ text: `${ROMAN[i] || i + 1}. ${r.name}`, bold: true, size: 24 })], spacing: { before: 0, after: 80, ...LS } }));
       const obs = parsed.observed?.[r.name];
       if (obs) {
