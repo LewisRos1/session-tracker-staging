@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1097";
+const APP_VERSION = "1098";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2752,9 +2752,9 @@ function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd
   ctx.scale(SCALE, SCALE);
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
 
-  const rangeLabel = period === "H1" ? "Jan–Jun" : "Jul–Dec";
+  const rangeLabel = period === "H1" ? "Jan - Jun" : "Jul - Dec";
   ctx.fillStyle = "#1f2937"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(`${(targetName || "").trim()}  (${rangeLabel} ${year})`, W / 2, 24);
+  ctx.fillText(`${(targetName || "").trim()} (${rangeLabel} ${year})`, W / 2, 24);
 
   const pts = labels.map((label, i) => ({ label, v: values[i], i })).filter(p => p.v !== null && p.v !== undefined);
   if (pts.length === 0) return null;
