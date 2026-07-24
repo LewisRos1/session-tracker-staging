@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1089";
+const APP_VERSION = "1090";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3546,7 +3546,8 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     { after: 280 }
   ));
 
-  paragraphs.push(mkPara("Overall Progress", { heading: HeadingLevel.HEADING_2, before: 280, after: 120, size: 26, bold: true }));
+  paragraphs.push(new Paragraph({ children: [], spacing: { before: 0, after: 280 } }));
+  paragraphs.push(mkPara("Overall Progress", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true }));
   const chartTrendRows = [...trendRows.filter(r => !r.noData)].sort((a, b) => b.delta - a.delta);
   const ovTitle = `${firstName} - ${monthRange} ${year} Progress`;
   const ovDrawFn = hyrDrawOverviewChartC;
@@ -3563,15 +3564,24 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   const wQualSet  = new Set(categorized.qualitative.map(r => r.name));
   const wNDSet    = new Set(trendRows.filter(r => r.noData).map(r => r.name));
   const wAllNames = [...new Set([...wQualSet, ...wNDSet])];
-  wAllNames.forEach(nm => {
-    const noteText = wQualSet.has(nm)
-      ? `*${nm} is not shown here — it's a qualitative target without a numeric score. See Section 3.`
-      : `*${nm} is not shown here — insufficient data to chart this term.`;
+  const joinNames = names => names.length === 1 ? names[0]
+    : names.slice(0, -1).join(", ") + " & " + names[names.length - 1];
+  const qualNames = [...wQualSet];
+  const ndNames   = [...wNDSet].filter(nm => !wQualSet.has(nm));
+  if (qualNames.length) {
+    const s = qualNames.length === 1;
     paragraphs.push(new Paragraph({
-      children: [new TextRun({ text: noteText, size: 22, italics: true, color: "9CA3AF" })],
+      children: [new TextRun({ text: `*${joinNames(qualNames)} ${s ? "is" : "are"} not shown here — ${s ? "it's a qualitative target" : "they're qualitative targets"} without a numeric score. See Section 3.`, size: 22, italics: true, color: "9CA3AF" })],
       alignment: AlignmentType.LEFT, spacing: { before: 0, after: 80 }
     }));
-  });
+  }
+  if (ndNames.length) {
+    const s = ndNames.length === 1;
+    paragraphs.push(new Paragraph({
+      children: [new TextRun({ text: `*${joinNames(ndNames)} ${s ? "is" : "are"} not shown here — insufficient data to chart this term.`, size: 22, italics: true, color: "9CA3AF" })],
+      alignment: AlignmentType.LEFT, spacing: { before: 0, after: 80 }
+    }));
+  }
   if (wAllNames.length) paragraphs.push(new Paragraph({ children: [], spacing: { before: 200, after: 0 } }));
 
   paragraphs.push(mkPara("Top Wins, Focus Areas, Recommendations & Strategies", { heading: HeadingLevel.HEADING_2, before: 280, after: 120, size: 26, bold: true, keepNext: true }));
