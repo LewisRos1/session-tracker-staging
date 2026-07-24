@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1083";
+const APP_VERSION = "1084";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1984,6 +1984,11 @@ function renderHalfYearReportsSection() {
       </select>
       <span id="hyr-period-loading" style="font-size:.85rem;color:var(--text-muted);white-space:nowrap;display:none">Checking…</span>
       <select id="hyr-period-select" class="admin-input" style="width:200px;flex-shrink:0;background:#fff;font-family:inherit;font-size:1rem;padding-right:2rem;display:none"></select>
+      <select id="hyr-chart-style" class="admin-input" style="width:190px;flex-shrink:0;background:#fff;font-family:inherit;font-size:.9rem;display:none">
+        <option value="A">Chart: Diagonal labels</option>
+        <option value="B">Chart: 2-line labels</option>
+        <option value="C">Chart: Horizontal bars</option>
+      </select>
       <button id="hyr-btn-generate" class="btn-add-section"
         style="font-size:.9rem;padding:.45rem 1.1rem;min-height:38px;white-space:nowrap;flex-shrink:0;display:none">
         Generate Report
@@ -2004,6 +2009,7 @@ function renderHalfYearReportsSection() {
 
     periodSel.style.display = "none";
     genBtn.style.display    = "none";
+    $("hyr-chart-style").style.display = "none";
     loading.style.display   = "none";
     if (!studentId) return;
 
@@ -2030,6 +2036,7 @@ function renderHalfYearReportsSection() {
       periodSel.innerHTML = `<option value="">— Select Semester —</option>` + opts.join("");
       periodSel.style.display = "";
       genBtn.style.display = "";
+      $("hyr-chart-style").style.display = "";
     } catch (err) {
       loading.style.display = "none";
       periodSel.innerHTML = `<option value="">Error loading sessions</option>`;
@@ -2041,8 +2048,9 @@ function renderHalfYearReportsSection() {
 }
 
 async function hyrGenerate() {
-  const studentId = $("hyr-student-select")?.value;
-  const periodVal = $("hyr-period-select")?.value;
+  const studentId  = $("hyr-student-select")?.value;
+  const periodVal  = $("hyr-period-select")?.value;
+  const chartStyle = $("hyr-chart-style")?.value || "A";
   if (!studentId) { alert("Please select a student first."); return; }
   if (!periodVal) { alert("Please select a semester first."); return; }
 
@@ -2172,7 +2180,7 @@ TARGET: [exact target name]
     setProgress(100, "Done!");
     await new Promise(r => setTimeout(r, 400));
 
-    hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData, chartData);
+    hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData, chartData, chartStyle);
 
   } catch (err) {
     alert("Failed to generate report:\n" + err.message);
@@ -2975,6 +2983,196 @@ function hyrDrawOverviewChart(chartTrendRows, title) {
   return { base64: canvas.toDataURL("image/png").split(",")[1], height: H };
 }
 
+// Option B: wider chart, horizontal 2-line labels
+function hyrDrawOverviewChartB(chartTrendRows, title) {
+  const n = chartTrendRows.length;
+  if (n === 0) return null;
+  const W = 920, PAD_L = 60, PAD_R = 25, PAD_TOP = 55, PAD_BTM = 80;
+  const TOP_H = 200, MID_GAP = 38, BTM_H = 160;
+  const CHART_W = W - PAD_L - PAD_R;
+  const H = PAD_TOP + TOP_H + MID_GAP + BTM_H + PAD_BTM;
+  const slotW = CHART_W / n;
+  const BAR_W = Math.max(10, Math.min(40, Math.floor(slotW / 2 - 6)));
+  const maxAbs = Math.max(...chartTrendRows.map(r => Math.abs(r.delta)), 10);
+  const TOP_BTM_Y = PAD_TOP + TOP_H;
+  const BTM_Y0    = PAD_TOP + TOP_H + MID_GAP;
+  const BTM_BTM_Y = BTM_Y0 + BTM_H;
+  const NET_CTR_Y = BTM_Y0 + BTM_H / 2;
+  const C_START = "#7dd3fc", C_END = "#a78bfa", C_UP = "#22c55e", C_DOWN = "#ef4444", C_STABLE = "#9ca3af";
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
+  if (title) { ctx.fillStyle = "#111827"; ctx.font = "bold 19px sans-serif"; ctx.textAlign = "center"; ctx.fillText(title, W / 2, 30); }
+  ctx.save(); ctx.fillStyle = "#374151"; ctx.font = "bold 17px sans-serif"; ctx.textAlign = "center";
+  ctx.translate(42, PAD_TOP + TOP_H / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("Overall Performance (%)", 0, 0); ctx.restore();
+  ctx.save(); ctx.fillStyle = "#374151"; ctx.font = "bold 17px sans-serif"; ctx.textAlign = "center";
+  ctx.translate(42, BTM_Y0 + BTM_H / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("Net Change (points)", 0, 0); ctx.restore();
+  for (const tick of [0, 20, 40, 60, 80, 100]) {
+    const y = TOP_BTM_Y - (tick / 100) * TOP_H;
+    ctx.strokeStyle = tick === 0 ? "#9ca3af" : "#e5e7eb"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(W - PAD_R, y); ctx.stroke();
+  }
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(PAD_L, TOP_BTM_Y + 4, CHART_W, MID_GAP - 8);
+  for (const tick of [-maxAbs, -Math.round(maxAbs / 2), 0, Math.round(maxAbs / 2), maxAbs]) {
+    const y = NET_CTR_Y - (tick / maxAbs) * (BTM_H / 2);
+    ctx.strokeStyle = tick === 0 ? "#374151" : "#e5e7eb"; ctx.lineWidth = tick === 0 ? 1.5 : 1;
+    ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(W - PAD_R, y); ctx.stroke();
+  }
+  const splitLabel = name => {
+    const t = name.trim();
+    if (t.length <= 16) return [t];
+    const mid = Math.ceil(t.length / 2);
+    const sp = t.lastIndexOf(" ", mid);
+    return sp > 4 ? [t.slice(0, sp).trim(), t.slice(sp).trim()] : [t.slice(0, mid), t.slice(mid).trim()];
+  };
+  for (let i = 0; i < n; i++) {
+    const r = chartTrendRows[i];
+    const cx = PAD_L + (i + 0.5) * slotW;
+    const dc = r.direction === "Trending Up" ? C_UP : r.direction === "Trending Down" ? C_DOWN : C_STABLE;
+    const sH = Math.max(2, (r.tStart / 100) * TOP_H), sX = cx - BAR_W - 2;
+    ctx.fillStyle = C_START; ctx.fillRect(sX, TOP_BTM_Y - sH, BAR_W, sH);
+    ctx.fillStyle = "#111827"; ctx.font = "16px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(String(r.tStart), sX + BAR_W / 2, TOP_BTM_Y - sH - 4);
+    const eH = Math.max(2, (r.tEnd / 100) * TOP_H), eX = cx + 2;
+    ctx.fillStyle = C_END; ctx.fillRect(eX, TOP_BTM_Y - eH, BAR_W, eH);
+    ctx.fillStyle = "#111827"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(String(r.tEnd), eX + BAR_W / 2, TOP_BTM_Y - eH - 4);
+    const barH = Math.max(3, (Math.abs(r.delta) / maxAbs) * (BTM_H / 2));
+    const barX = cx - BAR_W / 2;
+    const dl = (r.delta >= 0 ? "+" : "") + r.delta;
+    if (r.delta > 0) {
+      ctx.fillStyle = dc; ctx.fillRect(barX, NET_CTR_Y - barH, BAR_W, barH);
+      ctx.fillStyle = "#111827"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText(dl, cx, NET_CTR_Y - barH - 4);
+    } else if (r.delta < 0) {
+      ctx.fillStyle = dc; ctx.fillRect(barX, NET_CTR_Y, BAR_W, barH);
+      ctx.fillStyle = "#111827"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText(dl, cx, Math.min(NET_CTR_Y + barH + 18, BTM_BTM_Y - 10));
+    } else {
+      ctx.fillStyle = C_STABLE; ctx.fillRect(barX, NET_CTR_Y - 1, BAR_W, 2);
+      ctx.fillStyle = "#374151"; ctx.font = "16px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText("0", cx, NET_CTR_Y - 5);
+    }
+    const lines = splitLabel(r.name);
+    ctx.fillStyle = "#111827"; ctx.font = "12px sans-serif"; ctx.textAlign = "center";
+    lines.forEach((line, li) => ctx.fillText(line, cx, BTM_BTM_Y + 18 + li * 16));
+  }
+  ctx.font = "15px sans-serif";
+  const BOX = 12, GAP = 5, SPC = 14, RH = 22, legY0 = BTM_BTM_Y + 52;
+  [[{ color: C_START, label: "Term Start" }, { color: C_END, label: "Term End" }],
+   [{ color: C_DOWN, label: "Trending Down (<-8 points)" }, { color: C_STABLE, label: "Stable (±8 points)" }, { color: C_UP, label: "Trending Up (>+8 points)" }]]
+  .forEach((row, ri) => {
+    const rowW = row.reduce((acc, { label }) => acc + BOX + GAP + Math.ceil(ctx.measureText(label).width) + SPC, 0) - SPC;
+    let lx = PAD_L + (CHART_W - rowW) / 2; const ly = legY0 + ri * RH;
+    row.forEach(({ color, label }) => { ctx.fillStyle = color; ctx.fillRect(lx, ly - BOX + 2, BOX, BOX); ctx.fillStyle = "#374151"; ctx.textAlign = "left"; ctx.fillText(label, lx + BOX + GAP, ly); lx += BOX + GAP + Math.ceil(ctx.measureText(label).width) + SPC; });
+  });
+  ctx.strokeStyle = "#000000"; ctx.lineWidth = 1; ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
+  return { base64: canvas.toDataURL("image/png").split(",")[1], height: H };
+}
+
+// Option C: horizontal bar chart — names on left, bars go right
+function hyrDrawOverviewChartC(chartTrendRows, title) {
+  const n = chartTrendRows.length;
+  if (n === 0) return null;
+  const C_START = "#7dd3fc", C_END = "#a78bfa", C_UP = "#22c55e", C_DOWN = "#ef4444", C_STABLE = "#9ca3af";
+  const W = 700, PAD_L = 205, PAD_R = 20, CHART_W = W - PAD_L - PAD_R;
+  const PAD_TOP = 45, PAD_BTM = 75;
+  const BAR_H = 13, BAR_GAP = 5, ROW_H_PERF = BAR_H * 2 + BAR_GAP + 16;
+  const ROW_H_DELTA = 34, SECTION_GAP = 28, AXIS_H = 18;
+  const PERF_HDR_H = 22, DELTA_HDR_H = 22;
+  const PERF_Y = PAD_TOP + PERF_HDR_H;
+  const PERF_H = n * ROW_H_PERF;
+  const AXIS1_Y = PERF_Y + PERF_H;
+  const DELTA_Y = AXIS1_Y + AXIS_H + SECTION_GAP + DELTA_HDR_H;
+  const DELTA_H = n * ROW_H_DELTA;
+  const AXIS2_Y = DELTA_Y + DELTA_H;
+  const H = AXIS2_Y + AXIS_H + PAD_BTM;
+  const maxAbs = Math.max(...chartTrendRows.map(r => Math.abs(r.delta)), 10);
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
+  if (title) { ctx.fillStyle = "#111827"; ctx.font = "bold 15px sans-serif"; ctx.textAlign = "center"; ctx.fillText(title, W / 2, 28); }
+
+  const drawVGrid = (ticks, toX, yTop, yBot, zeroKey) => ticks.forEach(v => {
+    ctx.strokeStyle = v === zeroKey ? "#9ca3af" : "#e5e7eb"; ctx.lineWidth = v === zeroKey ? 1 : 1;
+    ctx.beginPath(); ctx.moveTo(toX(v), yTop); ctx.lineTo(toX(v), yBot); ctx.stroke();
+  });
+
+  // === PERFORMANCE SECTION ===
+  ctx.fillStyle = "#374151"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "left";
+  ctx.fillText("Overall Performance (%)", PAD_L, PAD_TOP + 15);
+  const toXPerf = v => PAD_L + (v / 100) * CHART_W;
+  drawVGrid([0, 25, 50, 75, 100], toXPerf, PERF_Y, AXIS1_Y, 0);
+  for (let i = 0; i < n; i++) {
+    const r = chartTrendRows[i];
+    const rowY = PERF_Y + i * ROW_H_PERF;
+    if (i % 2 === 0) { ctx.fillStyle = "#f9fafb"; ctx.fillRect(PAD_L, rowY, CHART_W, ROW_H_PERF); }
+    ctx.fillStyle = "#111827"; ctx.font = "11px sans-serif"; ctx.textAlign = "right";
+    ctx.fillText(r.name.trim(), PAD_L - 8, rowY + ROW_H_PERF / 2 + 4);
+    const startW = Math.max(2, (r.tStart / 100) * CHART_W), startY = rowY + 8;
+    ctx.fillStyle = C_START; ctx.fillRect(PAD_L, startY, startW, BAR_H);
+    ctx.fillStyle = "#111827"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "left";
+    ctx.fillText(String(r.tStart), PAD_L + startW + 3, startY + BAR_H - 1);
+    const endW = Math.max(2, (r.tEnd / 100) * CHART_W), endY = startY + BAR_H + BAR_GAP;
+    ctx.fillStyle = C_END; ctx.fillRect(PAD_L, endY, endW, BAR_H);
+    ctx.fillStyle = "#111827"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "left";
+    ctx.fillText(String(r.tEnd), PAD_L + endW + 3, endY + BAR_H - 1);
+  }
+  ctx.fillStyle = "#6b7280"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
+  [0, 25, 50, 75, 100].forEach(v => ctx.fillText(v + "%", toXPerf(v), AXIS1_Y + 13));
+
+  // === DELTA SECTION ===
+  ctx.fillStyle = "#374151"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "left";
+  ctx.fillText("Net Change (points)", PAD_L, AXIS1_Y + AXIS_H + SECTION_GAP + 15);
+  const xCenter = PAD_L + CHART_W / 2;
+  const toXDelta = v => xCenter + (v / maxAbs) * (CHART_W / 2);
+  const deltaTicks = [-maxAbs, -Math.round(maxAbs / 2), 0, Math.round(maxAbs / 2), maxAbs];
+  drawVGrid(deltaTicks, toXDelta, DELTA_Y, AXIS2_Y, 0);
+  ctx.strokeStyle = "#374151"; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(xCenter, DELTA_Y); ctx.lineTo(xCenter, AXIS2_Y); ctx.stroke();
+  for (let i = 0; i < n; i++) {
+    const r = chartTrendRows[i];
+    const rowY = DELTA_Y + i * ROW_H_DELTA;
+    const cy = rowY + ROW_H_DELTA / 2;
+    if (i % 2 === 0) { ctx.fillStyle = "#f9fafb"; ctx.fillRect(PAD_L, rowY, CHART_W, ROW_H_DELTA); }
+    ctx.fillStyle = "#111827"; ctx.font = "11px sans-serif"; ctx.textAlign = "right";
+    ctx.fillText(r.name.trim(), PAD_L - 8, cy + 4);
+    const dc = r.direction === "Trending Up" ? C_UP : r.direction === "Trending Down" ? C_DOWN : C_STABLE;
+    const bLen = Math.max(3, (Math.abs(r.delta) / maxAbs) * (CHART_W / 2));
+    const bY = cy - 7, dl = (r.delta >= 0 ? "+" : "") + r.delta;
+    if (r.delta > 0) {
+      ctx.fillStyle = dc; ctx.fillRect(xCenter, bY, bLen, 14);
+      ctx.fillStyle = "#111827"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "left";
+      ctx.fillText(dl, xCenter + bLen + 3, cy + 4);
+    } else if (r.delta < 0) {
+      ctx.fillStyle = dc; ctx.fillRect(xCenter - bLen, bY, bLen, 14);
+      ctx.fillStyle = "#111827"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "right";
+      ctx.fillText(dl, xCenter - bLen - 3, cy + 4);
+    } else {
+      ctx.fillStyle = C_STABLE; ctx.fillRect(xCenter - 1, bY, 2, 14);
+      ctx.fillStyle = "#374151"; ctx.font = "10px sans-serif"; ctx.textAlign = "left";
+      ctx.fillText("0", xCenter + 3, cy + 4);
+    }
+  }
+  ctx.fillStyle = "#6b7280"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
+  deltaTicks.forEach(v => ctx.fillText((v > 0 ? "+" : "") + v, toXDelta(v), AXIS2_Y + 13));
+
+  // Legend
+  ctx.font = "13px sans-serif";
+  const BOX = 11, GAP = 4, SPC = 13, LR = 19, legY0 = AXIS2_Y + AXIS_H + 10;
+  [[{ color: C_START, label: "Term Start" }, { color: C_END, label: "Term End" }],
+   [{ color: C_DOWN, label: "Trending Down (<-8 points)" }, { color: C_STABLE, label: "Stable (±8 points)" }, { color: C_UP, label: "Trending Up (>+8 points)" }]]
+  .forEach((row, ri) => {
+    const rowW = row.reduce((acc, { label }) => acc + BOX + GAP + Math.ceil(ctx.measureText(label).width) + SPC, 0) - SPC;
+    let lx = PAD_L + (CHART_W - rowW) / 2; const ly = legY0 + ri * LR;
+    row.forEach(({ color, label }) => { ctx.fillStyle = color; ctx.fillRect(lx, ly - BOX + 2, BOX, BOX); ctx.fillStyle = "#374151"; ctx.textAlign = "left"; ctx.fillText(label, lx + BOX + GAP, ly); lx += BOX + GAP + Math.ceil(ctx.measureText(label).width) + SPC; });
+  });
+  ctx.strokeStyle = "#000000"; ctx.lineWidth = 1; ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
+  return { base64: canvas.toDataURL("image/png").split(",")[1], height: H };
+}
+
 function hyrParseAiResponse(text) {
   const out = { executiveSummary: "", biggestWins: [], keyFocusAreas: [], observations: {}, observed: {}, actionPlanRows: [] };
   const exec = text.match(/===EXECUTIVE_SUMMARY===\s*([\s\S]*?)\s*===END===/);
@@ -3202,7 +3400,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
 }
 
 
-function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData, chartData) {
+function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData, chartData, chartStyle = "A") {
   const periodLabel = period === "H1" ? `January–June ${year}` : `July–December ${year}`;
   const firstName   = student.name.split(" ")[0];
   const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
@@ -3321,11 +3519,16 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   paragraphs.push(mkPara("Overall Progress", { heading: HeadingLevel.HEADING_2, before: 280, after: 120, size: 26, bold: true }));
   const chartTrendRows = [...trendRows.filter(r => !r.noData)].sort((a, b) => a.delta - b.delta);
   const ovTitle = `${firstName} - ${monthRange} ${year} Progress`;
-  const ovResult = hyrDrawOverviewChart(chartTrendRows, ovTitle);
+  const ovDrawFn = chartStyle === "B" ? hyrDrawOverviewChartB
+                 : chartStyle === "C" ? hyrDrawOverviewChartC
+                 : hyrDrawOverviewChart;
+  const ovNativeW = chartStyle === "B" ? 920 : 700;
+  const ovResult = ovDrawFn(chartTrendRows, ovTitle);
   if (ovResult) {
-    const ovH = Math.round(520 * ovResult.height / 700);
+    const ovDocW = 520;
+    const ovH = Math.round(ovDocW * ovResult.height / ovNativeW);
     paragraphs.push(new Paragraph({
-      children: [new ImageRun({ data: b64ToUint8(ovResult.base64), transformation: { width: 520, height: ovH }, type: "png" })],
+      children: [new ImageRun({ data: b64ToUint8(ovResult.base64), transformation: { width: ovDocW, height: ovH }, type: "png" })],
       alignment: AlignmentType.CENTER, spacing: { after: 60 }
     }));
   }
