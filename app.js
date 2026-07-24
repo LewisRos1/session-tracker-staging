@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1077";
+const APP_VERSION = "1078";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3102,7 +3102,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
       </tr>
       <tr><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;font-weight:700;text-align:center;vertical-align:middle;width:28%;white-space:nowrap">Biggest Wins</td><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;vertical-align:top"><ol style="margin:0;padding-left:1.4rem">${bwItems}</ol></td></tr>
       <tr><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;font-weight:700;text-align:center;vertical-align:middle;white-space:nowrap">Key Focus Areas</td><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;vertical-align:top"><ol style="margin:0;padding-left:1.4rem">${kfItems}</ol></td></tr>
-      <tr><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;font-weight:700;text-align:center;vertical-align:middle;white-space:nowrap">Strategy for Next Term</td><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;min-height:3rem"></td></tr>
+      <tr><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;font-weight:700;text-align:center;vertical-align:middle;white-space:nowrap">Recommendations & Strategies</td><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;min-height:3rem"></td></tr>
     </tbody></table>`;
   }
 
@@ -3139,10 +3139,10 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
 
   h += `<hr style="margin:2rem 0">`;
 
-  // Section 5: Next Term Action Plan (table)
+  // Section 5: Areas for Continued Focus (table)
   const planSection = categorized.qualitative.length ? "5" : "4";
-  h += `<h2 style="${SECTION_H2}">Section ${planSection}: Next Term Action Plan</h2>`;
-  h += `<p style="margin:.5rem 0 1rem;line-height:1.7">The table below highlights the areas where ${esc(firstName)} has the most room for improvement this term. These skills will be the key focus going into the next term, where the therapy team will continue to target each area through structured activities and guided practice.</p>`;
+  h += `<h2 style="${SECTION_H2}">Section ${planSection}: Areas for Continued Focus</h2>`;
+  h += `<p style="margin:.5rem 0 1rem;line-height:1.7">The table below highlights the areas where ${esc(firstName)} has the most room for improvement this term, along with recommendations for supporting their progress in each one.</p>`;
   if (parsed.actionPlanRows.length) {
     const rows = parsed.actionPlanRows.map((r, idx) => {
       const pts = (r.points || []).map(p => `<li style="margin:.25rem 0">${esc(p)}</li>`).join("");
@@ -3158,7 +3158,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
         <th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700;width:7.6%">No.</th>
         <th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700;width:25%">Target</th>
         <th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700">Details</th>
-        <th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700">Strategy for Next Term</th>
+        <th style="padding:.5rem .75rem;border:1px solid #e5e7eb;text-align:center;font-weight:700">Recommendations & Strategies</th>
       </tr></thead><tbody>${rows}</tbody></table>`;
   }
 
@@ -3363,7 +3363,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     const kiRows = [
       new TableRow({ tableHeader: true, children: [mkKiColorCell("Biggest Wins",    "d1fae5", "16a34a"), mkKiNumberedCell(parsed.biggestWins    || [], KI_NUM_REF)] }),
       new TableRow({                    children: [mkKiColorCell("Key Focus Areas",  "fef3c7", "d97706"), mkKiNumberedCell(parsed.keyFocusAreas  || [], KI_NUM_REF_2)] }),
-      new TableRow({                    children: [mkKiColorCell("Strategies",       "dbeafe", "2563eb"), mkKiNumberedCell([],                         KI_NUM_REF)] })
+      new TableRow({                    children: [mkKiColorCell("Recommendations & Strategies", "dbeafe", "2563eb"), mkKiNumberedCell([],                         KI_NUM_REF)] })
     ];
     paragraphs.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: kiRows }));
     paragraphs.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
@@ -3444,11 +3444,11 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     nextSectionNum = 4;
   }
 
-  // ── Section: Next Term Action Plan (landscape) ─────────────
+  // ── Section: Areas for Continued Focus (landscape) ─────────────
   const actionPlanParas = [];
-  actionPlanParas.push(mkPara(`Section ${nextSectionNum}: Next Term Action Plan`, { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
+  actionPlanParas.push(mkPara(`Section ${nextSectionNum}: Areas for Continued Focus`, { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
   actionPlanParas.push(mkPara(
-    `The table below highlights the areas where ${firstName} has the most room for improvement this term. These skills will be the key focus going into the next term, where the therapy team will continue to target each area through structured activities and guided practice.`,
+    `The table below highlights the areas where ${firstName} has the most room for improvement this term, along with recommendations for supporting their progress in each one.`,
     { after: 220 }
   ));
   if (parsed.actionPlanRows?.length) {
@@ -3458,7 +3458,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
       mkCell("No.", { bold: true, bg: HDR, size: 22, align: AlignmentType.CENTER, dxa: 634 }),
       mkCell("Target", { bold: true, bg: HDR, size: 22, dxa: 2088, align: AlignmentType.CENTER }),
       mkCell("Details", { bold: true, bg: HDR, size: 22, dxa: 5616, align: AlignmentType.CENTER }),
-      mkCell("Strategy for Next Term", { bold: true, bg: HDR, size: 22, dxa: 5616, align: AlignmentType.CENTER })
+      mkCell("Recommendations & Strategies", { bold: true, bg: HDR, size: 22, dxa: 5616, align: AlignmentType.CENTER })
     ]});
     const dataRows = parsed.actionPlanRows.map((r, idx) => new TableRow({ children: [
       mkCell(String(idx + 1), { align: AlignmentType.CENTER, dxa: 634 }),
