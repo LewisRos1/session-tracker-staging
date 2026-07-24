@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1095";
+const APP_VERSION = "1096";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2753,7 +2753,7 @@ function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
 
   const rangeLabel = period === "H1" ? "Jan–Jun" : "Jul–Dec";
-  ctx.fillStyle = "#1f2937"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "center";
+  ctx.fillStyle = "#1f2937"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center";
   ctx.fillText(`${(targetName || "").trim()}  (${rangeLabel} ${year})`, W / 2, 24);
 
   const pts = labels.map((label, i) => ({ label, v: values[i], i })).filter(p => p.v !== null && p.v !== undefined);
@@ -2796,7 +2796,7 @@ function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd
   const safeTrendY = (tY, dY, tV, dV) => Math.abs(tV - dV) <= 10 ? Math.max(dY, tY) + 20 : tY + 13;
   const tYS = toY(trendAt(xs[0]));
   const tYE = toY(trendAt(xs[xs.length - 1]));
-  ctx.fillStyle = "#6b7280"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
+  ctx.fillStyle = "#6b7280"; ctx.font = "13px sans-serif"; ctx.textAlign = "center";
   ctx.fillText(dispStart + "%", toX(xs[0]),             safeTrendY(tYS, toY(pts[0].v),             dispStart, pts[0].v));
   ctx.fillText(dispEnd   + "%", toX(xs[xs.length - 1]), safeTrendY(tYE, toY(pts[pts.length - 1].v), dispEnd,   pts[pts.length - 1].v));
 
@@ -2806,7 +2806,7 @@ function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd
   const ptStr  = (dispDelta >= 0 ? "+" : "") + dispDelta + " points";
   const icon   = dispDir === "Trending Up" ? "↑" : dispDir === "Trending Down" ? "↓" : "→";
   const rngStr = (tStart != null && tEnd != null) ? ` (${tStart}% → ${tEnd}%)` : "";
-  ctx.fillStyle = "#6b7280"; ctx.font = "italic 13px sans-serif"; ctx.textAlign = "center";
+  ctx.fillStyle = "#6b7280"; ctx.font = "italic 16px sans-serif"; ctx.textAlign = "center";
   ctx.fillText(`${icon} ${dispDir} | ${ptStr}${rngStr}`, W / 2, 42);
 
   // Data line
@@ -2819,12 +2819,12 @@ function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd
   pts.forEach(p => {
     const x = toX(p.i), y = toY(p.v);
     ctx.fillStyle = "#4472c4"; ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = "#1f2937"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "center";
+    ctx.fillStyle = "#1f2937"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "center";
     ctx.fillText(p.v + "%", x, y - 9);
   });
 
   // Month labels on X-axis
-  ctx.fillStyle = "#374151"; ctx.font = "11px sans-serif"; ctx.textAlign = "center";
+  ctx.fillStyle = "#374151"; ctx.font = "14px sans-serif"; ctx.textAlign = "center";
   labels.forEach((label, i) => ctx.fillText(label, toX(i), PAD.top + cH + 16));
 
   // Thin border around entire canvas
