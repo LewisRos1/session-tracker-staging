@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1073";
+const APP_VERSION = "1074";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3302,20 +3302,31 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     children: [new TextRun({ text: periodLabel, size: 24, color: "555555" })],
     alignment: AlignmentType.CENTER, spacing: { after: 960 }
   }));
-  paragraphs.push(mkPara(`Date of Report: ${new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}`, { after: 160 }));
-  paragraphs.push(mkPara(
-    `This report documents ${student.name}'s progress across the ${halfText} half of ${year} (${monthRange}) in ${n} key therapy target${n !== 1 ? "s" : ""}: ${targetList}. The therapy team has prepared this report to give you a clear overview of ${firstName}'s development and the areas we will continue to focus on in the coming months.`,
-    { after: 400 }
-  ));
+  paragraphs.push(mkPara(`Date of Report: ${new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}`, { after: 960 }));
 
   // ── Section 1: Executive Overview ──────────────────────────
   paragraphs.push(mkPara("Section 1: Executive Overview", { heading: HeadingLevel.HEADING_1, before: 560, after: 200, pageBreak: true, size: 32, bold: true }));
 
+  // Executive summary intro — split scored vs qualitative targets
+  const qualTargetNames = new Set(categorized.qualitative.map(r => r.name));
+  const scoredTargets   = activeTargets.filter(t => !qualTargetNames.has(t.name));
+  const qualTargetsArr  = activeTargets.filter(t => qualTargetNames.has(t.name));
+  const scoredN    = scoredTargets.length;
+  const scoredList = scoredN <= 1 ? (scoredTargets[0]?.name || "") : scoredTargets.slice(0, -1).map(t => t.name).join(", ") + " and " + scoredTargets[scoredTargets.length - 1].name;
+  const qualList   = qualTargetsArr.map(t => t.name).join(" and ");
+  const introTargetPhrase = scoredN && qualTargetsArr.length
+    ? `${scoredN} scored therapy target${scoredN !== 1 ? "s" : ""} (${scoredList}) plus a qualitative ${qualList}`
+    : `${n} therapy target${n !== 1 ? "s" : ""}: ${targetList}`;
+  paragraphs.push(mkPara(
+    `This report documents ${firstName}'s progress across the ${halfText} half of ${year} (${monthRange}) in ${introTargetPhrase}. The therapy team has prepared this report to give you a clear overview of ${firstName}'s development and the areas that need continued attention.`,
+    { after: 280 }
+  ));
+
+  paragraphs.push(mkPara("Overall Progress", { heading: HeadingLevel.HEADING_2, before: 280, after: 120, size: 26, bold: true }));
   const chartTrendRows = [...trendRows.filter(r => !r.noData)].sort((a, b) => a.delta - b.delta);
   const ovTitle = `${firstName} - ${monthRange} ${year} Progress`;
   const ovResult = hyrDrawOverviewChart(chartTrendRows, ovTitle);
   if (ovResult) {
-    paragraphs.push(mkPara(`The chart below shows an overview of ${firstName}'s overall progress across all targets this term (${monthRange} ${year}).`, { after: 160 }));
     const ovH = Math.round(520 * ovResult.height / 700);
     paragraphs.push(new Paragraph({
       children: [new ImageRun({ data: b64ToUint8(ovResult.base64), transformation: { width: 520, height: ovH }, type: "png" })],
@@ -3325,24 +3336,25 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   const wQualSet  = new Set(categorized.qualitative.map(r => r.name));
   const wNDSet    = new Set(trendRows.filter(r => r.noData).map(r => r.name));
   const wAllNames = [...new Set([...wQualSet, ...wNDSet])];
-  const wUncNotes = wAllNames.map(n => {
-    if (wQualSet.has(n) && wNDSet.has(n)) return `*${n} - not charted (qualitative target/insufficient data)`;
-    if (wQualSet.has(n)) return `*${n} - not charted (qualitative target)`;
-    return `*${n} - not charted (insufficient data)`;
-  }).join("    ");
-  if (wUncNotes) {
+  wAllNames.forEach(nm => {
+    const noteText = wQualSet.has(nm)
+      ? `*${nm} is not shown here — it's a qualitative target without a numeric score. See Section 3.`
+      : `*${nm} is not shown here — insufficient data to chart this term.`;
     paragraphs.push(new Paragraph({
-      children: [new TextRun({ text: wUncNotes, size: 22, italics: true, color: "9CA3AF" })],
-      alignment: AlignmentType.CENTER, spacing: { before: 0, after: 440 }
+      children: [new TextRun({ text: noteText, size: 22, italics: true, color: "9CA3AF" })],
+      alignment: AlignmentType.LEFT, spacing: { before: 0, after: 80 }
     }));
-  }
+  });
+  if (wAllNames.length) paragraphs.push(new Paragraph({ children: [], spacing: { before: 200, after: 0 } }));
+
+  paragraphs.push(mkPara("Top Wins, Focus Areas & Strategies", { heading: HeadingLevel.HEADING_2, before: 280, after: 120, size: 26, bold: true }));
   if ((parsed.biggestWins?.length || parsed.keyFocusAreas?.length)) {
-    const kiRows = [];
-    const mkKiLabelCell = (text) => new TableCell({
+    const mkKiColorCell = (text, fill, textColor) => new TableCell({
       width: { size: 28, type: WidthType.PERCENTAGE },
       verticalAlign: VerticalAlign.CENTER,
-      margins: { top: 100, bottom: 100, left: 150, right: 150 },
-      children: [new Paragraph({ children: [new TextRun({ text, bold: true, size: 22 })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })]
+      shading: { fill },
+      margins: { top: 120, bottom: 120, left: 150, right: 150 },
+      children: [new Paragraph({ children: [new TextRun({ text, bold: true, size: 22, color: textColor })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })]
     });
     const mkKiNumberedCell = (items, numRef = KI_NUM_REF) => new TableCell({
       width: { size: 72, type: WidthType.PERCENTAGE },
@@ -3358,14 +3370,11 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
           })
         : [new Paragraph({ children: [new TextRun({ text: "", size: 22 })], spacing: { before: 80, after: 80 } })]
     });
-    kiRows.push(new TableRow({ tableHeader: true, children: [
-      new TableCell({ width: { size: 28, type: WidthType.PERCENTAGE }, shading: { fill: "f3f4f6" }, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: [new Paragraph({ children: [new TextRun({ text: "Category", bold: true, size: 22 })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })] }),
-      new TableCell({ width: { size: 72, type: WidthType.PERCENTAGE }, shading: { fill: "f3f4f6" }, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: [new Paragraph({ children: [new TextRun({ text: "Top 4 Highlights", bold: true, size: 22 })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })] })
-    ]}));
-    kiRows.push(new TableRow({ children: [mkKiLabelCell("Biggest Wins"), mkKiNumberedCell(parsed.biggestWins || [], KI_NUM_REF)] }));
-    kiRows.push(new TableRow({ children: [mkKiLabelCell("Key Focus Areas"), mkKiNumberedCell(parsed.keyFocusAreas || [], KI_NUM_REF_2)] }));
-    kiRows.push(new TableRow({ children: [mkKiLabelCell("Strategy for Next Term"), mkKiNumberedCell([], KI_NUM_REF)] }));
-    paragraphs.push(mkPara(`Below are the top 4 most important wins and the 4 most critical focus areas that ${firstName} needs support with.`, { after: 160 }));
+    const kiRows = [
+      new TableRow({ tableHeader: true, children: [mkKiColorCell("Biggest Wins",    "d1fae5", "16a34a"), mkKiNumberedCell(parsed.biggestWins    || [], KI_NUM_REF)] }),
+      new TableRow({                    children: [mkKiColorCell("Key Focus Areas",  "fef3c7", "d97706"), mkKiNumberedCell(parsed.keyFocusAreas  || [], KI_NUM_REF_2)] }),
+      new TableRow({                    children: [mkKiColorCell("Strategy",         "dbeafe", "2563eb"), mkKiNumberedCell([],                         KI_NUM_REF)] })
+    ];
     paragraphs.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: kiRows }));
     paragraphs.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
   }
