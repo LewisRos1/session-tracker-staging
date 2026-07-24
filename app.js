@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1069";
+const APP_VERSION = "1070";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2172,7 +2172,7 @@ TARGET: [exact target name]
     setProgress(100, "Done!");
     await new Promise(r => setTimeout(r, 400));
 
-    hyrShowPreview(student, period, year, trendRows, categorized, parsed, breakdownData, chartData);
+    hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData, chartData);
 
   } catch (err) {
     alert("Failed to generate report:\n" + err.message);
@@ -3195,16 +3195,6 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   return h;
 }
 
-function hyrShowPreview(student, period, year, trendRows, categorized, parsed, breakdownData, chartData) {
-  const periodLabel = period === "H1" ? `Jan–Jun ${year}` : `Jul–Dec ${year}`;
-  $("hyr-preview-title").textContent = `${student.name} — ${periodLabel}`;
-  $("hyr-preview-body").innerHTML = hyrBuildPreviewHtml(student, period, year, trendRows, categorized, parsed, breakdownData, chartData);
-  $("hyr-preview-modal").classList.remove("hidden");
-  $("hyr-preview-close").onclick = () => $("hyr-preview-modal").classList.add("hidden");
-  $("hyr-preview-backdrop").onclick = () => $("hyr-preview-modal").classList.add("hidden");
-  $("hyr-btn-download-word").onclick = () => hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData, chartData);
-  $("hyr-btn-regenerate").onclick = () => { $("hyr-preview-modal").classList.add("hidden"); hyrGenerate(); };
-}
 
 function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData, chartData) {
   const periodLabel = period === "H1" ? `January–June ${year}` : `July–December ${year}`;
@@ -3280,7 +3270,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
       paras.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
       paras.push(new Paragraph({
         children: [
-          new TextRun({ text: `${ROMAN[i] || i + 1}. ${r.name.trim()}`, bold: true, size: 24 })
+          new TextRun({ text: `${ROMAN[i] || i + 1}. ${r.name.trim()} (${r.delta >= 0 ? "+" : ""}${r.delta} pts)`, bold: true, size: 24 })
         ],
         spacing: { before: 0, after: 100, ...LS }
       }));
@@ -3380,30 +3370,81 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     paragraphs.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
   }
 
-  // ── Section 2: Celebrating Progress ────────────────────────
-  paragraphs.push(mkPara("Section 2: Celebrating Progress", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
-  paragraphs.push(mkPara("2.1 Most Improved", { heading: HeadingLevel.HEADING_2, before: 160, after: 80, size: 26, bold: true }));
+  // ── Section 2: Progress by Category ────────────────────────
+  const HDR2 = "f3f4f6";
+  const richCritCell = (runs, pct) => {
+    const children = [];
+    for (const [txt, bd] of runs) children.push(new TextRun({ text: txt, bold: bd, size: 22 }));
+    return new TableCell({ width: { size: pct, type: WidthType.PERCENTAGE }, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: [new Paragraph({ children, spacing: { before: 80, after: 80 } })] });
+  };
+  paragraphs.push(mkPara("Section 2: Progress by Category", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
+  paragraphs.push(mkPara(`This section groups ${firstName}'s quantitative targets by how they performed this term (${monthRange} ${year}), using the criteria below.`, { after: 280 }));
+  paragraphs.push(mkPara("How the categories are defined", { heading: HeadingLevel.HEADING_2, before: 280, after: 120, size: 26, bold: true }));
+  const catData = [
+    ["2.1 Most Improved",       [["Gained ", false], ["more than 8 points", true], [" over the term.", false]]],
+    ["2.2 Strong & Steady",     [["Ending score ", false], ["80% or above", true], [" with stable progress (within ", false], ["±8 points", true], [" over the term).", false]]],
+    ["2.3 Developing",          [["Ending score ", false], ["under 80%", true], [" with stable progress (within ", false], ["±8 points", true], [" over the term).", false]]],
+    ["2.4 Needs Extra Support", [["Dropped by ", false], ["more than 8 points", true], [" over the term.", false]]]
+  ];
+  const catHeaderRow = new TableRow({ tableHeader: true, children: [
+    mkCell("Category", { bold: true, bg: HDR2, size: 22, pct: 30, align: AlignmentType.CENTER }),
+    mkCell("Criteria",  { bold: true, bg: HDR2, size: 22, pct: 70, align: AlignmentType.CENTER })
+  ]});
+  const catRows = catData.map(([sec, runs]) => new TableRow({ children: [
+    mkCell(sec, { pct: 30, bold: true, align: AlignmentType.CENTER }),
+    richCritCell(runs, 70)
+  ]}));
+  paragraphs.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [catHeaderRow, ...catRows] }));
+  paragraphs.push(new Paragraph({ children: [], spacing: { before: 400, after: 0 } }));
+  // Summary of Targets
+  paragraphs.push(mkPara("Summary of Targets", { heading: HeadingLevel.HEADING_2, before: 280, after: 120, size: 26, bold: true }));
+  const summaryHeaderRow = new TableRow({ tableHeader: true, children: [
+    mkCell("Category", { bold: true, bg: HDR2, size: 22, pct: 30, align: AlignmentType.CENTER }),
+    mkCell("Targets",  { bold: true, bg: HDR2, size: 22, pct: 70, align: AlignmentType.CENTER })
+  ]});
+  const summaryCategories = [
+    { label: "2.1 Most Improved",       targets: categorized.mostImproved },
+    { label: "2.2 Strong & Steady",     targets: categorized.strengths },
+    { label: "2.3 Developing",          targets: categorized.emerging },
+    { label: "2.4 Needs Extra Support", targets: categorized.needsSupport }
+  ];
+  const summaryRows = summaryCategories.map(({ label, targets }) => new TableRow({ children: [
+    mkCell(label, { pct: 30, bold: true }),
+    new TableCell({ width: { size: 70, type: WidthType.PERCENTAGE }, margins: { top: 80, bottom: 80, left: 150, right: 150 },
+      children: targets.length
+        ? targets.map(t => new Paragraph({ children: [new TextRun({ text: `• ${t.name}`, size: 22 })], spacing: { before: 40, after: 40 } }))
+        : [new Paragraph({ children: [new TextRun({ text: "No targets in this category", size: 22, italics: true, color: "9CA3AF" })], spacing: { before: 80, after: 80 } })]
+    })
+  ]}));
+  paragraphs.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [summaryHeaderRow, ...summaryRows] }));
+  paragraphs.push(new Paragraph({ children: [], spacing: { before: 400, after: 0 } }));
+  // Colored band headings + target details
+  const catBandPara = (text, fill, textColor) => new Paragraph({
+    children: [new TextRun({ text, bold: true, size: 28, color: textColor })],
+    shading: { fill },
+    spacing: { before: 480, after: 200 }
+  });
+  // 2.1 Most Improved (light green)
+  paragraphs.push(catBandPara("2.1 MOST IMPROVED", "d1fae5", "065f46"));
   if (categorized.mostImproved.length) paragraphs.push(...targetSectionParas(categorized.mostImproved));
-  else paragraphs.push(mkPara("No targets in this category.", { italics: true, color: "9CA3AF" }));
-  paragraphs.push(new Paragraph({ children: [], spacing: { before: 400, after: 0 } }));
-  paragraphs.push(mkPara("2.2 Strong & Steady", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
+  else paragraphs.push(mkPara("No targets in this category this term.", { italics: true, color: "9CA3AF" }));
+  // 2.2 Strong & Steady (gray)
+  paragraphs.push(catBandPara("2.2 STRONG & STEADY", "e5e7eb", "1f2937"));
   if (categorized.strengths.length) paragraphs.push(...targetSectionParas(categorized.strengths));
-  else paragraphs.push(mkPara("No targets in this category.", { italics: true, color: "9CA3AF" }));
-
-  // ── Section 3: Priority Focus Areas ────────────────────────
-  paragraphs.push(mkPara("Section 3: Priority Focus Areas", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
-  paragraphs.push(mkPara("3.1 Needs Extra Support", { heading: HeadingLevel.HEADING_2, before: 160, after: 80, size: 26, bold: true }));
-  if (categorized.needsSupport.length) paragraphs.push(...targetSectionParas(categorized.needsSupport));
-  else paragraphs.push(mkPara("No targets in this category.", { italics: true, color: "9CA3AF" }));
-  paragraphs.push(new Paragraph({ children: [], spacing: { before: 400, after: 0 } }));
-  paragraphs.push(mkPara("3.2 Developing", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
+  else paragraphs.push(mkPara("No targets in this category this term.", { italics: true, color: "9CA3AF" }));
+  // 2.3 Developing (gray)
+  paragraphs.push(catBandPara("2.3 DEVELOPING", "e5e7eb", "1f2937"));
   if (categorized.emerging.length) paragraphs.push(...targetSectionParas(categorized.emerging));
-  else paragraphs.push(mkPara("No targets in this category.", { italics: true, color: "9CA3AF" }));
+  else paragraphs.push(mkPara("No targets in this category this term.", { italics: true, color: "9CA3AF" }));
+  // 2.4 Needs Extra Support (red)
+  paragraphs.push(catBandPara("2.4 NEEDS EXTRA SUPPORT", "fee2e2", "991b1b"));
+  if (categorized.needsSupport.length) paragraphs.push(...targetSectionParas(categorized.needsSupport));
+  else paragraphs.push(mkPara("No targets in this category this term.", { italics: true, color: "9CA3AF" }));
 
-  // ── Section 4: Observed Skills (qualitative) ────────────────
-  let nextSectionNum = 4;
+  // ── Section 3: Observed Skills (qualitative) ────────────────
+  let nextSectionNum = 3;
   if (categorized.qualitative.length) {
-    paragraphs.push(mkPara("Section 4: Observed Skills (No Quantitative Data)", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
+    paragraphs.push(mkPara("Section 3: Observed Skills (No Quantitative Data)", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
     categorized.qualitative.forEach((r, i) => {
       paragraphs.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
       paragraphs.push(new Paragraph({ children: [new TextRun({ text: `${ROMAN[i] || i + 1}. ${r.name}`, bold: true, size: 24 })], spacing: { before: 0, after: 80, ...LS } }));
@@ -3417,7 +3458,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
         paragraphs.push(mkPara(`Tracked via session notes — no percentage scores recorded this period.`, { italics: true, color: "9CA3AF" }));
       }
     });
-    nextSectionNum = 5;
+    nextSectionNum = 4;
   }
 
   // ── Section: Next Term Action Plan (landscape) ─────────────
@@ -3456,31 +3497,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   const appendixTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped && breakdownData[t.name]?.length);
   if (appendixTargets.length) {
     appendixParas.push(mkPara(`Section ${nextSectionNum + 1}: Appendix`, { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
-    appendixParas.push(mkPara("6.1 How the Sections are Categorized", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
-    const HDR2 = "f3f4f6";
-    const catHeaderRow = new TableRow({ tableHeader: true, children: [
-      mkCell("Section",  { bold: true, bg: HDR2, size: 22, pct: 28, align: AlignmentType.CENTER }),
-      mkCell("Criteria", { bold: true, bg: HDR2, size: 22, pct: 72, align: AlignmentType.CENTER })
-    ]});
-    // Parse **bold** markers into mixed TextRun arrays for criteria cells
-    const richCritCell = (runs, pct) => {
-      const children = [];
-      for (const [txt, bd] of runs) children.push(new TextRun({ text: txt, bold: bd, size: 22 }));
-      return new TableCell({ width: { size: pct, type: WidthType.PERCENTAGE }, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: [new Paragraph({ children, spacing: { before: 80, after: 80 } })] });
-    };
-    const catData = [
-      ["2.1 Most Improved",       [["Gained ", false], ["more than 8 points", true], [" over the term.", false]]],
-      ["2.2 Strong & Steady",     [["Ending score ", false], ["80% or above", true], [" with stable progress (within ", false], ["±8 points", true], [" over the term).", false]]],
-      ["3.1 Needs Extra Support", [["Dropped by ", false], ["more than 8 points", true], [" over the term.", false]]],
-      ["3.2 Developing",          [["Ending score ", false], ["under 80%", true], [" with stable progress (within ", false], ["±8 points", true], [" over the term).", false]]]
-    ];
-    const catRows = catData.map(([sec, runs]) => new TableRow({ children: [
-      mkCell(sec, { pct: 28, bold: true, align: AlignmentType.CENTER }),
-      richCritCell(runs, 72)
-    ]}));
-    appendixParas.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [catHeaderRow, ...catRows] }));
-    appendixParas.push(new Paragraph({ children: [], spacing: { before: 400, after: 0 } }));
-    appendixParas.push(mkPara("6.2 Activity Breakdown Charts", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
+    appendixParas.push(mkPara("Activity Breakdown Charts", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
     const rangeLabel = period === "H1" ? `Jan–Jun ${year}` : `Jul–Dec ${year}`;
     for (const target of appendixTargets) {
       const actData = hyrToActivityData(breakdownData[target.name]);
