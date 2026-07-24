@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1067";
+const APP_VERSION = "1068";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2870,7 +2870,7 @@ function hyrDrawOverviewChart(chartTrendRows, title) {
   ctx.fillStyle = "#374151"; ctx.font = "bold 17px sans-serif"; ctx.textAlign = "center";
   ctx.translate(38, BTM_Y0 + BTM_H / 2);
   ctx.rotate(-Math.PI / 2);
-  ctx.fillText("Net Change (pts)", 0, 0);
+  ctx.fillText("Net Change (points)", 0, 0);
   ctx.restore();
 
   // Top gridlines
@@ -2943,9 +2943,9 @@ function hyrDrawOverviewChart(chartTrendRows, title) {
     { color: C_END,   label: "Term End" }
   ];
   const LEG_R2 = [
-    { color: C_DOWN,   label: "Trending Down (<-8 pts)" },
-    { color: C_STABLE, label: "Stable (±8 pts)" },
-    { color: C_UP,     label: "Trending Up (>+8 pts)" }
+    { color: C_DOWN,   label: "Trending Down (<-8 points)" },
+    { color: C_STABLE, label: "Stable (±8 points)" },
+    { color: C_UP,     label: "Trending Up (>+8 points)" }
   ];
   ctx.font = "17px sans-serif";
   const BOX = 14, GAP = 5, SPC = 16, ROW_H = 26;
@@ -3504,7 +3504,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
 
   const pageFooter = Footer ? new Footer({
     children: [new Paragraph({
-      children: [new TextRun({ children: [PageNumber.CURRENT], size: 20, color: "555555" })],
+      children: [new TextRun({ children: [PageNumber.CURRENT], size: 22, color: "555555" })],
       alignment: AlignmentType.RIGHT,
       spacing: { before: 80, after: 80 }
     })]

@@ -662,7 +662,7 @@ function drawOverviewChart(chartTrendRows, title) {
   ctx.fillStyle = "#374151"; ctx.font = "bold 17px sans-serif"; ctx.textAlign = "center";
   ctx.translate(38, BTM_Y0 + BTM_H / 2);
   ctx.rotate(-Math.PI / 2);
-  ctx.fillText("Net Change (pts)", 0, 0);
+  ctx.fillText("Net Change (points)", 0, 0);
   ctx.restore();
 
   // Top gridlines
@@ -727,9 +727,9 @@ function drawOverviewChart(chartTrendRows, title) {
     { color: C_END,   label: "Term End" }
   ];
   const LEG_R2 = [
-    { color: C_DOWN,   label: "Trending Down (<-8 pts)" },
-    { color: C_STABLE, label: "Stable (±8 pts)" },
-    { color: C_UP,     label: "Trending Up (>+8 pts)" }
+    { color: C_DOWN,   label: "Trending Down (<-8 points)" },
+    { color: C_STABLE, label: "Stable (±8 points)" },
+    { color: C_UP,     label: "Trending Up (>+8 points)" }
   ];
   ctx.font = "17px sans-serif";
   const BOX = 14, GAP = 5, SPC = 16, ROW_H = 26;
