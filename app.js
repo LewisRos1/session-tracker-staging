@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1075";
+const APP_VERSION = "1076";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3267,8 +3267,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     const paras = [];
     rows.forEach((r, i) => {
       const deltaStr = `${r.delta >= 0 ? "+" : ""}${r.delta} points`;
-      // Empty line before each target
-      paras.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
+      if (i > 0) paras.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
       paras.push(new Paragraph({
         children: [
           new TextRun({ text: `${ROMAN[i] || i + 1}. ${r.name.trim()}`, bold: true, size: 24 })
