@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1086";
+const APP_VERSION = "1087";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3063,27 +3063,29 @@ function hyrDrawOverviewChartB(chartTrendRows, title) {
   return { base64: canvas.toDataURL("image/png").split(",")[1], height: H };
 }
 
-// Option C: 3-column row layout — names left | delta mini-bar middle | perf bars right
+// Option C: 3-column row layout — names left | delta horizontal bar middle | perf bars right
 function hyrDrawOverviewChartC(chartTrendRows, title) {
   const n = chartTrendRows.length;
   if (n === 0) return null;
   const C_START = "#7dd3fc", C_END = "#a78bfa", C_UP = "#22c55e", C_DOWN = "#ef4444", C_STABLE = "#9ca3af";
   const W = 700;
   const NAME_W = 175;   // left col: target names
-  const DELTA_W = 80;   // middle col: net change vertical mini-bar
+  const DELTA_W = 130;  // middle col: net change horizontal bars (wider for clarity)
   const PAD_R = 15;
   const PERF_X = NAME_W + DELTA_W;
-  const PERF_W = W - PERF_X - PAD_R;
-  const PAD_TOP = 38;   // title
-  const HDR_H = 32;     // column headers + tick labels
-  const ROW_H = 56;     // per-target row
-  const PAD_BTM = 55;   // legend
+  const PERF_W = W - PERF_X - PAD_R;  // ~380px
+  const deltaCX = NAME_W + DELTA_W / 2;
+  const maxDeltaBarLen = DELTA_W / 2 - 14;  // max bar extends ~51px each side of center
+  const toXPerf = v => PERF_X + (v / 100) * PERF_W;
+
+  const PAD_TOP = 38;
+  const HDR_H = 32;
+  const ROW_H = 60;
+  const PAD_BTM = 58;
   const H = PAD_TOP + HDR_H + n * ROW_H + PAD_BTM;
   const CHART_Y0 = PAD_TOP + HDR_H;
   const CHART_Y1 = CHART_Y0 + n * ROW_H;
   const maxAbs = Math.max(...chartTrendRows.map(r => Math.abs(r.delta)), 10);
-  const deltaCX = NAME_W + DELTA_W / 2;
-  const toXPerf = v => PERF_X + (v / 100) * PERF_W;
 
   const canvas = document.createElement("canvas");
   canvas.width = W; canvas.height = H;
@@ -3091,24 +3093,24 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
 
   // Title
-  if (title) { ctx.fillStyle = "#111827"; ctx.font = "bold 15px sans-serif"; ctx.textAlign = "center"; ctx.fillText(title, W / 2, 25); }
+  if (title) { ctx.fillStyle = "#111827"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center"; ctx.fillText(title, W / 2, 26); }
 
-  // Column header labels
-  ctx.fillStyle = "#374151"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText("Net Change", deltaCX, PAD_TOP + 13);
+  // Column headers
+  ctx.fillStyle = "#374151"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText("Net Change (points)", deltaCX, PAD_TOP + 13);
   ctx.fillText("Overall Performance (%)", PERF_X + PERF_W / 2, PAD_TOP + 13);
 
-  // Perf gridlines (full chart height) + tick labels
+  // Perf gridlines + tick labels
   [0, 25, 50, 75, 100].forEach(v => {
     const gx = toXPerf(v);
     ctx.strokeStyle = v === 0 ? "#9ca3af" : "#e5e7eb"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(gx, PAD_TOP + 18); ctx.lineTo(gx, CHART_Y1); ctx.stroke();
-    ctx.fillStyle = "#6b7280"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
+    ctx.fillStyle = "#6b7280"; ctx.font = "11px sans-serif"; ctx.textAlign = "center";
     ctx.fillText(v + "%", gx, PAD_TOP + HDR_H - 2);
   });
 
-  // Delta center line (full chart height)
-  ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 1;
+  // Delta center vertical line
+  ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.moveTo(deltaCX, PAD_TOP + 18); ctx.lineTo(deltaCX, CHART_Y1); ctx.stroke();
 
   // Rows
@@ -3117,60 +3119,59 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
     const rowY = CHART_Y0 + i * ROW_H;
     const cy = rowY + ROW_H / 2;
 
-    // Alternating background (redraw gridlines on top)
+    // Alternating background, redraw gridlines on top
     if (i % 2 === 0) {
       ctx.fillStyle = "#f9fafb"; ctx.fillRect(0, rowY, W, ROW_H);
       [0, 25, 50, 75, 100].forEach(v => {
         ctx.strokeStyle = v === 0 ? "#9ca3af" : "#e5e7eb"; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(toXPerf(v), rowY); ctx.lineTo(toXPerf(v), rowY + ROW_H); ctx.stroke();
       });
-      ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 1;
+      ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.moveTo(deltaCX, rowY); ctx.lineTo(deltaCX, rowY + ROW_H); ctx.stroke();
     }
 
-    // Target name — split to 2 lines if long
+    // Target name (right-aligned, 2 lines if long)
     const t = r.name.trim();
     const words = t.split(" ");
     const splitAt = t.length > 18 ? Math.ceil(words.length / 2) : words.length;
     const line1 = words.slice(0, splitAt).join(" ");
     const line2 = words.slice(splitAt).join(" ");
-    ctx.fillStyle = "#111827"; ctx.font = "11px sans-serif"; ctx.textAlign = "right";
-    if (line2) { ctx.fillText(line1, NAME_W - 8, cy - 6); ctx.fillText(line2, NAME_W - 8, cy + 7); }
-    else { ctx.fillText(line1, NAME_W - 8, cy + 4); }
+    ctx.fillStyle = "#111827"; ctx.font = "13px sans-serif"; ctx.textAlign = "right";
+    if (line2) { ctx.fillText(line1, NAME_W - 8, cy - 7); ctx.fillText(line2, NAME_W - 8, cy + 8); }
+    else { ctx.fillText(line1, NAME_W - 8, cy + 5); }
 
-    // Delta mini vertical bar
+    // Delta horizontal bar: positive → right of center, negative → left of center
     const dc = r.direction === "Trending Up" ? C_UP : r.direction === "Trending Down" ? C_DOWN : C_STABLE;
-    const maxBarH = ROW_H * 0.36;
-    const barH = Math.max(2, (Math.abs(r.delta) / maxAbs) * maxBarH);
-    const BAR_W_D = 20;
-    const bx = deltaCX - BAR_W_D / 2;
+    const barLen = Math.max(3, (Math.abs(r.delta) / maxAbs) * maxDeltaBarLen);
+    const BAR_TH = 16;
+    const bY = cy - BAR_TH / 2;
     const dl = (r.delta >= 0 ? "+" : "") + r.delta;
     if (r.delta > 0) {
-      ctx.fillStyle = dc; ctx.fillRect(bx, cy - barH, BAR_W_D, barH);
-      ctx.fillStyle = "#111827"; ctx.font = "bold 9px sans-serif"; ctx.textAlign = "center";
-      ctx.fillText(dl, deltaCX, cy - barH - 2);
+      ctx.fillStyle = dc; ctx.fillRect(deltaCX, bY, barLen, BAR_TH);
+      ctx.fillStyle = "#111827"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
+      ctx.fillText(dl, deltaCX + barLen + 3, cy + 4);
     } else if (r.delta < 0) {
-      ctx.fillStyle = dc; ctx.fillRect(bx, cy, BAR_W_D, barH);
-      ctx.fillStyle = "#111827"; ctx.font = "bold 9px sans-serif"; ctx.textAlign = "center";
-      ctx.fillText(dl, deltaCX, Math.min(cy + barH + 10, rowY + ROW_H - 2));
+      ctx.fillStyle = dc; ctx.fillRect(deltaCX - barLen, bY, barLen, BAR_TH);
+      ctx.fillStyle = "#111827"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "right";
+      ctx.fillText(dl, deltaCX - barLen - 3, cy + 4);
     } else {
-      ctx.fillStyle = C_STABLE; ctx.fillRect(bx, cy - 1, BAR_W_D, 2);
-      ctx.fillStyle = "#374151"; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
-      ctx.fillText("0", deltaCX, cy - 4);
+      ctx.fillStyle = C_STABLE; ctx.fillRect(deltaCX - 2, bY, 4, BAR_TH);
+      ctx.fillStyle = "#374151"; ctx.font = "11px sans-serif"; ctx.textAlign = "left";
+      ctx.fillText("0", deltaCX + 3, cy + 4);
     }
 
-    // Performance horizontal bars (start on top, end below)
-    const BAR_HP = 13;
+    // Performance horizontal bars
+    const BAR_HP = 14;
     const sW = Math.max(2, (r.tStart / 100) * PERF_W);
     const eW = Math.max(2, (r.tEnd / 100) * PERF_W);
     const startBarY = cy - BAR_HP - 3;
     const endBarY = cy + 3;
     ctx.fillStyle = C_START; ctx.fillRect(PERF_X, startBarY, sW, BAR_HP);
-    ctx.fillStyle = "#111827"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "left";
-    ctx.fillText(String(r.tStart), PERF_X + sW + 3, startBarY + BAR_HP - 1);
+    ctx.fillStyle = "#111827"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "left";
+    ctx.fillText(String(r.tStart), PERF_X + sW + 4, startBarY + BAR_HP - 1);
     ctx.fillStyle = C_END; ctx.fillRect(PERF_X, endBarY, eW, BAR_HP);
-    ctx.fillStyle = "#111827"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "left";
-    ctx.fillText(String(r.tEnd), PERF_X + eW + 3, endBarY + BAR_HP - 1);
+    ctx.fillStyle = "#111827"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "left";
+    ctx.fillText(String(r.tEnd), PERF_X + eW + 4, endBarY + BAR_HP - 1);
 
     // Row separator
     if (i < n - 1) {
@@ -3189,8 +3190,8 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
   ctx.strokeRect(0, CHART_Y0, W, n * ROW_H);
 
   // Legend
-  ctx.font = "12px sans-serif";
-  const BOX = 10, GAP = 4, SPC = 12, LR = 18, legY0 = CHART_Y1 + 14;
+  ctx.font = "13px sans-serif";
+  const BOX = 11, GAP = 4, SPC = 13, LR = 19, legY0 = CHART_Y1 + 14;
   [[{ color: C_START, label: "Term Start" }, { color: C_END, label: "Term End" }],
    [{ color: C_DOWN, label: "Trending Down (<-8 points)" }, { color: C_STABLE, label: "Stable (±8 points)" }, { color: C_UP, label: "Trending Up (>+8 points)" }]]
   .forEach((row, ri) => {
