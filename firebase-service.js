@@ -32,19 +32,7 @@ import {
   signOut,
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-
-// ─── FIREBASE CONFIGURATION ────────────────────────────────
-// Replace every "YOUR_..." placeholder with your project's values.
-// Find these in: Firebase Console → Project Settings → Your apps → SDK setup
-const FIREBASE_CONFIG = {
-  apiKey:            "AIzaSyDzIdlSu_ipdbPtg9TEdWorGaznkslqsGI",
-  authDomain:        "session-tracker-staging.firebaseapp.com",
-  projectId:         "session-tracker-staging",
-  storageBucket:     "session-tracker-staging.firebasestorage.app",
-  messagingSenderId: "43697728086",
-  appId:             "1:43697728086:web:505e802505e14b0346a9f7"
-};
-// ────────────────────────────────────────────────────────────
+import { FIREBASE_CONFIG } from "./config.js";
 
 const app = initializeApp(FIREBASE_CONFIG);
 

@@ -3,6 +3,19 @@
 // Student/target/activity config is stored in Firestore after first run.
 // ============================================================
 
+// ─── FIREBASE CONFIGURATION ────────────────────────────────
+// This file stays in each repo — never overwritten during deploys.
+// Staging repo has staging values; live repo has live values.
+export const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyDzIdlSu_ipdbPtg9TEdWorGaznkslqsGI",
+  authDomain:        "session-tracker-staging.firebaseapp.com",
+  projectId:         "session-tracker-staging",
+  storageBucket:     "session-tracker-staging.firebasestorage.app",
+  messagingSenderId: "43697728086",
+  appId:             "1:43697728086:web:505e802505e14b0346a9f7"
+};
+// ────────────────────────────────────────────────────────────
+
 export const CONFIG = {
 
   PIN: "0108",
