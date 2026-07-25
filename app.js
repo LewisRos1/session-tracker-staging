@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1119";
+const APP_VERSION = "1120";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2141,6 +2141,7 @@ async function hyrGenerate() {
 GLOBAL RULES (apply to every section):
 - Be honest and sympathetic. Do NOT say positive things that are not supported by the data — false reassurance misleads parents and damages trust. Be kind in how you say things, not in what you choose to leave out.
 - NEVER use the em dash symbol (—) anywhere in the report. Use a comma, a full stop, or rewrite the sentence instead.
+- CRITICAL: A remark of "No Event", or an activity with no remark and no score, means the activity simply did not take place that session — the opportunity was not there, or there was not enough time. This is NOT a failure or a poor result for the student. Do NOT comment on it negatively, do NOT treat it as a missed attempt, and do NOT use it as evidence of difficulty. Ignore it entirely when forming your observations.
 
 Student: ${student.name}
 Reporting Period: ${periodLabel}
