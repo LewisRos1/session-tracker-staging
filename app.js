@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1104";
+const APP_VERSION = "1105";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2153,6 +2153,7 @@ Same rules: plain English, no jargon, no numbers, warm tone. Labels in ** bold.
 These are the areas where ${firstName} has the lowest scores this term: ${bottom5Names.join(", ")}.
 
 Write one block for each target above, in the same order. Each block: 2 to 3 short bullet points describing what ${firstName} specifically finds difficult in that area. Keep each point to one brief sentence. No strategies — just the specific difficulties.
+${categorized.qualitative.length ? `\nAlso write one block for each of these qualitative targets (observed in sessions, no percentage scores): ${categorized.qualitative.map(r => r.name).join(", ")}.\n\nSame format: 2 to 3 short bullet points about what ${firstName} most needs support with in this area. One brief sentence per bullet. No strategies.` : ""}
 
 Format EXACTLY as (one block per target):
 TARGET: [exact target name]
@@ -3648,8 +3649,8 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     { after: 220, align: AlignmentType.JUSTIFIED }
   ));
   const AP_NUM_REFS = (parsed.actionPlanRows || []).map((_, i) => `hyr-ap-row-${i}`);
-  const hasAnyFocusRows = (parsed.actionPlanRows?.length || 0) > 0 || categorized.qualitative.length > 0;
-  if (hasAnyFocusRows) {
+  const qualSet = new Set(categorized.qualitative.map(r => r.name));
+  if (parsed.actionPlanRows?.length) {
     const HDR = "f3f4f6";
     // No.=634, Target=2088, Details=5616, Strategy=5616 DXA (total 13954 = 9.69")
     const headerRow = new TableRow({ tableHeader: true, children: [
@@ -3660,7 +3661,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     ]});
     const dataRows = (parsed.actionPlanRows || []).map((r, idx) => new TableRow({ children: [
       mkCell(String(idx + 1), { align: AlignmentType.CENTER, dxa: 634 }),
-      mkCell(r.target || "", { dxa: 2088, align: AlignmentType.CENTER }),
+      mkCell(qualSet.has(r.target) ? `${r.target || ""} (Qualitative)` : r.target || "", { dxa: 2088, align: AlignmentType.CENTER }),
       new TableCell({
         width: { size: 5616, type: WidthType.DXA },
         margins: { top: 100, bottom: 100, left: 150, right: 150 },
@@ -3670,24 +3671,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
       }),
       mkCell("", { dxa: 5616 })
     ]}));
-    const apLen = (parsed.actionPlanRows || []).length;
-    const qualFocusRows = categorized.qualitative.map((r, i) => {
-      const obs = parsed.observed?.[r.name];
-      const detailChildren = obs
-        ? obs.split("\n").filter(l => l.trim().startsWith("•")).map(l => bulletPara(l.trim().slice(1).trim()))
-        : [new Paragraph({ children: [new TextRun({ text: "Tracked via session notes.", size: 22, italics: true, color: "9CA3AF" })], spacing: { before: 80, after: 80 } })];
-      return new TableRow({ children: [
-        mkCell(String(apLen + i + 1), { align: AlignmentType.CENTER, dxa: 634 }),
-        mkCell(`${r.name} (Qualitative)`, { dxa: 2088, align: AlignmentType.CENTER }),
-        new TableCell({
-          width: { size: 5616, type: WidthType.DXA },
-          margins: { top: 100, bottom: 100, left: 150, right: 150 },
-          children: detailChildren
-        }),
-        mkCell("", { dxa: 5616 })
-      ]});
-    });
-    actionPlanParas.push(new Table({ width: { size: 13954, type: WidthType.DXA }, rows: [headerRow, ...dataRows, ...qualFocusRows] }));
+    actionPlanParas.push(new Table({ width: { size: 13954, type: WidthType.DXA }, rows: [headerRow, ...dataRows] }));
   }
 
   // ── Section: Appendix (portrait) ───────────────────────────
@@ -3700,6 +3684,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     const sec2NumberMap = new Map();
     chartTrendRows.forEach((r, i) => sec2NumberMap.set(r.name, i + 1));
     categorized.qualitative.forEach((r, i) => sec2NumberMap.set(r.name, chartTrendRows.length + i + 1));
+    appendixTargets.sort((a, b) => (sec2NumberMap.get(a.name) ?? 999) - (sec2NumberMap.get(b.name) ?? 999));
     for (const target of appendixTargets) {
       const actData = hyrToActivityData(breakdownData[target.name]);
       const pages = paginateActivities(actData);

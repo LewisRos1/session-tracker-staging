@@ -757,15 +757,15 @@ export function renderActivityBreakdownChart(targetName, activityData, periodLab
   const SCALE = 2, SECTION_H = 28;
   const C_START = "#7dd3fc", C_END = "#a78bfa";
   const BAR_H = 14, BAR_GAP = 4, BARS_H = 2 * BAR_H + BAR_GAP;
-  const PAD = { top: 52, right: 50, bottom: 52, left: 250 };
+  const PAD = { top: 52, right: 50, bottom: 52, left: 365 };
   const W = 760;
   const LABEL_MAX_W = PAD.left - 16;
-  const LINE_H = 13, ROW_PAD_V = 10, MIN_ROW_H = BARS_H + ROW_PAD_V * 2;
+  const LINE_H = 16, ROW_PAD_V = 10, MIN_ROW_H = BARS_H + ROW_PAD_V * 2;
 
   const stripPrefix = name => name.replace(/\*/g, "").replace(/_/g, "");
 
   const tmpCtx = document.createElement("canvas").getContext("2d");
-  tmpCtx.font = "11px sans-serif";
+  tmpCtx.font = "14px sans-serif";
   const wrapText = (text, maxW) => {
     const words = (text || "").split(" ");
     const lines = []; let cur = "";
@@ -795,11 +795,11 @@ export function renderActivityBreakdownChart(targetName, activityData, periodLab
   const plotBottom = PAD.top + totalContentH;
 
   // Title
-  ctx.font = "bold 13px sans-serif"; ctx.fillStyle = "#111"; ctx.textAlign = "left";
+  ctx.font = "bold 16px sans-serif"; ctx.fillStyle = "#111"; ctx.textAlign = "left";
   ctx.fillText(chartTitle || `${targetName} — Progress (${periodLabel})`, 10, 28);
 
   // Column headers
-  ctx.font = "bold 9.5px sans-serif"; ctx.fillStyle = "#6b7280";
+  ctx.font = "bold 12px sans-serif"; ctx.fillStyle = "#6b7280";
   ctx.textAlign = "right"; ctx.fillText("Activity", PAD.left - 10, PAD.top - 7);
   ctx.textAlign = "center"; ctx.fillText("Overall Performance (%)", PAD.left + cW / 2, PAD.top - 7);
   ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 0.5;
@@ -823,7 +823,7 @@ export function renderActivityBreakdownChart(targetName, activityData, periodLab
   yPos = PAD.top;
   for (const act of activityData) {
     if (act.isSectionHeader) {
-      ctx.font = "bold 11px sans-serif"; ctx.fillStyle = "#374151"; ctx.textAlign = "left";
+      ctx.font = "bold 14px sans-serif"; ctx.fillStyle = "#374151"; ctx.textAlign = "left";
       ctx.fillText(act.label, 10, yPos + SECTION_H / 2 + 4);
       yPos += SECTION_H; continue;
     }
@@ -832,7 +832,7 @@ export function renderActivityBreakdownChart(targetName, activityData, periodLab
     yPos += rowH;
 
     // Wrapped label centred in row
-    ctx.font = "11px sans-serif"; ctx.fillStyle = "#374151"; ctx.textAlign = "right";
+    ctx.font = "14px sans-serif"; ctx.fillStyle = "#374151"; ctx.textAlign = "right";
     const totalTextH = act._lines.length * LINE_H;
     const textStartY = cy - totalTextH / 2 + LINE_H - 3;
     act._lines.forEach((line, li) => ctx.fillText(line, PAD.left - 10, textStartY + li * LINE_H));
@@ -848,27 +848,27 @@ export function renderActivityBreakdownChart(targetName, activityData, periodLab
     if (eAvg !== null) {
       const bW = Math.max(2, (eAvg / 100) * cW);
       ctx.fillStyle = C_START; ctx.fillRect(PAD.left, bar1Y, bW, BAR_H);
-      ctx.fillStyle = "#111827"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
+      ctx.fillStyle = "#111827"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "left";
       ctx.fillText(`${eAvg}%`, PAD.left + bW + 4, bar1Y + BAR_H - 2);
     }
     if (lAvg !== null) {
       const bW = Math.max(2, (lAvg / 100) * cW);
       ctx.fillStyle = C_END; ctx.fillRect(PAD.left, bar2Y, bW, BAR_H);
-      ctx.fillStyle = "#111827"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "left";
+      ctx.fillStyle = "#111827"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "left";
       ctx.fillText(`${lAvg}%`, PAD.left + bW + 4, bar2Y + BAR_H - 2);
     }
   }
 
   // Legend (single row, centered)
   const BOX = 12, LG = 6, LR = 20;
-  ctx.font = "11px sans-serif";
+  ctx.font = "14px sans-serif";
   const eTxt = "Earliest Month", lTxt = "Latest Month";
   const totalLegW = BOX + LG + ctx.measureText(eTxt).width + LR + BOX + LG + ctx.measureText(lTxt).width;
   let lx = Math.round((W - totalLegW) / 2);
   const legY = plotBottom + 30;
   ctx.fillStyle = C_START; ctx.fillRect(lx, legY - BOX + 2, BOX, BOX);
   lx += BOX + LG;
-  ctx.fillStyle = "#374151"; ctx.textAlign = "left"; ctx.fillText(eTxt, lx, legY);
+  ctx.fillStyle = "#374151"; ctx.font = "14px sans-serif"; ctx.textAlign = "left"; ctx.fillText(eTxt, lx, legY);
   lx += ctx.measureText(eTxt).width + LR;
   ctx.fillStyle = C_END; ctx.fillRect(lx, legY - BOX + 2, BOX, BOX);
   lx += BOX + LG;
