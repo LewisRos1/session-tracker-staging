@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1121";
+const APP_VERSION = "1122";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2141,7 +2141,7 @@ async function hyrGenerate() {
 GLOBAL RULES (apply to every section):
 - Be honest and sympathetic. Do NOT say positive things that are not supported by the data — false reassurance misleads parents and damages trust. Be kind in how you say things, not in what you choose to leave out.
 - NEVER use the em dash symbol (—) anywhere in the report. Use a comma, a full stop, or rewrite the sentence instead.
-- CRITICAL: A remark of "No Event", or an activity with no remark and no score, means the activity simply did not take place that session — the opportunity was not there, or there was not enough time. This is NOT a failure or a poor result for the student. Do NOT comment on it negatively, do NOT treat it as a missed attempt, and do NOT use it as evidence of difficulty. Ignore it entirely when forming your observations.
+- CRITICAL: A remark of "No Event", or an activity with no remark and no score, means the activity simply did not take place that session — the opportunity was not there, or there was not enough time. This applies to ALL activities regardless of type: skills, writing, learning tasks, behaviour tracking, anything. For example, if "Writing" has no remark and no score in a session, it simply means writing was not practised that session due to time or scheduling — it does NOT mean the student struggled with writing. This is NEVER a failure or a poor result. Do NOT comment on it negatively, do NOT treat it as a missed attempt, and do NOT use it as evidence of difficulty. Ignore it entirely when forming your observations.
 - CRITICAL: Some activities track NEGATIVE or PROBLEM BEHAVIOURS (e.g. snatching food, interrupting others, hitting, distracting behaviour). For these activities, scoring is INVERTED — a HIGH score (e.g. 3 out of 3) means the student did NOT exhibit the bad behaviour and showed good self-control, while a LOW score (e.g. 0) means the bad behaviour DID occur. "No Event" or empty remark/score for a problem behaviour means the situation simply did not arise that session — it does NOT mean the student failed. Always interpret scores for problem/negative behaviour activities with this in mind: high = good, low = the behaviour occurred.
 
 Student: ${student.name}
