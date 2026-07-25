@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1122";
+const APP_VERSION = "1123";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3452,9 +3452,10 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
         const pageSuffix = pages.length > 1 ? ` [Page ${pageIdx + 1} of ${pages.length}]` : "";
         const numPrefix = targetNum ? `${targetNum}) ` : "";
         const chartTitle = `${numPrefix}${target.name} - Progress (${rangeLabel})${pageSuffix}`;
+        const headingTitle = `${numPrefix}${target.name}${pageSuffix}`;
         const result = renderActivityBreakdownChart(target.name, pageData, rangeLabel, chartTitle);
         if (result) {
-          h += `<div style="margin-top:1.5rem"><p style="font-weight:700;font-size:.95rem;margin:0 0 .35rem">${esc(chartTitle)}</p>`;
+          h += `<div style="margin-top:1.5rem"><p style="font-weight:700;font-size:.95rem;margin:0 0 .35rem">${esc(headingTitle)}</p>`;
           h += `<img src="data:image/png;base64,${result.base64}" style="width:100%;max-width:600px;display:block;margin:.25rem 0 1rem"></div>`;
         }
       });
@@ -3744,10 +3745,11 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
         const pageSuffix = pages.length > 1 ? ` [Page ${pageIdx + 1} of ${pages.length}]` : "";
         const numPrefix = targetNum ? `${targetNum}) ` : "";
         const chartTitle = `${numPrefix}${target.name} - Progress (${rangeLabel})${pageSuffix}`;
+        const headingTitle = `${numPrefix}${target.name}${pageSuffix}`;
         const abResult = renderActivityBreakdownChart(target.name, pageData, rangeLabel, chartTitle);
         if (abResult) {
           const abH = Math.round(600 * abResult.height / 760);
-          appendixParas.push(mkPara(chartTitle, { heading: HeadingLevel.HEADING_2, before: firstChart ? 120 : 0, after: 100, size: 24, bold: true, pageBreak: !firstChart }));
+          appendixParas.push(mkPara(headingTitle, { heading: HeadingLevel.HEADING_2, before: firstChart ? 120 : 0, after: 100, size: 24, bold: true, pageBreak: !firstChart }));
           firstChart = false;
           appendixParas.push(new Paragraph({
             children: [new ImageRun({ data: b64ToUint8(abResult.base64), transformation: { width: 600, height: abH }, type: "png" })],
