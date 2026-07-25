@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1103";
+const APP_VERSION = "1104";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3648,7 +3648,8 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     { after: 220, align: AlignmentType.JUSTIFIED }
   ));
   const AP_NUM_REFS = (parsed.actionPlanRows || []).map((_, i) => `hyr-ap-row-${i}`);
-  if (parsed.actionPlanRows?.length) {
+  const hasAnyFocusRows = (parsed.actionPlanRows?.length || 0) > 0 || categorized.qualitative.length > 0;
+  if (hasAnyFocusRows) {
     const HDR = "f3f4f6";
     // No.=634, Target=2088, Details=5616, Strategy=5616 DXA (total 13954 = 9.69")
     const headerRow = new TableRow({ tableHeader: true, children: [
@@ -3657,7 +3658,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
       mkCell("Details", { bold: true, bg: HDR, size: 22, dxa: 5616, align: AlignmentType.CENTER }),
       mkCell("Recommendations & Strategies", { bold: true, bg: HDR, size: 22, dxa: 5616, align: AlignmentType.CENTER })
     ]});
-    const dataRows = parsed.actionPlanRows.map((r, idx) => new TableRow({ children: [
+    const dataRows = (parsed.actionPlanRows || []).map((r, idx) => new TableRow({ children: [
       mkCell(String(idx + 1), { align: AlignmentType.CENTER, dxa: 634 }),
       mkCell(r.target || "", { dxa: 2088, align: AlignmentType.CENTER }),
       new TableCell({
@@ -3669,7 +3670,24 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
       }),
       mkCell("", { dxa: 5616 })
     ]}));
-    actionPlanParas.push(new Table({ width: { size: 13954, type: WidthType.DXA }, rows: [headerRow, ...dataRows] }));
+    const apLen = (parsed.actionPlanRows || []).length;
+    const qualFocusRows = categorized.qualitative.map((r, i) => {
+      const obs = parsed.observed?.[r.name];
+      const detailChildren = obs
+        ? obs.split("\n").filter(l => l.trim().startsWith("•")).map(l => bulletPara(l.trim().slice(1).trim()))
+        : [new Paragraph({ children: [new TextRun({ text: "Tracked via session notes.", size: 22, italics: true, color: "9CA3AF" })], spacing: { before: 80, after: 80 } })];
+      return new TableRow({ children: [
+        mkCell(String(apLen + i + 1), { align: AlignmentType.CENTER, dxa: 634 }),
+        mkCell(`${r.name} (Qualitative)`, { dxa: 2088, align: AlignmentType.CENTER }),
+        new TableCell({
+          width: { size: 5616, type: WidthType.DXA },
+          margins: { top: 100, bottom: 100, left: 150, right: 150 },
+          children: detailChildren
+        }),
+        mkCell("", { dxa: 5616 })
+      ]});
+    });
+    actionPlanParas.push(new Table({ width: { size: 13954, type: WidthType.DXA }, rows: [headerRow, ...dataRows, ...qualFocusRows] }));
   }
 
   // ── Section: Appendix (portrait) ───────────────────────────
@@ -3679,12 +3697,18 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     appendixParas.push(mkPara(`Section ${nextSectionNum + 1}: Appendix`, { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
     appendixParas.push(mkPara("Activity Breakdown Charts", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
     const rangeLabel = period === "H1" ? `Jan–Jun ${year}` : `Jul–Dec ${year}`;
+    const sec2NumberMap = new Map();
+    chartTrendRows.forEach((r, i) => sec2NumberMap.set(r.name, i + 1));
+    categorized.qualitative.forEach((r, i) => sec2NumberMap.set(r.name, chartTrendRows.length + i + 1));
     for (const target of appendixTargets) {
       const actData = hyrToActivityData(breakdownData[target.name]);
       const pages = paginateActivities(actData);
+      const targetNum = sec2NumberMap.get(target.name);
       pages.forEach((pageData, pageIdx) => {
-        const pageSuffix = pages.length > 1 ? ` (Page ${pageIdx + 1})` : "";
-        const chartTitle = `${target.name}${pageSuffix} - Progress (${rangeLabel})`;
+        const numPrefix = targetNum
+          ? (pages.length > 1 ? `${targetNum}.${pageIdx + 1}) ` : `${targetNum}) `)
+          : "";
+        const chartTitle = `${numPrefix}${target.name} - Progress (${rangeLabel})`;
         const abResult = renderActivityBreakdownChart(target.name, pageData, rangeLabel, chartTitle);
         if (abResult) {
           const abH = Math.round(600 * abResult.height / 760);
