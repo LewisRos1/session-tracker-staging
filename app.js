@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1102";
+const APP_VERSION = "1103";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3565,7 +3565,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   if (qualNames.length) {
     const s = qualNames.length === 1;
     paragraphs.push(new Paragraph({
-      children: [new TextRun({ text: `*${joinNames(qualNames)} ${s ? "is" : "are"} not shown here — ${s ? "it's a qualitative target" : "they're qualitative targets"} without a numeric score. See Section 3.`, size: 22, italics: true, color: "9CA3AF" })],
+      children: [new TextRun({ text: `*${joinNames(qualNames)} ${s ? "is" : "are"} not shown here — ${s ? "it's a qualitative target" : "they're qualitative targets"} without a numeric score. See Section 2.`, size: 22, italics: true, color: "9CA3AF" })],
       alignment: AlignmentType.LEFT, spacing: { before: 0, after: 80 }
     }));
   }
@@ -3611,7 +3611,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   }
 
   // ── Section 2: Target Progress ──────────────────────────────
-  paragraphs.push(mkPara("Section 2: Target Progress", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
+  paragraphs.push(mkPara("Section 2: Target Review", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
   paragraphs.push(mkPara(
     `This section provides a detailed look at each of ${firstName}'s therapy targets for ${monthRange} ${year}.`,
     { after: 280, align: AlignmentType.JUSTIFIED }
@@ -3620,13 +3620,12 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   if (chartTrendRows.length) paragraphs.push(...targetSectionParas(chartTrendRows));
   else paragraphs.push(mkPara("No targets with sufficient data this term.", { italics: true, color: "9CA3AF" }));
 
-  // ── Section 3: Observed Skills (qualitative) ────────────────
-  let nextSectionNum = 3;
+  // Qualitative targets — continued numbering inline after numeric targets
   if (categorized.qualitative.length) {
-    paragraphs.push(mkPara("Section 3: Observed Skills (No Quantitative Data)", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
+    const offset = chartTrendRows.length;
     categorized.qualitative.forEach((r, i) => {
-      if (i > 0) paragraphs.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
-      paragraphs.push(new Paragraph({ children: [new TextRun({ text: `${i + 1}) ${r.name}`, bold: true, size: 24 })], spacing: { before: 0, after: 80, ...LS } }));
+      paragraphs.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
+      paragraphs.push(new Paragraph({ children: [new TextRun({ text: `${offset + i + 1}) ${r.name} (Qualitative)`, bold: true, size: 24 })], spacing: { before: 0, after: 80, ...LS } }));
       const obs = parsed.observed?.[r.name];
       if (obs) {
         obs.split("\n").forEach(line => {
@@ -3637,8 +3636,9 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
         paragraphs.push(mkPara(`Tracked via session notes — no percentage scores recorded this period.`, { italics: true, color: "9CA3AF" }));
       }
     });
-    nextSectionNum = 4;
   }
+
+  const nextSectionNum = 3;
 
   // ── Section: Focus Areas (landscape) ─────────────
   const actionPlanParas = [];
