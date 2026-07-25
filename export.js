@@ -902,14 +902,15 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
     return (py > sy || (py === sy && pm >= sm)) && (py < ey || (py === ey && pm <= em));
   };
 
-  // Period label: "Jan–Jun 2026" or "Dec 2025–Jan 2026" for cross-year
+  // Period label: "Jan - Jun 2026" or "Dec 2025 - Jan 2026" for cross-year (spaced hyphen to match AI report)
   const fM = allMonths[0].split(" "), lM = allMonths[allMonths.length - 1].split(" ");
   const periodLabel = fM[1] === lM[1]
-    ? `${fM[0].slice(0, 3)}–${lM[0].slice(0, 3)} ${lM[1]}`
-    : `${fM[0].slice(0, 3)} ${fM[1]}–${lM[0].slice(0, 3)} ${lM[1]}`;
+    ? `${fM[0].slice(0, 3)} - ${lM[0].slice(0, 3)} ${lM[1]}`
+    : `${fM[0].slice(0, 3)} ${fM[1]} - ${lM[0].slice(0, 3)} ${lM[1]}`;
 
   const ws = wb.addWorksheet("Activity Breakdown");
   let rowOffset = 0;
+  let targetNum = 0;
 
   for (const target of allTargets) {
     const actDisplayNameMap = {};  // only for extraNames fallback
@@ -1087,7 +1088,9 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
     const activityData = [...activeData, ...extraData];
     if (activityData.filter(a => !a.isSectionHeader).length === 0) continue;
 
-    const chartResult = renderActivityBreakdownChart(target.name, activityData, periodLabel);
+    targetNum++;
+    const chartTitle = `${targetNum}) ${target.name} - Progress (${periodLabel})`;
+    const chartResult = renderActivityBreakdownChart(target.name, activityData, periodLabel, chartTitle);
     if (!chartResult) continue;
     const { base64, height: chartH } = chartResult;
     const imgId = wb.addImage({ base64, extension: "png" });
