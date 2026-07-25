@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1111";
+const APP_VERSION = "1112";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -695,7 +695,7 @@ function registerServiceWorker() {
       // the whole time — visibilitychange alone never fires then, so an
       // update could otherwise sit undetected until the boss happens to
       // switch away and back, or manually refreshes.
-      setInterval(() => { reg.update(); checkVersionFromServer(); }, 60000);
+      setInterval(() => { reg.update(); checkVersionFromServer(); }, 15000);
     })
     .catch(() => {});
 }
