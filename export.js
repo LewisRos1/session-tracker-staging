@@ -583,13 +583,10 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
       return { name: target.name, tStart, tEnd, delta, direction, noData: false };
     });
 
-    // Categorise the same way the AI report does
+    // Two sections: all numeric targets (descending delta) then qualitative (no score)
     const CAT = [
-      { label: "Most Improved",       fill: "FFD1FAE5", font: "FF15803D", rows: trendRows.filter(r => !r.noData && r.delta > 8).sort((a, b) => b.delta - a.delta) },
-      { label: "Strong & Steady",     fill: "FFDBEAFE", font: "FF1D4ED8", rows: trendRows.filter(r => !r.noData && Math.abs(r.delta) <= 8 && r.tEnd >= 80).sort((a, b) => b.tEnd - a.tEnd) },
-      { label: "Developing",          fill: "FFFEF3C7", font: "FF92400E", rows: trendRows.filter(r => !r.noData && Math.abs(r.delta) <= 8 && r.tEnd < 80).sort((a, b) => b.tEnd - a.tEnd) },
-      { label: "Needs Extra Support", fill: "FFFEE2E2", font: "FFB91C1C", rows: trendRows.filter(r => !r.noData && r.delta < -8).sort((a, b) => a.delta - b.delta) },
-      { label: "No Data",             fill: "FFF3F4F6", font: "FF6B7280", rows: trendRows.filter(r => r.noData) },
+      { label: "Quantitative",          fill: "FFDBEAFE", font: "FF1D4ED8", rows: trendRows.filter(r => !r.noData).sort((a, b) => b.delta - a.delta) },
+      { label: "Qualitative (No Score)", fill: "FFF3F4F6", font: "FF6B7280", rows: trendRows.filter(r => r.noData) },
     ];
 
     const addCatHeader = (label, fillArgb, fontArgb) => {
@@ -605,7 +602,7 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
       addCatHeader(cat.label, cat.fill, cat.font);
       for (const row of cat.rows) {
         if (row.noData) {
-          const dirLabel = row.single ? "Single month" : "No data";
+          const dirLabel = row.single ? "Single month" : "No score";
           const r = ws.addRow([row.name, "", "", "", dirLabel]);
           r.getCell(5).font = { italic: true, color: { argb: "FF9CA3AF" } };
           continue;
