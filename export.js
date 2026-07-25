@@ -905,11 +905,44 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
     ? `${fM[0].slice(0, 3)} - ${lM[0].slice(0, 3)} ${lM[1]}`
     : `${fM[0].slice(0, 3)} ${fM[1]} - ${lM[0].slice(0, 3)} ${lM[1]}`;
 
+  // Compute per-target trendline delta to sort matching Trendline Summary order
+  const trendData = {};
+  for (const target of allTargets) {
+    const yValues = [];
+    for (const month of allMonths) {
+      const monthSessions = sessions.filter(s => s.month === month);
+      const vals = monthSessions.map(s => {
+        const snap = (s.targetsSnapshot || []).find(t => t.name === target.name);
+        const eff  = snap ? { ...target, maxPoints: snap.maxPoints ?? target.maxPoints } : target;
+        return calcDailyAverage(s, eff, allTargets);
+      }).filter(v => v !== null && !isNaN(v));
+      if (vals.length > 0) yValues.push(Math.round(avg(vals)));
+    }
+    if (yValues.length >= 2) {
+      const trend = linearRegressionValues(yValues);
+      const delta = Math.round(trend[trend.length - 1]) - Math.round(trend[0]);
+      trendData[target.name] = { hasData: true, delta };
+    } else {
+      trendData[target.name] = { hasData: false, delta: -Infinity };
+    }
+  }
+
+  // Sort: section 1 = Quantitative (hasData, descending delta), section 2 = Qualitative (no data)
+  const sortedTargets = [...allTargets].sort((a, b) => {
+    const da = trendData[a.name] || { hasData: false, delta: -Infinity };
+    const db = trendData[b.name] || { hasData: false, delta: -Infinity };
+    if (da.hasData !== db.hasData) return da.hasData ? -1 : 1;
+    if (da.hasData && db.hasData) return db.delta - da.delta;
+    return 0;
+  });
+
   const ws = wb.addWorksheet("Activity Breakdown");
   let rowOffset = 0;
-  let targetNum = 0;
+  let lastSection = null;
+  let targetNumInSection = 0;
+  const MAX_PER_CHART = 13;
 
-  for (const target of allTargets) {
+  for (const target of sortedTargets) {
     const actDisplayNameMap = {};  // only for extraNames fallback
     const actStatusMap = {};
     // Per-section display name maps so the same pa.name in multiple sections
@@ -1085,16 +1118,27 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
     const activityData = [...activeData, ...extraData];
     if (activityData.filter(a => !a.isSectionHeader).length === 0) continue;
 
-    targetNum++;
-    const chartTitle = `${targetNum}) ${target.name} - Progress (${periodLabel})`;
-    const chartResult = renderActivityBreakdownChart(target.name, activityData, periodLabel, chartTitle);
-    if (!chartResult) continue;
-    const { base64, height: chartH } = chartResult;
-    const imgId = wb.addImage({ base64, extension: "png" });
-    ws.addImage(imgId, { tl: { col: 0, row: rowOffset }, ext: { width: 673, height: chartH } });
-    const rowsNeeded = Math.ceil(chartH / 20) + 3;
-    for (let r = rowOffset; r < rowOffset + rowsNeeded; r++) ws.addRow([]);
-    rowOffset += rowsNeeded;
+    const td = trendData[target.name] || { hasData: false };
+    const sectionNum = td.hasData ? 1 : 2;
+    if (sectionNum !== lastSection) { lastSection = sectionNum; targetNumInSection = 0; }
+    targetNumInSection++;
+
+    // Split into chunks of max 13 activities to match AI report
+    const chunks = [];
+    for (let i = 0; i < activityData.length; i += MAX_PER_CHART) chunks.push(activityData.slice(i, i + MAX_PER_CHART));
+
+    for (let ci = 0; ci < chunks.length; ci++) {
+      const suffix = chunks.length > 1 ? ` (${ci + 1} of ${chunks.length})` : "";
+      const chartTitle = `${sectionNum}.${targetNumInSection}) ${target.name} - Progress (${periodLabel})${suffix}`;
+      const chartResult = renderActivityBreakdownChart(target.name, chunks[ci], periodLabel, chartTitle);
+      if (!chartResult) continue;
+      const { base64, height: chartH } = chartResult;
+      const imgId = wb.addImage({ base64, extension: "png" });
+      ws.addImage(imgId, { tl: { col: 0, row: rowOffset }, ext: { width: 673, height: chartH } });
+      const rowsNeeded = Math.ceil(chartH / 20) + 3;
+      for (let r = rowOffset; r < rowOffset + rowsNeeded; r++) ws.addRow([]);
+      rowOffset += rowsNeeded;
+    }
   }
 }
 
