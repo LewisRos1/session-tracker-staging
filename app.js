@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1101";
+const APP_VERSION = "1102";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2819,11 +2819,9 @@ function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd
   // Trend annotation subtitle — use pre-computed delta/direction if available
   const dispDelta = delta ?? Math.round(tStartVal !== tEndVal ? tEndVal - tStartVal : ys[ys.length-1] - ys[0]);
   const dispDir   = direction ?? (dispDelta > 8 ? "Trending Up" : dispDelta < -8 ? "Trending Down" : "Stable");
-  const ptStr  = (dispDelta >= 0 ? "+" : "") + dispDelta + " points";
   const icon   = dispDir === "Trending Up" ? "↑" : dispDir === "Trending Down" ? "↓" : "→";
-  const rngStr = (tStart != null && tEnd != null) ? ` (${tStart}% → ${tEnd}%)` : "";
   ctx.fillStyle = "#6b7280"; ctx.font = "italic 16px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(`${icon} ${dispDir} | ${ptStr}${rngStr}`, W / 2, 42);
+  ctx.fillText(`${icon} ${dispDir}`, W / 2, 42);
 
   // Data line
   ctx.strokeStyle = "#4472c4"; ctx.lineWidth = 2.5;
@@ -3615,9 +3613,10 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   // ── Section 2: Target Progress ──────────────────────────────
   paragraphs.push(mkPara("Section 2: Target Progress", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
   paragraphs.push(mkPara(
-    `This section provides a detailed look at each of ${firstName}'s therapy targets for ${monthRange} ${year}. Targets are presented from highest to lowest overall progression, consistent with the overview chart above.`,
+    `This section provides a detailed look at each of ${firstName}'s therapy targets for ${monthRange} ${year}.`,
     { after: 280, align: AlignmentType.JUSTIFIED }
   ));
+  paragraphs.push(new Paragraph({ children: [], spacing: { before: 0, after: 280 } }));
   if (chartTrendRows.length) paragraphs.push(...targetSectionParas(chartTrendRows));
   else paragraphs.push(mkPara("No targets with sufficient data this term.", { italics: true, color: "9CA3AF" }));
 
