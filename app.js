@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1107";
+const APP_VERSION = "1108";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -11895,8 +11895,14 @@ function renderTargetManageContent(student, target) {
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.3rem;flex-shrink:0">
           <span style="font-size:.72rem;color:#059669;white-space:nowrap">${dateLabel}</span>
-          <button class="btn-mn-undo-mastered" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Undo</button>
-          <button class="btn-adm-del btn-mn-del-mastered" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
+          <div style="position:relative">
+            <button class="btn-mn-inactive-kebab" data-completed-idx="${ci}" data-inactive-type="mastered" style="font-size:1.2rem;font-weight:900;min-width:28px;height:28px;border:none;background:#f3f4f6;cursor:pointer;padding:0 5px;border-radius:.3rem;line-height:1">⋮</button>
+            <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
+              <button class="btn-mn-restore" data-completed-idx="${ci}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
+              <button class="btn-mn-switch-status" data-completed-idx="${ci}" data-from="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#6b7280">🚩 Change to Discontinued</button>
+              <button class="btn-mn-del-mastered" data-completed-idx="${ci}" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
+            </div>
+          </div>
         </div>
       </div>`;
       subActs.forEach((sub, si) => {
@@ -11947,8 +11953,14 @@ function renderTargetManageContent(student, target) {
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.3rem;flex-shrink:0">
           <span style="font-size:.72rem;color:#6b7280;white-space:nowrap">${dateLabel}</span>
-          <button class="btn-mn-undo-discontinued" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Undo</button>
-          <button class="btn-adm-del btn-mn-del-discontinued" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
+          <div style="position:relative">
+            <button class="btn-mn-inactive-kebab" data-completed-idx="${ci}" data-inactive-type="discontinued" style="font-size:1.2rem;font-weight:900;min-width:28px;height:28px;border:none;background:#f3f4f6;cursor:pointer;padding:0 5px;border-radius:.3rem;line-height:1">⋮</button>
+            <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
+              <button class="btn-mn-restore" data-completed-idx="${ci}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
+              <button class="btn-mn-switch-status" data-completed-idx="${ci}" data-from="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#059669">⭐ Change to Mastered</button>
+              <button class="btn-mn-del-discontinued" data-completed-idx="${ci}" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
+            </div>
+          </div>
         </div>
       </div>`;
       subActs.forEach((sub, si) => {
@@ -12206,7 +12218,7 @@ function renderTargetManageContent(student, target) {
       const idx = btn.dataset.idx;
       const menu = $(`mn-km-${idx}`);
       const wasHidden = menu.style.display !== "block";
-      $("manage-modal-body").querySelectorAll(".mn-kebab-menu").forEach(m => m.style.display = "none");
+      $("manage-modal-body").querySelectorAll(".mn-kebab-menu, .mn-inactive-km").forEach(m => m.style.display = "none");
       if (wasHidden) {
         menu.style.display = "block";
         const closeMenu = ev => {
@@ -12310,9 +12322,8 @@ function renderTargetManageContent(student, target) {
               <p style="font-size:.84rem;margin:0 0 .5rem;color:#374151">We recommend selecting <strong>"Mark as Mastered"</strong> or <strong>"Mark as Discontinued"</strong> instead. Once marked, the activity will no longer appear in new sessions, but it will remain in your previous sessions and your existing data will be preserved.</p>
               <p style="font-size:.84rem;margin:.5rem 0 .3rem;color:#374151;font-weight:600">To proceed without deleting, follow these steps:</p>
               <ol style="font-size:.84rem;color:#374151;margin:.2rem 0 .8rem;padding-left:1.3rem;line-height:1.8">
-                <li>Tap <strong>Cancel</strong></li>
-                <li>Go to <strong>Edit Target</strong></li>
-                <li>Find the activity and tap the <strong>⋮</strong> button on the right</li>
+                <li>Tap the <strong>Cancel</strong> button below</li>
+                <li>Find the activity you wanted to delete and tap the <strong>⋮</strong> button on the right</li>
                 <li>Select <strong>"Mark as Mastered"</strong> or <strong>"Mark as Discontinued"</strong></li>
               </ol>
               <p style="font-size:.84rem;margin:0 0 .5rem;color:#374151">Still want to delete? Type <strong>${confirmWord}</strong> to confirm.</p>
@@ -12476,26 +12487,52 @@ function renderTargetManageContent(student, target) {
     });
   });
 
-  $("manage-modal-body").querySelectorAll(".btn-mn-undo-mastered").forEach(btn => {
+  $("manage-modal-body").querySelectorAll(".btn-mn-inactive-kebab").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const menu = btn.nextElementSibling;
+      const wasHidden = menu.style.display !== "block";
+      $("manage-modal-body").querySelectorAll(".mn-kebab-menu, .mn-inactive-km").forEach(m => m.style.display = "none");
+      if (wasHidden) {
+        menu.style.display = "block";
+        const closeMenu = ev => {
+          if (!menu.contains(ev.target)) { menu.style.display = "none"; document.removeEventListener("click", closeMenu); }
+        };
+        document.addEventListener("click", closeMenu);
+      }
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".btn-mn-restore").forEach(btn => {
     btn.addEventListener("click", async () => {
       const ci = Number(btn.dataset.completedIdx);
-      const pa = masteredActs[ci];
+      const type = btn.dataset.inactiveType;
+      const pa = type === "mastered" ? masteredActs[ci] : discontinuedActs[ci];
       if (!pa) return;
-      delete pa.masteredOn;
-      delete pa.isCompleted;
+      if (type === "mastered") { delete pa.masteredOn; delete pa.isCompleted; }
+      else { delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped; }
       await saveTarget();
       renderTargetManageContent(student, target);
     });
   });
 
-  $("manage-modal-body").querySelectorAll(".btn-mn-undo-discontinued").forEach(btn => {
+  $("manage-modal-body").querySelectorAll(".btn-mn-switch-status").forEach(btn => {
     btn.addEventListener("click", async () => {
       const ci = Number(btn.dataset.completedIdx);
-      const pa = discontinuedActs[ci];
-      if (!pa) return;
-      delete pa.discontinuedOn;
-      delete pa.isArchived;
-      delete pa.isStopped;
+      const from = btn.dataset.from;
+      if (from === "mastered") {
+        const pa = masteredActs[ci];
+        if (!pa) return;
+        const date = pa.masteredOn || new Date().toISOString().split("T")[0];
+        delete pa.masteredOn; delete pa.isCompleted;
+        pa.discontinuedOn = date; pa.isArchived = true;
+      } else {
+        const pa = discontinuedActs[ci];
+        if (!pa) return;
+        const date = pa.discontinuedOn || new Date().toISOString().split("T")[0];
+        delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped;
+        pa.masteredOn = date; pa.isCompleted = true;
+      }
       await saveTarget();
       renderTargetManageContent(student, target);
     });
@@ -12524,20 +12561,22 @@ function renderTargetManageContent(student, target) {
       btn.disabled = true;
       btn.textContent = "Checking…";
       let affected = 0;
+      let affectedSessions = [];
       try {
         const allSessions = _groupForTargetEdit
           ? await getAllSessionsForGroup(_groupForTargetEdit.id)
           : await getAllSessionsForStudent(student.id);
         const paPA2 = pa.parentActivity || null;
-        affected = allSessions.filter(s =>
+        affectedSessions = allSessions.filter(s =>
           Object.values(s.activities || {}).some(a =>
             a.targetName === target.name && a.activityName === pa.name &&
             (paPA2 === null ? !a.parentActivity : a.parentActivity === paPA2)
           )
-        ).length;
+        );
+        affected = affectedSessions.length;
       } catch { affected = -1; }
       btn.disabled = false;
-      btn.textContent = "🗑️ Delete";
+      btn.textContent = "🗑️ Delete Activity";
       if (affected === 0) {
         if (!confirm(`No past data found for this activity — safe to delete.`)) return;
         const actIdx = acts.indexOf(pa);
@@ -12551,16 +12590,17 @@ function renderTargetManageContent(student, target) {
         const overlay = document.createElement("div");
         overlay.dataset.delOverlay = "1";
         overlay.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding-top:1.25rem;z-index:200;border-radius:.75rem;overflow-y:auto";
+        const sessionDateList2 = affectedSessions.length > 0
+          ? `<p style="font-size:.82rem;margin:.4rem 0 .3rem;color:#374151;font-weight:600">Sessions with data:</p>
+             <ul style="font-size:.82rem;color:#374151;margin:0 0 .7rem;padding-left:1.2rem;line-height:1.8">${
+               affectedSessions
+                 .sort((a, b) => (a.date || "").localeCompare(b.date || ""))
+                 .map(s => `<li>Session ${escHtml(String(s.sessionNumber || s.number || "?"))}: ${escHtml(formatDateWithDay(s.date))}</li>`)
+                 .join("")
+             }</ul>` : "";
         overlay.innerHTML = `<div style="background:#fff;padding:1.25rem;border-radius:.75rem;width:min(320px,92%);box-shadow:0 4px 24px rgba(0,0,0,.25);margin-bottom:1rem">
           <p style="font-size:.88rem;margin:0 0 .6rem;color:#111;font-weight:700">⚠️ If you delete this activity, all data from the past <strong>${confirmWord} session${affected !== 1 ? "s" : ""}</strong> will be permanently lost.</p>
-          <p style="font-size:.84rem;margin:0 0 .5rem;color:#374151">We recommend selecting <strong>"Mark as Mastered"</strong> or <strong>"Mark as Discontinued"</strong> instead. Once marked, the activity will no longer appear in new sessions, but it will remain in your previous sessions and your existing data will be preserved.</p>
-          <p style="font-size:.84rem;margin:.5rem 0 .3rem;color:#374151;font-weight:600">To proceed without deleting, follow these steps:</p>
-          <ol style="font-size:.84rem;color:#374151;margin:.2rem 0 .8rem;padding-left:1.3rem;line-height:1.8">
-            <li>Tap <strong>Cancel</strong></li>
-            <li>Go to <strong>Edit Target</strong></li>
-            <li>Find the activity and tap the <strong>⋮</strong> button on the right</li>
-            <li>Select <strong>"Mark as Mastered"</strong> or <strong>"Mark as Discontinued"</strong></li>
-          </ol>
+          ${sessionDateList2}
           <p style="font-size:.84rem;margin:0 0 .5rem;color:#374151">Still want to delete? Type <strong>${confirmWord}</strong> to confirm.</p>
           <input id="del-type-input" type="text" autocomplete="off" inputmode="numeric"
             style="width:100%;box-sizing:border-box;padding:.45rem .6rem;border:2px solid #d1d5db;border-radius:.4rem;font-size:1.1rem;text-align:center;outline:none;margin-bottom:.6rem" placeholder="${confirmWord}">
@@ -13449,8 +13489,14 @@ function renderTemplateManageContent(template) {
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.3rem;flex-shrink:0">
           <span style="font-size:.72rem;color:#059669;white-space:nowrap">${dateLabel}</span>
-          <button class="btn-mn-undo-mastered" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Undo</button>
-          <button class="btn-adm-del btn-mn-del-mastered" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
+          <div style="position:relative">
+            <button class="btn-mn-inactive-kebab" data-completed-idx="${ci}" data-inactive-type="mastered" style="font-size:1.2rem;font-weight:900;min-width:28px;height:28px;border:none;background:#f3f4f6;cursor:pointer;padding:0 5px;border-radius:.3rem;line-height:1">⋮</button>
+            <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
+              <button class="btn-mn-restore" data-completed-idx="${ci}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
+              <button class="btn-mn-switch-status" data-completed-idx="${ci}" data-from="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#6b7280">🚩 Change to Discontinued</button>
+              <button class="btn-mn-del-mastered" data-completed-idx="${ci}" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
+            </div>
+          </div>
         </div>
       </div>`;
       subActs.forEach((sub, si) => {
@@ -13501,8 +13547,14 @@ function renderTemplateManageContent(template) {
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.3rem;flex-shrink:0">
           <span style="font-size:.72rem;color:#6b7280;white-space:nowrap">${dateLabel}</span>
-          <button class="btn-mn-undo-discontinued" data-completed-idx="${ci}" style="font-size:.75rem;padding:.25rem .55rem;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;color:#1d4ed8;white-space:nowrap">↩ Undo</button>
-          <button class="btn-adm-del btn-mn-del-discontinued" data-completed-idx="${ci}" title="Delete permanently">🗑</button>
+          <div style="position:relative">
+            <button class="btn-mn-inactive-kebab" data-completed-idx="${ci}" data-inactive-type="discontinued" style="font-size:1.2rem;font-weight:900;min-width:28px;height:28px;border:none;background:#f3f4f6;cursor:pointer;padding:0 5px;border-radius:.3rem;line-height:1">⋮</button>
+            <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
+              <button class="btn-mn-restore" data-completed-idx="${ci}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
+              <button class="btn-mn-switch-status" data-completed-idx="${ci}" data-from="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#059669">⭐ Change to Mastered</button>
+              <button class="btn-mn-del-discontinued" data-completed-idx="${ci}" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
+            </div>
+          </div>
         </div>
       </div>`;
       subActs.forEach((sub, si) => {
@@ -14014,26 +14066,52 @@ function renderTemplateManageContent(template) {
     });
   });
 
-  $("manage-modal-body").querySelectorAll(".btn-mn-undo-mastered").forEach(btn => {
+  $("manage-modal-body").querySelectorAll(".btn-mn-inactive-kebab").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const menu = btn.nextElementSibling;
+      const wasHidden = menu.style.display !== "block";
+      $("manage-modal-body").querySelectorAll(".mn-kebab-menu, .mn-inactive-km").forEach(m => m.style.display = "none");
+      if (wasHidden) {
+        menu.style.display = "block";
+        const closeMenu = ev => {
+          if (!menu.contains(ev.target)) { menu.style.display = "none"; document.removeEventListener("click", closeMenu); }
+        };
+        document.addEventListener("click", closeMenu);
+      }
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".btn-mn-restore").forEach(btn => {
     btn.addEventListener("click", async () => {
       const ci = Number(btn.dataset.completedIdx);
-      const pa = masteredActs[ci];
+      const type = btn.dataset.inactiveType;
+      const pa = type === "mastered" ? masteredActs[ci] : discontinuedActs[ci];
       if (!pa) return;
-      delete pa.masteredOn;
-      delete pa.isCompleted;
+      if (type === "mastered") { delete pa.masteredOn; delete pa.isCompleted; }
+      else { delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped; }
       await saveTemplateFn();
       renderTemplateManageContent(template);
     });
   });
 
-  $("manage-modal-body").querySelectorAll(".btn-mn-undo-discontinued").forEach(btn => {
+  $("manage-modal-body").querySelectorAll(".btn-mn-switch-status").forEach(btn => {
     btn.addEventListener("click", async () => {
       const ci = Number(btn.dataset.completedIdx);
-      const pa = discontinuedActs[ci];
-      if (!pa) return;
-      delete pa.discontinuedOn;
-      delete pa.isArchived;
-      delete pa.isStopped;
+      const from = btn.dataset.from;
+      if (from === "mastered") {
+        const pa = masteredActs[ci];
+        if (!pa) return;
+        const date = pa.masteredOn || new Date().toISOString().split("T")[0];
+        delete pa.masteredOn; delete pa.isCompleted;
+        pa.discontinuedOn = date; pa.isArchived = true;
+      } else {
+        const pa = discontinuedActs[ci];
+        if (!pa) return;
+        const date = pa.discontinuedOn || new Date().toISOString().split("T")[0];
+        delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped;
+        pa.masteredOn = date; pa.isCompleted = true;
+      }
       await saveTemplateFn();
       renderTemplateManageContent(template);
     });
