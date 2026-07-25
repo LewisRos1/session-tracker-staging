@@ -906,10 +906,23 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
     : `${fM[0].slice(0, 3)} ${fM[1]} - ${lM[0].slice(0, 3)} ${lM[1]}`;
 
   // Compute per-target trendline delta to sort matching Trendline Summary order
+  // Use same H1/H2 half-year grouping as Trendline Summary for the sort delta
+  // (using all months gives different regression than H1-only, causing order mismatch)
+  const H1_SORT = new Set(["January","February","March","April","May","June"]);
+  const sortBuckets = {}, sortOrder = [];
+  for (const month of allMonths) {
+    const [name, year] = month.split(" ");
+    const key = `${H1_SORT.has(name) ? "H1" : "H2"} ${year}`;
+    if (!sortBuckets[key]) { sortBuckets[key] = []; sortOrder.push(key); }
+    sortBuckets[key].push(month);
+  }
+  const sortKey = [...sortOrder].reverse().find(k => sortBuckets[k].length >= 2) || sortOrder[sortOrder.length - 1];
+  const sortMonths = sortBuckets[sortKey] || allMonths;
+
   const trendData = {};
   for (const target of allTargets) {
     const yValues = [];
-    for (const month of allMonths) {
+    for (const month of sortMonths) {
       const monthSessions = sessions.filter(s => s.month === month);
       const vals = monthSessions.map(s => {
         const snap = (s.targetsSnapshot || []).find(t => t.name === target.name);
@@ -938,8 +951,7 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
 
   const ws = wb.addWorksheet("Activity Breakdown");
   let rowOffset = 0;
-  let lastSection = null;
-  let targetNumInSection = 0;
+  let targetNum = 0;
   const MAX_PER_CHART = 13;
 
   for (const target of sortedTargets) {
@@ -1118,18 +1130,16 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
     const activityData = [...activeData, ...extraData];
     if (activityData.filter(a => !a.isSectionHeader).length === 0) continue;
 
-    const td = trendData[target.name] || { hasData: false };
-    const sectionNum = td.hasData ? 1 : 2;
-    if (sectionNum !== lastSection) { lastSection = sectionNum; targetNumInSection = 0; }
-    targetNumInSection++;
+    targetNum++;
 
-    // Split into chunks of max 13 activities to match AI report
+    // Split into chunks of max 13 activities
     const chunks = [];
     for (let i = 0; i < activityData.length; i += MAX_PER_CHART) chunks.push(activityData.slice(i, i + MAX_PER_CHART));
 
     for (let ci = 0; ci < chunks.length; ci++) {
-      const suffix = chunks.length > 1 ? ` (${ci + 1} of ${chunks.length})` : "";
-      const chartTitle = `${sectionNum}.${targetNumInSection}) ${target.name} - Progress (${periodLabel})${suffix}`;
+      // Dot notation only for split targets (e.g. 1.1) / 1.2)); plain number otherwise (e.g. 2))
+      const chartNum = chunks.length > 1 ? `${targetNum}.${ci + 1}` : `${targetNum}`;
+      const chartTitle = `${chartNum}) ${target.name} - Progress (${periodLabel})`;
       const chartResult = renderActivityBreakdownChart(target.name, chunks[ci], periodLabel, chartTitle);
       if (!chartResult) continue;
       const { base64, height: chartH } = chartResult;
