@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1099";
+const APP_VERSION = "1100";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3067,29 +3067,23 @@ function hyrDrawOverviewChartB(chartTrendRows, title) {
 function hyrDrawOverviewChartC(chartTrendRows, title) {
   const n = chartTrendRows.length;
   if (n === 0) return null;
-  const C_START = "#7dd3fc", C_END = "#a78bfa", C_UP = "#22c55e", C_DOWN = "#ef4444", C_STABLE = "#9ca3af";
+  const C_START = "#7dd3fc", C_END = "#a78bfa";
   const W = 700;
-  // Perf -15% from previous (285*0.85≈242); freed space to name+delta
   const NAME_W = 247;
-  const DELTA_W = 196;
   const PAD_R = 32;
-  const PERF_X = NAME_W + DELTA_W;       // 443
-  const PERF_W = W - PERF_X - PAD_R;    // 242
-  const deltaCX = NAME_W + DELTA_W / 2; // 345
-  const maxDeltaBarLen = DELTA_W / 2 - 14; // 84px
+  const PERF_X = NAME_W;
+  const PERF_W = W - PERF_X - PAD_R;    // 421
   const toXPerf = v => PERF_X + (v / 100) * PERF_W;
 
-  const PAD_TOP = 52;   // extra room between title and headers
-  const HDR_H = 28;     // no tick labels, just column header text
+  const PAD_TOP = 52;
+  const HDR_H = 28;
   const ROW_H = 72;
   const BOX = 13, LR = 23, GAP = 5, SPC = 15;
   const LEG_PAD = 22;
-  // PAD_BTM anchored from box-top: LEG_PAD + BOX + LR + LEG_PAD
-  const PAD_BTM = LEG_PAD + BOX + LR + LEG_PAD; // 22+13+23+22=80
+  const PAD_BTM = LEG_PAD + BOX + LEG_PAD;  // 57 — one legend row
   const H = PAD_TOP + HDR_H + n * ROW_H + PAD_BTM;
   const CHART_Y0 = PAD_TOP + HDR_H;
   const CHART_Y1 = CHART_Y0 + n * ROW_H;
-  const maxAbs = Math.max(...chartTrendRows.map(r => Math.abs(r.delta)), 10);
 
   const canvas = document.createElement("canvas");
   canvas.width = W; canvas.height = H;
@@ -3099,21 +3093,16 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
   // Title
   if (title) { ctx.fillStyle = "#111827"; ctx.font = "bold 19px sans-serif"; ctx.textAlign = "center"; ctx.fillText(title, W / 2, 30); }
 
-  // Column headers (well below title for breathing room)
+  // Column header
   ctx.fillStyle = "#374151"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText("Net Change (points)", deltaCX, PAD_TOP + 18);
   ctx.fillText("Overall Performance (%)", PERF_X + PERF_W / 2, PAD_TOP + 18);
 
-  // Perf gridlines only (no tick labels — values on bars are sufficient)
+  // Perf gridlines
   [0, 25, 50, 75, 100].forEach(v => {
     const gx = toXPerf(v);
     ctx.strokeStyle = v === 0 ? "#9ca3af" : "#e5e7eb"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(gx, PAD_TOP + 24); ctx.lineTo(gx, CHART_Y1); ctx.stroke();
   });
-
-  // Delta center vertical line
-  ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(deltaCX, PAD_TOP + 24); ctx.lineTo(deltaCX, CHART_Y1); ctx.stroke();
 
   // Rows
   for (let i = 0; i < n; i++) {
@@ -3128,8 +3117,6 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
         ctx.strokeStyle = v === 0 ? "#9ca3af" : "#e5e7eb"; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(toXPerf(v), rowY); ctx.lineTo(toXPerf(v), rowY + ROW_H); ctx.stroke();
       });
-      ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.moveTo(deltaCX, rowY); ctx.lineTo(deltaCX, rowY + ROW_H); ctx.stroke();
     }
 
     // Target name (right-aligned, split to 2 lines if long)
@@ -3142,24 +3129,7 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
     if (line2) { ctx.fillText(line1, NAME_W - 8, cy - 9); ctx.fillText(line2, NAME_W - 8, cy + 10); }
     else { ctx.fillText(line1, NAME_W - 8, cy + 6); }
 
-    // Delta bar: right=positive, left=negative
-    const dc = r.direction === "Trending Up" ? C_UP : r.direction === "Trending Down" ? C_DOWN : C_STABLE;
-    const barLen = Math.max(3, (Math.abs(r.delta) / maxAbs) * maxDeltaBarLen);
-    const BAR_TH = 19;
-    const bY = cy - BAR_TH / 2;
-    const dl = (r.delta >= 0 ? "+" : "") + r.delta;
-    if (r.delta > 0) {
-      ctx.fillStyle = dc; ctx.fillRect(deltaCX, bY, barLen, BAR_TH);
-    } else if (r.delta < 0) {
-      ctx.fillStyle = dc; ctx.fillRect(deltaCX - barLen, bY, barLen, BAR_TH);
-    } else {
-      ctx.fillStyle = C_STABLE; ctx.fillRect(deltaCX - 2, bY, 4, BAR_TH);
-    }
-    // Delta label: same font as perf end value (bold 16px)
-    ctx.fillStyle = "#111827"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center";
-    ctx.fillText(dl, deltaCX, bY + BAR_TH + 16);
-
-    // Performance bars: start = normal, end = bold; labels flip inside bar if they'd overflow
+    // Performance bars: start = normal, end = bold
     const BAR_HP = 16;
     const sW = Math.max(2, (r.tStart / 100) * PERF_W);
     const eW = Math.max(2, (r.tEnd / 100) * PERF_W);
@@ -3179,25 +3149,25 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
     }
   }
 
-  // Column separator lines
+  // Column separator (names | performance)
   ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(NAME_W, PAD_TOP + 24); ctx.lineTo(NAME_W, CHART_Y1); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(PERF_X, PAD_TOP + 24); ctx.lineTo(PERF_X, CHART_Y1); ctx.stroke();
 
   // Chart border
   ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 1;
   ctx.strokeRect(0, CHART_Y0, W, n * ROW_H);
 
-  // Legend: equal LEG_PAD from chart border to box top, and from box bottom to canvas edge
+  // Legend: Term Start + Term End (single row)
   ctx.font = "16px sans-serif";
-  const legBoxTop0 = CHART_Y1 + LEG_PAD;             // top of first row's color box
-  const legY0 = legBoxTop0 + BOX - 2;                // text baseline for row 0
-  [[{ color: C_START, label: "Term Start" }, { color: C_END, label: "Term End" }],
-   [{ color: C_DOWN, label: "Trending Down (<-8 points)" }, { color: C_STABLE, label: "Stable (±8 points)" }, { color: C_UP, label: "Trending Up (>+8 points)" }]]
-  .forEach((row, ri) => {
-    const rowW = row.reduce((acc, { label }) => acc + BOX + GAP + Math.ceil(ctx.measureText(label).width) + SPC, 0) - SPC;
-    let lx = (W - rowW) / 2; const ly = legY0 + ri * LR;
-    row.forEach(({ color, label }) => { ctx.fillStyle = color; ctx.fillRect(lx, ly - BOX + 2, BOX, BOX); ctx.fillStyle = "#374151"; ctx.textAlign = "left"; ctx.fillText(label, lx + BOX + GAP, ly); lx += BOX + GAP + Math.ceil(ctx.measureText(label).width) + SPC; });
+  const legBoxTop0 = CHART_Y1 + LEG_PAD;
+  const legY0 = legBoxTop0 + BOX - 2;
+  const legRow = [{ color: C_START, label: "Term Start" }, { color: C_END, label: "Term End" }];
+  const legRowW = legRow.reduce((acc, { label }) => acc + BOX + GAP + Math.ceil(ctx.measureText(label).width) + SPC, 0) - SPC;
+  let lx = (W - legRowW) / 2;
+  legRow.forEach(({ color, label }) => {
+    ctx.fillStyle = color; ctx.fillRect(lx, legY0 - BOX + 2, BOX, BOX);
+    ctx.fillStyle = "#374151"; ctx.textAlign = "left"; ctx.fillText(label, lx + BOX + GAP, legY0);
+    lx += BOX + GAP + Math.ceil(ctx.measureText(label).width) + SPC;
   });
   ctx.strokeStyle = "#000000"; ctx.lineWidth = 1; ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
   return { base64: canvas.toDataURL("image/png").split(",")[1], height: H };
@@ -3514,7 +3484,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
       if (i > 0) paras.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
       paras.push(new Paragraph({
         children: [
-          new TextRun({ text: `${ROMAN[i] || i + 1}. ${r.name.trim()}`, bold: true, size: 24 })
+          new TextRun({ text: `${i + 1}) ${r.name.trim()}`, bold: true, size: 24 })
         ],
         spacing: { before: 0, after: 100, ...LS }
       }));
@@ -3549,7 +3519,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   paragraphs.push(mkPara(`Date of Report: ${new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}`, { after: 960 }));
 
   // ── Section 1: Executive Overview ──────────────────────────
-  paragraphs.push(mkPara("Section 1: Executive Overview", { heading: HeadingLevel.HEADING_1, before: 560, after: 200, pageBreak: true, size: 32, bold: true }));
+  paragraphs.push(mkPara("Section 1: Overview", { heading: HeadingLevel.HEADING_1, before: 560, after: 200, pageBreak: true, size: 32, bold: true }));
 
   paragraphs.push(mkPara(
     `This report documents ${student.name}'s progress across the ${halfText} half of ${year} (${monthRange}) in ${n} key therapy target${n !== 1 ? "s" : ""}: ${targetList}. The therapy team has prepared this report to give you a clear overview of ${firstName}'s development and the areas that need continued attention.`,
@@ -3626,60 +3596,14 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     paragraphs.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
   }
 
-  // ── Section 2: Progress by Category ────────────────────────
-  const HDR2 = "f3f4f6";
-  const richCritCell = (runs, pct) => {
-    const children = [];
-    for (const [txt, bd] of runs) children.push(new TextRun({ text: txt, bold: bd, size: 22 }));
-    return new TableCell({ width: { size: pct, type: WidthType.PERCENTAGE }, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: [new Paragraph({ children, alignment: AlignmentType.JUSTIFIED, spacing: { before: 80, after: 80 } })] });
-  };
-  paragraphs.push(mkPara("Section 2: Progress by Category", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
-  paragraphs.push(mkPara(`Each of ${firstName}'s targets has been placed into one of four categories based on their progress this term (${monthRange} ${year}).`, { after: 280, align: AlignmentType.JUSTIFIED }));
-  paragraphs.push(mkPara("Summary of Targets", { heading: HeadingLevel.HEADING_2, before: 280, after: 120, size: 26, bold: true }));
-  const catData = [
-    { label: "2.1 Most Improved",       runs: [["Gained ", false], ["more than 8 points", true], [" over the term.", false]],          targets: categorized.mostImproved },
-    { label: "2.2 Strong & Steady",     runs: [["Ending score ", false], ["80% or above", true], [" with stable progress (within ", false], ["±8 points", true], [" over the term).", false]], targets: categorized.strengths },
-    { label: "2.3 Developing",          runs: [["Ending score ", false], ["under 80%", true], [" with stable progress (within ", false], ["±8 points", true], [" over the term).", false]],  targets: categorized.emerging },
-    { label: "2.4 Needs Extra Support", runs: [["Dropped by ", false], ["more than 8 points", true], [" over the term.", false]],        targets: categorized.needsSupport }
-  ];
-  const combinedHeaderRow = new TableRow({ tableHeader: true, children: [
-    mkCell("Category", { bold: true, bg: HDR2, size: 22, pct: 22, align: AlignmentType.CENTER }),
-    mkCell("Criteria",  { bold: true, bg: HDR2, size: 22, pct: 43, align: AlignmentType.CENTER }),
-    mkCell("Targets",   { bold: true, bg: HDR2, size: 22, pct: 35, align: AlignmentType.CENTER })
-  ]});
-  const combinedRows = catData.map(({ label, runs, targets }) => new TableRow({ children: [
-    mkCell(label, { pct: 22, bold: true, align: AlignmentType.CENTER }),
-    richCritCell(runs, 43),
-    new TableCell({ width: { size: 35, type: WidthType.PERCENTAGE }, margins: { top: 80, bottom: 80, left: 150, right: 150 },
-      children: targets.length
-        ? targets.map(t => new Paragraph({ children: [new TextRun({ text: `• ${t.name}`, size: 22 })], alignment: AlignmentType.JUSTIFIED, spacing: { before: 40, after: 40 } }))
-        : [new Paragraph({ children: [new TextRun({ text: "No targets in this category", size: 22, italics: true, color: "9CA3AF" })], spacing: { before: 80, after: 80 } })]
-    })
-  ]}));
-  paragraphs.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [combinedHeaderRow, ...combinedRows] }));
-  paragraphs.push(new Paragraph({ children: [], spacing: { before: 400, after: 0 } }));
-  // Colored band headings + target details
-  const catBandPara = (text, fill, textColor) => new Paragraph({
-    children: [new TextRun({ text, bold: true, size: 28, color: textColor })],
-    shading: { fill },
-    spacing: { before: 480, after: 200 }
-  });
-  // 2.1 Most Improved (light green)
-  paragraphs.push(catBandPara("2.1 MOST IMPROVED", "d1fae5", "065f46"));
-  if (categorized.mostImproved.length) paragraphs.push(...targetSectionParas(categorized.mostImproved));
-  else paragraphs.push(mkPara("No targets in this category this term.", { italics: true, color: "9CA3AF" }));
-  // 2.2 Strong & Steady (gray)
-  paragraphs.push(catBandPara("2.2 STRONG & STEADY", "e5e7eb", "1f2937"));
-  if (categorized.strengths.length) paragraphs.push(...targetSectionParas(categorized.strengths));
-  else paragraphs.push(mkPara("No targets in this category this term.", { italics: true, color: "9CA3AF" }));
-  // 2.3 Developing (gray)
-  paragraphs.push(catBandPara("2.3 DEVELOPING", "e5e7eb", "1f2937"));
-  if (categorized.emerging.length) paragraphs.push(...targetSectionParas(categorized.emerging));
-  else paragraphs.push(mkPara("No targets in this category this term.", { italics: true, color: "9CA3AF" }));
-  // 2.4 Needs Extra Support (red)
-  paragraphs.push(catBandPara("2.4 NEEDS EXTRA SUPPORT", "fee2e2", "991b1b"));
-  if (categorized.needsSupport.length) paragraphs.push(...targetSectionParas(categorized.needsSupport));
-  else paragraphs.push(mkPara("No targets in this category this term.", { italics: true, color: "9CA3AF" }));
+  // ── Section 2: Target Progress ──────────────────────────────
+  paragraphs.push(mkPara("Section 2: Target Progress", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
+  paragraphs.push(mkPara(
+    `This section provides a detailed look at each of ${firstName}'s therapy targets for ${monthRange} ${year}. Targets are presented from highest to lowest overall progression, consistent with the overview chart above.`,
+    { after: 280, align: AlignmentType.JUSTIFIED }
+  ));
+  if (chartTrendRows.length) paragraphs.push(...targetSectionParas(chartTrendRows));
+  else paragraphs.push(mkPara("No targets with sufficient data this term.", { italics: true, color: "9CA3AF" }));
 
   // ── Section 3: Observed Skills (qualitative) ────────────────
   let nextSectionNum = 3;
@@ -3687,7 +3611,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     paragraphs.push(mkPara("Section 3: Observed Skills (No Quantitative Data)", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
     categorized.qualitative.forEach((r, i) => {
       if (i > 0) paragraphs.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
-      paragraphs.push(new Paragraph({ children: [new TextRun({ text: `${ROMAN[i] || i + 1}. ${r.name}`, bold: true, size: 24 })], spacing: { before: 0, after: 80, ...LS } }));
+      paragraphs.push(new Paragraph({ children: [new TextRun({ text: `${i + 1}) ${r.name}`, bold: true, size: 24 })], spacing: { before: 0, after: 80, ...LS } }));
       const obs = parsed.observed?.[r.name];
       if (obs) {
         obs.split("\n").forEach(line => {
