@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1106";
+const APP_VERSION = "1107";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3395,7 +3395,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
       <tr><td style="padding:.45rem .75rem;border:1px solid #e5e7eb;font-weight:600">3.2 Developing</td><td style="padding:.45rem .75rem;border:1px solid #e5e7eb">Ending score <strong>under 80%</strong> with stable progress (within <strong>±8 points</strong> over the term).</td></tr>
     </tbody></table>`;
     h += `<h3 style="${SECTION_H3}">6.2 Activity Breakdown Charts</h3>`;
-    const rangeLabel = period === "H1" ? `Jan–Jun ${year}` : `Jul–Dec ${year}`;
+    const rangeLabel = period === "H1" ? `Jan - Jun ${year}` : `Jul - Dec ${year}`;
     for (const target of appendixTargets) {
       const actData = hyrToActivityData(breakdownData[target.name]);
       const pages = paginateActivities(actData);
@@ -3680,7 +3680,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   if (appendixTargets.length) {
     appendixParas.push(mkPara(`Section ${nextSectionNum + 1}: Appendix`, { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
     appendixParas.push(mkPara("Activity Breakdown Charts", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
-    const rangeLabel = period === "H1" ? `Jan–Jun ${year}` : `Jul–Dec ${year}`;
+    const rangeLabel = period === "H1" ? `Jan - Jun ${year}` : `Jul - Dec ${year}`;
     const sec2NumberMap = new Map();
     chartTrendRows.forEach((r, i) => sec2NumberMap.set(r.name, i + 1));
     categorized.qualitative.forEach((r, i) => sec2NumberMap.set(r.name, chartTrendRows.length + i + 1));

@@ -757,7 +757,7 @@ export function renderActivityBreakdownChart(targetName, activityData, periodLab
   const SCALE = 2, SECTION_H = 28;
   const C_START = "#7dd3fc", C_END = "#a78bfa";
   const BAR_H = 14, BAR_GAP = 4, BARS_H = 2 * BAR_H + BAR_GAP;
-  const PAD = { top: 52, right: 50, bottom: 52, left: 365 };
+  const PAD = { top: 72, right: 50, bottom: 52, left: 365 };
   const W = 760;
   const LABEL_MAX_W = PAD.left - 16;
   const LINE_H = 16, ROW_PAD_V = 10, MIN_ROW_H = BARS_H + ROW_PAD_V * 2;
