@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1100";
+const APP_VERSION = "1101";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -688,16 +688,32 @@ function registerServiceWorker() {
       });
       reg.update();
       document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "visible") reg.update();
+        if (document.visibilityState === "visible") { reg.update(); checkVersionFromServer(); }
       });
       // Catches updates even if the tab is just left open in the foreground
       // the whole time — visibilitychange alone never fires then, so an
       // update could otherwise sit undetected until the boss happens to
       // switch away and back, or manually refreshes.
-      setInterval(() => reg.update(), 60000);
+      setInterval(() => { reg.update(); checkVersionFromServer(); }, 60000);
     })
     .catch(() => {});
 }
+
+// Bypass CDN cache by fetching sw.js with a timestamp — CDN has never seen
+// this URL so it must go to origin. If the version in the file differs from
+// the running app, force a hard navigation to pick up the new files.
+async function checkVersionFromServer() {
+  try {
+    const resp = await fetch("/sw.js?_=" + Date.now(), { cache: "no-store" });
+    if (!resp.ok) return;
+    const text = await resp.text();
+    const m = text.match(/therapy-tracker-v(\d+)/);
+    if (m && m[1] !== APP_VERSION) {
+      window.location.replace(window.location.pathname + "?v=" + m[1]);
+    }
+  } catch (_) {}
+}
+checkVersionFromServer();
 
 // ============================================================
 // PIN SCREEN
