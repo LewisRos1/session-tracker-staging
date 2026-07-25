@@ -1137,9 +1137,8 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
     for (let i = 0; i < activityData.length; i += MAX_PER_CHART) chunks.push(activityData.slice(i, i + MAX_PER_CHART));
 
     for (let ci = 0; ci < chunks.length; ci++) {
-      // Dot notation only for split targets (e.g. 1.1) / 1.2)); plain number otherwise (e.g. 2))
-      const chartNum = chunks.length > 1 ? `${targetNum}.${ci + 1}` : `${targetNum}`;
-      const chartTitle = `${chartNum}) ${target.name} - Progress (${periodLabel})`;
+      const pageSuffix = chunks.length > 1 ? ` [Page ${ci + 1} of ${chunks.length}]` : "";
+      const chartTitle = `${targetNum}) ${target.name} - Progress (${periodLabel})${pageSuffix}`;
       const chartResult = renderActivityBreakdownChart(target.name, chunks[ci], periodLabel, chartTitle);
       if (!chartResult) continue;
       const { base64, height: chartH } = chartResult;

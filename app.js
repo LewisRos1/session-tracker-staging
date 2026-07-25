@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1117";
+const APP_VERSION = "1118";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3438,12 +3438,18 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
     </tbody></table>`;
     h += `<h3 style="${SECTION_H3}">6.2 Activity Breakdown Charts</h3>`;
     const rangeLabel = period === "H1" ? `Jan - Jun ${year}` : `Jul - Dec ${year}`;
+    const htmlNumMap = new Map();
+    trendRows.forEach((r, i) => htmlNumMap.set(r.name, i + 1));
+    categorized.qualitative.forEach((r, i) => htmlNumMap.set(r.name, trendRows.length + i + 1));
+    appendixTargets.sort((a, b) => (htmlNumMap.get(a.name) ?? 999) - (htmlNumMap.get(b.name) ?? 999));
     for (const target of appendixTargets) {
       const actData = hyrToActivityData(breakdownData[target.name]);
       const pages = paginateActivities(actData);
+      const targetNum = htmlNumMap.get(target.name);
       pages.forEach((pageData, pageIdx) => {
-        const pageSuffix = pages.length > 1 ? ` (Page ${pageIdx + 1})` : "";
-        const chartTitle = `${target.name}${pageSuffix} - Progress (${rangeLabel})`;
+        const pageSuffix = pages.length > 1 ? ` [Page ${pageIdx + 1} of ${pages.length}]` : "";
+        const numPrefix = targetNum ? `${targetNum}) ` : "";
+        const chartTitle = `${numPrefix}${target.name} - Progress (${rangeLabel})${pageSuffix}`;
         const result = renderActivityBreakdownChart(target.name, pageData, rangeLabel, chartTitle);
         if (result) {
           h += `<div style="margin-top:1.5rem"><p style="font-weight:700;font-size:.95rem;margin:0 0 .35rem">${esc(chartTitle)}</p>`;
@@ -3733,10 +3739,9 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
       const pages = paginateActivities(actData);
       const targetNum = sec2NumberMap.get(target.name);
       pages.forEach((pageData, pageIdx) => {
-        const numPrefix = targetNum
-          ? (pages.length > 1 ? `${targetNum}.${pageIdx + 1}) ` : `${targetNum}) `)
-          : "";
-        const chartTitle = `${numPrefix}${target.name} - Progress (${rangeLabel})`;
+        const pageSuffix = pages.length > 1 ? ` [Page ${pageIdx + 1} of ${pages.length}]` : "";
+        const numPrefix = targetNum ? `${targetNum}) ` : "";
+        const chartTitle = `${numPrefix}${target.name} - Progress (${rangeLabel})${pageSuffix}`;
         const abResult = renderActivityBreakdownChart(target.name, pageData, rangeLabel, chartTitle);
         if (abResult) {
           const abH = Math.round(600 * abResult.height / 760);
