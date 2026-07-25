@@ -30,6 +30,7 @@ import {
   deleteStudentConfig,
   setStudentWordExportReady,
   setStudentExcelExportReady,
+  setStudentAiH1ReportReady,
   loadTemplates,
   saveTemplate,
   deleteTemplate,
@@ -156,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1109";
+const APP_VERSION = "1110";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1097,6 +1098,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
             <col style="width:14%">
             <col style="width:110px">
             <col style="width:130px">
+            <col style="width:130px">
             <col style="width:160px">
             <col style="width:150px">
           </colgroup>
@@ -1107,6 +1109,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
               <th>Last Name</th>
               <th style="white-space:normal">Ready for Word Export</th>
               <th style="white-space:normal">Imported Excel data to Website</th>
+              <th style="white-space:normal">Ready for AI H1 Report</th>
               <th style="white-space:normal">Latest Individual Session Recorded</th>
               <th style="white-space:normal">Latest Group Session Recorded</th>
             </tr>
@@ -1124,6 +1127,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
                   </button>
                 </td>
                 <td class="reg-excel-export-cell" data-id="${escHtml(s.id)}" style="text-align:center">…</td>
+                <td class="reg-ai-h1-cell" data-id="${escHtml(s.id)}" style="text-align:center">…</td>
                 <td class="reg-indiv-num" data-id="${escHtml(s.id)}" style="text-align:center">…</td>
                 <td class="reg-group-num" data-id="${escHtml(s.id)}" style="text-align:center">…</td>
               </tr>`).join("")}
@@ -1222,6 +1226,44 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
       if (hasIndiv) wrap.appendChild(makeBtn("indiv", !!s.readyForExcelExportIndiv));
       if (hasGroup) wrap.appendChild(makeBtn("group", !!s.readyForExcelExportGroup));
       excelCell.appendChild(wrap);
+
+      const aiH1Cell = body.querySelector(`.reg-ai-h1-cell[data-id="${s.id}"]`);
+      if (!aiH1Cell) return;
+      if (!hasIndiv && !hasGroup) { aiH1Cell.textContent = "—"; return; }
+      aiH1Cell.innerHTML = "";
+      const makeAiBtn = (type, isReady) => {
+        const btn = document.createElement("button");
+        btn.className = "btn-ai-h1-ready" + (isReady ? " is-ready" : "");
+        btn.dataset.id   = s.id;
+        btn.dataset.type = type;
+        btn.dataset.ready = isReady ? "1" : "0";
+        btn.textContent = (type === "indiv" ? "Indiv: " : "Group: ") + (isReady ? "✓ Ready" : "No");
+        btn.addEventListener("click", async e => {
+          e.stopPropagation();
+          const currentlyReady = btn.dataset.ready === "1";
+          const action = currentlyReady ? "mark as NOT ready" : "mark as READY";
+          const label = type === "indiv" ? "Individual" : "Group";
+          if (!confirm(`Are you sure you want to ${action} for AI H1 Report (${label})?\n\n${s.name}`)) return;
+          const newReady = !currentlyReady;
+          btn.disabled = true;
+          try {
+            await setStudentAiH1ReportReady(s.id, type, newReady);
+            if (type === "indiv") s.readyForAiH1Indiv = newReady;
+            else s.readyForAiH1Group = newReady;
+            btn.dataset.ready = newReady ? "1" : "0";
+            btn.textContent = (type === "indiv" ? "Indiv: " : "Group: ") + (newReady ? "✓ Ready" : "No");
+            btn.classList.toggle("is-ready", newReady);
+          } finally {
+            btn.disabled = false;
+          }
+        });
+        return btn;
+      };
+      const aiWrap = document.createElement("div");
+      aiWrap.style.cssText = "display:flex;flex-direction:row;gap:4px;align-items:center;justify-content:center;flex-wrap:wrap";
+      if (hasIndiv) aiWrap.appendChild(makeAiBtn("indiv", !!s.readyForAiH1Indiv));
+      if (hasGroup) aiWrap.appendChild(makeAiBtn("group", !!s.readyForAiH1Group));
+      aiH1Cell.appendChild(aiWrap);
     });
   });
 }

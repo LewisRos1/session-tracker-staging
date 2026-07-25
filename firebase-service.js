@@ -751,6 +751,12 @@ export async function setStudentExcelExportReady(studentId, type, ready) {
   await updateDoc(doc(db, "students", studentId), { [field]: ready });
 }
 
+/** Toggle a "Ready for AI H1 Report" flag (type = 'indiv' | 'group') on a student document. */
+export async function setStudentAiH1ReportReady(studentId, type, ready) {
+  const field = type === "indiv" ? "readyForAiH1Indiv" : "readyForAiH1Group";
+  await updateDoc(doc(db, "students", studentId), { [field]: ready });
+}
+
 /**
  * Remove all activities, remarks, and FEDC comments for a deleted target
  * from every session belonging to that student.

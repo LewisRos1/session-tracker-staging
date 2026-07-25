@@ -2836,7 +2836,8 @@ div.admin-note-editable:empty::before {
 
 /* ─── STUDENT REGISTRY READY BUTTONS ─────────────────────── */
 .btn-word-export-ready,
-.btn-excel-export-ready {
+.btn-excel-export-ready,
+.btn-ai-h1-ready {
   padding: .25rem .6rem;
   border: none;
   border-radius: 1rem;
@@ -2849,10 +2850,14 @@ div.admin-note-editable:empty::before {
   transition: background .15s;
 }
 .btn-word-export-ready:hover,
-.btn-excel-export-ready:hover { background: #dc2626; }
+.btn-excel-export-ready:hover,
+.btn-ai-h1-ready:hover { background: #dc2626; }
 .btn-word-export-ready.is-ready,
-.btn-excel-export-ready.is-ready { background: #22c55e; }
+.btn-excel-export-ready.is-ready,
+.btn-ai-h1-ready.is-ready { background: #22c55e; }
 .btn-word-export-ready.is-ready:hover,
-.btn-excel-export-ready.is-ready:hover { background: #16a34a; }
+.btn-excel-export-ready.is-ready:hover,
+.btn-ai-h1-ready.is-ready:hover { background: #16a34a; }
 .btn-word-export-ready:disabled,
-.btn-excel-export-ready:disabled { opacity: .5; cursor: not-allowed; }
+.btn-excel-export-ready:disabled,
+.btn-ai-h1-ready:disabled { opacity: .5; cursor: not-allowed; }
