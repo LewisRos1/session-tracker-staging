@@ -560,7 +560,7 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
       hdr.getCell(c).alignment = STYLE_COL_HEADER.alignment;
     }
 
-    // Compute all rows first, then sort highest delta → lowest
+    // Compute all rows
     const trendRows = allTargets.map(target => {
       const yValues = [];
       for (const month of months) {
@@ -582,19 +582,39 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
       const direction = Math.abs(delta) <= 8 ? "Stable" : delta > 0 ? "Trending Up" : "Trending Down";
       return { name: target.name, tStart, tEnd, delta, direction, noData: false };
     });
-    trendRows.sort((a, b) => b.delta - a.delta); // highest → lowest; no-data rows (-Infinity) sink to bottom
 
-    for (const row of trendRows) {
-      if (row.noData) {
-        const dirLabel = row.single ? "Single month" : "No data";
-        const r = ws.addRow([row.name, "", "", "", dirLabel]);
-        r.getCell(5).font = { italic: true, color: { argb: "FF9CA3AF" } };
-        continue;
+    // Categorise the same way the AI report does
+    const CAT = [
+      { label: "Most Improved",       fill: "FFD1FAE5", font: "FF15803D", rows: trendRows.filter(r => !r.noData && r.delta > 8).sort((a, b) => b.delta - a.delta) },
+      { label: "Strong & Steady",     fill: "FFDBEAFE", font: "FF1D4ED8", rows: trendRows.filter(r => !r.noData && Math.abs(r.delta) <= 8 && r.tEnd >= 80).sort((a, b) => b.tEnd - a.tEnd) },
+      { label: "Developing",          fill: "FFFEF3C7", font: "FF92400E", rows: trendRows.filter(r => !r.noData && Math.abs(r.delta) <= 8 && r.tEnd < 80).sort((a, b) => b.tEnd - a.tEnd) },
+      { label: "Needs Extra Support", fill: "FFFEE2E2", font: "FFB91C1C", rows: trendRows.filter(r => !r.noData && r.delta < -8).sort((a, b) => a.delta - b.delta) },
+      { label: "No Data",             fill: "FFF3F4F6", font: "FF6B7280", rows: trendRows.filter(r => r.noData) },
+    ];
+
+    const addCatHeader = (label, fillArgb, fontArgb) => {
+      const r = ws.addRow([label, "", "", "", ""]);
+      try { ws.mergeCells(r.number, 1, r.number, NUM_COLS); } catch (_) {}
+      r.getCell(1).fill      = { type: "pattern", pattern: "solid", fgColor: { argb: fillArgb } };
+      r.getCell(1).font      = { bold: true, color: { argb: fontArgb } };
+      r.getCell(1).alignment = { horizontal: "left", vertical: "middle", indent: 1 };
+    };
+
+    for (const cat of CAT) {
+      if (cat.rows.length === 0) continue;
+      addCatHeader(cat.label, cat.fill, cat.font);
+      for (const row of cat.rows) {
+        if (row.noData) {
+          const dirLabel = row.single ? "Single month" : "No data";
+          const r = ws.addRow([row.name, "", "", "", dirLabel]);
+          r.getCell(5).font = { italic: true, color: { argb: "FF9CA3AF" } };
+          continue;
+        }
+        const deltaStr = row.delta >= 0 ? `+${row.delta}` : `${row.delta}`;
+        const r        = ws.addRow([row.name, `${row.tStart}%`, `${row.tEnd}%`, deltaStr, row.direction]);
+        const dirColor = row.direction === "Trending Up" ? "FF16A34A" : row.direction === "Trending Down" ? "FFDC2626" : "FF6B7280";
+        r.getCell(5).font = { bold: true, color: { argb: dirColor } };
       }
-      const deltaStr = row.delta >= 0 ? `+${row.delta}` : `${row.delta}`;
-      const r        = ws.addRow([row.name, `${row.tStart}%`, `${row.tEnd}%`, deltaStr, row.direction]);
-      const dirColor = row.direction === "Trending Up" ? "FF16A34A" : row.direction === "Trending Down" ? "FFDC2626" : "FF6B7280";
-      r.getCell(5).font = { bold: true, color: { argb: dirColor } };
     }
 
     // Overview bar chart for this period
@@ -1083,12 +1103,8 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
     const discontinuedData = discontinuedNames.map(n => buildEntry(n, discontinuedDNMap, paKeyToAliases[n] || [])).filter(Boolean);
     const extraData        = extraNames.map(n => buildEntry(n, actDisplayNameMap)).filter(Boolean);
 
-    const activityData = [
-      ...activeData,
-      ...extraData,
-      ...(masteredData.length > 0 ? [{ isSectionHeader: true, label: "Mastered" }, ...masteredData] : []),
-      ...(discontinuedData.length > 0 ? [{ isSectionHeader: true, label: "Discontinued" }, ...discontinuedData] : []),
-    ];
+    // Active-only: matches the AI report which only shows activities still in progress
+    const activityData = [...activeData, ...extraData];
     if (activityData.filter(a => !a.isSectionHeader).length === 0) continue;
 
     const chartResult = renderActivityBreakdownChart(target.name, activityData, periodLabel);
@@ -1453,7 +1469,6 @@ async function buildStudentWorkbook(student, sessions, includeTrials) {
   const sortedSessions = sessions.slice().sort((a, b) => a.date.localeCompare(b.date));
 
   addSummarySheets(wb, allTargets, sessions);
-  addBaselineVsCurrentSheet(wb, student.name, allTargets, sortedSessions);
   addHalfYearChartsSheets(wb, allTargets, sortedSessions);
   addTrendSummarySheet(wb, allTargets, sortedSessions);
   addActivityBreakdownSheet(wb, allTargets, sortedSessions);
@@ -1487,7 +1502,6 @@ async function buildGroupMemberWorkbook(studentName, allTargets, sessions, inclu
   const sortedSessions  = filtered.slice().sort((a, b) => a.date.localeCompare(b.date));
 
   addSummarySheets(wb, sortedTargets, filtered);
-  addBaselineVsCurrentSheet(wb, studentName, sortedTargets, sortedSessions);
   addHalfYearChartsSheets(wb, sortedTargets, sortedSessions);
   addTrendSummarySheet(wb, sortedTargets, sortedSessions);
   addActivityBreakdownSheet(wb, sortedTargets, sortedSessions);
