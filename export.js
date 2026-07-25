@@ -799,7 +799,7 @@ export function renderActivityBreakdownChart(targetName, activityData, periodLab
   ctx.fillText(chartTitle || `${targetName} — Progress (${periodLabel})`, 10, 28);
 
   // Column headers
-  ctx.font = "bold 12px sans-serif"; ctx.fillStyle = "#6b7280";
+  ctx.font = "bold 14px sans-serif"; ctx.fillStyle = "#6b7280";
   ctx.textAlign = "right"; ctx.fillText("Activity", PAD.left - 10, PAD.top - 7);
   ctx.textAlign = "center"; ctx.fillText("Overall Performance (%)", PAD.left + cW / 2, PAD.top - 7);
   ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 0.5;
@@ -848,7 +848,7 @@ export function renderActivityBreakdownChart(targetName, activityData, periodLab
     if (eAvg !== null) {
       const bW = Math.max(2, (eAvg / 100) * cW);
       ctx.fillStyle = C_START; ctx.fillRect(PAD.left, bar1Y, bW, BAR_H);
-      ctx.fillStyle = "#111827"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "left";
+      ctx.fillStyle = "#111827"; ctx.font = "14px sans-serif"; ctx.textAlign = "left";
       ctx.fillText(`${eAvg}%`, PAD.left + bW + 4, bar1Y + BAR_H - 2);
     }
     if (lAvg !== null) {

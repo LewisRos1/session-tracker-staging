@@ -156,7 +156,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1105";
+const APP_VERSION = "1106";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2641,7 +2641,7 @@ function hyrToActivityData(acts) {
   });
 }
 
-function paginateActivities(actData, maxPerPage = 15) {
+function paginateActivities(actData, maxPerPage = 13) {
   const pages = [];
   let curPage = [], curCount = 0, pendingHeader = null;
   for (const item of actData) {
@@ -3685,6 +3685,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     chartTrendRows.forEach((r, i) => sec2NumberMap.set(r.name, i + 1));
     categorized.qualitative.forEach((r, i) => sec2NumberMap.set(r.name, chartTrendRows.length + i + 1));
     appendixTargets.sort((a, b) => (sec2NumberMap.get(a.name) ?? 999) - (sec2NumberMap.get(b.name) ?? 999));
+    let firstChart = true;
     for (const target of appendixTargets) {
       const actData = hyrToActivityData(breakdownData[target.name]);
       const pages = paginateActivities(actData);
@@ -3697,8 +3698,8 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
         const abResult = renderActivityBreakdownChart(target.name, pageData, rangeLabel, chartTitle);
         if (abResult) {
           const abH = Math.round(600 * abResult.height / 760);
-          appendixParas.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
-          appendixParas.push(mkPara(chartTitle, { heading: HeadingLevel.HEADING_2, before: 0, after: 100, size: 24, bold: true }));
+          appendixParas.push(mkPara(chartTitle, { heading: HeadingLevel.HEADING_2, before: firstChart ? 120 : 0, after: 100, size: 24, bold: true, pageBreak: !firstChart }));
+          firstChart = false;
           appendixParas.push(new Paragraph({
             children: [new ImageRun({ data: b64ToUint8(abResult.base64), transformation: { width: 600, height: abH }, type: "png" })],
             alignment: AlignmentType.CENTER, spacing: { after: 240 }
