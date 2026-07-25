@@ -749,13 +749,14 @@ function drawOverviewChart(chartTrendRows, title) {
   return { base64: canvas.toDataURL("image/png").split(",")[1], height: H };
 }
 
-export function renderActivityBreakdownChart(targetName, activityData, periodLabel, chartTitle = null) {
+export function renderActivityBreakdownChart(targetName, activityData, periodLabel, chartTitle = null, showDuration = false) {
   if (!activityData || activityData.length === 0) return null;
   const SCALE = 2, SECTION_H = 28;
   const C_START = "#7dd3fc", C_END = "#a78bfa";
   const BAR_H = 14, BAR_GAP = 4, BARS_H = 2 * BAR_H + BAR_GAP;
+  const DUR_COL_W = showDuration ? 80 : 0;
   const PAD = { top: 72, right: 50, bottom: 52, left: 365 };
-  const W = 760;
+  const W = 760 + DUR_COL_W;
   const LABEL_MAX_W = PAD.left - 16;
   const LINE_H = 16, ROW_PAD_V = 10, MIN_ROW_H = BARS_H + ROW_PAD_V * 2;
 
@@ -788,7 +789,7 @@ export function renderActivityBreakdownChart(targetName, activityData, periodLab
   const ctx = canvas.getContext("2d");
   ctx.scale(SCALE, SCALE);
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
-  const cW = W - PAD.left - PAD.right;
+  const cW = W - PAD.left - PAD.right - DUR_COL_W; // bar area stays 345px regardless of duration col
   const plotBottom = PAD.top + totalContentH;
 
   // Title
@@ -799,6 +800,12 @@ export function renderActivityBreakdownChart(targetName, activityData, periodLab
   ctx.font = "bold 14px sans-serif"; ctx.fillStyle = "#6b7280";
   ctx.textAlign = "right"; ctx.fillText("Activity", PAD.left - 10, PAD.top - 7);
   ctx.textAlign = "center"; ctx.fillText("Overall Performance (%)", PAD.left + cW / 2, PAD.top - 7);
+  if (showDuration) {
+    const DUR_CX = PAD.left + cW + DUR_COL_W / 2;
+    ctx.font = "bold 13px sans-serif"; ctx.fillStyle = "#6b7280"; ctx.textAlign = "center";
+    ctx.fillText("Duration", DUR_CX, PAD.top - 18);
+    ctx.fillText("(Months)", DUR_CX, PAD.top - 4);
+  }
   ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 0.5;
   ctx.beginPath(); ctx.moveTo(0, PAD.top - 1); ctx.lineTo(W, PAD.top - 1); ctx.stroke();
 
@@ -853,6 +860,25 @@ export function renderActivityBreakdownChart(targetName, activityData, periodLab
       ctx.fillStyle = C_END; ctx.fillRect(PAD.left, bar2Y, bW, BAR_H);
       ctx.fillStyle = "#111827"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "left";
       ctx.fillText(`${lAvg}%`, PAD.left + bW + 4, bar2Y + BAR_H - 2);
+    }
+  }
+
+  // Duration column: separator + per-row values
+  if (showDuration) {
+    const DUR_X = PAD.left + cW;
+    const DUR_CX = DUR_X + DUR_COL_W / 2;
+    ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(DUR_X, PAD.top - 1); ctx.lineTo(DUR_X, plotBottom); ctx.stroke();
+    let yPosDur = PAD.top;
+    for (const act of activityData) {
+      if (act.isSectionHeader) { yPosDur += SECTION_H; continue; }
+      const rowH = act._rowH;
+      const cy = yPosDur + rowH / 2;
+      yPosDur += rowH;
+      if (act.monthCount != null) {
+        ctx.font = "bold 14px sans-serif"; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
+        ctx.fillText(String(act.monthCount), DUR_CX, cy + 5);
+      }
     }
   }
 
@@ -1091,6 +1117,7 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
     // aliases lets buildEntry find records stored under legacy activityName variants.
     const buildEntry = (actName, dnMap, aliases = []) => {
       const monthBuckets = {};
+      const monthsTracked = new Set(); // months with any remark (scored or not)
       for (const sess of sessions) {
         const actEntry = Object.entries(sess.activities || {}).find(
           ([, a]) => (a.activityName === actName || aliases.includes(a.activityName)) && (a.targetName === target.name || a.target === target.name)
@@ -1101,6 +1128,7 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
         const snap = (sess.targetsSnapshot || []).find(t => t.name === target.name);
         const mp = (snap ? (snap.maxPoints ?? target.maxPoints) : target.maxPoints) || 3;
         for (const rem of getRemarksForActivity(sess, actId)) {
+          monthsTracked.add(sess.month); // any remark (No Event, No Engagement, text-only, etc.) counts
           const scores = allScores(rem);
           if (scores.length === 0) continue;
           const pct = scores.reduce((a, b) => a + b, 0) / (scores.length * mp) * 100;
@@ -1117,8 +1145,7 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
         latest = { label: month.split(" ")[0].slice(0, 3), avg: mAvg };
       }
       if (earliest === null) return null;
-      const monthCount = Object.values(monthBuckets).filter(b => b.length > 0).length;
-      return { name: dnMap[actName] || actName, earliestLabel: earliest.label, earliestAvg: earliest.avg, latestLabel: latest.label, latestAvg: latest.avg, monthCount };
+      return { name: dnMap[actName] || actName, earliestLabel: earliest.label, earliestAvg: earliest.avg, latestLabel: latest.label, latestAvg: latest.avg, monthCount: monthsTracked.size };
     };
 
     const activeData       = activeNames.map(n => buildEntry(n, activeDNMap, paKeyToAliases[n] || [])).filter(Boolean);
@@ -1139,7 +1166,7 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
     for (let ci = 0; ci < chunks.length; ci++) {
       const pageSuffix = chunks.length > 1 ? ` [Page ${ci + 1} of ${chunks.length}]` : "";
       const chartTitle = `${targetNum}) ${target.name} - Progress (${periodLabel})${pageSuffix}`;
-      const chartResult = renderActivityBreakdownChart(target.name, chunks[ci], periodLabel, chartTitle);
+      const chartResult = renderActivityBreakdownChart(target.name, chunks[ci], periodLabel, chartTitle, true);
       if (!chartResult) continue;
       const { base64, height: chartH } = chartResult;
       const imgId = wb.addImage({ base64, extension: "png" });
