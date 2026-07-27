@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1162";
+const APP_VERSION = "1163";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -7583,6 +7583,8 @@ async function openSessionView(student, sessionId) {
   try {
     state.fbViewUnsubscribe = listenToSession(sessionId, async data => {
       state.viewSessionData = data;
+      window._lastViewData = data; // debug: persists after navigation
+      window._lastViewStudent = student;
       try {
         const filled = await autoFillViewMappedRemarks(student, sessionId, data);
         if (filled > 0) return;
