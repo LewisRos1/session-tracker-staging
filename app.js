@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1140";
+const APP_VERSION = "1141";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2047,15 +2047,15 @@ function renderHalfYearReportsSection() {
         Generate Report
       </button>
     </div>
-    <div id="hyr-activity-filter" class="hyr-excl-pulse" style="display:none;margin-top:.85rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:1rem 1.1rem">
-      <div style="font-size:.875rem;font-weight:600;color:#374151;margin-bottom:.8rem">Select the activities you want to <span style="text-decoration:underline;font-weight:800">EXCLUDE</span> from the Appendix:</div>
-      <div id="hyr-act-filter-list" style="display:flex;flex-direction:column;gap:1.1rem"></div>
-    </div>
     <div id="hyr-progress" style="display:none;margin-top:.85rem">
       <div style="background:#e5e7eb;border-radius:99px;height:6px;overflow:hidden">
         <div id="hyr-progress-bar" style="height:100%;background:var(--primary);width:0%;transition:width .5s ease"></div>
       </div>
       <div id="hyr-progress-label" style="font-size:.82rem;color:var(--text-muted);margin-top:.45rem;text-align:center"></div>
+    </div>
+    <div id="hyr-activity-filter" class="hyr-excl-pulse" style="display:none;margin-top:.85rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:1rem 1.1rem">
+      <div style="font-size:.875rem;font-weight:600;color:#374151;margin-bottom:.8rem">Select the activities you want to <span style="text-decoration:underline;font-weight:800">EXCLUDE</span> from the Appendix:</div>
+      <div id="hyr-act-filter-list" style="display:flex;flex-direction:column;gap:1.1rem"></div>
     </div>`;
 
   $("hyr-student-select").addEventListener("change", async e => {
@@ -2179,7 +2179,15 @@ function hyrPopulateActivityFilter(student, studentId, periodVal) {
   });
 }
 
+let _hyrAbortController = null;
+
 async function hyrGenerate() {
+  // If already generating, this click cancels
+  if (_hyrAbortController) {
+    _hyrAbortController.abort();
+    return;
+  }
+
   const studentId  = $("hyr-student-select")?.value;
   const periodVal  = $("hyr-period-select")?.value;
   if (!studentId) { alert("Please select a student first."); return; }
@@ -2194,7 +2202,7 @@ async function hyrGenerate() {
   const progress = $("hyr-progress");
   const bar      = $("hyr-progress-bar");
   const label    = $("hyr-progress-label");
-  const setProgress = (pct, text) => { bar.style.width = pct + "%"; label.textContent = text; btn.textContent = text; };
+  const setProgress = (pct, text) => { bar.style.width = pct + "%"; label.textContent = text; };
 
   btn.disabled = true; btn.textContent = "Generating…"; progress.style.display = "";
   setProgress(10, "Collecting session data…");
@@ -2208,6 +2216,12 @@ async function hyrGenerate() {
     const { text: dataText, chartData, breakdownData, trendRows, categorized } = await hyrCollectData(student, period, year, excludedActivities);
 
     setProgress(35, "Sending to AI…");
+
+    // Switch button to Cancel so user can abort the request
+    _hyrAbortController = new AbortController();
+    btn.disabled = false;
+    btn.textContent = "✕ Cancel";
+    btn.style.cssText += ";background:#fee2e2;color:#dc2626;border-color:#ef4444";
 
     const periodLabel = period === "H1" ? `January–June ${year}` : `July–December ${year}`;
     const firstName   = student.name.split(" ")[0];
@@ -2301,7 +2315,8 @@ TARGET: [exact target name]
         max_tokens: 8192,
         system: "You are a professional therapy report writer. Follow the requested format exactly.",
         messages: [{ role: "user", content: aiPrompt }]
-      })
+      }),
+      signal: _hyrAbortController.signal
     });
 
     setProgress(80, "Writing report…");
@@ -2323,10 +2338,16 @@ TARGET: [exact target name]
     hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData, chartData);
 
   } catch (err) {
-    alert("Failed to generate report:\n" + err.message);
+    if (err.name !== "AbortError") alert("Failed to generate report:\n" + err.message);
   } finally {
-    btn.disabled = false; btn.textContent = "Generate Report";
-    progress.style.display = "none"; bar.style.width = "0%";
+    _hyrAbortController = null;
+    btn.disabled = false;
+    btn.textContent = "Generate Report";
+    btn.style.background = "";
+    btn.style.color = "";
+    btn.style.borderColor = "";
+    progress.style.display = "none";
+    bar.style.width = "0%";
   }
 }
 
