@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1170";
+const APP_VERSION = "1171";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -5882,28 +5882,30 @@ function renderFedcTarget(target) {
       </div>`;
       children.forEach((sub, si) => {
         let subActData = findActivityByName(target.name, sub.title || sub.name, pa.title || pa.name, sub.id);
-        // Same fix as v1165 on the view screens: if the configId-matched record has no
-        // actual remark data, an empty auto-fill placeholder may have been adopted with
-        // this configId — fall through to find the real data-bearing record instead.
         // Two devices racing on session open (autoFillStructuredRemarks) can each create
-        // a separate placeholder with the same configId; whichever comes first in
-        // Object.entries wins and alternates as Firestore reshuffles after each write.
-        // Prefer configId-based lookup to find the duplicate that actually has data.
-        if (subActData && sub.id) {
-          const remHasData = r => ((r.text || "").trim() || (r.trials || []).some(t => t >= 0) || r.optionScore !== undefined);
-          const subHasData = Object.values(state.sessionData?.remarks || {}).some(r =>
-            r.activityId === subActData.id && remHasData(r)
-          );
-          if (!subHasData) {
-            const real = Object.entries(state.sessionData?.activities || {}).find(([altId, a]) =>
-              altId !== subActData.id &&
-              a.targetName === target.name &&
-              (a.configId === sub.id || a.activityName === sub.name || (sub.title && a.activityName === sub.title)) &&
-              Object.values(state.sessionData.remarks || {}).some(r =>
-                r.activityId === altId && remHasData(r)
-              )
-            );
-            if (real) subActData = { id: real[0], ...real[1] };
+        // a separate record with the same configId before seeing each other's snapshot.
+        // Object.entries order reshuffles on every Firestore write, so the display
+        // alternates between the records each time the user interacts with any activity.
+        // Fix: when multiple records share a configId, always pick the one with the most
+        // real data (trials > notes > option text > optionScore) — deterministic and
+        // independent of iteration order, so the right record always wins.
+        if (sub.id && state.sessionData) {
+          const subSameConfig = Object.entries(state.sessionData.activities || {})
+            .filter(([, a]) => a.configId === sub.id && a.targetName === target.name);
+          if (subSameConfig.length > 1) {
+            const subRemScore = ([actId]) => {
+              let s = 0;
+              for (const r of Object.values(state.sessionData.remarks || {})) {
+                if (r.activityId !== actId) continue;
+                s += (r.trials || []).filter(t => t >= 0).length * 100;
+                if ((r.masteryNote || "").trim()) s += 50;
+                if ((r.text || "").trim()) s += 10;
+                if (r.optionScore !== undefined) s += 5;
+              }
+              return s;
+            };
+            const subBest = subSameConfig.reduce((a, b) => subRemScore(a) >= subRemScore(b) ? a : b);
+            subActData = { id: subBest[0], ...subBest[1] };
           }
         }
         if (!subActData && state.sessionData) {
@@ -15434,24 +15436,26 @@ function buildGroupItemsByActivity(target, data, attendees) {
           (sub.id && a.configId === sub.id && a.targetName === target.name) ||
           (a.targetName === target.name && a.activityName === sub.name && a.parentActivity === sub.parentActivity)
         )?.[0] || null;
-        // Same actHasData fallback as individual session + view screens: if the matched
-        // record is an empty placeholder (e.g. two devices racing on session open),
-        // find the real data-bearing record instead — prefer configId for reliability.
-        if (subActId && sub.id) {
-          const grpRemHasData = r => ((r.text || "").trim() || (r.trials || []).some(t => t >= 0) || r.optionScore !== undefined);
-          const grpHasData = Object.values(data.remarks || {}).some(r =>
-            r.activityId === subActId && grpRemHasData(r)
-          );
-          if (!grpHasData) {
-            const real = Object.entries(data.activities || {}).find(([altId, a]) =>
-              altId !== subActId &&
-              a.targetName === target.name &&
-              (a.configId === sub.id || a.activityName === sub.name || (sub.title && a.activityName === sub.title)) &&
-              Object.values(data.remarks || {}).some(r =>
-                r.activityId === altId && grpRemHasData(r)
-              )
-            );
-            if (real) subActId = real[0];
+        // Same best-data-wins fix as individual session: when multiple records share
+        // the same configId (race between two devices on session open), always pick
+        // the one with the most real data so the display doesn't alternate.
+        if (sub.id) {
+          const grpSameConfig = Object.entries(data.activities || {})
+            .filter(([, a]) => a.configId === sub.id && a.targetName === target.name);
+          if (grpSameConfig.length > 1) {
+            const grpRemScore = ([actId]) => {
+              let s = 0;
+              for (const r of Object.values(data.remarks || {})) {
+                if (r.activityId !== actId) continue;
+                s += (r.trials || []).filter(t => t >= 0).length * 100;
+                if ((r.masteryNote || "").trim()) s += 50;
+                if ((r.text || "").trim()) s += 10;
+                if (r.optionScore !== undefined) s += 5;
+              }
+              return s;
+            };
+            const grpBest = grpSameConfig.reduce((a, b) => grpRemScore(a) >= grpRemScore(b) ? a : b);
+            subActId = grpBest[0];
           }
         }
         if (!subActId) {
