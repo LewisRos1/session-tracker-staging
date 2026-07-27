@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1132";
+const APP_VERSION = "1133";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2048,7 +2048,7 @@ function renderHalfYearReportsSection() {
       </button>
     </div>
     <div id="hyr-activity-filter" style="display:none;margin-top:.85rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:1rem 1.1rem">
-      <div style="font-size:.875rem;font-weight:600;color:#374151;margin-bottom:.8rem">Which activities do you want to exclude from the activity breakdown?</div>
+      <div style="font-size:.875rem;font-weight:600;color:#374151;margin-bottom:.8rem">Select the activities you want to <span style="text-decoration:underline">EXCLUDE</span> from the activity chart in the AI Report:</div>
       <div id="hyr-act-filter-list" style="display:flex;flex-direction:column;gap:1.1rem"></div>
     </div>
     <div id="hyr-progress" style="display:none;margin-top:.85rem">
