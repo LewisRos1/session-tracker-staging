@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1139";
+const APP_VERSION = "1140";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2194,7 +2194,7 @@ async function hyrGenerate() {
   const progress = $("hyr-progress");
   const bar      = $("hyr-progress-bar");
   const label    = $("hyr-progress-label");
-  const setProgress = (pct, text) => { bar.style.width = pct + "%"; label.textContent = text; };
+  const setProgress = (pct, text) => { bar.style.width = pct + "%"; label.textContent = text; btn.textContent = text; };
 
   btn.disabled = true; btn.textContent = "Generating…"; progress.style.display = "";
   setProgress(10, "Collecting session data…");
@@ -2608,8 +2608,8 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
       const bd = paSessionData(pa);
       if (!bd) continue;
       if (excludedActivities.has(`${tName}|${paKey}`)) continue;
-      const num = isActive ? ++activeNum : isMastered ? ++masteredNum : ++discontNum;
-      const ent = { name: `${num}) ${paKey}`, earliest: bd.earliest, latest: bd.latest, monthCount: bd.monthCount };
+      const num = isActive ? ++activeNum : isMastered ? ++masteredNum : ++discontNum; // eslint-disable-line no-unused-vars
+      const ent = { name: hyrStripActPrefix(paKey), earliest: bd.earliest, latest: bd.latest, monthCount: bd.monthCount };
       if (isActive) {
         if (pendingActiveHeader) { breakdownData[tName].push(pendingActiveHeader); pendingActiveHeader = null; }
         breakdownData[tName].push(ent);
@@ -2691,6 +2691,11 @@ function hyrCalcDailyAvg(sess, target) {
     }
   }
   return avgs.length > 0 ? avgs.reduce((a, b) => a + b, 0) / avgs.length : null;
+}
+
+function hyrStripActPrefix(name) {
+  // Remove leading "1) ", "12) ", "a) ", "b) " prefixes, including stacked ones like "1) b) "
+  return (name || "").replace(/^(\s*(\d+|[a-zA-Z])\)\s*)+/, "").trim();
 }
 
 function hyrStripHtml(s) {

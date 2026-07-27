@@ -1021,20 +1021,17 @@ function addActivityBreakdownHalfSheets(wb, allTargets, sessions) {
 
         let displayName;
         if (pa.parentActivity) {
-          const pIdx    = parentSectionIdx[pa.parentActivity];
+          const pIdx    = parentSectionIdx[pa.parentActivity]; // eslint-disable-line no-unused-vars
           const letterN = parentSubCount[pa.parentActivity] ?? 0;
           parentSubCount[pa.parentActivity] = letterN + 1;
-          const letter = String.fromCharCode(97 + letterN);
-          const subBase = (pa.title || pa.name || "").trim();
-          displayName = pIdx != null
-            ? `${pIdx}) ${letter}) ${subBase || `<Sub ${letter}>`}`
-            : `${letter}) ${subBase || `<Sub-Activity ${letter}>`}`;
+          const subBase = stripActPrefix((pa.title || pa.name || "").trim());
+          displayName = subBase || "<Sub-Activity>";
         } else {
           let sectionIdx;
           if (isActive)        { sectionIdx = ++activeIdx; }
           else if (isMastered) { sectionIdx = ++masteredIdx; }
           else                 { sectionIdx = ++discontinuedIdx; }
-          displayName = `${sectionIdx}) ${pa.title?.trim() || pa.name?.trim() || `<Activity ${sectionIdx}>`}`;
+          displayName = stripActPrefix(pa.title?.trim() || pa.name?.trim() || "") || `<Activity ${sectionIdx}>`;
           parentSectionIdx[pa.title || pa.name] = sectionIdx;
         }
 
@@ -3051,6 +3048,10 @@ function fmtDate(dateStr) {
 }
 
 // ─── CHART HELPERS ───────────────────────────────────────────
+
+function stripActPrefix(name) {
+  return (name || "").replace(/^(\s*(\d+|[a-zA-Z])\)\s*)+/, "").trim();
+}
 
 function linearRegressionValues(yValues) {
   const n = yValues.length;
