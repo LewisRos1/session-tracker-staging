@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1151";
+const APP_VERSION = "1152";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -10744,7 +10744,8 @@ function showAutoDateConfirm({ message, confirmLabel }) {
 function addOneDay(dateStr) {
   const d = new Date(dateStr + "T00:00:00");
   d.setDate(d.getDate() + 1);
-  return d.toISOString().slice(0, 10);
+  // Use local date parts — toISOString() returns UTC which shifts the date in UTC+ timezones
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function isActivityActive(pa, dateStr) {
