@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1166";
+const APP_VERSION = "1167";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -12603,9 +12603,18 @@ function renderTargetManageContent(student, target) {
   }
 
   initDragSort($("mn-act-list"), async newOrder => {
-    const reordered = newOrder.map(oldIdx => acts[oldIdx]);
-    reordered.forEach((a, i) => a.order = i);
-    target.predefinedActivities = reordered;
+    // newOrder only contains indices of top-level drag rows (sub-activities are rendered
+    // inline inside their parent and don't have their own drag rows). Re-attach each
+    // parent's sub-activities immediately after it so they're not dropped from the array.
+    const topLevel = newOrder.map(oldIdx => acts[oldIdx]);
+    const result = [];
+    for (const a of topLevel) {
+      result.push(a);
+      const key = a.title || a.name;
+      if (key) result.push(...acts.filter(a2 => a2.parentActivity === key));
+    }
+    result.forEach((a, i) => a.order = i);
+    target.predefinedActivities = result;
     await saveTarget();
     const scrollPos = $("manage-modal-body").scrollTop;
     renderTargetManageContent(student, target);
@@ -14102,9 +14111,15 @@ function renderTemplateManageContent(template) {
   }
 
   initDragSort($("mn-act-list"), async newOrder => {
-    const reordered = newOrder.map(oldIdx => acts[oldIdx]);
-    reordered.forEach((a, i) => a.order = i);
-    template.predefinedActivities = reordered;
+    const topLevel = newOrder.map(oldIdx => acts[oldIdx]);
+    const result = [];
+    for (const a of topLevel) {
+      result.push(a);
+      const key = a.title || a.name;
+      if (key) result.push(...acts.filter(a2 => a2.parentActivity === key));
+    }
+    result.forEach((a, i) => a.order = i);
+    template.predefinedActivities = result;
     await saveTemplateFn();
     const scrollPos = $("manage-modal-body").scrollTop;
     renderTemplateManageContent(template);
