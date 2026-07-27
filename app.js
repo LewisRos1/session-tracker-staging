@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1163";
+const APP_VERSION = "1164";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -7814,31 +7814,31 @@ function buildTargetViewTable(target, data) {
       let entry = pa.id ? (candidateEntries.find(([, a]) => a.configId === pa.id) || null) : null;
       if (!entry) {
         if (isSub) {
-          entry = candidateEntries.find(([, a]) => a.parentActivity === pa.parentActivity) || null;
-          if (!entry && pa.parentActivity) {
-            // After migration, pa.parentActivity may have been updated to the parent's new pa.name
-            // (details text), but old session records still store the old display name (pa.title).
-            // Find the parent config entry and try the opposite name variant as the lookup key.
-            const parentPa = (target.predefinedActivities || []).find(
-              p => !p.parentActivity && (p.name === pa.parentActivity || (p.title && p.title === pa.parentActivity))
-            );
-            if (parentPa) {
-              const altKey = parentPa.name === pa.parentActivity ? parentPa.title : parentPa.name;
-              if (altKey) entry = candidateEntries.find(([, a]) => a.parentActivity === altKey) || null;
-            }
-          }
-          if (!entry) {
-            // Only block the fallback when a NAMED top-level config matches — a top-level activity
-            // with name:"" (like a title-only parent such as "Social Skills") would always match
-            // sub-activities that also have name:"" and incorrectly prevent them from finding their
-            // old records (which were stored with activityName:"" due to the parentActivity bug).
-            const hasTopLevelConfig = (target.predefinedActivities || []).some(p =>
-              !p.parentActivity && !p.isHeading && !p.isNote && !p.isExportNote && p.name && p.name === pa.name
-            );
-            if (!hasTopLevelConfig) {
-              entry = sortByData(candidateEntries.filter(([, a]) => !a.parentActivity))[0] || null;
-            }
-          }
+          // All current config name/title keys — records whose parentActivity is NOT in this
+          // set were stored with an old parent name (e.g. with *bold*/_underline_ markers
+          // before the title/details split) and are "orphaned" from the current config.
+          const knownConfigKeys = new Set(
+            (target.predefinedActivities || []).flatMap(p => [p.name, p.title].filter(Boolean))
+          );
+          // Don't use orphaned/legacy fallbacks if a same-named top-level config exists —
+          // that would steal data belonging to the genuine top-level activity.
+          const hasTopLevelConfig = (target.predefinedActivities || []).some(p =>
+            !p.parentActivity && !p.isHeading && !p.isNote && !p.isExportNote && p.name && p.name === pa.name
+          );
+          // Accepted candidates: (a) exact parentActivity match, (b) orphaned old-format
+          // parent reference no longer in current config, (c) falsy parentActivity (legacy bug)
+          const subCandidates = hasTopLevelConfig
+            ? candidateEntries.filter(([, a]) => a.parentActivity === pa.parentActivity)
+            : candidateEntries.filter(([, a]) =>
+                a.parentActivity === pa.parentActivity ||
+                (a.parentActivity && !knownConfigKeys.has(a.parentActivity)) ||
+                !a.parentActivity
+              );
+          // Prefer the record with real data over empty placeholders
+          const actHasReal = id => Object.values(data.remarks || {}).some(r =>
+            r.activityId === id && ((r.text || "").trim() || (r.trials || []).some(t => t >= 0))
+          );
+          entry = subCandidates.find(([id]) => actHasReal(id)) || sortByData(subCandidates)[0] || null;
         } else {
           const claimable = pa.name === ""
             ? candidateEntries.filter(([, a]) => !a.parentActivity && a.activityName !== "")
@@ -9513,18 +9513,24 @@ function buildGroupTargetViewTable(target, data, attendees) {
       let entry2 = pa.id ? (candidateEntries2.find(([, a]) => a.configId === pa.id) || null) : null;
       if (!entry2) {
         if (isSub2) {
-          entry2 = candidateEntries2.find(([, a]) => a.parentActivity === pa.parentActivity) || null;
-          if (!entry2) {
-            const hasTopLevelConfig2 = (target.predefinedActivities || []).some(p =>
-              !p.parentActivity && !p.isHeading && !p.isNote && !p.isExportNote && p.name && p.name === pa.name
-            );
-            if (!hasTopLevelConfig2) {
-              entry2 = sortByData2(candidateEntries2.filter(([, a]) => !a.parentActivity))[0] || null;
-            }
-          }
+          const knownConfigKeys2 = new Set(
+            (target.predefinedActivities || []).flatMap(p => [p.name, p.title].filter(Boolean))
+          );
+          const hasTopLevelConfig2 = (target.predefinedActivities || []).some(p =>
+            !p.parentActivity && !p.isHeading && !p.isNote && !p.isExportNote && p.name && p.name === pa.name
+          );
+          const subCandidates2 = hasTopLevelConfig2
+            ? candidateEntries2.filter(([, a]) => a.parentActivity === pa.parentActivity)
+            : candidateEntries2.filter(([, a]) =>
+                a.parentActivity === pa.parentActivity ||
+                (a.parentActivity && !knownConfigKeys2.has(a.parentActivity)) ||
+                !a.parentActivity
+              );
+          const actHasReal2 = id => Object.values(data.remarks || {}).some(r =>
+            r.activityId === id && ((r.text || "").trim() || (r.trials || []).some(t => t >= 0))
+          );
+          entry2 = subCandidates2.find(([id]) => actHasReal2(id)) || sortByData2(subCandidates2)[0] || null;
         } else {
-          // Don't let a title-only parent (name:"") steal records with activityName:"" — those
-          // belong to its sub-activities which also had name:"" due to the legacy bug.
           const claimable2 = pa.name === ""
             ? candidateEntries2.filter(([, a]) => !a.parentActivity && a.activityName !== "")
             : candidateEntries2.filter(([, a]) => !a.parentActivity);
@@ -16689,10 +16695,18 @@ function findActivityByName(targetName, activityName, parentActivity = null, con
     if (parentActivity) {
       const adopt = entries.find(e => byName(e) && e[1].parentActivity === parentActivity && !e[1].configId);
       if (adopt) return { id: adopt[0], ...adopt[1] };
-      // Legacy fallback: old sub-activity records stored with falsy parentActivity (parent's empty
-      // details field was used as the key instead of title) — treat them as adoptable
+      // Legacy: falsy parentActivity (stored from empty parent.name)
       const legacy = entries.find(e => byName(e) && !e[1].parentActivity && !e[1].configId);
-      return legacy ? { id: legacy[0], ...legacy[1] } : null;
+      if (legacy) return { id: legacy[0], ...legacy[1] };
+      // Orphaned: parentActivity is a non-empty old-format value (e.g. with *bold*/_underline_
+      // markers from before the title/details split) that no longer matches the current key.
+      // Safe to adopt only when no same-named top-level record exists (would mean a name clash).
+      const hasTopLevel = entries.some(e => byName(e) && !e[1].parentActivity);
+      if (!hasTopLevel) {
+        const orphaned = entries.find(e => byName(e) && !e[1].configId);
+        if (orphaned) return { id: orphaned[0], ...orphaned[1] };
+      }
+      return null;
     }
     const adopt = entries.find(e => byName(e) && !e[1].parentActivity && !e[1].configId);
     return adopt ? { id: adopt[0], ...adopt[1] } : null;
@@ -16700,9 +16714,16 @@ function findActivityByName(targetName, activityName, parentActivity = null, con
   if (parentActivity) {
     const exact = entries.find(e => byName(e) && e[1].parentActivity === parentActivity);
     if (exact) return { id: exact[0], ...exact[1] };
-    // Legacy fallback: old sub-activities had parentActivity:"" or unset (falsy)
+    // Legacy: falsy parentActivity (stored from empty parent.name)
     const legacy = entries.find(e => byName(e) && !e[1].parentActivity);
-    return legacy ? { id: legacy[0], ...legacy[1] } : null;
+    if (legacy) return { id: legacy[0], ...legacy[1] };
+    // Orphaned old-format parentActivity — adopt if no same-named top-level record exists
+    const hasTopLevel = entries.some(e => byName(e) && !e[1].parentActivity);
+    if (!hasTopLevel) {
+      const orphaned = entries.find(e => byName(e));
+      if (orphaned) return { id: orphaned[0], ...orphaned[1] };
+    }
+    return null;
   }
   // Top-level: only match records with no parentActivity set
   const top = entries.find(e => byName(e) && !e[1].parentActivity);
