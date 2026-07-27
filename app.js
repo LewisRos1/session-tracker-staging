@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1147";
+const APP_VERSION = "1148";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4214,7 +4214,7 @@ function renderManageActivityScreen(student) {
         : '';
       const parentHint = parentNote ? `<span style="font-size:.72rem;color:#9ca3af"> (parent: ${escHtml(parentNote)})</span>` : '';
       const rowBg = indent ? 'background:#f0f9ff;border-left:3px solid #60a5fa;border-radius:.3rem;' : '';
-      return `<div style="${rowBg}display:flex;align-items:center;gap:.5rem;padding:.5rem .65rem">
+      return `<div data-pa-id="${escHtml(pa.id||'')}" style="${rowBg}display:flex;align-items:center;gap:.5rem;padding:.5rem .65rem">
         <div style="flex:1;min-width:0">
           <div style="font-size:.9rem;font-weight:600;color:#111827">${escHtml(displayName)}${parentHint}</div>
           ${badge ? `<div style="margin-top:.12rem">${badge}</div>` : ''}
@@ -4240,7 +4240,7 @@ function renderManageActivityScreen(student) {
         const parentNote = pa.parentActivity ? ` — parent: ${escHtml(pa.parentActivity)}` : '';
         const dateNote = label === 'mastered' && pa.masteredOn ? ` on ${fmtPeriodDate(pa.masteredOn)}`
           : label === 'discontinued' && pa.discontinuedOn ? ` on ${fmtPeriodDate(pa.discontinuedOn)}` : '';
-        return `<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .65rem;background:#f9fafb;border-radius:.3rem">
+        return `<div data-pa-id="${escHtml(pa.id||'')}" style="display:flex;align-items:center;gap:.5rem;padding:.45rem .65rem;background:#f9fafb;border-radius:.3rem">
           <div style="flex:1;min-width:0">
             <span style="font-size:.88rem;font-weight:600;color:#374151">${escHtml(displayName)}</span>
             <span style="font-size:.72rem;color:${color}">${dateNote}${parentNote}</span>
@@ -4374,6 +4374,26 @@ function renderManageActivityScreen(student) {
       renderManageActivityScreen(student);
     });
   });
+}
+
+function maScrollAndBlink(paId) {
+  if (!paId) return;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const list = $("session-picker-list");
+    if (!list) return;
+    const row = list.querySelector(`[data-pa-id="${CSS.escape(paId)}"]`);
+    if (!row) return;
+    const panel = row.closest('[id^="ma-col-"]');
+    if (panel && panel.style.display !== "flex") {
+      const toggle = list.querySelector(`[data-col-id="${panel.id}"]`);
+      if (toggle) toggle.click();
+    }
+    requestAnimationFrame(() => {
+      row.scrollIntoView({ block: "center", behavior: "smooth" });
+      row.classList.add("activity-cfg-blink");
+      row.addEventListener("animationend", () => row.classList.remove("activity-cfg-blink"), { once: true });
+    });
+  }));
 }
 
 // ============================================================
@@ -12135,6 +12155,7 @@ function renderTargetManageContent(student, target) {
         <div style="position:relative">
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:250px;overflow:hidden">
+            <button class="mn-km-manage-act" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#0369a1">🪄 Manage Activity</button>
             <div style="display:flex;align-items:stretch">
               <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
               <span title="Permanently removes this activity and all of its session data. This cannot be undone." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
@@ -12239,6 +12260,7 @@ function renderTargetManageContent(student, target) {
           <div style="position:relative">
             <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
             <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:250px;overflow:hidden">
+              <button class="mn-km-manage-act" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#0369a1">🪄 Manage Activity</button>
               <div style="display:flex;align-items:stretch">
                 <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
                 <span title="Deletes this activity and all its sub-activities." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
@@ -12288,6 +12310,7 @@ function renderTargetManageContent(student, target) {
           <div style="position:relative">
             <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
             <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:250px;overflow:hidden">
+              <button class="mn-km-manage-act" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#0369a1">🪄 Manage Activity</button>
               <div style="display:flex;align-items:stretch">
                 <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
                 <span title="Permanently removes this activity and all of its session data. This cannot be undone." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
@@ -12824,6 +12847,21 @@ function renderTargetManageContent(student, target) {
       panel.style.display = open ? "none" : "block";
       if (arrow) arrow.textContent = open ? "▶" : "▼";
       if (!open) panel.querySelectorAll(".mn-inactive-name-input").forEach(autoResizeTextarea);
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-km-manage-act").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (_groupForTargetEdit) return;
+      const idx = Number(btn.dataset.idx);
+      if (!acts[idx]) return;
+      const paId = acts[idx].id;
+      await closeManageModal();
+      const freshStudent = state.students.find(s => s.id === student.id) || student;
+      $("session-picker-title").textContent = freshStudent.name + " — Manage Activity";
+      $("session-picker-modal").classList.remove("hidden");
+      renderManageActivityScreen(freshStudent);
+      maScrollAndBlink(paId);
     });
   });
 
