@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1159";
+const APP_VERSION = "1160";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -7765,7 +7765,11 @@ function buildTargetViewTable(target, data) {
       }
       if (!isSub && (parentActNames.has(pa.name) || (pa.title && parentActNames.has(pa.title)))) {
         Object.entries(data.activities || {})
-          .filter(([, a]) => a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title)))
+          .filter(([, a]) => a.targetName === target.name && (
+            (pa.name && a.activityName === pa.name) ||
+            (pa.title && a.activityName === pa.title) ||
+            (pa.id && a.configId === pa.id)
+          ))
           .forEach(([id]) => matchedIds.add(id));
         const _paMastered = pa.masteredOn || (pa.inactiveReason === 'mastered' ? "2026-06-30" : null);
         const paBadge = pa.maintained
@@ -7820,15 +7824,22 @@ function buildTargetViewTable(target, data) {
             }
           }
           if (!entry) {
+            // Only block the fallback when a NAMED top-level config matches — a top-level activity
+            // with name:"" (like a title-only parent such as "Social Skills") would always match
+            // sub-activities that also have name:"" and incorrectly prevent them from finding their
+            // old records (which were stored with activityName:"" due to the parentActivity bug).
             const hasTopLevelConfig = (target.predefinedActivities || []).some(p =>
-              !p.parentActivity && !p.isHeading && !p.isNote && !p.isExportNote && p.name === pa.name
+              !p.parentActivity && !p.isHeading && !p.isNote && !p.isExportNote && p.name && p.name === pa.name
             );
             if (!hasTopLevelConfig) {
               entry = sortByData(candidateEntries.filter(([, a]) => !a.parentActivity))[0] || null;
             }
           }
         } else {
-          entry = sortByData(candidateEntries.filter(([, a]) => !a.parentActivity))[0] || null;
+          const claimable = pa.name === ""
+            ? candidateEntries.filter(([, a]) => !a.parentActivity && a.activityName !== "")
+            : candidateEntries.filter(([, a]) => !a.parentActivity);
+          entry = sortByData(claimable)[0] || null;
         }
       }
       if (entry && pa.id && !entry[1].configId) {
@@ -9501,14 +9512,19 @@ function buildGroupTargetViewTable(target, data, attendees) {
           entry2 = candidateEntries2.find(([, a]) => a.parentActivity === pa.parentActivity) || null;
           if (!entry2) {
             const hasTopLevelConfig2 = (target.predefinedActivities || []).some(p =>
-              !p.parentActivity && !p.isHeading && !p.isNote && !p.isExportNote && p.name === pa.name
+              !p.parentActivity && !p.isHeading && !p.isNote && !p.isExportNote && p.name && p.name === pa.name
             );
             if (!hasTopLevelConfig2) {
               entry2 = sortByData2(candidateEntries2.filter(([, a]) => !a.parentActivity))[0] || null;
             }
           }
         } else {
-          entry2 = sortByData2(candidateEntries2.filter(([, a]) => !a.parentActivity))[0] || null;
+          // Don't let a title-only parent (name:"") steal records with activityName:"" — those
+          // belong to its sub-activities which also had name:"" due to the legacy bug.
+          const claimable2 = pa.name === ""
+            ? candidateEntries2.filter(([, a]) => !a.parentActivity && a.activityName !== "")
+            : candidateEntries2.filter(([, a]) => !a.parentActivity);
+          entry2 = sortByData2(claimable2)[0] || null;
         }
       }
       if (entry2 && pa.id && !entry2[1].configId) {
