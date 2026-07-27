@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1169";
+const APP_VERSION = "1170";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -5372,6 +5372,8 @@ async function openSession(student, existingSessionId = null, dateStr = null) {
   state.entryRemarkSaver = setupEntryRemarkSaving($("target-content"), () => state.currentSessionId, () => {
     if (!state.renderPending || state.entryActionsInFlight > 0) return;
     if (document.activeElement === $("target-select")) return;
+    const _tc = $("target-content"), _ae = document.activeElement;
+    if (_tc?.contains(_ae) && (_ae?.tagName === "TEXTAREA" || _ae?.tagName === "INPUT")) return;
     state.renderPending = false;
     renderTargetContent();
   });
@@ -5883,19 +5885,22 @@ function renderFedcTarget(target) {
         // Same fix as v1165 on the view screens: if the configId-matched record has no
         // actual remark data, an empty auto-fill placeholder may have been adopted with
         // this configId — fall through to find the real data-bearing record instead.
+        // Two devices racing on session open (autoFillStructuredRemarks) can each create
+        // a separate placeholder with the same configId; whichever comes first in
+        // Object.entries wins and alternates as Firestore reshuffles after each write.
+        // Prefer configId-based lookup to find the duplicate that actually has data.
         if (subActData && sub.id) {
+          const remHasData = r => ((r.text || "").trim() || (r.trials || []).some(t => t >= 0) || r.optionScore !== undefined);
           const subHasData = Object.values(state.sessionData?.remarks || {}).some(r =>
-            r.activityId === subActData.id &&
-            ((r.text || "").trim() || (r.trials || []).some(t => t >= 0))
+            r.activityId === subActData.id && remHasData(r)
           );
           if (!subHasData) {
             const real = Object.entries(state.sessionData?.activities || {}).find(([altId, a]) =>
               altId !== subActData.id &&
               a.targetName === target.name &&
-              (a.activityName === (sub.title || sub.name)) &&
+              (a.configId === sub.id || a.activityName === sub.name || (sub.title && a.activityName === sub.title)) &&
               Object.values(state.sessionData.remarks || {}).some(r =>
-                r.activityId === altId &&
-                ((r.text || "").trim() || (r.trials || []).some(t => t >= 0))
+                r.activityId === altId && remHasData(r)
               )
             );
             if (real) subActData = { id: real[0], ...real[1] };
@@ -15430,20 +15435,20 @@ function buildGroupItemsByActivity(target, data, attendees) {
           (a.targetName === target.name && a.activityName === sub.name && a.parentActivity === sub.parentActivity)
         )?.[0] || null;
         // Same actHasData fallback as individual session + view screens: if the matched
-        // record is an empty placeholder, find the real data-bearing record instead.
+        // record is an empty placeholder (e.g. two devices racing on session open),
+        // find the real data-bearing record instead — prefer configId for reliability.
         if (subActId && sub.id) {
+          const grpRemHasData = r => ((r.text || "").trim() || (r.trials || []).some(t => t >= 0) || r.optionScore !== undefined);
           const grpHasData = Object.values(data.remarks || {}).some(r =>
-            r.activityId === subActId &&
-            ((r.text || "").trim() || (r.trials || []).some(t => t >= 0))
+            r.activityId === subActId && grpRemHasData(r)
           );
           if (!grpHasData) {
             const real = Object.entries(data.activities || {}).find(([altId, a]) =>
               altId !== subActId &&
               a.targetName === target.name &&
-              a.activityName === sub.name &&
+              (a.configId === sub.id || a.activityName === sub.name || (sub.title && a.activityName === sub.title)) &&
               Object.values(data.remarks || {}).some(r =>
-                r.activityId === altId &&
-                ((r.text || "").trim() || (r.trials || []).some(t => t >= 0))
+                r.activityId === altId && grpRemHasData(r)
               )
             );
             if (real) subActId = real[0];
