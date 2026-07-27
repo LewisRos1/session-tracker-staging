@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1133";
+const APP_VERSION = "1134";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2103,19 +2103,46 @@ function renderHalfYearReportsSection() {
   $("hyr-period-select").addEventListener("change", e => {
     const actFilter = $("hyr-activity-filter");
     if (!e.target.value) { actFilter.style.display = "none"; return; }
-    const student = state.students.find(s => s.id === $("hyr-student-select").value);
+    const studentId = $("hyr-student-select").value;
+    const student = state.students.find(s => s.id === studentId);
     if (!student) return;
-    hyrPopulateActivityFilter(student);
+    hyrPopulateActivityFilter(student, studentId, e.target.value);
     actFilter.style.display = "";
   });
 
   $("hyr-btn-generate").addEventListener("click", hyrGenerate);
 }
 
-function hyrPopulateActivityFilter(student) {
+function hyrExclKey(studentId, periodVal) {
+  return `hyr-excl|${studentId}|${periodVal}`;
+}
+
+function hyrLoadExcluded(studentId, periodVal) {
+  try { return new Set(JSON.parse(localStorage.getItem(hyrExclKey(studentId, periodVal))) || []); }
+  catch { return new Set(); }
+}
+
+function hyrSaveExcluded(studentId, periodVal) {
+  const excluded = [];
+  document.querySelectorAll(".hyr-act-cb[data-excluded='true']").forEach(btn => {
+    excluded.push(`${btn.dataset.target}|${btn.dataset.activity}`);
+  });
+  localStorage.setItem(hyrExclKey(studentId, periodVal), JSON.stringify(excluded));
+}
+
+function hyrApplyCbState(btn, excluded) {
+  btn.dataset.excluded    = excluded ? "true" : "false";
+  btn.textContent         = excluded ? "✕" : "";
+  btn.style.background    = excluded ? "#fee2e2" : "#fff";
+  btn.style.borderColor   = excluded ? "#ef4444" : "#d1d5db";
+  btn.style.color         = excluded ? "#ef4444" : "transparent";
+}
+
+function hyrPopulateActivityFilter(student, studentId, periodVal) {
   const list = $("hyr-act-filter-list");
   if (!list) return;
   list.innerHTML = "";
+  const saved = hyrLoadExcluded(studentId, periodVal);
   const targets = (student.targets || []).filter(t =>
     (t.predefinedActivities || []).some(pa => !pa.isHeading && !pa.isMaintainHeading && (pa.title || pa.name))
   );
@@ -2143,13 +2170,11 @@ function hyrPopulateActivityFilter(student) {
     list.appendChild(group);
   }
   list.querySelectorAll(".hyr-act-cb").forEach(btn => {
+    const key = `${btn.dataset.target}|${btn.dataset.activity}`;
+    if (saved.has(key)) hyrApplyCbState(btn, true);
     btn.addEventListener("click", () => {
-      const nowExcluded = btn.dataset.excluded !== "true";
-      btn.dataset.excluded = nowExcluded ? "true" : "false";
-      btn.textContent  = nowExcluded ? "✕" : "";
-      btn.style.background   = nowExcluded ? "#fee2e2" : "#fff";
-      btn.style.borderColor  = nowExcluded ? "#ef4444" : "#d1d5db";
-      btn.style.color        = nowExcluded ? "#ef4444" : "transparent";
+      hyrApplyCbState(btn, btn.dataset.excluded !== "true");
+      hyrSaveExcluded(studentId, periodVal);
     });
   });
 }
