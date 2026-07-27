@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1126";
+const APP_VERSION = "1127";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2399,19 +2399,29 @@ async function hyrCollectData(student, period, year) {
           if (!actMonthlyAvgs[mLabel]) actMonthlyAvgs[mLabel] = [];
           actMonthlyAvgs[mLabel].push(rem.avg);
         }
-        let actEarliest = null, actLatest = null;
+        const actDataMonths = [];
         for (let m = startMonth; m <= endMonth; m++) {
           const mLabel = shortMonths[m - 1];
           const scores = actMonthlyAvgs[mLabel];
           if (!scores || scores.length === 0) continue;
-          const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-          if (actEarliest === null) actEarliest = { label: mLabel, avg };
-          actLatest = { label: mLabel, avg };
+          actDataMonths.push({ label: mLabel, avg: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) });
         }
-        if (actEarliest !== null) {
-          const monthCount = Object.values(actMonthlyAvgs).filter(s => s.length > 0).length;
+        if (actDataMonths.length > 0) {
+          let actEarliest, actLatest;
+          if (actDataMonths.length >= 2) {
+            const yVals = actDataMonths.map(d => d.avg);
+            const n = yVals.length, xMean = (n + 1) / 2, yMean = yVals.reduce((a, b) => a + b, 0) / n;
+            let num = 0, den = 0;
+            yVals.forEach((y, i) => { const x = i + 1; num += (x - xMean) * (y - yMean); den += (x - xMean) ** 2; });
+            const slope = den !== 0 ? num / den : 0, intercept = yMean - slope * xMean;
+            actEarliest = { label: actDataMonths[0].label,                      avg: Math.max(0, Math.min(100, slope + intercept)) };
+            actLatest   = { label: actDataMonths[actDataMonths.length - 1].label, avg: Math.max(0, Math.min(100, slope * n + intercept)) };
+          } else {
+            actEarliest = actDataMonths[0];
+            actLatest   = actDataMonths[0];
+          }
           const dispName = actDisplayNames[actName] || actName;
-          bdMap[dispName] = { earliest: actEarliest, latest: actLatest, monthCount };
+          bdMap[dispName] = { earliest: actEarliest, latest: actLatest, monthCount: actDataMonths.length };
         }
 
         if (allRemarks.length === 0) {
@@ -2472,17 +2482,28 @@ async function hyrCollectData(student, period, year) {
           monthly[mLabel].push(avg);
         }
       }
-      let earliest = null, latest = null;
+      const dataMonths = [];
       for (let m = startMonth; m <= endMonth; m++) {
         const mLabel = shortMonths[m - 1];
         const scores = monthly[mLabel];
         if (!scores?.length) continue;
-        const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-        if (earliest === null) earliest = { label: mLabel, avg };
-        latest = { label: mLabel, avg };
+        dataMonths.push({ label: mLabel, avg: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) });
       }
-      if (earliest === null) return null;
-      return { earliest, latest, monthCount: Object.values(monthly).filter(s => s.length > 0).length };
+      if (dataMonths.length === 0) return null;
+      let earliest, latest;
+      if (dataMonths.length >= 2) {
+        const yVals = dataMonths.map(d => d.avg);
+        const n = yVals.length, xMean = (n + 1) / 2, yMean = yVals.reduce((a, b) => a + b, 0) / n;
+        let num = 0, den = 0;
+        yVals.forEach((y, i) => { const x = i + 1; num += (x - xMean) * (y - yMean); den += (x - xMean) ** 2; });
+        const slope = den !== 0 ? num / den : 0, intercept = yMean - slope * xMean;
+        earliest = { label: dataMonths[0].label,                   avg: Math.max(0, Math.min(100, slope + intercept)) };
+        latest   = { label: dataMonths[dataMonths.length - 1].label, avg: Math.max(0, Math.min(100, slope * n + intercept)) };
+      } else {
+        earliest = dataMonths[0];
+        latest   = dataMonths[0];
+      }
+      return { earliest, latest, monthCount: dataMonths.length };
     };
 
     let activeNum = 0, masteredNum = 0, discontNum = 0;
@@ -3453,7 +3474,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
         const numPrefix = targetNum ? `${targetNum}) ` : "";
         const chartTitle = `${numPrefix}${target.name} - Progress (${rangeLabel})${pageSuffix}`;
         const headingTitle = `${numPrefix}${target.name}${pageSuffix}`;
-        const result = renderActivityBreakdownChart(target.name, pageData, rangeLabel, chartTitle);
+        const result = renderActivityBreakdownChart(target.name, pageData, rangeLabel, chartTitle, false, ["Trendline Start", "Trendline End"]);
         if (result) {
           h += `<div style="margin-top:1.5rem"><p style="font-weight:700;font-size:.95rem;margin:0 0 .35rem">${esc(headingTitle)}</p>`;
           h += `<img src="data:image/png;base64,${result.base64}" style="width:100%;max-width:600px;display:block;margin:.25rem 0 1rem"></div>`;
@@ -3745,7 +3766,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
         const numPrefix = targetNum ? `${targetNum}) ` : "";
         const chartTitle = `${numPrefix}${target.name} - Progress (${rangeLabel})${pageSuffix}`;
         const headingTitle = `${numPrefix}${target.name}${pageSuffix}`;
-        const abResult = renderActivityBreakdownChart(target.name, pageData, rangeLabel, chartTitle);
+        const abResult = renderActivityBreakdownChart(target.name, pageData, rangeLabel, chartTitle, false, ["Trendline Start", "Trendline End"]);
         if (abResult) {
           const abH = Math.round(600 * abResult.height / 760);
           appendixParas.push(mkPara(headingTitle, { heading: HeadingLevel.HEADING_2, before: firstChart ? 120 : 0, after: 100, size: 24, bold: true, pageBreak: !firstChart }));
