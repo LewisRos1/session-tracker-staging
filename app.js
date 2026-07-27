@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1135";
+const APP_VERSION = "1136";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2047,12 +2047,8 @@ function renderHalfYearReportsSection() {
         Generate Report
       </button>
     </div>
-    <style>
-      @keyframes hyrLabelBlink { 0%,100%{opacity:1} 50%{opacity:.35} }
-      .hyr-label-blink { animation: hyrLabelBlink 1.1s ease-in-out infinite; }
-    </style>
-    <div id="hyr-activity-filter" style="display:none;margin-top:.85rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:1rem 1.1rem">
-      <div class="hyr-label-blink" style="font-size:.875rem;font-weight:600;color:#374151;margin-bottom:.8rem">Select the activities you want to <span style="text-decoration:underline;font-weight:800">EXCLUDE</span> from the activity chart in the AI Report:</div>
+    <div id="hyr-activity-filter" class="hyr-excl-pulse" style="display:none;margin-top:.85rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:1rem 1.1rem">
+      <div style="font-size:.875rem;font-weight:600;color:#374151;margin-bottom:.8rem">Select the activities you want to <span style="text-decoration:underline;font-weight:800">EXCLUDE</span> from the activity chart in the AI Report:</div>
       <div id="hyr-act-filter-list" style="display:flex;flex-direction:column;gap:1.1rem"></div>
     </div>
     <div id="hyr-progress" style="display:none;margin-top:.85rem">

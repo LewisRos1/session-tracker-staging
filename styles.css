@@ -141,6 +141,23 @@ html, body {
   animation: actCfgBlink 1.4s ease-in-out;
 }
 
+@keyframes btnFlashHint {
+  0%, 100% { box-shadow: none; outline: none; }
+  25%, 75%  { box-shadow: 0 0 0 4px #93c5fd; outline: 2px solid #3b82f6; }
+  50%       { box-shadow: 0 0 0 6px #bfdbfe; outline: 2px solid #60a5fa; }
+}
+.btn-flash-hint {
+  animation: btnFlashHint 1.1s ease-in-out;
+}
+
+@keyframes hyrExcludeGlow {
+  0%, 100% { box-shadow: none;                  border-color: #e5e7eb; }
+  50%       { box-shadow: 0 0 0 5px #fca5a5;    border-color: #ef4444; }
+}
+.hyr-excl-pulse {
+  animation: hyrExcludeGlow .85s ease-in-out infinite;
+}
+
 @keyframes pin-shake {
   0%, 100% { transform: translateX(0); }
   15%  { transform: translateX(-8px); }
