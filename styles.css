@@ -155,7 +155,7 @@ html, body {
   50%       { box-shadow: 0 0 0 5px #fca5a5;    border-color: #ef4444; }
 }
 .hyr-excl-pulse {
-  animation: hyrExcludeGlow .85s ease-in-out infinite;
+  animation: hyrExcludeGlow .85s ease-in-out 4;
 }
 
 @keyframes pin-shake {
