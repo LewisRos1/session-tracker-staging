@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1167";
+const APP_VERSION = "1168";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -11925,6 +11925,10 @@ function initDragSort(listEl, onReorder) {
       .map(el => Number(el.dataset.idx));
     dragEl = null;
     placeholder = null;
+    // Suppress the synthetic click that the browser fires at the drop position —
+    // otherwise buttons (e.g. "Add Sub-activity") under the release point get clicked.
+    document.addEventListener('click', e => { e.stopPropagation(); e.preventDefault(); },
+      { capture: true, once: true });
     onReorder(newOrder);
   };
 
@@ -12802,6 +12806,13 @@ function renderTargetManageContent(student, target) {
       const label = item?.isHeading ? "section heading" : item?.isMaintainHeading ? "maintain section heading" : item?.isNote ? "internal note" : item?.isExportNote ? "export note" : item?.isMapped ? "mapped-score activity" : item?.isMaintain ? "maintain activity (fixed)" : item?.isMaintainLive ? "maintain activity" : "activity";
       if (!confirm(`Delete this ${label}?`)) return;
       acts.splice(idx, 1);
+      // Also remove any sub-activities whose parent was just deleted
+      const parentKey = item?.title || item?.name;
+      if (parentKey) {
+        for (let i = acts.length - 1; i >= 0; i--) {
+          if (acts[i].parentActivity === parentKey) acts.splice(i, 1);
+        }
+      }
       acts.forEach((a, i) => a.order = i);
       target.predefinedActivities = acts;
       await saveTarget();
@@ -14265,6 +14276,12 @@ function renderTemplateManageContent(template) {
       const label = item?.isHeading ? "section heading" : item?.isNote ? "reference note" : "activity";
       if (!confirm(`Delete this ${label}?`)) return;
       acts.splice(idx, 1);
+      const parentKey2 = item?.title || item?.name;
+      if (parentKey2) {
+        for (let i = acts.length - 1; i >= 0; i--) {
+          if (acts[i].parentActivity === parentKey2) acts.splice(i, 1);
+        }
+      }
       acts.forEach((a, i) => a.order = i);
       template.predefinedActivities = acts;
       await saveTemplateFn();
