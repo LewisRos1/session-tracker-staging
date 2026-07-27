@@ -3256,9 +3256,9 @@ function renderActivityLineChart(actDisplayName, periodMonths, monthBuckets) {
   if (dataYValues.length === 0) return null;
 
   const year = periodMonths[0].split(" ")[1];
-  const dateRange = dataIndices.length === 1
-    ? `${labels[dataIndices[0]]} ${year}`
-    : `${labels[dataIndices[0]]}–${labels[dataIndices[dataIndices.length - 1]]} ${year}`;
+  const firstPeriodLabel = periodMonths[0].split(" ")[0].slice(0, 3);
+  const lastPeriodLabel  = periodMonths[periodMonths.length - 1].split(" ")[0].slice(0, 3);
+  const dateRange = `${firstPeriodLabel} - ${lastPeriodLabel} ${year}`;
   const titleText = `${actDisplayName}  (${dateRange})`;
 
   let regression = null, trendValues = null, lrDelta = 0;
