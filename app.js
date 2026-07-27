@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1173";
+const APP_VERSION = "1174";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -7880,10 +7880,38 @@ function buildTargetViewTable(target, data) {
       const actHasData = id => Object.values(data.remarks || {}).some(r =>
         r.activityId === id && ((r.text || "").trim() || (r.trials || []).some(t => t >= 0))
       );
-      let entry = pa.id ? (candidateEntries.find(([, a]) => a.configId === pa.id) || null) : null;
-      // For sub-activities: if the configId-matched record is empty, a previous version may have
-      // adopted an empty auto-fill placeholder with this configId — fall through to find the real
-      // data record (which may have an orphaned/old-format parentActivity and no configId yet).
+      // When multiple records share the same configId (race: two devices both called
+      // autoFillStructuredRemarks before either write landed), score by data richness
+      // and pick the winner — delete the losers so only one record survives.
+      let entry = null;
+      if (pa.id) {
+        const sameConfigEntries = candidateEntries.filter(([, a]) => a.configId === pa.id);
+        if (sameConfigEntries.length > 1) {
+          const viewScore = ([actId]) => {
+            let s = 0;
+            for (const r of Object.values(data.remarks || {})) {
+              if (r.activityId !== actId) continue;
+              s += (r.trials || []).filter(t => t !== null && t !== -1).length * 100;
+              if ((r.masteryNote || "").trim()) s += 50;
+              if ((r.text || "").trim()) s += 10;
+              if (r.optionScore !== undefined) s += 5;
+            }
+            return s;
+          };
+          entry = sameConfigEntries.reduce((a, b) => viewScore(a) >= viewScore(b) ? a : b);
+          for (const [loserId] of sameConfigEntries) {
+            if (loserId === entry[0]) continue;
+            matchedIds.add(loserId);
+            const loserRemIds = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === loserId).map(([id]) => id);
+            delete data.activities[loserId];
+            for (const remId of loserRemIds) delete data.remarks[remId];
+            deleteActivity(state.viewSessionId, loserId, loserRemIds).catch(() => {});
+          }
+        } else {
+          entry = sameConfigEntries[0] || null;
+        }
+      }
+      // If the configId-matched record has no real data, fall through to name-based lookup.
       if (isSub && entry && !actHasData(entry[0])) entry = null;
       if (!entry) {
         if (isSub) {
@@ -9586,7 +9614,35 @@ function buildGroupTargetViewTable(target, data, attendees) {
       const actHasData2 = id => Object.values(data.remarks || {}).some(r =>
         r.activityId === id && ((r.text || "").trim() || (r.trials || []).some(t => t >= 0))
       );
-      let entry2 = pa.id ? (candidateEntries2.find(([, a]) => a.configId === pa.id) || null) : null;
+      // Same deduplication as individual view: score by data richness, delete losers.
+      let entry2 = null;
+      if (pa.id) {
+        const sameConfigEntries2 = candidateEntries2.filter(([, a]) => a.configId === pa.id);
+        if (sameConfigEntries2.length > 1) {
+          const viewScore2 = ([actId]) => {
+            let s = 0;
+            for (const r of Object.values(data.remarks || {})) {
+              if (r.activityId !== actId) continue;
+              s += (r.trials || []).filter(t => t !== null && t !== -1).length * 100;
+              if ((r.masteryNote || "").trim()) s += 50;
+              if ((r.text || "").trim()) s += 10;
+              if (r.optionScore !== undefined) s += 5;
+            }
+            return s;
+          };
+          entry2 = sameConfigEntries2.reduce((a, b) => viewScore2(a) >= viewScore2(b) ? a : b);
+          for (const [loserId2] of sameConfigEntries2) {
+            if (loserId2 === entry2[0]) continue;
+            matchedIds.add(loserId2);
+            const loserRemIds2 = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === loserId2).map(([id]) => id);
+            delete data.activities[loserId2];
+            for (const remId of loserRemIds2) delete data.remarks[remId];
+            deleteActivity(state.viewGroupSessionId, loserId2, loserRemIds2).catch(() => {});
+          }
+        } else {
+          entry2 = sameConfigEntries2[0] || null;
+        }
+      }
       if (isSub2 && entry2 && !actHasData2(entry2[0])) entry2 = null;
       if (!entry2) {
         if (isSub2) {
