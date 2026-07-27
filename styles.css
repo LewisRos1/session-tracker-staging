@@ -137,7 +137,7 @@ html, body {
   50%       { box-shadow: 0 0 0 5px #bfdbfe; outline: 2px solid #3b82f6; }
 }
 .activity-cfg-blink {
-  animation: actCfgBlink 0.4s ease-in-out 4;
+  animation: actCfgBlink 0.65s ease-in-out 4;
 }
 
 @keyframes btnFlashHint {
