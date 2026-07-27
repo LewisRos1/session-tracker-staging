@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1143";
+const APP_VERSION = "1144";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2211,7 +2211,6 @@ async function hyrGenerate() {
 
   btn.disabled = true; progress.style.display = "";
   setProgress(5, "Collecting session data…");
-  await new Promise(r => setTimeout(r, 700));
 
   try {
     const excludedActivities = new Set();
@@ -2221,18 +2220,7 @@ async function hyrGenerate() {
 
     const { text: dataText, chartData, breakdownData, trendRows, categorized } = await hyrCollectData(student, period, year, excludedActivities);
 
-    setProgress(20, "Processing data…");
-    await new Promise(r => setTimeout(r, 600));
-    setProgress(35, "Sending to AI…");
-    await new Promise(r => setTimeout(r, 500));
-
-    // Switch button to Cancel so user can abort the request
-    _hyrAbortController = new AbortController();
-    inCancelMode = true;
-    btn.disabled = false;
-    btn.textContent = "✕ Cancel";
-    btn.style.cssText += ";background:#fee2e2;color:#dc2626;border-color:#ef4444";
-
+    // Build prompt synchronously — then start fetch immediately so it runs in parallel with fake phases
     const periodLabel = period === "H1" ? `January–June ${year}` : `July–December ${year}`;
     const firstName   = student.name.split(" ")[0];
     const targetsWithData = trendRows.filter(r => !r.noData);
@@ -2317,7 +2305,9 @@ TARGET: [exact target name]
 • [Optional third difficulty]
 ===END===`;
 
-    const resp = await fetch("https://session-tracker-ai.wang-loys22.workers.dev", {
+    // Start fetch immediately — fake phases will play while it runs in background
+    _hyrAbortController = new AbortController();
+    const fetchPromise = fetch("https://session-tracker-ai.wang-loys22.workers.dev", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -2329,7 +2319,23 @@ TARGET: [exact target name]
       signal: _hyrAbortController.signal
     });
 
-    // Fetch done — leave cancel mode so remaining steps show on button
+    // Fake phases run while fetch is already in flight
+    await new Promise(r => setTimeout(r, 1000));
+    setProgress(20, "Processing data…");
+    await new Promise(r => setTimeout(r, 1000));
+    setProgress(35, "Sending to AI…");
+    await new Promise(r => setTimeout(r, 500));
+
+    // Switch button to Cancel
+    inCancelMode = true;
+    btn.disabled = false;
+    btn.textContent = "✕ Cancel";
+    btn.style.cssText += ";background:#fee2e2;color:#dc2626;border-color:#ef4444";
+
+    // Await fetch (has been running for ~2.5s already)
+    const resp = await fetchPromise;
+
+    // Fetch done — restore button for remaining steps
     _hyrAbortController = null;
     inCancelMode = false;
     btn.disabled = true;
