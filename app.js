@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1161";
+const APP_VERSION = "1162";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -216,6 +216,7 @@ const state = {
   fbViewGroupUnsubscribe: null,
   viewGroupRenderPending: false,
 };
+window._s = state; // debug helper
 
 const $ = id => document.getElementById(id);
 
