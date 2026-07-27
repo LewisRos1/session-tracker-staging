@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1157";
+const APP_VERSION = "1158";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -16678,9 +16678,9 @@ function findActivityByName(targetName, activityName, parentActivity = null, con
     // parentActivity-less records, which would grab same-named top-level activity data.
     const exact = entries.find(e => byName(e) && e[1].parentActivity === parentActivity);
     if (exact) return { id: exact[0], ...exact[1] };
-    // Legacy fallback: old sub-activities were stored with parentActivity:"" due to a bug
-    // where the parent's empty details field was used as the key. Accept those records.
-    const legacy = entries.find(e => byName(e) && e[1].parentActivity === "");
+    // Legacy fallback: old sub-activities had parentActivity:"" or unset (falsy) because the
+    // parent's empty details field was used as the key — they were stored as top-level records.
+    const legacy = entries.find(e => byName(e) && !e[1].parentActivity);
     return legacy ? { id: legacy[0], ...legacy[1] } : null;
   }
   // Top-level: only match records with no parentActivity set
