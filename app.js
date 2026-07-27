@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1141";
+const APP_VERSION = "1142";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2202,9 +2202,14 @@ async function hyrGenerate() {
   const progress = $("hyr-progress");
   const bar      = $("hyr-progress-bar");
   const label    = $("hyr-progress-label");
-  const setProgress = (pct, text) => { bar.style.width = pct + "%"; label.textContent = text; };
+  let inCancelMode = false;
+  const setProgress = (pct, text) => {
+    bar.style.width = pct + "%";
+    label.textContent = text;
+    if (!inCancelMode) btn.textContent = text;
+  };
 
-  btn.disabled = true; btn.textContent = "Generating…"; progress.style.display = "";
+  btn.disabled = true; progress.style.display = "";
   setProgress(10, "Collecting session data…");
 
   try {
@@ -2219,6 +2224,7 @@ async function hyrGenerate() {
 
     // Switch button to Cancel so user can abort the request
     _hyrAbortController = new AbortController();
+    inCancelMode = true;
     btn.disabled = false;
     btn.textContent = "✕ Cancel";
     btn.style.cssText += ";background:#fee2e2;color:#dc2626;border-color:#ef4444";
@@ -2318,6 +2324,12 @@ TARGET: [exact target name]
       }),
       signal: _hyrAbortController.signal
     });
+
+    // Fetch done — leave cancel mode so remaining steps show on button
+    _hyrAbortController = null;
+    inCancelMode = false;
+    btn.disabled = true;
+    btn.style.background = ""; btn.style.color = ""; btn.style.borderColor = "";
 
     setProgress(80, "Writing report…");
 
