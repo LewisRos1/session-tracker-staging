@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1153";
+const APP_VERSION = "1154";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -13064,25 +13064,28 @@ function renderTargetManageContent(student, target) {
     });
   });
 
-  $("btn-mn-add-act").addEventListener("click", async () => {
+  $("btn-mn-add-act").addEventListener("click", () => {
+    const btn = $("btn-mn-add-act"); if (btn) btn.disabled = true;
     acts.push({ id: cfgId("a"), name: "", order: acts.length, createdOn: todayDateStr() });
     target.predefinedActivities = acts;
-    await saveTarget();
     renderTargetManageContent(student, target);
+    saveTarget().catch(() => {});
   });
 
-  $("btn-mn-add-heading").addEventListener("click", async () => {
+  $("btn-mn-add-heading").addEventListener("click", () => {
+    const btn = $("btn-mn-add-heading"); if (btn) btn.disabled = true;
     acts.push({ id: cfgId("h"), isHeading: true, name: "", order: acts.length, activeFrom: null });
     target.predefinedActivities = acts;
-    await saveTarget();
     renderTargetManageContent(student, target);
+    saveTarget().catch(() => {});
   });
 
-  $("btn-mn-add-note").addEventListener("click", async () => {
+  $("btn-mn-add-note").addEventListener("click", () => {
+    const btn = $("btn-mn-add-note"); if (btn) btn.disabled = true;
     acts.push({ id: cfgId("n"), isNote: true, text: "", order: acts.length, activeFrom: null });
     target.predefinedActivities = acts;
-    await saveTarget();
     renderTargetManageContent(student, target);
+    saveTarget().catch(() => {});
   });
 
   $("manage-modal-body").querySelectorAll(".mn-note-type-select").forEach(sel => {
@@ -13097,11 +13100,12 @@ function renderTargetManageContent(student, target) {
     });
   });
 
-  $("btn-mn-add-mapped").addEventListener("click", async () => {
+  $("btn-mn-add-mapped").addEventListener("click", () => {
+    const btn = $("btn-mn-add-mapped"); if (btn) btn.disabled = true;
     acts.push({ id: cfgId("m"), isMapped: true, name: "", mappedTargetId: null, order: acts.length, createdOn: todayDateStr() });
     target.predefinedActivities = acts;
-    await saveTarget();
     renderTargetManageContent(student, target);
+    saveTarget().catch(() => {});
   });
 
   $("manage-modal-body").querySelectorAll(".mn-mapped-target-select").forEach(sel => {
@@ -14161,25 +14165,28 @@ function renderTemplateManageContent(template) {
     });
   });
 
-  $("btn-mn-add-act").addEventListener("click", async () => {
+  $("btn-mn-add-act").addEventListener("click", () => {
+    const btn = $("btn-mn-add-act"); if (btn) btn.disabled = true;
     acts.push({ id: cfgId("a"), name: "", order: acts.length, createdOn: todayDateStr() });
     template.predefinedActivities = acts;
-    await saveTemplateFn();
     renderTemplateManageContent(template);
+    saveTemplateFn().catch(() => {});
   });
 
-  $("btn-mn-add-heading").addEventListener("click", async () => {
+  $("btn-mn-add-heading").addEventListener("click", () => {
+    const btn = $("btn-mn-add-heading"); if (btn) btn.disabled = true;
     acts.push({ id: cfgId("h"), isHeading: true, name: "", order: acts.length, activeFrom: null });
     template.predefinedActivities = acts;
-    await saveTemplateFn();
     renderTemplateManageContent(template);
+    saveTemplateFn().catch(() => {});
   });
 
-  $("btn-mn-add-note").addEventListener("click", async () => {
+  $("btn-mn-add-note").addEventListener("click", () => {
+    const btn = $("btn-mn-add-note"); if (btn) btn.disabled = true;
     acts.push({ id: cfgId("n"), isNote: true, text: "", order: acts.length, activeFrom: null });
     template.predefinedActivities = acts;
-    await saveTemplateFn();
     renderTemplateManageContent(template);
+    saveTemplateFn().catch(() => {});
   });
 
   $("manage-modal-body").querySelectorAll(".mn-note-type-select").forEach(sel => {
