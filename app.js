@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1131";
+const APP_VERSION = "1132";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2042,10 +2042,14 @@ function renderHalfYearReportsSection() {
       </select>
       <span id="hyr-period-loading" style="font-size:.85rem;color:var(--text-muted);white-space:nowrap;display:none">Checking…</span>
       <select id="hyr-period-select" class="admin-input" style="width:200px;flex-shrink:0;background:#fff;font-family:inherit;font-size:1rem;padding-right:2rem;display:none"></select>
-<button id="hyr-btn-generate" class="btn-add-section"
+      <button id="hyr-btn-generate" class="btn-add-section"
         style="font-size:.9rem;padding:.45rem 1.1rem;min-height:38px;white-space:nowrap;flex-shrink:0;display:none">
         Generate Report
       </button>
+    </div>
+    <div id="hyr-activity-filter" style="display:none;margin-top:.85rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:1rem 1.1rem">
+      <div style="font-size:.875rem;font-weight:600;color:#374151;margin-bottom:.8rem">Which activities do you want to exclude from the activity breakdown?</div>
+      <div id="hyr-act-filter-list" style="display:flex;flex-direction:column;gap:1.1rem"></div>
     </div>
     <div id="hyr-progress" style="display:none;margin-top:.85rem">
       <div style="background:#e5e7eb;border-radius:99px;height:6px;overflow:hidden">
@@ -2063,6 +2067,7 @@ function renderHalfYearReportsSection() {
     periodSel.style.display = "none";
     genBtn.style.display    = "none";
     loading.style.display   = "none";
+    $("hyr-activity-filter").style.display = "none";
     if (!studentId) return;
 
     loading.style.display = "";
@@ -2095,7 +2100,58 @@ function renderHalfYearReportsSection() {
     }
   });
 
+  $("hyr-period-select").addEventListener("change", e => {
+    const actFilter = $("hyr-activity-filter");
+    if (!e.target.value) { actFilter.style.display = "none"; return; }
+    const student = state.students.find(s => s.id === $("hyr-student-select").value);
+    if (!student) return;
+    hyrPopulateActivityFilter(student);
+    actFilter.style.display = "";
+  });
+
   $("hyr-btn-generate").addEventListener("click", hyrGenerate);
+}
+
+function hyrPopulateActivityFilter(student) {
+  const list = $("hyr-act-filter-list");
+  if (!list) return;
+  list.innerHTML = "";
+  const targets = (student.targets || []).filter(t =>
+    (t.predefinedActivities || []).some(pa => !pa.isHeading && !pa.isMaintainHeading && (pa.title || pa.name))
+  );
+  if (targets.length === 0) {
+    list.innerHTML = `<div style="font-size:.85rem;color:var(--text-muted)">No activities configured for this student.</div>`;
+    return;
+  }
+  for (const target of targets) {
+    const acts = (target.predefinedActivities || []).filter(pa => !pa.isHeading && !pa.isMaintainHeading && (pa.title || pa.name));
+    if (acts.length === 0) continue;
+    const group = document.createElement("div");
+    group.innerHTML = `
+      <div style="font-size:.8rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.45rem">${escHtml(target.name)}</div>
+      <div style="display:flex;flex-direction:column;gap:.3rem">
+        ${acts.map(pa => {
+          const paKey = escHtml(pa.title || pa.name);
+          return `<label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;font-size:.875rem;color:#374151">
+            <button class="hyr-act-cb" data-excluded="false"
+              data-target="${escHtml(target.name)}" data-activity="${paKey}"
+              style="width:22px;height:22px;border:2px solid #d1d5db;border-radius:5px;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;padding:0;color:transparent;transition:all .15s"></button>
+            <span>${paKey}</span>
+          </label>`;
+        }).join("")}
+      </div>`;
+    list.appendChild(group);
+  }
+  list.querySelectorAll(".hyr-act-cb").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const nowExcluded = btn.dataset.excluded !== "true";
+      btn.dataset.excluded = nowExcluded ? "true" : "false";
+      btn.textContent  = nowExcluded ? "✕" : "";
+      btn.style.background   = nowExcluded ? "#fee2e2" : "#fff";
+      btn.style.borderColor  = nowExcluded ? "#ef4444" : "#d1d5db";
+      btn.style.color        = nowExcluded ? "#ef4444" : "transparent";
+    });
+  });
 }
 
 async function hyrGenerate() {
@@ -2119,7 +2175,12 @@ async function hyrGenerate() {
   setProgress(10, "Collecting session data…");
 
   try {
-    const { text: dataText, chartData, breakdownData, trendRows, categorized } = await hyrCollectData(student, period, year);
+    const excludedActivities = new Set();
+    document.querySelectorAll(".hyr-act-cb[data-excluded='true']").forEach(btn => {
+      excludedActivities.add(`${btn.dataset.target}|${btn.dataset.activity}`);
+    });
+
+    const { text: dataText, chartData, breakdownData, trendRows, categorized } = await hyrCollectData(student, period, year, excludedActivities);
 
     setProgress(35, "Sending to AI…");
 
@@ -2244,7 +2305,7 @@ TARGET: [exact target name]
   }
 }
 
-async function hyrCollectData(student, period, year) {
+async function hyrCollectData(student, period, year, excludedActivities = new Set()) {
   const [startMonth, endMonth] = period === "H1" ? [1, 6] : [7, 12];
   const shortMonths = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -2521,6 +2582,7 @@ async function hyrCollectData(student, period, year) {
       const isActive = !isMastered && !isDiscont;
       const bd = paSessionData(pa);
       if (!bd) continue;
+      if (excludedActivities.has(`${tName}|${paKey}`)) continue;
       const num = isActive ? ++activeNum : isMastered ? ++masteredNum : ++discontNum;
       const ent = { name: `${num}) ${paKey}`, earliest: bd.earliest, latest: bd.latest, monthCount: bd.monthCount };
       if (isActive) {
