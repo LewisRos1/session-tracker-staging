@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1168";
+const APP_VERSION = "1169";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -5880,6 +5880,27 @@ function renderFedcTarget(target) {
       </div>`;
       children.forEach((sub, si) => {
         let subActData = findActivityByName(target.name, sub.title || sub.name, pa.title || pa.name, sub.id);
+        // Same fix as v1165 on the view screens: if the configId-matched record has no
+        // actual remark data, an empty auto-fill placeholder may have been adopted with
+        // this configId — fall through to find the real data-bearing record instead.
+        if (subActData && sub.id) {
+          const subHasData = Object.values(state.sessionData?.remarks || {}).some(r =>
+            r.activityId === subActData.id &&
+            ((r.text || "").trim() || (r.trials || []).some(t => t >= 0))
+          );
+          if (!subHasData) {
+            const real = Object.entries(state.sessionData?.activities || {}).find(([altId, a]) =>
+              altId !== subActData.id &&
+              a.targetName === target.name &&
+              (a.activityName === (sub.title || sub.name)) &&
+              Object.values(state.sessionData.remarks || {}).some(r =>
+                r.activityId === altId &&
+                ((r.text || "").trim() || (r.trials || []).some(t => t >= 0))
+              )
+            );
+            if (real) subActData = { id: real[0], ...real[1] };
+          }
+        }
         if (!subActData && state.sessionData) {
           // Orphan adoption: old top-level activity was deleted from config but its
           // session record still exists. Claim it for this sub-activity by writing
@@ -15408,6 +15429,26 @@ function buildGroupItemsByActivity(target, data, attendees) {
           (sub.id && a.configId === sub.id && a.targetName === target.name) ||
           (a.targetName === target.name && a.activityName === sub.name && a.parentActivity === sub.parentActivity)
         )?.[0] || null;
+        // Same actHasData fallback as individual session + view screens: if the matched
+        // record is an empty placeholder, find the real data-bearing record instead.
+        if (subActId && sub.id) {
+          const grpHasData = Object.values(data.remarks || {}).some(r =>
+            r.activityId === subActId &&
+            ((r.text || "").trim() || (r.trials || []).some(t => t >= 0))
+          );
+          if (!grpHasData) {
+            const real = Object.entries(data.activities || {}).find(([altId, a]) =>
+              altId !== subActId &&
+              a.targetName === target.name &&
+              a.activityName === sub.name &&
+              Object.values(data.remarks || {}).some(r =>
+                r.activityId === altId &&
+                ((r.text || "").trim() || (r.trials || []).some(t => t >= 0))
+              )
+            );
+            if (real) subActId = real[0];
+          }
+        }
         if (!subActId) {
           const grpHasLiveTopLevel = allPas.some(p =>
             !p.parentActivity && !p.isHeading && !p.isNote && !p.isExportNote && p.name === sub.name
