@@ -3316,17 +3316,25 @@ function renderActivityLineChart(actDisplayName, periodMonths, monthBuckets) {
         const { ctx: cx } = c;
         const yScale = c.scales.y;
         const trendBlue = "rgba(59,108,181,0.9)";
+        const LABEL_H = 14, GAP = 3;
         const defs = [
           { idx: dataIndices[0],                      regVal: regression[0],                     align: "left"  },
           { idx: dataIndices[dataIndices.length - 1], regVal: regression[regression.length - 1], align: "right" }
         ];
         for (const { idx, regVal, align } of defs) {
           const x = meta0.data[idx].x;
-          const y = yScale.getPixelForValue(regVal);
+          const dataPointY = meta0.data[idx].y;
+          const trendY = yScale.getPixelForValue(regVal);
+          const defaultLabelY = trendY - 4;
+          const dataLabelTop = dataPointY + 8;
+          // Collision: trendline label (baseline=bottom, anchored at defaultLabelY) overlaps
+          // data label (baseline=top, anchored at dataLabelTop). Push up if needed.
+          const hasCollision = defaultLabelY > dataLabelTop - GAP && defaultLabelY - LABEL_H < dataLabelTop + LABEL_H + GAP;
+          const labelY = hasCollision ? dataLabelTop - GAP : defaultLabelY;
           cx.save();
           cx.fillStyle = trendBlue; cx.font = "bold 11px sans-serif";
           cx.textAlign = align; cx.textBaseline = "bottom";
-          cx.fillText(Math.round(regVal) + "%", x + (align === "left" ? 4 : -4), y - 4);
+          cx.fillText(Math.round(regVal) + "%", x + (align === "left" ? 4 : -4), labelY);
           cx.restore();
         }
       }
