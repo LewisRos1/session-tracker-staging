@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1146";
+const APP_VERSION = "1147";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4138,6 +4138,245 @@ async function renderRecentlyDeleted() {
 }
 
 // ============================================================
+// MANAGE ACTIVITY SCREEN
+// ============================================================
+
+async function maGetLastDataDate(student, target, pa) {
+  const allSessions = await getAllSessionsForStudent(student.id);
+  const paName = pa.title || pa.name;
+  const dates = allSessions
+    .filter(s => Object.values(s.activities || {}).some(a =>
+      a.targetName === target.name &&
+      (a.activityName === paName || a.activityName === pa.name)
+    ))
+    .map(s => s.date).sort();
+  return dates[dates.length - 1] || null;
+}
+
+function maIsMastered(pa)   { return !!(pa.masteredOn || pa.inactiveReason === 'mastered'); }
+function maIsDiscont(pa)    { return !!(pa.discontinuedOn || pa.inactiveReason === 'discontinued') && !maIsMastered(pa); }
+function maIsMaintained(pa) { return !!pa.maintained; }
+function maIsActive(pa)     { return !maIsMastered(pa) && !maIsDiscont(pa) && !maIsMaintained(pa); }
+function maGetStatus(pa) {
+  if (maIsMastered(pa))   return 'mastered';
+  if (maIsDiscont(pa))    return 'discontinued';
+  if (maIsMaintained(pa)) return 'maintained';
+  return 'active';
+}
+
+function maKebabOptions(pa, tName) {
+  const s = `width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem`;
+  const id = escHtml(pa.id || '');
+  const tn = escHtml(tName);
+  const btn = (action, label, extra = '') =>
+    `<button class="ma-opt-btn" data-action="${action}" data-pa-id="${id}" data-tname="${tn}" style="${s}${extra}">${label}</button>`;
+  const status = maGetStatus(pa);
+  if (status === 'active') return btn('master','⭐ Activity Mastered') + btn('discontinue','🚩 Discontinue Activity',';color:#dc2626') + btn('maintain','🆗 Maintain Activity',';color:#0369a1');
+  if (status === 'maintained') return btn('master','⭐ Activity Mastered') + btn('discontinue','🚩 Discontinue Activity',';color:#dc2626') + btn('restore','↩ Restore to Active',';color:#4b5563');
+  if (status === 'mastered') return btn('change-discontinued','🚩 Change to Discontinued',';color:#dc2626') + btn('change-maintain','🆗 Change to Maintain',';color:#0369a1') + btn('restore','↩ Restore to Active',';color:#4b5563');
+  return btn('change-mastered','⭐ Change to Mastered') + btn('change-maintain','🆗 Change to Maintain',';color:#0369a1') + btn('restore','↩ Restore to Active',';color:#4b5563');
+}
+
+function renderManageActivityScreen(student) {
+  const targets = (student.targets || []).filter(t => !t.archived);
+  let html = `<div style="padding:.25rem 0 1.5rem">`;
+
+  targets.forEach((target, tIdx) => {
+    const tName = target.name;
+    const allPas = (target.predefinedActivities || [])
+      .filter(p => !p.isHeading && !p.isMaintainHeading && !p.isNote && !p.isExportNote)
+      .sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+
+    const masteredPas = allPas.filter(p => maIsMastered(p));
+    const discontPas  = allPas.filter(p => maIsDiscont(p));
+    const maintPas    = allPas.filter(p => maIsMaintained(p));
+    const activePas   = allPas.filter(p => maIsActive(p));
+    const activeTopLevel = activePas.filter(p => !p.parentActivity);
+    const activeSubs     = activePas.filter(p => !!p.parentActivity);
+
+    const kebabWrap = pa => `
+      <div style="position:relative;flex-shrink:0">
+        <button class="ma-kebab-btn btn-adm-del" data-pa-id="${escHtml(pa.id||'')}" style="font-size:1.2rem;font-weight:900;min-width:30px;min-height:30px;padding:.1rem .35rem" title="Options">⋮</button>
+        <div class="ma-kebab-menu" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:220px;overflow:hidden">
+          ${maKebabOptions(pa, tName)}
+        </div>
+      </div>`;
+
+    const renderRow = (pa, indent = false, parentNote = '') => {
+      const displayName = pa.title?.trim() || pa.name || '';
+      const status = maGetStatus(pa);
+      const badge = status === 'mastered'
+        ? `<span style="font-size:.73rem;color:#059669;font-weight:600">⭐ Mastered${pa.masteredOn ? ` on ${fmtPeriodDate(pa.masteredOn)}` : ''}</span>`
+        : status === 'discontinued'
+        ? `<span style="font-size:.73rem;color:#dc2626;font-weight:600">🚩 Discontinued${pa.discontinuedOn ? ` on ${fmtPeriodDate(pa.discontinuedOn)}` : ''}</span>`
+        : status === 'maintained'
+        ? `<span style="font-size:.73rem;color:#6b7280;font-weight:600">🆗 Maintained</span>`
+        : '';
+      const parentHint = parentNote ? `<span style="font-size:.72rem;color:#9ca3af"> (parent: ${escHtml(parentNote)})</span>` : '';
+      const rowBg = indent ? 'background:#f0f9ff;border-left:3px solid #60a5fa;border-radius:.3rem;' : '';
+      return `<div style="${rowBg}display:flex;align-items:center;gap:.5rem;padding:.5rem .65rem">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.9rem;font-weight:600;color:#111827">${escHtml(displayName)}${parentHint}</div>
+          ${badge ? `<div style="margin-top:.12rem">${badge}</div>` : ''}
+        </div>
+        ${kebabWrap(pa)}
+      </div>`;
+    };
+
+    let activeHtml = '';
+    for (const pa of activeTopLevel) {
+      activeHtml += renderRow(pa);
+      const children = activeSubs.filter(s => s.parentActivity === (pa.title || pa.name));
+      for (const child of children) activeHtml += renderRow(child, true);
+    }
+    const orphaned = activeSubs.filter(s => !activeTopLevel.some(p => (p.title || p.name) === s.parentActivity));
+    for (const sub of orphaned) activeHtml += renderRow(sub, false, sub.parentActivity || '');
+
+    const collapseSection = (label, emoji, color, pas) => {
+      if (!pas.length) return '';
+      const colId = `ma-col-${tIdx}-${label}`;
+      const items = pas.map(pa => {
+        const displayName = pa.title?.trim() || pa.name || '';
+        const parentNote = pa.parentActivity ? ` — parent: ${escHtml(pa.parentActivity)}` : '';
+        const dateNote = label === 'mastered' && pa.masteredOn ? ` on ${fmtPeriodDate(pa.masteredOn)}`
+          : label === 'discontinued' && pa.discontinuedOn ? ` on ${fmtPeriodDate(pa.discontinuedOn)}` : '';
+        return `<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .65rem;background:#f9fafb;border-radius:.3rem">
+          <div style="flex:1;min-width:0">
+            <span style="font-size:.88rem;font-weight:600;color:#374151">${escHtml(displayName)}</span>
+            <span style="font-size:.72rem;color:${color}">${dateNote}${parentNote}</span>
+          </div>
+          ${kebabWrap(pa)}
+        </div>`;
+      }).join('');
+      return `<div style="margin-top:.5rem">
+        <button class="ma-collapse-toggle" data-col-id="${colId}" style="display:flex;align-items:center;gap:.4rem;width:100%;background:none;border:none;cursor:pointer;padding:.35rem .1rem;font-size:.84rem;color:${color};font-weight:600;text-align:left">
+          <span class="ma-toggle-arrow" style="font-size:.7rem;display:inline-block;transition:transform .2s">▶</span>
+          ${emoji} ${label.charAt(0).toUpperCase() + label.slice(1)} (${pas.length})
+        </button>
+        <div id="${colId}" style="display:none;flex-direction:column;gap:.3rem;padding:.1rem 0">
+          ${items}
+        </div>
+      </div>`;
+    };
+
+    html += `<div style="margin-bottom:1.4rem">
+      <div style="font-size:.78rem;font-weight:700;color:var(--primary);letter-spacing:.06em;text-transform:uppercase;padding:.3rem 0 .4rem;border-bottom:2px solid var(--primary);margin-bottom:.55rem">${escHtml(tName)}</div>
+      <div style="display:flex;flex-direction:column;gap:.3rem">
+        ${activeHtml || `<div style="font-size:.83rem;color:#9ca3af;padding:.3rem 0">No active activities</div>`}
+      </div>
+      ${collapseSection('mastered','⭐','#059669',masteredPas)}
+      ${collapseSection('discontinued','🚩','#dc2626',discontPas)}
+      ${collapseSection('maintained','🆗','#6b7280',maintPas)}
+    </div>`;
+  });
+
+  html += '</div>';
+  $("session-picker-list").innerHTML = html;
+
+  // Collapse toggles
+  $("session-picker-list").querySelectorAll(".ma-collapse-toggle").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const panel = document.getElementById(btn.dataset.colId);
+      const arrow = btn.querySelector(".ma-toggle-arrow");
+      if (!panel) return;
+      const isOpen = panel.style.display === "flex";
+      panel.style.display = isOpen ? "none" : "flex";
+      panel.style.flexDirection = "column";
+      arrow.style.transform = isOpen ? "" : "rotate(90deg)";
+    });
+  });
+
+  // Kebab open/close
+  $("session-picker-list").querySelectorAll(".ma-kebab-btn").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const menu = btn.nextElementSibling;
+      const wasHidden = menu.style.display !== "block";
+      $("session-picker-list").querySelectorAll(".ma-kebab-menu").forEach(m => m.style.display = "none");
+      if (wasHidden) {
+        menu.style.display = "block";
+        const close = ev => {
+          if (!menu.contains(ev.target)) { menu.style.display = "none"; document.removeEventListener("click", close); }
+        };
+        document.addEventListener("click", close);
+      }
+    });
+  });
+
+  // Action handlers
+  $("session-picker-list").querySelectorAll(".ma-opt-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const action = btn.dataset.action;
+      const paId   = btn.dataset.paId;
+      const tName  = btn.dataset.tname;
+      const target = student.targets.find(t => t.name === tName);
+      if (!target) return;
+      const pa = (target.predefinedActivities || []).find(a => a.id === paId);
+      if (!pa) return;
+      btn.closest(".ma-kebab-menu").style.display = "none";
+      const actWord = pa.parentActivity ? "sub-activity" : "activity";
+
+      if (action === 'master' || action === 'discontinue') {
+        const origText = btn.textContent;
+        btn.disabled = true; btn.textContent = "Checking…";
+        let latestDate = null;
+        try { latestDate = await maGetLastDataDate(student, target, pa); }
+        finally { btn.disabled = false; btn.textContent = origText; }
+        const autoDate = latestDate ? addOneDay(latestDate) : todayDateStr();
+        const latestPart = latestDate
+          ? `The last time data was recorded for this ${actWord} was <strong>${fmtPeriodDate(latestDate)}</strong>.`
+          : `No previous data was found for this ${actWord}.`;
+        if (action === 'master') {
+          const ok = await showAutoDateConfirm({ message: `${latestPart} It will be marked as mastered from <strong>${fmtPeriodDate(autoDate)}</strong> onwards.`, confirmLabel: "Confirm ⭐" });
+          if (!ok) return;
+          delete pa.maintained; delete pa.activityColor; delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped; delete pa.inactiveReason;
+          pa.masteredOn = autoDate;
+        } else {
+          const ok = await showAutoDateConfirm({ message: `${latestPart} It will be discontinued from <strong>${fmtPeriodDate(autoDate)}</strong> onwards.`, confirmLabel: "Confirm 🚩" });
+          if (!ok) return;
+          delete pa.maintained; delete pa.activityColor; delete pa.masteredOn; delete pa.isCompleted; delete pa.inactiveReason;
+          pa.discontinuedOn = autoDate;
+        }
+      } else if (action === 'maintain') {
+        const ok = await showAutoDateConfirm({ message: `This ${actWord} will be labelled 🆗 Maintained. It will still appear in sessions.`, confirmLabel: "Confirm 🆗" });
+        if (!ok) return;
+        delete pa.masteredOn; delete pa.isCompleted; delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped; delete pa.inactiveReason;
+        pa.maintained = true; pa.activityColor = "gray";
+      } else if (action === 'restore') {
+        const ok = await showAutoDateConfirm({ message: `This ${actWord} will be restored to active status.`, confirmLabel: "Restore ↩" });
+        if (!ok) return;
+        delete pa.masteredOn; delete pa.isCompleted; delete pa.inactiveReason;
+        delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped;
+        delete pa.maintained; delete pa.activityColor;
+      } else if (action === 'change-discontinued') {
+        const existingDate = pa.masteredOn || todayDateStr();
+        const ok = await showAutoDateConfirm({ message: `This ${actWord} will be changed from ⭐ Mastered to 🚩 Discontinued, keeping the date (${fmtPeriodDate(existingDate)}).`, confirmLabel: "Confirm 🚩" });
+        if (!ok) return;
+        pa.discontinuedOn = existingDate;
+        delete pa.masteredOn; delete pa.isCompleted; delete pa.inactiveReason;
+      } else if (action === 'change-mastered') {
+        const existingDate = pa.discontinuedOn || todayDateStr();
+        const ok = await showAutoDateConfirm({ message: `This ${actWord} will be changed from 🚩 Discontinued to ⭐ Mastered, keeping the date (${fmtPeriodDate(existingDate)}).`, confirmLabel: "Confirm ⭐" });
+        if (!ok) return;
+        pa.masteredOn = existingDate;
+        delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped; delete pa.inactiveReason;
+      } else if (action === 'change-maintain') {
+        const ok = await showAutoDateConfirm({ message: `This ${actWord} will be changed to 🆗 Maintained. The mastered/discontinued date will be removed.`, confirmLabel: "Confirm 🆗" });
+        if (!ok) return;
+        delete pa.masteredOn; delete pa.isCompleted;
+        delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped; delete pa.inactiveReason;
+        pa.maintained = true; pa.activityColor = "gray";
+      }
+
+      const si = state.students.findIndex(s => s.id === student.id);
+      if (si >= 0) state.students[si] = student;
+      await saveStudent(student);
+      renderManageActivityScreen(student);
+    });
+  });
+}
+
+// ============================================================
 // SESSION PICKER
 // ============================================================
 
@@ -4174,6 +4413,12 @@ function showStudentChoice(student) {
         <span class="choice-icon">📝</span>
         <div class="choice-text">
           <div class="choice-label">Export to Word (Daily Session Note)</div>
+        </div>
+      </button>
+      <button class="choice-btn choice-manage-activity">
+        <span class="choice-icon">🪄</span>
+        <div class="choice-text">
+          <div class="choice-label">Manage Activity</div>
         </div>
       </button>
     </div>`;
@@ -4258,6 +4503,10 @@ function showStudentChoice(student) {
   $("session-picker-list").querySelector(".choice-manage").addEventListener("click", () => {
     closeSessionPicker();
     openManageModal(student, null);
+  });
+  $("session-picker-list").querySelector(".choice-manage-activity").addEventListener("click", () => {
+    $("session-picker-title").textContent = student.name + " — Manage Activity";
+    renderManageActivityScreen(student);
   });
 }
 
@@ -11886,11 +12135,6 @@ function renderTargetManageContent(student, target) {
         <div style="position:relative">
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:250px;overflow:hidden">
-            ${a.maintained
-              ? `<button class="mn-undo-maintain" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#4b5563">↩ Undo Maintain</button>`
-              : `<button class="mn-km-mastered" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">⭐ Activity Mastered</button>
-                 <button class="mn-km-discontinued" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#dc2626">🚩 Discontinue Activity</button>
-                 <button class="mn-km-maintain" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#0369a1">🆗 Maintain Activity</button>`}
             <div style="display:flex;align-items:stretch">
               <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
               <span title="Permanently removes this activity and all of its session data. This cannot be undone." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
@@ -11995,11 +12239,6 @@ function renderTargetManageContent(student, target) {
           <div style="position:relative">
             <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
             <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:250px;overflow:hidden">
-              ${a.maintained
-                ? `<button class="mn-undo-maintain" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#4b5563">↩ Undo Maintain</button>`
-                : `<button class="mn-km-mastered" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">⭐ Activity Mastered</button>
-                   <button class="mn-km-discontinued" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#dc2626">🚩 Discontinue Activity</button>
-                   <button class="mn-km-maintain" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#0369a1">🆗 Maintain Activity</button>`}
               <div style="display:flex;align-items:stretch">
                 <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
                 <span title="Deletes this activity and all its sub-activities." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
@@ -12049,11 +12288,6 @@ function renderTargetManageContent(student, target) {
           <div style="position:relative">
             <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
             <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:250px;overflow:hidden">
-              ${a.maintained
-                ? `<button class="mn-undo-maintain" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#4b5563">↩ Undo Maintain</button>`
-                : `<button class="mn-km-mastered" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">⭐ Activity Mastered</button>
-                   <button class="mn-km-discontinued" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#dc2626">🚩 Discontinue Activity</button>
-                   <button class="mn-km-maintain" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#0369a1">🆗 Maintain Activity</button>`}
               <div style="display:flex;align-items:stretch">
                 <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
                 <span title="Permanently removes this activity and all of its session data. This cannot be undone." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
@@ -12590,109 +12824,6 @@ function renderTargetManageContent(student, target) {
       panel.style.display = open ? "none" : "block";
       if (arrow) arrow.textContent = open ? "▶" : "▼";
       if (!open) panel.querySelectorAll(".mn-inactive-name-input").forEach(autoResizeTextarea);
-    });
-  });
-
-  $("manage-modal-body").querySelectorAll(".mn-km-mastered").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const idx = Number(btn.dataset.idx);
-      if (!acts[idx]) return;
-      const pa = acts[idx];
-      const actWord = pa.parentActivity ? "sub-activity" : "activity";
-      const origHtml = btn.innerHTML;
-      btn.disabled = true; btn.textContent = "Checking…";
-      let latestDate = null;
-      try {
-        const allSessions = _groupForTargetEdit
-          ? await getAllSessionsForGroup(_groupForTargetEdit.id)
-          : await getAllSessionsForStudent(student.id);
-        const dates = allSessions
-          .filter(s => Object.values(s.activities || {}).some(a => a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title))))
-          .map(s => s.date).sort();
-        latestDate = dates[dates.length - 1] || null;
-      } finally {
-        btn.disabled = false; btn.innerHTML = origHtml;
-      }
-      const autoDate = latestDate ? addOneDay(latestDate) : todayDateStr();
-      const latestPart = latestDate
-        ? `The latest data recorded for this ${actWord} is ${fmtPeriodDate(latestDate)}.`
-        : `No previous data was found for this ${actWord}.`;
-      const confirmed = await showAutoDateConfirm({
-        message: `${latestPart} This ${actWord} will be marked as mastered from ${fmtPeriodDate(autoDate)} onwards and will no longer appear in sessions from that date.`,
-        confirmLabel: "Confirm ⭐"
-      });
-      if (!confirmed) return;
-      acts[idx].masteredOn = autoDate;
-      target.predefinedActivities = acts;
-      await saveTarget();
-      renderTargetManageContent(student, target);
-    });
-  });
-
-  $("manage-modal-body").querySelectorAll(".mn-km-discontinued").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const idx = Number(btn.dataset.idx);
-      if (!acts[idx]) return;
-      const pa = acts[idx];
-      const actWord = pa.parentActivity ? "sub-activity" : "activity";
-      const origHtml = btn.innerHTML;
-      btn.disabled = true; btn.textContent = "Checking…";
-      let latestDate = null;
-      try {
-        const allSessions = _groupForTargetEdit
-          ? await getAllSessionsForGroup(_groupForTargetEdit.id)
-          : await getAllSessionsForStudent(student.id);
-        const dates = allSessions
-          .filter(s => Object.values(s.activities || {}).some(a => a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title))))
-          .map(s => s.date).sort();
-        latestDate = dates[dates.length - 1] || null;
-      } finally {
-        btn.disabled = false; btn.innerHTML = origHtml;
-      }
-      const autoDate = latestDate ? addOneDay(latestDate) : todayDateStr();
-      const latestPart = latestDate
-        ? `The latest data recorded for this ${actWord} is ${fmtPeriodDate(latestDate)}.`
-        : `No previous data was found for this ${actWord}.`;
-      const confirmed = await showAutoDateConfirm({
-        message: `${latestPart} This ${actWord} will be discontinued from ${fmtPeriodDate(autoDate)} onwards and will no longer appear in sessions from that date.`,
-        confirmLabel: "Confirm 🚩"
-      });
-      if (!confirmed) return;
-      acts[idx].discontinuedOn = autoDate;
-      target.predefinedActivities = acts;
-      await saveTarget();
-      renderTargetManageContent(student, target);
-    });
-  });
-
-  $("manage-modal-body").querySelectorAll(".mn-km-maintain").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const idx = Number(btn.dataset.idx);
-      if (!acts[idx]) return;
-      const pa = acts[idx];
-      const actWord = pa.parentActivity ? "sub-activity" : "activity";
-      const confirmed = await showAutoDateConfirm({
-        message: `This ${actWord} will be labelled 🆗 Maintained. It will still appear in sessions and accept remarks.`,
-        confirmLabel: "Confirm 🆗"
-      });
-      if (!confirmed) return;
-      acts[idx].maintained = true;
-      acts[idx].activityColor = "gray";
-      target.predefinedActivities = acts;
-      await saveTarget();
-      renderTargetManageContent(student, target);
-    });
-  });
-
-  $("manage-modal-body").querySelectorAll(".mn-undo-maintain").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const idx = Number(btn.dataset.idx);
-      if (!acts[idx]) return;
-      delete acts[idx].maintained;
-      delete acts[idx].activityColor;
-      target.predefinedActivities = acts;
-      await saveTarget();
-      renderTargetManageContent(student, target);
     });
   });
 
@@ -13645,11 +13776,6 @@ function renderTemplateManageContent(template) {
         <div style="position:relative">
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:250px;overflow:hidden">
-            ${a.maintained
-              ? `<button class="mn-undo-maintain" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#4b5563">↩ Undo Maintain</button>`
-              : `<button class="mn-km-mastered" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem">⭐ Activity Mastered</button>
-                 <button class="mn-km-discontinued" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#dc2626">🚩 Discontinue Activity</button>
-                 <button class="mn-km-maintain" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#0369a1">🆗 Maintain Activity</button>`}
             <div style="display:flex;align-items:stretch">
               <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
             </div>
