@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1174";
+const APP_VERSION = "1175";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -5906,7 +5906,7 @@ function renderFedcTarget(target) {
               let s = 0;
               for (const r of Object.values(state.sessionData.remarks || {})) {
                 if (r.activityId !== actId) continue;
-                s += (r.trials || []).filter(t => t >= 0).length * 100;
+                s += (r.trials || []).filter(t => t !== null && t !== -1).length * 100;
                 if ((r.masteryNote || "").trim()) s += 50;
                 if ((r.text || "").trim()) s += 10;
                 if (r.optionScore !== undefined) s += 5;
@@ -5915,9 +5915,14 @@ function renderFedcTarget(target) {
             };
             const subBest = subCandidates.reduce((a, b) => subRemScore(a) >= subRemScore(b) ? a : b);
             subActData = { id: subBest[0], ...subBest[1] };
-            // Stamp configId on the winner if it doesn't have one yet so findActivityByName
-            // finds it directly next render and autoFillStructuredRemarks skips creating a
-            // duplicate placeholder for it.
+            // Delete losers from Firestore so the duplicate never resurfaces.
+            for (const [loserId] of subCandidates) {
+              if (loserId === subBest[0]) continue;
+              const loserRemIds = Object.entries(state.sessionData.remarks || {}).filter(([, r]) => r.activityId === loserId).map(([id]) => id);
+              delete state.sessionData.activities[loserId];
+              for (const remId of loserRemIds) delete state.sessionData.remarks[remId];
+              deleteActivity(state.currentSessionId, loserId, loserRemIds).catch(() => {});
+            }
             if (!subBest[1].configId && state.sessionData.activities[subBest[0]]) {
               state.sessionData.activities[subBest[0]].configId = sub.id;
               adoptOrphanActivity(state.currentSessionId, subBest[0], subBest[1].parentActivity || null, sub.id).catch(() => {});
@@ -15540,7 +15545,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
               let s = 0;
               for (const r of Object.values(data.remarks || {})) {
                 if (r.activityId !== actId) continue;
-                s += (r.trials || []).filter(t => t >= 0).length * 100;
+                s += (r.trials || []).filter(t => t !== null && t !== -1).length * 100;
                 if ((r.masteryNote || "").trim()) s += 50;
                 if ((r.text || "").trim()) s += 10;
                 if (r.optionScore !== undefined) s += 5;
@@ -15549,6 +15554,13 @@ function buildGroupItemsByActivity(target, data, attendees) {
             };
             const grpBest = grpCandidates.reduce((a, b) => grpRemScore(a) >= grpRemScore(b) ? a : b);
             subActId = grpBest[0];
+            for (const [grpLoserId] of grpCandidates) {
+              if (grpLoserId === grpBest[0]) continue;
+              const grpLoserRemIds = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === grpLoserId).map(([id]) => id);
+              delete data.activities[grpLoserId];
+              for (const remId of grpLoserRemIds) delete data.remarks[remId];
+              deleteActivity(state.groupSessionId, grpLoserId, grpLoserRemIds).catch(() => {});
+            }
             if (!grpBest[1].configId && data.activities[grpBest[0]]) {
               data.activities[grpBest[0]].configId = sub.id;
               adoptOrphanActivity(state.groupSessionId, grpBest[0], grpBest[1].parentActivity || null, sub.id).catch(() => {});
