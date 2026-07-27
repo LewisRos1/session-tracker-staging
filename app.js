@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1164";
+const APP_VERSION = "1165";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -7811,7 +7811,15 @@ function buildTargetViewTable(target, data) {
       }
       const candidateEntries = Object.entries(data.activities || {})
         .filter(([id, a]) => a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title) || (pa.id && a.configId === pa.id)) && !matchedIds.has(id));
+      // Does an activity have at least one remark with real content?
+      const actHasData = id => Object.values(data.remarks || {}).some(r =>
+        r.activityId === id && ((r.text || "").trim() || (r.trials || []).some(t => t >= 0))
+      );
       let entry = pa.id ? (candidateEntries.find(([, a]) => a.configId === pa.id) || null) : null;
+      // For sub-activities: if the configId-matched record is empty, a previous version may have
+      // adopted an empty auto-fill placeholder with this configId — fall through to find the real
+      // data record (which may have an orphaned/old-format parentActivity and no configId yet).
+      if (isSub && entry && !actHasData(entry[0])) entry = null;
       if (!entry) {
         if (isSub) {
           // All current config name/title keys — records whose parentActivity is NOT in this
@@ -9509,8 +9517,12 @@ function buildGroupTargetViewTable(target, data, attendees) {
       }
       no++;
       const candidateEntries2 = Object.entries(data.activities || {})
-        .filter(([id, a]) => a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title)) && !matchedIds.has(id));
+        .filter(([id, a]) => a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title) || (pa.id && a.configId === pa.id)) && !matchedIds.has(id));
+      const actHasData2 = id => Object.values(data.remarks || {}).some(r =>
+        r.activityId === id && ((r.text || "").trim() || (r.trials || []).some(t => t >= 0))
+      );
       let entry2 = pa.id ? (candidateEntries2.find(([, a]) => a.configId === pa.id) || null) : null;
+      if (isSub2 && entry2 && !actHasData2(entry2[0])) entry2 = null;
       if (!entry2) {
         if (isSub2) {
           const knownConfigKeys2 = new Set(
