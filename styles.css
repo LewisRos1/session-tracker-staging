@@ -134,11 +134,10 @@ html, body {
 
 @keyframes actCfgBlink {
   0%, 100% { box-shadow: none; outline: none; }
-  20%, 60%  { box-shadow: 0 0 0 3px #93c5fd; outline: 2px solid #3b82f6; }
-  40%, 80%  { box-shadow: 0 0 0 5px #bfdbfe; outline: 2px solid #60a5fa; }
+  50%       { box-shadow: 0 0 0 5px #bfdbfe; outline: 2px solid #3b82f6; }
 }
 .activity-cfg-blink {
-  animation: actCfgBlink 1.4s ease-in-out;
+  animation: actCfgBlink 0.4s ease-in-out 4;
 }
 
 @keyframes btnFlashHint {
