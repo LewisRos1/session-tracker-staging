@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1154";
+const APP_VERSION = "1155";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -851,6 +851,8 @@ let _ranOneOffRepairs = false;
 function runOneOffRepairs() {
   if (_ranOneOffRepairs) return;
   _ranOneOffRepairs = true;
+
+  repairLevenChuaSubActivities().catch(err => console.error("repairLevenChuaSubActivities failed:", err));
 
   // One-time migration: set masteredOn = "2026-06-30" for all old-style mastered
   // activities (inactiveReason === 'mastered') that have no masteredOn date yet.
@@ -4137,6 +4139,47 @@ async function renderRecentlyDeleted() {
   });
 }
 
+// One-time repair: restore Normal voice and Monster Voice for Leven Chua
+// (accidentally deleted 2026-07-27 when they showed as phantom sub-activities
+// due to parentActivity:"" bug). Safe to leave in forever — exits immediately
+// once the activities exist.
+async function repairLevenChuaSubActivities() {
+  const student = (state.students || []).find(s => s.name === "Leven Chua");
+  if (!student) return;
+  const target = (student.targets || []).find(t => t.name === "Practical Life (At ZORA)");
+  if (!target) return;
+  const acts = target.predefinedActivities || [];
+  const parentKey = "Social Skills (Voice volume: Maintain normal voice)";
+  if (!acts.some(a => (a.title || a.name) === parentKey)) return;
+  if (acts.some(a => a.title === "Normal voice" && a.parentActivity)
+   && acts.some(a => a.title === "Monster Voice" && a.parentActivity)) return;
+
+  const parentIdx = acts.findIndex(a => (a.title || a.name) === parentKey);
+  const insertAt = parentIdx + 1;
+
+  if (!acts.some(a => a.title === "Normal voice" && a.parentActivity)) {
+    acts.splice(insertAt, 0, {
+      id: cfgId("a"), title: "Normal voice", name: "", parentActivity: parentKey,
+      inlineOptions: "High/Low", optionScores: { "High": 3, "Low": 0 },
+      sentenceStarter: "", order: 0, createdOn: todayDateStr()
+    });
+  }
+  if (!acts.some(a => a.title === "Monster Voice" && a.parentActivity)) {
+    const mIdx = acts.findIndex(a => a.title === "Normal voice" && a.parentActivity);
+    acts.splice(mIdx >= 0 ? mIdx + 1 : insertAt + 1, 0, {
+      id: cfgId("a"), title: "Monster Voice", name: "", parentActivity: parentKey,
+      inlineOptions: "High/Low", optionScores: { "High": 0, "Low": 3 },
+      sentenceStarter: "", order: 0, createdOn: todayDateStr()
+    });
+  }
+  acts.forEach((a, i) => a.order = i);
+  target.predefinedActivities = acts;
+  const si = (state.students || []).findIndex(s => s.id === student.id);
+  if (si >= 0) state.students[si] = student;
+  await saveStudent(student);
+  console.log("[repair] Restored Normal voice + Monster Voice for Leven Chua");
+}
+
 // ============================================================
 // MANAGE ACTIVITY SCREEN
 // ============================================================
@@ -5810,7 +5853,7 @@ function renderFedcTarget(target) {
     }
 
     // Parent activity with sub-activities — render as a connected visual group
-    const children = subActsByParent.get(pa.name) || [];
+    const children = subActsByParent.get(pa.title || pa.name) || [];
     if (children.length > 0) {
       const isGrayP  = pa.activityColor === "gray" || pa.isMaintainLive;
       const isGreenP = pa.activityColor === "green";
@@ -6005,7 +6048,7 @@ function renderFedcTarget(target) {
         : _isDiscontinued
         ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap;display:block;margin-bottom:.1rem">🚩 ${pa.discontinuedOn ? `Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}` : 'Discontinued'}</span>`
         : '';
-      const subActs = allPas.filter(p => p.parentActivity === pa.name && !p.isCompleted && !p.isArchived && !p.isStopped && !p.masteredOn && !p.discontinuedOn);
+      const subActs = allPas.filter(p => p.parentActivity === (pa.title || pa.name) && !p.isCompleted && !p.isArchived && !p.isStopped && !p.masteredOn && !p.discontinuedOn);
       const subHtml = subActs.length ? `<div style="display:flex;flex-direction:column;gap:.1rem;padding:.2rem 0 .1rem 1.25rem">
         ${subActs.map((sub, si) => `<div style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:#9ca3af"><span style="flex-shrink:0">${String.fromCharCode(97 + si)})</span><span>${escHtml(sub.name || '')}</span></div>`).join('')}
       </div>` : '';
@@ -12199,7 +12242,8 @@ function renderTargetManageContent(student, target) {
       if (a.parentActivity) return;
       manageActNo++;
 
-      const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.isCompleted && !a2.isArchived && !a2.isStopped && !a2.masteredOn && !a2.discontinuedOn);
+      const _paKey = a.title || a.name;
+      const subActs = _paKey ? acts.filter(a2 => a2.parentActivity === _paKey && !a2.isCompleted && !a2.isArchived && !a2.isStopped && !a2.masteredOn && !a2.discontinuedOn) : [];
       const hasSubActs = subActs.length > 0;
       const isGray = a.activityColor === "gray" || a.isMaintainLive;
       const isGreen = a.activityColor === "green";
@@ -12365,7 +12409,7 @@ function renderTargetManageContent(student, target) {
     masteredActs.forEach((a, ci) => {
       const globalIdx = acts.indexOf(a);
       const dateLabel = a.masteredOn ? `Mastered on ${fmtPeriodDate(a.masteredOn)}` : 'Mastered';
-      const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
+      const subActs = acts.filter(a2 => a2.parentActivity === (a.title || a.name) && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
       html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
         <div style="flex:1;display:flex;flex-direction:column;gap:.4rem">
           <div>
@@ -12423,7 +12467,7 @@ function renderTargetManageContent(student, target) {
     discontinuedActs.forEach((a, ci) => {
       const globalIdx = acts.indexOf(a);
       const dateLabel = a.discontinuedOn ? `Discontinued on ${fmtPeriodDate(a.discontinuedOn)}` : 'Discontinued';
-      const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
+      const subActs = acts.filter(a2 => a2.parentActivity === (a.title || a.name) && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
       html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
         <div style="flex:1;display:flex;flex-direction:column;gap:.4rem">
           <div>
@@ -12614,7 +12658,10 @@ function renderTargetManageContent(student, target) {
       titleInput.addEventListener("blur", async () => {
         const v = titleInput.value.trim();
         if (v === (a.title || "")) return;
+        const oldKey = a.title || a.name;
         a.title = v;
+        const newKey = a.title || a.name;
+        if (oldKey && oldKey !== newKey) acts.forEach(a2 => { if (a2.parentActivity === oldKey) a2.parentActivity = newKey; });
         renderTargetContent();
         await saveTarget();
         flashSaved(titleInput);
@@ -13130,14 +13177,15 @@ function renderTargetManageContent(student, target) {
         const typedName = nameInput.value.trim();
         if (typedName !== parentAct.name) parentAct.name = typedName;
       }
-      if (!parentAct.name) {
+      if (!(parentAct.title || parentAct.name)) {
         alert("Please enter an activity name before adding sub-activities.");
         nameInput?.focus();
         return;
       }
 
       // Check existing subs — all must be named before adding another
-      const existingSubs = acts.filter(a2 => a2.parentActivity === parentAct.name && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
+      const _parentKey = parentAct.title || parentAct.name;
+      const existingSubs = acts.filter(a2 => a2.parentActivity === _parentKey && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
       const unnamedSub = existingSubs.find(s => !s.name?.trim());
       if (unnamedSub) {
         const unnamedIdx = acts.indexOf(unnamedSub);
@@ -13162,9 +13210,9 @@ function renderTargetManageContent(student, target) {
       }
 
       parentAct.noRemark = true;
-      const siblingIdxs = acts.map((a2, i) => a2.parentActivity === parentAct.name ? i : -1).filter(i => i >= 0);
+      const siblingIdxs = acts.map((a2, i) => a2.parentActivity === _parentKey ? i : -1).filter(i => i >= 0);
       const insertAfter = siblingIdxs.length > 0 ? Math.max(...siblingIdxs) : parentIdx;
-      acts.splice(insertAfter + 1, 0, { id: cfgId("a"), name: "", parentActivity: parentAct.name, order: 0, activeFrom: null });
+      acts.splice(insertAfter + 1, 0, { id: cfgId("a"), name: "", parentActivity: _parentKey, order: 0, activeFrom: null });
       acts.forEach((a2, i) => a2.order = i);
       target.predefinedActivities = acts;
       const sp = $("manage-modal-body").scrollTop;
@@ -13185,7 +13233,7 @@ function renderTargetManageContent(student, target) {
       acts.forEach((a2, i) => a2.order = i);
       // If no sub-activities remain, clear parent's noRemark
       if (!acts.some(a2 => a2.parentActivity === parentName)) {
-        const parent = acts.find(a2 => a2.name === parentName);
+        const parent = acts.find(a2 => (a2.title || a2.name) === parentName);
         if (parent) delete parent.noRemark;
       }
       target.predefinedActivities = acts;
@@ -13868,7 +13916,7 @@ function renderTemplateManageContent(template) {
     masteredActs.forEach((a, ci) => {
       const globalIdx = acts.indexOf(a);
       const dateLabel = a.masteredOn ? `Mastered on ${fmtPeriodDate(a.masteredOn)}` : 'Mastered';
-      const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
+      const subActs = acts.filter(a2 => a2.parentActivity === (a.title || a.name) && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
       html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
         <div style="flex:1;display:flex;flex-direction:column;gap:.4rem">
           <div>
@@ -13926,7 +13974,7 @@ function renderTemplateManageContent(template) {
     discontinuedActs.forEach((a, ci) => {
       const globalIdx = acts.indexOf(a);
       const dateLabel = a.discontinuedOn ? `Discontinued on ${fmtPeriodDate(a.discontinuedOn)}` : 'Discontinued';
-      const subActs = acts.filter(a2 => a2.parentActivity === a.name && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
+      const subActs = acts.filter(a2 => a2.parentActivity === (a.title || a.name) && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
       html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
         <div style="flex:1;display:flex;flex-direction:column;gap:.4rem">
           <div>
