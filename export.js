@@ -491,7 +491,7 @@ function addHalfYearChartsSheets(wb, allTargets, sessions) {
       if (yValues.length < 1) { chartIdx++; continue; }
 
       const year = halfMonths[0].split(" ")[1];
-      const dateRange = `${labels[0]}–${labels[labels.length - 1]} ${year}`;
+      const dateRange = `${labels[0]} - ${labels[labels.length - 1]} ${year}`;
       const base64 = renderTargetChart(target.name, yValues, dateRange, null, labels);
       const imgId  = wb.addImage({ base64, extension: "png" });
 
@@ -3082,163 +3082,91 @@ function formatDateRange(dates) {
 }
 
 function renderTargetChart(targetName, yValues, dateRange, dates, customLabels = null) {
-  const SCALE   = 3;
-  const canvas  = document.createElement("canvas");
-  canvas.width  = 605;
-  canvas.height = 340;
-  const ctx    = canvas.getContext("2d");
+  if (typeof document === "undefined") return null;
+
+  const SCALE = 2;
+  const W = 580, H = 330;
+  const PAD = { top: 92, right: 20, bottom: 38, left: 22 };
+  const cW = W - PAD.left - PAD.right, cH = H - PAD.top - PAD.bottom;
+
   const shortMonths = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const labels = customLabels || (dates || []).map(d => {
     const [, m, day] = d.split("-").map(Number);
     return `${day} ${shortMonths[m - 1]}`;
   });
-  const trend  = linearRegressionValues(yValues);
 
-  // Direction: use the linear regression endpoint difference (slope × (n-1)).
-  // More robust than quarter-average comparison and not sensitive to single-session outliers.
-  const lrDelta  = Math.round(trend[trend.length - 1] - trend[0]);
-  let dirText, dirColor;
-  const ppStr = lrDelta >= 0 ? `+${lrDelta} pts` : `${lrDelta} pts`;
-  if (Math.abs(lrDelta) <= 8) {
-    dirText  = `→  Stable (${ppStr})`;
-    dirColor = "#888888";
-  } else if (lrDelta > 0) {
-    dirText  = `↑  Trending Up (${ppStr})`;
-    dirColor = "#2A7A3B";
-  } else {
-    dirText  = `↓  Trending Down (${ppStr})`;
-    dirColor = "#C0392B";
+  const np = yValues.length;
+  if (np === 0) return null;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W * SCALE; canvas.height = H * SCALE;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(SCALE, SCALE);
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
+
+  // Title
+  const titleText = dateRange ? `${targetName} (${dateRange})` : targetName;
+  ctx.fillStyle = "#1f2937"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText(titleText, W / 2, 24);
+
+  const toY = v => PAD.top + cH * (1 - v / 100);
+  const toX = i => PAD.left + (labels.length > 1 ? (i / (labels.length - 1)) * cW : cW / 2);
+
+  // Gridlines at 0, 20, 40, 60, 80, 100
+  ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
+  for (let v = 0; v <= 100; v += 20) {
+    const y = toY(v);
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + cW, y); ctx.stroke();
   }
 
-  const titleText = dateRange ? `${targetName}  (${dateRange})` : targetName;
+  // Linear regression
+  const trend = linearRegressionValues(yValues);
+  const tStartVal = Math.round(trend[0]);
+  const tEndVal   = Math.round(trend[trend.length - 1]);
 
-  const chart = new Chart(ctx, {
-    type: "line",
-    plugins: [
-      {
-        id: "whiteBg",
-        beforeDraw(c) {
-          c.ctx.save();
-          c.ctx.fillStyle = "#ffffff";
-          c.ctx.fillRect(0, 0, c.width, c.height);
-          c.ctx.restore();
-        }
-      },
-      {
-        id: "chartBorder",
-        afterDraw(c) {
-          c.ctx.save();
-          c.ctx.strokeStyle = "#000000";
-          c.ctx.lineWidth   = 1;
-          c.ctx.strokeRect(0.5, 0.5, c.width - 1, c.height - 1);
-          c.ctx.restore();
-        }
-      },
-      {
-        id: "pointLabels",
-        afterDatasetsDraw(c) {
-          const { ctx: cx, data } = c;
-          const meta = c.getDatasetMeta(0);
-          meta.data.forEach((point, i) => {
-            const value = data.datasets[0].data[i];
-            if (value === null || value === undefined) return;
-            cx.save();
-            cx.fillStyle    = "#000000";
-            cx.font         = "bold 11px sans-serif";
-            cx.textAlign    = "center";
-            cx.textBaseline = "top";
-            cx.fillText(value + "%", point.x, point.y + 8);
-            cx.restore();
-          });
-        }
-      },
-      {
-        id: "trendEndpoints",
-        afterDatasetsDraw(c) {
-          const meta1 = c.getDatasetMeta(1);
-          if (!meta1 || meta1.data.length < 2) return;
-          const { ctx: cx } = c;
-          const trendBlue = "rgba(59,108,181,0.9)";
-          const pts = [
-            { pt: meta1.data[0],                     val: Math.round(trend[0]),                align: "left"  },
-            { pt: meta1.data[meta1.data.length - 1], val: Math.round(trend[trend.length - 1]), align: "right" }
-          ];
-          for (const { pt, val, align } of pts) {
-            cx.save();
-            cx.fillStyle    = trendBlue;
-            cx.font         = "bold 11px sans-serif";
-            cx.textAlign    = align;
-            cx.textBaseline = "bottom";
-            cx.fillText(val + "%", pt.x + (align === "left" ? 4 : -4), pt.y - 4);
-            cx.restore();
-          }
-        }
-      }
-    ],
-    data: {
-      labels,
-      datasets: [
-        {
-          data:                 yValues,
-          borderColor:          "#3B6CB5",
-          backgroundColor:      "rgba(59,108,181,0.08)",
-          pointBackgroundColor: "#3B6CB5",
-          pointRadius:          5,
-          tension:              0,
-          fill:                 false,
-          clip:                 false
-        },
-        {
-          data:        trend,
-          borderColor: "rgba(59,108,181,0.45)",
-          borderDash:  [6, 4],
-          pointRadius: 0,
-          tension:     0,
-          fill:        false
-        }
-      ]
-    },
-    options: {
-      animation:        false,
-      responsive:       false,
-      devicePixelRatio: SCALE,
-      layout: { padding: { top: 10, left: 18, right: 18, bottom: 20 } },
-      plugins: {
-        title: {
-          display: true,
-          text:    titleText,
-          font:    { size: 15, weight: "bold" },
-          color:   "#000000"
-        },
-        subtitle: {
-          display: true,
-          text:    dirText,
-          color:   dirColor,
-          font:    { size: 12, style: "italic" },
-          padding: { bottom: 6 }
-        },
-        legend: { display: false }
-      },
-      scales: {
-        x: {
-          title: { display: true, text: "Date", color: "#000000", font: { size: 13, weight: "bold" } },
-          ticks: { color: "#000000", font: { size: 13 } },
-          grid:  { color: "rgba(0,0,0,0.07)" }
-        },
-        y: {
-          min:   0,
-          max:   100,
-          title: { display: false },
-          ticks: { display: false },
-          grid:  { color: "rgba(0,0,0,0.16)" }
-        }
-      }
-    }
+  // Dashed trendline (only with ≥2 data points)
+  if (np >= 2) {
+    ctx.strokeStyle = "#b0bec5"; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
+    ctx.beginPath(); ctx.moveTo(toX(0), toY(trend[0])); ctx.lineTo(toX(np - 1), toY(trend[np - 1]));
+    ctx.stroke(); ctx.setLineDash([]);
+
+    // Trendline endpoint labels — below trendline, with collision avoidance
+    const safeTrendY = (tY, dY, tV, dV) => Math.abs(tV - dV) <= 10 ? Math.max(dY, tY) + 20 : tY + 13;
+    ctx.fillStyle = "#6b7280"; ctx.font = "13px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(tStartVal + "%", toX(0),      safeTrendY(toY(trend[0]),      toY(yValues[0]),      tStartVal, yValues[0]));
+    ctx.fillText(tEndVal   + "%", toX(np - 1), safeTrendY(toY(trend[np - 1]), toY(yValues[np - 1]), tEndVal,   yValues[np - 1]));
+  }
+
+  // Direction subtitle
+  const delta = tEndVal - tStartVal;
+  const dirText  = delta > 8 ? "↑ Trending Up" : delta < -8 ? "↓ Trending Down" : "→ Stable";
+  const dirColor = delta > 8 ? "#2A7A3B" : delta < -8 ? "#C0392B" : "#6b7280";
+  ctx.fillStyle = dirColor; ctx.font = "italic 16px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText(dirText, W / 2, 42);
+
+  // Data line
+  ctx.strokeStyle = "#4472c4"; ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  yValues.forEach((v, i) => { i === 0 ? ctx.moveTo(toX(i), toY(v)) : ctx.lineTo(toX(i), toY(v)); });
+  ctx.stroke();
+
+  // Dots + value labels ABOVE each dot
+  yValues.forEach((v, i) => {
+    const x = toX(i), y = toY(v);
+    ctx.fillStyle = "#4472c4"; ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#1f2937"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(v + "%", x, y - 9);
   });
 
-  const base64 = canvas.toDataURL("image/png").split(",")[1];
-  chart.destroy();
-  return base64;
+  // Month labels on X-axis
+  ctx.fillStyle = "#374151"; ctx.font = "14px sans-serif"; ctx.textAlign = "center";
+  labels.forEach((label, i) => ctx.fillText(label, toX(i), PAD.top + cH + 16));
+
+  // Border
+  ctx.strokeStyle = "#000000"; ctx.lineWidth = 1;
+  ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
+
+  return canvas.toDataURL("image/png").split(",")[1];
 }
 
 function renderActivityLineChart(actDisplayName, periodMonths, monthBuckets) {
