@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1155";
+const APP_VERSION = "1156";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -5778,7 +5778,7 @@ function renderFedcTarget(target) {
   // Pre-compute active sub-activities per parent for visual grouping
   const subActsByParent = new Map();
   for (const pa of allPas) {
-    if (pa.parentActivity && pa.name?.trim() && isActivityActive(pa, sessionDateForFilter) && !pa.isCompleted && !pa.isArchived && !pa.isStopped) {
+    if (pa.parentActivity && (pa.title || pa.name)?.trim() && isActivityActive(pa, sessionDateForFilter) && !pa.isCompleted && !pa.isArchived && !pa.isStopped) {
       if (!subActsByParent.has(pa.parentActivity)) subActsByParent.set(pa.parentActivity, []);
       subActsByParent.get(pa.parentActivity).push(pa);
     }
