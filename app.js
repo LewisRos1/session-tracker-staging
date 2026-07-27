@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1124";
+const APP_VERSION = "1125";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3366,7 +3366,6 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
       </tr>
       <tr><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;font-weight:700;text-align:center;vertical-align:middle;width:28%;white-space:nowrap">Biggest Wins</td><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;vertical-align:top"><ol style="margin:0;padding-left:1.4rem">${bwItems}</ol></td></tr>
       <tr><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;font-weight:700;text-align:center;vertical-align:middle;white-space:nowrap">Key Focus Areas</td><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;vertical-align:top"><ol style="margin:0;padding-left:1.4rem">${kfItems}</ol></td></tr>
-      <tr><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;font-weight:700;text-align:center;vertical-align:middle;white-space:nowrap">Recommendations & Strategies</td><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;min-height:3rem"></td></tr>
     </tbody></table>`;
   }
 
@@ -3631,7 +3630,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   }
   if (wAllNames.length) paragraphs.push(new Paragraph({ children: [], spacing: { before: 200, after: 0 } }));
 
-  paragraphs.push(mkPara("Top Wins, Focus Areas, Recommendations & Strategies", { heading: HeadingLevel.HEADING_2, before: 280, after: 120, size: 26, bold: true, keepNext: true }));
+  paragraphs.push(mkPara("Top Wins & Focus Areas", { heading: HeadingLevel.HEADING_2, before: 280, after: 120, size: 26, bold: true, keepNext: true }));
   if ((parsed.biggestWins?.length || parsed.keyFocusAreas?.length)) {
     const mkKiColorCell = (text, fill, textColor) => new TableCell({
       width: { size: 28, type: WidthType.PERCENTAGE },
@@ -3657,7 +3656,6 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     const kiRows = [
       new TableRow({ tableHeader: true, children: [mkKiColorCell("Biggest Wins",    "d1fae5", "16a34a"), mkKiNumberedCell(parsed.biggestWins    || [], KI_NUM_REF)] }),
       new TableRow({                    children: [mkKiColorCell("Key Focus Areas",  "fef3c7", "d97706"), mkKiNumberedCell(parsed.keyFocusAreas  || [], KI_NUM_REF_2)] }),
-      new TableRow({                    children: [mkKiColorCell("Recommendations & Strategies", "dbeafe", "2563eb"), mkKiNumberedCell([],                         KI_NUM_REF)] })
     ];
     paragraphs.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: kiRows }));
     paragraphs.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
