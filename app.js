@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1152";
+const APP_VERSION = "1153";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4400,8 +4400,8 @@ function renderManageActivityScreen(student) {
 
       const si = state.students.findIndex(s => s.id === student.id);
       if (si >= 0) state.students[si] = student;
-      await saveStudent(student);
       renderManageActivityScreen(student);
+      saveStudent(student).catch(() => {});
     });
   });
 }
