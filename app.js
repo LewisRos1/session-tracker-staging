@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1142";
+const APP_VERSION = "1143";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2210,7 +2210,8 @@ async function hyrGenerate() {
   };
 
   btn.disabled = true; progress.style.display = "";
-  setProgress(10, "Collecting session data…");
+  setProgress(5, "Collecting session data…");
+  await new Promise(r => setTimeout(r, 700));
 
   try {
     const excludedActivities = new Set();
@@ -2220,7 +2221,10 @@ async function hyrGenerate() {
 
     const { text: dataText, chartData, breakdownData, trendRows, categorized } = await hyrCollectData(student, period, year, excludedActivities);
 
+    setProgress(20, "Processing data…");
+    await new Promise(r => setTimeout(r, 600));
     setProgress(35, "Sending to AI…");
+    await new Promise(r => setTimeout(r, 500));
 
     // Switch button to Cancel so user can abort the request
     _hyrAbortController = new AbortController();
@@ -2331,7 +2335,10 @@ TARGET: [exact target name]
     btn.disabled = true;
     btn.style.background = ""; btn.style.color = ""; btn.style.borderColor = "";
 
-    setProgress(80, "Writing report…");
+    setProgress(70, "AI response received…");
+    await new Promise(r => setTimeout(r, 600));
+    setProgress(85, "Writing report…");
+    await new Promise(r => setTimeout(r, 700));
 
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
