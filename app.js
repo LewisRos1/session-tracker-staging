@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1160";
+const APP_VERSION = "1161";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -705,7 +705,8 @@ function registerServiceWorker() {
 // the running app, force a hard navigation to pick up the new files.
 async function checkVersionFromServer() {
   try {
-    const resp = await fetch("/sw.js?_=" + Date.now(), { cache: "no-store" });
+    const swPath = new URL("sw.js", window.location.href).pathname;
+    const resp = await fetch(swPath + "?_=" + Date.now(), { cache: "no-store" });
     if (!resp.ok) return;
     const text = await resp.text();
     const m = text.match(/therapy-tracker-v(\d+)/);
