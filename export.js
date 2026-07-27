@@ -502,8 +502,8 @@ function addHalfYearChartsSheets(wb, allTargets, sessions) {
     }
   }
 
-  buildSheet("Charts H1 (Jan–Jun)", h1Months);
-  buildSheet("Charts H2 (Jul–Dec)", h2Months);
+  buildSheet("Target Charts H1", h1Months);
+  buildSheet("Target Charts H2", h2Months);
 }
 
 // "Trendline Summary" sheet: two separate tables (H1 then H2) with legend image at top.
@@ -749,7 +749,7 @@ function drawOverviewChart(chartTrendRows, title) {
   return { base64: canvas.toDataURL("image/png").split(",")[1], height: H };
 }
 
-export function renderActivityBreakdownChart(targetName, activityData, periodLabel, chartTitle = null, showDuration = false) {
+export function renderActivityBreakdownChart(targetName, activityData, periodLabel, chartTitle = null, showDuration = false, legendLabels = null) {
   if (!activityData || activityData.length === 0) return null;
   const SCALE = 2, SECTION_H = 28;
   const C_START = "#7dd3fc", C_END = "#a78bfa";
@@ -885,7 +885,8 @@ export function renderActivityBreakdownChart(targetName, activityData, periodLab
   // Legend (single row, centered)
   const BOX = 12, LG = 6, LR = 20;
   ctx.font = "14px sans-serif";
-  const eTxt = "Earliest Month", lTxt = "Latest Month";
+  const eTxt = (legendLabels && legendLabels[0]) || "Earliest Month";
+  const lTxt = (legendLabels && legendLabels[1]) || "Latest Month";
   const totalLegW = BOX + LG + ctx.measureText(eTxt).width + LR + BOX + LG + ctx.measureText(lTxt).width;
   let lx = Math.round((W - totalLegW) / 2);
   const legY = plotBottom + 30;
@@ -902,14 +903,17 @@ export function renderActivityBreakdownChart(targetName, activityData, periodLab
   return { base64: canvas.toDataURL("image/png").split(",")[1], height: H };
 }
 
-function addActivityBreakdownSheet(wb, allTargets, sessions) {
+function addActivityBreakdownHalfSheets(wb, allTargets, sessions) {
+  const H1_NAMES = new Set(["January","February","March","April","May","June"]);
+  const H2_NAMES = new Set(["July","August","September","October","November","December"]);
+
   const allMonths = [...new Set(sessions.map(s => s.month))].sort((a, b) => {
     const [ma, ya] = parseMonth(a); const [mb, yb] = parseMonth(b);
     return ya !== yb ? ya - yb : ma - mb;
   });
   if (allMonths.length === 0) return;
 
-  // Convert "YYYY-MM-DD" → "MonthName YYYY" for period comparison
+  // dateToMonthLabel / monthInPeriod use the FULL session range for mastered/discontinued checks
   const dateToMonthLabel = dateStr => {
     if (!dateStr) return null;
     const parts = dateStr.split("-");
@@ -925,257 +929,252 @@ function addActivityBreakdownSheet(wb, allTargets, sessions) {
     return (py > sy || (py === sy && pm >= sm)) && (py < ey || (py === ey && pm <= em));
   };
 
-  // Period label: "Jan - Jun 2026" or "Dec 2025 - Jan 2026" for cross-year (spaced hyphen to match AI report)
-  const fM = allMonths[0].split(" "), lM = allMonths[allMonths.length - 1].split(" ");
-  const periodLabel = fM[1] === lM[1]
-    ? `${fM[0].slice(0, 3)} - ${lM[0].slice(0, 3)} ${lM[1]}`
-    : `${fM[0].slice(0, 3)} ${fM[1]} - ${lM[0].slice(0, 3)} ${lM[1]}`;
+  function buildHalfSheet(sheetName, halfMonths) {
+    if (halfMonths.length === 0) return;
+    const halfMonthsSet = new Set(halfMonths);
 
-  // Compute per-target trendline delta to sort matching Trendline Summary order
-  // Use same H1/H2 half-year grouping as Trendline Summary for the sort delta
-  // (using all months gives different regression than H1-only, causing order mismatch)
-  const H1_SORT = new Set(["January","February","March","April","May","June"]);
-  const sortBuckets = {}, sortOrder = [];
-  for (const month of allMonths) {
-    const [name, year] = month.split(" ");
-    const key = `${H1_SORT.has(name) ? "H1" : "H2"} ${year}`;
-    if (!sortBuckets[key]) { sortBuckets[key] = []; sortOrder.push(key); }
-    sortBuckets[key].push(month);
-  }
-  const sortKey = [...sortOrder].reverse().find(k => sortBuckets[k].length >= 2) || sortOrder[sortOrder.length - 1];
-  const sortMonths = sortBuckets[sortKey] || allMonths;
+    const fM = halfMonths[0].split(" "), lM = halfMonths[halfMonths.length - 1].split(" ");
+    const periodLabel = fM[1] === lM[1]
+      ? `${fM[0].slice(0, 3)} - ${lM[0].slice(0, 3)} ${lM[1]}`
+      : `${fM[0].slice(0, 3)} ${fM[1]} - ${lM[0].slice(0, 3)} ${lM[1]}`;
 
-  const trendData = {};
-  for (const target of allTargets) {
-    const yValues = [];
-    for (const month of sortMonths) {
-      const monthSessions = sessions.filter(s => s.month === month);
-      const vals = monthSessions.map(s => {
-        const snap = (s.targetsSnapshot || []).find(t => t.name === target.name);
-        const eff  = snap ? { ...target, maxPoints: snap.maxPoints ?? target.maxPoints } : target;
-        return calcDailyAverage(s, eff, allTargets);
-      }).filter(v => v !== null && !isNaN(v));
-      if (vals.length > 0) yValues.push(Math.round(avg(vals)));
-    }
-    if (yValues.length >= 2) {
-      const trend = linearRegressionValues(yValues);
-      const delta = Math.round(trend[trend.length - 1]) - Math.round(trend[0]);
-      trendData[target.name] = { hasData: true, delta };
-    } else {
-      trendData[target.name] = { hasData: false, delta: -Infinity };
-    }
-  }
-
-  // Sort: section 1 = Quantitative (hasData, descending delta), section 2 = Qualitative (no data)
-  const sortedTargets = [...allTargets].sort((a, b) => {
-    const da = trendData[a.name] || { hasData: false, delta: -Infinity };
-    const db = trendData[b.name] || { hasData: false, delta: -Infinity };
-    if (da.hasData !== db.hasData) return da.hasData ? -1 : 1;
-    if (da.hasData && db.hasData) return db.delta - da.delta;
-    return 0;
-  });
-
-  const ws = wb.addWorksheet("Activity Breakdown");
-  let rowOffset = 0;
-  let targetNum = 0;
-  const MAX_PER_CHART = 13;
-
-  for (const target of sortedTargets) {
-    const actDisplayNameMap = {};  // only for extraNames fallback
-    const actStatusMap = {};
-    // Per-section display name maps so the same pa.name in multiple sections
-    // gets the correct section-specific counter (avoids last-write-wins overwrite).
-    const activeDNMap = {}, masteredDNMap = {}, discontinuedDNMap = {};
-    // Track ordered lists for each section
-    const activeNames = [], masteredNames = [], discontinuedNames = [];
-    // Pre-build parent map so sub-activities inherit discontinued/mastered status
-    const parentPaMap = {};
-    for (const pa of (target.predefinedActivities || [])) {
-      if (!pa.parentActivity && (pa.name || pa.title)) parentPaMap[pa.title || pa.name] = pa;
-    }
-    // When a user moves an activity name from pa.name → pa.title, some session records
-    // still carry activityName = old pa.name, or a combined "title + details" string from
-    // before the title field existed. Build alias maps so buildEntry merges those records
-    // into the correct predefined entry instead of showing them as duplicate extra rows.
-    const paKeyToAliases  = {};  // paKey (display title) → [legacy activityName values]
-    const paLegacyToKey   = {};  // exact legacy pa.name → paKey
-    const paConfigIdToKey = {};  // pa.id → paKey (most reliable redirect)
-    const paKeySearchText = {};  // paKey → lowercase combined title+name for fuzzy orphan matching
-    for (const pa of (target.predefinedActivities || [])) {
-      const key = pa.title || pa.name;
-      if (!key) continue;
-      if (pa.id) paConfigIdToKey[pa.id] = key;
-      if (pa.title && pa.name && pa.title !== pa.name) {
-        if (!paKeyToAliases[key]) paKeyToAliases[key] = [];
-        paKeyToAliases[key].push(pa.name);
-        paLegacyToKey[pa.name] = key;
+    // Sort targets by trendline delta for THIS half
+    const trendData = {};
+    for (const target of allTargets) {
+      const yValues = [];
+      for (const month of halfMonths) {
+        const monthSessions = sessions.filter(s => s.month === month);
+        const vals = monthSessions.map(s => {
+          const snap = (s.targetsSnapshot || []).find(t => t.name === target.name);
+          const eff  = snap ? { ...target, maxPoints: snap.maxPoints ?? target.maxPoints } : target;
+          return calcDailyAverage(s, eff, allTargets);
+        }).filter(v => v !== null && !isNaN(v));
+        if (vals.length > 0) yValues.push(Math.round(avg(vals)));
       }
-      paKeySearchText[key] = ((pa.title || "") + " " + (pa.name || "")).toLowerCase();
-    }
-
-    let activeIdx = 0, masteredIdx = 0, discontinuedIdx = 0;
-    const parentSectionIdx = {}; // standalone pa.name → its section counter value (for sub-act labels)
-    const parentSubCount   = {}; // parent pa.name → how many sub-acts have been labelled so far
-    for (const pa of (target.predefinedActivities || [])) {
-      if ((!pa.name && !pa.title) || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || pa.isMaintain
-          || pa.isCompleted) continue;
-
-      const parentPa = pa.parentActivity ? parentPaMap[pa.parentActivity] : null;
-      const effectiveMasteredOn     = pa.masteredOn     || parentPa?.masteredOn;
-      const effectiveDiscontinuedOn = pa.discontinuedOn || parentPa?.discontinuedOn;
-      const effectiveArchived       = pa.isArchived || pa.isStopped || parentPa?.isArchived || parentPa?.isStopped;
-
-      const masteredMonth     = dateToMonthLabel(effectiveMasteredOn);
-      const discontinuedMonth = dateToMonthLabel(effectiveDiscontinuedOn);
-
-      const isActive       = !effectiveMasteredOn && !effectiveDiscontinuedOn && !effectiveArchived;
-      const isMastered     = !!effectiveMasteredOn && monthInPeriod(masteredMonth);
-      const isDiscontinued = !effectiveMasteredOn && (effectiveArchived || (!!effectiveDiscontinuedOn && monthInPeriod(discontinuedMonth)));
-
-      if (!isActive && !isMastered && !isDiscontinued) continue;
-
-      const dnMap = isActive ? activeDNMap : isMastered ? masteredDNMap : discontinuedDNMap;
-
-      let displayName;
-      if (pa.parentActivity) {
-        // Sub-activity: does NOT increment the section counter.
-        // Unnamed ones use parent's index + letter suffix (a, b, c…).
-        const pIdx   = parentSectionIdx[pa.parentActivity];
-        const letterN = parentSubCount[pa.parentActivity] ?? 0;
-        parentSubCount[pa.parentActivity] = letterN + 1;
-        const letter = String.fromCharCode(97 + letterN);
-        const subBase = (pa.title || pa.name || "").trim();
-        displayName = pIdx != null
-          ? `${pIdx}) ${letter}) ${subBase || `<Sub ${letter}>`}`
-          : `${letter}) ${subBase || `<Sub-Activity ${letter}>`}`;
+      if (yValues.length >= 2) {
+        const tr = linearRegressionValues(yValues);
+        trendData[target.name] = { hasData: true, delta: Math.round(tr[tr.length - 1]) - Math.round(tr[0]) };
       } else {
-        // Standalone activity: increment the section counter.
-        let sectionIdx;
-        if (isActive)        { sectionIdx = ++activeIdx; }
-        else if (isMastered) { sectionIdx = ++masteredIdx; }
-        else                 { sectionIdx = ++discontinuedIdx; }
-        displayName = `${sectionIdx}) ${pa.title?.trim() || pa.name?.trim() || `<Activity ${sectionIdx}>`}`;
-        parentSectionIdx[pa.title || pa.name] = sectionIdx;
+        trendData[target.name] = { hasData: false, delta: -Infinity };
+      }
+    }
+    const sortedTargets = [...allTargets].sort((a, b) => {
+      const da = trendData[a.name] || { hasData: false, delta: -Infinity };
+      const db = trendData[b.name] || { hasData: false, delta: -Infinity };
+      if (da.hasData !== db.hasData) return da.hasData ? -1 : 1;
+      if (da.hasData && db.hasData) return db.delta - da.delta;
+      return 0;
+    });
+
+    const ws = wb.addWorksheet(sheetName);
+    let rowOffset = 0;
+    let targetNum = 0;
+    const MAX_PER_CHART = 13;
+
+    for (const target of sortedTargets) {
+      const actDisplayNameMap = {};
+      const actStatusMap = {};
+      const activeDNMap = {}, masteredDNMap = {}, discontinuedDNMap = {};
+      const activeNames = [], masteredNames = [], discontinuedNames = [];
+      const parentPaMap = {};
+      for (const pa of (target.predefinedActivities || [])) {
+        if (!pa.parentActivity && (pa.name || pa.title)) parentPaMap[pa.title || pa.name] = pa;
+      }
+      const paKeyToAliases  = {};
+      const paLegacyToKey   = {};
+      const paConfigIdToKey = {};
+      const paKeySearchText = {};
+      for (const pa of (target.predefinedActivities || [])) {
+        const key = pa.title || pa.name;
+        if (!key) continue;
+        if (pa.id) paConfigIdToKey[pa.id] = key;
+        if (pa.title && pa.name && pa.title !== pa.name) {
+          if (!paKeyToAliases[key]) paKeyToAliases[key] = [];
+          paKeyToAliases[key].push(pa.name);
+          paLegacyToKey[pa.name] = key;
+        }
+        paKeySearchText[key] = ((pa.title || "") + " " + (pa.name || "")).toLowerCase();
       }
 
-      const paKey = pa.title || pa.name;
-      dnMap[paKey] = displayName;
+      let activeIdx = 0, masteredIdx = 0, discontinuedIdx = 0;
+      const parentSectionIdx = {};
+      const parentSubCount   = {};
+      for (const pa of (target.predefinedActivities || [])) {
+        if ((!pa.name && !pa.title) || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || pa.isMaintain
+            || pa.isCompleted) continue;
 
-      if (isActive)            { actStatusMap[paKey] = "active";       activeNames.push(paKey); }
-      else if (isMastered)     { actStatusMap[paKey] = "mastered";     masteredNames.push(paKey); }
-      else if (isDiscontinued) { actStatusMap[paKey] = "discontinued"; discontinuedNames.push(paKey); }
-    }
+        const parentPa = pa.parentActivity ? parentPaMap[pa.parentActivity] : null;
+        const effectiveMasteredOn     = pa.masteredOn     || parentPa?.masteredOn;
+        const effectiveDiscontinuedOn = pa.discontinuedOn || parentPa?.discontinuedOn;
+        const effectiveArchived       = pa.isArchived || pa.isStopped || parentPa?.isArchived || parentPa?.isStopped;
 
-    // Extra activities from session data not in predefined
-    const extraNames = [];
-    for (const sess of sessions) {
-      for (const [, a] of Object.entries(sess.activities || {})) {
-        if ((a.targetName === target.name || a.target === target.name) && a.activityName && !a.isHeading && !a.isNote) {
-          if (!activeDNMap[a.activityName] && !masteredDNMap[a.activityName] && !discontinuedDNMap[a.activityName]
-              && !actDisplayNameMap[a.activityName]) {
-            // Redirect to predefined activity via configId (most reliable) or exact legacy pa.name match
-            const paKey = (a.configId && paConfigIdToKey[a.configId]) || paLegacyToKey[a.activityName];
-            if (paKey) {
-              if (!paKeyToAliases[paKey]) paKeyToAliases[paKey] = [];
-              if (!paKeyToAliases[paKey].includes(a.activityName)) paKeyToAliases[paKey].push(a.activityName);
-              const status = actStatusMap[paKey] || "active";
-              const targetDNMap = status === "mastered" ? masteredDNMap : status === "discontinued" ? discontinuedDNMap : activeDNMap;
-              targetDNMap[a.activityName] = targetDNMap[paKey] || paKey;
-              continue;
+        const masteredMonth     = dateToMonthLabel(effectiveMasteredOn);
+        const discontinuedMonth = dateToMonthLabel(effectiveDiscontinuedOn);
+
+        const isActive       = !effectiveMasteredOn && !effectiveDiscontinuedOn && !effectiveArchived;
+        const isMastered     = !!effectiveMasteredOn && monthInPeriod(masteredMonth);
+        const isDiscontinued = !effectiveMasteredOn && (effectiveArchived || (!!effectiveDiscontinuedOn && monthInPeriod(discontinuedMonth)));
+
+        if (!isActive && !isMastered && !isDiscontinued) continue;
+
+        const dnMap = isActive ? activeDNMap : isMastered ? masteredDNMap : discontinuedDNMap;
+
+        let displayName;
+        if (pa.parentActivity) {
+          const pIdx    = parentSectionIdx[pa.parentActivity];
+          const letterN = parentSubCount[pa.parentActivity] ?? 0;
+          parentSubCount[pa.parentActivity] = letterN + 1;
+          const letter = String.fromCharCode(97 + letterN);
+          const subBase = (pa.title || pa.name || "").trim();
+          displayName = pIdx != null
+            ? `${pIdx}) ${letter}) ${subBase || `<Sub ${letter}>`}`
+            : `${letter}) ${subBase || `<Sub-Activity ${letter}>`}`;
+        } else {
+          let sectionIdx;
+          if (isActive)        { sectionIdx = ++activeIdx; }
+          else if (isMastered) { sectionIdx = ++masteredIdx; }
+          else                 { sectionIdx = ++discontinuedIdx; }
+          displayName = `${sectionIdx}) ${pa.title?.trim() || pa.name?.trim() || `<Activity ${sectionIdx}>`}`;
+          parentSectionIdx[pa.title || pa.name] = sectionIdx;
+        }
+
+        const paKey = pa.title || pa.name;
+        dnMap[paKey] = displayName;
+
+        if (isActive)            { actStatusMap[paKey] = "active";       activeNames.push(paKey); }
+        else if (isMastered)     { actStatusMap[paKey] = "mastered";     masteredNames.push(paKey); }
+        else if (isDiscontinued) { actStatusMap[paKey] = "discontinued"; discontinuedNames.push(paKey); }
+      }
+
+      const extraNames = [];
+      for (const sess of sessions) {
+        for (const [, a] of Object.entries(sess.activities || {})) {
+          if ((a.targetName === target.name || a.target === target.name) && a.activityName && !a.isHeading && !a.isNote) {
+            if (!activeDNMap[a.activityName] && !masteredDNMap[a.activityName] && !discontinuedDNMap[a.activityName]
+                && !actDisplayNameMap[a.activityName]) {
+              const paKey = (a.configId && paConfigIdToKey[a.configId]) || paLegacyToKey[a.activityName];
+              if (paKey) {
+                if (!paKeyToAliases[paKey]) paKeyToAliases[paKey] = [];
+                if (!paKeyToAliases[paKey].includes(a.activityName)) paKeyToAliases[paKey].push(a.activityName);
+                const status = actStatusMap[paKey] || "active";
+                const targetDNMap = status === "mastered" ? masteredDNMap : status === "discontinued" ? discontinuedDNMap : activeDNMap;
+                targetDNMap[a.activityName] = targetDNMap[paKey] || paKey;
+                continue;
+              }
+              if (a.configId && !paConfigIdToKey[a.configId]) continue;
+              const actWords = a.activityName.toLowerCase().match(/\b[a-z]{4,}\b/g);
+              if (actWords && actWords.length >= 5) {
+                const isOrphanedPredefined = Object.values(paKeySearchText).some(
+                  text => actWords.filter(w => text.includes(w)).length / actWords.length >= 0.5
+                );
+                if (isOrphanedPredefined) continue;
+              }
+              if (a.isPredefined) continue;
+              actDisplayNameMap[a.activityName] = a.activityTitle || a.activityName;
+              actStatusMap[a.activityName] = "active";
+              extraNames.push(a.activityName);
             }
-            // Skip records with an unrecognised configId — created from a predefined activity
-            // config that has since been deleted or restructured with a new pa.id.
-            if (a.configId && !paConfigIdToKey[a.configId]) continue;
-            // Fuzzy word-overlap: if ≥50% of the record's significant words (4+ chars) match
-            // text in any predefined activity's combined title+name, it's likely an orphaned
-            // predefined record whose name changed beyond what the alias maps can reach.
-            // Minimum 5 words required to avoid false-positives on short user-added extras.
-            const actWords = a.activityName.toLowerCase().match(/\b[a-z]{4,}\b/g);
-            if (actWords && actWords.length >= 5) {
-              const isOrphanedPredefined = Object.values(paKeySearchText).some(
-                text => actWords.filter(w => text.includes(w)).length / actWords.length >= 0.5
-              );
-              if (isOrphanedPredefined) continue;
-            }
-            // Skip orphaned predefined records: isPredefined=true means the record was created
-            // from a predefined activity config entry — if it got here it means the config name
-            // has since changed and we have no way to match it back. Showing it as a separate
-            // row would create duplicates. Non-predefined records are genuinely user-added extras.
-            if (a.isPredefined) continue;
-            actDisplayNameMap[a.activityName] = a.activityTitle || a.activityName;
-            actStatusMap[a.activityName] = "active";
-            extraNames.push(a.activityName);
           }
         }
       }
-    }
 
-    const allNames = [...activeNames, ...masteredNames, ...discontinuedNames, ...extraNames];
-    if (allNames.length === 0) continue;
+      const allNames = [...activeNames, ...masteredNames, ...discontinuedNames, ...extraNames];
+      if (allNames.length === 0) continue;
 
-    // Build score data for each activity name; dnMap supplies the display label.
-    // aliases lets buildEntry find records stored under legacy activityName variants.
-    const buildEntry = (actName, dnMap, aliases = []) => {
-      const monthBuckets = {};
-      const monthsTracked = new Set(); // months with any remark (scored or not)
-      for (const sess of sessions) {
-        const actEntry = Object.entries(sess.activities || {}).find(
-          ([, a]) => (a.activityName === actName || aliases.includes(a.activityName)) && (a.targetName === target.name || a.target === target.name)
-        );
-        if (!actEntry) continue;
-        const [actKey, act] = actEntry;
-        const actId = act.id || actKey;
-        const snap = (sess.targetsSnapshot || []).find(t => t.name === target.name);
-        const mp = (snap ? (snap.maxPoints ?? target.maxPoints) : target.maxPoints) || 3;
-        for (const rem of getRemarksForActivity(sess, actId)) {
-          monthsTracked.add(sess.month); // any remark (No Event, No Engagement, text-only, etc.) counts
-          const scores = allScores(rem);
-          if (scores.length === 0) continue;
-          const pct = scores.reduce((a, b) => a + b, 0) / (scores.length * mp) * 100;
-          if (!monthBuckets[sess.month]) monthBuckets[sess.month] = [];
-          monthBuckets[sess.month].push(pct);
+      // buildEntry: filters to halfMonths, returns trendline endpoints + monthBuckets for line charts
+      const buildEntry = (actName, dnMap, aliases = []) => {
+        const monthBuckets = {};
+        for (const sess of sessions) {
+          if (!halfMonthsSet.has(sess.month)) continue;
+          const actEntry = Object.entries(sess.activities || {}).find(
+            ([, a]) => (a.activityName === actName || aliases.includes(a.activityName)) && (a.targetName === target.name || a.target === target.name)
+          );
+          if (!actEntry) continue;
+          const [actKey, act] = actEntry;
+          const actId = act.id || actKey;
+          const snap = (sess.targetsSnapshot || []).find(t => t.name === target.name);
+          const mp = (snap ? (snap.maxPoints ?? target.maxPoints) : target.maxPoints) || 3;
+          for (const rem of getRemarksForActivity(sess, actId)) {
+            const scores = allScores(rem);
+            if (scores.length === 0) continue;
+            const pct = scores.reduce((a, b) => a + b, 0) / (scores.length * mp) * 100;
+            if (!monthBuckets[sess.month]) monthBuckets[sess.month] = [];
+            monthBuckets[sess.month].push(pct);
+          }
         }
+        const dataMonths = halfMonths.filter(m => monthBuckets[m]?.length > 0);
+        if (dataMonths.length === 0) return null;
+        const dataAvgs = dataMonths.map(m => monthBuckets[m].reduce((a, b) => a + b, 0) / monthBuckets[m].length);
+        let earliestAvg, latestAvg;
+        if (dataAvgs.length >= 2) {
+          const tr = linearRegressionValues(dataAvgs);
+          earliestAvg = tr[0];
+          latestAvg   = tr[tr.length - 1];
+        } else {
+          earliestAvg = dataAvgs[0];
+          latestAvg   = dataAvgs[0];
+        }
+        return {
+          name: dnMap[actName] || actName,
+          earliestLabel: dataMonths[0].split(" ")[0].slice(0, 3),
+          earliestAvg,
+          latestLabel: dataMonths[dataMonths.length - 1].split(" ")[0].slice(0, 3),
+          latestAvg,
+          monthBuckets
+        };
+      };
+
+      const activeData       = activeNames.map(n => buildEntry(n, activeDNMap, paKeyToAliases[n] || [])).filter(Boolean);
+      const masteredData     = masteredNames.map(n => buildEntry(n, masteredDNMap, paKeyToAliases[n] || [])).filter(Boolean);
+      const discontinuedData = discontinuedNames.map(n => buildEntry(n, discontinuedDNMap, paKeyToAliases[n] || [])).filter(Boolean);
+      const extraData        = extraNames.map(n => buildEntry(n, actDisplayNameMap)).filter(Boolean);
+
+      const activityData = [...activeData, ...extraData];
+      if (activityData.filter(a => !a.isSectionHeader).length === 0) continue;
+
+      targetNum++;
+
+      // Breakdown charts (no duration column; legend labels = Trendline Start/End)
+      const chunks = [];
+      for (let i = 0; i < activityData.length; i += MAX_PER_CHART) chunks.push(activityData.slice(i, i + MAX_PER_CHART));
+      for (let ci = 0; ci < chunks.length; ci++) {
+        const pageSuffix = chunks.length > 1 ? ` [Page ${ci + 1} of ${chunks.length}]` : "";
+        const chartTitle = `${targetNum}) ${target.name} - Progress (${periodLabel})${pageSuffix}`;
+        const chartResult = renderActivityBreakdownChart(target.name, chunks[ci], periodLabel, chartTitle, false, ["Trendline Start", "Trendline End"]);
+        if (!chartResult) continue;
+        const { base64, height: chartH } = chartResult;
+        const imgId = wb.addImage({ base64, extension: "png" });
+        ws.addImage(imgId, { tl: { col: 0, row: rowOffset }, ext: { width: 673, height: chartH } });
+        const rowsNeeded = Math.ceil(chartH / 20) + 3;
+        for (let r = rowOffset; r < rowOffset + rowsNeeded; r++) ws.addRow([]);
+        rowOffset += rowsNeeded;
       }
-      let earliest = null, latest = null;
-      for (const month of allMonths) {
-        const scores = monthBuckets[month];
-        if (!scores || scores.length === 0) continue;
-        const mAvg = scores.reduce((a, b) => a + b, 0) / scores.length;
-        if (earliest === null) earliest = { label: month.split(" ")[0].slice(0, 3), avg: mAvg };
-        latest = { label: month.split(" ")[0].slice(0, 3), avg: mAvg };
+
+      // Activity line charts — one per activity, 2 per row, below the breakdown chart(s)
+      const lineEntries = activityData.filter(a => !a.isSectionHeader && a.monthBuckets);
+      if (lineEntries.length > 0) {
+        const lineRowStart = rowOffset;
+        const rowsForLines = Math.ceil(lineEntries.length / 2) * 19 + 2;
+        for (let r = rowOffset; r < rowOffset + rowsForLines; r++) ws.addRow([]);
+        let lineIdx = 0;
+        for (const entry of lineEntries) {
+          const lineBase64 = renderActivityLineChart(entry.name, halfMonths, entry.monthBuckets);
+          if (!lineBase64) continue;
+          const imgId = wb.addImage({ base64: lineBase64, extension: "png" });
+          const chartRow = lineRowStart + Math.floor(lineIdx / 2) * 19;
+          const chartCol = (lineIdx % 2) * 11;
+          ws.addImage(imgId, { tl: { col: chartCol, row: chartRow }, ext: { width: 605, height: 340 } });
+          lineIdx++;
+        }
+        rowOffset = lineRowStart + rowsForLines;
       }
-      if (earliest === null) return null;
-      return { name: dnMap[actName] || actName, earliestLabel: earliest.label, earliestAvg: earliest.avg, latestLabel: latest.label, latestAvg: latest.avg, monthCount: monthsTracked.size };
-    };
-
-    const activeData       = activeNames.map(n => buildEntry(n, activeDNMap, paKeyToAliases[n] || [])).filter(Boolean);
-    const masteredData     = masteredNames.map(n => buildEntry(n, masteredDNMap, paKeyToAliases[n] || [])).filter(Boolean);
-    const discontinuedData = discontinuedNames.map(n => buildEntry(n, discontinuedDNMap, paKeyToAliases[n] || [])).filter(Boolean);
-    const extraData        = extraNames.map(n => buildEntry(n, actDisplayNameMap)).filter(Boolean);
-
-    // Active-only: matches the AI report which only shows activities still in progress
-    const activityData = [...activeData, ...extraData];
-    if (activityData.filter(a => !a.isSectionHeader).length === 0) continue;
-
-    targetNum++;
-
-    // Split into chunks of max 13 activities
-    const chunks = [];
-    for (let i = 0; i < activityData.length; i += MAX_PER_CHART) chunks.push(activityData.slice(i, i + MAX_PER_CHART));
-
-    for (let ci = 0; ci < chunks.length; ci++) {
-      const pageSuffix = chunks.length > 1 ? ` [Page ${ci + 1} of ${chunks.length}]` : "";
-      const chartTitle = `${targetNum}) ${target.name} - Progress (${periodLabel})${pageSuffix}`;
-      const chartResult = renderActivityBreakdownChart(target.name, chunks[ci], periodLabel, chartTitle, true);
-      if (!chartResult) continue;
-      const { base64, height: chartH } = chartResult;
-      const imgId = wb.addImage({ base64, extension: "png" });
-      ws.addImage(imgId, { tl: { col: 0, row: rowOffset }, ext: { width: 673, height: chartH } });
-      const rowsNeeded = Math.ceil(chartH / 20) + 3;
-      for (let r = rowOffset; r < rowOffset + rowsNeeded; r++) ws.addRow([]);
-      rowOffset += rowsNeeded;
     }
   }
+
+  const h1Months = allMonths.filter(m => H1_NAMES.has(m.split(" ")[0]));
+  const h2Months = allMonths.filter(m => H2_NAMES.has(m.split(" ")[0]));
+  buildHalfSheet("Activity Charts H1", h1Months);
+  buildHalfSheet("Activity Charts H2", h2Months);
 }
 
 function addActivityScoreSheet(wb, allTargets, sessions) {
@@ -1531,7 +1530,7 @@ async function buildStudentWorkbook(student, sessions, includeTrials) {
   addSummarySheets(wb, allTargets, sessions);
   addHalfYearChartsSheets(wb, allTargets, sortedSessions);
   addTrendSummarySheet(wb, allTargets, sortedSessions);
-  addActivityBreakdownSheet(wb, allTargets, sortedSessions);
+  addActivityBreakdownHalfSheets(wb, allTargets, sortedSessions);
   addActivityScoreSheet(wb, allTargets, sortedSessions);
   addIndividualTargetSheets(wb, allTargets, sessions, student.name, includeTrials);
 
@@ -1564,7 +1563,7 @@ async function buildGroupMemberWorkbook(studentName, allTargets, sessions, inclu
   addSummarySheets(wb, sortedTargets, filtered);
   addHalfYearChartsSheets(wb, sortedTargets, sortedSessions);
   addTrendSummarySheet(wb, sortedTargets, sortedSessions);
-  addActivityBreakdownSheet(wb, sortedTargets, sortedSessions);
+  addActivityBreakdownHalfSheets(wb, sortedTargets, sortedSessions);
   addActivityScoreSheet(wb, sortedTargets, sortedSessions);
   addIndividualTargetSheets(wb, sortedTargets, filtered, studentName, includeTrials);
 
@@ -3240,6 +3239,150 @@ function renderTargetChart(targetName, yValues, dateRange, dates, customLabels =
   const base64 = canvas.toDataURL("image/png").split(",")[1];
   chart.destroy();
   return base64;
+}
+
+function renderActivityLineChart(actDisplayName, periodMonths, monthBuckets) {
+  if (typeof Chart === "undefined") return null;
+
+  const labels = periodMonths.map(m => m.split(" ")[0].slice(0, 3));
+  const yValues = periodMonths.map(m => {
+    const scores = monthBuckets[m];
+    if (!scores || scores.length === 0) return null;
+    return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+  });
+
+  const dataIndices = [], dataYValues = [];
+  yValues.forEach((v, i) => { if (v !== null) { dataIndices.push(i); dataYValues.push(v); } });
+  if (dataYValues.length === 0) return null;
+
+  const year = periodMonths[0].split(" ")[1];
+  const dateRange = dataIndices.length === 1
+    ? `${labels[dataIndices[0]]} ${year}`
+    : `${labels[dataIndices[0]]}–${labels[dataIndices[dataIndices.length - 1]]} ${year}`;
+  const titleText = `${actDisplayName}  (${dateRange})`;
+
+  let regression = null, trendValues = null, lrDelta = 0;
+  let dirText = "", dirColor = "#888888";
+
+  if (dataYValues.length >= 2) {
+    regression = linearRegressionValues(dataYValues);
+    lrDelta = Math.round(regression[regression.length - 1] - regression[0]);
+    trendValues = yValues.map((_, i) => {
+      const di = dataIndices.indexOf(i);
+      return di >= 0 ? regression[di] : null;
+    });
+    const ppStr = lrDelta >= 0 ? `+${lrDelta} pts` : `${lrDelta} pts`;
+    if (Math.abs(lrDelta) <= 8)  { dirText = `→  Stable (${ppStr})`;       dirColor = "#888888"; }
+    else if (lrDelta > 0)         { dirText = `↑  Trending Up (${ppStr})`;  dirColor = "#2A7A3B"; }
+    else                          { dirText = `↓  Trending Down (${ppStr})`; dirColor = "#C0392B"; }
+  }
+
+  const SCALE = 3;
+  const canvas = document.createElement("canvas");
+  canvas.width = 605; canvas.height = 340;
+  const ctx = canvas.getContext("2d");
+
+  const plugins = [
+    {
+      id: "whiteBg",
+      beforeDraw(c) { c.ctx.save(); c.ctx.fillStyle = "#ffffff"; c.ctx.fillRect(0, 0, c.width, c.height); c.ctx.restore(); }
+    },
+    {
+      id: "chartBorder",
+      afterDraw(c) { c.ctx.save(); c.ctx.strokeStyle = "#000000"; c.ctx.lineWidth = 1; c.ctx.strokeRect(0.5, 0.5, c.width - 1, c.height - 1); c.ctx.restore(); }
+    },
+    {
+      id: "pointLabels",
+      afterDatasetsDraw(c) {
+        const { ctx: cx } = c;
+        c.getDatasetMeta(0).data.forEach((point, i) => {
+          if (yValues[i] === null || yValues[i] === undefined) return;
+          cx.save();
+          cx.fillStyle = "#000000"; cx.font = "bold 11px sans-serif";
+          cx.textAlign = "center"; cx.textBaseline = "top";
+          cx.fillText(yValues[i] + "%", point.x, point.y + 8);
+          cx.restore();
+        });
+      }
+    }
+  ];
+
+  if (regression) {
+    plugins.push({
+      id: "trendEndpoints",
+      afterDatasetsDraw(c) {
+        const meta0 = c.getDatasetMeta(0);
+        if (!meta0 || !meta0.data.length) return;
+        const { ctx: cx } = c;
+        const yScale = c.scales.y;
+        const trendBlue = "rgba(59,108,181,0.9)";
+        const defs = [
+          { idx: dataIndices[0],                      regVal: regression[0],                     align: "left"  },
+          { idx: dataIndices[dataIndices.length - 1], regVal: regression[regression.length - 1], align: "right" }
+        ];
+        for (const { idx, regVal, align } of defs) {
+          const x = meta0.data[idx].x;
+          const y = yScale.getPixelForValue(regVal);
+          cx.save();
+          cx.fillStyle = trendBlue; cx.font = "bold 11px sans-serif";
+          cx.textAlign = align; cx.textBaseline = "bottom";
+          cx.fillText(Math.round(regVal) + "%", x + (align === "left" ? 4 : -4), y - 4);
+          cx.restore();
+        }
+      }
+    });
+  }
+
+  const datasets = [
+    {
+      data: yValues,
+      borderColor: "#3B6CB5",
+      backgroundColor: "rgba(59,108,181,0.08)",
+      pointBackgroundColor: "#3B6CB5",
+      pointRadius: yValues.map(v => v !== null ? 5 : 0),
+      spanGaps: false,
+      tension: 0,
+      fill: false,
+      clip: false
+    }
+  ];
+
+  if (trendValues) {
+    datasets.push({
+      data: trendValues,
+      borderColor: "rgba(59,108,181,0.45)",
+      borderDash: [6, 4],
+      pointRadius: 0,
+      tension: 0,
+      fill: false,
+      spanGaps: true
+    });
+  }
+
+  const chart = new Chart(ctx, {
+    type: "line",
+    plugins,
+    data: { labels, datasets },
+    options: {
+      animation: false,
+      responsive: false,
+      devicePixelRatio: SCALE,
+      layout: { padding: { top: 10, left: 18, right: 18, bottom: 20 } },
+      plugins: {
+        title:    { display: true, text: titleText, font: { size: 15, weight: "bold" }, color: "#000000" },
+        subtitle: { display: !!dirText, text: dirText, color: dirColor, font: { size: 12, style: "italic" }, padding: { bottom: 6 } },
+        legend:   { display: false }
+      },
+      scales: {
+        x: { title: { display: true, text: "Month", color: "#000000", font: { size: 13, weight: "bold" } }, ticks: { color: "#000000", font: { size: 13 } }, grid: { color: "rgba(0,0,0,0.07)" } },
+        y: { min: 0, max: 100, title: { display: false }, ticks: { display: false }, grid: { color: "rgba(0,0,0,0.16)" } }
+      }
+    }
+  });
+
+  const actBase64 = canvas.toDataURL("image/png").split(",")[1];
+  chart.destroy();
+  return actBase64;
 }
 
 // ─── BASELINE VS CURRENT CHART HELPERS ──────────────────────
