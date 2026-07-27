@@ -3242,155 +3242,105 @@ function renderTargetChart(targetName, yValues, dateRange, dates, customLabels =
 }
 
 function renderActivityLineChart(actDisplayName, periodMonths, monthBuckets) {
-  if (typeof Chart === "undefined") return null;
+  if (typeof document === "undefined") return null;
+
+  const SCALE = 2;
+  const W = 580, H = 330;
+  const PAD = { top: 92, right: 20, bottom: 38, left: 22 };
+  const cW = W - PAD.left - PAD.right, cH = H - PAD.top - PAD.bottom;
 
   const labels = periodMonths.map(m => m.split(" ")[0].slice(0, 3));
-  const yValues = periodMonths.map(m => {
+  const fullValues = periodMonths.map(m => {
     const scores = monthBuckets[m];
     if (!scores || scores.length === 0) return null;
     return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
   });
 
-  const dataIndices = [], dataYValues = [];
-  yValues.forEach((v, i) => { if (v !== null) { dataIndices.push(i); dataYValues.push(v); } });
-  if (dataYValues.length === 0) return null;
+  const pts = fullValues.map((v, i) => ({ label: labels[i], v, i })).filter(p => p.v !== null && p.v !== undefined);
+  if (pts.length === 0) return null;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W * SCALE; canvas.height = H * SCALE;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(SCALE, SCALE);
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
 
   const year = periodMonths[0].split(" ")[1];
-  const firstPeriodLabel = periodMonths[0].split(" ")[0].slice(0, 3);
-  const lastPeriodLabel  = periodMonths[periodMonths.length - 1].split(" ")[0].slice(0, 3);
-  const dateRange = `${firstPeriodLabel} - ${lastPeriodLabel} ${year}`;
-  const titleText = `${actDisplayName}  (${dateRange})`;
+  const periodLabel = `${labels[0]} - ${labels[labels.length - 1]} ${year}`;
+  ctx.fillStyle = "#1f2937"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText(`${actDisplayName} (${periodLabel})`, W / 2, 24);
 
-  let regression = null, trendValues = null, lrDelta = 0;
-  let dirText = "", dirColor = "#888888";
+  const toY = v => PAD.top + cH * (1 - v / 100);
+  const toX = i => PAD.left + (labels.length > 1 ? (i / (labels.length - 1)) * cW : cW / 2);
 
-  if (dataYValues.length >= 2) {
-    regression = linearRegressionValues(dataYValues);
-    lrDelta = Math.round(regression[regression.length - 1] - regression[0]);
-    trendValues = yValues.map((_, i) => {
-      const di = dataIndices.indexOf(i);
-      return di >= 0 ? regression[di] : null;
-    });
-    const ppStr = lrDelta >= 0 ? `+${lrDelta} pts` : `${lrDelta} pts`;
-    if (Math.abs(lrDelta) <= 8)  { dirText = `→  Stable (${ppStr})`;       dirColor = "#888888"; }
-    else if (lrDelta > 0)         { dirText = `↑  Trending Up (${ppStr})`;  dirColor = "#2A7A3B"; }
-    else                          { dirText = `↓  Trending Down (${ppStr})`; dirColor = "#C0392B"; }
+  // Gridlines at 0, 20, 40, 60, 80, 100
+  ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
+  for (let v = 0; v <= 100; v += 20) {
+    const y = toY(v);
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + cW, y); ctx.stroke();
   }
 
-  const SCALE = 3;
-  const canvas = document.createElement("canvas");
-  canvas.width = 605; canvas.height = 340;
-  const ctx = canvas.getContext("2d");
+  // Linear regression over data points (calendar-position aware)
+  const xs = pts.map(p => p.i), ys = pts.map(p => p.v), np = pts.length;
+  let slope = 0, intercept = ys[0] ?? 0;
+  if (np >= 2) {
+    const sX = xs.reduce((a,b)=>a+b,0), sY = ys.reduce((a,b)=>a+b,0);
+    const sXY = xs.reduce((a,x,i)=>a+x*ys[i],0), sX2 = xs.reduce((a,x)=>a+x*x,0);
+    const denom = np*sX2 - sX*sX;
+    slope = denom ? (np*sXY - sX*sY) / denom : 0;
+    intercept = (sY - slope*sX) / np;
+  }
+  const trendAt = i => Math.max(0, Math.min(100, slope*i + intercept));
+  const tStartVal = Math.round(trendAt(xs[0]));
+  const tEndVal   = Math.round(trendAt(xs[xs.length - 1]));
 
-  const plugins = [
-    {
-      id: "whiteBg",
-      beforeDraw(c) { c.ctx.save(); c.ctx.fillStyle = "#ffffff"; c.ctx.fillRect(0, 0, c.width, c.height); c.ctx.restore(); }
-    },
-    {
-      id: "chartBorder",
-      afterDraw(c) { c.ctx.save(); c.ctx.strokeStyle = "#000000"; c.ctx.lineWidth = 1; c.ctx.strokeRect(0.5, 0.5, c.width - 1, c.height - 1); c.ctx.restore(); }
-    },
-    {
-      id: "pointLabels",
-      afterDatasetsDraw(c) {
-        const { ctx: cx } = c;
-        c.getDatasetMeta(0).data.forEach((point, i) => {
-          if (yValues[i] === null || yValues[i] === undefined) return;
-          cx.save();
-          cx.fillStyle = "#000000"; cx.font = "bold 11px sans-serif";
-          cx.textAlign = "center"; cx.textBaseline = "top";
-          cx.fillText(yValues[i] + "%", point.x, point.y + 8);
-          cx.restore();
-        });
-      }
-    }
-  ];
+  // Dashed trendline (only with ≥2 data points)
+  if (np >= 2) {
+    ctx.strokeStyle = "#b0bec5"; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.moveTo(toX(xs[0]), toY(trendAt(xs[0])));
+    ctx.lineTo(toX(xs[xs.length - 1]), toY(trendAt(xs[xs.length - 1])));
+    ctx.stroke(); ctx.setLineDash([]);
 
-  if (regression) {
-    plugins.push({
-      id: "trendEndpoints",
-      afterDatasetsDraw(c) {
-        const meta0 = c.getDatasetMeta(0);
-        if (!meta0 || !meta0.data.length) return;
-        const { ctx: cx } = c;
-        const yScale = c.scales.y;
-        const trendBlue = "rgba(59,108,181,0.9)";
-        const LABEL_H = 14, GAP = 3;
-        const defs = [
-          { idx: dataIndices[0],                      regVal: regression[0],                     align: "left"  },
-          { idx: dataIndices[dataIndices.length - 1], regVal: regression[regression.length - 1], align: "right" }
-        ];
-        for (const { idx, regVal, align } of defs) {
-          const x = meta0.data[idx].x;
-          const dataPointY = meta0.data[idx].y;
-          const trendY = yScale.getPixelForValue(regVal);
-          const defaultLabelY = trendY - 4;
-          const dataLabelTop = dataPointY + 8;
-          // Collision: trendline label (baseline=bottom, anchored at defaultLabelY) overlaps
-          // data label (baseline=top, anchored at dataLabelTop). Push up if needed.
-          const hasCollision = defaultLabelY > dataLabelTop - GAP && defaultLabelY - LABEL_H < dataLabelTop + LABEL_H + GAP;
-          const labelY = hasCollision ? dataLabelTop - GAP : defaultLabelY;
-          cx.save();
-          cx.fillStyle = trendBlue; cx.font = "bold 11px sans-serif";
-          cx.textAlign = align; cx.textBaseline = "bottom";
-          cx.fillText(Math.round(regVal) + "%", x + (align === "left" ? 4 : -4), labelY);
-          cx.restore();
-        }
-      }
-    });
+    // Trendline endpoint labels — below the trendline, with collision avoidance
+    const safeTrendY = (tY, dY, tV, dV) => Math.abs(tV - dV) <= 10 ? Math.max(dY, tY) + 20 : tY + 13;
+    const tYS = toY(trendAt(xs[0]));
+    const tYE = toY(trendAt(xs[xs.length - 1]));
+    ctx.fillStyle = "#6b7280"; ctx.font = "13px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(tStartVal + "%", toX(xs[0]),             safeTrendY(tYS, toY(pts[0].v),             tStartVal, pts[0].v));
+    ctx.fillText(tEndVal   + "%", toX(xs[xs.length - 1]), safeTrendY(tYE, toY(pts[pts.length - 1].v), tEndVal,   pts[pts.length - 1].v));
   }
 
-  const datasets = [
-    {
-      data: yValues,
-      borderColor: "#3B6CB5",
-      backgroundColor: "rgba(59,108,181,0.08)",
-      pointBackgroundColor: "#3B6CB5",
-      pointRadius: yValues.map(v => v !== null ? 5 : 0),
-      spanGaps: false,
-      tension: 0,
-      fill: false,
-      clip: false
-    }
-  ];
+  // Direction subtitle
+  const delta = tEndVal - tStartVal;
+  const dirText  = delta > 8 ? "↑ Trending Up" : delta < -8 ? "↓ Trending Down" : "→ Stable";
+  const dirColor = delta > 8 ? "#2A7A3B" : delta < -8 ? "#C0392B" : "#6b7280";
+  ctx.fillStyle = dirColor; ctx.font = "italic 16px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText(dirText, W / 2, 42);
 
-  if (trendValues) {
-    datasets.push({
-      data: trendValues,
-      borderColor: "rgba(59,108,181,0.45)",
-      borderDash: [6, 4],
-      pointRadius: 0,
-      tension: 0,
-      fill: false,
-      spanGaps: true
-    });
-  }
+  // Data line
+  ctx.strokeStyle = "#4472c4"; ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  pts.forEach((p, idx) => { const x = toX(p.i), y = toY(p.v); idx === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
+  ctx.stroke();
 
-  const chart = new Chart(ctx, {
-    type: "line",
-    plugins,
-    data: { labels, datasets },
-    options: {
-      animation: false,
-      responsive: false,
-      devicePixelRatio: SCALE,
-      layout: { padding: { top: 10, left: 18, right: 18, bottom: 20 } },
-      plugins: {
-        title:    { display: true, text: titleText, font: { size: 15, weight: "bold" }, color: "#000000" },
-        subtitle: { display: !!dirText, text: dirText, color: dirColor, font: { size: 12, style: "italic" }, padding: { bottom: 6 } },
-        legend:   { display: false }
-      },
-      scales: {
-        x: { title: { display: true, text: "Month", color: "#000000", font: { size: 13, weight: "bold" } }, ticks: { color: "#000000", font: { size: 13 } }, grid: { color: "rgba(0,0,0,0.07)" } },
-        y: { min: 0, max: 100, title: { display: false }, ticks: { display: false }, grid: { color: "rgba(0,0,0,0.16)" } }
-      }
-    }
+  // Dots + value labels ABOVE each dot
+  pts.forEach(p => {
+    const x = toX(p.i), y = toY(p.v);
+    ctx.fillStyle = "#4472c4"; ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#1f2937"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(p.v + "%", x, y - 9);
   });
 
-  const actBase64 = canvas.toDataURL("image/png").split(",")[1];
-  chart.destroy();
-  return actBase64;
+  // Month labels on X-axis
+  ctx.fillStyle = "#374151"; ctx.font = "14px sans-serif"; ctx.textAlign = "center";
+  labels.forEach((label, i) => ctx.fillText(label, toX(i), PAD.top + cH + 16));
+
+  // Border
+  ctx.strokeStyle = "#000000"; ctx.lineWidth = 1;
+  ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
+
+  return canvas.toDataURL("image/png").split(",")[1];
 }
 
 // ─── BASELINE VS CURRENT CHART HELPERS ──────────────────────
