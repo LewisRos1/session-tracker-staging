@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1150";
+const APP_VERSION = "1151";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4246,10 +4246,10 @@ function renderManageActivityScreen(student) {
       if (pa.isHeading || pa.isMaintainHeading) {
         const isGray  = pa.headingColor === 'gray' || pa.isMaintainHeading;
         const isGreen = pa.headingColor === 'green';
-        const bg    = isGray ? '#9ca3af' : isGreen ? '#a9d18e' : 'var(--primary)';
-        const color = isGray ? '#fff'    : isGreen ? '#1a4731' : '#fff';
-        const bord  = isGray ? '#6b7280' : isGreen ? '#70ad47' : 'var(--primary)';
-        activeHtml += `<div style="background:${bg};color:${color};border:1px solid ${bord};border-radius:.35rem;padding:.3rem .75rem;font-size:.82rem;font-weight:700;letter-spacing:.04em;margin-top:.2rem">${escHtml(pa.name || '')}</div>`;
+        const bg    = isGray ? '#f3f4f6'         : isGreen ? '#e2efda'        : 'var(--primary-light)';
+        const color = isGray ? '#6b7280'         : isGreen ? '#1a4731'        : 'var(--primary-dark)';
+        const bord  = isGray ? '4px solid #9ca3af' : isGreen ? '4px solid #70ad47' : '4px solid var(--primary)';
+        activeHtml += `<div style="background:${bg};color:${color};border-left:${bord};border-radius:var(--radius-sm);padding:.4rem .85rem;font-size:.8rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;margin-top:.5rem">${escHtml(pa.name || '')}</div>`;
         continue;
       }
 
@@ -4289,9 +4289,8 @@ function renderManageActivityScreen(student) {
     };
 
     html += `<div style="margin-bottom:2rem">
-      <div style="display:flex;align-items:center;gap:.65rem;margin-bottom:.8rem;padding-bottom:.55rem;border-bottom:2px solid var(--primary)">
-        <div style="width:4px;min-width:4px;height:1.5rem;background:var(--primary);border-radius:2px"></div>
-        <span style="font-size:.95rem;font-weight:700;color:#1e3a5f;letter-spacing:.02em">${escHtml(tName)}</span>
+      <div style="background:var(--primary);color:#fff;border-radius:.45rem;padding:.5rem .9rem;font-size:.95rem;font-weight:700;letter-spacing:.02em;margin-bottom:.8rem">
+        ${escHtml(tName)}
       </div>
       <div style="display:flex;flex-direction:column;gap:.45rem">
         ${activeHtml || `<div style="font-size:.83rem;color:#9ca3af;padding:.4rem .5rem;font-style:italic">No active activities</div>`}
