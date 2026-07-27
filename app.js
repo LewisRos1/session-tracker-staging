@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1172";
+const APP_VERSION = "1173";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -7252,22 +7252,30 @@ async function autoFillStructuredRemarks(student, sessionId) {
       const paParent = pa.parentActivity || null;
       const paConfigId = pa.id || null;
       const allActs = Object.entries(data.activities || {});
-      // Primary: match by configId (exact). If that fails, ALSO check for an unlinked
-      // record (no configId yet) that matches by name — this is the "old format" record
-      // created before configIds were introduced. Without this fallback, autoFill would
-      // create a second duplicate placeholder that hides the real data-bearing record.
-      let existingAct = paConfigId
-        ? allActs.find(([, a]) => a.configId === paConfigId && a.targetName === target.name)
+      // Collect ALL candidate records for this activity slot: the configId-matched
+      // record AND any unlinked (no configId) record matching by name+parent.
+      // Two records can coexist when an old session has a data record created before
+      // the configId system (Record A, no configId) alongside an auto-fill placeholder
+      // (Record B, has configId). We must skip auto-fill if ANY candidate already
+      // has a remark — not just the configId-matched one — otherwise we keep
+      // creating a fresh placeholder for Record B even when Record A has real data,
+      // causing the oscillating display bug.
+      const allCandidateIds = allActs
+        .filter(([, a]) => {
+          if (a.targetName !== target.name) return false;
+          if (paConfigId && a.configId === paConfigId) return true;
+          if (a.configId) return false;
+          const nameOk = a.activityName === pa.name || (pa.title && a.activityName === pa.title);
+          if (!nameOk) return false;
+          return paParent ? (!a.parentActivity || a.parentActivity === paParent) : !a.parentActivity;
+        })
+        .map(([id]) => id);
+      const allRemarkActIds = new Set(Object.values(data.remarks || {}).map(r => r.activityId));
+      if (allCandidateIds.some(id => allRemarkActIds.has(id))) continue;
+      const existingAct = allCandidateIds.length > 0
+        ? allActs.find(([id]) => id === allCandidateIds[0])
         : null;
-      if (!existingAct) {
-        // Name-based fallback: only adopt records that have NO configId (unlinked).
-        // Records with a DIFFERENT configId belong to another configured activity.
-        existingAct = paParent
-          ? allActs.find(([, a]) => !a.configId && a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title)) && (a.parentActivity === paParent || !a.parentActivity))
-          : allActs.find(([, a]) => !a.configId && a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title)) && !a.parentActivity);
-      }
       let actId = existingAct?.[0] || null;
-      if (actId && Object.values(data.remarks || {}).some(r => r.activityId === actId)) continue;
       const key = `${sessionId}:${target.name}:${paConfigId || pa.name}:${paParent || ""}`;
       if (structuredRemarkAutoFillInFlight.has(key)) continue;
       structuredRemarkAutoFillInFlight.add(key);
