@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1165";
+const APP_VERSION = "1166";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -5450,9 +5450,17 @@ async function openSession(student, existingSessionId = null, dateStr = null) {
       // safety — including deferring forever while the user keeps typing
       // (which is exactly what made "+Add Remark & Trials" look like it
       // wasn't registering when clicked soon after typing elsewhere).
-      const isEntryBusy = () => document.activeElement === $("target-select")
-        || state.entryActionsInFlight > 0
-        || document.activeElement?.classList.contains("pending-activity-name-input");
+      const isEntryBusy = () => {
+        const ae = document.activeElement;
+        if (ae === $("target-select")) return true;
+        if (state.entryActionsInFlight > 0) return true;
+        if (ae?.classList.contains("pending-activity-name-input")) return true;
+        // Any text field inside target-content means the user is actively typing.
+        // Re-rendering now would destroy their unsaved input before the debounce saves it.
+        const tc = $("target-content");
+        if (tc?.contains(ae) && (ae?.tagName === "TEXTAREA" || ae?.tagName === "INPUT")) return true;
+        return false;
+      };
       if (isEntryBusy()) {
         state.renderPending = true;
       } else {
@@ -15014,8 +15022,14 @@ async function openGroupSession(group, dateStr, attendees) {
       // Busy = dropdown open, or a button's own multi-step write still in
       // flight — see the matching comment in openSession's listener for why
       // a focused box never needs to defer a render here.
-      const isGroupEntryBusy = () => document.activeElement === $("group-target-select")
-        || state.entryGroupActionsInFlight > 0;
+      const isGroupEntryBusy = () => {
+        const ae = document.activeElement;
+        if (ae === $("group-target-select")) return true;
+        if (state.entryGroupActionsInFlight > 0) return true;
+        const gc = $("group-target-content");
+        if (gc?.contains(ae) && (ae?.tagName === "TEXTAREA" || ae?.tagName === "INPUT")) return true;
+        return false;
+      };
       if (isGroupEntryBusy()) {
         state.groupRenderPending = true;
         return;
