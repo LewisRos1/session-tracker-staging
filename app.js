@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1149";
+const APP_VERSION = "1150";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4192,14 +4192,17 @@ function renderManageActivityScreen(student) {
 
   targets.forEach((target, tIdx) => {
     const tName = target.name;
+    // Keep headings so they render as section dividers; only exclude notes
     const allPas = (target.predefinedActivities || [])
-      .filter(p => !p.isHeading && !p.isMaintainHeading && !p.isNote && !p.isExportNote)
+      .filter(p => !p.isNote && !p.isExportNote)
       .sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
 
-    const masteredPas = allPas.filter(p => maIsMastered(p));
-    const discontPas  = allPas.filter(p => maIsDiscont(p));
-    const maintPas    = allPas.filter(p => maIsMaintained(p));
-    const activePas   = allPas.filter(p => maIsActive(p));
+    // Status buckets exclude headings
+    const activityPas = allPas.filter(p => !p.isHeading && !p.isMaintainHeading);
+    const masteredPas = activityPas.filter(p => maIsMastered(p));
+    const discontPas  = activityPas.filter(p => maIsDiscont(p));
+    const maintPas    = activityPas.filter(p => maIsMaintained(p));
+    const activePas   = activityPas.filter(p => maIsActive(p));
     const activeTopLevel = activePas.filter(p => !p.parentActivity);
     const activeSubs     = activePas.filter(p => !!p.parentActivity);
 
@@ -4220,25 +4223,44 @@ function renderManageActivityScreen(student) {
       return '';
     };
 
-    const card = (pa, indent = false, orphanParent = '') => {
+    const card = (pa, indent = false, orphanParent = '', num = null) => {
       const nameHtml = paDisplayHtml(pa) || `<em style="color:#9ca3af;font-size:.85rem">Untitled</em>`;
       const badge = statusBadge(pa);
-      const parentTag = orphanParent ? `<span style="font-size:.71rem;color:#9ca3af;margin-left:.3rem">(from: ${escHtml(orphanParent)})</span>` : '';
+      const parentTag = orphanParent ? `<span style="font-size:.71rem;color:#9ca3af;display:block;margin-top:.1rem">(from: ${escHtml(orphanParent)})</span>` : '';
+      const numTag = num !== null ? `<span style="color:#6b7280;font-weight:600;margin-right:.25rem">${num})</span>` : '';
       const borderLeft = indent ? 'border-left:3px solid #60a5fa' : 'border-left:3px solid var(--primary)';
       const bg = indent ? 'background:#f0f9ff' : 'background:#fff';
       const ml = indent ? 'margin-left:1.4rem;' : '';
-      return `<div data-pa-id="${escHtml(pa.id||'')}" style="${ml}${bg};border:1px solid #e5e7eb;${borderLeft};border-radius:.5rem;padding:.6rem .75rem .6rem .9rem;display:flex;align-items:center;gap:.5rem;box-shadow:0 1px 3px rgba(0,0,0,.06)">
-        <div style="flex:1;min-width:0;line-height:1.45">${nameHtml}${parentTag}${badge}</div>
+      return `<div data-pa-id="${escHtml(pa.id||'')}" style="${ml}${bg};border:1px solid #e5e7eb;${borderLeft};border-radius:.5rem;padding:.6rem .75rem .6rem .9rem;display:flex;align-items:flex-start;gap:.5rem;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+        <div style="flex:1;min-width:0;line-height:1.5;white-space:pre-wrap">${numTag}${nameHtml}${parentTag}${badge}</div>
         ${kebabWrap(pa)}
       </div>`;
     };
 
+    // Render active section in array order so headings appear inline
+    let actNum = 0;
     let activeHtml = '';
-    for (const pa of activeTopLevel) {
-      activeHtml += card(pa);
+    for (const pa of allPas) {
+      if (pa.parentActivity) continue; // subs rendered inside parent block
+
+      if (pa.isHeading || pa.isMaintainHeading) {
+        const isGray  = pa.headingColor === 'gray' || pa.isMaintainHeading;
+        const isGreen = pa.headingColor === 'green';
+        const bg    = isGray ? '#9ca3af' : isGreen ? '#a9d18e' : 'var(--primary)';
+        const color = isGray ? '#fff'    : isGreen ? '#1a4731' : '#fff';
+        const bord  = isGray ? '#6b7280' : isGreen ? '#70ad47' : 'var(--primary)';
+        activeHtml += `<div style="background:${bg};color:${color};border:1px solid ${bord};border-radius:.35rem;padding:.3rem .75rem;font-size:.82rem;font-weight:700;letter-spacing:.04em;margin-top:.2rem">${escHtml(pa.name || '')}</div>`;
+        continue;
+      }
+
+      if (!maIsActive(pa)) continue;
+
+      actNum++;
+      activeHtml += card(pa, false, '', actNum);
       const children = activeSubs.filter(s => s.parentActivity === (pa.title || pa.name));
       for (const child of children) activeHtml += card(child, true);
     }
+    // Orphaned subs whose parent isn't active
     const orphaned = activeSubs.filter(s => !activeTopLevel.some(p => (p.title || p.name) === s.parentActivity));
     for (const sub of orphaned) activeHtml += card(sub, false, sub.parentActivity || '');
 
@@ -4249,8 +4271,8 @@ function renderManageActivityScreen(student) {
         const nameHtml = paDisplayHtml(pa) || `<em style="color:#9ca3af;font-size:.85rem">Untitled</em>`;
         const badge = statusBadge(pa, true);
         const parentTag = pa.parentActivity ? `<span style="font-size:.71rem;color:#9ca3af;margin-left:.3rem">(from: ${escHtml(pa.parentActivity)})</span>` : '';
-        return `<div data-pa-id="${escHtml(pa.id||'')}" style="background:${bgCard};border:1px solid ${borderCard};border-left:3px solid ${color};border-radius:.5rem;padding:.55rem .75rem .55rem .9rem;display:flex;align-items:center;gap:.5rem;box-shadow:0 1px 3px rgba(0,0,0,.04)">
-          <div style="flex:1;min-width:0;line-height:1.45">${nameHtml}${parentTag}${badge}</div>
+        return `<div data-pa-id="${escHtml(pa.id||'')}" style="background:${bgCard};border:1px solid ${borderCard};border-left:3px solid ${color};border-radius:.5rem;padding:.55rem .75rem .55rem .9rem;display:flex;align-items:flex-start;gap:.5rem;box-shadow:0 1px 3px rgba(0,0,0,.04)">
+          <div style="flex:1;min-width:0;line-height:1.5;white-space:pre-wrap">${nameHtml}${parentTag}${badge}</div>
           ${kebabWrap(pa)}
         </div>`;
       }).join('');
