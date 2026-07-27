@@ -267,6 +267,21 @@
   </div>
 
   <!-- ══════════════════════════════════════════════════════
+       MANAGE ACTIVITY SCREEN
+       ══════════════════════════════════════════════════════ -->
+  <div id="screen-manage-activity" class="screen hidden">
+    <header class="session-header">
+      <button class="btn-back" id="btn-manage-activity-back" aria-label="Back to home">←</button>
+      <div class="session-info">
+        <span class="session-student-name" id="manage-activity-title">Manage Activity</span>
+      </div>
+    </header>
+    <div id="manage-activity-body" style="overflow-y:auto;flex:1;padding:1rem 1.1rem 2rem">
+      <!-- populated by JS -->
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
        SCORE PICKER MODAL (bottom sheet)
        ══════════════════════════════════════════════════════ -->
   <div id="score-modal" class="modal hidden" role="dialog" aria-modal="true"

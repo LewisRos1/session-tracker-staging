@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1148";
+const APP_VERSION = "1149";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4177,9 +4177,18 @@ function maKebabOptions(pa, tName) {
   return btn('change-mastered','⭐ Change to Mastered') + btn('change-maintain','🆗 Change to Maintain',';color:#0369a1') + btn('restore','↩ Restore to Active',';color:#4b5563');
 }
 
+function openManageActivityScreen(student) {
+  $("manage-activity-title").textContent = student.name;
+  showScreen("screen-manage-activity");
+  $("btn-manage-activity-back").onclick = showHome;
+  renderManageActivityScreen(student);
+}
+
 function renderManageActivityScreen(student) {
+  const body = $("manage-activity-body");
+  if (!body) return;
   const targets = (student.targets || []).filter(t => !t.archived);
-  let html = `<div style="padding:.25rem 0 1.5rem">`;
+  let html = '';
 
   targets.forEach((target, tIdx) => {
     const tName = target.name;
@@ -4196,85 +4205,85 @@ function renderManageActivityScreen(student) {
 
     const kebabWrap = pa => `
       <div style="position:relative;flex-shrink:0">
-        <button class="ma-kebab-btn btn-adm-del" data-pa-id="${escHtml(pa.id||'')}" style="font-size:1.2rem;font-weight:900;min-width:30px;min-height:30px;padding:.1rem .35rem" title="Options">⋮</button>
+        <button class="ma-kebab-btn btn-adm-del" data-pa-id="${escHtml(pa.id||'')}" style="font-size:1.3rem;font-weight:900;min-width:34px;min-height:34px;padding:.1rem .4rem;color:#9ca3af;border-radius:.4rem" title="Options">⋮</button>
         <div class="ma-kebab-menu" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:220px;overflow:hidden">
           ${maKebabOptions(pa, tName)}
         </div>
       </div>`;
 
-    const renderRow = (pa, indent = false, parentNote = '') => {
-      const displayName = pa.title?.trim() || pa.name || '';
-      const status = maGetStatus(pa);
-      const badge = status === 'mastered'
-        ? `<span style="font-size:.73rem;color:#059669;font-weight:600">⭐ Mastered${pa.masteredOn ? ` on ${fmtPeriodDate(pa.masteredOn)}` : ''}</span>`
-        : status === 'discontinued'
-        ? `<span style="font-size:.73rem;color:#dc2626;font-weight:600">🚩 Discontinued${pa.discontinuedOn ? ` on ${fmtPeriodDate(pa.discontinuedOn)}` : ''}</span>`
-        : status === 'maintained'
-        ? `<span style="font-size:.73rem;color:#6b7280;font-weight:600">🆗 Maintained</span>`
-        : '';
-      const parentHint = parentNote ? `<span style="font-size:.72rem;color:#9ca3af"> (parent: ${escHtml(parentNote)})</span>` : '';
-      const rowBg = indent ? 'background:#f0f9ff;border-left:3px solid #60a5fa;border-radius:.3rem;' : '';
-      return `<div data-pa-id="${escHtml(pa.id||'')}" style="${rowBg}display:flex;align-items:center;gap:.5rem;padding:.5rem .65rem">
-        <div style="flex:1;min-width:0">
-          <div style="font-size:.9rem;font-weight:600;color:#111827">${escHtml(displayName)}${parentHint}</div>
-          ${badge ? `<div style="margin-top:.12rem">${badge}</div>` : ''}
-        </div>
+    const statusBadge = (pa, small = false) => {
+      const s = maGetStatus(pa);
+      const sz = small ? 'font-size:.71rem' : 'font-size:.73rem';
+      if (s === 'mastered')    return `<span style="${sz};display:inline-block;margin-top:.25rem;background:#d1fae5;color:#059669;font-weight:600;padding:.1rem .5rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ Mastered${pa.masteredOn ? ` ${fmtPeriodDate(pa.masteredOn)}` : ''}</span>`;
+      if (s === 'discontinued') return `<span style="${sz};display:inline-block;margin-top:.25rem;background:#fee2e2;color:#dc2626;font-weight:600;padding:.1rem .5rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 Discontinued${pa.discontinuedOn ? ` ${fmtPeriodDate(pa.discontinuedOn)}` : ''}</span>`;
+      if (s === 'maintained')  return `<span style="${sz};display:inline-block;margin-top:.25rem;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.1rem .5rem;border-radius:.3rem;border:1px solid #d1d5db">🆗 Maintained</span>`;
+      return '';
+    };
+
+    const card = (pa, indent = false, orphanParent = '') => {
+      const nameHtml = paDisplayHtml(pa) || `<em style="color:#9ca3af;font-size:.85rem">Untitled</em>`;
+      const badge = statusBadge(pa);
+      const parentTag = orphanParent ? `<span style="font-size:.71rem;color:#9ca3af;margin-left:.3rem">(from: ${escHtml(orphanParent)})</span>` : '';
+      const borderLeft = indent ? 'border-left:3px solid #60a5fa' : 'border-left:3px solid var(--primary)';
+      const bg = indent ? 'background:#f0f9ff' : 'background:#fff';
+      const ml = indent ? 'margin-left:1.4rem;' : '';
+      return `<div data-pa-id="${escHtml(pa.id||'')}" style="${ml}${bg};border:1px solid #e5e7eb;${borderLeft};border-radius:.5rem;padding:.6rem .75rem .6rem .9rem;display:flex;align-items:center;gap:.5rem;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+        <div style="flex:1;min-width:0;line-height:1.45">${nameHtml}${parentTag}${badge}</div>
         ${kebabWrap(pa)}
       </div>`;
     };
 
     let activeHtml = '';
     for (const pa of activeTopLevel) {
-      activeHtml += renderRow(pa);
+      activeHtml += card(pa);
       const children = activeSubs.filter(s => s.parentActivity === (pa.title || pa.name));
-      for (const child of children) activeHtml += renderRow(child, true);
+      for (const child of children) activeHtml += card(child, true);
     }
     const orphaned = activeSubs.filter(s => !activeTopLevel.some(p => (p.title || p.name) === s.parentActivity));
-    for (const sub of orphaned) activeHtml += renderRow(sub, false, sub.parentActivity || '');
+    for (const sub of orphaned) activeHtml += card(sub, false, sub.parentActivity || '');
 
-    const collapseSection = (label, emoji, color, pas) => {
+    const collapseSection = (label, emoji, color, bgCard, borderCard, pas) => {
       if (!pas.length) return '';
       const colId = `ma-col-${tIdx}-${label}`;
       const items = pas.map(pa => {
-        const displayName = pa.title?.trim() || pa.name || '';
-        const parentNote = pa.parentActivity ? ` — parent: ${escHtml(pa.parentActivity)}` : '';
-        const dateNote = label === 'mastered' && pa.masteredOn ? ` on ${fmtPeriodDate(pa.masteredOn)}`
-          : label === 'discontinued' && pa.discontinuedOn ? ` on ${fmtPeriodDate(pa.discontinuedOn)}` : '';
-        return `<div data-pa-id="${escHtml(pa.id||'')}" style="display:flex;align-items:center;gap:.5rem;padding:.45rem .65rem;background:#f9fafb;border-radius:.3rem">
-          <div style="flex:1;min-width:0">
-            <span style="font-size:.88rem;font-weight:600;color:#374151">${escHtml(displayName)}</span>
-            <span style="font-size:.72rem;color:${color}">${dateNote}${parentNote}</span>
-          </div>
+        const nameHtml = paDisplayHtml(pa) || `<em style="color:#9ca3af;font-size:.85rem">Untitled</em>`;
+        const badge = statusBadge(pa, true);
+        const parentTag = pa.parentActivity ? `<span style="font-size:.71rem;color:#9ca3af;margin-left:.3rem">(from: ${escHtml(pa.parentActivity)})</span>` : '';
+        return `<div data-pa-id="${escHtml(pa.id||'')}" style="background:${bgCard};border:1px solid ${borderCard};border-left:3px solid ${color};border-radius:.5rem;padding:.55rem .75rem .55rem .9rem;display:flex;align-items:center;gap:.5rem;box-shadow:0 1px 3px rgba(0,0,0,.04)">
+          <div style="flex:1;min-width:0;line-height:1.45">${nameHtml}${parentTag}${badge}</div>
           ${kebabWrap(pa)}
         </div>`;
       }).join('');
-      return `<div style="margin-top:.5rem">
-        <button class="ma-collapse-toggle" data-col-id="${colId}" style="display:flex;align-items:center;gap:.4rem;width:100%;background:none;border:none;cursor:pointer;padding:.35rem .1rem;font-size:.84rem;color:${color};font-weight:600;text-align:left">
-          <span class="ma-toggle-arrow" style="font-size:.7rem;display:inline-block;transition:transform .2s">▶</span>
-          ${emoji} ${label.charAt(0).toUpperCase() + label.slice(1)} (${pas.length})
+      return `<div style="margin-top:.85rem">
+        <button class="ma-collapse-toggle" data-col-id="${colId}" style="display:flex;align-items:center;gap:.45rem;width:100%;background:none;border:none;cursor:pointer;padding:.3rem 0 .4rem;font-size:.84rem;color:${color};font-weight:700;text-align:left">
+          <span class="ma-toggle-arrow" style="font-size:.68rem;display:inline-block;transition:transform .2s">▶</span>
+          ${emoji} ${label.charAt(0).toUpperCase() + label.slice(1)}
+          <span style="font-size:.77rem;background:${bgCard};border:1px solid ${borderCard};color:${color};padding:.05rem .5rem;border-radius:99px">${pas.length}</span>
         </button>
-        <div id="${colId}" style="display:none;flex-direction:column;gap:.3rem;padding:.1rem 0">
+        <div id="${colId}" style="display:none;flex-direction:column;gap:.4rem;padding:.15rem 0 .1rem">
           ${items}
         </div>
       </div>`;
     };
 
-    html += `<div style="margin-bottom:1.4rem">
-      <div style="font-size:.78rem;font-weight:700;color:var(--primary);letter-spacing:.06em;text-transform:uppercase;padding:.3rem 0 .4rem;border-bottom:2px solid var(--primary);margin-bottom:.55rem">${escHtml(tName)}</div>
-      <div style="display:flex;flex-direction:column;gap:.3rem">
-        ${activeHtml || `<div style="font-size:.83rem;color:#9ca3af;padding:.3rem 0">No active activities</div>`}
+    html += `<div style="margin-bottom:2rem">
+      <div style="display:flex;align-items:center;gap:.65rem;margin-bottom:.8rem;padding-bottom:.55rem;border-bottom:2px solid var(--primary)">
+        <div style="width:4px;min-width:4px;height:1.5rem;background:var(--primary);border-radius:2px"></div>
+        <span style="font-size:.95rem;font-weight:700;color:#1e3a5f;letter-spacing:.02em">${escHtml(tName)}</span>
       </div>
-      ${collapseSection('mastered','⭐','#059669',masteredPas)}
-      ${collapseSection('discontinued','🚩','#dc2626',discontPas)}
-      ${collapseSection('maintained','🆗','#6b7280',maintPas)}
+      <div style="display:flex;flex-direction:column;gap:.45rem">
+        ${activeHtml || `<div style="font-size:.83rem;color:#9ca3af;padding:.4rem .5rem;font-style:italic">No active activities</div>`}
+      </div>
+      ${collapseSection('mastered','⭐','#059669','#f0fdf4','#bbf7d0',masteredPas)}
+      ${collapseSection('discontinued','🚩','#dc2626','#fff5f5','#fecaca',discontPas)}
+      ${collapseSection('maintained','🆗','#6b7280','#f9fafb','#e5e7eb',maintPas)}
     </div>`;
   });
 
-  html += '</div>';
-  $("session-picker-list").innerHTML = html;
+  body.innerHTML = html;
 
   // Collapse toggles
-  $("session-picker-list").querySelectorAll(".ma-collapse-toggle").forEach(btn => {
+  body.querySelectorAll(".ma-collapse-toggle").forEach(btn => {
     btn.addEventListener("click", () => {
       const panel = document.getElementById(btn.dataset.colId);
       const arrow = btn.querySelector(".ma-toggle-arrow");
@@ -4287,12 +4296,12 @@ function renderManageActivityScreen(student) {
   });
 
   // Kebab open/close
-  $("session-picker-list").querySelectorAll(".ma-kebab-btn").forEach(btn => {
+  body.querySelectorAll(".ma-kebab-btn").forEach(btn => {
     btn.addEventListener("click", e => {
       e.stopPropagation();
       const menu = btn.nextElementSibling;
       const wasHidden = menu.style.display !== "block";
-      $("session-picker-list").querySelectorAll(".ma-kebab-menu").forEach(m => m.style.display = "none");
+      body.querySelectorAll(".ma-kebab-menu").forEach(m => m.style.display = "none");
       if (wasHidden) {
         menu.style.display = "block";
         const close = ev => {
@@ -4304,7 +4313,7 @@ function renderManageActivityScreen(student) {
   });
 
   // Action handlers
-  $("session-picker-list").querySelectorAll(".ma-opt-btn").forEach(btn => {
+  body.querySelectorAll(".ma-opt-btn").forEach(btn => {
     btn.addEventListener("click", async () => {
       const action = btn.dataset.action;
       const paId   = btn.dataset.paId;
@@ -4379,13 +4388,13 @@ function renderManageActivityScreen(student) {
 function maScrollAndBlink(paId) {
   if (!paId) return;
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    const list = $("session-picker-list");
-    if (!list) return;
-    const row = list.querySelector(`[data-pa-id="${CSS.escape(paId)}"]`);
+    const body = $("manage-activity-body");
+    if (!body) return;
+    const row = body.querySelector(`[data-pa-id="${CSS.escape(paId)}"]`);
     if (!row) return;
     const panel = row.closest('[id^="ma-col-"]');
     if (panel && panel.style.display !== "flex") {
-      const toggle = list.querySelector(`[data-col-id="${panel.id}"]`);
+      const toggle = body.querySelector(`[data-col-id="${panel.id}"]`);
       if (toggle) toggle.click();
     }
     requestAnimationFrame(() => {
@@ -4423,6 +4432,12 @@ function showStudentChoice(student) {
           <div class="choice-label">Manage Student</div>
         </div>
       </button>
+      <button class="choice-btn choice-manage-activity">
+        <span class="choice-icon">🪄</span>
+        <div class="choice-text">
+          <div class="choice-label">Manage Activity</div>
+        </div>
+      </button>
       <button class="choice-btn choice-export-excel">
         <span class="choice-icon">📊</span>
         <div class="choice-text">
@@ -4433,12 +4448,6 @@ function showStudentChoice(student) {
         <span class="choice-icon">📝</span>
         <div class="choice-text">
           <div class="choice-label">Export to Word (Daily Session Note)</div>
-        </div>
-      </button>
-      <button class="choice-btn choice-manage-activity">
-        <span class="choice-icon">🪄</span>
-        <div class="choice-text">
-          <div class="choice-label">Manage Activity</div>
         </div>
       </button>
     </div>`;
@@ -4525,8 +4534,8 @@ function showStudentChoice(student) {
     openManageModal(student, null);
   });
   $("session-picker-list").querySelector(".choice-manage-activity").addEventListener("click", () => {
-    $("session-picker-title").textContent = student.name + " — Manage Activity";
-    renderManageActivityScreen(student);
+    closeSessionPicker();
+    openManageActivityScreen(student);
   });
 }
 
@@ -12858,9 +12867,7 @@ function renderTargetManageContent(student, target) {
       const paId = acts[idx].id;
       await closeManageModal();
       const freshStudent = state.students.find(s => s.id === student.id) || student;
-      $("session-picker-title").textContent = freshStudent.name + " — Manage Activity";
-      $("session-picker-modal").classList.remove("hidden");
-      renderManageActivityScreen(freshStudent);
+      openManageActivityScreen(freshStudent);
       maScrollAndBlink(paId);
     });
   });
