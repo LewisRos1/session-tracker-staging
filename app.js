@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1171";
+const APP_VERSION = "1172";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -5882,17 +5882,26 @@ function renderFedcTarget(target) {
       </div>`;
       children.forEach((sub, si) => {
         let subActData = findActivityByName(target.name, sub.title || sub.name, pa.title || pa.name, sub.id);
-        // Two devices racing on session open (autoFillStructuredRemarks) can each create
-        // a separate record with the same configId before seeing each other's snapshot.
-        // Object.entries order reshuffles on every Firestore write, so the display
-        // alternates between the records each time the user interacts with any activity.
-        // Fix: when multiple records share a configId, always pick the one with the most
-        // real data (trials > notes > option text > optionScore) — deterministic and
-        // independent of iteration order, so the right record always wins.
+        // Root cause of the alternating-display bug: a real data record (Record A, no
+        // configId — created before configIds existed) coexists with an auto-fill
+        // placeholder (Record B, has configId). findActivityByName always returns Record B
+        // via exact-configId match, hiding Record A's real data. When Record B's empty
+        // remark is cleaned up and recreated by autoFillStructuredRemarks, the display
+        // briefly shows Record A, causing the visible alternation.
+        // Fix: build a candidate pool that includes BOTH the configId-matched record AND
+        // any no-configId record matching by name (old-format records), score all of them
+        // by data richness, and always pick the winner. Then stamp the winner's configId
+        // so findActivityByName finds it directly on subsequent renders.
         if (sub.id && state.sessionData) {
-          const subSameConfig = Object.entries(state.sessionData.activities || {})
-            .filter(([, a]) => a.configId === sub.id && a.targetName === target.name);
-          if (subSameConfig.length > 1) {
+          const subCandidates = Object.entries(state.sessionData.activities || {}).filter(([, a]) => {
+            if (a.targetName !== target.name) return false;
+            if (a.configId === sub.id) return true;   // configId match
+            if (a.configId) return false;              // different configId → belongs elsewhere
+            const nameOk = a.activityName === sub.name || (sub.title && a.activityName === sub.title);
+            if (!nameOk) return false;
+            return !a.parentActivity || a.parentActivity === (pa.title || pa.name);
+          });
+          if (subCandidates.length > 1) {
             const subRemScore = ([actId]) => {
               let s = 0;
               for (const r of Object.values(state.sessionData.remarks || {})) {
@@ -5904,8 +5913,15 @@ function renderFedcTarget(target) {
               }
               return s;
             };
-            const subBest = subSameConfig.reduce((a, b) => subRemScore(a) >= subRemScore(b) ? a : b);
+            const subBest = subCandidates.reduce((a, b) => subRemScore(a) >= subRemScore(b) ? a : b);
             subActData = { id: subBest[0], ...subBest[1] };
+            // Stamp configId on the winner if it doesn't have one yet so findActivityByName
+            // finds it directly next render and autoFillStructuredRemarks skips creating a
+            // duplicate placeholder for it.
+            if (!subBest[1].configId && state.sessionData.activities[subBest[0]]) {
+              state.sessionData.activities[subBest[0]].configId = sub.id;
+              adoptOrphanActivity(state.currentSessionId, subBest[0], subBest[1].parentActivity || null, sub.id).catch(() => {});
+            }
           }
         }
         if (!subActData && state.sessionData) {
@@ -7236,15 +7252,20 @@ async function autoFillStructuredRemarks(student, sessionId) {
       const paParent = pa.parentActivity || null;
       const paConfigId = pa.id || null;
       const allActs = Object.entries(data.activities || {});
-      // If the predefined activity has a configId, only match by configId — do NOT
-      // fall back to name matching. A same-named discontinued activity's records must
-      // not be mistaken for this new activity's records (they'd prevent the remark from
-      // being auto-created and cause the wrong remark-type UI to appear).
-      const existingAct = paConfigId
+      // Primary: match by configId (exact). If that fails, ALSO check for an unlinked
+      // record (no configId yet) that matches by name — this is the "old format" record
+      // created before configIds were introduced. Without this fallback, autoFill would
+      // create a second duplicate placeholder that hides the real data-bearing record.
+      let existingAct = paConfigId
         ? allActs.find(([, a]) => a.configId === paConfigId && a.targetName === target.name)
-        : (paParent
-          ? allActs.find(([, a]) => a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title)) && a.parentActivity === paParent)
-          : allActs.find(([, a]) => a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title)) && !a.parentActivity));
+        : null;
+      if (!existingAct) {
+        // Name-based fallback: only adopt records that have NO configId (unlinked).
+        // Records with a DIFFERENT configId belong to another configured activity.
+        existingAct = paParent
+          ? allActs.find(([, a]) => !a.configId && a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title)) && (a.parentActivity === paParent || !a.parentActivity))
+          : allActs.find(([, a]) => !a.configId && a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title)) && !a.parentActivity);
+      }
       let actId = existingAct?.[0] || null;
       if (actId && Object.values(data.remarks || {}).some(r => r.activityId === actId)) continue;
       const key = `${sessionId}:${target.name}:${paConfigId || pa.name}:${paParent || ""}`;
@@ -15436,13 +15457,21 @@ function buildGroupItemsByActivity(target, data, attendees) {
           (sub.id && a.configId === sub.id && a.targetName === target.name) ||
           (a.targetName === target.name && a.activityName === sub.name && a.parentActivity === sub.parentActivity)
         )?.[0] || null;
-        // Same best-data-wins fix as individual session: when multiple records share
-        // the same configId (race between two devices on session open), always pick
-        // the one with the most real data so the display doesn't alternate.
+        // Extended-candidates fix (mirrors individual session): include records with no
+        // configId that match by name+parent, in addition to configId-matched records.
+        // Scores all by data richness and picks the winner, stamping configId on it so
+        // future renders don't recreate a duplicate placeholder hiding the real record.
         if (sub.id) {
-          const grpSameConfig = Object.entries(data.activities || {})
-            .filter(([, a]) => a.configId === sub.id && a.targetName === target.name);
-          if (grpSameConfig.length > 1) {
+          const paName = sub.parentActivity || null;
+          const grpCandidates = Object.entries(data.activities || {}).filter(([, a]) => {
+            if (a.targetName !== target.name) return false;
+            if (a.configId === sub.id) return true;
+            if (a.configId) return false;
+            const nameOk = a.activityName === sub.name || (sub.title && a.activityName === sub.title);
+            if (!nameOk) return false;
+            return !a.parentActivity || a.parentActivity === paName;
+          });
+          if (grpCandidates.length > 1) {
             const grpRemScore = ([actId]) => {
               let s = 0;
               for (const r of Object.values(data.remarks || {})) {
@@ -15454,8 +15483,12 @@ function buildGroupItemsByActivity(target, data, attendees) {
               }
               return s;
             };
-            const grpBest = grpSameConfig.reduce((a, b) => grpRemScore(a) >= grpRemScore(b) ? a : b);
+            const grpBest = grpCandidates.reduce((a, b) => grpRemScore(a) >= grpRemScore(b) ? a : b);
             subActId = grpBest[0];
+            if (!grpBest[1].configId && data.activities[grpBest[0]]) {
+              data.activities[grpBest[0]].configId = sub.id;
+              adoptOrphanActivity(state.groupSessionId, grpBest[0], grpBest[1].parentActivity || null, sub.id).catch(() => {});
+            }
           }
         }
         if (!subActId) {
