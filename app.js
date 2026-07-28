@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1194";
+const APP_VERSION = "1195";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -8363,7 +8363,11 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
     || `<textarea class="view-remark-edit" rows="1" data-rem-id="${escHtml(rem.id)}"
           data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`;
 
-  const noteField = remarkHasNote
+  // Show the note textarea if the current type includes it, OR if the remark
+  // already has a masteryNote saved (e.g. type was +Free Text in the past and
+  // was later changed back — old notes should remain visible and editable).
+  const showNote = remarkHasNote || !!(rem.masteryNote && rem.masteryNote.trim().length > 0);
+  const noteField = showNote
     ? `<textarea class="view-mastery-note" rows="1" data-rem-id="${escHtml(rem.id)}"
         data-saved-html="${escHtml(rem.masteryNote || "")}"
         placeholder="Notes…">${escHtml(plainTextForEdit(rem.masteryNote))}</textarea>`
@@ -8376,7 +8380,7 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
         || `<textarea class="view-starter-input" data-rem-id="${escHtml(rem.id)}"
             rows="1" style="overflow-y:hidden">${escHtml(rem.text || "")}</textarea>`
       }`;
-    remarkCell = remarkHasNote
+    remarkCell = showNote
       ? `<div class="view-starter-wrap view-starter-wrap-note" contenteditable="false">
           <div class="view-starter-top-row">${starterTopRow}</div>
           ${noteField}
@@ -10193,7 +10197,8 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
         || `<textarea class="view-remark-edit" rows="1" data-rem-id="${escHtml(rem.id)}"
               data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`;
 
-      const noteField = remarkHasNote
+      const showNote = remarkHasNote || !!(rem.masteryNote && rem.masteryNote.trim().length > 0);
+      const noteField = showNote
         ? `<textarea class="view-mastery-note" rows="1" data-rem-id="${escHtml(rem.id)}"
             data-saved-html="${escHtml(rem.masteryNote || "")}"
             placeholder="Notes…">${escHtml(plainTextForEdit(rem.masteryNote))}</textarea>`
@@ -10206,7 +10211,7 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
             || `<textarea class="view-starter-input" data-rem-id="${escHtml(rem.id)}"
                 rows="1" style="overflow-y:hidden">${escHtml(rem.text || "")}</textarea>`
           }`;
-        remarkCell = remarkHasNote
+        remarkCell = showNote
           ? `<div class="view-starter-wrap view-starter-wrap-note" contenteditable="false">
               <div class="view-starter-top-row">${starterTopRow}</div>
               ${noteField}
