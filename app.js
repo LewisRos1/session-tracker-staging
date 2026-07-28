@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1204";
+const APP_VERSION = "1205";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4432,9 +4432,6 @@ function renderManageActivityScreen(student) {
     };
 
     html += `<div style="margin-bottom:2rem">
-      <div style="background:var(--primary);color:#fff;border-radius:.45rem;padding:.5rem .9rem;font-size:.95rem;font-weight:700;letter-spacing:.02em;margin-bottom:.8rem">
-        ${escHtml(tName)}
-      </div>
       <div style="display:flex;flex-direction:column;gap:.45rem">
         ${activeHtml || `<div style="font-size:.83rem;color:#9ca3af;padding:.4rem .5rem;font-style:italic">No active activities</div>`}
       </div>
@@ -4443,8 +4440,9 @@ function renderManageActivityScreen(student) {
       ${collapseSection('maintained','🆗','#6b7280','#f9fafb','#e5e7eb',maintPas)}
     </div>`;
 
-  const dropHtml = `<div style="margin-bottom:1.1rem">
-    <select id="ma-target-select" style="width:100%;padding:.6rem .8rem;border:1.5px solid #d1d5db;border-radius:.5rem;font-size:.95rem;background:#fff;color:#111827;cursor:pointer;font-weight:500;box-shadow:0 1px 2px rgba(0,0,0,.05)">
+  const dropHtml = `<div class="target-selector" style="position:static;margin-bottom:.8rem">
+    <label class="target-label">Target</label>
+    <select id="ma-target-select" class="target-dropdown">
       ${targets.map((t, i) => `<option value="${i}"${i === _maSelectedTargetIdx ? ' selected' : ''}>${escHtml(t.name)}</option>`).join('')}
     </select>
   </div>`;
