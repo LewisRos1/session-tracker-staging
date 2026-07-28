@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1192";
+const APP_VERSION = "1193";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -5612,7 +5612,7 @@ async function leaveSession() {
       const allTargetNames = new Set(Object.values(data.activities || {}).map(a => a.targetName));
       allTargetNames.forEach(name => {
         const target = (student?.targets || []).find(t => t.name === name);
-        cleanupEmptyEntries(sessionId, data, name, target).catch(() => {});
+        cleanupEmptyEntries(sessionId, data, name, target, true).catch(() => {});
       });
     }
   }
@@ -7518,7 +7518,7 @@ async function autoFillMaintainedRemarks(student, sessionId) {
 // remark that's otherwise empty gets deleted outright (as if "+" was never
 // clicked), and one that has other real content just has that stray slot
 // quietly dropped from its trials array.
-async function cleanupEmptyEntries(sessionId, data, targetName, target = null) {
+async function cleanupEmptyEntries(sessionId, data, targetName, target = null, isLeaving = false) {
   if (!sessionId || !data) return;
   // Mapped-score activities are designed to have no remark of their own until
   // their mapped target gains an average (see autoFillMappedRemarks) — an
@@ -7527,8 +7527,12 @@ async function cleanupEmptyEntries(sessionId, data, targetName, target = null) {
   const mappedNames   = new Set((target?.predefinedActivities || []).filter(pa => pa.isMapped).map(pa => pa.name));
   // Auto-open activities (Select One / Tickbox / Sentence Starter + select) get
   // an empty placeholder remark on session open so the user can pick immediately.
-  // Don't delete it on target switch — it's not stale, it's waiting for input.
-  const autoOpenNames = new Set((target?.predefinedActivities || []).filter(pa => isAutoOpenRemarkType(pa)).map(pa => pa.name));
+  // During a target switch (isLeaving = false) keep them — they're waiting for input.
+  // On session leave (isLeaving = true) treat them like any other empty remark so
+  // they don't persist as ghost records when the session has other real data.
+  const autoOpenNames = isLeaving
+    ? new Set()
+    : new Set((target?.predefinedActivities || []).filter(pa => isAutoOpenRemarkType(pa)).map(pa => pa.name));
   const acts = Object.entries(data.activities || {})
     .filter(([, a]) => a.targetName === targetName && !mappedNames.has(a.activityName) && !autoOpenNames.has(a.activityName));
   const stripEmpty = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
@@ -7804,7 +7808,7 @@ async function leaveSessionView() {
       const allTargetNames = new Set(Object.values(data.activities || {}).map(a => a.targetName));
       allTargetNames.forEach(name => {
         const target = (student?.targets || []).find(t => t.name === name);
-        cleanupEmptyEntries(sessionId, data, name, target).catch(() => {});
+        cleanupEmptyEntries(sessionId, data, name, target, true).catch(() => {});
       });
     }
   }
@@ -9528,7 +9532,7 @@ async function leaveGroupSessionView() {
       const allTargetNames = new Set(Object.values(data.activities || {}).map(a => a.targetName));
       allTargetNames.forEach(name => {
         const target = (group?.targets || []).find(t => t.name === name);
-        cleanupEmptyEntries(sessionId, data, name, target).catch(() => {});
+        cleanupEmptyEntries(sessionId, data, name, target, true).catch(() => {});
       });
     }
   }
@@ -15516,7 +15520,7 @@ async function leaveGroupSession() {
       const allTargetNames = new Set(Object.values(data.activities || {}).map(a => a.targetName));
       allTargetNames.forEach(name => {
         const target = (group?.targets || []).find(t => t.name === name);
-        cleanupEmptyEntries(sessionId, data, name, target).catch(() => {});
+        cleanupEmptyEntries(sessionId, data, name, target, true).catch(() => {});
       });
     }
   }
