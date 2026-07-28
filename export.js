@@ -223,6 +223,28 @@ function richTextActivityWithNote(activityName, note) {
   if (typeof actCell === "string") return { richText: [{ text: actCell }, noteRun] };
   return { richText: [...actCell.richText, noteRun] };
 }
+
+// Appends activityDisplayDetails (description/bullets) below an already-built cell.
+function appendActivityDetails(cell, details) {
+  if (!details) return cell;
+  const detailRuns = [];
+  parseInlineMarkup(details).forEach((lineRuns, lineIdx) => {
+    if (lineIdx > 0) detailRuns.push({ text: "\n" });
+    for (const run of lineRuns) {
+      if (!run.text) continue;
+      const entry = { text: run.text };
+      if (run.bold || run.underline) {
+        entry.font = {};
+        if (run.bold) entry.font.bold = true;
+        if (run.underline) entry.font.underline = true;
+      }
+      detailRuns.push(entry);
+    }
+  });
+  if (detailRuns.length === 0) return cell;
+  if (typeof cell === "string") return { richText: [{ text: cell }, { text: "\n" }, ...detailRuns] };
+  return { richText: [...cell.richText, { text: "\n" }, ...detailRuns] };
+}
 // Thin border: soft periwinkle-gray for summary sheets
 const CELL_BORDER = {
   top:    { style: "thin", color: { argb: "FFB0C8E0" } },
@@ -492,7 +514,7 @@ function addHalfYearChartsSheets(wb, allTargets, sessions) {
 
       const year = halfMonths[0].split(" ")[1];
       const dateRange = `${labels[0]} - ${labels[labels.length - 1]} ${year}`;
-      const base64 = renderTargetChart(target.name, yValues, dateRange, null, labels);
+      const base64 = renderTargetChart(stripActivityMarkup(target.name), yValues, dateRange, null, labels);
       const imgId  = wb.addImage({ base64, extension: "png" });
 
       const chartRow = ROW_OFFSET + Math.floor(chartIdx / 2) * 19;
@@ -2625,14 +2647,14 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, mastere
       if (act.noRemark) {
         if (act.isGray) grayRows.add(rows.length);
         if (act.isGreen) greenRows.add(rows.length);
-        const r = blankRow(); r[1] = buildExcelActivityCell(act.activityName); rows.push(r);
+        const r = blankRow(); r[1] = appendActivityDetails(buildExcelActivityCell(act.activityName), act.activityDisplayDetails); rows.push(r);
         continue;
       }
 
       // Sub-activity: indented lettered label
       if (act.isSubActivity) {
         const subLabel = `    ${act.subLabel}) ${act.activityName}`;
-        const subCell  = buildExcelActivityCell(subLabel);
+        const subCell  = appendActivityDetails(buildExcelActivityCell(subLabel), act.activityDisplayDetails);
         if (act.isGray) grayRows.add(rows.length);
         if (act.isGreen) greenRows.add(rows.length);
         if (act.empty) {
@@ -2679,6 +2701,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, mastere
           : act.isArchived ? buildExcelActivityCell(act.activityName, " (Archived)")
           : buildExcelActivityCell(act.activityName);
       }
+      activityCell = appendActivityDetails(activityCell, act.activityDisplayDetails);
 
       if (act.empty) {
         if (act.isGray) grayRows.add(rows.length);
