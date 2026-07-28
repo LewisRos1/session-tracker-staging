@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1198";
+const APP_VERSION = "1199";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -8254,11 +8254,12 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
           data-target-name="${escHtml(target.name)}" data-is-predefined="${isPredefined}">${escHtml(opt)}</button>`
       ).join("")}</div>`;
     } else {
-      emptySelHtml = `<div class="view-remark-multi-opts" contenteditable="false">${opts.map(opt =>
-        `<button class="view-single-create-btn" data-opt="${escHtml(opt)}"
+      emptySelHtml = `<div class="view-remark-multi-opts" contenteditable="false">${opts.map(opt => {
+        const sc = (paEntry?.optionScores && paEntry.optionScores[opt] !== undefined) ? paEntry.optionScores[opt] : "";
+        return `<button class="view-single-create-btn" data-opt="${escHtml(opt)}" data-score="${sc}"
           data-act-id="${escHtml(actId || "")}" data-act-name="${escHtml(actName)}"
-          data-target-name="${escHtml(target.name)}" data-is-predefined="${isPredefined}">${escHtml(opt)}</button>`
-      ).join("")}</div>`;
+          data-target-name="${escHtml(target.name)}" data-is-predefined="${isPredefined}">${escHtml(opt)}</button>`;
+      }).join("")}</div>`;
     }
     const noteEmptyHtml = remarkHasNote
       ? `<textarea class="view-mastery-note view-mastery-note-empty" rows="1"
@@ -9370,15 +9371,19 @@ function attachViewListeners() {
       const remId = generateId("r");
       const order = Date.now();
       const val = btn.dataset.opt;
+      const scoreVal = btn.dataset.score !== "" ? Number(btn.dataset.score) : NaN;
       data.activities = data.activities || {};
       data.remarks = data.remarks || {};
       if (isNewAct) data.activities[actId] = { targetName, activityName: actName, order, isPredefined: isPredef };
-      data.remarks[remId] = { activityId: actId, text: val, trials: [], order };
+      const newRem = { activityId: actId, text: val, trials: [], order };
+      if (!isNaN(scoreVal)) newRem.optionScore = scoreVal;
+      data.remarks[remId] = newRem;
       renderSessionView();
       (async () => {
         try {
           if (isNewAct) await addActivity(state.viewSessionId, targetName, actName, order, isPredef, actId);
           await addRemark(state.viewSessionId, actId, val, null, remId);
+          if (!isNaN(scoreVal)) await setOptionScore(state.viewSessionId, remId, scoreVal);
         } catch (err) {
           if (isNewAct) delete data.activities[actId];
           delete data.remarks[remId];
