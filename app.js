@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1201";
+const APP_VERSION = "1202";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4267,12 +4267,17 @@ async function maGetLastDataDate(student, target, pa) {
       const matchIds = Object.entries(sActs)
         .filter(([, a]) => a.targetName === target.name && (a.activityName === paName || a.activityName === pa.name))
         .map(([id]) => id);
-      return matchIds.some(actId => Object.values(sRems).some(r =>
-        r.activityId === actId && (
-          (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
-          (r.trials || []).some(t => t !== null && t !== -1)
-        )
-      ));
+      const hasData = matchIds.some(actId => Object.values(sRems).some(r => {
+        if (r.activityId !== actId) return false;
+        const textOk = (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0;
+        const trialsOk = (r.trials || []).some(t => t !== null && t !== -1);
+        const scoreOk = r.optionScore !== undefined;
+        if (textOk || trialsOk || scoreOk) {
+          console.log("[maGetLastDataDate] MATCH", s.date, "actId:", actId, "text:", r.text, "trials:", r.trials, "optionScore:", r.optionScore);
+        }
+        return textOk || trialsOk || scoreOk;
+      }));
+      return hasData;
     })
     .map(s => s.date).sort();
   return dates[dates.length - 1] || null;
