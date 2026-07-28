@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1189";
+const APP_VERSION = "1190";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3551,7 +3551,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   h += `<h2 style="${SECTION_H2}">Section 1: Executive Overview</h2>`;
 
   if (chartTrendRows.length) {
-    const ovTitle  = `${firstName} - ${monthRange} ${year} Progress`;
+    const ovTitle  = `${student.name} (${monthRange} ${year} Progress)`;
     const ovResult = hyrDrawOverviewChart(chartTrendRows, ovTitle);
     if (ovResult) {
       const overviewDesc = enrolledLate
@@ -3829,7 +3829,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   paragraphs.push(new Paragraph({ children: [], spacing: { before: 0, after: 280 } }));
   paragraphs.push(mkPara("Overall Progress", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true }));
   const chartTrendRows = [...trendRows.filter(r => !r.noData)].sort((a, b) => b.delta - a.delta);
-  const ovTitle = `${firstName} (${monthRange} ${year} Progress)`;
+  const ovTitle = `${student.name} (${monthRange} ${year} Progress)`;
   const ovDrawFn = hyrDrawOverviewChartC;
   const ovNativeW = 700;
   const ovResult = ovDrawFn(chartTrendRows, ovTitle);
@@ -3851,7 +3851,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   if (qualNames.length) {
     const s = qualNames.length === 1;
     paragraphs.push(new Paragraph({
-      children: [new TextRun({ text: `*${joinNames(qualNames)} ${s ? "is" : "are"} not shown here — ${s ? "it's a qualitative target" : "they're qualitative targets"} without a numeric score. See Section 2.`, size: 22, italics: true, color: "9CA3AF" })],
+      children: [new TextRun({ text: `*${joinNames(qualNames)} ${s ? "is" : "are"} not shown here — ${s ? "it's a qualitative target" : "they're qualitative targets"} without a numeric score.`, size: 22, italics: true, color: "9CA3AF" })],
       alignment: AlignmentType.LEFT, spacing: { before: 0, after: 80 }
     }));
   }
