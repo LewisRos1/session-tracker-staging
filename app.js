@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1200";
+const APP_VERSION = "1201";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4261,10 +4261,19 @@ async function maGetLastDataDate(student, target, pa) {
   const allSessions = await getAllSessionsForStudent(student.id);
   const paName = pa.title || pa.name;
   const dates = allSessions
-    .filter(s => Object.values(s.activities || {}).some(a =>
-      a.targetName === target.name &&
-      (a.activityName === paName || a.activityName === pa.name)
-    ))
+    .filter(s => {
+      const sActs = s.activities || {};
+      const sRems = s.remarks || {};
+      const matchIds = Object.entries(sActs)
+        .filter(([, a]) => a.targetName === target.name && (a.activityName === paName || a.activityName === pa.name))
+        .map(([id]) => id);
+      return matchIds.some(actId => Object.values(sRems).some(r =>
+        r.activityId === actId && (
+          (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
+          (r.trials || []).some(t => t !== null && t !== -1)
+        )
+      ));
+    })
     .map(s => s.date).sort();
   return dates[dates.length - 1] || null;
 }
