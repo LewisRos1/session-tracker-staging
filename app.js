@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1202";
+const APP_VERSION = "1203";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4260,24 +4260,32 @@ async function repairLevenChuaSubActivities() {
 async function maGetLastDataDate(student, target, pa) {
   const allSessions = await getAllSessionsForStudent(student.id);
   const paName = pa.title || pa.name;
+  const paConfigId = pa.id || null;
+  const paParent = pa.parentActivity || null;
   const dates = allSessions
     .filter(s => {
       const sActs = s.activities || {};
       const sRems = s.remarks || {};
+      // Mirror autoFillStructuredRemarks candidate logic: accept records by configId
+      // first, skip records claimed by a different activity (have a configId that isn't ours),
+      // then fall back to name-only match for unlinked (pre-configId) records.
       const matchIds = Object.entries(sActs)
-        .filter(([, a]) => a.targetName === target.name && (a.activityName === paName || a.activityName === pa.name))
+        .filter(([, a]) => {
+          if (a.targetName !== target.name) return false;
+          if (paConfigId && a.configId === paConfigId) return true;
+          if (a.configId) return false;
+          const nameOk = a.activityName === paName || a.activityName === pa.name;
+          if (!nameOk) return false;
+          return paParent ? (!a.parentActivity || a.parentActivity === paParent) : !a.parentActivity;
+        })
         .map(([id]) => id);
-      const hasData = matchIds.some(actId => Object.values(sRems).some(r => {
-        if (r.activityId !== actId) return false;
-        const textOk = (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0;
-        const trialsOk = (r.trials || []).some(t => t !== null && t !== -1);
-        const scoreOk = r.optionScore !== undefined;
-        if (textOk || trialsOk || scoreOk) {
-          console.log("[maGetLastDataDate] MATCH", s.date, "actId:", actId, "text:", r.text, "trials:", r.trials, "optionScore:", r.optionScore);
-        }
-        return textOk || trialsOk || scoreOk;
-      }));
-      return hasData;
+      return matchIds.some(actId => Object.values(sRems).some(r =>
+        r.activityId === actId && (
+          (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
+          (r.trials || []).some(t => t !== null && t !== -1) ||
+          r.optionScore !== undefined
+        )
+      ));
     })
     .map(s => s.date).sort();
   return dates[dates.length - 1] || null;
