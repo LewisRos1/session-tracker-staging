@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1195";
+const APP_VERSION = "1196";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -5599,12 +5599,20 @@ async function leaveSession() {
     const remarkHasData = Object.values(data.remarks || {}).some(r => {
       const act = (data.activities || {})[r.activityId];
       if (!act) return false;
+      const rText   = stripEmpty(r.text);
+      const rNote   = stripEmpty(r.masteryNote);
+      const rTrials = (r.trials || []).filter(t => t !== null && t !== -1);
+      // An unmodified auto-filled "Maintain" placeholder is not real user data.
+      // Only count it if the user actually added trials, edited the text, or added a note.
+      if (rText === "Maintain" && rTrials.length === 0 && !rNote) {
+        const pa = (student?.targets || []).flatMap(t => t.predefinedActivities || [])
+          .find(p => p.maintained && (p.name === act.activityName || (p.id && p.id === act.configId)));
+        if (pa) return false;
+      }
       // Count data under ANY targetName — if a target was renamed and the
       // propagation didn't finish, activities under the old name still contain
       // real data that must not make this session look "empty" and get deleted.
-      return stripEmpty(r.text).length > 0
-        || (r.trials || []).some(t => t !== null && t !== -1)
-        || stripEmpty(r.masteryNote).length > 0;
+      return rText.length > 0 || rTrials.length > 0 || rNote.length > 0;
     });
     if (!fedcHasData && !remarkHasData) {
       deleteEmptyIndividualSession(sessionId, student.id, data.date).catch(() => {});
@@ -7795,12 +7803,18 @@ async function leaveSessionView() {
     const remarkHasData = Object.values(data.remarks || {}).some(r => {
       const act = (data.activities || {})[r.activityId];
       if (!act) return false;
+      const rText   = stripEmpty(r.text);
+      const rNote   = stripEmpty(r.masteryNote);
+      const rTrials = (r.trials || []).filter(t => t !== null && t !== -1);
+      if (rText === "Maintain" && rTrials.length === 0 && !rNote) {
+        const pa = (student?.targets || []).flatMap(t => t.predefinedActivities || [])
+          .find(p => p.maintained && (p.name === act.activityName || (p.id && p.id === act.configId)));
+        if (pa) return false;
+      }
       // Count data under ANY targetName — if a target was renamed and the
       // propagation didn't finish, activities under the old name still contain
       // real data that must not make this session look "empty" and get deleted.
-      return stripEmpty(r.text).length > 0
-        || (r.trials || []).some(t => t !== null && t !== -1)
-        || stripEmpty(r.masteryNote).length > 0;
+      return rText.length > 0 || rTrials.length > 0 || rNote.length > 0;
     });
     if (!fedcHasData && !remarkHasData) {
       deleteEmptyIndividualSession(sessionId, student.id, data.date).catch(() => {});
