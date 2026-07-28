@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1203";
+const APP_VERSION = "1204";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4266,14 +4266,14 @@ async function maGetLastDataDate(student, target, pa) {
     .filter(s => {
       const sActs = s.activities || {};
       const sRems = s.remarks || {};
-      // Mirror autoFillStructuredRemarks candidate logic: accept records by configId
-      // first, skip records claimed by a different activity (have a configId that isn't ours),
-      // then fall back to name-only match for unlinked (pre-configId) records.
+      // Accept records by configId first; also accept name-matched records regardless
+      // of whether they've been claimed by another activity (rename artifacts).
+      // This ensures days where old free-text was entered still count as last-data-date
+      // even if the record was later adopted by a renamed activity.
       const matchIds = Object.entries(sActs)
         .filter(([, a]) => {
           if (a.targetName !== target.name) return false;
           if (paConfigId && a.configId === paConfigId) return true;
-          if (a.configId) return false;
           const nameOk = a.activityName === paName || a.activityName === pa.name;
           if (!nameOk) return false;
           return paParent ? (!a.parentActivity || a.parentActivity === paParent) : !a.parentActivity;
@@ -6710,7 +6710,22 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
   function makeOptPills(remId, remText) {
     if (opts.length === 0) return null;
     const removedBadge = (() => {
-      if (!remText) return "";
+      if (!remText) {
+        // Check for orphan records: same activityName, different actId, with old free-text data
+        const actRec = state.sessionData?.activities?.[rem.activityId];
+        if (actRec) {
+          for (const [oid, oact] of Object.entries(state.sessionData.activities || {})) {
+            if (oid === rem.activityId) continue;
+            if (oact.targetName !== actRec.targetName || oact.activityName !== actRec.activityName) continue;
+            for (const [, r] of Object.entries(state.sessionData.remarks || {})) {
+              if (r.activityId !== oid) continue;
+              const txt = (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+              if (txt && !opts.includes(txt)) return `<div style="font-size:.78rem;color:#9ca3af;margin-top:.3rem;font-style:italic">Old data: ${escHtml(txt)}</div>`;
+            }
+          }
+        }
+        return "";
+      }
       if (multiSelect) {
         const sel = remText.split(", ").map(s => s.trim()).filter(Boolean);
         const gone = sel.filter(s => !opts.includes(s));
@@ -8268,20 +8283,33 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
       </tr>`;
     }
     // opts.length > 0 — show actual select/multi UI directly (no button)
+    // When no matched record exists (actId=null), check for orphan records with
+    // same activityName that carry old free-text (rename artifact).
+    const _orphanOldText = actId === null ? (() => {
+      for (const [oid, oact] of Object.entries(data.activities || {})) {
+        if (oact.targetName !== target.name || oact.activityName !== actName) continue;
+        for (const r of viewGetRemarks(data, oid)) {
+          const txt = (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+          if (txt && !opts.includes(txt)) return txt;
+        }
+      }
+      return "";
+    })() : "";
+    const _orphanBadge = _orphanOldText ? `<div style="font-size:.78rem;color:#9ca3af;margin-top:.25rem;font-style:italic">Old data: ${escHtml(_orphanOldText)}</div>` : "";
     let emptySelHtml;
     if (multiSelect) {
       emptySelHtml = `<div class="view-remark-multi-opts" contenteditable="false">${opts.map(opt =>
         `<button class="view-multi-create-btn" data-opt="${escHtml(opt)}"
           data-act-id="${escHtml(actId || "")}" data-act-name="${escHtml(actName)}"
           data-target-name="${escHtml(target.name)}" data-is-predefined="${isPredefined}">${escHtml(opt)}</button>`
-      ).join("")}</div>`;
+      ).join("")}${_orphanBadge}</div>`;
     } else {
       emptySelHtml = `<div class="view-remark-multi-opts" contenteditable="false">${opts.map(opt => {
         const sc = (paEntry?.optionScores && paEntry.optionScores[opt] !== undefined) ? paEntry.optionScores[opt] : "";
         return `<button class="view-single-create-btn" data-opt="${escHtml(opt)}" data-score="${sc}"
           data-act-id="${escHtml(actId || "")}" data-act-name="${escHtml(actName)}"
           data-target-name="${escHtml(target.name)}" data-is-predefined="${isPredefined}">${escHtml(opt)}</button>`;
-      }).join("")}</div>`;
+      }).join("")}${_orphanBadge}</div>`;
     }
     const noteEmptyHtml = remarkHasNote
       ? `<textarea class="view-mastery-note view-mastery-note-empty" rows="1"
