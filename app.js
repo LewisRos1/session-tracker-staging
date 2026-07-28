@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1176";
+const APP_VERSION = "1177";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -5404,8 +5404,6 @@ async function openSession(student, existingSessionId = null, dateStr = null) {
         if (data.remarks) for (const [remId] of remEntries) delete data.remarks[remId];
       }
       state.sessionData = data;
-      window._dbgSD = data; // temporary debug global — remove after bug fixed
-      window._dbgSID = sessionId;
       if (firstLoad) {
         // Persist the Firestore cleanup once on open, not on every snapshot.
         if (orphanActIds.length > 0) {
@@ -5903,7 +5901,6 @@ function renderFedcTarget(target) {
             if (!nameOk) return false;
             return !a.parentActivity || a.parentActivity === (pa.title || pa.name);
           });
-          console.log(`[DEDUP] sub="${sub.name||sub.title}" configId=${sub.id} candidates:`, subCandidates.length, subCandidates.map(([id]) => id));
           if (subCandidates.length > 1) {
             const subRemScore = ([actId]) => {
               let s = 0;
@@ -5917,15 +5914,13 @@ function renderFedcTarget(target) {
               return s;
             };
             const subBest = subCandidates.reduce((a, b) => subRemScore(a) >= subRemScore(b) ? a : b);
-            console.log(`[DEDUP] winner=${subBest[0]} score=${subRemScore(subBest)}`, subCandidates.map(([id]) => `${id}:${subRemScore([id])}`));
             subActData = { id: subBest[0], ...subBest[1] };
             for (const [loserId] of subCandidates) {
               if (loserId === subBest[0]) continue;
               const loserRemIds = Object.entries(state.sessionData.remarks || {}).filter(([, r]) => r.activityId === loserId).map(([id]) => id);
-              console.log(`[DEDUP] deleting loser=${loserId} remIds=`, loserRemIds);
               delete state.sessionData.activities[loserId];
               for (const remId of loserRemIds) delete state.sessionData.remarks[remId];
-              deleteActivity(state.currentSessionId, loserId, loserRemIds).catch(e => console.error("[DEDUP] deleteActivity failed:", e));
+              deleteActivity(state.currentSessionId, loserId, loserRemIds).catch(() => {});
             }
             if (!subBest[1].configId && state.sessionData.activities[subBest[0]]) {
               state.sessionData.activities[subBest[0]].configId = sub.id;
