@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1179";
+const APP_VERSION = "1180";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2158,16 +2158,18 @@ function hyrPopulateActivityFilter(student, studentId, periodVal) {
     const acts = (target.predefinedActivities || []).filter(pa => !pa.isHeading && !pa.isMaintainHeading && (pa.title || pa.name));
     if (acts.length === 0) continue;
     const group = document.createElement("div");
+    const stripMk = s => (s || "").replace(/\*_(.+?)_\*/g, "$1").replace(/_\*(.+?)\*_/g, "$1").replace(/\*(.+?)\*/g, "$1").replace(/_(.+?)_/g, "$1");
     group.innerHTML = `
-      <div style="font-size:.8rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.45rem">${escHtml(target.name)}</div>
+      <div style="font-size:.8rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.45rem">${escHtml(stripMk(target.name))}</div>
       <div style="display:flex;flex-direction:column;gap:.3rem">
         ${acts.map(pa => {
           const paKey = escHtml(pa.title || pa.name);
+          const paLabel = escHtml(stripMk(pa.title || pa.name));
           return `<label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;font-size:.875rem;color:#374151">
             <button class="hyr-act-cb" data-excluded="false"
               data-target="${escHtml(target.name)}" data-activity="${paKey}"
               style="width:22px;height:22px;border:2px solid #d1d5db;border-radius:5px;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;padding:0;color:transparent;transition:all .15s"></button>
-            <span>${paKey}</span>
+            <span>${paLabel}</span>
           </label>`;
         }).join("")}
       </div>`;
