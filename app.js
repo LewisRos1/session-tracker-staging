@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1199";
+const APP_VERSION = "1200";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -13140,6 +13140,14 @@ function renderTargetManageContent(student, target) {
           await saveTarget();
           renderTargetManageContent(student, target);
         } else {
+          if (!(pa.name || "").trim()) {
+            const actIdx = acts.indexOf(pa);
+            if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
+            target.predefinedActivities = acts;
+            await saveTarget();
+            renderTargetManageContent(student, target);
+            return;
+          }
           btn.disabled = true;
           btn.textContent = "Checking…";
           let affected = 0;
@@ -13339,15 +13347,23 @@ function renderTargetManageContent(student, target) {
 
   const _delSectionAct = async (pa, btn) => {
     if (!pa) return;
-      btn.disabled = true;
-      btn.textContent = "Checking…";
-      let affected = 0;
-      let affectedSessions = [];
-      try {
-        const allSessions = _groupForTargetEdit
-          ? await getAllSessionsForGroup(_groupForTargetEdit.id)
-          : await getAllSessionsForStudent(student.id);
-        const paPA2 = pa.parentActivity || null;
+    if (!(pa.name || "").trim()) {
+      const actIdx = acts.indexOf(pa);
+      if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
+      target.predefinedActivities = acts;
+      await saveTarget();
+      renderTargetManageContent(student, target);
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = "Checking…";
+    let affected = 0;
+    let affectedSessions = [];
+    try {
+      const allSessions = _groupForTargetEdit
+        ? await getAllSessionsForGroup(_groupForTargetEdit.id)
+        : await getAllSessionsForStudent(student.id);
+      const paPA2 = pa.parentActivity || null;
         affectedSessions = allSessions.filter(s =>
           Object.values(s.activities || {}).some(a =>
             a.targetName === target.name && a.activityName === pa.name &&
