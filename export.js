@@ -493,10 +493,15 @@ function addHalfYearChartsSheets(wb, allTargets, sessions) {
     const ROW_OFFSET = 7;
     let chartIdx = 0;
 
+    // Start all charts from the student's global enrollment month (first month with any session)
+    const globalStartIdx = halfMonths.findIndex(m => sessions.some(s => s.month === m));
+    if (globalStartIdx === -1) return;
+    const activeHalfMonths = halfMonths.slice(globalStartIdx);
+
     for (const target of allTargets) {
       const yValues = [], labels = [];
 
-      for (const month of halfMonths) {
+      for (const month of activeHalfMonths) {
         const monthSessions = sessions.filter(s => s.month === month);
         const dailyAvgs = monthSessions.map(s => {
           const snap = (s.targetsSnapshot || []).find(t => t.name === target.name);
@@ -504,13 +509,13 @@ function addHalfYearChartsSheets(wb, allTargets, sessions) {
           return calcDailyAverage(s, eff, allTargets);
         }).filter(v => v !== null && !isNaN(v));
 
-        if (dailyAvgs.length > 0) {
-          yValues.push(Math.round(avg(dailyAvgs)));
-          labels.push(month.split(" ")[0].slice(0, 3));
-        }
+        labels.push(month.split(" ")[0].slice(0, 3));
+        yValues.push(dailyAvgs.length > 0 ? Math.round(avg(dailyAvgs)) : null);
       }
 
-      if (yValues.length < 1) { chartIdx++; continue; }
+      // Trim trailing nulls (months after this target's last data point)
+      while (yValues.length > 0 && yValues[yValues.length - 1] === null) { yValues.pop(); labels.pop(); }
+      if (!yValues.some(v => v !== null)) { chartIdx++; continue; }
 
       const year = halfMonths[0].split(" ")[1];
       const dateRange = `${labels[0]} - ${labels[labels.length - 1]} ${year}`;
@@ -3125,7 +3130,9 @@ function renderTargetChart(targetName, yValues, dateRange, dates, customLabels =
     return `${day} ${shortMonths[m - 1]}`;
   });
 
-  const np = yValues.length;
+  // Support nulls in yValues (months with no data yet on the x-axis)
+  const nonNullPts = yValues.map((v, i) => ({ v, i })).filter(p => p.v !== null && p.v !== undefined);
+  const np = nonNullPts.length;
   if (np === 0) return null;
 
   const canvas = document.createElement("canvas");
@@ -3149,22 +3156,24 @@ function renderTargetChart(targetName, yValues, dateRange, dates, customLabels =
     ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + cW, y); ctx.stroke();
   }
 
-  // Linear regression
-  const trend = linearRegressionValues(yValues);
+  // Linear regression on non-null values only
+  const trend = linearRegressionValues(nonNullPts.map(p => p.v));
   const tStartVal = Math.round(trend[0]);
-  const tEndVal   = Math.round(trend[trend.length - 1]);
+  const tEndVal   = Math.round(trend[np - 1]);
 
-  // Dashed trendline (only with ≥2 data points)
+  // Dashed trendline (only with ≥2 data points), spans first→last non-null x-position
   if (np >= 2) {
     ctx.strokeStyle = "#b0bec5"; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
-    ctx.beginPath(); ctx.moveTo(toX(0), toY(trend[0])); ctx.lineTo(toX(np - 1), toY(trend[np - 1]));
+    ctx.beginPath();
+    ctx.moveTo(toX(nonNullPts[0].i), toY(trend[0]));
+    ctx.lineTo(toX(nonNullPts[np - 1].i), toY(trend[np - 1]));
     ctx.stroke(); ctx.setLineDash([]);
 
     // Trendline endpoint labels — below trendline, with collision avoidance
     const safeTrendY = (tY, dY, tV, dV) => Math.abs(tV - dV) <= 10 ? Math.max(dY, tY) + 20 : tY + 13;
     ctx.fillStyle = "#6b7280"; ctx.font = "13px sans-serif"; ctx.textAlign = "center";
-    ctx.fillText(tStartVal + "%", toX(0),      safeTrendY(toY(trend[0]),      toY(yValues[0]),      tStartVal, yValues[0]));
-    ctx.fillText(tEndVal   + "%", toX(np - 1), safeTrendY(toY(trend[np - 1]), toY(yValues[np - 1]), tEndVal,   yValues[np - 1]));
+    ctx.fillText(tStartVal + "%", toX(nonNullPts[0].i),      safeTrendY(toY(trend[0]),      toY(nonNullPts[0].v),      tStartVal, nonNullPts[0].v));
+    ctx.fillText(tEndVal   + "%", toX(nonNullPts[np - 1].i), safeTrendY(toY(trend[np - 1]), toY(nonNullPts[np - 1].v), tEndVal,   nonNullPts[np - 1].v));
   }
 
   // Direction subtitle
@@ -3174,21 +3183,26 @@ function renderTargetChart(targetName, yValues, dateRange, dates, customLabels =
   ctx.fillStyle = dirColor; ctx.font = "italic 16px sans-serif"; ctx.textAlign = "center";
   ctx.fillText(dirText, W / 2, 42);
 
-  // Data line
+  // Data line — skip nulls, don't connect across gaps
   ctx.strokeStyle = "#4472c4"; ctx.lineWidth = 2.5;
   ctx.beginPath();
-  yValues.forEach((v, i) => { i === 0 ? ctx.moveTo(toX(i), toY(v)) : ctx.lineTo(toX(i), toY(v)); });
+  let _lineStarted = false;
+  yValues.forEach((v, i) => {
+    if (v === null || v === undefined) { _lineStarted = false; return; }
+    const x = toX(i), y = toY(v);
+    if (!_lineStarted) { ctx.moveTo(x, y); _lineStarted = true; } else ctx.lineTo(x, y);
+  });
   ctx.stroke();
 
-  // Dots + value labels ABOVE each dot
-  yValues.forEach((v, i) => {
-    const x = toX(i), y = toY(v);
+  // Dots + value labels ABOVE each non-null dot
+  nonNullPts.forEach(p => {
+    const x = toX(p.i), y = toY(p.v);
     ctx.fillStyle = "#4472c4"; ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = "#1f2937"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "center";
-    ctx.fillText(v + "%", x, y - 9);
+    ctx.fillText(p.v + "%", x, y - 9);
   });
 
-  // Month labels on X-axis
+  // Month labels on X-axis (all labels including empty-month positions)
   ctx.fillStyle = "#374151"; ctx.font = "14px sans-serif"; ctx.textAlign = "center";
   labels.forEach((label, i) => ctx.fillText(label, toX(i), PAD.top + cH + 16));
 

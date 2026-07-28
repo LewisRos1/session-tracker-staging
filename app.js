@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1183";
+const APP_VERSION = "1184";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2995,20 +2995,18 @@ function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd
   ctx.scale(SCALE, SCALE);
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
 
-  // Only include months that have actual data — re-index sequentially so empty months don't appear
-  const pts = labels
-    .map((label, i) => ({ label, v: values[i] }))
-    .filter(p => p.v !== null && p.v !== undefined)
-    .map((p, seqI) => ({ ...p, i: seqI }));
+  // Keep all months (including nulls for empty months) — only draw dots/labels for non-null
+  const allPts = labels.map((label, i) => ({ label, v: (values[i] !== undefined ? values[i] : null), i }));
+  const pts    = allPts.filter(p => p.v !== null && p.v !== undefined);
   if (pts.length === 0) return null;
 
-  const rangeLabel = pts.length > 1 ? `${pts[0].label} - ${pts[pts.length - 1].label}` : pts[0].label;
+  const rangeLabel = allPts.length > 1 ? `${allPts[0].label} - ${allPts[allPts.length - 1].label}` : allPts[0].label;
   ctx.fillStyle = "#1f2937"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center";
   ctx.fillText(`${(targetName || "").trim()} (${rangeLabel} ${year})`, W / 2, 24);
 
   // Fixed 0–100 Y range; Y-axis labels hidden (data point labels carry the values)
   const toY = v => PAD.top + cH * (1 - v / 100);
-  const toX = i => PAD.left + (pts.length > 1 ? (i / (pts.length - 1)) * cW : cW / 2);
+  const toX = i => PAD.left + (allPts.length > 1 ? (i / (allPts.length - 1)) * cW : cW / 2);
 
   // Gridlines at 0, 20, 40, 60, 80, 100 — no labels
   ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
@@ -3054,13 +3052,18 @@ function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd
   ctx.fillStyle = "#6b7280"; ctx.font = "italic 16px sans-serif"; ctx.textAlign = "center";
   ctx.fillText(`${icon} ${dispDir}`, W / 2, 42);
 
-  // Data line
+  // Data line — skip nulls, don't connect across gaps
   ctx.strokeStyle = "#4472c4"; ctx.lineWidth = 2.5;
   ctx.beginPath();
-  pts.forEach((p, idx) => { const x=toX(p.i), y=toY(p.v); idx===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+  let _lineStarted = false;
+  allPts.forEach(p => {
+    if (p.v === null || p.v === undefined) { _lineStarted = false; return; }
+    const x = toX(p.i), y = toY(p.v);
+    if (!_lineStarted) { ctx.moveTo(x, y); _lineStarted = true; } else ctx.lineTo(x, y);
+  });
   ctx.stroke();
 
-  // Data point dots + value labels above
+  // Data point dots + value labels above (only non-null)
   pts.forEach(p => {
     const x = toX(p.i), y = toY(p.v);
     ctx.fillStyle = "#4472c4"; ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI*2); ctx.fill();
@@ -3068,9 +3071,9 @@ function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd
     ctx.fillText(p.v + "%", x, y - 9);
   });
 
-  // Month labels on X-axis — only months with data
+  // Month labels on X-axis — all months including empty positions
   ctx.fillStyle = "#374151"; ctx.font = "14px sans-serif"; ctx.textAlign = "center";
-  pts.forEach(p => ctx.fillText(p.label, toX(p.i), PAD.top + cH + 16));
+  allPts.forEach(p => ctx.fillText(p.label, toX(p.i), PAD.top + cH + 16));
 
   // Thin border around entire canvas
   ctx.strokeStyle = "#000000"; ctx.lineWidth = 1;
@@ -3498,8 +3501,19 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
     return `<p style="margin:.3rem 0 .3rem 1.4rem;line-height:1.6;text-indent:-1rem">${html}</p>`;
   }).join("");
 
+  // Global enrollment month: earliest index where any target has data
+  const _hyrGlobalFirstIdx = (() => {
+    for (let _i = 0; _i < 6; _i++) {
+      if (trendRows.some(r => r.values && r.values[_i] !== null && r.values[_i] !== undefined)) return _i;
+    }
+    return 0;
+  })();
+
   const targetBlock = (r, i) => {
-    const lb64 = hyrDrawLineChart(r.name, r.labels, r.values, period, year, r.tStart, r.tEnd, r.delta, r.direction);
+    const _gLabels = r.labels.slice(_hyrGlobalFirstIdx);
+    const _gValues = r.values.slice(_hyrGlobalFirstIdx);
+    while (_gValues.length > 0 && (_gValues[_gValues.length - 1] === null || _gValues[_gValues.length - 1] === undefined)) { _gValues.pop(); _gLabels.pop(); }
+    const lb64 = hyrDrawLineChart(r.name, _gLabels, _gValues, period, year, r.tStart, r.tEnd, r.delta, r.direction);
     const chartImg = lb64 ? `<img src="data:image/png;base64,${lb64}" style="width:100%;max-width:540px;display:block;margin:.5rem 0 .75rem">` : "";
     return `<div style="margin-top:2rem">
       <p style="font-weight:700;font-size:1rem;margin:0 0 .15rem">${ROMAN[i] || i + 1}. ${esc(r.name.trim())}</p>
@@ -3749,6 +3763,14 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
     });
   }
 
+  // Global enrollment month: earliest index where any target has data
+  const _wordGlobalFirstIdx = (() => {
+    for (let _i = 0; _i < 6; _i++) {
+      if (trendRows.some(r => r.values && r.values[_i] !== null && r.values[_i] !== undefined)) return _i;
+    }
+    return 0;
+  })();
+
   function targetSectionParas(rows, obsKey = "observations") {
     const paras = [];
     rows.forEach((r, i) => {
@@ -3760,7 +3782,10 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
         ],
         spacing: { before: 0, after: 100, ...LS }
       }));
-      const lb64 = hyrDrawLineChart(r.name, r.labels, r.values, period, year, r.tStart, r.tEnd, r.delta, r.direction);
+      const _wLabels = r.labels.slice(_wordGlobalFirstIdx);
+      const _wValues = r.values.slice(_wordGlobalFirstIdx);
+      while (_wValues.length > 0 && (_wValues[_wValues.length - 1] === null || _wValues[_wValues.length - 1] === undefined)) { _wValues.pop(); _wLabels.pop(); }
+      const lb64 = hyrDrawLineChart(r.name, _wLabels, _wValues, period, year, r.tStart, r.tEnd, r.delta, r.direction);
       if (lb64) paras.push(new Paragraph({
         children: [new ImageRun({ data: b64ToUint8(lb64), transformation: { width: 540, height: 280 }, type: "png" })],
         alignment: AlignmentType.CENTER, spacing: { after: 100 }
