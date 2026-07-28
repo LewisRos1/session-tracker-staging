@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1182";
+const APP_VERSION = "1183";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2897,7 +2897,9 @@ function hyrDrawActivityBreakdown(targetName, activities, period, year) {
   const cW = W - PAD.left - PAD.right;
   const toX = v => PAD.left + (v / 100) * cW;
   const plotBottom = PAD.top + nActs * ROW_H;
-  const rangeLabel = period === "H1" ? "Jan–Jun" : "Jul–Dec";
+  const rangeLabel = activities.length > 0
+    ? (() => { const f = activities.find(a => a.earliestLabel); const l = [...activities].reverse().find(a => a.latestLabel); return f && l ? `${f.earliestLabel} - ${l.latestLabel}` : (period === "H1" ? "Jan–Jun" : "Jul–Dec"); })()
+    : (period === "H1" ? "Jan–Jun" : "Jul–Dec");
 
   ctx.font = "bold 13px sans-serif"; ctx.fillStyle = "#111"; ctx.textAlign = "left";
   ctx.fillText(`${targetName} — Activity Comparison (${rangeLabel} ${year})`, 10, 28);
@@ -3641,7 +3643,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
       <tr><td style="padding:.45rem .75rem;border:1px solid #e5e7eb;font-weight:600">3.2 Developing</td><td style="padding:.45rem .75rem;border:1px solid #e5e7eb">Ending score <strong>under 80%</strong> with stable progress (within <strong>±8 points</strong> over the term).</td></tr>
     </tbody></table>`;
     h += `<h3 style="${SECTION_H3}">6.2 Activity Breakdown Charts</h3>`;
-    const rangeLabel = period === "H1" ? `Jan - Jun ${year}` : `Jul - Dec ${year}`;
+    const rangeLabel = `${_htmlFirstMonth.slice(0, 3)} - ${_htmlTermEnd.slice(0, 3)} ${year}`;
     const htmlNumMap = new Map();
     trendRows.forEach((r, i) => htmlNumMap.set(r.name, i + 1));
     categorized.qualitative.forEach((r, i) => htmlNumMap.set(r.name, trendRows.length + i + 1));
@@ -3938,7 +3940,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   if (appendixTargets.length) {
     appendixParas.push(mkPara(`Section ${nextSectionNum + 1}: Appendix`, { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
     appendixParas.push(mkPara("Activity Breakdown Charts", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
-    const rangeLabel = period === "H1" ? `Jan - Jun ${year}` : `Jul - Dec ${year}`;
+    const rangeLabel = `${firstMonthName.slice(0, 3)} - ${halfEndName.slice(0, 3)} ${year}`;
     const sec2NumberMap = new Map();
     chartTrendRows.forEach((r, i) => sec2NumberMap.set(r.name, i + 1));
     categorized.qualitative.forEach((r, i) => sec2NumberMap.set(r.name, chartTrendRows.length + i + 1));

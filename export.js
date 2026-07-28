@@ -959,6 +959,12 @@ function addActivityBreakdownHalfSheets(wb, allTargets, sessions) {
     const periodLabel = fM[1] === lM[1]
       ? `${fM[0].slice(0, 3)} - ${lM[0].slice(0, 3)} ${lM[1]}`
       : `${fM[0].slice(0, 3)} ${fM[1]} - ${lM[0].slice(0, 3)} ${lM[1]}`;
+    // Chart titles use actual first month with data (not necessarily the first half-year month)
+    const _firstDataHalfMonth = halfMonths.find(m => sessions.some(s => s.month === m)) || halfMonths[0];
+    const fDM = _firstDataHalfMonth.split(" ");
+    const chartPeriodLabel = fDM[1] === lM[1]
+      ? `${fDM[0].slice(0, 3)} - ${lM[0].slice(0, 3)} ${lM[1]}`
+      : `${fDM[0].slice(0, 3)} ${fDM[1]} - ${lM[0].slice(0, 3)} ${lM[1]}`;
 
     // Sort targets by trendline delta for THIS half
     const trendData = {};
@@ -1158,8 +1164,8 @@ function addActivityBreakdownHalfSheets(wb, allTargets, sessions) {
       for (let i = 0; i < activityData.length; i += MAX_PER_CHART) chunks.push(activityData.slice(i, i + MAX_PER_CHART));
       for (let ci = 0; ci < chunks.length; ci++) {
         const pageSuffix = chunks.length > 1 ? ` [Page ${ci + 1} of ${chunks.length}]` : "";
-        const chartTitle = `${targetNum}) ${target.name} - Progress (${periodLabel})${pageSuffix}`;
-        const chartResult = renderActivityBreakdownChart(target.name, chunks[ci], periodLabel, chartTitle, false, ["Trendline Start", "Trendline End"]);
+        const chartTitle = `${targetNum}) ${target.name} - Progress (${chartPeriodLabel})${pageSuffix}`;
+        const chartResult = renderActivityBreakdownChart(target.name, chunks[ci], chartPeriodLabel, chartTitle, false, ["Trendline Start", "Trendline End"]);
         if (!chartResult) continue;
         const { base64, height: chartH } = chartResult;
         const imgId = wb.addImage({ base64, extension: "png" });
