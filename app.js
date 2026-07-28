@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1181";
+const APP_VERSION = "1182";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2343,7 +2343,7 @@ TARGET: [exact target name]
     await new Promise(r => setTimeout(r, 1000));
     setProgress(20, "Processing data…");
     await new Promise(r => setTimeout(r, 1000));
-    setProgress(35, "Sending to AI…");
+    setProgress(35, "Sending to AI (Approx. ~15 seconds)…");
     await new Promise(r => setTimeout(r, 500));
 
     // Switch button to Cancel
