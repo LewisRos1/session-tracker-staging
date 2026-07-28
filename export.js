@@ -3197,7 +3197,7 @@ function renderTargetChart(targetName, yValues, dateRange, dates, customLabels =
   const dirText  = delta > 8 ? "↑ Trending Up" : delta < -8 ? "↓ Trending Down" : "→ Stable";
   const dirColor = delta > 8 ? "#2A7A3B" : delta < -8 ? "#C0392B" : "#6b7280";
   ctx.fillStyle = dirColor; ctx.font = "italic 16px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(dirText, W / 2, _aDirY);
+  ctx.fillText(dirText, W / 2, _dirY);
 
   // Data line — skip nulls, don't connect across gaps
   ctx.strokeStyle = "#4472c4"; ctx.lineWidth = 2.5;
@@ -3309,7 +3309,7 @@ function renderActivityLineChart(actDisplayName, periodMonths, monthBuckets) {
   const dirText  = delta > 8 ? "↑ Trending Up" : delta < -8 ? "↓ Trending Down" : "→ Stable";
   const dirColor = delta > 8 ? "#2A7A3B" : delta < -8 ? "#C0392B" : "#6b7280";
   ctx.fillStyle = dirColor; ctx.font = "italic 16px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(dirText, W / 2, _dirY);
+  ctx.fillText(dirText, W / 2, _aDirY);
 
   // Data line
   ctx.strokeStyle = "#4472c4"; ctx.lineWidth = 2.5;
