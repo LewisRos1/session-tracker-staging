@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1190";
+const APP_VERSION = "1191";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3851,7 +3851,7 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   if (qualNames.length) {
     const s = qualNames.length === 1;
     paragraphs.push(new Paragraph({
-      children: [new TextRun({ text: `*${joinNames(qualNames)} ${s ? "is" : "are"} not shown here — ${s ? "it's a qualitative target" : "they're qualitative targets"} without a numeric score.`, size: 22, italics: true, color: "9CA3AF" })],
+      children: [new TextRun({ text: `*${joinNames(qualNames)} ${s ? "is a qualitative target" : "are qualitative targets"} without a numeric score, so ${s ? "it isn't" : "they aren't"} shown in the chart above. ${s ? "It's" : "They're"} described in Section 2 instead.`, size: 22, italics: true, color: "9CA3AF" })],
       alignment: AlignmentType.LEFT, spacing: { before: 0, after: 80 }
     }));
   }
