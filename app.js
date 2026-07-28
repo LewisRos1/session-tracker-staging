@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1193";
+const APP_VERSION = "1194";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -6684,9 +6684,9 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
       if (multiSelect) {
         const sel = remText.split(", ").map(s => s.trim()).filter(Boolean);
         const gone = sel.filter(s => !opts.includes(s));
-        return gone.length ? `<div style="font-size:.78rem;color:#9ca3af;margin-top:.3rem;font-style:italic">Previously selected (removed): ${escHtml(gone.join(", "))}</div>` : "";
+        return gone.length ? `<div style="font-size:.78rem;color:#9ca3af;margin-top:.3rem;font-style:italic">Old data: ${escHtml(gone.join(", "))}</div>` : "";
       }
-      return !opts.includes(remText) ? `<div style="font-size:.78rem;color:#9ca3af;margin-top:.3rem;font-style:italic">Previously: ${escHtml(remText)} (removed)</div>` : "";
+      return !opts.includes(remText) ? `<div style="font-size:.78rem;color:#9ca3af;margin-top:.3rem;font-style:italic">Old data: ${escHtml(remText)}</div>` : "";
     })();
     if (multiSelect) {
       const sel = (remText || "").split(", ").map(s => s.trim()).filter(Boolean);
@@ -8342,9 +8342,9 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
       if (multiSelect) {
         const sel = remText.split(", ").map(s => s.trim()).filter(Boolean);
         const gone = sel.filter(s => !opts.includes(s));
-        return gone.length ? `<div style="font-size:.78rem;color:#9ca3af;margin-top:.25rem;font-style:italic">Previously selected (removed): ${escHtml(gone.join(", "))}</div>` : "";
+        return gone.length ? `<div style="font-size:.78rem;color:#9ca3af;margin-top:.25rem;font-style:italic">Old data: ${escHtml(gone.join(", "))}</div>` : "";
       }
-      return !opts.includes(remText) ? `<div style="font-size:.78rem;color:#9ca3af;margin-top:.25rem;font-style:italic">Previously: ${escHtml(remText)} (removed)</div>` : "";
+      return !opts.includes(remText) ? `<div style="font-size:.78rem;color:#9ca3af;margin-top:.25rem;font-style:italic">Old data: ${escHtml(remText)}</div>` : "";
     })();
     if (multiSelect) {
       const sel = (remText || "").split(", ").map(s => s.trim()).filter(Boolean);
@@ -16095,9 +16095,9 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
       if (multiSelect) {
         const sel = remText.split(", ").map(s => s.trim()).filter(Boolean);
         const gone = sel.filter(s => !opts.includes(s));
-        return gone.length ? `<div style="font-size:.78rem;color:#9ca3af;margin-top:.3rem;font-style:italic">Previously selected (removed): ${escHtml(gone.join(", "))}</div>` : "";
+        return gone.length ? `<div style="font-size:.78rem;color:#9ca3af;margin-top:.3rem;font-style:italic">Old data: ${escHtml(gone.join(", "))}</div>` : "";
       }
-      return !opts.includes(remText) ? `<div style="font-size:.78rem;color:#9ca3af;margin-top:.3rem;font-style:italic">Previously: ${escHtml(remText)} (removed)</div>` : "";
+      return !opts.includes(remText) ? `<div style="font-size:.78rem;color:#9ca3af;margin-top:.3rem;font-style:italic">Old data: ${escHtml(remText)}</div>` : "";
     })();
     if (multiSelect) {
       const sel = (remText || "").split(", ").map(s => s.trim()).filter(Boolean);
