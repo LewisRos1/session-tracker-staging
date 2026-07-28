@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1180";
+const APP_VERSION = "1181";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2993,16 +2993,20 @@ function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd
   ctx.scale(SCALE, SCALE);
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
 
-  const rangeLabel = period === "H1" ? "Jan - Jun" : "Jul - Dec";
+  // Only include months that have actual data — re-index sequentially so empty months don't appear
+  const pts = labels
+    .map((label, i) => ({ label, v: values[i] }))
+    .filter(p => p.v !== null && p.v !== undefined)
+    .map((p, seqI) => ({ ...p, i: seqI }));
+  if (pts.length === 0) return null;
+
+  const rangeLabel = pts.length > 1 ? `${pts[0].label} - ${pts[pts.length - 1].label}` : pts[0].label;
   ctx.fillStyle = "#1f2937"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center";
   ctx.fillText(`${(targetName || "").trim()} (${rangeLabel} ${year})`, W / 2, 24);
 
-  const pts = labels.map((label, i) => ({ label, v: values[i], i })).filter(p => p.v !== null && p.v !== undefined);
-  if (pts.length === 0) return null;
-
   // Fixed 0–100 Y range; Y-axis labels hidden (data point labels carry the values)
   const toY = v => PAD.top + cH * (1 - v / 100);
-  const toX = i => PAD.left + (labels.length > 1 ? (i / (labels.length - 1)) * cW : cW / 2);
+  const toX = i => PAD.left + (pts.length > 1 ? (i / (pts.length - 1)) * cW : cW / 2);
 
   // Gridlines at 0, 20, 40, 60, 80, 100 — no labels
   ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
@@ -3062,9 +3066,9 @@ function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd
     ctx.fillText(p.v + "%", x, y - 9);
   });
 
-  // Month labels on X-axis
+  // Month labels on X-axis — only months with data
   ctx.fillStyle = "#374151"; ctx.font = "14px sans-serif"; ctx.textAlign = "center";
-  labels.forEach((label, i) => ctx.fillText(label, toX(i), PAD.top + cH + 16));
+  pts.forEach(p => ctx.fillText(p.label, toX(p.i), PAD.top + cH + 16));
 
   // Thin border around entire canvas
   ctx.strokeStyle = "#000000"; ctx.lineWidth = 1;
