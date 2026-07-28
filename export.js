@@ -1056,14 +1056,14 @@ function addActivityBreakdownHalfSheets(wb, allTargets, sessions) {
           const pIdx    = parentSectionIdx[pa.parentActivity]; // eslint-disable-line no-unused-vars
           const letterN = parentSubCount[pa.parentActivity] ?? 0;
           parentSubCount[pa.parentActivity] = letterN + 1;
-          const subBase = stripActPrefix((pa.title || pa.name || "").trim());
+          const subBase = stripActivityMarkup(stripActPrefix((pa.title || pa.name || "").trim()));
           displayName = subBase || "<Sub-Activity>";
         } else {
           let sectionIdx;
           if (isActive)        { sectionIdx = ++activeIdx; }
           else if (isMastered) { sectionIdx = ++masteredIdx; }
           else                 { sectionIdx = ++discontinuedIdx; }
-          displayName = stripActPrefix(pa.title?.trim() || pa.name?.trim() || "") || `<Activity ${sectionIdx}>`;
+          displayName = stripActivityMarkup(stripActPrefix(pa.title?.trim() || pa.name?.trim() || "")) || `<Activity ${sectionIdx}>`;
           parentSectionIdx[pa.title || pa.name] = sectionIdx;
         }
 
@@ -1335,14 +1335,14 @@ function addActivityScoreSheet(wb, allTargets, sessions) {
       if (pa.parentActivity) {
         const n = subCounters[pa.parentActivity] || 0;
         subCounters[pa.parentActivity] = n + 1;
-        displayName = `    ${String.fromCharCode(97 + n)}) ${(pa.title || pa.name || "").trim()}`;
+        displayName = `    ${String.fromCharCode(97 + n)}) ${stripActivityMarkup((pa.title || pa.name || "").trim())}`;
       } else {
         actNum++;
         const status = (pa.isCompleted || pa.masteredOn)              ? " — Mastered"
                      : (pa.isArchived || pa.isStopped || pa.discontinuedOn) ? " — Discontinued"
                      : pa.isMaintain                                   ? " — Maintained"
                      : "";
-        displayName = `${actNum}) ${(pa.title || pa.name || "").trim()}${status}`;
+        displayName = `${actNum}) ${stripActivityMarkup((pa.title || pa.name || "").trim())}${status}`;
       }
 
       // Build row: session scores + month averages
@@ -3115,6 +3115,19 @@ function formatDateRange(dates) {
   return                              `${mo[fm - 1]} ${fy} – ${mo[lm - 1]} ${ly}`;
 }
 
+function wrapChartTitle(ctx, text, maxW) {
+  const words = text.split(" ");
+  const lines = [];
+  let line = "";
+  for (const w of words) {
+    const test = line ? `${line} ${w}` : w;
+    if (line && ctx.measureText(test).width > maxW) { lines.push(line); line = w; }
+    else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
 function renderTargetChart(targetName, yValues, dateRange, dates, customLabels = null) {
   if (typeof document === "undefined") return null;
 
@@ -3140,10 +3153,14 @@ function renderTargetChart(targetName, yValues, dateRange, dates, customLabels =
   ctx.scale(SCALE, SCALE);
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
 
-  // Title
+  // Title (wrapped if long)
   const titleText = dateRange ? `${targetName} (${dateRange})` : targetName;
-  ctx.fillStyle = "#1f2937"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(titleText, W / 2, 24);
+  ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center";
+  const _tLines = wrapChartTitle(ctx, titleText, W - 32);
+  const _tStartY = _tLines.length === 1 ? 24 : _tLines.length === 2 ? 16 : 10;
+  ctx.fillStyle = "#1f2937";
+  _tLines.forEach((line, i) => ctx.fillText(line, W / 2, _tStartY + i * 20));
+  const _dirY = _tStartY + _tLines.length * 20 + 4;
 
   const toY = v => PAD.top + cH * (1 - v / 100);
   const toX = i => PAD.left + (labels.length > 1 ? (i / (labels.length - 1)) * cW : cW / 2);
@@ -3180,7 +3197,7 @@ function renderTargetChart(targetName, yValues, dateRange, dates, customLabels =
   const dirText  = delta > 8 ? "↑ Trending Up" : delta < -8 ? "↓ Trending Down" : "→ Stable";
   const dirColor = delta > 8 ? "#2A7A3B" : delta < -8 ? "#C0392B" : "#6b7280";
   ctx.fillStyle = dirColor; ctx.font = "italic 16px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(dirText, W / 2, 42);
+  ctx.fillText(dirText, W / 2, _aDirY);
 
   // Data line — skip nulls, don't connect across gaps
   ctx.strokeStyle = "#4472c4"; ctx.lineWidth = 2.5;
@@ -3238,8 +3255,13 @@ function renderActivityLineChart(actDisplayName, periodMonths, monthBuckets) {
 
   const year = periodMonths[0].split(" ")[1];
   const periodLabel = `${labels[0]} - ${labels[labels.length - 1]} ${year}`;
-  ctx.fillStyle = "#1f2937"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(`${actDisplayName} (${periodLabel})`, W / 2, 24);
+  const _aTitle = `${stripActivityMarkup(actDisplayName)} (${periodLabel})`;
+  ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center";
+  const _aTLines = wrapChartTitle(ctx, _aTitle, W - 32);
+  const _aTStartY = _aTLines.length === 1 ? 24 : _aTLines.length === 2 ? 16 : 10;
+  ctx.fillStyle = "#1f2937";
+  _aTLines.forEach((line, i) => ctx.fillText(line, W / 2, _aTStartY + i * 20));
+  const _aDirY = _aTStartY + _aTLines.length * 20 + 4;
 
   const toY = v => PAD.top + cH * (1 - v / 100);
   const toX = i => PAD.left + (labels.length > 1 ? (i / (labels.length - 1)) * cW : cW / 2);
@@ -3287,7 +3309,7 @@ function renderActivityLineChart(actDisplayName, periodMonths, monthBuckets) {
   const dirText  = delta > 8 ? "↑ Trending Up" : delta < -8 ? "↓ Trending Down" : "→ Stable";
   const dirColor = delta > 8 ? "#2A7A3B" : delta < -8 ? "#C0392B" : "#6b7280";
   ctx.fillStyle = dirColor; ctx.font = "italic 16px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(dirText, W / 2, 42);
+  ctx.fillText(dirText, W / 2, _dirY);
 
   // Data line
   ctx.strokeStyle = "#4472c4"; ctx.lineWidth = 2.5;
