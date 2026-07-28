@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1184";
+const APP_VERSION = "1185";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3000,7 +3000,8 @@ function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd
   const pts    = allPts.filter(p => p.v !== null && p.v !== undefined);
   if (pts.length === 0) return null;
 
-  const rangeLabel = allPts.length > 1 ? `${allPts[0].label} - ${allPts[allPts.length - 1].label}` : allPts[0].label;
+  const halfEnd = period === "H1" ? "Jun" : "Dec";
+  const rangeLabel = allPts.length > 0 ? `${allPts[0].label} - ${halfEnd}` : halfEnd;
   ctx.fillStyle = "#1f2937"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center";
   ctx.fillText(`${(targetName || "").trim()} (${rangeLabel} ${year})`, W / 2, 24);
 

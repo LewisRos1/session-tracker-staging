@@ -518,7 +518,8 @@ function addHalfYearChartsSheets(wb, allTargets, sessions) {
       if (!yValues.some(v => v !== null)) { chartIdx++; continue; }
 
       const year = halfMonths[0].split(" ")[1];
-      const dateRange = `${labels[0]} - ${labels[labels.length - 1]} ${year}`;
+      const halfEndLabel = halfMonths[halfMonths.length - 1].split(" ")[0].slice(0, 3);
+      const dateRange = `${labels[0]} - ${halfEndLabel} ${year}`;
       const base64 = renderTargetChart(stripActivityMarkup(target.name), yValues, dateRange, null, labels);
       const imgId  = wb.addImage({ base64, extension: "png" });
 
