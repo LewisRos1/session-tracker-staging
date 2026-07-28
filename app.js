@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1186";
+const APP_VERSION = "1187";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4300,14 +4300,19 @@ function openManageActivityScreen(student) {
   renderManageActivityScreen(student);
 }
 
+let _maSelectedTargetIdx = 0;
+
 function renderManageActivityScreen(student) {
   const body = $("manage-activity-body");
   if (!body) return;
   const targets = (student.targets || []).filter(t => !t.archived);
-  let html = '';
+  if (!targets.length) { body.innerHTML = `<div style="padding:1rem;color:#9ca3af;font-style:italic">No targets found.</div>`; return; }
+  if (_maSelectedTargetIdx >= targets.length) _maSelectedTargetIdx = 0;
 
-  targets.forEach((target, tIdx) => {
-    const tName = target.name;
+  const target = targets[_maSelectedTargetIdx];
+  const tIdx   = _maSelectedTargetIdx;
+  const tName  = target.name;
+  let html = '';
     // Keep headings so they render as section dividers; only exclude notes
     const allPas = (target.predefinedActivities || [])
       .filter(p => !p.isNote && !p.isExportNote)
@@ -4415,9 +4420,19 @@ function renderManageActivityScreen(student) {
       ${collapseSection('discontinued','🚩','#dc2626','#fff5f5','#fecaca',discontPas)}
       ${collapseSection('maintained','🆗','#6b7280','#f9fafb','#e5e7eb',maintPas)}
     </div>`;
-  });
 
-  body.innerHTML = html;
+  const dropHtml = `<div style="margin-bottom:1.1rem">
+    <select id="ma-target-select" style="width:100%;padding:.6rem .8rem;border:1.5px solid #d1d5db;border-radius:.5rem;font-size:.95rem;background:#fff;color:#111827;cursor:pointer;font-weight:500;box-shadow:0 1px 2px rgba(0,0,0,.05)">
+      ${targets.map((t, i) => `<option value="${i}"${i === _maSelectedTargetIdx ? ' selected' : ''}>${escHtml(t.name)}</option>`).join('')}
+    </select>
+  </div>`;
+
+  body.innerHTML = dropHtml + html;
+
+  document.getElementById("ma-target-select").addEventListener("change", function() {
+    _maSelectedTargetIdx = parseInt(this.value, 10);
+    renderManageActivityScreen(student);
+  });
 
   // Collapse toggles
   body.querySelectorAll(".ma-collapse-toggle").forEach(btn => {
