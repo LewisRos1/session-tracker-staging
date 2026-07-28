@@ -513,8 +513,6 @@ function addHalfYearChartsSheets(wb, allTargets, sessions) {
         yValues.push(dailyAvgs.length > 0 ? Math.round(avg(dailyAvgs)) : null);
       }
 
-      // Trim trailing nulls (months after this target's last data point)
-      while (yValues.length > 0 && yValues[yValues.length - 1] === null) { yValues.pop(); labels.pop(); }
       if (!yValues.some(v => v !== null)) { chartIdx++; continue; }
 
       const year = halfMonths[0].split(" ")[1];

@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1185";
+const APP_VERSION = "1186";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -3513,7 +3513,6 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   const targetBlock = (r, i) => {
     const _gLabels = r.labels.slice(_hyrGlobalFirstIdx);
     const _gValues = r.values.slice(_hyrGlobalFirstIdx);
-    while (_gValues.length > 0 && (_gValues[_gValues.length - 1] === null || _gValues[_gValues.length - 1] === undefined)) { _gValues.pop(); _gLabels.pop(); }
     const lb64 = hyrDrawLineChart(r.name, _gLabels, _gValues, period, year, r.tStart, r.tEnd, r.delta, r.direction);
     const chartImg = lb64 ? `<img src="data:image/png;base64,${lb64}" style="width:100%;max-width:540px;display:block;margin:.5rem 0 .75rem">` : "";
     return `<div style="margin-top:2rem">
@@ -3785,7 +3784,6 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
       }));
       const _wLabels = r.labels.slice(_wordGlobalFirstIdx);
       const _wValues = r.values.slice(_wordGlobalFirstIdx);
-      while (_wValues.length > 0 && (_wValues[_wValues.length - 1] === null || _wValues[_wValues.length - 1] === undefined)) { _wValues.pop(); _wLabels.pop(); }
       const lb64 = hyrDrawLineChart(r.name, _wLabels, _wValues, period, year, r.tStart, r.tEnd, r.delta, r.direction);
       if (lb64) paras.push(new Paragraph({
         children: [new ImageRun({ data: b64ToUint8(lb64), transformation: { width: 540, height: 280 }, type: "png" })],
