@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1196";
+const APP_VERSION = "1197";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -8305,7 +8305,8 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
   return remarks.map((rem, ri) => viewRemarkRow(
     ri === 0 ? no : null,
     ri === 0 ? actCell : null,
-    rem, target, inlineOptions, sentenceStarter, multiSelect, mappedInfo, remarkHasNote, rowClass
+    rem, target, inlineOptions, sentenceStarter, multiSelect, mappedInfo, remarkHasNote, rowClass,
+    paEntry?.optionScores || null
   )).join("");
 }
 
@@ -8336,7 +8337,7 @@ function buildTrialCellsHtml(rem, maxPts) {
     `<button class="view-add-trial" data-rem-id="${escHtml(rem.id)}">+</button>`;
 }
 
-function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false, rowClass = "") {
+function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false, rowClass = "", optionScores = null) {
   const maxPts = target.maxPoints || 3;
   const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts, rem.optionScore);
   const trialCells = mappedInfo
@@ -8367,10 +8368,11 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
           data-rem-id="${escHtml(remId)}" data-opt="${escHtml(opt)}">${escHtml(opt)}</button>`
       ).join("")}${removedBadge}</div>`;
     }
-    return `<div class="view-remark-multi-opts" contenteditable="false">${opts.map(opt =>
-      `<button class="view-remark-single-btn${remText === opt ? " active" : ""}"
-        data-rem-id="${escHtml(remId)}" data-opt="${escHtml(opt)}">${escHtml(opt)}</button>`
-    ).join("")}${removedBadge}</div>`;
+    return `<div class="view-remark-multi-opts" contenteditable="false">${opts.map(opt => {
+      const sc = (optionScores && optionScores[opt] !== undefined) ? optionScores[opt] : "";
+      return `<button class="view-remark-single-btn${remText === opt ? " active" : ""}"
+        data-rem-id="${escHtml(remId)}" data-opt="${escHtml(opt)}" data-score="${sc}">${escHtml(opt)}</button>`;
+    }).join("")}${removedBadge}</div>`;
   }
 
   const optSelect = makeViewOpts(rem.id, rem.text)
@@ -9247,11 +9249,24 @@ function attachViewListeners() {
       if (!isActive) btn.classList.add("active");
       const rem = state.viewSessionData?.remarks?.[btn.dataset.remId];
       const prevText = rem?.text;
+      const prevOptScore = rem?.optionScore;
       if (rem) rem.text = newText;
+      // Mirror the live session: update optionScore so Total/% score updates immediately.
+      const scoreVal = btn.dataset.score !== "" ? Number(btn.dataset.score) : NaN;
+      if (!isNaN(scoreVal) && !isActive) {
+        if (rem) rem.optionScore = scoreVal;
+      } else {
+        if (rem) delete rem.optionScore;
+      }
       try {
         await updateRemarkText(state.viewSessionId, btn.dataset.remId, newText);
+        if (!isNaN(scoreVal) && !isActive) {
+          await setOptionScore(state.viewSessionId, btn.dataset.remId, scoreVal);
+        } else {
+          await clearOptionScore(state.viewSessionId, btn.dataset.remId);
+        }
       } catch (err) {
-        if (rem) rem.text = prevText;
+        if (rem) { rem.text = prevText; if (prevOptScore !== undefined) rem.optionScore = prevOptScore; else delete rem.optionScore; }
         alert("Couldn't save — check your connection and try again.\n\n" + err.message);
       }
     }));
@@ -9952,7 +9967,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
       const mappedInfo = resolveViewGroupMappedScoreDisplay(paEntry, data, studentName);
       return remarks.map((rem, ri) => viewGroupRemarkRow(
         ri === 0 ? noVal : null, ri === 0 ? actVal : null, studentName, rem, target,
-        mappedInlineOptions, mappedSentenceStarter, mappedMultiSelect, null, mappedInfo, mappedHasNote
+        mappedInlineOptions, mappedSentenceStarter, mappedMultiSelect, null, mappedInfo, mappedHasNote, "", paEntry?.optionScores || null
       )).join("");
     }).join("");
   }
@@ -10159,7 +10174,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
 
       html += viewGroupRemarkRow(
         noVal, actVal, entry.studentName, entry, target,
-        inlineOptions, sentenceStarter, multiSelect, combineOpts, null, remarkHasNote, rowClass
+        inlineOptions, sentenceStarter, multiSelect, combineOpts, null, remarkHasNote, rowClass, paEntry?.optionScores || null
       );
       firstRowOverall = false;
     }
@@ -10167,7 +10182,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
   return html;
 }
 
-function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, combineOpts = null, mappedInfo = null, remarkHasNote = false, rowClass = "") {
+function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, combineOpts = null, mappedInfo = null, remarkHasNote = false, rowClass = "", optionScores = null) {
   const maxPts = target.maxPoints || 3;
   const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts, rem.optionScore);
   const trialCells = mappedInfo
@@ -10201,10 +10216,11 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
               data-rem-id="${escHtml(remId)}" data-opt="${escHtml(opt)}">${escHtml(opt)}</button>`
           ).join("")}</div>`;
         }
-        return `<div class="view-remark-multi-opts" contenteditable="false">${opts.map(opt =>
-          `<button class="view-remark-single-btn${remText === opt ? " active" : ""}"
-            data-rem-id="${escHtml(remId)}" data-opt="${escHtml(opt)}">${escHtml(opt)}</button>`
-        ).join("")}</div>`;
+        return `<div class="view-remark-multi-opts" contenteditable="false">${opts.map(opt => {
+          const sc = (optionScores && optionScores[opt] !== undefined) ? optionScores[opt] : "";
+          return `<button class="view-remark-single-btn${remText === opt ? " active" : ""}"
+            data-rem-id="${escHtml(remId)}" data-opt="${escHtml(opt)}" data-score="${sc}">${escHtml(opt)}</button>`;
+        }).join("")}</div>`;
       };
 
       const optSelect = makeViewOpts(rem.id, rem.text)
@@ -10445,11 +10461,23 @@ function attachGroupViewListeners() {
       if (!isActive) btn.classList.add("active");
       const rem = state.viewGroupSessionData?.remarks?.[btn.dataset.remId];
       const prevText = rem?.text;
+      const prevOptScore = rem?.optionScore;
       if (rem) rem.text = newText;
+      const scoreVal = btn.dataset.score !== "" ? Number(btn.dataset.score) : NaN;
+      if (!isNaN(scoreVal) && !isActive) {
+        if (rem) rem.optionScore = scoreVal;
+      } else {
+        if (rem) delete rem.optionScore;
+      }
       try {
         await updateRemarkText(sid(), btn.dataset.remId, newText);
+        if (!isNaN(scoreVal) && !isActive) {
+          await setOptionScore(sid(), btn.dataset.remId, scoreVal);
+        } else {
+          await clearOptionScore(sid(), btn.dataset.remId);
+        }
       } catch (err) {
-        if (rem) rem.text = prevText;
+        if (rem) { rem.text = prevText; if (prevOptScore !== undefined) rem.optionScore = prevOptScore; else delete rem.optionScore; }
         alert("Couldn't save — check your connection and try again.\n\n" + err.message);
       }
     }));
