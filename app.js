@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1197";
+const APP_VERSION = "1198";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -8325,7 +8325,9 @@ function calcViewTrialSummary(trials, maxPts, optionScore = undefined) {
 
 function buildTrialCellsHtml(rem, maxPts) {
   const allTrials = rem.trials || [];
-  return allTrials.map((t, ti) => `
+  const optBadge = rem.optionScore !== undefined
+    ? `<span class="trial-badge trial-badge--option">${rem.optionScore}</span>` : "";
+  return optBadge + allTrials.map((t, ti) => `
     <span class="trial-cell">
       <select class="view-trial-select" data-rem-id="${escHtml(rem.id)}" data-trial-idx="${ti}">
         <option value="-1"${t === -1 ? " selected" : ""}>—</option>
