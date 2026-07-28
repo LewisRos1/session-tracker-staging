@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1178";
+const APP_VERSION = "1179";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2227,6 +2227,20 @@ async function hyrGenerate() {
     // Build prompt synchronously — then start fetch immediately so it runs in parallel with fake phases
     const periodLabel = period === "H1" ? `January–June ${year}` : `July–December ${year}`;
     const firstName   = student.name.split(" ")[0];
+    // Actual data start month (may differ from term start if student enrolled mid-term)
+    const _hyrMonthAbbrs = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const _hyrMonthFull  = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+    const _hyrTermStart  = period === "H1" ? "January" : "July";
+    const _hyrTermEnd    = period === "H1" ? "June" : "December";
+    let _hyrFirstLabel = null;
+    for (let _i = 0; _i < 6 && !_hyrFirstLabel; _i++) {
+      for (const _r of trendRows) { if (_r.labels?.[_i]) { _hyrFirstLabel = _r.labels[_i]; break; } }
+    }
+    const _hyrFirstMonth = (_hyrMonthAbbrs.indexOf(_hyrFirstLabel) >= 0 ? _hyrMonthFull[_hyrMonthAbbrs.indexOf(_hyrFirstLabel)] : null) || _hyrTermStart;
+    const _hyrEnrolledLate = _hyrFirstMonth !== _hyrTermStart;
+    const aiReportingPeriod = _hyrEnrolledLate
+      ? `${_hyrFirstMonth}–${_hyrTermEnd} ${year} (student joined in ${_hyrFirstMonth}; full term is ${periodLabel})`
+      : periodLabel;
     const targetsWithData = trendRows.filter(r => !r.noData);
 
     const qualitativeWithData = categorized.qualitative.filter(r => !!chartData[r.name]);
@@ -2248,7 +2262,7 @@ GLOBAL RULES (apply to every section):
 - CRITICAL: Some activities track NEGATIVE or PROBLEM BEHAVIOURS (e.g. snatching food, interrupting others, hitting, distracting behaviour). For these activities, scoring is INVERTED — a HIGH score (e.g. 3 out of 3) means the student did NOT exhibit the bad behaviour and showed good self-control, while a LOW score (e.g. 0) means the bad behaviour DID occur. Always interpret scores for problem/negative behaviour activities with this in mind: high = good, low = the behaviour occurred.
 
 Student: ${student.name}
-Reporting Period: ${periodLabel}
+Reporting Period: ${aiReportingPeriod}
 
 SESSION DATA:
 ${dataText}
@@ -3449,6 +3463,18 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   const monthRange     = period === "H1" ? "January to June" : "July to December";
   const nextMonthRange = period === "H1" ? "July to December" : "January to June";
   const nextTermYear   = period === "H1" ? year : year + 1;
+  // Actual data start (may be later than term start for students who enrolled mid-term)
+  const _htmlMonthAbbrs = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const _htmlMonthFull  = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const _htmlTermStart  = period === "H1" ? "January" : "July";
+  const _htmlTermEnd    = period === "H1" ? "June"    : "December";
+  let _htmlFirstLabel = null;
+  for (let _i = 0; _i < 6 && !_htmlFirstLabel; _i++) {
+    for (const _r of trendRows) { if (_r.labels?.[_i]) { _htmlFirstLabel = _r.labels[_i]; break; } }
+  }
+  const _htmlFirstMonth = (_htmlMonthAbbrs.indexOf(_htmlFirstLabel) >= 0 ? _htmlMonthFull[_htmlMonthAbbrs.indexOf(_htmlFirstLabel)] : null) || _htmlTermStart;
+  const enrolledLate   = _htmlFirstMonth !== _htmlTermStart;
+  const trackingRange  = `${_htmlFirstMonth}–${_htmlTermEnd} ${year}`;
   const ROMAN = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"];
 
   const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -3487,11 +3513,15 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
 
   // Cover page
   h += `<div style="text-align:center;padding:2.5rem 0 2rem;border-bottom:2px solid #e5e7eb;margin-bottom:2rem">
-    <div style="font-size:1.6rem;font-weight:800;color:#111827;margin-bottom:.5rem;letter-spacing:-.02em">Half-Year Progress Report</div>
+    <div style="font-size:1.6rem;font-weight:800;color:#111827;margin-bottom:.25rem;letter-spacing:-.02em">Half-Year Progress Report</div>
+    <div style="font-size:1.05rem;font-weight:500;color:#6b7280;margin-bottom:.5rem">(${esc(periodLabel)})</div>
     <div style="font-size:1.15rem;font-weight:600;color:#374151;margin-bottom:.25rem">${esc(student.name)}</div>
-    <div style="color:#6b7280;font-size:.95rem">${esc(periodLabel)}</div>
+    <div style="color:#6b7280;font-size:.95rem">Tracking Period: ${esc(trackingRange)}</div>
   </div>`;
-  h += `<p style="margin:.5rem 0;line-height:1.7">This report documents ${esc(student.name)}'s progress across the ${halfText} half of ${year} (${monthRange}) in ${n} key therapy target${n !== 1 ? "s" : ""}: ${esc(targetList)}. The therapy team has prepared this report to give you a clear overview of ${esc(firstName)}'s development and the areas we will continue to focus on in the coming months.</p>`;
+  const introText = enrolledLate
+    ? `Although the term runs from ${_htmlTermStart} to ${_htmlTermEnd} ${year}, ${esc(student.name)} joined us in ${_htmlFirstMonth} ${year}. This report covers their progress from ${_htmlFirstMonth} to ${_htmlTermEnd} ${year} in ${n} key therapy target${n !== 1 ? "s" : ""}: ${esc(targetList)}. The therapy team has prepared this report to give you a clear overview of ${esc(firstName)}'s development and the areas we will continue to focus on in the coming months.`
+    : `This report documents ${esc(student.name)}'s progress across the ${halfText} half of ${year} (${monthRange}) in ${n} key therapy target${n !== 1 ? "s" : ""}: ${esc(targetList)}. The therapy team has prepared this report to give you a clear overview of ${esc(firstName)}'s development and the areas we will continue to focus on in the coming months.`;
+  h += `<p style="margin:.5rem 0;line-height:1.7">${introText}</p>`;
 
   h += `<hr style="margin:2rem 0">`;
 
@@ -3502,7 +3532,10 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
     const ovTitle  = `${firstName} - ${monthRange} ${year} Progress`;
     const ovResult = hyrDrawOverviewChart(chartTrendRows, ovTitle);
     if (ovResult) {
-      h += `<p style="margin:.5rem 0 .75rem;line-height:1.7">The chart below shows an overview of ${esc(firstName)}'s overall progress across all targets this term (${esc(monthRange)} ${year}).</p>`;
+      const overviewDesc = enrolledLate
+        ? `The chart below shows an overview of ${esc(firstName)}'s overall progress across all targets from ${_htmlFirstMonth} to ${_htmlTermEnd} ${year}.`
+        : `The chart below shows an overview of ${esc(firstName)}'s overall progress across all targets this term (${esc(monthRange)} ${year}).`;
+      h += `<p style="margin:.5rem 0 .75rem;line-height:1.7">${overviewDesc}</p>`;
       h += `<img src="data:image/png;base64,${ovResult.base64}" style="width:100%;max-width:700px;display:block;margin:.5rem 0 .3rem">`;
     }
   }
@@ -3647,7 +3680,9 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   }
   const firstMonthName = FULL_MONTH_NAMES[_firstLabel] || halfStartDefault;
   const monthRange = `${firstMonthName} to ${halfEndName}`;
-  const periodLabel = `${firstMonthName}–${halfEndName} ${year}`;
+  const periodLabel    = `${firstMonthName}–${halfEndName} ${year}`;
+  const fullTermLabel  = `${halfStartDefault}–${halfEndName} ${year}`;
+  const enrolledLate   = firstMonthName !== halfStartDefault;
   const nextMonthRange = period === "H1" ? "July to December" : "January to June";
   const nextTermYear   = period === "H1" ? year : year + 1;
   const ROMAN = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"];
@@ -3735,14 +3770,18 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   // ── Cover Page ──────────────────────────────────────────────
   paragraphs.push(new Paragraph({
     children: [new TextRun({ text: "Half-Year Progress Report", bold: true, size: 40 })],
-    alignment: AlignmentType.CENTER, spacing: { before: 1440, after: 200 }
+    alignment: AlignmentType.CENTER, spacing: { before: 1440, after: 120 }
+  }));
+  paragraphs.push(new Paragraph({
+    children: [new TextRun({ text: `(${fullTermLabel})`, size: 26, color: "555555" })],
+    alignment: AlignmentType.CENTER, spacing: { after: 240 }
   }));
   paragraphs.push(new Paragraph({
     children: [new TextRun({ text: student.name, size: 28, bold: true })],
     alignment: AlignmentType.CENTER, spacing: { after: 120 }
   }));
   paragraphs.push(new Paragraph({
-    children: [new TextRun({ text: periodLabel, size: 24, color: "555555" })],
+    children: [new TextRun({ text: `Tracking Period: ${periodLabel}`, size: 24, color: "555555" })],
     alignment: AlignmentType.CENTER, spacing: { after: 960 }
   }));
   paragraphs.push(mkPara(`Date of Report: ${new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}`, { after: 960 }));
@@ -3750,10 +3789,10 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   // ── Section 1: Executive Overview ──────────────────────────
   paragraphs.push(mkPara("Section 1: Overview", { heading: HeadingLevel.HEADING_1, before: 560, after: 200, pageBreak: true, size: 32, bold: true }));
 
-  paragraphs.push(mkPara(
-    `This report documents ${student.name}'s progress across the ${halfText} half of ${year} (${monthRange}) in ${n} key therapy target${n !== 1 ? "s" : ""}: ${targetList}. The therapy team has prepared this report to give you a clear overview of ${firstName}'s development and the areas that need continued attention.`,
-    { after: 280, align: AlignmentType.JUSTIFIED }
-  ));
+  const wordIntroText = enrolledLate
+    ? `Although the term runs from ${halfStartDefault} to ${halfEndName} ${year}, ${student.name} joined us in ${firstMonthName} ${year}. This report covers their progress from ${firstMonthName} to ${halfEndName} ${year} in ${n} key therapy target${n !== 1 ? "s" : ""}: ${targetList}. The therapy team has prepared this report to give you a clear overview of ${firstName}'s development and the areas that need continued attention.`
+    : `This report documents ${student.name}'s progress across the ${halfText} half of ${year} (${monthRange}) in ${n} key therapy target${n !== 1 ? "s" : ""}: ${targetList}. The therapy team has prepared this report to give you a clear overview of ${firstName}'s development and the areas that need continued attention.`;
+  paragraphs.push(mkPara(wordIntroText, { after: 280, align: AlignmentType.JUSTIFIED }));
 
   paragraphs.push(new Paragraph({ children: [], spacing: { before: 0, after: 280 } }));
   paragraphs.push(mkPara("Overall Progress", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true }));
