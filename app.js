@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1205";
+const APP_VERSION = "1206";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -12738,7 +12738,7 @@ function renderTargetManageContent(student, target) {
                 ${remarkTypeSelect}
               </div>
               ${maintainedRow}
-              <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:#f9fafb;border:1px solid #d1d5db;border-radius:.35rem;color:#374151;cursor:pointer;align-self:flex-start">↳ Add Sub-activity</button>
+              <button class="mn-convert-to-sub-btn" data-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:#f9fafb;border:1px solid #d1d5db;border-radius:.35rem;color:#374151;cursor:pointer;align-self:flex-start">↳ Move under parent</button>
             </div>
           </div>
           <div style="position:relative">
@@ -13610,6 +13610,66 @@ function renderTargetManageContent(student, target) {
       renderTargetManageContent(student, target);
       requestAnimationFrame(() => { const b = $("manage-modal-body"); if (b) b.scrollTop = sp; });
       saveTarget();
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-convert-to-sub-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.dataset.idx);
+      const act = acts[idx];
+      if (!act) return;
+
+      // Replace button with inline "parent title" form
+      const form = document.createElement("div");
+      form.style.cssText = "display:flex;flex-direction:column;gap:.4rem;background:#f0f9ff;border:1px solid #bae6fd;border-radius:.45rem;padding:.6rem .75rem";
+      form.innerHTML = `
+        <div style="font-size:.82rem;font-weight:600;color:#0369a1">Parent activity name</div>
+        <input type="text" class="mn-parent-title-input admin-input" placeholder="e.g. Self-Regulation"
+          style="width:100%;border:1.5px solid #d1d5db;border-radius:.4rem;padding:.4rem .6rem;font-size:.88rem;box-sizing:border-box" />
+        <div class="mn-parent-error" style="display:none;font-size:.78rem;color:#dc2626;font-weight:600">⚠ Parent activity needs a title</div>
+        <div style="display:flex;gap:.5rem">
+          <button class="mn-parent-confirm" type="button"
+            style="font-size:.82rem;padding:.3rem .75rem;background:var(--primary);color:#fff;border:none;border-radius:.35rem;cursor:pointer;font-weight:600">✓ Confirm</button>
+          <button class="mn-parent-cancel" type="button"
+            style="font-size:.82rem;padding:.3rem .75rem;background:#f9fafb;border:1px solid #d1d5db;border-radius:.35rem;cursor:pointer;color:#374151">✗ Cancel</button>
+        </div>`;
+      btn.replaceWith(form);
+
+      const input = form.querySelector(".mn-parent-title-input");
+      const errDiv = form.querySelector(".mn-parent-error");
+      const confirmBtn = form.querySelector(".mn-parent-confirm");
+      const cancelBtn = form.querySelector(".mn-parent-cancel");
+      input.focus();
+
+      const doConfirm = () => {
+        const title = input.value.trim();
+        if (!title) {
+          input.style.border = "1.5px solid #dc2626";
+          errDiv.style.display = "";
+          input.focus();
+          return;
+        }
+        // Insert new parent activity directly before the current activity
+        const newParent = { id: cfgId("a"), title, name: "", noRemark: true, order: 0, activeFrom: null };
+        act.parentActivity = title;
+        acts.splice(idx, 0, newParent);
+        acts.forEach((a2, i) => a2.order = i);
+        target.predefinedActivities = acts;
+        const sp = $("manage-modal-body").scrollTop;
+        renderTargetManageContent(student, target);
+        requestAnimationFrame(() => { const b = $("manage-modal-body"); if (b) b.scrollTop = sp; });
+        saveTarget();
+      };
+
+      confirmBtn.addEventListener("click", doConfirm);
+      input.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); doConfirm(); } });
+      cancelBtn.addEventListener("click", () => form.replaceWith(btn));
+      input.addEventListener("input", () => {
+        if (input.value.trim()) {
+          input.style.border = "1.5px solid #d1d5db";
+          errDiv.style.display = "none";
+        }
+      });
     });
   });
 
