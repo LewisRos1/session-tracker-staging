@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1253";
+const APP_VERSION = "1254";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -9029,32 +9029,6 @@ function setupEntryRemarkSaving(host, getSessionId, onIdle) {
           const remId = await addGroupRemark(sid, actId, el.dataset.student, text);
           el.dataset.actId = actId;
           el.dataset.remId = remId;
-          el.dataset.savedHtml = htmlForStorage(text);
-        } finally {
-          el.dataset.creating = "false";
-        }
-      };
-      trackWrite(create());
-    });
-
-    // Maintained activity with no remark yet (individual live session). Shows
-    // "Maintain" pre-filled; saves to Firestore on blur or input so the cell
-    // becomes a normal editable remark after the next snapshot re-render.
-    host.querySelectorAll(".maintained-remark-pending[data-pa-name]").forEach(el => {
-      const text = el.value.trim() || "Maintain";
-      if (el.dataset.creating === "true" || el.dataset.remId) return;
-      el.dataset.creating = "true";
-      const create = async () => {
-        try {
-          const paOrder = el.dataset.paOrder !== "" ? Number(el.dataset.paOrder) : 0;
-          let actId = el.dataset.actId || null;
-          if (!actId) {
-            actId = await addActivity(sid, el.dataset.target, el.dataset.paName, paOrder, true,
-              undefined, null, el.dataset.cfgId || null);
-          }
-          const remId = await addRemark(sid, actId, text);
-          el.dataset.actId  = actId;
-          el.dataset.remId  = remId;
           el.dataset.savedHtml = htmlForStorage(text);
         } finally {
           el.dataset.creating = "false";
