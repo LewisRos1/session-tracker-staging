@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1228";
+const APP_VERSION = "1229";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4349,20 +4349,47 @@ function renderManageActivityScreen(student) {
     const collapseSection = (label, emoji, color, bgCard, borderCard, pas) => {
       if (!pas.length) return '';
       const colId = `ma-col-${tIdx}-${label}`;
-      const items = pas.map(pa => {
+      const topLevel = pas.filter(p => !p.parentActivity);
+      const subs     = pas.filter(p => !!p.parentActivity);
+      const _inactiveCard = (pa, extraStyle = '') => {
         const nameHtml = paDisplayHtml(pa) || `<em style="color:#9ca3af;font-size:.85rem">Untitled</em>`;
         const badge = statusBadge(pa, true);
-        const parentTag = pa.parentActivity ? `<span style="font-size:.71rem;color:#9ca3af;margin-left:.3rem">(from: ${escHtml(pa.parentActivity)})</span>` : '';
-        return `<div data-pa-id="${escHtml(pa.id||'')}" style="background:${bgCard};border:1px solid ${borderCard};border-left:3px solid ${color};border-radius:.5rem;padding:.55rem .75rem .55rem .9rem;display:flex;align-items:flex-start;gap:.5rem;box-shadow:0 1px 3px rgba(0,0,0,.04)">
-          <div style="flex:1;min-width:0;line-height:1.5;white-space:pre-wrap">${nameHtml}${parentTag}${badge}</div>
+        return `<div data-pa-id="${escHtml(pa.id||'')}" style="background:${bgCard};border:1px solid ${borderCard};border-left:3px solid ${color};border-radius:.5rem;padding:.55rem .75rem .55rem .9rem;display:flex;align-items:flex-start;gap:.5rem;box-shadow:0 1px 3px rgba(0,0,0,.04)${extraStyle}">
+          <div style="flex:1;min-width:0;line-height:1.5;white-space:pre-wrap">${nameHtml}${badge}</div>
           ${kebabWrap(pa)}
         </div>`;
-      }).join('');
+      };
+      let items = '';
+      for (const pa of topLevel) {
+        items += _inactiveCard(pa);
+        const paKey = pa._linkKey || pa.title || pa.name;
+        const children = paKey ? subs.filter(s => s.parentActivity === paKey) : [];
+        children.forEach((sub, ci) => {
+          const subNameHtml = paDisplayHtml(sub) || `<em style="color:#9ca3af;font-size:.85rem">Untitled</em>`;
+          const subBadge = statusBadge(sub, true);
+          items += `<div data-pa-id="${escHtml(sub.id||'')}" style="margin-left:1.4rem;background:${bgCard};border:1px solid ${borderCard};border-left:3px solid ${color};border-radius:.5rem;padding:.55rem .75rem .55rem .9rem;display:flex;align-items:flex-start;gap:.5rem;box-shadow:0 1px 3px rgba(0,0,0,.04)">
+            <span style="font-size:.75rem;font-weight:700;color:${color};flex-shrink:0;min-width:1.4rem;padding-top:.15rem">${String.fromCharCode(97 + ci)})</span>
+            <div style="flex:1;min-width:0;line-height:1.5;white-space:pre-wrap">${subNameHtml}${subBadge}</div>
+            ${kebabWrap(sub)}
+          </div>`;
+        });
+      }
+      // Orphaned subs whose parent isn't in this section
+      subs.filter(s => !topLevel.some(p => (p._linkKey || p.title || p.name) === s.parentActivity)).forEach(sub => {
+        const nameHtml = paDisplayHtml(sub) || `<em style="color:#9ca3af;font-size:.85rem">Untitled</em>`;
+        const badge = statusBadge(sub, true);
+        items += `<div data-pa-id="${escHtml(sub.id||'')}" style="background:${bgCard};border:1px solid ${borderCard};border-left:3px solid ${color};border-radius:.5rem;padding:.55rem .75rem .55rem .9rem;display:flex;align-items:flex-start;gap:.5rem;box-shadow:0 1px 3px rgba(0,0,0,.04)">
+          <div style="flex:1;min-width:0;line-height:1.5;white-space:pre-wrap">${nameHtml}<span style="font-size:.71rem;color:#9ca3af;margin-left:.3rem">(from: ${escHtml(sub.parentActivity)})</span>${badge}</div>
+          ${kebabWrap(sub)}
+        </div>`;
+      });
+      // Badge count: count top-level groups + orphaned subs (not individual children)
+      const groupCount = topLevel.length + subs.filter(s => !topLevel.some(p => (p._linkKey || p.title || p.name) === s.parentActivity)).length;
       return `<div style="margin-top:.85rem">
         <button class="ma-collapse-toggle" data-col-id="${colId}" style="display:flex;align-items:center;gap:.45rem;width:100%;background:none;border:none;cursor:pointer;padding:.3rem 0 .4rem;font-size:.84rem;color:${color};font-weight:700;text-align:left">
           <span class="ma-toggle-arrow" style="font-size:.68rem;display:inline-block;transition:transform .2s">▶</span>
           ${emoji} ${label.charAt(0).toUpperCase() + label.slice(1)}
-          <span style="font-size:.77rem;background:${bgCard};border:1px solid ${borderCard};color:${color};padding:.05rem .5rem;border-radius:99px">${pas.length}</span>
+          <span style="font-size:.77rem;background:${bgCard};border:1px solid ${borderCard};color:${color};padding:.05rem .5rem;border-radius:99px">${groupCount}</span>
         </button>
         <div id="${colId}" style="display:none;flex-direction:column;gap:.4rem;padding:.15rem 0 .1rem">
           ${items}
