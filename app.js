@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1216";
+const APP_VERSION = "1217";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -1968,60 +1968,14 @@ function renderExportButtons() {
 
 // ─── HALF YEAR REPORTS ───────────────────────────────────────
 
-const HYR_DEFAULT_PROMPT = `You are a professional therapy report writer for a child development therapy centre. Write an honest, empathetic, and parent-friendly half-year progress report based on the session data provided.
+const HYR_DEFAULT_PROMPT = `You are writing a half-year progress report for parents. Keep everything warm, honest, and easy to read.
 
-SCORING SCALE:
-3 = Independent, 2 = Partial Prompt, 1 = Fully Prompted, 0 = No Response
-- 90%+   : Consistently independent
-- 83–89% : Working independently, occasional minor support needed
-- 70–82% : Partial independence, still requires regular prompting
-- Below 70%: Needs significant support, not yet independent on this skill
-
-CRITICAL RULES:
-- Be HONEST but EMPATHETIC. If a child is struggling, acknowledge it clearly but with sensitivity — parents need truth delivered with care, not harshness.
-- Do NOT simply describe what the numbers show. Interpret what they mean for the child's development.
-- Do NOT pad with vague phrases like "showed enthusiasm" or "demonstrated effort" unless backed by specific evidence in the session remarks.
-- Every claim must be grounded in the data or session remarks provided.
-- NEVER use em dashes (—) anywhere in the report. Use commas, full stops, or rewrite the sentence instead. This is non-negotiable.
-- Be CONCISE. Do not repeat the same point across multiple bullets. Each bullet must add new information.
-- Do NOT provide intervention strategies or therapy recommendations. That is the role of the ABA consultant.
-
-REPORT STRUCTURE:
-
-1. Purpose of Report
-   - Write EXACTLY 2 sentences. No more.
-   - Sentence 1: State the student's name, the reporting period, and list the therapy targets covered.
-   - Sentence 2: State that this report is prepared by the therapy team to give parents a clear overview of their child's progress and areas of continued focus.
-   - Keep this structure identical for every report.
-
-2. Progress and Achievement (one section per target, in the order provided)
-   IMPORTANT: Use the exact target name as the ## heading (e.g. ## Self-Regulation). Do not number, prefix, or modify it.
-   Write ENTIRELY in point form using "•" bullet points. No flowing paragraphs.
-   Each bullet must be concise (1–2 sentences max) and add unique information. Do not repeat.
-   Include the following, each as a separate bullet:
-   • Overall trend: one honest sentence on how performance moved across the half-year
-   • Strengths: name specific activities or skills the child performed well on, referencing session remarks where available
-   • Challenges: name specific activities or skills the child found difficult; if performance dropped in a period, give a grounded reason from the remarks
-   • Clinical snapshot: one honest sentence on the child's current independence level on this target
-   Do NOT say "as shown in the chart" or reference any visual.
-
-3. Recommended Focus Areas
-   - Use "•" as the bullet character
-   - 3–5 bullets listing specific skills or activities that are anticipated to continue receiving therapeutic intervention
-   - This section informs parents what the team plans to continue focusing on — do NOT suggest strategies or what parents should do at home
-   - Be direct. If something has not progressed as expected, name it honestly but sensitively.
-
-4. Closing
-   - 2–3 sentences only
-   - Acknowledge the child's genuine progress and the team's commitment to continued support
-   - Be warm and encouraging, but grounded — avoid empty reassurances
-
-WRITING STYLE:
-- Professional, empathetic, and parent-friendly (explain any jargon briefly)
-- Third person throughout (use the child's name)
-- Point form for sections 2 and 3; short paragraphs for sections 1 and 4
-- Do NOT reference graphs, charts, tables, or any visual element
-- The report must be concise, clear, and genuinely useful — a busy parent should be able to read it in under 5 minutes`;
+GLOBAL RULES (apply to every section):
+- Be honest and sympathetic. Do NOT say positive things that are not supported by the data — false reassurance misleads parents and damages trust. Be kind in how you say things, not in what you choose to leave out.
+- NEVER use the em dash symbol (—) anywhere in the report. Use a comma, a full stop, or rewrite the sentence instead.
+- CRITICAL: A remark of "No Event" means the student did NOT perform or exhibit that behaviour or activity in that session. For negative/problem behaviours (e.g. snatching food, hitting, interrupting), "No Event" is a POSITIVE outcome — the bad behaviour simply did not occur. For skill or learning activities, "No Event" means the skill was not observed or demonstrated that session — treat it as neutral, not a failure. Do NOT treat "No Event" negatively in either case.
+- CRITICAL: A remark of "IP", "In Progress", or an activity with NO remark AND NO score, means there was not enough time to do that activity in that session. This tells you nothing about the student's ability or progress. Do NOT comment on it, do NOT treat it as a missed attempt, and do NOT use it as evidence of difficulty or strength. Ignore these entries entirely when forming your observations.
+- CRITICAL: Some activities track NEGATIVE or PROBLEM BEHAVIOURS (e.g. snatching food, interrupting others, hitting, distracting behaviour). For these activities, scoring is INVERTED — a HIGH score (e.g. 3 out of 3) means the student did NOT exhibit the bad behaviour and showed good self-control, while a LOW score (e.g. 0) means the bad behaviour DID occur. Always interpret scores for problem/negative behaviour activities with this in mind: high = good, low = the behaviour occurred.`;
 
 let _hyrConfig = null;
 
@@ -2254,14 +2208,8 @@ async function hyrGenerate() {
       .slice(0, 5);
     const bottom5Names = bottom5Targets.map(r => r.name);
 
-    const aiPrompt = `You are writing a half-year progress report for parents. Keep everything warm, honest, and easy to read.
-
-GLOBAL RULES (apply to every section):
-- Be honest and sympathetic. Do NOT say positive things that are not supported by the data — false reassurance misleads parents and damages trust. Be kind in how you say things, not in what you choose to leave out.
-- NEVER use the em dash symbol (—) anywhere in the report. Use a comma, a full stop, or rewrite the sentence instead.
-- CRITICAL: A remark of "No Event" means the student did NOT perform or exhibit that behaviour or activity in that session. For negative/problem behaviours (e.g. snatching food, hitting, interrupting), "No Event" is a POSITIVE outcome — the bad behaviour simply did not occur. For skill or learning activities, "No Event" means the skill was not observed or demonstrated that session — treat it as neutral, not a failure. Do NOT treat "No Event" negatively in either case.
-- CRITICAL: A remark of "IP", "In Progress", or an activity with NO remark AND NO score, means there was not enough time to do that activity in that session. This tells you nothing about the student's ability or progress. Do NOT comment on it, do NOT treat it as a missed attempt, and do NOT use it as evidence of difficulty or strength. Ignore these entries entirely when forming your observations.
-- CRITICAL: Some activities track NEGATIVE or PROBLEM BEHAVIOURS (e.g. snatching food, interrupting others, hitting, distracting behaviour). For these activities, scoring is INVERTED — a HIGH score (e.g. 3 out of 3) means the student did NOT exhibit the bad behaviour and showed good self-control, while a LOW score (e.g. 0) means the bad behaviour DID occur. Always interpret scores for problem/negative behaviour activities with this in mind: high = good, low = the behaviour occurred.
+    const _hyrPromptInstr = (await getHyrConfig()).prompt || HYR_DEFAULT_PROMPT;
+    const aiPrompt = `${_hyrPromptInstr}
 
 Student: ${student.name}
 Reporting Period: ${aiReportingPeriod}
