@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1248";
+const APP_VERSION = "1249";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4331,14 +4331,19 @@ function renderManageActivityScreen(student) {
       return '';
     };
 
-    const card = (pa, indent = false, orphanParent = '', num = null, subIdx = null) => {
+    const card = (pa, indent = false, orphanParent = '', num = null, subIdx = null, forceMaint = false) => {
       const nameHtml = paDisplayHtml(pa) || `<em style="color:#9ca3af;font-size:.85rem">Untitled</em>`;
       const badge = statusBadge(pa);
       const parentTag = orphanParent ? `<span style="font-size:.71rem;color:#9ca3af;display:block;margin-top:.1rem">from Parent Activity: ${escHtml(orphanParent)}</span>` : '';
       const numTag = num !== null ? `<span style="color:#6b7280;font-weight:600;margin-right:.25rem">${num})</span>` :
                      subIdx !== null ? `<span style="color:#0369a1;font-weight:600;margin-right:.25rem">${String.fromCharCode(97 + subIdx)})</span>` : '';
-      const borderLeft = indent ? 'border-left:3px solid #60a5fa' : 'border-left:3px solid var(--primary)';
-      const bg = indent ? 'background:#f0f9ff' : 'background:#fff';
+      const isMaint = forceMaint || maIsMaintained(pa);
+      const borderLeft = indent
+        ? (isMaint ? 'border-left:3px solid #9ca3af' : 'border-left:3px solid #60a5fa')
+        : (isMaint ? 'border-left:3px solid #9ca3af' : 'border-left:3px solid var(--primary)');
+      const bg = indent
+        ? (isMaint ? 'background:#f3f4f6' : 'background:#f0f9ff')
+        : (isMaint ? 'background:#f9fafb' : 'background:#fff');
       const ml = indent ? 'margin-left:1.4rem;' : '';
       return `<div data-pa-id="${escHtml(pa.id||'')}" style="${ml}${bg};border:1px solid #e5e7eb;${borderLeft};border-radius:.5rem;padding:.6rem .75rem .6rem .9rem;display:flex;align-items:flex-start;gap:.5rem;box-shadow:0 1px 3px rgba(0,0,0,.06)">
         <div style="flex:1;min-width:0;line-height:1.5;white-space:pre-wrap">${numTag}${nameHtml}${parentTag}${badge}</div>
@@ -4362,15 +4367,18 @@ function renderManageActivityScreen(student) {
         continue;
       }
 
-      if (!maIsActive(pa)) continue;
+      if (!maIsActive(pa) && !maIsMaintained(pa)) continue;
 
       actNum++;
       activeHtml += card(pa, false, '', actNum);
-      const children = activeSubs.filter(s => s.parentActivity === (pa.title || pa.name));
-      children.forEach((child, ci) => { activeHtml += card(child, true, '', null, ci); });
+      const paKey = pa.title || pa.name;
+      const activeChildren = activeSubs.filter(s => s.parentActivity === paKey);
+      const maintChildren  = maintPas.filter(s => !!s.parentActivity && s.parentActivity === paKey);
+      [...activeChildren, ...maintChildren].forEach((child, ci) => { activeHtml += card(child, true, '', null, ci); });
     }
-    // Orphaned subs whose parent isn't active
-    const orphaned = activeSubs.filter(s => !activeTopLevel.some(p => (p.title || p.name) === s.parentActivity));
+    // Orphaned subs whose parent isn't active or maintained in the main list
+    const shownTopLevelKeys = new Set([...activeTopLevel, ...maintPas.filter(p => !p.parentActivity)].map(p => p.title || p.name));
+    const orphaned = activeSubs.filter(s => !shownTopLevelKeys.has(s.parentActivity));
     for (const sub of orphaned) activeHtml += card(sub, false, sub.parentActivity || '');
 
     const collapseSection = (label, emoji, color, bgCard, borderCard, pas) => {
@@ -4430,7 +4438,6 @@ function renderManageActivityScreen(student) {
       </div>
       ${collapseSection('mastered','⭐','#059669','#f0fdf4','#bbf7d0',masteredPas)}
       ${collapseSection('discontinued','🚩','#dc2626','#fff5f5','#fecaca',discontPas)}
-      ${collapseSection('maintained','🆗','#6b7280','#f9fafb','#e5e7eb',maintPas)}
     </div>`;
 
   const dropHtml = `<div class="target-selector" style="position:static;margin-bottom:.8rem">
@@ -6239,17 +6246,6 @@ function renderFedcTarget(target) {
       }
       if (isPending) {
         html += renderPendingRemarkFields(pendingKey, actId, pa.name, idx, target);
-      } else if (pa.maintained && remarks.length === 0) {
-        // Pre-render "Maintain" as a read-only placeholder. autoFillMaintainedRemarks
-        // will write it to Firestore once the session has real data. Showing it here
-        // immediately means: (1) the boss knows the auto-fill is coming (no empty-box
-        // confusion), and (2) when the Firestore write triggers a re-render, the label
-        // was already visible so there is no layout jerk.
-        html += `<div class="entry-divider" contenteditable="false"></div>
-        <div class="entry-field" contenteditable="false">
-          <span class="field-label">Remark</span>
-          <span class="field-value-fixed" style="color:#9ca3af;font-style:italic">Maintain</span>
-        </div>`;
       } else {
         const addLabel = pa.isMapped ? "Score" : pa.manualScore ? "Remark &amp; Score" : "Remark &amp; Trials";
         html += `<button class="btn-add-remark" contenteditable="false"
@@ -8315,19 +8311,6 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
   if (remarks.length === 0) {
     const opts = parseOpts(inlineOptions);
     const showEmpty = opts.length === 0;
-    if (showEmpty && _maintained) {
-      // Static placeholder — mirrors the live-entry behaviour. The auto-fill will
-      // write the real remark when the session has data; until then this signals
-      // the boss that "Maintain" is expected here, not that the cell is blank.
-      return `<tr${rowClass ? ` class="${rowClass}"` : ""}>
-        <td class="vcol-no" contenteditable="false">${no}</td>
-        <td class="vcol-act" contenteditable="false">${actCell}</td>
-        <td class="vcol-rem" contenteditable="false"><span style="color:#9ca3af;font-style:italic">Maintain</span></td>
-        <td class="vcol-trials" contenteditable="false">&nbsp;</td>
-        <td class="vcol-total" contenteditable="false">&nbsp;</td>
-        <td class="vcol-score" contenteditable="false">&nbsp;</td>
-      </tr>`;
-    }
     if (showEmpty) {
       const emptyCell = `<textarea class="view-remark-edit view-remark-empty" rows="1"
            data-act-id="${escHtml(actId || "")}"
