@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1234";
+const APP_VERSION = "1235";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -12945,6 +12945,7 @@ function renderTargetManageContent(student, target) {
             <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:250px;overflow:hidden">
               <button class="mn-km-manage-act" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#0369a1">🪄 Manage Activity</button>
               <button class="mn-km-move-to-parent" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">↳ Move under another activity</button>
+              <button class="mn-km-add-sub" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">➕ Add sub-activity</button>
               <div style="display:flex;align-items:stretch">
                 <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
                 <span title="Permanently removes this activity and all of its session data. This cannot be undone." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
@@ -13499,6 +13500,88 @@ function renderTargetManageContent(student, target) {
           }
         }
       }
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-km-add-sub").forEach(btn => {
+    btn.addEventListener("click", async e => {
+      e.stopPropagation();
+      $("manage-modal-body").querySelectorAll(".mn-kebab-menu, .mn-inactive-km").forEach(m => m.style.display = "none");
+      const idx = Number(btn.dataset.idx);
+      const act = acts[idx];
+      if (!act) return;
+      const origText = btn.textContent;
+      btn.disabled = true; btn.textContent = "Checking…";
+      let affectedSessions = [];
+      try {
+        const allSessions = _groupForTargetEdit
+          ? await getAllSessionsForGroup(_groupForTargetEdit.id)
+          : await getAllSessionsForStudent(student.id);
+        affectedSessions = allSessions.filter(s => {
+          const sActs = s.activities || {}; const sRems = s.remarks || {};
+          const matchIds = Object.entries(sActs).filter(([, a]) =>
+            a.targetName === target.name &&
+            (a.activityName === act.name || (act.title && a.activityName === act.title)) &&
+            !a.parentActivity
+          ).map(([id]) => id);
+          return matchIds.some(actId => Object.values(sRems).some(r =>
+            r.activityId === actId && (
+              (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
+              (r.trials || []).some(t => t !== null && t !== -1) || r.optionScore !== undefined
+            )
+          ));
+        });
+      } catch (err) {
+        btn.disabled = false; btn.textContent = origText;
+        return;
+      }
+      btn.disabled = false; btn.textContent = origText;
+      if (affectedSessions.length > 0) {
+        const n = affectedSessions.length;
+        const latest3 = [...affectedSessions].sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 3);
+        const sessionList = `<ul style="font-size:.82rem;color:#374151;margin:.3rem 0 0;padding-left:1.2rem;line-height:1.8">${
+          latest3.map(s => `<li>Session ${escHtml(String(s.sessionNumber || s.number || "?"))}: ${escHtml(formatDateWithDay(s.date))}</li>`).join("")
+        }${n > 3 ? `<li style="color:#9ca3af">…and ${n - 3} more</li>` : ''}</ul>`;
+        const modalSheet = $("manage-modal").querySelector(".modal-sheet");
+        modalSheet.querySelectorAll("[data-addsub-err]").forEach(el => el.remove());
+        const errOverlay = document.createElement("div");
+        errOverlay.dataset.addsubErr = "1";
+        errOverlay.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding-top:2rem;z-index:200;border-radius:.75rem";
+        modalSheet.style.position = "relative";
+        errOverlay.innerHTML = `<div style="background:#fff;padding:1.25rem;border-radius:.75rem;width:min(380px,92%);box-shadow:0 4px 24px rgba(0,0,0,.25)">
+          <div style="font-size:.88rem;font-weight:700;color:#dc2626;margin-bottom:.5rem">⚠️ Cannot add sub-activity</div>
+          <div style="font-size:.82rem;color:#374151;margin-bottom:.35rem"><strong>"${escHtml(act.title || act.name)}"</strong> already has data in ${n} session${n !== 1 ? 's' : ''}. Parent activities are just titles — they can't hold session data.</div>
+          ${sessionList}
+          <button id="mn-addsub-err-close" style="width:100%;padding:.4rem;border:1px solid #d1d5db;border-radius:.4rem;background:#f9fafb;cursor:pointer;font-size:.85rem;margin-top:.75rem">OK</button>
+        </div>`;
+        modalSheet.appendChild(errOverlay);
+        errOverlay.querySelector("#mn-addsub-err-close").addEventListener("click", () => errOverlay.remove());
+        return;
+      }
+      // No past data — make this activity a parent and create a blank sub-activity below it
+      act.noRemark = true;
+      const subId = cfgId("a");
+      const paKey = act._linkKey || act.title || act.name;
+      const newSub = { id: subId, title: "", name: "", parentActivity: paKey, order: 0 };
+      acts.splice(idx + 1, 0, newSub);
+      acts.forEach((a2, i) => a2.order = i);
+      target.predefinedActivities = acts;
+      const sp = $("manage-modal-body").scrollTop;
+      renderTargetManageContent(student, target);
+      requestAnimationFrame(() => {
+        const b = $("manage-modal-body");
+        if (b) b.scrollTop = sp;
+        const subInput = $(`mn-act-title-${idx + 1}`);
+        if (subInput) {
+          subInput.focus();
+          let n = 0; const orig = subInput.style.background;
+          const iv = setInterval(() => {
+            subInput.style.background = (n % 2 === 0) ? "#bfdbfe" : (orig || "");
+            if (++n >= 6) { clearInterval(iv); subInput.style.background = orig || ""; }
+          }, 110);
+        }
+      });
+      saveTarget();
     });
   });
 
