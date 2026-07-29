@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1231";
+const APP_VERSION = "1232";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4334,7 +4334,7 @@ function renderManageActivityScreen(student) {
     const card = (pa, indent = false, orphanParent = '', num = null, subIdx = null) => {
       const nameHtml = paDisplayHtml(pa) || `<em style="color:#9ca3af;font-size:.85rem">Untitled</em>`;
       const badge = statusBadge(pa);
-      const parentTag = orphanParent ? `<span style="font-size:.71rem;color:#9ca3af;display:block;margin-top:.1rem">(from: ${escHtml(orphanParent)})</span>` : '';
+      const parentTag = orphanParent ? `<span style="font-size:.71rem;color:#9ca3af;display:block;margin-top:.1rem">from Parent Activity: ${escHtml(orphanParent)}</span>` : '';
       const numTag = num !== null ? `<span style="color:#6b7280;font-weight:600;margin-right:.25rem">${num})</span>` :
                      subIdx !== null ? `<span style="color:#0369a1;font-weight:600;margin-right:.25rem">${String.fromCharCode(97 + subIdx)})</span>` : '';
       const borderLeft = indent ? 'border-left:3px solid #60a5fa' : 'border-left:3px solid var(--primary)';
@@ -4406,7 +4406,7 @@ function renderManageActivityScreen(student) {
         const nameHtml = paDisplayHtml(sub) || `<em style="color:#9ca3af;font-size:.85rem">Untitled</em>`;
         const badge = statusBadge(sub, true);
         items += `<div data-pa-id="${escHtml(sub.id||'')}" style="background:${bgCard};border:1px solid ${borderCard};border-left:3px solid ${color};border-radius:.5rem;padding:.55rem .75rem .55rem .9rem;display:flex;align-items:flex-start;gap:.5rem;box-shadow:0 1px 3px rgba(0,0,0,.04)">
-          <div style="flex:1;min-width:0;line-height:1.5;white-space:pre-wrap">${nameHtml}<span style="font-size:.71rem;color:#9ca3af;margin-left:.3rem">(from: ${escHtml(sub.parentActivity)})</span>${badge}</div>
+          <div style="flex:1;min-width:0;line-height:1.5;white-space:pre-wrap">${nameHtml}<span style="font-size:.71rem;color:#9ca3af;display:block;margin-top:.1rem">from Parent Activity: ${escHtml(sub.parentActivity)}</span>${badge}</div>
           ${kebabWrap(sub)}
         </div>`;
       });
