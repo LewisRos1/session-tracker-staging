@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1226";
+const APP_VERSION = "1227";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4444,18 +4444,20 @@ function renderManageActivityScreen(student) {
         finally { btn.disabled = false; btn.textContent = origText; }
         return result;
       };
-      const _buildInfoHtml = (latestDate, minDate, latestSubName, soText) => {
+      const _buildInfoHtml = (latestDate, minDate, latestSubName, restrictionText) => {
         if (!latestDate) return `No previous session data was found for this ${actWord}.`;
-        const datePart = latestSubName
-          ? `The last session with data for sub-activity <strong>${escHtml(latestSubName)}</strong> was <strong>${fmtPeriodDate(latestDate)}</strong>.`
-          : `The last session with data for this ${actWord} was <strong>${fmtPeriodDate(latestDate)}</strong>.`;
-        return `${datePart} So, ${soText} <strong>${fmtPeriodDate(minDate)}</strong> onwards.`;
+        const sourcePart = latestSubName
+          ? `The last recorded session for the sub-activity <strong>"${escHtml(latestSubName)}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>.`
+          : `The last recorded session for this ${actWord} was on <strong>${fmtPeriodDate(latestDate)}</strong>.`;
+        return `${sourcePart}<br>${restrictionText} <strong>${fmtPeriodDate(minDate)}</strong> onwards.`;
       };
       if (action === 'master' || action === 'discontinue') {
         const { date: latestDate, subName: latestSubName } = await _maLoadLatest();
         const minDate = latestDate ? addOneDay(latestDate) : todayDateStr();
-        const actionVerb = action === 'master' ? 'you can only master this activity from' : 'you can only discontinue this activity from';
-        const infoHtml = _buildInfoHtml(latestDate, minDate, latestSubName, actionVerb);
+        const restrictionText = action === 'master'
+          ? 'You can only mark this activity as mastered from'
+          : 'You can only discontinue this activity from';
+        const infoHtml = _buildInfoHtml(latestDate, minDate, latestSubName, restrictionText);
         const pickedDate = await showDatePickerOverlay({
           heading: action === 'master' ? '⭐ Mark as Mastered' : '🚩 Discontinue Activity',
           infoHtml,
@@ -4464,17 +4466,32 @@ function renderManageActivityScreen(student) {
           confirmLabel: action === 'master' ? 'Confirm ⭐' : 'Confirm 🚩'
         });
         if (!pickedDate) return;
+        // Also cascade to sub-activities when acting on a parent
+        const _cascadeToSubs = fn => {
+          if (pa.parentActivity) return; // pa is itself a sub — don't cascade
+          const paKey = pa._linkKey || pa.title || pa.name;
+          if (!paKey) return;
+          (target.predefinedActivities || []).filter(a => a.parentActivity === paKey).forEach(fn);
+        };
         if (action === 'master') {
           delete pa.maintained; delete pa.activityColor; delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped; delete pa.inactiveReason;
           pa.masteredOn = pickedDate;
+          _cascadeToSubs(sub => {
+            delete sub.maintained; delete sub.activityColor; delete sub.discontinuedOn; delete sub.isArchived; delete sub.isStopped; delete sub.inactiveReason;
+            sub.masteredOn = pickedDate;
+          });
         } else {
           delete pa.maintained; delete pa.activityColor; delete pa.masteredOn; delete pa.isCompleted; delete pa.inactiveReason;
           pa.discontinuedOn = pickedDate;
+          _cascadeToSubs(sub => {
+            delete sub.maintained; delete sub.activityColor; delete sub.masteredOn; delete sub.isCompleted; delete sub.inactiveReason;
+            sub.discontinuedOn = pickedDate;
+          });
         }
       } else if (action === 'change-master-date') {
         const { date: latestDate, subName: latestSubName } = await _maLoadLatest();
         const minDate = latestDate ? addOneDay(latestDate) : todayDateStr();
-        const infoHtml = _buildInfoHtml(latestDate, minDate, latestSubName, 'you can only set this date from');
+        const infoHtml = _buildInfoHtml(latestDate, minDate, latestSubName, 'You can only set the mastered date from');
         const pickedDate = await showDatePickerOverlay({
           heading: '📅 Change Mastered Date',
           infoHtml,
@@ -4487,7 +4504,7 @@ function renderManageActivityScreen(student) {
       } else if (action === 'change-disc-date') {
         const { date: latestDate, subName: latestSubName } = await _maLoadLatest();
         const minDate = latestDate ? addOneDay(latestDate) : todayDateStr();
-        const infoHtml = _buildInfoHtml(latestDate, minDate, latestSubName, 'you can only set this date from');
+        const infoHtml = _buildInfoHtml(latestDate, minDate, latestSubName, 'You can only set the discontinued date from');
         const pickedDate = await showDatePickerOverlay({
           heading: '📅 Change Discontinued Date',
           infoHtml,
@@ -4508,6 +4525,15 @@ function renderManageActivityScreen(student) {
         delete pa.masteredOn; delete pa.isCompleted; delete pa.inactiveReason;
         delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped;
         delete pa.maintained; delete pa.activityColor;
+        // Restore sub-activities when parent is restored
+        if (!pa.parentActivity) {
+          const paKey = pa._linkKey || pa.title || pa.name;
+          if (paKey) (target.predefinedActivities || []).filter(a => a.parentActivity === paKey).forEach(sub => {
+            delete sub.masteredOn; delete sub.isCompleted; delete sub.inactiveReason;
+            delete sub.discontinuedOn; delete sub.isArchived; delete sub.isStopped;
+            delete sub.maintained; delete sub.activityColor;
+          });
+        }
       } else if (action === 'change-discontinued') {
         const existingDate = pa.masteredOn || todayDateStr();
         const ok = await showAutoDateConfirm({ message: `This ${actWord} will be changed from ⭐ Mastered to 🚩 Discontinued, keeping the same date (${fmtPeriodDate(existingDate)}).`, confirmLabel: "Confirm 🚩" });
@@ -4686,7 +4712,31 @@ function showStudentChoice(student) {
   });
   $("session-picker-list").querySelector(".choice-manage-activity").addEventListener("click", () => {
     closeSessionPicker();
-    openManageActivityScreen(student);
+    $("manage-modal-title").textContent = "Manage Activity";
+    $("manage-modal-body").innerHTML = `
+      <div style="padding:2rem 1rem;display:flex;flex-direction:column;align-items:center;gap:.75rem">
+        <div style="font-size:.9rem;color:var(--text-muted)">Enter password to continue</div>
+        <input id="ma-gate-pw" type="password" class="admin-input"
+          style="width:200px;text-align:center;font-size:1rem"
+          placeholder="Enter password" autocomplete="new-password">
+        <div id="ma-gate-pw-err" style="font-size:.8rem;color:#dc2626;display:none">Incorrect password</div>
+        <button class="btn-primary-sm" id="ma-gate-pw-btn" style="padding:.5rem 1.5rem">Continue</button>
+      </div>`;
+    $("manage-modal").classList.remove("hidden");
+    const pwInput = $("ma-gate-pw");
+    pwInput.value = "";
+    setTimeout(() => { pwInput.value = ""; pwInput.focus(); }, 50);
+    const checkPw = () => {
+      if (pwInput.value !== "0823") {
+        $("ma-gate-pw-err").style.display = "";
+        pwInput.value = "";
+        return;
+      }
+      $("manage-modal").classList.add("hidden");
+      openManageActivityScreen(student);
+    };
+    pwInput.addEventListener("keydown", e => { if (e.key === "Enter") checkPw(); });
+    $("ma-gate-pw-btn").addEventListener("click", checkPw);
   });
 }
 
@@ -11135,7 +11185,7 @@ function showDatePickerOverlay({ heading, infoHtml, minDate, defaultDate, confir
     overlay.innerHTML = `<div style="background:#fff;border-radius:.75rem;padding:1.5rem;max-width:400px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.22)">
       <div style="font-size:.93rem;font-weight:700;color:#111;margin-bottom:.55rem">${heading}</div>
       ${infoHtml ? `<div style="font-size:.85rem;color:#374151;margin-bottom:.9rem;line-height:1.6">${infoHtml}</div>` : ''}
-      <label style="font-size:.82rem;font-weight:600;color:#374151;display:block;margin-bottom:.35rem">Select the last date you want this activity to show:</label>
+      <label style="font-size:.82rem;font-weight:600;color:#374151;display:block;margin-bottom:.35rem">Please select the final date you want this activity to appear.</label>
       <input type="date" id="dp-date-inp" value="${def}" min="${min}" style="width:100%;box-sizing:border-box;padding:.5rem .7rem;border:1.5px solid #d1d5db;border-radius:.4rem;font-size:.95rem;outline:none;margin-bottom:1rem">
       <div style="display:flex;gap:.6rem;justify-content:flex-end">
         <button class="dp-cancel" style="padding:.5rem 1rem;border:1px solid #d1d5db;border-radius:.4rem;background:#fff;cursor:pointer;font-size:.9rem">Cancel</button>
@@ -13588,7 +13638,7 @@ function renderTargetManageContent(student, target) {
       } finally { btn.disabled = false; btn.textContent = origText; }
       const minDate = latestDate ? addOneDay(latestDate) : todayDateStr();
       const infoHtml = latestDate
-        ? `The last session with data for this activity was <strong>${fmtPeriodDate(latestDate)}</strong>. So, you can only set this date from <strong>${fmtPeriodDate(minDate)}</strong> onwards.`
+        ? `The last recorded session for this activity was on <strong>${fmtPeriodDate(latestDate)}</strong>.<br>You can only set this date from <strong>${fmtPeriodDate(minDate)}</strong> onwards.`
         : `No previous session data was found for this activity.`;
       const current = type === "mastered" ? pa.masteredOn : pa.discontinuedOn;
       const pickedDate = await showDatePickerOverlay({
