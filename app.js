@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1242";
+const APP_VERSION = "1243";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -13716,10 +13716,13 @@ function renderTargetManageContent(student, target) {
       const idx = Number(btn.dataset.idx);
       if (!acts[idx]) return;
       const paId = acts[idx].id;
-      await closeManageModal();
+      // Hide modal and navigate immediately — don't wait for Firestore save
+      $("manage-modal").classList.add("hidden");
       const freshStudent = state.students.find(s => s.id === student.id) || student;
       openManageActivityScreen(freshStudent);
       maScrollAndBlink(paId);
+      // Save in background (renderTargetContent inside will update a hidden screen — no flicker)
+      closeManageModal().catch(() => {});
     });
   });
 
