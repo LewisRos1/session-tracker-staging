@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1247";
+const APP_VERSION = "1248";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -13455,14 +13455,11 @@ function renderTargetManageContent(student, target) {
                    <p style="font-size:.84rem;margin:0 0 .35rem;color:#374151">To confirm deletion, type: <strong>${confirmWord}</strong></p>
                    <input id="del-type-input" type="text" autocomplete="off" inputmode="numeric"
                      style="width:100%;box-sizing:border-box;padding:.45rem .6rem;border:2px solid #d1d5db;border-radius:.4rem;font-size:1.1rem;text-align:center;outline:none;margin-bottom:.6rem" placeholder="${confirmWord}">`
-                : `<p style="font-size:.84rem;margin:0 0 .5rem;color:#6b7280">No past session data found for this activity. This cannot be undone.</p>
-                   <p style="font-size:.84rem;margin:0 0 .35rem;color:#374151">To confirm deletion, type: <strong>DELETE</strong></p>
-                   <input id="del-type-input" type="text" autocomplete="off"
-                     style="width:100%;box-sizing:border-box;padding:.45rem .6rem;border:2px solid #d1d5db;border-radius:.4rem;font-size:1.1rem;text-align:center;outline:none;margin-bottom:.6rem" placeholder="DELETE">`
+                : `<p style="font-size:.84rem;margin:0 0 .75rem;color:#374151">This activity has no session data recorded. It is safe to delete. Would you like to proceed?</p>`
               }
               <div style="display:flex;gap:.5rem">
                 <button id="del-type-cancel" style="flex:1;padding:.45rem;border:1px solid #d1d5db;border-radius:.4rem;background:#f9fafb;cursor:pointer;font-size:.85rem">Cancel</button>
-                <button id="del-type-ok" disabled style="flex:1;padding:.45rem;border:none;border-radius:.4rem;background:#dc2626;color:#fff;cursor:pointer;font-size:.85rem;opacity:.4">Delete</button>
+                <button id="del-type-ok" ${hasData ? 'disabled style="flex:1;padding:.45rem;border:none;border-radius:.4rem;background:#dc2626;color:#fff;cursor:pointer;font-size:.85rem;opacity:.4"' : 'style="flex:1;padding:.45rem;border:none;border-radius:.4rem;background:#dc2626;color:#fff;cursor:pointer;font-size:.85rem"'}>Delete</button>
               </div>
             </div>`;
             const modalSheet = $("manage-modal").querySelector(".modal-sheet");
@@ -13480,7 +13477,7 @@ function renderTargetManageContent(student, target) {
             }
             overlay.querySelector("#del-type-cancel").addEventListener("click", () => overlay.remove());
             okBtn.addEventListener("click", async () => {
-              if (inp.value !== confirmWord) return;
+              if (inp && inp.value !== confirmWord) return;
               overlay.remove();
               const actIdx = acts.indexOf(pa);
               if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
