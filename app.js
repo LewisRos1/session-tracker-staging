@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1225";
+const APP_VERSION = "1226";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4176,36 +4176,56 @@ async function repairLevenChuaSubActivities() {
 
 async function maGetLastDataDate(student, target, pa) {
   const allSessions = await getAllSessionsForStudent(student.id);
-  const paName = pa.title || pa.name;
-  const paConfigId = pa.id || null;
-  const paParent = pa.parentActivity || null;
-  const dates = allSessions
-    .filter(s => {
-      const sActs = s.activities || {};
-      const sRems = s.remarks || {};
-      // Accept records by configId first; also accept name-matched records regardless
-      // of whether they've been claimed by another activity (rename artifacts).
-      // This ensures days where old free-text was entered still count as last-data-date
-      // even if the record was later adopted by a renamed activity.
-      const matchIds = Object.entries(sActs)
-        .filter(([, a]) => {
-          if (a.targetName !== target.name) return false;
-          if (paConfigId && a.configId === paConfigId) return true;
-          const nameOk = a.activityName === paName || a.activityName === pa.name;
-          if (!nameOk) return false;
-          return paParent ? (!a.parentActivity || a.parentActivity === paParent) : !a.parentActivity;
-        })
-        .map(([id]) => id);
-      return matchIds.some(actId => Object.values(sRems).some(r =>
-        r.activityId === actId && (
-          (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
-          (r.trials || []).some(t => t !== null && t !== -1) ||
-          r.optionScore !== undefined
-        )
-      ));
-    })
-    .map(s => s.date).sort();
-  return dates[dates.length - 1] || null;
+
+  const getLatestFor = checkPa => {
+    const checkName = checkPa.title || checkPa.name;
+    const checkConfigId = checkPa.id || null;
+    const checkParent = checkPa.parentActivity || null;
+    const dates = allSessions
+      .filter(s => {
+        const sActs = s.activities || {};
+        const sRems = s.remarks || {};
+        // Accept by configId first; also accept name-matched records regardless
+        // of adoption by a renamed activity (covers rename-artifact dates).
+        const matchIds = Object.entries(sActs)
+          .filter(([, a]) => {
+            if (a.targetName !== target.name) return false;
+            if (checkConfigId && a.configId === checkConfigId) return true;
+            const nameOk = a.activityName === checkName || a.activityName === checkPa.name;
+            if (!nameOk) return false;
+            return checkParent ? (!a.parentActivity || a.parentActivity === checkParent) : !a.parentActivity;
+          })
+          .map(([id]) => id);
+        return matchIds.some(actId => Object.values(sRems).some(r =>
+          r.activityId === actId && (
+            (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
+            (r.trials || []).some(t => t !== null && t !== -1) ||
+            r.optionScore !== undefined
+          )
+        ));
+      })
+      .map(s => s.date).sort();
+    return dates[dates.length - 1] || null;
+  };
+
+  const selfDate = getLatestFor(pa);
+
+  // If this is a parent activity, also check its sub-activities so the minimum
+  // date accounts for data recorded against any of its children.
+  const paKey = pa._linkKey || pa.title || pa.name;
+  const subPas = !pa.parentActivity && paKey
+    ? (target.predefinedActivities || []).filter(a => a.parentActivity === paKey && !a.isHeading && !a.isNote && !a.isExportNote)
+    : [];
+
+  let subDate = null, subName = null;
+  for (const sub of subPas) {
+    const d = getLatestFor(sub);
+    if (d && (!subDate || d > subDate)) { subDate = d; subName = sub.title || sub.name; }
+  }
+
+  if (!selfDate && !subDate) return { date: null, subName: null };
+  if (selfDate && (!subDate || selfDate >= subDate)) return { date: selfDate, subName: null };
+  return { date: subDate, subName };
 }
 
 function maIsMastered(pa)   { return !!(pa.masteredOn || pa.inactiveReason === 'mastered'); }
@@ -4419,17 +4439,23 @@ function renderManageActivityScreen(student) {
       const _maLoadLatest = async () => {
         const origText = btn.textContent;
         btn.disabled = true; btn.textContent = "Checking…";
-        let d = null;
-        try { d = await maGetLastDataDate(student, target, pa); }
+        let result = { date: null, subName: null };
+        try { result = await maGetLastDataDate(student, target, pa); }
         finally { btn.disabled = false; btn.textContent = origText; }
-        return d;
+        return result;
+      };
+      const _buildInfoHtml = (latestDate, minDate, latestSubName, soText) => {
+        if (!latestDate) return `No previous session data was found for this ${actWord}.`;
+        const datePart = latestSubName
+          ? `The last session with data for sub-activity <strong>${escHtml(latestSubName)}</strong> was <strong>${fmtPeriodDate(latestDate)}</strong>.`
+          : `The last session with data for this ${actWord} was <strong>${fmtPeriodDate(latestDate)}</strong>.`;
+        return `${datePart} So, ${soText} <strong>${fmtPeriodDate(minDate)}</strong> onwards.`;
       };
       if (action === 'master' || action === 'discontinue') {
-        const latestDate = await _maLoadLatest();
+        const { date: latestDate, subName: latestSubName } = await _maLoadLatest();
         const minDate = latestDate ? addOneDay(latestDate) : todayDateStr();
-        const infoHtml = latestDate
-          ? `The last session with data for this ${actWord} was <strong>${fmtPeriodDate(latestDate)}</strong>.`
-          : `No previous session data was found for this ${actWord}.`;
+        const actionVerb = action === 'master' ? 'you can only master this activity from' : 'you can only discontinue this activity from';
+        const infoHtml = _buildInfoHtml(latestDate, minDate, latestSubName, actionVerb);
         const pickedDate = await showDatePickerOverlay({
           heading: action === 'master' ? '⭐ Mark as Mastered' : '🚩 Discontinue Activity',
           infoHtml,
@@ -4446,11 +4472,9 @@ function renderManageActivityScreen(student) {
           pa.discontinuedOn = pickedDate;
         }
       } else if (action === 'change-master-date') {
-        const latestDate = await _maLoadLatest();
+        const { date: latestDate, subName: latestSubName } = await _maLoadLatest();
         const minDate = latestDate ? addOneDay(latestDate) : todayDateStr();
-        const infoHtml = latestDate
-          ? `The last session with data for this ${actWord} was <strong>${fmtPeriodDate(latestDate)}</strong>.`
-          : `No previous session data was found for this ${actWord}.`;
+        const infoHtml = _buildInfoHtml(latestDate, minDate, latestSubName, 'you can only set this date from');
         const pickedDate = await showDatePickerOverlay({
           heading: '📅 Change Mastered Date',
           infoHtml,
@@ -4461,11 +4485,9 @@ function renderManageActivityScreen(student) {
         if (!pickedDate) return;
         pa.masteredOn = pickedDate;
       } else if (action === 'change-disc-date') {
-        const latestDate = await _maLoadLatest();
+        const { date: latestDate, subName: latestSubName } = await _maLoadLatest();
         const minDate = latestDate ? addOneDay(latestDate) : todayDateStr();
-        const infoHtml = latestDate
-          ? `The last session with data for this ${actWord} was <strong>${fmtPeriodDate(latestDate)}</strong>.`
-          : `No previous session data was found for this ${actWord}.`;
+        const infoHtml = _buildInfoHtml(latestDate, minDate, latestSubName, 'you can only set this date from');
         const pickedDate = await showDatePickerOverlay({
           heading: '📅 Change Discontinued Date',
           infoHtml,
@@ -11113,9 +11135,8 @@ function showDatePickerOverlay({ heading, infoHtml, minDate, defaultDate, confir
     overlay.innerHTML = `<div style="background:#fff;border-radius:.75rem;padding:1.5rem;max-width:400px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.22)">
       <div style="font-size:.93rem;font-weight:700;color:#111;margin-bottom:.55rem">${heading}</div>
       ${infoHtml ? `<div style="font-size:.85rem;color:#374151;margin-bottom:.9rem;line-height:1.6">${infoHtml}</div>` : ''}
-      <label style="font-size:.82rem;font-weight:600;color:#374151;display:block;margin-bottom:.35rem">Last date this activity appears in sessions:</label>
-      <input type="date" id="dp-date-inp" value="${def}" min="${min}" style="width:100%;box-sizing:border-box;padding:.5rem .7rem;border:1.5px solid #d1d5db;border-radius:.4rem;font-size:.95rem;outline:none;margin-bottom:.35rem">
-      <div style="font-size:.77rem;color:#6b7280;margin-bottom:1rem">Sessions after this date will not show this activity.</div>
+      <label style="font-size:.82rem;font-weight:600;color:#374151;display:block;margin-bottom:.35rem">Select the last date you want this activity to show:</label>
+      <input type="date" id="dp-date-inp" value="${def}" min="${min}" style="width:100%;box-sizing:border-box;padding:.5rem .7rem;border:1.5px solid #d1d5db;border-radius:.4rem;font-size:.95rem;outline:none;margin-bottom:1rem">
       <div style="display:flex;gap:.6rem;justify-content:flex-end">
         <button class="dp-cancel" style="padding:.5rem 1rem;border:1px solid #d1d5db;border-radius:.4rem;background:#fff;cursor:pointer;font-size:.9rem">Cancel</button>
         <button class="dp-confirm" style="padding:.5rem 1rem;border:none;border-radius:.4rem;background:var(--primary);color:#fff;cursor:pointer;font-size:.9rem;font-weight:600">${confirmLabel}</button>
@@ -13567,7 +13588,7 @@ function renderTargetManageContent(student, target) {
       } finally { btn.disabled = false; btn.textContent = origText; }
       const minDate = latestDate ? addOneDay(latestDate) : todayDateStr();
       const infoHtml = latestDate
-        ? `The last session with data for this activity was <strong>${fmtPeriodDate(latestDate)}</strong>.`
+        ? `The last session with data for this activity was <strong>${fmtPeriodDate(latestDate)}</strong>. So, you can only set this date from <strong>${fmtPeriodDate(minDate)}</strong> onwards.`
         : `No previous session data was found for this activity.`;
       const current = type === "mastered" ? pa.masteredOn : pa.discontinuedOn;
       const pickedDate = await showDatePickerOverlay({
