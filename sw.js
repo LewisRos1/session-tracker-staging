@@ -3,7 +3,7 @@
 // Firebase SDK handles Firestore data offline independently.
 // ============================================================
 
-const CACHE_NAME = "therapy-tracker-v1222";
+const CACHE_NAME = "therapy-tracker-v1223";
 
 // App shell files to pre-cache
 const SHELL_URLS = [
@@ -44,12 +44,14 @@ self.addEventListener("activate", event => {
   event.waitUntil(
     caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    ).then(() =>
-      self.clients.matchAll({ includeUncontrolled: true, type: "window" })
+    // claim() first so matchAll only returns clients in this SW's own scope,
+    // not uncontrolled clients from other paths on the same github.io origin.
+    ).then(() => self.clients.claim())
+    .then(() =>
+      self.clients.matchAll({ type: "window" })
         .then(clients => clients.forEach(c => c.postMessage({ type: "swActivated", version })))
     )
   );
-  self.clients.claim();
 });
 
 // Fetch: network-first for local shell (always get latest); offline falls back to cache
