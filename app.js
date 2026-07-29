@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1206";
+const APP_VERSION = "1207";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -12738,7 +12738,7 @@ function renderTargetManageContent(student, target) {
                 ${remarkTypeSelect}
               </div>
               ${maintainedRow}
-              <button class="mn-convert-to-sub-btn" data-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:#f9fafb;border:1px solid #d1d5db;border-radius:.35rem;color:#374151;cursor:pointer;align-self:flex-start">↳ Move under parent</button>
+              <button class="mn-convert-to-sub-btn" data-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:#f9fafb;border:1px solid #d1d5db;border-radius:.35rem;color:#374151;cursor:pointer;align-self:flex-start">↳ Change this activity into a sub-activity (& put it under a new parent-activity)</button>
             </div>
           </div>
           <div style="position:relative">
