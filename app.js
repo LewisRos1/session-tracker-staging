@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1207";
+const APP_VERSION = "1208";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -11228,7 +11228,28 @@ function openManageModal(student, targetOrNull, templateOrNull = null, remarkPre
   } else if (templateOrNull) {
     renderTemplateManageContent(templateOrNull);
   } else if (targetOrNull) {
-    renderTargetManageContent(student, targetOrNull);
+    // Password gate before revealing Edit Target
+    $("manage-modal-title").textContent = "Edit Target";
+    $("manage-modal-body").innerHTML = `
+      <div style="padding:2rem 1rem;display:flex;flex-direction:column;align-items:center;gap:.75rem">
+        <div style="font-size:.9rem;color:var(--text-muted)">Enter password to continue</div>
+        <input id="edit-target-pw" type="password" class="admin-input"
+          style="width:200px;text-align:center;font-size:1rem"
+          placeholder="Enter password" autocomplete="new-password">
+        <div id="edit-target-pw-err" style="font-size:.8rem;color:#dc2626;display:none">Incorrect password</div>
+      </div>`;
+    const pwInput = $("edit-target-pw");
+    pwInput.value = "";
+    setTimeout(() => { pwInput.value = ""; pwInput.focus(); }, 50);
+    const checkPw = () => {
+      if (pwInput.value !== "0823") {
+        $("edit-target-pw-err").style.display = "";
+        pwInput.value = "";
+        return;
+      }
+      renderTargetManageContent(student, targetOrNull);
+    };
+    pwInput.addEventListener("keydown", e => { if (e.key === "Enter") checkPw(); });
   } else {
     renderStudentManageContent(student);
   }
