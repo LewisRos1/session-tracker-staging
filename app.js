@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1213";
+const APP_VERSION = "1214";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -13654,10 +13654,10 @@ function renderTargetManageContent(student, target) {
       // Check existing subs — all must be named before adding another
       const _parentKey = parentAct.title || parentAct.name;
       const existingSubs = acts.filter(a2 => a2.parentActivity === _parentKey && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
-      const unnamedSub = existingSubs.find(s => !s.name?.trim());
+      const unnamedSub = existingSubs.find(s => !s.name?.trim() && !s.title?.trim());
       if (unnamedSub) {
         const unnamedIdx = acts.indexOf(unnamedSub);
-        const unnamedInput = $("manage-modal-body").querySelector(`.mn-act-name-input[data-idx="${unnamedIdx}"]`);
+        const unnamedInput = $("manage-modal-body").querySelector(`.mn-act-title-${unnamedIdx}, .mn-act-name-input[data-idx="${unnamedIdx}"]`);
         unnamedInput?.focus();
         alert("Please name all existing sub-activities before adding another.");
         return;
