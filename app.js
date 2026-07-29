@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1251";
+const APP_VERSION = "1252";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -6247,7 +6247,11 @@ function renderFedcTarget(target) {
       if (isPending) {
         html += renderPendingRemarkFields(pendingKey, actId, pa.name, idx, target);
       } else if (pa.maintained && remarks.length === 0) {
-        html += renderPendingRemarkFields(pendingKey, actId, pa.name, idx, target, "Maintain");
+        html += `<div class="entry-divider" contenteditable="false"></div>
+        <div class="entry-field" contenteditable="false">
+          <span class="field-label">Remark</span>
+          <span class="field-value-fixed" style="color:#6b7280">Maintain</span>
+        </div>`;
       } else {
         const addLabel = pa.isMapped ? "Score" : pa.manualScore ? "Remark &amp; Score" : "Remark &amp; Trials";
         html += `<button class="btn-add-remark" contenteditable="false"
