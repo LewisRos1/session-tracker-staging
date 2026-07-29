@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1224";
+const APP_VERSION = "1225";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4233,7 +4233,8 @@ function maKebabOptions(pa, tName) {
 }
 
 function openManageActivityScreen(student) {
-  $("manage-activity-title").textContent = student.name;
+  const sub = $("manage-activity-subtitle");
+  if (sub) sub.textContent = student.name;
   showScreen("screen-manage-activity");
   $("btn-manage-activity-back").onclick = showHome;
   renderManageActivityScreen(student);
@@ -4283,11 +4284,12 @@ function renderManageActivityScreen(student) {
       return '';
     };
 
-    const card = (pa, indent = false, orphanParent = '', num = null) => {
+    const card = (pa, indent = false, orphanParent = '', num = null, subIdx = null) => {
       const nameHtml = paDisplayHtml(pa) || `<em style="color:#9ca3af;font-size:.85rem">Untitled</em>`;
       const badge = statusBadge(pa);
       const parentTag = orphanParent ? `<span style="font-size:.71rem;color:#9ca3af;display:block;margin-top:.1rem">(from: ${escHtml(orphanParent)})</span>` : '';
-      const numTag = num !== null ? `<span style="color:#6b7280;font-weight:600;margin-right:.25rem">${num})</span>` : '';
+      const numTag = num !== null ? `<span style="color:#6b7280;font-weight:600;margin-right:.25rem">${num})</span>` :
+                     subIdx !== null ? `<span style="color:#0369a1;font-weight:600;margin-right:.25rem">${String.fromCharCode(97 + subIdx)})</span>` : '';
       const borderLeft = indent ? 'border-left:3px solid #60a5fa' : 'border-left:3px solid var(--primary)';
       const bg = indent ? 'background:#f0f9ff' : 'background:#fff';
       const ml = indent ? 'margin-left:1.4rem;' : '';
@@ -4318,7 +4320,7 @@ function renderManageActivityScreen(student) {
       actNum++;
       activeHtml += card(pa, false, '', actNum);
       const children = activeSubs.filter(s => s.parentActivity === (pa.title || pa.name));
-      for (const child of children) activeHtml += card(child, true);
+      children.forEach((child, ci) => { activeHtml += card(child, true, '', null, ci); });
     }
     // Orphaned subs whose parent isn't active
     const orphaned = activeSubs.filter(s => !activeTopLevel.some(p => (p.title || p.name) === s.parentActivity));
