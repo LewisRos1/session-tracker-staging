@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1252";
+const APP_VERSION = "1253";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -6247,11 +6247,23 @@ function renderFedcTarget(target) {
       if (isPending) {
         html += renderPendingRemarkFields(pendingKey, actId, pa.name, idx, target);
       } else if (pa.maintained && remarks.length === 0) {
+        const _hasMaintainData = Object.values(state.sessionData?.remarks || {}).some(r =>
+          (r.text && r.text.trim()) || (r.trials || []).some(t => t >= 0) || r.optionScore !== undefined
+        );
         html += `<div class="entry-divider" contenteditable="false"></div>
         <div class="entry-field" contenteditable="false">
-          <span class="field-label">Remark</span>
-          <span class="field-value-fixed" style="color:#6b7280">Maintain</span>
-        </div>`;
+          <span class="field-label">Remark</span>`;
+        if (_hasMaintainData) {
+          html += `<textarea class="field-input maintained-remark-pending" rows="1"
+            data-act-id="${actId || ""}"
+            data-pa-name="${escHtml(pa.name || pa.title)}"
+            data-pa-order="${idx}"
+            data-cfg-id="${escHtml(pa.id || "")}"
+            data-target="${escHtml(target.name)}">Maintain</textarea>`;
+        } else {
+          html += `<span class="field-value-fixed" style="color:#6b7280">Maintain</span>`;
+        }
+        html += `</div>`;
       } else {
         const addLabel = pa.isMapped ? "Score" : pa.manualScore ? "Remark &amp; Score" : "Remark &amp; Trials";
         html += `<button class="btn-add-remark" contenteditable="false"
@@ -9017,6 +9029,32 @@ function setupEntryRemarkSaving(host, getSessionId, onIdle) {
           const remId = await addGroupRemark(sid, actId, el.dataset.student, text);
           el.dataset.actId = actId;
           el.dataset.remId = remId;
+          el.dataset.savedHtml = htmlForStorage(text);
+        } finally {
+          el.dataset.creating = "false";
+        }
+      };
+      trackWrite(create());
+    });
+
+    // Maintained activity with no remark yet (individual live session). Shows
+    // "Maintain" pre-filled; saves to Firestore on blur or input so the cell
+    // becomes a normal editable remark after the next snapshot re-render.
+    host.querySelectorAll(".maintained-remark-pending[data-pa-name]").forEach(el => {
+      const text = el.value.trim() || "Maintain";
+      if (el.dataset.creating === "true" || el.dataset.remId) return;
+      el.dataset.creating = "true";
+      const create = async () => {
+        try {
+          const paOrder = el.dataset.paOrder !== "" ? Number(el.dataset.paOrder) : 0;
+          let actId = el.dataset.actId || null;
+          if (!actId) {
+            actId = await addActivity(sid, el.dataset.target, el.dataset.paName, paOrder, true,
+              undefined, null, el.dataset.cfgId || null);
+          }
+          const remId = await addRemark(sid, actId, text);
+          el.dataset.actId  = actId;
+          el.dataset.remId  = remId;
           el.dataset.savedHtml = htmlForStorage(text);
         } finally {
           el.dataset.creating = "false";
