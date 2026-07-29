@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1209";
+const APP_VERSION = "1210";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -13644,10 +13644,9 @@ function renderTargetManageContent(student, target) {
       const form = document.createElement("div");
       form.style.cssText = "display:flex;flex-direction:column;gap:.4rem;background:#f0f9ff;border:1px solid #bae6fd;border-radius:.45rem;padding:.6rem .75rem";
       form.innerHTML = `
-        <div style="font-size:.82rem;font-weight:600;color:#0369a1">Parent activity name</div>
+        <div style="font-size:.82rem;font-weight:600;color:#0369a1">Please enter a Parent-activity name first:</div>
         <input type="text" class="mn-parent-title-input admin-input" placeholder="e.g. Self-Regulation"
           style="width:100%;border:1.5px solid #d1d5db;border-radius:.4rem;padding:.4rem .6rem;font-size:.88rem;box-sizing:border-box" />
-        <div class="mn-parent-error" style="display:none;font-size:.78rem;color:#dc2626;font-weight:600">Please enter a Parent-activity name first:</div>
         <div style="display:flex;gap:.5rem">
           <button class="mn-parent-confirm" type="button"
             style="font-size:.82rem;padding:.3rem .75rem;background:var(--primary);color:#fff;border:none;border-radius:.35rem;cursor:pointer;font-weight:600">✓ Confirm</button>
@@ -13657,23 +13656,22 @@ function renderTargetManageContent(student, target) {
       btn.replaceWith(form);
 
       const input = form.querySelector(".mn-parent-title-input");
-      const errDiv = form.querySelector(".mn-parent-error");
       const confirmBtn = form.querySelector(".mn-parent-confirm");
       const cancelBtn = form.querySelector(".mn-parent-cancel");
       input.focus();
 
+      const blinkForm = () => {
+        let n = 0;
+        const iv = setInterval(() => {
+          form.style.background = (n % 2 === 0) ? "#bfdbfe" : "#f0f9ff";
+          if (++n >= 6) { clearInterval(iv); form.style.background = "#f0f9ff"; }
+        }, 100);
+      };
+
       const doConfirm = () => {
         const title = input.value.trim();
         if (!title) {
-          errDiv.style.display = "";
-          // Blink the entire light-blue box twice to draw attention
-          form.animate([
-            { backgroundColor: "#f0f9ff", borderColor: "#bae6fd" },
-            { backgroundColor: "#bfdbfe", borderColor: "#3b82f6" },
-            { backgroundColor: "#f0f9ff", borderColor: "#bae6fd" },
-            { backgroundColor: "#bfdbfe", borderColor: "#3b82f6" },
-            { backgroundColor: "#f0f9ff", borderColor: "#bae6fd" },
-          ], { duration: 500, easing: "ease-in-out" });
+          blinkForm();
           input.focus();
           return;
         }
@@ -13692,9 +13690,6 @@ function renderTargetManageContent(student, target) {
       confirmBtn.addEventListener("click", doConfirm);
       input.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); doConfirm(); } });
       cancelBtn.addEventListener("click", () => form.replaceWith(btn));
-      input.addEventListener("input", () => {
-        if (input.value.trim()) errDiv.style.display = "none";
-      });
     });
   });
 
