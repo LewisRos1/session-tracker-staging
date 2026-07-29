@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1208";
+const APP_VERSION = "1209";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -13647,7 +13647,7 @@ function renderTargetManageContent(student, target) {
         <div style="font-size:.82rem;font-weight:600;color:#0369a1">Parent activity name</div>
         <input type="text" class="mn-parent-title-input admin-input" placeholder="e.g. Self-Regulation"
           style="width:100%;border:1.5px solid #d1d5db;border-radius:.4rem;padding:.4rem .6rem;font-size:.88rem;box-sizing:border-box" />
-        <div class="mn-parent-error" style="display:none;font-size:.78rem;color:#dc2626;font-weight:600">⚠ Parent activity needs a title</div>
+        <div class="mn-parent-error" style="display:none;font-size:.78rem;color:#dc2626;font-weight:600">Please enter a Parent-activity name first:</div>
         <div style="display:flex;gap:.5rem">
           <button class="mn-parent-confirm" type="button"
             style="font-size:.82rem;padding:.3rem .75rem;background:var(--primary);color:#fff;border:none;border-radius:.35rem;cursor:pointer;font-weight:600">✓ Confirm</button>
@@ -13665,8 +13665,15 @@ function renderTargetManageContent(student, target) {
       const doConfirm = () => {
         const title = input.value.trim();
         if (!title) {
-          input.style.border = "1.5px solid #dc2626";
           errDiv.style.display = "";
+          // Blink the entire light-blue box twice to draw attention
+          form.animate([
+            { backgroundColor: "#f0f9ff", borderColor: "#bae6fd" },
+            { backgroundColor: "#bfdbfe", borderColor: "#3b82f6" },
+            { backgroundColor: "#f0f9ff", borderColor: "#bae6fd" },
+            { backgroundColor: "#bfdbfe", borderColor: "#3b82f6" },
+            { backgroundColor: "#f0f9ff", borderColor: "#bae6fd" },
+          ], { duration: 500, easing: "ease-in-out" });
           input.focus();
           return;
         }
@@ -13686,10 +13693,7 @@ function renderTargetManageContent(student, target) {
       input.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); doConfirm(); } });
       cancelBtn.addEventListener("click", () => form.replaceWith(btn));
       input.addEventListener("input", () => {
-        if (input.value.trim()) {
-          input.style.border = "1.5px solid #d1d5db";
-          errDiv.style.display = "none";
-        }
+        if (input.value.trim()) errDiv.style.display = "none";
       });
     });
   });
