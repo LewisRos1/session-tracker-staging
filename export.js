@@ -2813,7 +2813,7 @@ function getAllActivitiesForTarget(session, target) {
     if (pa.isCompleted || pa.isArchived || pa.isStopped) continue;
     if (pa.parentActivity) {
       const parentExists = (target.predefinedActivities || []).some(
-        p => !p.parentActivity && p.name === pa.parentActivity
+        p => !p.parentActivity && (p.title || p.name) === pa.parentActivity
           && isActivityActive(p, session.date)
           && !p.isCompleted && !p.isArchived && !p.isStopped && !p.masteredOn && !p.discontinuedOn
       );
@@ -2850,7 +2850,7 @@ function getAllActivitiesForTarget(session, target) {
       const si = subLabelCounters[pa.parentActivity] || 0;
       subLabelCounters[pa.parentActivity] = si + 1;
       const subLabel = String.fromCharCode(97 + si);
-      const parentPa = (target.predefinedActivities || []).find(p => !p.parentActivity && p.name === pa.parentActivity);
+      const parentPa = (target.predefinedActivities || []).find(p => !p.parentActivity && (p.title || p.name) === pa.parentActivity);
       const subStatusPrefix = pa.discontinuedOn ? '(Discontinued) '
         : pa.masteredOn ? '(Mastered) '
         : pa.maintained ? '(Maintained) '

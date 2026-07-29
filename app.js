@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1219";
+const APP_VERSION = "1220";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -9709,7 +9709,7 @@ function buildGroupTargetViewTable(target, data, attendees) {
       const isSub2 = !!pa.parentActivity;
       if (isSub2) {
         const parentExists2 = (target.predefinedActivities || []).some(
-          p => !p.parentActivity && p.name === pa.parentActivity
+          p => !p.parentActivity && (p.title || p.name) === pa.parentActivity
             && isActivityActive(p, data.date)
             && !p.isCompleted && !p.isArchived && !p.isStopped
         );
