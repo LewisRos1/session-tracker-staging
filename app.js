@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1249";
+const APP_VERSION = "1250";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -8318,7 +8318,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
            data-target="${escHtml(target.name)}"
            data-is-predefined="${isPredefined}"
            data-parent-activity="${escHtml(paConfig?.parentActivity || "")}"
-           data-config-id="${escHtml(paConfig?.id || "")}"></textarea>`;
+           data-config-id="${escHtml(paConfig?.id || "")}">${_maintained ? "Maintain" : ""}</textarea>`;
       const addTrialBtn = mappedInfo
         ? ""
         : `<button class="view-add-trial-new" data-act-id="${escHtml(actId || "")}"
