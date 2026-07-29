@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1250";
+const APP_VERSION = "1251";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -6246,6 +6246,8 @@ function renderFedcTarget(target) {
       }
       if (isPending) {
         html += renderPendingRemarkFields(pendingKey, actId, pa.name, idx, target);
+      } else if (pa.maintained && remarks.length === 0) {
+        html += renderPendingRemarkFields(pendingKey, actId, pa.name, idx, target, "Maintain");
       } else {
         const addLabel = pa.isMapped ? "Score" : pa.manualScore ? "Remark &amp; Score" : "Remark &amp; Trials";
         html += `<button class="btn-add-remark" contenteditable="false"
@@ -6886,14 +6888,14 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
 }
 
 
-function renderPendingRemarkFields(pendingKey, actId, paName, paOrder, target) {
+function renderPendingRemarkFields(pendingKey, actId, paName, paOrder, target, initialValue = "") {
   return `
     <div class="entry-divider" contenteditable="false"></div>
     <div class="entry-field">
       <span class="field-label" contenteditable="false">Remark</span>
       <button class="btn-sketch btn-sketch-pending" contenteditable="false" aria-label="Open sketch board">✏</button>
       <textarea id="new-remark-textarea" class="field-input" rows="1"
-        placeholder="Type remark…"></textarea>
+        placeholder="Type remark…">${escHtml(initialValue)}</textarea>
     </div>
     <div class="pending-remark-actions" contenteditable="false">
       <button class="btn-cancel-remark btn-remark-cancel">✕ Cancel</button>
@@ -16364,7 +16366,7 @@ function renderGroupStudentBlock(studentName, target, data) {
 
   const cards = activityEntries.length
     ? activityEntries.map(({ actId, actName, actNote, pa }) =>
-        renderGroupStudentActivityCard(studentName, actName, actId, target, data, actNote, pa?.isMapped ? pa : null)).join("")
+        renderGroupStudentActivityCard(studentName, actName, actId, target, data, actNote, pa?.isMapped ? pa : null, !!pa?.maintained)).join("")
     : `<p class="empty-hint" contenteditable="false" style="padding:1rem">No activities yet. Add them under Edit Target.</p>`;
 
   return `<div class="group-by-student-block" data-student="${escHtml(studentName)}">
@@ -16373,7 +16375,7 @@ function renderGroupStudentBlock(studentName, target, data) {
   </div>`;
 }
 
-function renderGroupStudentActivityCard(studentName, actName, actId, target, data, actNote = null, mappedPa = null) {
+function renderGroupStudentActivityCard(studentName, actName, actId, target, data, actNote = null, mappedPa = null, isMaintained = false) {
   const remarksForThisStudent = actId
     ? Object.entries(data.remarks || {})
         .filter(([, r]) => r.activityId === actId && r.studentName === studentName)
@@ -16400,15 +16402,27 @@ function renderGroupStudentActivityCard(studentName, actName, actId, target, dat
     html += renderGroupStudentRowCompact(remId, rem, target, mappedInfo);
   }
 
-  html += remarksForThisStudent.length === 0
-    ? `<button class="btn-add-remark btn-group-add-remark-pending" contenteditable="false"
-        data-student="${escHtml(studentName)}"
+  if (remarksForThisStudent.length === 0 && isMaintained) {
+    html += `<div class="entry-field">
+      <span class="field-label" contenteditable="false">Remark</span>
+      <textarea class="field-input group-remark-input group-remark-input-empty" rows="1"
         data-act-id="${escHtml(actId || "")}"
         data-act-name="${escHtml(actName)}"
-        data-target="${escHtml(target.name)}">+ Add Remark${mappedPa ? "" : " &amp; Trials"}</button>`
-    : `<button class="btn-add-remark btn-group-add-remark-student-more" contenteditable="false"
-        data-act-id="${escHtml(actId || "")}"
-        data-student="${escHtml(studentName)}">+ Add Remark${mappedPa ? "" : " &amp; Trials"}</button>`;
+        data-target="${escHtml(target.name)}"
+        data-is-predefined="true"
+        data-student="${escHtml(studentName)}">Maintain</textarea>
+    </div>`;
+  } else {
+    html += remarksForThisStudent.length === 0
+      ? `<button class="btn-add-remark btn-group-add-remark-pending" contenteditable="false"
+          data-student="${escHtml(studentName)}"
+          data-act-id="${escHtml(actId || "")}"
+          data-act-name="${escHtml(actName)}"
+          data-target="${escHtml(target.name)}">+ Add Remark${mappedPa ? "" : " &amp; Trials"}</button>`
+      : `<button class="btn-add-remark btn-group-add-remark-student-more" contenteditable="false"
+          data-act-id="${escHtml(actId || "")}"
+          data-student="${escHtml(studentName)}">+ Add Remark${mappedPa ? "" : " &amp; Trials"}</button>`;
+  }
 
   html += `</div>`;
   return html;
