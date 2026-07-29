@@ -1718,7 +1718,10 @@ function buildRemarkLines(starter, text, masteryNote) {
   }
   if (masteryNote) {
     if (lines.length > 0) lines.push([{ text: "" }]);
-    masteryNote.split("\n").forEach(ln => lines.push([{ text: ln }]));
+    masteryNote.split("\n").forEach((ln, i) => {
+      if (i === 0) lines.push([{ text: "Note: ", bold: true }, { text: ln }]);
+      else lines.push([{ text: ln }]);
+    });
   }
   if (lines.length === 0) lines.push([{ text: "" }]);
   return lines;
