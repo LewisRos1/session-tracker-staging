@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1220";
+const APP_VERSION = "1221";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -12632,6 +12632,7 @@ function renderTargetManageContent(student, target) {
                     <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subIdx}" data-idx="${subIdx}"
                       placeholder="Enter Activity Title Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
                   </div>
+                  <button class="mn-move-sub-act" data-idx="${subIdx}" title="Move to a different parent activity" style="flex-shrink:0;margin-top:.35rem;font-size:.78rem;padding:.25rem .5rem;background:#eff6ff;border:1px solid #bfdbfe;border-radius:.35rem;color:#1d4ed8;cursor:pointer;line-height:1.2">↳ Move</button>
                   <button class="btn-adm-del mn-del-sub-act" data-idx="${subIdx}" title="Delete sub-activity" style="flex-shrink:0;margin-top:.35rem">🗑</button>
                 </div>
               </div>
@@ -12746,6 +12747,7 @@ function renderTargetManageContent(student, target) {
             <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
             <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:250px;overflow:hidden">
               <button class="mn-km-manage-act" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#0369a1">🪄 Manage Activity</button>
+              <button class="mn-km-move-to-parent" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">↳ Move under another activity</button>
               <div style="display:flex;align-items:stretch">
                 <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
                 <span title="Permanently removes this activity and all of its session data. This cannot be undone." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
@@ -13299,6 +13301,123 @@ function renderTargetManageContent(student, target) {
             });
           }
         }
+      }
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-km-move-to-parent, .mn-move-sub-act").forEach(btn => {
+    btn.addEventListener("click", async e => {
+      e.stopPropagation();
+      $("manage-modal-body").querySelectorAll(".mn-kebab-menu, .mn-inactive-km").forEach(m => m.style.display = "none");
+      const idx = Number(btn.dataset.idx);
+      const pa = acts[idx];
+      if (!pa) return;
+      const modalSheet = $("manage-modal").querySelector(".modal-sheet");
+      modalSheet.querySelectorAll("[data-move-overlay]").forEach(el => el.remove());
+      const overlay = document.createElement("div");
+      overlay.dataset.moveOverlay = "1";
+      overlay.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding-top:1.25rem;z-index:200;border-radius:.75rem;overflow-y:auto";
+      overlay.innerHTML = `<div style="background:#fff;padding:1.25rem;border-radius:.75rem;width:min(360px,92%);box-shadow:0 4px 24px rgba(0,0,0,.25);margin-bottom:1rem">
+        <div style="font-size:.88rem;font-weight:700;color:#111;margin-bottom:.5rem">↳ Move under another activity</div>
+        <div style="font-size:.82rem;color:#6b7280;margin-bottom:.7rem">Checking all sessions for data…</div>
+        <div style="display:flex;justify-content:center;padding:.5rem 0"><span style="font-size:1.2rem">⏳</span></div>
+        <button id="mn-move-cancel" style="width:100%;padding:.4rem;border:1px solid #d1d5db;border-radius:.4rem;background:#f9fafb;cursor:pointer;font-size:.85rem;margin-top:.6rem">Cancel</button>
+      </div>`;
+      modalSheet.style.position = "relative";
+      modalSheet.appendChild(overlay);
+      const closeOverlay = () => overlay.remove();
+      overlay.querySelector("#mn-move-cancel").addEventListener("click", closeOverlay);
+      try {
+        const allSessions = _groupForTargetEdit
+          ? await getAllSessionsForGroup(_groupForTargetEdit.id)
+          : await getAllSessionsForStudent(student.id);
+        const candidates = acts.filter(cand => {
+          if (cand === pa) return false;
+          if (cand.parentActivity) return false;
+          if (cand.isHeading || cand.isNote || cand.isExportNote || cand.isMaintainHeading || cand.isMaintain) return false;
+          if (!cand.name && !cand.title) return false;
+          if (cand.isCompleted || cand.isArchived || cand.isStopped || cand.masteredOn || cand.discontinuedOn) return false;
+          if (pa.parentActivity && (cand.title || cand.name) === pa.parentActivity) return false;
+          return true;
+        });
+        const results = candidates.map(cand => {
+          const dataCount = allSessions.filter(s => {
+            const sActs = s.activities || {}; const sRems = s.remarks || {};
+            const matchIds = Object.entries(sActs).filter(([, a]) =>
+              a.targetName === target.name &&
+              (a.activityName === cand.name || (cand.title && a.activityName === cand.title)) &&
+              !a.parentActivity
+            ).map(([id]) => id);
+            return matchIds.some(actId => Object.values(sRems).some(r =>
+              r.activityId === actId && (
+                (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
+                (r.trials || []).some(t => t !== null && t !== -1)
+              )
+            ));
+          }).length;
+          return { cand, dataCount };
+        });
+        const empty = results.filter(r => r.dataCount === 0);
+        const hasData = results.filter(r => r.dataCount > 0);
+        const paLabel = escHtml(pa.title || pa.name || "this activity");
+        const emptyHtml = empty.length > 0
+          ? empty.map(({ cand }) => {
+              const label = cand.title || cand.name;
+              const alreadyParent = acts.some(a2 => a2.parentActivity === (cand.title || cand.name));
+              const badge = alreadyParent
+                ? ` <span style="font-size:.7rem;background:#dbeafe;color:#1e40af;border-radius:.3rem;padding:.05rem .3rem;vertical-align:middle;margin-left:.3rem">has sub-activities</span>`
+                : '';
+              return `<button class="mn-move-pick-btn" data-cand-idx="${acts.indexOf(cand)}" style="width:100%;text-align:left;padding:.5rem .7rem;border:1px solid #e5e7eb;border-radius:.4rem;background:#f9fafb;cursor:pointer;font-size:.84rem;color:#111;margin-bottom:.3rem;display:block">${escHtml(label)}${badge}</button>`;
+            }).join('')
+          : `<div style="font-size:.82rem;color:#6b7280;font-style:italic;padding:.4rem 0">No empty activities available in this target.</div>`;
+        const hasDataHtml = hasData.length > 0
+          ? `<div style="margin-top:.6rem;border-top:1px solid #e5e7eb;padding-top:.6rem">
+              <div style="font-size:.75rem;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.4rem">Cannot use — has session data</div>
+              ${hasData.map(({ cand, dataCount }) =>
+                `<div style="padding:.4rem .7rem;border:1px solid #f3f4f6;border-radius:.4rem;background:#f9fafb;font-size:.82rem;color:#9ca3af;margin-bottom:.25rem;display:flex;justify-content:space-between;gap:.5rem">
+                  <span>${escHtml(cand.title || cand.name)}</span>
+                  <span style="white-space:nowrap;flex-shrink:0">${dataCount} session${dataCount !== 1 ? 's' : ''}</span>
+                </div>`
+              ).join('')}
+            </div>` : '';
+        overlay.querySelector("div").innerHTML = `
+          <div style="font-size:.88rem;font-weight:700;color:#111;margin-bottom:.25rem">↳ Move "${paLabel}" under:</div>
+          <div style="font-size:.78rem;color:#6b7280;margin-bottom:.8rem">Select an activity with no session data to become its parent.</div>
+          <div>${emptyHtml}${hasDataHtml}</div>
+          <button id="mn-move-cancel2" style="width:100%;padding:.4rem;border:1px solid #d1d5db;border-radius:.4rem;background:#f9fafb;cursor:pointer;font-size:.85rem;margin-top:.6rem">Cancel</button>
+        `;
+        overlay.querySelector("#mn-move-cancel2").addEventListener("click", closeOverlay);
+        overlay.querySelectorAll(".mn-move-pick-btn").forEach(pickBtn => {
+          pickBtn.addEventListener("click", async () => {
+            const candIdx = Number(pickBtn.dataset.candIdx);
+            const chosen = acts[candIdx];
+            if (!chosen) return;
+            const chosenKey = chosen.title || chosen.name;
+            const oldParentKey = pa.parentActivity || null;
+            pa.parentActivity = chosenKey;
+            chosen.noRemark = true;
+            if (oldParentKey) {
+              const stillHasSubs = acts.some(a2 => a2 !== pa && a2.parentActivity === oldParentKey);
+              if (!stillHasSubs) {
+                const oldParent = acts.find(a2 => (a2.title || a2.name) === oldParentKey);
+                if (oldParent) delete oldParent.noRemark;
+              }
+            }
+            acts.forEach((a2, i) => a2.order = i);
+            target.predefinedActivities = acts;
+            closeOverlay();
+            await saveTarget();
+            const scrollPos = $("manage-modal-body").scrollTop;
+            renderTargetManageContent(student, target);
+            requestAnimationFrame(() => { const b = $("manage-modal-body"); if (b) b.scrollTop = scrollPos; });
+          });
+        });
+      } catch (err) {
+        overlay.querySelector("div").innerHTML = `
+          <div style="font-size:.85rem;color:#dc2626;margin-bottom:.6rem">Error loading session data: ${escHtml(err.message)}</div>
+          <button id="mn-move-cancel3" style="width:100%;padding:.4rem;border:1px solid #d1d5db;border-radius:.4rem;background:#f9fafb;cursor:pointer;font-size:.85rem">Close</button>
+        `;
+        overlay.querySelector("#mn-move-cancel3").addEventListener("click", closeOverlay);
       }
     });
   });
