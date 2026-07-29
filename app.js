@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1218";
+const APP_VERSION = "1219";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -6689,6 +6689,9 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
   // the select-one options above are whatever the boss configured (not
   // hardcoded mastery values), so this reuses the same .mastery-note-input
   // class/rem.masteryNote field to pick up the existing save wiring for free.
+  const _hiddenNote = !remarkHasNote
+    ? ((rem.masteryNote || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim())
+    : "";
   const noteField = remarkHasNote
     ? `<div class="entry-field">
         <span class="field-label" contenteditable="false">Notes</span>
@@ -6697,7 +6700,12 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
           data-rem-id="${rem.id}" placeholder="Notes…"
           data-saved-html="${escHtml(rem.masteryNote || "")}">${escHtml(plainTextForEdit(rem.masteryNote || ""))}</textarea>
       </div>`
-    : "";
+    : (_hiddenNote
+        ? `<div class="entry-field">
+            <span class="field-label" contenteditable="false">Notes</span>
+            <div style="font-size:.78rem;color:#9ca3af;font-style:italic">Old data: ${escHtml(_hiddenNote)}</div>
+          </div>`
+        : "");
 
   return `
     <div class="entry-divider" contenteditable="false"></div>
