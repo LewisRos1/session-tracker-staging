@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1229";
+const APP_VERSION = "1230";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4239,17 +4239,17 @@ function maGetStatus(pa) {
   return 'active';
 }
 
-function maKebabOptions(pa, tName) {
+function maKebabOptions(pa, tName, isParent = false) {
   const s = `width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem`;
   const id = escHtml(pa.id || '');
   const tn = escHtml(tName);
   const btn = (action, label, extra = '') =>
     `<button class="ma-opt-btn" data-action="${action}" data-pa-id="${id}" data-tname="${tn}" style="${s}${extra}">${label}</button>`;
   const status = maGetStatus(pa);
-  if (status === 'active') return btn('master','⭐ Activity Mastered') + btn('discontinue','🚩 Discontinue Activity',';color:#dc2626') + btn('maintain','🆗 Maintain Activity',';color:#0369a1');
+  if (status === 'active') return btn('master','⭐ Activity Mastered') + btn('discontinue','🚩 Discontinue Activity',';color:#dc2626') + (!isParent ? btn('maintain','🆗 Maintain Activity',';color:#0369a1') : '');
   if (status === 'maintained') return btn('master','⭐ Activity Mastered') + btn('discontinue','🚩 Discontinue Activity',';color:#dc2626') + btn('restore','↩ Restore to Active',';color:#4b5563');
-  if (status === 'mastered') return btn('change-master-date','📅 Change Mastered Date') + btn('change-discontinued','🚩 Change to Discontinued',';color:#dc2626') + btn('change-maintain','🆗 Change to Maintain',';color:#0369a1') + btn('restore','↩ Restore to Active',';color:#4b5563');
-  return btn('change-disc-date','📅 Change Discontinued Date') + btn('change-mastered','⭐ Change to Mastered') + btn('change-maintain','🆗 Change to Maintain',';color:#0369a1') + btn('restore','↩ Restore to Active',';color:#4b5563');
+  if (status === 'mastered') return btn('change-master-date','📅 Change Mastered Date') + btn('change-discontinued','🚩 Change to Discontinued',';color:#dc2626') + (!isParent ? btn('change-maintain','🆗 Change to Maintain',';color:#0369a1') : '') + btn('restore','↩ Restore to Active',';color:#4b5563');
+  return btn('change-disc-date','📅 Change Discontinued Date') + btn('change-mastered','⭐ Change to Mastered') + (!isParent ? btn('change-maintain','🆗 Change to Maintain',';color:#0369a1') : '') + btn('restore','↩ Restore to Active',';color:#4b5563');
 }
 
 function openManageActivityScreen(student) {
@@ -4280,6 +4280,30 @@ function renderManageActivityScreen(student) {
 
     // Status buckets exclude headings
     const activityPas = allPas.filter(p => !p.isHeading && !p.isMaintainHeading);
+
+    // Auto-repair: if a parent was mastered/discontinued but its subs were left active
+    // (can happen if the parent was marked before cascade logic existed), fix them now.
+    {
+      let repaired = false;
+      activityPas.filter(p => !p.parentActivity).forEach(parent => {
+        const ps = maGetStatus(parent);
+        if (ps !== 'mastered' && ps !== 'discontinued') return;
+        const paKey = parent._linkKey || parent.title || parent.name;
+        if (!paKey) return;
+        activityPas.filter(a => a.parentActivity === paKey && maIsActive(a)).forEach(child => {
+          if (ps === 'mastered') {
+            delete child.maintained; delete child.activityColor; delete child.discontinuedOn; delete child.isArchived; delete child.isStopped; delete child.inactiveReason;
+            child.masteredOn = parent.masteredOn;
+          } else {
+            delete child.maintained; delete child.activityColor; delete child.masteredOn; delete child.isCompleted; delete child.inactiveReason;
+            child.discontinuedOn = parent.discontinuedOn;
+          }
+          repaired = true;
+        });
+      });
+      if (repaired) saveStudent(student).catch(() => {});
+    }
+
     const masteredPas = activityPas.filter(p => maIsMastered(p));
     const discontPas  = activityPas.filter(p => maIsDiscont(p));
     const maintPas    = activityPas.filter(p => maIsMaintained(p));
@@ -4287,13 +4311,16 @@ function renderManageActivityScreen(student) {
     const activeTopLevel = activePas.filter(p => !p.parentActivity);
     const activeSubs     = activePas.filter(p => !!p.parentActivity);
 
-    const kebabWrap = pa => `
-      <div style="position:relative;flex-shrink:0">
+    const kebabWrap = pa => {
+      const paKey = pa._linkKey || pa.title || pa.name;
+      const isParent = !pa.parentActivity && !!paKey && activityPas.some(a => a.parentActivity === paKey);
+      return `<div style="position:relative;flex-shrink:0">
         <button class="ma-kebab-btn btn-adm-del" data-pa-id="${escHtml(pa.id||'')}" style="font-size:1.3rem;font-weight:900;min-width:34px;min-height:34px;padding:.1rem .4rem;color:#9ca3af;border-radius:.4rem" title="Options">⋮</button>
         <div class="ma-kebab-menu" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:220px;overflow:hidden">
-          ${maKebabOptions(pa, tName)}
+          ${maKebabOptions(pa, tName, isParent)}
         </div>
       </div>`;
+    };
 
     const statusBadge = (pa, small = false) => {
       const s = maGetStatus(pa);
