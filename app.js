@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1239";
+const APP_VERSION = "1240";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4489,7 +4489,8 @@ function renderManageActivityScreen(student) {
       if (!pa) return;
       btn.closest(".ma-kebab-menu").style.display = "none";
       const actWord = pa.parentActivity ? "sub-activity" : "activity";
-      const paDisplayName = escHtml(pa.title || pa.name || '');
+      const _stripMk = s => (s || "").replace(/\*_([\s\S]+?)_\*/g, "$1").replace(/_\*([\s\S]+?)\*_/g, "$1").replace(/\*([\s\S]+?)\*/g, "$1").replace(/_([\s\S]+?)_/g, "$1");
+      const paDisplayName = escHtml(_stripMk(pa.title || pa.name || ''));
 
       const _maLoadLatest = async () => {
         const origText = btn.textContent;
@@ -4502,7 +4503,7 @@ function renderManageActivityScreen(student) {
       const _buildInfoHtml = (latestDate, minDate, latestSubName, restrictionText) => {
         if (!latestDate) return `No previous session data was found for <strong>"${paDisplayName}"</strong>.`;
         const sourcePart = latestSubName
-          ? `The last recorded session for the sub-activity <strong>"${escHtml(latestSubName)}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>.`
+          ? `The last recorded session for the sub-activity <strong>"${escHtml(_stripMk(latestSubName))}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>.`
           : `The last recorded session for <strong>"${paDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>.`;
         return `${sourcePart} So, ${restrictionText.charAt(0).toLowerCase() + restrictionText.slice(1)} <strong>${fmtPeriodDate(minDate)}</strong> onwards.`;
       };
