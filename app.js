@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1241";
+const APP_VERSION = "1242";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -7337,23 +7337,7 @@ function attachTargetListeners(target) {
       const student = state.currentStudent;
       const tgt = student?.targets?.find(t => t.name === state.selectedTargetName);
       if (!student || !tgt) return;
-      openManageModal(student, tgt);
-      // Modal renders synchronously; rAF lets the browser paint first so
-      // scrollIntoView has real layout dimensions to work with.
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        if (!paId) return;
-        const acts = tgt.predefinedActivities || [];
-        const idx = acts.findIndex(a => a.id === paId);
-        if (idx < 0) return;
-        const modalBody = $("manage-modal-body");
-        const el = modalBody?.querySelector(`.admin-list-item[data-idx="${idx}"]`);
-        if (!el || !modalBody) return;
-        // Scroll the modal body so the element lands ~120px from the top
-        const elOffsetTop = el.offsetTop;
-        modalBody.scrollTop = elOffsetTop - 120;
-        el.classList.add("activity-cfg-blink");
-        el.addEventListener("animationend", () => el.classList.remove("activity-cfg-blink"), { once: true });
-      }));
+      openManageModal(student, tgt, null, null, paId || null);
     });
   });
 
@@ -11345,7 +11329,7 @@ function periodSectionHtml(activeFrom, activeTo, idx, withBorder, inactiveReason
 
 // ── Open / close ──────────────────────────────────────────────
 
-function openManageModal(student, targetOrNull, templateOrNull = null, remarkPresetOrNull = null) {
+function openManageModal(student, targetOrNull, templateOrNull = null, remarkPresetOrNull = null, scrollToPaId = null) {
   $("manage-modal").classList.remove("hidden");
   if (remarkPresetOrNull) {
     renderRemarkPresetManageContent(remarkPresetOrNull);
@@ -11372,6 +11356,19 @@ function openManageModal(student, targetOrNull, templateOrNull = null, remarkPre
         return;
       }
       renderTargetManageContent(student, targetOrNull);
+      if (scrollToPaId) {
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          const acts = targetOrNull.predefinedActivities || [];
+          const idx = acts.findIndex(a => a.id === scrollToPaId);
+          if (idx < 0) return;
+          const modalBody = $("manage-modal-body");
+          const el = modalBody?.querySelector(`.admin-list-item[data-idx="${idx}"]`);
+          if (!el || !modalBody) return;
+          modalBody.scrollTop = el.offsetTop - 120;
+          el.classList.add("activity-cfg-blink");
+          el.addEventListener("animationend", () => el.classList.remove("activity-cfg-blink"), { once: true });
+        }));
+      }
     };
     pwInput.addEventListener("keydown", e => { if (e.key === "Enter") checkPw(); });
   } else {
