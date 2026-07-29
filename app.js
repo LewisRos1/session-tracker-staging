@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1245";
+const APP_VERSION = "1247";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -13441,25 +13441,28 @@ function renderTargetManageContent(student, target) {
             overlay.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding-top:1.25rem;z-index:200;border-radius:.75rem;overflow-y:auto";
             const _delLatest3 = [...affectedSessions].sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 3);
             const sessionDateList = affectedSessions.length > 0
-              ? `<p style="font-size:.82rem;margin:.4rem 0 .6rem;color:#374151;font-weight:600">Sessions with data (${affectedSessions.length} total — showing 3 latest):</p>
-                 <ul style="font-size:.82rem;color:#374151;margin:0 0 .7rem;padding-left:1.2rem;line-height:1.8">${
-                   _delLatest3.map(s => `<li>Session ${escHtml(String(s.sessionNumber || s.number || "?"))}: ${escHtml(formatDateWithDay(s.date))}</li>`).join("")
-                 }${affectedSessions.length > 3 ? `<li style="color:#9ca3af">…and ${affectedSessions.length - 3} more</li>` : ''}</ul>` : "";
+              ? `<p style="font-size:.82rem;margin:.4rem 0 .35rem;color:#374151;font-weight:600">Latest ${Math.min(affectedSessions.length, 3)} Session${Math.min(affectedSessions.length, 3) !== 1 ? "s" : ""} with Data:</p>
+                 <ul style="font-size:.82rem;color:#374151;margin:0 0 .7rem;padding-left:0;list-style:none;line-height:1.9">${
+                   _delLatest3.map(s => `<li>• Session ${escHtml(String(s.sessionNumber || s.number || "?"))} — ${escHtml(formatDateWithDay(s.date))}</li>`).join("")
+                 }${affectedSessions.length > 3 ? `<li style="color:#9ca3af">  …and ${affectedSessions.length - 3} more</li>` : ''}</ul>` : "";
             const hasData = affected > 0;
             overlay.innerHTML = `<div style="background:#fff;padding:1.25rem;border-radius:.75rem;width:min(320px,92%);box-shadow:0 4px 24px rgba(0,0,0,.25);margin-bottom:1rem">
               <p style="font-size:.88rem;margin:0 0 .5rem;color:#111;font-weight:700">⚠️ Delete "${escHtml(pa.title || pa.name || 'this activity')}"?</p>
               ${hasData
-                ? `<p style="font-size:.84rem;margin:0 0 .4rem;color:#dc2626;font-weight:600">This activity has data in <strong>${affected} session${affected !== 1 ? "s" : ""}</strong>. Deleting it will permanently remove all that data.</p>
+                ? `<p style="font-size:.84rem;margin:0 0 .4rem;color:#374151">This activity contains data from ${affected} session${affected !== 1 ? "s" : ""}. Deleting it will permanently remove all associated data.</p>
                    ${sessionDateList}
-                   <p style="font-size:.84rem;margin:0 0 .5rem;color:#374151">We recommend <strong>"Mark as Discontinued"</strong> instead — the activity disappears from new sessions but your past data is preserved.</p>
-                   <p style="font-size:.84rem;margin:.5rem 0 .3rem;color:#374151">Still want to delete? Type <strong>${confirmWord}</strong> to confirm:</p>
+                   <p style="font-size:.84rem;margin:0 0 .6rem;color:#374151">We recommend selecting <strong>"Mark as Discontinued"</strong> instead. This will remove the activity from future sessions while keeping your past data intact.</p>
+                   <p style="font-size:.84rem;margin:0 0 .35rem;color:#374151">To confirm deletion, type: <strong>${confirmWord}</strong></p>
                    <input id="del-type-input" type="text" autocomplete="off" inputmode="numeric"
                      style="width:100%;box-sizing:border-box;padding:.45rem .6rem;border:2px solid #d1d5db;border-radius:.4rem;font-size:1.1rem;text-align:center;outline:none;margin-bottom:.6rem" placeholder="${confirmWord}">`
-                : `<p style="font-size:.84rem;margin:0 0 .75rem;color:#6b7280">No past session data found for this activity. This cannot be undone.</p>`
+                : `<p style="font-size:.84rem;margin:0 0 .5rem;color:#6b7280">No past session data found for this activity. This cannot be undone.</p>
+                   <p style="font-size:.84rem;margin:0 0 .35rem;color:#374151">To confirm deletion, type: <strong>DELETE</strong></p>
+                   <input id="del-type-input" type="text" autocomplete="off"
+                     style="width:100%;box-sizing:border-box;padding:.45rem .6rem;border:2px solid #d1d5db;border-radius:.4rem;font-size:1.1rem;text-align:center;outline:none;margin-bottom:.6rem" placeholder="DELETE">`
               }
               <div style="display:flex;gap:.5rem">
                 <button id="del-type-cancel" style="flex:1;padding:.45rem;border:1px solid #d1d5db;border-radius:.4rem;background:#f9fafb;cursor:pointer;font-size:.85rem">Cancel</button>
-                <button id="del-type-ok" ${hasData ? 'disabled style="flex:1;padding:.45rem;border:none;border-radius:.4rem;background:#dc2626;color:#fff;cursor:pointer;font-size:.85rem;opacity:.4"' : 'style="flex:1;padding:.45rem;border:none;border-radius:.4rem;background:#dc2626;color:#fff;cursor:pointer;font-size:.85rem"'}>Delete</button>
+                <button id="del-type-ok" disabled style="flex:1;padding:.45rem;border:none;border-radius:.4rem;background:#dc2626;color:#fff;cursor:pointer;font-size:.85rem;opacity:.4">Delete</button>
               </div>
             </div>`;
             const modalSheet = $("manage-modal").querySelector(".modal-sheet");
@@ -13477,7 +13480,7 @@ function renderTargetManageContent(student, target) {
             }
             overlay.querySelector("#del-type-cancel").addEventListener("click", () => overlay.remove());
             okBtn.addEventListener("click", async () => {
-              if (inp && inp.value !== confirmWord) return;
+              if (inp.value !== confirmWord) return;
               overlay.remove();
               const actIdx = acts.indexOf(pa);
               if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
