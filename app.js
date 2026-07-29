@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1244";
+const APP_VERSION = "1245";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -13409,32 +13409,31 @@ function renderTargetManageContent(student, target) {
             const allSessions = _groupForTargetEdit
               ? await getAllSessionsForGroup(_groupForTargetEdit.id)
               : await getAllSessionsForStudent(student.id);
-            const paPA = pa.parentActivity || null;
+            // Include sub-activities when checking a parent activity
+            const paKey = pa._linkKey || pa.title || pa.name;
+            const toCheck = [{ name: pa.name, title: pa.title, paPA: pa.parentActivity || null }];
+            (acts || []).filter(a => a.parentActivity === paKey && !a.isHeading && !a.isNote && !a.isExportNote)
+              .forEach(sub => toCheck.push({ name: sub.name, title: sub.title, paPA: paKey }));
             affectedSessions = allSessions.filter(s => {
               const sActs = s.activities || {}; const sRems = s.remarks || {};
-              const matchIds = Object.entries(sActs).filter(([, a]) =>
-                a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title)) &&
-                (paPA === null ? !a.parentActivity : a.parentActivity === paPA)
-              ).map(([id]) => id);
-              return matchIds.some(actId => Object.values(sRems).some(r =>
-                r.activityId === actId && (
-                  (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
-                  (r.trials || []).some(t => t !== null && t !== -1)
-                )
-              ));
+              return toCheck.some(({ name, title, paPA }) => {
+                const matchIds = Object.entries(sActs).filter(([, a]) =>
+                  a.targetName === target.name && (a.activityName === name || (title && a.activityName === title)) &&
+                  (paPA === null ? !a.parentActivity : a.parentActivity === paPA)
+                ).map(([id]) => id);
+                return matchIds.some(actId => Object.values(sRems).some(r =>
+                  r.activityId === actId && (
+                    (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
+                    (r.trials || []).some(t => t !== null && t !== -1)
+                  )
+                ));
+              });
             });
             affected = affectedSessions.length;
           } catch { affected = -1; }
           btn.disabled = false;
           btn.textContent = "🗑️ Delete Activity";
-          if (affected === 0) {
-            if (!confirm(`No past data found for this activity — safe to delete.`)) return;
-            const actIdx = acts.indexOf(pa);
-            if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
-            target.predefinedActivities = acts;
-            await saveTarget();
-            renderTargetManageContent(student, target);
-          } else {
+          {
             const confirmWord = affected > 0 ? String(affected) : "DELETE";
             $("manage-modal").querySelectorAll("[data-del-overlay]").forEach(el => el.remove());
             const overlay = document.createElement("div");
@@ -13446,22 +13445,21 @@ function renderTargetManageContent(student, target) {
                  <ul style="font-size:.82rem;color:#374151;margin:0 0 .7rem;padding-left:1.2rem;line-height:1.8">${
                    _delLatest3.map(s => `<li>Session ${escHtml(String(s.sessionNumber || s.number || "?"))}: ${escHtml(formatDateWithDay(s.date))}</li>`).join("")
                  }${affectedSessions.length > 3 ? `<li style="color:#9ca3af">…and ${affectedSessions.length - 3} more</li>` : ''}</ul>` : "";
+            const hasData = affected > 0;
             overlay.innerHTML = `<div style="background:#fff;padding:1.25rem;border-radius:.75rem;width:min(320px,92%);box-shadow:0 4px 24px rgba(0,0,0,.25);margin-bottom:1rem">
-              <p style="font-size:.88rem;margin:0 0 .6rem;color:#111;font-weight:700">⚠️ If you delete this activity, all data from the past <strong>${confirmWord} session${affected !== 1 ? "s" : ""}</strong> will be permanently lost.</p>
-              ${sessionDateList}
-              <p style="font-size:.84rem;margin:0 0 .5rem;color:#374151">We recommend selecting <strong>"Mark as Mastered"</strong> or <strong>"Mark as Discontinued"</strong> instead. Once marked, the activity will no longer appear in new sessions, but it will remain in your previous sessions and your existing data will be preserved.</p>
-              <p style="font-size:.84rem;margin:.5rem 0 .3rem;color:#374151;font-weight:600">To proceed without deleting, follow these steps:</p>
-              <ol style="font-size:.84rem;color:#374151;margin:.2rem 0 .8rem;padding-left:1.3rem;line-height:1.8">
-                <li>Tap the <strong>Cancel</strong> button below</li>
-                <li>Find the activity you wanted to delete and tap the <strong>⋮</strong> button on the right</li>
-                <li>Select <strong>"Mark as Mastered"</strong> or <strong>"Mark as Discontinued"</strong></li>
-              </ol>
-              <p style="font-size:.84rem;margin:0 0 .5rem;color:#374151">Still want to delete? Type <strong>${confirmWord}</strong> to confirm.</p>
-              <input id="del-type-input" type="text" autocomplete="off" inputmode="numeric"
-                style="width:100%;box-sizing:border-box;padding:.45rem .6rem;border:2px solid #d1d5db;border-radius:.4rem;font-size:1.1rem;text-align:center;outline:none;margin-bottom:.6rem" placeholder="${confirmWord}">
+              <p style="font-size:.88rem;margin:0 0 .5rem;color:#111;font-weight:700">⚠️ Delete "${escHtml(pa.title || pa.name || 'this activity')}"?</p>
+              ${hasData
+                ? `<p style="font-size:.84rem;margin:0 0 .4rem;color:#dc2626;font-weight:600">This activity has data in <strong>${affected} session${affected !== 1 ? "s" : ""}</strong>. Deleting it will permanently remove all that data.</p>
+                   ${sessionDateList}
+                   <p style="font-size:.84rem;margin:0 0 .5rem;color:#374151">We recommend <strong>"Mark as Discontinued"</strong> instead — the activity disappears from new sessions but your past data is preserved.</p>
+                   <p style="font-size:.84rem;margin:.5rem 0 .3rem;color:#374151">Still want to delete? Type <strong>${confirmWord}</strong> to confirm:</p>
+                   <input id="del-type-input" type="text" autocomplete="off" inputmode="numeric"
+                     style="width:100%;box-sizing:border-box;padding:.45rem .6rem;border:2px solid #d1d5db;border-radius:.4rem;font-size:1.1rem;text-align:center;outline:none;margin-bottom:.6rem" placeholder="${confirmWord}">`
+                : `<p style="font-size:.84rem;margin:0 0 .75rem;color:#6b7280">No past session data found for this activity. This cannot be undone.</p>`
+              }
               <div style="display:flex;gap:.5rem">
                 <button id="del-type-cancel" style="flex:1;padding:.45rem;border:1px solid #d1d5db;border-radius:.4rem;background:#f9fafb;cursor:pointer;font-size:.85rem">Cancel</button>
-                <button id="del-type-ok" disabled style="flex:1;padding:.45rem;border:none;border-radius:.4rem;background:#dc2626;color:#fff;cursor:pointer;font-size:.85rem;opacity:.4">Confirm Delete</button>
+                <button id="del-type-ok" ${hasData ? 'disabled style="flex:1;padding:.45rem;border:none;border-radius:.4rem;background:#dc2626;color:#fff;cursor:pointer;font-size:.85rem;opacity:.4"' : 'style="flex:1;padding:.45rem;border:none;border-radius:.4rem;background:#dc2626;color:#fff;cursor:pointer;font-size:.85rem"'}>Delete</button>
               </div>
             </div>`;
             const modalSheet = $("manage-modal").querySelector(".modal-sheet");
@@ -13469,14 +13467,17 @@ function renderTargetManageContent(student, target) {
             modalSheet.appendChild(overlay);
             const inp = overlay.querySelector("#del-type-input");
             const okBtn = overlay.querySelector("#del-type-ok");
-            inp.focus();
-            inp.addEventListener("input", () => {
-              const ok = inp.value === confirmWord;
-              okBtn.disabled = !ok;
-              okBtn.style.opacity = ok ? "1" : ".4";
-            });
+            if (inp) {
+              inp.focus();
+              inp.addEventListener("input", () => {
+                const ok = inp.value === confirmWord;
+                okBtn.disabled = !ok;
+                okBtn.style.opacity = ok ? "1" : ".4";
+              });
+            }
             overlay.querySelector("#del-type-cancel").addEventListener("click", () => overlay.remove());
             okBtn.addEventListener("click", async () => {
+              if (inp && inp.value !== confirmWord) return;
               overlay.remove();
               const actIdx = acts.indexOf(pa);
               if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
