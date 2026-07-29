@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1230";
+const APP_VERSION = "1231";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4489,6 +4489,7 @@ function renderManageActivityScreen(student) {
       if (!pa) return;
       btn.closest(".ma-kebab-menu").style.display = "none";
       const actWord = pa.parentActivity ? "sub-activity" : "activity";
+      const paDisplayName = escHtml(pa.title || pa.name || '');
 
       const _maLoadLatest = async () => {
         const origText = btn.textContent;
@@ -4499,11 +4500,11 @@ function renderManageActivityScreen(student) {
         return result;
       };
       const _buildInfoHtml = (latestDate, minDate, latestSubName, restrictionText) => {
-        if (!latestDate) return `No previous session data was found for this ${actWord}.`;
+        if (!latestDate) return `No previous session data was found for <strong>"${paDisplayName}"</strong>.`;
         const sourcePart = latestSubName
           ? `The last recorded session for the sub-activity <strong>"${escHtml(latestSubName)}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>.`
-          : `The last recorded session for this ${actWord} was on <strong>${fmtPeriodDate(latestDate)}</strong>.`;
-        return `${sourcePart}<br><br>${restrictionText} <strong>${fmtPeriodDate(minDate)}</strong> onwards.`;
+          : `The last recorded session for <strong>"${paDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>.`;
+        return `${sourcePart} So, ${restrictionText.charAt(0).toLowerCase() + restrictionText.slice(1)} <strong>${fmtPeriodDate(minDate)}</strong> onwards.`;
       };
       if (action === 'master' || action === 'discontinue') {
         const { date: latestDate, subName: latestSubName } = await _maLoadLatest();
@@ -13691,9 +13692,10 @@ function renderTargetManageContent(student, target) {
         latestDate = dates[dates.length - 1] || null;
       } finally { btn.disabled = false; btn.textContent = origText; }
       const minDate = latestDate ? addOneDay(latestDate) : todayDateStr();
+      const _paName = escHtml(pa.title || pa.name || '');
       const infoHtml = latestDate
-        ? `The last recorded session for this activity was on <strong>${fmtPeriodDate(latestDate)}</strong>.<br>You can only set this date from <strong>${fmtPeriodDate(minDate)}</strong> onwards.`
-        : `No previous session data was found for this activity.`;
+        ? `The last recorded session for <strong>"${_paName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>. So, you can only set this date from <strong>${fmtPeriodDate(minDate)}</strong> onwards.`
+        : `No previous session data was found for <strong>"${_paName}"</strong>.`;
       const current = type === "mastered" ? pa.masteredOn : pa.discontinuedOn;
       const pickedDate = await showDatePickerOverlay({
         heading: type === "mastered" ? "📅 Change Mastered Date" : "📅 Change Discontinued Date",
