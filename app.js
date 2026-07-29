@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1236";
+const APP_VERSION = "1237";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -12830,7 +12830,7 @@ function renderTargetManageContent(student, target) {
                     <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subIdx}" data-idx="${subIdx}"
                       placeholder="Enter Activity Title Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
                   </div>
-                  <button class="mn-move-sub-act" data-idx="${subIdx}" title="Move to a different parent activity" style="flex-shrink:0;margin-top:.35rem;font-size:.78rem;padding:.25rem .5rem;background:#eff6ff;border:1px solid #bfdbfe;border-radius:.35rem;color:#1d4ed8;cursor:pointer;line-height:1.2">↳ Move</button>
+                  <button class="mn-move-sub-act" data-idx="${subIdx}" title="Move to a different parent activity" style="flex-shrink:0;margin-top:.35rem;font-size:.78rem;padding:.25rem .5rem;background:#eff6ff;border:1px solid #bfdbfe;border-radius:.35rem;color:#1d4ed8;cursor:pointer;line-height:1.2">↳ Move to another Parent Activity</button>
                   <button class="btn-adm-del mn-del-sub-act" data-idx="${subIdx}" title="Delete sub-activity" style="flex-shrink:0;margin-top:.35rem">🗑</button>
                 </div>
               </div>
