@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1232";
+const APP_VERSION = "1233";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4526,7 +4526,8 @@ function renderManageActivityScreen(student) {
           if (pa.parentActivity) return; // pa is itself a sub — don't cascade
           const paKey = pa._linkKey || pa.title || pa.name;
           if (!paKey) return;
-          (target.predefinedActivities || []).filter(a => a.parentActivity === paKey).forEach(fn);
+          // Only cascade to subs that are still active — preserve independently set dates
+          (target.predefinedActivities || []).filter(a => a.parentActivity === paKey && maIsActive(a)).forEach(fn);
         };
         if (action === 'master') {
           delete pa.maintained; delete pa.activityColor; delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped; delete pa.inactiveReason;
