@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1227";
+const APP_VERSION = "1228";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4449,7 +4449,7 @@ function renderManageActivityScreen(student) {
         const sourcePart = latestSubName
           ? `The last recorded session for the sub-activity <strong>"${escHtml(latestSubName)}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>.`
           : `The last recorded session for this ${actWord} was on <strong>${fmtPeriodDate(latestDate)}</strong>.`;
-        return `${sourcePart}<br>${restrictionText} <strong>${fmtPeriodDate(minDate)}</strong> onwards.`;
+        return `${sourcePart}<br><br>${restrictionText} <strong>${fmtPeriodDate(minDate)}</strong> onwards.`;
       };
       if (action === 'master' || action === 'discontinue') {
         const { date: latestDate, subName: latestSubName } = await _maLoadLatest();
