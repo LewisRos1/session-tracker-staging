@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1211";
+const APP_VERSION = "1212";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -11547,7 +11547,13 @@ async function closeManageModal() {
     });
     const before = acts.length;
     for (let i = acts.length - 1; i >= 0; i--) {
-      if (isEmptyActItem(acts[i])) acts.splice(i, 1);
+      if (isEmptyActItem(acts[i])) {
+        // Restore any sub-activities pointing to this empty parent so they
+        // become top-level instead of orphaned (invisible everywhere).
+        const removedKey = acts[i]._linkKey || acts[i].id;
+        if (removedKey) acts.forEach(a2 => { if (a2.parentActivity === removedKey) delete a2.parentActivity; });
+        acts.splice(i, 1);
+      }
     }
     if (acts.length !== before) acts.forEach((a, i) => a.order = i);
     // Always save on close — not just when empty items were removed. Any
@@ -12422,6 +12428,21 @@ function renderTargetManageContent(student, target) {
   }
 
   const acts = target.predefinedActivities;
+
+  // Auto-restore sub-activities whose parent was deleted (e.g. empty parent
+  // discarded on modal close). Without this they become permanently invisible.
+  {
+    const parentKeys = new Set(acts.map(a => a._linkKey || a.title || a.name).filter(Boolean));
+    let orphanFixed = false;
+    acts.forEach(a => {
+      if (!a.parentActivity) return;
+      if (!parentKeys.has(a.parentActivity)) { delete a.parentActivity; orphanFixed = true; }
+    });
+    if (orphanFixed) {
+      acts.forEach((a, i) => a.order = i);
+      (_groupForTargetEdit ? saveGroup(_groupForTargetEdit) : saveStudent(student)).catch(() => {});
+    }
+  }
 
   // Migrate fixedRemark activities to free text on first open
   if (acts.some(a => a.fixedRemark !== undefined)) {
