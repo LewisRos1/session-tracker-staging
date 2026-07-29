@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1235";
+const APP_VERSION = "1236";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -6156,7 +6156,7 @@ function renderFedcTarget(target) {
         html += `<div class="entry-block" style="border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);border-top:1px solid var(--border);border-radius:${subRadius};box-shadow:var(--shadow)">
           <div class="entry-field" contenteditable="false">
             <span style="flex-shrink:0;align-self:flex-start;margin-top:.45rem;display:inline-block;background:#dbeafe;color:#1e40af;border-radius:.4rem;padding:.12rem .5rem;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Subactivity</span>
-            <span class="field-value-fixed"><span style="color:#1e40af;font-weight:700;margin-right:.25rem">${subLabel})</span>${paDisplayHtml(sub)}</span>
+            <span class="field-value-fixed"><span style="color:#1e40af;font-weight:700;margin-right:.25rem">${subLabel})</span>${inactiveReasonBadge(sub)}${paDisplayHtml(sub)}</span>
           </div>`;
         for (const rem of subRemarks) {
           html += renderRemarkFields(rem, target, getActivityInlineOptions(sub), (sub.inlineOptions || sub.remarkPresetId || sub.remarkHasNote) ? (sub.sentenceStarter || null) : null, sub.optionsMulti || false, null, sub.remarkHasNote || false, false, sub.optionScores || null);
@@ -16271,7 +16271,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
         groupHtml += `<div style="border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);border-top:1px solid var(--border);border-radius:${subRadius};overflow:hidden">
           <div style="padding:.4rem .6rem;display:flex;align-items:center;gap:.45rem">
             <span style="flex-shrink:0;background:#dbeafe;color:#1e40af;border-radius:.4rem;padding:.12rem .5rem;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Subactivity</span>
-            <span style="font-size:.85rem;font-weight:700;color:#374151"><span style="color:#1e40af">${letters[si]})</span> ${escHtml(sub.name)}</span>
+            <span style="font-size:.85rem;font-weight:700;color:#374151"><span style="color:#1e40af">${letters[si]})</span> ${escHtml(sub.name)}</span>${inactiveReasonBadge(sub)}
           </div>
           ${subCard}
         </div>`;
