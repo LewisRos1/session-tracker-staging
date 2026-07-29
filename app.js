@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1217";
+const APP_VERSION = "1218";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2208,8 +2208,7 @@ async function hyrGenerate() {
       .slice(0, 5);
     const bottom5Names = bottom5Targets.map(r => r.name);
 
-    const _hyrPromptInstr = (await getHyrConfig()).prompt || HYR_DEFAULT_PROMPT;
-    const aiPrompt = `${_hyrPromptInstr}
+    const aiPrompt = `${HYR_DEFAULT_PROMPT}
 
 Student: ${student.name}
 Reporting Period: ${aiReportingPeriod}
@@ -4009,48 +4008,18 @@ async function hyrOpenSettings() {
 }
 
 async function hyrShowPromptEditor() {
-  const config = await getHyrConfig();
-
   $("manage-modal-title").textContent = "Prompt for AI Report";
   $("manage-modal-body").innerHTML = `
     <div style="padding:.75rem 1rem;display:flex;flex-direction:column;gap:1rem">
       <div style="border:1.5px solid var(--border);border-radius:.6rem;padding:.85rem 1rem">
         <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:.65rem">
-          This is what Claude is instructed to do when generating a report. Edits are saved automatically.
+          This is the exact prompt sent to Claude every time a report is generated. It is set in the code and cannot be edited here.
         </div>
-        <textarea id="hyr-prompt-textarea" class="admin-input" rows="18"
-          style="font-family:monospace;font-size:.78rem;resize:vertical"
-        >${escHtml(config.prompt || HYR_DEFAULT_PROMPT)}</textarea>
-        <div id="hyr-autosave-status" style="font-size:.75rem;color:var(--text-muted);margin-top:.4rem;text-align:right;min-height:1em"></div>
+        <textarea class="admin-input" rows="18" readonly
+          style="font-family:monospace;font-size:.78rem;resize:vertical;background:#f9fafb;color:#374151;cursor:default"
+        >${escHtml(HYR_DEFAULT_PROMPT)}</textarea>
       </div>
     </div>`;
-
-  let saveTimer = null;
-  $("hyr-prompt-textarea").addEventListener("input", () => {
-    const status = $("hyr-autosave-status");
-    status.textContent = "Unsaved changes…";
-    status.style.color = "var(--text-muted)";
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(async () => {
-      const newPrompt = $("hyr-prompt-textarea")?.value.trim();
-      if (!newPrompt) return;
-      status.textContent = "Saving…";
-      try {
-        _hyrConfig = null;
-        await saveHalfYearReportConfig({ ...config, prompt: newPrompt });
-        _hyrConfig = await loadHalfYearReportConfig();
-        if ($("hyr-autosave-status")) {
-          $("hyr-autosave-status").textContent = "Saved ✓";
-          $("hyr-autosave-status").style.color = "#16a34a";
-        }
-      } catch {
-        if ($("hyr-autosave-status")) {
-          $("hyr-autosave-status").textContent = "Save failed";
-          $("hyr-autosave-status").style.color = "#dc2626";
-        }
-      }
-    }, 900);
-  });
 }
 
 async function renderRecentlyDeleted() {
