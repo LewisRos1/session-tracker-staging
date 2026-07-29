@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1223";
+const APP_VERSION = "1224";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -4228,8 +4228,8 @@ function maKebabOptions(pa, tName) {
   const status = maGetStatus(pa);
   if (status === 'active') return btn('master','⭐ Activity Mastered') + btn('discontinue','🚩 Discontinue Activity',';color:#dc2626') + btn('maintain','🆗 Maintain Activity',';color:#0369a1');
   if (status === 'maintained') return btn('master','⭐ Activity Mastered') + btn('discontinue','🚩 Discontinue Activity',';color:#dc2626') + btn('restore','↩ Restore to Active',';color:#4b5563');
-  if (status === 'mastered') return btn('change-discontinued','🚩 Change to Discontinued',';color:#dc2626') + btn('change-maintain','🆗 Change to Maintain',';color:#0369a1') + btn('restore','↩ Restore to Active',';color:#4b5563');
-  return btn('change-mastered','⭐ Change to Mastered') + btn('change-maintain','🆗 Change to Maintain',';color:#0369a1') + btn('restore','↩ Restore to Active',';color:#4b5563');
+  if (status === 'mastered') return btn('change-master-date','📅 Change Mastered Date') + btn('change-discontinued','🚩 Change to Discontinued',';color:#dc2626') + btn('change-maintain','🆗 Change to Maintain',';color:#0369a1') + btn('restore','↩ Restore to Active',';color:#4b5563');
+  return btn('change-disc-date','📅 Change Discontinued Date') + btn('change-mastered','⭐ Change to Mastered') + btn('change-maintain','🆗 Change to Maintain',';color:#0369a1') + btn('restore','↩ Restore to Active',';color:#4b5563');
 }
 
 function openManageActivityScreen(student) {
@@ -4414,27 +4414,65 @@ function renderManageActivityScreen(student) {
       btn.closest(".ma-kebab-menu").style.display = "none";
       const actWord = pa.parentActivity ? "sub-activity" : "activity";
 
-      if (action === 'master' || action === 'discontinue') {
+      const _maLoadLatest = async () => {
         const origText = btn.textContent;
         btn.disabled = true; btn.textContent = "Checking…";
-        let latestDate = null;
-        try { latestDate = await maGetLastDataDate(student, target, pa); }
+        let d = null;
+        try { d = await maGetLastDataDate(student, target, pa); }
         finally { btn.disabled = false; btn.textContent = origText; }
-        const autoDate = latestDate ? addOneDay(latestDate) : todayDateStr();
-        const latestPart = latestDate
-          ? `The last time data was recorded for this ${actWord} was <strong>${fmtPeriodDate(latestDate)}</strong>.`
-          : `No previous data was found for this ${actWord}.`;
+        return d;
+      };
+      if (action === 'master' || action === 'discontinue') {
+        const latestDate = await _maLoadLatest();
+        const minDate = latestDate ? addOneDay(latestDate) : todayDateStr();
+        const infoHtml = latestDate
+          ? `The last session with data for this ${actWord} was <strong>${fmtPeriodDate(latestDate)}</strong>.`
+          : `No previous session data was found for this ${actWord}.`;
+        const pickedDate = await showDatePickerOverlay({
+          heading: action === 'master' ? '⭐ Mark as Mastered' : '🚩 Discontinue Activity',
+          infoHtml,
+          minDate,
+          defaultDate: minDate,
+          confirmLabel: action === 'master' ? 'Confirm ⭐' : 'Confirm 🚩'
+        });
+        if (!pickedDate) return;
         if (action === 'master') {
-          const ok = await showAutoDateConfirm({ message: `${latestPart} It will be marked as mastered from <strong>${fmtPeriodDate(autoDate)}</strong> onwards.`, confirmLabel: "Confirm ⭐" });
-          if (!ok) return;
           delete pa.maintained; delete pa.activityColor; delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped; delete pa.inactiveReason;
-          pa.masteredOn = autoDate;
+          pa.masteredOn = pickedDate;
         } else {
-          const ok = await showAutoDateConfirm({ message: `${latestPart} It will be discontinued from <strong>${fmtPeriodDate(autoDate)}</strong> onwards.`, confirmLabel: "Confirm 🚩" });
-          if (!ok) return;
           delete pa.maintained; delete pa.activityColor; delete pa.masteredOn; delete pa.isCompleted; delete pa.inactiveReason;
-          pa.discontinuedOn = autoDate;
+          pa.discontinuedOn = pickedDate;
         }
+      } else if (action === 'change-master-date') {
+        const latestDate = await _maLoadLatest();
+        const minDate = latestDate ? addOneDay(latestDate) : todayDateStr();
+        const infoHtml = latestDate
+          ? `The last session with data for this ${actWord} was <strong>${fmtPeriodDate(latestDate)}</strong>.`
+          : `No previous session data was found for this ${actWord}.`;
+        const pickedDate = await showDatePickerOverlay({
+          heading: '📅 Change Mastered Date',
+          infoHtml,
+          minDate,
+          defaultDate: pa.masteredOn || minDate,
+          confirmLabel: 'Save Date'
+        });
+        if (!pickedDate) return;
+        pa.masteredOn = pickedDate;
+      } else if (action === 'change-disc-date') {
+        const latestDate = await _maLoadLatest();
+        const minDate = latestDate ? addOneDay(latestDate) : todayDateStr();
+        const infoHtml = latestDate
+          ? `The last session with data for this ${actWord} was <strong>${fmtPeriodDate(latestDate)}</strong>.`
+          : `No previous session data was found for this ${actWord}.`;
+        const pickedDate = await showDatePickerOverlay({
+          heading: '📅 Change Discontinued Date',
+          infoHtml,
+          minDate,
+          defaultDate: pa.discontinuedOn || minDate,
+          confirmLabel: 'Save Date'
+        });
+        if (!pickedDate) return;
+        pa.discontinuedOn = pickedDate;
       } else if (action === 'maintain') {
         const ok = await showAutoDateConfirm({ message: `This ${actWord} will be labelled 🆗 Maintained. It will still appear in sessions.`, confirmLabel: "Confirm 🆗" });
         if (!ok) return;
@@ -4448,13 +4486,13 @@ function renderManageActivityScreen(student) {
         delete pa.maintained; delete pa.activityColor;
       } else if (action === 'change-discontinued') {
         const existingDate = pa.masteredOn || todayDateStr();
-        const ok = await showAutoDateConfirm({ message: `This ${actWord} will be changed from ⭐ Mastered to 🚩 Discontinued, keeping the date (${fmtPeriodDate(existingDate)}).`, confirmLabel: "Confirm 🚩" });
+        const ok = await showAutoDateConfirm({ message: `This ${actWord} will be changed from ⭐ Mastered to 🚩 Discontinued, keeping the same date (${fmtPeriodDate(existingDate)}).`, confirmLabel: "Confirm 🚩" });
         if (!ok) return;
         pa.discontinuedOn = existingDate;
         delete pa.masteredOn; delete pa.isCompleted; delete pa.inactiveReason;
       } else if (action === 'change-mastered') {
         const existingDate = pa.discontinuedOn || todayDateStr();
-        const ok = await showAutoDateConfirm({ message: `This ${actWord} will be changed from 🚩 Discontinued to ⭐ Mastered, keeping the date (${fmtPeriodDate(existingDate)}).`, confirmLabel: "Confirm ⭐" });
+        const ok = await showAutoDateConfirm({ message: `This ${actWord} will be changed from 🚩 Discontinued to ⭐ Mastered, keeping the same date (${fmtPeriodDate(existingDate)}).`, confirmLabel: "Confirm ⭐" });
         if (!ok) return;
         pa.masteredOn = existingDate;
         delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped; delete pa.inactiveReason;
@@ -11064,6 +11102,37 @@ function showAutoDateConfirm({ message, confirmLabel }) {
   });
 }
 
+function showDatePickerOverlay({ heading, infoHtml, minDate, defaultDate, confirmLabel }) {
+  return new Promise(resolve => {
+    const overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem";
+    const min = minDate || todayDateStr();
+    const def = defaultDate && defaultDate >= min ? defaultDate : min;
+    overlay.innerHTML = `<div style="background:#fff;border-radius:.75rem;padding:1.5rem;max-width:400px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.22)">
+      <div style="font-size:.93rem;font-weight:700;color:#111;margin-bottom:.55rem">${heading}</div>
+      ${infoHtml ? `<div style="font-size:.85rem;color:#374151;margin-bottom:.9rem;line-height:1.6">${infoHtml}</div>` : ''}
+      <label style="font-size:.82rem;font-weight:600;color:#374151;display:block;margin-bottom:.35rem">Last date this activity appears in sessions:</label>
+      <input type="date" id="dp-date-inp" value="${def}" min="${min}" style="width:100%;box-sizing:border-box;padding:.5rem .7rem;border:1.5px solid #d1d5db;border-radius:.4rem;font-size:.95rem;outline:none;margin-bottom:.35rem">
+      <div style="font-size:.77rem;color:#6b7280;margin-bottom:1rem">Sessions after this date will not show this activity.</div>
+      <div style="display:flex;gap:.6rem;justify-content:flex-end">
+        <button class="dp-cancel" style="padding:.5rem 1rem;border:1px solid #d1d5db;border-radius:.4rem;background:#fff;cursor:pointer;font-size:.9rem">Cancel</button>
+        <button class="dp-confirm" style="padding:.5rem 1rem;border:none;border-radius:.4rem;background:var(--primary);color:#fff;cursor:pointer;font-size:.9rem;font-weight:600">${confirmLabel}</button>
+      </div>
+    </div>`;
+    document.body.appendChild(overlay);
+    const inp = overlay.querySelector("#dp-date-inp");
+    const finish = val => { overlay.remove(); document.removeEventListener("keydown", onKey); resolve(val); };
+    overlay.querySelector(".dp-cancel").addEventListener("click", () => finish(null));
+    overlay.querySelector(".dp-confirm").addEventListener("click", () => {
+      if (!inp.value || inp.value < min) { inp.style.borderColor = "#dc2626"; return; }
+      finish(inp.value);
+    });
+    const onKey = e => { if (e.key === "Escape") finish(null); };
+    document.addEventListener("keydown", onKey);
+    requestAnimationFrame(() => inp.focus());
+  });
+}
+
 function addOneDay(dateStr) {
   const d = new Date(dateStr + "T00:00:00");
   d.setDate(d.getDate() + 1);
@@ -11073,8 +11142,8 @@ function addOneDay(dateStr) {
 
 function isActivityActive(pa, dateStr) {
   if (!dateStr) return true;
-  if (pa.masteredOn    && dateStr >= pa.masteredOn)    return false;
-  if (pa.discontinuedOn && dateStr >= pa.discontinuedOn) return false;
+  if (pa.masteredOn    && dateStr > pa.masteredOn)    return false;
+  if (pa.discontinuedOn && dateStr > pa.discontinuedOn) return false;
   if (pa.activeFrom && dateStr < pa.activeFrom) return false;
   if (pa.activeTo   && dateStr > pa.activeTo)   return false;
   return true;
@@ -12801,6 +12870,7 @@ function renderTargetManageContent(student, target) {
           <div style="position:relative">
             <button class="btn-mn-inactive-kebab" data-completed-idx="${ci}" data-inactive-type="mastered" style="font-size:1.2rem;font-weight:900;min-width:28px;height:28px;border:none;background:#f3f4f6;cursor:pointer;padding:0 5px;border-radius:.3rem;line-height:1">⋮</button>
             <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
+              <button class="btn-mn-change-date" data-completed-idx="${ci}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Mastered Date</button>
               <button class="btn-mn-restore" data-completed-idx="${ci}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active Activity</button>
               <button class="btn-mn-switch-status" data-completed-idx="${ci}" data-from="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#6b7280">🚩 Change to Discontinued</button>
               <button class="btn-mn-del-mastered" data-completed-idx="${ci}" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
@@ -12859,6 +12929,7 @@ function renderTargetManageContent(student, target) {
           <div style="position:relative">
             <button class="btn-mn-inactive-kebab" data-completed-idx="${ci}" data-inactive-type="discontinued" style="font-size:1.2rem;font-weight:900;min-width:28px;height:28px;border:none;background:#f3f4f6;cursor:pointer;padding:0 5px;border-radius:.3rem;line-height:1">⋮</button>
             <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
+              <button class="btn-mn-change-date" data-completed-idx="${ci}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Discontinued Date</button>
               <button class="btn-mn-restore" data-completed-idx="${ci}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active Activity</button>
               <button class="btn-mn-switch-status" data-completed-idx="${ci}" data-from="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#059669">⭐ Change to Mastered</button>
               <button class="btn-mn-del-discontinued" data-completed-idx="${ci}" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
@@ -13456,6 +13527,59 @@ function renderTargetManageContent(student, target) {
         };
         document.addEventListener("click", closeMenu);
       }
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".btn-mn-change-date").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      $("manage-modal-body").querySelectorAll(".mn-kebab-menu, .mn-inactive-km").forEach(m => m.style.display = "none");
+      const ci = Number(btn.dataset.completedIdx);
+      const type = btn.dataset.inactiveType;
+      const pa = type === "mastered" ? masteredActs[ci] : discontinuedActs[ci];
+      if (!pa) return;
+      const origText = btn.textContent;
+      btn.disabled = true; btn.textContent = "Checking…";
+      let latestDate = null;
+      try {
+        const allSessions = _groupForTargetEdit
+          ? await getAllSessionsForGroup(_groupForTargetEdit.id)
+          : await getAllSessionsForStudent(student.id);
+        const paName = pa.title || pa.name;
+        const paParent = pa.parentActivity || null;
+        const dates = allSessions.filter(s => {
+          const sActs = s.activities || {}; const sRems = s.remarks || {};
+          const matchIds = Object.entries(sActs).filter(([, a]) => {
+            if (a.targetName !== target.name) return false;
+            const nameOk = a.activityName === paName || a.activityName === pa.name;
+            if (!nameOk) return false;
+            return paParent ? (!a.parentActivity || a.parentActivity === paParent) : !a.parentActivity;
+          }).map(([id]) => id);
+          return matchIds.some(actId => Object.values(sRems).some(r =>
+            r.activityId === actId && (
+              (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
+              (r.trials || []).some(t => t !== null && t !== -1) || r.optionScore !== undefined
+            )
+          ));
+        }).map(s => s.date).sort();
+        latestDate = dates[dates.length - 1] || null;
+      } finally { btn.disabled = false; btn.textContent = origText; }
+      const minDate = latestDate ? addOneDay(latestDate) : todayDateStr();
+      const infoHtml = latestDate
+        ? `The last session with data for this activity was <strong>${fmtPeriodDate(latestDate)}</strong>.`
+        : `No previous session data was found for this activity.`;
+      const current = type === "mastered" ? pa.masteredOn : pa.discontinuedOn;
+      const pickedDate = await showDatePickerOverlay({
+        heading: type === "mastered" ? "📅 Change Mastered Date" : "📅 Change Discontinued Date",
+        infoHtml,
+        minDate,
+        defaultDate: current || minDate,
+        confirmLabel: "Save Date"
+      });
+      if (!pickedDate) return;
+      if (type === "mastered") pa.masteredOn = pickedDate;
+      else pa.discontinuedOn = pickedDate;
+      await saveTarget();
+      renderTargetManageContent(student, target);
     });
   });
 
@@ -14512,6 +14636,7 @@ function renderTemplateManageContent(template) {
           <div style="position:relative">
             <button class="btn-mn-inactive-kebab" data-completed-idx="${ci}" data-inactive-type="mastered" style="font-size:1.2rem;font-weight:900;min-width:28px;height:28px;border:none;background:#f3f4f6;cursor:pointer;padding:0 5px;border-radius:.3rem;line-height:1">⋮</button>
             <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
+              <button class="btn-mn-change-date" data-completed-idx="${ci}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Mastered Date</button>
               <button class="btn-mn-restore" data-completed-idx="${ci}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active Activity</button>
               <button class="btn-mn-switch-status" data-completed-idx="${ci}" data-from="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#6b7280">🚩 Change to Discontinued</button>
               <button class="btn-mn-del-mastered" data-completed-idx="${ci}" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
@@ -14570,6 +14695,7 @@ function renderTemplateManageContent(template) {
           <div style="position:relative">
             <button class="btn-mn-inactive-kebab" data-completed-idx="${ci}" data-inactive-type="discontinued" style="font-size:1.2rem;font-weight:900;min-width:28px;height:28px;border:none;background:#f3f4f6;cursor:pointer;padding:0 5px;border-radius:.3rem;line-height:1">⋮</button>
             <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
+              <button class="btn-mn-change-date" data-completed-idx="${ci}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Discontinued Date</button>
               <button class="btn-mn-restore" data-completed-idx="${ci}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active Activity</button>
               <button class="btn-mn-switch-status" data-completed-idx="${ci}" data-from="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#059669">⭐ Change to Mastered</button>
               <button class="btn-mn-del-discontinued" data-completed-idx="${ci}" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
