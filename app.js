@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1210";
+const APP_VERSION = "1211";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -12622,7 +12622,7 @@ function renderTargetManageContent(student, target) {
       if (a.parentActivity) return;
       manageActNo++;
 
-      const _paKey = a.title || a.name;
+      const _paKey = a._linkKey || a.title || a.name;
       const subActs = _paKey ? acts.filter(a2 => a2.parentActivity === _paKey && !a2.isCompleted && !a2.isArchived && !a2.isStopped && !a2.masteredOn && !a2.discontinuedOn) : [];
       const hasSubActs = subActs.length > 0;
       const isGray = a.activityColor === "gray" || a.isMaintainLive;
@@ -13047,10 +13047,13 @@ function renderTargetManageContent(student, target) {
       titleInput.addEventListener("blur", async () => {
         const v = titleInput.value.trim();
         if (v === (a.title || "")) return;
-        const oldKey = a.title || a.name;
+        const oldKey = a._linkKey || a.title || a.name;
         a.title = v;
         const newKey = a.title || a.name;
-        if (oldKey && oldKey !== newKey) acts.forEach(a2 => { if (a2.parentActivity === oldKey) a2.parentActivity = newKey; });
+        if (oldKey !== newKey) {
+          acts.forEach(a2 => { if (a2.parentActivity === oldKey) a2.parentActivity = newKey; });
+          delete a._linkKey;
+        }
         renderTargetContent();
         await saveTarget();
         flashSaved(titleInput);
@@ -13066,9 +13069,10 @@ function renderTargetManageContent(student, target) {
       detailsInput.addEventListener("blur", async () => {
         const v = detailsInput.value.trim();
         if (v === (a.name || "")) return;
-        const oldName = a.name;
+        const oldName = a._linkKey || a.name;
         a.name = v;
         acts.forEach(a2 => { if (a2.parentActivity === oldName) a2.parentActivity = v; });
+        delete a._linkKey;
         renderTargetContent();
         await saveTarget();
         flashSaved(detailsInput);
@@ -13639,57 +13643,34 @@ function renderTargetManageContent(student, target) {
       const idx = Number(btn.dataset.idx);
       const act = acts[idx];
       if (!act) return;
-
-      // Replace button with inline "parent title" form
-      const form = document.createElement("div");
-      form.style.cssText = "display:flex;flex-direction:column;gap:.4rem;background:#f0f9ff;border:1px solid #bae6fd;border-radius:.45rem;padding:.6rem .75rem";
-      form.innerHTML = `
-        <div style="font-size:.82rem;font-weight:600;color:#0369a1">Please enter a Parent-activity name first:</div>
-        <input type="text" class="mn-parent-title-input admin-input" placeholder="e.g. Self-Regulation"
-          style="width:100%;border:1.5px solid #d1d5db;border-radius:.4rem;padding:.4rem .6rem;font-size:.88rem;box-sizing:border-box" />
-        <div style="display:flex;gap:.5rem">
-          <button class="mn-parent-confirm" type="button"
-            style="font-size:.82rem;padding:.3rem .75rem;background:var(--primary);color:#fff;border:none;border-radius:.35rem;cursor:pointer;font-weight:600">✓ Confirm</button>
-          <button class="mn-parent-cancel" type="button"
-            style="font-size:.82rem;padding:.3rem .75rem;background:#f9fafb;border:1px solid #d1d5db;border-radius:.35rem;cursor:pointer;color:#374151">✗ Cancel</button>
-        </div>`;
-      btn.replaceWith(form);
-
-      const input = form.querySelector(".mn-parent-title-input");
-      const confirmBtn = form.querySelector(".mn-parent-confirm");
-      const cancelBtn = form.querySelector(".mn-parent-cancel");
-      input.focus();
-
-      const blinkForm = () => {
-        let n = 0;
-        const iv = setInterval(() => {
-          form.style.background = (n % 2 === 0) ? "#bfdbfe" : "#f0f9ff";
-          if (++n >= 6) { clearInterval(iv); form.style.background = "#f0f9ff"; }
-        }, 100);
-      };
-
-      const doConfirm = () => {
-        const title = input.value.trim();
-        if (!title) {
-          blinkForm();
-          input.focus();
-          return;
+      // Create a blank parent immediately — use its id as a stable _linkKey so
+      // the child can be matched even before the user fills in the title.
+      const pid = cfgId("a");
+      const newParent = { id: pid, title: "", name: "", _linkKey: pid, noRemark: true, order: 0, activeFrom: null };
+      act.parentActivity = pid;
+      acts.splice(idx, 0, newParent);
+      acts.forEach((a2, i) => a2.order = i);
+      target.predefinedActivities = acts;
+      const sp = $("manage-modal-body").scrollTop;
+      renderTargetManageContent(student, target);
+      requestAnimationFrame(() => {
+        const b = $("manage-modal-body");
+        if (b) b.scrollTop = sp;
+        // Blink the new parent card (now at idx position in the list)
+        const parentCard = b?.querySelector(`.admin-list-item[data-idx="${idx}"]`);
+        if (parentCard) {
+          let n = 0;
+          const orig = parentCard.style.background;
+          const iv = setInterval(() => {
+            parentCard.style.background = (n % 2 === 0) ? "#bfdbfe" : (orig || "");
+            if (++n >= 6) { clearInterval(iv); parentCard.style.background = orig || ""; }
+          }, 110);
+          // Focus the parent's Activity Title input so the user can type right away
+          const titleInput = parentCard.querySelector(".mn-act-title-input");
+          if (titleInput) titleInput.focus();
         }
-        // Insert new parent activity directly before the current activity
-        const newParent = { id: cfgId("a"), title, name: "", noRemark: true, order: 0, activeFrom: null };
-        act.parentActivity = title;
-        acts.splice(idx, 0, newParent);
-        acts.forEach((a2, i) => a2.order = i);
-        target.predefinedActivities = acts;
-        const sp = $("manage-modal-body").scrollTop;
-        renderTargetManageContent(student, target);
-        requestAnimationFrame(() => { const b = $("manage-modal-body"); if (b) b.scrollTop = sp; });
-        saveTarget();
-      };
-
-      confirmBtn.addEventListener("click", doConfirm);
-      input.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); doConfirm(); } });
-      cancelBtn.addEventListener("click", () => form.replaceWith(btn));
+      });
+      saveTarget();
     });
   });
 
