@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1233";
+const APP_VERSION = "1234";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -12938,7 +12938,6 @@ function renderTargetManageContent(student, target) {
                 ${remarkTypeSelect}
               </div>
               ${maintainedRow}
-              <button class="mn-convert-to-sub-btn" data-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:#f9fafb;border:1px solid #d1d5db;border-radius:.35rem;color:#374151;cursor:pointer;align-self:flex-start">↳ Change this activity into a sub-activity (& put it under a new parent-activity)</button>
             </div>
           </div>
           <div style="position:relative">
@@ -13982,43 +13981,6 @@ function renderTargetManageContent(student, target) {
       const sp = $("manage-modal-body").scrollTop;
       renderTargetManageContent(student, target);
       requestAnimationFrame(() => { const b = $("manage-modal-body"); if (b) b.scrollTop = sp; });
-      saveTarget();
-    });
-  });
-
-  $("manage-modal-body").querySelectorAll(".mn-convert-to-sub-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const idx = Number(btn.dataset.idx);
-      const act = acts[idx];
-      if (!act) return;
-      // Create a blank parent immediately — use its id as a stable _linkKey so
-      // the child can be matched even before the user fills in the title.
-      const pid = cfgId("a");
-      const newParent = { id: pid, title: "", name: "", _linkKey: pid, noRemark: true, order: 0, activeFrom: null };
-      act.parentActivity = pid;
-      acts.splice(idx, 0, newParent);
-      acts.forEach((a2, i) => a2.order = i);
-      target.predefinedActivities = acts;
-      const sp = $("manage-modal-body").scrollTop;
-      renderTargetManageContent(student, target);
-      requestAnimationFrame(() => {
-        const b = $("manage-modal-body");
-        if (b) b.scrollTop = sp;
-        // Blink the parent's Activity Title input and focus it
-        const parentCard = b?.querySelector(`.admin-list-item[data-idx="${idx}"]`);
-        if (parentCard) {
-          const titleInput = parentCard.querySelector(".mn-act-title-input");
-          if (titleInput) {
-            titleInput.focus();
-            let n = 0;
-            const orig = titleInput.style.background;
-            const iv = setInterval(() => {
-              titleInput.style.background = (n % 2 === 0) ? "#bfdbfe" : (orig || "");
-              if (++n >= 6) { clearInterval(iv); titleInput.style.background = orig || ""; }
-            }, 110);
-          }
-        }
-      });
       saveTarget();
     });
   });
