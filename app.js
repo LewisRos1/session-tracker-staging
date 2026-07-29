@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1214";
+const APP_VERSION = "1215";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -12761,7 +12761,10 @@ function renderTargetManageContent(student, target) {
               </div>
               ${subActsHtml}
               ${maintainedRowSub}
-              <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:#f9fafb;border:1px solid #d1d5db;border-radius:.35rem;color:#374151;cursor:pointer;align-self:flex-start">+ Add Sub-activity</button>
+              <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+                <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:#f9fafb;border:1px solid #d1d5db;border-radius:.35rem;color:#374151;cursor:pointer">+ Add Sub-activity</button>
+                ${a._linkKey ? `<button class="mn-undo-convert-btn" data-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:#fee2e2;border:1px solid #fca5a5;border-radius:.35rem;color:#dc2626;cursor:pointer">↩ Undo — keep as its own activity</button>` : ''}
+              </div>
             </div>
           </div>
           <div style="position:relative">
@@ -13741,6 +13744,25 @@ function renderTargetManageContent(student, target) {
         const parent = acts.find(a2 => (a2.title || a2.name) === parentName);
         if (parent) delete parent.noRemark;
       }
+      target.predefinedActivities = acts;
+      await saveTarget();
+      const sp = $("manage-modal-body").scrollTop;
+      renderTargetManageContent(student, target);
+      requestAnimationFrame(() => { const b = $("manage-modal-body"); if (b) b.scrollTop = sp; });
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-undo-convert-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const idx = Number(btn.dataset.idx);
+      const parentAct = acts[idx];
+      if (!parentAct) return;
+      // Restore all sub-activities under this parent back to top-level
+      const linkKey = parentAct._linkKey || parentAct.title || parentAct.name;
+      acts.forEach(a2 => { if (a2.parentActivity === linkKey) delete a2.parentActivity; });
+      // Remove the blank parent
+      acts.splice(idx, 1);
+      acts.forEach((a2, i) => a2.order = i);
       target.predefinedActivities = acts;
       await saveTarget();
       const sp = $("manage-modal-body").scrollTop;
