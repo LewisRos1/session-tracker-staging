@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1212";
+const APP_VERSION = "1213";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -11506,6 +11506,7 @@ function showGroupDupFromTemplate(group) {
 
 async function closeManageModal() {
   $("manage-modal").classList.add("hidden");
+  const _savedGroupForTargetEdit = _groupForTargetEdit;
   _groupForTargetEdit = null;
 
   // This function force-renders the live session screen further down (to
@@ -11519,7 +11520,6 @@ async function closeManageModal() {
 
   if (_pendingActsCleanup) {
     const { acts, save } = _pendingActsCleanup;
-    _pendingActsCleanup = null;
     // Flush any text that's sitting in still-focused inputs without having
     // triggered a blur (e.g. user clicks X without first clicking elsewhere).
     // Covers: activity name, note/heading text, and sentence starter.
@@ -11545,6 +11545,37 @@ async function closeManageModal() {
       }
       if (starterEl) a.sentenceStarter = starterEl.value.trim() || null;
     });
+
+    // Block close if any newly-created parent activity still has no title.
+    const blankParentIdx = acts.findIndex(a => a._linkKey && !(a.title || "").trim());
+    if (blankParentIdx !== -1) {
+      $("manage-modal").classList.remove("hidden");
+      _groupForTargetEdit = _savedGroupForTargetEdit;
+      const b = $("manage-modal-body");
+      const parentCard = b?.querySelector(`.admin-list-item[data-idx="${blankParentIdx}"]`);
+      if (parentCard) {
+        parentCard.scrollIntoView({ behavior: "smooth", block: "center" });
+        const titleInput = parentCard.querySelector(".mn-act-title-input");
+        if (titleInput) {
+          titleInput.focus();
+          if (!parentCard.querySelector(".mn-parent-title-err")) {
+            const errMsg = document.createElement("div");
+            errMsg.className = "mn-parent-title-err";
+            errMsg.style.cssText = "font-size:.78rem;color:#dc2626;margin:.25rem 0 0";
+            errMsg.textContent = "Please enter an Activity Title for this parent activity.";
+            titleInput.parentNode.insertBefore(errMsg, titleInput.nextSibling);
+          }
+          let n = 0;
+          const iv = setInterval(() => {
+            titleInput.style.outline = (n % 2 === 0) ? "2px solid #dc2626" : "";
+            if (++n >= 8) { clearInterval(iv); titleInput.style.outline = ""; }
+          }, 130);
+        }
+      }
+      return;
+    }
+
+    _pendingActsCleanup = null;
     const before = acts.length;
     for (let i = acts.length - 1; i >= 0; i--) {
       if (isEmptyActItem(acts[i])) {
@@ -13677,18 +13708,19 @@ function renderTargetManageContent(student, target) {
       requestAnimationFrame(() => {
         const b = $("manage-modal-body");
         if (b) b.scrollTop = sp;
-        // Blink the new parent card (now at idx position in the list)
+        // Blink the parent's Activity Title input and focus it
         const parentCard = b?.querySelector(`.admin-list-item[data-idx="${idx}"]`);
         if (parentCard) {
-          let n = 0;
-          const orig = parentCard.style.background;
-          const iv = setInterval(() => {
-            parentCard.style.background = (n % 2 === 0) ? "#bfdbfe" : (orig || "");
-            if (++n >= 6) { clearInterval(iv); parentCard.style.background = orig || ""; }
-          }, 110);
-          // Focus the parent's Activity Title input so the user can type right away
           const titleInput = parentCard.querySelector(".mn-act-title-input");
-          if (titleInput) titleInput.focus();
+          if (titleInput) {
+            titleInput.focus();
+            let n = 0;
+            const orig = titleInput.style.background;
+            const iv = setInterval(() => {
+              titleInput.style.background = (n % 2 === 0) ? "#bfdbfe" : (orig || "");
+              if (++n >= 6) { clearInterval(iv); titleInput.style.background = orig || ""; }
+            }, 110);
+          }
         }
       });
       saveTarget();
