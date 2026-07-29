@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1243";
+const APP_VERSION = "1244";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -13572,11 +13572,8 @@ function renderTargetManageContent(student, target) {
         const subInput = $(`mn-act-title-${idx + 1}`);
         if (subInput) {
           subInput.focus();
-          let n = 0; const orig = subInput.style.background;
-          const iv = setInterval(() => {
-            subInput.style.background = (n % 2 === 0) ? "#bfdbfe" : (orig || "");
-            if (++n >= 6) { clearInterval(iv); subInput.style.background = orig || ""; }
-          }, 110);
+          subInput.classList.add("input-bg-blink");
+          subInput.addEventListener("animationend", () => subInput.classList.remove("input-bg-blink"), { once: true });
         }
       });
       saveTarget();
