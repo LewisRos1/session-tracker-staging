@@ -167,9 +167,49 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1280";
+const APP_VERSION = "1281";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Daisy" };
+
+// ─── PASSWORD GATE ────────────────────────────────────────────
+// Single shared password for exports and old-session access.
+function requirePassword(onSuccess) {
+  $("manage-modal-title").textContent = "Password Required";
+  $("manage-modal-body").innerHTML = `
+    <div style="padding:2rem 1rem;display:flex;flex-direction:column;align-items:center;gap:.75rem">
+      <div style="font-size:.9rem;color:var(--text-muted)">Enter password to continue</div>
+      <input id="req-pw-input" type="password" class="admin-input"
+        style="width:200px;text-align:center;font-size:1rem"
+        placeholder="Enter password" autocomplete="new-password">
+      <div id="req-pw-err" style="font-size:.8rem;color:#dc2626;display:none">Incorrect password</div>
+      <button class="btn-primary-sm" id="req-pw-btn" style="padding:.5rem 1.5rem">Continue</button>
+    </div>`;
+  $("manage-modal").classList.remove("hidden");
+  const pwInput = $("req-pw-input");
+  pwInput.value = "";
+  setTimeout(() => pwInput.focus(), 50);
+  const check = () => {
+    if (pwInput.value !== "0823") {
+      $("req-pw-err").style.display = "";
+      pwInput.value = "";
+      return;
+    }
+    closeManageModal();
+    onSuccess();
+  };
+  $("req-pw-btn").addEventListener("click", check);
+  pwInput.addEventListener("keydown", e => { if (e.key === "Enter") check(); });
+}
+
+function isOlderThan7Days(dateStr) {
+  if (!dateStr) return false;
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const sessionDate = new Date(y, m - 1, d);
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 7);
+  cutoff.setHours(0, 0, 0, 0);
+  return sessionDate < cutoff;
+}
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -2030,20 +2070,22 @@ function renderExportButtons() {
     </div>`;
 
   const wire = (btnId, defaultLabel, includeTrials) => {
-    $(btnId).addEventListener("click", async () => {
-      const btn = $(btnId);
-      btn.style.width = btn.offsetWidth + "px";
-      btn.disabled = true;
-      btn.textContent = "Generating…";
-      try {
-        await exportAllStudents(state.students, state.groups, includeTrials);
-      } catch (err) {
-        alert("Export failed: " + err.message);
-      } finally {
-        btn.disabled = false;
-        btn.textContent = defaultLabel;
-        btn.style.width = "";
-      }
+    $(btnId).addEventListener("click", () => {
+      requirePassword(async () => {
+        const btn = $(btnId);
+        btn.style.width = btn.offsetWidth + "px";
+        btn.disabled = true;
+        btn.textContent = "Generating…";
+        try {
+          await exportAllStudents(state.students, state.groups, includeTrials);
+        } catch (err) {
+          alert("Export failed: " + err.message);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = defaultLabel;
+          btn.style.width = "";
+        }
+      });
     });
   };
   wire("btn-export-all-trials", "Backup All Excel (ZIP)", true);
@@ -2154,7 +2196,7 @@ function renderHalfYearReportsSection() {
     actFilter.style.display = "";
   });
 
-  $("hyr-btn-generate").addEventListener("click", hyrGenerate);
+  $("hyr-btn-generate").addEventListener("click", () => requirePassword(hyrGenerate));
 }
 
 function hyrExclKey(studentId, periodVal) {
@@ -4781,14 +4823,14 @@ function showStudentChoice(student) {
   $("session-picker-modal").classList.remove("hidden");
 
   $("session-picker-list").querySelector(".choice-export-excel").addEventListener("click", () => {
-    showExportTrialsChoice(student.name, includeTrials => exportStudentData(student, includeTrials));
+    requirePassword(() => showExportTrialsChoice(student.name, includeTrials => exportStudentData(student, includeTrials)));
   });
   $("session-picker-list").querySelector(".choice-export-word").addEventListener("click", () => {
-    showExportSessionPickerGeneric(
+    requirePassword(() => showExportSessionPickerGeneric(
       student.name,
       () => getRecentSessionsForStudent(student.id),
       session => exportStudentSingleSessionWord(student, session)
-    );
+    ));
   });
 
   $("session-picker-list").querySelector(".choice-today").addEventListener("click", () => {
@@ -4988,7 +5030,8 @@ function renderSessionsForMonth(student, month, monthSessions, byMonth, today, s
   list.querySelectorAll(".session-list-item").forEach(item => {
     item.addEventListener("click", () => {
       closeSessionPicker();
-      openSessionView(student, item.dataset.sessionId);
+      const open = () => openSessionView(student, item.dataset.sessionId);
+      if (isOlderThan7Days(item.dataset.sessionDate)) { requirePassword(open); } else { open(); }
     });
   });
 }
@@ -5203,15 +5246,17 @@ function showGroupExportStudentPicker(group, mode) {
   $("session-picker-list").querySelectorAll(".choice-export-student").forEach(btn => {
     btn.addEventListener("click", () => {
       const name = btn.dataset.name;
-      if (mode === "word") {
-        showExportSessionPickerGeneric(
-          `${name} (Group)`,
-          () => getRecentGroupSessions(group.id),
-          session => exportGroupMemberSingleSessionWord(name, [group], session)
-        );
-        return;
-      }
-      showExportTrialsChoice(`${name} (Group)`, includeTrials => exportGroupMemberData(name, [group], includeTrials));
+      requirePassword(() => {
+        if (mode === "word") {
+          showExportSessionPickerGeneric(
+            `${name} (Group)`,
+            () => getRecentGroupSessions(group.id),
+            session => exportGroupMemberSingleSessionWord(name, [group], session)
+          );
+          return;
+        }
+        showExportTrialsChoice(`${name} (Group)`, includeTrials => exportGroupMemberData(name, [group], includeTrials));
+      });
     });
   });
 }
@@ -5301,7 +5346,10 @@ function renderGoToSessionsForMonth(student, month, monthSessions, byMonth, toda
     item.addEventListener("click", () => {
       const sid = item.dataset.sessionId;
       closeSessionPicker();
-      if (sid !== state.viewSessionId) openSessionView(student, sid);
+      if (sid !== state.viewSessionId) {
+        const open = () => openSessionView(student, sid);
+        if (isOlderThan7Days(item.dataset.sessionDate)) { requirePassword(open); } else { open(); }
+      }
     });
   });
 }
@@ -8244,31 +8292,33 @@ async function handleCheckedByClick(e, isGroup) {
   // ── Export to Word button ────────────────────────────────────
   const exportBtn = e.target.closest(".chk-export-btn");
   if (exportBtn) {
-    if (isGroup) {
-      const attendees = state.viewGroupSessionData?.attendees || state.viewGroup?.students || [];
-      const session   = { id: state.viewGroupSessionId, ...(state.viewGroupSessionData || {}) };
-      if (attendees.length === 1) {
-        exportGroupMemberSingleSessionWord(attendees[0], [state.viewGroup], session);
-      } else {
-        $("session-picker-title").textContent = "Export for…";
-        $("session-picker-list").innerHTML = attendees.length
-          ? `<div class="choice-list">` + attendees.map(name => `
-              <button class="choice-btn choice-grp-view-export" data-name="${escHtml(name)}">
-                <span class="choice-icon">📤</span>
-                <div class="choice-text"><div class="choice-label">${escHtml(name)}</div></div>
-              </button>`).join("") + `</div>`
-          : `<p class="empty-hint">No attendees found.</p>`;
-        $("session-picker-modal").classList.remove("hidden");
-        $("session-picker-list").querySelectorAll(".choice-grp-view-export").forEach(btn => {
-          btn.addEventListener("click", () => {
-            closeSessionPicker();
-            exportGroupMemberSingleSessionWord(btn.dataset.name, [state.viewGroup], session);
+    requirePassword(() => {
+      if (isGroup) {
+        const attendees = state.viewGroupSessionData?.attendees || state.viewGroup?.students || [];
+        const session   = { id: state.viewGroupSessionId, ...(state.viewGroupSessionData || {}) };
+        if (attendees.length === 1) {
+          exportGroupMemberSingleSessionWord(attendees[0], [state.viewGroup], session);
+        } else {
+          $("session-picker-title").textContent = "Export for…";
+          $("session-picker-list").innerHTML = attendees.length
+            ? `<div class="choice-list">` + attendees.map(name => `
+                <button class="choice-btn choice-grp-view-export" data-name="${escHtml(name)}">
+                  <span class="choice-icon">📤</span>
+                  <div class="choice-text"><div class="choice-label">${escHtml(name)}</div></div>
+                </button>`).join("") + `</div>`
+            : `<p class="empty-hint">No attendees found.</p>`;
+          $("session-picker-modal").classList.remove("hidden");
+          $("session-picker-list").querySelectorAll(".choice-grp-view-export").forEach(btn => {
+            btn.addEventListener("click", () => {
+              closeSessionPicker();
+              exportGroupMemberSingleSessionWord(btn.dataset.name, [state.viewGroup], session);
+            });
           });
-        });
+        }
+      } else {
+        exportStudentSingleSessionWord(state.viewStudent, { id: state.viewSessionId, ...(state.viewSessionData || {}) });
       }
-    } else {
-      exportStudentSingleSessionWord(state.viewStudent, { id: state.viewSessionId, ...(state.viewSessionData || {}) });
-    }
+    });
     return true;
   }
 
@@ -11773,7 +11823,10 @@ function renderGoToGroupSessionsForMonth(group, month, monthSessions, byMonth, t
     item.addEventListener("click", () => {
       const sid = item.dataset.sessionId;
       closeSessionPicker();
-      if (sid !== state.viewGroupSessionId) openGroupSessionView(group, sid);
+      if (sid !== state.viewGroupSessionId) {
+        const open = () => openGroupSessionView(group, sid);
+        if (isOlderThan7Days(item.dataset.sessionDate)) { requirePassword(open); } else { open(); }
+      }
     });
   });
 }
@@ -18554,7 +18607,7 @@ function renderSessionListRows(sorted, display, today, { isCurrentId, extraLine,
     const label     = sessionItemLabel(s.date, today);
     const labelHtml = renderLabel ? renderLabel(s, label) : `<strong>Session ${s.sessionNumber}</strong>: ${label}`;
     const extra     = extraLine ? extraLine(s) : "";
-    html += `<div class="${cls}" data-session-id="${s.id}">
+    html += `<div class="${cls}" data-session-id="${s.id}" data-session-date="${s.date}">
       <div class="session-list-meta">
         <div class="session-list-label">${labelHtml}</div>
         ${extra}
