@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1254";
+const APP_VERSION = "1255";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -6247,23 +6247,25 @@ function renderFedcTarget(target) {
       if (isPending) {
         html += renderPendingRemarkFields(pendingKey, actId, pa.name, idx, target);
       } else if (pa.maintained && remarks.length === 0) {
-        const _hasMaintainData = Object.values(state.sessionData?.remarks || {}).some(r =>
-          (r.text && r.text.trim()) || (r.trials || []).some(t => t >= 0) || r.optionScore !== undefined
-        );
+        const addLabel = pa.isMapped ? "Score" : pa.manualScore ? "Remark &amp; Score" : "Remark &amp; Trials";
         html += `<div class="entry-divider" contenteditable="false"></div>
         <div class="entry-field" contenteditable="false">
-          <span class="field-label">Remark</span>`;
-        if (_hasMaintainData) {
-          html += `<textarea class="field-input maintained-remark-pending" rows="1"
+          <span class="field-label">Remark</span>
+          <textarea class="field-input maintained-remark-pending" rows="1"
             data-act-id="${actId || ""}"
             data-pa-name="${escHtml(pa.name || pa.title)}"
             data-pa-order="${idx}"
             data-cfg-id="${escHtml(pa.id || "")}"
-            data-target="${escHtml(target.name)}">Maintain</textarea>`;
-        } else {
-          html += `<span class="field-value-fixed" style="color:#6b7280">Maintain</span>`;
-        }
-        html += `</div>`;
+            data-target="${escHtml(target.name)}">Maintain</textarea>
+        </div>
+        <button class="btn-add-remark" contenteditable="false"
+          data-pending-key="${escHtml(pendingKey)}"
+          data-act-id="${actId || ""}"
+          data-pa-name="${escHtml(pa.name || pa.title)}"
+          data-pa-order="${idx}"
+          data-is-mapped="${pa.isMapped ? "1" : ""}"
+          data-cfg-id="${escHtml(pa.id || "")}"
+          data-target="${escHtml(target.name)}">+ Add ${addLabel}</button>`;
       } else {
         const addLabel = pa.isMapped ? "Score" : pa.manualScore ? "Remark &amp; Score" : "Remark &amp; Trials";
         html += `<button class="btn-add-remark" contenteditable="false"
@@ -7601,12 +7603,6 @@ const maintainedRemarkAutoFillInFlight = new Set();
 
 async function autoFillMaintainedRemarks(student, sessionId) {
   const data = state.sessionData;
-  // Only fill if the session already has at least one real piece of recorded data.
-  // This prevents creating a "ghost" session when the user opens but doesn't record anything.
-  const hasRealData = Object.values(data.remarks || {}).some(r =>
-    (r.text && r.text.trim()) || (r.trials || []).some(t => t >= 0) || r.optionScore !== undefined
-  );
-  if (!hasRealData) return 0;
   const toFill = [];
   for (const target of (student.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
@@ -9013,9 +9009,41 @@ function setupEntryRemarkSaving(host, getSessionId, onIdle) {
     // real text" guard as above, plus a remId/creating check so a debounce
     // timer firing right after focusout (or vice versa) can't create a
     // second, duplicate remark from the same typed text.
+    // Individual maintained placeholder — only save if user actually changed the text.
+    // Autofill handles writing the default "Maintain" to Firestore; racing it here
+    // caused duplicate remarks (v1253 bug). Same in-flight key as autoFillMaintainedRemarks.
+    host.querySelectorAll(".maintained-remark-pending[data-pa-name]").forEach(el => {
+      const text = el.value.trim();
+      if (!text || text === "Maintain" || el.dataset.creating === "true" || el.dataset.remId) return;
+      const key = `${sid}:${el.dataset.target}:${el.dataset.paName}:maintained`;
+      if (maintainedRemarkAutoFillInFlight.has(key)) return;
+      maintainedRemarkAutoFillInFlight.add(key);
+      el.dataset.creating = "true";
+      const create = async () => {
+        try {
+          const paOrder = el.dataset.paOrder !== "" ? Number(el.dataset.paOrder) : 0;
+          let actId = el.dataset.actId || null;
+          if (!actId) {
+            actId = await addActivity(sid, el.dataset.target, el.dataset.paName, paOrder, true,
+              undefined, null, el.dataset.cfgId || null);
+          }
+          const remId = await addRemark(sid, actId, text);
+          el.dataset.actId = actId;
+          el.dataset.remId = remId;
+          el.dataset.savedHtml = htmlForStorage(text);
+        } finally {
+          el.dataset.creating = "false";
+          maintainedRemarkAutoFillInFlight.delete(key);
+        }
+      };
+      trackWrite(create());
+    });
+
     host.querySelectorAll(".group-remark-input-empty[data-student]").forEach(el => {
       const text = el.value.trim();
       if (!text || el.dataset.creating === "true" || el.dataset.remId) return;
+      // Maintained placeholder — autofill writes "Maintain" to Firestore, don't race it.
+      if (text === "Maintain" && el.dataset.isMaintained === "true") return;
       el.dataset.creating = "true";
       const create = async () => {
         try {
@@ -15846,11 +15874,15 @@ async function openGroupSession(group, dateStr, attendees) {
             if (mappedFilled > 0) return;
             const structuredFilled = await autoFillGroupStructuredRemarks(group, sid, data, state.selectedGroupTargetName, attendees);
             if (structuredFilled > 0) return;
-            const maintainedFilled = await autoFillGroupMaintainedRemarks(group, sid, data, state.selectedGroupTargetName, attendees);
-            if (maintainedFilled > 0) return;
           } catch (err) { console.error("Group session auto-fill failed:", err); }
         }
       }
+      // Run on every snapshot (not just firstLoad) so all targets get "Maintain"
+      // written as soon as the session opens, regardless of which target is selected.
+      try {
+        const maintainedFilled = await autoFillGroupMaintainedRemarks(group, sid, state.groupAttendees);
+        if (maintainedFilled > 0) return;
+      } catch (err) { console.error("autoFillGroupMaintainedRemarks failed:", err); }
       if (state.scorePicker?.open && state.scorePicker?.isGroup) renderScoreModalTrials(state.scorePicker.remId);
       // Busy = dropdown open, or a button's own multi-step write still in
       // flight — see the matching comment in openSession's listener for why
@@ -15956,6 +15988,10 @@ function populateGroupTargetDropdown(targets) {
           state.selectedGroupTargetName, state.groupAttendees
         );
         if (structuredFilled > 0) return;
+        const maintainedFilled = await autoFillGroupMaintainedRemarks(
+          state.currentGroup, state.groupSessionId, state.groupAttendees
+        );
+        if (maintainedFilled > 0) return;
       } catch (err) { console.error("Group target auto-fill failed:", err); }
     }
     renderGroupTargetContent();
@@ -16015,31 +16051,40 @@ async function autoFillGroupMappedRemarks(group, sessionId, data, targetName, at
 }
 
 // Group-entry counterpart of autoFillMaintainedRemarks.
-async function autoFillGroupMaintainedRemarks(group, sessionId, data, targetName, attendees) {
-  const target = group.targets.find(t => t.name === targetName);
-  if (!target) return 0;
-  const hasRealData = Object.values(data.remarks || {}).some(r =>
-    (r.text && r.text.trim()) || (r.trials || []).some(t => t >= 0) || r.optionScore !== undefined
-  );
-  if (!hasRealData) return 0;
+async function autoFillGroupMaintainedRemarks(group, sessionId, attendees) {
+  const data = state.groupSessionData;
+  if (!data) return 0;
   let count = 0;
-  for (const pa of (target.predefinedActivities || [])) {
-    if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || (!pa.name && !pa.title)) continue;
-    const existingAct = Object.entries(data.activities || {})
-      .find(([, a]) => a.targetName === targetName && (a.activityName === pa.name || (pa.title && a.activityName === pa.title) || (pa.id && a.configId === pa.id)));
-    const actId = existingAct?.[0];
-    if (!actId) continue;
-    for (const studentName of attendees) {
-      const hasRemark = Object.values(data.remarks || {})
-        .some(r => r.activityId === actId && r.studentName === studentName);
-      if (hasRemark) continue;
-      const key = `${sessionId}:${targetName}:${pa.name}:${studentName}:maintained`;
-      if (maintainedRemarkAutoFillInFlight.has(key)) continue;
-      maintainedRemarkAutoFillInFlight.add(key);
-      try {
-        await addGroupRemark(sessionId, actId, studentName, "Maintain");
-        count++;
-      } finally { maintainedRemarkAutoFillInFlight.delete(key); }
+  for (const target of (group.targets || [])) {
+    for (const pa of (target.predefinedActivities || [])) {
+      if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || (!pa.name && !pa.title)) continue;
+      const allMatches = Object.entries(data.activities || {})
+        .filter(([, a]) => a.targetName === target.name && !a.parentActivity &&
+                           (a.activityName === pa.name || (pa.title && a.activityName === pa.title) || (pa.id && a.configId === pa.id)));
+      const canonical = allMatches.find(([, a]) => pa.id && a.configId === pa.id) || allMatches[0] || null;
+      let actId = canonical?.[0] || null;
+      if (!actId) {
+        const actKey = `${sessionId}:${target.name}:${pa.name}:maintained:act`;
+        if (maintainedRemarkAutoFillInFlight.has(actKey)) continue;
+        maintainedRemarkAutoFillInFlight.add(actKey);
+        try {
+          actId = await addActivity(sessionId, target.name, pa.name, pa.order ?? 0, true);
+          count++;
+        } catch { maintainedRemarkAutoFillInFlight.delete(actKey); continue; }
+        maintainedRemarkAutoFillInFlight.delete(actKey);
+      }
+      for (const studentName of attendees) {
+        const hasRemark = Object.values(data.remarks || {})
+          .some(r => r.activityId === actId && r.studentName === studentName);
+        if (hasRemark) continue;
+        const key = `${sessionId}:${target.name}:${pa.name}:${studentName}:maintained`;
+        if (maintainedRemarkAutoFillInFlight.has(key)) continue;
+        maintainedRemarkAutoFillInFlight.add(key);
+        try {
+          await addGroupRemark(sessionId, actId, studentName, "Maintain");
+          count++;
+        } finally { maintainedRemarkAutoFillInFlight.delete(key); }
+      }
     }
   }
   return count;
@@ -16106,7 +16151,18 @@ async function leaveGroupSession() {
     // Delete if no useful data
     const hasData = Object.values(data.remarks || {}).some(r => {
       const strip = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
-      return strip(r.text).length > 0 || (r.trials || []).some(t => t !== -1);
+      const text = strip(r.text);
+      // "Maintain" placed by autofill doesn't count as real recorded data — mirrors
+      // the same exclusion in leaveSession for individual sessions.
+      if (text === "Maintain" && !(r.trials || []).some(t => t !== -1) && !r.note) {
+        const act = data.activities?.[r.activityId];
+        const tgt = (group?.targets || []).find(t => t.name === act?.targetName);
+        const pa = (tgt?.predefinedActivities || []).find(p =>
+          p.maintained && (p.name === act?.activityName || (p.id && p.id === act?.configId))
+        );
+        if (pa) return false;
+      }
+      return text.length > 0 || (r.trials || []).some(t => t !== -1);
     });
     if (!hasData) {
       deleteSession(sessionId).catch(() => {});
@@ -16426,6 +16482,7 @@ function renderGroupStudentActivityCard(studentName, actName, actId, target, dat
         data-act-name="${escHtml(actName)}"
         data-target="${escHtml(target.name)}"
         data-is-predefined="true"
+        data-is-maintained="true"
         data-student="${escHtml(studentName)}">Maintain</textarea>
     </div>`;
   } else {
