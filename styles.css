@@ -3,6 +3,12 @@
    Mobile-first, optimised for touch screens.
    ============================================================ */
 
+/* ── Print protection: show nothing but a black page ──────── */
+@media print {
+  body, body * { visibility: hidden !important; display: none !important; }
+  html { background: #000 !important; }
+}
+
 /* ─── RESET & TOKENS ────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -3592,3 +3598,4 @@ button.wf-pill:hover { filter: brightness(.93); }
 .btn-word-export-ready:disabled,
 .btn-excel-export-ready:disabled,
 .btn-ai-h1-ready:disabled { opacity: .5; cursor: not-allowed; }
+

@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1284";
+const APP_VERSION = "1285";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -549,6 +549,11 @@ function closeTextEditorSheet() {
 }
 
 // ─── INIT ────────────────────────────────────────────────────
+// Block Ctrl+P (print dialog keyboard shortcut)
+document.addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "p") e.preventDefault();
+});
+
 document.addEventListener("DOMContentLoaded", async () => {
 
   // Register SW immediately — don't wait for Firebase so updates are never blocked.
