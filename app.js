@@ -167,17 +167,17 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1282";
+const APP_VERSION = "1283";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Daisy" };
 
 // ─── PASSWORD GATE ────────────────────────────────────────────
 // Single shared password for exports and old-session access.
-function requirePassword(onSuccess) {
+function requirePassword(onSuccess, message = "Enter password to continue") {
   $("manage-modal-title").textContent = "Password Required";
   $("manage-modal-body").innerHTML = `
     <div style="padding:2rem 1rem;display:flex;flex-direction:column;align-items:center;gap:.75rem">
-      <div style="font-size:.9rem;color:var(--text-muted)">Enter password to continue</div>
+      <div style="font-size:.85rem;color:var(--text-muted);text-align:center;max-width:240px;line-height:1.4">${escHtml(message)}</div>
       <input id="req-pw-input" type="password" class="admin-input"
         style="width:200px;text-align:center;font-size:1rem"
         placeholder="Enter password" autocomplete="new-password">
@@ -200,6 +200,8 @@ function requirePassword(onSuccess) {
   $("req-pw-btn").addEventListener("click", check);
   pwInput.addEventListener("keydown", e => { if (e.key === "Enter") check(); });
 }
+
+const EXPIRED_MSG = "This session is over 7 days old and has expired for free viewing. A password is required to continue.";
 
 function isOlderThan7Days(dateStr) {
   if (!dateStr) return false;
@@ -5040,7 +5042,7 @@ function renderSessionsForMonth(student, month, monthSessions, byMonth, today, s
     item.addEventListener("click", () => {
       closeSessionPicker();
       const open = () => openSessionView(student, item.dataset.sessionId);
-      if (isOlderThan7Days(item.dataset.sessionDate)) { requirePassword(open); } else { open(); }
+      if (isOlderThan7Days(item.dataset.sessionDate)) { requirePassword(open, EXPIRED_MSG); } else { open(); }
     });
   });
 }
@@ -5357,7 +5359,7 @@ function renderGoToSessionsForMonth(student, month, monthSessions, byMonth, toda
       closeSessionPicker();
       if (sid !== state.viewSessionId) {
         const open = () => openSessionView(student, sid);
-        if (isOlderThan7Days(item.dataset.sessionDate)) { requirePassword(open); } else { open(); }
+        if (isOlderThan7Days(item.dataset.sessionDate)) { requirePassword(open, EXPIRED_MSG); } else { open(); }
       }
     });
   });
@@ -5538,7 +5540,8 @@ function renderStartSessionCalendar(student, today, displayDate, takenDates = ne
   $("session-picker-list").querySelectorAll(".date-picker-day:not([disabled])").forEach(btn => {
     btn.addEventListener("click", () => {
       closeSessionPicker();
-      openSession(student, null, btn.dataset.date);
+      const open = () => openSession(student, null, btn.dataset.date);
+      if (isOlderThan7Days(btn.dataset.date)) { requirePassword(open, EXPIRED_MSG); } else { open(); }
     });
   });
 }
@@ -11834,7 +11837,7 @@ function renderGoToGroupSessionsForMonth(group, month, monthSessions, byMonth, t
       closeSessionPicker();
       if (sid !== state.viewGroupSessionId) {
         const open = () => openGroupSessionView(group, sid);
-        if (isOlderThan7Days(item.dataset.sessionDate)) { requirePassword(open); } else { open(); }
+        if (isOlderThan7Days(item.dataset.sessionDate)) { requirePassword(open, EXPIRED_MSG); } else { open(); }
       }
     });
   });
