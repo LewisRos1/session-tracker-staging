@@ -158,7 +158,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1258";
+const APP_VERSION = "1259";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Daisy" };
 
@@ -8011,7 +8011,7 @@ function renderCheckedByStrip(stripEl, data) {
     return `<button class="${classes}" data-role="${role}" ${locked ? "disabled" : ""}>${inner}</button>`;
   };
 
-  stripEl.innerHTML = `<div class="chk-inner">${pillHtml("assistant", false)}${pillHtml("main", !checks.assistant)}</div>`;
+  stripEl.innerHTML = `<div class="chk-inner">${pillHtml("assistant", false)}${pillHtml("main", false)}</div>`;
 }
 
 function initCheckedByStrip(stripId, sidGetter, dataGetter) {
@@ -8046,7 +8046,6 @@ function initCheckedByStrip(stripId, sidGetter, dataGetter) {
     const isChecked = !!checks[role];
     if (isChecked) {
       delete checks[role];
-      if (role === "assistant") delete checks.main; // undoing review also clears approval
     } else {
       checks[role] = { by: CHECKED_BY[role], at: Date.now() };
     }
