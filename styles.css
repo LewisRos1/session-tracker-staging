@@ -2832,7 +2832,7 @@ button.wf-pill:hover { filter: brightness(.93); }
 
 /* Row 2 triggers */
 .wf-note-wrap {
-  grid-column: 3;
+  grid-column: 3 / 6;
   grid-row: 2;
   display: flex;
   justify-content: center;
@@ -2870,7 +2870,11 @@ button.wf-pill:hover { filter: brightness(.93); }
   z-index: 9999;
   top: 110px;
   right: 20px;
-  width: 375px;
+  width: 470px;
+  min-width: 280px;
+  min-height: 200px;
+  resize: both;
+  overflow: hidden;
   background: #fef9c3;
   border: 1.5px solid #fde047;
   border-radius: 10px;
@@ -2912,7 +2916,8 @@ button.wf-pill:hover { filter: brightness(.93); }
   padding: .6rem .7rem .75rem;
   user-select: text;
   overflow-y: auto;
-  max-height: calc(100vh - 160px);
+  flex: 1;
+  min-height: 0;
 }
 
 /* Corrections table */
@@ -2950,6 +2955,37 @@ button.wf-pill:hover { filter: brightness(.93); }
 .snote-row--done .snote-text { text-decoration: line-through; opacity: .6; }
 .snote-empty { color: #92400e; opacity: .7; font-style: italic; font-size: .82rem; padding: .5rem .35rem; }
 
+.snote-textarea {
+  width: 100%;
+  resize: none;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: .84rem;
+  color: #422006;
+  overflow: hidden;
+  min-height: 1.4em;
+  padding: 0;
+  line-height: 1.45;
+}
+.snote-textarea:focus { outline: 2px solid #f59e0b; border-radius: 3px; }
+
+.snote-add-row-btn {
+  width: 100%;
+  margin-top: .4rem;
+  padding: .35rem;
+  background: none;
+  border: 1.5px dashed #f59e0b;
+  border-radius: 6px;
+  color: #92400e;
+  font-size: .82rem;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: center;
+  transition: background .12s;
+}
+.snote-add-row-btn:hover { background: #fef08a; }
+
 .snote-delete {
   background: none;
   border: none;
@@ -2961,10 +2997,9 @@ button.wf-pill:hover { filter: brightness(.93); }
 }
 .snote-delete:hover { background: #fde68a; }
 
-/* Add-row below table */
+/* Legacy — kept as empty tombstone so search finds the block was intentionally removed */
 .snote-add-row {
-  display: flex;
-  gap: .4rem;
+  display: none;
 }
 .snote-input {
   flex: 1;
@@ -2993,6 +3028,7 @@ button.wf-pill:hover { filter: brightness(.93); }
 .snote-add-btn:hover { background: #fcd34d; }
 
 .snote-submit-btn {
+  display: none;
   width: 100%;
   padding: .4rem;
   background: #10b981;
@@ -3006,6 +3042,7 @@ button.wf-pill:hover { filter: brightness(.93); }
 }
 .snote-submit-btn:hover { background: #059669; }
 .snote-undo-btn {
+  display: none;
   width: 100%;
   padding: .35rem;
   background: white;

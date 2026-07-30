@@ -78,6 +78,8 @@ import {
   addReviewComment,
   deleteReviewComment,
   setReviewSubmitted,
+  setRevisionDone,
+  updateReviewCommentText,
   markCommentFixed,
   listenToReviewQueue,
   signInWithPin,
@@ -165,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1274";
+const APP_VERSION = "1275";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Daisy" };
 
@@ -8073,23 +8075,26 @@ let _grpCommentDraft     = "";
 let _grpSigningCmtId     = null;
 let _grpSigningName      = "";
 
-// Sticky note (floating draggable)
+// Sticky note (floating draggable corrections list)
 let _stickyNoteSessionId = null;
 let _stickyNoteIsGroup   = false;
 let _noteDebounce        = null;
+let _focusNewRow         = false;
+const _textareaDebounce  = new Map();
 
 function getWorkflowState(data) {
   const checks    = data?.checks || {};
   const rayDone   = !!checks.assistant;
   const daisyDone = !!checks.main;
+  const reviewUnlocked  = rayDone && daisyDone;
   const reviewSubmitted = !!data?.reviewSubmitted;
+  const revisionDone    = data?.revisionDone || null; // { by, at } or null
   const comments  = Object.entries(data?.reviewComments || {})
     .sort(([,a],[,b]) => (a.order || 0) - (b.order || 0));
-  const allFixed  = comments.length > 0 && comments.every(([,c]) => !!c.fixedByName);
+  const allFixed   = comments.length > 0 && comments.every(([,c]) => !!c.fixedByName);
   const noComments = comments.length === 0;
-  const reviewUnlocked = rayDone && daisyDone;
-  const ready = reviewSubmitted && (noComments || allFixed);
-  return { rayDone, daisyDone, reviewUnlocked, reviewSubmitted, comments, allFixed, noComments, ready };
+  const ready = reviewSubmitted && !!revisionDone;
+  return { rayDone, daisyDone, reviewUnlocked, reviewSubmitted, revisionDone, comments, allFixed, noComments, ready };
 }
 
 function fmtCheckTimestamp(ts) {
@@ -8103,11 +8108,10 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
   const ws     = getWorkflowState(data);
   const checks = data?.checks || {};
 
-  // Refresh sticky note if it's open for this session
+  // Refresh sticky note if open for this session
   const curSid = isGroup ? state.viewGroupSessionId : state.viewSessionId;
   if (_stickyNoteSessionId === curSid) renderStickyNoteContent(data, isGroup);
 
-  // ── Arrow SVG ────────────────────────────────────────────────
   const arrow = `<div class="wf-arrow" aria-hidden="true">
     <svg width="32" height="24" viewBox="0 0 32 24" fill="none">
       <line x1="0" y1="12" x2="22" y2="12" stroke="#9ca3af" stroke-width="2"/>
@@ -8115,78 +8119,83 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     </svg>
   </div>`;
 
-  // ── Phase 1 "Enter Data" ──────────────────────────────────────
-  const mkPill = (role, done, at) => {
+  // Shared confirm widget
+  const mkConfirm = (role, msg) => `
+    <div class="wf-confirming">
+      <span class="wf-confirm-msg">${msg}</span>
+      <div class="wf-confirm-btns">
+        <button class="chk-btn-yes" data-role="${role}">Confirm ✓</button>
+        <button class="chk-btn-no"  data-role="${role}">Cancel</button>
+      </div>
+    </div>`;
+
+  // ── Phase 1: Enter Data ───────────────────────────────────────
+  const mkPill1 = (role, done, at) => {
     const name = role === "assistant" ? "Ray" : "Daisy";
-    if (confirmRole === role) {
-      const msg = done ? `Undo ${name}?` : `${name}: Sure?`;
-      return `<div class="wf-confirming">
-        <span class="wf-confirm-msg">${msg}</span>
-        <div class="wf-confirm-btns">
-          <button class="chk-btn-yes" data-role="${role}">${done ? "Undo" : "Confirm ✓"}</button>
-          <button class="chk-btn-no"  data-role="${role}">Cancel</button>
-        </div>
-      </div>`;
-    }
-    if (done) {
-      return `<button class="wf-pill wf-pill--done" data-role="${role}">✓ ${escHtml(name)} · ${escHtml(fmtCheckTimestamp(at))}</button>`;
-    }
+    if (confirmRole === role) return mkConfirm(role, done ? `Undo ${name}?` : `${name}: Sure?`);
+    if (done) return `<button class="wf-pill wf-pill--done" data-role="${role}">✓ ${escHtml(name)} · ${escHtml(fmtCheckTimestamp(at))}</button>`;
     return `<button class="wf-pill wf-pill--pending" data-role="${role}">○ ${escHtml(name)}: Pending</button>`;
   };
 
-  // Green only when BOTH done
   const p1State = (ws.rayDone && ws.daisyDone) ? "done" : "pending";
   const p1Node = `<div class="wf-node wf-node--${p1State}">
-    <div class="wf-node-label">Enter Data</div>
+    <div class="wf-node-label">Phase 1: Enter Data</div>
     <div class="wf-node-body">
-      ${mkPill("assistant", ws.rayDone, checks.assistant?.at)}
-      ${mkPill("main", ws.daisyDone, checks.main?.at)}
+      ${mkPill1("assistant", ws.rayDone, checks.assistant?.at)}
+      ${mkPill1("main", ws.daisyDone, checks.main?.at)}
     </div>
   </div>`;
 
-  // ── Phase 2 "Review & Feedback" ──────────────────────────────
-  let p2State, p2Pill;
+  // ── Phase 2: Review & Feedback ────────────────────────────────
+  let p2State, p2Body;
   if (!ws.reviewUnlocked) {
-    p2State = "pending"; p2Pill = `<div class="wf-pill wf-pill--pending">○ Daisy: Pending</div>`;
+    p2State = "pending";
+    p2Body  = `<div class="wf-pill wf-pill--pending">○ Daisy: Pending</div>`;
+  } else if (confirmRole === "phase2") {
+    p2State = "p2-active";
+    p2Body  = mkConfirm("phase2", ws.reviewSubmitted ? "Undo Phase 2?" : "Mark as reviewed?");
   } else if (!ws.reviewSubmitted) {
-    p2State = "p2-active"; p2Pill = `<div class="wf-pill wf-pill--attention">○ Daisy: Pending</div>`;
+    p2State = "p2-active";
+    p2Body  = `<button class="wf-pill wf-pill--attention" data-role="phase2">○ Daisy: Pending</button>`;
   } else {
-    p2State = "done"; p2Pill = `<div class="wf-pill wf-pill--done">✓ Daisy: Reviewed</div>`;
+    p2State = "done";
+    p2Body  = `<button class="wf-pill wf-pill--done" data-role="phase2">✓ Daisy · ${escHtml(fmtCheckTimestamp(data.reviewSubmittedAt))}</button>`;
   }
   const p2Node = `<div class="wf-node wf-node--${p2State}">
-    <div class="wf-node-label">Review &amp; Feedback</div>
-    <div class="wf-node-body">${p2Pill}</div>
+    <div class="wf-node-label">Phase 2: Review &amp; Feedback</div>
+    <div class="wf-node-body">${p2Body}</div>
   </div>`;
 
-  // ── Phase 3 "Revision" ────────────────────────────────────────
-  let p3State, p3Pill;
+  // ── Phase 3: Revision ─────────────────────────────────────────
+  let p3State, p3Body;
   if (!ws.reviewSubmitted) {
-    p3State = "pending"; p3Pill = `<div class="wf-pill wf-pill--pending">○ Ray: Pending</div>`;
-  } else if (ws.noComments || ws.allFixed) {
-    p3State = "done";
-    p3Pill  = ws.noComments
-      ? `<div class="wf-pill wf-pill--done">✓ No corrections</div>`
-      : `<div class="wf-pill wf-pill--done">✓ All ${ws.comments.length} fixed</div>`;
-  } else {
-    const fixedCount = ws.comments.filter(([,c]) => !!c.fixedByName).length;
+    p3State = "pending";
+    p3Body  = `<div class="wf-pill wf-pill--pending">○ Ray: Pending</div>`;
+  } else if (confirmRole === "phase3") {
     p3State = "corrections";
-    p3Pill  = `<div class="wf-pill wf-pill--warn">○ Ray: Pending (${fixedCount}/${ws.comments.length})</div>`;
+    p3Body  = mkConfirm("phase3", ws.revisionDone ? "Undo Phase 3?" : "Mark revision done?");
+  } else if (!ws.revisionDone) {
+    p3State = "corrections";
+    p3Body  = `<button class="wf-pill wf-pill--warn" data-role="phase3">○ Ray: Pending</button>`;
+  } else {
+    p3State = "done";
+    p3Body  = `<button class="wf-pill wf-pill--done" data-role="phase3">✓ Ray · ${escHtml(fmtCheckTimestamp(ws.revisionDone.at))}</button>`;
   }
   const p3Node = `<div class="wf-node wf-node--${p3State}">
-    <div class="wf-node-label">Revision</div>
-    <div class="wf-node-body">${p3Pill}</div>
+    <div class="wf-node-label">Phase 3: Revision</div>
+    <div class="wf-node-body">${p3Body}</div>
   </div>`;
 
-  // ── Phase 4 "Nigel" ──────────────────────────────────────────
+  // ── Phase 4: Nigel ────────────────────────────────────────────
   const nigelState = ws.ready ? "nigel-ready" : "nigel";
   const nigelNode  = `<div class="wf-node wf-node--${nigelState}">
-    <div class="wf-node-label">Nigel</div>
+    <div class="wf-node-label">Phase 4: Nigel</div>
     <div class="wf-node-body">
       <div class="wf-node-line">${ws.ready ? "Ready to Send! 🎉" : "Waiting... 🤔"}</div>
     </div>
   </div>`;
 
-  // ── Row 2: Note button (col 3) + Export button (col 7) ───────
+  // ── Row 2: Note (col 3-5, between Phase 2 & 3) + Export (col 7)
   const hasCmts = ws.comments.length > 0;
   const noteTrigger = `<div class="wf-note-wrap">
     <button class="wf-note-btn${hasCmts ? " has-note" : ""}" data-action="open-note">
@@ -8279,21 +8288,38 @@ async function handleCheckedByClick(e, isGroup) {
     const sid  = getSid();
     const data = getData();
     if (!sid) return true;
-    const checks   = { ...(data?.checks || {}) };
-    const role     = yesBtn.dataset.role;
-    const wasDone  = !!checks[role];
-    if (wasDone) { delete checks[role]; } else { checks[role] = { by: CHECKED_BY[role], at: Date.now() }; }
-    try {
-      await updateSessionChecks(sid, checks);
-      // Update workflow queue status based on new Phase-1 state
-      const bothDone   = !!checks.assistant && !!checks.main;
-      const wasQueued  = data?.workflowStatus === "daisy_pending";
-      if (bothDone && !data?.reviewSubmitted) {
-        await updateWorkflowStatus(sid, "daisy_pending", getSubjectMeta());
-      } else if (!bothDone && wasQueued) {
-        await updateWorkflowStatus(sid, null);
-      }
-    } catch (err) { console.error("updateSessionChecks:", err); }
+    const role = yesBtn.dataset.role;
+
+    if (role === "assistant" || role === "main") {
+      const checks  = { ...(data?.checks || {}) };
+      const wasDone = !!checks[role];
+      if (wasDone) { delete checks[role]; } else { checks[role] = { by: CHECKED_BY[role], at: Date.now() }; }
+      try {
+        await updateSessionChecks(sid, checks);
+        const bothDone  = !!checks.assistant && !!checks.main;
+        const wasQueued = data?.workflowStatus === "daisy_pending";
+        if (bothDone && !data?.reviewSubmitted) {
+          await updateWorkflowStatus(sid, "daisy_pending", getSubjectMeta());
+        } else if (!bothDone && wasQueued) {
+          await updateWorkflowStatus(sid, null);
+        }
+      } catch (err) { console.error("updateSessionChecks:", err); }
+    } else if (role === "phase2") {
+      const ws     = getWorkflowState(data);
+      const newDone = !ws.reviewSubmitted;
+      try {
+        await setReviewSubmitted(sid, newDone);
+        const newStatus = newDone ? (ws.comments.length > 0 ? "ray_pending" : null) : "daisy_pending";
+        await updateWorkflowStatus(sid, newStatus, getSubjectMeta());
+      } catch (err) { console.error("togglePhase2:", err); }
+    } else if (role === "phase3") {
+      const ws     = getWorkflowState(data);
+      const newDone = !ws.revisionDone;
+      try {
+        await setRevisionDone(sid, newDone);
+        await updateWorkflowStatus(sid, newDone ? null : "ray_pending", getSubjectMeta());
+      } catch (err) { console.error("togglePhase3:", err); }
+    }
     return true;
   }
 
@@ -8307,36 +8333,52 @@ async function handleCheckedByClick(e, isGroup) {
 // ── Sticky Note — "List of Corrections" ──────────────────────
 
 function renderStickyNoteContent(data, isGroup) {
-  const tbody  = document.getElementById("sticky-note-rows");
-  const addRow = document.getElementById("sticky-note-add-row");
-  const subBtn = document.getElementById("sticky-note-submit");
-  const undoBtn = document.getElementById("sticky-note-undo");
+  const tbody = document.getElementById("sticky-note-rows");
   if (!tbody) return;
 
   const ws = getWorkflowState(data);
-  const canAdd  = ws.reviewUnlocked && !ws.reviewSubmitted;
-  const showSub = canAdd;
-  const showUndo = ws.reviewSubmitted && ws.comments.every(([,c]) => !c.fixedByName);
+
+  // Preserve focused textarea and caret position across re-renders
+  const activeEl      = document.activeElement;
+  const focusedCmtId  = activeEl?.classList.contains("snote-textarea") ? activeEl.dataset.cmtId : null;
+  const caretPos      = focusedCmtId ? activeEl.selectionEnd : null;
+  // Keep live value so re-render doesn't lose in-flight text
+  const liveText      = focusedCmtId ? activeEl.value : null;
 
   if (ws.comments.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="3" class="snote-empty">${canAdd ? "No corrections yet — add one below." : "No corrections."}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="3" class="snote-empty">No corrections — click + Add Row to start.</td></tr>`;
   } else {
-    tbody.innerHTML = ws.comments.map(([id, c], i) => `
-      <tr class="snote-row${c.fixedByName ? " snote-row--done" : ""}">
+    tbody.innerHTML = ws.comments.map(([id, c], i) => {
+      const text = (focusedCmtId === id && liveText !== null) ? liveText : (c.text || "");
+      return `<tr class="snote-row${c.fixedByName ? " snote-row--done" : ""}">
         <td class="snote-no">${i + 1}</td>
-        <td class="snote-text">${escHtml(c.text)}</td>
-        <td class="snote-tick">
-          ${canAdd
-            ? `<button class="snote-delete" data-cmt-id="${id}" title="Delete">✕</button>`
-            : `<input type="checkbox" class="snote-check" data-cmt-id="${id}" ${c.fixedByName ? "checked" : ""}>`
-          }
-        </td>
-      </tr>`).join("");
+        <td class="snote-text"><textarea class="snote-textarea" data-cmt-id="${id}" rows="1" placeholder="Type here…">${escHtml(text)}</textarea></td>
+        <td class="snote-tick"><input type="checkbox" class="snote-check" data-cmt-id="${id}" ${c.fixedByName ? "checked" : ""}></td>
+      </tr>`;
+    }).join("");
+
+    // Auto-size all textareas
+    tbody.querySelectorAll(".snote-textarea").forEach(ta => {
+      ta.style.height = "auto";
+      ta.style.height = ta.scrollHeight + "px";
+    });
   }
 
-  if (addRow)  addRow.style.display  = canAdd    ? "flex" : "none";
-  if (subBtn)  subBtn.style.display  = showSub   ? "block" : "none";
-  if (undoBtn) undoBtn.style.display = showUndo  ? "block" : "none";
+  // Restore focus & caret
+  if (focusedCmtId) {
+    const ta = tbody.querySelector(`.snote-textarea[data-cmt-id="${focusedCmtId}"]`);
+    if (ta) {
+      ta.focus();
+      if (caretPos !== null) { try { ta.selectionEnd = caretPos; ta.selectionStart = caretPos; } catch {} }
+    }
+  }
+
+  // Focus newly added row
+  if (_focusNewRow) {
+    _focusNewRow = false;
+    const all = tbody.querySelectorAll(".snote-textarea");
+    if (all.length > 0) all[all.length - 1].focus();
+  }
 }
 
 function openStickyNote(sessionId, isGroup, data) {
@@ -8351,8 +8393,6 @@ function openStickyNote(sessionId, isGroup, data) {
   }
   el.classList.remove("hidden");
   renderStickyNoteContent(data, isGroup);
-  const inp = document.getElementById("sticky-note-input");
-  if (inp) inp.focus();
 }
 
 function closeStickyNote() {
@@ -8399,90 +8439,62 @@ function setupStickyNote() {
 
   closeEl.addEventListener("click", closeStickyNote);
 
-  // ── Correction actions (event delegation on note body) ───────
+  // ── Context helpers ──────────────────────────────────────────
   const getCtx = () => ({
-    sid:  _stickyNoteSessionId,
-    data: _stickyNoteIsGroup ? state.viewGroupSessionData : state.viewSessionData,
+    sid:    _stickyNoteSessionId,
+    data:   _stickyNoteIsGroup ? state.viewGroupSessionData : state.viewSessionData,
     isGroup: _stickyNoteIsGroup,
     meta: {
-      subjectName: _stickyNoteIsGroup ? state.viewGroup?.name    : state.viewStudent?.name,
-      subjectId:   _stickyNoteIsGroup ? state.viewGroupSessionData?.groupId   : state.viewSessionData?.studentId,
+      subjectName: _stickyNoteIsGroup ? state.viewGroup?.name : state.viewStudent?.name,
+      subjectId:   _stickyNoteIsGroup ? state.viewGroupSessionData?.groupId : state.viewSessionData?.studentId,
       isGroup:     !!_stickyNoteIsGroup,
       date:        _stickyNoteIsGroup ? state.viewGroupSessionData?.date : state.viewSessionData?.date
     }
   });
 
-  async function addCorrection() {
-    const inp = document.getElementById("sticky-note-input");
-    const text = (inp?.value || "").trim();
-    if (!text || !_stickyNoteSessionId) return;
-    inp.value = "";
-    try { await addReviewComment(_stickyNoteSessionId, text); }
-    catch (err) { console.error("addReviewComment:", err); }
-  }
-
+  // ── Click delegation ─────────────────────────────────────────
   note.addEventListener("click", async e => {
-    // Add button
-    if (e.target.id === "sticky-note-add") { await addCorrection(); return; }
-
-    // Submit review
-    if (e.target.id === "sticky-note-submit") {
-      const { sid, data, meta } = getCtx();
-      if (!sid) return;
-      const ws = getWorkflowState(data);
-      try {
-        await setReviewSubmitted(sid, true);
-        await updateWorkflowStatus(sid, ws.comments.length > 0 ? "ray_pending" : null, meta);
-      } catch (err) { console.error("submitReview:", err); }
-      return;
-    }
-
-    // Undo submit
-    if (e.target.id === "sticky-note-undo") {
-      const { sid, meta } = getCtx();
-      if (!sid) return;
-      try {
-        await setReviewSubmitted(sid, false);
-        await updateWorkflowStatus(sid, "daisy_pending", meta);
-      } catch (err) { console.error("undoSubmit:", err); }
-      return;
-    }
-
-    // Delete correction
-    const del = e.target.closest(".snote-delete");
-    if (del) {
+    // + Add Row
+    if (e.target.id === "sticky-note-add-row-btn") {
       const { sid } = getCtx();
       if (!sid) return;
-      try { await deleteReviewComment(sid, del.dataset.cmtId); }
-      catch (err) { console.error("deleteReviewComment:", err); }
+      _focusNewRow = true;
+      try { await addReviewComment(sid, ""); }
+      catch (err) { console.error("addReviewComment:", err); }
       return;
     }
 
-    // Tick/untick correction (Ray's checkbox)
+    // Tick/untick checkbox
     const chk = e.target.closest(".snote-check");
     if (chk) {
-      const { sid, data, meta } = getCtx();
+      const { sid } = getCtx();
       if (!sid) return;
       const cmtId  = chk.dataset.cmtId;
       const fixing = chk.checked;
-      try {
-        await markCommentFixed(sid, cmtId, fixing ? "Ray" : null);
-        if (fixing) {
-          const ws = getWorkflowState(data);
-          const updatedCmts = ws.comments.map(([id, c]) => id === cmtId ? [id, { ...c, fixedByName: "Ray" }] : [id, c]);
-          if (updatedCmts.every(([,c]) => !!c.fixedByName)) {
-            await updateWorkflowStatus(sid, null, meta);
-          }
-        }
-      } catch (err) { console.error("markCommentFixed:", err); }
+      try { await markCommentFixed(sid, cmtId, fixing ? "Ray" : null); }
+      catch (err) { console.error("markCommentFixed:", err); }
       return;
     }
   });
 
-  // Add on Enter key
-  note.addEventListener("keydown", async e => {
-    const inp = document.getElementById("sticky-note-input");
-    if (e.target === inp && e.key === "Enter") { e.preventDefault(); await addCorrection(); }
+  // ── Textarea auto-save (debounced, per-row) ──────────────────
+  note.addEventListener("input", e => {
+    const ta = e.target.closest(".snote-textarea");
+    if (!ta) return;
+    const cmtId = ta.dataset.cmtId;
+    if (!cmtId) return;
+    // Auto-grow
+    ta.style.height = "auto";
+    ta.style.height = ta.scrollHeight + "px";
+    // Debounce save
+    if (_textareaDebounce.has(cmtId)) clearTimeout(_textareaDebounce.get(cmtId));
+    _textareaDebounce.set(cmtId, setTimeout(async () => {
+      _textareaDebounce.delete(cmtId);
+      const { sid } = getCtx();
+      if (!sid) return;
+      try { await updateReviewCommentText(sid, cmtId, ta.value); }
+      catch (err) { console.error("updateReviewCommentText:", err); }
+    }, 600));
   });
 }
 

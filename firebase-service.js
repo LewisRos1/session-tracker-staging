@@ -334,7 +334,24 @@ export async function updateWorkflowNote(sessionId, note) {
 export async function setReviewSubmitted(sessionId, submitted) {
   const updates = { reviewSubmitted: !!submitted };
   if (submitted) updates.reviewSubmittedAt = Date.now();
+  else updates.reviewSubmittedAt = deleteField();
   await updateDoc(doc(db, "sessions", sessionId), updates);
+}
+
+/** Mark Phase 3 revision as done (Ray manually ticks the pill). */
+export async function setRevisionDone(sessionId, done) {
+  if (done) {
+    await updateDoc(doc(db, "sessions", sessionId), { revisionDone: { by: "Ray", at: Date.now() } });
+  } else {
+    await updateDoc(doc(db, "sessions", sessionId), { revisionDone: deleteField() });
+  }
+}
+
+/** Update the text of an existing review comment (for auto-save on textarea input). */
+export async function updateReviewCommentText(sessionId, commentId, text) {
+  await updateDoc(doc(db, "sessions", sessionId), {
+    [`reviewComments.${commentId}.text`]: text
+  });
 }
 
 /** Mark a comment as fixed by name. Pass null fixedByName to unmark. */
