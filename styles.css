@@ -2927,6 +2927,9 @@ button.wf-pill:hover { filter: brightness(.93); }
   font-size: .84rem;
   font-family: inherit;
   color: #422006;
+  border: 1.5px solid #f59e0b;
+  border-radius: 6px;
+  overflow: hidden;
 }
 .snote-table thead th {
   text-align: left;
@@ -2935,9 +2938,12 @@ button.wf-pill:hover { filter: brightness(.93); }
   text-transform: uppercase;
   letter-spacing: .05em;
   color: #92400e;
-  border-bottom: 1.5px solid #fde047;
-  padding: .2rem .35rem .35rem;
+  background: #fef08a;
+  border-bottom: 1.5px solid #f59e0b;
+  border-right: 1px solid #f59e0b;
+  padding: .25rem .35rem .3rem;
 }
+.snote-table thead th:last-child { border-right: none; }
 .snote-th-no   { width: 2rem; }
 .snote-th-tick { width: 2.2rem; text-align: center; }
 .snote-th-text { }
@@ -2945,8 +2951,10 @@ button.wf-pill:hover { filter: brightness(.93); }
 .snote-row td {
   padding: .3rem .35rem;
   border-bottom: 1px solid #fef08a;
+  border-right: 1px solid #fef08a;
   vertical-align: top;
 }
+.snote-row td:last-child { border-right: none; }
 .snote-row:last-child td { border-bottom: none; }
 .snote-no   { color: #92400e; font-weight: 600; text-align: right; padding-right: .6rem; }
 .snote-text { word-break: break-word; }
@@ -2985,6 +2993,59 @@ button.wf-pill:hover { filter: brightness(.93); }
   transition: background .12s;
 }
 .snote-add-row-btn:hover { background: #fef08a; }
+
+/* Phase shortcut pill at the bottom of the sticky note */
+.snote-footer {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding-top: .3rem;
+  border-top: 1px dashed #fde047;
+  margin-top: .1rem;
+}
+.snote-phase-pill {
+  font-size: .78rem;
+  padding: .22rem .65rem;
+  border-radius: 999px;
+  border: 1.5px solid #f59e0b;
+  background: #fef3c7;
+  color: #92400e;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background .12s;
+}
+.snote-phase-pill:hover { background: #fde68a; }
+.snote-phase-confirm {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  font-size: .78rem;
+  color: #713f12;
+  flex-wrap: wrap;
+}
+.snote-phase-confirm-msg { font-weight: 600; }
+.snote-phase-confirm-yes {
+  padding: .2rem .55rem;
+  border-radius: 999px;
+  border: 1.5px solid #10b981;
+  background: #d1fae5;
+  color: #065f46;
+  font-size: .78rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+.snote-phase-confirm-yes:hover { background: #a7f3d0; }
+.snote-phase-confirm-no {
+  padding: .2rem .55rem;
+  border-radius: 999px;
+  border: 1.5px solid #9ca3af;
+  background: none;
+  color: #6b7280;
+  font-size: .78rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+.snote-phase-confirm-no:hover { background: #f3f4f6; }
 
 .snote-delete {
   background: none;

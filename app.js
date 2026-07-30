@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1276";
+const APP_VERSION = "1277";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Daisy" };
 
@@ -8076,11 +8076,12 @@ let _grpSigningCmtId     = null;
 let _grpSigningName      = "";
 
 // Sticky note (floating draggable corrections list)
-let _stickyNoteSessionId = null;
-let _stickyNoteIsGroup   = false;
-let _noteDebounce        = null;
-let _focusNewRow         = false;
-const _textareaDebounce  = new Map();
+let _stickyNoteSessionId    = null;
+let _stickyNoteIsGroup      = false;
+let _noteDebounce           = null;
+let _focusNewRow            = false;
+let _stickyNotePhaseConfirm = null; // "phase2" | "phase3" | null
+const _textareaDebounce     = new Map();
 
 function getWorkflowState(data) {
   const checks    = data?.checks || {};
@@ -8379,6 +8380,28 @@ function renderStickyNoteContent(data, isGroup) {
     const all = tbody.querySelectorAll(".snote-textarea");
     if (all.length > 0) all[all.length - 1].focus();
   }
+
+  // ── Footer: pending-phase shortcut pill ──────────────────────
+  const footer = document.getElementById("sticky-note-footer");
+  if (footer) {
+    let pendingRole = null;
+    if (ws.reviewUnlocked && !ws.reviewSubmitted)   pendingRole = "phase2";
+    else if (ws.reviewSubmitted && !ws.revisionDone) pendingRole = "phase3";
+
+    if (!pendingRole) {
+      footer.innerHTML = "";
+    } else if (_stickyNotePhaseConfirm === pendingRole) {
+      const label = pendingRole === "phase2" ? "Mark Phase 2 done?" : "Mark Phase 3 done?";
+      footer.innerHTML = `<div class="snote-phase-confirm">
+        <span class="snote-phase-confirm-msg">${label}</span>
+        <button class="snote-phase-confirm-yes" data-role="${pendingRole}">Confirm ✓</button>
+        <button class="snote-phase-confirm-no"  data-role="${pendingRole}">Cancel</button>
+      </div>`;
+    } else {
+      const label = pendingRole === "phase2" ? "○ Phase 2: Pending" : "○ Phase 3: Pending";
+      footer.innerHTML = `<button class="snote-phase-pill" data-role="${pendingRole}">${label}</button>`;
+    }
+  }
 }
 
 function openStickyNote(sessionId, isGroup, data) {
@@ -8398,7 +8421,8 @@ function openStickyNote(sessionId, isGroup, data) {
 function closeStickyNote() {
   const el = document.getElementById("sticky-note");
   if (el) el.classList.add("hidden");
-  _stickyNoteSessionId = null;
+  _stickyNoteSessionId    = null;
+  _stickyNotePhaseConfirm = null;
 }
 
 function setupStickyNote() {
@@ -8461,6 +8485,45 @@ function setupStickyNote() {
       _focusNewRow = true;
       try { await addReviewComment(sid, ""); }
       catch (err) { console.error("addReviewComment:", err); }
+      return;
+    }
+
+    // Phase shortcut pill → enter confirm state
+    const phasePill = e.target.closest(".snote-phase-pill");
+    if (phasePill) {
+      _stickyNotePhaseConfirm = phasePill.dataset.role;
+      const { data, isGroup } = getCtx();
+      renderStickyNoteContent(data, isGroup);
+      return;
+    }
+
+    // Phase confirm — yes
+    const phaseYes = e.target.closest(".snote-phase-confirm-yes");
+    if (phaseYes) {
+      const role = phaseYes.dataset.role;
+      _stickyNotePhaseConfirm = null;
+      const { sid, data, meta } = getCtx();
+      if (!sid) return;
+      const ws = getWorkflowState(data);
+      try {
+        if (role === "phase2") {
+          await setReviewSubmitted(sid, true);
+          const newStatus = ws.comments.length > 0 ? "ray_pending" : null;
+          await updateWorkflowStatus(sid, newStatus, meta);
+        } else if (role === "phase3") {
+          await setRevisionDone(sid, true);
+          await updateWorkflowStatus(sid, null, meta);
+        }
+      } catch (err) { console.error("snotePhaseConfirm:", err); }
+      return;
+    }
+
+    // Phase confirm — cancel
+    const phaseNo = e.target.closest(".snote-phase-confirm-no");
+    if (phaseNo) {
+      _stickyNotePhaseConfirm = null;
+      const { data, isGroup } = getCtx();
+      renderStickyNoteContent(data, isGroup);
       return;
     }
 
