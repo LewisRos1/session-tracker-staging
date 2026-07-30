@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1281";
+const APP_VERSION = "1282";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Daisy" };
 
@@ -2336,8 +2336,15 @@ async function hyrGenerate() {
       .slice(0, 5);
     const bottom5Names = bottom5Targets.map(r => r.name);
 
-    const aiPrompt = `${HYR_DEFAULT_PROMPT}
+    const excludedList = excludedActivities.size > 0
+      ? [...excludedActivities].map(k => {
+          const [t, a] = k.split("|");
+          return `  - ${a} (under target: ${t})`;
+        }).join("\n")
+      : null;
 
+    const aiPrompt = `${HYR_DEFAULT_PROMPT}
+${excludedList ? `\nEXCLUDED ACTIVITIES — ABSOLUTE RULE: The following activities have been deliberately excluded from this report by the author. They are NOT present in the session data below. Do NOT mention, reference, discuss, or draw any conclusions about them anywhere in the report — not in the executive summary, not in key insights, not in any target or observation section. Treat them as if they do not exist:\n${excludedList}\n` : ""}
 Student: ${student.name}
 Reporting Period: ${aiReportingPeriod}
 
@@ -2592,6 +2599,8 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
     if (actNames.size > 0) {
       lines.push("Activities:");
       for (const actName of actNames) {
+        // Skip activities excluded by the user in the report UI
+        if (excludedActivities.has(`${tName}|${actName}`)) continue;
         // Collect all remarks for this activity across all sessions, sorted by date
         const allRemarks = [];
         const hyrAliases  = paKeyToAliases[actName] || [];
