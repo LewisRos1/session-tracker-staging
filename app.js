@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1286";
+const APP_VERSION = "1287";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -201,7 +201,7 @@ function requirePassword(onSuccess, message = "Enter password to continue") {
   pwInput.addEventListener("keydown", e => { if (e.key === "Enter") check(); });
 }
 
-const LEGAL_WARNING = "Unauthorised downloading or sharing of client data for personal use is a serious breach of privacy law. Violators will be reported to the relevant authorities and may face civil and criminal liability.";
+const LEGAL_WARNING = "Unauthorised sharing or downloading of client data without permission for personal use is strictly prohibited. Any violation of this policy constitutes a serious breach of privacy law. Violators may be reported to the relevant authorities and may be subject to civil and criminal liability.";
 const EXPIRED_MSG = `This session is over 7 days old and has expired for free viewing. A password is required to continue.\n\n${LEGAL_WARNING}`;
 const EXPORT_MSG  = `Enter password to continue.\n\n${LEGAL_WARNING}`;
 
