@@ -2771,7 +2771,7 @@ div.admin-note-editable:empty::before {
   flex-direction: column;
   gap: .3rem;
   flex: 1;
-  justify-content: center;
+  justify-content: flex-start;
 }
 .wf-node-line { font-size: .875rem; }
 
