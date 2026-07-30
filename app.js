@@ -158,7 +158,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1267";
+const APP_VERSION = "1268";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Daisy" };
 
@@ -7888,6 +7888,10 @@ async function openSessionView(student, sessionId) {
         const maintainedFilled = await autoFillViewMaintainedRemarks(student, sessionId, data);
         if (maintainedFilled > 0) return;
       } catch (err) { console.error("autoFillViewMaintainedRemarks failed:", err); }
+      try {
+        const structuredFilled = await autoFillViewStructuredRemarks(student, sessionId, data);
+        if (structuredFilled > 0) return;
+      } catch (err) { console.error("autoFillViewStructuredRemarks failed:", err); }
       if (isViewBusy() || state.viewActionsInFlight > 0) { state.viewRenderPending = true; }
       else               { renderSessionView(); }
     });
@@ -8804,6 +8808,61 @@ async function autoFillViewMaintainedRemarks(student, sessionId, data) {
   return count;
 }
 
+// View-screen counterpart of autoFillStructuredRemarks — re-creates empty
+// placeholder remarks for auto-open activities (Mastery Level / Select One /
+// Tickbox) whose records were cleaned up when the session was last left.
+// Without this, those activities render as view-single-create-btn (needing a
+// new activity+remark write pair), and the intermediate Firestore snapshot
+// between the two writes reverts the optimistic render. With this, by the
+// time the user clicks, the record already exists and only a single
+// updateRemarkText write is needed (no intermediate-state risk).
+async function autoFillViewStructuredRemarks(student, sessionId, data) {
+  // Same guard as autoFillViewMaintainedRemarks: skip fully-empty sessions.
+  const hasRealData = Object.values(data.remarks || {}).some(r =>
+    (r.text && r.text.trim()) || (r.trials || []).some(t => t >= 0) || r.optionScore !== undefined
+  );
+  if (!hasRealData) return 0;
+  const sessionDate = data.date || null;
+  let count = 0;
+  for (const target of (student.targets || [])) {
+    for (const pa of (target.predefinedActivities || [])) {
+      if (!isAutoOpenRemarkType(pa)) continue;
+      if (pa.maintained || pa.isMapped) continue; // handled by other auto-fills
+      if (!isActivityActive(pa, sessionDate)) continue;
+      const paConfigId = pa.id || null;
+      const paParent = pa.parentActivity || null;
+      const allActs = Object.entries(data.activities || {});
+      // Skip if ANY candidate for this slot already has a remark (even empty).
+      const candidateIds = allActs
+        .filter(([, a]) => {
+          if (a.targetName !== target.name) return false;
+          if (paConfigId && a.configId === paConfigId) return true;
+          if (a.configId) return false;
+          const nameOk = a.activityName === pa.name || (pa.title && a.activityName === pa.title);
+          if (!nameOk) return false;
+          return paParent ? (!a.parentActivity || a.parentActivity === paParent) : !a.parentActivity;
+        })
+        .map(([id]) => id);
+      const remarkActIds = new Set(Object.values(data.remarks || {}).map(r => r.activityId));
+      if (candidateIds.some(id => remarkActIds.has(id))) continue;
+      const existingActId = candidateIds[0] || null;
+      const key = `${sessionId}:${target.name}:${paConfigId || pa.name}:${paParent || ""}:view`;
+      if (structuredRemarkAutoFillInFlight.has(key)) continue;
+      structuredRemarkAutoFillInFlight.add(key);
+      try {
+        if (existingActId) {
+          await addRemark(sessionId, existingActId, "");
+        } else {
+          await addAutoFillActivityAndRemark(sessionId, target.name, pa.name, pa.order ?? 0, paParent, paConfigId);
+        }
+        count++;
+      } catch { /* silent — next snapshot will retry */ }
+      finally { structuredRemarkAutoFillInFlight.delete(key); }
+    }
+  }
+  return count;
+}
+
 // Resolves a mapped-score activity's display for one attendee on the group
 // View/Edit Past Sessions screen — see resolveGroupMappedScoreDisplay
 // (live-entry counterpart). Per-attendee throughout, per the boss's decision.
@@ -8849,6 +8908,46 @@ async function autoFillViewGroupMappedRemarks(group, sessionId, data) {
         } finally {
           mappedRemarkAutoFillInFlight.delete(key);
         }
+      }
+    }
+  }
+  return count;
+}
+
+// Group View/Edit Past Sessions counterpart of autoFillViewStructuredRemarks.
+// Creates one empty placeholder remark per attendee for each auto-open activity
+// that was cleaned up on session leave, so they show as clickable buttons
+// (view-remark-single-btn) rather than a "create" button requiring two writes.
+async function autoFillViewGroupStructuredRemarks(group, sessionId, data) {
+  const hasRealData = Object.values(data.remarks || {}).some(r =>
+    (r.text && r.text.trim()) || (r.trials || []).some(t => t >= 0) || r.optionScore !== undefined
+  );
+  if (!hasRealData) return 0;
+  const attendees = data.attendees || (group.students || []).filter(Boolean);
+  let count = 0;
+  for (const target of (group.targets || [])) {
+    for (const pa of (target.predefinedActivities || [])) {
+      if (!isAutoOpenRemarkType(pa)) continue;
+      if (pa.maintained || pa.isMapped) continue;
+      const existingAct = Object.entries(data.activities || {})
+        .find(([, a]) => a.targetName === target.name &&
+          (a.activityName === pa.name || (pa.title && a.activityName === pa.title) || (pa.id && a.configId === pa.id)));
+      let actId = existingAct?.[0] || null;
+      for (const studentName of attendees) {
+        const hasRemark = actId && Object.values(data.remarks || {})
+          .some(r => r.activityId === actId && r.studentName === studentName);
+        if (hasRemark) continue;
+        const key = `${sessionId}:${target.name}:${pa.id || pa.name}:${studentName}:view`;
+        if (structuredRemarkAutoFillInFlight.has(key)) continue;
+        structuredRemarkAutoFillInFlight.add(key);
+        try {
+          if (!actId) {
+            actId = await addActivity(sessionId, target.name, pa.name, pa.order ?? 0, true);
+          }
+          await addGroupRemark(sessionId, actId, studentName, "");
+          count++;
+        } catch { /* silent */ }
+        finally { structuredRemarkAutoFillInFlight.delete(key); }
       }
     }
   }
@@ -9800,6 +9899,10 @@ async function openGroupSessionView(group, sessionId) {
         const filled = await autoFillViewGroupMappedRemarks(group, sessionId, data);
         if (filled > 0) return; // the write triggers another snapshot, which renders
       } catch (err) { console.error("autoFillViewGroupMappedRemarks failed:", err); }
+      try {
+        const structuredFilled = await autoFillViewGroupStructuredRemarks(group, sessionId, data);
+        if (structuredFilled > 0) return;
+      } catch (err) { console.error("autoFillViewGroupStructuredRemarks failed:", err); }
       if (isGroupViewBusy() || state.viewGroupActionsInFlight > 0) { state.viewGroupRenderPending = true; }
       else                   { renderGroupSessionView(); }
     });
