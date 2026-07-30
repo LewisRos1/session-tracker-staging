@@ -157,7 +157,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1255";
+const APP_VERSION = "1256";
 
 // ─── STATE ───────────────────────────────────────────────────
 const state = {
@@ -8602,8 +8602,9 @@ function calcViewDayAvg(data, target, visited = new Set()) {
           return;
         }
         const trials = (rem.trials || []).filter(t => t !== -1);
-        if (!trials.length) return;
-        avgs.push(trials.reduce((a, b) => a + b, 0) / (trials.length * (target.maxPoints || 3)) * 100);
+        const allScores = rem.optionScore !== undefined ? [...trials, rem.optionScore] : trials;
+        if (!allScores.length) return;
+        avgs.push(allScores.reduce((a, b) => a + b, 0) / (allScores.length * (target.maxPoints || 3)) * 100);
       });
     });
   return avgs.length ? Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length) : null;
