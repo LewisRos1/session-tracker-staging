@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1287";
+const APP_VERSION = "1288";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -177,7 +177,7 @@ function requirePassword(onSuccess, message = "Enter password to continue") {
   $("manage-modal-title").textContent = "Password Required";
   $("manage-modal-body").innerHTML = `
     <div style="padding:2rem 1rem;display:flex;flex-direction:column;align-items:center;gap:.75rem">
-      <div style="font-size:.85rem;color:var(--text-muted);text-align:center;max-width:260px;line-height:1.5;white-space:pre-line">${escHtml(message)}</div>
+      <div style="font-size:.85rem;color:var(--text-muted);text-align:center;max-width:260px;line-height:1.5">${message}</div>
       <input id="req-pw-input" type="password" class="admin-input"
         style="width:200px;text-align:center;font-size:1rem"
         placeholder="Enter password" autocomplete="new-password">
@@ -201,9 +201,9 @@ function requirePassword(onSuccess, message = "Enter password to continue") {
   pwInput.addEventListener("keydown", e => { if (e.key === "Enter") check(); });
 }
 
-const LEGAL_WARNING = "Unauthorised sharing or downloading of client data without permission for personal use is strictly prohibited. Any violation of this policy constitutes a serious breach of privacy law. Violators may be reported to the relevant authorities and may be subject to civil and criminal liability.";
-const EXPIRED_MSG = `This session is over 7 days old and has expired for free viewing. A password is required to continue.\n\n${LEGAL_WARNING}`;
-const EXPORT_MSG  = `Enter password to continue.\n\n${LEGAL_WARNING}`;
+const LEGAL_WARNING = `<strong>Client data is confidential</strong> and must only be accessed, used, or shared for authorised purposes. Unauthorised <strong>downloading of client data</strong> without permission for personal use is <strong>strictly prohibited</strong>.<br><br>Any violation of this policy constitutes a serious breach of privacy law. Violators may be <strong>reported to the relevant authorities</strong> and may be subject to civil and criminal liability.`;
+const EXPIRED_MSG = `This session is over 7 days old and has expired for free viewing. A password is required to continue.<br><br>${LEGAL_WARNING}`;
+const EXPORT_MSG  = `Enter password to continue.<br><br>${LEGAL_WARNING}`;
 
 function isOlderThan7Days(dateStr) {
   if (!dateStr) return false;
