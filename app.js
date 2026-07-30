@@ -164,7 +164,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1270";
+const APP_VERSION = "1271";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Daisy" };
 
@@ -1080,7 +1080,7 @@ function renderStudentDatabaseButton() {
   const badge   = pending > 0 ? ` (${pending})` : "";
   container.innerHTML = `<div class="info-btn-row">
     <button class="export-btn export-btn-all" id="btn-open-student-registry">Student Database</button>
-    <button class="export-btn info-checklist-btn${pending > 0 ? " has-pending" : ""}" id="btn-open-checklist">📋 Checklist${escHtml(badge)}</button>
+    <button class="export-btn export-btn-all" id="btn-open-checklist">📋 Checklist${escHtml(badge)}</button>
   </div>`;
   $("btn-open-student-registry").addEventListener("click", () => openStudentRegistryScreen());
   $("btn-open-checklist").addEventListener("click", openChecklistModal);

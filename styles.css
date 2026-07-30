@@ -2715,13 +2715,7 @@ div.admin-note-editable:empty::before {
   flex-wrap: wrap;
   gap: .5rem;
 }
-.info-checklist-btn { background: #f9fafb; }
-.info-checklist-btn.has-pending {
-  background: #fef3c7;
-  border-color: #fbbf24;
-  color: #92400e;
-}
-.info-checklist-btn.has-pending:hover { background: #fde68a; }
+.info-btn-row .export-btn-all { margin-bottom: 0; }
 
 /* ─── Checklist modal ───────────────────────────────────────── */
 .checklist-group-header {
