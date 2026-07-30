@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1285";
+const APP_VERSION = "1286";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -177,7 +177,7 @@ function requirePassword(onSuccess, message = "Enter password to continue") {
   $("manage-modal-title").textContent = "Password Required";
   $("manage-modal-body").innerHTML = `
     <div style="padding:2rem 1rem;display:flex;flex-direction:column;align-items:center;gap:.75rem">
-      <div style="font-size:.85rem;color:var(--text-muted);text-align:center;max-width:240px;line-height:1.4">${escHtml(message)}</div>
+      <div style="font-size:.85rem;color:var(--text-muted);text-align:center;max-width:260px;line-height:1.5;white-space:pre-line">${escHtml(message)}</div>
       <input id="req-pw-input" type="password" class="admin-input"
         style="width:200px;text-align:center;font-size:1rem"
         placeholder="Enter password" autocomplete="new-password">
@@ -201,7 +201,9 @@ function requirePassword(onSuccess, message = "Enter password to continue") {
   pwInput.addEventListener("keydown", e => { if (e.key === "Enter") check(); });
 }
 
-const EXPIRED_MSG = "This session is over 7 days old and has expired for free viewing. A password is required to continue.";
+const LEGAL_WARNING = "Unauthorised downloading or sharing of client data for personal use is a serious breach of privacy law. Violators will be reported to the relevant authorities and may face civil and criminal liability.";
+const EXPIRED_MSG = `This session is over 7 days old and has expired for free viewing. A password is required to continue.\n\n${LEGAL_WARNING}`;
+const EXPORT_MSG  = `Enter password to continue.\n\n${LEGAL_WARNING}`;
 
 function isOlderThan7Days(dateStr) {
   if (!dateStr) return false;
@@ -2092,7 +2094,7 @@ function renderExportButtons() {
           btn.textContent = defaultLabel;
           btn.style.width = "";
         }
-      });
+      }, EXPORT_MSG);
     });
   };
   wire("btn-export-all-trials", "Backup All Excel (ZIP)", true);
@@ -2203,7 +2205,7 @@ function renderHalfYearReportsSection() {
     actFilter.style.display = "";
   });
 
-  $("hyr-btn-generate").addEventListener("click", () => requirePassword(hyrGenerate));
+  $("hyr-btn-generate").addEventListener("click", () => requirePassword(hyrGenerate, EXPORT_MSG));
 }
 
 function hyrExclKey(studentId, periodVal) {
@@ -4839,14 +4841,14 @@ function showStudentChoice(student) {
   $("session-picker-modal").classList.remove("hidden");
 
   $("session-picker-list").querySelector(".choice-export-excel").addEventListener("click", () => {
-    requirePassword(() => showExportTrialsChoice(student.name, includeTrials => exportStudentData(student, includeTrials)));
+    requirePassword(() => showExportTrialsChoice(student.name, includeTrials => exportStudentData(student, includeTrials)), EXPORT_MSG);
   });
   $("session-picker-list").querySelector(".choice-export-word").addEventListener("click", () => {
     requirePassword(() => showExportSessionPickerGeneric(
       student.name,
       () => getRecentSessionsForStudent(student.id),
       session => exportStudentSingleSessionWord(student, session)
-    ));
+    ), EXPORT_MSG);
   });
 
   $("session-picker-list").querySelector(".choice-today").addEventListener("click", () => {
@@ -5272,7 +5274,7 @@ function showGroupExportStudentPicker(group, mode) {
           return;
         }
         showExportTrialsChoice(`${name} (Group)`, includeTrials => exportGroupMemberData(name, [group], includeTrials));
-      });
+      }, EXPORT_MSG);
     });
   });
 }
@@ -8335,7 +8337,7 @@ async function handleCheckedByClick(e, isGroup) {
       } else {
         exportStudentSingleSessionWord(state.viewStudent, { id: state.viewSessionId, ...(state.viewSessionData || {}) });
       }
-    });
+    }, EXPORT_MSG);
     return true;
   }
 
