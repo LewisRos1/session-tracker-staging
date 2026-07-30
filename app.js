@@ -73,6 +73,12 @@ import {
   cleanupExpiredTrash,
   reassignGroupStudentAcrossSessions,
   updateSessionChecks,
+  updateWorkflowStatus,
+  addReviewComment,
+  deleteReviewComment,
+  setReviewSubmitted,
+  markCommentFixed,
+  listenToReviewQueue,
   signInWithPin,
   signOutUser,
   onAuthChange,
@@ -158,7 +164,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1268";
+const APP_VERSION = "1269";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Daisy" };
 
@@ -218,6 +224,9 @@ const state = {
   viewGroupSessionData:   null,
   fbViewGroupUnsubscribe: null,
   viewGroupRenderPending: false,
+  // Review queue (home screen checklist for pending review work)
+  reviewQueueItems:        [],
+  reviewQueueUnsubscribe:  null,
 };
 window._s = state; // debug helper
 
@@ -597,6 +606,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
     if (!user) {
+      if (state.reviewQueueUnsubscribe) { state.reviewQueueUnsubscribe(); state.reviewQueueUnsubscribe = null; }
       await waitForUpdatingScreenMinimum();
       initPin();
       return;
@@ -604,6 +614,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadAppData();
     await migrateGrayActivitiesToMaintained();
     await waitForUpdatingScreenMinimum();
+    // Start live review queue listener (updates home screen checklist in real time)
+    if (state.reviewQueueUnsubscribe) { state.reviewQueueUnsubscribe(); state.reviewQueueUnsubscribe = null; }
+    state.reviewQueueUnsubscribe = listenToReviewQueue(items => {
+      state.reviewQueueItems = items;
+      if ($("screen-home") && !$("screen-home").classList.contains("hidden")) {
+        renderReviewQueue(items);
+      }
+    });
     showHome();
     cleanupExpiredTrash();
   });
@@ -836,6 +854,7 @@ async function showHome() {
   state.searchGroup = "";
   [$("search-existing"), $("search-assessment"), $("search-template"), $("search-group")]
     .forEach(el => { if (el) el.value = ""; });
+  renderReviewQueue(state.reviewQueueItems);
   renderExistingStudentButtons();
   renderGroupButtons();
   renderAssessmentStudentButtons();
@@ -844,6 +863,62 @@ async function showHome() {
   renderHalfYearReportsSection();
   renderStudentDatabaseButton();
   runOneOffRepairs();
+}
+
+function renderReviewQueue(items) {
+  const section = $("home-review-queue");
+  const content = $("review-queue-content");
+  if (!section || !content) return;
+
+  const daisyItems = (items || []).filter(i => i.workflowStatus === "daisy_pending")
+    .sort((a, b) => (a.workflowDate || a.date || "").localeCompare(b.workflowDate || b.date || ""));
+  const rayItems   = (items || []).filter(i => i.workflowStatus === "ray_pending")
+    .sort((a, b) => (a.workflowDate || a.date || "").localeCompare(b.workflowDate || b.date || ""));
+
+  if (daisyItems.length === 0 && rayItems.length === 0) {
+    section.classList.add("hidden");
+    return;
+  }
+  section.classList.remove("hidden");
+
+  const itemHtml = item => {
+    const d = item.workflowDate || item.date;
+    const dateStr = d ? formatDateWithDay(d) : "Unknown date";
+    return `<button class="review-queue-item" data-session-id="${item.id}" data-subject-id="${escHtml(item.workflowSubjectId || "")}" data-is-group="${!!item.workflowIsGroup}">
+      <span class="review-queue-date">${escHtml(dateStr)}</span>
+      <span class="review-queue-name">${escHtml(item.workflowSubjectName || "Unknown")}</span>
+    </button>`;
+  };
+
+  let html = "";
+  if (daisyItems.length > 0) {
+    html += `<div class="review-queue-group">
+      <div class="review-queue-subtitle">🔍 Daisy – Review Needed</div>
+      ${daisyItems.map(itemHtml).join("")}
+    </div>`;
+  }
+  if (rayItems.length > 0) {
+    html += `<div class="review-queue-group">
+      <div class="review-queue-subtitle">🔧 Ray – Corrections Needed</div>
+      ${rayItems.map(itemHtml).join("")}
+    </div>`;
+  }
+  content.innerHTML = html;
+
+  content.querySelectorAll(".review-queue-item").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const sid       = btn.dataset.sessionId;
+      const subjectId = btn.dataset.subjectId;
+      const isGrp     = btn.dataset.isGroup === "true";
+      if (isGrp) {
+        const group = (state.groups || []).find(g => g.id === subjectId);
+        if (group) openGroupSessionView(group, sid);
+      } else {
+        const student = (state.students || []).find(s => s.id === subjectId);
+        if (student) openSessionView(student, sid);
+      }
+    });
+  });
 }
 
 // One-off repairs for specific data issues already fixed in the app's logic
@@ -7822,6 +7897,7 @@ async function openSessionView(student, sessionId) {
   $("view-session-meta").textContent = "";
   $("session-view-body").innerHTML = `<div class="loading">Loading…</div>`;
   _viewChkConfirmRole = null; clearTimeout(_viewChkConfirmTimer);
+  _viewReviewPanelOpen = false; _viewCommentDraft = ""; _viewSigningCmtId = null; _viewSigningName = "";
 
   if (state.fbViewUnsubscribe) { state.fbViewUnsubscribe(); state.fbViewUnsubscribe = null; }
 
@@ -7907,6 +7983,7 @@ async function leaveSessionView() {
   $("btn-delete-session")?.classList.add("hidden");
   $("btn-goto-session")?.classList.add("hidden");
   _viewChkConfirmRole = null; clearTimeout(_viewChkConfirmTimer);
+  _viewReviewPanelOpen = false; _viewCommentDraft = ""; _viewSigningCmtId = null; _viewSigningName = "";
   // Flush (and await it) while the Firestore listener is still live, same as
   // leaveSession() does for the live entry screen — flush() only writes to
   // Firestore, state.viewSessionData only updates once the listener echoes
@@ -7977,6 +8054,30 @@ let _viewChkConfirmTimer = null;
 let _grpChkConfirmRole   = null;
 let _grpChkConfirmTimer  = null;
 
+// Review panel state (individual / group)
+let _viewReviewPanelOpen = false;
+let _viewCommentDraft    = "";
+let _viewSigningCmtId    = null;
+let _viewSigningName     = "";
+let _grpReviewPanelOpen  = false;
+let _grpCommentDraft     = "";
+let _grpSigningCmtId     = null;
+let _grpSigningName      = "";
+
+function getWorkflowState(data) {
+  const checks    = data?.checks || {};
+  const rayDone   = !!checks.assistant;
+  const daisyDone = !!checks.main;
+  const reviewSubmitted = !!data?.reviewSubmitted;
+  const comments  = Object.entries(data?.reviewComments || {})
+    .sort(([,a],[,b]) => (a.order || 0) - (b.order || 0));
+  const allFixed  = comments.length > 0 && comments.every(([,c]) => !!c.fixedByName);
+  const noComments = comments.length === 0;
+  const reviewUnlocked = rayDone && daisyDone;
+  const ready = reviewSubmitted && (noComments || allFixed);
+  return { rayDone, daisyDone, reviewUnlocked, reviewSubmitted, comments, allFixed, noComments, ready };
+}
+
 function fmtCheckTimestamp(ts) {
   const d = new Date(ts);
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -7984,36 +8085,147 @@ function fmtCheckTimestamp(ts) {
   return `${d.getDate()} ${months[d.getMonth()]} ${h % 12 || 12}:${m}${h < 12 ? "am" : "pm"}`;
 }
 
-function renderCheckedByStripHtml(data, confirmRole) {
+function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
+  const ws     = getWorkflowState(data);
   const checks = data?.checks || {};
 
-  const pillHtml = role => {
-    const check        = checks[role];
-    const name         = CHECKED_BY[role];
-    const isChecked    = !!check;
-    const isConfirming = confirmRole === role;
-    const classes = ["checked-by-pill", isChecked && "is-checked", isConfirming && "is-confirming"].filter(Boolean).join(" ");
+  const panelOpen    = isGroup ? _grpReviewPanelOpen : _viewReviewPanelOpen;
+  const cmtDraft     = isGroup ? _grpCommentDraft    : _viewCommentDraft;
+  const signingCmtId = isGroup ? _grpSigningCmtId    : _viewSigningCmtId;
+  const signingName  = isGroup ? _grpSigningName     : _viewSigningName;
 
-    if (isConfirming) {
-      const msg = isChecked
-        ? `✓ ${escHtml(name)} · ${escHtml(fmtCheckTimestamp(check.at))} — Undo?`
-        : `${escHtml(name)}: Are you sure?`;
-      return `<div class="${classes}">
-        <span class="chk-label">${msg}</span>
-        <span class="chk-confirm-btns">
-          <button class="chk-btn-yes" data-role="${role}">${isChecked ? "Undo ✓" : "Confirm ✓"}</button>
-          <button class="chk-btn-no"  data-role="${role}">Cancel</button>
-        </span>
+  // ── RAY PILL ────────────────────────────────────────────────
+  let rayPill;
+  if (confirmRole === "assistant") {
+    const msg = ws.rayDone
+      ? `✓ Ray · ${fmtCheckTimestamp(checks.assistant.at)} — Undo?`
+      : `Ray: Are you sure?`;
+    rayPill = `<div class="checked-by-pill is-confirming">
+      <span class="chk-label">${msg}</span>
+      <span class="chk-confirm-btns">
+        <button class="chk-btn-yes" data-role="assistant">${ws.rayDone ? "Undo ✓" : "Confirm ✓"}</button>
+        <button class="chk-btn-no"  data-role="assistant">Cancel</button>
+      </span></div>`;
+  } else if (ws.rayDone && ws.reviewSubmitted && !ws.allFixed && !ws.noComments) {
+    const pending = ws.comments.filter(([,c]) => !c.fixedByName).length;
+    rayPill = `<button class="checked-by-pill chk-ray-corrections" data-role="assistant">
+      🔧 <span class="chk-label">Ray · ${pending} correction${pending !== 1 ? "s" : ""} to fix</span></button>`;
+  } else if (ws.rayDone && ws.ready) {
+    rayPill = `<button class="checked-by-pill is-checked chk-no-action" data-role="assistant">
+      <span class="chk-mark">✓</span> <span class="chk-label">Ray · All Fixed</span></button>`;
+  } else if (ws.rayDone) {
+    rayPill = `<button class="checked-by-pill is-checked${ws.reviewSubmitted ? " chk-no-action" : ""}" data-role="assistant">
+      <span class="chk-mark">✓</span> <span class="chk-label">Ray · ${fmtCheckTimestamp(checks.assistant.at)}</span></button>`;
+  } else {
+    rayPill = `<button class="checked-by-pill" data-role="assistant">
+      <span class="chk-label">Ray: Incomplete</span></button>`;
+  }
+
+  // ── DAISY PILL ──────────────────────────────────────────────
+  let daisyPill;
+  if (confirmRole === "main") {
+    const msg = ws.daisyDone
+      ? `✓ Daisy · ${fmtCheckTimestamp(checks.main.at)} — Undo?`
+      : `Daisy: Are you sure?`;
+    daisyPill = `<div class="checked-by-pill is-confirming">
+      <span class="chk-label">${msg}</span>
+      <span class="chk-confirm-btns">
+        <button class="chk-btn-yes" data-role="main">${ws.daisyDone ? "Undo ✓" : "Confirm ✓"}</button>
+        <button class="chk-btn-no"  data-role="main">Cancel</button>
+      </span></div>`;
+  } else if (ws.reviewUnlocked && !ws.reviewSubmitted) {
+    // Phase 2: Daisy's pill toggles the review panel
+    const label = panelOpen ? "Daisy: Reviewing 📝" : "Daisy: Review Pending 🔍";
+    daisyPill = `<button class="checked-by-pill chk-daisy-review${panelOpen ? " is-reviewing" : ""}" data-action="toggle-review-panel">
+      <span class="chk-label">${label}</span></button>`;
+  } else if (ws.daisyDone && ws.reviewSubmitted) {
+    daisyPill = `<button class="checked-by-pill is-checked chk-no-action" data-role="main">
+      <span class="chk-mark">✓</span> <span class="chk-label">Daisy: Reviewed</span></button>`;
+  } else if (ws.daisyDone) {
+    daisyPill = `<button class="checked-by-pill is-checked" data-role="main">
+      <span class="chk-mark">✓</span> <span class="chk-label">Daisy · ${fmtCheckTimestamp(checks.main.at)}</span></button>`;
+  } else {
+    daisyPill = `<button class="checked-by-pill" data-role="main">
+      <span class="chk-label">Daisy: Incomplete</span></button>`;
+  }
+
+  // ── NIGEL PILL ──────────────────────────────────────────────
+  let nigelPill = "";
+  if (ws.ready) {
+    nigelPill = `<button class="checked-by-pill chk-nigel chk-nigel-ready" disabled>Nigel: 🎉 Ready!</button>`;
+  } else if (ws.reviewUnlocked || ws.reviewSubmitted) {
+    nigelPill = `<button class="checked-by-pill chk-nigel" disabled>Nigel: Waiting…</button>`;
+  }
+
+  const exportBtn = `<button class="chk-export-btn" title="Export this session to Word">📄 Export to Word (Daily Session Note)</button>`;
+
+  // ── REVIEW PANEL ────────────────────────────────────────────
+  let reviewPanel = "";
+  if (ws.reviewUnlocked && !ws.reviewSubmitted && panelOpen) {
+    // Phase 2: Daisy adds comments and submits review
+    const cmtItems = ws.comments.map(([id, c]) => `
+      <div class="review-comment">
+        <span class="review-comment-text">${escHtml(c.text)}</span>
+        <button class="review-cmt-delete" data-cmt-id="${id}" title="Delete">✕</button>
+      </div>`).join("");
+    reviewPanel = `<div class="review-panel">
+      <div class="review-panel-header">
+        <span class="review-panel-title">Review Comments for Ray</span>
+        <button class="review-panel-close">✕ Close</button>
+      </div>
+      <div class="review-comments-list">${cmtItems || '<p class="review-empty-hint">No comments yet. Add one below, or submit if no corrections are needed.</p>'}</div>
+      <div class="review-add-row">
+        <input class="review-comment-input" placeholder="Add a comment for Ray…" value="${escHtml(cmtDraft)}">
+        <button class="review-add-btn">Add</button>
+      </div>
+      <button class="review-submit-btn">Submit Review ✓</button>
+    </div>`;
+  } else if (ws.reviewSubmitted) {
+    // Phase 3: Always-visible correction to-do list
+    const canReopen = ws.comments.every(([,c]) => !c.fixedByName);
+    const reopenBtn = (canReopen && !ws.noComments)
+      ? `<button class="review-reopen-btn">Re-open Review</button>` : "";
+    const cmtItems = ws.comments.map(([id, c]) => {
+      if (c.fixedByName) {
+        return `<div class="review-comment review-comment--fixed">
+          <span class="review-comment-check">✓</span>
+          <span class="review-comment-text">${escHtml(c.text)}</span>
+          <span class="review-comment-fixed-by">Fixed by ${escHtml(c.fixedByName)}</span>
+        </div>`;
+      }
+      if (signingCmtId === id) {
+        return `<div class="review-comment review-comment--signing">
+          <span class="review-comment-text">${escHtml(c.text)}</span>
+          <div class="review-sign-row">
+            <input class="review-sign-input" placeholder="Type your name to confirm fix…" value="${escHtml(signingName)}">
+            <button class="review-sign-confirm" data-cmt-id="${id}">Confirm</button>
+            <button class="review-sign-cancel">Cancel</button>
+          </div>
+        </div>`;
+      }
+      return `<div class="review-comment">
+        <label class="review-checkbox-label">
+          <input type="checkbox" class="review-cmt-check" data-cmt-id="${id}">
+          <span class="review-comment-text">${escHtml(c.text)}</span>
+        </label>
       </div>`;
-    }
+    }).join("");
+    const body = ws.noComments
+      ? `<p class="review-empty-hint">No corrections needed — Nigel can export! 🎉</p>`
+      : `<div class="review-comments-list">${cmtItems}</div>`;
+    reviewPanel = `<div class="review-panel review-panel--phase3">
+      <div class="review-panel-header">
+        <span class="review-panel-title">Daisy's Review Comments</span>
+        ${reopenBtn}
+      </div>
+      ${body}
+    </div>`;
+  }
 
-    const inner = isChecked
-      ? `<span class="chk-mark">✓</span> <span class="chk-label">${escHtml(name)} · ${escHtml(fmtCheckTimestamp(check.at))}</span>`
-      : `<span class="chk-label">${escHtml(name)}: ${role === "assistant" ? "Incomplete" : "Not Yet Approved"}</span>`;
-    return `<button class="${classes}" data-role="${role}">${inner}</button>`;
-  };
-
-  return `<div class="checked-by-strip" contenteditable="false"><div class="chk-inner">${pillHtml("assistant")}${pillHtml("main")}<button class="chk-export-btn" title="Export this session to Word">📄 Export to Word (Daily Session Note)</button></div></div>`;
+  return `<div class="checked-by-strip" contenteditable="false">
+    <div class="chk-inner">${rayPill}${daisyPill}${exportBtn}${nigelPill}</div>
+    ${reviewPanel}
+  </div>`;
 }
 
 async function handleCheckedByClick(e, isGroup) {
@@ -8022,8 +8234,117 @@ async function handleCheckedByClick(e, isGroup) {
   const clearTimer   = ()  => clearTimeout(isGroup ? _grpChkConfirmTimer : _viewChkConfirmTimer);
   const setTimer     = fn  => { const t = setTimeout(fn, 4000); if (isGroup) _grpChkConfirmTimer = t; else _viewChkConfirmTimer = t; };
   const rerender     = ()  => isGroup ? renderGroupSessionView() : renderSessionView();
+  const getSid       = ()  => isGroup ? state.viewGroupSessionId  : state.viewSessionId;
+  const getData      = ()  => isGroup ? state.viewGroupSessionData : state.viewSessionData;
+  const getSubjectMeta = () => {
+    const data = getData();
+    return {
+      subjectName: isGroup ? state.viewGroup?.name : state.viewStudent?.name,
+      subjectId:   isGroup ? data?.groupId          : data?.studentId,
+      isGroup:     !!isGroup,
+      date:        data?.date
+    };
+  };
 
-  // Export to Word button
+  // ── Toggle Daisy's review panel (Phase 2) ───────────────────
+  const reviewToggle = e.target.closest("[data-action='toggle-review-panel']");
+  if (reviewToggle) {
+    if (isGroup) _grpReviewPanelOpen = !_grpReviewPanelOpen;
+    else         _viewReviewPanelOpen = !_viewReviewPanelOpen;
+    rerender();
+    return true;
+  }
+
+  // ── Close review panel button ────────────────────────────────
+  if (e.target.closest(".review-panel-close")) {
+    if (isGroup) _grpReviewPanelOpen = false;
+    else         _viewReviewPanelOpen = false;
+    rerender();
+    return true;
+  }
+
+  // ── Add comment button (or Enter handled in attachViewListeners) ─
+  if (e.target.closest(".review-add-btn")) {
+    const draft   = (isGroup ? _grpCommentDraft : _viewCommentDraft).trim();
+    if (!draft) return true;
+    if (isGroup) _grpCommentDraft = ""; else _viewCommentDraft = "";
+    try { await addReviewComment(getSid(), draft); } catch (err) { console.error("addReviewComment:", err); }
+    return true;
+  }
+
+  // ── Delete comment button ────────────────────────────────────
+  const deleteBtn = e.target.closest(".review-cmt-delete");
+  if (deleteBtn) {
+    try { await deleteReviewComment(getSid(), deleteBtn.dataset.cmtId); } catch (err) { console.error("deleteReviewComment:", err); }
+    return true;
+  }
+
+  // ── Submit review button ─────────────────────────────────────
+  if (e.target.closest(".review-submit-btn")) {
+    const sid = getSid();
+    const ws  = getWorkflowState(getData());
+    if (isGroup) _grpReviewPanelOpen = false; else _viewReviewPanelOpen = false;
+    const newStatus = ws.comments.length > 0 ? "ray_pending" : null;
+    try {
+      await setReviewSubmitted(sid, true);
+      await updateWorkflowStatus(sid, newStatus, getSubjectMeta());
+    } catch (err) { console.error("submitReview:", err); }
+    return true;
+  }
+
+  // ── Re-open review button ────────────────────────────────────
+  if (e.target.closest(".review-reopen-btn")) {
+    const sid = getSid();
+    if (isGroup) _grpReviewPanelOpen = true; else _viewReviewPanelOpen = true;
+    try {
+      await setReviewSubmitted(sid, false);
+      await updateWorkflowStatus(sid, "daisy_pending", getSubjectMeta());
+    } catch (err) { console.error("reopenReview:", err); }
+    return true;
+  }
+
+  // ── Checkbox click → start signing prompt ───────────────────
+  const cmtCheck = e.target.closest(".review-cmt-check");
+  if (cmtCheck) {
+    const cmtId = cmtCheck.dataset.cmtId;
+    if (isGroup) { _grpSigningCmtId = cmtId; _grpSigningName = ""; }
+    else         { _viewSigningCmtId = cmtId; _viewSigningName = ""; }
+    rerender();
+    return true;
+  }
+
+  // ── Sign confirm button ──────────────────────────────────────
+  const signConfirm = e.target.closest(".review-sign-confirm");
+  if (signConfirm) {
+    const strip     = e.target.closest(".checked-by-strip");
+    const nameInput = strip?.querySelector(".review-sign-input");
+    const name      = (nameInput?.value || "").trim();
+    if (!name) { nameInput?.focus(); return true; }
+    const cmtId = signConfirm.dataset.cmtId;
+    const sid   = getSid();
+    const ws    = getWorkflowState(getData());
+    if (isGroup) { _grpSigningCmtId = null; _grpSigningName = ""; }
+    else         { _viewSigningCmtId = null; _viewSigningName = ""; }
+    try {
+      await markCommentFixed(sid, cmtId, name);
+      // Check optimistically if this was the last unfixed comment
+      const updatedCmts = ws.comments.map(([id, c]) => id === cmtId ? [id, { ...c, fixedByName: name }] : [id, c]);
+      if (updatedCmts.every(([,c]) => !!c.fixedByName)) {
+        await updateWorkflowStatus(sid, null, getSubjectMeta());
+      }
+    } catch (err) { console.error("markCommentFixed:", err); }
+    return true;
+  }
+
+  // ── Sign cancel button ───────────────────────────────────────
+  if (e.target.closest(".review-sign-cancel")) {
+    if (isGroup) { _grpSigningCmtId = null; _grpSigningName = ""; }
+    else         { _viewSigningCmtId = null; _viewSigningName = ""; }
+    rerender();
+    return true;
+  }
+
+  // ── Export to Word button ────────────────────────────────────
   const exportBtn = e.target.closest(".chk-export-btn");
   if (exportBtn) {
     if (isGroup) {
@@ -8054,8 +8375,9 @@ async function handleCheckedByClick(e, isGroup) {
     return true;
   }
 
-  // Pill click → confirming state
-  const pill = e.target.closest(".checked-by-pill:not(.is-confirming)");
+  // ── Phase-1 pill click → confirm flow ───────────────────────
+  // Exclude: Daisy's Phase-2 toggle pill (data-action), Nigel pill (.chk-nigel), locked pills (.chk-no-action)
+  const pill = e.target.closest(".checked-by-pill:not(.is-confirming):not([data-action]):not(.chk-nigel):not(.chk-no-action)");
   if (pill) {
     clearTimer();
     setConfirm(pill.dataset.role);
@@ -8063,22 +8385,36 @@ async function handleCheckedByClick(e, isGroup) {
     setTimer(() => { setConfirm(null); rerender(); });
     return true;
   }
-  // Confirm button
+
+  // ── Confirm button ───────────────────────────────────────────
   const yesBtn = e.target.closest(".chk-btn-yes");
   if (yesBtn) {
     clearTimer(); setConfirm(null);
-    const sid    = isGroup ? state.viewGroupSessionId : state.viewSessionId;
-    const data   = isGroup ? state.viewGroupSessionData : state.viewSessionData;
+    const sid  = getSid();
+    const data = getData();
     if (!sid) return true;
-    const checks    = { ...(data?.checks || {}) };
-    const role      = yesBtn.dataset.role;
-    if (checks[role]) { delete checks[role]; } else { checks[role] = { by: CHECKED_BY[role], at: Date.now() }; }
-    try { await updateSessionChecks(sid, checks); } catch (err) { console.error("updateSessionChecks failed:", err); }
+    const checks   = { ...(data?.checks || {}) };
+    const role     = yesBtn.dataset.role;
+    const wasDone  = !!checks[role];
+    if (wasDone) { delete checks[role]; } else { checks[role] = { by: CHECKED_BY[role], at: Date.now() }; }
+    try {
+      await updateSessionChecks(sid, checks);
+      // Update workflow queue status based on new Phase-1 state
+      const bothDone   = !!checks.assistant && !!checks.main;
+      const wasQueued  = data?.workflowStatus === "daisy_pending";
+      if (bothDone && !data?.reviewSubmitted) {
+        await updateWorkflowStatus(sid, "daisy_pending", getSubjectMeta());
+      } else if (!bothDone && wasQueued) {
+        await updateWorkflowStatus(sid, null);
+      }
+    } catch (err) { console.error("updateSessionChecks:", err); }
     return true;
   }
-  // Cancel button
+
+  // ── Cancel button ────────────────────────────────────────────
   const noBtn = e.target.closest(".chk-btn-no");
   if (noBtn) { clearTimer(); setConfirm(null); rerender(); return true; }
+
   return false;
 }
 
@@ -8125,7 +8461,7 @@ function renderSessionView() {
   const body = $("session-view-body");
   const scrollTop = body.scrollTop;
   const captured = captureActiveEditState(body);
-  const stripHtml = renderCheckedByStripHtml(data, _viewChkConfirmRole);
+  const stripHtml = renderCheckedByStripHtml(data, _viewChkConfirmRole, false);
   body.innerHTML = stripHtml + (sorted.length
     ? sorted.map(t => buildTargetViewTable(t, data)).join("")
     : `<p style="color:var(--text-muted);padding:1rem">No targets recorded.</p>`);
@@ -9854,6 +10190,24 @@ function attachViewListeners() {
     });
   });
 
+  // ── Review panel inputs (recreated on each render) ────────────
+  const cmtInput = body.querySelector(".review-comment-input");
+  if (cmtInput) {
+    cmtInput.addEventListener("input", () => { _viewCommentDraft = cmtInput.value; });
+    cmtInput.addEventListener("keydown", async e => {
+      if (e.key !== "Enter" || !cmtInput.value.trim()) return;
+      e.preventDefault();
+      const text = cmtInput.value.trim();
+      _viewCommentDraft = "";
+      try { await addReviewComment(state.viewSessionId, text); } catch (err) { console.error("addReviewComment:", err); }
+    });
+  }
+  const signInput = body.querySelector(".review-sign-input");
+  if (signInput) {
+    signInput.addEventListener("input", () => { _viewSigningName = signInput.value; });
+    signInput.focus();
+  }
+
 }
 
 // ============================================================
@@ -9879,6 +10233,7 @@ async function openGroupSessionView(group, sessionId) {
   $("group-view-session-meta").textContent = "";
   $("group-session-view-body").innerHTML = `<div class="loading">Loading…</div>`;
   _grpChkConfirmRole = null; clearTimeout(_grpChkConfirmTimer);
+  _grpReviewPanelOpen = false; _grpCommentDraft = ""; _grpSigningCmtId = null; _grpSigningName = "";
   if (state.viewGroupChkDelegate) $("group-session-view-body").removeEventListener("click", state.viewGroupChkDelegate);
   state.viewGroupChkDelegate = async e => { await handleCheckedByClick(e, true); };
   $("group-session-view-body").addEventListener("click", state.viewGroupChkDelegate);
@@ -9918,6 +10273,7 @@ async function leaveGroupSessionView() {
   $("btn-group-delete-session")?.classList.add("hidden");
   $("btn-group-goto-session")?.classList.add("hidden");
   _grpChkConfirmRole = null; clearTimeout(_grpChkConfirmTimer);
+  _grpReviewPanelOpen = false; _grpCommentDraft = ""; _grpSigningCmtId = null; _grpSigningName = "";
   if (state.viewGroupChkDelegate) { $("group-session-view-body")?.removeEventListener("click", state.viewGroupChkDelegate); state.viewGroupChkDelegate = null; }
   // See the matching comment in leaveSessionView() — flush (and await it)
   // before unsubscribing, not after, so the listener is still alive to
@@ -10008,7 +10364,7 @@ function renderGroupSessionView() {
   const body = $("group-session-view-body");
   const scrollTop = body.scrollTop;
   const captured = captureActiveEditState(body);
-  const grpStripHtml = renderCheckedByStripHtml(data, _grpChkConfirmRole);
+  const grpStripHtml = renderCheckedByStripHtml(data, _grpChkConfirmRole, true);
   body.innerHTML = grpStripHtml + (sorted.length
     ? sorted.map(t => buildGroupTargetViewTable(t, data, attendees)).join("")
     : `<p style="color:var(--text-muted);padding:1rem">No targets recorded.</p>`);
@@ -11153,6 +11509,24 @@ function attachGroupViewListeners() {
       await updateFedcComment(sid(), target.name, ta.value);
     });
   });
+
+  // ── Review panel inputs (recreated on each render) ────────────
+  const grpCmtInput = body.querySelector(".review-comment-input");
+  if (grpCmtInput) {
+    grpCmtInput.addEventListener("input", () => { _grpCommentDraft = grpCmtInput.value; });
+    grpCmtInput.addEventListener("keydown", async e => {
+      if (e.key !== "Enter" || !grpCmtInput.value.trim()) return;
+      e.preventDefault();
+      const text = grpCmtInput.value.trim();
+      _grpCommentDraft = "";
+      try { await addReviewComment(sid(), text); } catch (err) { console.error("addReviewComment (grp):", err); }
+    });
+  }
+  const grpSignInput = body.querySelector(".review-sign-input");
+  if (grpSignInput) {
+    grpSignInput.addEventListener("input", () => { _grpSigningName = grpSignInput.value; });
+    grpSignInput.focus();
+  }
 }
 
 // ── Go To Another (group) Session ─────────────────────────────
