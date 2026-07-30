@@ -371,6 +371,15 @@
          inputmode="none" data-placeholder="Write here…"></div>
   </div>
 
+  <!-- Draggable sticky note (Daisy's workflow note) -->
+  <div id="sticky-note" class="sticky-note hidden" role="dialog" aria-label="Daisy's Note">
+    <div class="sticky-note-header" id="sticky-note-drag-handle">
+      <span>📝 Daisy's Note</span>
+      <button class="sticky-note-close" id="btn-sticky-note-close" title="Close">✕</button>
+    </div>
+    <textarea class="sticky-note-textarea" id="sticky-note-content" placeholder="Type a note about this session…"></textarea>
+  </div>
+
   <!-- Main app (ES module) -->
   <script type="module" src="app.js"></script>
 </body>

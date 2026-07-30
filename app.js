@@ -74,6 +74,7 @@ import {
   reassignGroupStudentAcrossSessions,
   updateSessionChecks,
   updateWorkflowStatus,
+  updateWorkflowNote,
   addReviewComment,
   deleteReviewComment,
   setReviewSubmitted,
@@ -164,7 +165,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1271";
+const APP_VERSION = "1273";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Daisy" };
 
@@ -508,6 +509,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Register SW immediately — don't wait for Firebase so updates are never blocked.
   registerServiceWorker();
+  setupStickyNote();
 
   // If auth never resolves (e.g. Firebase CDN unreachable on iOS after cache clear),
   // show a reload button after 10 s so the user isn't trapped on the loading screen.
@@ -8043,6 +8045,7 @@ async function leaveSessionView() {
     }
   }
 
+  closeStickyNote();
   showHome();
 }
 
@@ -8069,6 +8072,11 @@ let _grpReviewPanelOpen  = false;
 let _grpCommentDraft     = "";
 let _grpSigningCmtId     = null;
 let _grpSigningName      = "";
+
+// Sticky note (floating draggable)
+let _stickyNoteSessionId = null;
+let _stickyNoteIsGroup   = false;
+let _noteDebounce        = null;
 
 function getWorkflowState(data) {
   const checks    = data?.checks || {};
@@ -8100,75 +8108,111 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
   const signingCmtId = isGroup ? _grpSigningCmtId    : _viewSigningCmtId;
   const signingName  = isGroup ? _grpSigningName     : _viewSigningName;
 
-  // ── RAY PILL ────────────────────────────────────────────────
-  let rayPill;
-  if (confirmRole === "assistant") {
-    const msg = ws.rayDone
-      ? `✓ Ray · ${fmtCheckTimestamp(checks.assistant.at)} — Undo?`
-      : `Ray: Are you sure?`;
-    rayPill = `<div class="checked-by-pill is-confirming">
-      <span class="chk-label">${msg}</span>
-      <span class="chk-confirm-btns">
-        <button class="chk-btn-yes" data-role="assistant">${ws.rayDone ? "Undo ✓" : "Confirm ✓"}</button>
-        <button class="chk-btn-no"  data-role="assistant">Cancel</button>
-      </span></div>`;
-  } else if (ws.rayDone && ws.reviewSubmitted && !ws.allFixed && !ws.noComments) {
-    const pending = ws.comments.filter(([,c]) => !c.fixedByName).length;
-    rayPill = `<button class="checked-by-pill chk-ray-corrections" data-role="assistant">
-      🔧 <span class="chk-label">Ray · ${pending} correction${pending !== 1 ? "s" : ""} to fix</span></button>`;
-  } else if (ws.rayDone && ws.ready) {
-    rayPill = `<button class="checked-by-pill is-checked chk-no-action" data-role="assistant">
-      <span class="chk-mark">✓</span> <span class="chk-label">Ray · All Fixed</span></button>`;
-  } else if (ws.rayDone) {
-    rayPill = `<button class="checked-by-pill is-checked${ws.reviewSubmitted ? " chk-no-action" : ""}" data-role="assistant">
-      <span class="chk-mark">✓</span> <span class="chk-label">Ray · ${fmtCheckTimestamp(checks.assistant.at)}</span></button>`;
-  } else {
-    rayPill = `<button class="checked-by-pill" data-role="assistant">
-      <span class="chk-label">Ray: Incomplete</span></button>`;
-  }
+  // ── Arrow SVG ────────────────────────────────────────────────
+  const arrow = `<div class="wf-arrow" aria-hidden="true">
+    <svg width="32" height="24" viewBox="0 0 32 24" fill="none">
+      <line x1="0" y1="12" x2="22" y2="12" stroke="#9ca3af" stroke-width="2"/>
+      <polygon points="19,6 32,12 19,18" fill="#9ca3af"/>
+    </svg>
+  </div>`;
 
-  // ── DAISY PILL ──────────────────────────────────────────────
-  let daisyPill;
-  if (confirmRole === "main") {
-    const msg = ws.daisyDone
-      ? `✓ Daisy · ${fmtCheckTimestamp(checks.main.at)} — Undo?`
-      : `Daisy: Are you sure?`;
-    daisyPill = `<div class="checked-by-pill is-confirming">
-      <span class="chk-label">${msg}</span>
-      <span class="chk-confirm-btns">
-        <button class="chk-btn-yes" data-role="main">${ws.daisyDone ? "Undo ✓" : "Confirm ✓"}</button>
-        <button class="chk-btn-no"  data-role="main">Cancel</button>
-      </span></div>`;
-  } else if (ws.reviewUnlocked && !ws.reviewSubmitted) {
-    // Phase 2: Daisy's pill toggles the review panel
-    const label = panelOpen ? "Daisy: Reviewing 📝" : "Daisy: Review Pending 🔍";
-    daisyPill = `<button class="checked-by-pill chk-daisy-review${panelOpen ? " is-reviewing" : ""}" data-action="toggle-review-panel">
-      <span class="chk-label">${label}</span></button>`;
-  } else if (ws.daisyDone && ws.reviewSubmitted) {
-    daisyPill = `<button class="checked-by-pill is-checked chk-no-action" data-role="main">
-      <span class="chk-mark">✓</span> <span class="chk-label">Daisy: Reviewed</span></button>`;
-  } else if (ws.daisyDone) {
-    daisyPill = `<button class="checked-by-pill is-checked" data-role="main">
-      <span class="chk-mark">✓</span> <span class="chk-label">Daisy · ${fmtCheckTimestamp(checks.main.at)}</span></button>`;
-  } else {
-    daisyPill = `<button class="checked-by-pill" data-role="main">
-      <span class="chk-label">Daisy: Incomplete</span></button>`;
-  }
+  // ── Phase 1 node ──────────────────────────────────────────────
+  const canUndoPhase1 = !ws.reviewSubmitted;
+  const mkCheckItem = (role, done, at) => {
+    const name = role === "assistant" ? "Ray" : "Daisy";
+    if (confirmRole === role) {
+      const msg = done ? `Undo ${name}?` : `${name}: Sure?`;
+      return `<div class="wf-confirming">
+        <span class="wf-confirm-msg">${msg}</span>
+        <div class="wf-confirm-btns">
+          <button class="chk-btn-yes" data-role="${role}">${done ? "Undo" : "Confirm ✓"}</button>
+          <button class="chk-btn-no"  data-role="${role}">Cancel</button>
+        </div>
+      </div>`;
+    }
+    const locked = !canUndoPhase1 && done;
+    if (done) {
+      return `<button class="wf-check-item wf-check-item--done${locked ? " wf-check-locked" : ""}" data-role="${role}">
+        <span class="wf-check-tick">✓</span><span>${escHtml(name)} · ${escHtml(fmtCheckTimestamp(at))}</span>
+      </button>`;
+    }
+    return `<button class="wf-check-item" data-role="${role}">
+      <span class="wf-check-circle">○</span><span>${escHtml(name)}: Incomplete</span>
+    </button>`;
+  };
 
-  // ── NIGEL PILL ──────────────────────────────────────────────
-  let nigelPill = "";
-  if (ws.ready) {
-    nigelPill = `<button class="checked-by-pill chk-nigel chk-nigel-ready" disabled>Nigel: 🎉 Ready!</button>`;
-  } else if (ws.reviewUnlocked || ws.reviewSubmitted) {
-    nigelPill = `<button class="checked-by-pill chk-nigel" disabled>Nigel: Waiting…</button>`;
+  const p1State = (ws.rayDone && ws.daisyDone) ? "done" : ((ws.rayDone || ws.daisyDone) ? "partial" : "pending");
+  const p1Node = `<div class="wf-node wf-node--${p1State}">
+    <div class="wf-node-label">Phase 1</div>
+    <div class="wf-node-body">
+      ${mkCheckItem("assistant", ws.rayDone, checks.assistant?.at)}
+      ${mkCheckItem("main", ws.daisyDone, checks.main?.at)}
+    </div>
+  </div>`;
+
+  // ── Phase 2 node ──────────────────────────────────────────────
+  let p2State, p2Body;
+  if (!ws.reviewUnlocked) {
+    p2State = "pending";
+    p2Body  = `<div class="wf-node-line">Daisy reviews Ray's work</div>`;
+  } else if (!ws.reviewSubmitted) {
+    p2State = panelOpen ? "p2-open" : "p2-active";
+    p2Body  = `<button class="wf-node-action" data-action="toggle-review-panel">
+      ${panelOpen ? "📝 Reviewing… ▲" : "🔍 Review Pending ▼"}
+    </button>`;
+  } else {
+    p2State = "done";
+    p2Body  = `<div class="wf-node-line">✓ Daisy reviewed</div>`;
   }
+  const p2Node = `<div class="wf-node wf-node--${p2State}">
+    <div class="wf-node-label">Phase 2</div>
+    <div class="wf-node-body">${p2Body}</div>
+  </div>`;
+
+  // Note button below Phase 2
+  const hasNote = !!(data?.workflowNote || "").trim();
+  const noteTrigger = `<div class="wf-note-wrap">
+    <button class="wf-note-btn${hasNote ? " has-note" : ""}" data-action="open-note">
+      📝 ${hasNote ? "Note ●" : "Note"}
+    </button>
+  </div>`;
+
+  // ── Phase 3 node ──────────────────────────────────────────────
+  let p3State, p3Body;
+  if (!ws.reviewSubmitted) {
+    p3State = "pending";
+    p3Body  = `<div class="wf-node-line">Ray fixes corrections</div>`;
+  } else if (ws.noComments) {
+    p3State = "done";
+    p3Body  = `<div class="wf-node-line">No corrections needed</div>`;
+  } else if (ws.allFixed) {
+    p3State = "done";
+    p3Body  = `<div class="wf-node-line">✓ All ${ws.comments.length} fixed</div>`;
+  } else {
+    const fixedCount   = ws.comments.filter(([,c]) => !!c.fixedByName).length;
+    p3State = "corrections";
+    p3Body  = `<div class="wf-node-line">🔧 ${fixedCount}/${ws.comments.length} fixed</div>
+               <div class="wf-node-hint">See list below ↓</div>`;
+  }
+  const p3Node = `<div class="wf-node wf-node--${p3State}">
+    <div class="wf-node-label">Phase 3</div>
+    <div class="wf-node-body">${p3Body}</div>
+  </div>`;
+
+  // ── Nigel node ────────────────────────────────────────────────
+  const nigelState = ws.ready ? "nigel-ready" : "nigel";
+  const nigelNode  = `<div class="wf-node wf-node--${nigelState}">
+    <div class="wf-node-label">Nigel</div>
+    <div class="wf-node-body">
+      <div class="wf-node-line">${ws.ready ? "🎉 Ready!" : "Waiting…"}</div>
+    </div>
+  </div>`;
 
   const exportBtn = `<button class="chk-export-btn" title="Export this session to Word">📄 Export to Word (Daily Session Note)</button>`;
 
-  // ── REVIEW PANEL ────────────────────────────────────────────
+  // ── Review panel ──────────────────────────────────────────────
   let reviewPanel = "";
   if (ws.reviewUnlocked && !ws.reviewSubmitted && panelOpen) {
-    // Phase 2: Daisy adds comments and submits review
     const cmtItems = ws.comments.map(([id, c]) => `
       <div class="review-comment">
         <span class="review-comment-text">${escHtml(c.text)}</span>
@@ -8187,7 +8231,6 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
       <button class="review-submit-btn">Submit Review ✓</button>
     </div>`;
   } else if (ws.reviewSubmitted) {
-    // Phase 3: Always-visible correction to-do list
     const canReopen = ws.comments.every(([,c]) => !c.fixedByName);
     const reopenBtn = (canReopen && !ws.noComments)
       ? `<button class="review-reopen-btn">Re-open Review</button>` : "";
@@ -8229,7 +8272,11 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
   }
 
   return `<div class="checked-by-strip" contenteditable="false">
-    <div class="chk-inner">${rayPill}${daisyPill}${exportBtn}${nigelPill}</div>
+    <div class="workflow-chart">
+      ${p1Node}${arrow}${p2Node}${arrow}${p3Node}${arrow}${nigelNode}
+      ${noteTrigger}
+    </div>
+    <div class="wf-export-row">${exportBtn}</div>
     ${reviewPanel}
   </div>`;
 }
@@ -8350,6 +8397,12 @@ async function handleCheckedByClick(e, isGroup) {
     return true;
   }
 
+  // ── Note button ──────────────────────────────────────────────
+  if (e.target.closest("[data-action='open-note']")) {
+    openStickyNote(getSid(), !!isGroup, getData()?.workflowNote || "");
+    return true;
+  }
+
   // ── Export to Word button ────────────────────────────────────
   const exportBtn = e.target.closest(".chk-export-btn");
   if (exportBtn) {
@@ -8381,12 +8434,11 @@ async function handleCheckedByClick(e, isGroup) {
     return true;
   }
 
-  // ── Phase-1 pill click → confirm flow ───────────────────────
-  // Exclude: Daisy's Phase-2 toggle pill (data-action), Nigel pill (.chk-nigel), locked pills (.chk-no-action)
-  const pill = e.target.closest(".checked-by-pill:not(.is-confirming):not([data-action]):not(.chk-nigel):not(.chk-no-action)");
-  if (pill) {
+  // ── Phase-1 check item click → confirm flow ─────────────────
+  const checkItem = e.target.closest(".wf-check-item:not(.wf-check-locked)");
+  if (checkItem) {
     clearTimer();
-    setConfirm(pill.dataset.role);
+    setConfirm(checkItem.dataset.role);
     rerender();
     setTimer(() => { setConfirm(null); rerender(); });
     return true;
@@ -8422,6 +8474,90 @@ async function handleCheckedByClick(e, isGroup) {
   if (noBtn) { clearTimer(); setConfirm(null); rerender(); return true; }
 
   return false;
+}
+
+// ── Sticky Note (floating draggable) ─────────────────────────
+
+function openStickyNote(sessionId, isGroup, noteText) {
+  _stickyNoteSessionId = sessionId;
+  _stickyNoteIsGroup   = !!isGroup;
+  const el = document.getElementById("sticky-note");
+  if (!el) return;
+  const ta = document.getElementById("sticky-note-content");
+  if (ta) ta.value = noteText || "";
+  // First open: place in top-right. Subsequent drags use left/top.
+  if (!el.dataset.positioned) {
+    el.style.right = "20px";
+    el.style.top   = "110px";
+    el.style.left  = "";
+  }
+  el.classList.remove("hidden");
+  if (ta) ta.focus();
+}
+
+function closeStickyNote() {
+  const el = document.getElementById("sticky-note");
+  if (el) el.classList.add("hidden");
+  _stickyNoteSessionId = null;
+}
+
+function setupStickyNote() {
+  const note    = document.getElementById("sticky-note");
+  const handle  = document.getElementById("sticky-note-drag-handle");
+  const closeEl = document.getElementById("btn-sticky-note-close");
+  const ta      = document.getElementById("sticky-note-content");
+  if (!note || !handle || !closeEl || !ta) return;
+
+  let dragging = false, ox = 0, oy = 0, nl = 0, nt = 0;
+
+  function startDrag(cx, cy) {
+    if (!note.dataset.positioned) {
+      const rect = note.getBoundingClientRect();
+      note.style.left  = rect.left + "px";
+      note.style.right = "";
+      note.style.top   = rect.top + "px";
+      note.dataset.positioned = "1";
+    }
+    nl = parseFloat(note.style.left)  || 0;
+    nt = parseFloat(note.style.top)   || 0;
+    ox = cx; oy = cy;
+    dragging = true;
+  }
+
+  function onMove(cx, cy) {
+    if (!dragging) return;
+    note.style.left  = Math.max(0, nl + cx - ox) + "px";
+    note.style.top   = Math.max(0, nt + cy - oy) + "px";
+    note.style.right = "";
+    note.dataset.positioned = "1";
+  }
+
+  handle.addEventListener("mousedown",  e => { startDrag(e.clientX, e.clientY); e.preventDefault(); });
+  document.addEventListener("mousemove", e => onMove(e.clientX, e.clientY));
+  document.addEventListener("mouseup",   () => { dragging = false; });
+
+  handle.addEventListener("touchstart", e => {
+    const t = e.touches[0];
+    startDrag(t.clientX, t.clientY);
+  }, { passive: false });
+  document.addEventListener("touchmove", e => {
+    if (!dragging) return;
+    const t = e.touches[0];
+    onMove(t.clientX, t.clientY);
+    e.preventDefault();
+  }, { passive: false });
+  document.addEventListener("touchend", () => { dragging = false; });
+
+  closeEl.addEventListener("click", closeStickyNote);
+
+  ta.addEventListener("input", () => {
+    clearTimeout(_noteDebounce);
+    _noteDebounce = setTimeout(async () => {
+      if (!_stickyNoteSessionId) return;
+      try { await updateWorkflowNote(_stickyNoteSessionId, ta.value); }
+      catch (err) { console.error("updateWorkflowNote:", err); }
+    }, 600);
+  });
 }
 
 function renderSessionView() {
@@ -10321,6 +10457,7 @@ async function leaveGroupSessionView() {
     }
   }
 
+  closeStickyNote();
   showHome();
 }
 

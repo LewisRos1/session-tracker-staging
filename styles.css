@@ -2728,10 +2728,223 @@ div.admin-note-editable:empty::before {
 }
 .checklist-group-header:first-child { border-top: none; margin-top: 0; }
 
+/* ─── Workflow Flowchart ─────────────────────────────────────── */
+.workflow-chart {
+  display: grid;
+  grid-template-columns: 1fr 2rem 1fr 2rem 1fr 2rem minmax(70px,1fr);
+  grid-template-rows: auto auto;
+  align-items: start;
+  gap: .35rem 0;
+}
+
+/* Arrows sit in row 1 naturally */
+.wf-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 1.5rem; /* align with node body, past the label */
+}
+
+/* Flowchart nodes */
+.wf-node {
+  border: 1.5px solid #d1d5db;
+  border-radius: 8px;
+  background: #f9fafb;
+  color: #6b7280;
+  padding: .45rem .55rem;
+  font-size: .78rem;
+}
+.wf-node-label {
+  font-size: .65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  opacity: .7;
+  margin-bottom: .3rem;
+}
+.wf-node-body { display: flex; flex-direction: column; gap: .25rem; }
+.wf-node-line { font-size: .78rem; }
+.wf-node-hint { font-size: .7rem; opacity: .75; }
+
+/* Phase 1 — partial (one person done) */
+.wf-node--partial { border-color: #fbbf24; background: #fef3c7; color: #92400e; }
+/* All states that are "done" / ready */
+.wf-node--done, .wf-node--nigel-ready {
+  border-color: #34d399;
+  background: #d1fae5;
+  color: #065f46;
+}
+/* Phase 2 — review pending (Daisy needs to act) */
+.wf-node--p2-active {
+  border-color: #fbbf24;
+  background: #fef3c7;
+  color: #92400e;
+}
+/* Phase 2 — panel open (Daisy is reviewing) */
+.wf-node--p2-open {
+  border-color: #f59e0b;
+  background: #fde68a;
+  color: #78350f;
+}
+/* Phase 3 — has pending corrections */
+.wf-node--corrections {
+  border-color: #f87171;
+  background: #fee2e2;
+  color: #991b1b;
+}
+/* Nigel locked */
+.wf-node--nigel {
+  border-color: #d1d5db;
+  background: #f9fafb;
+  color: #6b7280;
+}
+
+/* Phase 2 clickable action button (inside node) */
+.wf-node-action {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: .15rem .2rem;
+  font-size: .78rem;
+  color: inherit;
+  border-radius: 4px;
+  font-family: inherit;
+}
+.wf-node-action:hover { background: rgba(0,0,0,.07); }
+
+/* Phase-1 check item buttons */
+.wf-check-item {
+  display: flex;
+  align-items: center;
+  gap: .3rem;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  padding: .2rem .25rem;
+  font-size: .76rem;
+  font-family: inherit;
+  cursor: pointer;
+  color: inherit;
+}
+.wf-check-item:hover:not(.wf-check-locked) { background: rgba(0,0,0,.07); }
+.wf-check-item--done { color: #065f46; }
+.wf-check-locked { cursor: default; pointer-events: none; opacity: .7; }
+.wf-check-tick  { color: #10b981; font-weight: 700; }
+.wf-check-circle { color: #9ca3af; }
+
+/* Phase-1 confirm state (replaces the button) */
+.wf-confirming {
+  background: #fef3c7;
+  border: 1.5px solid #f59e0b;
+  border-radius: 6px;
+  padding: .3rem .4rem;
+  font-size: .76rem;
+  color: #78350f;
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+}
+.wf-confirm-msg { font-weight: 600; }
+.wf-confirm-btns { display: flex; gap: .25rem; }
+
+/* Note trigger — grid row 2, col 3 (under Phase 2) */
+.wf-note-wrap {
+  grid-column: 3;
+  grid-row: 2;
+  display: flex;
+  justify-content: center;
+  padding-top: .2rem;
+}
+.wf-note-btn {
+  font-size: .73rem;
+  font-weight: 600;
+  font-family: inherit;
+  padding: .2rem .65rem;
+  border: 1.5px solid #c4b5fd;
+  background: #ede9fe;
+  color: #5b21b6;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .1s, border-color .1s;
+}
+.wf-note-btn:hover { background: #ddd6fe; border-color: #a78bfa; }
+.wf-note-btn.has-note { background: #c4b5fd; border-color: #7c3aed; color: #3b0764; }
+
+/* Export row below chart */
+.wf-export-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: .4rem;
+  margin-bottom: .3rem;
+}
+
+/* ─── Sticky Note ────────────────────────────────────────────── */
+.sticky-note {
+  position: fixed;
+  z-index: 9999;
+  top: 110px;
+  right: 20px;
+  width: 250px;
+  background: #fef9c3;
+  border: 1.5px solid #fde047;
+  border-radius: 10px;
+  box-shadow: 3px 6px 22px rgba(0,0,0,.22);
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+}
+.sticky-note.hidden { display: none; }
+.sticky-note-header {
+  background: #fde047;
+  border-radius: 8px 8px 0 0;
+  padding: .35rem .65rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: .8rem;
+  font-weight: 700;
+  color: #713f12;
+  cursor: grab;
+}
+.sticky-note-header:active { cursor: grabbing; }
+.sticky-note-close {
+  background: none;
+  border: none;
+  font-size: .85rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #713f12;
+  padding: 0 .2rem;
+}
+.sticky-note-close:hover { color: #431407; }
+.sticky-note-textarea {
+  flex: 1;
+  border: none;
+  background: transparent;
+  resize: none;
+  padding: .6rem .75rem;
+  font-size: .84rem;
+  font-family: inherit;
+  color: #422006;
+  min-height: 150px;
+  outline: none;
+  user-select: text;
+}
+
 @media (max-width: 600px) {
   .checked-by-strip { margin: -1rem -.9rem .6rem; padding: .45rem .9rem; }
   .checked-by-pill  { font-size: .74rem; padding: .25rem .7rem; }
   .chk-export-btn   { font-size: .74rem; padding: .25rem .7rem; }
+  .workflow-chart {
+    grid-template-columns: 1fr 1.5rem 1fr 1.5rem 1fr 1.5rem minmax(60px,.8fr);
+  }
+  .wf-node { font-size: .72rem; padding: .35rem .4rem; }
+  .sticky-note { width: 210px; }
 }
 
 /* ─── Session View Screen ──────────────────────────────────── */

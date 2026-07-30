@@ -325,6 +325,11 @@ export async function deleteReviewComment(sessionId, commentId) {
   });
 }
 
+/** Save Daisy's general workflow note (stored directly on the session doc). */
+export async function updateWorkflowNote(sessionId, note) {
+  await updateDoc(doc(db, "sessions", sessionId), { workflowNote: note ?? "" });
+}
+
 /** Mark the review as submitted (true) or re-open it (false). */
 export async function setReviewSubmitted(sessionId, submitted) {
   const updates = { reviewSubmitted: !!submitted };
