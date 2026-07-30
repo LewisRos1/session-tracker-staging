@@ -158,7 +158,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1261";
+const APP_VERSION = "1262";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Daisy" };
 
@@ -8009,7 +8009,7 @@ function renderCheckedByStripHtml(data, confirmRole) {
     return `<button class="${classes}" data-role="${role}">${inner}</button>`;
   };
 
-  return `<div class="checked-by-strip" contenteditable="false"><div class="chk-inner">${pillHtml("assistant")}${pillHtml("main")}<button class="chk-export-btn" title="Export this session to Word">📄 Export to Word</button></div></div>`;
+  return `<div class="checked-by-strip" contenteditable="false"><div class="chk-inner">${pillHtml("assistant")}${pillHtml("main")}<button class="chk-export-btn" title="Export this session to Word">📄 Export to Word (Daily Session Note)</button></div></div>`;
 }
 
 async function handleCheckedByClick(e, isGroup) {
