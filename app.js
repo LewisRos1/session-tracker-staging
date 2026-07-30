@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1278";
+const APP_VERSION = "1279";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Daisy" };
 
@@ -8081,6 +8081,7 @@ let _stickyNoteIsGroup      = false;
 let _noteDebounce           = null;
 let _focusNewRow            = false;
 let _stickyNotePhaseConfirm = null; // "phase2" | "phase3" | null
+let _phase3Error            = null; // error string shown in Phase 3 node, auto-clears
 const _textareaDebounce     = new Map();
 
 function getWorkflowState(data) {
@@ -8185,6 +8186,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
   const p3Node = `<div class="wf-node wf-node--${p3State}">
     <div class="wf-node-label">Phase 3: Revision</div>
     <div class="wf-node-body">${p3Body}</div>
+    ${_phase3Error ? `<div class="wf-error-msg">⚠ ${escHtml(_phase3Error)}</div>` : ""}
   </div>`;
 
   // ── Phase 4: Nigel ────────────────────────────────────────────
@@ -8316,6 +8318,14 @@ async function handleCheckedByClick(e, isGroup) {
     } else if (role === "phase3") {
       const ws     = getWorkflowState(data);
       const newDone = !ws.revisionDone;
+      if (newDone && ws.comments.length > 0 && !ws.allFixed) {
+        const unfixed = ws.comments.filter(([,c]) => !c.fixedByName).length;
+        _phase3Error = `${unfixed} correction${unfixed > 1 ? "s" : ""} still unticked.`;
+        rerender();
+        setTimeout(() => { _phase3Error = null; rerender(); }, 3500);
+        return true;
+      }
+      _phase3Error = null;
       try {
         await setRevisionDone(sid, newDone);
         await updateWorkflowStatus(sid, newDone ? null : "ray_pending", getSubjectMeta());
@@ -8511,6 +8521,16 @@ function setupStickyNote() {
           const newStatus = ws.comments.length > 0 ? "ray_pending" : null;
           await updateWorkflowStatus(sid, newStatus, meta);
         } else if (role === "phase3") {
+          if (ws.comments.length > 0 && !ws.allFixed) {
+            const unfixed = ws.comments.filter(([,c]) => !c.fixedByName).length;
+            _phase3Error = `${unfixed} correction${unfixed > 1 ? "s" : ""} still unticked.`;
+            _stickyNotePhaseConfirm = null;
+            renderStickyNoteContent(data, isGroup);
+            rerender();
+            setTimeout(() => { _phase3Error = null; rerender(); }, 3500);
+            return;
+          }
+          _phase3Error = null;
           await setRevisionDone(sid, true);
           await updateWorkflowStatus(sid, null, meta);
         }

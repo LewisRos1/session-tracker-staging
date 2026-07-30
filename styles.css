@@ -2829,6 +2829,7 @@ button.wf-pill:hover { filter: brightness(.93); }
 }
 .wf-confirm-msg  { font-size: .8rem; font-weight: 600; }
 .wf-confirm-btns { display: flex; gap: .3rem; }
+.wf-error-msg    { font-size: .75rem; color: #dc2626; font-weight: 600; margin-top: .35rem; }
 
 /* Row 2 triggers */
 .wf-note-wrap {
