@@ -2423,18 +2423,18 @@ div.admin-note-editable:empty::before {
 
 /* ─── Checked By Approval Strip ───────────────────────────── */
 .checked-by-strip {
-  padding: .5rem 1.25rem;
+  padding: .5rem 1.25rem .75rem;
   background: #f5f5ff;
   border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
+  margin-bottom: .5rem;
 }
-.checked-by-strip.hidden { display: none; }
 
 .chk-inner {
   display: flex;
   flex-wrap: wrap;
   gap: .45rem;
   align-items: center;
+  justify-content: center;
 }
 
 .checked-by-pill {
@@ -2507,6 +2507,7 @@ div.admin-note-editable:empty::before {
   padding: 1rem 1.25rem;
   -webkit-overflow-scrolling: touch;
 }
+.session-view-body:focus { outline: none; }
 
 .target-view-section { margin-bottom: 2.25rem; }
 

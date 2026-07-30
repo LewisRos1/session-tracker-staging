@@ -158,7 +158,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1259";
+const APP_VERSION = "1260";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Daisy" };
 
@@ -585,10 +585,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     commitTextEditorSheet();
     closeTextEditorSheet();
   });
-
-  // Checked-by approval strip — attach listeners once (the elements are static HTML).
-  initCheckedByStrip("checked-by-strip",       () => state.viewSessionId,      () => state.viewSessionData);
-  initCheckedByStrip("group-checked-by-strip", () => state.viewGroupSessionId, () => state.viewGroupSessionData);
 
   // Firestore now requires a real signed-in user (see firebase-service.js).
   // Sign-in persists across reloads, but only counts for the calendar day
@@ -7825,8 +7821,7 @@ async function openSessionView(student, sessionId) {
   $("view-student-name").textContent = student.name;
   $("view-session-meta").textContent = "";
   $("session-view-body").innerHTML = `<div class="loading">Loading…</div>`;
-  const _chkStrip = $("checked-by-strip");
-  if (_chkStrip) { delete _chkStrip.dataset.confirmRole; clearTimeout(_chkStrip._chkTimer); _chkStrip.innerHTML = ""; _chkStrip.classList.remove("hidden"); }
+  _viewChkConfirmRole = null; clearTimeout(_viewChkConfirmTimer);
 
   if (state.fbViewUnsubscribe) { state.fbViewUnsubscribe(); state.fbViewUnsubscribe = null; }
 
@@ -7840,7 +7835,8 @@ async function openSessionView(student, sessionId) {
   if (state.viewClickDelegate) {
     $("session-view-body").removeEventListener("click", state.viewClickDelegate);
   }
-  state.viewClickDelegate = e => {
+  state.viewClickDelegate = async e => {
+    if (await handleCheckedByClick(e, false)) return;
     const addRemarkBtn = e.target.closest(".view-add-remark-target");
     if (addRemarkBtn) { showViewAddRemarkPicker(addRemarkBtn.dataset.target); return; }
 
@@ -7906,8 +7902,7 @@ async function leaveSessionView() {
   $("text-editor-sheet").classList.add("hidden");
   $("btn-delete-session")?.classList.add("hidden");
   $("btn-goto-session")?.classList.add("hidden");
-  const _lChkStrip = $("checked-by-strip");
-  if (_lChkStrip) { clearTimeout(_lChkStrip._chkTimer); delete _lChkStrip.dataset.confirmRole; _lChkStrip.classList.add("hidden"); _lChkStrip.innerHTML = ""; }
+  _viewChkConfirmRole = null; clearTimeout(_viewChkConfirmTimer);
   // Flush (and await it) while the Firestore listener is still live, same as
   // leaveSession() does for the live entry screen — flush() only writes to
   // Firestore, state.viewSessionData only updates once the listener echoes
@@ -7968,10 +7963,15 @@ $("btn-view-back").addEventListener("click", leaveSessionView);
 $("btn-student-registry-back")?.addEventListener("click", showHome);
 
 // ── Checked By strip (View/Edit Past Sessions approval flow) ──────────────────
-// Ray = assistant teacher (writes the notes first); Daisy = main teacher
-// (reviews and approves). Strip sits between the blue header and the scrollable
-// content. Confirmation state is stored on the DOM element so Firestore
-// snapshots can re-render the strip without losing a pending confirm click.
+// Ray = assistant teacher; Daisy = main teacher. Rendered as the first item
+// inside the scrollable body so it scrolls away with the content naturally.
+// Confirm state lives in module-level vars (the DOM element is recreated on
+// every renderSessionView call so dataset can't carry it between renders).
+
+let _viewChkConfirmRole  = null;
+let _viewChkConfirmTimer = null;
+let _grpChkConfirmRole   = null;
+let _grpChkConfirmTimer  = null;
 
 function fmtCheckTimestamp(ts) {
   const d = new Date(ts);
@@ -7980,17 +7980,15 @@ function fmtCheckTimestamp(ts) {
   return `${d.getDate()} ${months[d.getMonth()]} ${h % 12 || 12}:${m}${h < 12 ? "am" : "pm"}`;
 }
 
-function renderCheckedByStrip(stripEl, data) {
-  if (!stripEl) return;
-  const checks       = data?.checks || {};
-  const confirmRole  = stripEl.dataset.confirmRole || null;
+function renderCheckedByStripHtml(data, confirmRole) {
+  const checks = data?.checks || {};
 
-  const pillHtml = (role, locked) => {
+  const pillHtml = role => {
     const check        = checks[role];
     const name         = CHECKED_BY[role];
     const isChecked    = !!check;
     const isConfirming = confirmRole === role;
-    const classes = ["checked-by-pill", isChecked && "is-checked", locked && "is-locked", isConfirming && "is-confirming"].filter(Boolean).join(" ");
+    const classes = ["checked-by-pill", isChecked && "is-checked", isConfirming && "is-confirming"].filter(Boolean).join(" ");
 
     if (isConfirming) {
       const msg = isChecked
@@ -7999,59 +7997,54 @@ function renderCheckedByStrip(stripEl, data) {
       return `<div class="${classes}">
         <span class="chk-label">${msg}</span>
         <span class="chk-confirm-btns">
-          <button class="chk-btn-yes" data-role="${role}" data-action="confirm">${isChecked ? "Undo ✓" : "Confirm ✓"}</button>
-          <button class="chk-btn-no"  data-role="${role}" data-action="cancel">Cancel</button>
+          <button class="chk-btn-yes" data-role="${role}">${isChecked ? "Undo ✓" : "Confirm ✓"}</button>
+          <button class="chk-btn-no"  data-role="${role}">Cancel</button>
         </span>
       </div>`;
     }
 
     const inner = isChecked
       ? `<span class="chk-mark">✓</span> <span class="chk-label">${escHtml(name)} · ${escHtml(fmtCheckTimestamp(check.at))}</span>`
-      : `<span class="chk-label">${escHtml(name)}: ${role === "assistant" ? "Mark Reviewed" : "Mark Approved"}</span>`;
-    return `<button class="${classes}" data-role="${role}" ${locked ? "disabled" : ""}>${inner}</button>`;
+      : `<span class="chk-label">${escHtml(name)}: ${role === "assistant" ? "Incomplete" : "Not Yet Approved"}</span>`;
+    return `<button class="${classes}" data-role="${role}">${inner}</button>`;
   };
 
-  stripEl.innerHTML = `<div class="chk-inner">${pillHtml("assistant", false)}${pillHtml("main", false)}</div>`;
+  return `<div class="checked-by-strip" contenteditable="false"><div class="chk-inner">${pillHtml("assistant")}${pillHtml("main")}</div></div>`;
 }
 
-function initCheckedByStrip(stripId, sidGetter, dataGetter) {
-  const strip = $(stripId);
-  if (!strip) return;
-  strip.addEventListener("click", async e => {
-    // Pill click → enter confirming state
-    const pill = e.target.closest(".checked-by-pill:not(.is-locked):not(.is-confirming)");
-    if (pill) {
-      clearTimeout(strip._chkTimer);
-      strip.dataset.confirmRole = pill.dataset.role;
-      renderCheckedByStrip(strip, dataGetter());
-      strip._chkTimer = setTimeout(() => {
-        delete strip.dataset.confirmRole;
-        renderCheckedByStrip(strip, dataGetter());
-      }, 4000);
-      return;
-    }
-    // Confirm / cancel
-    const yesBtn = e.target.closest(".chk-btn-yes");
-    const noBtn  = e.target.closest(".chk-btn-no");
-    if (!yesBtn && !noBtn) return;
-    clearTimeout(strip._chkTimer);
-    delete strip.dataset.confirmRole;
-    if (noBtn) { renderCheckedByStrip(strip, dataGetter()); return; }
-    // Confirmed — write to Firestore
-    const role      = yesBtn.dataset.role;
-    const sid       = sidGetter();
-    if (!sid) return;
-    const data      = dataGetter();
+async function handleCheckedByClick(e, isGroup) {
+  const confirmRole  = isGroup ? _grpChkConfirmRole  : _viewChkConfirmRole;
+  const setConfirm   = r => { if (isGroup) _grpChkConfirmRole = r; else _viewChkConfirmRole = r; };
+  const clearTimer   = ()  => clearTimeout(isGroup ? _grpChkConfirmTimer : _viewChkConfirmTimer);
+  const setTimer     = fn  => { const t = setTimeout(fn, 4000); if (isGroup) _grpChkConfirmTimer = t; else _viewChkConfirmTimer = t; };
+  const rerender     = ()  => isGroup ? renderGroupSessionView() : renderSessionView();
+
+  // Pill click → confirming state
+  const pill = e.target.closest(".checked-by-pill:not(.is-confirming)");
+  if (pill) {
+    clearTimer();
+    setConfirm(pill.dataset.role);
+    rerender();
+    setTimer(() => { setConfirm(null); rerender(); });
+    return true;
+  }
+  // Confirm button
+  const yesBtn = e.target.closest(".chk-btn-yes");
+  if (yesBtn) {
+    clearTimer(); setConfirm(null);
+    const sid    = isGroup ? state.viewGroupSessionId : state.viewSessionId;
+    const data   = isGroup ? state.viewGroupSessionData : state.viewSessionData;
+    if (!sid) return true;
     const checks    = { ...(data?.checks || {}) };
-    const isChecked = !!checks[role];
-    if (isChecked) {
-      delete checks[role];
-    } else {
-      checks[role] = { by: CHECKED_BY[role], at: Date.now() };
-    }
-    try { await updateSessionChecks(sid, checks); }
-    catch (err) { console.error("updateSessionChecks failed:", err); }
-  });
+    const role      = yesBtn.dataset.role;
+    if (checks[role]) { delete checks[role]; } else { checks[role] = { by: CHECKED_BY[role], at: Date.now() }; }
+    try { await updateSessionChecks(sid, checks); } catch (err) { console.error("updateSessionChecks failed:", err); }
+    return true;
+  }
+  // Cancel button
+  const noBtn = e.target.closest(".chk-btn-no");
+  if (noBtn) { clearTimer(); setConfirm(null); rerender(); return true; }
+  return false;
 }
 
 function renderSessionView() {
@@ -8095,18 +8088,16 @@ function renderSessionView() {
   const sorted  = sortTargetsByOrder(targets);
 
   const body = $("session-view-body");
-  // body itself scrolls (overflow-y:auto) — replacing its innerHTML resets
-  // scrollTop to 0 in every browser, so capture/restore around the swap.
   const scrollTop = body.scrollTop;
   const captured = captureActiveEditState(body);
-  body.innerHTML = sorted.length
+  const stripHtml = renderCheckedByStripHtml(data, _viewChkConfirmRole);
+  body.innerHTML = stripHtml + (sorted.length
     ? sorted.map(t => buildTargetViewTable(t, data)).join("")
-    : `<p style="color:var(--text-muted);padding:1rem">No targets recorded.</p>`;
+    : `<p style="color:var(--text-muted);padding:1rem">No targets recorded.</p>`);
 
   attachViewListeners();
   restoreActiveEditState(body, captured);
   body.scrollTop = scrollTop;
-  renderCheckedByStrip($("checked-by-strip"), data);
 }
 
 function buildTargetViewTable(target, data) {
@@ -9761,8 +9752,10 @@ async function openGroupSessionView(group, sessionId) {
   $("group-view-group-name").textContent = group.name;
   $("group-view-session-meta").textContent = "";
   $("group-session-view-body").innerHTML = `<div class="loading">Loading…</div>`;
-  const _gChkStrip = $("group-checked-by-strip");
-  if (_gChkStrip) { delete _gChkStrip.dataset.confirmRole; clearTimeout(_gChkStrip._chkTimer); _gChkStrip.innerHTML = ""; _gChkStrip.classList.remove("hidden"); }
+  _grpChkConfirmRole = null; clearTimeout(_grpChkConfirmTimer);
+  if (state.viewGroupChkDelegate) $("group-session-view-body").removeEventListener("click", state.viewGroupChkDelegate);
+  state.viewGroupChkDelegate = async e => { await handleCheckedByClick(e, true); };
+  $("group-session-view-body").addEventListener("click", state.viewGroupChkDelegate);
 
   if (state.fbViewGroupUnsubscribe) { state.fbViewGroupUnsubscribe(); state.fbViewGroupUnsubscribe = null; }
 
@@ -9794,8 +9787,8 @@ async function leaveGroupSessionView() {
   $("text-editor-sheet").classList.add("hidden");
   $("btn-group-delete-session")?.classList.add("hidden");
   $("btn-group-goto-session")?.classList.add("hidden");
-  const _lgChkStrip = $("group-checked-by-strip");
-  if (_lgChkStrip) { clearTimeout(_lgChkStrip._chkTimer); delete _lgChkStrip.dataset.confirmRole; _lgChkStrip.classList.add("hidden"); _lgChkStrip.innerHTML = ""; }
+  _grpChkConfirmRole = null; clearTimeout(_grpChkConfirmTimer);
+  if (state.viewGroupChkDelegate) { $("group-session-view-body")?.removeEventListener("click", state.viewGroupChkDelegate); state.viewGroupChkDelegate = null; }
   // See the matching comment in leaveSessionView() — flush (and await it)
   // before unsubscribing, not after, so the listener is still alive to
   // reflect the flushed write into state.viewGroupSessionData before the
@@ -9885,14 +9878,14 @@ function renderGroupSessionView() {
   const body = $("group-session-view-body");
   const scrollTop = body.scrollTop;
   const captured = captureActiveEditState(body);
-  body.innerHTML = sorted.length
+  const grpStripHtml = renderCheckedByStripHtml(data, _grpChkConfirmRole);
+  body.innerHTML = grpStripHtml + (sorted.length
     ? sorted.map(t => buildGroupTargetViewTable(t, data, attendees)).join("")
-    : `<p style="color:var(--text-muted);padding:1rem">No targets recorded.</p>`;
+    : `<p style="color:var(--text-muted);padding:1rem">No targets recorded.</p>`);
 
   attachGroupViewListeners();
   restoreActiveEditState(body, captured);
   body.scrollTop = scrollTop;
-  renderCheckedByStrip($("group-checked-by-strip"), data);
 }
 
 // Pairs each attending student's remarks for one activity into "rounds" by creation order,
