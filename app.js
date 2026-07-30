@@ -167,9 +167,9 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1283";
+const APP_VERSION = "1284";
 // Names shown on the approval strip in View/Edit Past Sessions.
-const CHECKED_BY = { assistant: "Ray", main: "Daisy" };
+const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
 // ─── PASSWORD GATE ────────────────────────────────────────────
 // Single shared password for exports and old-session access.
@@ -8191,7 +8191,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
 
   // ── Phase 1: Enter Data ───────────────────────────────────────
   const mkPill1 = (role, done, at) => {
-    const name = role === "assistant" ? "Ray" : "Daisy";
+    const name = role === "assistant" ? "Ray" : "Ms. Daisy";
     if (confirmRole === role) return mkConfirm(role, done ? `Undo ${name}?` : `${name}: Sure?`);
     if (done) return `<button class="wf-pill wf-pill--done" data-role="${role}">✓ ${escHtml(name)} · ${escHtml(fmtCheckTimestamp(at))}</button>`;
     return `<button class="wf-pill wf-pill--pending" data-role="${role}">○ ${escHtml(name)}: Pending</button>`;
@@ -8210,16 +8210,16 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
   let p2State, p2Body;
   if (!ws.reviewUnlocked) {
     p2State = "pending";
-    p2Body  = `<div class="wf-pill wf-pill--pending">○ Daisy: Pending</div>`;
+    p2Body  = `<div class="wf-pill wf-pill--pending">○ Ms. Daisy: Pending</div>`;
   } else if (confirmRole === "phase2") {
     p2State = "p2-active";
     p2Body  = mkConfirm("phase2", ws.reviewSubmitted ? "Undo Phase 2?" : "Mark as reviewed?");
   } else if (!ws.reviewSubmitted) {
     p2State = "p2-active";
-    p2Body  = `<button class="wf-pill wf-pill--attention" data-role="phase2">○ Daisy: Pending</button>`;
+    p2Body  = `<button class="wf-pill wf-pill--attention" data-role="phase2">○ Ms. Daisy: Pending</button>`;
   } else {
     p2State = "done";
-    p2Body  = `<button class="wf-pill wf-pill--done" data-role="phase2">✓ Daisy · ${escHtml(fmtCheckTimestamp(data.reviewSubmittedAt))}</button>`;
+    p2Body  = `<button class="wf-pill wf-pill--done" data-role="phase2">✓ Ms. Daisy · ${escHtml(fmtCheckTimestamp(data.reviewSubmittedAt))}</button>`;
   }
   const p2Node = `<div class="wf-node wf-node--${p2State}">
     <div class="wf-node-label">Phase 2: Review &amp; Feedback</div>
