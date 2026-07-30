@@ -371,13 +371,30 @@
          inputmode="none" data-placeholder="Write here…"></div>
   </div>
 
-  <!-- Draggable sticky note (Daisy's workflow note) -->
-  <div id="sticky-note" class="sticky-note hidden" role="dialog" aria-label="Daisy's Note">
+  <!-- Draggable corrections list -->
+  <div id="sticky-note" class="sticky-note hidden" role="dialog" aria-label="List of Corrections">
     <div class="sticky-note-header" id="sticky-note-drag-handle">
-      <span>📝 Daisy's Note</span>
+      <span>📝 List of Corrections</span>
       <button class="sticky-note-close" id="btn-sticky-note-close" title="Close">✕</button>
     </div>
-    <textarea class="sticky-note-textarea" id="sticky-note-content" placeholder="Type a note about this session…"></textarea>
+    <div class="sticky-note-body">
+      <table class="snote-table">
+        <thead>
+          <tr>
+            <th class="snote-th-no">No.</th>
+            <th class="snote-th-text">Correction</th>
+            <th class="snote-th-tick">✓</th>
+          </tr>
+        </thead>
+        <tbody id="sticky-note-rows"></tbody>
+      </table>
+      <div id="sticky-note-add-row" class="snote-add-row" style="display:none">
+        <input id="sticky-note-input" class="snote-input" placeholder="Add correction…">
+        <button id="sticky-note-add" class="snote-add-btn">Add</button>
+      </div>
+      <button id="sticky-note-submit" class="snote-submit-btn" style="display:none">✓ Submit Review</button>
+      <button id="sticky-note-undo"   class="snote-undo-btn"   style="display:none">↩ Undo Submit</button>
+    </div>
   </div>
 
   <!-- Main app (ES module) -->

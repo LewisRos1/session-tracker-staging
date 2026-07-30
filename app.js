@@ -165,7 +165,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1273";
+const APP_VERSION = "1274";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Daisy" };
 
@@ -8103,10 +8103,9 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
   const ws     = getWorkflowState(data);
   const checks = data?.checks || {};
 
-  const panelOpen    = isGroup ? _grpReviewPanelOpen : _viewReviewPanelOpen;
-  const cmtDraft     = isGroup ? _grpCommentDraft    : _viewCommentDraft;
-  const signingCmtId = isGroup ? _grpSigningCmtId    : _viewSigningCmtId;
-  const signingName  = isGroup ? _grpSigningName     : _viewSigningName;
+  // Refresh sticky note if it's open for this session
+  const curSid = isGroup ? state.viewGroupSessionId : state.viewSessionId;
+  if (_stickyNoteSessionId === curSid) renderStickyNoteContent(data, isGroup);
 
   // ── Arrow SVG ────────────────────────────────────────────────
   const arrow = `<div class="wf-arrow" aria-hidden="true">
@@ -8116,9 +8115,8 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     </svg>
   </div>`;
 
-  // ── Phase 1 node ──────────────────────────────────────────────
-  const canUndoPhase1 = !ws.reviewSubmitted;
-  const mkCheckItem = (role, done, at) => {
+  // ── Phase 1 "Enter Data" ──────────────────────────────────────
+  const mkPill = (role, done, at) => {
     const name = role === "assistant" ? "Ray" : "Daisy";
     if (confirmRole === role) {
       const msg = done ? `Undo ${name}?` : `${name}: Sure?`;
@@ -8130,154 +8128,82 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
         </div>
       </div>`;
     }
-    const locked = !canUndoPhase1 && done;
     if (done) {
-      return `<button class="wf-check-item wf-check-item--done${locked ? " wf-check-locked" : ""}" data-role="${role}">
-        <span class="wf-check-tick">✓</span><span>${escHtml(name)} · ${escHtml(fmtCheckTimestamp(at))}</span>
-      </button>`;
+      return `<button class="wf-pill wf-pill--done" data-role="${role}">✓ ${escHtml(name)} · ${escHtml(fmtCheckTimestamp(at))}</button>`;
     }
-    return `<button class="wf-check-item" data-role="${role}">
-      <span class="wf-check-circle">○</span><span>${escHtml(name)}: Incomplete</span>
-    </button>`;
+    return `<button class="wf-pill wf-pill--pending" data-role="${role}">○ ${escHtml(name)}: Pending</button>`;
   };
 
-  const p1State = (ws.rayDone && ws.daisyDone) ? "done" : ((ws.rayDone || ws.daisyDone) ? "partial" : "pending");
+  // Green only when BOTH done
+  const p1State = (ws.rayDone && ws.daisyDone) ? "done" : "pending";
   const p1Node = `<div class="wf-node wf-node--${p1State}">
-    <div class="wf-node-label">Phase 1</div>
+    <div class="wf-node-label">Enter Data</div>
     <div class="wf-node-body">
-      ${mkCheckItem("assistant", ws.rayDone, checks.assistant?.at)}
-      ${mkCheckItem("main", ws.daisyDone, checks.main?.at)}
+      ${mkPill("assistant", ws.rayDone, checks.assistant?.at)}
+      ${mkPill("main", ws.daisyDone, checks.main?.at)}
     </div>
   </div>`;
 
-  // ── Phase 2 node ──────────────────────────────────────────────
-  let p2State, p2Body;
+  // ── Phase 2 "Review & Feedback" ──────────────────────────────
+  let p2State, p2Pill;
   if (!ws.reviewUnlocked) {
-    p2State = "pending";
-    p2Body  = `<div class="wf-node-line">Daisy reviews Ray's work</div>`;
+    p2State = "pending"; p2Pill = `<div class="wf-pill wf-pill--pending">○ Daisy: Pending</div>`;
   } else if (!ws.reviewSubmitted) {
-    p2State = panelOpen ? "p2-open" : "p2-active";
-    p2Body  = `<button class="wf-node-action" data-action="toggle-review-panel">
-      ${panelOpen ? "📝 Reviewing… ▲" : "🔍 Review Pending ▼"}
-    </button>`;
+    p2State = "p2-active"; p2Pill = `<div class="wf-pill wf-pill--attention">○ Daisy: Pending</div>`;
   } else {
-    p2State = "done";
-    p2Body  = `<div class="wf-node-line">✓ Daisy reviewed</div>`;
+    p2State = "done"; p2Pill = `<div class="wf-pill wf-pill--done">✓ Daisy: Reviewed</div>`;
   }
   const p2Node = `<div class="wf-node wf-node--${p2State}">
-    <div class="wf-node-label">Phase 2</div>
-    <div class="wf-node-body">${p2Body}</div>
+    <div class="wf-node-label">Review &amp; Feedback</div>
+    <div class="wf-node-body">${p2Pill}</div>
   </div>`;
 
-  // Note button below Phase 2
-  const hasNote = !!(data?.workflowNote || "").trim();
-  const noteTrigger = `<div class="wf-note-wrap">
-    <button class="wf-note-btn${hasNote ? " has-note" : ""}" data-action="open-note">
-      📝 ${hasNote ? "Note ●" : "Note"}
-    </button>
-  </div>`;
-
-  // ── Phase 3 node ──────────────────────────────────────────────
-  let p3State, p3Body;
+  // ── Phase 3 "Revision" ────────────────────────────────────────
+  let p3State, p3Pill;
   if (!ws.reviewSubmitted) {
-    p3State = "pending";
-    p3Body  = `<div class="wf-node-line">Ray fixes corrections</div>`;
-  } else if (ws.noComments) {
+    p3State = "pending"; p3Pill = `<div class="wf-pill wf-pill--pending">○ Ray: Pending</div>`;
+  } else if (ws.noComments || ws.allFixed) {
     p3State = "done";
-    p3Body  = `<div class="wf-node-line">No corrections needed</div>`;
-  } else if (ws.allFixed) {
-    p3State = "done";
-    p3Body  = `<div class="wf-node-line">✓ All ${ws.comments.length} fixed</div>`;
+    p3Pill  = ws.noComments
+      ? `<div class="wf-pill wf-pill--done">✓ No corrections</div>`
+      : `<div class="wf-pill wf-pill--done">✓ All ${ws.comments.length} fixed</div>`;
   } else {
-    const fixedCount   = ws.comments.filter(([,c]) => !!c.fixedByName).length;
+    const fixedCount = ws.comments.filter(([,c]) => !!c.fixedByName).length;
     p3State = "corrections";
-    p3Body  = `<div class="wf-node-line">🔧 ${fixedCount}/${ws.comments.length} fixed</div>
-               <div class="wf-node-hint">See list below ↓</div>`;
+    p3Pill  = `<div class="wf-pill wf-pill--warn">○ Ray: Pending (${fixedCount}/${ws.comments.length})</div>`;
   }
   const p3Node = `<div class="wf-node wf-node--${p3State}">
-    <div class="wf-node-label">Phase 3</div>
-    <div class="wf-node-body">${p3Body}</div>
+    <div class="wf-node-label">Revision</div>
+    <div class="wf-node-body">${p3Pill}</div>
   </div>`;
 
-  // ── Nigel node ────────────────────────────────────────────────
+  // ── Phase 4 "Nigel" ──────────────────────────────────────────
   const nigelState = ws.ready ? "nigel-ready" : "nigel";
   const nigelNode  = `<div class="wf-node wf-node--${nigelState}">
     <div class="wf-node-label">Nigel</div>
     <div class="wf-node-body">
-      <div class="wf-node-line">${ws.ready ? "🎉 Ready!" : "Waiting…"}</div>
+      <div class="wf-node-line">${ws.ready ? "Ready to Send! 🎉" : "Waiting... 🤔"}</div>
     </div>
   </div>`;
 
-  const exportBtn = `<button class="chk-export-btn" title="Export this session to Word">📄 Export to Word (Daily Session Note)</button>`;
+  // ── Row 2: Note button (col 3) + Export button (col 7) ───────
+  const hasCmts = ws.comments.length > 0;
+  const noteTrigger = `<div class="wf-note-wrap">
+    <button class="wf-note-btn${hasCmts ? " has-note" : ""}" data-action="open-note">
+      📝 List of Corrections${hasCmts ? ` (${ws.comments.length})` : ""}
+    </button>
+  </div>`;
 
-  // ── Review panel ──────────────────────────────────────────────
-  let reviewPanel = "";
-  if (ws.reviewUnlocked && !ws.reviewSubmitted && panelOpen) {
-    const cmtItems = ws.comments.map(([id, c]) => `
-      <div class="review-comment">
-        <span class="review-comment-text">${escHtml(c.text)}</span>
-        <button class="review-cmt-delete" data-cmt-id="${id}" title="Delete">✕</button>
-      </div>`).join("");
-    reviewPanel = `<div class="review-panel">
-      <div class="review-panel-header">
-        <span class="review-panel-title">Review Comments for Ray</span>
-        <button class="review-panel-close">✕ Close</button>
-      </div>
-      <div class="review-comments-list">${cmtItems || '<p class="review-empty-hint">No comments yet. Add one below, or submit if no corrections are needed.</p>'}</div>
-      <div class="review-add-row">
-        <input class="review-comment-input" placeholder="Add a comment for Ray…" value="${escHtml(cmtDraft)}">
-        <button class="review-add-btn">Add</button>
-      </div>
-      <button class="review-submit-btn">Submit Review ✓</button>
-    </div>`;
-  } else if (ws.reviewSubmitted) {
-    const canReopen = ws.comments.every(([,c]) => !c.fixedByName);
-    const reopenBtn = (canReopen && !ws.noComments)
-      ? `<button class="review-reopen-btn">Re-open Review</button>` : "";
-    const cmtItems = ws.comments.map(([id, c]) => {
-      if (c.fixedByName) {
-        return `<div class="review-comment review-comment--fixed">
-          <span class="review-comment-check">✓</span>
-          <span class="review-comment-text">${escHtml(c.text)}</span>
-          <span class="review-comment-fixed-by">Fixed by ${escHtml(c.fixedByName)}</span>
-        </div>`;
-      }
-      if (signingCmtId === id) {
-        return `<div class="review-comment review-comment--signing">
-          <span class="review-comment-text">${escHtml(c.text)}</span>
-          <div class="review-sign-row">
-            <input class="review-sign-input" placeholder="Type your name to confirm fix…" value="${escHtml(signingName)}">
-            <button class="review-sign-confirm" data-cmt-id="${id}">Confirm</button>
-            <button class="review-sign-cancel">Cancel</button>
-          </div>
-        </div>`;
-      }
-      return `<div class="review-comment">
-        <label class="review-checkbox-label">
-          <input type="checkbox" class="review-cmt-check" data-cmt-id="${id}">
-          <span class="review-comment-text">${escHtml(c.text)}</span>
-        </label>
-      </div>`;
-    }).join("");
-    const body = ws.noComments
-      ? `<p class="review-empty-hint">No corrections needed — Nigel can export! 🎉</p>`
-      : `<div class="review-comments-list">${cmtItems}</div>`;
-    reviewPanel = `<div class="review-panel review-panel--phase3">
-      <div class="review-panel-header">
-        <span class="review-panel-title">Daisy's Review Comments</span>
-        ${reopenBtn}
-      </div>
-      ${body}
-    </div>`;
-  }
+  const exportTrigger = `<div class="wf-export-wrap">
+    <button class="chk-export-btn" title="Export this session to Word">📄 Export to Word</button>
+  </div>`;
 
   return `<div class="checked-by-strip" contenteditable="false">
     <div class="workflow-chart">
       ${p1Node}${arrow}${p2Node}${arrow}${p3Node}${arrow}${nigelNode}
       ${noteTrigger}
+      ${exportTrigger}
     </div>
-    <div class="wf-export-row">${exportBtn}</div>
-    ${reviewPanel}
   </div>`;
 }
 
@@ -8299,107 +8225,9 @@ async function handleCheckedByClick(e, isGroup) {
     };
   };
 
-  // ── Toggle Daisy's review panel (Phase 2) ───────────────────
-  const reviewToggle = e.target.closest("[data-action='toggle-review-panel']");
-  if (reviewToggle) {
-    if (isGroup) _grpReviewPanelOpen = !_grpReviewPanelOpen;
-    else         _viewReviewPanelOpen = !_viewReviewPanelOpen;
-    rerender();
-    return true;
-  }
-
-  // ── Close review panel button ────────────────────────────────
-  if (e.target.closest(".review-panel-close")) {
-    if (isGroup) _grpReviewPanelOpen = false;
-    else         _viewReviewPanelOpen = false;
-    rerender();
-    return true;
-  }
-
-  // ── Add comment button (or Enter handled in attachViewListeners) ─
-  if (e.target.closest(".review-add-btn")) {
-    const draft   = (isGroup ? _grpCommentDraft : _viewCommentDraft).trim();
-    if (!draft) return true;
-    if (isGroup) _grpCommentDraft = ""; else _viewCommentDraft = "";
-    try { await addReviewComment(getSid(), draft); } catch (err) { console.error("addReviewComment:", err); }
-    return true;
-  }
-
-  // ── Delete comment button ────────────────────────────────────
-  const deleteBtn = e.target.closest(".review-cmt-delete");
-  if (deleteBtn) {
-    try { await deleteReviewComment(getSid(), deleteBtn.dataset.cmtId); } catch (err) { console.error("deleteReviewComment:", err); }
-    return true;
-  }
-
-  // ── Submit review button ─────────────────────────────────────
-  if (e.target.closest(".review-submit-btn")) {
-    const sid = getSid();
-    const ws  = getWorkflowState(getData());
-    if (isGroup) _grpReviewPanelOpen = false; else _viewReviewPanelOpen = false;
-    const newStatus = ws.comments.length > 0 ? "ray_pending" : null;
-    try {
-      await setReviewSubmitted(sid, true);
-      await updateWorkflowStatus(sid, newStatus, getSubjectMeta());
-    } catch (err) { console.error("submitReview:", err); }
-    return true;
-  }
-
-  // ── Re-open review button ────────────────────────────────────
-  if (e.target.closest(".review-reopen-btn")) {
-    const sid = getSid();
-    if (isGroup) _grpReviewPanelOpen = true; else _viewReviewPanelOpen = true;
-    try {
-      await setReviewSubmitted(sid, false);
-      await updateWorkflowStatus(sid, "daisy_pending", getSubjectMeta());
-    } catch (err) { console.error("reopenReview:", err); }
-    return true;
-  }
-
-  // ── Checkbox click → start signing prompt ───────────────────
-  const cmtCheck = e.target.closest(".review-cmt-check");
-  if (cmtCheck) {
-    const cmtId = cmtCheck.dataset.cmtId;
-    if (isGroup) { _grpSigningCmtId = cmtId; _grpSigningName = ""; }
-    else         { _viewSigningCmtId = cmtId; _viewSigningName = ""; }
-    rerender();
-    return true;
-  }
-
-  // ── Sign confirm button ──────────────────────────────────────
-  const signConfirm = e.target.closest(".review-sign-confirm");
-  if (signConfirm) {
-    const strip     = e.target.closest(".checked-by-strip");
-    const nameInput = strip?.querySelector(".review-sign-input");
-    const name      = (nameInput?.value || "").trim();
-    if (!name) { nameInput?.focus(); return true; }
-    const cmtId = signConfirm.dataset.cmtId;
-    const sid   = getSid();
-    const ws    = getWorkflowState(getData());
-    if (isGroup) { _grpSigningCmtId = null; _grpSigningName = ""; }
-    else         { _viewSigningCmtId = null; _viewSigningName = ""; }
-    try {
-      await markCommentFixed(sid, cmtId, name);
-      // Check optimistically if this was the last unfixed comment
-      const updatedCmts = ws.comments.map(([id, c]) => id === cmtId ? [id, { ...c, fixedByName: name }] : [id, c]);
-      if (updatedCmts.every(([,c]) => !!c.fixedByName)) {
-        await updateWorkflowStatus(sid, null, getSubjectMeta());
-      }
-    } catch (err) { console.error("markCommentFixed:", err); }
-    return true;
-  }
-
-  // ── Sign cancel button ───────────────────────────────────────
-  if (e.target.closest(".review-sign-cancel")) {
-    if (isGroup) { _grpSigningCmtId = null; _grpSigningName = ""; }
-    else         { _viewSigningCmtId = null; _viewSigningName = ""; }
-    rerender();
-    return true;
-  }
-
-  // ── Note button ──────────────────────────────────────────────
+  // ── Note / corrections list button ───────────────────────────
   if (e.target.closest("[data-action='open-note']")) {
-    openStickyNote(getSid(), !!isGroup, getData()?.workflowNote || "");
+    openStickyNote(getSid(), !!isGroup, getData());
     return true;
   }
 
@@ -8434,11 +8262,11 @@ async function handleCheckedByClick(e, isGroup) {
     return true;
   }
 
-  // ── Phase-1 check item click → confirm flow ─────────────────
-  const checkItem = e.target.closest(".wf-check-item:not(.wf-check-locked)");
-  if (checkItem) {
+  // ── Phase-1 pill click → confirm flow ───────────────────────
+  const pillBtn = e.target.closest(".wf-pill[data-role]");
+  if (pillBtn) {
     clearTimer();
-    setConfirm(checkItem.dataset.role);
+    setConfirm(pillBtn.dataset.role);
     rerender();
     setTimer(() => { setConfirm(null); rerender(); });
     return true;
@@ -8476,23 +8304,55 @@ async function handleCheckedByClick(e, isGroup) {
   return false;
 }
 
-// ── Sticky Note (floating draggable) ─────────────────────────
+// ── Sticky Note — "List of Corrections" ──────────────────────
 
-function openStickyNote(sessionId, isGroup, noteText) {
+function renderStickyNoteContent(data, isGroup) {
+  const tbody  = document.getElementById("sticky-note-rows");
+  const addRow = document.getElementById("sticky-note-add-row");
+  const subBtn = document.getElementById("sticky-note-submit");
+  const undoBtn = document.getElementById("sticky-note-undo");
+  if (!tbody) return;
+
+  const ws = getWorkflowState(data);
+  const canAdd  = ws.reviewUnlocked && !ws.reviewSubmitted;
+  const showSub = canAdd;
+  const showUndo = ws.reviewSubmitted && ws.comments.every(([,c]) => !c.fixedByName);
+
+  if (ws.comments.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="3" class="snote-empty">${canAdd ? "No corrections yet — add one below." : "No corrections."}</td></tr>`;
+  } else {
+    tbody.innerHTML = ws.comments.map(([id, c], i) => `
+      <tr class="snote-row${c.fixedByName ? " snote-row--done" : ""}">
+        <td class="snote-no">${i + 1}</td>
+        <td class="snote-text">${escHtml(c.text)}</td>
+        <td class="snote-tick">
+          ${canAdd
+            ? `<button class="snote-delete" data-cmt-id="${id}" title="Delete">✕</button>`
+            : `<input type="checkbox" class="snote-check" data-cmt-id="${id}" ${c.fixedByName ? "checked" : ""}>`
+          }
+        </td>
+      </tr>`).join("");
+  }
+
+  if (addRow)  addRow.style.display  = canAdd    ? "flex" : "none";
+  if (subBtn)  subBtn.style.display  = showSub   ? "block" : "none";
+  if (undoBtn) undoBtn.style.display = showUndo  ? "block" : "none";
+}
+
+function openStickyNote(sessionId, isGroup, data) {
   _stickyNoteSessionId = sessionId;
   _stickyNoteIsGroup   = !!isGroup;
   const el = document.getElementById("sticky-note");
   if (!el) return;
-  const ta = document.getElementById("sticky-note-content");
-  if (ta) ta.value = noteText || "";
-  // First open: place in top-right. Subsequent drags use left/top.
   if (!el.dataset.positioned) {
     el.style.right = "20px";
     el.style.top   = "110px";
     el.style.left  = "";
   }
   el.classList.remove("hidden");
-  if (ta) ta.focus();
+  renderStickyNoteContent(data, isGroup);
+  const inp = document.getElementById("sticky-note-input");
+  if (inp) inp.focus();
 }
 
 function closeStickyNote() {
@@ -8505,9 +8365,9 @@ function setupStickyNote() {
   const note    = document.getElementById("sticky-note");
   const handle  = document.getElementById("sticky-note-drag-handle");
   const closeEl = document.getElementById("btn-sticky-note-close");
-  const ta      = document.getElementById("sticky-note-content");
-  if (!note || !handle || !closeEl || !ta) return;
+  if (!note || !handle || !closeEl) return;
 
+  // ── Drag ─────────────────────────────────────────────────────
   let dragging = false, ox = 0, oy = 0, nl = 0, nt = 0;
 
   function startDrag(cx, cy) {
@@ -8518,12 +8378,11 @@ function setupStickyNote() {
       note.style.top   = rect.top + "px";
       note.dataset.positioned = "1";
     }
-    nl = parseFloat(note.style.left)  || 0;
-    nt = parseFloat(note.style.top)   || 0;
+    nl = parseFloat(note.style.left) || 0;
+    nt = parseFloat(note.style.top)  || 0;
     ox = cx; oy = cy;
     dragging = true;
   }
-
   function onMove(cx, cy) {
     if (!dragging) return;
     note.style.left  = Math.max(0, nl + cx - ox) + "px";
@@ -8531,32 +8390,99 @@ function setupStickyNote() {
     note.style.right = "";
     note.dataset.positioned = "1";
   }
-
   handle.addEventListener("mousedown",  e => { startDrag(e.clientX, e.clientY); e.preventDefault(); });
   document.addEventListener("mousemove", e => onMove(e.clientX, e.clientY));
   document.addEventListener("mouseup",   () => { dragging = false; });
-
-  handle.addEventListener("touchstart", e => {
-    const t = e.touches[0];
-    startDrag(t.clientX, t.clientY);
-  }, { passive: false });
-  document.addEventListener("touchmove", e => {
-    if (!dragging) return;
-    const t = e.touches[0];
-    onMove(t.clientX, t.clientY);
-    e.preventDefault();
-  }, { passive: false });
+  handle.addEventListener("touchstart", e => { const t = e.touches[0]; startDrag(t.clientX, t.clientY); }, { passive: false });
+  document.addEventListener("touchmove", e => { if (!dragging) return; const t = e.touches[0]; onMove(t.clientX, t.clientY); e.preventDefault(); }, { passive: false });
   document.addEventListener("touchend", () => { dragging = false; });
 
   closeEl.addEventListener("click", closeStickyNote);
 
-  ta.addEventListener("input", () => {
-    clearTimeout(_noteDebounce);
-    _noteDebounce = setTimeout(async () => {
-      if (!_stickyNoteSessionId) return;
-      try { await updateWorkflowNote(_stickyNoteSessionId, ta.value); }
-      catch (err) { console.error("updateWorkflowNote:", err); }
-    }, 600);
+  // ── Correction actions (event delegation on note body) ───────
+  const getCtx = () => ({
+    sid:  _stickyNoteSessionId,
+    data: _stickyNoteIsGroup ? state.viewGroupSessionData : state.viewSessionData,
+    isGroup: _stickyNoteIsGroup,
+    meta: {
+      subjectName: _stickyNoteIsGroup ? state.viewGroup?.name    : state.viewStudent?.name,
+      subjectId:   _stickyNoteIsGroup ? state.viewGroupSessionData?.groupId   : state.viewSessionData?.studentId,
+      isGroup:     !!_stickyNoteIsGroup,
+      date:        _stickyNoteIsGroup ? state.viewGroupSessionData?.date : state.viewSessionData?.date
+    }
+  });
+
+  async function addCorrection() {
+    const inp = document.getElementById("sticky-note-input");
+    const text = (inp?.value || "").trim();
+    if (!text || !_stickyNoteSessionId) return;
+    inp.value = "";
+    try { await addReviewComment(_stickyNoteSessionId, text); }
+    catch (err) { console.error("addReviewComment:", err); }
+  }
+
+  note.addEventListener("click", async e => {
+    // Add button
+    if (e.target.id === "sticky-note-add") { await addCorrection(); return; }
+
+    // Submit review
+    if (e.target.id === "sticky-note-submit") {
+      const { sid, data, meta } = getCtx();
+      if (!sid) return;
+      const ws = getWorkflowState(data);
+      try {
+        await setReviewSubmitted(sid, true);
+        await updateWorkflowStatus(sid, ws.comments.length > 0 ? "ray_pending" : null, meta);
+      } catch (err) { console.error("submitReview:", err); }
+      return;
+    }
+
+    // Undo submit
+    if (e.target.id === "sticky-note-undo") {
+      const { sid, meta } = getCtx();
+      if (!sid) return;
+      try {
+        await setReviewSubmitted(sid, false);
+        await updateWorkflowStatus(sid, "daisy_pending", meta);
+      } catch (err) { console.error("undoSubmit:", err); }
+      return;
+    }
+
+    // Delete correction
+    const del = e.target.closest(".snote-delete");
+    if (del) {
+      const { sid } = getCtx();
+      if (!sid) return;
+      try { await deleteReviewComment(sid, del.dataset.cmtId); }
+      catch (err) { console.error("deleteReviewComment:", err); }
+      return;
+    }
+
+    // Tick/untick correction (Ray's checkbox)
+    const chk = e.target.closest(".snote-check");
+    if (chk) {
+      const { sid, data, meta } = getCtx();
+      if (!sid) return;
+      const cmtId  = chk.dataset.cmtId;
+      const fixing = chk.checked;
+      try {
+        await markCommentFixed(sid, cmtId, fixing ? "Ray" : null);
+        if (fixing) {
+          const ws = getWorkflowState(data);
+          const updatedCmts = ws.comments.map(([id, c]) => id === cmtId ? [id, { ...c, fixedByName: "Ray" }] : [id, c]);
+          if (updatedCmts.every(([,c]) => !!c.fixedByName)) {
+            await updateWorkflowStatus(sid, null, meta);
+          }
+        }
+      } catch (err) { console.error("markCommentFixed:", err); }
+      return;
+    }
+  });
+
+  // Add on Enter key
+  note.addEventListener("keydown", async e => {
+    const inp = document.getElementById("sticky-note-input");
+    if (e.target === inp && e.key === "Enter") { e.preventDefault(); await addCorrection(); }
   });
 }
 
