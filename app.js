@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1288";
+const APP_VERSION = "1289";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -8145,7 +8145,6 @@ let _stickyNoteSessionId    = null;
 let _stickyNoteIsGroup      = false;
 let _noteDebounce           = null;
 let _focusNewRow            = false;
-let _stickyNotePhaseConfirm = null; // "phase2" | "phase3" | null
 let _phase3Error            = null; // error string shown in Phase 3 node, auto-clears
 const _textareaDebounce     = new Map();
 
@@ -8201,7 +8200,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     const name = role === "assistant" ? "Ray" : "Ms. Daisy";
     if (confirmRole === role) return mkConfirm(role, done ? `Undo ${name}?` : `${name}: Sure?`);
     if (done) return `<button class="wf-pill wf-pill--done" data-role="${role}">✓ ${escHtml(name)} · ${escHtml(fmtCheckTimestamp(at))}</button>`;
-    return `<button class="wf-pill wf-pill--pending" data-role="${role}">○ ${escHtml(name)}: Pending</button>`;
+    return `<button class="wf-pill wf-pill--pending" data-role="${role}">○ ${escHtml(name)}: Incomplete</button>`;
   };
 
   const p1State = (ws.rayDone && ws.daisyDone) ? "done" : "pending";
@@ -8217,13 +8216,13 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
   let p2State, p2Body;
   if (!ws.reviewUnlocked) {
     p2State = "pending";
-    p2Body  = `<div class="wf-pill wf-pill--pending">○ Ms. Daisy: Pending</div>`;
+    p2Body  = `<div class="wf-pill wf-pill--pending">○ Ms. Daisy: Incomplete</div>`;
   } else if (confirmRole === "phase2") {
     p2State = "p2-active";
     p2Body  = mkConfirm("phase2", ws.reviewSubmitted ? "Undo Phase 2?" : "Mark as reviewed?");
   } else if (!ws.reviewSubmitted) {
     p2State = "p2-active";
-    p2Body  = `<button class="wf-pill wf-pill--attention" data-role="phase2">○ Ms. Daisy: Pending</button>`;
+    p2Body  = `<button class="wf-pill wf-pill--attention" data-role="phase2">○ Ms. Daisy: Incomplete</button>`;
   } else {
     p2State = "done";
     p2Body  = `<button class="wf-pill wf-pill--done" data-role="phase2">✓ Ms. Daisy · ${escHtml(fmtCheckTimestamp(data.reviewSubmittedAt))}</button>`;
@@ -8237,13 +8236,13 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
   let p3State, p3Body;
   if (!ws.reviewSubmitted) {
     p3State = "pending";
-    p3Body  = `<div class="wf-pill wf-pill--pending">○ Ray: Pending</div>`;
+    p3Body  = `<div class="wf-pill wf-pill--pending">○ Ray: Incomplete</div>`;
   } else if (confirmRole === "phase3") {
     p3State = "corrections";
     p3Body  = mkConfirm("phase3", ws.revisionDone ? "Undo Phase 3?" : "Mark revision done?");
   } else if (!ws.revisionDone) {
     p3State = "corrections";
-    p3Body  = `<button class="wf-pill wf-pill--warn" data-role="phase3">○ Ray: Pending</button>`;
+    p3Body  = `<button class="wf-pill wf-pill--warn" data-role="phase3">○ Ray: Incomplete</button>`;
   } else {
     p3State = "done";
     p3Body  = `<button class="wf-pill wf-pill--done" data-role="phase3">✓ Ray · ${escHtml(fmtCheckTimestamp(ws.revisionDone.at))}</button>`;
@@ -8458,27 +8457,6 @@ function renderStickyNoteContent(data, isGroup) {
     if (all.length > 0) all[all.length - 1].focus();
   }
 
-  // ── Footer: pending-phase shortcut pill ──────────────────────
-  const footer = document.getElementById("sticky-note-footer");
-  if (footer) {
-    let pendingRole = null;
-    if (ws.reviewUnlocked && !ws.reviewSubmitted)   pendingRole = "phase2";
-    else if (ws.reviewSubmitted && !ws.revisionDone) pendingRole = "phase3";
-
-    if (!pendingRole) {
-      footer.innerHTML = "";
-    } else if (_stickyNotePhaseConfirm === pendingRole) {
-      const label = pendingRole === "phase2" ? "Mark Phase 2 done?" : "Mark Phase 3 done?";
-      footer.innerHTML = `<div class="snote-phase-confirm">
-        <span class="snote-phase-confirm-msg">${label}</span>
-        <button class="snote-phase-confirm-yes" data-role="${pendingRole}">Confirm ✓</button>
-        <button class="snote-phase-confirm-no"  data-role="${pendingRole}">Cancel</button>
-      </div>`;
-    } else {
-      const label = pendingRole === "phase2" ? "○ Phase 2: Pending" : "○ Phase 3: Pending";
-      footer.innerHTML = `<button class="snote-phase-pill" data-role="${pendingRole}">${label}</button>`;
-    }
-  }
 }
 
 function openStickyNote(sessionId, isGroup, data) {
@@ -8498,8 +8476,7 @@ function openStickyNote(sessionId, isGroup, data) {
 function closeStickyNote() {
   const el = document.getElementById("sticky-note");
   if (el) el.classList.add("hidden");
-  _stickyNoteSessionId    = null;
-  _stickyNotePhaseConfirm = null;
+  _stickyNoteSessionId = null;
 }
 
 function setupStickyNote() {
@@ -8562,55 +8539,6 @@ function setupStickyNote() {
       _focusNewRow = true;
       try { await addReviewComment(sid, ""); }
       catch (err) { console.error("addReviewComment:", err); }
-      return;
-    }
-
-    // Phase shortcut pill → enter confirm state
-    const phasePill = e.target.closest(".snote-phase-pill");
-    if (phasePill) {
-      _stickyNotePhaseConfirm = phasePill.dataset.role;
-      const { data, isGroup } = getCtx();
-      renderStickyNoteContent(data, isGroup);
-      return;
-    }
-
-    // Phase confirm — yes
-    const phaseYes = e.target.closest(".snote-phase-confirm-yes");
-    if (phaseYes) {
-      const role = phaseYes.dataset.role;
-      _stickyNotePhaseConfirm = null;
-      const { sid, data, meta } = getCtx();
-      if (!sid) return;
-      const ws = getWorkflowState(data);
-      try {
-        if (role === "phase2") {
-          await setReviewSubmitted(sid, true);
-          const newStatus = ws.comments.length > 0 ? "ray_pending" : null;
-          await updateWorkflowStatus(sid, newStatus, meta);
-        } else if (role === "phase3") {
-          if (ws.comments.length > 0 && !ws.allFixed) {
-            const unfixed = ws.comments.filter(([,c]) => !c.fixedByName).length;
-            _phase3Error = `${unfixed} correction${unfixed > 1 ? "s" : ""} still unticked.`;
-            _stickyNotePhaseConfirm = null;
-            renderStickyNoteContent(data, isGroup);
-            rerender();
-            setTimeout(() => { _phase3Error = null; rerender(); }, 3500);
-            return;
-          }
-          _phase3Error = null;
-          await setRevisionDone(sid, true);
-          await updateWorkflowStatus(sid, null, meta);
-        }
-      } catch (err) { console.error("snotePhaseConfirm:", err); }
-      return;
-    }
-
-    // Phase confirm — cancel
-    const phaseNo = e.target.closest(".snote-phase-confirm-no");
-    if (phaseNo) {
-      _stickyNotePhaseConfirm = null;
-      const { data, isGroup } = getCtx();
-      renderStickyNoteContent(data, isGroup);
       return;
     }
 

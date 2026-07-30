@@ -2951,9 +2951,9 @@ button.wf-pill:hover { filter: brightness(.93); }
   padding: .25rem .35rem .3rem;
 }
 .snote-table thead th:last-child { border-right: none; }
-.snote-th-no   { width: 2rem; }
+.snote-th-no   { width: 2rem; text-align: center; }
 .snote-th-tick { width: 2.2rem; text-align: center; }
-.snote-th-text { }
+.snote-th-text { text-align: center; }
 
 .snote-row td {
   padding: .3rem .35rem;
@@ -2990,7 +2990,7 @@ button.wf-pill:hover { filter: brightness(.93); }
   margin-top: .4rem;
   padding: .35rem;
   background: none;
-  border: 1.5px dashed #f59e0b;
+  border: 1.5px solid #f59e0b;
   border-radius: 6px;
   color: #92400e;
   font-size: .82rem;
