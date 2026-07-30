@@ -158,7 +158,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1264";
+const APP_VERSION = "1265";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Daisy" };
 
@@ -12526,7 +12526,8 @@ function initDragSort(listEl, onReorder) {
     // Instantly collapse all cards to compact rows; measure AFTER so placeholder matches
     listEl.classList.add('is-reordering');
     const rect = item.getBoundingClientRect();
-    offsetY = e.clientY - rect.top;
+    // Pin cursor to the card's center (where ⠿ sits due to align-items:center)
+    offsetY = rect.height / 2;
     lastY   = e.clientY;
 
     placeholder = document.createElement('div');
