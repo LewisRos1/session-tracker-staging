@@ -158,7 +158,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1262";
+const APP_VERSION = "1263";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Daisy" };
 
@@ -12523,6 +12523,8 @@ function initDragSort(listEl, onReorder) {
     e.preventDefault();
     e.stopPropagation();
 
+    // Instantly collapse all cards to compact rows; measure AFTER so placeholder matches
+    listEl.classList.add('is-reordering');
     const rect = item.getBoundingClientRect();
     offsetY = e.clientY - rect.top;
     lastY   = e.clientY;
@@ -12563,6 +12565,7 @@ function initDragSort(listEl, onReorder) {
   const endDrag = () => {
     if (!dragEl) return;
     if (scrollRaf) { cancelAnimationFrame(scrollRaf); scrollRaf = null; }
+    listEl.classList.remove('is-reordering');
     dragEl.style.cssText = '';
     if (placeholder?.parentNode) placeholder.parentNode.insertBefore(dragEl, placeholder);
     placeholder?.remove();
@@ -12901,7 +12904,9 @@ function renderTargetManageContent(student, target) {
 
       html += `<div class="admin-list-item" data-idx="${idx}">
         <span class="drag-handle">⠿</span>
-        <div style="flex:1;display:flex;flex-direction:column;gap:.55rem">
+        <div style="flex:1;min-width:0">
+          <div class="mn-act-compact-title">${paDisplayHtml(a, true)}</div>
+          <div class="mn-act-body" style="display:flex;flex-direction:column;gap:.55rem">
             <div>
               <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title</div>
               <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
@@ -12936,6 +12941,7 @@ function renderTargetManageContent(student, target) {
                 ${mappedOptions}
               </select>
             </div>
+          </div>
         </div>
         <div style="position:relative">
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
@@ -13015,7 +13021,9 @@ function renderTargetManageContent(student, target) {
           <span class="drag-handle">⠿</span>
           <div style="flex:1;display:flex;gap:.5rem;align-items:flex-start">
             <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;min-width:1.6rem;padding-top:.2rem">${manageActNo})</span>
-            <div style="flex:1;display:flex;flex-direction:column;gap:.55rem">
+            <div style="flex:1;min-width:0">
+              <div class="mn-act-compact-title">${paDisplayHtml(a, true)}</div>
+              <div class="mn-act-body" style="display:flex;flex-direction:column;gap:.55rem">
               <div>
                 <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title</div>
                 <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
@@ -13045,6 +13053,7 @@ function renderTargetManageContent(student, target) {
                 <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:#f9fafb;border:1px solid #d1d5db;border-radius:.35rem;color:#374151;cursor:pointer">+ Add Sub-activity</button>
                 ${a._linkKey ? `<button class="mn-undo-convert-btn" data-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:#fee2e2;border:1px solid #fca5a5;border-radius:.35rem;color:#dc2626;cursor:pointer">↩ Undo — keep as its own activity</button>` : ''}
               </div>
+              </div>
             </div>
           </div>
           <div style="position:relative">
@@ -13065,7 +13074,9 @@ function renderTargetManageContent(student, target) {
           <span class="drag-handle">⠿</span>
           <div style="flex:1;display:flex;gap:.5rem;align-items:flex-start">
             <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;min-width:1.6rem;padding-top:.2rem">${manageActNo})</span>
-            <div style="flex:1;display:flex;flex-direction:column;gap:.55rem">
+            <div style="flex:1;min-width:0">
+              <div class="mn-act-compact-title">${paDisplayHtml(a, true)}</div>
+              <div class="mn-act-body" style="display:flex;flex-direction:column;gap:.55rem">
               <div>
                 <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title</div>
                 <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
@@ -13094,6 +13105,7 @@ function renderTargetManageContent(student, target) {
                 ${remarkTypeSelect}
               </div>
               ${maintainedRow}
+              </div>
             </div>
           </div>
           <div style="position:relative">

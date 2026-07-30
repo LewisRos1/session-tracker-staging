@@ -1637,6 +1637,20 @@ input.field-input::placeholder {
   border-radius: var(--radius-sm);
 }
 
+/* Compact drag mode — snap cards to title-only rows while reordering */
+.mn-act-compact-title {
+  display: none;
+  font-size: .9rem;
+  font-weight: 600;
+  color: #374151;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: .05rem 0;
+}
+.is-reordering .mn-act-compact-title { display: block; }
+.is-reordering .mn-act-body { display: none; }
+
 .admin-item-name {
   flex: 1;
   font-size: .97rem;
