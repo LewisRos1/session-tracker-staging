@@ -164,7 +164,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1269";
+const APP_VERSION = "1270";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Daisy" };
 
@@ -619,7 +619,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     state.reviewQueueUnsubscribe = listenToReviewQueue(items => {
       state.reviewQueueItems = items;
       if ($("screen-home") && !$("screen-home").classList.contains("hidden")) {
-        renderReviewQueue(items);
+        renderStudentDatabaseButton();
       }
     });
     showHome();
@@ -854,7 +854,6 @@ async function showHome() {
   state.searchGroup = "";
   [$("search-existing"), $("search-assessment"), $("search-template"), $("search-group")]
     .forEach(el => { if (el) el.value = ""; });
-  renderReviewQueue(state.reviewQueueItems);
   renderExistingStudentButtons();
   renderGroupButtons();
   renderAssessmentStudentButtons();
@@ -863,62 +862,6 @@ async function showHome() {
   renderHalfYearReportsSection();
   renderStudentDatabaseButton();
   runOneOffRepairs();
-}
-
-function renderReviewQueue(items) {
-  const section = $("home-review-queue");
-  const content = $("review-queue-content");
-  if (!section || !content) return;
-
-  const daisyItems = (items || []).filter(i => i.workflowStatus === "daisy_pending")
-    .sort((a, b) => (a.workflowDate || a.date || "").localeCompare(b.workflowDate || b.date || ""));
-  const rayItems   = (items || []).filter(i => i.workflowStatus === "ray_pending")
-    .sort((a, b) => (a.workflowDate || a.date || "").localeCompare(b.workflowDate || b.date || ""));
-
-  if (daisyItems.length === 0 && rayItems.length === 0) {
-    section.classList.add("hidden");
-    return;
-  }
-  section.classList.remove("hidden");
-
-  const itemHtml = item => {
-    const d = item.workflowDate || item.date;
-    const dateStr = d ? formatDateWithDay(d) : "Unknown date";
-    return `<button class="review-queue-item" data-session-id="${item.id}" data-subject-id="${escHtml(item.workflowSubjectId || "")}" data-is-group="${!!item.workflowIsGroup}">
-      <span class="review-queue-date">${escHtml(dateStr)}</span>
-      <span class="review-queue-name">${escHtml(item.workflowSubjectName || "Unknown")}</span>
-    </button>`;
-  };
-
-  let html = "";
-  if (daisyItems.length > 0) {
-    html += `<div class="review-queue-group">
-      <div class="review-queue-subtitle">🔍 Daisy – Review Needed</div>
-      ${daisyItems.map(itemHtml).join("")}
-    </div>`;
-  }
-  if (rayItems.length > 0) {
-    html += `<div class="review-queue-group">
-      <div class="review-queue-subtitle">🔧 Ray – Corrections Needed</div>
-      ${rayItems.map(itemHtml).join("")}
-    </div>`;
-  }
-  content.innerHTML = html;
-
-  content.querySelectorAll(".review-queue-item").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const sid       = btn.dataset.sessionId;
-      const subjectId = btn.dataset.subjectId;
-      const isGrp     = btn.dataset.isGroup === "true";
-      if (isGrp) {
-        const group = (state.groups || []).find(g => g.id === subjectId);
-        if (group) openGroupSessionView(group, sid);
-      } else {
-        const student = (state.students || []).find(s => s.id === subjectId);
-        if (student) openSessionView(student, sid);
-      }
-    });
-  });
 }
 
 // One-off repairs for specific data issues already fixed in the app's logic
@@ -1133,8 +1076,71 @@ $("search-template").addEventListener("input", e => {
 function renderStudentDatabaseButton() {
   const container = $("student-database-button");
   if (!container) return;
-  container.innerHTML = `<button class="export-btn export-btn-all" id="btn-open-student-registry">View</button>`;
+  const pending = (state.reviewQueueItems || []).length;
+  const badge   = pending > 0 ? ` (${pending})` : "";
+  container.innerHTML = `<div class="info-btn-row">
+    <button class="export-btn export-btn-all" id="btn-open-student-registry">Student Database</button>
+    <button class="export-btn info-checklist-btn${pending > 0 ? " has-pending" : ""}" id="btn-open-checklist">📋 Checklist${escHtml(badge)}</button>
+  </div>`;
   $("btn-open-student-registry").addEventListener("click", () => openStudentRegistryScreen());
+  $("btn-open-checklist").addEventListener("click", openChecklistModal);
+}
+
+function openChecklistModal() {
+  const items = state.reviewQueueItems || [];
+  $("session-picker-title").textContent = "📋 Checklist";
+
+  if (items.length === 0) {
+    $("session-picker-list").innerHTML = `<p class="empty-hint" style="padding:1rem 1.25rem">No pending reviews or corrections. All done! ✓</p>`;
+    $("session-picker-modal").classList.remove("hidden");
+    return;
+  }
+
+  const daisyItems = items.filter(i => i.workflowStatus === "daisy_pending")
+    .sort((a, b) => (a.workflowDate || a.date || "").localeCompare(b.workflowDate || b.date || ""));
+  const rayItems = items.filter(i => i.workflowStatus === "ray_pending")
+    .sort((a, b) => (a.workflowDate || a.date || "").localeCompare(b.workflowDate || b.date || ""));
+
+  const itemHtml = item => {
+    const d       = item.workflowDate || item.date;
+    const dateStr = d ? formatDateWithDay(d) : "Unknown date";
+    return `<button class="choice-btn checklist-modal-item" data-session-id="${item.id}" data-subject-id="${escHtml(item.workflowSubjectId || "")}" data-is-group="${!!item.workflowIsGroup}">
+      <div class="choice-text">
+        <div class="choice-label">${escHtml(item.workflowSubjectName || "Unknown")}</div>
+        <div class="choice-sub">${escHtml(dateStr)}</div>
+      </div>
+    </button>`;
+  };
+
+  let html = '<div class="choice-list">';
+  if (daisyItems.length > 0) {
+    html += `<div class="checklist-group-header">🔍 Daisy – Review Needed</div>`;
+    html += daisyItems.map(itemHtml).join("");
+  }
+  if (rayItems.length > 0) {
+    html += `<div class="checklist-group-header">🔧 Ray – Corrections Needed</div>`;
+    html += rayItems.map(itemHtml).join("");
+  }
+  html += "</div>";
+
+  $("session-picker-list").innerHTML = html;
+  $("session-picker-modal").classList.remove("hidden");
+
+  $("session-picker-list").querySelectorAll(".checklist-modal-item").forEach(btn => {
+    btn.addEventListener("click", () => {
+      closeSessionPicker();
+      const sid       = btn.dataset.sessionId;
+      const subjectId = btn.dataset.subjectId;
+      const isGrp     = btn.dataset.isGroup === "true";
+      if (isGrp) {
+        const group = (state.groups || []).find(g => g.id === subjectId);
+        if (group) openGroupSessionView(group, sid);
+      } else {
+        const student = (state.students || []).find(s => s.id === subjectId);
+        if (student) openSessionView(student, sid);
+      }
+    });
+  });
 }
 
 // highlightAdd: briefly glows "+ Add New Student" — used when redirected
