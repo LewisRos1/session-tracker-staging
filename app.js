@@ -158,7 +158,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1266";
+const APP_VERSION = "1267";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Daisy" };
 
@@ -9638,7 +9638,7 @@ function attachViewListeners() {
 
   // Inline single-select for preset activities with no remark yet
   body.querySelectorAll(".view-single-create-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", withViewAction("viewActionsInFlight", "viewRenderPending", isViewBusy, renderSessionView, async () => {
       const data = state.viewSessionData;
       const targetName = btn.dataset.targetName;
       const actName = btn.dataset.actName;
@@ -9656,23 +9656,21 @@ function attachViewListeners() {
       if (!isNaN(scoreVal)) newRem.optionScore = scoreVal;
       data.remarks[remId] = newRem;
       renderSessionView();
-      (async () => {
-        try {
-          if (isNewAct) await addActivity(state.viewSessionId, targetName, actName, order, isPredef, actId);
-          await addRemark(state.viewSessionId, actId, val, null, remId);
-          if (!isNaN(scoreVal)) await setOptionScore(state.viewSessionId, remId, scoreVal);
-        } catch (err) {
-          if (isNewAct) delete data.activities[actId];
-          delete data.remarks[remId];
-          renderSessionView();
-          alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
-        }
-      })();
-    });
+      try {
+        if (isNewAct) await addActivity(state.viewSessionId, targetName, actName, order, isPredef, actId);
+        await addRemark(state.viewSessionId, actId, val, null, remId);
+        if (!isNaN(scoreVal)) await setOptionScore(state.viewSessionId, remId, scoreVal);
+      } catch (err) {
+        if (isNewAct) delete data.activities[actId];
+        delete data.remarks[remId];
+        renderSessionView();
+        alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
+      }
+    }));
   });
 
   body.querySelectorAll(".view-multi-create-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", withViewAction("viewActionsInFlight", "viewRenderPending", isViewBusy, renderSessionView, async () => {
       const data = state.viewSessionData;
       const targetName = btn.dataset.targetName;
       const actName = btn.dataset.actName;
@@ -9687,18 +9685,16 @@ function attachViewListeners() {
       if (isNewAct) data.activities[actId] = { targetName, activityName: actName, order, isPredefined: isPredef };
       data.remarks[remId] = { activityId: actId, text: val, trials: [], order };
       renderSessionView();
-      (async () => {
-        try {
-          if (isNewAct) await addActivity(state.viewSessionId, targetName, actName, order, isPredef, actId);
-          await addRemark(state.viewSessionId, actId, val, null, remId);
-        } catch (err) {
-          if (isNewAct) delete data.activities[actId];
-          delete data.remarks[remId];
-          renderSessionView();
-          alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
-        }
-      })();
-    });
+      try {
+        if (isNewAct) await addActivity(state.viewSessionId, targetName, actName, order, isPredef, actId);
+        await addRemark(state.viewSessionId, actId, val, null, remId);
+      } catch (err) {
+        if (isNewAct) delete data.activities[actId];
+        delete data.remarks[remId];
+        renderSessionView();
+        alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
+      }
+    }));
   });
 
   // Auto-expand remark/starter textareas based on content height
@@ -10917,7 +10913,7 @@ function attachGroupViewListeners() {
 
   // Inline single-select for group preset activities with no remark yet
   body.querySelectorAll(".view-group-single-create-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", wrap(async () => {
       const data = state.viewGroupSessionData;
       const targetName = btn.dataset.targetName;
       const actName = btn.dataset.actName;
@@ -10936,22 +10932,20 @@ function attachGroupViewListeners() {
       const remId = generateId("r");
       data.remarks[remId] = { activityId: actId, studentName, text: val, trials: [], order: actOrder };
       renderGroupSessionView();
-      (async () => {
-        try {
-          if (isNewAct) await addActivity(sid(), targetName, actName, actOrder, true, actId);
-          await addGroupRemark(sid(), actId, studentName, val, remId);
-        } catch (err) {
-          if (isNewAct) delete data.activities[actId];
-          delete data.remarks[remId];
-          renderGroupSessionView();
-          alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
-        }
-      })();
-    });
+      try {
+        if (isNewAct) await addActivity(sid(), targetName, actName, actOrder, true, actId);
+        await addGroupRemark(sid(), actId, studentName, val, remId);
+      } catch (err) {
+        if (isNewAct) delete data.activities[actId];
+        delete data.remarks[remId];
+        renderGroupSessionView();
+        alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
+      }
+    }));
   });
 
   body.querySelectorAll(".view-group-multi-create-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", wrap(async () => {
       const data = state.viewGroupSessionData;
       const targetName = btn.dataset.targetName;
       const actName = btn.dataset.actName;
@@ -10970,18 +10964,16 @@ function attachGroupViewListeners() {
       const remId = generateId("r");
       data.remarks[remId] = { activityId: actId, studentName, text: val, trials: [], order: actOrder };
       renderGroupSessionView();
-      (async () => {
-        try {
-          if (isNewAct) await addActivity(sid(), targetName, actName, actOrder, true, actId);
-          await addGroupRemark(sid(), actId, studentName, val, remId);
-        } catch (err) {
-          if (isNewAct) delete data.activities[actId];
-          delete data.remarks[remId];
-          renderGroupSessionView();
-          alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
-        }
-      })();
-    });
+      try {
+        if (isNewAct) await addActivity(sid(), targetName, actName, actOrder, true, actId);
+        await addGroupRemark(sid(), actId, studentName, val, remId);
+      } catch (err) {
+        if (isNewAct) delete data.activities[actId];
+        delete data.remarks[remId];
+        renderGroupSessionView();
+        alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
+      }
+    }));
   });
 
   // Auto-expand remark/starter textareas in group view
