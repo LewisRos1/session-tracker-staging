@@ -2421,6 +2421,84 @@ div.admin-note-editable:empty::before {
 }
 
 
+/* ─── Checked By Approval Strip ───────────────────────────── */
+.checked-by-strip {
+  padding: .5rem 1.25rem;
+  background: #f5f5ff;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.checked-by-strip.hidden { display: none; }
+
+.chk-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem;
+  align-items: center;
+}
+
+.checked-by-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  padding: .3rem .85rem;
+  border-radius: 999px;
+  border: 1.5px solid #c7d2fe;
+  background: white;
+  color: #4338ca;
+  font-size: .8rem;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: border-color .12s, background .12s;
+}
+.checked-by-pill:not(.is-locked):not(.is-confirming):hover {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+.checked-by-pill.is-checked {
+  background: #d1fae5;
+  border-color: #34d399;
+  color: #065f46;
+}
+.checked-by-pill.is-locked {
+  opacity: .4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.checked-by-pill.is-confirming {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #78350f;
+  cursor: default;
+}
+.chk-mark { color: #10b981; }
+.is-confirming .chk-mark { color: inherit; }
+.chk-label { pointer-events: none; }
+
+.chk-confirm-btns {
+  display: inline-flex;
+  gap: .25rem;
+  margin-left: .2rem;
+}
+.chk-btn-yes, .chk-btn-no {
+  padding: .15rem .45rem;
+  border-radius: 4px;
+  font-size: .74rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid;
+  line-height: 1.4;
+}
+.chk-btn-yes { background: #10b981; border-color: #059669; color: white; }
+.chk-btn-no  { background: white; border-color: #9ca3af; color: #374151; }
+
+@media (max-width: 600px) {
+  .checked-by-strip { padding: .45rem .9rem; }
+  .checked-by-pill  { font-size: .74rem; padding: .25rem .7rem; }
+}
+
 /* ─── Session View Screen ──────────────────────────────────── */
 .session-view-body {
   flex: 1;

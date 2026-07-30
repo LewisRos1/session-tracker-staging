@@ -294,6 +294,11 @@ export async function finishSession(sessionId) {
   await updateDoc(doc(db, "sessions", sessionId), { finished: true });
 }
 
+/** Save the "Checked By" approval data for a session (replaces the whole map). */
+export async function updateSessionChecks(sessionId, checks) {
+  await updateDoc(doc(db, "sessions", sessionId), { checks: checks ?? {} });
+}
+
 /** Change the date (and recalculate month + session number) of an existing session. */
 export async function updateSessionDate(sessionId, newDateStr, studentId) {
   const month = getMonthString(newDateStr);
