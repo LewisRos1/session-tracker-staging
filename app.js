@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1277";
+const APP_VERSION = "1278";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Daisy" };
 
@@ -8285,7 +8285,7 @@ async function handleCheckedByClick(e, isGroup) {
   // ── Confirm button ───────────────────────────────────────────
   const yesBtn = e.target.closest(".chk-btn-yes");
   if (yesBtn) {
-    clearTimer(); setConfirm(null);
+    clearTimer(); setConfirm(null); rerender(); // remove confirm UI immediately — no lag
     const sid  = getSid();
     const data = getData();
     if (!sid) return true;
