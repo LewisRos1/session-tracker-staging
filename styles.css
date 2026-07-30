@@ -2423,10 +2423,10 @@ div.admin-note-editable:empty::before {
 
 /* ─── Checked By Approval Strip ───────────────────────────── */
 .checked-by-strip {
-  padding: .5rem 1.25rem .75rem;
+  margin: -1rem -1.25rem .75rem;
+  padding: .5rem 1.25rem .6rem;
   background: #f5f5ff;
   border-bottom: 1px solid var(--border);
-  margin-bottom: .5rem;
 }
 
 .chk-inner {
@@ -2494,9 +2494,28 @@ div.admin-note-editable:empty::before {
 .chk-btn-yes { background: #10b981; border-color: #059669; color: white; }
 .chk-btn-no  { background: white; border-color: #9ca3af; color: #374151; }
 
+.chk-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  padding: .3rem .85rem;
+  border-radius: 999px;
+  border: 1.5px solid #a5b4fc;
+  background: white;
+  color: #4338ca;
+  font-size: .8rem;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: border-color .12s, background .12s;
+}
+.chk-export-btn:hover { border-color: var(--primary); background: var(--primary-light); }
+
 @media (max-width: 600px) {
-  .checked-by-strip { padding: .45rem .9rem; }
+  .checked-by-strip { margin: -1rem -.9rem .6rem; padding: .45rem .9rem; }
   .checked-by-pill  { font-size: .74rem; padding: .25rem .7rem; }
+  .chk-export-btn   { font-size: .74rem; padding: .25rem .7rem; }
 }
 
 /* ─── Session View Screen ──────────────────────────────────── */

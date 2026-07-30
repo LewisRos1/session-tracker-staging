@@ -158,7 +158,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1260";
+const APP_VERSION = "1261";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Daisy" };
 
@@ -8009,7 +8009,7 @@ function renderCheckedByStripHtml(data, confirmRole) {
     return `<button class="${classes}" data-role="${role}">${inner}</button>`;
   };
 
-  return `<div class="checked-by-strip" contenteditable="false"><div class="chk-inner">${pillHtml("assistant")}${pillHtml("main")}</div></div>`;
+  return `<div class="checked-by-strip" contenteditable="false"><div class="chk-inner">${pillHtml("assistant")}${pillHtml("main")}<button class="chk-export-btn" title="Export this session to Word">📄 Export to Word</button></div></div>`;
 }
 
 async function handleCheckedByClick(e, isGroup) {
@@ -8018,6 +8018,37 @@ async function handleCheckedByClick(e, isGroup) {
   const clearTimer   = ()  => clearTimeout(isGroup ? _grpChkConfirmTimer : _viewChkConfirmTimer);
   const setTimer     = fn  => { const t = setTimeout(fn, 4000); if (isGroup) _grpChkConfirmTimer = t; else _viewChkConfirmTimer = t; };
   const rerender     = ()  => isGroup ? renderGroupSessionView() : renderSessionView();
+
+  // Export to Word button
+  const exportBtn = e.target.closest(".chk-export-btn");
+  if (exportBtn) {
+    if (isGroup) {
+      const attendees = state.viewGroupSessionData?.attendees || state.viewGroup?.students || [];
+      const session   = { id: state.viewGroupSessionId, ...(state.viewGroupSessionData || {}) };
+      if (attendees.length === 1) {
+        exportGroupMemberSingleSessionWord(attendees[0], [state.viewGroup], session);
+      } else {
+        $("session-picker-title").textContent = "Export for…";
+        $("session-picker-list").innerHTML = attendees.length
+          ? `<div class="choice-list">` + attendees.map(name => `
+              <button class="choice-btn choice-grp-view-export" data-name="${escHtml(name)}">
+                <span class="choice-icon">📤</span>
+                <div class="choice-text"><div class="choice-label">${escHtml(name)}</div></div>
+              </button>`).join("") + `</div>`
+          : `<p class="empty-hint">No attendees found.</p>`;
+        $("session-picker-modal").classList.remove("hidden");
+        $("session-picker-list").querySelectorAll(".choice-grp-view-export").forEach(btn => {
+          btn.addEventListener("click", () => {
+            closeSessionPicker();
+            exportGroupMemberSingleSessionWord(btn.dataset.name, [state.viewGroup], session);
+          });
+        });
+      }
+    } else {
+      exportStudentSingleSessionWord(state.viewStudent, { id: state.viewSessionId, ...(state.viewSessionData || {}) });
+    }
+    return true;
+  }
 
   // Pill click → confirming state
   const pill = e.target.closest(".checked-by-pill:not(.is-confirming)");
