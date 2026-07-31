@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1291";
+const APP_VERSION = "1292";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -4157,16 +4157,17 @@ async function hyrOpenSettings() {
 }
 
 async function hyrShowPromptEditor() {
+  const dynamicBlock = `\n[DYNAMIC — injected at report generation time when activities are excluded from the appendix]\n\nEXCLUDED ACTIVITIES — ABSOLUTE RULE: The following activities have been deliberately excluded from this report by the author. They are NOT present in the session data below. Do NOT mention, reference, discuss, or draw any conclusions about them anywhere in the report — not in the executive summary, not in key insights, not in any target or observation section. Treat them as if they do not exist:\n  - [Activity Name] (under target: [Target Name])\n  - [Activity Name] (under target: [Target Name])\n  ...\n\n[END OF DYNAMIC SECTION]\n`;
   $("manage-modal-title").textContent = "Prompt for AI Report";
   $("manage-modal-body").innerHTML = `
     <div style="padding:.75rem 1rem;display:flex;flex-direction:column;gap:1rem">
       <div style="border:1.5px solid var(--border);border-radius:.6rem;padding:.85rem 1rem">
         <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:.65rem">
-          This is the exact prompt sent to Claude every time a report is generated. It is set in the code and cannot be edited here.
+          This is the exact prompt sent to Claude every time a report is generated. The section in brackets is inserted automatically when you exclude activities from the appendix.
         </div>
-        <textarea class="admin-input" rows="18" readonly
+        <textarea class="admin-input" rows="22" readonly
           style="font-family:monospace;font-size:.78rem;resize:vertical;background:#f9fafb;color:#374151;cursor:default"
-        >${escHtml(HYR_DEFAULT_PROMPT)}</textarea>
+        >${escHtml(HYR_DEFAULT_PROMPT + dynamicBlock)}</textarea>
       </div>
     </div>`;
 }
