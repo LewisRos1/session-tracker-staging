@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1314";
+const APP_VERSION = "1315";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -3517,12 +3517,12 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
   }
 
   // Bold column separators: Activity | Progress+labels | Status
-  ctx.strokeStyle = "#6b7280"; ctx.lineWidth = 2;
+  ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(NAME_W,      PAD_TOP + 24); ctx.lineTo(NAME_W,      CHART_Y1); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(BOLD_SEP_X,  PAD_TOP + 24); ctx.lineTo(BOLD_SEP_X,  CHART_Y1); ctx.stroke();
 
   // Chart outline: top/bottom bold (match column separators), left/right thin
-  ctx.strokeStyle = "#6b7280"; ctx.lineWidth = 2;
+  ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(0, CHART_Y0); ctx.lineTo(W, CHART_Y0); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(0, CHART_Y1); ctx.lineTo(W, CHART_Y1); ctx.stroke();
   ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 1;
