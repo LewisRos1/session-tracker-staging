@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1304";
+const APP_VERSION = "1305";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -4039,7 +4039,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   }
   if (wAllNames.length) paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 200, after: 0 } }));
 
-  paragraphs.push(mkPara("Top Wins & Focus Areas", { heading: HeadingLevel.HEADING_2, before: 280, after: 120, size: 26, bold: true, keepNext: true }));
+  paragraphs.push(mkPara("Biggest Wins & Key Focus Areas", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true, keepNext: true, pageBreak: true }));
   if ((parsed.biggestWins?.length || parsed.keyFocusAreas?.length)) {
     const mkKiColorCell = (text, fill, textColor) => new TableCell({
       width: { size: 28, type: WidthType.PERCENTAGE },
@@ -4063,8 +4063,8 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
         : [new Paragraph({ children: [new TextRun({ text: "", size: 22 })], spacing: { before: 80, after: 80 } })]
     });
     const kiRows = [
-      new TableRow({ tableHeader: true, children: [mkKiColorCell("Biggest Wins",    "d1fae5", "16a34a"), mkKiNumberedCell(parsed.biggestWins    || [], KI_NUM_REF)] }),
-      new TableRow({                    children: [mkKiColorCell("Key Focus Areas",  "fef3c7", "d97706"), mkKiNumberedCell(parsed.keyFocusAreas  || [], KI_NUM_REF_2)] }),
+      new TableRow({ tableHeader: true, cantSplit: true, children: [mkKiColorCell("Biggest Wins",    "d1fae5", "16a34a"), mkKiNumberedCell(parsed.biggestWins    || [], KI_NUM_REF)] }),
+      new TableRow({                    cantSplit: true, children: [mkKiColorCell("Key Focus Areas",  "fef3c7", "d97706"), mkKiNumberedCell(parsed.keyFocusAreas  || [], KI_NUM_REF_2)] }),
     ];
     paragraphs.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: kiRows }));
     paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 280, after: 0 } }));
