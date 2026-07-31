@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1302";
+const APP_VERSION = "1303";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -3905,34 +3905,37 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   } catch (_) {}
 
   // logo natural size 1658×493 → display at 454×135 in body, 180×54 in header
+  // CPL = 1.15 line spacing applied to every cover-page paragraph
+  const CPL = { line: 276, lineRule: "auto" };
   paragraphs.push(new Paragraph({
     children: logoData
       ? [new ImageRun({ data: logoData, transformation: { width: 454, height: 135 }, type: "png" })]
       : [],
-    alignment: AlignmentType.CENTER, spacing: { before: 480, after: 560 }
+    alignment: AlignmentType.CENTER, spacing: { before: 480, after: 560, ...CPL }
   }));
   paragraphs.push(new Paragraph({
     children: [new TextRun({ text: "Half-Year Progress Report", bold: true, size: 72, font: TNR })],
-    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }
+    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, ...CPL }
   }));
   paragraphs.push(new Paragraph({
     children: [new TextRun({ text: `(${fullTermLabel})`, bold: true, size: 36, font: TNR })],
-    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 640 }
+    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 640, ...CPL }
   }));
 
   const mkCoverLabelPara = text => new Paragraph({
     children: [new TextRun({ text, bold: true, size: 36, font: TNR })],
-    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }
+    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, ...CPL }
   });
+  // run: { size } sets the paragraph mark font so typing in an empty cell starts at the right size
   const mkCoverTable1Col = (value, size = 32) => new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
     rows: [new TableRow({ children: [new TableCell({
       width: { size: 100, type: WidthType.PERCENTAGE },
       margins: { top: 72, bottom: 72, left: 120, right: 120 },
-      children: [new Paragraph({ children: [new TextRun({ text: value, size, font: TNR })], alignment: AlignmentType.CENTER })]
+      children: [new Paragraph({ run: { size }, children: [new TextRun({ text: value, size, font: TNR })], alignment: AlignmentType.CENTER, spacing: { ...CPL } })]
     })] })]
   });
-  const mkCoverSpacer = () => new Paragraph({ children: [], spacing: { before: 0, after: 480 } });
+  const mkCoverSpacer = () => new Paragraph({ children: [], spacing: { before: 0, after: 480, ...CPL } });
 
   paragraphs.push(mkCoverLabelPara("Student Name:"));
   paragraphs.push(mkCoverTable1Col(student.name));
@@ -3949,13 +3952,13 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
       width: { size: 28, type: WidthType.PERCENTAGE },
       verticalAlign: VerticalAlign.CENTER,
       margins: { top: 72, bottom: 72, left: 120, right: 120 },
-      children: [new Paragraph({ children: [new TextRun({ text: label, bold: true, size: 24, font: TNR })], alignment: AlignmentType.CENTER })]
+      children: [new Paragraph({ run: { size: 24 }, children: [new TextRun({ text: label, bold: true, size: 24, font: TNR })], alignment: AlignmentType.CENTER, spacing: { ...CPL } })]
     }),
     new TableCell({
       width: { size: 72, type: WidthType.PERCENTAGE },
       verticalAlign: VerticalAlign.CENTER,
       margins: { top: 72, bottom: 72, left: 120, right: 120 },
-      children: [new Paragraph({ children: [new TextRun({ text: "", size: 24, font: TNR })], alignment: AlignmentType.CENTER })]
+      children: [new Paragraph({ run: { size: 24 }, children: [new TextRun({ text: "", size: 24, font: TNR })], alignment: AlignmentType.CENTER, spacing: { ...CPL } })]
     })
   ]});
   paragraphs.push(new Table({
@@ -3972,12 +3975,12 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     new TableCell({
       width: { size: 30, type: WidthType.PERCENTAGE },
       margins: { top: 60, bottom: 60, left: 120, right: 120 },
-      children: [new Paragraph({ children: [new TextRun({ text: label, bold: true, size: 22 })], spacing: { before: 40, after: 40 } })]
+      children: [new Paragraph({ run: { size: 22 }, children: [new TextRun({ text: label, bold: true, size: 22 })], spacing: { before: 40, after: 40 } })]
     }),
     new TableCell({
       width: { size: 70, type: WidthType.PERCENTAGE },
       margins: { top: 60, bottom: 60, left: 120, right: 120 },
-      children: [new Paragraph({ children: [new TextRun({ text: value, size: 22 })], spacing: { before: 40, after: 40 } })]
+      children: [new Paragraph({ run: { size: 22 }, children: [new TextRun({ text: value, size: 22 })], spacing: { before: 40, after: 40 } })]
     })
   ]});
   paragraphs.push(new Table({
@@ -3999,7 +4002,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   paragraphs.push(mkPara(wordIntroText, { after: 280, align: AlignmentType.JUSTIFIED }));
 
   paragraphs.push(new Paragraph({ children: [], spacing: { before: 0, after: 280 } }));
-  paragraphs.push(mkPara("Overall Performance", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true }));
+  paragraphs.push(mkPara("Overall Performance", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true, pageBreak: true }));
   const chartTrendRows = [...trendRows.filter(r => !r.noData)].sort((a, b) => b.delta - a.delta);
   const ovTitle = `${student.name} (${monthRange} ${year} Progress)`;
   const ovDrawFn = hyrDrawOverviewChartC;
