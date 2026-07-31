@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1292";
+const APP_VERSION = "1293";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -4350,7 +4350,7 @@ async function maGetLastDataDate(student, target, pa) {
           r.activityId === actId && (
             (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
             (r.trials || []).some(t => t !== null && t !== -1) ||
-            r.optionScore !== undefined
+            (r.optionScore !== undefined && r.optionScore !== null)
           )
         ));
       })
@@ -14339,7 +14339,7 @@ function renderTargetManageContent(student, target) {
           return matchIds.some(actId => Object.values(sRems).some(r =>
             r.activityId === actId && (
               (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
-              (r.trials || []).some(t => t !== null && t !== -1) || r.optionScore !== undefined
+              (r.trials || []).some(t => t !== null && t !== -1) || (r.optionScore !== undefined && r.optionScore !== null)
             )
           ));
         });
@@ -14580,7 +14580,7 @@ function renderTargetManageContent(student, target) {
           return matchIds.some(actId => Object.values(sRems).some(r =>
             r.activityId === actId && (
               (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
-              (r.trials || []).some(t => t !== null && t !== -1) || r.optionScore !== undefined
+              (r.trials || []).some(t => t !== null && t !== -1) || (r.optionScore !== undefined && r.optionScore !== null)
             )
           ));
         }).map(s => s.date).sort();
