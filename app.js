@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1298";
+const APP_VERSION = "1299";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -3780,7 +3780,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
 }
 
 
-function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData, chartData) {
+async function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData, chartData) {
   const firstName   = student.name.split(" ")[0];
   const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
   const n = activeTargets.length;
@@ -3896,34 +3896,109 @@ function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, 
   const paragraphs = [];
 
   // ── Cover Page ──────────────────────────────────────────────
-  paragraphs.push(new Paragraph({
-    children: [new TextRun({ text: "Half-Year Progress Report", bold: true, size: 40 })],
-    alignment: AlignmentType.CENTER, spacing: { before: 1440, after: 120 }
-  }));
-  paragraphs.push(new Paragraph({
-    children: [new TextRun({ text: `(${fullTermLabel})`, size: 26, color: "555555" })],
-    alignment: AlignmentType.CENTER, spacing: { after: 240 }
-  }));
-  paragraphs.push(new Paragraph({
-    children: [new TextRun({ text: student.name, size: 28, bold: true })],
-    alignment: AlignmentType.CENTER, spacing: { after: 120 }
-  }));
-  paragraphs.push(new Paragraph({
-    children: [new TextRun({ text: `Tracking Period: ${periodLabel}`, size: 24, color: "555555" })],
-    alignment: AlignmentType.CENTER, spacing: { after: 960 }
-  }));
-  paragraphs.push(mkPara(`Date of Report: ${new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}`, { after: 960 }));
+  const TNR = "Times New Roman";
+  const reportDate = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  let logoData = null;
+  try {
+    const logoResp = await fetch("ZORA Logo for AI Report.png", { cache: "no-cache" });
+    if (logoResp.ok) logoData = new Uint8Array(await logoResp.arrayBuffer());
+  } catch (_) {}
 
-  // ── Section 1: Executive Overview ──────────────────────────
+  paragraphs.push(new Paragraph({
+    children: logoData
+      ? [new ImageRun({ data: logoData, transformation: { width: 454, height: 108 }, type: "png" })]
+      : [],
+    alignment: AlignmentType.CENTER, spacing: { before: 480, after: 480 }
+  }));
+  paragraphs.push(new Paragraph({
+    children: [new TextRun({ text: "Half-Year Progress Report", bold: true, size: 72, font: TNR })],
+    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }
+  }));
+  paragraphs.push(new Paragraph({
+    children: [new TextRun({ text: `(${fullTermLabel})`, bold: true, size: 36, font: TNR })],
+    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 480 }
+  }));
+
+  const mkCoverLabelPara = text => new Paragraph({
+    children: [new TextRun({ text, bold: true, size: 36, font: TNR })],
+    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }
+  });
+  const mkCoverTable1Col = value => new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [new TableRow({ children: [new TableCell({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      margins: { top: 72, bottom: 72, left: 120, right: 120 },
+      children: [new Paragraph({ children: [new TextRun({ text: value, size: 32, font: TNR })], alignment: AlignmentType.CENTER })]
+    })] })]
+  });
+  const mkCoverSpacer = () => new Paragraph({ children: [], spacing: { before: 0, after: 240 } });
+
+  paragraphs.push(mkCoverLabelPara("Student Name:"));
+  paragraphs.push(mkCoverTable1Col(student.name));
+  paragraphs.push(mkCoverSpacer());
+  paragraphs.push(mkCoverLabelPara("Program:"));
+  paragraphs.push(mkCoverTable1Col(""));
+  paragraphs.push(mkCoverSpacer());
+  paragraphs.push(mkCoverLabelPara("Date of Report:"));
+  paragraphs.push(mkCoverTable1Col(reportDate));
+  paragraphs.push(mkCoverSpacer());
+  paragraphs.push(mkCoverLabelPara("Company Details:"));
+  const mkCompanyRow = label => new TableRow({ children: [
+    new TableCell({
+      width: { size: 28, type: WidthType.PERCENTAGE },
+      verticalAlign: VerticalAlign.CENTER,
+      margins: { top: 72, bottom: 72, left: 120, right: 120 },
+      children: [new Paragraph({ children: [new TextRun({ text: label, bold: true, font: TNR })], alignment: AlignmentType.CENTER })]
+    }),
+    new TableCell({
+      width: { size: 72, type: WidthType.PERCENTAGE },
+      verticalAlign: VerticalAlign.CENTER,
+      margins: { top: 72, bottom: 72, left: 120, right: 120 },
+      children: [new Paragraph({ children: [new TextRun({ text: "", font: TNR })], alignment: AlignmentType.CENTER })]
+    })
+  ]});
+  paragraphs.push(new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [mkCompanyRow("Tel:"), mkCompanyRow("Email:"), mkCompanyRow("Website:"), mkCompanyRow("Address:")]
+  }));
+
+  // ── Section 1: Overview ──────────────────────────────────────
   paragraphs.push(mkPara("Section 1: Overview", { heading: HeadingLevel.HEADING_1, before: 560, after: 200, pageBreak: true, size: 32, bold: true }));
 
+  // Student Details
+  paragraphs.push(mkPara("Student Details", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true }));
+  const mkDetailRow = (label, value) => new TableRow({ children: [
+    new TableCell({
+      width: { size: 30, type: WidthType.PERCENTAGE },
+      margins: { top: 60, bottom: 60, left: 120, right: 120 },
+      children: [new Paragraph({ children: [new TextRun({ text: label, bold: true, size: 22 })], spacing: { before: 40, after: 40 } })]
+    }),
+    new TableCell({
+      width: { size: 70, type: WidthType.PERCENTAGE },
+      margins: { top: 60, bottom: 60, left: 120, right: 120 },
+      children: [new Paragraph({ children: [new TextRun({ text: value, size: 22 })], spacing: { before: 40, after: 40 } })]
+    })
+  ]});
+  paragraphs.push(new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [
+      mkDetailRow("Name:", student.name),
+      mkDetailRow("Date of Birth:", ""),
+      mkDetailRow("Age:", ""),
+      mkDetailRow("Date of report:", reportDate)
+    ]
+  }));
+  paragraphs.push(new Paragraph({ children: [], spacing: { before: 200, after: 0 } }));
+
+  // Introduction
+  paragraphs.push(mkPara("Introduction", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true }));
   const wordIntroText = enrolledLate
     ? `Although the term runs from ${halfStartDefault} to ${halfEndName} ${year}, ${student.name} joined us in ${firstMonthName} ${year}. This report covers their progress from ${firstMonthName} to ${halfEndName} ${year} in ${n} key therapy target${n !== 1 ? "s" : ""}: ${targetList}. The therapy team has prepared this report to give you a clear overview of ${firstName}'s development and the areas that need continued attention.`
     : `This report documents ${student.name}'s progress across the ${halfText} half of ${year} (${monthRange}) in ${n} key therapy target${n !== 1 ? "s" : ""}: ${targetList}. The therapy team has prepared this report to give you a clear overview of ${firstName}'s development and the areas that need continued attention.`;
   paragraphs.push(mkPara(wordIntroText, { after: 280, align: AlignmentType.JUSTIFIED }));
 
   paragraphs.push(new Paragraph({ children: [], spacing: { before: 0, after: 280 } }));
-  paragraphs.push(mkPara("Overall Progress", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true }));
+  paragraphs.push(mkPara("Overall Performance", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true }));
   const chartTrendRows = [...trendRows.filter(r => !r.noData)].sort((a, b) => b.delta - a.delta);
   const ovTitle = `${student.name} (${monthRange} ${year} Progress)`;
   const ovDrawFn = hyrDrawOverviewChartC;
