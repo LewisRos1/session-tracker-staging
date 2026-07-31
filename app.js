@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1318";
+const APP_VERSION = "1319";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -2385,9 +2385,8 @@ ${targetsWithData.map(r => `===OBSERVATION: ${r.name}===
 Write 2 to 3 bullets for ${firstName}'s parents about this target. Format each bullet with a bold label followed by plain (not bold) content. Use these labels:
 • **Strengths:** One specific thing ${firstName} is doing well — a real skill or behaviour they show in sessions.
 • **Weaknesses:** One honest challenge — name the exact situation, trigger, or level of support that causes difficulty. Be warm, not alarming.
-• **Note:** (Optional) Only add a 3rd bullet if there is genuinely useful extra context. Skip if not needed.
 
-IMPORTANT: The label MUST be wrapped in ** for bold (e.g. **Strengths:** **Weaknesses:** **Note:**). The content after the colon is NOT bold.
+IMPORTANT: The label MUST be wrapped in ** for bold (e.g. **Strengths:** **Weaknesses:**). The content after the colon is NOT bold. Write exactly 2 bullets per target — Strengths and Weaknesses only. Do NOT add a Note bullet.
 
 STRICT RULES — follow every one:
 - NO numbers, percentages, or month references. Parents see those in the graph.
@@ -2401,9 +2400,8 @@ ${qualitativeWithData.map(r => `===OBSERVED: ${r.name}===
 Write 2 to 3 bullets about ${r.name} based on what was observed in sessions and any notes or remarks recorded.
 • **Strengths:** Something positive noticed about this skill area — a real behaviour, moment, or improvement.
 • **Weaknesses:** Something still developing or difficult — explained kindly with a specific example if possible.
-• **Note:** One practical observation about ${r.name} — a pattern, habit, or insight that parents would find helpful when supporting ${firstName} at home.
 
-Same rules: plain English, no jargon, no numbers, warm tone. Labels in ** bold.
+Same rules: plain English, no jargon, no numbers, warm tone. Labels in ** bold. Write exactly 2 bullets — Strengths and Weaknesses only. Do NOT add a Note bullet.
 ===END===`).join("\n\n")}
 
 ===ACTION_PLAN===
@@ -3627,7 +3625,9 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   const obsHtml = (obs) => (obs || "").split("\n").map(line => {
     const t = line.trim();
     if (!t.startsWith("•")) return "";
-    const html = esc(t).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    const content = t.slice(1).trim();
+    if (/^\*\*Note:/i.test(content)) return "";   // suppress Note bullets
+    const html = esc("• " + content).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
     return `<p style="margin:.3rem 0 .3rem 1.4rem;line-height:1.6;text-indent:-1rem">${html}</p>`;
   }).join("");
 
@@ -3920,7 +3920,10 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
       }));
       (parsed[obsKey]?.[r.name] || "").split("\n").forEach(line => {
         const t = line.trim();
-        if (t.startsWith("•")) paras.push(bulletPara(t.slice(1).trim()));
+        if (!t.startsWith("•")) return;
+        const content = t.slice(1).trim();
+        if (/^\*\*Note:/i.test(content)) return;   // suppress Note bullets
+        paras.push(bulletPara(content));
       });
     });
     return paras;
