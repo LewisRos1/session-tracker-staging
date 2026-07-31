@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1310";
+const APP_VERSION = "1311";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -2805,7 +2805,7 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
     }
     const { tStart, tEnd } = hyrLinearTrend(nonNull);
     const delta = tEnd - tStart;
-    const direction = Math.abs(delta) <= 8 ? "Stable" : delta > 0 ? "Trending Up" : "Trending Down";
+    const direction = Math.abs(delta) <= 8 ? "Stable" : delta > 0 ? "Improving" : "Declining";
     trendRows.push({ name: target.name, tStart, tEnd, delta, direction, labels: cd.labels, values: cd.values, noData: false });
   }
   trendRows.sort((a, b) => (b.delta ?? -Infinity) - (a.delta ?? -Infinity));
@@ -3144,8 +3144,8 @@ function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd
 
   // Trend annotation subtitle — use pre-computed delta/direction if available
   const dispDelta = delta ?? Math.round(tStartVal !== tEndVal ? tEndVal - tStartVal : ys[ys.length-1] - ys[0]);
-  const dispDir   = direction ?? (dispDelta > 8 ? "Trending Up" : dispDelta < -8 ? "Trending Down" : "Stable");
-  const icon   = dispDir === "Trending Up" ? "↑" : dispDir === "Trending Down" ? "↓" : "→";
+  const dispDir   = direction ?? (dispDelta > 8 ? "Improving" : dispDelta < -8 ? "Declining" : "Stable");
+  const icon   = dispDir === "Improving" ? "↑" : dispDir === "Declining" ? "↓" : "→";
   ctx.fillStyle = "#6b7280"; ctx.font = "italic 16px sans-serif"; ctx.textAlign = "center";
   ctx.fillText(`${icon} ${dispDir}`, W / 2, 42);
 
@@ -3245,7 +3245,7 @@ function hyrDrawOverviewChart(chartTrendRows, title) {
   for (let i = 0; i < n; i++) {
     const r = chartTrendRows[i];
     const cx = PAD_L + (i + 0.5) * slotW;
-    const dc = r.direction === "Trending Up" ? C_UP : r.direction === "Trending Down" ? C_DOWN : C_STABLE;
+    const dc = r.direction === "Improving" ? C_UP : r.direction === "Declining" ? C_DOWN : C_STABLE;
 
     // Start bar
     const sH = Math.max(2, (r.tStart / 100) * TOP_H);
@@ -3294,9 +3294,9 @@ function hyrDrawOverviewChart(chartTrendRows, title) {
     { color: C_END,   label: "Term End" }
   ];
   const LEG_R2 = [
-    { color: C_DOWN,   label: "Trending Down (<-8 points)" },
+    { color: C_DOWN,   label: "Declining (<-8 points)" },
     { color: C_STABLE, label: "Stable (±8 points)" },
-    { color: C_UP,     label: "Trending Up (>+8 points)" }
+    { color: C_UP,     label: "Improving (>+8 points)" }
   ];
   ctx.font = "17px sans-serif";
   const BOX = 14, GAP = 5, SPC = 16, ROW_H = 26;
@@ -3366,7 +3366,7 @@ function hyrDrawOverviewChartB(chartTrendRows, title) {
   for (let i = 0; i < n; i++) {
     const r = chartTrendRows[i];
     const cx = PAD_L + (i + 0.5) * slotW;
-    const dc = r.direction === "Trending Up" ? C_UP : r.direction === "Trending Down" ? C_DOWN : C_STABLE;
+    const dc = r.direction === "Improving" ? C_UP : r.direction === "Declining" ? C_DOWN : C_STABLE;
     const sH = Math.max(2, (r.tStart / 100) * TOP_H), sX = cx - BAR_W - 2;
     ctx.fillStyle = C_START; ctx.fillRect(sX, TOP_BTM_Y - sH, BAR_W, sH);
     ctx.fillStyle = "#111827"; ctx.font = "16px sans-serif"; ctx.textAlign = "center";
@@ -3398,7 +3398,7 @@ function hyrDrawOverviewChartB(chartTrendRows, title) {
   ctx.font = "15px sans-serif";
   const BOX = 12, GAP = 5, SPC = 14, RH = 22, legY0 = BTM_BTM_Y + 52;
   [[{ color: C_START, label: "Term Start" }, { color: C_END, label: "Term End" }],
-   [{ color: C_DOWN, label: "Trending Down (<-8 points)" }, { color: C_STABLE, label: "Stable (±8 points)" }, { color: C_UP, label: "Trending Up (>+8 points)" }]]
+   [{ color: C_DOWN, label: "Declining (<-8 points)" }, { color: C_STABLE, label: "Stable (±8 points)" }, { color: C_UP, label: "Improving (>+8 points)" }]]
   .forEach((row, ri) => {
     const rowW = row.reduce((acc, { label }) => acc + BOX + GAP + Math.ceil(ctx.measureText(label).width) + SPC, 0) - SPC;
     let lx = PAD_L + (CHART_W - rowW) / 2; const ly = legY0 + ri * RH;
@@ -3487,19 +3487,12 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
     ctx.fillStyle = C_START; ctx.fillRect(PERF_X, startBarY, sW, BAR_HP);
     ctx.fillStyle = C_END;   ctx.fillRect(PERF_X, endBarY,   eW, BAR_HP);
 
-    // Value labels: always black; draw inside bar (right-aligned) if no room to the right
+    // Value labels: always to the right of the bar in black
     const drawBarVal = (val, barW, barY, bold) => {
       const txt = String(Math.round(val));
       ctx.font = bold ? "bold 15px sans-serif" : "15px sans-serif";
-      ctx.fillStyle = "#111827";
-      const tw = ctx.measureText(txt).width;
-      if (barW + tw + 6 > PERF_W) {
-        ctx.textAlign = "right";
-        ctx.fillText(txt, PERF_X + barW - 3, barY + BAR_HP - 2);
-      } else {
-        ctx.textAlign = "left";
-        ctx.fillText(txt, PERF_X + barW + 4, barY + BAR_HP - 2);
-      }
+      ctx.fillStyle = "#111827"; ctx.textAlign = "left";
+      ctx.fillText(txt, PERF_X + barW + 4, barY + BAR_HP - 2);
     };
     drawBarVal(r.tStart, sW, startBarY, false);
     drawBarVal(r.tEnd,   eW, endBarY,   true);

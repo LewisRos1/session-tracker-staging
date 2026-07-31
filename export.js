@@ -605,7 +605,7 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
       const tStart = Math.round(trend[0]);
       const tEnd   = Math.round(trend[trend.length - 1]);
       const delta  = tEnd - tStart;
-      const direction = Math.abs(delta) <= 8 ? "Stable" : delta > 0 ? "Trending Up" : "Trending Down";
+      const direction = Math.abs(delta) <= 8 ? "Stable" : delta > 0 ? "Improving" : "Declining";
       return { name: target.name, tStart, tEnd, delta, direction, noData: false };
     });
 
@@ -635,7 +635,7 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
         }
         const deltaStr = row.delta >= 0 ? `+${row.delta}` : `${row.delta}`;
         const r        = ws.addRow([row.name, `${row.tStart}%`, `${row.tEnd}%`, deltaStr, row.direction]);
-        const dirColor = row.direction === "Trending Up" ? "FF16A34A" : row.direction === "Trending Down" ? "FFDC2626" : "FF6B7280";
+        const dirColor = row.direction === "Improving" ? "FF16A34A" : row.direction === "Declining" ? "FFDC2626" : "FF6B7280";
         r.getCell(5).font = { bold: true, color: { argb: dirColor } };
       }
     }
@@ -3243,7 +3243,7 @@ function renderTargetChart(targetName, yValues, dateRange, dates, customLabels =
 
   // Direction subtitle
   const delta = tEndVal - tStartVal;
-  const dirText  = delta > 8 ? "↑ Trending Up" : delta < -8 ? "↓ Trending Down" : "→ Stable";
+  const dirText  = delta > 8 ? "↑ Improving" : delta < -8 ? "↓ Declining" : "→ Stable";
   const dirColor = delta > 8 ? "#2A7A3B" : delta < -8 ? "#C0392B" : "#6b7280";
   ctx.fillStyle = dirColor; ctx.font = "italic 16px sans-serif"; ctx.textAlign = "center";
   ctx.fillText(dirText, W / 2, _dirY);
@@ -3355,7 +3355,7 @@ function renderActivityLineChart(actDisplayName, periodMonths, monthBuckets) {
 
   // Direction subtitle
   const delta = tEndVal - tStartVal;
-  const dirText  = delta > 8 ? "↑ Trending Up" : delta < -8 ? "↓ Trending Down" : "→ Stable";
+  const dirText  = delta > 8 ? "↑ Improving" : delta < -8 ? "↓ Declining" : "→ Stable";
   const dirColor = delta > 8 ? "#2A7A3B" : delta < -8 ? "#C0392B" : "#6b7280";
   ctx.fillStyle = dirColor; ctx.font = "italic 16px sans-serif"; ctx.textAlign = "center";
   ctx.fillText(dirText, W / 2, _aDirY);
@@ -3424,9 +3424,9 @@ function renderThresholdLegend() {
   const BORDER  = "#9ca3af";
   const GRID    = "#d1d5db";
   const rows = [
-    { arrow: "↑", label: "Trending Up",  cond: "> +8pp",        color: "#16a34a", bg: "#dcfce7" },
+    { arrow: "↑", label: "Improving",  cond: "> +8pp",        color: "#16a34a", bg: "#dcfce7" },
     { arrow: "→", label: "Stable",        cond: "−8pp to +8pp",  color: "#4b5563", bg: "#f9fafb" },
-    { arrow: "↓", label: "Trending Down", cond: "< −8pp",        color: "#dc2626", bg: "#fff5f5" },
+    { arrow: "↓", label: "Declining", cond: "< −8pp",        color: "#dc2626", bg: "#fff5f5" },
   ];
 
   // ── Title row ──────────────────────────────────────────────────
