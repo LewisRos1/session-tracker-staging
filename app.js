@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1294";
+const APP_VERSION = "1295";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -7684,7 +7684,7 @@ async function autoFillStructuredRemarks(student, sessionId) {
   await Promise.all(toFill.map(async item => {
     try {
       if (!item.actId) {
-        await addAutoFillActivityAndRemark(sessionId, item.target.name, item.pa.name, item.pa.order ?? 0, item.paParent, item.paConfigId);
+        await addAutoFillActivityAndRemark(sessionId, item.target.name, item.pa.title || item.pa.name, item.pa.order ?? 0, item.paParent, item.paConfigId);
       } else {
         await addRemark(sessionId, item.actId, "");
       }
@@ -7828,7 +7828,7 @@ async function cleanupEmptyEntries(sessionId, data, targetName, target = null, i
   // they don't persist as ghost records when the session has other real data.
   const autoOpenNames = isLeaving
     ? new Set()
-    : new Set((target?.predefinedActivities || []).filter(pa => isAutoOpenRemarkType(pa)).map(pa => pa.name));
+    : new Set((target?.predefinedActivities || []).filter(pa => isAutoOpenRemarkType(pa)).map(pa => pa.title || pa.name));
   const acts = Object.entries(data.activities || {})
     .filter(([, a]) => a.targetName === targetName && !mappedNames.has(a.activityName) && !autoOpenNames.has(a.activityName));
   const stripEmpty = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
@@ -9359,7 +9359,7 @@ async function autoFillViewStructuredRemarks(student, sessionId, data) {
         if (existingActId) {
           await addRemark(sessionId, existingActId, "");
         } else {
-          await addAutoFillActivityAndRemark(sessionId, target.name, pa.name, pa.order ?? 0, paParent, paConfigId);
+          await addAutoFillActivityAndRemark(sessionId, target.name, pa.title || pa.name, pa.order ?? 0, paParent, paConfigId);
         }
         count++;
       } catch { /* silent — next snapshot will retry */ }
@@ -9448,7 +9448,7 @@ async function autoFillViewGroupStructuredRemarks(group, sessionId, data) {
         structuredRemarkAutoFillInFlight.add(key);
         try {
           if (!actId) {
-            actId = await addActivity(sessionId, target.name, pa.name, pa.order ?? 0, true);
+            actId = await addActivity(sessionId, target.name, pa.title || pa.name, pa.order ?? 0, true);
           }
           await addGroupRemark(sessionId, actId, studentName, "");
           count++;
@@ -16896,14 +16896,14 @@ async function autoFillGroupStructuredRemarks(group, sessionId, data, targetName
     if (pa.isCompleted || pa.isArchived) continue;
     if (!isAutoOpenRemarkType(pa)) continue;
     const existingAct = Object.entries(data.activities || {})
-      .find(([, a]) => a.targetName === targetName && a.activityName === pa.name);
+      .find(([, a]) => a.targetName === targetName && (a.activityName === pa.name || (pa.title && a.activityName === pa.title) || (pa.id && a.configId === pa.id)));
     const actId = existingAct?.[0];
     if (!actId) continue;
     for (const studentName of attendees) {
       const hasRemark = Object.values(data.remarks || {})
         .some(r => r.activityId === actId && r.studentName === studentName);
       if (hasRemark) continue;
-      const key = `${sessionId}:${targetName}:${pa.name}:${studentName}`;
+      const key = `${sessionId}:${targetName}:${pa.id || pa.name}:${studentName}`;
       if (structuredRemarkAutoFillInFlight.has(key)) continue;
       structuredRemarkAutoFillInFlight.add(key);
       try {
