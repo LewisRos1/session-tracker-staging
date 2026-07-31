@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1312";
+const APP_VERSION = "1313";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -3521,9 +3521,13 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
   ctx.beginPath(); ctx.moveTo(NAME_W,      PAD_TOP + 24); ctx.lineTo(NAME_W,      CHART_Y1); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(BOLD_SEP_X,  PAD_TOP + 24); ctx.lineTo(BOLD_SEP_X,  CHART_Y1); ctx.stroke();
 
-  // Chart border
+  // Chart outline: top/bottom bold (match column separators), left/right thin
+  ctx.strokeStyle = "#6b7280"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, CHART_Y0); ctx.lineTo(W, CHART_Y0); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, CHART_Y1); ctx.lineTo(W, CHART_Y1); ctx.stroke();
   ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 1;
-  ctx.strokeRect(0, CHART_Y0, W, n * ROW_H);
+  ctx.beginPath(); ctx.moveTo(0, CHART_Y0); ctx.lineTo(0, CHART_Y1); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(W, CHART_Y0); ctx.lineTo(W, CHART_Y1); ctx.stroke();
 
   // X-axis labels below the bar area (0–100 only, not the padding zone)
   ctx.fillStyle = "#6b7280"; ctx.font = "13px sans-serif"; ctx.textAlign = "center";
