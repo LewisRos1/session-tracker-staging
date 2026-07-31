@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1300";
+const APP_VERSION = "1301";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -194,7 +194,7 @@ function requirePassword(onSuccess, message = "Enter password to continue") {
       pwInput.value = "";
       return;
     }
-    closeManageModal();
+    $("manage-modal").classList.add("hidden");
     onSuccess();
   };
   $("req-pw-btn").addEventListener("click", check);
