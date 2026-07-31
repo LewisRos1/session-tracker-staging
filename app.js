@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1297";
+const APP_VERSION = "1298";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -9160,6 +9160,11 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
           ${noteField}
         </div>`
       : `<div class="view-starter-wrap" contenteditable="false">${starterTopRow}</div>`;
+  } else if (showNote) {
+    remarkCell = `<div class="view-starter-wrap view-starter-wrap-note" contenteditable="false">
+      <div class="view-starter-top-row">${optSelect}</div>
+      ${noteField}
+    </div>`;
   } else {
     remarkCell = optSelect;
   }
@@ -11165,6 +11170,11 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
               ${noteField}
             </div>`
           : `<div class="view-starter-wrap" contenteditable="false">${starterTopRow}</div>`;
+      } else if (showNote) {
+        remarkCell = `<div class="view-starter-wrap view-starter-wrap-note" contenteditable="false">
+          <div class="view-starter-top-row">${optSelect}</div>
+          ${noteField}
+        </div>`;
       } else {
         remarkCell = optSelect;
       }
