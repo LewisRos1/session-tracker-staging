@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1307";
+const APP_VERSION = "1308";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -4027,12 +4027,30 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   }));
   paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 200, after: 0 } }));
 
-  // Introduction
-  paragraphs.push(mkPara("Introduction", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true }));
-  const wordIntroText = enrolledLate
-    ? `Although the term runs from ${halfStartDefault} to ${halfEndName} ${year}, ${student.name} joined us in ${firstMonthName} ${year}. This report covers their progress from ${firstMonthName} to ${halfEndName} ${year} in ${n} key therapy target${n !== 1 ? "s" : ""}: ${targetList}. The therapy team has prepared this report to give you a clear overview of ${firstName}'s development and the areas that need continued attention.`
-    : `This report documents ${student.name}'s progress across the ${halfText} half of ${year} (${monthRange}) in ${n} key therapy target${n !== 1 ? "s" : ""}: ${targetList}. The therapy team has prepared this report to give you a clear overview of ${firstName}'s development and the areas that need continued attention.`;
-  paragraphs.push(mkPara(wordIntroText, { after: 280, align: AlignmentType.JUSTIFIED }));
+  // About This Report
+  paragraphs.push(mkPara("About This Report", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true }));
+  let fedcSeen = false;
+  const expandedNames = tNames.map(name => {
+    if (!fedcSeen && /FEDC/i.test(name)) {
+      fedcSeen = true;
+      return name.replace(/FEDC/i, "Functional Emotional Developmental Capacity (FEDC)");
+    }
+    return name;
+  });
+  const wordIntroLine1 = enrolledLate
+    ? `Although the term runs from ${halfStartDefault} to ${halfEndName} ${year}, ${student.name} joined us in ${firstMonthName} ${year}. This report covers their progress from ${firstMonthName} to ${halfEndName} ${year} in ${n} key therapy target${n !== 1 ? "s" : ""}:`
+    : `This report documents ${student.name}'s progress across the ${halfText} half of ${year} (${monthRange}) in ${n} key therapy target${n !== 1 ? "s" : ""}:`;
+  paragraphs.push(mkPara(wordIntroLine1, { after: 80, align: AlignmentType.JUSTIFIED }));
+  expandedNames.forEach((name, i) => {
+    paragraphs.push(new Paragraph({
+      run: { size: 22 },
+      children: [new TextRun({ text: `${i + 1}.  ${name}`, size: 22 })],
+      indent: { left: 360 },
+      spacing: { before: 40, after: 40, ...LS },
+      alignment: AlignmentType.LEFT
+    }));
+  });
+  paragraphs.push(mkPara(`The therapy team has prepared this report to give you a clear overview of ${firstName}'s development and the areas that need continued attention.`, { before: 120, after: 280, align: AlignmentType.JUSTIFIED }));
 
   paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 0, after: 280 } }));
   paragraphs.push(mkPara("Overall Progress", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true, pageBreak: true }));
