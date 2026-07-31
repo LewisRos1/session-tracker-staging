@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1315";
+const APP_VERSION = "1316";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -3670,8 +3670,8 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
     <div style="color:#6b7280;font-size:.95rem">Tracking Period: ${esc(trackingRange)}</div>
   </div>`;
   const introText = enrolledLate
-    ? `Although the term runs from ${_htmlTermStart} to ${_htmlTermEnd} ${year}, ${esc(student.name)} joined us in ${_htmlFirstMonth} ${year}. This report covers their progress from ${_htmlFirstMonth} to ${_htmlTermEnd} ${year} in ${n} key therapy target${n !== 1 ? "s" : ""}: ${esc(targetList)}. The therapy team has prepared this report to give you a clear overview of ${esc(firstName)}'s development and the areas we will continue to focus on in the coming months.`
-    : `This report documents ${esc(student.name)}'s progress across the ${halfText} half of ${year} (${monthRange}) in ${n} key therapy target${n !== 1 ? "s" : ""}: ${esc(targetList)}. The therapy team has prepared this report to give you a clear overview of ${esc(firstName)}'s development and the areas we will continue to focus on in the coming months.`;
+    ? `Although the term runs from ${_htmlTermStart} to ${_htmlTermEnd} ${year}, ${esc(firstName)} joined us in ${_htmlFirstMonth} ${year}. This report covers their progress from ${_htmlFirstMonth} to ${_htmlTermEnd} ${year} in ${n} key therapy target${n !== 1 ? "s" : ""}: ${esc(targetList)}. The therapy team has prepared this report to give you a clear overview of ${esc(firstName)}'s development and the areas we will continue to focus on in the coming months.`
+    : `This report documents ${esc(firstName)}'s progress across the ${halfText} half of ${year} (${monthRange}) in ${n} key therapy target${n !== 1 ? "s" : ""}: ${esc(targetList)}. The therapy team has prepared this report to give you a clear overview of ${esc(firstName)}'s development and the areas we will continue to focus on in the coming months.`;
   h += `<p style="margin:.5rem 0;line-height:1.7">${introText}</p>`;
 
   h += `<hr style="margin:2rem 0">`;
@@ -4029,8 +4029,8 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     return name;
   });
   const wordIntroLine1 = enrolledLate
-    ? `Although the term runs from ${halfStartDefault} to ${halfEndName} ${year}, ${student.name} joined us in ${firstMonthName} ${year}. This report covers their progress from ${firstMonthName} to ${halfEndName} ${year} in ${n} key therapy target${n !== 1 ? "s" : ""}:`
-    : `This report documents ${student.name}'s progress across the ${halfText} half of ${year} (${monthRange}) in ${n} key therapy target${n !== 1 ? "s" : ""}:`;
+    ? `Although the term runs from ${halfStartDefault} to ${halfEndName} ${year}, ${firstName} joined us in ${firstMonthName} ${year}. This report covers their progress from ${firstMonthName} to ${halfEndName} ${year} in ${n} key therapy target${n !== 1 ? "s" : ""}:`
+    : `This report documents ${firstName}'s progress across the ${halfText} half of ${year} (${monthRange}) in ${n} key therapy target${n !== 1 ? "s" : ""}:`;
   paragraphs.push(mkPara(wordIntroLine1, { after: 80, align: AlignmentType.JUSTIFIED }));
   expandedNames.forEach((name, i) => {
     paragraphs.push(new Paragraph({
@@ -4041,7 +4041,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
       alignment: AlignmentType.LEFT
     }));
   });
-  paragraphs.push(mkPara(`The therapy team has prepared this report to give you a clear overview of ${student.name}'s development and the areas that need continued attention.`, { before: 120, after: 280, align: AlignmentType.JUSTIFIED }));
+  paragraphs.push(mkPara(`The therapy team has prepared this report to give you a clear overview of ${firstName}'s development and the areas that need continued attention.`, { before: 120, after: 280, align: AlignmentType.JUSTIFIED }));
 
   paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 0, after: 280 } }));
   paragraphs.push(mkPara("Overall Progress", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true, pageBreak: true }));
@@ -4115,7 +4115,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   // ── Section 2: Target Progress ──────────────────────────────
   paragraphs.push(mkPara("Section 2: Target Review", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
   paragraphs.push(mkPara(
-    `This section provides a detailed look at each of ${student.name}'s therapy targets for ${monthRange} ${year}.`,
+    `This section provides a detailed look at each of ${firstName}'s therapy targets for ${monthRange} ${year}.`,
     { after: 280, align: AlignmentType.JUSTIFIED }
   ));
   paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 0, after: 280 } }));
@@ -4146,7 +4146,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   const actionPlanParas = [];
   actionPlanParas.push(mkPara(`Section ${nextSectionNum}: Focus Areas`, { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
   actionPlanParas.push(mkPara(
-    `The table below highlights the areas where ${student.name} has the most room for improvement this term, along with recommendations for supporting their progress in each one.`,
+    `The table below highlights the areas where ${firstName} has the most room for improvement this term, along with recommendations for supporting their progress in each one.`,
     { after: 220, align: AlignmentType.JUSTIFIED }
   ));
   const AP_NUM_REFS = (parsed.actionPlanRows || []).map((_, i) => `hyr-ap-row-${i}`);
