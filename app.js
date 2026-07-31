@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1293";
+const APP_VERSION = "1294";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -4341,6 +4341,7 @@ async function maGetLastDataDate(student, target, pa) {
           .filter(([, a]) => {
             if (a.targetName !== target.name) return false;
             if (checkConfigId && a.configId === checkConfigId) return true;
+            if (a.configId && checkConfigId && a.configId !== checkConfigId) return false;
             const nameOk = a.activityName === checkName || a.activityName === checkPa.name;
             if (!nameOk) return false;
             return checkParent ? (!a.parentActivity || a.parentActivity === checkParent) : !a.parentActivity;
@@ -14331,11 +14332,14 @@ function renderTargetManageContent(student, target) {
           : await getAllSessionsForStudent(student.id);
         affectedSessions = allSessions.filter(s => {
           const sActs = s.activities || {}; const sRems = s.remarks || {};
-          const matchIds = Object.entries(sActs).filter(([, a]) =>
-            a.targetName === target.name &&
-            (a.activityName === act.name || (act.title && a.activityName === act.title)) &&
-            !a.parentActivity
-          ).map(([id]) => id);
+          const matchIds = Object.entries(sActs).filter(([, a]) => {
+            if (a.targetName !== target.name || a.parentActivity) return false;
+            // If this session record already has a configId from a *different* predefined
+            // activity, exclude it — it's an orphan from a deleted/recreated activity
+            // with the same name, not data for the current one.
+            if (a.configId && act.id && a.configId !== act.id) return false;
+            return a.activityName === act.name || (act.title && a.activityName === act.title);
+          }).map(([id]) => id);
           return matchIds.some(actId => Object.values(sRems).some(r =>
             r.activityId === actId && (
               (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
@@ -14573,6 +14577,7 @@ function renderTargetManageContent(student, target) {
           const sActs = s.activities || {}; const sRems = s.remarks || {};
           const matchIds = Object.entries(sActs).filter(([, a]) => {
             if (a.targetName !== target.name) return false;
+            if (a.configId && pa.id && a.configId !== pa.id) return false;
             const nameOk = a.activityName === paName || a.activityName === pa.name;
             if (!nameOk) return false;
             return paParent ? (!a.parentActivity || a.parentActivity === paParent) : !a.parentActivity;
