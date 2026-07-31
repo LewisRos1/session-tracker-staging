@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1317";
+const APP_VERSION = "1318";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -13328,7 +13328,9 @@ function initDragSort(listEl, onReorder) {
     item.after(placeholder);
 
     dragEl = item;
+    dragEl._savedStyle = dragEl.style.cssText;   // preserve inline styles (e.g. display:flex on opt rows)
     dragEl.style.cssText =
+      (dragEl._savedStyle ? dragEl._savedStyle + ';' : '') +
       `position:fixed;left:${rect.left}px;width:${rect.width}px;` +
       `top:${rect.top}px;z-index:9999;opacity:.85;` +
       `box-shadow:0 4px 16px rgba(0,0,0,.2);pointer-events:none;`;
@@ -13359,7 +13361,8 @@ function initDragSort(listEl, onReorder) {
     if (!dragEl) return;
     if (scrollRaf) { cancelAnimationFrame(scrollRaf); scrollRaf = null; }
     listEl.classList.remove('is-reordering');
-    dragEl.style.cssText = '';
+    dragEl.style.cssText = dragEl._savedStyle || '';
+    delete dragEl._savedStyle;
     if (placeholder?.parentNode) placeholder.parentNode.insertBefore(dragEl, placeholder);
     placeholder?.remove();
     const newOrder = [...listEl.children]
