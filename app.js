@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1289";
+const APP_VERSION = "1290";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -1155,7 +1155,7 @@ function openChecklistModal() {
   const itemHtml = item => {
     const d       = item.workflowDate || item.date;
     const dateStr = d ? formatDateWithDay(d) : "Unknown date";
-    return `<button class="choice-btn checklist-modal-item" data-session-id="${item.id}" data-subject-id="${escHtml(item.workflowSubjectId || "")}" data-is-group="${!!item.workflowIsGroup}">
+    return `<button class="choice-btn checklist-modal-item" data-session-id="${item.id}" data-subject-id="${escHtml(item.workflowSubjectId || "")}" data-is-group="${!!item.workflowIsGroup}" data-session-date="${escHtml(d || "")}">
       <div class="choice-text">
         <div class="choice-label">${escHtml(item.workflowSubjectName || "Unknown")}</div>
         <div class="choice-sub">${escHtml(dateStr)}</div>
@@ -1179,17 +1179,20 @@ function openChecklistModal() {
 
   $("session-picker-list").querySelectorAll(".checklist-modal-item").forEach(btn => {
     btn.addEventListener("click", () => {
-      closeSessionPicker();
       const sid       = btn.dataset.sessionId;
       const subjectId = btn.dataset.subjectId;
       const isGrp     = btn.dataset.isGroup === "true";
-      if (isGrp) {
-        const group = (state.groups || []).find(g => g.id === subjectId);
-        if (group) openGroupSessionView(group, sid);
-      } else {
-        const student = (state.students || []).find(s => s.id === subjectId);
-        if (student) openSessionView(student, sid);
-      }
+      const doOpen = () => {
+        closeSessionPicker();
+        if (isGrp) {
+          const group = (state.groups || []).find(g => g.id === subjectId);
+          if (group) openGroupSessionView(group, sid);
+        } else {
+          const student = (state.students || []).find(s => s.id === subjectId);
+          if (student) openSessionView(student, sid);
+        }
+      };
+      if (isOlderThan7Days(btn.dataset.sessionDate)) { requirePassword(doOpen, EXPIRED_MSG); } else { doOpen(); }
     });
   });
 }
@@ -5115,11 +5118,14 @@ function renderPickDateCalendar(student, sessions, byMonth, today, displayDate, 
   }
   $("session-picker-list").querySelectorAll(".date-picker-day:not([disabled])").forEach(btn => {
     btn.addEventListener("click", async () => {
-      closeSessionPicker();
       const ds = btn.dataset.date;
-      const sessionId = sessionIdByDate.get(ds) || await getOrCreateSessionForDate(student.id, ds, student.targets);
-      if (onSelect) onSelect(student, sessionId);
-      else openSessionView(student, sessionId);
+      const doOpen = async () => {
+        closeSessionPicker();
+        const sessionId = sessionIdByDate.get(ds) || await getOrCreateSessionForDate(student.id, ds, student.targets);
+        if (onSelect) onSelect(student, sessionId);
+        else openSessionView(student, sessionId);
+      };
+      if (isOlderThan7Days(ds)) { requirePassword(doOpen, EXPIRED_MSG); } else { doOpen(); }
     });
   });
 }
@@ -5470,7 +5476,10 @@ function renderGoToSessionsForMonthEntry(student, month, monthSessions, byMonth,
     item.addEventListener("click", () => {
       const sid = item.dataset.sessionId;
       closeSessionPicker();
-      if (sid !== state.currentSessionId) openSession(student, sid);
+      if (sid !== state.currentSessionId) {
+        const open = () => openSession(student, sid);
+        if (isOlderThan7Days(item.dataset.sessionDate)) { requirePassword(open, EXPIRED_MSG); } else { open(); }
+      }
     });
   });
 }
@@ -5606,8 +5615,9 @@ function renderGroupStartSessionCalendar(group, today, displayDate, takenDates =
   }
   $("session-picker-list").querySelectorAll(".date-picker-day:not([disabled])").forEach(btn => {
     btn.addEventListener("click", () => {
-      closeSessionPicker();
-      openGroupSession(group, btn.dataset.date, group.students);
+      const ds = btn.dataset.date;
+      const doOpen = () => { closeSessionPicker(); openGroupSession(group, ds, group.students); };
+      if (isOlderThan7Days(ds)) { requirePassword(doOpen, EXPIRED_MSG); } else { doOpen(); }
     });
   });
 }
