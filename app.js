@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1301";
+const APP_VERSION = "1302";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -3806,7 +3806,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   const ROMAN = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"];
 
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun, LevelFormat,
-          Table, TableRow, TableCell, WidthType, PageOrientation, SectionType, Footer, PageNumber, VerticalAlign } = window.docx;
+          Table, TableRow, TableCell, WidthType, PageOrientation, SectionType, Header, Footer, PageNumber, VerticalAlign } = window.docx;
   const BULLET_REF   = "hyr-bullets";
   const KI_NUM_REF   = "hyr-ki-numbered";
   const KI_NUM_REF_2 = "hyr-ki-numbered-2";
@@ -3904,11 +3904,12 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     if (logoResp.ok) logoData = new Uint8Array(await logoResp.arrayBuffer());
   } catch (_) {}
 
+  // logo natural size 1658×493 → display at 454×135 in body, 180×54 in header
   paragraphs.push(new Paragraph({
     children: logoData
-      ? [new ImageRun({ data: logoData, transformation: { width: 454, height: 108 }, type: "png" })]
+      ? [new ImageRun({ data: logoData, transformation: { width: 454, height: 135 }, type: "png" })]
       : [],
-    alignment: AlignmentType.CENTER, spacing: { before: 480, after: 480 }
+    alignment: AlignmentType.CENTER, spacing: { before: 480, after: 560 }
   }));
   paragraphs.push(new Paragraph({
     children: [new TextRun({ text: "Half-Year Progress Report", bold: true, size: 72, font: TNR })],
@@ -3916,28 +3917,28 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   }));
   paragraphs.push(new Paragraph({
     children: [new TextRun({ text: `(${fullTermLabel})`, bold: true, size: 36, font: TNR })],
-    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 480 }
+    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 640 }
   }));
 
   const mkCoverLabelPara = text => new Paragraph({
     children: [new TextRun({ text, bold: true, size: 36, font: TNR })],
     alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }
   });
-  const mkCoverTable1Col = value => new Table({
+  const mkCoverTable1Col = (value, size = 32) => new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
     rows: [new TableRow({ children: [new TableCell({
       width: { size: 100, type: WidthType.PERCENTAGE },
       margins: { top: 72, bottom: 72, left: 120, right: 120 },
-      children: [new Paragraph({ children: [new TextRun({ text: value, size: 32, font: TNR })], alignment: AlignmentType.CENTER })]
+      children: [new Paragraph({ children: [new TextRun({ text: value, size, font: TNR })], alignment: AlignmentType.CENTER })]
     })] })]
   });
-  const mkCoverSpacer = () => new Paragraph({ children: [], spacing: { before: 0, after: 240 } });
+  const mkCoverSpacer = () => new Paragraph({ children: [], spacing: { before: 0, after: 480 } });
 
   paragraphs.push(mkCoverLabelPara("Student Name:"));
   paragraphs.push(mkCoverTable1Col(student.name));
   paragraphs.push(mkCoverSpacer());
   paragraphs.push(mkCoverLabelPara("Program:"));
-  paragraphs.push(mkCoverTable1Col(""));
+  paragraphs.push(mkCoverTable1Col("", 32));
   paragraphs.push(mkCoverSpacer());
   paragraphs.push(mkCoverLabelPara("Date of Report:"));
   paragraphs.push(mkCoverTable1Col(reportDate));
@@ -3948,13 +3949,13 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
       width: { size: 28, type: WidthType.PERCENTAGE },
       verticalAlign: VerticalAlign.CENTER,
       margins: { top: 72, bottom: 72, left: 120, right: 120 },
-      children: [new Paragraph({ children: [new TextRun({ text: label, bold: true, font: TNR })], alignment: AlignmentType.CENTER })]
+      children: [new Paragraph({ children: [new TextRun({ text: label, bold: true, size: 24, font: TNR })], alignment: AlignmentType.CENTER })]
     }),
     new TableCell({
       width: { size: 72, type: WidthType.PERCENTAGE },
       verticalAlign: VerticalAlign.CENTER,
       margins: { top: 72, bottom: 72, left: 120, right: 120 },
-      children: [new Paragraph({ children: [new TextRun({ text: "", font: TNR })], alignment: AlignmentType.CENTER })]
+      children: [new Paragraph({ children: [new TextRun({ text: "", size: 24, font: TNR })], alignment: AlignmentType.CENTER })]
     })
   ]});
   paragraphs.push(new Table({
@@ -4173,6 +4174,15 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   }) : undefined;
   const footers = pageFooter ? { default: pageFooter } : undefined;
 
+  const pageHeader = (Header && logoData) ? new Header({
+    children: [new Paragraph({
+      children: [new ImageRun({ data: logoData, transformation: { width: 180, height: 54 }, type: "png" })],
+      alignment: AlignmentType.RIGHT,
+      spacing: { before: 0, after: 0 }
+    })]
+  }) : undefined;
+  const headers = pageHeader ? { default: pageHeader } : undefined;
+
   const landscapeProps = {
     type: SectionType?.NEXT_PAGE ?? "nextPage",
     page: { size: { orientation: PageOrientation?.LANDSCAPE ?? "landscape" } }
@@ -4182,9 +4192,9 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     page: { size: { orientation: PageOrientation?.PORTRAIT ?? "portrait" } }
   };
 
-  const docSections = [{ properties: {}, footers, children: paragraphs }];
-  if (actionPlanParas.length) docSections.push({ properties: landscapeProps, footers, children: actionPlanParas });
-  if (appendixParas.length) docSections.push({ properties: portraitProps, footers, children: appendixParas });
+  const docSections = [{ properties: {}, footers, headers, children: paragraphs }];
+  if (actionPlanParas.length) docSections.push({ properties: landscapeProps, footers, headers, children: actionPlanParas });
+  if (appendixParas.length) docSections.push({ properties: portraitProps, footers, headers, children: appendixParas });
 
   const doc = new Document({
     numbering: { config: [
