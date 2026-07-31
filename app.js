@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1299";
+const APP_VERSION = "1300";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -2474,7 +2474,7 @@ TARGET: [exact target name]
     setProgress(100, "Done!");
     await new Promise(r => setTimeout(r, 400));
 
-    hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData, chartData);
+    await hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData, chartData);
 
   } catch (err) {
     if (err.name !== "AbortError") alert("Failed to generate report:\n" + err.message);
@@ -4196,13 +4196,12 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     sections: docSections
   });
 
-  Packer.toBlob(doc).then(blob => {
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${student.name} Half Year Report ${period} ${year}.docx`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  });
+  const blob = await Packer.toBlob(doc);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `${student.name} Half Year Report ${period} ${year}.docx`;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 async function hyrOpenSettings() {
