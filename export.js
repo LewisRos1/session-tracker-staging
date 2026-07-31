@@ -1842,9 +1842,28 @@ function wordTargetRows(target, session, allTargets) {
     // like a plain "+ Add Activity" and drops the note, same reasoning as above.
     const activityLabel = act.activityName;
 
-    // noRemark parent: numbered title, empty remark and score
+    // noRemark parent: show data if present at parent level, otherwise blank
     if (act.noRemark) {
-      rows.push({ cells: [activityLabel, "", ""], actLines: buildActLines(act, activityLabel), isGray: act.isGray, isGreen: act.isGreen });
+      const noRmkRemarks = getRemarksForActivity(session, act.id).filter(hasRemarkContent);
+      if (noRmkRemarks.length === 0) {
+        rows.push({ cells: [activityLabel, "", ""], actLines: buildActLines(act, activityLabel), isGray: act.isGray, isGreen: act.isGreen });
+      } else {
+        let first = true;
+        for (const rem of noRmkRemarks) {
+          const validTrials = allScores(rem);
+          const remarkAvg   = calcRemarkAvg(validTrials, target.maxPoints);
+          const text        = stripRemarkHtml(rem.text);
+          const note        = stripRemarkHtml(rem.masteryNote || "");
+          rows.push({
+            cells: [first ? activityLabel : "", "", remarkAvg !== null ? pct(remarkAvg) : ""],
+            actLines: first ? buildActLines(act, activityLabel) : null,
+            remarkLines: buildRemarkLines(null, text, note),
+            isGray: act.isGray,
+            isGreen: act.isGreen
+          });
+          first = false;
+        }
+      }
       continue;
     }
 
@@ -2656,11 +2675,30 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, mastere
         }
       }
 
-      // noRemark parent: numbered title, empty remark
+      // noRemark parent: show data if present at parent level, otherwise blank
       if (act.noRemark) {
         if (act.isGray) grayRows.add(rows.length);
         if (act.isGreen) greenRows.add(rows.length);
-        const r = blankRow(); r[1] = appendActivityDetails(buildExcelActivityCell(act.activityName), act.activityDisplayDetails); rows.push(r);
+        const actCell = appendActivityDetails(buildExcelActivityCell(act.activityName), act.activityDisplayDetails);
+        const noRmkRemarks = getRemarksForActivity(session, act.id).filter(hasRemarkContent);
+        if (noRmkRemarks.length === 0) {
+          const r = blankRow(); r[1] = actCell; rows.push(r);
+        } else {
+          let first = true;
+          for (const rem of noRmkRemarks) {
+            if (act.isGray) grayRows.add(rows.length);
+            if (act.isGreen) greenRows.add(rows.length);
+            const validTrials = allScores(rem);
+            const remarkAvg   = calcRemarkAvg(validTrials, target.maxPoints);
+            const r = blankRow();
+            r[1] = first ? actCell : "";
+            r[2] = buildExcelRemarkCell(rem.text, null, stripRemarkHtml(rem.masteryNote || ""));
+            if (includeTrials) { r[3] = trialsList(rem.optionScore !== undefined ? [...(rem.trials || []), rem.optionScore] : rem.trials); r[4] = remarkAvg !== null ? pct(remarkAvg) : ""; }
+            else { r[3] = remarkAvg !== null ? pct(remarkAvg) : ""; }
+            rows.push(r);
+            first = false;
+          }
+        }
         continue;
       }
 
@@ -2875,16 +2913,24 @@ function getAllActivitiesForTarget(session, target) {
     // Mastered / discontinued → defer to bottom with x) prefix, don't consume a number
     if (pa.masteredOn) {
       const _sAct = claimAct(pa);
-      const _name = `x) (Mastered) ${pa.title || pa.name}`;
-      if (_sAct) { usedIds.add(_sAct.id); masteredActivities.push({ ..._sAct, activityName: _name }); }
-      else { masteredActivities.push({ id: null, activityName: _name, isPredefined: true, empty: true }); }
+      const _paKey = pa.title || pa.name;
+      const _name = `x) (Mastered) ${_paKey}`;
+      const _subs = (target.predefinedActivities || []).filter(p => p.parentActivity === _paKey);
+      const _subText = _subs.length > 0 ? _subs.map((p, i) => `${String.fromCharCode(97 + i)}. ${p.title || p.name}`).join("\n") : null;
+      const _extra = { activityDisplayDetails: _subText || (pa.title ? (pa.name || null) : null), activityTitleBold: !!pa.isBold, activityTitleUnderline: !!pa.isUnderline };
+      if (_sAct) { usedIds.add(_sAct.id); masteredActivities.push({ ..._sAct, activityName: _name, ..._extra }); }
+      else { masteredActivities.push({ id: null, activityName: _name, isPredefined: true, empty: true, ..._extra }); }
       continue;
     }
     if (pa.discontinuedOn) {
       const _sAct = claimAct(pa);
-      const _name = `x) (Discontinued) ${pa.title || pa.name}`;
-      if (_sAct) { usedIds.add(_sAct.id); discontinuedActivities.push({ ..._sAct, activityName: _name }); }
-      else { discontinuedActivities.push({ id: null, activityName: _name, isPredefined: true, empty: true }); }
+      const _paKey = pa.title || pa.name;
+      const _name = `x) (Discontinued) ${_paKey}`;
+      const _subs = (target.predefinedActivities || []).filter(p => p.parentActivity === _paKey);
+      const _subText = _subs.length > 0 ? _subs.map((p, i) => `${String.fromCharCode(97 + i)}. ${p.title || p.name}`).join("\n") : null;
+      const _extra = { activityDisplayDetails: _subText || (pa.title ? (pa.name || null) : null), activityTitleBold: !!pa.isBold, activityTitleUnderline: !!pa.isUnderline };
+      if (_sAct) { usedIds.add(_sAct.id); discontinuedActivities.push({ ..._sAct, activityName: _name, ..._extra }); }
+      else { discontinuedActivities.push({ id: null, activityName: _name, isPredefined: true, empty: true, ..._extra }); }
       continue;
     }
 
@@ -2895,11 +2941,11 @@ function getAllActivitiesForTarget(session, target) {
     const numberedName = `${exportActNum}) ${_exportStatusPrefix}${_paDisplayBase}`;
     const paExtraProps = { activityDisplayDetails: pa.title ? (pa.name || null) : null, activityTitleBold: !!pa.isBold, activityTitleUnderline: !!pa.isUnderline };
 
-    // Parent activity (noRemark) — numbered title, empty remark
+    // Parent activity (noRemark) — numbered title; session data at parent level is still shown
     if (pa.noRemark) {
       const sActNr = claimAct(pa);
       if (sActNr) usedIds.add(sActNr.id);
-      result.push({ id: null, activityName: numberedName, isPredefined: true, noRemark: true, empty: true, ...paExtraProps });
+      result.push({ id: sActNr?.id ?? null, activityName: numberedName, isPredefined: true, noRemark: true, empty: !sActNr, ...paExtraProps });
       continue;
     }
 
