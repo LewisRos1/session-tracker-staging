@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1296";
+const APP_VERSION = "1297";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -7002,13 +7002,14 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
       const sel = (remText || "").split(", ").map(s => s.trim()).filter(Boolean);
       return `<div class="remark-preset-opts remark-preset-opts-multi" contenteditable="false">${opts.map(opt =>
         `<button class="btn-remark-opt btn-remark-opt--multi${sel.includes(opt) ? " active" : ""}"
-          data-rem-id="${remId}" data-opt="${escHtml(opt)}">${escHtml(opt)}</button>`
+          data-rem-id="${remId}" data-opt="${escHtml(opt)}" onmousedown="event.preventDefault()">${escHtml(opt)}</button>`
       ).join("")}${removedBadge}</div>`;
     }
     return `<div class="remark-preset-opts" contenteditable="false">${opts.map(opt =>
       `<button class="btn-remark-opt${remText === opt ? " active" : ""}"
         data-rem-id="${remId}" data-opt="${escHtml(opt)}"
-        data-score="${optionScores?.[opt] !== undefined ? optionScores[opt] : ''}">${escHtml(opt)}</button>`
+        data-score="${optionScores?.[opt] !== undefined ? optionScores[opt] : ''}"
+        onmousedown="event.preventDefault()">${escHtml(opt)}</button>`
     ).join("")}${removedBadge}</div>`;
   }
 
@@ -17558,13 +17559,14 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
       const sel = (remText || "").split(", ").map(s => s.trim()).filter(Boolean);
       return `<div class="remark-preset-opts remark-preset-opts-multi" contenteditable="false">${opts.map(opt =>
         `<button class="btn-remark-opt btn-remark-opt--multi${sel.includes(opt) ? " active" : ""}"
-          data-rem-id="${remId}" data-opt="${escHtml(opt)}">${escHtml(opt)}</button>`
+          data-rem-id="${remId}" data-opt="${escHtml(opt)}" onmousedown="event.preventDefault()">${escHtml(opt)}</button>`
       ).join("")}${removedBadge}</div>`;
     }
     return `<div class="remark-preset-opts" contenteditable="false">${opts.map(opt =>
       `<button class="btn-remark-opt${remText === opt ? " active" : ""}"
         data-rem-id="${remId}" data-opt="${escHtml(opt)}"
-        data-score="${optionScores?.[opt] !== undefined ? optionScores[opt] : ''}">${escHtml(opt)}</button>`
+        data-score="${optionScores?.[opt] !== undefined ? optionScores[opt] : ''}"
+        onmousedown="event.preventDefault()">${escHtml(opt)}</button>`
     ).join("")}${removedBadge}</div>`;
   }
 
