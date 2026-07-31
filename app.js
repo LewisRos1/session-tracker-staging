@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1295";
+const APP_VERSION = "1296";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -7657,7 +7657,7 @@ async function autoFillStructuredRemarks(student, sessionId) {
           if (a.targetName !== target.name) return false;
           if (paConfigId && a.configId === paConfigId) return true;
           if (a.configId) return false;
-          const nameOk = a.activityName === pa.name || (pa.title && a.activityName === pa.title);
+          const nameOk = (pa.name && a.activityName === pa.name) || (pa.title && a.activityName === pa.title);
           if (!nameOk) return false;
           return paParent ? (!a.parentActivity || a.parentActivity === paParent) : !a.parentActivity;
         })
@@ -9344,7 +9344,7 @@ async function autoFillViewStructuredRemarks(student, sessionId, data) {
           if (a.targetName !== target.name) return false;
           if (paConfigId && a.configId === paConfigId) return true;
           if (a.configId) return false;
-          const nameOk = a.activityName === pa.name || (pa.title && a.activityName === pa.title);
+          const nameOk = (pa.name && a.activityName === pa.name) || (pa.title && a.activityName === pa.title);
           if (!nameOk) return false;
           return paParent ? (!a.parentActivity || a.parentActivity === paParent) : !a.parentActivity;
         })
