@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1303";
+const APP_VERSION = "1304";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -3871,7 +3871,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     const paras = [];
     rows.forEach((r, i) => {
       const deltaStr = `${r.delta >= 0 ? "+" : ""}${r.delta} points`;
-      if (i > 0) paras.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
+      if (i > 0) paras.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 280, after: 0 } }));
       paras.push(new Paragraph({
         children: [
           new TextRun({ text: `${i + 1}) ${r.name.trim()}`, bold: true, size: 24 })
@@ -3992,7 +3992,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
       mkDetailRow("Date of report:", reportDate)
     ]
   }));
-  paragraphs.push(new Paragraph({ children: [], spacing: { before: 200, after: 0 } }));
+  paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 200, after: 0 } }));
 
   // Introduction
   paragraphs.push(mkPara("Introduction", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true }));
@@ -4001,7 +4001,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     : `This report documents ${student.name}'s progress across the ${halfText} half of ${year} (${monthRange}) in ${n} key therapy target${n !== 1 ? "s" : ""}: ${targetList}. The therapy team has prepared this report to give you a clear overview of ${firstName}'s development and the areas that need continued attention.`;
   paragraphs.push(mkPara(wordIntroText, { after: 280, align: AlignmentType.JUSTIFIED }));
 
-  paragraphs.push(new Paragraph({ children: [], spacing: { before: 0, after: 280 } }));
+  paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 0, after: 280 } }));
   paragraphs.push(mkPara("Overall Performance", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true, pageBreak: true }));
   const chartTrendRows = [...trendRows.filter(r => !r.noData)].sort((a, b) => b.delta - a.delta);
   const ovTitle = `${student.name} (${monthRange} ${year} Progress)`;
@@ -4037,7 +4037,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
       alignment: AlignmentType.LEFT, spacing: { before: 0, after: 80 }
     }));
   }
-  if (wAllNames.length) paragraphs.push(new Paragraph({ children: [], spacing: { before: 200, after: 0 } }));
+  if (wAllNames.length) paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 200, after: 0 } }));
 
   paragraphs.push(mkPara("Top Wins & Focus Areas", { heading: HeadingLevel.HEADING_2, before: 280, after: 120, size: 26, bold: true, keepNext: true }));
   if ((parsed.biggestWins?.length || parsed.keyFocusAreas?.length)) {
@@ -4067,7 +4067,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
       new TableRow({                    children: [mkKiColorCell("Key Focus Areas",  "fef3c7", "d97706"), mkKiNumberedCell(parsed.keyFocusAreas  || [], KI_NUM_REF_2)] }),
     ];
     paragraphs.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: kiRows }));
-    paragraphs.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
+    paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 280, after: 0 } }));
   }
 
   // ── Section 2: Target Progress ──────────────────────────────
@@ -4076,7 +4076,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     `This section provides a detailed look at each of ${firstName}'s therapy targets for ${monthRange} ${year}.`,
     { after: 280, align: AlignmentType.JUSTIFIED }
   ));
-  paragraphs.push(new Paragraph({ children: [], spacing: { before: 0, after: 280 } }));
+  paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 0, after: 280 } }));
   if (chartTrendRows.length) paragraphs.push(...targetSectionParas(chartTrendRows));
   else paragraphs.push(mkPara("No targets with sufficient data this term.", { italics: true, color: "9CA3AF" }));
 
@@ -4084,7 +4084,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   if (categorized.qualitative.length) {
     const offset = chartTrendRows.length;
     categorized.qualitative.forEach((r, i) => {
-      paragraphs.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
+      paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 280, after: 0 } }));
       paragraphs.push(new Paragraph({ children: [new TextRun({ text: `${offset + i + 1}) ${r.name} (Qualitative)`, bold: true, size: 24 })], spacing: { before: 0, after: 80, ...LS } }));
       const obs = parsed.observed?.[r.name];
       if (obs) {
