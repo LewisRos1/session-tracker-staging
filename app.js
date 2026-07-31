@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1308";
+const APP_VERSION = "1309";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -3959,45 +3959,35 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     children: [new TextRun({ text, bold: true, size: 36, font: TNR })],
     alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, ...CPL }
   });
-  // run: { size } sets the paragraph mark font so typing in an empty cell starts at the right size
-  const mkCoverTable1Col = (value, size = 32) => new Table({
-    width: { size: 100, type: WidthType.PERCENTAGE },
-    rows: [new TableRow({ children: [new TableCell({
-      width: { size: 100, type: WidthType.PERCENTAGE },
-      margins: { top: 72, bottom: 72, left: 120, right: 120 },
-      children: [new Paragraph({ run: { size }, children: [new TextRun({ text: value, size, font: TNR })], alignment: AlignmentType.CENTER, spacing: { ...CPL } })]
-    })] })]
+  // Shaded paragraph (White, Background 1, Darker 15% = #D9D9D9) replaces single-col tables
+  const mkCoverShaded = (value, size = 32) => new Paragraph({
+    shading: { type: "clear", fill: "D9D9D9", color: "auto" },
+    run: { size },
+    children: [new TextRun({ text: value, size, font: TNR })],
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 80, after: 160, ...CPL },
+    indent: { left: 120, right: 120 }
   });
   const mkCoverSpacer = () => new Paragraph({ children: [], spacing: { before: 0, after: 480, ...CPL } });
+  const mkCompanyLine = label => new Paragraph({
+    children: [
+      new TextRun({ text: `${label}  `, bold: true, size: 28, font: TNR }),
+      new TextRun({ text: "[insert text]", size: 28, font: TNR })
+    ],
+    alignment: AlignmentType.CENTER, spacing: { before: 40, after: 40, ...CPL }
+  });
 
   paragraphs.push(mkCoverLabelPara("Student Name:"));
-  paragraphs.push(mkCoverTable1Col(student.name));
+  paragraphs.push(mkCoverShaded(student.name));
   paragraphs.push(mkCoverSpacer());
   paragraphs.push(mkCoverLabelPara("Program:"));
-  paragraphs.push(mkCoverTable1Col("", 32));
+  paragraphs.push(mkCoverShaded("", 32));
   paragraphs.push(mkCoverSpacer());
   paragraphs.push(mkCoverLabelPara("Date of Report:"));
-  paragraphs.push(mkCoverTable1Col(reportDate));
+  paragraphs.push(mkCoverShaded(reportDate));
   paragraphs.push(mkCoverSpacer());
   paragraphs.push(mkCoverLabelPara("Company Details:"));
-  const mkCompanyRow = label => new TableRow({ children: [
-    new TableCell({
-      width: { size: 28, type: WidthType.PERCENTAGE },
-      verticalAlign: VerticalAlign.CENTER,
-      margins: { top: 72, bottom: 72, left: 120, right: 120 },
-      children: [new Paragraph({ run: { size: 24 }, children: [new TextRun({ text: label, bold: true, size: 24, font: TNR })], alignment: AlignmentType.CENTER, spacing: { ...CPL } })]
-    }),
-    new TableCell({
-      width: { size: 72, type: WidthType.PERCENTAGE },
-      verticalAlign: VerticalAlign.CENTER,
-      margins: { top: 72, bottom: 72, left: 120, right: 120 },
-      children: [new Paragraph({ run: { size: 24 }, children: [new TextRun({ text: "", size: 24, font: TNR })], alignment: AlignmentType.CENTER, spacing: { ...CPL } })]
-    })
-  ]});
-  paragraphs.push(new Table({
-    width: { size: 100, type: WidthType.PERCENTAGE },
-    rows: [mkCompanyRow("Tel:"), mkCompanyRow("Email:"), mkCompanyRow("Website:"), mkCompanyRow("Address:")]
-  }));
+  ["Tel:", "Email:", "Website:", "Address:"].forEach(label => paragraphs.push(mkCompanyLine(label)));
 
   // ── Section 1: Overview ──────────────────────────────────────
   paragraphs.push(mkPara("Section 1: Overview", { heading: HeadingLevel.HEADING_1, before: 560, after: 200, pageBreak: true, size: 32, bold: true }));
@@ -4022,7 +4012,8 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
       mkDetailRow("Name:", student.name),
       mkDetailRow("Date of Birth:", ""),
       mkDetailRow("Age:", ""),
-      mkDetailRow("Date of report:", reportDate)
+      mkDetailRow("Tracking Period:", `${monthRange} ${year}`),
+      mkDetailRow("Date of Report:", reportDate)
     ]
   }));
   paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 200, after: 0 } }));
@@ -4220,11 +4211,18 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   }
 
   const pageFooter = Footer ? new Footer({
-    children: [new Paragraph({
-      children: [new TextRun({ children: [PageNumber.CURRENT], size: 22, color: "555555" })],
-      alignment: AlignmentType.RIGHT,
-      spacing: { before: 80, after: 80 }
-    })]
+    children: [
+      new Paragraph({
+        children: [new TextRun({ text: "ZORA Behavioural Intervention", size: 20, color: "555555" })],
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 60, after: 0 }
+      }),
+      new Paragraph({
+        children: [new TextRun({ children: [PageNumber.CURRENT], size: 20, color: "555555" })],
+        alignment: AlignmentType.RIGHT,
+        spacing: { before: 0, after: 0 }
+      })
+    ]
   }) : undefined;
   const footers = pageFooter ? { default: pageFooter } : undefined;
 
