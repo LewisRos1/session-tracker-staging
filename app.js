@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1309";
+const APP_VERSION = "1310";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -3971,8 +3971,8 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   const mkCoverSpacer = () => new Paragraph({ children: [], spacing: { before: 0, after: 480, ...CPL } });
   const mkCompanyLine = label => new Paragraph({
     children: [
-      new TextRun({ text: `${label}  `, bold: true, size: 28, font: TNR }),
-      new TextRun({ text: "[insert text]", size: 28, font: TNR })
+      new TextRun({ text: `${label}  `, bold: true, size: 28, font: TNR, underline: { type: "none" } }),
+      new TextRun({ text: "[insert text]", size: 28, font: TNR, underline: { type: "none" } })
     ],
     alignment: AlignmentType.CENTER, spacing: { before: 40, after: 40, ...CPL }
   });
@@ -4211,18 +4211,19 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   }
 
   const pageFooter = Footer ? new Footer({
-    children: [
-      new Paragraph({
-        children: [new TextRun({ text: "ZORA Behavioural Intervention", size: 20, color: "555555" })],
-        alignment: AlignmentType.CENTER,
-        spacing: { before: 60, after: 0 }
-      }),
-      new Paragraph({
-        children: [new TextRun({ children: [PageNumber.CURRENT], size: 20, color: "555555" })],
-        alignment: AlignmentType.RIGHT,
-        spacing: { before: 0, after: 0 }
-      })
-    ]
+    children: [new Paragraph({
+      tabStops: [
+        { type: "center", position: 4750 },
+        { type: "right", position: 9500 }
+      ],
+      children: [
+        new TextRun({ text: "\t" }),
+        new TextRun({ text: "ZORA Behavioural Intervention", size: 20, color: "555555" }),
+        new TextRun({ text: "\t" }),
+        new TextRun({ children: [PageNumber.CURRENT], size: 20, color: "555555" })
+      ],
+      spacing: { before: 60, after: 0 }
+    })]
   }) : undefined;
   const footers = pageFooter ? { default: pageFooter } : undefined;
 
