@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1311";
+const APP_VERSION = "1312";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -3414,12 +3414,14 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
   if (n === 0) return null;
   const C_START = "#7dd3fc", C_END = "#a78bfa";
   const W = 700;
-  const NAME_W = 200;
-  const STATUS_W = 95;
-  const PAD_R = 10;
+  const NAME_W = 195;           // Activity column
+  const PERF_W = 315;           // Bar area (maps 0–100%)
+  const PAD_VAL = 55;           // Padding zone after 100% for value labels
+  const BOLD_SEP_X = NAME_W + PERF_W + PAD_VAL;  // 565: bold separator before Status
+  const PAD_R = 5;
+  const STATUS_W = W - BOLD_SEP_X - PAD_R;        // 130
+  const STATUS_CENTER_X = BOLD_SEP_X + STATUS_W / 2;  // 630
   const PERF_X = NAME_W;
-  const PERF_W = W - NAME_W - STATUS_W - PAD_R;  // 395
-  const STATUS_X = PERF_X + PERF_W;               // 595
   const toXPerf = v => PERF_X + (v / 100) * PERF_W;
 
   const PAD_TOP = 52;
@@ -3441,15 +3443,16 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
   // Title
   if (title) { ctx.fillStyle = "#111827"; ctx.font = "bold 19px sans-serif"; ctx.textAlign = "center"; ctx.fillText(title, W / 2, 30); }
 
-  // Column headers
+  // Column headers: Activity | Overall Progress (%) | Status
   ctx.fillStyle = "#374151"; ctx.font = "bold 15px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText("Overall Progress (%)", PERF_X + PERF_W / 2, PAD_TOP + 18);
-  ctx.fillText("Status", STATUS_X + STATUS_W / 2, PAD_TOP + 18);
+  ctx.fillText("Activity", NAME_W / 2, PAD_TOP + 18);
+  ctx.fillText("Overall Progress (%)", PERF_X + (PERF_W + PAD_VAL) / 2, PAD_TOP + 18);
+  ctx.fillText("Status", STATUS_CENTER_X, PAD_TOP + 18);
 
-  // Perf gridlines (header area)
-  [0, 25, 50, 75, 100].forEach(v => {
+  // Light gridlines at 25, 50, 75, 100 only (0% is covered by the bold Activity separator)
+  [25, 50, 75, 100].forEach(v => {
     const gx = toXPerf(v);
-    ctx.strokeStyle = v === 0 ? "#9ca3af" : "#e5e7eb"; ctx.lineWidth = 1;
+    ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(gx, PAD_TOP + 24); ctx.lineTo(gx, CHART_Y1); ctx.stroke();
   });
 
@@ -3459,16 +3462,16 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
     const rowY = CHART_Y0 + i * ROW_H;
     const cy = rowY + ROW_H / 2;
 
-    // Alternating background, redraw gridlines on top
+    // Alternating background, redraw light gridlines on top
     if (i % 2 === 0) {
       ctx.fillStyle = "#f9fafb"; ctx.fillRect(0, rowY, W, ROW_H);
-      [0, 25, 50, 75, 100].forEach(v => {
-        ctx.strokeStyle = v === 0 ? "#9ca3af" : "#e5e7eb"; ctx.lineWidth = 1;
+      [25, 50, 75, 100].forEach(v => {
+        ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(toXPerf(v), rowY); ctx.lineTo(toXPerf(v), rowY + ROW_H); ctx.stroke();
       });
     }
 
-    // Target name (right-aligned, split to 2 lines if long)
+    // Activity name (right-aligned, split to 2 lines if long)
     const t = r.name.trim();
     const words = t.split(" ");
     const splitAt = t.length > 16 ? Math.ceil(words.length / 2) : words.length;
@@ -3487,7 +3490,7 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
     ctx.fillStyle = C_START; ctx.fillRect(PERF_X, startBarY, sW, BAR_HP);
     ctx.fillStyle = C_END;   ctx.fillRect(PERF_X, endBarY,   eW, BAR_HP);
 
-    // Value labels: always to the right of the bar in black
+    // Value labels: always to the right of the bar — PAD_VAL gives room even at 100%
     const drawBarVal = (val, barW, barY, bold) => {
       const txt = String(Math.round(val));
       ctx.font = bold ? "bold 15px sans-serif" : "15px sans-serif";
@@ -3504,7 +3507,7 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
     else if (delta < -8) { statusText = "↓ Declining"; statusColor = "#dc2626"; }
     else                 { statusText = "→ Stable";    statusColor = "#6b7280"; }
     ctx.font = "13px sans-serif"; ctx.fillStyle = statusColor; ctx.textAlign = "center";
-    ctx.fillText(statusText, STATUS_X + STATUS_W / 2, cy + 6);
+    ctx.fillText(statusText, STATUS_CENTER_X, cy + 6);
 
     // Row separator
     if (i < n - 1) {
@@ -3513,16 +3516,16 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
     }
   }
 
-  // Column separators (name | perf) and (perf | status)
-  ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(NAME_W,   PAD_TOP + 24); ctx.lineTo(NAME_W,   CHART_Y1); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(STATUS_X, PAD_TOP + 24); ctx.lineTo(STATUS_X, CHART_Y1); ctx.stroke();
+  // Bold column separators: Activity | Progress+labels | Status
+  ctx.strokeStyle = "#6b7280"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(NAME_W,      PAD_TOP + 24); ctx.lineTo(NAME_W,      CHART_Y1); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(BOLD_SEP_X,  PAD_TOP + 24); ctx.lineTo(BOLD_SEP_X,  CHART_Y1); ctx.stroke();
 
   // Chart border
   ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 1;
   ctx.strokeRect(0, CHART_Y0, W, n * ROW_H);
 
-  // X-axis labels
+  // X-axis labels below the bar area (0–100 only, not the padding zone)
   ctx.fillStyle = "#6b7280"; ctx.font = "13px sans-serif"; ctx.textAlign = "center";
   [0, 25, 50, 75, 100].forEach(v => {
     ctx.fillText(String(v), toXPerf(v), CHART_Y1 + 16);
@@ -3964,7 +3967,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   const mkCoverSpacer = () => new Paragraph({ children: [], spacing: { before: 0, after: 480, ...CPL } });
   const mkCompanyLine = label => new Paragraph({
     children: [
-      new TextRun({ text: `${label}  `, bold: true, size: 28, font: TNR, underline: { type: "none" } }),
+      new TextRun({ text: `${label} `, bold: true, size: 28, font: TNR, underline: { type: "none" } }),
       new TextRun({ text: "[insert text]", size: 28, font: TNR, underline: { type: "none" } })
     ],
     alignment: AlignmentType.CENTER, spacing: { before: 40, after: 40, ...CPL }
@@ -4211,9 +4214,9 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
       ],
       children: [
         new TextRun({ text: "\t" }),
-        new TextRun({ text: "ZORA Behavioural Intervention", size: 20, color: "555555" }),
+        new TextRun({ text: "ZORA Behavioural Intervention", size: 22, color: "555555" }),
         new TextRun({ text: "\t" }),
-        new TextRun({ children: [PageNumber.CURRENT], size: 20, color: "555555" })
+        new TextRun({ children: [PageNumber.CURRENT], size: 22, color: "555555" })
       ],
       spacing: { before: 60, after: 0 }
     })]
