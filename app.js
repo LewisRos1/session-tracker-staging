@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1316";
+const APP_VERSION = "1317";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -13309,7 +13309,8 @@ function initDragSort(listEl, onReorder) {
 
   listEl.addEventListener('pointerdown', e => {
     if (!e.target.closest('.drag-handle')) return;
-    const item = e.target.closest('.admin-list-item');
+    // Find the direct child of listEl that contains the handle (works for any item class)
+    const item = [...listEl.children].find(child => child.contains(e.target));
     if (!item) return;
     e.preventDefault();
     e.stopPropagation();
@@ -13341,7 +13342,7 @@ function initDragSort(listEl, onReorder) {
     lastY = e.clientY;
     dragEl.style.top = (e.clientY - offsetY) + 'px';
 
-    const items = [...listEl.children].filter(el => el.classList.contains('admin-list-item') && el !== dragEl);
+    const items = [...listEl.children].filter(el => el !== dragEl && el !== placeholder);
     let inserted = false;
     for (const item of items) {
       const { top, height } = item.getBoundingClientRect();
@@ -13362,7 +13363,7 @@ function initDragSort(listEl, onReorder) {
     if (placeholder?.parentNode) placeholder.parentNode.insertBefore(dragEl, placeholder);
     placeholder?.remove();
     const newOrder = [...listEl.children]
-      .filter(el => el.classList.contains('admin-list-item'))
+      .filter(el => el !== placeholder)
       .map(el => Number(el.dataset.idx));
     dragEl = null;
     placeholder = null;
