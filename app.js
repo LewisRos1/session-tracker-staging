@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1306";
+const APP_VERSION = "1307";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -3487,28 +3487,29 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
     ctx.fillStyle = C_START; ctx.fillRect(PERF_X, startBarY, sW, BAR_HP);
     ctx.fillStyle = C_END;   ctx.fillRect(PERF_X, endBarY,   eW, BAR_HP);
 
-    // Value labels: draw inside bar (white) if it would overflow into Status column
+    // Value labels: always black; draw inside bar (right-aligned) if no room to the right
     const drawBarVal = (val, barW, barY, bold) => {
       const txt = String(Math.round(val));
       ctx.font = bold ? "bold 15px sans-serif" : "15px sans-serif";
+      ctx.fillStyle = "#111827";
       const tw = ctx.measureText(txt).width;
       if (barW + tw + 6 > PERF_W) {
-        ctx.fillStyle = "#ffffff"; ctx.textAlign = "right";
+        ctx.textAlign = "right";
         ctx.fillText(txt, PERF_X + barW - 3, barY + BAR_HP - 2);
       } else {
-        ctx.fillStyle = "#111827"; ctx.textAlign = "left";
+        ctx.textAlign = "left";
         ctx.fillText(txt, PERF_X + barW + 4, barY + BAR_HP - 2);
       }
     };
     drawBarVal(r.tStart, sW, startBarY, false);
     drawBarVal(r.tEnd,   eW, endBarY,   true);
 
-    // Status column
+    // Status column: ±8 threshold
     const delta = r.delta ?? (r.tEnd - r.tStart);
     let statusText, statusColor;
-    if      (delta > 0) { statusText = "↑ Improving"; statusColor = "#16a34a"; }
-    else if (delta < 0) { statusText = "↓ Declining"; statusColor = "#dc2626"; }
-    else                { statusText = "→ Stable";    statusColor = "#6b7280"; }
+    if      (delta > 8)  { statusText = "↑ Improving"; statusColor = "#16a34a"; }
+    else if (delta < -8) { statusText = "↓ Declining"; statusColor = "#dc2626"; }
+    else                 { statusText = "→ Stable";    statusColor = "#6b7280"; }
     ctx.font = "13px sans-serif"; ctx.fillStyle = statusColor; ctx.textAlign = "center";
     ctx.fillText(statusText, STATUS_X + STATUS_W / 2, cy + 6);
 
