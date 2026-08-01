@@ -168,7 +168,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1327";
+const APP_VERSION = "1328";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -6147,6 +6147,11 @@ function populateTargetDropdown(targets) {
     // as "still choosing" — so leaving it focused here would block every
     // future render until the user happens to click elsewhere.
     sel.blur();
+    // Render the newly-selected target synchronously NOW, before any async
+    // work starts.  Auto-fills and snapshot callbacks can throw or arrive in
+    // any order — this guarantees the correct target content is shown
+    // immediately regardless of what happens next.
+    try { renderTargetContent(); } catch(e) { console.error("renderTargetContent (sync) failed:", e); }
     // Also run auto-fills on target switch: the Firestore snapshot listener
     // only fires when session data changes, but switching targets alone doesn't
     // cause a write, so newly-added structured/mapped activities would otherwise
@@ -6157,7 +6162,7 @@ function populateTargetDropdown(targets) {
         await autoFillMappedRemarks(state.currentStudent, state.currentSessionId);
         await autoFillMaintainedRemarks(state.currentStudent, state.currentSessionId, state.selectedTargetName);
       } catch (e) { console.error("auto-fill error on target switch:", e); }
-      renderTargetContent();
+      try { renderTargetContent(); } catch(e) { console.error("renderTargetContent (post-fill) failed:", e); }
     })();
   };
 }
@@ -6294,9 +6299,14 @@ function renderTargetContent() {
   const scrollHost = container.closest(".session-body");
   const scrollTop  = scrollHost?.scrollTop;
   const captured = captureActiveEditState(container);
-  container.innerHTML = target.predefinedActivities?.length > 0
-    ? renderFedcTarget(target)
-    : renderRegularTarget(target);
+  try {
+    container.innerHTML = target.predefinedActivities?.length > 0
+      ? renderFedcTarget(target)
+      : renderRegularTarget(target);
+  } catch(e) {
+    console.error("renderTargetContent innerHTML failed for target:", target?.name, e);
+    throw e;
+  }
 
   attachTargetListeners(target);
   restoreActiveEditState(container, captured);
