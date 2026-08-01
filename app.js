@@ -168,7 +168,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1336";
+const APP_VERSION = "1337";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -7859,7 +7859,9 @@ function attachTargetListeners(target) {
       _msSetHint(hint, pct);
       _msUpdateAvgChip(sanitized.trim());
     });
+    let _msAlerting = false;
     input.addEventListener("blur", () => {
+      if (_msAlerting) return;
       const val = input.value.trim();
       const err = validateManualScore(val);
       if (!err) {
@@ -7870,7 +7872,9 @@ function attachTargetListeners(target) {
         }
         return;
       }
+      _msAlerting = true;
       alert(err);
+      _msAlerting = false;
       setTimeout(() => input.focus(), 0);
     });
   });
@@ -13656,12 +13660,12 @@ function stripRemarkHtml(s) {
 
 // Validates a manual score string. Returns null if valid (or empty), or an
 // error string to show the user if it's invalid (bad format or out of range).
-const MS_ACCEPTED = "Accepted: 25 · 25.5 · 25% · 25.5% · 1/4 · 5/20";
+const MS_ACCEPTED = "Accepted formats:\n1. 25\n2. 25.5\n3. 25%\n4. 25.5%\n5. 1/4\n6. 5/20";
 function validateManualScore(val) {
   if (!val || !String(val).trim()) return null;
   const parsed = parseManualScore(String(val).trim());
-  if (parsed === null) return `Invalid format. ${MS_ACCEPTED}`;
-  if (parsed > 100)    return `Score cannot exceed 100%. ${MS_ACCEPTED}`;
+  if (parsed === null) return `Invalid format.\n\n${MS_ACCEPTED}`;
+  if (parsed > 100)    return `Score cannot exceed 100%.\n\n${MS_ACCEPTED}`;
   return null;
 }
 
