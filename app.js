@@ -92,7 +92,8 @@ import {
   getAllSessionsForGroup,
   changeSessionNumber,
   loadHalfYearReportConfig,
-  saveHalfYearReportConfig
+  saveHalfYearReportConfig,
+  getStudentById
 } from "./firebase-service.js";
 import {
   exportStudentData, exportAllStudents, exportGroupMemberData,
@@ -167,7 +168,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1321";
+const APP_VERSION = "1322";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -5850,6 +5851,17 @@ async function openSession(student, existingSessionId = null, dateStr = null) {
   // looking at, not silently reset to the first target in the list —
   // only a genuine student switch starts fresh.
   const preservedTargetName = state.currentStudent?.id === student.id ? state.selectedTargetName : null;
+  // Always refresh from Firestore so target config changes (made on another device
+  // or since app startup) are reflected — stale in-memory student data causes the
+  // wrong target's activities to appear when predefined activities were added/removed.
+  try {
+    const fresh = await getStudentById(student.id);
+    if (fresh) {
+      Object.assign(student, fresh);
+      const si = (state.students || []).findIndex(s => s.id === student.id);
+      if (si >= 0) state.students[si] = student;
+    }
+  } catch {}
   state.currentStudent     = student;
   state.selectedTargetName = null;
   state.sessionData        = null;
