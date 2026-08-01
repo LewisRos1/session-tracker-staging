@@ -168,7 +168,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1330";
+const APP_VERSION = "1331";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -6518,6 +6518,13 @@ function renderFedcTarget(target) {
             <span style="flex-shrink:0;align-self:flex-start;margin-top:.45rem;display:inline-block;background:#dbeafe;color:#1e40af;border-radius:.4rem;padding:.12rem .5rem;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Subactivity</span>
             <span class="field-value-fixed"><span style="color:#1e40af;font-weight:700;margin-right:.25rem">${subLabel})</span>${inactiveReasonBadge(sub)}${paDisplayHtml(sub)}</span>
           </div>`;
+        const _subNoOpts = (sub.remarkHasNote || sub.optionsMulti) && parseOpts(getActivityInlineOptions(sub)).length === 0;
+        if (_subNoOpts) {
+          html += `<div class="entry-field" contenteditable="false">
+            <span class="field-label">Remark</span>
+            <span style="color:#9ca3af;font-style:italic;font-size:.88rem">&lt;Please Add Options in Edit Target&gt;</span>
+          </div>`;
+        } else {
         for (const rem of subRemarks) {
           html += renderRemarkFields(rem, target, getActivityInlineOptions(sub), (sub.inlineOptions || sub.remarkPresetId || sub.remarkHasNote) ? (sub.sentenceStarter || null) : null, sub.optionsMulti || false, null, sub.remarkHasNote || false, false, sub.optionScores || null, !!(sub.manualScore || sub.remarkHasNote || sub.inlineOptions || sub.remarkPresetId));
         }
@@ -6533,6 +6540,7 @@ function renderFedcTarget(target) {
             data-cfg-id="${escHtml(sub.id || "")}"
             data-target="${escHtml(target.name)}">+ Add Remark &amp; Trials</button>`;
         }
+        } // end _subNoOpts else
         html += `</div>`;
       });
       html += `</div>`;
@@ -6593,6 +6601,13 @@ function renderFedcTarget(target) {
         }
       }
     } else {
+      const _paNoOpts = (pa.remarkHasNote || pa.optionsMulti) && parseOpts(getActivityInlineOptions(pa)).length === 0;
+      if (_paNoOpts) {
+        html += `<div class="entry-field" contenteditable="false">
+          <span class="field-label">Remark</span>
+          <span style="color:#9ca3af;font-style:italic;font-size:.88rem">&lt;Please Add Options in Edit Target&gt;</span>
+        </div>`;
+      } else {
       for (const rem of remarks) {
         html += renderRemarkFields(rem, target, getActivityInlineOptions(pa), (pa.inlineOptions || pa.remarkPresetId || pa.remarkHasNote) ? (pa.sentenceStarter || null) : null, pa.optionsMulti || false, mappedInfo, pa.remarkHasNote || false, pa.manualScore || false, pa.optionScores || null, !!(pa.manualScore || pa.remarkHasNote || pa.inlineOptions || pa.remarkPresetId));
       }
@@ -6629,6 +6644,7 @@ function renderFedcTarget(target) {
           data-cfg-id="${escHtml(pa.id || "")}"
           data-target="${escHtml(target.name)}">+ Add ${addLabel}</button>`;
       }
+      } // end _paNoOpts else
     }
 
     html += `</div>`;
