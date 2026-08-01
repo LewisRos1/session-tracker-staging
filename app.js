@@ -168,7 +168,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1333";
+const APP_VERSION = "1334";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -7143,8 +7143,8 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
     const currentVal = rem.text ? stripRemarkHtml(rem.text).trim() : "";
     const parsed = parseManualScore(currentVal);
     const parsedPct  = parsed !== null ? Math.round(parsed * 10) / 10 : null;
-    const parsedHintText = parsedPct !== null ? `${parsedPct}%` : "Enter %";
-    const parsedHint = `<span class="manual-score-hint" data-rem-id="${rem.id}" style="display:inline-flex;align-items:center;padding:.15rem .55rem;border-radius:999px;font-size:.78rem;font-weight:600;background:#dbeafe;color:#1e40af;margin-left:.4rem;white-space:nowrap">${escHtml(parsedHintText)}</span>`;
+    const parsedHintText = parsedPct !== null ? `= ${parsedPct}%` : "";
+    const parsedHint = `<span class="manual-score-hint" data-rem-id="${rem.id}" style="font-size:.88rem;color:#9ca3af;margin-left:.5rem;white-space:nowrap${parsedPct === null ? ";display:none" : ""}">${escHtml(parsedHintText)}</span>`;
     const _msNote = (rem.masteryNote || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
     const _msShowNote = noteCapable && !!_msNote;
     const msNoteField = noteCapable
@@ -7848,11 +7848,15 @@ function attachTargetListeners(target) {
   c.querySelectorAll(".remark-text-input[data-manual-score='1']").forEach(input => {
     const _msHint = () => c.querySelector(`.manual-score-hint[data-rem-id="${input.dataset.remId}"]`);
     const _msErrDiv = () => input.closest(".entry-block")?.querySelector(`.ms-error[data-ms-error-rem="${input.dataset.remId}"]`);
+    const _msSetHint = (hint, pct) => {
+      if (pct !== null) { hint.textContent = `= ${pct}%`; hint.style.display = ""; hint.style.color = "#9ca3af"; }
+      else              { hint.textContent = ""; hint.style.display = "none"; hint.style.color = ""; }
+    };
     const _msClearError = () => {
       input.style.borderColor = "";
       _msErrDiv()?.remove();
       const hint = _msHint();
-      if (hint) { hint.style.background = ""; hint.style.color = ""; }
+      if (hint) { hint.style.color = "#9ca3af"; }
     };
     input.addEventListener("input", () => {
       // Strip anything that isn't a digit, decimal point, slash, or percent sign
@@ -7865,7 +7869,7 @@ function attachTargetListeners(target) {
       if (!hint) return;
       const parsed = parseManualScore(cleaned.trim());
       const pct    = parsed !== null ? Math.round(parsed * 10) / 10 : null;
-      hint.textContent = pct !== null ? `${pct}%` : "Enter %";
+      _msSetHint(hint, pct);
     });
     input.addEventListener("blur", () => {
       const val = input.value.trim();
@@ -7875,15 +7879,14 @@ function attachTargetListeners(target) {
         const hint = _msHint();
         if (hint) {
           const parsed = parseManualScore(val);
-          const pct = parsed !== null ? Math.round(parsed * 10) / 10 : null;
-          hint.textContent = pct !== null ? `${pct}%` : "Enter %";
+          _msSetHint(hint, parsed !== null ? Math.round(parsed * 10) / 10 : null);
         }
         return;
       }
       // Mark as invalid and show error message below the score row
       input.style.borderColor = "#ef4444";
       const hint = _msHint();
-      if (hint) { hint.textContent = "!"; hint.style.background = "#fee2e2"; hint.style.color = "#dc2626"; }
+      if (hint) { hint.textContent = "!"; hint.style.display = ""; hint.style.color = "#dc2626"; }
       const entryField = input.closest(".entry-field");
       if (entryField) {
         const errDiv = document.createElement("div");
