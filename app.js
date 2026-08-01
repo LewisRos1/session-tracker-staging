@@ -168,7 +168,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1332";
+const APP_VERSION = "1333";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -4944,6 +4944,9 @@ function maScrollAndBlink(paId) {
 
 // Show three-choice sheet: Today's Session | Edit Past Sessions | Manage Student
 function showStudentChoice(student) {
+  // Pre-fetch sessions as soon as the picker opens so the tick marks are
+  // ready by the time the user navigates to "Pick A Date".
+  const sessionsFetch = getRecentSessionsForStudent(student.id);
   $("session-picker-title").textContent = student.name;
   $("session-picker-list").innerHTML = `
     <div class="choice-list">
@@ -5010,8 +5013,6 @@ function showStudentChoice(student) {
       return `${d} ${months[m - 1]}`;
     };
 
-    // Pre-fetch sessions immediately so ticks are ready by the time user clicks "Pick A Date"
-    const sessionsFetch = getRecentSessionsForStudent(student.id);
 
     $("session-picker-list").innerHTML = `
       <div class="session-date-step">
@@ -5851,17 +5852,9 @@ async function openSession(student, existingSessionId = null, dateStr = null) {
   // looking at, not silently reset to the first target in the list —
   // only a genuine student switch starts fresh.
   const preservedTargetName = state.currentStudent?.id === student.id ? state.selectedTargetName : null;
-  // Always refresh from Firestore so target config changes (made on another device
-  // or since app startup) are reflected — stale in-memory student data causes the
-  // wrong target's activities to appear when predefined activities were added/removed.
-  try {
-    const fresh = await getStudentById(student.id);
-    if (fresh) {
-      Object.assign(student, fresh);
-      const si = (state.students || []).findIndex(s => s.id === student.id);
-      if (si >= 0) state.students[si] = student;
-    }
-  } catch {}
+
+  // Show the session screen immediately — before any network call — so
+  // closing the picker never flashes the home screen while we fetch.
   state.currentStudent     = student;
   state.selectedTargetName = null;
   state.sessionData        = null;
@@ -5896,6 +5889,18 @@ async function openSession(student, existingSessionId = null, dateStr = null) {
   state.entryEnterKeyCleanup?.();
   state.entryEnterKeyCleanup = setupEntryEnterKeyDelegation($("target-content"),
     () => getEffectiveTargets().find(t => t.name === state.selectedTargetName));
+
+  // Refresh student data from Firestore now that the loading screen is visible,
+  // so target config changes made on another device are picked up.
+  try {
+    const fresh = await getStudentById(student.id);
+    if (fresh) {
+      Object.assign(student, fresh);
+      state.currentStudent = student;
+      const si = (state.students || []).findIndex(s => s.id === student.id);
+      if (si >= 0) state.students[si] = student;
+    }
+  } catch {}
 
   try {
     const sessionId = existingSessionId
