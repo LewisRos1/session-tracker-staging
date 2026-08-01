@@ -168,7 +168,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1329";
+const APP_VERSION = "1330";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -7819,16 +7819,45 @@ function attachTargetListeners(target) {
 
   // ── Manual score input: allow only numeric characters, update hint live ──
   c.querySelectorAll(".remark-text-input[data-manual-score='1']").forEach(input => {
+    const _msHint = () => c.querySelector(`.manual-score-hint[data-rem-id="${input.dataset.remId}"]`);
+    const _msErrDiv = () => input.closest(".entry-block")?.querySelector(`.ms-error[data-ms-error-rem="${input.dataset.remId}"]`);
+    const _msClearError = () => {
+      input.style.borderColor = "";
+      _msErrDiv()?.remove();
+      const hint = _msHint();
+      if (hint) { hint.style.background = ""; hint.style.color = ""; }
+    };
     input.addEventListener("input", () => {
       // Strip anything that isn't a digit, decimal point, slash, or percent sign
       const cleaned = input.value.replace(/[^0-9./%]/g, "");
       if (input.value !== cleaned) input.value = cleaned;
+      // Clear any existing error while the user is editing
+      _msClearError();
       // Update the adjacent hint span in real time
-      const hint = c.querySelector(`.manual-score-hint[data-rem-id="${input.dataset.remId}"]`);
+      const hint = _msHint();
       if (!hint) return;
       const parsed = parseManualScore(cleaned.trim());
       const pct    = parsed !== null ? Math.round(parsed * 10) / 10 : null;
       hint.textContent = pct !== null ? `${pct}%` : "%";
+    });
+    input.addEventListener("blur", () => {
+      const val = input.value.trim();
+      const err = validateManualScore(val);
+      _msClearError();
+      if (!err) return;
+      // Mark as invalid and show error message below the score row
+      input.style.borderColor = "#ef4444";
+      const hint = _msHint();
+      if (hint) { hint.textContent = "!"; hint.style.background = "#fee2e2"; hint.style.color = "#dc2626"; }
+      const entryField = input.closest(".entry-field");
+      if (entryField) {
+        const errDiv = document.createElement("div");
+        errDiv.className = "ms-error";
+        errDiv.dataset.msErrorRem = input.dataset.remId;
+        errDiv.style.cssText = "font-size:.78rem;color:#dc2626;padding:.15rem .5rem .3rem;line-height:1.4";
+        errDiv.textContent = err;
+        entryField.after(errDiv);
+      }
     });
   });
 
@@ -9966,8 +9995,12 @@ function setupEntryRemarkSaving(host, getSessionId, onIdle) {
       });
     };
 
-    diffAndSave(".remark-text-input[data-rem-id]", el => htmlForStorage(el.value),
-      (el, html) => updateRemarkText(sid, el.dataset.remId, html));
+    diffAndSave(".remark-text-input[data-rem-id]", el => {
+      // Block saving manual score inputs whose current value is invalid
+      if (el.dataset.manualScore === '1' && el.value.trim() && validateManualScore(el.value.trim()) !== null)
+        return el.dataset.savedHtml;
+      return htmlForStorage(el.value);
+    }, (el, html) => updateRemarkText(sid, el.dataset.remId, html));
 
     diffAndSave(".mastery-note-input[data-rem-id]", el => htmlForStorage(el.value),
       (el, html) => updateRemarkNote(sid, el.dataset.remId, html));
@@ -13604,6 +13637,17 @@ function stripRemarkHtml(s) {
     .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"')
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+// Validates a manual score string. Returns null if valid (or empty), or an
+// error string to show the user if it's invalid (bad format or out of range).
+const MS_ACCEPTED = "Accepted: 25 · 25.5 · 25% · 25.5% · 5/20";
+function validateManualScore(val) {
+  if (!val || !String(val).trim()) return null;
+  const parsed = parseManualScore(String(val).trim());
+  if (parsed === null) return `Invalid format. ${MS_ACCEPTED}`;
+  if (parsed > 100)    return `Score cannot exceed 100%. ${MS_ACCEPTED}`;
+  return null;
 }
 
 // Parses a manually-typed score value into a percentage (0–100).
