@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1320";
+const APP_VERSION = "1321";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -5941,7 +5941,7 @@ async function openSession(student, existingSessionId = null, dateStr = null) {
         if (mappedFilled > 0) return;
       } catch (err) { console.error("autoFillMappedRemarks failed:", err); }
       try {
-        const maintainedFilled = await autoFillMaintainedRemarks(student, sessionId);
+        const maintainedFilled = await autoFillMaintainedRemarks(student, sessionId, state.selectedTargetName);
         if (maintainedFilled > 0) return;
       } catch (err) { console.error("autoFillMaintainedRemarks failed:", err); }
       // Keep score modal trial badges in sync with Firestore
@@ -6118,7 +6118,7 @@ function populateTargetDropdown(targets) {
       try {
         if (await autoFillStructuredRemarks(state.currentStudent, state.currentSessionId) > 0) return;
         if (await autoFillMappedRemarks(state.currentStudent, state.currentSessionId) > 0) return;
-        if (await autoFillMaintainedRemarks(state.currentStudent, state.currentSessionId) > 0) return;
+        if (await autoFillMaintainedRemarks(state.currentStudent, state.currentSessionId, state.selectedTargetName) > 0) return;
         renderTargetContent();
       } catch { renderTargetContent(); }
     })();
@@ -7964,10 +7964,34 @@ async function autoFillMappedRemarks(student, sessionId) {
 // Mirrors autoFillMappedRemarks — runs on first load and target switch only.
 const maintainedRemarkAutoFillInFlight = new Set();
 
-async function autoFillMaintainedRemarks(student, sessionId) {
+// Shared fill executor: creates the activity (if missing) then the remark.
+async function _runMaintainedFills(sessionId, items) {
+  await Promise.all(items.map(async item => {
+    if (!item.actId) {
+      try {
+        item.actId = await addActivity(sessionId, item.target.name, item.pa.name, item.pa.order ?? 0, true);
+      } catch { maintainedRemarkAutoFillInFlight.delete(item.key); item.actId = null; }
+    }
+  }));
+  await Promise.all(items.map(async item => {
+    if (!item.actId) return;
+    try { await addRemark(sessionId, item.actId, "Maintain"); }
+    finally { maintainedRemarkAutoFillInFlight.delete(item.key); }
+  }));
+}
+
+// selectedTargetName: the target currently on screen. Fills for that target
+// block the return value (so the snapshot listener defers rendering until
+// they land). Fills for OTHER targets start concurrently in the background
+// so a target with many maintained activities never stalls a different
+// target that has none.
+async function autoFillMaintainedRemarks(student, sessionId, selectedTargetName = null) {
   const data = state.sessionData;
-  const toFill = [];
+  const currentFill = [];
+  const bgFill = [];
   for (const target of (student.targets || [])) {
+    const bucket = (selectedTargetName === null || target.name === selectedTargetName)
+      ? currentFill : bgFill;
     for (const pa of (target.predefinedActivities || [])) {
       if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || (!pa.name && !pa.title)) continue;
       // Match by name OR by configId so a character-level name mismatch never spawns a duplicate.
@@ -7986,23 +8010,14 @@ async function autoFillMaintainedRemarks(student, sessionId) {
       const key = `${sessionId}:${target.name}:${pa.name}:maintained`;
       if (maintainedRemarkAutoFillInFlight.has(key)) continue;
       maintainedRemarkAutoFillInFlight.add(key);
-      toFill.push({ target, pa, actId, key });
+      bucket.push({ target, pa, actId, key });
     }
   }
-  if (toFill.length === 0) return 0;
-  await Promise.all(toFill.map(async item => {
-    if (!item.actId) {
-      try {
-        item.actId = await addActivity(sessionId, item.target.name, item.pa.name, item.pa.order ?? 0, true);
-      } catch { maintainedRemarkAutoFillInFlight.delete(item.key); item.actId = null; }
-    }
-  }));
-  await Promise.all(toFill.map(async item => {
-    if (!item.actId) return;
-    try { await addRemark(sessionId, item.actId, "Maintain"); }
-    finally { maintainedRemarkAutoFillInFlight.delete(item.key); }
-  }));
-  return toFill.length;
+  // Other targets: start fills but don't block rendering on them.
+  if (bgFill.length > 0) _runMaintainedFills(sessionId, bgFill).catch(() => {});
+  if (currentFill.length === 0) return 0;
+  await _runMaintainedFills(sessionId, currentFill);
+  return currentFill.length;
 }
 
 // Deletes remarks that have no text, no mastery note, and no valid trials for
@@ -12753,7 +12768,7 @@ async function closeManageModal() {
         try {
           if (await autoFillStructuredRemarks(state.currentStudent, state.currentSessionId) > 0) return;
           if (await autoFillMappedRemarks(state.currentStudent, state.currentSessionId) > 0) return;
-          if (await autoFillMaintainedRemarks(state.currentStudent, state.currentSessionId) > 0) return;
+          if (await autoFillMaintainedRemarks(state.currentStudent, state.currentSessionId, state.selectedTargetName) > 0) return;
           renderTargetContent();
         } catch { renderTargetContent(); }
       })();
