@@ -168,7 +168,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1331";
+const APP_VERSION = "1332";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -7138,7 +7138,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
     const currentVal = rem.text ? stripRemarkHtml(rem.text).trim() : "";
     const parsed = parseManualScore(currentVal);
     const parsedPct  = parsed !== null ? Math.round(parsed * 10) / 10 : null;
-    const parsedHintText = parsedPct !== null ? `${parsedPct}%` : "%";
+    const parsedHintText = parsedPct !== null ? `${parsedPct}%` : "Enter %";
     const parsedHint = `<span class="manual-score-hint" data-rem-id="${rem.id}" style="display:inline-flex;align-items:center;padding:.15rem .55rem;border-radius:999px;font-size:.78rem;font-weight:600;background:#dbeafe;color:#1e40af;margin-left:.4rem;white-space:nowrap">${escHtml(parsedHintText)}</span>`;
     const _msNote = (rem.masteryNote || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
     const _msShowNote = noteCapable && !!_msNote;
@@ -7152,22 +7152,28 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
           <button class="btn-delete-note" contenteditable="false" data-rem-id="${rem.id}" style="font-size:.75rem;color:#9ca3af;background:transparent;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .45rem;cursor:pointer;white-space:nowrap;flex-shrink:0">Delete Note</button>
         </div>`
       : "";
-    const msAddNoteBtn = (noteCapable && !_msShowNote)
-      ? `<button class="btn-add-note" data-rem-id="${rem.id}" contenteditable="false" style="margin-left:.75rem;font-size:.8rem;padding:.25rem .6rem;background:transparent;border:1px solid #a5b4fc;color:#6366f1;border-radius:.35rem;cursor:pointer;white-space:nowrap;flex-shrink:0">+ Note</button>`
+    const msNoteRow = (noteCapable && !_msShowNote)
+      ? `<div class="entry-field" contenteditable="false">
+          <span class="field-label"></span>
+          <div class="trials-row">
+            <div class="trials-badges"></div>
+            <button class="btn-add-note btn-note-sm" data-rem-id="${rem.id}" contenteditable="false">+ Note</button>
+          </div>
+        </div>`
       : "";
     return `
     <div class="entry-divider" contenteditable="false"></div>
     <div class="entry-field" contenteditable="false">
       <span class="field-label">Score</span>
-      <input type="text" class="field-input remark-text-input" style="max-width:10rem"
+      <input type="text" class="field-input remark-text-input" style="max-width:14rem"
         data-rem-id="${rem.id}" data-saved-html="${escHtml(currentVal)}"
         data-manual-score="1"
         placeholder="e.g. 5/20, 25%, 25, 0.25"
-        value="${escHtml(currentVal)}">${parsedHint}${msAddNoteBtn}
+        value="${escHtml(currentVal)}">${parsedHint}
       <button class="btn-icon btn-delete-remark" contenteditable="false"
         data-rem-id="${rem.id}" title="Delete score">🗑</button>
     </div>
-    ${msNoteField}`;
+    ${msNoteField}${msNoteRow}`;
   }
 
   const trials = rem.trials || [];
@@ -7182,7 +7188,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
   const _existingNote = (rem.masteryNote || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
   const _showNote = noteCapable && !!_existingNote;
   const addNoteBtn = (noteCapable && !_showNote)
-    ? `<button class="btn-add-note" data-rem-id="${rem.id}" contenteditable="false" style="margin-left:.75rem;font-size:.8rem;padding:.25rem .6rem;background:transparent;border:1px solid #a5b4fc;color:#6366f1;border-radius:.35rem;cursor:pointer;white-space:nowrap;flex-shrink:0">+ Note</button>`
+    ? `<button class="btn-add-note btn-note-sm" data-rem-id="${rem.id}" contenteditable="false" style="margin-left:.5rem">+ Note</button>`
     : "";
 
   const trailingField = mappedInfo
@@ -7854,13 +7860,21 @@ function attachTargetListeners(target) {
       if (!hint) return;
       const parsed = parseManualScore(cleaned.trim());
       const pct    = parsed !== null ? Math.round(parsed * 10) / 10 : null;
-      hint.textContent = pct !== null ? `${pct}%` : "%";
+      hint.textContent = pct !== null ? `${pct}%` : "Enter %";
     });
     input.addEventListener("blur", () => {
       const val = input.value.trim();
       const err = validateManualScore(val);
       _msClearError();
-      if (!err) return;
+      if (!err) {
+        const hint = _msHint();
+        if (hint) {
+          const parsed = parseManualScore(val);
+          const pct = parsed !== null ? Math.round(parsed * 10) / 10 : null;
+          hint.textContent = pct !== null ? `${pct}%` : "Enter %";
+        }
+        return;
+      }
       // Mark as invalid and show error message below the score row
       input.style.borderColor = "#ef4444";
       const hint = _msHint();
@@ -17907,7 +17921,7 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
   const _grpExistingNote = (rem.masteryNote || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
   const _grpShowNote = noteCapable && !!_grpExistingNote;
   const grpAddNoteBtn = (noteCapable && !_grpShowNote)
-    ? `<button class="btn-add-note" data-rem-id="${remId}" contenteditable="false" style="margin-left:.75rem;font-size:.8rem;padding:.25rem .6rem;background:transparent;border:1px solid #a5b4fc;color:#6366f1;border-radius:.35rem;cursor:pointer;white-space:nowrap;flex-shrink:0">+ Note</button>`
+    ? `<button class="btn-add-note btn-note-sm" data-rem-id="${remId}" contenteditable="false" style="margin-left:.5rem">+ Note</button>`
     : "";
 
   const trailingField = mappedInfo

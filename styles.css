@@ -1118,6 +1118,21 @@ input.field-input::placeholder {
 
 .btn-primary-sm:hover { background: var(--primary-dark); }
 
+.btn-note-sm {
+  padding: .45rem .85rem;
+  background: #6366f1;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: .88rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 36px;
+  white-space: nowrap;
+  transition: background .15s;
+}
+.btn-note-sm:hover { background: #4f46e5; }
+
 .btn-cancel-plain {
   padding: .45rem .75rem;
   background: none;
