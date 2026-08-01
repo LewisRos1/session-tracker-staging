@@ -168,7 +168,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1334";
+const APP_VERSION = "1335";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -7145,25 +7145,14 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
     const parsedPct  = parsed !== null ? Math.round(parsed * 10) / 10 : null;
     const parsedHintText = parsedPct !== null ? `= ${parsedPct}%` : "";
     const parsedHint = `<span class="manual-score-hint" data-rem-id="${rem.id}" style="font-size:.88rem;color:#9ca3af;margin-left:.5rem;white-space:nowrap${parsedPct === null ? ";display:none" : ""}">${escHtml(parsedHintText)}</span>`;
-    const _msNote = (rem.masteryNote || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
-    const _msShowNote = noteCapable && !!_msNote;
     const msNoteField = noteCapable
-      ? `<div class="entry-field entry-note-field" data-rem-id="${rem.id}"${_msShowNote ? "" : ' style="display:none"'}>
+      ? `<div class="entry-field entry-note-field" data-rem-id="${rem.id}">
           <span class="field-label" contenteditable="false">Notes</span>
           <button class="btn-sketch" contenteditable="false" data-rem-id="${rem.id}" aria-label="Open sketch board">✏</button>
           <textarea class="field-input mastery-note-input" rows="1"
             data-rem-id="${rem.id}" placeholder="Notes…"
             data-saved-html="${escHtml(rem.masteryNote || "")}">${escHtml(plainTextForEdit(rem.masteryNote || ""))}</textarea>
           <button class="btn-delete-note" contenteditable="false" data-rem-id="${rem.id}" style="font-size:.75rem;color:#9ca3af;background:transparent;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .45rem;cursor:pointer;white-space:nowrap;flex-shrink:0">Delete Note</button>
-        </div>`
-      : "";
-    const msNoteRow = (noteCapable && !_msShowNote)
-      ? `<div class="entry-field" contenteditable="false">
-          <span class="field-label"></span>
-          <div class="trials-row">
-            <div class="trials-badges"></div>
-            <button class="btn-add-note btn-note-sm" data-rem-id="${rem.id}" contenteditable="false">+ Note</button>
-          </div>
         </div>`
       : "";
     return `
@@ -7178,7 +7167,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
       <button class="btn-icon btn-delete-remark" contenteditable="false"
         data-rem-id="${rem.id}" title="Delete score">🗑</button>
     </div>
-    ${msNoteField}${msNoteRow}`;
+    ${msNoteField}`;
   }
 
   const trials = rem.trials || [];
@@ -7191,10 +7180,6 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
   const badgesHtml = regularBadges + optBadge;
 
   const _existingNote = (rem.masteryNote || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
-  const _showNote = noteCapable && !!_existingNote;
-  const addNoteBtn = (noteCapable && !_showNote)
-    ? `<button class="btn-add-note btn-note-sm" data-rem-id="${rem.id}" contenteditable="false" style="margin-left:.5rem">+ Note</button>`
-    : "";
 
   const trailingField = mappedInfo
     ? `<div class="entry-field" contenteditable="false">
@@ -7207,7 +7192,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
           <div class="trials-badges">${badgesHtml}</div>
           <button class="btn-add-trial btn-primary-sm"
             data-rem-id="${rem.id}"
-            data-target="${escHtml(target.name)}" onmousedown="event.preventDefault()">+ Trial</button>${addNoteBtn}
+            data-target="${escHtml(target.name)}" onmousedown="event.preventDefault()">+ Trial</button>
         </div>
       </div>`;
 
@@ -7280,7 +7265,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
   // but somehow have note data, show an "Old data" fallback.
   let noteField;
   if (noteCapable) {
-    noteField = `<div class="entry-field entry-note-field" data-rem-id="${rem.id}"${_showNote ? "" : ' style="display:none"'}>
+    noteField = `<div class="entry-field entry-note-field" data-rem-id="${rem.id}">
         <span class="field-label" contenteditable="false">Notes</span>
         <button class="btn-sketch" contenteditable="false" data-rem-id="${rem.id}" aria-label="Open sketch board">✏</button>
         <textarea class="field-input mastery-note-input" rows="1"
@@ -7747,21 +7732,6 @@ function attachTargetListeners(target) {
     });
   });
 
-  // ── Show note field ───────────────────────────────────────
-  c.querySelectorAll(".btn-add-note").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const remId = btn.dataset.remId;
-      const entryBlock = btn.closest(".entry-block");
-      btn.style.display = "none";
-      const noteDiv = entryBlock?.querySelector(`.entry-note-field[data-rem-id="${remId}"]`);
-      if (noteDiv) {
-        noteDiv.style.removeProperty("display");
-        const ta = noteDiv.querySelector(".mastery-note-input");
-        if (ta) { autoResizeTextarea(ta); ta.focus(); }
-      }
-    });
-  });
-
   // ── Delete note ───────────────────────────────────────────
   c.querySelectorAll(".btn-delete-note").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -7773,12 +7743,9 @@ function attachTargetListeners(target) {
       if (sid) updateRemarkNote(sid, remId, "").catch(() => {});
       const noteDiv = entryBlock?.querySelector(`.entry-note-field[data-rem-id="${remId}"]`);
       if (noteDiv) {
-        noteDiv.style.display = "none";
         const ta = noteDiv.querySelector(".mastery-note-input");
         if (ta) { ta.value = ""; ta.dataset.savedHtml = ""; }
       }
-      const addBtn = entryBlock?.querySelector(`.btn-add-note[data-rem-id="${remId}"]`);
-      if (addBtn) addBtn.style.removeProperty("display");
     });
   });
 
@@ -17927,10 +17894,6 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
     ? `<span class="trial-badge trial-badge--option">${rem.optionScore}</span>` : "";
   const badges = regularBadges + optBadge;
   const _grpExistingNote = (rem.masteryNote || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
-  const _grpShowNote = noteCapable && !!_grpExistingNote;
-  const grpAddNoteBtn = (noteCapable && !_grpShowNote)
-    ? `<button class="btn-add-note btn-note-sm" data-rem-id="${remId}" contenteditable="false" style="margin-left:.5rem">+ Note</button>`
-    : "";
 
   const trailingField = mappedInfo
     ? `<div class="entry-field" contenteditable="false">
@@ -17942,7 +17905,7 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
         <div class="trials-row">
           <div class="trials-badges">${badges}</div>
           <button class="btn-primary-sm btn-add-trial btn-group-add-trial"
-            data-rem-id="${remId}" data-target="${escHtml(target.name)}" onmousedown="event.preventDefault()">+ Trial</button>${grpAddNoteBtn}
+            data-rem-id="${remId}" data-target="${escHtml(target.name)}" onmousedown="event.preventDefault()">+ Trial</button>
         </div>
       </div>`;
 
@@ -17994,7 +17957,7 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
 
   let noteField;
   if (noteCapable) {
-    noteField = `<div class="entry-field entry-note-field" data-rem-id="${remId}"${_grpShowNote ? "" : ' style="display:none"'}>
+    noteField = `<div class="entry-field entry-note-field" data-rem-id="${remId}">
         <span class="field-label" contenteditable="false">Notes</span>
         <button class="btn-sketch btn-group-sketch" contenteditable="false" data-rem-id="${remId}" aria-label="Open sketch board">✏</button>
         <textarea class="field-input mastery-note-input" rows="1"
@@ -18416,21 +18379,6 @@ function attachGroupTargetListeners(target) {
     });
   });
 
-  // ── Show note (group) ─────────────────────────────────────
-  c.querySelectorAll(".btn-add-note").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const remId = btn.dataset.remId;
-      const section = btn.closest(".group-student-section");
-      btn.style.display = "none";
-      const noteDiv = section?.querySelector(`.entry-note-field[data-rem-id="${remId}"]`);
-      if (noteDiv) {
-        noteDiv.style.removeProperty("display");
-        const ta = noteDiv.querySelector(".mastery-note-input");
-        if (ta) { autoResizeTextarea(ta); ta.focus(); }
-      }
-    });
-  });
-
   // ── Delete note (group) ───────────────────────────────────
   c.querySelectorAll(".btn-delete-note").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -18442,12 +18390,9 @@ function attachGroupTargetListeners(target) {
       if (sid) updateRemarkNote(sid, remId, "").catch(() => {});
       const noteDiv = section?.querySelector(`.entry-note-field[data-rem-id="${remId}"]`);
       if (noteDiv) {
-        noteDiv.style.display = "none";
         const ta = noteDiv.querySelector(".mastery-note-input");
         if (ta) { ta.value = ""; ta.dataset.savedHtml = ""; }
       }
-      const addBtn = section?.querySelector(`.btn-add-note[data-rem-id="${remId}"]`);
-      if (addBtn) addBtn.style.removeProperty("display");
     });
   });
 
