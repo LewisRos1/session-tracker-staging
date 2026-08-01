@@ -168,7 +168,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1328";
+const APP_VERSION = "1329";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -13589,6 +13589,19 @@ function stripNoteHtml(text) {
     .replace(/<b>/gi, "*").replace(/<\/b>/gi, "*")
     .replace(/<u>/gi, "_").replace(/<\/u>/gi, "_")
     .replace(/<[^>]*>/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+// Strips HTML tags and decodes entities from a stored remark string.
+function stripRemarkHtml(s) {
+  return (s || "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/div>/gi, "\n").replace(/<div>/gi, "")
+    .replace(/<\/p>/gi, "\n").replace(/<p>/gi, "")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&amp;/g, "&").replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"')
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
