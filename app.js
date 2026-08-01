@@ -168,7 +168,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1326";
+const APP_VERSION = "1327";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -6153,11 +6153,11 @@ function populateTargetDropdown(targets) {
     // never auto-fill until a write happened.
     (async () => {
       try {
-        if (await autoFillStructuredRemarks(state.currentStudent, state.currentSessionId) > 0) return;
-        if (await autoFillMappedRemarks(state.currentStudent, state.currentSessionId) > 0) return;
-        if (await autoFillMaintainedRemarks(state.currentStudent, state.currentSessionId, state.selectedTargetName) > 0) return;
-        renderTargetContent();
-      } catch { renderTargetContent(); }
+        await autoFillStructuredRemarks(state.currentStudent, state.currentSessionId);
+        await autoFillMappedRemarks(state.currentStudent, state.currentSessionId);
+        await autoFillMaintainedRemarks(state.currentStudent, state.currentSessionId, state.selectedTargetName);
+      } catch (e) { console.error("auto-fill error on target switch:", e); }
+      renderTargetContent();
     })();
   };
 }
@@ -8062,7 +8062,17 @@ async function autoFillMaintainedRemarks(student, sessionId, selectedTargetName 
         deleteActivity(sessionId, dupeActId, dupeRemIds);
       }
       let actId = canonical?.[0] || null;
-      if (actId && Object.values(data.remarks || {}).some(r => r.activityId === actId)) continue;
+      if (actId) {
+        const existingRems = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === actId);
+        if (existingRems.length > 1) {
+          existingRems.sort(([, a], [, b]) => (b.order || 0) - (a.order || 0));
+          for (const [remId] of existingRems.slice(1)) {
+            deleteRemark(sessionId, remId).catch(() => {});
+            delete data.remarks[remId];
+          }
+        }
+        if (existingRems.length > 0) continue;
+      }
       const key = `${sessionId}:${target.name}:${pa.name}:maintained`;
       if (maintainedRemarkAutoFillInFlight.has(key)) continue;
       maintainedRemarkAutoFillInFlight.add(key);
@@ -12822,11 +12832,11 @@ async function closeManageModal() {
       // session doc.
       (async () => {
         try {
-          if (await autoFillStructuredRemarks(state.currentStudent, state.currentSessionId) > 0) return;
-          if (await autoFillMappedRemarks(state.currentStudent, state.currentSessionId) > 0) return;
-          if (await autoFillMaintainedRemarks(state.currentStudent, state.currentSessionId, state.selectedTargetName) > 0) return;
-          renderTargetContent();
-        } catch { renderTargetContent(); }
+          await autoFillStructuredRemarks(state.currentStudent, state.currentSessionId);
+          await autoFillMappedRemarks(state.currentStudent, state.currentSessionId);
+          await autoFillMaintainedRemarks(state.currentStudent, state.currentSessionId, state.selectedTargetName);
+        } catch (e) { console.error("auto-fill error after Edit Target:", e); }
+        renderTargetContent();
       })();
     }
   }
