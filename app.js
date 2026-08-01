@@ -168,7 +168,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1325";
+const APP_VERSION = "1326";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -7869,6 +7869,7 @@ async function saveNewRemark(target) {
 // there's nothing to pre-select, so they stay collapsed behind "+ Add
 // Remark & Trials" until the boss actually has something to type.
 function isAutoOpenRemarkType(pa) {
+  if (pa.manualScore) return true;
   if (pa.remarkHasNote) return true;
   if (pa.sentenceStarter && pa.inlineOptions) return true;
   if (pa.sentenceStarter) return false;
