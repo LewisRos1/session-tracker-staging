@@ -168,7 +168,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1322";
+const APP_VERSION = "1323";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -7108,7 +7108,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
       <span class="field-label">Score</span>
       <input type="text" class="field-input remark-text-input" style="max-width:10rem"
         data-rem-id="${rem.id}" data-saved-html="${escHtml(currentVal)}"
-        placeholder="e.g. 5/20, 25% or 25"
+        placeholder="e.g. 5/20, 25%, 25 or 0.25"
         value="${escHtml(currentVal)}">${parsedHint}${msAddNoteBtn}
       <button class="btn-icon btn-delete-remark" contenteditable="false"
         data-rem-id="${rem.id}" title="Delete score">🗑</button>
@@ -13539,7 +13539,7 @@ function parseManualScore(val) {
   const pct = s.match(/^(\d+(?:\.\d+)?)\s*%$/);
   if (pct) return parseFloat(pct[1]);
   const num = s.match(/^(\d+(?:\.\d+)?)$/);
-  if (num) return parseFloat(num[1]);
+  if (num) { const v = parseFloat(num[1]); return v < 1 ? v * 100 : v; }
   return null;
 }
 
