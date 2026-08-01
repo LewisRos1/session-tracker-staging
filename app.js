@@ -168,7 +168,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1324";
+const APP_VERSION = "1325";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -7112,9 +7112,8 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
     const currentVal = rem.text ? stripRemarkHtml(rem.text).trim() : "";
     const parsed = parseManualScore(currentVal);
     const parsedPct  = parsed !== null ? Math.round(parsed * 10) / 10 : null;
-    const parsedHint = currentVal && parsedPct !== null
-      ? `<span class="manual-score-hint" data-rem-id="${rem.id}" style="font-size:.78rem;color:#6b7280;margin-left:.25rem">${escHtml(currentVal)} = ${parsedPct}%</span>`
-      : `<span class="manual-score-hint" data-rem-id="${rem.id}" style="font-size:.78rem;color:#6b7280;margin-left:.25rem"></span>`;
+    const parsedHintText = parsedPct !== null ? `${parsedPct}%` : "%";
+    const parsedHint = `<span class="manual-score-hint" data-rem-id="${rem.id}" style="display:inline-flex;align-items:center;padding:.15rem .55rem;border-radius:999px;font-size:.78rem;font-weight:600;background:#dbeafe;color:#1e40af;margin-left:.4rem;white-space:nowrap">${escHtml(parsedHintText)}</span>`;
     const _msNote = (rem.masteryNote || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
     const _msShowNote = noteCapable && !!_msNote;
     const msNoteField = noteCapable
@@ -7819,7 +7818,7 @@ function attachTargetListeners(target) {
       if (!hint) return;
       const parsed = parseManualScore(cleaned.trim());
       const pct    = parsed !== null ? Math.round(parsed * 10) / 10 : null;
-      hint.textContent = (cleaned && pct !== null) ? `${cleaned} = ${pct}%` : "";
+      hint.textContent = pct !== null ? `${pct}%` : "%";
     });
   });
 
