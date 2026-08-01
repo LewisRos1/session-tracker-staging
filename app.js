@@ -168,7 +168,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1335";
+const APP_VERSION = "1336";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -6249,7 +6249,8 @@ function calcDaysAverage(target, visited = new Set()) {
       if (mappedPct !== null) avgs.push(mappedPct);
       continue;
     }
-    const manualPa = (target.predefinedActivities || []).find(p => p.manualScore && p.name === act.activityName);
+    const manualPa = (target.predefinedActivities || []).find(p => p.manualScore &&
+        (p.name === act.activityName || (act.configId && p.id === act.configId)));
     for (const rem of getRemarksForActivity(act.id)) {
       if (manualPa) {
         const pct = parseManualScore(plainTextForEdit(rem.text || "").trim());
@@ -7814,34 +7815,53 @@ function attachTargetListeners(target) {
   // ── Manual score input: allow only numeric characters, update hint live ──
   c.querySelectorAll(".remark-text-input[data-manual-score='1']").forEach(input => {
     const _msHint = () => c.querySelector(`.manual-score-hint[data-rem-id="${input.dataset.remId}"]`);
-    const _msErrDiv = () => input.closest(".entry-block")?.querySelector(`.ms-error[data-ms-error-rem="${input.dataset.remId}"]`);
     const _msSetHint = (hint, pct) => {
       if (pct !== null) { hint.textContent = `= ${pct}%`; hint.style.display = ""; hint.style.color = "#9ca3af"; }
       else              { hint.textContent = ""; hint.style.display = "none"; hint.style.color = ""; }
     };
-    const _msClearError = () => {
-      input.style.borderColor = "";
-      _msErrDiv()?.remove();
-      const hint = _msHint();
-      if (hint) { hint.style.color = "#9ca3af"; }
+    const _msUpdateAvgChip = (rawVal) => {
+      const remId = input.dataset.remId;
+      const rem = state.sessionData?.remarks?.[remId];
+      if (!rem) return;
+      const prevText = rem.text;
+      rem.text = rawVal;
+      const target = getEffectiveTargets().find(t => t.name === state.selectedTargetName);
+      if (target) {
+        const liveAvg = calcDaysAverage(target);
+        const avgEl = $("days-average-value");
+        if (avgEl) avgEl.textContent = liveAvg !== null ? liveAvg + "%" : "—";
+      }
+      rem.text = prevText;
+    };
+    const _msSanitize = (raw) => {
+      let s = raw.replace(/[^0-9./%]/g, "");
+      // Nothing allowed after %
+      const pctIdx = s.indexOf("%");
+      if (pctIdx !== -1) s = s.slice(0, pctIdx + 1);
+      // Only one /
+      const slashIdx = s.indexOf("/");
+      if (slashIdx !== -1) s = s.slice(0, slashIdx + 1) + s.slice(slashIdx + 1).replace(/\//g, "");
+      // Collapse consecutive dots
+      s = s.replace(/\.{2,}/g, ".");
+      return s;
     };
     input.addEventListener("input", () => {
-      // Strip anything that isn't a digit, decimal point, slash, or percent sign
-      const cleaned = input.value.replace(/[^0-9./%]/g, "");
-      if (input.value !== cleaned) input.value = cleaned;
-      // Clear any existing error while the user is editing
-      _msClearError();
-      // Update the adjacent hint span in real time
+      const sanitized = _msSanitize(input.value);
+      if (input.value !== sanitized) {
+        const pos = input.selectionStart - (input.value.length - sanitized.length);
+        input.value = sanitized;
+        input.setSelectionRange(Math.max(0, pos), Math.max(0, pos));
+      }
       const hint = _msHint();
       if (!hint) return;
-      const parsed = parseManualScore(cleaned.trim());
+      const parsed = parseManualScore(sanitized.trim());
       const pct    = parsed !== null ? Math.round(parsed * 10) / 10 : null;
       _msSetHint(hint, pct);
+      _msUpdateAvgChip(sanitized.trim());
     });
     input.addEventListener("blur", () => {
       const val = input.value.trim();
       const err = validateManualScore(val);
-      _msClearError();
       if (!err) {
         const hint = _msHint();
         if (hint) {
@@ -7850,19 +7870,8 @@ function attachTargetListeners(target) {
         }
         return;
       }
-      // Mark as invalid and show error message below the score row
-      input.style.borderColor = "#ef4444";
-      const hint = _msHint();
-      if (hint) { hint.textContent = "!"; hint.style.display = ""; hint.style.color = "#dc2626"; }
-      const entryField = input.closest(".entry-field");
-      if (entryField) {
-        const errDiv = document.createElement("div");
-        errDiv.className = "ms-error";
-        errDiv.dataset.msErrorRem = input.dataset.remId;
-        errDiv.style.cssText = "font-size:.78rem;color:#dc2626;padding:.15rem .5rem .3rem;line-height:1.4";
-        errDiv.textContent = err;
-        entryField.after(errDiv);
-      }
+      alert(err);
+      setTimeout(() => input.focus(), 0);
     });
   });
 
@@ -9553,7 +9562,8 @@ function calcViewDayAvg(data, target, visited = new Set()) {
         }
         return;
       }
-      const manualPa = (target.predefinedActivities || []).find(p => p.manualScore && p.name === act.activityName);
+      const manualPa = (target.predefinedActivities || []).find(p => p.manualScore &&
+          (p.name === act.activityName || (act.configId && p.id === act.configId)));
       viewGetRemarks(data, actId).forEach(rem => {
         if (manualPa) {
           const pct = parseManualScore(plainTextForEdit(rem.text || "").trim());
@@ -13646,7 +13656,7 @@ function stripRemarkHtml(s) {
 
 // Validates a manual score string. Returns null if valid (or empty), or an
 // error string to show the user if it's invalid (bad format or out of range).
-const MS_ACCEPTED = "Accepted: 25 · 25.5 · 25% · 25.5% · 5/20";
+const MS_ACCEPTED = "Accepted: 25 · 25.5 · 25% · 25.5% · 1/4 · 5/20";
 function validateManualScore(val) {
   if (!val || !String(val).trim()) return null;
   const parsed = parseManualScore(String(val).trim());
@@ -13665,7 +13675,7 @@ function parseManualScore(val) {
   const pct = s.match(/^(\d+(?:\.\d+)?)\s*%$/);
   if (pct) return parseFloat(pct[1]);
   const num = s.match(/^(\d+(?:\.\d+)?)$/);
-  if (num) { const v = parseFloat(num[1]); return v < 1 ? v * 100 : v; }
+  if (num) return parseFloat(num[1]);
   return null;
 }
 
