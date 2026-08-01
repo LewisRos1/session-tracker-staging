@@ -167,7 +167,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1319";
+const APP_VERSION = "1320";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -6472,7 +6472,7 @@ function renderFedcTarget(target) {
             <span class="field-value-fixed"><span style="color:#1e40af;font-weight:700;margin-right:.25rem">${subLabel})</span>${inactiveReasonBadge(sub)}${paDisplayHtml(sub)}</span>
           </div>`;
         for (const rem of subRemarks) {
-          html += renderRemarkFields(rem, target, getActivityInlineOptions(sub), (sub.inlineOptions || sub.remarkPresetId || sub.remarkHasNote) ? (sub.sentenceStarter || null) : null, sub.optionsMulti || false, null, sub.remarkHasNote || false, false, sub.optionScores || null);
+          html += renderRemarkFields(rem, target, getActivityInlineOptions(sub), (sub.inlineOptions || sub.remarkPresetId || sub.remarkHasNote) ? (sub.sentenceStarter || null) : null, sub.optionsMulti || false, null, sub.remarkHasNote || false, false, sub.optionScores || null, !!(sub.manualScore || sub.remarkHasNote || sub.inlineOptions || sub.remarkPresetId));
         }
         if (subPending) {
           html += renderPendingRemarkFields(sub.name, subActId, sub.name, idx, target);
@@ -6547,7 +6547,7 @@ function renderFedcTarget(target) {
       }
     } else {
       for (const rem of remarks) {
-        html += renderRemarkFields(rem, target, getActivityInlineOptions(pa), (pa.inlineOptions || pa.remarkPresetId || pa.remarkHasNote) ? (pa.sentenceStarter || null) : null, pa.optionsMulti || false, mappedInfo, pa.remarkHasNote || false, pa.manualScore || false, pa.optionScores || null);
+        html += renderRemarkFields(rem, target, getActivityInlineOptions(pa), (pa.inlineOptions || pa.remarkPresetId || pa.remarkHasNote) ? (pa.sentenceStarter || null) : null, pa.optionsMulti || false, mappedInfo, pa.remarkHasNote || false, pa.manualScore || false, pa.optionScores || null, !!(pa.manualScore || pa.remarkHasNote || pa.inlineOptions || pa.remarkPresetId));
       }
       if (isPending) {
         html += renderPendingRemarkFields(pendingKey, actId, pa.name, idx, target);
@@ -7051,7 +7051,7 @@ function toggleBulletSelection(el) {
 
 // ─── REMARK FIELDS ───────────────────────────────────────────
 
-function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false, manualScore = false, optionScores = null) {
+function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false, manualScore = false, optionScores = null, noteCapable = false) {
   const opts = parseOpts(inlineOptions);
 
   // Sync optionScore with current config whenever the target is re-rendered.
@@ -7075,6 +7075,21 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
     const currentVal = rem.text ? stripRemarkHtml(rem.text).trim() : "";
     const parsed = parseManualScore(currentVal);
     const parsedHint = currentVal && parsed !== null ? `<span style="font-size:.78rem;color:#6b7280;margin-left:.25rem">= ${Math.round(parsed * 10) / 10}%</span>` : "";
+    const _msNote = (rem.masteryNote || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+    const _msShowNote = noteCapable && !!_msNote;
+    const msNoteField = noteCapable
+      ? `<div class="entry-field entry-note-field" data-rem-id="${rem.id}"${_msShowNote ? "" : ' style="display:none"'}>
+          <span class="field-label" contenteditable="false">Notes</span>
+          <button class="btn-sketch" contenteditable="false" data-rem-id="${rem.id}" aria-label="Open sketch board">✏</button>
+          <textarea class="field-input mastery-note-input" rows="1"
+            data-rem-id="${rem.id}" placeholder="Notes…"
+            data-saved-html="${escHtml(rem.masteryNote || "")}">${escHtml(plainTextForEdit(rem.masteryNote || ""))}</textarea>
+          <button class="btn-delete-note" contenteditable="false" data-rem-id="${rem.id}" style="font-size:.75rem;color:#9ca3af;background:transparent;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .45rem;cursor:pointer;white-space:nowrap;flex-shrink:0">Delete Note</button>
+        </div>`
+      : "";
+    const msAddNoteBtn = (noteCapable && !_msShowNote)
+      ? `<button class="btn-add-note" data-rem-id="${rem.id}" contenteditable="false" style="margin-left:.75rem;font-size:.8rem;padding:.25rem .6rem;background:transparent;border:1px solid #a5b4fc;color:#6366f1;border-radius:.35rem;cursor:pointer;white-space:nowrap;flex-shrink:0">+ Note</button>`
+      : "";
     return `
     <div class="entry-divider" contenteditable="false"></div>
     <div class="entry-field" contenteditable="false">
@@ -7082,10 +7097,11 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
       <input type="text" class="field-input remark-text-input" style="max-width:10rem"
         data-rem-id="${rem.id}" data-saved-html="${escHtml(currentVal)}"
         placeholder="e.g. 5/20, 25% or 25"
-        value="${escHtml(currentVal)}">${parsedHint}
+        value="${escHtml(currentVal)}">${parsedHint}${msAddNoteBtn}
       <button class="btn-icon btn-delete-remark" contenteditable="false"
         data-rem-id="${rem.id}" title="Delete score">🗑</button>
-    </div>`;
+    </div>
+    ${msNoteField}`;
   }
 
   const trials = rem.trials || [];
@@ -7096,6 +7112,12 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
   const optBadge = rem.optionScore !== undefined
     ? `<span class="trial-badge trial-badge--option">${rem.optionScore}</span>` : "";
   const badgesHtml = regularBadges + optBadge;
+
+  const _existingNote = (rem.masteryNote || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+  const _showNote = noteCapable && !!_existingNote;
+  const addNoteBtn = (noteCapable && !_showNote)
+    ? `<button class="btn-add-note" data-rem-id="${rem.id}" contenteditable="false" style="margin-left:.75rem;font-size:.8rem;padding:.25rem .6rem;background:transparent;border:1px solid #a5b4fc;color:#6366f1;border-radius:.35rem;cursor:pointer;white-space:nowrap;flex-shrink:0">+ Note</button>`
+    : "";
 
   const trailingField = mappedInfo
     ? `<div class="entry-field" contenteditable="false">
@@ -7108,7 +7130,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
           <div class="trials-badges">${badgesHtml}</div>
           <button class="btn-add-trial btn-primary-sm"
             data-rem-id="${rem.id}"
-            data-target="${escHtml(target.name)}" onmousedown="event.preventDefault()">+ Trial</button>
+            data-target="${escHtml(target.name)}" onmousedown="event.preventDefault()">+ Trial</button>${addNoteBtn}
         </div>
       </div>`;
 
@@ -7176,27 +7198,27 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
     remarkContent = optBtns;
   }
 
-  // Generalized version of Mastery's separate Notes field — same idea, but
-  // the select-one options above are whatever the boss configured (not
-  // hardcoded mastery values), so this reuses the same .mastery-note-input
-  // class/rem.masteryNote field to pick up the existing save wiring for free.
-  const _hiddenNote = !remarkHasNote
-    ? ((rem.masteryNote || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim())
-    : "";
-  const noteField = remarkHasNote
-    ? `<div class="entry-field">
+  // Note field: shown immediately if there's existing data; otherwise hidden until
+  // user clicks [+ Note]. For activities that had noteCapable=false in the past
+  // but somehow have note data, show an "Old data" fallback.
+  let noteField;
+  if (noteCapable) {
+    noteField = `<div class="entry-field entry-note-field" data-rem-id="${rem.id}"${_showNote ? "" : ' style="display:none"'}>
         <span class="field-label" contenteditable="false">Notes</span>
         <button class="btn-sketch" contenteditable="false" data-rem-id="${rem.id}" aria-label="Open sketch board">✏</button>
         <textarea class="field-input mastery-note-input" rows="1"
           data-rem-id="${rem.id}" placeholder="Notes…"
           data-saved-html="${escHtml(rem.masteryNote || "")}">${escHtml(plainTextForEdit(rem.masteryNote || ""))}</textarea>
-      </div>`
-    : (_hiddenNote
-        ? `<div class="entry-field">
-            <span class="field-label" contenteditable="false">Notes</span>
-            <div style="font-size:.78rem;color:#9ca3af;font-style:italic">Old data: ${escHtml(_hiddenNote)}</div>
-          </div>`
-        : "");
+        <button class="btn-delete-note" contenteditable="false" data-rem-id="${rem.id}" style="font-size:.75rem;color:#9ca3af;background:transparent;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .45rem;cursor:pointer;white-space:nowrap;flex-shrink:0">Delete Note</button>
+      </div>`;
+  } else {
+    noteField = _existingNote
+      ? `<div class="entry-field">
+          <span class="field-label" contenteditable="false">Notes</span>
+          <div style="font-size:.78rem;color:#9ca3af;font-style:italic">Old data: ${escHtml(_existingNote)}</div>
+        </div>`
+      : "";
+  }
 
   return `
     <div class="entry-divider" contenteditable="false"></div>
@@ -7645,6 +7667,41 @@ function attachTargetListeners(target) {
         renderTargetContent();
         alert("Couldn't delete remark — check your connection and try again.\n\n" + err.message);
       });
+    });
+  });
+
+  // ── Show note field ───────────────────────────────────────
+  c.querySelectorAll(".btn-add-note").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const remId = btn.dataset.remId;
+      const entryBlock = btn.closest(".entry-block");
+      btn.style.display = "none";
+      const noteDiv = entryBlock?.querySelector(`.entry-note-field[data-rem-id="${remId}"]`);
+      if (noteDiv) {
+        noteDiv.style.removeProperty("display");
+        const ta = noteDiv.querySelector(".mastery-note-input");
+        if (ta) { autoResizeTextarea(ta); ta.focus(); }
+      }
+    });
+  });
+
+  // ── Delete note ───────────────────────────────────────────
+  c.querySelectorAll(".btn-delete-note").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (!confirm("Delete this note? The text will be lost.")) return;
+      const remId = btn.dataset.remId;
+      const entryBlock = btn.closest(".entry-block");
+      if (state.sessionData?.remarks?.[remId]) state.sessionData.remarks[remId].masteryNote = "";
+      const sid = state.currentSessionId;
+      if (sid) updateRemarkNote(sid, remId, "").catch(() => {});
+      const noteDiv = entryBlock?.querySelector(`.entry-note-field[data-rem-id="${remId}"]`);
+      if (noteDiv) {
+        noteDiv.style.display = "none";
+        const ta = noteDiv.querySelector(".mastery-note-input");
+        if (ta) { ta.value = ""; ta.dataset.savedHtml = ""; }
+      }
+      const addBtn = entryBlock?.querySelector(`.btn-add-note[data-rem-id="${remId}"]`);
+      if (addBtn) addBtn.style.removeProperty("display");
     });
   });
 
@@ -12233,9 +12290,9 @@ function fmtPeriodDate(d) {
 }
 
 function presetLabel(val) {
-  return { "": "Free Text", fixed_remark: "Fixed Remark", manual_score: "Manual Score",
-    starter_fixed: "Sentence Starter + Select one", starter_fixed_multi: "Sentence Starter + Tick boxes",
-    starter_fixed_note: "Sentence Starter + Select One + Free Text" }[val] ?? "Free Text";
+  return { "": "Text Only", fixed_remark: "Fixed Remark", manual_score: "Manual Score",
+    starter_fixed: "Multiple Choice", starter_fixed_multi: "Checkboxes",
+    starter_fixed_note: "Multiple Choice" }[val] ?? "Text Only";
 }
 
 function periodSectionHtml(activeFrom, activeTo, idx, withBorder, inactiveReason) {
@@ -13467,18 +13524,17 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
   const type = a.manualScore ? "manual_score"
     : a.remarkHasNote ? "starter_fixed_note"
     : (a.sentenceStarter && a.inlineOptions && a.optionsMulti) ? "starter_fixed_multi"
-    : (a.sentenceStarter && a.inlineOptions) ? "starter_fixed"
+    : (a.sentenceStarter && a.inlineOptions) ? "starter_fixed_note"
     : a.sentenceStarter ? ""
     : (a.inlineOptions && a.optionsMulti) ? "starter_fixed_multi"
-    : (a.inlineOptions || a.remarkPresetId) ? "starter_fixed" : "";
-  const showStarter = type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note";
+    : (a.inlineOptions || a.remarkPresetId) ? "starter_fixed_note" : "";
+  const showStarter = type === "starter_fixed_multi" || type === "starter_fixed_note";
   return `<div style="flex:1;display:flex;flex-direction:column;gap:.4rem;min-width:0">
     <select class="act-preset-select mn-act-preset" data-idx="${idx}" style="border-color:#b8bcc4">
-      <option value="">Free text</option>
+      <option value="">Text Only</option>
       <option value="manual_score"${type === "manual_score" ? " selected" : ""}>Manual Score</option>
-      <option value="starter_fixed"${type === "starter_fixed" ? " selected" : ""}>Sentence Starter + Multiple Options</option>
-      <option value="starter_fixed_multi"${type === "starter_fixed_multi" ? " selected" : ""}>Sentence Starter + Checkboxes</option>
-      <option value="starter_fixed_note"${type === "starter_fixed_note" ? " selected" : ""}>Sentence Starter + Multiple Options + Free Text</option>
+      <option value="starter_fixed_note"${type === "starter_fixed_note" ? " selected" : ""}>Multiple Choice</option>
+      <option value="starter_fixed_multi"${type === "starter_fixed_multi" ? " selected" : ""}>Checkboxes</option>
     </select>
     <div class="mn-act-starter-wrap" data-idx="${idx}" style="${showStarter ? "display:flex;flex-direction:column;gap:.3rem" : "display:none"}">
       <span style="font-size:.95rem;color:#374151;font-weight:700">Sentence Starter</span>
@@ -15134,7 +15190,7 @@ function renderTargetManageContent(student, target) {
         $("manage-modal-body").scrollTop = sp;
         return;
       }
-      const usesOpts = (type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note");
+      const usesOpts = (type === "starter_fixed_multi" || type === "starter_fixed_note");
       acts[idx].sentenceStarter = null;
       acts[idx].remarkPresetId  = null;
       if (!usesOpts) { acts[idx].inlineOptions = null; delete acts[idx].optionScores; }
@@ -16148,7 +16204,7 @@ function renderTemplateManageContent(template) {
         $("manage-modal-body").scrollTop = sp;
         return;
       }
-      const usesOpts = (type === "starter_fixed" || type === "starter_fixed_multi" || type === "starter_fixed_note");
+      const usesOpts = (type === "starter_fixed_multi" || type === "starter_fixed_note");
       acts[idx].sentenceStarter = null;
       acts[idx].remarkPresetId  = null;
       if (!usesOpts) { acts[idx].inlineOptions = null; delete acts[idx].optionScores; }
@@ -17499,6 +17555,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
   const sentenceStarter = (paEntry?.inlineOptions || paEntry?.remarkPresetId || paEntry?.remarkHasNote) ? (paEntry?.sentenceStarter || null) : null;
   const multiSelect     = paEntry?.optionsMulti || false;
   const remarkHasNote   = paEntry?.remarkHasNote || false;
+  const noteCapableGrp  = !!(paEntry?.manualScore || paEntry?.remarkHasNote || paEntry?.inlineOptions || paEntry?.remarkPresetId);
   const isFreeText      = parseOpts(inlineOptions).length === 0 && !sentenceStarter;
 
   const noteRow = actNote && actNote.trim()
@@ -17521,7 +17578,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
       if (remarks.length === 0) return renderGroupStudentPendingRow(studentName, actId, actName, target, true);
       const mappedInfo = resolveGroupMappedScoreDisplay(mappedPa, target, data, studentName);
       return remarks.map(([remId, rem]) => renderGroupStudentRow(
-        studentName, remId, rem, target, mappedInfo, inlineOptions, sentenceStarter, multiSelect, remarkHasNote, paEntry?.optionScores || null
+        studentName, remId, rem, target, mappedInfo, inlineOptions, sentenceStarter, multiSelect, remarkHasNote, paEntry?.optionScores || null, noteCapableGrp
       )).join("");
     }).join("");
     return `<div class="entry-block entry-block-predefined" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">
@@ -17597,7 +17654,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
       bodyHtml = attendees.map(studentName => {
         const entry = byStudent[studentName]?.[i] || null;
         if (entry) return renderGroupStudentRow(
-          studentName, entry[0], entry[1], target, null, inlineOptions, sentenceStarter, multiSelect, remarkHasNote, paEntry?.optionScores || null
+          studentName, entry[0], entry[1], target, null, inlineOptions, sentenceStarter, multiSelect, remarkHasNote, paEntry?.optionScores || null, noteCapableGrp
         );
         return isFreeText
           ? renderGroupStudentEmptyRow(studentName, actId, actName, target, isPredefined)
@@ -17675,7 +17732,7 @@ function renderGroupStudentTrialsOnlyRow(studentName, remId, rem, target) {
 // just with .group-remark-input instead of .remark-text-input for the
 // free-text fallback box, since this row is one attendee's slice of a
 // shared-activity card instead of a single student's own remark field.
-function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = null, inlineOptions = null, sentenceStarter = null, multiSelect = false, remarkHasNote = false, optionScores = null) {
+function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = null, inlineOptions = null, sentenceStarter = null, multiSelect = false, remarkHasNote = false, optionScores = null, noteCapable = false) {
   const trials = rem.trials || [];
   const regularBadges = trials.map((t, i) =>
     `<span class="trial-badge">${t === -1 ? "—" : t}<button class="btn-trial-delete btn-group-trial-del" data-rem-id="${remId}" data-idx="${i}">×</button></span>`
@@ -17683,6 +17740,12 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
   const optBadge = rem.optionScore !== undefined
     ? `<span class="trial-badge trial-badge--option">${rem.optionScore}</span>` : "";
   const badges = regularBadges + optBadge;
+  const _grpExistingNote = (rem.masteryNote || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+  const _grpShowNote = noteCapable && !!_grpExistingNote;
+  const grpAddNoteBtn = (noteCapable && !_grpShowNote)
+    ? `<button class="btn-add-note" data-rem-id="${remId}" contenteditable="false" style="margin-left:.75rem;font-size:.8rem;padding:.25rem .6rem;background:transparent;border:1px solid #a5b4fc;color:#6366f1;border-radius:.35rem;cursor:pointer;white-space:nowrap;flex-shrink:0">+ Note</button>`
+    : "";
+
   const trailingField = mappedInfo
     ? `<div class="entry-field" contenteditable="false">
         <span class="field-label">${escHtml(mappedInfo.label)}</span>
@@ -17693,7 +17756,7 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
         <div class="trials-row">
           <div class="trials-badges">${badges}</div>
           <button class="btn-primary-sm btn-add-trial btn-group-add-trial"
-            data-rem-id="${remId}" data-target="${escHtml(target.name)}" onmousedown="event.preventDefault()">+ Trial</button>
+            data-rem-id="${remId}" data-target="${escHtml(target.name)}" onmousedown="event.preventDefault()">+ Trial</button>${grpAddNoteBtn}
         </div>
       </div>`;
 
@@ -17743,15 +17806,24 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
     remarkContent = makeOptPills(rem.text) || freeTextBox;
   }
 
-  const noteField = remarkHasNote
-    ? `<div class="entry-field" contenteditable="false">
-        <span class="field-label">Notes</span>
-        <button class="btn-sketch btn-group-sketch" data-rem-id="${remId}" aria-label="Open sketch board">✏</button>
+  let noteField;
+  if (noteCapable) {
+    noteField = `<div class="entry-field entry-note-field" data-rem-id="${remId}"${_grpShowNote ? "" : ' style="display:none"'}>
+        <span class="field-label" contenteditable="false">Notes</span>
+        <button class="btn-sketch btn-group-sketch" contenteditable="false" data-rem-id="${remId}" aria-label="Open sketch board">✏</button>
         <textarea class="field-input mastery-note-input" rows="1"
           data-rem-id="${remId}" placeholder="Notes…"
           data-saved-html="${escHtml(rem.masteryNote || "")}">${escHtml(plainTextForEdit(rem.masteryNote || ""))}</textarea>
-      </div>`
-    : "";
+        <button class="btn-delete-note" contenteditable="false" data-rem-id="${remId}" style="font-size:.75rem;color:#9ca3af;background:transparent;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .45rem;cursor:pointer;white-space:nowrap;flex-shrink:0">Delete Note</button>
+      </div>`;
+  } else {
+    noteField = _grpExistingNote
+      ? `<div class="entry-field" contenteditable="false">
+          <span class="field-label">Notes</span>
+          <div style="font-size:.78rem;color:#9ca3af;font-style:italic">Old data: ${escHtml(_grpExistingNote)}</div>
+        </div>`
+      : "";
+  }
 
   return `<div class="group-student-section" data-rem-id="${remId}" data-student="${escHtml(studentName)}">
     <div class="group-student-name-row" contenteditable="false">
@@ -18155,6 +18227,41 @@ function attachGroupTargetListeners(target) {
         renderGroupTargetContent();
         alert("Couldn't delete remark — check your connection and try again.\n\n" + err.message);
       });
+    });
+  });
+
+  // ── Show note (group) ─────────────────────────────────────
+  c.querySelectorAll(".btn-add-note").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const remId = btn.dataset.remId;
+      const section = btn.closest(".group-student-section");
+      btn.style.display = "none";
+      const noteDiv = section?.querySelector(`.entry-note-field[data-rem-id="${remId}"]`);
+      if (noteDiv) {
+        noteDiv.style.removeProperty("display");
+        const ta = noteDiv.querySelector(".mastery-note-input");
+        if (ta) { autoResizeTextarea(ta); ta.focus(); }
+      }
+    });
+  });
+
+  // ── Delete note (group) ───────────────────────────────────
+  c.querySelectorAll(".btn-delete-note").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (!confirm("Delete this note? The text will be lost.")) return;
+      const remId = btn.dataset.remId;
+      const section = btn.closest(".group-student-section");
+      if (state.groupSessionData?.remarks?.[remId]) state.groupSessionData.remarks[remId].masteryNote = "";
+      const sid = state.groupSessionId;
+      if (sid) updateRemarkNote(sid, remId, "").catch(() => {});
+      const noteDiv = section?.querySelector(`.entry-note-field[data-rem-id="${remId}"]`);
+      if (noteDiv) {
+        noteDiv.style.display = "none";
+        const ta = noteDiv.querySelector(".mastery-note-input");
+        if (ta) { ta.value = ""; ta.dataset.savedHtml = ""; }
+      }
+      const addBtn = section?.querySelector(`.btn-add-note[data-rem-id="${remId}"]`);
+      if (addBtn) addBtn.style.removeProperty("display");
     });
   });
 
