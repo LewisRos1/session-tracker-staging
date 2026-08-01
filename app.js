@@ -168,7 +168,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1323";
+const APP_VERSION = "1324";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -5925,6 +5925,31 @@ async function openSession(student, existingSessionId = null, dateStr = null) {
         if (orphanActIds.length > 0) {
           deleteOrphanActivities(sessionId, orphanActIds, orphanRemIds).catch(() => {});
         }
+        // Clean up isPredefined session records for activities that are no longer
+        // in the current target config (e.g., activities deleted from Edit Target after
+        // they were already auto-filled into session data as maintained activities).
+        // Without this, stale session records survive in Firestore forever and
+        // autoFillMaintainedRemarks re-fills them on every snapshot.
+        const staleActIds = [];
+        const staleRemIds = [];
+        for (const [actId, act] of Object.entries(data.activities || {})) {
+          if (!act.isPredefined || !act.targetName) continue;
+          const tc = (student.targets || []).find(t => t.name === act.targetName);
+          if (!tc) continue;
+          const inConfig = (tc.predefinedActivities || []).some(pa =>
+            (act.configId && pa.id && pa.id === act.configId) ||
+            pa.name === act.activityName || pa.title === act.activityName
+          );
+          if (inConfig) continue;
+          const remEntries = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === actId);
+          staleActIds.push(actId);
+          for (const [remId] of remEntries) staleRemIds.push(remId);
+          delete data.activities[actId];
+          if (data.remarks) for (const [remId] of remEntries) delete data.remarks[remId];
+        }
+        if (staleActIds.length > 0) {
+          deleteOrphanActivities(sessionId, staleActIds, staleRemIds).catch(() => {});
+        }
         const eff = getEffectiveTargets();
         state.selectedTargetName = (preservedTargetName && eff.some(t => t.name === preservedTargetName))
           ? preservedTargetName
@@ -7086,7 +7111,10 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
   if (manualScore) {
     const currentVal = rem.text ? stripRemarkHtml(rem.text).trim() : "";
     const parsed = parseManualScore(currentVal);
-    const parsedHint = currentVal && parsed !== null ? `<span style="font-size:.78rem;color:#6b7280;margin-left:.25rem">= ${Math.round(parsed * 10) / 10}%</span>` : "";
+    const parsedPct  = parsed !== null ? Math.round(parsed * 10) / 10 : null;
+    const parsedHint = currentVal && parsedPct !== null
+      ? `<span class="manual-score-hint" data-rem-id="${rem.id}" style="font-size:.78rem;color:#6b7280;margin-left:.25rem">${escHtml(currentVal)} = ${parsedPct}%</span>`
+      : `<span class="manual-score-hint" data-rem-id="${rem.id}" style="font-size:.78rem;color:#6b7280;margin-left:.25rem"></span>`;
     const _msNote = (rem.masteryNote || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
     const _msShowNote = noteCapable && !!_msNote;
     const msNoteField = noteCapable
@@ -7108,7 +7136,8 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
       <span class="field-label">Score</span>
       <input type="text" class="field-input remark-text-input" style="max-width:10rem"
         data-rem-id="${rem.id}" data-saved-html="${escHtml(currentVal)}"
-        placeholder="e.g. 5/20, 25%, 25 or 0.25"
+        data-manual-score="1"
+        placeholder="e.g. 5/20, 25%, 25, 0.25"
         value="${escHtml(currentVal)}">${parsedHint}${msAddNoteBtn}
       <button class="btn-icon btn-delete-remark" contenteditable="false"
         data-rem-id="${rem.id}" title="Delete score">🗑</button>
@@ -7776,6 +7805,21 @@ function attachTargetListeners(target) {
         renderTargetContent();
         alert("Couldn't delete trial — check your connection and try again.\n\n" + err.message);
       });
+    });
+  });
+
+  // ── Manual score input: allow only numeric characters, update hint live ──
+  c.querySelectorAll(".remark-text-input[data-manual-score='1']").forEach(input => {
+    input.addEventListener("input", () => {
+      // Strip anything that isn't a digit, decimal point, slash, or percent sign
+      const cleaned = input.value.replace(/[^0-9./%]/g, "");
+      if (input.value !== cleaned) input.value = cleaned;
+      // Update the adjacent hint span in real time
+      const hint = c.querySelector(`.manual-score-hint[data-rem-id="${input.dataset.remId}"]`);
+      if (!hint) return;
+      const parsed = parseManualScore(cleaned.trim());
+      const pct    = parsed !== null ? Math.round(parsed * 10) / 10 : null;
+      hint.textContent = (cleaned && pct !== null) ? `${cleaned} = ${pct}%` : "";
     });
   });
 
