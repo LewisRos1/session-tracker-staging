@@ -169,7 +169,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1342";
+const APP_VERSION = "1343";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -1055,7 +1055,7 @@ function runOneOffRepairs() {
   }
 }
 
-// "Mastery Level + Free Text" was removed as a Remark Type — this converts
+// "Mastery Level + Free Text" was removed as a Activity Type — this converts
 // any activity still configured as isMastery into the equivalent Sentence
 // Starter + Select One + Free Text config, the exact same pure config flip
 // the old per-activity "Convert" button used to do: existing remarks'
@@ -7173,7 +7173,6 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
           <textarea class="field-input mastery-note-input" rows="1"
             data-rem-id="${rem.id}"
             data-saved-html="${escHtml(rem.masteryNote || "")}">${escHtml(plainTextForEdit(rem.masteryNote || ""))}</textarea>
-          <button class="btn-delete-note" contenteditable="false" data-rem-id="${rem.id}" style="font-size:.75rem;color:#9ca3af;background:transparent;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .45rem;cursor:pointer;white-space:nowrap;flex-shrink:0">Delete Note</button>
         </div>`
       : "";
     return `
@@ -7294,7 +7293,6 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
         <textarea class="field-input mastery-note-input" rows="1"
           data-rem-id="${rem.id}"
           data-saved-html="${escHtml(rem.masteryNote || "")}">${escHtml(plainTextForEdit(rem.masteryNote || ""))}</textarea>
-        <button class="btn-delete-note" contenteditable="false" data-rem-id="${rem.id}" style="font-size:.75rem;color:#9ca3af;background:transparent;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .45rem;cursor:pointer;white-space:nowrap;flex-shrink:0">Delete Note</button>
       </div>`;
   } else {
     noteField = _existingNote
@@ -12455,9 +12453,9 @@ function fmtPeriodDate(d) {
 }
 
 function presetLabel(val) {
-  return { "": "Text Only", fixed_remark: "Fixed Remark", manual_score: "Manual Score",
+  return { "": "Remark Only", fixed_remark: "Fixed Remark", manual_score: "Manual Score",
     starter_fixed: "Multiple Choice", starter_fixed_multi: "Checkboxes",
-    starter_fixed_note: "Multiple Choice" }[val] ?? "Text Only";
+    starter_fixed_note: "Multiple Choice" }[val] ?? "Remark Only";
 }
 
 function periodSectionHtml(activeFrom, activeTo, idx, withBorder, inactiveReason) {
@@ -13720,7 +13718,7 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
   const showStarter = type === "starter_fixed_multi" || type === "starter_fixed_note";
   return `<div style="flex:1;display:flex;flex-direction:column;gap:.4rem;min-width:0">
     <select class="act-preset-select mn-act-preset" data-idx="${idx}" style="border-color:#b8bcc4">
-      <option value="">Text Only</option>
+      <option value="">Remark Only</option>
       <option value="manual_score"${type === "manual_score" ? " selected" : ""}>Manual Score</option>
       <option value="starter_fixed_note"${type === "starter_fixed_note" ? " selected" : ""}>Multiple Choice</option>
       <option value="starter_fixed_multi"${type === "starter_fixed_multi" ? " selected" : ""}>Checkboxes</option>
@@ -13975,7 +13973,7 @@ function renderTargetManageContent(student, target) {
               </div>
             </div>
             <div>
-              <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Remark Type</div>
+              <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Type</div>
               ${buildRemarkTypeControls(a, idx, target.maxPoints || 3)}
             </div>
             <div style="display:flex;align-items:center;gap:.5rem">
@@ -14053,7 +14051,7 @@ function renderTargetManageContent(student, target) {
                 </div>
               </div>
               <div>
-                <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Remark Type</div>
+                <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Type</div>
                 ${subRemarkType}
               </div>
               ${subFixedRemarkRow}
@@ -14145,7 +14143,7 @@ function renderTargetManageContent(student, target) {
                 </div>
               </div>
               <div>
-                <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Remark Type</div>
+                <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Type</div>
                 ${remarkTypeSelect}
               </div>
               ${maintainedRow}
@@ -15955,7 +15953,7 @@ function renderTemplateManageContent(template) {
               rows="1" placeholder="Activity Details" style="flex:1">${escHtml(a.name || '')}</textarea>
           </div>
           <div style="display:flex;align-items:flex-start;gap:.5rem">
-            <span style="font-size:.93rem;color:#374151;white-space:nowrap;font-weight:700;padding-top:.3rem">Remark Type:</span>
+            <span style="font-size:.93rem;color:#374151;white-space:nowrap;font-weight:700;padding-top:.3rem">Activity Type:</span>
             ${remarkTypeSelect}
           </div>
         </div>
@@ -17986,7 +17984,6 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
         <textarea class="field-input mastery-note-input" rows="1"
           data-rem-id="${remId}"
           data-saved-html="${escHtml(rem.masteryNote || "")}">${escHtml(plainTextForEdit(rem.masteryNote || ""))}</textarea>
-        <button class="btn-delete-note" contenteditable="false" data-rem-id="${remId}" style="font-size:.75rem;color:#9ca3af;background:transparent;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .45rem;cursor:pointer;white-space:nowrap;flex-shrink:0">Delete Note</button>
       </div>`;
   } else {
     noteField = _grpExistingNote
