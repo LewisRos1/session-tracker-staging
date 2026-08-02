@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1347";
+const APP_VERSION = "1348";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -15328,94 +15328,170 @@ function renderTargetManageContent(student, target) {
   $("manage-modal-body").querySelectorAll(".mn-act-preset").forEach(sel => {
     sel.addEventListener("change", async () => {
       const idx = Number(sel.dataset.idx);
+      const pa  = acts[idx];
+      const type = sel.value;
+      const oldType = pa.optionsMulti ? "starter_fixed_multi"
+        : pa.remarkHasNote ? "starter_fixed_note"
+        : pa.manualScore   ? "manual_score"
+        : pa.fixedRemark !== undefined ? "fixed_remark"
+        : "";
+
       const body = $("manage-modal-body");
       const starterWrap   = body.querySelector(`.mn-act-starter-wrap[data-idx="${idx}"]`);
       const starterInput  = body.querySelector(`.mn-act-starter-text[data-idx="${idx}"]`);
       const optsContainer = body.querySelector(`.mn-opts-container[data-idx="${idx}"]`);
-      const type = sel.value;
 
-      // Switching to Fixed Remark triggers a re-render to show the fixed remark textarea
-      if (type === "fixed_remark") {
-        if (acts[idx].fixedRemark === undefined) acts[idx].fixedRemark = "";
-        acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
-        acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false; delete acts[idx].manualScore;
-        target.predefinedActivities = acts;
-        await saveTarget();
-        renderTargetManageContent(student, target);
-        return;
-      }
-      // Switching to Manual Score — set flag and re-render so type detection updates
-      if (type === "manual_score") {
-        acts[idx].manualScore = true;
-        delete acts[idx].fixedRemark; acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
-        acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false;
-        target.predefinedActivities = acts;
-        await saveTarget();
-        const sp = $("manage-modal-body").scrollTop;
-        renderTargetManageContent(student, target);
-        $("manage-modal-body").scrollTop = sp;
-        return;
-      }
-      // Switching away from Fixed Remark — clear it and re-render to remove the textarea
-      if (acts[idx].fixedRemark !== undefined) {
-        delete acts[idx].fixedRemark;
-        acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
-        acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false; delete acts[idx].manualScore;
-        target.predefinedActivities = acts;
-        await saveTarget();
-        renderTargetManageContent(student, target);
-        return;
-      }
-      // Switching away from Manual Score
-      if (acts[idx].manualScore) {
-        delete acts[idx].manualScore;
-        acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
-        acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false;
-        target.predefinedActivities = acts;
-        await saveTarget();
-        const sp = $("manage-modal-body").scrollTop;
-        renderTargetManageContent(student, target);
-        $("manage-modal-body").scrollTop = sp;
-        return;
-      }
-      const usesOpts = (type === "starter_fixed_multi" || type === "starter_fixed_note");
-      const wasRemarkOnly = usesOpts
-        && !acts[idx].inlineOptions && !acts[idx].remarkPresetId
-        && !acts[idx].optionsMulti  && !acts[idx].remarkHasNote;
-      acts[idx].sentenceStarter = null;
-      acts[idx].remarkPresetId  = null;
-      if (!usesOpts) { acts[idx].inlineOptions = null; delete acts[idx].optionScores; }
-      acts[idx].optionsMulti    = (type === "starter_fixed_multi");
-      acts[idx].remarkHasNote   = (type === "starter_fixed_note");
-      const starterVis = usesOpts;
-      const optsVis    = usesOpts;
-      starterWrap.style.cssText    = starterVis ? "display:flex;flex-direction:column;gap:.3rem" : "display:none";
-      optsContainer.style.display  = optsVis ? "" : "none";
-      const typeLabel = optsContainer.querySelector(".mn-opts-type-label");
-      if (typeLabel) typeLabel.textContent = type === "starter_fixed_multi" ? "Checkboxes" : "Multiple Options";
-      if (usesOpts) { acts[idx].inlineOptions = getOptsFromDom(idx).join("\x1F") || null; rebuildOptScores(idx); }
-      if (starterVis) { starterInput.focus(); }
-      else if (optsVis) { optsContainer.querySelector(".mn-opt-item")?.focus(); }
-      else { target.predefinedActivities = acts; await saveTarget(); }
-      if (wasRemarkOnly) {
-        const actName  = acts[idx].name;
-        const actCfgId = acts[idx].id;
-        getAllSessionsForStudent(student.id).then(async sessions => {
-          for (const sess of sessions) {
-            const matchActIds = Object.entries(sess.activities || {})
-              .filter(([, a]) => a.configId === actCfgId || a.activityName === actName)
-              .map(([id]) => id);
-            const changes = {};
-            for (const [remId, rem] of Object.entries(sess.remarks || {})) {
-              if (!matchActIds.includes(rem.activityId)) continue;
-              const txt = (rem.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
-              if (!txt || rem.masteryNote) continue;
-              changes[remId] = { text: "", masteryNote: txt };
+      const doChange = async () => {
+        // Switching to Fixed Remark triggers a re-render to show the fixed remark textarea
+        if (type === "fixed_remark") {
+          if (acts[idx].fixedRemark === undefined) acts[idx].fixedRemark = "";
+          acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
+          acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false; delete acts[idx].manualScore;
+          target.predefinedActivities = acts;
+          await saveTarget();
+          renderTargetManageContent(student, target);
+          return;
+        }
+        // Switching to Manual Score — set flag and re-render so type detection updates
+        if (type === "manual_score") {
+          acts[idx].manualScore = true;
+          delete acts[idx].fixedRemark; acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
+          acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false;
+          target.predefinedActivities = acts;
+          await saveTarget();
+          const sp = $("manage-modal-body").scrollTop;
+          renderTargetManageContent(student, target);
+          $("manage-modal-body").scrollTop = sp;
+          return;
+        }
+        // Switching away from Fixed Remark — clear it and re-render to remove the textarea
+        if (acts[idx].fixedRemark !== undefined) {
+          delete acts[idx].fixedRemark;
+          acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
+          acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false; delete acts[idx].manualScore;
+          target.predefinedActivities = acts;
+          await saveTarget();
+          renderTargetManageContent(student, target);
+          return;
+        }
+        // Switching away from Manual Score
+        if (acts[idx].manualScore) {
+          delete acts[idx].manualScore;
+          acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
+          acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false;
+          target.predefinedActivities = acts;
+          await saveTarget();
+          const sp = $("manage-modal-body").scrollTop;
+          renderTargetManageContent(student, target);
+          $("manage-modal-body").scrollTop = sp;
+          return;
+        }
+        const usesOpts = (type === "starter_fixed_multi" || type === "starter_fixed_note");
+        const wasRemarkOnly = usesOpts
+          && !acts[idx].inlineOptions && !acts[idx].remarkPresetId
+          && !acts[idx].optionsMulti  && !acts[idx].remarkHasNote;
+        acts[idx].sentenceStarter = null;
+        acts[idx].remarkPresetId  = null;
+        if (!usesOpts) { acts[idx].inlineOptions = null; delete acts[idx].optionScores; }
+        acts[idx].optionsMulti    = (type === "starter_fixed_multi");
+        acts[idx].remarkHasNote   = (type === "starter_fixed_note");
+        const starterVis = usesOpts;
+        const optsVis    = usesOpts;
+        starterWrap.style.cssText    = starterVis ? "display:flex;flex-direction:column;gap:.3rem" : "display:none";
+        optsContainer.style.display  = optsVis ? "" : "none";
+        const typeLabel = optsContainer.querySelector(".mn-opts-type-label");
+        if (typeLabel) typeLabel.textContent = type === "starter_fixed_multi" ? "Checkboxes" : "Multiple Options";
+        if (usesOpts) { acts[idx].inlineOptions = getOptsFromDom(idx).join("\x1F") || null; rebuildOptScores(idx); }
+        if (starterVis) { starterInput.focus(); }
+        else if (optsVis) { optsContainer.querySelector(".mn-opt-item")?.focus(); }
+        else { target.predefinedActivities = acts; await saveTarget(); }
+        if (wasRemarkOnly) {
+          const actName2  = acts[idx].name;
+          const actCfgId2 = acts[idx].id;
+          getAllSessionsForStudent(student.id).then(async sessions => {
+            for (const sess of sessions) {
+              const matchActIds = Object.entries(sess.activities || {})
+                .filter(([, a]) => a.configId === actCfgId2 || a.activityName === actName2)
+                .map(([id]) => id);
+              const changes = {};
+              for (const [remId, rem] of Object.entries(sess.remarks || {})) {
+                if (!matchActIds.includes(rem.activityId)) continue;
+                const txt = (rem.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+                if (!txt || rem.masteryNote) continue;
+                changes[remId] = { text: "", masteryNote: txt };
+              }
+              if (Object.keys(changes).length > 0) await migrateRemarksToNote(sess.id, changes);
             }
-            if (Object.keys(changes).length > 0) await migrateRemarksToNote(sess.id, changes);
-          }
-        }).catch(err => console.error("remark→note migration failed:", err));
+          }).catch(err => console.error("remark→note migration failed:", err));
+        }
+      };
+
+      // Check past session data before allowing the type change
+      const actCfgId = pa.id || null;
+      const actName  = pa.name || pa.title || "";
+      let sessionsWithData = [];
+      try {
+        const allSess = await getAllSessionsForStudent(student.id);
+        for (const sess of allSess) {
+          const matchActIds = Object.entries(sess.activities || {})
+            .filter(([, a]) => (actCfgId && a.configId === actCfgId) || a.activityName === actName)
+            .map(([id]) => id);
+          const hasData = matchActIds.length > 0 && Object.values(sess.remarks || {})
+            .some(rem => matchActIds.includes(rem.activityId));
+          if (hasData) sessionsWithData.push(sess);
+        }
+      } catch (e) { /* proceed without gate on error */ }
+
+      if (sessionsWithData.length === 0) {
+        await doChange();
+        return;
       }
+
+      // Has past data — show password overlay
+      $("manage-modal").querySelectorAll("[data-type-change-overlay]").forEach(el => el.remove());
+      const overlay = document.createElement("div");
+      overlay.dataset.typeChangeOverlay = "1";
+      overlay.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding-top:1.25rem;z-index:200;border-radius:.75rem;overflow-y:auto";
+      const sessionDateHtml = sessionsWithData
+        .sort((a, b) => (a.date || "").localeCompare(b.date || ""))
+        .map(s => `<li>Session ${escHtml(String(s.sessionNumber || s.number || "?"))}: ${escHtml(formatDateWithDay(s.date))}</li>`)
+        .join("");
+      overlay.innerHTML = `<div style="background:#fff;padding:1.25rem;border-radius:.75rem;width:min(320px,92%);box-shadow:0 4px 24px rgba(0,0,0,.25);margin-bottom:1rem">
+        <p style="font-size:.88rem;margin:0 0 .5rem;color:#111;font-weight:700">⚠️ This activity has data in <strong>${sessionsWithData.length} past session${sessionsWithData.length !== 1 ? "s" : ""}</strong>.</p>
+        <p style="font-size:.82rem;margin:0 0 .25rem;color:#374151;font-weight:600">Sessions with data:</p>
+        <ul style="font-size:.82rem;color:#374151;margin:0 0 .75rem;padding-left:1.2rem;line-height:1.8">${sessionDateHtml}</ul>
+        <p style="font-size:.84rem;margin:0 0 .5rem;color:#374151">Please ask Lewis to change the activity type.</p>
+        <p style="font-size:.84rem;margin:0 0 .35rem;color:#374151;font-weight:600">Please Enter Special Password (Only Lewis Knows)</p>
+        <input id="act-type-pw" type="password" autocomplete="off" inputmode="numeric"
+          style="width:100%;box-sizing:border-box;padding:.45rem .6rem;border:2px solid #d1d5db;border-radius:.4rem;font-size:1.1rem;text-align:center;outline:none;margin-bottom:.3rem" placeholder="••••">
+        <div id="act-type-pw-err" style="color:#dc2626;font-size:.82rem;margin-bottom:.5rem;min-height:1.1em"></div>
+        <div style="display:flex;gap:.5rem">
+          <button id="act-type-pw-cancel" style="flex:1;padding:.45rem;border:1px solid #d1d5db;border-radius:.4rem;background:#f9fafb;cursor:pointer;font-size:.85rem">Cancel</button>
+          <button id="act-type-pw-ok" style="flex:1;padding:.45rem;border:none;border-radius:.4rem;background:var(--primary);color:#fff;cursor:pointer;font-size:.85rem">Confirm</button>
+        </div>
+      </div>`;
+      const modalSheet = $("manage-modal").querySelector(".modal-sheet");
+      modalSheet.style.position = "relative";
+      modalSheet.appendChild(overlay);
+      const pwInp = overlay.querySelector("#act-type-pw");
+      const pwErr = overlay.querySelector("#act-type-pw-err");
+      pwInp.focus();
+      overlay.querySelector("#act-type-pw-cancel").addEventListener("click", () => {
+        overlay.remove();
+        sel.value = oldType;
+      });
+      const tryConfirm = async () => {
+        if (pwInp.value !== "8888") {
+          pwErr.textContent = "Incorrect password.";
+          pwInp.value = "";
+          pwInp.focus();
+          return;
+        }
+        overlay.remove();
+        await doChange();
+      };
+      overlay.querySelector("#act-type-pw-ok").addEventListener("click", tryConfirm);
+      pwInp.addEventListener("keydown", e => { if (e.key === "Enter") tryConfirm(); });
     });
   });
 
