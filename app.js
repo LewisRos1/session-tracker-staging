@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1352";
+const APP_VERSION = "1353";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -15469,7 +15469,11 @@ function renderTargetManageContent(student, target) {
             .filter(([, a]) => (actCfgId && a.configId === actCfgId) || a.activityName === actName)
             .map(([id]) => id);
           const hasData = matchActIds.length > 0 && Object.values(sess.remarks || {})
-            .some(rem => matchActIds.includes(rem.activityId));
+            .some(rem => {
+              if (!matchActIds.includes(rem.activityId)) return false;
+              const txt = (rem.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+              return txt || rem.masteryNote || (rem.trials && rem.trials.length > 0) || rem.optionScore !== undefined;
+            });
           if (hasData) sessionsWithData.push(sess);
         }
       } catch (e) { /* proceed without gate on error */ }
@@ -15484,11 +15488,11 @@ function renderTargetManageContent(student, target) {
       const overlay = document.createElement("div");
       overlay.dataset.typeChangeOverlay = "1";
       overlay.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding-top:1.25rem;z-index:200;border-radius:.75rem;overflow-y:auto";
-      const sortedSessions = sessionsWithData.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-      const shownSessions  = sortedSessions.slice(-3);
+      const sortedSessions = sessionsWithData.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+      const shownSessions  = sortedSessions.slice(0, 3);
       const hiddenCount    = sortedSessions.length - shownSessions.length;
-      const sessionDateHtml = (hiddenCount > 0 ? `<li style="color:#9ca3af">… and ${hiddenCount} earlier session${hiddenCount !== 1 ? "s" : ""}</li>` : "")
-        + shownSessions.map(s => `<li>Session ${escHtml(String(s.sessionNumber || s.number || "?"))}: ${escHtml(formatDateWithDay(s.date))}</li>`).join("");
+      const sessionDateHtml = shownSessions.map(s => `<li>Session ${escHtml(String(s.sessionNumber || s.number || "?"))}: ${escHtml(formatDateWithDay(s.date))}</li>`).join("")
+        + (hiddenCount > 0 ? `<li style="color:#9ca3af">… and ${hiddenCount} earlier session${hiddenCount !== 1 ? "s" : ""}</li>` : "");
       overlay.innerHTML = `<div style="background:#fff;padding:1.25rem;border-radius:.75rem;width:min(320px,92%);box-shadow:0 4px 24px rgba(0,0,0,.25);margin-bottom:1rem">
         <p style="font-size:.88rem;margin:0 0 .5rem;color:#111;font-weight:700">⚠️ This activity has data in <strong>${sessionsWithData.length} past session${sessionsWithData.length !== 1 ? "s" : ""}</strong>.</p>
         <p style="font-size:.82rem;margin:0 0 .25rem;color:#374151;font-weight:600">Sessions with data:</p>
