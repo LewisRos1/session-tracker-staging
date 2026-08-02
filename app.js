@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1354";
+const APP_VERSION = "1355";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -15422,9 +15422,10 @@ function renderTargetManageContent(student, target) {
         const typeLabel = optsContainer.querySelector(".mn-opts-type-label");
         if (typeLabel) typeLabel.textContent = type === "starter_fixed_multi" ? "Checkboxes" : "Multiple Options";
         if (usesOpts) { acts[idx].inlineOptions = getOptsFromDom(idx).join("\x1F") || null; rebuildOptScores(idx); }
+        target.predefinedActivities = acts;
+        await saveTarget(); // always persist the type change immediately so re-renders don't revert it
         if (starterVis) { starterInput.focus(); }
         else if (optsVis) { optsContainer.querySelector(".mn-opt-item")?.focus(); }
-        else { target.predefinedActivities = acts; await saveTarget(); }
         if (wasRemarkOnly) {
           const actName2  = acts[idx].name;
           const actCfgId2 = acts[idx].id;
@@ -15471,7 +15472,6 @@ function renderTargetManageContent(student, target) {
       let sessionsWithData = [];
       try {
         const allSess = await getSessionsCached();
-        if (myToken !== _typeChangeToken) return; // user changed again — discard this stale result
         for (const sess of allSess) {
           const matchActIds = Object.entries(sess.activities || {})
             .filter(([, a]) => (actCfgId && a.configId === actCfgId) || a.activityName === actName)
@@ -15485,6 +15485,8 @@ function renderTargetManageContent(student, target) {
           if (hasData) sessionsWithData.push(sess);
         }
       } catch (e) { /* proceed without gate on error */ }
+      // Abort check outside try/catch so errors can't bypass it
+      if (myToken !== _typeChangeToken) { sel.value = oldType; return; }
 
       if (sessionsWithData.length === 0) {
         await doChange();
