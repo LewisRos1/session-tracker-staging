@@ -168,7 +168,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1338";
+const APP_VERSION = "1339";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -7025,9 +7025,8 @@ function wrapTextareaSelection(el, marker) {
   }
 
   if (start === end) {
-    const word = wordBoundsAt(value, start);
-    if (word.end === word.start) return; // no word under the cursor — nothing to format
-    start = word.start; end = word.end;
+    if (!value.trim()) return;
+    start = 0; end = value.length;
   }
 
   const before = value.slice(0, start);
