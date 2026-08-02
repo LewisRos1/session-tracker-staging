@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1346";
+const APP_VERSION = "1347";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -6436,7 +6436,7 @@ function renderFedcTarget(target) {
           <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${paDisplayHtml(pa)}</span>
         </div>
         <div class="entry-field" contenteditable="false">
-          <span class="field-label">Remark</span>
+          <span class="field-label">Notes</span>
           <span class="field-value-fixed" style="white-space:pre-wrap;color:#111827">${formatActivityMarkup(fixedText)}</span>
         </div>
       </div>`;
@@ -6549,7 +6549,7 @@ function renderFedcTarget(target) {
         const _subNoOpts = (sub.remarkHasNote || sub.optionsMulti) && parseOpts(getActivityInlineOptions(sub)).length === 0;
         if (_subNoOpts) {
           html += `<div class="entry-field" contenteditable="false">
-            <span class="field-label">Remark</span>
+            <span class="field-label">Notes</span>
             <span style="color:#9ca3af;font-style:italic;font-size:.88rem">&lt;Please Add Options in Edit Target&gt;</span>
           </div>`;
         } else {
@@ -6632,7 +6632,7 @@ function renderFedcTarget(target) {
       const _paNoOpts = (pa.remarkHasNote || pa.optionsMulti) && parseOpts(getActivityInlineOptions(pa)).length === 0;
       if (_paNoOpts) {
         html += `<div class="entry-field" contenteditable="false">
-          <span class="field-label">Remark</span>
+          <span class="field-label">Notes</span>
           <span style="color:#9ca3af;font-style:italic;font-size:.88rem">&lt;Please Add Options in Edit Target&gt;</span>
         </div>`;
       } else {
@@ -6645,7 +6645,7 @@ function renderFedcTarget(target) {
         const addLabel = pa.isMapped ? "Score" : pa.manualScore ? "Remark &amp; Score" : "Remark &amp; Trials";
         html += `<div class="entry-divider" contenteditable="false"></div>
         <div class="entry-field" contenteditable="false">
-          <span class="field-label">Remark</span>
+          <span class="field-label">Notes</span>
           <textarea class="field-input maintained-remark-pending" rows="1"
             data-act-id="${actId || ""}"
             data-pa-name="${escHtml(pa.name || pa.title)}"
@@ -6728,7 +6728,7 @@ function renderFedcTarget(target) {
           <span class="field-value-fixed">${statusBadge}${paDisplayHtml(pa, true)}</span>
         </div>
         ${fixedText !== null ? `<div class="entry-field" contenteditable="false">
-          <span class="field-label">Remark</span>
+          <span class="field-label">Notes</span>
           <span class="field-value-fixed" style="white-space:pre-wrap">${formatActivityMarkup(fixedText)}</span>
         </div>` : ''}
         ${subHtml}
