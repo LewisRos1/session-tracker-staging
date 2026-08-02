@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1349";
+const APP_VERSION = "1350";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -6637,6 +6637,19 @@ function renderFedcTarget(target) {
         </div>`;
       } else {
       for (const rem of remarks) {
+        // Self-heal: data stranded in masteryNote by an accidental type-change roundtrip back to Notes Only
+        if (!pa.inlineOptions && !pa.remarkPresetId && !pa.optionsMulti && !pa.remarkHasNote && !pa.manualScore
+            && !rem.text && rem.masteryNote) {
+          const rescued = rem.masteryNote;
+          rem.text = rescued;
+          rem.masteryNote = "";
+          if (state.sessionData?.remarks?.[rem.id]) {
+            state.sessionData.remarks[rem.id].text = rescued;
+            state.sessionData.remarks[rem.id].masteryNote = "";
+          }
+          const sid = state.currentSessionId;
+          if (sid) migrateRemarksToNote(sid, { [rem.id]: { text: rescued, masteryNote: "" } }).catch(() => {});
+        }
         html += renderRemarkFields(rem, target, getActivityInlineOptions(pa), (pa.inlineOptions || pa.remarkPresetId || pa.remarkHasNote) ? (pa.sentenceStarter || null) : null, pa.optionsMulti || false, mappedInfo, pa.remarkHasNote || false, pa.manualScore || false, pa.optionScores || null, !!(pa.manualScore || pa.remarkHasNote || pa.inlineOptions || pa.remarkPresetId));
       }
       if (isPending) {
@@ -15423,6 +15436,25 @@ function renderTargetManageContent(student, target) {
               if (Object.keys(changes).length > 0) await migrateRemarksToNote(sess.id, changes);
             }
           }).catch(err => console.error("remark→note migration failed:", err));
+        }
+        // Reverse migration: switching back TO Notes Only — move masteryNote back into text
+        if (type === "" && !usesOpts) {
+          const actName2  = acts[idx].name;
+          const actCfgId2 = acts[idx].id;
+          getAllSessionsForStudent(student.id).then(async sessions => {
+            for (const sess of sessions) {
+              const matchActIds = Object.entries(sess.activities || {})
+                .filter(([, a]) => a.configId === actCfgId2 || a.activityName === actName2)
+                .map(([id]) => id);
+              const changes = {};
+              for (const [remId, rem] of Object.entries(sess.remarks || {})) {
+                if (!matchActIds.includes(rem.activityId)) continue;
+                if (!rem.masteryNote) continue;
+                changes[remId] = { text: rem.masteryNote, masteryNote: "" };
+              }
+              if (Object.keys(changes).length > 0) await migrateRemarksToNote(sess.id, changes);
+            }
+          }).catch(err => console.error("note→remark reverse migration failed:", err));
         }
       };
 
