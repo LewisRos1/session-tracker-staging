@@ -815,6 +815,17 @@ export async function setStudentNote(studentId, note) {
   await updateDoc(doc(db, "students", studentId), { note });
 }
 
+/** Move rem.text → rem.masteryNote for multiple remarks in one session. */
+export async function migrateRemarksToNote(sessionId, changes) {
+  // changes: { [remId]: { text: string, masteryNote: string } }
+  const updateData = {};
+  for (const [remId, vals] of Object.entries(changes)) {
+    updateData[`remarks.${remId}.text`] = vals.text;
+    updateData[`remarks.${remId}.masteryNote`] = vals.masteryNote;
+  }
+  await updateDoc(doc(db, "sessions", sessionId), updateData);
+}
+
 /** Toggle the "Ready for Word Export" flag on a student document. */
 export async function setStudentWordExportReady(studentId, ready) {
   await updateDoc(doc(db, "students", studentId), { readyForWordExport: ready });

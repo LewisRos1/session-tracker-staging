@@ -29,6 +29,7 @@ import {
   saveStudent,
   deleteStudentConfig,
   setStudentNote,
+  migrateRemarksToNote,
   setStudentWordExportReady,
   setStudentExcelExportReady,
   setStudentAiH1ReportReady,
@@ -169,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1343";
+const APP_VERSION = "1344";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -15378,6 +15379,9 @@ function renderTargetManageContent(student, target) {
         return;
       }
       const usesOpts = (type === "starter_fixed_multi" || type === "starter_fixed_note");
+      const wasRemarkOnly = usesOpts
+        && !acts[idx].inlineOptions && !acts[idx].remarkPresetId
+        && !acts[idx].optionsMulti  && !acts[idx].remarkHasNote;
       acts[idx].sentenceStarter = null;
       acts[idx].remarkPresetId  = null;
       if (!usesOpts) { acts[idx].inlineOptions = null; delete acts[idx].optionScores; }
@@ -15393,6 +15397,25 @@ function renderTargetManageContent(student, target) {
       if (starterVis) { starterInput.focus(); }
       else if (optsVis) { optsContainer.querySelector(".mn-opt-item")?.focus(); }
       else { target.predefinedActivities = acts; await saveTarget(); }
+      if (wasRemarkOnly) {
+        const actName  = acts[idx].name;
+        const actCfgId = acts[idx].id;
+        getAllSessionsForStudent(student.id).then(async sessions => {
+          for (const sess of sessions) {
+            const matchActIds = Object.entries(sess.activities || {})
+              .filter(([, a]) => a.configId === actCfgId || a.activityName === actName)
+              .map(([id]) => id);
+            const changes = {};
+            for (const [remId, rem] of Object.entries(sess.remarks || {})) {
+              if (!matchActIds.includes(rem.activityId)) continue;
+              const txt = (rem.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+              if (!txt || rem.masteryNote) continue;
+              changes[remId] = { text: "", masteryNote: txt };
+            }
+            if (Object.keys(changes).length > 0) await migrateRemarksToNote(sess.id, changes);
+          }
+        }).catch(err => console.error("remark→note migration failed:", err));
+      }
     });
   });
 
