@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1350";
+const APP_VERSION = "1351";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -7297,7 +7297,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
   // Note field: shown immediately if there's existing data; otherwise hidden until
   // user clicks [+ Note]. For activities that had noteCapable=false in the past
   // but somehow have note data, show an "Old data" fallback.
-  const remarkLabel = multiSelect ? "Checkboxes" : (opts.length > 0 ? "Multiple Choice" : "Remark");
+  const remarkLabel = multiSelect ? "Checkboxes" : (opts.length > 0 ? "Multiple Choice" : "Notes");
 
   let noteField;
   if (noteCapable) {
@@ -18105,7 +18105,7 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
     remarkContent = makeOptPills(rem.text) || freeTextBox;
   }
 
-  const grpRemarkLabel = multiSelect ? "Checkboxes" : (opts.length > 0 ? "Multiple Choice" : "Remark");
+  const grpRemarkLabel = multiSelect ? "Checkboxes" : (opts.length > 0 ? "Multiple Choice" : "Notes");
 
   let noteField;
   if (noteCapable) {
