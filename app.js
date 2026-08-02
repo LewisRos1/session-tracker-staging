@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1344";
+const APP_VERSION = "1345";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -7169,7 +7169,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
     const parsedHint = `<span class="manual-score-hint" data-rem-id="${rem.id}" style="font-size:.93rem;font-family:inherit;color:#9ca3af;margin-left:.5rem;white-space:nowrap;align-self:center${parsedPct === null ? ";display:none" : ""}">${escHtml(parsedHintText)}</span>`;
     const msNoteField = noteCapable
       ? `<div class="entry-field entry-note-field" data-rem-id="${rem.id}">
-          <span class="field-label" contenteditable="false">Remark</span>
+          <span class="field-label" contenteditable="false">Notes</span>
           <button class="btn-sketch" contenteditable="false" data-rem-id="${rem.id}" aria-label="Open sketch board">✏</button>
           <textarea class="field-input mastery-note-input" rows="1"
             data-rem-id="${rem.id}"
@@ -7289,7 +7289,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
   let noteField;
   if (noteCapable) {
     noteField = `<div class="entry-field entry-note-field" data-rem-id="${rem.id}">
-        <span class="field-label" contenteditable="false">Remark</span>
+        <span class="field-label" contenteditable="false">Notes</span>
         <button class="btn-sketch" contenteditable="false" data-rem-id="${rem.id}" aria-label="Open sketch board">✏</button>
         <textarea class="field-input mastery-note-input" rows="1"
           data-rem-id="${rem.id}"
@@ -7298,7 +7298,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
   } else {
     noteField = _existingNote
       ? `<div class="entry-field">
-          <span class="field-label" contenteditable="false">Remark</span>
+          <span class="field-label" contenteditable="false">Notes</span>
           <div style="font-size:.78rem;color:#9ca3af;font-style:italic">Old data: ${escHtml(_existingNote)}</div>
         </div>`
       : "";
@@ -12454,9 +12454,9 @@ function fmtPeriodDate(d) {
 }
 
 function presetLabel(val) {
-  return { "": "Remark Only", fixed_remark: "Fixed Remark", manual_score: "Manual Score",
+  return { "": "Notes Only", fixed_remark: "Fixed Remark", manual_score: "Manual Score",
     starter_fixed: "Multiple Choice", starter_fixed_multi: "Checkboxes",
-    starter_fixed_note: "Multiple Choice" }[val] ?? "Remark Only";
+    starter_fixed_note: "Multiple Choice" }[val] ?? "Notes Only";
 }
 
 function periodSectionHtml(activeFrom, activeTo, idx, withBorder, inactiveReason) {
@@ -13719,7 +13719,7 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
   const showStarter = type === "starter_fixed_multi" || type === "starter_fixed_note";
   return `<div style="flex:1;display:flex;flex-direction:column;gap:.4rem;min-width:0">
     <select class="act-preset-select mn-act-preset" data-idx="${idx}" style="border-color:#b8bcc4">
-      <option value="">Remark Only</option>
+      <option value="">Notes Only</option>
       <option value="manual_score"${type === "manual_score" ? " selected" : ""}>Manual Score</option>
       <option value="starter_fixed_note"${type === "starter_fixed_note" ? " selected" : ""}>Multiple Choice</option>
       <option value="starter_fixed_multi"${type === "starter_fixed_multi" ? " selected" : ""}>Checkboxes</option>
@@ -18002,7 +18002,7 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
   let noteField;
   if (noteCapable) {
     noteField = `<div class="entry-field entry-note-field" data-rem-id="${remId}">
-        <span class="field-label" contenteditable="false">Remark</span>
+        <span class="field-label" contenteditable="false">Notes</span>
         <button class="btn-sketch btn-group-sketch" contenteditable="false" data-rem-id="${remId}" aria-label="Open sketch board">✏</button>
         <textarea class="field-input mastery-note-input" rows="1"
           data-rem-id="${remId}"
@@ -18011,7 +18011,7 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
   } else {
     noteField = _grpExistingNote
       ? `<div class="entry-field" contenteditable="false">
-          <span class="field-label">Remark</span>
+          <span class="field-label">Notes</span>
           <div style="font-size:.78rem;color:#9ca3af;font-style:italic">Old data: ${escHtml(_grpExistingNote)}</div>
         </div>`
       : "";
