@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1353";
+const APP_VERSION = "1354";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -15338,8 +15338,15 @@ function renderTargetManageContent(student, target) {
     });
   });
 
+  // Shared per render: cache the sessions fetch so rapid type changes don't each fire a separate Firestore query.
+  // Token increments on every change; stale handlers bail out after the await.
+  let _sessionsPromise = null;
+  const getSessionsCached = () => { if (!_sessionsPromise) _sessionsPromise = getAllSessionsForStudent(student.id); return _sessionsPromise; };
+  let _typeChangeToken = 0;
+
   $("manage-modal-body").querySelectorAll(".mn-act-preset").forEach(sel => {
     sel.addEventListener("change", async () => {
+      const myToken = ++_typeChangeToken;
       const idx = Number(sel.dataset.idx);
       const pa  = acts[idx];
       const type = sel.value;
@@ -15463,7 +15470,8 @@ function renderTargetManageContent(student, target) {
       const actName  = pa.name || pa.title || "";
       let sessionsWithData = [];
       try {
-        const allSess = await getAllSessionsForStudent(student.id);
+        const allSess = await getSessionsCached();
+        if (myToken !== _typeChangeToken) return; // user changed again — discard this stale result
         for (const sess of allSess) {
           const matchActIds = Object.entries(sess.activities || {})
             .filter(([, a]) => (actCfgId && a.configId === actCfgId) || a.activityName === actName)
