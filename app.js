@@ -28,6 +28,7 @@ import {
   loadStudentsConfig,
   saveStudent,
   deleteStudentConfig,
+  setStudentNote,
   setStudentWordExportReady,
   setStudentExcelExportReady,
   setStudentAiH1ReportReady,
@@ -168,7 +169,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1339";
+const APP_VERSION = "1340";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -1239,6 +1240,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
             <col style="width:42px">
             <col style="width:14%">
             <col style="width:14%">
+            <col style="width:120px">
             <col style="width:110px">
             <col style="width:130px">
             <col style="width:130px">
@@ -1250,6 +1252,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
               <th>No.</th>
               <th>First Name</th>
               <th>Last Name</th>
+              <th>Note</th>
               <th style="white-space:normal">Ready for Word Export</th>
               <th style="white-space:normal">Imported Excel data to Website</th>
               <th style="white-space:normal">Ready for AI H1 Report</th>
@@ -1263,6 +1266,11 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
                 <td style="text-align:center">${i + 1}</td>
                 <td style="text-align:center">${escHtml(s.firstName || s.name.split(/\s+/)[0] || "")}</td>
                 <td style="text-align:center">${escHtml(s.lastName || s.name.split(/\s+/).slice(1).join(" ") || "")}</td>
+                <td style="text-align:center" onclick="event.stopPropagation()">
+                  <input class="admin-input db-note-input" data-id="${escHtml(s.id)}"
+                    value="${escHtml(s.note || '')}" placeholder="—"
+                    style="width:100%;text-align:center" />
+                </td>
                 <td style="text-align:center">
                   <button class="btn-word-export-ready${s.readyForWordExport ? " is-ready" : ""}"
                     data-id="${escHtml(s.id)}" data-ready="${s.readyForWordExport ? "1" : "0"}">
@@ -1307,6 +1315,19 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
       } finally {
         btn.disabled = false;
       }
+    });
+  });
+
+  $("student-registry-body").querySelectorAll(".db-note-input").forEach(input => {
+    input.addEventListener("blur", async () => {
+      const id = input.dataset.id;
+      const s = state.students.find(x => x.id === id);
+      if (!s) return;
+      const note = input.value.trim();
+      if (note === (s.note || "")) return;
+      s.note = note;
+      await setStudentNote(id, note);
+      renderExistingStudentButtons();
     });
   });
 
@@ -1973,7 +1994,7 @@ function renderStudentList(container, students, query = "") {
   container.innerHTML = `<div class="roster-list">` +
     filtered.map(s => `
       <button class="roster-item" data-id="${s.id}">
-        <span class="roster-item-name">${escHtml(s.name)}</span>
+        <span class="roster-item-name">${escHtml(s.name)}${s.note ? ` <span style="opacity:.6">${escHtml(s.note)}</span>` : ""}</span>
       </button>
     `).join("") +
     `</div>`;

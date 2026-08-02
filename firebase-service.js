@@ -810,6 +810,11 @@ export async function deleteStudentConfig(studentId) {
   await deleteDoc(doc(db, "students", studentId));
 }
 
+/** Save the free-text note on a student document. */
+export async function setStudentNote(studentId, note) {
+  await updateDoc(doc(db, "students", studentId), { note });
+}
+
 /** Toggle the "Ready for Word Export" flag on a student document. */
 export async function setStudentWordExportReady(studentId, ready) {
   await updateDoc(doc(db, "students", studentId), { readyForWordExport: ready });
