@@ -169,7 +169,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1340";
+const APP_VERSION = "1341";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -1238,9 +1238,9 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
         <table class="view-table">
           <colgroup>
             <col style="width:42px">
-            <col style="width:14%">
-            <col style="width:14%">
-            <col style="width:120px">
+            <col style="width:10%">
+            <col style="width:10%">
+            <col style="width:190px">
             <col style="width:110px">
             <col style="width:130px">
             <col style="width:130px">
