@@ -169,7 +169,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1341";
+const APP_VERSION = "1342";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -13762,7 +13762,7 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
             ${archived.map(ao =>
               `<div class="mn-removed-row" style="display:flex;align-items:center;gap:.5rem;padding:.3rem 0;border-bottom:1px solid #f3f4f6">` +
               `<span style="flex:1;font-size:.9rem;color:#6b7280">${escHtml(ao.text)}</span>` +
-              `<button class="mn-opt-unremove" data-idx="${idx}" data-text="${escHtml(ao.text)}" data-score="${ao.score ?? ""}" style="font-size:.78rem;padding:.25rem .55rem;color:#059669;background:none;border:1px solid #6ee7b7;border-radius:.35rem;cursor:pointer">Unremove</button>` +
+              `<button class="mn-opt-unremove" data-idx="${idx}" data-text="${escHtml(ao.text)}" data-score="${ao.score ?? ""}" style="font-size:.78rem;padding:.25rem .55rem;color:#059669;background:none;border:1px solid #6ee7b7;border-radius:.35rem;cursor:pointer">Put Back in Options</button>` +
               `</div>`
             ).join("")}
           </div>
@@ -15564,7 +15564,7 @@ function renderTargetManageContent(student, target) {
       list.innerHTML = archived.map(ao =>
         `<div class="mn-removed-row" style="display:flex;align-items:center;gap:.5rem;padding:.3rem 0;border-bottom:1px solid #f3f4f6">` +
         `<span style="flex:1;font-size:.9rem;color:#6b7280">${escHtml(ao.text)}</span>` +
-        `<button class="mn-opt-unremove" data-idx="${idx}" data-text="${escHtml(ao.text)}" data-score="${ao.score ?? ""}" style="font-size:.78rem;padding:.25rem .55rem;color:#059669;background:none;border:1px solid #6ee7b7;border-radius:.35rem;cursor:pointer">Unremove</button>` +
+        `<button class="mn-opt-unremove" data-idx="${idx}" data-text="${escHtml(ao.text)}" data-score="${ao.score ?? ""}" style="font-size:.78rem;padding:.25rem .55rem;color:#059669;background:none;border:1px solid #6ee7b7;border-radius:.35rem;cursor:pointer">Put Back in Options</button>` +
         `</div>`
       ).join("");
       list.querySelectorAll(".mn-opt-unremove").forEach(btn => wireOptUnremove(btn, idx));
@@ -15604,25 +15604,10 @@ function renderTargetManageContent(student, target) {
       acts[idx].inlineOptions = currentOpts.join("\x1F") || null;
       if (score !== undefined) { acts[idx].optionScores = acts[idx].optionScores || {}; acts[idx].optionScores[optText] = score; }
       target.predefinedActivities = acts;
-      // Add row back to active list as readonly
-      const container = $("manage-modal-body").querySelector(`.mn-opts-container[data-idx="${idx}"]`);
-      const list = container.querySelector(".mn-opts-list");
-      const oi = list.querySelectorAll(".mn-opt-row").length;
-      const row = document.createElement("div");
-      row.className = "mn-opt-row admin-list-item";
-      row.style.cssText = "display:flex;align-items:center;gap:.4rem;margin-bottom:.4rem";
-      row.innerHTML =
-        `<span class="drag-handle" style="cursor:grab;color:#c4c9d4;font-size:1.1rem;flex-shrink:0;padding:0 .15rem;user-select:none">⠿</span>` +
-        `<span class="mn-opt-num" style="font-size:.8rem;color:#6b7280;white-space:nowrap;flex-shrink:0;font-weight:600">Option ${oi + 1}:</span>` +
-        `<input class="admin-input mn-opt-item" data-idx="${idx}" data-oi="${oi}" value="${escHtml(optText)}" readonly style="flex:1;padding:.45rem .6rem;font-size:.95rem;min-width:0;background:#f9fafb;color:#374151;cursor:default">` +
-        `<input class="admin-input mn-opt-score" type="number" min="0" max="${maxPts}" step="0.5" data-idx="${idx}" data-oi="${oi}" value="${score !== undefined ? score : ""}" placeholder="Pts" style="width:3.8rem;flex-shrink:0;padding:.45rem .3rem;font-size:.9rem;text-align:center">` +
-        `<button class="mn-opt-remove" data-idx="${idx}" data-oi="${oi}" data-text="${escHtml(optText)}" style="flex-shrink:0;padding:.3rem .65rem;font-size:.82rem;color:#dc2626;background:none;border:1px solid #fca5a5;border-radius:.35rem;cursor:pointer">Remove</button>`;
-      list.appendChild(row);
-      wireOptScore(row.querySelector(".mn-opt-score"), idx);
-      wireOptRemove(row.querySelector(".mn-opt-remove"), idx);
-      row.querySelector(".mn-opt-item").addEventListener("click", () => showOptLockedMsg(row.querySelector(".mn-opt-item")));
-      updateRemovedSection(idx);
       await saveTarget();
+      const scrollPos = $("manage-modal-body").scrollTop;
+      renderTargetManageContent(student, target);
+      $("manage-modal-body").scrollTop = scrollPos;
     });
   };
 
@@ -15658,7 +15643,7 @@ function renderTargetManageContent(student, target) {
     const row = inp.closest(".mn-opt-row");
     const msg = document.createElement("span");
     msg.style.cssText = "font-size:.88rem;color:#f59e0b;white-space:nowrap;flex-shrink:0;font-weight:700";
-    msg.textContent = "Can't rename — use + Add Option or Remove";
+    msg.textContent = `Option can't be renamed — create a new one with 🗑 & "+ Add Option" instead.`;
     row.insertBefore(msg, inp);
     setTimeout(() => { inp.style.borderColor = ""; msg.remove(); delete inp.dataset.msgActive; }, 2500);
   };
@@ -15753,7 +15738,7 @@ function renderTargetManageContent(student, target) {
           const errMsg = document.createElement("span");
           errMsg.style.cssText = "font-size:.88rem;color:#dc2626;white-space:nowrap;flex-shrink:0;font-weight:700";
           errMsg.textContent = existingArchived.includes(newName)
-            ? `"${newName}" was removed — use Unremove`
+            ? `"${newName}" was removed — use "Put Back in Options"`
             : `"${newName}" already exists`;
           row.insertBefore(errMsg, nameInput);
           setTimeout(() => { list.removeChild(row); renumberOpts(list); }, 10000);
