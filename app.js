@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1348";
+const APP_VERSION = "1349";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -15452,16 +15452,16 @@ function renderTargetManageContent(student, target) {
       const overlay = document.createElement("div");
       overlay.dataset.typeChangeOverlay = "1";
       overlay.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding-top:1.25rem;z-index:200;border-radius:.75rem;overflow-y:auto";
-      const sessionDateHtml = sessionsWithData
-        .sort((a, b) => (a.date || "").localeCompare(b.date || ""))
-        .map(s => `<li>Session ${escHtml(String(s.sessionNumber || s.number || "?"))}: ${escHtml(formatDateWithDay(s.date))}</li>`)
-        .join("");
+      const sortedSessions = sessionsWithData.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+      const shownSessions  = sortedSessions.slice(-3);
+      const hiddenCount    = sortedSessions.length - shownSessions.length;
+      const sessionDateHtml = (hiddenCount > 0 ? `<li style="color:#9ca3af">… and ${hiddenCount} earlier session${hiddenCount !== 1 ? "s" : ""}</li>` : "")
+        + shownSessions.map(s => `<li>Session ${escHtml(String(s.sessionNumber || s.number || "?"))}: ${escHtml(formatDateWithDay(s.date))}</li>`).join("");
       overlay.innerHTML = `<div style="background:#fff;padding:1.25rem;border-radius:.75rem;width:min(320px,92%);box-shadow:0 4px 24px rgba(0,0,0,.25);margin-bottom:1rem">
         <p style="font-size:.88rem;margin:0 0 .5rem;color:#111;font-weight:700">⚠️ This activity has data in <strong>${sessionsWithData.length} past session${sessionsWithData.length !== 1 ? "s" : ""}</strong>.</p>
         <p style="font-size:.82rem;margin:0 0 .25rem;color:#374151;font-weight:600">Sessions with data:</p>
         <ul style="font-size:.82rem;color:#374151;margin:0 0 .75rem;padding-left:1.2rem;line-height:1.8">${sessionDateHtml}</ul>
-        <p style="font-size:.84rem;margin:0 0 .5rem;color:#374151">Please ask Lewis to change the activity type.</p>
-        <p style="font-size:.84rem;margin:0 0 .35rem;color:#374151;font-weight:600">Please Enter Special Password (Only Lewis Knows)</p>
+        <p style="font-size:.84rem;margin:0 0 .35rem;color:#374151;font-weight:600">To change the activity type, please enter special password (only Lewis knows)</p>
         <input id="act-type-pw" type="password" autocomplete="off" inputmode="numeric"
           style="width:100%;box-sizing:border-box;padding:.45rem .6rem;border:2px solid #d1d5db;border-radius:.4rem;font-size:1.1rem;text-align:center;outline:none;margin-bottom:.3rem" placeholder="••••">
         <div id="act-type-pw-err" style="color:#dc2626;font-size:.82rem;margin-bottom:.5rem;min-height:1.1em"></div>
