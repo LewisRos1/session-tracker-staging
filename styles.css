@@ -1768,15 +1768,16 @@ textarea.admin-input { resize: vertical; min-height: 60px; line-height: 1.45; }
 .mn-opt-remove {
   color: #9ca3af;
   background: none;
-  border: none;
+  border: 1px solid #d1d5db;
   cursor: pointer;
-  padding: .3rem .35rem;
+  padding: .28rem .55rem;
   border-radius: .3rem;
-  font-size: 1rem;
+  font-size: .8rem;
   line-height: 1;
   flex-shrink: 0;
+  white-space: nowrap;
 }
-.mn-opt-remove:hover { color: #dc2626; background: #fee2e2; }
+.mn-opt-remove:hover { color: #dc2626; background: #fee2e2; border-color: #fca5a5; }
 .btn-fmt {
   width: 2rem;
   height: 2rem;

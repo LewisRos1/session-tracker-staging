@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1345";
+const APP_VERSION = "1346";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -13743,7 +13743,7 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
             `<span class="mn-opt-num" style="display:none"></span>` +
             `<input class="admin-input mn-opt-item" data-idx="${idx}" data-oi="${oi}" value="${escHtml(opt)}" placeholder="Enter option…" ${opt ? `readonly style="flex:1;padding:.45rem .6rem;font-size:.95rem;min-width:0;background:#f9fafb;color:#374151;cursor:default"` : `data-empty-opt="1" style="flex:1;padding:.45rem .6rem;font-size:.95rem;min-width:0"`}>` +
             `<input class="admin-input mn-opt-score" type="number" min="0" max="${maxPts}" step="0.5" data-idx="${idx}" data-oi="${oi}" value="${escHtml(String(a.optionScores?.[opt] ?? ''))}" placeholder="Pts" style="width:3.8rem;flex-shrink:0;padding:.45rem .3rem;font-size:.9rem;text-align:center">` +
-            `<button class="mn-opt-remove" data-idx="${idx}" data-oi="${oi}" data-text="${escHtml(opt)}" title="Remove option">🗑</button>` +
+            `<button class="mn-opt-remove" data-idx="${idx}" data-oi="${oi}" data-text="${escHtml(opt)}" title="Remove option">Remove Option</button>` +
             `</div>`
           ).join("");
         })()}</div>
@@ -15664,9 +15664,9 @@ function renderTargetManageContent(student, target) {
     const row = inp.closest(".mn-opt-row");
     const msg = document.createElement("span");
     msg.style.cssText = "font-size:.88rem;color:#f59e0b;white-space:nowrap;flex-shrink:0;font-weight:700";
-    msg.textContent = `Option can't be renamed — create a new one with 🗑 & "+ Add Option" instead.`;
+    msg.textContent = `Option can't be renamed — create a new one with "Remove Option" & "+ Add Option" instead.`;
     row.insertBefore(msg, inp);
-    setTimeout(() => { inp.style.borderColor = ""; msg.remove(); delete inp.dataset.msgActive; }, 2500);
+    setTimeout(() => { inp.style.borderColor = ""; msg.remove(); delete inp.dataset.msgActive; }, 10000);
   };
 
   $("manage-modal-body").querySelectorAll(".mn-opt-item[readonly]").forEach(inp => {
@@ -15732,7 +15732,7 @@ function renderTargetManageContent(student, target) {
         `<span class="mn-opt-countdown" style="font-size:.88rem;color:#f59e0b;white-space:nowrap;flex-shrink:0;font-weight:700">Locks in 30s</span>` +
         `<input class="admin-input mn-opt-item" data-idx="${idx}" data-oi="${oi}" placeholder="Enter option name…" style="flex:1;padding:.45rem .6rem;font-size:.95rem;min-width:0;border-color:#f59e0b;background:#fffbeb">` +
         `<input class="admin-input mn-opt-score" type="number" min="0" max="${target.maxPoints || 3}" step="0.5" data-idx="${idx}" data-oi="${oi}" placeholder="Pts" style="width:3.8rem;flex-shrink:0;padding:.45rem .3rem;font-size:.9rem;text-align:center">` +
-        `<button class="mn-opt-remove" data-idx="${idx}" data-oi="${oi}" data-text="" title="Remove option">🗑</button>`;
+        `<button class="mn-opt-remove" data-idx="${idx}" data-oi="${oi}" data-text="" title="Remove option">Remove Option</button>`;
       list.appendChild(row);
 
       const nameInput  = row.querySelector(".mn-opt-item");
@@ -16839,7 +16839,7 @@ function renderTemplateManageContent(template) {
         `<span class="mn-opt-num" style="display:none"></span>` +
         `<span class="mn-opt-countdown" style="font-size:.88rem;color:#f59e0b;white-space:nowrap;flex-shrink:0;font-weight:700">Locks in 30s</span>` +
         `<input class="admin-input mn-opt-item" data-idx="${idx}" data-oi="${oi}" placeholder="Enter option name…" style="flex:1;padding:.45rem .6rem;font-size:.95rem;min-width:0;border-color:#f59e0b;background:#fffbeb">` +
-        `<button class="mn-opt-remove" data-idx="${idx}" data-oi="${oi}" title="Remove option">🗑</button>`;
+        `<button class="mn-opt-remove" data-idx="${idx}" data-oi="${oi}" title="Remove option">Remove Option</button>`;
       list.appendChild(row);
 
       const nameInput = row.querySelector(".mn-opt-item");
