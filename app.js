@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1355";
+const APP_VERSION = "1356";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -3311,8 +3311,8 @@ function hyrDrawOverviewChart(chartTrendRows, title) {
 
   // Legend — 2 rows: row1=term colours, row2=trend directions
   const LEG_R1 = [
-    { color: C_START, label: "Term Start" },
-    { color: C_END,   label: "Term End" }
+    { color: C_START, label: "Start of Term/Trendline" },
+    { color: C_END,   label: "End of Term/Trendline" }
   ];
   const LEG_R2 = [
     { color: C_DOWN,   label: "Declining (<-8 points)" },
@@ -3418,7 +3418,7 @@ function hyrDrawOverviewChartB(chartTrendRows, title) {
   }
   ctx.font = "15px sans-serif";
   const BOX = 12, GAP = 5, SPC = 14, RH = 22, legY0 = BTM_BTM_Y + 52;
-  [[{ color: C_START, label: "Term Start" }, { color: C_END, label: "Term End" }],
+  [[{ color: C_START, label: "Start of Term/Trendline" }, { color: C_END, label: "End of Term/Trendline" }],
    [{ color: C_DOWN, label: "Declining (<-8 points)" }, { color: C_STABLE, label: "Stable (±8 points)" }, { color: C_UP, label: "Improving (>+8 points)" }]]
   .forEach((row, ri) => {
     const rowW = row.reduce((acc, { label }) => acc + BOX + GAP + Math.ceil(ctx.measureText(label).width) + SPC, 0) - SPC;
@@ -3527,7 +3527,7 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
     if      (delta > 8)  { statusText = "↑ Improving"; statusColor = "#16a34a"; }
     else if (delta < -8) { statusText = "↓ Declining"; statusColor = "#dc2626"; }
     else                 { statusText = "→ Stable";    statusColor = "#6b7280"; }
-    ctx.font = "13px sans-serif"; ctx.fillStyle = statusColor; ctx.textAlign = "center";
+    ctx.font = "15px sans-serif"; ctx.fillStyle = statusColor; ctx.textAlign = "center";
     ctx.fillText(statusText, STATUS_CENTER_X, cy + 6);
 
     // Row separator
@@ -3560,7 +3560,7 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
   ctx.font = "15px sans-serif";
   const legBoxTop0 = CHART_Y1 + XAXIS_H + LEG_PAD;
   const legY0 = legBoxTop0 + BOX - 2;
-  const legRow = [{ color: C_START, label: "Term Start" }, { color: C_END, label: "Term End" }];
+  const legRow = [{ color: C_START, label: "Start of Term/Trendline" }, { color: C_END, label: "End of Term/Trendline" }];
   const legRowW = legRow.reduce((acc, { label }) => acc + BOX + GAP + Math.ceil(ctx.measureText(label).width) + SPC, 0) - SPC;
   let lx = (W - legRowW) / 2;
   legRow.forEach(({ color, label }) => {
@@ -3823,7 +3823,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
         const numPrefix = targetNum ? `${targetNum}) ` : "";
         const chartTitle = `${numPrefix}${target.name} - Progress (${rangeLabel})${pageSuffix}`;
         const headingTitle = `${numPrefix}${target.name}${pageSuffix}`;
-        const result = renderActivityBreakdownChart(target.name, pageData, rangeLabel, chartTitle, false, ["Trendline Start", "Trendline End"]);
+        const result = renderActivityBreakdownChart(target.name, pageData, rangeLabel, chartTitle, false, ["Start of Term/Trendline", "End of Term/Trendline"]);
         if (result) {
           h += `<div style="margin-top:1.5rem"><p style="font-weight:700;font-size:.95rem;margin:0 0 .35rem">${esc(headingTitle)}</p>`;
           h += `<img src="data:image/png;base64,${result.base64}" style="width:100%;max-width:600px;display:block;margin:.25rem 0 1rem"></div>`;
@@ -4222,7 +4222,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
         const numPrefix = targetNum ? `${targetNum}) ` : "";
         const chartTitle = `${numPrefix}${target.name} - Progress (${rangeLabel})${pageSuffix}`;
         const headingTitle = `${numPrefix}${target.name}${pageSuffix}`;
-        const abResult = renderActivityBreakdownChart(target.name, pageData, rangeLabel, chartTitle, false, ["Trendline Start", "Trendline End"]);
+        const abResult = renderActivityBreakdownChart(target.name, pageData, rangeLabel, chartTitle, false, ["Start of Term/Trendline", "End of Term/Trendline"]);
         if (abResult) {
           const abH = Math.round(600 * abResult.height / 760);
           appendixParas.push(mkPara(headingTitle, { heading: HeadingLevel.HEADING_2, before: firstChart ? 120 : 0, after: 100, size: 24, bold: true, pageBreak: !firstChart }));

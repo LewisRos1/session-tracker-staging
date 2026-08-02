@@ -671,11 +671,14 @@ function drawOverviewChart(chartTrendRows, title) {
   const n = chartTrendRows.length;
   if (n === 0) return null;
   const C_START = "#7dd3fc", C_END = "#a78bfa";
-  const W = 700;
   const NAME_W = 247;
-  const PAD_R = 32;
+  const STATUS_W = 130;
+  const PAD_R = 5;
+  const PERF_W = 421;
   const PERF_X = NAME_W;
-  const PERF_W = W - PERF_X - PAD_R;
+  const BOLD_SEP_X = PERF_X + PERF_W + 27; // separator between perf+labels and status
+  const STATUS_CENTER_X = BOLD_SEP_X + STATUS_W / 2;
+  const W = BOLD_SEP_X + STATUS_W + PAD_R;
   const toXPerf = v => PERF_X + (v / 100) * PERF_W;
 
   const PAD_TOP = 52;
@@ -696,9 +699,10 @@ function drawOverviewChart(chartTrendRows, title) {
   // Title
   if (title) { ctx.fillStyle = "#111827"; ctx.font = "bold 19px sans-serif"; ctx.textAlign = "center"; ctx.fillText(title, W / 2, 30); }
 
-  // Column header
+  // Column headers
   ctx.fillStyle = "#374151"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText("Overall Performance (%)", PERF_X + PERF_W / 2, PAD_TOP + 18);
+  ctx.fillText("Overall Progress (%)", PERF_X + PERF_W / 2, PAD_TOP + 18);
+  ctx.fillText("Status", STATUS_CENTER_X, PAD_TOP + 18);
 
   // Gridlines
   [0, 25, 50, 75, 100].forEach(v => {
@@ -744,15 +748,24 @@ function drawOverviewChart(chartTrendRows, title) {
     ctx.fillStyle = "#111827"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "left";
     ctx.fillText(String(Math.round(r.tEnd)), PERF_X + eW + 4, endBarY + BAR_HP - 1);
 
+    // Status column
+    const delta = r.delta ?? (r.tEnd - r.tStart);
+    const dir = r.direction ?? (delta > 8 ? "Improving" : delta < -8 ? "Declining" : "Stable");
+    const statusText  = dir === "Improving" ? "↑ Improving" : dir === "Declining" ? "↓ Declining" : "→ Stable";
+    const statusColor = dir === "Improving" ? "#16a34a"    : dir === "Declining" ? "#dc2626"    : "#6b7280";
+    ctx.font = "16px sans-serif"; ctx.fillStyle = statusColor; ctx.textAlign = "center";
+    ctx.fillText(statusText, STATUS_CENTER_X, cy + 6);
+
     if (i < n - 1) {
       ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(0, rowY + ROW_H); ctx.lineTo(W, rowY + ROW_H); ctx.stroke();
     }
   }
 
-  // Column separator
-  ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(NAME_W, PAD_TOP + 24); ctx.lineTo(NAME_W, CHART_Y1); ctx.stroke();
+  // Column separators
+  ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(NAME_W,      PAD_TOP + 24); ctx.lineTo(NAME_W,      CHART_Y1); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(BOLD_SEP_X,  PAD_TOP + 24); ctx.lineTo(BOLD_SEP_X,  CHART_Y1); ctx.stroke();
 
   // Chart border
   ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 1;
@@ -762,7 +775,7 @@ function drawOverviewChart(chartTrendRows, title) {
   ctx.font = "16px sans-serif";
   const legBoxTop0 = CHART_Y1 + LEG_PAD;
   const legY0 = legBoxTop0 + BOX - 2;
-  const legRow = [{ color: C_START, label: "Term Start" }, { color: C_END, label: "Term End" }];
+  const legRow = [{ color: C_START, label: "Start of Term/Trendline" }, { color: C_END, label: "End of Term/Trendline" }];
   const legRowW = legRow.reduce((acc, { label }) => acc + BOX + GAP + Math.ceil(ctx.measureText(label).width) + SPC, 0) - SPC;
   let lx = (W - legRowW) / 2;
   legRow.forEach(({ color, label }) => {
@@ -1169,7 +1182,7 @@ function addActivityBreakdownHalfSheets(wb, allTargets, sessions) {
       for (let ci = 0; ci < chunks.length; ci++) {
         const pageSuffix = chunks.length > 1 ? ` [Page ${ci + 1} of ${chunks.length}]` : "";
         const chartTitle = `${targetNum}) ${target.name} - Progress (${chartPeriodLabel})${pageSuffix}`;
-        const chartResult = renderActivityBreakdownChart(target.name, chunks[ci], chartPeriodLabel, chartTitle, false, ["Trendline Start", "Trendline End"]);
+        const chartResult = renderActivityBreakdownChart(target.name, chunks[ci], chartPeriodLabel, chartTitle, false, ["Start of Term/Trendline", "End of Term/Trendline"]);
         if (!chartResult) continue;
         const { base64, height: chartH } = chartResult;
         const imgId = wb.addImage({ base64, extension: "png" });
