@@ -331,7 +331,7 @@ html, body {
 }
 
 .section-title-blink {
-  animation: sectionBlink 0.22s ease 0s 4;
+  animation: sectionBlink .85s ease-in-out 4;
   border-radius: 4px;
   padding: 2px 4px;
   margin: -2px -4px;
