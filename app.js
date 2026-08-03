@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1373";
+const APP_VERSION = "1374";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -2314,10 +2314,13 @@ function renderHalfYearReportsSection() {
 
     } else if (type === "monthly") {
       $("hyr-period-label").textContent = "Month";
+      const now = new Date();
+      const currentYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
       const monthsWithData = new Set();
       for (const sess of _hyrSessions) {
         const parts = sess.date.split("-").map(Number);
-        monthsWithData.add(`${parts[0]}-${String(parts[1]).padStart(2, "0")}`);
+        const ym = `${parts[0]}-${String(parts[1]).padStart(2, "0")}`;
+        if (ym < currentYM) monthsWithData.add(ym);
       }
       if (monthsWithData.size === 0) {
         periodSel.innerHTML = `<option value="">No sessions found</option>`;
