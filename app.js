@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1364";
+const APP_VERSION = "1365";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -2208,55 +2208,90 @@ function renderHalfYearReportsSection() {
     .filter(s => s.type !== "assessment" && s.type !== "unassigned")
     .sort((a, b) => a.name.localeCompare(b.name));
 
+  const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
   container.innerHTML = `
-    <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:nowrap">
-      <select id="hyr-student-select" class="admin-input" style="flex:1;min-width:0;background:#fff;font-family:inherit;font-size:1rem">
-        <option value="">— Select Student —</option>
-        ${students.map(s => `<option value="${escHtml(s.id)}">${escHtml(s.name)}</option>`).join("")}
-      </select>
-      <span id="hyr-period-loading" style="font-size:.85rem;color:var(--text-muted);white-space:nowrap;display:none">Checking…</span>
-      <select id="hyr-period-select" class="admin-input" style="width:200px;flex-shrink:0;background:#fff;font-family:inherit;font-size:1rem;padding-right:2rem;display:none"></select>
-      <button id="hyr-btn-generate" class="btn-add-section"
-        style="font-size:.9rem;padding:.45rem 1.1rem;min-height:38px;white-space:nowrap;flex-shrink:0;display:none">
-        Generate Report
-      </button>
-    </div>
-    <div id="hyr-progress" style="display:none;margin-top:.85rem">
-      <div style="background:#e5e7eb;border-radius:99px;height:6px;overflow:hidden">
-        <div id="hyr-progress-bar" style="height:100%;background:var(--primary);width:0%;transition:width .5s ease"></div>
+    <div style="display:flex;flex-direction:column;gap:.5rem">
+      <div style="display:flex;gap:.5rem;align-items:center">
+        <select id="hyr-student-select" class="admin-input" style="flex:1;min-width:0;background:#fff;font-family:inherit;font-size:1rem">
+          <option value="">— Select Student —</option>
+          ${students.map(s => `<option value="${escHtml(s.id)}">${escHtml(s.name)}</option>`).join("")}
+        </select>
+        <span id="hyr-period-loading" style="font-size:.85rem;color:var(--text-muted);white-space:nowrap;display:none">Checking…</span>
       </div>
-      <div id="hyr-progress-label" style="font-size:.82rem;color:var(--text-muted);margin-top:.45rem;text-align:center"></div>
-    </div>
-    <div id="hyr-activity-filter" class="hyr-excl-pulse" style="display:none;margin-top:.85rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:1rem 1.1rem">
-      <div style="font-size:.875rem;font-weight:600;color:#374151;margin-bottom:.8rem">Select the activities you want to <span style="text-decoration:underline;font-weight:800">EXCLUDE</span> from the Appendix:</div>
-      <div id="hyr-act-filter-list" style="display:flex;flex-direction:column;gap:1.1rem"></div>
+      <select id="hyr-type-select" class="admin-input" style="display:none;background:#fff;font-family:inherit;font-size:1rem">
+        <option value="">— Report Type —</option>
+        <option value="halfyear">Half Year</option>
+        <option value="monthly">Monthly</option>
+      </select>
+      <div style="display:flex;gap:.5rem;align-items:center">
+        <select id="hyr-period-select" class="admin-input" style="flex:1;min-width:0;background:#fff;font-family:inherit;font-size:1rem;display:none"></select>
+        <button id="hyr-btn-generate" class="btn-add-section"
+          style="font-size:.9rem;padding:.45rem 1.1rem;min-height:38px;white-space:nowrap;flex-shrink:0;display:none">
+          Generate Report
+        </button>
+      </div>
+      <div id="hyr-progress" style="display:none">
+        <div style="background:#e5e7eb;border-radius:99px;height:6px;overflow:hidden">
+          <div id="hyr-progress-bar" style="height:100%;background:var(--primary);width:0%;transition:width .5s ease"></div>
+        </div>
+        <div id="hyr-progress-label" style="font-size:.82rem;color:var(--text-muted);margin-top:.45rem;text-align:center"></div>
+      </div>
+      <div id="hyr-activity-filter" class="hyr-excl-pulse" style="display:none;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:1rem 1.1rem">
+        <div style="font-size:.875rem;font-weight:600;color:#374151;margin-bottom:.8rem">Select the activities you want to <span style="text-decoration:underline;font-weight:800">EXCLUDE</span> from the Appendix:</div>
+        <div id="hyr-act-filter-list" style="display:flex;flex-direction:column;gap:1.1rem"></div>
+      </div>
     </div>`;
+
+  let _hyrSessions = null;
+
+  const resetBelowStudent = () => {
+    $("hyr-type-select").value = "";
+    $("hyr-type-select").style.display = "none";
+    $("hyr-period-select").style.display = "none";
+    $("hyr-btn-generate").style.display = "none";
+    $("hyr-activity-filter").style.display = "none";
+  };
+
+  const resetBelowType = () => {
+    $("hyr-period-select").style.display = "none";
+    $("hyr-btn-generate").style.display = "none";
+    $("hyr-activity-filter").style.display = "none";
+  };
 
   $("hyr-student-select").addEventListener("change", async e => {
     const studentId = e.target.value;
-    const periodSel = $("hyr-period-select");
-    const genBtn    = $("hyr-btn-generate");
-    const loading   = $("hyr-period-loading");
-
-    periodSel.style.display = "none";
-    genBtn.style.display    = "none";
-    loading.style.display   = "none";
-    $("hyr-activity-filter").style.display = "none";
+    const loading = $("hyr-period-loading");
+    _hyrSessions = null;
+    resetBelowStudent();
     if (!studentId) return;
-
     loading.style.display = "";
     try {
-      const sessions = await getAllSessionsForStudent(studentId);
+      _hyrSessions = await getAllSessionsForStudent(studentId);
+      $("hyr-type-select").style.display = "";
+    } catch (err) {
+      // silent
+    } finally {
+      loading.style.display = "none";
+    }
+  });
+
+  $("hyr-type-select").addEventListener("change", e => {
+    const type = e.target.value;
+    const periodSel = $("hyr-period-select");
+    const genBtn    = $("hyr-btn-generate");
+    resetBelowType();
+    if (!type || !_hyrSessions) return;
+
+    if (type === "halfyear") {
       const periodsWithData = new Set();
-      for (const sess of sessions) {
+      for (const sess of _hyrSessions) {
         const [y, m] = sess.date.split("-").map(Number);
         periodsWithData.add(`${y}-${m <= 6 ? "H1" : "H2"}`);
       }
-      loading.style.display = "none";
       if (periodsWithData.size === 0) {
         periodSel.innerHTML = `<option value="">No sessions found</option>`;
-        periodSel.style.display = "";
-        return;
+        periodSel.style.display = ""; return;
       }
       const opts = [...periodsWithData]
         .sort((a, b) => b.localeCompare(a))
@@ -2267,16 +2302,33 @@ function renderHalfYearReportsSection() {
       periodSel.innerHTML = `<option value="">— Select Semester —</option>` + opts.join("");
       periodSel.style.display = "";
       genBtn.style.display = "";
-    } catch (err) {
-      loading.style.display = "none";
-      periodSel.innerHTML = `<option value="">Error loading sessions</option>`;
+
+    } else if (type === "monthly") {
+      const monthsWithData = new Set();
+      for (const sess of _hyrSessions) {
+        const parts = sess.date.split("-").map(Number);
+        monthsWithData.add(`${parts[0]}-${String(parts[1]).padStart(2, "0")}`);
+      }
+      if (monthsWithData.size === 0) {
+        periodSel.innerHTML = `<option value="">No sessions found</option>`;
+        periodSel.style.display = ""; return;
+      }
+      const opts = [...monthsWithData]
+        .sort((a, b) => b.localeCompare(a))
+        .map(ym => {
+          const [y, m] = ym.split("-").map(Number);
+          return `<option value="monthly-${ym}">${MONTH_NAMES[m - 1]} ${y}</option>`;
+        });
+      periodSel.innerHTML = `<option value="">— Select Month —</option>` + opts.join("");
       periodSel.style.display = "";
+      genBtn.style.display = "";
     }
   });
 
   $("hyr-period-select").addEventListener("change", e => {
+    const type = $("hyr-type-select").value;
     const actFilter = $("hyr-activity-filter");
-    if (!e.target.value) { actFilter.style.display = "none"; return; }
+    if (!e.target.value || type !== "halfyear") { actFilter.style.display = "none"; return; }
     const studentId = $("hyr-student-select").value;
     const student = state.students.find(s => s.id === studentId);
     if (!student) return;
@@ -2284,7 +2336,11 @@ function renderHalfYearReportsSection() {
     actFilter.style.display = "";
   });
 
-  $("hyr-btn-generate").addEventListener("click", () => requirePassword(hyrGenerate, EXPORT_MSG));
+  $("hyr-btn-generate").addEventListener("click", () => {
+    const type = $("hyr-type-select").value;
+    if (type === "monthly") return; // placeholder — monthly generation TBD
+    requirePassword(hyrGenerate, EXPORT_MSG);
+  });
 }
 
 function hyrExclKey(studentId, periodVal) {
