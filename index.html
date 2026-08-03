@@ -80,21 +80,10 @@
       <button id="btn-logout" class="btn-logout">Log Out</button>
     </header>
     <div class="home-body">
-      <nav class="home-sidenav" id="home-sidenav">
-        <div class="home-sidenav-label">Office</div>
-        <button class="home-sidenav-item sidenav-active" data-target="home-sec-db">Student Database</button>
-        <button class="home-sidenav-item" data-target="home-sec-individual">Individual Sessions</button>
-        <button class="home-sidenav-item" data-target="home-sec-group">Group Sessions</button>
-        <button class="home-sidenav-item" data-target="home-sec-assessment">Student Assessments</button>
-        <button class="home-sidenav-item" data-target="home-sec-templates">Templates</button>
-        <button class="home-sidenav-item" data-screen="screen-ai-report">AI Report Generator</button>
-        <div class="home-sidenav-label">For IT Use</div>
-        <button class="home-sidenav-item" data-screen="screen-lewis">Settings</button>
-      </nav>
       <main class="home-main" id="home-main">
         <section id="home-sec-db">
           <div class="section-header">
-            <h2 class="section-title">STUDENT DATABASE</h2>
+            <h2 class="section-title">MORE FEATURES</h2>
           </div>
           <div id="student-database-button"></div>
         </section>
@@ -134,6 +123,12 @@
           </div>
           <div class="student-buttons" id="template-buttons"></div>
         </section>
+        <section id="home-sec-lewis">
+          <div class="section-header">
+            <h2 class="section-title">For Lewis (IT) Use</h2>
+          </div>
+          <div id="export-all-button"></div>
+        </section>
       </main>
     </div>
   </div>
@@ -150,22 +145,6 @@
     </header>
     <div style="overflow-y:auto;flex:1;padding:1.25rem">
       <div id="half-year-report-section"></div>
-    </div>
-  </div>
-
-  <!-- ══════════════════════════════════════════════════════
-       SETTINGS (IT) SCREEN
-       ══════════════════════════════════════════════════════ -->
-  <div id="screen-lewis" class="screen hidden">
-    <header class="session-header">
-      <button class="btn-back" id="btn-lewis-back" aria-label="Back to home">←</button>
-      <div class="session-info">
-        <span class="session-student-name">Settings</span>
-        <span class="session-meta">(backup all data every Saturday)</span>
-      </div>
-    </header>
-    <div style="overflow-y:auto;flex:1;padding:1.25rem">
-      <div id="export-all-button"></div>
     </div>
   </div>
 

@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1369";
+const APP_VERSION = "1370";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -620,8 +620,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Register SW immediately — don't wait for Firebase so updates are never blocked.
   registerServiceWorker();
   setupStickyNote();
-  initHomeSidenav();
-  $("btn-lewis-back").addEventListener("click", showHome);
   $("btn-ai-report-back").addEventListener("click", showHome);
 
   // If auth never resolves (e.g. Firebase CDN unreachable on iOS after cache clear),
@@ -1191,12 +1189,12 @@ $("search-template").addEventListener("input", e => {
 function renderStudentDatabaseButton() {
   const container = $("student-database-button");
   if (!container) return;
-  const pending = (state.reviewQueueItems || []).length;
-  const badge   = pending > 0 ? ` (${pending})` : "";
   container.innerHTML = `<div class="info-btn-row">
-    <button class="export-btn export-btn-all" id="btn-open-student-registry">View</button>
+    <button class="export-btn export-btn-all" id="btn-open-student-registry" style="margin-bottom:0">Student Database</button>
+    <button class="export-btn" id="btn-open-ai-report">AI Report Generator</button>
   </div>`;
   $("btn-open-student-registry").addEventListener("click", () => openStudentRegistryScreen());
+  $("btn-open-ai-report").addEventListener("click", () => showScreen("screen-ai-report"));
 }
 
 function openChecklistModal() {
@@ -2156,8 +2154,8 @@ function renderExportButtons() {
   if (!exportAllContainer) return;
 
   exportAllContainer.innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:.6rem;max-width:320px;align-items:stretch">
-      <button class="export-btn export-btn-all" id="btn-export-all-trials" style="margin-bottom:0">Backup All Excel (ZIP)</button>
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+      <button class="export-btn export-btn-all" id="btn-export-all-trials">Backup All Excel (ZIP)</button>
       <button class="export-btn" id="btn-data-integrity-check">🔍 Run Data Integrity Check</button>
       <button class="export-btn" id="btn-recently-deleted">🗑️ Recently Deleted (30 days)</button>
       <button class="export-btn" id="btn-hyr-settings">✏️ Prompt for AI Report</button>
