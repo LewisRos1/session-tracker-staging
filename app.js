@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1358";
+const APP_VERSION = "1359";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -566,6 +566,9 @@ function initHomeSidenav() {
 
   const sections = items.map(i => document.getElementById(i.dataset.target)).filter(Boolean);
 
+  let _scrollLocked = false;
+  let _scrollLockTimer = null;
+
   const setActive = id => {
     items.forEach(i => i.classList.toggle("sidenav-active", i.dataset.target === id));
   };
@@ -574,7 +577,7 @@ function initHomeSidenav() {
     const h = target.querySelector(".section-title");
     if (!h) return;
     h.classList.remove("section-title-blink");
-    void h.offsetWidth; // restart animation
+    void h.offsetWidth;
     h.classList.add("section-title-blink");
     h.addEventListener("animationend", () => h.classList.remove("section-title-blink"), { once: true });
   };
@@ -583,19 +586,28 @@ function initHomeSidenav() {
     item.addEventListener("click", () => {
       const target = document.getElementById(item.dataset.target);
       if (!target) return;
-      setActive(item.dataset.target); // highlight immediately, don't wait for scroll
+      setActive(item.dataset.target);
+      // Lock scroll handler so the smooth-scroll animation doesn't override the active state
+      _scrollLocked = true;
+      clearTimeout(_scrollLockTimer);
+      _scrollLockTimer = setTimeout(() => { _scrollLocked = false; }, 1200);
       target.scrollIntoView({ behavior: "smooth", block: "start" });
       blinkSection(target);
     });
   });
 
   main.addEventListener("scroll", () => {
+    if (_scrollLocked) return;
     const mainTop = main.getBoundingClientRect().top;
+    const mainH   = main.clientHeight;
+    // Near bottom: sections can't reach the 20px top threshold so use a wider threshold
+    const nearBottom = main.scrollHeight - main.scrollTop - mainH < 100;
+    const threshold  = nearBottom ? mainH * 0.75 : 20;
     let activeId = sections[0]?.id;
     for (const sec of sections) {
-      if (sec.getBoundingClientRect().top - mainTop <= 20) activeId = sec.id;
+      if (sec.getBoundingClientRect().top - mainTop <= threshold) activeId = sec.id;
     }
-    if (activeId) setActive(activeId);
+    setActive(activeId);
   }, { passive: true });
 }
 
