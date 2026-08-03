@@ -285,7 +285,7 @@ html, body {
 }
 
 .home-sidenav {
-  width: 112px;
+  width: 138px;
   flex-shrink: 0;
   background: var(--white);
   border-right: 1px solid var(--border);
@@ -323,6 +323,20 @@ html, body {
   background: var(--primary-light);
   color: var(--primary);
   font-weight: 700;
+}
+
+@keyframes sectionBlink {
+  0%   { background: transparent; }
+  25%  { background: var(--primary-light); }
+  55%  { background: var(--primary-light); }
+  100% { background: transparent; }
+}
+
+.section-title-blink {
+  animation: sectionBlink 0.7s ease;
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin: -2px -4px;
 }
 
 .home-main {

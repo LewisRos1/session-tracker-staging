@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1357";
+const APP_VERSION = "1358";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -570,10 +570,22 @@ function initHomeSidenav() {
     items.forEach(i => i.classList.toggle("sidenav-active", i.dataset.target === id));
   };
 
+  const blinkSection = target => {
+    const h = target.querySelector(".section-title");
+    if (!h) return;
+    h.classList.remove("section-title-blink");
+    void h.offsetWidth; // restart animation
+    h.classList.add("section-title-blink");
+    h.addEventListener("animationend", () => h.classList.remove("section-title-blink"), { once: true });
+  };
+
   items.forEach(item => {
     item.addEventListener("click", () => {
       const target = document.getElementById(item.dataset.target);
-      if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (!target) return;
+      setActive(item.dataset.target); // highlight immediately, don't wait for scroll
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      blinkSection(target);
     });
   });
 
