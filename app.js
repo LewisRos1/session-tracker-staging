@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1365";
+const APP_VERSION = "1366";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -2210,24 +2210,32 @@ function renderHalfYearReportsSection() {
 
   const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
+  const labelStyle = `width:110px;font-weight:600;font-size:.9rem;color:#374151;flex-shrink:0`;
+  const rowStyle   = `display:flex;gap:.75rem;align-items:center`;
+
   container.innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:.5rem">
-      <div style="display:flex;gap:.5rem;align-items:center">
+    <div style="display:flex;flex-direction:column;gap:.55rem">
+      <div style="${rowStyle}">
+        <span style="${labelStyle}">Student</span>
         <select id="hyr-student-select" class="admin-input" style="flex:1;min-width:0;background:#fff;font-family:inherit;font-size:1rem">
-          <option value="">— Select Student —</option>
+          <option value="">— Select —</option>
           ${students.map(s => `<option value="${escHtml(s.id)}">${escHtml(s.name)}</option>`).join("")}
         </select>
         <span id="hyr-period-loading" style="font-size:.85rem;color:var(--text-muted);white-space:nowrap;display:none">Checking…</span>
       </div>
-      <select id="hyr-type-select" class="admin-input" style="display:none;background:#fff;font-family:inherit;font-size:1rem">
-        <option value="">— Report Type —</option>
-        <option value="halfyear">Half Year</option>
-        <option value="monthly">Monthly</option>
-      </select>
-      <div style="display:flex;gap:.5rem;align-items:center">
-        <select id="hyr-period-select" class="admin-input" style="flex:1;min-width:0;background:#fff;font-family:inherit;font-size:1rem;display:none"></select>
+      <div id="hyr-row-type" style="display:none;gap:.75rem;align-items:center">
+        <span style="${labelStyle}">Report Type</span>
+        <select id="hyr-type-select" class="admin-input" style="flex:1;min-width:0;background:#fff;font-family:inherit;font-size:1rem">
+          <option value="">— Select —</option>
+          <option value="halfyear">Half Year</option>
+          <option value="monthly">Monthly</option>
+        </select>
+      </div>
+      <div id="hyr-row-period" style="display:none;gap:.75rem;align-items:center">
+        <span id="hyr-period-label" style="${labelStyle}">Semester</span>
+        <select id="hyr-period-select" class="admin-input" style="flex:1;min-width:0;background:#fff;font-family:inherit;font-size:1rem"></select>
         <button id="hyr-btn-generate" class="btn-add-section"
-          style="font-size:.9rem;padding:.45rem 1.1rem;min-height:38px;white-space:nowrap;flex-shrink:0;display:none">
+          style="font-size:.9rem;padding:.45rem 1.1rem;min-height:38px;white-space:nowrap;flex-shrink:0">
           Generate Report
         </button>
       </div>
@@ -2247,15 +2255,13 @@ function renderHalfYearReportsSection() {
 
   const resetBelowStudent = () => {
     $("hyr-type-select").value = "";
-    $("hyr-type-select").style.display = "none";
-    $("hyr-period-select").style.display = "none";
-    $("hyr-btn-generate").style.display = "none";
+    $("hyr-row-type").style.display  = "none";
+    $("hyr-row-period").style.display = "none";
     $("hyr-activity-filter").style.display = "none";
   };
 
   const resetBelowType = () => {
-    $("hyr-period-select").style.display = "none";
-    $("hyr-btn-generate").style.display = "none";
+    $("hyr-row-period").style.display = "none";
     $("hyr-activity-filter").style.display = "none";
   };
 
@@ -2268,7 +2274,7 @@ function renderHalfYearReportsSection() {
     loading.style.display = "";
     try {
       _hyrSessions = await getAllSessionsForStudent(studentId);
-      $("hyr-type-select").style.display = "";
+      $("hyr-row-type").style.display = "flex";
     } catch (err) {
       // silent
     } finally {
@@ -2279,11 +2285,11 @@ function renderHalfYearReportsSection() {
   $("hyr-type-select").addEventListener("change", e => {
     const type = e.target.value;
     const periodSel = $("hyr-period-select");
-    const genBtn    = $("hyr-btn-generate");
     resetBelowType();
     if (!type || !_hyrSessions) return;
 
     if (type === "halfyear") {
+      $("hyr-period-label").textContent = "Semester";
       const periodsWithData = new Set();
       for (const sess of _hyrSessions) {
         const [y, m] = sess.date.split("-").map(Number);
@@ -2291,7 +2297,7 @@ function renderHalfYearReportsSection() {
       }
       if (periodsWithData.size === 0) {
         periodSel.innerHTML = `<option value="">No sessions found</option>`;
-        periodSel.style.display = ""; return;
+        $("hyr-row-period").style.display = "flex"; return;
       }
       const opts = [...periodsWithData]
         .sort((a, b) => b.localeCompare(a))
@@ -2299,11 +2305,11 @@ function renderHalfYearReportsSection() {
           const [y, h] = p.split("-");
           return `<option value="${p}">${y} ${h} (${h === "H1" ? "Jan–Jun" : "Jul–Dec"})</option>`;
         });
-      periodSel.innerHTML = `<option value="">— Select Semester —</option>` + opts.join("");
-      periodSel.style.display = "";
-      genBtn.style.display = "";
+      periodSel.innerHTML = `<option value="">— Select —</option>` + opts.join("");
+      $("hyr-row-period").style.display = "flex";
 
     } else if (type === "monthly") {
+      $("hyr-period-label").textContent = "Month";
       const monthsWithData = new Set();
       for (const sess of _hyrSessions) {
         const parts = sess.date.split("-").map(Number);
@@ -2311,7 +2317,7 @@ function renderHalfYearReportsSection() {
       }
       if (monthsWithData.size === 0) {
         periodSel.innerHTML = `<option value="">No sessions found</option>`;
-        periodSel.style.display = ""; return;
+        $("hyr-row-period").style.display = "flex"; return;
       }
       const opts = [...monthsWithData]
         .sort((a, b) => b.localeCompare(a))
@@ -2319,16 +2325,14 @@ function renderHalfYearReportsSection() {
           const [y, m] = ym.split("-").map(Number);
           return `<option value="monthly-${ym}">${MONTH_NAMES[m - 1]} ${y}</option>`;
         });
-      periodSel.innerHTML = `<option value="">— Select Month —</option>` + opts.join("");
-      periodSel.style.display = "";
-      genBtn.style.display = "";
+      periodSel.innerHTML = `<option value="">— Select —</option>` + opts.join("");
+      $("hyr-row-period").style.display = "flex";
     }
   });
 
   $("hyr-period-select").addEventListener("change", e => {
-    const type = $("hyr-type-select").value;
     const actFilter = $("hyr-activity-filter");
-    if (!e.target.value || type !== "halfyear") { actFilter.style.display = "none"; return; }
+    if (!e.target.value) { actFilter.style.display = "none"; return; }
     const studentId = $("hyr-student-select").value;
     const student = state.students.find(s => s.id === studentId);
     if (!student) return;
