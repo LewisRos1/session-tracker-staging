@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1359";
+const APP_VERSION = "1360";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -2150,7 +2150,7 @@ function renderExportButtons() {
   if (!exportAllContainer) return;
 
   exportAllContainer.innerHTML = `
-    <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:.6rem;max-width:320px">
       <button class="export-btn export-btn-all" id="btn-export-all-trials">Backup All Excel (ZIP)</button>
       <button class="export-btn" id="btn-data-integrity-check">🔍 Run Data Integrity Check</button>
       <button class="export-btn" id="btn-recently-deleted">🗑️ Recently Deleted (30 days)</button>

@@ -326,14 +326,12 @@ html, body {
 }
 
 @keyframes sectionBlink {
-  0%   { background: transparent; }
-  25%  { background: var(--primary-light); }
-  55%  { background: var(--primary-light); }
-  100% { background: transparent; }
+  0%, 100% { background: transparent; }
+  50%      { background: var(--primary-light); }
 }
 
 .section-title-blink {
-  animation: sectionBlink 0.7s ease;
+  animation: sectionBlink 0.22s ease 0s 4;
   border-radius: 4px;
   padding: 2px 4px;
   margin: -2px -4px;
