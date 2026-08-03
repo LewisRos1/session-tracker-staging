@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1374";
+const APP_VERSION = "1375";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -4983,7 +4983,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
 
   const blob = await Packer.toBlob(doc);
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
-  a.download = `${student.name} Monthly Report ${monthName} ${year}.docx`; a.click();
+  a.download = `${student.name} - ${monthName} ${year} - Monthly Report.docx`; a.click();
   URL.revokeObjectURL(a.href);
 }
 
