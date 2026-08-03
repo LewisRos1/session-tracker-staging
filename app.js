@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1371";
+const APP_VERSION = "1372";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -2346,7 +2346,7 @@ function renderHalfYearReportsSection() {
 
   $("hyr-btn-generate").addEventListener("click", () => {
     const type = $("hyr-type-select").value;
-    if (type === "monthly") return; // placeholder — monthly generation TBD
+    if (type === "monthly") { requirePassword(monthlyGenerate, EXPORT_MSG); return; }
     requirePassword(hyrGenerate, EXPORT_MSG);
   });
 }
@@ -4407,6 +4407,650 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   a.href = URL.createObjectURL(blob);
   a.download = `${student.name} Half Year Report ${period} ${year}.docx`;
   a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ============================================================
+// MONTHLY REPORT GENERATION
+// ============================================================
+
+async function monthlyGenerate() {
+  const studentId = $("hyr-student-select")?.value;
+  const periodVal = $("hyr-period-select")?.value;
+  if (!studentId) { alert("Please select a student first."); return; }
+  if (!periodVal || !periodVal.startsWith("monthly-")) { alert("Please select a month first."); return; }
+  const student = state.students.find(s => s.id === studentId);
+  if (!student) return;
+
+  const parts = periodVal.replace("monthly-", "").split("-").map(Number);
+  const year = parts[0], month = parts[1];
+
+  const btn = $("hyr-btn-generate");
+  const progress = $("hyr-progress");
+  const bar = $("hyr-progress-bar");
+  const label = $("hyr-progress-label");
+  let inCancelMode = false;
+  const setProgress = (pct, text) => {
+    bar.style.width = pct + "%"; label.textContent = text;
+    if (!inCancelMode) btn.textContent = text;
+  };
+
+  btn.disabled = true; progress.style.display = "";
+  setProgress(5, "Collecting session data…");
+  try {
+    const excludedActivities = new Set();
+    document.querySelectorAll(".hyr-act-cb[data-excluded='true']").forEach(b => {
+      excludedActivities.add(`${b.dataset.target}|${b.dataset.activity}`);
+    });
+
+    const allSessions = await getAllSessionsForStudent(studentId);
+    setProgress(15, "Processing data…");
+
+    const FULL_MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+    const monthName = FULL_MONTHS[month - 1];
+    const firstName = student.name.split(" ")[0];
+    const collected = monthlyCollectData(student, year, month, allSessions, excludedActivities);
+    const { overviewData, miniData, aiLines, appendixData, sessionCount } = collected;
+
+    const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
+    const excludedList = excludedActivities.size > 0
+      ? [...excludedActivities].map(k => { const [t, a] = k.split("|"); return `  - ${a} (under target: ${t})`; }).join("\n")
+      : null;
+
+    const aiPrompt = `${HYR_DEFAULT_PROMPT}
+${excludedList ? `\nEXCLUDED ACTIVITIES — ABSOLUTE RULE: The following activities have been deliberately excluded from this report. Do NOT mention, reference, or draw conclusions about them anywhere:\n${excludedList}\n` : ""}
+Student: ${student.name}
+Reporting Month: ${monthName} ${year}
+Number of sessions this month: ${sessionCount}
+
+SESSION DATA FOR ${monthName.toUpperCase()} ${year}:
+${aiLines.join("\n")}
+
+Provide ONLY the following sections using EXACTLY these markers. No extra text outside the markers.
+
+${activeTargets.map(t => `===TARGET_REVIEW: ${t.name}===
+Write 2-3 bullet points about what was observed for this target in ${monthName} ${year}. Focus on what specifically happened in sessions this month. Plain English, warm tone, no jargon, no numbers or percentages.
+Format each bullet as: • [content — NOT bold, no labels]
+===END===
+
+===FOCUS_AREAS: ${t.name}===
+Write exactly 1-2 specific struggles observed for this target this month.
+For each struggle use this EXACT format on separate lines:
+STRUGGLE: [name the specific behaviour precisely — e.g. "does not yet wait for verbal cue before responding" not "needs work on turn-taking"]
+EXAMPLE: [concrete example from a session this month — a specific moment or incident]
+
+If 2 struggles, write two STRUGGLE/EXAMPLE pairs. If only 1, write one. No extra text.
+===END===`).join("\n\n")}`;
+
+    _hyrAbortController = new AbortController();
+    const fetchPromise = fetch("https://session-tracker-ai.wang-loys22.workers.dev", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 8192,
+        system: "You are a professional therapy report writer. Follow the requested format exactly.",
+        messages: [{ role: "user", content: aiPrompt }]
+      }),
+      signal: _hyrAbortController.signal
+    });
+
+    await new Promise(r => setTimeout(r, 800));
+    setProgress(25, "Processing data…");
+    await new Promise(r => setTimeout(r, 800));
+    setProgress(38, "Sending to AI (Approx. ~15 seconds)…");
+    await new Promise(r => setTimeout(r, 400));
+
+    inCancelMode = true;
+    btn.disabled = false;
+    btn.textContent = "✕ Cancel";
+    btn.style.cssText += ";background:#fee2e2;color:#dc2626;border-color:#ef4444";
+
+    const resp = await fetchPromise;
+    _hyrAbortController = null;
+    inCancelMode = false;
+    btn.disabled = true;
+    btn.style.background = ""; btn.style.color = ""; btn.style.borderColor = "";
+
+    setProgress(72, "AI response received…");
+    await new Promise(r => setTimeout(r, 500));
+    setProgress(86, "Writing report…");
+    await new Promise(r => setTimeout(r, 600));
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error?.message || `API error ${resp.status}`);
+    }
+    const data = await resp.json();
+    const reportText = data.content?.[0]?.text || "";
+    if (!reportText) throw new Error("Empty response from Claude.");
+
+    const parsed = monthlyParseAiResponse(reportText);
+    setProgress(100, "Done!");
+    await new Promise(r => setTimeout(r, 400));
+
+    await monthlyDownloadWord(student, year, month, monthName, sessionCount, overviewData, miniData, parsed, appendixData);
+    await monthlyDownloadExcel(student, year, month, monthName, overviewData, miniData);
+  } catch (err) {
+    if (err.name !== "AbortError") alert("Failed to generate monthly report:\n" + err.message);
+  } finally {
+    _hyrAbortController = null;
+    btn.disabled = false; btn.textContent = "Generate Report";
+    btn.style.background = ""; btn.style.color = ""; btn.style.borderColor = "";
+    progress.style.display = "none"; bar.style.width = "0%";
+  }
+}
+
+function monthlyCollectData(student, year, month, allSessions, excludedActivities = new Set()) {
+  const ABBRS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
+
+  const thisMonthSessions = allSessions.filter(s => { const [y,m] = s.date.split("-").map(Number); return y === year && m === month; });
+  let lastYear = year, lastMonth = month - 1;
+  if (lastMonth === 0) { lastMonth = 12; lastYear = year - 1; }
+  const lastMonthSessions = allSessions.filter(s => { const [y,m] = s.date.split("-").map(Number); return y === lastYear && m === lastMonth; });
+  const yearToDateSessions = allSessions.filter(s => { const [y,m] = s.date.split("-").map(Number); return y === year && m <= month; });
+
+  const sessionCount = thisMonthSessions.length;
+  const thisMonthLabel = ABBRS[month - 1];
+  const lastMonthLabel = ABBRS[lastMonth - 1];
+
+  const overviewData = {}, miniData = {}, aiLines = [], appendixData = {};
+
+  for (const target of activeTargets) {
+    const tName = target.name;
+
+    // Overview: monthly averages Jan → report month
+    const ovLabels = [], ovValues = [];
+    for (let m = 1; m <= month; m++) {
+      const mLabel = ABBRS[m - 1]; ovLabels.push(mLabel);
+      const mSess = yearToDateSessions.filter(s => { const [,sm] = s.date.split("-").map(Number); return sm === m; });
+      const avgs = mSess.map(s => hyrCalcDailyAvg(s, target)).filter(v => v !== null);
+      ovValues.push(avgs.length ? Math.round(avgs.reduce((a,b)=>a+b,0)/avgs.length) : null);
+    }
+    overviewData[tName] = { labels: ovLabels, values: ovValues };
+
+    // Mini: this month vs last month
+    const computeAvg = sess => {
+      const avgs = sess.map(s => hyrCalcDailyAvg(s, target)).filter(v => v !== null);
+      return avgs.length ? Math.round(avgs.reduce((a,b)=>a+b,0)/avgs.length) : null;
+    };
+    miniData[tName] = {
+      lastMonthLabel, lastMonthAvg: computeAvg(lastMonthSessions),
+      thisMonthLabel, thisMonthAvg: computeAvg(thisMonthSessions)
+    };
+
+    // AI lines
+    aiLines.push(`=== TARGET: ${tName} ===`);
+    const tm = miniData[tName];
+    if (tm.thisMonthAvg !== null) aiLines.push(`This month (${thisMonthLabel}): ${tm.thisMonthAvg}%`);
+    if (tm.lastMonthAvg !== null) aiLines.push(`Last month (${lastMonthLabel}): ${tm.lastMonthAvg}%`);
+
+    // Activity remarks for AI + appendix
+    appendixData[tName] = [];
+    const paKeyToAliases = {}, paKeyToConfigId = {}, legacyToKey = {};
+    const actNames = new Set(), actDisplayNames = {};
+
+    for (const pa of (target.predefinedActivities || [])) {
+      const key = pa.title || pa.name; if (!key) continue;
+      if (pa.id) paKeyToConfigId[key] = pa.id;
+      if (!pa.masteredOn && !pa.discontinuedOn && !pa.isCompleted && !pa.isArchived && !pa.isStopped) {
+        actNames.add(key); actDisplayNames[key] = key;
+        if (pa.title && pa.name && pa.title !== pa.name) {
+          if (!paKeyToAliases[key]) paKeyToAliases[key] = [];
+          paKeyToAliases[key].push(pa.name);
+          legacyToKey[pa.name] = key;
+        }
+      }
+    }
+    for (const sess of thisMonthSessions) {
+      for (const act of Object.values(sess.activities || {})) {
+        if ((act.targetName === tName || act.target === tName) && act.activityName && !legacyToKey[act.activityName]) {
+          actNames.add(act.activityName);
+          if (!actDisplayNames[act.activityName]) actDisplayNames[act.activityName] = act.activityTitle || act.activityName;
+        }
+      }
+    }
+
+    if (actNames.size) aiLines.push("Activities:");
+    for (const actName of actNames) {
+      if (excludedActivities.has(`${tName}|${actName}`)) continue;
+      const aliases = paKeyToAliases[actName] || [];
+      const configId = paKeyToConfigId[actName];
+      const allRemarks = [];
+      for (const sess of thisMonthSessions) {
+        const entry = Object.entries(sess.activities || {}).find(
+          ([,a]) => (a.activityName === actName || aliases.includes(a.activityName) || (configId && a.configId === configId)) &&
+                    (a.targetName === tName || a.target === tName)
+        );
+        if (!entry) continue;
+        const [sKey, sAct] = entry;
+        const sId = sAct.id || sKey;
+        for (const rem of Object.values(sess.remarks || {})) {
+          if (rem.activityId !== sId) continue;
+          const trials = (rem.trials || []).filter(t => t !== -1);
+          if (rem.optionScore !== undefined) trials.push(rem.optionScore);
+          const avg = trials.length ? Math.round(trials.reduce((a,b)=>a+b,0)/(trials.length*(target.maxPoints||3))*100) : null;
+          const text = hyrStripHtml(rem.text || "");
+          if (text || avg !== null) {
+            allRemarks.push({ date: sess.date, activityName: actDisplayNames[actName] || actName, text, avg });
+            appendixData[tName].push({ date: sess.date, activityName: actDisplayNames[actName] || actName, text, avg });
+          }
+        }
+      }
+      allRemarks.sort((a,b) => a.date.localeCompare(b.date));
+      const scored = allRemarks.filter(r => r.avg !== null);
+      const avgLine = scored.length ? ` (avg ${Math.round(scored.reduce((a,b)=>a+b.avg,0)/scored.length)}%)` : "";
+      aiLines.push(`  • ${actDisplayNames[actName]||actName}${avgLine}`);
+      for (const rem of allRemarks) {
+        if (rem.text) aiLines.push(`    - "${rem.text.substring(0, 200).trim()}"`);
+      }
+    }
+    aiLines.push("");
+  }
+
+  return { overviewData, miniData, aiLines, appendixData, sessionCount, thisMonthLabel, lastMonthLabel };
+}
+
+function monthlyParseAiResponse(text) {
+  const out = { targetReviews: {}, focusAreas: {} };
+  const trRe = /===TARGET_REVIEW:\s*(.+?)===\s*([\s\S]*?)\s*===END===/g;
+  const faRe = /===FOCUS_AREAS:\s*(.+?)===\s*([\s\S]*?)\s*===END===/g;
+  let m;
+  while ((m = trRe.exec(text)) !== null) out.targetReviews[m[1].trim()] = m[2].trim();
+  while ((m = faRe.exec(text)) !== null) {
+    const tName = m[1].trim(), content = m[2].trim();
+    const struggles = [];
+    content.split(/\n(?=STRUGGLE:)/g).forEach(pair => {
+      const sM = pair.match(/STRUGGLE:\s*(.+)/), eM = pair.match(/EXAMPLE:\s*([\s\S]+)/);
+      if (sM) struggles.push({ struggle: sM[1].trim(), example: eM ? eM[1].trim() : "" });
+    });
+    out.focusAreas[tName] = struggles;
+  }
+  return out;
+}
+
+function monthlyDrawOverviewChart(overviewData, title) {
+  const COLORS = ["#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#ec4899","#14b8a6","#f97316"];
+  const targetNames = Object.keys(overviewData);
+  if (!targetNames.length) return null;
+  const allLabels = overviewData[targetNames[0]]?.labels || [];
+  if (!allLabels.length) return null;
+
+  const SCALE = 2;
+  const LEGEND_ROWS = Math.ceil(targetNames.length / 3);
+  const LEGEND_H = LEGEND_ROWS * 22 + 14;
+  const W = 580, H = 310 + LEGEND_H;
+  const PAD = { top: 52, right: 20, bottom: 44 + LEGEND_H, left: 48 };
+  const cW = W - PAD.left - PAD.right, cH = H - PAD.top - PAD.bottom;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W * SCALE; canvas.height = H * SCALE;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(SCALE, SCALE);
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
+
+  ctx.fillStyle = "#1f2937"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText(title, W / 2, 28);
+
+  for (const gl of [0,25,50,75,100]) {
+    const y = PAD.top + cH - (gl / 100) * cH;
+    ctx.beginPath(); ctx.strokeStyle = gl === 0 ? "#9ca3af" : "#e5e7eb"; ctx.lineWidth = gl === 0 ? 1 : 0.8;
+    ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + cW, y); ctx.stroke();
+    ctx.fillStyle = "#6b7280"; ctx.font = "10px sans-serif"; ctx.textAlign = "right";
+    ctx.fillText(`${gl}%`, PAD.left - 4, y + 3.5);
+  }
+
+  const xStep = allLabels.length > 1 ? cW / (allLabels.length - 1) : cW;
+  ctx.fillStyle = "#374151"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
+  allLabels.forEach((lbl, i) => {
+    ctx.fillText(lbl, PAD.left + (allLabels.length === 1 ? cW / 2 : i * xStep), PAD.top + cH + 16);
+  });
+
+  for (let ti = 0; ti < targetNames.length; ti++) {
+    const { labels, values } = overviewData[targetNames[ti]];
+    const color = COLORS[ti % COLORS.length];
+    ctx.strokeStyle = color; ctx.lineWidth = 2;
+    ctx.beginPath();
+    let started = false;
+    values.forEach((v, i) => {
+      if (v == null) { started = false; return; }
+      const x = PAD.left + (labels.length === 1 ? cW / 2 : i * xStep);
+      const y = PAD.top + cH - (v / 100) * cH;
+      if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    ctx.fillStyle = color;
+    values.forEach((v, i) => {
+      if (v == null) return;
+      const x = PAD.left + (labels.length === 1 ? cW / 2 : i * xStep);
+      const y = PAD.top + cH - (v / 100) * cH;
+      ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2); ctx.fill();
+    });
+  }
+
+  const legendY = H - LEGEND_H + 8;
+  const itemW = (W - 16) / 3;
+  targetNames.forEach((tName, i) => {
+    const col = i % 3, row = Math.floor(i / 3);
+    const lx = col * itemW + 16, ly = legendY + row * 22;
+    ctx.fillStyle = COLORS[i % COLORS.length];
+    ctx.fillRect(lx, ly + 2, 16, 10);
+    ctx.fillStyle = "#374151"; ctx.font = "9.5px sans-serif"; ctx.textAlign = "left";
+    ctx.fillText((tName.length > 28 ? tName.slice(0, 26) + "…" : tName), lx + 20, ly + 11);
+  });
+
+  return { base64: canvas.toDataURL("image/png").split(",")[1], height: H };
+}
+
+function monthlyDrawMiniBarChart(targetName, lastLabel, lastAvg, thisLabel, thisAvg) {
+  const SCALE = 2;
+  const W = 260, H = 180;
+  const PAD = { top: 38, right: 16, bottom: 38, left: 48 };
+  const cW = W - PAD.left - PAD.right, cH = H - PAD.top - PAD.bottom;
+  const barW = cW / 3.5, spacing = (cW - barW * 2) / 3;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W * SCALE; canvas.height = H * SCALE;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(SCALE, SCALE);
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
+
+  for (const gl of [0, 50, 100]) {
+    const y = PAD.top + cH - (gl / 100) * cH;
+    ctx.beginPath(); ctx.strokeStyle = gl === 0 ? "#9ca3af" : "#e5e7eb"; ctx.lineWidth = gl === 0 ? 1 : 0.8;
+    ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + cW, y); ctx.stroke();
+    ctx.fillStyle = "#6b7280"; ctx.font = "9px sans-serif"; ctx.textAlign = "right";
+    ctx.fillText(`${gl}%`, PAD.left - 4, y + 3.5);
+  }
+
+  [{ label: lastLabel, avg: lastAvg, color: "#93c5fd" }, { label: thisLabel, avg: thisAvg, color: "#3b82f6" }].forEach((bar, i) => {
+    const x = PAD.left + spacing + i * (barW + spacing);
+    if (bar.avg !== null) {
+      const bH = (bar.avg / 100) * cH;
+      ctx.fillStyle = bar.color;
+      ctx.fillRect(x, PAD.top + cH - bH, barW, bH);
+      ctx.fillStyle = "#1f2937"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText(`${bar.avg}%`, x + barW / 2, PAD.top + cH - bH - 5);
+    } else {
+      ctx.fillStyle = "#9ca3af"; ctx.font = "9px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText("no data", x + barW / 2, PAD.top + cH - 8);
+    }
+    ctx.fillStyle = "#374151"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(bar.label, x + barW / 2, PAD.top + cH + 14);
+  });
+
+  return { base64: canvas.toDataURL("image/png").split(",")[1], height: H };
+}
+
+async function monthlyDownloadWord(student, year, month, monthName, sessionCount, overviewData, miniData, parsed, appendixData) {
+  const firstName = student.name.split(" ")[0];
+  const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
+  const reportDate = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun, LevelFormat,
+          Table, TableRow, TableCell, WidthType, PageOrientation, SectionType, Header, Footer, PageNumber } = window.docx;
+
+  const LS = { line: 276, lineRule: "auto" };
+
+  function b64ToUint8(b64) {
+    const bin = atob(b64); const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return arr;
+  }
+
+  function mkPara(text, opts = {}) {
+    return new Paragraph({
+      children: [new TextRun({ text, bold: opts.bold, italics: opts.italics, size: opts.size || 22, color: opts.color })],
+      heading: opts.heading, alignment: opts.align || AlignmentType.LEFT,
+      spacing: { before: opts.before || 0, after: opts.after || 140, ...LS },
+      pageBreakBefore: opts.pageBreak || false, keepNext: opts.keepNext || false
+    });
+  }
+
+  function bulletPara(text) {
+    const runs = []; const re = /(\*\*[^*]+\*\*|_[^_]+_)/g; let idx = 0, m;
+    while ((m = re.exec(text)) !== null) {
+      if (m.index > idx) runs.push(new TextRun({ text: text.slice(idx, m.index), size: 22 }));
+      if (m[0].startsWith("**")) runs.push(new TextRun({ text: m[0].slice(2,-2), bold: true, size: 22 }));
+      else runs.push(new TextRun({ text: m[0].slice(1,-1), italics: true, size: 22 }));
+      idx = m.index + m[0].length;
+    }
+    if (idx < text.length) runs.push(new TextRun({ text: text.slice(idx), size: 22 }));
+    return new Paragraph({ children: runs, style: "List Bullet", alignment: AlignmentType.BOTH, spacing: { after: 100, ...LS } });
+  }
+
+  function mkCell(text, opts = {}) {
+    return new TableCell({
+      width: opts.dxa !== undefined ? { size: opts.dxa, type: WidthType.DXA }
+           : opts.pct !== undefined ? { size: opts.pct, type: WidthType.PERCENTAGE } : undefined,
+      margins: { top: 100, bottom: 100, left: 150, right: 150 },
+      children: [new Paragraph({
+        children: [new TextRun({ text, bold: opts.bold, size: opts.size || 22, color: opts.color, italics: opts.italics })],
+        alignment: opts.align || AlignmentType.LEFT, spacing: { before: 80, after: 80 }
+      })],
+      shading: opts.bg ? { fill: opts.bg } : undefined
+    });
+  }
+
+  const paragraphs = [];
+  const TNR = "Times New Roman";
+  let logoData = null;
+  try {
+    const r = await fetch("ZORA Logo for AI Report.png", { cache: "no-cache" });
+    if (r.ok) logoData = new Uint8Array(await r.arrayBuffer());
+  } catch (_) {}
+
+  const CPL = { line: 276, lineRule: "auto" };
+  paragraphs.push(new Paragraph({
+    children: logoData ? [new ImageRun({ data: logoData, transformation: { width: 454, height: 135 }, type: "png" })] : [],
+    alignment: AlignmentType.CENTER, spacing: { before: 480, after: 560, ...CPL }
+  }));
+  paragraphs.push(new Paragraph({
+    children: [new TextRun({ text: "Monthly Progress Report", bold: true, size: 72, font: TNR })],
+    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, ...CPL }
+  }));
+  paragraphs.push(new Paragraph({
+    children: [new TextRun({ text: `(${monthName} ${year})`, bold: true, size: 36, font: TNR })],
+    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 640, ...CPL }
+  }));
+
+  const mkCoverLabel = t => new Paragraph({ children: [new TextRun({ text: t, bold: true, size: 36, font: TNR })], alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, ...CPL } });
+  const mkCoverShaded = (v, sz = 32) => new Paragraph({ shading: { type: "clear", fill: "D9D9D9", color: "auto" }, children: [new TextRun({ text: v, size: sz, font: TNR })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 160, ...CPL }, indent: { left: 120, right: 120 } });
+  const mkCoverSpacer = () => new Paragraph({ children: [], spacing: { before: 0, after: 480, ...CPL } });
+  const mkCompanyLine = l => new Paragraph({ children: [new TextRun({ text: `${l} `, bold: true, size: 28, font: TNR }), new TextRun({ text: "[insert text]", size: 28, font: TNR })], alignment: AlignmentType.CENTER, spacing: { before: 40, after: 40, ...CPL } });
+
+  paragraphs.push(mkCoverLabel("Student Name:")); paragraphs.push(mkCoverShaded(student.name));
+  paragraphs.push(mkCoverSpacer());
+  paragraphs.push(mkCoverLabel(`Sessions in ${monthName}:`)); paragraphs.push(mkCoverShaded(String(sessionCount)));
+  paragraphs.push(mkCoverSpacer());
+  paragraphs.push(mkCoverLabel("Program:")); paragraphs.push(mkCoverShaded(""));
+  paragraphs.push(mkCoverSpacer());
+  paragraphs.push(mkCoverLabel("Date of Report:")); paragraphs.push(mkCoverShaded(reportDate));
+  paragraphs.push(mkCoverSpacer());
+  paragraphs.push(mkCoverLabel("Company Details:"));
+  ["Tel:", "Email:", "Website:", "Address:"].forEach(l => paragraphs.push(mkCompanyLine(l)));
+
+  // Section 1: Target Review
+  paragraphs.push(mkPara("Section 1: Target Review", { heading: HeadingLevel.HEADING_1, before: 560, after: 200, pageBreak: true, size: 32, bold: true }));
+  paragraphs.push(mkPara(`This section covers ${firstName}'s performance across all therapy targets in ${monthName} ${year}.`, { after: 160, align: AlignmentType.JUSTIFIED }));
+
+  const ovResult = monthlyDrawOverviewChart(overviewData, `${student.name} — Progress Overview (Jan–${monthName.slice(0,3)} ${year})`);
+  if (ovResult) {
+    const ovW = 540, ovH = Math.round(ovW * ovResult.height / 580);
+    paragraphs.push(new Paragraph({ children: [new ImageRun({ data: b64ToUint8(ovResult.base64), transformation: { width: ovW, height: ovH }, type: "png" })], alignment: AlignmentType.CENTER, spacing: { before: 120, after: 200 } }));
+  }
+
+  activeTargets.forEach((target, i) => {
+    const tName = target.name;
+    const md = miniData[tName] || {};
+    const review = parsed.targetReviews?.[tName] || "";
+    if (i > 0) paragraphs.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
+    paragraphs.push(new Paragraph({ children: [new TextRun({ text: `${i + 1}) ${tName}`, bold: true, size: 24 })], spacing: { before: 0, after: 100, ...LS } }));
+    const miniResult = monthlyDrawMiniBarChart(tName, md.lastMonthLabel, md.lastMonthAvg, md.thisMonthLabel, md.thisMonthAvg);
+    if (miniResult) {
+      const mW = 220, mH = Math.round(mW * miniResult.height / 260);
+      paragraphs.push(new Paragraph({ children: [new ImageRun({ data: b64ToUint8(miniResult.base64), transformation: { width: mW, height: mH }, type: "png" })], alignment: AlignmentType.LEFT, spacing: { after: 80 } }));
+    }
+    if (review) {
+      review.split("\n").forEach(line => { const t = line.trim(); if (t.startsWith("•")) paragraphs.push(bulletPara(t.slice(1).trim())); });
+    } else {
+      paragraphs.push(mkPara("No observations recorded this month.", { italics: true, color: "9CA3AF" }));
+    }
+  });
+
+  // Section 2: Focus Areas & Recommendations (landscape)
+  const AP_NUM_REFS = activeTargets.map((_, i) => `monthly-ap-${i}`);
+  const focusParas = [];
+  focusParas.push(mkPara("Section 2: Focus Areas & Recommendations for Next Month", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
+  focusParas.push(mkPara(`The table below highlights the key focus areas for ${firstName} in the coming month.`, { after: 220, align: AlignmentType.JUSTIFIED }));
+
+  const HDR = "f3f4f6";
+  const focusHeaderRow = new TableRow({ tableHeader: true, children: [
+    mkCell("No.",     { bold: true, bg: HDR, size: 22, align: AlignmentType.CENTER, dxa: 634 }),
+    mkCell("Target",  { bold: true, bg: HDR, size: 22, dxa: 2088, align: AlignmentType.CENTER }),
+    mkCell("Focus Areas", { bold: true, bg: HDR, size: 22, dxa: 5616, align: AlignmentType.CENTER }),
+    mkCell("Recommendations & Strategies", { bold: true, bg: HDR, size: 22, dxa: 5616, align: AlignmentType.CENTER })
+  ]});
+
+  const focusDataRows = activeTargets.map((target, idx) => {
+    const struggles = parsed.focusAreas?.[target.name] || [];
+    const cellKids = struggles.length
+      ? struggles.flatMap((s, si) => [
+          new Paragraph({ children: [new TextRun({ text: s.struggle, size: 22 })], numbering: { reference: AP_NUM_REFS[idx], level: 0 }, spacing: { before: si === 0 ? 40 : 80, after: 40, ...LS } }),
+          ...(s.example ? [new Paragraph({ children: [new TextRun({ text: `e.g. ${s.example}`, size: 20, italics: true, color: "6b7280" })], indent: { left: 360 }, spacing: { before: 0, after: 60 } })] : [])
+        ])
+      : [new Paragraph({ children: [new TextRun({ text: "", size: 22 })], spacing: { before: 80, after: 80 } })];
+    return new TableRow({ children: [
+      mkCell(String(idx + 1), { align: AlignmentType.CENTER, dxa: 634 }),
+      mkCell(target.name, { dxa: 2088 }),
+      new TableCell({ width: { size: 5616, type: WidthType.DXA }, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: cellKids }),
+      mkCell("", { dxa: 5616 })
+    ]});
+  });
+  focusParas.push(new Table({ width: { size: 13954, type: WidthType.DXA }, rows: [focusHeaderRow, ...focusDataRows] }));
+
+  // Section 3: Appendix (portrait)
+  const appendixParas = [];
+  const appTargets = activeTargets.filter(t => (appendixData[t.name] || []).length > 0);
+  if (appTargets.length) {
+    appendixParas.push(mkPara("Section 3: Appendix", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
+    appendixParas.push(mkPara(`Session remarks for ${monthName} ${year}.`, { after: 200 }));
+    let firstTarget = true;
+    for (const target of appTargets) {
+      const rows = appendixData[target.name] || [];
+      if (!rows.length) continue;
+      appendixParas.push(mkPara(target.name, { heading: HeadingLevel.HEADING_2, before: firstTarget ? 80 : 0, after: 100, size: 24, bold: true, pageBreak: !firstTarget }));
+      firstTarget = false;
+      const aHDR = "f3f4f6";
+      const aHeader = new TableRow({ tableHeader: true, children: [
+        mkCell("Date",     { bold: true, bg: aHDR, size: 20, dxa: 1600, align: AlignmentType.CENTER }),
+        mkCell("Activity", { bold: true, bg: aHDR, size: 20, dxa: 3000 }),
+        mkCell("Remarks",  { bold: true, bg: aHDR, size: 20, dxa: 6354 }),
+        mkCell("Score",    { bold: true, bg: aHDR, size: 20, dxa: 1000, align: AlignmentType.CENTER })
+      ]});
+      const aRows = rows.map(rem => new TableRow({ children: [
+        mkCell(rem.date, { dxa: 1600, size: 20, align: AlignmentType.CENTER }),
+        mkCell(rem.activityName || "", { dxa: 3000, size: 20 }),
+        mkCell(rem.text || "", { dxa: 6354, size: 20 }),
+        mkCell(rem.avg !== null ? `${rem.avg}%` : "", { dxa: 1000, size: 20, align: AlignmentType.CENTER })
+      ]}));
+      appendixParas.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [aHeader, ...aRows] }));
+    }
+  }
+
+  const pageFooter = Footer ? new Footer({ children: [new Paragraph({ tabStops: [{ type: "center", position: 4750 },{ type: "right", position: 9500 }], children: [new TextRun({ text: "\t" }), new TextRun({ text: "ZORA Behavioural Intervention", size: 22, color: "555555" }), new TextRun({ text: "\t" }), new TextRun({ children: [PageNumber.CURRENT], size: 22, color: "555555" })], spacing: { before: 60, after: 0 } })] }) : undefined;
+  const pageHeader = (Header && logoData) ? new Header({ children: [new Paragraph({ children: [new ImageRun({ data: logoData, transformation: { width: 180, height: 54 }, type: "png" })], alignment: AlignmentType.RIGHT, spacing: { before: 0, after: 0 } })] }) : undefined;
+  const footers = pageFooter ? { default: pageFooter } : undefined;
+  const headers = pageHeader ? { default: pageHeader } : undefined;
+
+  const landscapeProps = { type: SectionType?.NEXT_PAGE ?? "nextPage", page: { size: { orientation: PageOrientation?.LANDSCAPE ?? "landscape" } } };
+  const portraitProps  = { type: SectionType?.NEXT_PAGE ?? "nextPage", page: { size: { orientation: PageOrientation?.PORTRAIT ?? "portrait" } } };
+
+  const docSections = [{ properties: {}, footers, headers, children: paragraphs }];
+  if (focusParas.length)   docSections.push({ properties: landscapeProps, footers, headers, children: focusParas });
+  if (appendixParas.length) docSections.push({ properties: portraitProps,  footers, headers, children: appendixParas });
+
+  const doc = new Document({
+    numbering: { config: [
+      { reference: "monthly-bullets", levels: [{ level: 0, format: LevelFormat?.BULLET ?? "bullet", text: "", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } }, run: { fonts: { ascii: "Wingdings", hAnsi: "Wingdings", hint: "default" }, size: 22 } } }] },
+      ...AP_NUM_REFS.map(ref => ({ reference: ref, levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 480, hanging: 240 } }, run: { size: 22 } } }] }))
+    ] },
+    sections: docSections
+  });
+
+  const blob = await Packer.toBlob(doc);
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = `${student.name} Monthly Report ${monthName} ${year}.docx`; a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+async function monthlyDownloadExcel(student, year, month, monthName, overviewData, miniData) {
+  const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Daisy Session Tracker";
+  const ws = wb.addWorksheet(`${monthName} ${year}`);
+  let rowCursor = 0;
+
+  // Title rows
+  ws.addRow([`${student.name} — Monthly Report: ${monthName} ${year}`]);
+  ws.getRow(1).font = { bold: true, size: 14 };
+  ws.addRow([`Generated: ${new Date().toLocaleDateString("en-GB")}`]);
+  ws.getRow(2).font = { size: 10, color: { argb: "FF6b7280" } };
+  ws.addRow([]); rowCursor = 3;
+
+  // Overview chart (all targets, Jan → report month)
+  const ovResult = monthlyDrawOverviewChart(overviewData, `${student.name} — Progress Overview (Jan–${monthName.slice(0,3)} ${year})`);
+  if (ovResult) {
+    ws.addRow(["Overview: All Targets"]);
+    ws.getRow(ws.lastRow.number).font = { bold: true, size: 12 };
+    rowCursor++;
+    const ovW = 640, ovH = Math.round(640 * ovResult.height / 580);
+    const OV_ROWS = Math.ceil(ovH / 19) + 1;
+    const ovImgId = wb.addImage({ base64: ovResult.base64, extension: "png" });
+    ws.addImage(ovImgId, { tl: { col: 0, row: rowCursor }, ext: { width: ovW, height: ovH } });
+    for (let i = 0; i < OV_ROWS; i++) { ws.addRow([]); }
+    ws.addRow([]); rowCursor += OV_ROWS + 1;
+  }
+
+  // Mini charts: 2 per row, this month vs last month
+  ws.addRow(["This Month vs Last Month — Per Target"]);
+  ws.getRow(ws.lastRow.number).font = { bold: true, size: 12 };
+  rowCursor++;
+  ws.addRow([]); rowCursor++;
+
+  const MINI_W = 280, MINI_H = 193;
+  const MINI_ROWS = Math.ceil(MINI_H / 19) + 2;
+  const MINI_COL_STEP = 5;
+  const miniStart = rowCursor;
+
+  let chartIdx = 0;
+  for (const target of activeTargets) {
+    const md = miniData[target.name];
+    if (!md) continue;
+    const miniResult = monthlyDrawMiniBarChart(target.name, md.lastMonthLabel, md.lastMonthAvg, md.thisMonthLabel, md.thisMonthAvg);
+    if (!miniResult) { chartIdx++; continue; }
+
+    const chartRowOffset = miniStart + Math.floor(chartIdx / 2) * MINI_ROWS;
+    const chartColOffset = (chartIdx % 2) * MINI_COL_STEP;
+    // Target label in a cell above the image
+    ws.getCell(chartRowOffset + 1, chartColOffset + 1).value = target.name;
+    ws.getCell(chartRowOffset + 1, chartColOffset + 1).font = { bold: true, size: 10 };
+    const imgId = wb.addImage({ base64: miniResult.base64, extension: "png" });
+    ws.addImage(imgId, { tl: { col: chartColOffset, row: chartRowOffset + 1 }, ext: { width: MINI_W, height: MINI_H } });
+    chartIdx++;
+  }
+
+  const totalMiniRows = Math.ceil(chartIdx / 2) * MINI_ROWS;
+  for (let i = 0; i < totalMiniRows; i++) ws.addRow([]);
+
+  ws.getColumn(1).width = 40;
+  for (let c = 2; c <= 12; c++) ws.getColumn(c).width = 11;
+
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = `${student.name} Monthly Charts ${monthName} ${year}.xlsx`; a.click();
   URL.revokeObjectURL(a.href);
 }
 
