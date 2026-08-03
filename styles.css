@@ -278,6 +278,53 @@ html, body {
 }
 
 
+.home-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.home-sidenav {
+  width: 112px;
+  flex-shrink: 0;
+  background: var(--white);
+  border-right: 1px solid var(--border);
+  padding: 0.5rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow-y: auto;
+}
+
+.home-sidenav-item {
+  display: block;
+  width: calc(100% - 10px);
+  margin: 0 5px;
+  padding: 0.55rem 0.6rem;
+  font-size: 0.73rem;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: left;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  user-select: none;
+}
+
+.home-sidenav-item:hover {
+  background: var(--bg);
+  color: #374151;
+}
+
+.home-sidenav-item.sidenav-active {
+  background: var(--primary-light);
+  color: var(--primary);
+  font-weight: 700;
+}
+
 .home-main {
   flex: 1;
   overflow-y: auto;

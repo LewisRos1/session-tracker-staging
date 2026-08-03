@@ -79,62 +79,73 @@
       <span id="app-version" class="app-version"></span>
       <button id="btn-logout" class="btn-logout">Log Out</button>
     </header>
-    <main class="home-main">
-      <section>
-        <div class="section-header">
-          <h2 class="section-title">STUDENT DATABASE</h2>
-        </div>
-        <div id="student-database-button"></div>
-      </section>
-      <section>
-        <div class="section-header">
-          <h2 class="section-title">Individual Sessions</h2>
-          <input type="search" class="section-search" id="search-existing"
-            placeholder="Search…" autocomplete="off" />
-          <button class="btn-add-section" id="btn-add-existing-student">+ Add</button>
-        </div>
-        <div class="student-buttons" id="existing-student-buttons"></div>
-      </section>
-      <section>
-        <div class="section-header">
-          <h2 class="section-title">Group Sessions</h2>
-          <input type="search" class="section-search" id="search-group"
-            placeholder="Search…" autocomplete="off" />
-          <button class="btn-add-section" id="btn-add-group">+ Add</button>
-        </div>
-        <div class="student-buttons" id="group-buttons"></div>
-      </section>
-      <section>
-        <div class="section-header">
-          <h2 class="section-title">Student Assessments</h2>
-          <input type="search" class="section-search" id="search-assessment"
-            placeholder="Search…" autocomplete="off" />
-          <button class="btn-add-section" id="btn-add-assessment-student">+ Add</button>
-        </div>
-        <div class="student-buttons" id="assessment-student-buttons"></div>
-      </section>
-      <section>
-        <div class="section-header">
-          <h2 class="section-title">Templates</h2>
-          <input type="search" class="section-search" id="search-template"
-            placeholder="Search…" autocomplete="off" />
-          <button class="btn-add-section" id="btn-add-template">+ Add</button>
-        </div>
-        <div class="student-buttons" id="template-buttons"></div>
-      </section>
-      <section>
-        <div class="section-header">
-          <h2 class="section-title">GENERATE HALF YEAR REPORT (AI)</h2>
-        </div>
-        <div id="half-year-report-section"></div>
-      </section>
-      <section>
-        <div class="section-header">
-          <h2 class="section-title">FOR LEWIS (IT) USE <span style="font-size:.7em;font-weight:400;color:var(--text-muted)">(backup all data every Saturday)</span></h2>
-        </div>
-        <div id="export-all-button"></div>
-      </section>
-    </main>
+    <div class="home-body">
+      <nav class="home-sidenav" id="home-sidenav">
+        <button class="home-sidenav-item sidenav-active" data-target="home-sec-db">Student DB</button>
+        <button class="home-sidenav-item" data-target="home-sec-individual">Individual Sessions</button>
+        <button class="home-sidenav-item" data-target="home-sec-group">Group Sessions</button>
+        <button class="home-sidenav-item" data-target="home-sec-assessment">Assessments</button>
+        <button class="home-sidenav-item" data-target="home-sec-templates">Templates</button>
+        <button class="home-sidenav-item" data-target="home-sec-ai">AI Report</button>
+        <button class="home-sidenav-item" data-target="home-sec-lewis">Backup</button>
+      </nav>
+      <main class="home-main" id="home-main">
+        <section id="home-sec-db">
+          <div class="section-header">
+            <h2 class="section-title">STUDENT DATABASE</h2>
+          </div>
+          <div id="student-database-button"></div>
+        </section>
+        <section id="home-sec-individual">
+          <div class="section-header">
+            <h2 class="section-title">Individual Sessions</h2>
+            <input type="search" class="section-search" id="search-existing"
+              placeholder="Search…" autocomplete="off" />
+            <button class="btn-add-section" id="btn-add-existing-student">+ Add</button>
+          </div>
+          <div class="student-buttons" id="existing-student-buttons"></div>
+        </section>
+        <section id="home-sec-group">
+          <div class="section-header">
+            <h2 class="section-title">Group Sessions</h2>
+            <input type="search" class="section-search" id="search-group"
+              placeholder="Search…" autocomplete="off" />
+            <button class="btn-add-section" id="btn-add-group">+ Add</button>
+          </div>
+          <div class="student-buttons" id="group-buttons"></div>
+        </section>
+        <section id="home-sec-assessment">
+          <div class="section-header">
+            <h2 class="section-title">Student Assessments</h2>
+            <input type="search" class="section-search" id="search-assessment"
+              placeholder="Search…" autocomplete="off" />
+            <button class="btn-add-section" id="btn-add-assessment-student">+ Add</button>
+          </div>
+          <div class="student-buttons" id="assessment-student-buttons"></div>
+        </section>
+        <section id="home-sec-templates">
+          <div class="section-header">
+            <h2 class="section-title">Templates</h2>
+            <input type="search" class="section-search" id="search-template"
+              placeholder="Search…" autocomplete="off" />
+            <button class="btn-add-section" id="btn-add-template">+ Add</button>
+          </div>
+          <div class="student-buttons" id="template-buttons"></div>
+        </section>
+        <section id="home-sec-ai">
+          <div class="section-header">
+            <h2 class="section-title">GENERATE HALF YEAR REPORT (AI)</h2>
+          </div>
+          <div id="half-year-report-section"></div>
+        </section>
+        <section id="home-sec-lewis">
+          <div class="section-header">
+            <h2 class="section-title">FOR LEWIS (IT) USE <span style="font-size:.7em;font-weight:400;color:var(--text-muted)">(backup all data every Saturday)</span></h2>
+          </div>
+          <div id="export-all-button"></div>
+        </section>
+      </main>
+    </div>
   </div>
 
   <!-- ══════════════════════════════════════════════════════

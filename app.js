@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1356";
+const APP_VERSION = "1357";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -559,11 +559,40 @@ document.addEventListener("keydown", e => {
   if ((e.ctrlKey || e.metaKey) && e.key === "p") e.preventDefault();
 });
 
+function initHomeSidenav() {
+  const items = Array.from(document.querySelectorAll(".home-sidenav-item"));
+  const main  = document.getElementById("home-main");
+  if (!items.length || !main) return;
+
+  const sections = items.map(i => document.getElementById(i.dataset.target)).filter(Boolean);
+
+  const setActive = id => {
+    items.forEach(i => i.classList.toggle("sidenav-active", i.dataset.target === id));
+  };
+
+  items.forEach(item => {
+    item.addEventListener("click", () => {
+      const target = document.getElementById(item.dataset.target);
+      if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+
+  main.addEventListener("scroll", () => {
+    const mainTop = main.getBoundingClientRect().top;
+    let activeId = sections[0]?.id;
+    for (const sec of sections) {
+      if (sec.getBoundingClientRect().top - mainTop <= 20) activeId = sec.id;
+    }
+    if (activeId) setActive(activeId);
+  }, { passive: true });
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
 
   // Register SW immediately — don't wait for Firebase so updates are never blocked.
   registerServiceWorker();
   setupStickyNote();
+  initHomeSidenav();
 
   // If auth never resolves (e.g. Firebase CDN unreachable on iOS after cache clear),
   // show a reload button after 10 s so the user isn't trapped on the loading screen.
