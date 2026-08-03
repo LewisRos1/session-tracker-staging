@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1372";
+const APP_VERSION = "1373";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -4530,7 +4530,6 @@ If 2 struggles, write two STRUGGLE/EXAMPLE pairs. If only 1, write one. No extra
     await new Promise(r => setTimeout(r, 400));
 
     await monthlyDownloadWord(student, year, month, monthName, sessionCount, overviewData, miniData, parsed, appendixData);
-    await monthlyDownloadExcel(student, year, month, monthName, overviewData, miniData);
   } catch (err) {
     if (err.name !== "AbortError") alert("Failed to generate monthly report:\n" + err.message);
   } finally {
