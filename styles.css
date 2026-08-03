@@ -285,7 +285,7 @@ html, body {
 }
 
 .home-sidenav {
-  width: 138px;
+  width: 172px;
   flex-shrink: 0;
   background: var(--white);
   border-right: 1px solid var(--border);
@@ -305,6 +305,9 @@ html, body {
   font-weight: 500;
   line-height: 1.35;
   text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--text-muted);
   background: none;
   border: none;
@@ -326,8 +329,8 @@ html, body {
 }
 
 @keyframes sectionBlink {
-  0%, 100% { background: transparent; }
-  50%      { background: var(--primary-light); }
+  0%, 100% { background: transparent; color: inherit; }
+  50%      { background: #bfdbfe; color: var(--primary); }
 }
 
 .section-title-blink {
