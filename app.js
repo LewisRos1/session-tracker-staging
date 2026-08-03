@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1368";
+const APP_VERSION = "1369";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -622,6 +622,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupStickyNote();
   initHomeSidenav();
   $("btn-lewis-back").addEventListener("click", showHome);
+  $("btn-ai-report-back").addEventListener("click", showHome);
 
   // If auth never resolves (e.g. Firebase CDN unreachable on iOS after cache clear),
   // show a reload button after 10 s so the user isn't trapped on the loading screen.

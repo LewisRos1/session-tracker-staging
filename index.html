@@ -81,13 +81,15 @@
     </header>
     <div class="home-body">
       <nav class="home-sidenav" id="home-sidenav">
+        <div class="home-sidenav-label">Office</div>
         <button class="home-sidenav-item sidenav-active" data-target="home-sec-db">Student Database</button>
         <button class="home-sidenav-item" data-target="home-sec-individual">Individual Sessions</button>
         <button class="home-sidenav-item" data-target="home-sec-group">Group Sessions</button>
         <button class="home-sidenav-item" data-target="home-sec-assessment">Student Assessments</button>
         <button class="home-sidenav-item" data-target="home-sec-templates">Templates</button>
-        <button class="home-sidenav-item" data-target="home-sec-ai">AI Report Generator</button>
-        <button class="home-sidenav-item home-sidenav-link" data-screen="screen-lewis">For Lewis (IT) Use</button>
+        <button class="home-sidenav-item" data-screen="screen-ai-report">AI Report Generator</button>
+        <div class="home-sidenav-label">For IT Use</div>
+        <button class="home-sidenav-item" data-screen="screen-lewis">Settings</button>
       </nav>
       <main class="home-main" id="home-main">
         <section id="home-sec-db">
@@ -132,24 +134,33 @@
           </div>
           <div class="student-buttons" id="template-buttons"></div>
         </section>
-        <section id="home-sec-ai">
-          <div class="section-header">
-            <h2 class="section-title">AI Report Generator</h2>
-          </div>
-          <div id="half-year-report-section"></div>
-        </section>
       </main>
     </div>
   </div>
 
   <!-- ══════════════════════════════════════════════════════
-       LEWIS (IT) SCREEN
+       AI REPORT GENERATOR SCREEN
+       ══════════════════════════════════════════════════════ -->
+  <div id="screen-ai-report" class="screen hidden">
+    <header class="session-header">
+      <button class="btn-back" id="btn-ai-report-back" aria-label="Back to home">←</button>
+      <div class="session-info">
+        <span class="session-student-name">AI Report Generator</span>
+      </div>
+    </header>
+    <div style="overflow-y:auto;flex:1;padding:1.25rem">
+      <div id="half-year-report-section"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       SETTINGS (IT) SCREEN
        ══════════════════════════════════════════════════════ -->
   <div id="screen-lewis" class="screen hidden">
     <header class="session-header">
       <button class="btn-back" id="btn-lewis-back" aria-label="Back to home">←</button>
       <div class="session-info">
-        <span class="session-student-name">For Lewis (IT) Use</span>
+        <span class="session-student-name">Settings</span>
         <span class="session-meta">(backup all data every Saturday)</span>
       </div>
     </header>

@@ -328,10 +328,14 @@ html, body {
   font-weight: 700;
 }
 
-.home-sidenav-link {
-  margin-top: 6px;
-  border-top: 1px solid var(--border);
-  padding-top: 0.65rem;
+.home-sidenav-label {
+  padding: 0.65rem 0.65rem 0.1rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: #9ca3af;
+  margin-top: 2px;
 }
 
 @keyframes sectionBlink {
