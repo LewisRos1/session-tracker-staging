@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1375";
+const APP_VERSION = "1376";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -4472,17 +4472,12 @@ ${aiLines.join("\n")}
 Provide ONLY the following sections using EXACTLY these markers. No extra text outside the markers.
 
 ${activeTargets.map(t => `===TARGET_REVIEW: ${t.name}===
-Write 2-3 bullet points about what was observed for this target in ${monthName} ${year}. Focus on what specifically happened in sessions this month. Plain English, warm tone, no jargon, no numbers or percentages.
+Write EXACTLY 2 bullet points about what was observed for this target in ${monthName} ${year}. Focus on what specifically happened in sessions this month. Plain English, warm tone, no jargon, no numbers or percentages.
 Format each bullet as: • [content — NOT bold, no labels]
 ===END===
 
 ===FOCUS_AREAS: ${t.name}===
-Write exactly 1-2 specific struggles observed for this target this month.
-For each struggle use this EXACT format on separate lines:
-STRUGGLE: [name the specific behaviour precisely — e.g. "does not yet wait for verbal cue before responding" not "needs work on turn-taking"]
-EXAMPLE: [concrete example from a session this month — a specific moment or incident]
-
-If 2 struggles, write two STRUGGLE/EXAMPLE pairs. If only 1, write one. No extra text.
+Write exactly 1-2 specific struggles observed for this target this month. Name each struggle precisely — e.g. "does not yet wait for verbal cue before responding" not "needs work on turn-taking". Capitalise the first word. One struggle per line, starting with •.
 ===END===`).join("\n\n")}`;
 
     _hyrAbortController = new AbortController();
@@ -4662,11 +4657,12 @@ function monthlyParseAiResponse(text) {
   while ((m = trRe.exec(text)) !== null) out.targetReviews[m[1].trim()] = m[2].trim();
   while ((m = faRe.exec(text)) !== null) {
     const tName = m[1].trim(), content = m[2].trim();
-    const struggles = [];
-    content.split(/\n(?=STRUGGLE:)/g).forEach(pair => {
-      const sM = pair.match(/STRUGGLE:\s*(.+)/), eM = pair.match(/EXAMPLE:\s*([\s\S]+)/);
-      if (sM) struggles.push({ struggle: sM[1].trim(), example: eM ? eM[1].trim() : "" });
-    });
+    const struggles = content.split("\n")
+      .map(l => l.trim())
+      .filter(l => l.startsWith("•") || /^\d+[.)]\s/.test(l))
+      .map(l => l.replace(/^[•\d.)\s]+/, "").trim())
+      .filter(Boolean)
+      .map(s => s.charAt(0).toUpperCase() + s.slice(1));
     out.focusAreas[tName] = struggles;
   }
   return out;
@@ -4785,6 +4781,140 @@ function monthlyDrawMiniBarChart(targetName, lastLabel, lastAvg, thisLabel, this
   return { base64: canvas.toDataURL("image/png").split(",")[1], height: H };
 }
 
+function monthlyDrawTargetLineChart(targetName, labels, values, year) {
+  let startIdx = 0;
+  while (startIdx < values.length && (values[startIdx] === null || values[startIdx] === undefined)) startIdx++;
+  if (startIdx >= values.length) return null;
+  const trimLabels = labels.slice(startIdx);
+  const trimValues = values.slice(startIdx);
+
+  const SCALE = 2;
+  const W = 540, H = 280;
+  const PAD = { top: 72, right: 20, bottom: 36, left: 22 };
+  const cW = W - PAD.left - PAD.right, cH = H - PAD.top - PAD.bottom;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W * SCALE; canvas.height = H * SCALE;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(SCALE, SCALE);
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
+
+  const allPts = trimLabels.map((label, i) => ({ label, v: trimValues[i] ?? null, i }));
+  const pts = allPts.filter(p => p.v !== null);
+  if (!pts.length) return null;
+
+  const firstLabel = allPts[0].label, lastLabel = allPts[allPts.length - 1].label;
+  const rangeLabel = firstLabel === lastLabel ? firstLabel : `${firstLabel} - ${lastLabel}`;
+  ctx.fillStyle = "#1f2937"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText(`${(targetName || "").trim()} (${rangeLabel} ${year})`, W / 2, 20);
+
+  const toY = v => PAD.top + cH * (1 - v / 100);
+  const toX = i => PAD.left + (allPts.length > 1 ? (i / (allPts.length - 1)) * cW : cW / 2);
+
+  ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
+  for (let v = 0; v <= 100; v += 20) { const y = toY(v); ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + cW, y); ctx.stroke(); }
+
+  const xs = pts.map(p => p.i), ys = pts.map(p => p.v), np = pts.length;
+  const sX = xs.reduce((a,b)=>a+b,0), sY = ys.reduce((a,b)=>a+b,0);
+  const sXY = xs.reduce((a,x,i)=>a+x*ys[i],0), sX2 = xs.reduce((a,x)=>a+x*x,0);
+  const denom = np*sX2 - sX*sX;
+  const slope = denom ? (np*sXY - sX*sY)/denom : 0, intercept = (sY - slope*sX)/np;
+  const trendAt = i => Math.max(0, Math.min(100, slope*i + intercept));
+  const tStart = Math.round(trendAt(xs[0])), tEnd = Math.round(trendAt(xs[xs.length-1]));
+  const delta = tEnd - tStart;
+  const direction = Math.abs(delta) <= 8 ? "Stable" : delta > 0 ? "Improving" : "Declining";
+  const icon = direction === "Improving" ? "↑" : direction === "Declining" ? "↓" : "→";
+
+  ctx.strokeStyle = "#b0bec5"; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
+  ctx.beginPath(); ctx.moveTo(toX(xs[0]), toY(trendAt(xs[0]))); ctx.lineTo(toX(xs[xs.length-1]), toY(trendAt(xs[xs.length-1]))); ctx.stroke(); ctx.setLineDash([]);
+
+  const safeTrendY = (tY, dY, tV, dV) => Math.abs(tV - dV) <= 10 ? Math.max(dY, tY) + 18 : tY + 12;
+  ctx.fillStyle = "#6b7280"; ctx.font = "12px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText(tStart + "%", toX(xs[0]), safeTrendY(toY(trendAt(xs[0])), toY(pts[0].v), tStart, pts[0].v));
+  ctx.fillText(tEnd + "%", toX(xs[xs.length-1]), safeTrendY(toY(trendAt(xs[xs.length-1])), toY(pts[pts.length-1].v), tEnd, pts[pts.length-1].v));
+
+  ctx.fillStyle = "#6b7280"; ctx.font = "italic 14px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText(`${icon} ${direction}`, W / 2, 36);
+
+  ctx.strokeStyle = "#4472c4"; ctx.lineWidth = 2.5; ctx.beginPath();
+  let started = false;
+  allPts.forEach(p => { if (p.v === null) { started = false; return; } const x = toX(p.i), y = toY(p.v); if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y); });
+  ctx.stroke();
+
+  pts.forEach(p => {
+    const x = toX(p.i), y = toY(p.v);
+    ctx.fillStyle = "#4472c4"; ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#1f2937"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(p.v + "%", x, y - 8);
+  });
+
+  ctx.fillStyle = "#374151"; ctx.font = "13px sans-serif"; ctx.textAlign = "center";
+  allPts.forEach(p => ctx.fillText(p.label, toX(p.i), PAD.top + cH + 14));
+
+  ctx.strokeStyle = "#000000"; ctx.lineWidth = 1; ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
+  return canvas.toDataURL("image/png").split(",")[1];
+}
+
+function monthlyDrawMiniHorizontalBar(lastLabel, lastAvg, thisLabel, thisAvg) {
+  const C_LAST = "#7dd3fc", C_THIS = "#a78bfa";
+  const W = 500, NAME_W = 60, PERF_W = 290, PAD_VAL = 50;
+  const PERF_X = NAME_W;
+  const toXPerf = v => PERF_X + (v / 100) * PERF_W;
+
+  const PAD_TOP = 44, HDR_H = 24, ROW_H = 52, PAD_BTM = 38;
+  const H = PAD_TOP + HDR_H + 2 * ROW_H + PAD_BTM;
+  const CHART_Y0 = PAD_TOP + HDR_H, CHART_Y1 = CHART_Y0 + 2 * ROW_H;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
+
+  ctx.fillStyle = "#374151"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText("Month", NAME_W / 2, PAD_TOP + 16);
+  ctx.fillText("Progress (%)", PERF_X + (PERF_W + PAD_VAL) / 2, PAD_TOP + 16);
+
+  [25, 50, 75, 100].forEach(v => {
+    const gx = toXPerf(v); ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(gx, PAD_TOP + 22); ctx.lineTo(gx, CHART_Y1); ctx.stroke();
+  });
+
+  [{ label: lastLabel, avg: lastAvg, color: C_LAST }, { label: thisLabel, avg: thisAvg, color: C_THIS }].forEach((row, i) => {
+    const rowY = CHART_Y0 + i * ROW_H, cy = rowY + ROW_H / 2;
+    if (i % 2 === 0) {
+      ctx.fillStyle = "#f9fafb"; ctx.fillRect(0, rowY, W, ROW_H);
+      [25, 50, 75, 100].forEach(v => { const gx = toXPerf(v); ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(gx, rowY); ctx.lineTo(gx, rowY + ROW_H); ctx.stroke(); });
+    }
+    ctx.fillStyle = "#111827"; ctx.font = "13px sans-serif"; ctx.textAlign = "right";
+    ctx.fillText(row.label, NAME_W - 8, cy + 5);
+    const BAR_H = 18;
+    if (row.avg !== null && row.avg !== undefined) {
+      const bW = Math.max(2, (row.avg / 100) * PERF_W);
+      ctx.fillStyle = row.color; ctx.fillRect(PERF_X, cy - BAR_H / 2, bW, BAR_H);
+      ctx.fillStyle = "#111827"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "left";
+      ctx.fillText(`${row.avg}%`, PERF_X + bW + 4, cy + 5);
+    } else {
+      ctx.fillStyle = "#9ca3af"; ctx.font = "italic 12px sans-serif"; ctx.textAlign = "left";
+      ctx.fillText("no data", PERF_X + 4, cy + 5);
+    }
+    if (i < 1) { ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, rowY + ROW_H); ctx.lineTo(W, rowY + ROW_H); ctx.stroke(); }
+  });
+
+  ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(NAME_W, PAD_TOP + 22); ctx.lineTo(NAME_W, CHART_Y1); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, CHART_Y0); ctx.lineTo(W, CHART_Y0); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, CHART_Y1); ctx.lineTo(W, CHART_Y1); ctx.stroke();
+
+  const LEG_Y = CHART_Y1 + 14;
+  [[C_LAST, "Last Month"], [C_THIS, "This Month"]].forEach(([color, label], i) => {
+    const lx = 10 + i * 130; ctx.fillStyle = color; ctx.fillRect(lx, LEG_Y, 12, 12);
+    ctx.fillStyle = "#374151"; ctx.font = "12px sans-serif"; ctx.textAlign = "left";
+    ctx.fillText(label, lx + 16, LEG_Y + 10);
+  });
+
+  return { base64: canvas.toDataURL("image/png").split(",")[1], height: H };
+}
+
 async function monthlyDownloadWord(student, year, month, monthName, sessionCount, overviewData, miniData, parsed, appendixData) {
   const firstName = student.name.split(" ")[0];
   const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
@@ -4877,25 +5007,32 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   paragraphs.push(mkPara("Section 1: Target Review", { heading: HeadingLevel.HEADING_1, before: 560, after: 200, pageBreak: true, size: 32, bold: true }));
   paragraphs.push(mkPara(`This section covers ${firstName}'s performance across all therapy targets in ${monthName} ${year}.`, { after: 160, align: AlignmentType.JUSTIFIED }));
 
-  const ovResult = monthlyDrawOverviewChart(overviewData, `${student.name} — Progress Overview (Jan–${monthName.slice(0,3)} ${year})`);
-  if (ovResult) {
-    const ovW = 540, ovH = Math.round(ovW * ovResult.height / 580);
-    paragraphs.push(new Paragraph({ children: [new ImageRun({ data: b64ToUint8(ovResult.base64), transformation: { width: ovW, height: ovH }, type: "png" })], alignment: AlignmentType.CENTER, spacing: { before: 120, after: 200 } }));
-  }
-
   activeTargets.forEach((target, i) => {
     const tName = target.name;
     const md = miniData[tName] || {};
     const review = parsed.targetReviews?.[tName] || "";
-    if (i > 0) paragraphs.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
+    if (i > 0) paragraphs.push(new Paragraph({ children: [], spacing: { before: 300, after: 0 } }));
     paragraphs.push(new Paragraph({ children: [new TextRun({ text: `${i + 1}) ${tName}`, bold: true, size: 24 })], spacing: { before: 0, after: 100, ...LS } }));
-    const miniResult = monthlyDrawMiniBarChart(tName, md.lastMonthLabel, md.lastMonthAvg, md.thisMonthLabel, md.thisMonthAvg);
-    if (miniResult) {
-      const mW = 220, mH = Math.round(mW * miniResult.height / 260);
-      paragraphs.push(new Paragraph({ children: [new ImageRun({ data: b64ToUint8(miniResult.base64), transformation: { width: mW, height: mH }, type: "png" })], alignment: AlignmentType.LEFT, spacing: { after: 80 } }));
+
+    // Per-target line chart (first available month → report month)
+    const { labels: ovLabels, values: ovValues } = overviewData[tName] || { labels: [], values: [] };
+    const lineB64 = monthlyDrawTargetLineChart(tName, ovLabels, ovValues, year);
+    if (lineB64) {
+      const lW = 500, lH = Math.round(lW * 280 / 540);
+      paragraphs.push(new Paragraph({ children: [new ImageRun({ data: b64ToUint8(lineB64), transformation: { width: lW, height: lH }, type: "png" })], alignment: AlignmentType.CENTER, spacing: { after: 120 } }));
     }
-    if (review) {
-      review.split("\n").forEach(line => { const t = line.trim(); if (t.startsWith("•")) paragraphs.push(bulletPara(t.slice(1).trim())); });
+
+    // Mini horizontal bar (last month vs this month)
+    const miniResult = monthlyDrawMiniHorizontalBar(md.lastMonthLabel, md.lastMonthAvg, md.thisMonthLabel, md.thisMonthAvg);
+    if (miniResult) {
+      const mW = 400, mH = Math.round(mW * miniResult.height / 500);
+      paragraphs.push(new Paragraph({ children: [new ImageRun({ data: b64ToUint8(miniResult.base64), transformation: { width: mW, height: mH }, type: "png" })], alignment: AlignmentType.LEFT, spacing: { after: 100 } }));
+    }
+
+    // Bullet points — max 2
+    const bullets = review.split("\n").map(l => l.trim()).filter(l => l.startsWith("•")).slice(0, 2);
+    if (bullets.length) {
+      bullets.forEach(line => paragraphs.push(bulletPara(line.slice(1).trim())));
     } else {
       paragraphs.push(mkPara("No observations recorded this month.", { italics: true, color: "9CA3AF" }));
     }
@@ -4918,10 +5055,11 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   const focusDataRows = activeTargets.map((target, idx) => {
     const struggles = parsed.focusAreas?.[target.name] || [];
     const cellKids = struggles.length
-      ? struggles.flatMap((s, si) => [
-          new Paragraph({ children: [new TextRun({ text: s.struggle, size: 22 })], numbering: { reference: AP_NUM_REFS[idx], level: 0 }, spacing: { before: si === 0 ? 40 : 80, after: 40, ...LS } }),
-          ...(s.example ? [new Paragraph({ children: [new TextRun({ text: `e.g. ${s.example}`, size: 20, italics: true, color: "6b7280" })], indent: { left: 360 }, spacing: { before: 0, after: 60 } })] : [])
-        ])
+      ? struggles.map((s, si) => new Paragraph({
+          children: [new TextRun({ text: s, size: 22 })],
+          numbering: { reference: AP_NUM_REFS[idx], level: 0 },
+          spacing: { before: si === 0 ? 40 : 80, after: 40, ...LS }
+        }))
       : [new Paragraph({ children: [new TextRun({ text: "", size: 22 })], spacing: { before: 80, after: 80 } })];
     return new TableRow({ children: [
       mkCell(String(idx + 1), { align: AlignmentType.CENTER, dxa: 634 }),
@@ -4932,35 +5070,6 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   });
   focusParas.push(new Table({ width: { size: 13954, type: WidthType.DXA }, rows: [focusHeaderRow, ...focusDataRows] }));
 
-  // Section 3: Appendix (portrait)
-  const appendixParas = [];
-  const appTargets = activeTargets.filter(t => (appendixData[t.name] || []).length > 0);
-  if (appTargets.length) {
-    appendixParas.push(mkPara("Section 3: Appendix", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
-    appendixParas.push(mkPara(`Session remarks for ${monthName} ${year}.`, { after: 200 }));
-    let firstTarget = true;
-    for (const target of appTargets) {
-      const rows = appendixData[target.name] || [];
-      if (!rows.length) continue;
-      appendixParas.push(mkPara(target.name, { heading: HeadingLevel.HEADING_2, before: firstTarget ? 80 : 0, after: 100, size: 24, bold: true, pageBreak: !firstTarget }));
-      firstTarget = false;
-      const aHDR = "f3f4f6";
-      const aHeader = new TableRow({ tableHeader: true, children: [
-        mkCell("Date",     { bold: true, bg: aHDR, size: 20, dxa: 1600, align: AlignmentType.CENTER }),
-        mkCell("Activity", { bold: true, bg: aHDR, size: 20, dxa: 3000 }),
-        mkCell("Remarks",  { bold: true, bg: aHDR, size: 20, dxa: 6354 }),
-        mkCell("Score",    { bold: true, bg: aHDR, size: 20, dxa: 1000, align: AlignmentType.CENTER })
-      ]});
-      const aRows = rows.map(rem => new TableRow({ children: [
-        mkCell(rem.date, { dxa: 1600, size: 20, align: AlignmentType.CENTER }),
-        mkCell(rem.activityName || "", { dxa: 3000, size: 20 }),
-        mkCell(rem.text || "", { dxa: 6354, size: 20 }),
-        mkCell(rem.avg !== null ? `${rem.avg}%` : "", { dxa: 1000, size: 20, align: AlignmentType.CENTER })
-      ]}));
-      appendixParas.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [aHeader, ...aRows] }));
-    }
-  }
-
   const pageFooter = Footer ? new Footer({ children: [new Paragraph({ tabStops: [{ type: "center", position: 4750 },{ type: "right", position: 9500 }], children: [new TextRun({ text: "\t" }), new TextRun({ text: "ZORA Behavioural Intervention", size: 22, color: "555555" }), new TextRun({ text: "\t" }), new TextRun({ children: [PageNumber.CURRENT], size: 22, color: "555555" })], spacing: { before: 60, after: 0 } })] }) : undefined;
   const pageHeader = (Header && logoData) ? new Header({ children: [new Paragraph({ children: [new ImageRun({ data: logoData, transformation: { width: 180, height: 54 }, type: "png" })], alignment: AlignmentType.RIGHT, spacing: { before: 0, after: 0 } })] }) : undefined;
   const footers = pageFooter ? { default: pageFooter } : undefined;
@@ -4970,8 +5079,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   const portraitProps  = { type: SectionType?.NEXT_PAGE ?? "nextPage", page: { size: { orientation: PageOrientation?.PORTRAIT ?? "portrait" } } };
 
   const docSections = [{ properties: {}, footers, headers, children: paragraphs }];
-  if (focusParas.length)   docSections.push({ properties: landscapeProps, footers, headers, children: focusParas });
-  if (appendixParas.length) docSections.push({ properties: portraitProps,  footers, headers, children: appendixParas });
+  if (focusParas.length) docSections.push({ properties: landscapeProps, footers, headers, children: focusParas });
 
   const doc = new Document({
     numbering: { config: [
