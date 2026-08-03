@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1367";
+const APP_VERSION = "1368";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -584,10 +584,14 @@ function initHomeSidenav() {
 
   items.forEach(item => {
     item.addEventListener("click", () => {
+      // Screen-link items navigate to a different page entirely
+      if (item.dataset.screen) {
+        showScreen(item.dataset.screen);
+        return;
+      }
       const target = document.getElementById(item.dataset.target);
       if (!target) return;
       setActive(item.dataset.target);
-      // Lock scroll handler so the smooth-scroll animation doesn't override the active state
       _scrollLocked = true;
       clearTimeout(_scrollLockTimer);
       _scrollLockTimer = setTimeout(() => { _scrollLocked = false; }, 1200);
@@ -617,6 +621,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   registerServiceWorker();
   setupStickyNote();
   initHomeSidenav();
+  $("btn-lewis-back").addEventListener("click", showHome);
 
   // If auth never resolves (e.g. Firebase CDN unreachable on iOS after cache clear),
   // show a reload button after 10 s so the user isn't trapped on the loading screen.
