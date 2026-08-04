@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1392";
+const APP_VERSION = "1393";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -4977,6 +4977,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   function mkCell(text, opts = {}) {
     return new TableCell({
       width: opts.dxa !== undefined ? { size: opts.dxa, type: WidthType.DXA } : undefined,
+      verticalAlign: VerticalAlign.CENTER,
       margins: { top: 100, bottom: 100, left: 150, right: 150 },
       children: [new Paragraph({
         children: [new TextRun({ text, bold: opts.bold, size: opts.size || 22, color: opts.color, italics: opts.italics })],
@@ -4991,6 +4992,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     if (subText) children.push(new TextRun({ break: 1, text: subText, size: 18, color: "6b7280" }));
     return new TableCell({
       width: { size: dxa, type: WidthType.DXA },
+      verticalAlign: VerticalAlign.CENTER,
       margins: { top: 100, bottom: 100, left: 150, right: 150 },
       children: [new Paragraph({ children, alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })],
       shading: { fill: "f3f4f6" }
@@ -5001,6 +5003,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     const cfg = { up: { text: "↑ Improving", color: "16a34a" }, down: { text: "↓ Declining", color: "dc2626" }, stable: { text: "→ Stable", color: "6b7280" } }[trend] || { text: "→ Stable", color: "6b7280" };
     return new TableCell({
       width: { size: dxa, type: WidthType.DXA },
+      verticalAlign: VerticalAlign.CENTER,
       margins: { top: 100, bottom: 100, left: 150, right: 150 },
       children: [new Paragraph({ children: [new TextRun({ text: cfg.text, color: cfg.color, bold: true, size: 22 })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })]
     });
@@ -5040,53 +5043,63 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   paragraphs.push(mkPara("Progress Summary", { heading: HeadingLevel.HEADING_1, before: 560, after: 200, pageBreak: true, size: 32, bold: true }));
   paragraphs.push(mkPara(`Here is a snapshot of ${firstName}'s progress in ${monthName} ${year}.`, { after: 200 }));
 
+  // Columns: Target 1.2" | Past3M 0.85" | ThisMonth 0.85" | Score 0.6" | Summary 2.75"
   const summaryHdrRow = new TableRow({ tableHeader: true, children: [
-    mkHdrCell("Target",         "",                          1728),
-    mkHdrCell("Past 3 Months",  `(${threeMonthPeriodLabel})`, 1512),
-    mkHdrCell("This Month",     `(${oneMonthPeriodLabel})`,   1512),
-    mkHdrCell("Summary",        "",                          4248),
+    mkHdrCell("Target",         "",                           1728),
+    mkHdrCell("Past 3 Months",  `(${threeMonthPeriodLabel})`, 1224),
+    mkHdrCell("This Month",     `(${oneMonthPeriodLabel})`,   1224),
+    mkHdrCell("Score",          "(this month)",               864),
+    mkHdrCell("Summary",        "",                           3960),
   ]});
 
-  const summaryDataRows = activeTargets.map(target => {
+  const sortedForSummary = [...activeTargets].sort((a, b) => {
+    const aScore = (miniData[a.name] || {}).thisMonthAvg ?? -1;
+    const bScore = (miniData[b.name] || {}).thisMonthAvg ?? -1;
+    return bScore - aScore;
+  });
+
+  const summaryDataRows = sortedForSummary.map(target => {
     const tName = target.name;
     const td = threeMonthData[tName] || {};
     const md = miniData[tName] || {};
     const raw = parsed.summaries?.[tName];
     const sentence = Array.isArray(raw) ? (raw[0] || "") : (raw || "");
+    const scoreText = md.thisMonthAvg != null ? `${Math.round(md.thisMonthAvg)}%` : "—";
     const summaryKids = sentence
       ? [new Paragraph({ children: [new TextRun({ text: sentence, size: 20 })], spacing: { before: 80, after: 80 } })]
       : [new Paragraph({ children: [new TextRun({ text: "—", size: 20, italics: true })], spacing: { before: 80, after: 80 } })];
     return new TableRow({ children: [
       mkCell(tName, { dxa: 1728, align: AlignmentType.CENTER }),
-      mkTrendCell(td.trend || "stable", 1512),
-      mkTrendCell(md.trend || "stable", 1512),
-      new TableCell({ width: { size: 4248, type: WidthType.DXA }, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: summaryKids })
+      mkTrendCell(td.trend || "stable", 1224),
+      mkTrendCell(md.trend || "stable", 1224),
+      mkCell(scoreText, { dxa: 864, align: AlignmentType.CENTER }),
+      new TableCell({ width: { size: 3960, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: summaryKids })
     ]});
   });
   paragraphs.push(new Table({ width: { size: 9000, type: WidthType.DXA }, rows: [summaryHdrRow, ...summaryDataRows] }));
 
-  // ── Focus Areas (landscape, non-up targets only) ──
+  // ── Focus Areas (portrait) ──
   const focusParas = [];
   if (focusTargets.length > 0) {
     focusParas.push(mkPara("Focus Areas & Recommendations for Next Month", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
     focusParas.push(mkPara(`The table below highlights areas for ${firstName} to focus on next month.`, { after: 220 }));
     const focusHdrRow = new TableRow({ tableHeader: true, children: [
-      mkCell("No.",     { bold: true, bg: HDR, size: 22, align: AlignmentType.CENTER, dxa: 634 }),
-      mkCell("Target",  { bold: true, bg: HDR, size: 22, dxa: 2088, align: AlignmentType.CENTER }),
-      mkCell("Focus Areas",                      { bold: true, bg: HDR, size: 22, dxa: 5616, align: AlignmentType.CENTER }),
-      mkCell("Recommendations & Strategies",     { bold: true, bg: HDR, size: 22, dxa: 5616, align: AlignmentType.CENTER })
+      mkCell("No.",     { bold: true, bg: HDR, size: 22, align: AlignmentType.CENTER, dxa: 450 }),
+      mkCell("Target",  { bold: true, bg: HDR, size: 22, dxa: 1620, align: AlignmentType.CENTER }),
+      mkCell("Focus Areas",                  { bold: true, bg: HDR, size: 22, dxa: 3465, align: AlignmentType.CENTER }),
+      mkCell("Recommendations & Strategies", { bold: true, bg: HDR, size: 22, dxa: 3465, align: AlignmentType.CENTER })
     ]});
     const focusDataRows = focusTargets.map((target, idx) => {
       const sentence = (parsed.focusAreas?.[target.name] || [])[0] || "";
-      const cellKids = [new Paragraph({ children: [new TextRun({ text: sentence, size: 22 })], spacing: { before: 80, after: 80, ...LS } })];
+      const cellKids = [new Paragraph({ children: [new TextRun({ text: sentence, size: 22 })], spacing: { before: 80, after: 80 } })];
       return new TableRow({ children: [
-        mkCell(String(idx + 1), { align: AlignmentType.CENTER, dxa: 634 }),
-        mkCell(target.name, { dxa: 2088 }),
-        new TableCell({ width: { size: 5616, type: WidthType.DXA }, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: cellKids }),
-        mkCell("", { dxa: 5616 })
+        mkCell(String(idx + 1), { align: AlignmentType.CENTER, dxa: 450 }),
+        mkCell(target.name, { dxa: 1620 }),
+        new TableCell({ width: { size: 3465, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: cellKids }),
+        mkCell("", { dxa: 3465 })
       ]});
     });
-    focusParas.push(new Table({ width: { size: 13954, type: WidthType.DXA }, rows: [focusHdrRow, ...focusDataRows] }));
+    focusParas.push(new Table({ width: { size: 9000, type: WidthType.DXA }, rows: [focusHdrRow, ...focusDataRows] }));
   }
 
   // ── Appendix: side-by-side charts per target (portrait) ──
@@ -5162,7 +5175,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   const portraitProps  = { type: SectionType?.NEXT_PAGE ?? "nextPage", page: { size: { orientation: PageOrientation?.PORTRAIT ?? "portrait" } } };
 
   const docSections = [{ properties: {}, footers, headers, children: paragraphs }];
-  if (focusParas.length) docSections.push({ properties: landscapeProps, footers, headers, children: focusParas });
+  if (focusParas.length) docSections.push({ properties: portraitProps, footers, headers, children: focusParas });
   docSections.push({ properties: focusParas.length ? portraitProps : {}, footers, headers, children: appendixParas });
 
   const doc = new Document({ sections: docSections });
