@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1389";
+const APP_VERSION = "1390";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -622,15 +622,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupStickyNote();
   $("btn-ai-report-back").addEventListener("click", showHome);
 
-  // If auth never resolves (e.g. Firebase IndexedDB hang after clearing site data),
-  // fall back to PIN screen after 8 s so the user isn't trapped on the loading screen.
-  // authResolved is set true as soon as onAuthChange's callback runs even once.
+  // If there's no today-login record in localStorage, Firebase auth can't possibly
+  // auto-sign-in (either first load or site data was cleared). Skip the Firebase
+  // wait entirely and go straight to PIN — no loading screen hang.
   let authResolved = false;
-  setTimeout(() => {
-    if (!authResolved && document.getElementById("screen-loading")?.classList.contains("active")) {
-      initPin();
-    }
-  }, 8000);
+  if (!hasLoggedInToday()) {
+    initPin();
+    authResolved = true; // prevent the timeout below from calling initPin a second time
+  } else {
+    // Logged in today — wait for Firebase to confirm, but give up after 5 s.
+    setTimeout(() => {
+      if (!authResolved) initPin();
+    }, 5000);
+  }
 
   // On iOS, relatedTarget is always null and pointerdown may not fire for <select>.
   // Use both pointerdown and touchstart (touchstart fires reliably before focusout on iOS).
