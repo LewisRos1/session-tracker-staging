@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1376";
+const APP_VERSION = "1377";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -16295,6 +16295,7 @@ function renderTargetManageContent(student, target) {
         if (usesOpts) { acts[idx].inlineOptions = getOptsFromDom(idx).join("\x1F") || null; rebuildOptScores(idx); }
         target.predefinedActivities = acts;
         await saveTarget(); // always persist the type change immediately so re-renders don't revert it
+        if (state.sessionData) renderTargetContent();
         if (starterVis) { starterInput.focus(); }
         else if (optsVis) { optsContainer.querySelector(".mn-opt-item")?.focus(); }
         if (wasRemarkOnly) {
