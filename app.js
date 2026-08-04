@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1377";
+const APP_VERSION = "1378";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -7417,7 +7417,7 @@ function renderFedcTarget(target) {
             <span style="flex-shrink:0;align-self:flex-start;margin-top:.45rem;display:inline-block;background:#dbeafe;color:#1e40af;border-radius:.4rem;padding:.12rem .5rem;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Subactivity</span>
             <span class="field-value-fixed"><span style="color:#1e40af;font-weight:700;margin-right:.25rem">${subLabel})</span>${inactiveReasonBadge(sub)}${paDisplayHtml(sub)}</span>
           </div>`;
-        const _subNoOpts = (sub.remarkHasNote || sub.optionsMulti) && parseOpts(getActivityInlineOptions(sub)).length === 0;
+        const _subNoOpts = (sub.remarkHasNote || (sub.optionsMulti && getActivityInlineOptions(sub))) && parseOpts(getActivityInlineOptions(sub)).length === 0;
         if (_subNoOpts) {
           html += `<div class="entry-field" contenteditable="false">
             <span class="field-label">Notes</span>
@@ -7500,7 +7500,14 @@ function renderFedcTarget(target) {
         }
       }
     } else {
-      const _paNoOpts = (pa.remarkHasNote || pa.optionsMulti) && parseOpts(getActivityInlineOptions(pa)).length === 0;
+      const _paNoOpts = (pa.remarkHasNote || (pa.optionsMulti && getActivityInlineOptions(pa))) && parseOpts(getActivityInlineOptions(pa)).length === 0;
+      // Self-heal: stale optionsMulti=true with no inlineOptions — Edit Target shows Notes Only so clear the flag
+      if (pa.optionsMulti && !getActivityInlineOptions(pa) && !pa.remarkHasNote) {
+        pa.optionsMulti = false;
+        const student = state.currentStudent;
+        const tgt = student?.targets?.find(t => t.name === state.selectedTargetName);
+        if (tgt) { const si = state.students?.findIndex(s => s.id === student.id); if (si >= 0) state.students[si] = student; saveStudent(student).catch(() => {}); }
+      }
       if (_paNoOpts) {
         html += `<div class="entry-field" contenteditable="false">
           <span class="field-label">Notes</span>
