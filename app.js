@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1384";
+const APP_VERSION = "1385";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -4482,7 +4482,7 @@ Past 3 months (${(td.labels||[]).join(", ")}): ${trendLabel(td.trend)}
 This month (${md.lastMonthLabel}→${md.thisMonthLabel}): ${trendLabel(md.trend)}
 Session data:
 ${(aiData[t.name] || []).join("\n")}
-Write EXACTLY ONE short honest sentence (max 15 words) that directly tells the parent whether this target is improving or not. Must match the trend data above. Warm but never falsely positive. No numbers, no jargon.
+Write EXACTLY ONE short sentence (max 15 words) that adds meaning the parent cannot already see from the trend arrows. Do NOT describe or restate the trend direction — the arrows already show that. Instead: if both trends agree, say WHY or what it means for the child. If the two trends differ (e.g. stable overall but declined this month), explain what changed or what drove the shift. Give a real insight. Honest, warm, plain English. No jargon, no percentages, no trend words like "improved" or "declined".
 ===END===
 ${isFocus ? `
 ===FOCUS: ${t.name}===
