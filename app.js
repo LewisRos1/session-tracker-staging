@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1378";
+const APP_VERSION = "1379";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -4453,12 +4453,15 @@ async function monthlyGenerate() {
     const monthName = FULL_MONTHS[month - 1];
     const firstName = student.name.split(" ")[0];
     const collected = monthlyCollectData(student, year, month, allSessions, excludedActivities);
-    const { overviewData, miniData, aiLines, appendixData, sessionCount } = collected;
+    const { threeMonthData, miniData, aiData, sessionCount, threeMonthPeriodLabel, oneMonthPeriodLabel } = collected;
 
     const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
+    const focusTargets = activeTargets.filter(t => miniData[t.name]?.trend !== "up");
     const excludedList = excludedActivities.size > 0
       ? [...excludedActivities].map(k => { const [t, a] = k.split("|"); return `  - ${a} (under target: ${t})`; }).join("\n")
       : null;
+
+    const trendLabel = t => ({ up: "↑ Improving", down: "↓ Declining", stable: "→ Stable" })[t] || "→ Stable";
 
     const aiPrompt = `${HYR_DEFAULT_PROMPT}
 ${excludedList ? `\nEXCLUDED ACTIVITIES — ABSOLUTE RULE: The following activities have been deliberately excluded from this report. Do NOT mention, reference, or draw conclusions about them anywhere:\n${excludedList}\n` : ""}
@@ -4466,19 +4469,26 @@ Student: ${student.name}
 Reporting Month: ${monthName} ${year}
 Number of sessions this month: ${sessionCount}
 
-SESSION DATA FOR ${monthName.toUpperCase()} ${year}:
-${aiLines.join("\n")}
+You are writing a PARENT-FRIENDLY monthly progress report. Use plain English only — no clinical jargon, no percentages in the text, no technical terms. Warm but honest tone.
 
-Provide ONLY the following sections using EXACTLY these markers. No extra text outside the markers.
+Provide ONLY the following sections using EXACTLY these markers. No extra text outside markers.
 
-${activeTargets.map(t => `===TARGET_REVIEW: ${t.name}===
-Write EXACTLY 2 bullet points about what was observed for this target in ${monthName} ${year}. Focus on what specifically happened in sessions this month. Plain English, warm tone, no jargon, no numbers or percentages.
-Format each bullet as: • [content — NOT bold, no labels]
+${activeTargets.map(t => {
+  const td = threeMonthData[t.name] || {};
+  const md = miniData[t.name] || {};
+  const isFocus = md.trend !== "up";
+  return `===SUMMARY: ${t.name}===
+Past 3 months (${(td.labels||[]).join(", ")}): ${trendLabel(td.trend)}
+This month (${md.lastMonthLabel}→${md.thisMonthLabel}): ${trendLabel(md.trend)}
+Session data:
+${(aiData[t.name] || []).join("\n")}
+Write EXACTLY ONE sentence in plain English for a parent. Interpret the combination of both trends honestly — e.g. if 3 months trending up but this month dipped, acknowledge both. No numbers or percentages.
 ===END===
-
-===FOCUS_AREAS: ${t.name}===
-Write exactly 1-2 specific struggles observed for this target this month. Name each struggle precisely — e.g. "does not yet wait for verbal cue before responding" not "needs work on turn-taking". Capitalise the first word. One struggle per line, starting with •.
-===END===`).join("\n\n")}`;
+${isFocus ? `
+===FOCUS: ${t.name}===
+Write 1-2 specific struggles observed this month. Name each precisely (e.g. "does not yet wait for verbal cue before responding" not "needs work on turn-taking"). Capitalise first word. One per line starting with •.
+===END===` : ""}`;
+}).join("\n\n")}`;
 
     _hyrAbortController = new AbortController();
     const fetchPromise = fetch("https://session-tracker-ai.wang-loys22.workers.dev", {
@@ -4527,7 +4537,7 @@ Write exactly 1-2 specific struggles observed for this target this month. Name e
     setProgress(100, "Done!");
     await new Promise(r => setTimeout(r, 400));
 
-    await monthlyDownloadWord(student, year, month, monthName, sessionCount, overviewData, miniData, parsed, appendixData);
+    await monthlyDownloadWord(student, year, month, monthName, sessionCount, threeMonthData, miniData, parsed, threeMonthPeriodLabel, oneMonthPeriodLabel);
   } catch (err) {
     if (err.name !== "AbortError") alert("Failed to generate monthly report:\n" + err.message);
   } finally {
@@ -4538,6 +4548,22 @@ Write exactly 1-2 specific struggles observed for this target this month. Name e
   }
 }
 
+// Compute trend direction from an array of values (nulls OK) using linear regression trendline ±8 threshold
+function monthlyComputeTrend(values) {
+  const pts = values.map((v, i) => ({ i, v })).filter(p => p.v !== null && p.v !== undefined);
+  if (pts.length < 2) return "stable";
+  const n = pts.length;
+  const xs = pts.map(p => p.i), ys = pts.map(p => p.v);
+  const sX = xs.reduce((a,b)=>a+b,0), sY = ys.reduce((a,b)=>a+b,0);
+  const sXY = xs.reduce((a,x,i)=>a+x*ys[i],0), sX2 = xs.reduce((a,x)=>a+x*x,0);
+  const denom = n*sX2 - sX*sX;
+  if (!denom) return "stable";
+  const slope = (n*sXY - sX*sY)/denom, intercept = (sY - slope*sX)/n;
+  const tStart = slope*xs[0] + intercept, tEnd = slope*xs[xs.length-1] + intercept;
+  const delta = tEnd - tStart;
+  return delta > 8 ? "up" : delta < -8 ? "down" : "stable";
+}
+
 function monthlyCollectData(student, year, month, allSessions, excludedActivities = new Set()) {
   const ABBRS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
@@ -4546,48 +4572,53 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
   let lastYear = year, lastMonth = month - 1;
   if (lastMonth === 0) { lastMonth = 12; lastYear = year - 1; }
   const lastMonthSessions = allSessions.filter(s => { const [y,m] = s.date.split("-").map(Number); return y === lastYear && m === lastMonth; });
-  const yearToDateSessions = allSessions.filter(s => { const [y,m] = s.date.split("-").map(Number); return y === year && m <= month; });
 
   const sessionCount = thisMonthSessions.length;
   const thisMonthLabel = ABBRS[month - 1];
   const lastMonthLabel = ABBRS[lastMonth - 1];
 
-  const overviewData = {}, miniData = {}, aiLines = [], appendixData = {};
+  // Period labels for column headers
+  let pm3 = month - 3; if (pm3 <= 0) pm3 += 12;
+  const threeMonthPeriodLabel = `${ABBRS[pm3-1]}-${ABBRS[lastMonth-1]}`;
+  const oneMonthPeriodLabel = `${lastMonthLabel}→${thisMonthLabel}`;
+
+  const miniData = {}, threeMonthData = {}, aiData = {};
 
   for (const target of activeTargets) {
     const tName = target.name;
 
-    // Overview: monthly averages Jan → report month
-    const ovLabels = [], ovValues = [];
-    for (let m = 1; m <= month; m++) {
-      const mLabel = ABBRS[m - 1]; ovLabels.push(mLabel);
-      const mSess = yearToDateSessions.filter(s => { const [,sm] = s.date.split("-").map(Number); return sm === m; });
-      const avgs = mSess.map(s => hyrCalcDailyAvg(s, target)).filter(v => v !== null);
-      ovValues.push(avgs.length ? Math.round(avgs.reduce((a,b)=>a+b,0)/avgs.length) : null);
-    }
-    overviewData[tName] = { labels: ovLabels, values: ovValues };
-
-    // Mini: this month vs last month
+    // Mini: this month vs last month + 1-month trend (2 points → direct delta)
     const computeAvg = sess => {
       const avgs = sess.map(s => hyrCalcDailyAvg(s, target)).filter(v => v !== null);
       return avgs.length ? Math.round(avgs.reduce((a,b)=>a+b,0)/avgs.length) : null;
     };
-    miniData[tName] = {
-      lastMonthLabel, lastMonthAvg: computeAvg(lastMonthSessions),
-      thisMonthLabel, thisMonthAvg: computeAvg(thisMonthSessions)
-    };
+    const lastMonthAvg = computeAvg(lastMonthSessions);
+    const thisMonthAvg = computeAvg(thisMonthSessions);
+    const oneDelta = (lastMonthAvg !== null && thisMonthAvg !== null) ? thisMonthAvg - lastMonthAvg : 0;
+    const oneTrend = (lastMonthAvg === null || thisMonthAvg === null) ? "stable"
+      : oneDelta > 8 ? "up" : oneDelta < -8 ? "down" : "stable";
+    miniData[tName] = { lastMonthLabel, lastMonthAvg, thisMonthLabel, thisMonthAvg, trend: oneTrend };
 
-    // AI lines
-    aiLines.push(`=== TARGET: ${tName} ===`);
-    const tm = miniData[tName];
-    if (tm.thisMonthAvg !== null) aiLines.push(`This month (${thisMonthLabel}): ${tm.thisMonthAvg}%`);
-    if (tm.lastMonthAvg !== null) aiLines.push(`Last month (${lastMonthLabel}): ${tm.lastMonthAvg}%`);
+    // Three-month window: [month-3, month-2, month-1] (crosses year boundary if needed)
+    const tLabels = [], tAvgs = [];
+    for (let offset = 3; offset >= 1; offset--) {
+      let tm = month - offset, ty = year;
+      if (tm <= 0) { tm += 12; ty--; }
+      const tmSess = allSessions.filter(s => { const [sy,sm] = s.date.split("-").map(Number); return sy === ty && sm === tm; });
+      const avgs = tmSess.map(s => hyrCalcDailyAvg(s, target)).filter(v => v !== null);
+      tLabels.push(ABBRS[tm - 1]);
+      tAvgs.push(avgs.length ? Math.round(avgs.reduce((a,b)=>a+b,0)/avgs.length) : null);
+    }
+    threeMonthData[tName] = { labels: tLabels, avgs: tAvgs, trend: monthlyComputeTrend(tAvgs) };
 
-    // Activity remarks for AI + appendix
-    appendixData[tName] = [];
+    // AI data: per-target context lines
+    const lines = [];
+    lines.push(`Past 3 months (${tLabels.join(", ")}): ${tAvgs.map(v => v !== null ? v + "%" : "no data").join(", ")}`);
+    lines.push(`Last month (${lastMonthLabel}): ${lastMonthAvg !== null ? lastMonthAvg + "%" : "no data"}`);
+    lines.push(`This month (${thisMonthLabel}): ${thisMonthAvg !== null ? thisMonthAvg + "%" : "no data"}`);
+
     const paKeyToAliases = {}, paKeyToConfigId = {}, legacyToKey = {};
     const actNames = new Set(), actDisplayNames = {};
-
     for (const pa of (target.predefinedActivities || [])) {
       const key = pa.title || pa.name; if (!key) continue;
       if (pa.id) paKeyToConfigId[key] = pa.id;
@@ -4608,8 +4639,7 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
         }
       }
     }
-
-    if (actNames.size) aiLines.push("Activities:");
+    if (actNames.size) lines.push("Activities this month:");
     for (const actName of actNames) {
       if (excludedActivities.has(`${tName}|${actName}`)) continue;
       const aliases = paKeyToAliases[actName] || [];
@@ -4629,33 +4659,30 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
           if (rem.optionScore !== undefined) trials.push(rem.optionScore);
           const avg = trials.length ? Math.round(trials.reduce((a,b)=>a+b,0)/(trials.length*(target.maxPoints||3))*100) : null;
           const text = hyrStripHtml(rem.text || "");
-          if (text || avg !== null) {
-            allRemarks.push({ date: sess.date, activityName: actDisplayNames[actName] || actName, text, avg });
-            appendixData[tName].push({ date: sess.date, activityName: actDisplayNames[actName] || actName, text, avg });
-          }
+          if (text || avg !== null) allRemarks.push({ date: sess.date, text, avg });
         }
       }
       allRemarks.sort((a,b) => a.date.localeCompare(b.date));
       const scored = allRemarks.filter(r => r.avg !== null);
       const avgLine = scored.length ? ` (avg ${Math.round(scored.reduce((a,b)=>a+b.avg,0)/scored.length)}%)` : "";
-      aiLines.push(`  • ${actDisplayNames[actName]||actName}${avgLine}`);
+      lines.push(`  • ${actDisplayNames[actName]||actName}${avgLine}`);
       for (const rem of allRemarks) {
-        if (rem.text) aiLines.push(`    - "${rem.text.substring(0, 200).trim()}"`);
+        if (rem.text) lines.push(`    - "${rem.text.substring(0, 200).trim()}"`);
       }
     }
-    aiLines.push("");
+    aiData[tName] = lines;
   }
 
-  return { overviewData, miniData, aiLines, appendixData, sessionCount, thisMonthLabel, lastMonthLabel };
+  return { threeMonthData, miniData, aiData, sessionCount, thisMonthLabel, lastMonthLabel, threeMonthPeriodLabel, oneMonthPeriodLabel };
 }
 
 function monthlyParseAiResponse(text) {
-  const out = { targetReviews: {}, focusAreas: {} };
-  const trRe = /===TARGET_REVIEW:\s*(.+?)===\s*([\s\S]*?)\s*===END===/g;
-  const faRe = /===FOCUS_AREAS:\s*(.+?)===\s*([\s\S]*?)\s*===END===/g;
+  const out = { summaries: {}, focusAreas: {} };
+  const sumRe = /===SUMMARY:\s*(.+?)===\s*([\s\S]*?)\s*===END===/g;
+  const focRe = /===FOCUS:\s*(.+?)===\s*([\s\S]*?)\s*===END===/g;
   let m;
-  while ((m = trRe.exec(text)) !== null) out.targetReviews[m[1].trim()] = m[2].trim();
-  while ((m = faRe.exec(text)) !== null) {
+  while ((m = sumRe.exec(text)) !== null) out.summaries[m[1].trim()] = m[2].trim();
+  while ((m = focRe.exec(text)) !== null) {
     const tName = m[1].trim(), content = m[2].trim();
     const struggles = content.split("\n")
       .map(l => l.trim())
@@ -4915,15 +4942,17 @@ function monthlyDrawMiniHorizontalBar(lastLabel, lastAvg, thisLabel, thisAvg) {
   return { base64: canvas.toDataURL("image/png").split(",")[1], height: H };
 }
 
-async function monthlyDownloadWord(student, year, month, monthName, sessionCount, overviewData, miniData, parsed, appendixData) {
+async function monthlyDownloadWord(student, year, month, monthName, sessionCount, threeMonthData, miniData, parsed, threeMonthPeriodLabel, oneMonthPeriodLabel) {
   const firstName = student.name.split(" ")[0];
   const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
+  const focusTargets = activeTargets.filter(t => miniData[t.name]?.trend !== "up");
   const reportDate = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun, LevelFormat,
           Table, TableRow, TableCell, WidthType, PageOrientation, SectionType, Header, Footer, PageNumber } = window.docx;
 
   const LS = { line: 276, lineRule: "auto" };
+  const BRNONE = { style: "none", size: 0, color: "auto" };
 
   function b64ToUint8(b64) {
     const bin = atob(b64); const arr = new Uint8Array(bin.length);
@@ -4940,28 +4969,35 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     });
   }
 
-  function bulletPara(text) {
-    const runs = []; const re = /(\*\*[^*]+\*\*|_[^_]+_)/g; let idx = 0, m;
-    while ((m = re.exec(text)) !== null) {
-      if (m.index > idx) runs.push(new TextRun({ text: text.slice(idx, m.index), size: 22 }));
-      if (m[0].startsWith("**")) runs.push(new TextRun({ text: m[0].slice(2,-2), bold: true, size: 22 }));
-      else runs.push(new TextRun({ text: m[0].slice(1,-1), italics: true, size: 22 }));
-      idx = m.index + m[0].length;
-    }
-    if (idx < text.length) runs.push(new TextRun({ text: text.slice(idx), size: 22 }));
-    return new Paragraph({ children: runs, style: "List Bullet", alignment: AlignmentType.BOTH, spacing: { after: 100, ...LS } });
-  }
-
   function mkCell(text, opts = {}) {
     return new TableCell({
-      width: opts.dxa !== undefined ? { size: opts.dxa, type: WidthType.DXA }
-           : opts.pct !== undefined ? { size: opts.pct, type: WidthType.PERCENTAGE } : undefined,
+      width: opts.dxa !== undefined ? { size: opts.dxa, type: WidthType.DXA } : undefined,
       margins: { top: 100, bottom: 100, left: 150, right: 150 },
       children: [new Paragraph({
         children: [new TextRun({ text, bold: opts.bold, size: opts.size || 22, color: opts.color, italics: opts.italics })],
         alignment: opts.align || AlignmentType.LEFT, spacing: { before: 80, after: 80 }
       })],
       shading: opts.bg ? { fill: opts.bg } : undefined
+    });
+  }
+
+  function mkHdrCell(mainText, subText, dxa) {
+    const children = [new TextRun({ text: mainText, bold: true, size: 22 })];
+    if (subText) children.push(new TextRun({ break: 1, text: subText, size: 18, color: "6b7280" }));
+    return new TableCell({
+      width: { size: dxa, type: WidthType.DXA },
+      margins: { top: 100, bottom: 100, left: 150, right: 150 },
+      children: [new Paragraph({ children, alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })],
+      shading: { fill: "f3f4f6" }
+    });
+  }
+
+  function mkTrendCell(trend, dxa) {
+    const cfg = { up: { text: "↑ Improving", color: "16a34a" }, down: { text: "↓ Declining", color: "dc2626" }, stable: { text: "→ Stable", color: "6b7280" } }[trend] || { text: "→ Stable", color: "6b7280" };
+    return new TableCell({
+      width: { size: dxa, type: WidthType.DXA },
+      margins: { top: 100, bottom: 100, left: 150, right: 150 },
+      children: [new Paragraph({ children: [new TextRun({ text: cfg.text, color: cfg.color, bold: true, size: 22 })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })]
     });
   }
 
@@ -4973,25 +5009,18 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     if (r.ok) logoData = new Uint8Array(await r.arrayBuffer());
   } catch (_) {}
 
+  // ── Cover page ──
   const CPL = { line: 276, lineRule: "auto" };
   paragraphs.push(new Paragraph({
     children: logoData ? [new ImageRun({ data: logoData, transformation: { width: 454, height: 135 }, type: "png" })] : [],
     alignment: AlignmentType.CENTER, spacing: { before: 480, after: 560, ...CPL }
   }));
-  paragraphs.push(new Paragraph({
-    children: [new TextRun({ text: "Monthly Progress Report", bold: true, size: 72, font: TNR })],
-    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, ...CPL }
-  }));
-  paragraphs.push(new Paragraph({
-    children: [new TextRun({ text: `(${monthName} ${year})`, bold: true, size: 36, font: TNR })],
-    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 640, ...CPL }
-  }));
-
-  const mkCoverLabel = t => new Paragraph({ children: [new TextRun({ text: t, bold: true, size: 36, font: TNR })], alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, ...CPL } });
+  paragraphs.push(new Paragraph({ children: [new TextRun({ text: "Monthly Progress Report", bold: true, size: 72, font: TNR })], alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, ...CPL } }));
+  paragraphs.push(new Paragraph({ children: [new TextRun({ text: `(${monthName} ${year})`, bold: true, size: 36, font: TNR })], alignment: AlignmentType.CENTER, spacing: { before: 0, after: 640, ...CPL } }));
+  const mkCoverLabel  = t => new Paragraph({ children: [new TextRun({ text: t, bold: true, size: 36, font: TNR })], alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, ...CPL } });
   const mkCoverShaded = (v, sz = 32) => new Paragraph({ shading: { type: "clear", fill: "D9D9D9", color: "auto" }, children: [new TextRun({ text: v, size: sz, font: TNR })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 160, ...CPL }, indent: { left: 120, right: 120 } });
   const mkCoverSpacer = () => new Paragraph({ children: [], spacing: { before: 0, after: 480, ...CPL } });
   const mkCompanyLine = l => new Paragraph({ children: [new TextRun({ text: `${l} `, bold: true, size: 28, font: TNR }), new TextRun({ text: "[insert text]", size: 28, font: TNR })], alignment: AlignmentType.CENTER, spacing: { before: 40, after: 40, ...CPL } });
-
   paragraphs.push(mkCoverLabel("Student Name:")); paragraphs.push(mkCoverShaded(student.name));
   paragraphs.push(mkCoverSpacer());
   paragraphs.push(mkCoverLabel(`Sessions in ${monthName}:`)); paragraphs.push(mkCoverShaded(String(sessionCount)));
@@ -5003,73 +5032,96 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   paragraphs.push(mkCoverLabel("Company Details:"));
   ["Tel:", "Email:", "Website:", "Address:"].forEach(l => paragraphs.push(mkCompanyLine(l)));
 
-  // Section 1: Target Review
-  paragraphs.push(mkPara("Section 1: Target Review", { heading: HeadingLevel.HEADING_1, before: 560, after: 200, pageBreak: true, size: 32, bold: true }));
-  paragraphs.push(mkPara(`This section covers ${firstName}'s performance across all therapy targets in ${monthName} ${year}.`, { after: 160, align: AlignmentType.JUSTIFIED }));
-
-  activeTargets.forEach((target, i) => {
-    const tName = target.name;
-    const md = miniData[tName] || {};
-    const review = parsed.targetReviews?.[tName] || "";
-    if (i > 0) paragraphs.push(new Paragraph({ children: [], spacing: { before: 300, after: 0 } }));
-    paragraphs.push(new Paragraph({ children: [new TextRun({ text: `${i + 1}) ${tName}`, bold: true, size: 24 })], spacing: { before: 0, after: 100, ...LS } }));
-
-    // Per-target line chart (first available month → report month)
-    const { labels: ovLabels, values: ovValues } = overviewData[tName] || { labels: [], values: [] };
-    const lineB64 = monthlyDrawTargetLineChart(tName, ovLabels, ovValues, year);
-    if (lineB64) {
-      const lW = 500, lH = Math.round(lW * 280 / 540);
-      paragraphs.push(new Paragraph({ children: [new ImageRun({ data: b64ToUint8(lineB64), transformation: { width: lW, height: lH }, type: "png" })], alignment: AlignmentType.CENTER, spacing: { after: 120 } }));
-    }
-
-    // Mini horizontal bar (last month vs this month)
-    const miniResult = monthlyDrawMiniHorizontalBar(md.lastMonthLabel, md.lastMonthAvg, md.thisMonthLabel, md.thisMonthAvg);
-    if (miniResult) {
-      const mW = 400, mH = Math.round(mW * miniResult.height / 500);
-      paragraphs.push(new Paragraph({ children: [new ImageRun({ data: b64ToUint8(miniResult.base64), transformation: { width: mW, height: mH }, type: "png" })], alignment: AlignmentType.LEFT, spacing: { after: 100 } }));
-    }
-
-    // Bullet points — max 2
-    const bullets = review.split("\n").map(l => l.trim()).filter(l => l.startsWith("•")).slice(0, 2);
-    if (bullets.length) {
-      bullets.forEach(line => paragraphs.push(bulletPara(line.slice(1).trim())));
-    } else {
-      paragraphs.push(mkPara("No observations recorded this month.", { italics: true, color: "9CA3AF" }));
-    }
-  });
-
-  // Section 2: Focus Areas & Recommendations (landscape)
-  const AP_NUM_REFS = activeTargets.map((_, i) => `monthly-ap-${i}`);
-  const focusParas = [];
-  focusParas.push(mkPara("Section 2: Focus Areas & Recommendations for Next Month", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
-  focusParas.push(mkPara(`The table below highlights the key focus areas for ${firstName} in the coming month.`, { after: 220, align: AlignmentType.JUSTIFIED }));
-
+  // ── Progress Summary (portrait) ──
   const HDR = "f3f4f6";
-  const focusHeaderRow = new TableRow({ tableHeader: true, children: [
-    mkCell("No.",     { bold: true, bg: HDR, size: 22, align: AlignmentType.CENTER, dxa: 634 }),
-    mkCell("Target",  { bold: true, bg: HDR, size: 22, dxa: 2088, align: AlignmentType.CENTER }),
-    mkCell("Focus Areas", { bold: true, bg: HDR, size: 22, dxa: 5616, align: AlignmentType.CENTER }),
-    mkCell("Recommendations & Strategies", { bold: true, bg: HDR, size: 22, dxa: 5616, align: AlignmentType.CENTER })
+  paragraphs.push(mkPara("Progress Summary", { heading: HeadingLevel.HEADING_1, before: 560, after: 200, pageBreak: true, size: 32, bold: true }));
+  paragraphs.push(mkPara(`Here is a snapshot of ${firstName}'s progress in ${monthName} ${year}.`, { after: 200 }));
+
+  const summaryHdrRow = new TableRow({ tableHeader: true, children: [
+    mkHdrCell("Target",         "",                          2400),
+    mkHdrCell("Past 3 Months",  `(${threeMonthPeriodLabel})`, 1600),
+    mkHdrCell("This Month",     `(${oneMonthPeriodLabel})`,   1600),
+    mkHdrCell("Summary",        "",                          4000),
   ]});
 
-  const focusDataRows = activeTargets.map((target, idx) => {
-    const struggles = parsed.focusAreas?.[target.name] || [];
-    const cellKids = struggles.length
-      ? struggles.map((s, si) => new Paragraph({
-          children: [new TextRun({ text: s, size: 22 })],
-          numbering: { reference: AP_NUM_REFS[idx], level: 0 },
-          spacing: { before: si === 0 ? 40 : 80, after: 40, ...LS }
-        }))
-      : [new Paragraph({ children: [new TextRun({ text: "", size: 22 })], spacing: { before: 80, after: 80 } })];
+  const summaryDataRows = activeTargets.map(target => {
+    const tName = target.name;
+    const td = threeMonthData[tName] || {};
+    const md = miniData[tName] || {};
+    const summary = parsed.summaries?.[tName] || "";
     return new TableRow({ children: [
-      mkCell(String(idx + 1), { align: AlignmentType.CENTER, dxa: 634 }),
-      mkCell(target.name, { dxa: 2088 }),
-      new TableCell({ width: { size: 5616, type: WidthType.DXA }, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: cellKids }),
-      mkCell("", { dxa: 5616 })
+      mkCell(tName, { dxa: 2400 }),
+      mkTrendCell(td.trend || "stable", 1600),
+      mkTrendCell(md.trend || "stable", 1600),
+      new TableCell({
+        width: { size: 4000, type: WidthType.DXA },
+        margins: { top: 100, bottom: 100, left: 150, right: 150 },
+        children: [new Paragraph({ children: [new TextRun({ text: summary || "—", size: 22, italics: !summary })], alignment: AlignmentType.LEFT, spacing: { before: 80, after: 80 } })]
+      })
     ]});
   });
-  focusParas.push(new Table({ width: { size: 13954, type: WidthType.DXA }, rows: [focusHeaderRow, ...focusDataRows] }));
+  paragraphs.push(new Table({ width: { size: 9600, type: WidthType.DXA }, rows: [summaryHdrRow, ...summaryDataRows] }));
 
+  // ── Focus Areas (landscape, non-up targets only) ──
+  const focusParas = [];
+  if (focusTargets.length > 0) {
+    const AP_NUM_REFS = focusTargets.map((_, i) => `monthly-focus-${i}`);
+    focusParas.push(mkPara("Focus Areas & Recommendations for Next Month", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
+    focusParas.push(mkPara(`The table below highlights areas for ${firstName} to focus on next month.`, { after: 220 }));
+    const focusHdrRow = new TableRow({ tableHeader: true, children: [
+      mkCell("No.",     { bold: true, bg: HDR, size: 22, align: AlignmentType.CENTER, dxa: 634 }),
+      mkCell("Target",  { bold: true, bg: HDR, size: 22, dxa: 2088, align: AlignmentType.CENTER }),
+      mkCell("Focus Areas",                      { bold: true, bg: HDR, size: 22, dxa: 5616, align: AlignmentType.CENTER }),
+      mkCell("Recommendations & Strategies",     { bold: true, bg: HDR, size: 22, dxa: 5616, align: AlignmentType.CENTER })
+    ]});
+    const focusDataRows = focusTargets.map((target, idx) => {
+      const struggles = parsed.focusAreas?.[target.name] || [];
+      const cellKids = struggles.length
+        ? struggles.map((s, si) => new Paragraph({ children: [new TextRun({ text: s, size: 22 })], numbering: { reference: AP_NUM_REFS[idx], level: 0 }, spacing: { before: si === 0 ? 40 : 80, after: 40, ...LS } }))
+        : [new Paragraph({ children: [new TextRun({ text: "", size: 22 })], spacing: { before: 80, after: 80 } })];
+      return new TableRow({ children: [
+        mkCell(String(idx + 1), { align: AlignmentType.CENTER, dxa: 634 }),
+        mkCell(target.name, { dxa: 2088 }),
+        new TableCell({ width: { size: 5616, type: WidthType.DXA }, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: cellKids }),
+        mkCell("", { dxa: 5616 })
+      ]});
+    });
+    focusParas.push(new Table({ width: { size: 13954, type: WidthType.DXA }, rows: [focusHdrRow, ...focusDataRows] }));
+  }
+
+  // ── Appendix: side-by-side charts per target (portrait) ──
+  const appendixParas = [];
+  appendixParas.push(mkPara("Appendix: Target Charts", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true, pageBreak: true }));
+  appendixParas.push(mkPara("Past 3 months trend and this month vs last month for each target.", { after: 240 }));
+
+  for (const target of activeTargets) {
+    const tName = target.name;
+    const td = threeMonthData[tName] || {};
+    const md = miniData[tName] || {};
+
+    appendixParas.push(new Paragraph({ children: [new TextRun({ text: tName, bold: true, size: 26 })], spacing: { before: 280, after: 120, ...LS } }));
+
+    const lineB64 = monthlyDrawTargetLineChart(tName, td.labels || [], td.avgs || [], year);
+    const miniResult = monthlyDrawMiniHorizontalBar(md.lastMonthLabel, md.lastMonthAvg, md.thisMonthLabel, md.thisMonthAvg);
+
+    const noDataCell = txt => new TableCell({ borders: { top: BRNONE, bottom: BRNONE, left: BRNONE, right: BRNONE }, width: { size: 4680, type: WidthType.DXA }, children: [new Paragraph({ children: [new TextRun({ text: txt, italics: true, size: 20, color: "9ca3af" })] })] });
+
+    const leftCell = lineB64
+      ? new TableCell({ borders: { top: BRNONE, bottom: BRNONE, left: BRNONE, right: BRNONE }, width: { size: 4680, type: WidthType.DXA }, margins: { top: 0, bottom: 0, left: 0, right: 100 }, children: [new Paragraph({ children: [new ImageRun({ data: b64ToUint8(lineB64), transformation: { width: 230, height: Math.round(230 * 280 / 540) }, type: "png" })], alignment: AlignmentType.CENTER })] })
+      : noDataCell("No data for past 3 months");
+
+    const rightCell = miniResult
+      ? new TableCell({ borders: { top: BRNONE, bottom: BRNONE, left: BRNONE, right: BRNONE }, width: { size: 4680, type: WidthType.DXA }, margins: { top: 0, bottom: 0, left: 100, right: 0 }, children: [new Paragraph({ children: [new ImageRun({ data: b64ToUint8(miniResult.base64), transformation: { width: 220, height: Math.round(220 * miniResult.height / 500) }, type: "png" })], alignment: AlignmentType.CENTER })] })
+      : noDataCell("No data this month");
+
+    appendixParas.push(new Table({
+      borders: { top: BRNONE, bottom: BRNONE, left: BRNONE, right: BRNONE, insideH: BRNONE, insideV: BRNONE },
+      width: { size: 9360, type: WidthType.DXA },
+      rows: [new TableRow({ children: [leftCell, rightCell] })]
+    }));
+  }
+
+  // ── Assemble sections + doc ──
   const pageFooter = Footer ? new Footer({ children: [new Paragraph({ tabStops: [{ type: "center", position: 4750 },{ type: "right", position: 9500 }], children: [new TextRun({ text: "\t" }), new TextRun({ text: "ZORA Behavioural Intervention", size: 22, color: "555555" }), new TextRun({ text: "\t" }), new TextRun({ children: [PageNumber.CURRENT], size: 22, color: "555555" })], spacing: { before: 60, after: 0 } })] }) : undefined;
   const pageHeader = (Header && logoData) ? new Header({ children: [new Paragraph({ children: [new ImageRun({ data: logoData, transformation: { width: 180, height: 54 }, type: "png" })], alignment: AlignmentType.RIGHT, spacing: { before: 0, after: 0 } })] }) : undefined;
   const footers = pageFooter ? { default: pageFooter } : undefined;
@@ -5078,14 +5130,14 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   const landscapeProps = { type: SectionType?.NEXT_PAGE ?? "nextPage", page: { size: { orientation: PageOrientation?.LANDSCAPE ?? "landscape" } } };
   const portraitProps  = { type: SectionType?.NEXT_PAGE ?? "nextPage", page: { size: { orientation: PageOrientation?.PORTRAIT ?? "portrait" } } };
 
+  const focusNumConfig = focusTargets.map((_, i) => ({ reference: `monthly-focus-${i}`, levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 480, hanging: 240 } }, run: { size: 22 } } }] }));
+
   const docSections = [{ properties: {}, footers, headers, children: paragraphs }];
   if (focusParas.length) docSections.push({ properties: landscapeProps, footers, headers, children: focusParas });
+  docSections.push({ properties: focusParas.length ? portraitProps : {}, footers, headers, children: appendixParas });
 
   const doc = new Document({
-    numbering: { config: [
-      { reference: "monthly-bullets", levels: [{ level: 0, format: LevelFormat?.BULLET ?? "bullet", text: "", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } }, run: { fonts: { ascii: "Wingdings", hAnsi: "Wingdings", hint: "default" }, size: 22 } } }] },
-      ...AP_NUM_REFS.map(ref => ({ reference: ref, levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 480, hanging: 240 } }, run: { size: 22 } } }] }))
-    ] },
+    numbering: { config: focusNumConfig.length ? focusNumConfig : [{ reference: "monthly-placeholder", levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 480, hanging: 240 } }, run: { size: 22 } } }] }] },
     sections: docSections
   });
 
