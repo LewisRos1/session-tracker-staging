@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1380";
+const APP_VERSION = "1381";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -5013,7 +5013,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   const mkCompanyLine = l => new Paragraph({ children: [new TextRun({ text: `${l} `, bold: true, size: 28, font: TNR }), new TextRun({ text: "[insert text]", size: 28, font: TNR })], alignment: AlignmentType.CENTER, spacing: { before: 40, after: 40, ...CPL } });
   paragraphs.push(mkCoverLabel("Student Name:")); paragraphs.push(mkCoverShaded(student.name));
   paragraphs.push(mkCoverSpacer());
-  paragraphs.push(mkCoverLabel("Program:")); paragraphs.push(mkCoverShaded("", 28));
+  paragraphs.push(mkCoverLabel("Program:")); paragraphs.push(mkCoverShaded("​", 32));
   paragraphs.push(mkCoverSpacer());
   paragraphs.push(mkCoverLabel("Date of Report:")); paragraphs.push(mkCoverShaded(reportDate));
   paragraphs.push(mkCoverSpacer());
