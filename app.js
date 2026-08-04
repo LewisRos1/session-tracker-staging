@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1385";
+const APP_VERSION = "1386";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -4838,13 +4838,15 @@ function monthlyDrawTargetLineChart(targetName, labels, values, year) {
   const toY = v => PAD.top + cH * (1 - v / 100);
   const toX = i => PAD.left + (allPts.length > 1 ? (i / (allPts.length - 1)) * cW : cW / 2);
 
-  // Y-axis gridlines + labels
+  // Y-axis gridlines + labels (skip 100% label to avoid collision with top data point labels)
   ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
   for (let v = 0; v <= 100; v += 25) {
     const y = toY(v);
     ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + cW, y); ctx.stroke();
-    ctx.fillStyle = "#6b7280"; ctx.font = "11px sans-serif"; ctx.textAlign = "right";
-    ctx.fillText(v + "%", PAD.left - 4, y + 4);
+    if (v < 100) {
+      ctx.fillStyle = "#6b7280"; ctx.font = "11px sans-serif"; ctx.textAlign = "right";
+      ctx.fillText(v + "%", PAD.left - 4, y + 4);
+    }
   }
 
   const xs = pts.map(p => p.i), ys = pts.map(p => p.v), np = pts.length;
@@ -4858,10 +4860,10 @@ function monthlyDrawTargetLineChart(targetName, labels, values, year) {
   const direction = Math.abs(delta) <= 8 ? "Stable" : delta > 0 ? "Improving" : "Declining";
   const icon = direction === "Improving" ? "↑" : direction === "Declining" ? "↓" : "→";
 
-  ctx.fillStyle = "#6b7280"; ctx.font = "italic 13px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(`${icon} ${direction}`, W / 2, 31);
+  ctx.fillStyle = "#6b7280"; ctx.font = "italic 12px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText(`${icon} ${direction}  (${tStart}%→${tEnd}%)`, W / 2, 31);
 
-  ctx.strokeStyle = "#b0bec5"; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+  ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 2; ctx.setLineDash([5, 3]);
   ctx.beginPath(); ctx.moveTo(toX(xs[0]), toY(trendAt(xs[0]))); ctx.lineTo(toX(xs[xs.length-1]), toY(trendAt(xs[xs.length-1]))); ctx.stroke(); ctx.setLineDash([]);
 
   ctx.strokeStyle = "#4472c4"; ctx.lineWidth = 2.5; ctx.beginPath();
@@ -5082,35 +5084,65 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
 
   // ── Appendix: side-by-side charts per target (portrait) ──
   const appendixParas = [];
-  appendixParas.push(mkPara("Appendix: Target Charts", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true, pageBreak: true }));
-  appendixParas.push(mkPara("Past 3 months trend and this month vs last month for each target.", { after: 240 }));
+  appendixParas.push(mkPara("Appendix: Target Charts", { heading: HeadingLevel.HEADING_1, before: 560, after: 200, size: 32, bold: true, pageBreak: true }));
+
+  const tblBR = { style: "single", size: 4, color: "e5e7eb" };
+  function mkHdrChart(mainText, subText) {
+    return new TableCell({
+      width: { size: 4680, type: WidthType.DXA },
+      margins: { top: 100, bottom: 100, left: 120, right: 120 },
+      shading: { fill: "f3f4f6" },
+      borders: { top: tblBR, bottom: tblBR, left: tblBR, right: tblBR },
+      children: [new Paragraph({ children: [new TextRun({ text: mainText, bold: true, size: 22 }), new TextRun({ break: 1, text: subText, size: 18, color: "6b7280" })], alignment: AlignmentType.CENTER, spacing: { before: 60, after: 60 } })]
+    });
+  }
+
+  const appendixRows = [];
+  appendixRows.push(new TableRow({ tableHeader: true, children: [
+    mkHdrChart("Past 3 Months", "(month to month trend)"),
+    mkHdrChart("This Month", "(vs last month)")
+  ]}));
 
   for (const target of activeTargets) {
     const tName = target.name;
     const td = threeMonthData[tName] || {};
     const md = miniData[tName] || {};
-
-    appendixParas.push(new Paragraph({ children: [new TextRun({ text: tName, bold: true, size: 26 })], spacing: { before: 280, after: 120, ...LS } }));
-
     const lineB64 = monthlyDrawTargetLineChart(tName, td.labels || [], td.avgs || [], year);
     const miniResult = monthlyDrawMiniVerticalBar(md.lastMonthLabel, md.lastMonthAvg, md.thisMonthLabel, md.thisMonthAvg);
 
-    const noDataCell = txt => new TableCell({ borders: { top: BRNONE, bottom: BRNONE, left: BRNONE, right: BRNONE }, width: { size: 4680, type: WidthType.DXA }, children: [new Paragraph({ children: [new TextRun({ text: txt, italics: true, size: 20, color: "9ca3af" })] })] });
-
-    const leftCell = lineB64
-      ? new TableCell({ borders: { top: BRNONE, bottom: BRNONE, left: BRNONE, right: BRNONE }, width: { size: 4680, type: WidthType.DXA }, margins: { top: 0, bottom: 0, left: 0, right: 60 }, children: [new Paragraph({ children: [new ImageRun({ data: b64ToUint8(lineB64), transformation: { width: 226, height: Math.round(226 * 200 / 230) }, type: "png" })], alignment: AlignmentType.CENTER })] })
-      : noDataCell("No data for past 3 months");
-
-    const rightCell = miniResult
-      ? new TableCell({ borders: { top: BRNONE, bottom: BRNONE, left: BRNONE, right: BRNONE }, width: { size: 4680, type: WidthType.DXA }, margins: { top: 0, bottom: 0, left: 60, right: 0 }, children: [new Paragraph({ children: [new ImageRun({ data: b64ToUint8(miniResult.base64), transformation: { width: 196, height: Math.round(196 * miniResult.height / miniResult.width) }, type: "png" })], alignment: AlignmentType.CENTER })] })
-      : noDataCell("No data this month");
-
-    appendixParas.push(new Table({
-      borders: { top: BRNONE, bottom: BRNONE, left: BRNONE, right: BRNONE, insideH: BRNONE, insideV: BRNONE },
+    // Target name row — spans both columns
+    appendixRows.push(new TableRow({ children: [new TableCell({
+      columnSpan: 2,
       width: { size: 9360, type: WidthType.DXA },
-      rows: [new TableRow({ children: [leftCell, rightCell] })]
-    }));
+      margins: { top: 100, bottom: 100, left: 160, right: 160 },
+      shading: { fill: "eff6ff" },
+      borders: { top: tblBR, bottom: tblBR, left: tblBR, right: tblBR },
+      children: [new Paragraph({ children: [new TextRun({ text: tName, bold: true, size: 24 })], spacing: { before: 60, after: 60 } })]
+    })]});
+
+    // Chart row
+    const noDataPara = txt => [new Paragraph({ children: [new TextRun({ text: txt, italics: true, size: 20, color: "9ca3af" })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })];
+    appendixRows.push(new TableRow({ children: [
+      new TableCell({
+        width: { size: 4680, type: WidthType.DXA },
+        margins: { top: 80, bottom: 80, left: 60, right: 60 },
+        borders: { top: tblBR, bottom: tblBR, left: tblBR, right: tblBR },
+        children: lineB64
+          ? [new Paragraph({ children: [new ImageRun({ data: b64ToUint8(lineB64), transformation: { width: 220, height: Math.round(220 * 200 / 230) }, type: "png" })], alignment: AlignmentType.CENTER, spacing: { before: 40, after: 40 } })]
+          : noDataPara("No data for past 3 months")
+      }),
+      new TableCell({
+        width: { size: 4680, type: WidthType.DXA },
+        margins: { top: 80, bottom: 80, left: 60, right: 60 },
+        borders: { top: tblBR, bottom: tblBR, left: tblBR, right: tblBR },
+        children: miniResult
+          ? [new Paragraph({ children: [new ImageRun({ data: b64ToUint8(miniResult.base64), transformation: { width: 196, height: Math.round(196 * miniResult.height / miniResult.width) }, type: "png" })], alignment: AlignmentType.CENTER, spacing: { before: 40, after: 40 } })]
+          : noDataPara("No data this month")
+      })
+    ]}));
   }
+
+  appendixParas.push(new Table({ width: { size: 9360, type: WidthType.DXA }, rows: appendixRows }));
 
   // ── Assemble sections + doc ──
   const pageFooter = Footer ? new Footer({ children: [new Paragraph({ tabStops: [{ type: "center", position: 4750 },{ type: "right", position: 9500 }], children: [new TextRun({ text: "\t" }), new TextRun({ text: "ZORA Behavioural Intervention", size: 22, color: "555555" }), new TextRun({ text: "\t" }), new TextRun({ children: [PageNumber.CURRENT], size: 22, color: "555555" })], spacing: { before: 60, after: 0 } })] }) : undefined;
