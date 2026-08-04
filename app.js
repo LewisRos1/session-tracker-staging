@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1396";
+const APP_VERSION = "1397";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -4823,8 +4823,8 @@ function monthlyDrawTargetLineChart(targetName, labels, values, year) {
 
   const SCALE = 2;
   const W = 230, H = 200;
-  // PAD.left=24 so centred dot labels near x=0 don't clip off the left edge
-  const PAD = { top: 40, right: 20, bottom: 22, left: 24 };
+  // PAD.left=24: centred dot labels near x=0 don't clip; PAD.top=52: room for subtitle above high-value dots
+  const PAD = { top: 52, right: 20, bottom: 22, left: 24 };
   const cW = W - PAD.left - PAD.right, cH = H - PAD.top - PAD.bottom;
 
   const canvas = document.createElement("canvas");
@@ -4840,59 +4840,79 @@ function monthlyDrawTargetLineChart(targetName, labels, values, year) {
   const firstLabel = allPts[0].label, lastLabel = allPts[allPts.length - 1].label;
   const rangeLabel = firstLabel === lastLabel ? firstLabel : `${firstLabel} - ${lastLabel}`;
 
-  // Title: just the date range (target name already shown in the table heading above)
+  // Title: just the date range
   ctx.fillStyle = "#1f2937"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "center";
   ctx.fillText(`${rangeLabel} ${year}`, W / 2, 15);
 
   const toY = v => PAD.top + cH * (1 - v / 100);
   const toX = i => PAD.left + (allPts.length > 1 ? (i / (allPts.length - 1)) * cW : cW / 2);
 
-  // Y-axis gridlines only (no labels — values shown on each dot)
+  // Y-axis gridlines only
   ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
   for (let v = 0; v <= 100; v += 25) {
     const y = toY(v);
     ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + cW, y); ctx.stroke();
   }
 
-  // Linear regression trendline
-  const xs = pts.map(p => p.i), ys = pts.map(p => p.v), np = pts.length;
-  const sX = xs.reduce((a,b)=>a+b,0), sY = ys.reduce((a,b)=>a+b,0);
-  const sXY = xs.reduce((a,x,i)=>a+x*ys[i],0), sX2 = xs.reduce((a,x)=>a+x*x,0);
-  const denom = np*sX2 - sX*sX;
-  const slope = denom ? (np*sXY - sX*sY)/denom : 0, intercept = (sY - slope*sX)/np;
-  const trendAt = i => Math.max(0, Math.min(100, slope*i + intercept));
-  const tStart = Math.round(trendAt(xs[0])), tEnd = Math.round(trendAt(xs[xs.length-1]));
-  const delta = tEnd - tStart;
-  const direction = Math.abs(delta) <= 8 ? "Stable" : delta > 0 ? "Improving" : "Declining";
-  const icon = direction === "Improving" ? "↑" : direction === "Declining" ? "↓" : "→";
+  // Direction subtitle — computed differently for 2-point vs multi-point charts
+  const twoPointMode = pts.length <= 2;
+  let direction, icon;
 
-  // Subtitle: direction only, no "(x%→x%)"
+  if (twoPointMode) {
+    // 2 data points: direction from direct delta, no trendline overlay
+    const rawDelta = pts.length === 2 ? pts[1].v - pts[0].v : 0;
+    direction = Math.abs(rawDelta) <= 8 ? "Stable" : rawDelta > 0 ? "Improving" : "Declining";
+    icon = direction === "Improving" ? "↑" : direction === "Declining" ? "↓" : "→";
+  } else {
+    // 3+ points: linear regression trendline
+    const xs = pts.map(p => p.i), ys = pts.map(p => p.v), np = pts.length;
+    const sX = xs.reduce((a,b)=>a+b,0), sY = ys.reduce((a,b)=>a+b,0);
+    const sXY = xs.reduce((a,x,i)=>a+x*ys[i],0), sX2 = xs.reduce((a,x)=>a+x*x,0);
+    const denom = np*sX2 - sX*sX;
+    const slope = denom ? (np*sXY - sX*sY)/denom : 0, intercept = (sY - slope*sX)/np;
+    const trendAt = i => Math.max(0, Math.min(100, slope*i + intercept));
+    const tStart = Math.round(trendAt(xs[0])), tEnd = Math.round(trendAt(xs[xs.length-1]));
+    const delta = tEnd - tStart;
+    direction = Math.abs(delta) <= 8 ? "Stable" : delta > 0 ? "Improving" : "Declining";
+    icon = direction === "Improving" ? "↑" : direction === "Declining" ? "↓" : "→";
+
+    // Dashed trendline
+    ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 2; ctx.setLineDash([5, 3]);
+    const txStart = toX(xs[0]), tyStart = toY(trendAt(xs[0]));
+    const txEnd   = toX(xs[xs.length - 1]), tyEnd = toY(trendAt(xs[xs.length - 1]));
+    ctx.beginPath(); ctx.moveTo(txStart, tyStart); ctx.lineTo(txEnd, tyEnd); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Trendline endpoint labels in gray; shift below if they'd collide with dot labels
+    ctx.fillStyle = "#9ca3af"; ctx.font = "bold 11px sans-serif";
+    const startDotY = pts.find(p => p.i === xs[0]) ? toY(pts.find(p => p.i === xs[0]).v) : null;
+    const endDotY   = pts.find(p => p.i === xs[xs.length-1]) ? toY(pts.find(p => p.i === xs[xs.length-1]).v) : null;
+    const startBelow = startDotY !== null && Math.abs(tyStart - startDotY) < 18;
+    const endBelow   = endDotY   !== null && Math.abs(tyEnd   - endDotY)   < 18;
+    ctx.textAlign = "left";  ctx.fillText(tStart + "%", txStart + 3, startBelow ? tyStart + 14 : tyStart - 4);
+    ctx.textAlign = "right"; ctx.fillText(tEnd   + "%", txEnd   - 3, endBelow   ? tyEnd   + 14 : tyEnd   - 4);
+  }
+
+  // Subtitle
   ctx.fillStyle = "#6b7280"; ctx.font = "italic 12px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(`${icon} ${direction}`, W / 2, 29);
+  ctx.fillText(`${icon} ${direction}`, W / 2, 30);
 
-  // Dashed trendline
-  ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 2; ctx.setLineDash([5, 3]);
-  const txStart = toX(xs[0]), tyStart = toY(trendAt(xs[0]));
-  const txEnd   = toX(xs[xs.length - 1]), tyEnd = toY(trendAt(xs[xs.length - 1]));
-  ctx.beginPath(); ctx.moveTo(txStart, tyStart); ctx.lineTo(txEnd, tyEnd); ctx.stroke();
-  ctx.setLineDash([]);
+  // 2-point mode: draw connecting line; multi-point mode: dots only (no connecting line)
+  if (twoPointMode && pts.length === 2) {
+    ctx.strokeStyle = "#4472c4"; ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(toX(pts[0].i), toY(pts[0].v));
+    ctx.lineTo(toX(pts[1].i), toY(pts[1].v));
+    ctx.stroke();
+  }
 
-  // Trendline start/end values in trendline colour; avoid colliding with dot labels
-  ctx.fillStyle = "#9ca3af"; ctx.font = "bold 11px sans-serif";
-  const startDotY = pts.find(p => p.i === xs[0]) ? toY(pts.find(p => p.i === xs[0]).v) : null;
-  const endDotY   = pts.find(p => p.i === xs[xs.length-1]) ? toY(pts.find(p => p.i === xs[xs.length-1]).v) : null;
-  // If within 18px of a dot (whose label is drawn above), draw trendline label below instead
-  const startBelow = startDotY !== null && Math.abs(tyStart - startDotY) < 18;
-  const endBelow   = endDotY   !== null && Math.abs(tyEnd   - endDotY)   < 18;
-  ctx.textAlign = "left";  ctx.fillText(tStart + "%", txStart + 3, startBelow ? tyStart + 14 : tyStart - 4);
-  ctx.textAlign = "right"; ctx.fillText(tEnd   + "%", txEnd   - 3, endBelow   ? tyEnd   + 14 : tyEnd   - 4);
-
-  // Dots only — no connecting line
+  // Dots + labels; flip label below if near chart top to avoid subtitle collision
   pts.forEach(p => {
     const x = toX(p.i), y = toY(p.v);
     ctx.fillStyle = "#4472c4"; ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = "#1f2937"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "center";
-    ctx.fillText(p.v + "%", x, y - 7);
+    const labelY = (y - 7 < PAD.top + 4) ? y + 16 : y - 7;
+    ctx.fillText(p.v + "%", x, labelY);
   });
 
   // X-axis month labels
@@ -5085,8 +5105,8 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
       : [new Paragraph({ children: [new TextRun({ text: "—", size: 20, italics: true })], spacing: { before: 80, after: 80 } })];
     return new TableRow({ children: [
       mkCell(tDisplayName, { dxa: 1728, align: AlignmentType.CENTER }),
-      isQualitative ? mkCell("", { dxa: 1224 }) : mkTrendCell(td.trend || "stable", 1224),
-      isQualitative ? mkCell("", { dxa: 1224 }) : mkTrendCell(md.trend || "stable", 1224),
+      isQualitative ? mkCell("—", { dxa: 1224, align: AlignmentType.CENTER }) : mkTrendCell(td.trend || "stable", 1224),
+      isQualitative ? mkCell("—", { dxa: 1224, align: AlignmentType.CENTER }) : mkTrendCell(md.trend || "stable", 1224),
       mkCell(scoreText, { dxa: 864, align: AlignmentType.CENTER }),
       new TableCell({ width: { size: 3960, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: summaryKids })
     ]});
@@ -5138,6 +5158,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     mkHdrChart("This Month",    `(${oneMonthPeriodLabel})`)
   ]}));
 
+  let appendixIdx = 1;
   for (const target of activeTargets) {
     const tName = target.name;
     const td = threeMonthData[tName] || {};
@@ -5162,7 +5183,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
       margins: { top: 100, bottom: 100, left: 160, right: 160 },
       shading: { fill: "eff6ff" },
       borders: { top: tblBR, bottom: tblBR, left: tblBR, right: tblBR },
-      children: [new Paragraph({ children: [new TextRun({ text: tName, bold: true, size: 24 })], spacing: { before: 60, after: 60 } })]
+      children: [new Paragraph({ children: [new TextRun({ text: `${appendixIdx++}) ${tName}`, bold: true, size: 24 })], spacing: { before: 60, after: 60 } })]
     })]})
   );
 
