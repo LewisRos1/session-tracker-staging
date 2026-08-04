@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1394";
+const APP_VERSION = "1395";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -4960,7 +4960,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   const reportDate = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun, LevelFormat,
-          Table, TableRow, TableCell, WidthType, PageOrientation, SectionType, Header, Footer, PageNumber } = window.docx;
+          Table, TableRow, TableCell, WidthType, PageOrientation, SectionType, Header, Footer, PageNumber, VerticalAlign } = window.docx;
 
   const LS = { line: 276, lineRule: "auto" };
   const BRNONE = { style: "none", size: 0, color: "auto" };
