@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1382";
+const APP_VERSION = "1383";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -4814,9 +4814,10 @@ function monthlyDrawTargetLineChart(targetName, labels, values, year) {
   const trimLabels = labels.slice(startIdx);
   const trimValues = values.slice(startIdx);
 
+  // Canvas sized close to display pt size so fonts don't shrink when embedded in Word
   const SCALE = 2;
-  const W = 540, H = 280;
-  const PAD = { top: 72, right: 20, bottom: 36, left: 22 };
+  const W = 230, H = 200;
+  const PAD = { top: 46, right: 10, bottom: 22, left: 36 };
   const cW = W - PAD.left - PAD.right, cH = H - PAD.top - PAD.bottom;
 
   const canvas = document.createElement("canvas");
@@ -4832,13 +4833,19 @@ function monthlyDrawTargetLineChart(targetName, labels, values, year) {
   const firstLabel = allPts[0].label, lastLabel = allPts[allPts.length - 1].label;
   const rangeLabel = firstLabel === lastLabel ? firstLabel : `${firstLabel} - ${lastLabel}`;
   ctx.fillStyle = "#1f2937"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(`${(targetName || "").trim()} (${rangeLabel} ${year})`, W / 2, 20);
+  ctx.fillText(`${(targetName || "").trim()} (${rangeLabel} ${year})`, W / 2, 16);
 
   const toY = v => PAD.top + cH * (1 - v / 100);
   const toX = i => PAD.left + (allPts.length > 1 ? (i / (allPts.length - 1)) * cW : cW / 2);
 
+  // Y-axis gridlines + labels
   ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
-  for (let v = 0; v <= 100; v += 20) { const y = toY(v); ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + cW, y); ctx.stroke(); }
+  for (let v = 0; v <= 100; v += 25) {
+    const y = toY(v);
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + cW, y); ctx.stroke();
+    ctx.fillStyle = "#6b7280"; ctx.font = "11px sans-serif"; ctx.textAlign = "right";
+    ctx.fillText(v + "%", PAD.left - 4, y + 4);
+  }
 
   const xs = pts.map(p => p.i), ys = pts.map(p => p.v), np = pts.length;
   const sX = xs.reduce((a,b)=>a+b,0), sY = ys.reduce((a,b)=>a+b,0);
@@ -4851,16 +4858,11 @@ function monthlyDrawTargetLineChart(targetName, labels, values, year) {
   const direction = Math.abs(delta) <= 8 ? "Stable" : delta > 0 ? "Improving" : "Declining";
   const icon = direction === "Improving" ? "↑" : direction === "Declining" ? "↓" : "→";
 
-  ctx.strokeStyle = "#b0bec5"; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
+  ctx.fillStyle = "#6b7280"; ctx.font = "italic 13px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText(`${icon} ${direction}`, W / 2, 31);
+
+  ctx.strokeStyle = "#b0bec5"; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
   ctx.beginPath(); ctx.moveTo(toX(xs[0]), toY(trendAt(xs[0]))); ctx.lineTo(toX(xs[xs.length-1]), toY(trendAt(xs[xs.length-1]))); ctx.stroke(); ctx.setLineDash([]);
-
-  const safeTrendY = (tY, dY, tV, dV) => Math.abs(tV - dV) <= 10 ? Math.max(dY, tY) + 18 : tY + 12;
-  ctx.fillStyle = "#6b7280"; ctx.font = "12px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(tStart + "%", toX(xs[0]), safeTrendY(toY(trendAt(xs[0])), toY(pts[0].v), tStart, pts[0].v));
-  ctx.fillText(tEnd + "%", toX(xs[xs.length-1]), safeTrendY(toY(trendAt(xs[xs.length-1])), toY(pts[pts.length-1].v), tEnd, pts[pts.length-1].v));
-
-  ctx.fillStyle = "#6b7280"; ctx.font = "italic 14px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(`${icon} ${direction}`, W / 2, 36);
 
   ctx.strokeStyle = "#4472c4"; ctx.lineWidth = 2.5; ctx.beginPath();
   let started = false;
@@ -4871,34 +4873,38 @@ function monthlyDrawTargetLineChart(targetName, labels, values, year) {
     const x = toX(p.i), y = toY(p.v);
     ctx.fillStyle = "#4472c4"; ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = "#1f2937"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "center";
-    ctx.fillText(p.v + "%", x, y - 8);
+    ctx.fillText(p.v + "%", x, y - 7);
   });
 
   ctx.fillStyle = "#374151"; ctx.font = "13px sans-serif"; ctx.textAlign = "center";
-  allPts.forEach(p => ctx.fillText(p.label, toX(p.i), PAD.top + cH + 14));
+  allPts.forEach(p => ctx.fillText(p.label, toX(p.i), PAD.top + cH + 15));
 
-  ctx.strokeStyle = "#000000"; ctx.lineWidth = 1; ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
+  ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1; ctx.strokeRect(PAD.left, PAD.top, cW, cH);
   return canvas.toDataURL("image/png").split(",")[1];
 }
 
 function monthlyDrawMiniVerticalBar(lastLabel, lastAvg, thisLabel, thisAvg) {
   const C_LAST = "#7dd3fc", C_THIS = "#a78bfa";
-  const W = 400, H = 320;
-  const PAD_TOP = 40, PAD_BTM = 70, PAD_L = 56, PAD_R = 20;
+  // Canvas sized close to display pt size; SCALE=2 for sharp rendering
+  const SCALE = 2;
+  const W = 200, H = 240;
+  const PAD_TOP = 36, PAD_BTM = 52, PAD_L = 44, PAD_R = 8;
   const CHART_W = W - PAD_L - PAD_R, CHART_H = H - PAD_TOP - PAD_BTM;
-  const BAR_W = 80, GAP = (CHART_W - 2 * BAR_W) / 3;
+  const BAR_W = 42;
+  const GAP = (CHART_W - 2 * BAR_W) / 3;
 
   const canvas = document.createElement("canvas");
-  canvas.width = W; canvas.height = H;
+  canvas.width = W * SCALE; canvas.height = H * SCALE;
   const ctx = canvas.getContext("2d");
+  ctx.scale(SCALE, SCALE);
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
 
   [0, 25, 50, 75, 100].forEach(v => {
     const gy = PAD_TOP + CHART_H - (v / 100) * CHART_H;
     ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(PAD_L, gy); ctx.lineTo(PAD_L + CHART_W, gy); ctx.stroke();
-    ctx.fillStyle = "#6b7280"; ctx.font = "11px sans-serif"; ctx.textAlign = "right";
-    ctx.fillText(`${v}%`, PAD_L - 6, gy + 4);
+    ctx.fillStyle = "#6b7280"; ctx.font = "12px sans-serif"; ctx.textAlign = "right";
+    ctx.fillText(`${v}%`, PAD_L - 4, gy + 4);
   });
 
   [{ label: lastLabel, avg: lastAvg, color: C_LAST }, { label: thisLabel, avg: thisAvg, color: C_THIS }].forEach((bar, i) => {
@@ -4907,26 +4913,26 @@ function monthlyDrawMiniVerticalBar(lastLabel, lastAvg, thisLabel, thisAvg) {
       const bH = Math.max(2, (bar.avg / 100) * CHART_H);
       const by = PAD_TOP + CHART_H - bH;
       ctx.fillStyle = bar.color; ctx.fillRect(bx, by, BAR_W, bH);
-      ctx.fillStyle = "#111827"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "center";
-      ctx.fillText(`${bar.avg}%`, bx + BAR_W / 2, by - 7);
+      ctx.fillStyle = "#111827"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText(`${bar.avg}%`, bx + BAR_W / 2, by - 6);
     } else {
-      ctx.fillStyle = "#9ca3af"; ctx.font = "italic 11px sans-serif"; ctx.textAlign = "center";
+      ctx.fillStyle = "#9ca3af"; ctx.font = "italic 12px sans-serif"; ctx.textAlign = "center";
       ctx.fillText("no data", bx + BAR_W / 2, PAD_TOP + CHART_H - 10);
     }
-    ctx.fillStyle = "#111827"; ctx.font = "13px sans-serif"; ctx.textAlign = "center";
-    ctx.fillText(bar.label || "", bx + BAR_W / 2, PAD_TOP + CHART_H + 20);
+    ctx.fillStyle = "#111827"; ctx.font = "14px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(bar.label || "", bx + BAR_W / 2, PAD_TOP + CHART_H + 18);
   });
 
-  ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 2;
+  ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.moveTo(PAD_L, PAD_TOP); ctx.lineTo(PAD_L, PAD_TOP + CHART_H); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(PAD_L, PAD_TOP + CHART_H); ctx.lineTo(PAD_L + CHART_W, PAD_TOP + CHART_H); ctx.stroke();
 
-  const LEG_Y = H - 30;
+  const LEG_Y = H - 26;
   [[C_LAST, "Last Month"], [C_THIS, "This Month"]].forEach(([color, label], i) => {
-    const lx = PAD_L + i * 160;
-    ctx.fillStyle = color; ctx.fillRect(lx, LEG_Y, 12, 12);
+    const lx = PAD_L + i * 90;
+    ctx.fillStyle = color; ctx.fillRect(lx, LEG_Y, 11, 11);
     ctx.fillStyle = "#374151"; ctx.font = "12px sans-serif"; ctx.textAlign = "left";
-    ctx.fillText(label, lx + 16, LEG_Y + 10);
+    ctx.fillText(label, lx + 14, LEG_Y + 9);
   });
 
   return { base64: canvas.toDataURL("image/png").split(",")[1], height: H, width: W };
@@ -5092,11 +5098,11 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     const noDataCell = txt => new TableCell({ borders: { top: BRNONE, bottom: BRNONE, left: BRNONE, right: BRNONE }, width: { size: 4680, type: WidthType.DXA }, children: [new Paragraph({ children: [new TextRun({ text: txt, italics: true, size: 20, color: "9ca3af" })] })] });
 
     const leftCell = lineB64
-      ? new TableCell({ borders: { top: BRNONE, bottom: BRNONE, left: BRNONE, right: BRNONE }, width: { size: 4680, type: WidthType.DXA }, margins: { top: 0, bottom: 0, left: 0, right: 80 }, children: [new Paragraph({ children: [new ImageRun({ data: b64ToUint8(lineB64), transformation: { width: 220, height: Math.round(220 * 280 / 540) }, type: "png" })], alignment: AlignmentType.CENTER })] })
+      ? new TableCell({ borders: { top: BRNONE, bottom: BRNONE, left: BRNONE, right: BRNONE }, width: { size: 4680, type: WidthType.DXA }, margins: { top: 0, bottom: 0, left: 0, right: 60 }, children: [new Paragraph({ children: [new ImageRun({ data: b64ToUint8(lineB64), transformation: { width: 226, height: Math.round(226 * 200 / 230) }, type: "png" })], alignment: AlignmentType.CENTER })] })
       : noDataCell("No data for past 3 months");
 
     const rightCell = miniResult
-      ? new TableCell({ borders: { top: BRNONE, bottom: BRNONE, left: BRNONE, right: BRNONE }, width: { size: 4680, type: WidthType.DXA }, margins: { top: 0, bottom: 0, left: 80, right: 0 }, children: [new Paragraph({ children: [new ImageRun({ data: b64ToUint8(miniResult.base64), transformation: { width: 210, height: Math.round(210 * miniResult.height / miniResult.width) }, type: "png" })], alignment: AlignmentType.CENTER })] })
+      ? new TableCell({ borders: { top: BRNONE, bottom: BRNONE, left: BRNONE, right: BRNONE }, width: { size: 4680, type: WidthType.DXA }, margins: { top: 0, bottom: 0, left: 60, right: 0 }, children: [new Paragraph({ children: [new ImageRun({ data: b64ToUint8(miniResult.base64), transformation: { width: 196, height: Math.round(196 * miniResult.height / miniResult.width) }, type: "png" })], alignment: AlignmentType.CENTER })] })
       : noDataCell("No data this month");
 
     appendixParas.push(new Table({
