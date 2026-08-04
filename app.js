@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1387";
+const APP_VERSION = "1388";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -622,13 +622,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupStickyNote();
   $("btn-ai-report-back").addEventListener("click", showHome);
 
-  // If auth never resolves (e.g. Firebase CDN unreachable on iOS after cache clear),
-  // show a reload button after 10 s so the user isn't trapped on the loading screen.
+  // If auth never resolves (e.g. Firebase IndexedDB hang after clearing site data),
+  // fall back to PIN screen after 8 s so the user isn't trapped on the loading screen.
+  // authResolved is set true as soon as onAuthChange's callback runs even once.
+  let authResolved = false;
   setTimeout(() => {
-    if (document.getElementById("screen-loading")?.classList.contains("active")) {
-      document.getElementById("btn-loading-reload")?.classList.remove("hidden");
+    if (!authResolved && document.getElementById("screen-loading")?.classList.contains("active")) {
+      initPin();
     }
-  }, 10000);
+  }, 8000);
 
   // On iOS, relatedTarget is always null and pointerdown may not fire for <select>.
   // Use both pointerdown and touchstart (touchstart fires reliably before focusout on iOS).
@@ -714,6 +716,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // signed back out here, which makes onAuthChange fire again with
   // user = null and fall into the PIN branch below.
   onAuthChange(async user => {
+    authResolved = true;
     if (user && !hasLoggedInToday()) {
       await signOutUser();
       return;
