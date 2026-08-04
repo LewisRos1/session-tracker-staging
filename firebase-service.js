@@ -26,8 +26,6 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import {
   getAuth,
-  setPersistence,
-  browserLocalPersistence,
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged
@@ -48,12 +46,10 @@ const db = initializeFirestore(app, {
 // anyone could read). Firebase requires passwords to be 6+ characters, so
 // the PIN gets a fixed prefix glued on before being sent — staff never see
 // or type that prefix, they still just enter the PIN on the keypad.
+// browserLocalPersistence is the default for web — no setPersistence call needed.
+// Calling setPersistence after getAuth() can trigger an internal sign-out round-trip
+// to Firebase servers which hangs when local tokens are missing (e.g. after clearing site data).
 const auth = getAuth(app);
-// Sign-in persists across reloads (browserLocalPersistence) — staff only
-// need the PIN once per calendar day, not on every single app open. app.js
-// tracks the last login date itself and forces a sign-out (signOutUser)
-// once that date is no longer today.
-setPersistence(auth, browserLocalPersistence);
 const AUTH_EMAIL    = "staff@session-tracker.app";
 const PIN_PASSWORD_PREFIX = "str-pin-";
 
