@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1391";
+const APP_VERSION = "1392";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -2230,7 +2230,7 @@ function renderHalfYearReportsSection() {
         <span style="${labelStyle}">Student</span>
         <select id="hyr-student-select" class="admin-input" style="flex:1;min-width:0;background:#fff;font-family:inherit;font-size:1rem">
           <option value="">— Select —</option>
-          ${students.map(s => `<option value="${escHtml(s.id)}">${escHtml(s.name) + (s.note ? ' (' + escHtml(s.note) + ')' : '')}</option>`).join("")}
+          ${students.map(s => `<option value="${escHtml(s.id)}">${escHtml(s.name) + (s.note ? ' ' + escHtml(s.note) : '')}</option>`).join("")}
         </select>
         <span id="hyr-period-loading" style="font-size:.85rem;color:var(--text-muted);white-space:nowrap;display:none">Checking…</span>
       </div>
@@ -2507,7 +2507,7 @@ async function hyrGenerate() {
 
     const aiPrompt = `${HYR_DEFAULT_PROMPT}
 ${excludedList ? `\nEXCLUDED ACTIVITIES — ABSOLUTE RULE: The following activities have been deliberately excluded from this report by the author. They are NOT present in the session data below. Do NOT mention, reference, discuss, or draw any conclusions about them anywhere in the report — not in the executive summary, not in key insights, not in any target or observation section. Treat them as if they do not exist:\n${excludedList}\n` : ""}
-Student: ${student.name}${student.note ? ` (${student.note})` : ""}
+Student: ${student.name}${student.note ? ` ${student.note}` : ""}
 ${student.note ? `Student Program Note: ${student.note}\n` : ""}Reporting Period: ${aiReportingPeriod}
 
 SESSION DATA:
@@ -4472,7 +4472,7 @@ async function monthlyGenerate() {
 
     const aiPrompt = `${HYR_DEFAULT_PROMPT}
 ${excludedList ? `\nEXCLUDED ACTIVITIES — ABSOLUTE RULE: The following activities have been deliberately excluded from this report. Do NOT mention, reference, or draw conclusions about them anywhere:\n${excludedList}\n` : ""}
-Student: ${student.name}${student.note ? ` (${student.note})` : ""}
+Student: ${student.name}${student.note ? ` ${student.note}` : ""}
 ${student.note ? `Student Program Note: ${student.note}\n` : ""}Reporting Month: ${monthName} ${year}
 Number of sessions this month: ${sessionCount}
 
