@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1393";
+const APP_VERSION = "1394";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -4821,10 +4821,10 @@ function monthlyDrawTargetLineChart(targetName, labels, values, year) {
   const trimLabels = labels.slice(startIdx);
   const trimValues = values.slice(startIdx);
 
-  // Canvas sized close to display pt size so fonts don't shrink when embedded in Word
   const SCALE = 2;
   const W = 230, H = 200;
-  const PAD = { top: 46, right: 10, bottom: 22, left: 36 };
+  // No y-axis labels → smaller left pad
+  const PAD = { top: 40, right: 14, bottom: 22, left: 10 };
   const cW = W - PAD.left - PAD.right, cH = H - PAD.top - PAD.bottom;
 
   const canvas = document.createElement("canvas");
@@ -4839,23 +4839,22 @@ function monthlyDrawTargetLineChart(targetName, labels, values, year) {
 
   const firstLabel = allPts[0].label, lastLabel = allPts[allPts.length - 1].label;
   const rangeLabel = firstLabel === lastLabel ? firstLabel : `${firstLabel} - ${lastLabel}`;
+
+  // Title: just the date range (target name already shown in the table heading above)
   ctx.fillStyle = "#1f2937"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(`${(targetName || "").trim()} (${rangeLabel} ${year})`, W / 2, 16);
+  ctx.fillText(`${rangeLabel} ${year}`, W / 2, 15);
 
   const toY = v => PAD.top + cH * (1 - v / 100);
   const toX = i => PAD.left + (allPts.length > 1 ? (i / (allPts.length - 1)) * cW : cW / 2);
 
-  // Y-axis gridlines + labels (skip 100% label to avoid collision with top data point labels)
+  // Y-axis gridlines only (no labels — values shown on each dot)
   ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
   for (let v = 0; v <= 100; v += 25) {
     const y = toY(v);
     ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + cW, y); ctx.stroke();
-    if (v < 100) {
-      ctx.fillStyle = "#6b7280"; ctx.font = "11px sans-serif"; ctx.textAlign = "right";
-      ctx.fillText(v + "%", PAD.left - 4, y + 4);
-    }
   }
 
+  // Linear regression trendline
   const xs = pts.map(p => p.i), ys = pts.map(p => p.v), np = pts.length;
   const sX = xs.reduce((a,b)=>a+b,0), sY = ys.reduce((a,b)=>a+b,0);
   const sXY = xs.reduce((a,x,i)=>a+x*ys[i],0), sX2 = xs.reduce((a,x)=>a+x*x,0);
@@ -4867,17 +4866,23 @@ function monthlyDrawTargetLineChart(targetName, labels, values, year) {
   const direction = Math.abs(delta) <= 8 ? "Stable" : delta > 0 ? "Improving" : "Declining";
   const icon = direction === "Improving" ? "↑" : direction === "Declining" ? "↓" : "→";
 
+  // Subtitle: direction only, no "(x%→x%)"
   ctx.fillStyle = "#6b7280"; ctx.font = "italic 12px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(`${icon} ${direction}  (${tStart}%→${tEnd}%)`, W / 2, 31);
+  ctx.fillText(`${icon} ${direction}`, W / 2, 29);
 
+  // Dashed trendline
   ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 2; ctx.setLineDash([5, 3]);
-  ctx.beginPath(); ctx.moveTo(toX(xs[0]), toY(trendAt(xs[0]))); ctx.lineTo(toX(xs[xs.length-1]), toY(trendAt(xs[xs.length-1]))); ctx.stroke(); ctx.setLineDash([]);
+  const txStart = toX(xs[0]), tyStart = toY(trendAt(xs[0]));
+  const txEnd   = toX(xs[xs.length - 1]), tyEnd = toY(trendAt(xs[xs.length - 1]));
+  ctx.beginPath(); ctx.moveTo(txStart, tyStart); ctx.lineTo(txEnd, tyEnd); ctx.stroke();
+  ctx.setLineDash([]);
 
-  ctx.strokeStyle = "#4472c4"; ctx.lineWidth = 2.5; ctx.beginPath();
-  let started = false;
-  allPts.forEach(p => { if (p.v === null) { started = false; return; } const x = toX(p.i), y = toY(p.v); if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y); });
-  ctx.stroke();
+  // Trendline start/end values in trendline colour
+  ctx.fillStyle = "#9ca3af"; ctx.font = "bold 11px sans-serif";
+  ctx.textAlign = "left";  ctx.fillText(tStart + "%", txStart + 3, tyStart - 4);
+  ctx.textAlign = "right"; ctx.fillText(tEnd   + "%", txEnd   - 3, tyEnd   - 4);
 
+  // Dots only — no connecting line
   pts.forEach(p => {
     const x = toX(p.i), y = toY(p.v);
     ctx.fillStyle = "#4472c4"; ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI*2); ctx.fill();
@@ -4885,6 +4890,7 @@ function monthlyDrawTargetLineChart(targetName, labels, values, year) {
     ctx.fillText(p.v + "%", x, y - 7);
   });
 
+  // X-axis month labels
   ctx.fillStyle = "#374151"; ctx.font = "13px sans-serif"; ctx.textAlign = "center";
   allPts.forEach(p => ctx.fillText(p.label, toX(p.i), PAD.top + cH + 15));
 
@@ -5127,6 +5133,12 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     const tName = target.name;
     const td = threeMonthData[tName] || {};
     const md = miniData[tName] || {};
+
+    // Skip qualitative targets — no numeric data in any period
+    const hasLineData = (td.avgs || []).some(v => v !== null && v !== undefined);
+    const hasMiniData = md.thisMonthAvg != null || md.lastMonthAvg != null;
+    if (!hasLineData && !hasMiniData) continue;
+
     const lineB64 = monthlyDrawTargetLineChart(tName, td.labels || [], td.avgs || [], year);
     const miniResult = monthlyDrawMiniVerticalBar(md.lastMonthLabel, md.lastMonthAvg, md.thisMonthLabel, md.thisMonthAvg);
 
