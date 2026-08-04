@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1386";
+const APP_VERSION = "1387";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -2223,7 +2223,7 @@ function renderHalfYearReportsSection() {
         <span style="${labelStyle}">Student</span>
         <select id="hyr-student-select" class="admin-input" style="flex:1;min-width:0;background:#fff;font-family:inherit;font-size:1rem">
           <option value="">— Select —</option>
-          ${students.map(s => `<option value="${escHtml(s.id)}">${escHtml(s.name)}${s.note ? ` (${escHtml(s.note)})` : ""}</option>`).join("")}
+          ${students.map(s => `<option value="${escHtml(s.id)}">${escHtml(s.name) + (s.note ? ' (' + escHtml(s.note) + ')' : '')}</option>`).join("")}
         </select>
         <span id="hyr-period-loading" style="font-size:.85rem;color:var(--text-muted);white-space:nowrap;display:none">Checking…</span>
       </div>
