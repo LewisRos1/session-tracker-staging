@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1381";
+const APP_VERSION = "1382";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -4482,11 +4482,11 @@ Past 3 months (${(td.labels||[]).join(", ")}): ${trendLabel(td.trend)}
 This month (${md.lastMonthLabel}→${md.thisMonthLabel}): ${trendLabel(md.trend)}
 Session data:
 ${(aiData[t.name] || []).join("\n")}
-Write exactly 3 short bullet points (starting with •) of 5-8 words each. No full sentences. Parent-friendly phrases only. No percentages or jargon.
+Write EXACTLY ONE short honest sentence (max 15 words) that directly tells the parent whether this target is improving or not. Must match the trend data above. Warm but never falsely positive. No numbers, no jargon.
 ===END===
 ${isFocus ? `
 ===FOCUS: ${t.name}===
-Write EXACTLY ONE plain-English sentence describing the single biggest concern for a parent. Be specific (e.g. "Still struggles to wait before responding" not "needs work on turn-taking"). No jargon, no percentages.
+Write EXACTLY ONE sentence about the single biggest struggle. Use the simplest everyday words — as if explaining to a parent on the phone with no therapy background. Short words, short sentence. Honest but kind. No jargon.
 ===END===` : ""}`;
 }).join("\n\n")}`;
 
@@ -5026,10 +5026,10 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   paragraphs.push(mkPara(`Here is a snapshot of ${firstName}'s progress in ${monthName} ${year}.`, { after: 200 }));
 
   const summaryHdrRow = new TableRow({ tableHeader: true, children: [
-    mkHdrCell("Target",         "",                          1800),
-    mkHdrCell("Past 3 Months",  `(${threeMonthPeriodLabel})`, 1440),
-    mkHdrCell("This Month",     `(${oneMonthPeriodLabel})`,   1440),
-    mkHdrCell("Summary",        "",                          4320),
+    mkHdrCell("Target",         "",                          1728),
+    mkHdrCell("Past 3 Months",  `(${threeMonthPeriodLabel})`, 1512),
+    mkHdrCell("This Month",     `(${oneMonthPeriodLabel})`,   1512),
+    mkHdrCell("Summary",        "",                          4248),
   ]});
 
   const summaryDataRows = activeTargets.map(target => {
@@ -5037,15 +5037,15 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     const td = threeMonthData[tName] || {};
     const md = miniData[tName] || {};
     const raw = parsed.summaries?.[tName];
-    const bullets = Array.isArray(raw) ? raw : raw ? [raw] : [];
-    const summaryKids = bullets.length
-      ? bullets.map((b, bi) => new Paragraph({ children: [new TextRun({ text: `• ${b}`, size: 20 })], spacing: { before: bi === 0 ? 40 : 60, after: 40 } }))
+    const sentence = Array.isArray(raw) ? (raw[0] || "") : (raw || "");
+    const summaryKids = sentence
+      ? [new Paragraph({ children: [new TextRun({ text: sentence, size: 20 })], spacing: { before: 80, after: 80 } })]
       : [new Paragraph({ children: [new TextRun({ text: "—", size: 20, italics: true })], spacing: { before: 80, after: 80 } })];
     return new TableRow({ children: [
-      mkCell(tName, { dxa: 1800, align: AlignmentType.CENTER }),
-      mkTrendCell(td.trend || "stable", 1440),
-      mkTrendCell(md.trend || "stable", 1440),
-      new TableCell({ width: { size: 4320, type: WidthType.DXA }, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: summaryKids })
+      mkCell(tName, { dxa: 1728, align: AlignmentType.CENTER }),
+      mkTrendCell(td.trend || "stable", 1512),
+      mkTrendCell(md.trend || "stable", 1512),
+      new TableCell({ width: { size: 4248, type: WidthType.DXA }, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: summaryKids })
     ]});
   });
   paragraphs.push(new Table({ width: { size: 9000, type: WidthType.DXA }, rows: [summaryHdrRow, ...summaryDataRows] }));
