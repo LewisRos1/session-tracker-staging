@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1390";
+const APP_VERSION = "1391";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -5125,7 +5125,8 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
       shading: { fill: "eff6ff" },
       borders: { top: tblBR, bottom: tblBR, left: tblBR, right: tblBR },
       children: [new Paragraph({ children: [new TextRun({ text: tName, bold: true, size: 24 })], spacing: { before: 60, after: 60 } })]
-    })]});
+    })]})
+  );
 
     // Chart row
     const noDataPara = txt => [new Paragraph({ children: [new TextRun({ text: txt, italics: true, size: 20, color: "9ca3af" })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })];
