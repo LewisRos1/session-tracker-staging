@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1395";
+const APP_VERSION = "1396";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -4586,7 +4586,7 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
 
   // Period labels for column headers
   let pm3 = month - 3; if (pm3 <= 0) pm3 += 12;
-  const threeMonthPeriodLabel = `${ABBRS[pm3-1]}-${ABBRS[lastMonth-1]}`;
+  const threeMonthPeriodLabel = `${ABBRS[pm3-1]}→${ABBRS[lastMonth-1]}`;
   const oneMonthPeriodLabel = `${lastMonthLabel}→${thisMonthLabel}`;
 
   const miniData = {}, threeMonthData = {}, aiData = {};
@@ -4823,8 +4823,8 @@ function monthlyDrawTargetLineChart(targetName, labels, values, year) {
 
   const SCALE = 2;
   const W = 230, H = 200;
-  // No y-axis labels → smaller left pad
-  const PAD = { top: 40, right: 14, bottom: 22, left: 10 };
+  // PAD.left=24 so centred dot labels near x=0 don't clip off the left edge
+  const PAD = { top: 40, right: 20, bottom: 22, left: 24 };
   const cW = W - PAD.left - PAD.right, cH = H - PAD.top - PAD.bottom;
 
   const canvas = document.createElement("canvas");
@@ -4877,10 +4877,15 @@ function monthlyDrawTargetLineChart(targetName, labels, values, year) {
   ctx.beginPath(); ctx.moveTo(txStart, tyStart); ctx.lineTo(txEnd, tyEnd); ctx.stroke();
   ctx.setLineDash([]);
 
-  // Trendline start/end values in trendline colour
+  // Trendline start/end values in trendline colour; avoid colliding with dot labels
   ctx.fillStyle = "#9ca3af"; ctx.font = "bold 11px sans-serif";
-  ctx.textAlign = "left";  ctx.fillText(tStart + "%", txStart + 3, tyStart - 4);
-  ctx.textAlign = "right"; ctx.fillText(tEnd   + "%", txEnd   - 3, tyEnd   - 4);
+  const startDotY = pts.find(p => p.i === xs[0]) ? toY(pts.find(p => p.i === xs[0]).v) : null;
+  const endDotY   = pts.find(p => p.i === xs[xs.length-1]) ? toY(pts.find(p => p.i === xs[xs.length-1]).v) : null;
+  // If within 18px of a dot (whose label is drawn above), draw trendline label below instead
+  const startBelow = startDotY !== null && Math.abs(tyStart - startDotY) < 18;
+  const endBelow   = endDotY   !== null && Math.abs(tyEnd   - endDotY)   < 18;
+  ctx.textAlign = "left";  ctx.fillText(tStart + "%", txStart + 3, startBelow ? tyStart + 14 : tyStart - 4);
+  ctx.textAlign = "right"; ctx.fillText(tEnd   + "%", txEnd   - 3, endBelow   ? tyEnd   + 14 : tyEnd   - 4);
 
   // Dots only — no connecting line
   pts.forEach(p => {
@@ -5068,16 +5073,20 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     const tName = target.name;
     const td = threeMonthData[tName] || {};
     const md = miniData[tName] || {};
+    const hasLineData = (td.avgs || []).some(v => v !== null && v !== undefined);
+    const hasMiniData = md.thisMonthAvg != null || md.lastMonthAvg != null;
+    const isQualitative = !hasLineData && !hasMiniData;
     const raw = parsed.summaries?.[tName];
     const sentence = Array.isArray(raw) ? (raw[0] || "") : (raw || "");
-    const scoreText = md.thisMonthAvg != null ? `${Math.round(md.thisMonthAvg)}%` : "—";
+    const scoreText = (!isQualitative && md.thisMonthAvg != null) ? `${Math.round(md.thisMonthAvg)}%` : "—";
+    const tDisplayName = isQualitative ? `${tName} (Qualitative)` : tName;
     const summaryKids = sentence
-      ? [new Paragraph({ children: [new TextRun({ text: sentence, size: 20 })], spacing: { before: 80, after: 80 } })]
+      ? [new Paragraph({ children: [new TextRun({ text: sentence, size: 20 })], alignment: AlignmentType.BOTH, spacing: { before: 80, after: 80 } })]
       : [new Paragraph({ children: [new TextRun({ text: "—", size: 20, italics: true })], spacing: { before: 80, after: 80 } })];
     return new TableRow({ children: [
-      mkCell(tName, { dxa: 1728, align: AlignmentType.CENTER }),
-      mkTrendCell(td.trend || "stable", 1224),
-      mkTrendCell(md.trend || "stable", 1224),
+      mkCell(tDisplayName, { dxa: 1728, align: AlignmentType.CENTER }),
+      isQualitative ? mkCell("", { dxa: 1224 }) : mkTrendCell(td.trend || "stable", 1224),
+      isQualitative ? mkCell("", { dxa: 1224 }) : mkTrendCell(md.trend || "stable", 1224),
       mkCell(scoreText, { dxa: 864, align: AlignmentType.CENTER }),
       new TableCell({ width: { size: 3960, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: summaryKids })
     ]});
@@ -5097,10 +5106,10 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     ]});
     const focusDataRows = focusTargets.map((target, idx) => {
       const sentence = (parsed.focusAreas?.[target.name] || [])[0] || "";
-      const cellKids = [new Paragraph({ children: [new TextRun({ text: sentence, size: 22 })], spacing: { before: 80, after: 80 } })];
+      const cellKids = [new Paragraph({ children: [new TextRun({ text: sentence, size: 22 })], alignment: AlignmentType.BOTH, spacing: { before: 80, after: 80 } })];
       return new TableRow({ children: [
         mkCell(String(idx + 1), { align: AlignmentType.CENTER, dxa: 450 }),
-        mkCell(target.name, { dxa: 1620 }),
+        mkCell(target.name, { dxa: 1620, align: AlignmentType.CENTER }),
         new TableCell({ width: { size: 3465, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: cellKids }),
         mkCell("", { dxa: 3465 })
       ]});
@@ -5125,8 +5134,8 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
 
   const appendixRows = [];
   appendixRows.push(new TableRow({ tableHeader: true, children: [
-    mkHdrChart("Past 3 Months", "(month to month trend)"),
-    mkHdrChart("This Month", "(vs last month)")
+    mkHdrChart("Past 3 Months", `(${threeMonthPeriodLabel})`),
+    mkHdrChart("This Month",    `(${oneMonthPeriodLabel})`)
   ]}));
 
   for (const target of activeTargets) {
@@ -5140,7 +5149,11 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     if (!hasLineData && !hasMiniData) continue;
 
     const lineB64 = monthlyDrawTargetLineChart(tName, td.labels || [], td.avgs || [], year);
-    const miniResult = monthlyDrawMiniVerticalBar(md.lastMonthLabel, md.lastMonthAvg, md.thisMonthLabel, md.thisMonthAvg);
+    // "This Month" as a 2-point line chart (same style as 3-month chart)
+    const miniB64  = monthlyDrawTargetLineChart(tName,
+      [md.lastMonthLabel, md.thisMonthLabel],
+      [md.lastMonthAvg ?? null, md.thisMonthAvg ?? null],
+      year);
 
     // Target name row — spans both columns
     appendixRows.push(new TableRow({ children: [new TableCell({
@@ -5168,8 +5181,8 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
         width: { size: 4680, type: WidthType.DXA },
         margins: { top: 80, bottom: 80, left: 60, right: 60 },
         borders: { top: tblBR, bottom: tblBR, left: tblBR, right: tblBR },
-        children: miniResult
-          ? [new Paragraph({ children: [new ImageRun({ data: b64ToUint8(miniResult.base64), transformation: { width: 196, height: Math.round(196 * miniResult.height / miniResult.width) }, type: "png" })], alignment: AlignmentType.CENTER, spacing: { before: 40, after: 40 } })]
+        children: miniB64
+          ? [new Paragraph({ children: [new ImageRun({ data: b64ToUint8(miniB64), transformation: { width: 220, height: Math.round(220 * 200 / 230) }, type: "png" })], alignment: AlignmentType.CENTER, spacing: { before: 40, after: 40 } })]
           : noDataPara("No data this month")
       })
     ]}));
