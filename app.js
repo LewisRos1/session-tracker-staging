@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1428";
+const APP_VERSION = "1429";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -9796,6 +9796,9 @@ function getWorkflowState(data) {
   const p3Done  = id => !!p3Check(id);
   const allP3Done = p3Ids.length === 0 || p3Ids.every(p3Done);
 
+  // No-corrections decision — Daisy declares Phase 3 not needed
+  const noCorrectionsDecision = checks["no_corrections"] || null;
+
   const comments  = Object.entries(data?.reviewComments || {})
     .sort(([,a],[,b]) => (a.order || 0) - (b.order || 0));
   const allFixed   = comments.length > 0 && comments.every(([,c]) => !!c.fixedByName);
@@ -9803,9 +9806,6 @@ function getWorkflowState(data) {
   const p3Bypassed = !!noCorrectionsDecision;
   const effectiveAllP3Done = allP3Done || p3Bypassed;
   const ready = allP1Done && reviewSubmitted && effectiveAllP3Done && (noComments || allFixed);
-
-  // No-corrections decision — Daisy declares Phase 3 not needed
-  const noCorrectionsDecision = checks["no_corrections"] || null;
 
   // Phase 4 — Nigel exports to Word
   const p4Check = checks["p4_nigel"] || null;
