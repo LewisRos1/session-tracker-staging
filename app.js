@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1415";
+const APP_VERSION = "1416";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -9898,18 +9898,21 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
 
   // ── Phase 4: Export (Nigel) ───────────────────────────────────
   let nigelState, nigelBody;
-  if (confirmRole === "p4_nigel" && ws.ready) {
+  if (ws.p1Ids.length === 0) {
+    nigelState = "nigel";
+    nigelBody  = `<div class="wf-pill wf-pill--pending">⚠ No instructors in Phase 1</div>`;
+  } else if (confirmRole === "p4_nigel" && ws.ready) {
     nigelState = "nigel-ready";
     nigelBody  = mkConfirm("p4_nigel", ws.p4Done ? "Undo export mark?" : "Mark as exported?");
-  } else if (!ws.ready) {
-    nigelState = "nigel";
-    nigelBody  = `<div class="wf-pill wf-pill--pending">○ Waiting…</div>`;
   } else if (ws.p4Done) {
     nigelState = "nigel-ready";
     nigelBody  = `<button class="wf-pill wf-pill--done" data-role="p4_nigel">✓ Nigel · ${escHtml(fmtCheckTimestamp(ws.p4Check?.at))}</button>`;
-  } else {
+  } else if (ws.ready) {
     nigelState = "nigel-ready";
     nigelBody  = `<button class="wf-pill wf-pill--attention" data-role="p4_nigel">○ Nigel: Export to Word</button>`;
+  } else {
+    nigelState = "nigel";
+    nigelBody  = `<div class="wf-pill wf-pill--pending">○ Nigel (waiting…)</div>`;
   }
   const nigelNode  = `<div class="wf-node wf-node--${nigelState}">
     <div class="wf-node-label">Phase 4: Export</div>
