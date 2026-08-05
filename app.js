@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1416";
+const APP_VERSION = "1417";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -10117,7 +10117,7 @@ function renderStickyNoteContent(data, isGroup) {
   const liveText      = focusedCmtId ? activeEl.value : null;
 
   if (ws.comments.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="3" class="snote-empty">No corrections — click + Add Row to start.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" class="snote-empty">No corrections — click + Add Row to start.</td></tr>`;
   } else {
     tbody.innerHTML = ws.comments.map(([id, c], i) => {
       const text = (focusedCmtId === id && liveText !== null) ? liveText : (c.text || "");
@@ -10254,6 +10254,7 @@ function setupStickyNote() {
     if (delBtn) {
       const { sid } = getCtx();
       if (!sid) return;
+      if (!confirm("Delete this row? This cannot be undone.")) return;
       const cmtId = delBtn.dataset.cmtId;
       try { await deleteReviewComment(sid, cmtId); }
       catch (err) { console.error("deleteReviewComment:", err); }

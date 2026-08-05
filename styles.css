@@ -3038,6 +3038,7 @@ button.wf-pill:hover { filter: brightness(.93); }
 .snote-table thead th:last-child { border-right: none; }
 .snote-th-no   { width: 2rem; text-align: center; }
 .snote-th-tick { width: 2.2rem; text-align: center; }
+.snote-th-del  { width: 1.8rem; }
 .snote-th-text { text-align: center; }
 
 .snote-row td {
@@ -3138,6 +3139,18 @@ button.wf-pill:hover { filter: brightness(.93); }
   cursor: pointer;
 }
 .snote-phase-confirm-no:hover { background: #f3f4f6; }
+
+.snote-del { width: 1.8rem; text-align: center; padding: .1rem .2rem; }
+.snote-del-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: .9rem;
+  padding: .1rem .25rem;
+  border-radius: 4px;
+  opacity: .6;
+}
+.snote-del-btn:hover { opacity: 1; background: #fde68a; }
 
 .snote-delete {
   background: none;
