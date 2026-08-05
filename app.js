@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1443";
+const APP_VERSION = "1444";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -1330,12 +1330,6 @@ function renderTodoTiles(results) {
     return;
   }
 
-  const allDone = results.every(r => r.pending.length === 0);
-  if (allDone) {
-    body.innerHTML = `<p style="padding:2rem;text-align:center;color:var(--text-muted);font-size:1.05rem">All caught up! No pending tasks. ✓</p>`;
-    return;
-  }
-
   const mkSessionRow = (s, inst) => {
     const isGroup   = !!s.groupId;
     const subjectId = s.studentId || s.groupId || "";
@@ -1394,7 +1388,7 @@ function renderTodoTiles(results) {
             style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:.9rem 1rem;border:none;background:#f9fafb;cursor:${hasPending ? "pointer" : "default"};text-align:left">
             <div style="display:flex;align-items:center;gap:.5rem">
               <span style="font-weight:700;font-size:.95rem;color:#1f2937">${escHtml(inst.name)}</span>
-              <span style="background:#3b82f6;color:#fff;border-radius:999px;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;padding:0 5px;flex-shrink:0">${pending.length}</span>
+              <span style="background:${pending.length > 0 ? '#3b82f6' : '#d1d5db'};color:${pending.length > 0 ? '#fff' : '#6b7280'};border-radius:999px;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;padding:0 5px;flex-shrink:0">${pending.length}</span>
             </div>
             ${hasPending ? `<span class="todo-chevron" style="color:#6b7280;font-size:1.5rem;line-height:1;transition:transform .2s;transform:rotate(-90deg)">▾</span>` : ""}
           </button>
