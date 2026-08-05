@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1402";
+const APP_VERSION = "1403";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -1329,12 +1329,16 @@ function renderTodoTiles(results) {
     return;
   }
 
-  body.innerHTML = withPending.map(({ inst, pending }) => `
+  body.innerHTML = `<div style="padding:1rem;display:flex;flex-direction:column;gap:.65rem">` +
+    withPending.map(({ inst, pending }) => `
     <button class="todo-person-row" data-id="${inst.id}"
-      style="display:flex;align-items:center;gap:.6rem;width:100%;padding:1.1rem 1.3rem;border:none;border-bottom:1px solid #f3f4f6;background:#fff;cursor:pointer;font-size:1rem;font-weight:600;color:#1f2937;text-align:left">
-      <span>${escHtml(inst.name)}</span>
-      <span style="background:#3b82f6;color:#fff;border-radius:999px;min-width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:700;padding:0 6px;flex-shrink:0">${pending.length}</span>
-    </button>`).join("");
+      style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:1rem 1.2rem;border:1.5px solid #e5e7eb;border-radius:14px;background:#fff;cursor:pointer;font-size:1rem;font-weight:600;color:#1f2937;text-align:left;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+      <div style="display:flex;align-items:center;gap:.55rem">
+        <span>${escHtml(inst.name)}</span>
+        <span style="background:#3b82f6;color:#fff;border-radius:999px;min-width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:700;padding:0 6px;flex-shrink:0">${pending.length}</span>
+      </div>
+      <span style="color:#9ca3af;font-size:1.2rem;font-weight:400">›</span>
+    </button>`).join("") + `</div>`;
 
   body.querySelectorAll(".todo-person-row").forEach(btn => {
     btn.addEventListener("click", () => {
