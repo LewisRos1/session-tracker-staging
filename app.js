@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1403";
+const APP_VERSION = "1404";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -1323,61 +1323,65 @@ function renderTodoTiles(results) {
     return;
   }
 
-  const withPending = results.filter(r => r.pending.length > 0);
-  if (withPending.length === 0) {
+  const allDone = results.every(r => r.pending.length === 0);
+  if (allDone) {
     body.innerHTML = `<p style="padding:2rem;text-align:center;color:var(--text-muted);font-size:1.05rem">All caught up! No pending tasks. ✓</p>`;
     return;
   }
 
-  body.innerHTML = `<div style="padding:1rem;display:flex;flex-direction:column;gap:.65rem">` +
-    withPending.map(({ inst, pending }) => `
-    <button class="todo-person-row" data-id="${inst.id}"
-      style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:1rem 1.2rem;border:1.5px solid #e5e7eb;border-radius:14px;background:#fff;cursor:pointer;font-size:1rem;font-weight:600;color:#1f2937;text-align:left;box-shadow:0 1px 4px rgba(0,0,0,.06)">
-      <div style="display:flex;align-items:center;gap:.55rem">
-        <span>${escHtml(inst.name)}</span>
-        <span style="background:#3b82f6;color:#fff;border-radius:999px;min-width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:700;padding:0 6px;flex-shrink:0">${pending.length}</span>
-      </div>
-      <span style="color:#9ca3af;font-size:1.2rem;font-weight:400">›</span>
-    </button>`).join("") + `</div>`;
-
-  body.querySelectorAll(".todo-person-row").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const { inst, pending } = results.find(r => r.inst.id === btn.dataset.id);
-      renderTodoPersonList(inst, pending, results);
-    });
-  });
-}
-
-function renderTodoPersonList(inst, sessions, results) {
-  const body = $("todo-body");
-  const sorted = [...sessions].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const mkSessionRow = s => {
+    const name      = s.workflowSubjectName || s.studentName || s.groupName || "Unknown";
+    const dateStr   = s.date ? formatDateWithDay(s.date) : "Unknown date";
+    const subjectId = s.workflowSubjectId || s.studentId || s.groupId || "";
+    const isGroup   = !!s.groupId;
+    return `<button class="todo-session-row"
+        data-session-id="${s.id}"
+        data-subject-id="${escHtml(subjectId)}"
+        data-is-group="${isGroup}"
+        data-session-date="${escHtml(s.date || "")}"
+        style="display:flex;flex-direction:column;align-items:flex-start;width:100%;padding:.65rem .9rem;border:none;border-top:1px solid #f3f4f6;background:transparent;cursor:pointer;text-align:left">
+      <span style="font-size:.88rem;font-weight:600;color:#1f2937">${escHtml(name)}</span>
+      <span style="font-size:.78rem;color:var(--text-muted)">${escHtml(dateStr)}</span>
+    </button>`;
+  };
 
   body.innerHTML = `
-    <div style="padding:1rem 1.1rem">
-      <button class="todo-back-btn" style="display:flex;align-items:center;gap:.4rem;background:none;border:none;cursor:pointer;font-size:.95rem;color:#3b82f6;font-weight:600;padding:.25rem 0;margin-bottom:1rem">← Back</button>
-      <div style="font-size:1.1rem;font-weight:700;color:#1f2937;margin-bottom:1rem">${escHtml(inst.name)} — ${sorted.length} pending</div>
-      ${sorted.map(s => {
-        const name      = s.workflowSubjectName || s.studentName || s.groupName || "Unknown";
-        const dateStr   = s.date ? formatDateWithDay(s.date) : "Unknown date";
-        const subjectId = s.workflowSubjectId || s.studentId || s.groupId || "";
-        const isGroup   = !!s.groupId;
-        return `<button class="todo-session-row"
-            data-session-id="${s.id}"
-            data-subject-id="${escHtml(subjectId)}"
-            data-is-group="${isGroup}"
-            data-session-date="${escHtml(s.date || "")}"
-            style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:.9rem 1rem;border:none;border-bottom:1px solid #f3f4f6;background:#fff;cursor:pointer;font-size:.95rem;color:#374151;text-align:left;border-radius:0">
-          <div>
-            <div style="font-weight:600">${escHtml(name)}</div>
-            <div style="font-size:.82rem;color:var(--text-muted)">${escHtml(dateStr)}</div>
+    <div style="padding:1rem;display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;align-items:start">
+      ${results.map(({ inst, pending }) => {
+        const hasPending = pending.length > 0;
+        const sorted = [...pending].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+        const badgeColor = hasPending ? "#ef4444" : "#d1d5db";
+        const badgeText  = hasPending ? String(pending.length) : "0";
+        return `
+        <div class="todo-col" style="border:1.5px solid #e5e7eb;border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+          <button class="todo-col-header" data-id="${inst.id}"
+            style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:.9rem 1rem;border:none;background:#f9fafb;cursor:${hasPending ? "pointer" : "default"};text-align:left">
+            <div style="display:flex;align-items:center;gap:.5rem">
+              <span style="font-weight:700;font-size:.95rem;color:#1f2937">${escHtml(inst.name)}</span>
+              <span style="background:${badgeColor};color:#fff;border-radius:999px;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;padding:0 5px;flex-shrink:0">${badgeText}</span>
+            </div>
+            ${hasPending ? `<span class="todo-chevron" style="color:#9ca3af;font-size:1rem;transition:transform .2s">▾</span>` : ""}
+          </button>
+          <div class="todo-col-body" data-id="${inst.id}" style="${hasPending ? "" : "display:none"}">
+            ${hasPending ? sorted.map(mkSessionRow).join("") : ""}
           </div>
-          <span style="color:#9ca3af;font-size:1.2rem">›</span>
-        </button>`;
+        </div>`;
       }).join("")}
     </div>`;
 
-  body.querySelector(".todo-back-btn").addEventListener("click", () => renderTodoTiles(results));
+  // Toggle collapse
+  body.querySelectorAll(".todo-col-header").forEach(btn => {
+    if (!btn.querySelector(".todo-chevron")) return;
+    btn.addEventListener("click", () => {
+      const colBody = body.querySelector(`.todo-col-body[data-id="${btn.dataset.id}"]`);
+      const chevron = btn.querySelector(".todo-chevron");
+      const open = colBody.style.display === "none";
+      colBody.style.display = open ? "" : "none";
+      chevron.style.transform = open ? "" : "rotate(-90deg)";
+    });
+  });
 
+  // Open session on tap
   body.querySelectorAll(".todo-session-row").forEach(btn => {
     btn.addEventListener("click", () => {
       const sid       = btn.dataset.sessionId;
