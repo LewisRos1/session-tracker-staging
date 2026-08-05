@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1405";
+const APP_VERSION = "1406";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -9715,7 +9715,7 @@ function getWorkflowState(data) {
     .sort(([,a],[,b]) => (a.order || 0) - (b.order || 0));
   const allFixed   = comments.length > 0 && comments.every(([,c]) => !!c.fixedByName);
   const noComments = comments.length === 0;
-  const ready = reviewSubmitted && allP3Done && (noComments || allFixed);
+  const ready = allP1Done && reviewSubmitted && allP3Done && (noComments || allFixed);
 
   const revisionDone = (allP3Done && p3Ids.length > 0)
     ? { by: "done", at: Math.max(...p3Ids.map(id => p3Check(id)?.at || 0)) }
