@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1408";
+const APP_VERSION = "1409";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -182,7 +182,7 @@ const INSTRUCTORS = [
 
 // Show the instructor picker as a step inside the session-picker modal.
 // Calls onConfirm(participantIds[]) when the user taps Next.
-function showInstructorPickerStep(onConfirm) {
+function showInstructorPickerStep(onConfirm, preSelected = []) {
   $("session-picker-title").textContent = "Instructors";
   $("session-picker-list").innerHTML = `
     <div style="padding:1.5rem 1.25rem;display:flex;flex-direction:column;align-items:center">
@@ -191,6 +191,7 @@ function showInstructorPickerStep(onConfirm) {
         ${INSTRUCTORS.map(inst => `
           <label style="display:flex;align-items:center;justify-content:center;gap:.85rem;padding:.75rem 0;cursor:pointer;font-size:1rem;border-bottom:1px solid #f3f4f6">
             <input type="checkbox" class="inst-check" value="${inst.id}"
+              ${preSelected.includes(inst.id) ? "checked" : ""}
               style="width:1.2rem;height:1.2rem;accent-color:#3b82f6;cursor:pointer;flex-shrink:0">
             <span style="color:#1f2937;width:7rem">${escHtml(inst.name)}</span>
           </label>`).join("")}
@@ -6190,12 +6191,17 @@ function showStudentChoice(student) {
       </div>`;
 
     $("session-picker-list").querySelectorAll(".btn-date-quick").forEach(btn => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", async () => {
         const chosenDate = btn.dataset.date;
+        let preSelected = [];
+        try {
+          const sessions = await sessionsFetch;
+          preSelected = sessions.find(s => s.date === chosenDate)?.participants || [];
+        } catch {}
         showInstructorPickerStep(participants => {
           closeSessionPicker();
           openSession(student, null, chosenDate, participants);
-        });
+        }, preSelected);
       });
     });
 
@@ -6223,7 +6229,8 @@ function showStudentChoice(student) {
           empties.forEach(s => deleteSession(s.id).catch(() => {}));
           if (empties.length > 0) resequenceIndividualSessions(student.id).catch(() => {});
           const takenDates = new Set(sessions.filter(hasData).map(s => s.date));
-          renderStartSessionCalendar(student, today, displayDate, takenDates);
+          const sessionsByDate = new Map(sessions.map(s => [s.date, s.participants || []]));
+          renderStartSessionCalendar(student, today, displayDate, takenDates, sessionsByDate);
         })
         .catch(() => {});
     });
@@ -6814,7 +6821,7 @@ async function showEditDatePicker() {
   renderDatePickerCalendar(currentDate, takenDates, getTodayString(), currentDate);
 }
 
-function renderStartSessionCalendar(student, today, displayDate, takenDates = new Set()) {
+function renderStartSessionCalendar(student, today, displayDate, takenDates = new Set(), sessionsByDate = new Map()) {
   const [y, m] = displayDate.split("-").map(Number);
   const monthLabel = new Date(y, m - 1, 1)
     .toLocaleString("default", { month: "long", year: "numeric" });
@@ -6858,27 +6865,28 @@ function renderStartSessionCalendar(student, today, displayDate, takenDates = ne
   $("session-picker-list").innerHTML = html;
 
   $("session-picker-list").querySelector(".btn-date-prev").addEventListener("click", () => {
-    renderStartSessionCalendar(student, today, prevM, takenDates);
+    renderStartSessionCalendar(student, today, prevM, takenDates, sessionsByDate);
   });
   if (canNext) {
     $("session-picker-list").querySelector(".btn-date-next").addEventListener("click", () => {
-      renderStartSessionCalendar(student, today, nextM, takenDates);
+      renderStartSessionCalendar(student, today, nextM, takenDates, sessionsByDate);
     });
   }
   $("session-picker-list").querySelectorAll(".date-picker-day:not([disabled])").forEach(btn => {
     btn.addEventListener("click", () => {
       const chosenDate = btn.dataset.date;
+      const preSelected = sessionsByDate.get(chosenDate) || [];
       const proceed = participants => {
         closeSessionPicker();
         openSession(student, null, chosenDate, participants);
       };
-      const pickAndProceed = () => showInstructorPickerStep(proceed);
+      const pickAndProceed = () => showInstructorPickerStep(proceed, preSelected);
       if (isOlderThan7Days(chosenDate)) { requirePassword(pickAndProceed, EXPIRED_MSG); } else { pickAndProceed(); }
     });
   });
 }
 
-function renderGroupStartSessionCalendar(group, today, displayDate, takenDates = new Set()) {
+function renderGroupStartSessionCalendar(group, today, displayDate, takenDates = new Set(), sessionsByDate = new Map()) {
   const [y, m] = displayDate.split("-").map(Number);
   const monthLabel = new Date(y, m - 1, 1)
     .toLocaleString("default", { month: "long", year: "numeric" });
@@ -6922,18 +6930,19 @@ function renderGroupStartSessionCalendar(group, today, displayDate, takenDates =
   $("session-picker-list").innerHTML = html;
 
   $("session-picker-list").querySelector(".btn-date-prev").addEventListener("click", () => {
-    renderGroupStartSessionCalendar(group, today, prevM, takenDates);
+    renderGroupStartSessionCalendar(group, today, prevM, takenDates, sessionsByDate);
   });
   if (canNext) {
     $("session-picker-list").querySelector(".btn-date-next").addEventListener("click", () => {
-      renderGroupStartSessionCalendar(group, today, nextM, takenDates);
+      renderGroupStartSessionCalendar(group, today, nextM, takenDates, sessionsByDate);
     });
   }
   $("session-picker-list").querySelectorAll(".date-picker-day:not([disabled])").forEach(btn => {
     btn.addEventListener("click", () => {
       const ds = btn.dataset.date;
+      const preSelected = sessionsByDate.get(ds) || [];
       const proceed = participants => { closeSessionPicker(); openGroupSession(group, ds, group.students, participants); };
-      const pickAndProceed = () => showInstructorPickerStep(proceed);
+      const pickAndProceed = () => showInstructorPickerStep(proceed, preSelected);
       if (isOlderThan7Days(ds)) { requirePassword(pickAndProceed, EXPIRED_MSG); } else { pickAndProceed(); }
     });
   });
@@ -9327,13 +9336,6 @@ async function autoFillMaintainedRemarks(student, sessionId, selectedTargetName 
       let actId = canonical?.[0] || null;
       if (actId) {
         const existingRems = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === actId);
-        if (existingRems.length > 1) {
-          existingRems.sort(([, a], [, b]) => (b.order || 0) - (a.order || 0));
-          for (const [remId] of existingRems.slice(1)) {
-            deleteRemark(sessionId, remId).catch(() => {});
-            delete data.remarks[remId];
-          }
-        }
         if (existingRems.length > 0) continue;
       }
       const key = `${sessionId}:${target.name}:${pa.name}:maintained`;
@@ -18345,13 +18347,19 @@ function showGroupChoice(group) {
           <button class="btn-date-other">Pick A Date</button>
         </div>
       </div>`;
+    const groupSessionsFetch = getRecentGroupSessions(group.id);
     $("session-picker-list").querySelectorAll(".btn-date-quick").forEach(btn => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", async () => {
         const chosenDate = btn.dataset.date;
+        let preSelected = [];
+        try {
+          const sessions = await groupSessionsFetch;
+          preSelected = sessions.find(s => s.date === chosenDate)?.participants || [];
+        } catch {}
         showInstructorPickerStep(participants => {
           closeSessionPicker();
           openGroupSession(group, chosenDate, group.students, participants);
-        });
+        }, preSelected);
       });
     });
     $("session-picker-list").querySelector(".btn-date-other").addEventListener("click", () => {
@@ -18360,10 +18368,11 @@ function showGroupChoice(group) {
       // Render immediately so iPad doesn't see a frozen UI while waiting for network
       renderGroupStartSessionCalendar(group, today, displayDate, new Set());
       // Then load taken dates and re-render with blue dots
-      getRecentGroupSessions(group.id)
+      groupSessionsFetch
         .then(sessions => {
           const takenDates = new Set(sessions.map(s => s.date));
-          renderGroupStartSessionCalendar(group, today, displayDate, takenDates);
+          const sessionsByDate = new Map(sessions.map(s => [s.date, s.participants || []]));
+          renderGroupStartSessionCalendar(group, today, displayDate, takenDates, sessionsByDate);
         })
         .catch(() => {});
     });
