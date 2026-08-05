@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1431";
+const APP_VERSION = "1432";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -10111,7 +10111,7 @@ async function handleCheckedByClick(e, isGroup) {
           // If no real corrections remain, ask about skipping Phase 3
           const hasRealCorrections = allCmts.some(([, c]) => (c.text || "").trim());
           if (!hasRealCorrections) {
-            if (confirm("No corrections needed? Nigel can export straight away.")) {
+            if (confirm("List of Corrections is empty, confirm no revisions needed?")) {
               const checks = { ...(data?.checks || {}), no_corrections: { by: "daisy", at: Date.now() } };
               await updateSessionChecks(sid, checks);
             }
