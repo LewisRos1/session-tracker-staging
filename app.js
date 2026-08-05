@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1422";
+const APP_VERSION = "1423";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -1347,14 +1347,24 @@ function renderTodoTiles(results) {
     }
     const dateStr = s.date ? formatDateWithDay(s.date) : "Unknown date";
     const checks  = s.checks || {};
-    let phaseLabel = "";
-    if (!checks[`p1_${inst.id}`]) {
-      phaseLabel = "Enter Data";
-    } else if (inst.id === "daisy" && !s.reviewSubmitted) {
-      phaseLabel = "Check";
-    } else if (inst.id !== "daisy" && s.reviewSubmitted && !checks[`p3_${inst.id}`]) {
-      phaseLabel = "Revision";
+
+    // Compute all pending tasks for this instructor on this session
+    const tasks = [];
+    if (!checks[`p1_${inst.id}`]) tasks.push("Enter Data");
+    if (inst.id === "daisy" && !s.reviewSubmitted) {
+      // Phase 2 only shows if it's unlocked (all non-Daisy p1 done)
+      const nonDaisy = (s.participants || []).filter(id => id !== "daisy");
+      const p2Unlocked = nonDaisy.length > 0 ? nonDaisy.every(id => !!checks[`p1_${id}`]) : !!checks["p1_daisy"];
+      if (p2Unlocked) tasks.push("Check");
     }
+    if (inst.id !== "daisy" && s.reviewSubmitted && !checks[`p3_${inst.id}`]) tasks.push("Revision");
+
+    const pillStyle = t => t === "Check"
+      ? "background:#ede9fe;color:#6d28d9"
+      : t === "Revision"
+        ? "background:#fff7ed;color:#c2410c"
+        : "background:#eff6ff;color:#1d4ed8";
+
     return `<button class="todo-session-row"
         data-session-id="${s.id}"
         data-subject-id="${escHtml(subjectId)}"
@@ -1362,9 +1372,9 @@ function renderTodoTiles(results) {
         data-session-date="${escHtml(s.date || "")}"
         style="display:flex;flex-direction:column;align-items:flex-start;width:100%;padding:.65rem .9rem;border:none;border-top:1px solid #f3f4f6;background:transparent;cursor:pointer;text-align:left">
       <span style="font-size:.88rem;font-weight:600;color:#1f2937">${escHtml(name)}</span>
-      <span style="display:flex;align-items:center;gap:.4rem;margin-top:.1rem">
+      <span style="display:flex;align-items:center;gap:.4rem;margin-top:.15rem;flex-wrap:wrap">
         <span style="font-size:.78rem;color:var(--text-muted)">${escHtml(dateStr)}</span>
-        ${phaseLabel ? `<span style="font-size:.68rem;font-weight:600;padding:.1rem .45rem;border-radius:999px;background:${phaseLabel==="Check"?"#ede9fe;color:#6d28d9":phaseLabel==="Revision"?"#fff7ed;color:#c2410c":"#eff6ff;color:#1d4ed8"}">${escHtml(phaseLabel)}</span>` : ""}
+        ${tasks.map(t => `<span style="font-size:.75rem;font-weight:600;padding:.15rem .55rem;border-radius:999px;${pillStyle(t)}">${escHtml(t)}</span>`).join("")}
       </span>
     </button>`;
   };
