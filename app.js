@@ -170,7 +170,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1397";
+const APP_VERSION = "1398";
 // Names shown on the approval strip in View/Edit Past Sessions.
 const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
 
@@ -7562,7 +7562,7 @@ function renderFedcTarget(target) {
           </div>`;
         } else {
         for (const rem of subRemarks) {
-          html += renderRemarkFields(rem, target, getActivityInlineOptions(sub), (sub.inlineOptions || sub.remarkPresetId || sub.remarkHasNote) ? (sub.sentenceStarter || null) : null, sub.optionsMulti || false, null, sub.remarkHasNote || false, false, sub.optionScores || null, !!(sub.manualScore || sub.remarkHasNote || sub.inlineOptions || sub.remarkPresetId));
+          html += renderRemarkFields(rem, target, getActivityInlineOptions(sub), sub.sentenceStarter || null, sub.optionsMulti || false, null, sub.remarkHasNote || false, false, sub.optionScores || null, !!(sub.manualScore || sub.remarkHasNote || sub.inlineOptions || sub.remarkPresetId));
         }
         if (subPending) {
           html += renderPendingRemarkFields(sub.name, subActId, sub.name, idx, target);
@@ -7665,7 +7665,7 @@ function renderFedcTarget(target) {
           const sid = state.currentSessionId;
           if (sid) migrateRemarksToNote(sid, { [rem.id]: { text: rescued, masteryNote: "" } }).catch(() => {});
         }
-        html += renderRemarkFields(rem, target, getActivityInlineOptions(pa), (pa.inlineOptions || pa.remarkPresetId || pa.remarkHasNote) ? (pa.sentenceStarter || null) : null, pa.optionsMulti || false, mappedInfo, pa.remarkHasNote || false, pa.manualScore || false, pa.optionScores || null, !!(pa.manualScore || pa.remarkHasNote || pa.inlineOptions || pa.remarkPresetId));
+        html += renderRemarkFields(rem, target, getActivityInlineOptions(pa), pa.sentenceStarter || null, pa.optionsMulti || false, mappedInfo, pa.remarkHasNote || false, pa.manualScore || false, pa.optionScores || null, !!(pa.manualScore || pa.remarkHasNote || pa.inlineOptions || pa.remarkPresetId));
       }
       if (isPending) {
         html += renderPendingRemarkFields(pendingKey, actId, pa.name, idx, target);
@@ -14744,7 +14744,7 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
     : a.sentenceStarter ? ""
     : (a.inlineOptions && a.optionsMulti) ? "starter_fixed_multi"
     : (a.inlineOptions || a.remarkPresetId) ? "starter_fixed_note" : "";
-  const showStarter = type === "starter_fixed_multi" || type === "starter_fixed_note";
+  const showStarter = type !== "manual_score";
   return `<div style="flex:1;display:flex;flex-direction:column;gap:.4rem;min-width:0">
     <select class="act-preset-select mn-act-preset" data-idx="${idx}" style="border-color:#b8bcc4">
       <option value="">Notes Only</option>
@@ -16430,7 +16430,7 @@ function renderTargetManageContent(student, target) {
         if (!usesOpts) { acts[idx].inlineOptions = null; delete acts[idx].optionScores; }
         acts[idx].optionsMulti    = (type === "starter_fixed_multi");
         acts[idx].remarkHasNote   = (type === "starter_fixed_note");
-        const starterVis = usesOpts;
+        const starterVis = usesOpts || type === "";
         const optsVis    = usesOpts;
         starterWrap.style.cssText    = starterVis ? "display:flex;flex-direction:column;gap:.3rem" : "display:none";
         optsContainer.style.display  = optsVis ? "" : "none";
@@ -17543,7 +17543,7 @@ function renderTemplateManageContent(template) {
       if (!usesOpts) { acts[idx].inlineOptions = null; delete acts[idx].optionScores; }
       acts[idx].optionsMulti    = (type === "starter_fixed_multi");
       acts[idx].remarkHasNote   = (type === "starter_fixed_note");
-      const starterVis = usesOpts;
+      const starterVis = usesOpts || type === "";
       const optsVis    = usesOpts;
       starterWrap.style.cssText    = starterVis ? "display:flex;flex-direction:column;gap:.3rem" : "display:none";
       optsContainer.style.display  = optsVis ? "" : "none";
@@ -18885,7 +18885,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
   // renderGroupStudentEmptyRow) — preset-option/sentence-starter activities
   // have no typeable free text, so those still need the explicit button.
   const inlineOptions   = paEntry ? getActivityInlineOptions(paEntry) : null;
-  const sentenceStarter = (paEntry?.inlineOptions || paEntry?.remarkPresetId || paEntry?.remarkHasNote) ? (paEntry?.sentenceStarter || null) : null;
+  const sentenceStarter = paEntry?.sentenceStarter || null;
   const multiSelect     = paEntry?.optionsMulti || false;
   const remarkHasNote   = paEntry?.remarkHasNote || false;
   const noteCapableGrp  = !!(paEntry?.manualScore || paEntry?.remarkHasNote || paEntry?.inlineOptions || paEntry?.remarkPresetId);
