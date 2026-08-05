@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1399";
+const APP_VERSION = "1400";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -1227,11 +1227,11 @@ function renderStudentDatabaseButton() {
   container.innerHTML = `<div class="info-btn-row">
     <button class="export-btn export-btn-all" id="btn-open-student-registry" style="margin-bottom:0">Student Database</button>
     <button class="export-btn" id="btn-open-ai-report">AI Report Generator</button>
-    <button class="export-btn" id="btn-open-todo">Session Checklist</button>
+    <button class="export-btn" id="btn-open-todo">To Do List</button>
   </div>`;
   $("btn-open-student-registry").addEventListener("click", () => openStudentRegistryScreen());
   $("btn-open-ai-report").addEventListener("click", () => showScreen("screen-ai-report"));
-  $("btn-open-todo").addEventListener("click", () => openTodoModal());
+  $("btn-open-todo").addEventListener("click", () => openTodoScreen());
 }
 
 function openChecklistModal() {
@@ -1294,22 +1294,17 @@ function openChecklistModal() {
   });
 }
 
-async function openTodoModal() {
-  $("session-picker-title").textContent = "Session Checklist";
-  $("session-picker-list").innerHTML = `<p class="empty-hint" style="padding:1rem 1.25rem">Loading…</p>`;
-  $("session-picker-modal").classList.remove("hidden");
+async function openTodoScreen() {
+  showScreen("screen-todo");
+  $("todo-body").innerHTML = `<p style="padding:1.5rem;color:var(--text-muted)">Loading…</p>`;
 
   // Compute pending counts for each instructor in parallel
   const results = await Promise.all(INSTRUCTORS.map(async inst => {
     const sessions = await getSessionsWithParticipant(inst.id).catch(() => []);
     const pending = sessions.filter(s => {
       const checks = s.checks || {};
-      const p1Ids  = s.participants || [];
-      // P1 incomplete for this person
       if (!checks[`p1_${inst.id}`]) return true;
-      // P2 incomplete (Daisy only — reviewSubmitted)
       if (inst.id === "daisy" && !s.reviewSubmitted) return true;
-      // P3 incomplete for this person (non-Daisy, after review submitted)
       if (inst.id !== "daisy" && s.reviewSubmitted && !checks[`p3_${inst.id}`]) return true;
       return false;
     });
@@ -1318,56 +1313,56 @@ async function openTodoModal() {
 
   const hasAny = results.some(r => r.pending.length > 0);
   if (!hasAny) {
-    $("session-picker-list").innerHTML = `<p class="empty-hint" style="padding:1rem 1.25rem">All caught up! No pending tasks. ✓</p>`;
+    $("todo-body").innerHTML = `<p style="padding:1.5rem;color:var(--text-muted)">All caught up! No pending tasks. ✓</p>`;
     return;
   }
 
-  $("session-picker-list").innerHTML = `<div class="choice-list">` +
-    results.filter(r => r.pending.length > 0).map(({ inst, pending }) =>
-      `<button class="choice-btn todo-person-btn" data-id="${inst.id}">
-        <span class="choice-icon">👤</span>
-        <div class="choice-text">
-          <div class="choice-label">${escHtml(inst.name)}</div>
-          <div class="choice-sub">${pending.length} session${pending.length !== 1 ? "s" : ""} pending</div>
-        </div>
-      </button>`).join("") + `</div>`;
+  $("todo-body").innerHTML = results.filter(r => r.pending.length > 0).map(({ inst, pending }) => `
+    <div class="todo-person-card" style="margin-bottom:1rem;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden">
+      <button class="todo-person-header" data-id="${inst.id}"
+        style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:1rem 1.2rem;background:#f9fafb;border:none;cursor:pointer;font-size:1rem;font-weight:600;color:#1f2937;text-align:left">
+        <span>${escHtml(inst.name)}</span>
+        <span style="background:#3b82f6;color:#fff;border-radius:999px;padding:.2rem .75rem;font-size:.9rem">${pending.length}</span>
+      </button>
+      <div class="todo-person-list" data-id="${inst.id}" style="display:none">
+        ${[...pending].sort((a,b) => (a.date||"").localeCompare(b.date||"")).map(s => {
+          const name      = s.workflowSubjectName || s.studentName || s.groupName || "Unknown";
+          const dateStr   = s.date ? formatDateWithDay(s.date) : "Unknown date";
+          const subjectId = s.workflowSubjectId || s.studentId || s.groupId || "";
+          const isGroup   = !!s.groupId;
+          return `<button class="todo-session-row"
+              data-session-id="${s.id}"
+              data-subject-id="${escHtml(subjectId)}"
+              data-is-group="${isGroup}"
+              data-session-date="${escHtml(s.date || "")}"
+              style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:.85rem 1.2rem;border:none;border-top:1px solid #f3f4f6;background:#fff;cursor:pointer;font-size:.95rem;color:#374151;text-align:left">
+            <div>
+              <div style="font-weight:500">${escHtml(name)}</div>
+              <div style="font-size:.82rem;color:var(--text-muted)">${escHtml(dateStr)}</div>
+            </div>
+            <span style="color:#9ca3af;font-size:1.1rem">›</span>
+          </button>`;
+        }).join("")}
+      </div>
+    </div>`).join("");
 
-  $("session-picker-list").querySelectorAll(".todo-person-btn").forEach(btn => {
+  // Toggle expand/collapse
+  $("todo-body").querySelectorAll(".todo-person-header").forEach(btn => {
     btn.addEventListener("click", () => {
-      const { inst, pending } = results.find(r => r.inst.id === btn.dataset.id);
-      openTodoPersonList(inst, pending);
+      const list = $("todo-body").querySelector(`.todo-person-list[data-id="${btn.dataset.id}"]`);
+      const open = list.style.display === "none";
+      list.style.display = open ? "block" : "none";
+      btn.style.background = open ? "#eff6ff" : "#f9fafb";
     });
   });
-}
 
-function openTodoPersonList(inst, sessions) {
-  $("session-picker-title").textContent = `${inst.name} — Pending`;
-  const sorted = [...sessions].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-  $("session-picker-list").innerHTML = `<div class="choice-list">` +
-    sorted.map(s => {
-      const name    = s.workflowSubjectName || s.studentName || s.groupName || "Unknown";
-      const dateStr = s.date ? formatDateWithDay(s.date) : "Unknown date";
-      const subjectId = s.workflowSubjectId || s.studentId || s.groupId || "";
-      const isGroup   = !!s.groupId;
-      return `<button class="choice-btn checklist-modal-item"
-          data-session-id="${s.id}"
-          data-subject-id="${escHtml(subjectId)}"
-          data-is-group="${isGroup}"
-          data-session-date="${escHtml(s.date || "")}">
-        <div class="choice-text">
-          <div class="choice-label">${escHtml(name)}</div>
-          <div class="choice-sub">${escHtml(dateStr)}</div>
-        </div>
-      </button>`;
-    }).join("") + `</div>`;
-
-  $("session-picker-list").querySelectorAll(".checklist-modal-item").forEach(btn => {
+  // Open session on row tap
+  $("todo-body").querySelectorAll(".todo-session-row").forEach(btn => {
     btn.addEventListener("click", () => {
       const sid       = btn.dataset.sessionId;
       const subjectId = btn.dataset.subjectId;
       const isGrp     = btn.dataset.isGroup === "true";
       const doOpen = () => {
-        closeSessionPicker();
         if (isGrp) {
           const group = (state.groups || []).find(g => g.id === subjectId);
           if (group) openGroupSessionView(group, sid);
@@ -9643,6 +9638,7 @@ async function leaveSessionView() {
 
 $("btn-view-back").addEventListener("click", leaveSessionView);
 $("btn-student-registry-back")?.addEventListener("click", showHome);
+$("btn-todo-back")?.addEventListener("click", showHome);
 
 // ── Checked By strip (View/Edit Past Sessions approval flow) ──────────────────
 // Ray = assistant teacher; Daisy = main teacher. Rendered as the first item
