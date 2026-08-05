@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1439";
+const APP_VERSION = "1440";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -5752,19 +5752,8 @@ function openManageActivityScreen(student) {
   if (sub) sub.textContent = student.name;
   showScreen("screen-manage-activity");
   $("btn-manage-activity-back").onclick = showHome;
-
-  // Rearrange Targets button — inject fresh each time so it always exists even on cached HTML
-  let reorderBtn = $("btn-ma-reorder-targets");
-  if (!reorderBtn) {
-    reorderBtn = document.createElement("button");
-    reorderBtn.id = "btn-ma-reorder-targets";
-    reorderBtn.className = "btn-manage-targets";
-    document.getElementById("screen-manage-activity").querySelector("header").appendChild(reorderBtn);
-  }
-  reorderBtn.textContent = "↕️ Rearrange Targets";
-  reorderBtn.classList.remove("hidden");
-  reorderBtn.onclick = () => showTargetReorderList(student);
-
+  // Hide the old header button — the button is now inline next to the dropdown
+  $("btn-ma-reorder-targets")?.classList.add("hidden");
   renderManageActivityScreen(student);
 }
 
@@ -5948,17 +5937,15 @@ function renderManageActivityScreen(student) {
       ${collapseSection('discontinued','🚩','#dc2626','#fff5f5','#fecaca',discontPas)}
     </div>`;
 
-  const dropHtml = `<div class="target-selector" style="position:static;margin-bottom:.8rem">
-    <label class="target-label">Target</label>
-    <select id="ma-target-select" class="target-dropdown">
+  const dropHtml = `<div class="target-selector" style="position:static;margin-bottom:.8rem;display:flex;align-items:center;gap:.5rem">
+    <label class="target-label" style="flex-shrink:0">Target</label>
+    <select id="ma-target-select" class="target-dropdown" style="flex:1">
       ${targets.map((t, i) => `<option value="${i}"${i === _maSelectedTargetIdx ? ' selected' : ''}>${escHtml(t.name)}</option>`).join('')}
     </select>
+    <button id="btn-ma-rearrange-inline" class="btn-manage-targets">↕️ Rearrange</button>
   </div>`;
 
-  const rearrangeHtml = `<div style="display:flex;justify-content:flex-end;margin-bottom:.5rem">
-    <button id="btn-ma-rearrange-inline" class="btn-manage-targets" style="font-size:.88rem;padding:.4rem 1rem">↕️ Rearrange Targets</button>
-  </div>`;
-  body.innerHTML = rearrangeHtml + dropHtml + html;
+  body.innerHTML = dropHtml + html;
 
   body.querySelector("#btn-ma-rearrange-inline").addEventListener("click", () => showTargetReorderList(student));
 
@@ -6192,13 +6179,7 @@ function showStudentChoice(student) {
       <button class="choice-btn choice-manage-activity">
         <span class="choice-icon">🪄</span>
         <div class="choice-text">
-          <div class="choice-label">Manage Activity</div>
-        </div>
-      </button>
-      <button class="choice-btn choice-reorder-targets">
-        <span class="choice-icon">↕️</span>
-        <div class="choice-text">
-          <div class="choice-label">Rearrange Targets</div>
+          <div class="choice-label">Manage Activity & Targets</div>
         </div>
       </button>
       <button class="choice-btn choice-export-excel">
@@ -6308,7 +6289,7 @@ function showStudentChoice(student) {
   });
   $("session-picker-list").querySelector(".choice-manage-activity").addEventListener("click", () => {
     closeSessionPicker();
-    $("manage-modal-title").textContent = "Manage Activity";
+    $("manage-modal-title").textContent = "Manage Activity & Targets";
     $("manage-modal-body").innerHTML = `
       <div style="padding:2rem 1rem;display:flex;flex-direction:column;align-items:center;gap:.75rem">
         <div style="font-size:.9rem;color:var(--text-muted)">Enter password to continue</div>
@@ -6333,10 +6314,6 @@ function showStudentChoice(student) {
     };
     pwInput.addEventListener("keydown", e => { if (e.key === "Enter") checkPw(); });
     $("ma-gate-pw-btn").addEventListener("click", checkPw);
-  });
-  $("session-picker-list").querySelector(".choice-reorder-targets").addEventListener("click", () => {
-    closeSessionPicker();
-    showTargetReorderList(student);
   });
 }
 
