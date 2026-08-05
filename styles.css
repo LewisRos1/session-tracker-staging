@@ -2873,6 +2873,9 @@ div.admin-note-editable:empty::before {
 .wf-node--done, .wf-node--nigel-ready {
   border-color: #34d399; background: #d1fae5; color: #065f46;
 }
+.wf-node--locked {
+  border-color: #d1d5db; background: #f3f4f6; color: #9ca3af;
+}
 .wf-node--p2-active,
 .wf-node--corrections,
 .wf-node--pending,
@@ -2902,6 +2905,7 @@ button.wf-pill { cursor: pointer; transition: filter .1s; }
 button.wf-pill:hover { filter: brightness(.93); }
 
 .wf-pill--done    { border-color: #34d399; background: #d1fae5; color: #065f46; }
+.wf-pill--locked  { border-color: #e5e7eb; background: #f9fafb; color: #9ca3af; font-style: italic; }
 .wf-pill--pending,
 .wf-pill--attention,
 .wf-pill--warn    { border-color: #d1d5db; background: #fff; color: #374151; }

@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1418";
+const APP_VERSION = "1419";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -9846,11 +9846,11 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     <div class="wf-node-body">${p1Body}</div>
   </div>`;
 
-  // ── Phase 2: Review & Feedback (always Daisy, no lock) ───────
+  // ── Phase 2: Review & Feedback ───────────────────────────────
   let p2State, p2Body;
-  if (ws.p1Ids.length === 0) {
-    p2State = "pending";
-    p2Body  = `<div class="wf-pill wf-pill--pending">Select instructors in Phase 1 first</div>`;
+  if (!ws.allP1Done) {
+    p2State = "locked";
+    p2Body  = `<div class="wf-pill wf-pill--locked">🔒 Complete Phase 1 first</div>`;
   } else if (confirmRole === "phase2") {
     p2State = "p2-active";
     p2Body  = mkConfirm("phase2", ws.reviewSubmitted ? "Undo Phase 2?" : "Mark as reviewed?");
@@ -9878,14 +9878,12 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
   };
 
   let p3State, p3Body;
-  if (ws.p1Ids.length === 0) {
-    p3State = "pending";
-    p3Body  = `<div class="wf-pill wf-pill--pending">Select instructors in Phase 1 first</div>`;
+  if (!ws.reviewSubmitted) {
+    p3State = "locked";
+    p3Body  = `<div class="wf-pill wf-pill--locked">🔒 Complete Phase 2 first</div>`;
   } else if (ws.p3Ids.length === 0) {
-    p3State = ws.reviewSubmitted ? "done" : "pending";
-    p3Body  = ws.reviewSubmitted
-      ? `<div class="wf-pill wf-pill--done">✓ No revision needed</div>`
-      : `<div class="wf-pill wf-pill--pending">○ Waiting…</div>`;
+    p3State = "done";
+    p3Body  = `<div class="wf-pill wf-pill--done">✓ No revision needed</div>`;
   } else {
     p3State = ws.allP3Done ? "done" : "corrections";
     p3Body  = ws.p3Ids.map(mkPill3).join("");
@@ -9898,21 +9896,18 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
 
   // ── Phase 4: Export (Nigel) ───────────────────────────────────
   let nigelState, nigelBody;
-  if (ws.p1Ids.length === 0) {
-    nigelState = "nigel";
-    nigelBody  = `<div class="wf-pill wf-pill--pending">⚠ No instructors in Phase 1</div>`;
-  } else if (confirmRole === "p4_nigel" && ws.ready) {
+  if (!ws.ready) {
+    nigelState = "locked";
+    nigelBody  = `<div class="wf-pill wf-pill--locked">🔒 Complete previous phases first</div>`;
+  } else if (confirmRole === "p4_nigel") {
     nigelState = "nigel-ready";
     nigelBody  = mkConfirm("p4_nigel", ws.p4Done ? "Undo export mark?" : "Mark as exported?");
   } else if (ws.p4Done) {
     nigelState = "nigel-ready";
     nigelBody  = `<button class="wf-pill wf-pill--done" data-role="p4_nigel">✓ Nigel · ${escHtml(fmtCheckTimestamp(ws.p4Check?.at))}</button>`;
-  } else if (ws.ready) {
+  } else {
     nigelState = "nigel-ready";
     nigelBody  = `<button class="wf-pill wf-pill--attention" data-role="p4_nigel">○ Nigel: Export to Word</button>`;
-  } else {
-    nigelState = "nigel";
-    nigelBody  = `<div class="wf-pill wf-pill--pending">○ Nigel: Incomplete</div>`;
   }
   const nigelNode  = `<div class="wf-node wf-node--${nigelState}">
     <div class="wf-node-label">Phase 4: Export</div>
