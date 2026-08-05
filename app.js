@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1421";
+const APP_VERSION = "1422";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -1334,7 +1334,7 @@ function renderTodoTiles(results) {
     return;
   }
 
-  const mkSessionRow = s => {
+  const mkSessionRow = (s, inst) => {
     const isGroup   = !!s.groupId;
     const subjectId = s.studentId || s.groupId || "";
     let name = s.workflowSubjectName || "";
@@ -1345,7 +1345,16 @@ function renderTodoTiles(results) {
         name = (state.students || []).find(st => st.id === s.studentId)?.name || s.studentName || "Unknown";
       }
     }
-    const dateStr   = s.date ? formatDateWithDay(s.date) : "Unknown date";
+    const dateStr = s.date ? formatDateWithDay(s.date) : "Unknown date";
+    const checks  = s.checks || {};
+    let phaseLabel = "";
+    if (!checks[`p1_${inst.id}`]) {
+      phaseLabel = "Enter Data";
+    } else if (inst.id === "daisy" && !s.reviewSubmitted) {
+      phaseLabel = "Check";
+    } else if (inst.id !== "daisy" && s.reviewSubmitted && !checks[`p3_${inst.id}`]) {
+      phaseLabel = "Revision";
+    }
     return `<button class="todo-session-row"
         data-session-id="${s.id}"
         data-subject-id="${escHtml(subjectId)}"
@@ -1353,7 +1362,10 @@ function renderTodoTiles(results) {
         data-session-date="${escHtml(s.date || "")}"
         style="display:flex;flex-direction:column;align-items:flex-start;width:100%;padding:.65rem .9rem;border:none;border-top:1px solid #f3f4f6;background:transparent;cursor:pointer;text-align:left">
       <span style="font-size:.88rem;font-weight:600;color:#1f2937">${escHtml(name)}</span>
-      <span style="font-size:.78rem;color:var(--text-muted)">${escHtml(dateStr)}</span>
+      <span style="display:flex;align-items:center;gap:.4rem;margin-top:.1rem">
+        <span style="font-size:.78rem;color:var(--text-muted)">${escHtml(dateStr)}</span>
+        ${phaseLabel ? `<span style="font-size:.68rem;font-weight:600;padding:.1rem .45rem;border-radius:999px;background:${phaseLabel==="Check"?"#ede9fe;color:#6d28d9":phaseLabel==="Revision"?"#fff7ed;color:#c2410c":"#eff6ff;color:#1d4ed8"}">${escHtml(phaseLabel)}</span>` : ""}
+      </span>
     </button>`;
   };
 
@@ -1373,7 +1385,7 @@ function renderTodoTiles(results) {
             ${hasPending ? `<span class="todo-chevron" style="color:#6b7280;font-size:1.5rem;line-height:1;transition:transform .2s;transform:rotate(-90deg)">▾</span>` : ""}
           </button>
           <div class="todo-col-body" data-id="${inst.id}" style="display:none">
-            ${hasPending ? sorted.map(mkSessionRow).join("") : ""}
+            ${hasPending ? sorted.map(s => mkSessionRow(s, inst)).join("") : ""}
           </div>
         </div>`;
       }).join("")}
