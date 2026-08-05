@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1433";
+const APP_VERSION = "1434";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -5746,6 +5746,12 @@ function openManageActivityScreen(student) {
   if (sub) sub.textContent = student.name;
   showScreen("screen-manage-activity");
   $("btn-manage-activity-back").onclick = showHome;
+  const reorderBtn = $("btn-ma-reorder-targets");
+  if (reorderBtn) {
+    const targets = (student.targets || []).filter(t => !t.archived);
+    reorderBtn.classList.toggle("hidden", targets.length < 2);
+    reorderBtn.onclick = () => showTargetReorderList(student);
+  }
   renderManageActivityScreen(student);
 }
 
