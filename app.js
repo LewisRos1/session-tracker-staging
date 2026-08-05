@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1417";
+const APP_VERSION = "1418";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -9912,7 +9912,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     nigelBody  = `<button class="wf-pill wf-pill--attention" data-role="p4_nigel">○ Nigel: Export to Word</button>`;
   } else {
     nigelState = "nigel";
-    nigelBody  = `<div class="wf-pill wf-pill--pending">○ Nigel (waiting…)</div>`;
+    nigelBody  = `<div class="wf-pill wf-pill--pending">○ Nigel: Incomplete</div>`;
   }
   const nigelNode  = `<div class="wf-node wf-node--${nigelState}">
     <div class="wf-node-label">Phase 4: Export</div>
