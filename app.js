@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1442";
+const APP_VERSION = "1443";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -9895,12 +9895,18 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
   // ── Phase 2: Review & Feedback ───────────────────────────────
   let p2State, p2Body;
   if (!p2Unlocked) {
-    const pending = ws.p3Ids.filter(id => !ws.p1Done(id)).map(instName);
-    const pendingStr = pending.length === 1
-      ? pending[0]
-      : pending.slice(0, -1).join(", ") + " & " + pending[pending.length - 1];
+    // Non-Daisy participants still pending; fall back to all participants if no non-Daisy ones exist
+    let pending = ws.p3Ids.filter(id => !ws.p1Done(id)).map(instName);
+    if (pending.length === 0) {
+      pending = ws.p1Ids.filter(id => !ws.p1Done(id)).map(instName);
+    }
+    const pendingStr = pending.length === 0
+      ? "No instructors selected"
+      : pending.length === 1
+        ? pending[0] + " to complete Phase 1 first"
+        : pending.slice(0, -1).join(", ") + " & " + pending[pending.length - 1] + " to complete Phase 1 first";
     p2State = "locked";
-    p2Body  = `<div class="wf-pill wf-pill--locked">🔒 ${escHtml(pendingStr)} to complete Phase 1 first</div>`;
+    p2Body  = `<div class="wf-pill wf-pill--locked">🔒 ${escHtml(pendingStr)}</div>`;
   } else if (confirmRole === "phase2") {
     p2State = "p2-active";
     p2Body  = mkConfirm("phase2", ws.reviewSubmitted ? "Undo Phase 2?" : "Mark as reviewed?");
