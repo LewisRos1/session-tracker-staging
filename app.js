@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1436";
+const APP_VERSION = "1437";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -1347,7 +1347,7 @@ function renderTodoTiles(results) {
         name = (state.students || []).find(st => st.id === s.studentId)?.name || s.studentName || "Unknown";
       }
     }
-    const dateStr = s.date ? formatDateWithDay(s.date) : "Unknown date";
+    const dateStr = s.date ? relativeTodoDate(s.date) : "Unknown date";
     const checks  = s.checks || {};
     const ws      = getWorkflowState(s);
 
@@ -5752,12 +5752,19 @@ function openManageActivityScreen(student) {
   if (sub) sub.textContent = student.name;
   showScreen("screen-manage-activity");
   $("btn-manage-activity-back").onclick = showHome;
-  const reorderBtn = $("btn-ma-reorder-targets");
-  if (reorderBtn) {
-    const targets = (student.targets || []).filter(t => !t.archived);
-    reorderBtn.classList.toggle("hidden", targets.length === 0);
-    reorderBtn.onclick = () => showTargetReorderList(student);
+
+  // Rearrange Targets button — inject fresh each time so it always exists even on cached HTML
+  let reorderBtn = $("btn-ma-reorder-targets");
+  if (!reorderBtn) {
+    reorderBtn = document.createElement("button");
+    reorderBtn.id = "btn-ma-reorder-targets";
+    reorderBtn.className = "btn-manage-targets";
+    document.getElementById("screen-manage-activity").querySelector("header").appendChild(reorderBtn);
   }
+  reorderBtn.textContent = "↕️ Rearrange Targets";
+  reorderBtn.classList.remove("hidden");
+  reorderBtn.onclick = () => showTargetReorderList(student);
+
   renderManageActivityScreen(student);
 }
 
@@ -7220,8 +7227,9 @@ async function openSession(student, existingSessionId = null, dateStr = null, pa
         if (mappedFilled > 0) return;
       } catch (err) { console.error("autoFillMappedRemarks failed:", err); }
       try {
-        const maintainedFilled = await autoFillMaintainedRemarks(student, sessionId, state.selectedTargetName);
-        if (maintainedFilled > 0) return;
+        await autoFillMaintainedRemarks(student, sessionId, state.selectedTargetName);
+        // Don't return early — render now and let the Firestore write from
+        // the fill trigger its own snapshot update rather than blocking here.
       } catch (err) { console.error("autoFillMaintainedRemarks failed:", err); }
       // Keep score modal trial badges in sync with Firestore
       if (state.scorePicker?.open && state.scorePicker?.remId) {
@@ -20497,6 +20505,19 @@ function formatDate(dateStr) {
 }
 function formatDateWithDay(dateStr) {
   return `${dayAbbr(dateStr)}, ${formatDate(dateStr)}`;
+}
+function relativeTodoDate(dateStr) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const [y,m,d] = dateStr.split("-").map(Number);
+  const date = new Date(y, m-1, d);
+  const diffDays = Math.round((today - date) / 86400000);
+  const day = dayAbbr(dateStr);
+  const full = formatDate(dateStr); // "29 Jul 2026"
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return `Yesterday, ${full}`;
+  if (diffDays <= 7) return `Last ${day}, ${full}`;
+  const weeks = Math.round(diffDays / 7);
+  return `(${weeks} week${weeks > 1 ? "s" : ""} ago) ${day}, ${full}`;
 }
 function relativeDaySuffix(dateStr) {
   return dateStr === getTodayString() ? " (Today)" : "";
