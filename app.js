@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1432";
+const APP_VERSION = "1433";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -10271,7 +10271,17 @@ function setupStickyNote() {
   document.addEventListener("touchmove", e => { if (!dragging) return; const t = e.touches[0]; onMove(t.clientX, t.clientY); e.preventDefault(); }, { passive: false });
   document.addEventListener("touchend", () => { dragging = false; });
 
-  closeEl.addEventListener("click", closeStickyNote);
+  closeEl.addEventListener("click", async () => {
+    // Auto-delete empty rows before closing
+    const { sid, data } = getCtx();
+    if (sid) {
+      const emptyIds = Object.entries(data?.reviewComments || {})
+        .filter(([, c]) => !(c.text || "").trim())
+        .map(([id]) => id);
+      await Promise.all(emptyIds.map(id => deleteReviewComment(sid, id).catch(() => {})));
+    }
+    closeStickyNote();
+  });
 
   // ── Context helpers ──────────────────────────────────────────
   const getCtx = () => ({
