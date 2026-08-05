@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1404";
+const APP_VERSION = "1405";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -1350,19 +1350,17 @@ function renderTodoTiles(results) {
       ${results.map(({ inst, pending }) => {
         const hasPending = pending.length > 0;
         const sorted = [...pending].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-        const badgeColor = hasPending ? "#ef4444" : "#d1d5db";
-        const badgeText  = hasPending ? String(pending.length) : "0";
         return `
         <div class="todo-col" style="border:1.5px solid #e5e7eb;border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.06)">
           <button class="todo-col-header" data-id="${inst.id}"
             style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:.9rem 1rem;border:none;background:#f9fafb;cursor:${hasPending ? "pointer" : "default"};text-align:left">
             <div style="display:flex;align-items:center;gap:.5rem">
               <span style="font-weight:700;font-size:.95rem;color:#1f2937">${escHtml(inst.name)}</span>
-              <span style="background:${badgeColor};color:#fff;border-radius:999px;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;padding:0 5px;flex-shrink:0">${badgeText}</span>
+              <span style="background:#3b82f6;color:#fff;border-radius:999px;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;padding:0 5px;flex-shrink:0">${pending.length}</span>
             </div>
-            ${hasPending ? `<span class="todo-chevron" style="color:#9ca3af;font-size:1rem;transition:transform .2s">▾</span>` : ""}
+            ${hasPending ? `<span class="todo-chevron" style="color:#9ca3af;font-size:1rem;transition:transform .2s;transform:rotate(-90deg)">▾</span>` : ""}
           </button>
-          <div class="todo-col-body" data-id="${inst.id}" style="${hasPending ? "" : "display:none"}">
+          <div class="todo-col-body" data-id="${inst.id}" style="display:none">
             ${hasPending ? sorted.map(mkSessionRow).join("") : ""}
           </div>
         </div>`;
@@ -1377,7 +1375,7 @@ function renderTodoTiles(results) {
       const chevron = btn.querySelector(".todo-chevron");
       const open = colBody.style.display === "none";
       colBody.style.display = open ? "" : "none";
-      chevron.style.transform = open ? "" : "rotate(-90deg)";
+      chevron.style.transform = open ? "rotate(0deg)" : "rotate(-90deg)";
     });
   });
 

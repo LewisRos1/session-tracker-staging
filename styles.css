@@ -2904,9 +2904,9 @@ button.wf-pill { cursor: pointer; transition: filter .1s; }
 button.wf-pill:hover { filter: brightness(.93); }
 
 .wf-pill--done    { border-color: #34d399; background: #d1fae5; color: #065f46; }
-.wf-pill--pending { border-color: #d1d5db; background: #f9fafb; color: #6b7280; }
-.wf-pill--attention { border-color: #fbbf24; background: #fef3c7; color: #92400e; }
-.wf-pill--warn    { border-color: #f87171; background: #fee2e2; color: #991b1b; }
+.wf-pill--pending,
+.wf-pill--attention,
+.wf-pill--warn    { border-color: #d1d5db; background: #fff; color: #374151; }
 
 /* Confirm state (replaces a pill in Phase 1) */
 .wf-confirming {
