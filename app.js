@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1429";
+const APP_VERSION = "1430";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -9905,7 +9905,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     p2Body  = `<button class="wf-pill wf-pill--done" data-role="phase2">✓ Ms. Daisy · ${escHtml(fmtCheckTimestamp(data.reviewSubmittedAt))}</button>`;
   }
   const p2Node = `<div class="wf-node wf-node--${p2State}">
-    <div class="wf-node-label">Phase 2: Review &amp; Feedback</div>
+    <div class="wf-node-label">Phase 2: Check</div>
     <div class="wf-node-body">${p2Body}</div>
   </div>`;
 
