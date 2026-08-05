@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1410";
+const APP_VERSION = "1411";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -8813,15 +8813,20 @@ function attachTargetListeners(target) {
         }
         if (paName) actId = await ensureFedcActivity(target.name, paName, paOrder, btn.dataset.paParent || null, btn.dataset.cfgId || null);
         if (!actId) { btn.disabled = false; return; }
-        // Maintained placeholder: lock in "Maintain" first so it isn't lost,
-        // then fall through to add the real empty remark below it.
+        // Maintained placeholder: ensure "Maintain" remark exists before adding the
+        // empty one. Autofill may have already written it during the ensureFedcActivity
+        // await, so check first to avoid a duplicate.
         if (btn.dataset.isMaintained === "1") {
-          const mId = generateId("r");
-          state.sessionData.remarks = state.sessionData.remarks || {};
-          state.sessionData.remarks[mId] = { activityId: actId, text: "Maintain", trials: [], order: Date.now() - 1 };
-          addRemark(state.currentSessionId, actId, "Maintain", null, mId).catch(() => {
-            delete state.sessionData.remarks[mId];
-          });
+          const alreadyMaintained = Object.values(state.sessionData.remarks || {})
+            .some(r => r.activityId === actId && r.text === "Maintain");
+          if (!alreadyMaintained) {
+            const mId = generateId("r");
+            state.sessionData.remarks = state.sessionData.remarks || {};
+            state.sessionData.remarks[mId] = { activityId: actId, text: "Maintain", trials: [], order: Date.now() - 1 };
+            addRemark(state.currentSessionId, actId, "Maintain", null, mId).catch(() => {
+              delete state.sessionData.remarks[mId];
+            });
+          }
         }
         const initialText = "";
         // Write the remark into local state and render right away instead of
