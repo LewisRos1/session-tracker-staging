@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1407";
+const APP_VERSION = "1408";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -7833,6 +7833,7 @@ function renderFedcTarget(target) {
           data-pa-name="${escHtml(pa.name || pa.title)}"
           data-pa-order="${idx}"
           data-is-mapped="${pa.isMapped ? "1" : ""}"
+          data-is-maintained="1"
           data-cfg-id="${escHtml(pa.id || "")}"
           data-target="${escHtml(target.name)}">+ Add ${addLabel}</button>`;
       } else {
@@ -8796,6 +8797,16 @@ function attachTargetListeners(target) {
         }
         if (paName) actId = await ensureFedcActivity(target.name, paName, paOrder, btn.dataset.paParent || null, btn.dataset.cfgId || null);
         if (!actId) { btn.disabled = false; return; }
+        // Maintained placeholder: lock in "Maintain" first so it isn't lost,
+        // then fall through to add the real empty remark below it.
+        if (btn.dataset.isMaintained === "1") {
+          const mId = generateId("r");
+          state.sessionData.remarks = state.sessionData.remarks || {};
+          state.sessionData.remarks[mId] = { activityId: actId, text: "Maintain", trials: [], order: Date.now() - 1 };
+          addRemark(state.currentSessionId, actId, "Maintain", null, mId).catch(() => {
+            delete state.sessionData.remarks[mId];
+          });
+        }
         const initialText = "";
         // Write the remark into local state and render right away instead of
         // waiting on the Firestore round trip — addRemark() is handed the
