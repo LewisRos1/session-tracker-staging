@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1425";
+const APP_VERSION = "1426";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -6232,10 +6232,15 @@ function showStudentChoice(student) {
             const sessions = await sessionsFetch;
             preSelected = sessions.find(s => s.date === chosenDate)?.participants || [];
           } catch {}
-          showInstructorPickerStep(participants => {
+          if (preSelected.length > 0) {
             closeSessionPicker();
-            openSession(student, null, chosenDate, participants);
-          }, preSelected, renderDateStep, formatDateWithDay(chosenDate));
+            openSession(student, null, chosenDate, preSelected);
+          } else {
+            showInstructorPickerStep(participants => {
+              closeSessionPicker();
+              openSession(student, null, chosenDate, participants);
+            }, [], renderDateStep, formatDateWithDay(chosenDate));
+          }
         });
       });
       $("session-picker-list").querySelector(".btn-date-other").addEventListener("click", () => {
@@ -6912,7 +6917,9 @@ function renderStartSessionCalendar(student, today, displayDate, takenDates = ne
         openSession(student, null, chosenDate, participants);
       };
       const backFn = () => renderStartSessionCalendar(student, today, displayDate, takenDates, sessionsByDate, onBack);
-      const pickAndProceed = () => showInstructorPickerStep(proceed, preSelected, onBack || backFn, formatDateWithDay(chosenDate));
+      const pickAndProceed = () => preSelected.length > 0
+        ? proceed(preSelected)
+        : showInstructorPickerStep(proceed, [], onBack || backFn, formatDateWithDay(chosenDate));
       if (isOlderThan7Days(chosenDate)) { requirePassword(pickAndProceed, EXPIRED_MSG); } else { pickAndProceed(); }
     });
   });
@@ -6975,7 +6982,9 @@ function renderGroupStartSessionCalendar(group, today, displayDate, takenDates =
       const preSelected = sessionsByDate.get(ds) || [];
       const proceed = participants => { closeSessionPicker(); openGroupSession(group, ds, group.students, participants); };
       const backFn = () => renderGroupStartSessionCalendar(group, today, displayDate, takenDates, sessionsByDate, onBack);
-      const pickAndProceed = () => showInstructorPickerStep(proceed, preSelected, onBack || backFn, formatDateWithDay(ds));
+      const pickAndProceed = () => preSelected.length > 0
+        ? proceed(preSelected)
+        : showInstructorPickerStep(proceed, [], onBack || backFn, formatDateWithDay(ds));
       if (isOlderThan7Days(ds)) { requirePassword(pickAndProceed, EXPIRED_MSG); } else { pickAndProceed(); }
     });
   });
@@ -18481,10 +18490,15 @@ function showGroupChoice(group) {
             const sessions = await groupSessionsFetch;
             preSelected = sessions.find(s => s.date === chosenDate)?.participants || [];
           } catch {}
-          showInstructorPickerStep(participants => {
+          if (preSelected.length > 0) {
             closeSessionPicker();
-            openGroupSession(group, chosenDate, group.students, participants);
-          }, preSelected, renderGroupDateStep, formatDateWithDay(chosenDate));
+            openGroupSession(group, chosenDate, group.students, preSelected);
+          } else {
+            showInstructorPickerStep(participants => {
+              closeSessionPicker();
+              openGroupSession(group, chosenDate, group.students, participants);
+            }, [], renderGroupDateStep, formatDateWithDay(chosenDate));
+          }
         });
       });
       $("session-picker-list").querySelector(".btn-date-other").addEventListener("click", () => {
