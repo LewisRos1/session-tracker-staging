@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1409";
+const APP_VERSION = "1410";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -1331,10 +1331,17 @@ function renderTodoTiles(results) {
   }
 
   const mkSessionRow = s => {
-    const name      = s.workflowSubjectName || s.studentName || s.groupName || "Unknown";
-    const dateStr   = s.date ? formatDateWithDay(s.date) : "Unknown date";
-    const subjectId = s.workflowSubjectId || s.studentId || s.groupId || "";
     const isGroup   = !!s.groupId;
+    const subjectId = s.studentId || s.groupId || "";
+    let name = s.workflowSubjectName || "";
+    if (!name) {
+      if (isGroup) {
+        name = (state.groups || []).find(g => g.id === s.groupId)?.name || s.groupName || "Unknown";
+      } else {
+        name = (state.students || []).find(st => st.id === s.studentId)?.name || s.studentName || "Unknown";
+      }
+    }
+    const dateStr   = s.date ? formatDateWithDay(s.date) : "Unknown date";
     return `<button class="todo-session-row"
         data-session-id="${s.id}"
         data-subject-id="${escHtml(subjectId)}"
