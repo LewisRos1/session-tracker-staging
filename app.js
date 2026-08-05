@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1430";
+const APP_VERSION = "1431";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -10097,12 +10097,32 @@ async function handleCheckedByClick(e, isGroup) {
         }
       } catch (err) { console.error("updateSessionChecks p1:", err); }
     } else if (role === "phase2") {
-      const ws     = getWorkflowState(data);
+      const ws      = getWorkflowState(data);
       const newDone = !ws.reviewSubmitted;
       try {
         await setReviewSubmitted(sid, newDone);
-        const newStatus = newDone ? (ws.comments.length > 0 ? "ray_pending" : null) : "daisy_pending";
-        await updateWorkflowStatus(sid, newStatus, getSubjectMeta());
+
+        if (newDone) {
+          // Auto-delete empty correction rows
+          const allCmts   = Object.entries(data?.reviewComments || {});
+          const emptyIds  = allCmts.filter(([, c]) => !(c.text || "").trim()).map(([id]) => id);
+          await Promise.all(emptyIds.map(id => deleteReviewComment(sid, id).catch(() => {})));
+
+          // If no real corrections remain, ask about skipping Phase 3
+          const hasRealCorrections = allCmts.some(([, c]) => (c.text || "").trim());
+          if (!hasRealCorrections) {
+            if (confirm("No corrections needed? Nigel can export straight away.")) {
+              const checks = { ...(data?.checks || {}), no_corrections: { by: "daisy", at: Date.now() } };
+              await updateSessionChecks(sid, checks);
+            }
+          }
+
+          const updatedCmts = allCmts.filter(([id, c]) => !emptyIds.includes(id) && (c.text || "").trim());
+          const newStatus = updatedCmts.length > 0 ? "ray_pending" : null;
+          await updateWorkflowStatus(sid, newStatus, getSubjectMeta());
+        } else {
+          await updateWorkflowStatus(sid, "daisy_pending", getSubjectMeta());
+        }
       } catch (err) { console.error("togglePhase2:", err); }
     } else if (role.startsWith("p3_")) {
       const ws     = getWorkflowState(data);
@@ -10278,16 +10298,6 @@ function setupStickyNote() {
       return;
     }
 
-    // No corrections needed
-    if (e.target.id === "sticky-note-no-corrections-btn") {
-      const { sid, data } = getCtx();
-      if (!sid) return;
-      if (!confirm("Mark as no corrections needed? This will unlock Phase 4 for Nigel to export.")) return;
-      const checks = { ...(data?.checks || {}), no_corrections: { by: "daisy", at: Date.now() } };
-      try { await updateSessionChecks(sid, checks); }
-      catch (err) { console.error("no_corrections:", err); }
-      return;
-    }
 
     // Tick/untick checkbox
     const chk = e.target.closest(".snote-check");
