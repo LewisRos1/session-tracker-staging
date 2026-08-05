@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1437";
+const APP_VERSION = "1438";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -5955,7 +5955,12 @@ function renderManageActivityScreen(student) {
     </select>
   </div>`;
 
-  body.innerHTML = dropHtml + html;
+  const rearrangeHtml = `<div style="display:flex;justify-content:flex-end;margin-bottom:.5rem">
+    <button id="btn-ma-rearrange-inline" class="btn-manage-targets" style="font-size:.88rem;padding:.4rem 1rem">↕️ Rearrange Targets</button>
+  </div>`;
+  body.innerHTML = rearrangeHtml + dropHtml + html;
+
+  body.querySelector("#btn-ma-rearrange-inline").addEventListener("click", () => showTargetReorderList(student));
 
   document.getElementById("ma-target-select").addEventListener("change", function() {
     _maSelectedTargetIdx = parseInt(this.value, 10);
