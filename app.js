@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1419";
+const APP_VERSION = "1420";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -9846,9 +9846,14 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     <div class="wf-node-body">${p1Body}</div>
   </div>`;
 
+  // Phase 2 unlocks when all non-Daisy Phase 1 participants are done
+  const p2Unlocked = ws.p3Ids.length > 0
+    ? ws.p3Ids.every(id => ws.p1Done(id))
+    : ws.allP1Done;
+
   // ── Phase 2: Review & Feedback ───────────────────────────────
   let p2State, p2Body;
-  if (!ws.allP1Done) {
+  if (!p2Unlocked) {
     p2State = "locked";
     p2Body  = `<div class="wf-pill wf-pill--locked">🔒 Complete Phase 1 first</div>`;
   } else if (confirmRole === "phase2") {
