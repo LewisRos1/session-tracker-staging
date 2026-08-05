@@ -75,6 +75,7 @@ import {
   cleanupExpiredTrash,
   reassignGroupStudentAcrossSessions,
   updateSessionChecks,
+  updateSessionParticipants,
   updateWorkflowStatus,
   updateWorkflowNote,
   addReviewComment,
@@ -84,6 +85,7 @@ import {
   updateReviewCommentText,
   markCommentFixed,
   listenToReviewQueue,
+  getSessionsWithParticipant,
   signInWithPin,
   signOutUser,
   onAuthChange,
@@ -170,9 +172,35 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1398";
-// Names shown on the approval strip in View/Edit Past Sessions.
-const CHECKED_BY = { assistant: "Ray", main: "Ms. Daisy" };
+const APP_VERSION = "1399";
+// The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
+const INSTRUCTORS = [
+  { id: "daisy", name: "Ms. Daisy", isMain: true  },
+  { id: "ray",   name: "Ray",       isMain: false },
+  { id: "nigel", name: "Nigel",     isMain: false },
+];
+
+// Show the instructor picker as a step inside the session-picker modal.
+// Calls onConfirm(participantIds[]) when the user taps Next.
+function showInstructorPickerStep(onConfirm) {
+  $("session-picker-title").textContent = "Instructors";
+  $("session-picker-list").innerHTML = `
+    <div style="padding:1rem 1.25rem">
+      <p style="margin:0 0 1rem;font-weight:600;color:#374151">Who's running this session?</p>
+      ${INSTRUCTORS.map(inst => `
+        <label style="display:flex;align-items:center;gap:.85rem;padding:.65rem 0;cursor:pointer;font-size:1rem;border-bottom:1px solid #f3f4f6">
+          <input type="checkbox" class="inst-check" value="${inst.id}"
+            style="width:1.2rem;height:1.2rem;accent-color:#3b82f6;cursor:pointer;flex-shrink:0">
+          <span style="color:#1f2937">${escHtml(inst.name)}</span>
+        </label>`).join("")}
+      <button class="btn-inst-next export-btn" style="margin-top:1.2rem;width:100%;padding:.75rem;font-size:1rem">Next →</button>
+    </div>`;
+  $("session-picker-list").querySelector(".btn-inst-next").addEventListener("click", () => {
+    const participants = [...$("session-picker-list").querySelectorAll(".inst-check:checked")].map(c => c.value);
+    if (!participants.length) { alert("Please select at least one instructor."); return; }
+    onConfirm(participants);
+  });
+}
 
 // ─── PASSWORD GATE ────────────────────────────────────────────
 // Single shared password for exports and old-session access.
@@ -1199,9 +1227,11 @@ function renderStudentDatabaseButton() {
   container.innerHTML = `<div class="info-btn-row">
     <button class="export-btn export-btn-all" id="btn-open-student-registry" style="margin-bottom:0">Student Database</button>
     <button class="export-btn" id="btn-open-ai-report">AI Report Generator</button>
+    <button class="export-btn" id="btn-open-todo">Session Checklist</button>
   </div>`;
   $("btn-open-student-registry").addEventListener("click", () => openStudentRegistryScreen());
   $("btn-open-ai-report").addEventListener("click", () => showScreen("screen-ai-report"));
+  $("btn-open-todo").addEventListener("click", () => openTodoModal());
 }
 
 function openChecklistModal() {
@@ -1243,6 +1273,93 @@ function openChecklistModal() {
 
   $("session-picker-list").innerHTML = html;
   $("session-picker-modal").classList.remove("hidden");
+
+  $("session-picker-list").querySelectorAll(".checklist-modal-item").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const sid       = btn.dataset.sessionId;
+      const subjectId = btn.dataset.subjectId;
+      const isGrp     = btn.dataset.isGroup === "true";
+      const doOpen = () => {
+        closeSessionPicker();
+        if (isGrp) {
+          const group = (state.groups || []).find(g => g.id === subjectId);
+          if (group) openGroupSessionView(group, sid);
+        } else {
+          const student = (state.students || []).find(s => s.id === subjectId);
+          if (student) openSessionView(student, sid);
+        }
+      };
+      if (isOlderThan7Days(btn.dataset.sessionDate)) { requirePassword(doOpen, EXPIRED_MSG); } else { doOpen(); }
+    });
+  });
+}
+
+async function openTodoModal() {
+  $("session-picker-title").textContent = "Session Checklist";
+  $("session-picker-list").innerHTML = `<p class="empty-hint" style="padding:1rem 1.25rem">Loading…</p>`;
+  $("session-picker-modal").classList.remove("hidden");
+
+  // Compute pending counts for each instructor in parallel
+  const results = await Promise.all(INSTRUCTORS.map(async inst => {
+    const sessions = await getSessionsWithParticipant(inst.id).catch(() => []);
+    const pending = sessions.filter(s => {
+      const checks = s.checks || {};
+      const p1Ids  = s.participants || [];
+      // P1 incomplete for this person
+      if (!checks[`p1_${inst.id}`]) return true;
+      // P2 incomplete (Daisy only — reviewSubmitted)
+      if (inst.id === "daisy" && !s.reviewSubmitted) return true;
+      // P3 incomplete for this person (non-Daisy, after review submitted)
+      if (inst.id !== "daisy" && s.reviewSubmitted && !checks[`p3_${inst.id}`]) return true;
+      return false;
+    });
+    return { inst, pending };
+  }));
+
+  const hasAny = results.some(r => r.pending.length > 0);
+  if (!hasAny) {
+    $("session-picker-list").innerHTML = `<p class="empty-hint" style="padding:1rem 1.25rem">All caught up! No pending tasks. ✓</p>`;
+    return;
+  }
+
+  $("session-picker-list").innerHTML = `<div class="choice-list">` +
+    results.filter(r => r.pending.length > 0).map(({ inst, pending }) =>
+      `<button class="choice-btn todo-person-btn" data-id="${inst.id}">
+        <span class="choice-icon">👤</span>
+        <div class="choice-text">
+          <div class="choice-label">${escHtml(inst.name)}</div>
+          <div class="choice-sub">${pending.length} session${pending.length !== 1 ? "s" : ""} pending</div>
+        </div>
+      </button>`).join("") + `</div>`;
+
+  $("session-picker-list").querySelectorAll(".todo-person-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const { inst, pending } = results.find(r => r.inst.id === btn.dataset.id);
+      openTodoPersonList(inst, pending);
+    });
+  });
+}
+
+function openTodoPersonList(inst, sessions) {
+  $("session-picker-title").textContent = `${inst.name} — Pending`;
+  const sorted = [...sessions].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  $("session-picker-list").innerHTML = `<div class="choice-list">` +
+    sorted.map(s => {
+      const name    = s.workflowSubjectName || s.studentName || s.groupName || "Unknown";
+      const dateStr = s.date ? formatDateWithDay(s.date) : "Unknown date";
+      const subjectId = s.workflowSubjectId || s.studentId || s.groupId || "";
+      const isGroup   = !!s.groupId;
+      return `<button class="choice-btn checklist-modal-item"
+          data-session-id="${s.id}"
+          data-subject-id="${escHtml(subjectId)}"
+          data-is-group="${isGroup}"
+          data-session-date="${escHtml(s.date || "")}">
+        <div class="choice-text">
+          <div class="choice-label">${escHtml(name)}</div>
+          <div class="choice-sub">${escHtml(dateStr)}</div>
+        </div>
+      </button>`;
+    }).join("") + `</div>`;
 
   $("session-picker-list").querySelectorAll(".checklist-modal-item").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -6056,8 +6173,11 @@ function showStudentChoice(student) {
 
     $("session-picker-list").querySelectorAll(".btn-date-quick").forEach(btn => {
       btn.addEventListener("click", () => {
-        closeSessionPicker();
-        openSession(student, null, btn.dataset.date);
+        const chosenDate = btn.dataset.date;
+        showInstructorPickerStep(participants => {
+          closeSessionPicker();
+          openSession(student, null, chosenDate, participants);
+        });
       });
     });
 
@@ -6729,9 +6849,13 @@ function renderStartSessionCalendar(student, today, displayDate, takenDates = ne
   }
   $("session-picker-list").querySelectorAll(".date-picker-day:not([disabled])").forEach(btn => {
     btn.addEventListener("click", () => {
-      closeSessionPicker();
-      const open = () => openSession(student, null, btn.dataset.date);
-      if (isOlderThan7Days(btn.dataset.date)) { requirePassword(open, EXPIRED_MSG); } else { open(); }
+      const chosenDate = btn.dataset.date;
+      const proceed = participants => {
+        closeSessionPicker();
+        openSession(student, null, chosenDate, participants);
+      };
+      const pickAndProceed = () => showInstructorPickerStep(proceed);
+      if (isOlderThan7Days(chosenDate)) { requirePassword(pickAndProceed, EXPIRED_MSG); } else { pickAndProceed(); }
     });
   });
 }
@@ -6790,8 +6914,9 @@ function renderGroupStartSessionCalendar(group, today, displayDate, takenDates =
   $("session-picker-list").querySelectorAll(".date-picker-day:not([disabled])").forEach(btn => {
     btn.addEventListener("click", () => {
       const ds = btn.dataset.date;
-      const doOpen = () => { closeSessionPicker(); openGroupSession(group, ds, group.students); };
-      if (isOlderThan7Days(ds)) { requirePassword(doOpen, EXPIRED_MSG); } else { doOpen(); }
+      const proceed = participants => { closeSessionPicker(); openGroupSession(group, ds, group.students, participants); };
+      const pickAndProceed = () => showInstructorPickerStep(proceed);
+      if (isOlderThan7Days(ds)) { requirePassword(pickAndProceed, EXPIRED_MSG); } else { pickAndProceed(); }
     });
   });
 }
@@ -6876,7 +7001,7 @@ function getEffectiveTargets() {
   return state.currentStudent?.targets || [];
 }
 
-async function openSession(student, existingSessionId = null, dateStr = null) {
+async function openSession(student, existingSessionId = null, dateStr = null, participants = null) {
   // Jumping to another date for the SAME student via "Go To Another
   // Session" should land back on whatever target they were already
   // looking at, not silently reset to the first target in the list —
@@ -6937,6 +7062,9 @@ async function openSession(student, existingSessionId = null, dateStr = null) {
       ? existingSessionId
       : await getOrCreateSessionForDate(student.id, dateStr || getTodayString(), student.targets);
     state.currentSessionId = sessionId;
+    if (participants && !existingSessionId) {
+      updateSessionParticipants(sessionId, participants).catch(() => {});
+    }
 
     state.fbUnsubscribe = listenToSession(sessionId, async data => {
       const firstLoad = state.sessionData === null;
@@ -9546,18 +9674,41 @@ let _phase3Error            = null; // error string shown in Phase 3 node, auto-
 const _textareaDebounce     = new Map();
 
 function getWorkflowState(data) {
-  const checks    = data?.checks || {};
-  const rayDone   = !!checks.assistant;
-  const daisyDone = !!checks.main;
-  const reviewUnlocked  = rayDone && daisyDone;
+  const checks       = data?.checks || {};
+  const participants = data?.participants || [];
+
+  // Phase 1 — one pill per participant
+  const p1Ids   = participants;
+  const p1Check = id => checks[`p1_${id}`] || null;
+  const p1Done  = id => !!p1Check(id);
+  const allP1Done = p1Ids.length > 0 && p1Ids.every(p1Done);
+
+  // Phase 2 — always Daisy, uses reviewSubmitted flag
   const reviewSubmitted = !!data?.reviewSubmitted;
-  const revisionDone    = data?.revisionDone || null; // { by, at } or null
+
+  // Phase 3 — Phase 1 participants except Daisy
+  const p3Ids   = p1Ids.filter(id => id !== "daisy");
+  const p3Check = id => checks[`p3_${id}`] || null;
+  const p3Done  = id => !!p3Check(id);
+  const allP3Done = p3Ids.length === 0 || p3Ids.every(p3Done);
+
   const comments  = Object.entries(data?.reviewComments || {})
     .sort(([,a],[,b]) => (a.order || 0) - (b.order || 0));
   const allFixed   = comments.length > 0 && comments.every(([,c]) => !!c.fixedByName);
   const noComments = comments.length === 0;
-  const ready = reviewSubmitted && !!revisionDone;
-  return { rayDone, daisyDone, reviewUnlocked, reviewSubmitted, revisionDone, comments, allFixed, noComments, ready };
+  const ready = reviewSubmitted && allP3Done && (noComments || allFixed);
+
+  const revisionDone = (allP3Done && p3Ids.length > 0)
+    ? { by: "done", at: Math.max(...p3Ids.map(id => p3Check(id)?.at || 0)) }
+    : null;
+
+  return {
+    p1Ids, p1Done, p1Check, allP1Done,
+    reviewSubmitted, reviewUnlocked: allP1Done,
+    p3Ids, p3Done, p3Check, allP3Done,
+    comments, allFixed, noComments, ready, revisionDone,
+    rayDone: p1Done("ray"), daisyDone: p1Done("daisy"),
+  };
 }
 
 function fmtCheckTimestamp(ts) {
@@ -9568,8 +9719,7 @@ function fmtCheckTimestamp(ts) {
 }
 
 function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
-  const ws     = getWorkflowState(data);
-  const checks = data?.checks || {};
+  const ws = getWorkflowState(data);
 
   // Refresh sticky note if open for this session
   const curSid = isGroup ? state.viewGroupSessionId : state.viewSessionId;
@@ -9582,7 +9732,6 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     </svg>
   </div>`;
 
-  // Shared confirm widget
   const mkConfirm = (role, msg) => `
     <div class="wf-confirming">
       <span class="wf-confirm-msg">${msg}</span>
@@ -9592,29 +9741,34 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
       </div>
     </div>`;
 
+  const instName = id => (INSTRUCTORS.find(i => i.id === id) || { name: id }).name;
+
   // ── Phase 1: Enter Data ───────────────────────────────────────
-  const mkPill1 = (role, done, at) => {
-    const name = role === "assistant" ? "Ray" : "Ms. Daisy";
+  const mkPill1 = id => {
+    const name = instName(id);
+    const role = `p1_${id}`;
+    const done = ws.p1Done(id);
+    const at   = ws.p1Check(id)?.at;
     if (confirmRole === role) return mkConfirm(role, done ? `Undo ${name}?` : `${name}: Sure?`);
     if (done) return `<button class="wf-pill wf-pill--done" data-role="${role}">✓ ${escHtml(name)} · ${escHtml(fmtCheckTimestamp(at))}</button>`;
     return `<button class="wf-pill wf-pill--pending" data-role="${role}">○ ${escHtml(name)}: Incomplete</button>`;
   };
 
-  const p1State = (ws.rayDone && ws.daisyDone) ? "done" : "pending";
+  const editInstBtn = `<button class="wf-pill wf-pill--edit-inst" data-action="edit-instructors"
+    style="margin-top:.4rem;font-size:.78rem;padding:.2rem .65rem;background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;border-radius:6px;cursor:pointer">✏ Edit Instructors</button>`;
+
+  const p1State = ws.allP1Done ? "done" : "pending";
+  const p1Body  = ws.p1Ids.length === 0
+    ? `<div class="wf-pill wf-pill--pending">○ No instructors set</div>${editInstBtn}`
+    : `${ws.p1Ids.map(mkPill1).join("")}${editInstBtn}`;
   const p1Node = `<div class="wf-node wf-node--${p1State}">
     <div class="wf-node-label">Phase 1: Enter Data</div>
-    <div class="wf-node-body">
-      ${mkPill1("assistant", ws.rayDone, checks.assistant?.at)}
-      ${mkPill1("main", ws.daisyDone, checks.main?.at)}
-    </div>
+    <div class="wf-node-body">${p1Body}</div>
   </div>`;
 
-  // ── Phase 2: Review & Feedback ────────────────────────────────
+  // ── Phase 2: Review & Feedback (always Daisy, no lock) ───────
   let p2State, p2Body;
-  if (!ws.reviewUnlocked) {
-    p2State = "pending";
-    p2Body  = `<div class="wf-pill wf-pill--pending">○ Ms. Daisy: Incomplete</div>`;
-  } else if (confirmRole === "phase2") {
+  if (confirmRole === "phase2") {
     p2State = "p2-active";
     p2Body  = mkConfirm("phase2", ws.reviewSubmitted ? "Undo Phase 2?" : "Mark as reviewed?");
   } else if (!ws.reviewSubmitted) {
@@ -9629,20 +9783,26 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     <div class="wf-node-body">${p2Body}</div>
   </div>`;
 
-  // ── Phase 3: Revision ─────────────────────────────────────────
+  // ── Phase 3: Revision (non-Daisy participants, no lock) ───────
+  const mkPill3 = id => {
+    const name = instName(id);
+    const role = `p3_${id}`;
+    const done = ws.p3Done(id);
+    const at   = ws.p3Check(id)?.at;
+    if (confirmRole === role) return mkConfirm(role, done ? `Undo ${name}?` : `${name}: Sure?`);
+    if (done) return `<button class="wf-pill wf-pill--done" data-role="${role}">✓ ${escHtml(name)} · ${escHtml(fmtCheckTimestamp(at))}</button>`;
+    return `<button class="wf-pill wf-pill--warn" data-role="${role}">○ ${escHtml(name)}: Incomplete</button>`;
+  };
+
   let p3State, p3Body;
-  if (!ws.reviewSubmitted) {
-    p3State = "pending";
-    p3Body  = `<div class="wf-pill wf-pill--pending">○ Ray: Incomplete</div>`;
-  } else if (confirmRole === "phase3") {
-    p3State = "corrections";
-    p3Body  = mkConfirm("phase3", ws.revisionDone ? "Undo Phase 3?" : "Mark revision done?");
-  } else if (!ws.revisionDone) {
-    p3State = "corrections";
-    p3Body  = `<button class="wf-pill wf-pill--warn" data-role="phase3">○ Ray: Incomplete</button>`;
+  if (ws.p3Ids.length === 0) {
+    p3State = ws.reviewSubmitted ? "done" : "pending";
+    p3Body  = ws.reviewSubmitted
+      ? `<div class="wf-pill wf-pill--done">✓ No revision needed</div>`
+      : `<div class="wf-pill wf-pill--pending">○ Waiting…</div>`;
   } else {
-    p3State = "done";
-    p3Body  = `<button class="wf-pill wf-pill--done" data-role="phase3">✓ Ray · ${escHtml(fmtCheckTimestamp(ws.revisionDone.at))}</button>`;
+    p3State = ws.allP3Done ? "done" : "corrections";
+    p3Body  = ws.p3Ids.map(mkPill3).join("");
   }
   const p3Node = `<div class="wf-node wf-node--${p3State}">
     <div class="wf-node-label">Phase 3: Revision</div>
@@ -9659,7 +9819,6 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     </div>
   </div>`;
 
-  // ── Row 2: Note (col 3-5, between Phase 2 & 3) + Export (col 7)
   const hasCmts = ws.comments.length > 0;
   const noteTrigger = `<div class="wf-note-wrap">
     <button class="wf-note-btn${hasCmts ? " has-note" : ""}" data-action="open-note">
@@ -9737,7 +9896,32 @@ async function handleCheckedByClick(e, isGroup) {
     return true;
   }
 
-  // ── Phase-1 pill click → confirm flow ───────────────────────
+  // ── Edit Instructors button ──────────────────────────────────
+  if (e.target.closest("[data-action='edit-instructors']")) {
+    const curParticipants = getData()?.participants || [];
+    $("session-picker-title").textContent = "Edit Instructors";
+    $("session-picker-list").innerHTML = `
+      <div style="padding:1rem 1.25rem">
+        <p style="margin:0 0 1rem;font-weight:600;color:#374151">Who ran this session?</p>
+        ${INSTRUCTORS.map(inst => `
+          <label style="display:flex;align-items:center;gap:.85rem;padding:.65rem 0;cursor:pointer;font-size:1rem;border-bottom:1px solid #f3f4f6">
+            <input type="checkbox" class="inst-edit-check" value="${inst.id}"${curParticipants.includes(inst.id) ? " checked" : ""}
+              style="width:1.2rem;height:1.2rem;accent-color:#3b82f6;cursor:pointer;flex-shrink:0">
+            <span style="color:#1f2937">${escHtml(inst.name)}</span>
+          </label>`).join("")}
+        <button class="btn-inst-save export-btn" style="margin-top:1.2rem;width:100%;padding:.75rem;font-size:1rem">Save</button>
+      </div>`;
+    $("session-picker-modal").classList.remove("hidden");
+    $("session-picker-list").querySelector(".btn-inst-save").addEventListener("click", async () => {
+      const participants = [...$("session-picker-list").querySelectorAll(".inst-edit-check:checked")].map(c => c.value);
+      if (!participants.length) { alert("Please select at least one instructor."); return; }
+      closeSessionPicker();
+      await updateSessionParticipants(getSid(), participants).catch(() => {});
+    });
+    return true;
+  }
+
+  // ── Phase-pill click → confirm flow ─────────────────────────
   const pillBtn = e.target.closest(".wf-pill[data-role]");
   if (pillBtn) {
     clearTimer();
@@ -9756,20 +9940,19 @@ async function handleCheckedByClick(e, isGroup) {
     if (!sid) return true;
     const role = yesBtn.dataset.role;
 
-    if (role === "assistant" || role === "main") {
+    if (role.startsWith("p1_")) {
       const checks  = { ...(data?.checks || {}) };
       const wasDone = !!checks[role];
-      if (wasDone) { delete checks[role]; } else { checks[role] = { by: CHECKED_BY[role], at: Date.now() }; }
+      if (wasDone) { delete checks[role]; } else { checks[role] = { by: role.slice(3), at: Date.now() }; }
       try {
         await updateSessionChecks(sid, checks);
-        const bothDone  = !!checks.assistant && !!checks.main;
-        const wasQueued = data?.workflowStatus === "daisy_pending";
-        if (bothDone && !data?.reviewSubmitted) {
+        const ws2 = getWorkflowState({ ...data, checks });
+        if (ws2.allP1Done && !data?.reviewSubmitted) {
           await updateWorkflowStatus(sid, "daisy_pending", getSubjectMeta());
-        } else if (!bothDone && wasQueued) {
+        } else if (!ws2.allP1Done && data?.workflowStatus === "daisy_pending") {
           await updateWorkflowStatus(sid, null);
         }
-      } catch (err) { console.error("updateSessionChecks:", err); }
+      } catch (err) { console.error("updateSessionChecks p1:", err); }
     } else if (role === "phase2") {
       const ws     = getWorkflowState(data);
       const newDone = !ws.reviewSubmitted;
@@ -9778,9 +9961,10 @@ async function handleCheckedByClick(e, isGroup) {
         const newStatus = newDone ? (ws.comments.length > 0 ? "ray_pending" : null) : "daisy_pending";
         await updateWorkflowStatus(sid, newStatus, getSubjectMeta());
       } catch (err) { console.error("togglePhase2:", err); }
-    } else if (role === "phase3") {
+    } else if (role.startsWith("p3_")) {
       const ws     = getWorkflowState(data);
-      const newDone = !ws.revisionDone;
+      const id     = role.slice(3);
+      const newDone = !ws.p3Done(id);
       if (newDone && ws.comments.length > 0 && !ws.allFixed) {
         const unfixed = ws.comments.filter(([,c]) => !c.fixedByName).length;
         _phase3Error = `${unfixed} correction${unfixed > 1 ? "s" : ""} still unticked.`;
@@ -9789,10 +9973,14 @@ async function handleCheckedByClick(e, isGroup) {
         return true;
       }
       _phase3Error = null;
+      const checks  = { ...(data?.checks || {}) };
+      if (newDone) { checks[role] = { by: id, at: Date.now() }; } else { delete checks[role]; }
       try {
-        await setRevisionDone(sid, newDone);
-        await updateWorkflowStatus(sid, newDone ? null : "ray_pending", getSubjectMeta());
-      } catch (err) { console.error("togglePhase3:", err); }
+        await updateSessionChecks(sid, checks);
+        const ws2    = getWorkflowState({ ...data, checks });
+        const allDone = ws2.allP3Done && ws2.p3Ids.length > 0;
+        await updateWorkflowStatus(sid, allDone ? null : "ray_pending", getSubjectMeta());
+      } catch (err) { console.error("updateSessionChecks p3:", err); }
     }
     return true;
   }
@@ -18127,8 +18315,11 @@ function showGroupChoice(group) {
       </div>`;
     $("session-picker-list").querySelectorAll(".btn-date-quick").forEach(btn => {
       btn.addEventListener("click", () => {
-        closeSessionPicker();
-        openGroupSession(group, btn.dataset.date, group.students);
+        const chosenDate = btn.dataset.date;
+        showInstructorPickerStep(participants => {
+          closeSessionPicker();
+          openGroupSession(group, chosenDate, group.students, participants);
+        });
       });
     });
     $("session-picker-list").querySelector(".btn-date-other").addEventListener("click", () => {
@@ -18156,7 +18347,7 @@ function showGroupChoice(group) {
 }
 
 // ── Open group session ───────────────────────────────────────
-async function openGroupSession(group, dateStr, attendees) {
+async function openGroupSession(group, dateStr, attendees, participants = null) {
   attendees = (attendees || []).filter(Boolean);
   // Same reasoning as openSession's preservedTargetName above — jumping to
   // another date for the SAME group should keep the currently-viewed
@@ -18190,6 +18381,7 @@ async function openGroupSession(group, dateStr, attendees) {
   try {
     const sid = await getOrCreateGroupSessionForDate(group.id, dateStr, group.targets, attendees, group.studentLinks || {});
     state.groupSessionId = sid;
+    if (participants) updateSessionParticipants(sid, participants).catch(() => {});
     let firstLoad = true;
     state.fbGroupUnsubscribe = listenToSession(sid, async data => {
       state.groupSessionData = data;

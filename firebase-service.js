@@ -343,6 +343,11 @@ export async function setRevisionDone(sessionId, done) {
   }
 }
 
+/** Save the instructor participants list for a session. */
+export async function updateSessionParticipants(sessionId, participants) {
+  await updateDoc(doc(db, "sessions", sessionId), { participants: participants ?? [] });
+}
+
 /** Update the text of an existing review comment (for auto-save on textarea input). */
 export async function updateReviewCommentText(sessionId, commentId, text) {
   await updateDoc(doc(db, "sessions", sessionId), {
@@ -363,6 +368,13 @@ export async function markCommentFixed(sessionId, commentId, fixedByName) {
       [`reviewComments.${commentId}.fixedAt`]:     deleteField()
     });
   }
+}
+
+/** All sessions where a given instructor id appears in the participants array. */
+export async function getSessionsWithParticipant(instructorId) {
+  const q = query(collection(db, "sessions"), where("participants", "array-contains", instructorId));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
 /** Real-time listener for sessions awaiting Daisy's review or Ray's corrections. */
