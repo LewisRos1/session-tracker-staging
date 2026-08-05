@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1426";
+const APP_VERSION = "1427";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -1359,11 +1359,9 @@ function renderTodoTiles(results) {
     }
     if (inst.id !== "daisy" && s.reviewSubmitted && !checks[`p3_${inst.id}`]) tasks.push("Revision");
 
-    const pillStyle = t => t === "Check"
-      ? "background:#ede9fe;color:#6d28d9"
-      : t === "Revision"
-        ? "background:#fff7ed;color:#c2410c"
-        : "background:#eff6ff;color:#1d4ed8";
+    const pillStyle = t => t === "Enter Data"
+      ? "background:#eff6ff;color:#1d4ed8"
+      : "background:#fff7ed;color:#c2410c";
 
     return `<button class="todo-session-row"
         data-session-id="${s.id}"
