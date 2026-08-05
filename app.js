@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1434";
+const APP_VERSION = "1435";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -1309,9 +1309,11 @@ async function openTodoScreen() {
     const sessions = await getSessionsWithParticipant(inst.id).catch(() => []);
     const pending = sessions.filter(s => {
       const checks = s.checks || {};
+      const ws = getWorkflowState(s);
       if (!checks[`p1_${inst.id}`]) return true;
       if (inst.id === "daisy" && !s.reviewSubmitted) return true;
-      if (inst.id !== "daisy" && s.reviewSubmitted && !checks[`p3_${inst.id}`]) return true;
+      if (inst.id !== "daisy" && s.reviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) return true;
+      if (inst.id === "nigel" && ws.ready && !ws.p4Done) return true;
       return false;
     });
     return { inst, pending };
@@ -1347,6 +1349,7 @@ function renderTodoTiles(results) {
     }
     const dateStr = s.date ? formatDateWithDay(s.date) : "Unknown date";
     const checks  = s.checks || {};
+    const ws      = getWorkflowState(s);
 
     // Compute all pending tasks for this instructor on this session
     const tasks = [];
@@ -1357,11 +1360,14 @@ function renderTodoTiles(results) {
       const p2Unlocked = nonDaisy.length > 0 ? nonDaisy.every(id => !!checks[`p1_${id}`]) : !!checks["p1_daisy"];
       if (p2Unlocked) tasks.push("Check");
     }
-    if (inst.id !== "daisy" && s.reviewSubmitted && !checks[`p3_${inst.id}`]) tasks.push("Revision");
+    if (inst.id !== "daisy" && s.reviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) tasks.push("Revision");
+    if (inst.id === "nigel" && ws.ready && !ws.p4Done) tasks.push("Export");
 
     const pillStyle = t => t === "Enter Data"
       ? "background:#eff6ff;color:#1d4ed8"
-      : "background:#fff7ed;color:#c2410c";
+      : t === "Export"
+        ? "background:#f0fdf4;color:#15803d"
+        : "background:#fff7ed;color:#c2410c";
 
     return `<button class="todo-session-row"
         data-session-id="${s.id}"
@@ -7351,11 +7357,6 @@ function populateTargetDropdown(targets) {
 
   sel.value = state.selectedTargetName || sorted[0]?.name || "";
 
-  const reorderBtn = $("btn-reorder-targets");
-  if (reorderBtn) {
-    reorderBtn.classList.toggle("hidden", targets.length < 2);
-    reorderBtn.onclick = () => showTargetReorderList(state.currentStudent);
-  }
   const editInstBtn2 = $("btn-entry-edit-instructors");
   if (editInstBtn2) {
     editInstBtn2.classList.remove("hidden");
