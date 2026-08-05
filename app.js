@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1438";
+const APP_VERSION = "1439";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -6195,6 +6195,12 @@ function showStudentChoice(student) {
           <div class="choice-label">Manage Activity</div>
         </div>
       </button>
+      <button class="choice-btn choice-reorder-targets">
+        <span class="choice-icon">↕️</span>
+        <div class="choice-text">
+          <div class="choice-label">Rearrange Targets</div>
+        </div>
+      </button>
       <button class="choice-btn choice-export-excel">
         <span class="choice-icon">📊</span>
         <div class="choice-text">
@@ -6327,6 +6333,10 @@ function showStudentChoice(student) {
     };
     pwInput.addEventListener("keydown", e => { if (e.key === "Enter") checkPw(); });
     $("ma-gate-pw-btn").addEventListener("click", checkPw);
+  });
+  $("session-picker-list").querySelector(".choice-reorder-targets").addEventListener("click", () => {
+    closeSessionPicker();
+    showTargetReorderList(student);
   });
 }
 
