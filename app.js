@@ -172,11 +172,11 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1406";
+const APP_VERSION = "1407";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
-  { id: "ray",   name: "Ray",       isMain: false },
+  { id: "ray",   name: "Rayhanah",  isMain: false },
   { id: "nigel", name: "Nigel",     isMain: false },
 ];
 
@@ -10155,7 +10155,7 @@ function setupStickyNote() {
       if (!sid) return;
       const cmtId  = chk.dataset.cmtId;
       const fixing = chk.checked;
-      try { await markCommentFixed(sid, cmtId, fixing ? "Ray" : null); }
+      try { await markCommentFixed(sid, cmtId, fixing ? "Rayhanah" : null); }
       catch (err) { console.error("markCommentFixed:", err); }
       return;
     }
