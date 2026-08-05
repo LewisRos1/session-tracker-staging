@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1424";
+const APP_VERSION = "1425";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -1374,7 +1374,7 @@ function renderTodoTiles(results) {
       <span style="font-size:.88rem;font-weight:600;color:#1f2937">${escHtml(name)}</span>
       <span style="display:flex;align-items:center;gap:.4rem;margin-top:.15rem;flex-wrap:wrap">
         <span style="font-size:.78rem;color:var(--text-muted)">${escHtml(dateStr)}</span>
-        ${tasks.map(t => `<span style="font-size:.94rem;font-weight:600;padding:.15rem .55rem;border-radius:999px;${pillStyle(t)}">${escHtml(t)}</span>`).join("")}
+        ${tasks.map(t => `<span style="font-size:.8rem;font-weight:600;padding:.15rem .55rem;border-radius:999px;${pillStyle(t)}">${escHtml(t)}</span>`).join("")}
       </span>
     </button>`;
   };
