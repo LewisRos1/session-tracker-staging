@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1412";
+const APP_VERSION = "1413";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -1366,7 +1366,7 @@ function renderTodoTiles(results) {
               <span style="font-weight:700;font-size:.95rem;color:#1f2937">${escHtml(inst.name)}</span>
               <span style="background:#3b82f6;color:#fff;border-radius:999px;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;padding:0 5px;flex-shrink:0">${pending.length}</span>
             </div>
-            ${hasPending ? `<span class="todo-chevron" style="color:#9ca3af;font-size:1rem;transition:transform .2s;transform:rotate(-90deg)">▾</span>` : ""}
+            ${hasPending ? `<span class="todo-chevron" style="color:#6b7280;font-size:1.5rem;line-height:1;transition:transform .2s;transform:rotate(-90deg)">▾</span>` : ""}
           </button>
           <div class="todo-col-body" data-id="${inst.id}" style="display:none">
             ${hasPending ? sorted.map(mkSessionRow).join("") : ""}
