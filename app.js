@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1414";
+const APP_VERSION = "1415";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -6216,38 +6216,31 @@ function showStudentChoice(student) {
           }, preSelected, renderDateStep, formatDateWithDay(chosenDate));
         });
       });
-      $("session-picker-list").querySelector(".btn-date-other").addEventListener("click", dateOtherHandler);
-    };
-    const dateOtherHandler = () => {
-      const [ty, tm] = today.split("-").map(Number);
-      const displayDate = `${ty}-${String(tm).padStart(2,"0")}-01`;
-      renderStartSessionCalendar(student, today, displayDate, new Set(), new Map(), renderDateStep);
-      sessionsFetch.then(sessions => {
-
-    $("session-picker-list").querySelector(".btn-date-other").addEventListener("click", () => {
-      const [ty, tm] = today.split("-").map(Number);
-      const displayDate = `${ty}-${String(tm).padStart(2,"0")}-01`;
-      renderStartSessionCalendar(student, today, displayDate, new Set(), new Map(), renderDateStep);
-      sessionsFetch
-        .then(sessions => {
-          const curTgtNames = new Set((student.targets || []).map(t => t.name));
-          const stripE = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
-          const hasData = s => {
-            if (Object.values(s.fedcComments || {}).some(c => stripE(c).length > 0)) return true;
-            return Object.values(s.remarks || {}).some(r => {
-              const act = (s.activities || {})[r.activityId];
-              if (!act || !curTgtNames.has(act.targetName)) return false;
-              return stripE(r.text).length > 0 || (r.trials || []).some(t => t !== null && t !== -1) || stripE(r.masteryNote).length > 0;
-            });
-          };
-          const empties = sessions.filter(s => !hasData(s));
-          empties.forEach(s => deleteSession(s.id).catch(() => {}));
-          if (empties.length > 0) resequenceIndividualSessions(student.id).catch(() => {});
-          const takenDates = new Set(sessions.filter(hasData).map(s => s.date));
-          const sessionsByDate = new Map(sessions.map(s => [s.date, s.participants || []]));
-          renderStartSessionCalendar(student, today, displayDate, takenDates, sessionsByDate, renderDateStep);
-        })
-        .catch(() => {});
+      $("session-picker-list").querySelector(".btn-date-other").addEventListener("click", () => {
+        const [ty, tm] = today.split("-").map(Number);
+        const displayDate = `${ty}-${String(tm).padStart(2,"0")}-01`;
+        renderStartSessionCalendar(student, today, displayDate, new Set(), new Map(), renderDateStep);
+        sessionsFetch
+          .then(sessions => {
+            const curTgtNames = new Set((student.targets || []).map(t => t.name));
+            const stripE = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
+            const hasData = s => {
+              if (Object.values(s.fedcComments || {}).some(c => stripE(c).length > 0)) return true;
+              return Object.values(s.remarks || {}).some(r => {
+                const act = (s.activities || {})[r.activityId];
+                if (!act || !curTgtNames.has(act.targetName)) return false;
+                return stripE(r.text).length > 0 || (r.trials || []).some(t => t !== null && t !== -1) || stripE(r.masteryNote).length > 0;
+              });
+            };
+            const empties = sessions.filter(s => !hasData(s));
+            empties.forEach(s => deleteSession(s.id).catch(() => {}));
+            if (empties.length > 0) resequenceIndividualSessions(student.id).catch(() => {});
+            const takenDates = new Set(sessions.filter(hasData).map(s => s.date));
+            const sessionsByDate = new Map(sessions.map(s => [s.date, s.participants || []]));
+            renderStartSessionCalendar(student, today, displayDate, takenDates, sessionsByDate, renderDateStep);
+          })
+          .catch(() => {});
+      });
     };
     renderDateStep();
   });
