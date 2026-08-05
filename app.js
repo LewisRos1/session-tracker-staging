@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1440";
+const APP_VERSION = "1441";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -5942,7 +5942,7 @@ function renderManageActivityScreen(student) {
     <select id="ma-target-select" class="target-dropdown" style="flex:1">
       ${targets.map((t, i) => `<option value="${i}"${i === _maSelectedTargetIdx ? ' selected' : ''}>${escHtml(t.name)}</option>`).join('')}
     </select>
-    <button id="btn-ma-rearrange-inline" class="btn-manage-targets">↕️ Rearrange</button>
+    <button id="btn-ma-rearrange-inline" class="btn-manage-targets">↕️ Rearrange Targets</button>
   </div>`;
 
   body.innerHTML = dropHtml + html;
