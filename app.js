@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1401";
+const APP_VERSION = "1402";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -1298,9 +1298,8 @@ function openChecklistModal() {
 
 async function openTodoScreen() {
   showScreen("screen-todo");
-  $("todo-body").innerHTML = `<p style="padding:1.5rem;color:var(--text-muted)">Loading…</p>`;
+  renderTodoTiles(null); // show loading state
 
-  // Compute pending counts for each instructor in parallel
   const results = await Promise.all(INSTRUCTORS.map(async inst => {
     const sessions = await getSessionsWithParticipant(inst.id).catch(() => []);
     const pending = sessions.filter(s => {
@@ -1313,53 +1312,69 @@ async function openTodoScreen() {
     return { inst, pending };
   }));
 
-  const hasAny = results.some(r => r.pending.length > 0);
-  if (!hasAny) {
-    $("todo-body").innerHTML = `<p style="padding:1.5rem;color:var(--text-muted)">All caught up! No pending tasks. ✓</p>`;
+  renderTodoTiles(results);
+}
+
+function renderTodoTiles(results) {
+  const body = $("todo-body");
+
+  if (!results) {
+    body.innerHTML = `<p style="padding:1.5rem;color:var(--text-muted)">Loading…</p>`;
     return;
   }
 
-  $("todo-body").innerHTML = results.filter(r => r.pending.length > 0).map(({ inst, pending }) => `
-    <div class="todo-person-card" style="margin-bottom:1rem;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden">
-      <button class="todo-person-header" data-id="${inst.id}"
-        style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:1rem 1.2rem;background:#f9fafb;border:none;cursor:pointer;font-size:1rem;font-weight:600;color:#1f2937;text-align:left">
-        <span>${escHtml(inst.name)}</span>
-        <span style="background:#3b82f6;color:#fff;border-radius:999px;padding:.2rem .75rem;font-size:.9rem">${pending.length}</span>
-      </button>
-      <div class="todo-person-list" data-id="${inst.id}" style="display:none">
-        ${[...pending].sort((a,b) => (a.date||"").localeCompare(b.date||"")).map(s => {
-          const name      = s.workflowSubjectName || s.studentName || s.groupName || "Unknown";
-          const dateStr   = s.date ? formatDateWithDay(s.date) : "Unknown date";
-          const subjectId = s.workflowSubjectId || s.studentId || s.groupId || "";
-          const isGroup   = !!s.groupId;
-          return `<button class="todo-session-row"
-              data-session-id="${s.id}"
-              data-subject-id="${escHtml(subjectId)}"
-              data-is-group="${isGroup}"
-              data-session-date="${escHtml(s.date || "")}"
-              style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:.85rem 1.2rem;border:none;border-top:1px solid #f3f4f6;background:#fff;cursor:pointer;font-size:.95rem;color:#374151;text-align:left">
-            <div>
-              <div style="font-weight:500">${escHtml(name)}</div>
-              <div style="font-size:.82rem;color:var(--text-muted)">${escHtml(dateStr)}</div>
-            </div>
-            <span style="color:#9ca3af;font-size:1.1rem">›</span>
-          </button>`;
-        }).join("")}
-      </div>
-    </div>`).join("");
+  const withPending = results.filter(r => r.pending.length > 0);
+  if (withPending.length === 0) {
+    body.innerHTML = `<p style="padding:2rem;text-align:center;color:var(--text-muted);font-size:1.05rem">All caught up! No pending tasks. ✓</p>`;
+    return;
+  }
 
-  // Toggle expand/collapse
-  $("todo-body").querySelectorAll(".todo-person-header").forEach(btn => {
+  body.innerHTML = withPending.map(({ inst, pending }) => `
+    <button class="todo-person-row" data-id="${inst.id}"
+      style="display:flex;align-items:center;gap:.6rem;width:100%;padding:1.1rem 1.3rem;border:none;border-bottom:1px solid #f3f4f6;background:#fff;cursor:pointer;font-size:1rem;font-weight:600;color:#1f2937;text-align:left">
+      <span>${escHtml(inst.name)}</span>
+      <span style="background:#3b82f6;color:#fff;border-radius:999px;min-width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:700;padding:0 6px;flex-shrink:0">${pending.length}</span>
+    </button>`).join("");
+
+  body.querySelectorAll(".todo-person-row").forEach(btn => {
     btn.addEventListener("click", () => {
-      const list = $("todo-body").querySelector(`.todo-person-list[data-id="${btn.dataset.id}"]`);
-      const open = list.style.display === "none";
-      list.style.display = open ? "block" : "none";
-      btn.style.background = open ? "#eff6ff" : "#f9fafb";
+      const { inst, pending } = results.find(r => r.inst.id === btn.dataset.id);
+      renderTodoPersonList(inst, pending, results);
     });
   });
+}
 
-  // Open session on row tap
-  $("todo-body").querySelectorAll(".todo-session-row").forEach(btn => {
+function renderTodoPersonList(inst, sessions, results) {
+  const body = $("todo-body");
+  const sorted = [...sessions].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+
+  body.innerHTML = `
+    <div style="padding:1rem 1.1rem">
+      <button class="todo-back-btn" style="display:flex;align-items:center;gap:.4rem;background:none;border:none;cursor:pointer;font-size:.95rem;color:#3b82f6;font-weight:600;padding:.25rem 0;margin-bottom:1rem">← Back</button>
+      <div style="font-size:1.1rem;font-weight:700;color:#1f2937;margin-bottom:1rem">${escHtml(inst.name)} — ${sorted.length} pending</div>
+      ${sorted.map(s => {
+        const name      = s.workflowSubjectName || s.studentName || s.groupName || "Unknown";
+        const dateStr   = s.date ? formatDateWithDay(s.date) : "Unknown date";
+        const subjectId = s.workflowSubjectId || s.studentId || s.groupId || "";
+        const isGroup   = !!s.groupId;
+        return `<button class="todo-session-row"
+            data-session-id="${s.id}"
+            data-subject-id="${escHtml(subjectId)}"
+            data-is-group="${isGroup}"
+            data-session-date="${escHtml(s.date || "")}"
+            style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:.9rem 1rem;border:none;border-bottom:1px solid #f3f4f6;background:#fff;cursor:pointer;font-size:.95rem;color:#374151;text-align:left;border-radius:0">
+          <div>
+            <div style="font-weight:600">${escHtml(name)}</div>
+            <div style="font-size:.82rem;color:var(--text-muted)">${escHtml(dateStr)}</div>
+          </div>
+          <span style="color:#9ca3af;font-size:1.2rem">›</span>
+        </button>`;
+      }).join("")}
+    </div>`;
+
+  body.querySelector(".todo-back-btn").addEventListener("click", () => renderTodoTiles(results));
+
+  body.querySelectorAll(".todo-session-row").forEach(btn => {
     btn.addEventListener("click", () => {
       const sid       = btn.dataset.sessionId;
       const subjectId = btn.dataset.subjectId;

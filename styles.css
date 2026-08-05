@@ -2873,10 +2873,9 @@ div.admin-note-editable:empty::before {
 .wf-node--done, .wf-node--nigel-ready {
   border-color: #34d399; background: #d1fae5; color: #065f46;
 }
-.wf-node--p2-active {
-  border-color: #fbbf24; background: #fef3c7; color: #92400e;
-}
-.wf-node--corrections {
+.wf-node--p2-active,
+.wf-node--corrections,
+.wf-node--pending {
   border-color: #f87171; background: #fee2e2; color: #991b1b;
 }
 .wf-node--nigel {
