@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1400";
+const APP_VERSION = "1401";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -185,15 +185,17 @@ const INSTRUCTORS = [
 function showInstructorPickerStep(onConfirm) {
   $("session-picker-title").textContent = "Instructors";
   $("session-picker-list").innerHTML = `
-    <div style="padding:1rem 1.25rem">
-      <p style="margin:0 0 1rem;font-weight:600;color:#374151">Who's running this session?</p>
-      ${INSTRUCTORS.map(inst => `
-        <label style="display:flex;align-items:center;gap:.85rem;padding:.65rem 0;cursor:pointer;font-size:1rem;border-bottom:1px solid #f3f4f6">
-          <input type="checkbox" class="inst-check" value="${inst.id}"
-            style="width:1.2rem;height:1.2rem;accent-color:#3b82f6;cursor:pointer;flex-shrink:0">
-          <span style="color:#1f2937">${escHtml(inst.name)}</span>
-        </label>`).join("")}
-      <button class="btn-inst-next export-btn" style="margin-top:1.2rem;width:100%;padding:.75rem;font-size:1rem">Next →</button>
+    <div style="padding:1.5rem 1.25rem;display:flex;flex-direction:column;align-items:center">
+      <p style="margin:0 0 1.25rem;font-weight:600;color:#374151;text-align:center">Who is facilitating this session?</p>
+      <div style="width:100%;max-width:320px">
+        ${INSTRUCTORS.map(inst => `
+          <label style="display:flex;align-items:center;justify-content:center;gap:.85rem;padding:.75rem 0;cursor:pointer;font-size:1rem;border-bottom:1px solid #f3f4f6">
+            <input type="checkbox" class="inst-check" value="${inst.id}"
+              style="width:1.2rem;height:1.2rem;accent-color:#3b82f6;cursor:pointer;flex-shrink:0">
+            <span style="color:#1f2937;width:7rem">${escHtml(inst.name)}</span>
+          </label>`).join("")}
+      </div>
+      <button class="btn-inst-next export-btn" style="margin-top:1.5rem;width:100%;padding:.85rem;font-size:1rem;text-align:center">Next →</button>
     </div>`;
   $("session-picker-list").querySelector(".btn-inst-next").addEventListener("click", () => {
     const participants = [...$("session-picker-list").querySelectorAll(".inst-check:checked")].map(c => c.value);
@@ -9897,15 +9899,17 @@ async function handleCheckedByClick(e, isGroup) {
     const curParticipants = getData()?.participants || [];
     $("session-picker-title").textContent = "Edit Instructors";
     $("session-picker-list").innerHTML = `
-      <div style="padding:1rem 1.25rem">
-        <p style="margin:0 0 1rem;font-weight:600;color:#374151">Who ran this session?</p>
-        ${INSTRUCTORS.map(inst => `
-          <label style="display:flex;align-items:center;gap:.85rem;padding:.65rem 0;cursor:pointer;font-size:1rem;border-bottom:1px solid #f3f4f6">
-            <input type="checkbox" class="inst-edit-check" value="${inst.id}"${curParticipants.includes(inst.id) ? " checked" : ""}
-              style="width:1.2rem;height:1.2rem;accent-color:#3b82f6;cursor:pointer;flex-shrink:0">
-            <span style="color:#1f2937">${escHtml(inst.name)}</span>
-          </label>`).join("")}
-        <button class="btn-inst-save export-btn" style="margin-top:1.2rem;width:100%;padding:.75rem;font-size:1rem">Save</button>
+      <div style="padding:1.5rem 1.25rem;display:flex;flex-direction:column;align-items:center">
+        <p style="margin:0 0 1.25rem;font-weight:600;color:#374151;text-align:center">Who is facilitating this session?</p>
+        <div style="width:100%;max-width:320px">
+          ${INSTRUCTORS.map(inst => `
+            <label style="display:flex;align-items:center;justify-content:center;gap:.85rem;padding:.75rem 0;cursor:pointer;font-size:1rem;border-bottom:1px solid #f3f4f6">
+              <input type="checkbox" class="inst-edit-check" value="${inst.id}"${curParticipants.includes(inst.id) ? " checked" : ""}
+                style="width:1.2rem;height:1.2rem;accent-color:#3b82f6;cursor:pointer;flex-shrink:0">
+              <span style="color:#1f2937;width:7rem">${escHtml(inst.name)}</span>
+            </label>`).join("")}
+        </div>
+        <button class="btn-inst-save export-btn" style="margin-top:1.5rem;width:100%;padding:.85rem;font-size:1rem;text-align:center">Save</button>
       </div>`;
     $("session-picker-modal").classList.remove("hidden");
     $("session-picker-list").querySelector(".btn-inst-save").addEventListener("click", async () => {
