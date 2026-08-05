@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1420";
+const APP_VERSION = "1421";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -9854,8 +9854,12 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
   // ── Phase 2: Review & Feedback ───────────────────────────────
   let p2State, p2Body;
   if (!p2Unlocked) {
+    const pending = ws.p3Ids.filter(id => !ws.p1Done(id)).map(instName);
+    const pendingStr = pending.length === 1
+      ? pending[0]
+      : pending.slice(0, -1).join(", ") + " & " + pending[pending.length - 1];
     p2State = "locked";
-    p2Body  = `<div class="wf-pill wf-pill--locked">🔒 Complete Phase 1 first</div>`;
+    p2Body  = `<div class="wf-pill wf-pill--locked">🔒 ${escHtml(pendingStr)} to complete Phase 1 first</div>`;
   } else if (confirmRole === "phase2") {
     p2State = "p2-active";
     p2Body  = mkConfirm("phase2", ws.reviewSubmitted ? "Undo Phase 2?" : "Mark as reviewed?");
