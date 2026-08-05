@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1413";
+const APP_VERSION = "1414";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -182,11 +182,12 @@ const INSTRUCTORS = [
 
 // Show the instructor picker as a step inside the session-picker modal.
 // Calls onConfirm(participantIds[]) when the user taps Next.
-function showInstructorPickerStep(onConfirm, preSelected = []) {
+function showInstructorPickerStep(onConfirm, preSelected = [], onBack = null, dateStr = null) {
   $("session-picker-title").textContent = "Instructors";
   $("session-picker-list").innerHTML = `
     <div style="padding:1.5rem 1.25rem;display:flex;flex-direction:column;align-items:center">
-      <p style="margin:0 0 1.25rem;font-weight:600;color:#374151;text-align:center">Who is facilitating this session?</p>
+      <p style="margin:0 0 .35rem;font-weight:600;color:#374151;text-align:center">Who is facilitating this session?</p>
+      ${dateStr ? `<p style="margin:0 0 1.25rem;font-size:.9rem;color:#6b7280;text-align:center">${escHtml(dateStr)}</p>` : `<div style="margin-bottom:1.25rem"></div>`}
       <div style="width:100%;max-width:320px">
         ${INSTRUCTORS.map(inst => `
           <label style="display:flex;align-items:center;justify-content:center;gap:.85rem;padding:.75rem 0;cursor:pointer;font-size:1rem;border-bottom:1px solid #f3f4f6">
@@ -196,11 +197,14 @@ function showInstructorPickerStep(onConfirm, preSelected = []) {
             <span style="color:#1f2937;width:7rem">${escHtml(inst.name)}</span>
           </label>`).join("")}
       </div>
-      <button class="btn-inst-next export-btn" style="margin-top:1.5rem;width:100%;padding:.85rem;font-size:1rem;text-align:center">Next →</button>
+      <div style="display:flex;gap:.75rem;margin-top:1.5rem;width:100%">
+        ${onBack ? `<button class="btn-inst-back export-btn" style="flex:0 0 auto;padding:.85rem 1.25rem;font-size:1rem">← Back</button>` : ""}
+        <button class="btn-inst-next export-btn" style="flex:1;padding:.85rem;font-size:1rem;text-align:center">Next →</button>
+      </div>
     </div>`;
+  if (onBack) $("session-picker-list").querySelector(".btn-inst-back").addEventListener("click", onBack);
   $("session-picker-list").querySelector(".btn-inst-next").addEventListener("click", () => {
     const participants = [...$("session-picker-list").querySelectorAll(".inst-check:checked")].map(c => c.value);
-    if (!participants.length) { alert("Please select at least one instructor."); return; }
     onConfirm(participants);
   });
 }
@@ -6187,41 +6191,45 @@ function showStudentChoice(student) {
     };
 
 
-    $("session-picker-list").innerHTML = `
-      <div class="session-date-step">
-        <p class="session-date-prompt">What date is this session for?</p>
-        <div class="date-quick-btns">
-          <button class="btn-date-quick" data-date="${yesterday}">Yesterday (${fmtShort(yesterday)})</button>
-          <button class="btn-date-quick" data-date="${today}">Today (${fmtShort(today)})</button>
-          <button class="btn-date-other">Pick A Date</button>
-        </div>
-      </div>`;
-
-    $("session-picker-list").querySelectorAll(".btn-date-quick").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        const chosenDate = btn.dataset.date;
-        let preSelected = [];
-        try {
-          const sessions = await sessionsFetch;
-          preSelected = sessions.find(s => s.date === chosenDate)?.participants || [];
-        } catch {}
-        showInstructorPickerStep(participants => {
-          closeSessionPicker();
-          openSession(student, null, chosenDate, participants);
-        }, preSelected);
+    const renderDateStep = () => {
+      $("session-picker-title").textContent = student.name;
+      $("session-picker-list").innerHTML = `
+        <div class="session-date-step">
+          <p class="session-date-prompt">What date is this session for?</p>
+          <div class="date-quick-btns">
+            <button class="btn-date-quick" data-date="${yesterday}">Yesterday (${fmtShort(yesterday)})</button>
+            <button class="btn-date-quick" data-date="${today}">Today (${fmtShort(today)})</button>
+            <button class="btn-date-other">Pick A Date</button>
+          </div>
+        </div>`;
+      $("session-picker-list").querySelectorAll(".btn-date-quick").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const chosenDate = btn.dataset.date;
+          let preSelected = [];
+          try {
+            const sessions = await sessionsFetch;
+            preSelected = sessions.find(s => s.date === chosenDate)?.participants || [];
+          } catch {}
+          showInstructorPickerStep(participants => {
+            closeSessionPicker();
+            openSession(student, null, chosenDate, participants);
+          }, preSelected, renderDateStep, formatDateWithDay(chosenDate));
+        });
       });
-    });
+      $("session-picker-list").querySelector(".btn-date-other").addEventListener("click", dateOtherHandler);
+    };
+    const dateOtherHandler = () => {
+      const [ty, tm] = today.split("-").map(Number);
+      const displayDate = `${ty}-${String(tm).padStart(2,"0")}-01`;
+      renderStartSessionCalendar(student, today, displayDate, new Set(), new Map(), renderDateStep);
+      sessionsFetch.then(sessions => {
 
     $("session-picker-list").querySelector(".btn-date-other").addEventListener("click", () => {
       const [ty, tm] = today.split("-").map(Number);
       const displayDate = `${ty}-${String(tm).padStart(2,"0")}-01`;
-      // Render immediately so iPad doesn't see a frozen UI while waiting for network
-      renderStartSessionCalendar(student, today, displayDate, new Set());
-      // Use the pre-fetched promise — likely already resolved by now
+      renderStartSessionCalendar(student, today, displayDate, new Set(), new Map(), renderDateStep);
       sessionsFetch
         .then(sessions => {
-          // Filter out empty sessions so stale Firestore docs don't show phantom checkmarks.
-          // Matches the same hasUsefulData logic used in showSessionPicker.
           const curTgtNames = new Set((student.targets || []).map(t => t.name));
           const stripE = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
           const hasData = s => {
@@ -6237,10 +6245,11 @@ function showStudentChoice(student) {
           if (empties.length > 0) resequenceIndividualSessions(student.id).catch(() => {});
           const takenDates = new Set(sessions.filter(hasData).map(s => s.date));
           const sessionsByDate = new Map(sessions.map(s => [s.date, s.participants || []]));
-          renderStartSessionCalendar(student, today, displayDate, takenDates, sessionsByDate);
+          renderStartSessionCalendar(student, today, displayDate, takenDates, sessionsByDate, renderDateStep);
         })
         .catch(() => {});
-    });
+    };
+    renderDateStep();
   });
   $("session-picker-list").querySelector(".choice-other").addEventListener("click", () => {
     showSessionPicker(student);
@@ -6828,7 +6837,7 @@ async function showEditDatePicker() {
   renderDatePickerCalendar(currentDate, takenDates, getTodayString(), currentDate);
 }
 
-function renderStartSessionCalendar(student, today, displayDate, takenDates = new Set(), sessionsByDate = new Map()) {
+function renderStartSessionCalendar(student, today, displayDate, takenDates = new Set(), sessionsByDate = new Map(), onBack = null) {
   const [y, m] = displayDate.split("-").map(Number);
   const monthLabel = new Date(y, m - 1, 1)
     .toLocaleString("default", { month: "long", year: "numeric" });
@@ -6872,11 +6881,11 @@ function renderStartSessionCalendar(student, today, displayDate, takenDates = ne
   $("session-picker-list").innerHTML = html;
 
   $("session-picker-list").querySelector(".btn-date-prev").addEventListener("click", () => {
-    renderStartSessionCalendar(student, today, prevM, takenDates, sessionsByDate);
+    renderStartSessionCalendar(student, today, prevM, takenDates, sessionsByDate, onBack);
   });
   if (canNext) {
     $("session-picker-list").querySelector(".btn-date-next").addEventListener("click", () => {
-      renderStartSessionCalendar(student, today, nextM, takenDates, sessionsByDate);
+      renderStartSessionCalendar(student, today, nextM, takenDates, sessionsByDate, onBack);
     });
   }
   $("session-picker-list").querySelectorAll(".date-picker-day:not([disabled])").forEach(btn => {
@@ -6887,13 +6896,14 @@ function renderStartSessionCalendar(student, today, displayDate, takenDates = ne
         closeSessionPicker();
         openSession(student, null, chosenDate, participants);
       };
-      const pickAndProceed = () => showInstructorPickerStep(proceed, preSelected);
+      const backFn = () => renderStartSessionCalendar(student, today, displayDate, takenDates, sessionsByDate, onBack);
+      const pickAndProceed = () => showInstructorPickerStep(proceed, preSelected, onBack || backFn, formatDateWithDay(chosenDate));
       if (isOlderThan7Days(chosenDate)) { requirePassword(pickAndProceed, EXPIRED_MSG); } else { pickAndProceed(); }
     });
   });
 }
 
-function renderGroupStartSessionCalendar(group, today, displayDate, takenDates = new Set(), sessionsByDate = new Map()) {
+function renderGroupStartSessionCalendar(group, today, displayDate, takenDates = new Set(), sessionsByDate = new Map(), onBack = null) {
   const [y, m] = displayDate.split("-").map(Number);
   const monthLabel = new Date(y, m - 1, 1)
     .toLocaleString("default", { month: "long", year: "numeric" });
@@ -6937,11 +6947,11 @@ function renderGroupStartSessionCalendar(group, today, displayDate, takenDates =
   $("session-picker-list").innerHTML = html;
 
   $("session-picker-list").querySelector(".btn-date-prev").addEventListener("click", () => {
-    renderGroupStartSessionCalendar(group, today, prevM, takenDates, sessionsByDate);
+    renderGroupStartSessionCalendar(group, today, prevM, takenDates, sessionsByDate, onBack);
   });
   if (canNext) {
     $("session-picker-list").querySelector(".btn-date-next").addEventListener("click", () => {
-      renderGroupStartSessionCalendar(group, today, nextM, takenDates, sessionsByDate);
+      renderGroupStartSessionCalendar(group, today, nextM, takenDates, sessionsByDate, onBack);
     });
   }
   $("session-picker-list").querySelectorAll(".date-picker-day:not([disabled])").forEach(btn => {
@@ -6949,7 +6959,8 @@ function renderGroupStartSessionCalendar(group, today, displayDate, takenDates =
       const ds = btn.dataset.date;
       const preSelected = sessionsByDate.get(ds) || [];
       const proceed = participants => { closeSessionPicker(); openGroupSession(group, ds, group.students, participants); };
-      const pickAndProceed = () => showInstructorPickerStep(proceed, preSelected);
+      const backFn = () => renderGroupStartSessionCalendar(group, today, displayDate, takenDates, sessionsByDate, onBack);
+      const pickAndProceed = () => showInstructorPickerStep(proceed, preSelected, onBack || backFn, formatDateWithDay(ds));
       if (isOlderThan7Days(ds)) { requirePassword(pickAndProceed, EXPIRED_MSG); } else { pickAndProceed(); }
     });
   });
@@ -7316,6 +7327,33 @@ function populateTargetDropdown(targets) {
   if (reorderBtn) {
     reorderBtn.classList.toggle("hidden", targets.length < 2);
     reorderBtn.onclick = () => showTargetReorderList(state.currentStudent);
+  }
+  const editInstBtn2 = $("btn-entry-edit-instructors");
+  if (editInstBtn2) {
+    editInstBtn2.classList.remove("hidden");
+    editInstBtn2.onclick = () => {
+      const curParticipants = state.sessionData?.participants || [];
+      $("session-picker-title").textContent = "Edit Instructors";
+      $("session-picker-list").innerHTML = `
+        <div style="padding:1.5rem 1.25rem;display:flex;flex-direction:column;align-items:center">
+          <p style="margin:0 0 1.25rem;font-weight:600;color:#374151;text-align:center">Who is facilitating this session?</p>
+          <div style="width:100%;max-width:320px">
+            ${INSTRUCTORS.map(inst => `
+              <label style="display:flex;align-items:center;justify-content:center;gap:.85rem;padding:.75rem 0;cursor:pointer;font-size:1rem;border-bottom:1px solid #f3f4f6">
+                <input type="checkbox" class="inst-edit-check" value="${inst.id}"${curParticipants.includes(inst.id) ? " checked" : ""}
+                  style="width:1.2rem;height:1.2rem;accent-color:#3b82f6;cursor:pointer;flex-shrink:0">
+                <span style="color:#1f2937;width:7rem">${escHtml(inst.name)}</span>
+              </label>`).join("")}
+          </div>
+          <button class="btn-inst-save export-btn" style="margin-top:1.5rem;width:100%;padding:.85rem;font-size:1rem;text-align:center">Save</button>
+        </div>`;
+      $("session-picker-modal").classList.remove("hidden");
+      $("session-picker-list").querySelector(".btn-inst-save").addEventListener("click", async () => {
+        const participants = [...$("session-picker-list").querySelectorAll(".inst-edit-check:checked")].map(c => c.value);
+        closeSessionPicker();
+        await updateSessionParticipants(state.currentSessionId, participants).catch(() => {});
+      });
+    };
   }
 
   sel.onchange = async () => {
@@ -9742,6 +9780,10 @@ function getWorkflowState(data) {
   const noComments = comments.length === 0;
   const ready = allP1Done && reviewSubmitted && allP3Done && (noComments || allFixed);
 
+  // Phase 4 — Nigel exports to Word
+  const p4Check = checks["p4_nigel"] || null;
+  const p4Done  = !!p4Check;
+
   const revisionDone = (allP3Done && p3Ids.length > 0)
     ? { by: "done", at: Math.max(...p3Ids.map(id => p3Check(id)?.at || 0)) }
     : null;
@@ -9750,6 +9792,7 @@ function getWorkflowState(data) {
     p1Ids, p1Done, p1Check, allP1Done,
     reviewSubmitted, reviewUnlocked: allP1Done,
     p3Ids, p3Done, p3Check, allP3Done,
+    p4Check, p4Done,
     comments, allFixed, noComments, ready, revisionDone,
     rayDone: p1Done("ray"), daisyDone: p1Done("daisy"),
   };
@@ -9860,13 +9903,24 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     ${_phase3Error ? `<div class="wf-error-msg">⚠ ${escHtml(_phase3Error)}</div>` : ""}
   </div>`;
 
-  // ── Phase 4: Nigel ────────────────────────────────────────────
-  const nigelState = ws.ready ? "nigel-ready" : "nigel";
+  // ── Phase 4: Export (Nigel) ───────────────────────────────────
+  let nigelState, nigelBody;
+  if (confirmRole === "p4_nigel" && ws.ready) {
+    nigelState = "nigel-ready";
+    nigelBody  = mkConfirm("p4_nigel", ws.p4Done ? "Undo export mark?" : "Mark as exported?");
+  } else if (!ws.ready) {
+    nigelState = "nigel";
+    nigelBody  = `<div class="wf-pill wf-pill--pending">○ Waiting…</div>`;
+  } else if (ws.p4Done) {
+    nigelState = "nigel-ready";
+    nigelBody  = `<button class="wf-pill wf-pill--done" data-role="p4_nigel">✓ Nigel · ${escHtml(fmtCheckTimestamp(ws.p4Check?.at))}</button>`;
+  } else {
+    nigelState = "nigel-ready";
+    nigelBody  = `<button class="wf-pill wf-pill--attention" data-role="p4_nigel">○ Nigel: Export to Word</button>`;
+  }
   const nigelNode  = `<div class="wf-node wf-node--${nigelState}">
-    <div class="wf-node-label">Phase 4: Nigel</div>
-    <div class="wf-node-body">
-      <div class="wf-node-line">${ws.ready ? "Ready to Send! 🎉" : "Waiting... 🤔"}</div>
-    </div>
+    <div class="wf-node-label">Phase 4: Export</div>
+    <div class="wf-node-body">${nigelBody}</div>
   </div>`;
 
   const hasCmts = ws.comments.length > 0;
@@ -10033,6 +10087,13 @@ async function handleCheckedByClick(e, isGroup) {
         const allDone = ws2.allP3Done && ws2.p3Ids.length > 0;
         await updateWorkflowStatus(sid, allDone ? null : "ray_pending", getSubjectMeta());
       } catch (err) { console.error("updateSessionChecks p3:", err); }
+    } else if (role === "p4_nigel") {
+      const ws      = getWorkflowState(data);
+      const newDone = !ws.p4Done;
+      const checks  = { ...(data?.checks || {}) };
+      if (newDone) { checks["p4_nigel"] = { by: "nigel", at: Date.now() }; } else { delete checks["p4_nigel"]; }
+      try { await updateSessionChecks(sid, checks); }
+      catch (err) { console.error("updateSessionChecks p4:", err); }
     }
     return true;
   }
@@ -10068,6 +10129,7 @@ function renderStickyNoteContent(data, isGroup) {
         <td class="snote-no">${i + 1}</td>
         <td class="snote-text"><textarea class="snote-textarea" data-cmt-id="${id}" rows="1" placeholder="Type here…">${escHtml(text)}</textarea></td>
         <td class="snote-tick"><input type="checkbox" class="snote-check" data-cmt-id="${id}" ${c.fixedByName ? "checked" : ""}></td>
+        <td class="snote-del"><button class="snote-del-btn" data-cmt-id="${id}" title="Delete row">🗑</button></td>
       </tr>`;
     }).join("");
 
@@ -10188,6 +10250,17 @@ function setupStickyNote() {
       const fixing = chk.checked;
       try { await markCommentFixed(sid, cmtId, fixing ? "Rayhanah" : null); }
       catch (err) { console.error("markCommentFixed:", err); }
+      return;
+    }
+
+    // Delete row
+    const delBtn = e.target.closest(".snote-del-btn");
+    if (delBtn) {
+      const { sid } = getCtx();
+      if (!sid) return;
+      const cmtId = delBtn.dataset.cmtId;
+      try { await deleteReviewComment(sid, cmtId); }
+      catch (err) { console.error("deleteReviewComment:", err); }
       return;
     }
   });
@@ -18366,34 +18439,45 @@ function showGroupChoice(group) {
         </div>
       </div>`;
     const groupSessionsFetch = getRecentGroupSessions(group.id);
-    $("session-picker-list").querySelectorAll(".btn-date-quick").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        const chosenDate = btn.dataset.date;
-        let preSelected = [];
-        try {
-          const sessions = await groupSessionsFetch;
-          preSelected = sessions.find(s => s.date === chosenDate)?.participants || [];
-        } catch {}
-        showInstructorPickerStep(participants => {
-          closeSessionPicker();
-          openGroupSession(group, chosenDate, group.students, participants);
-        }, preSelected);
+    const renderGroupDateStep = () => {
+      $("session-picker-title").textContent = group.name || "Group";
+      $("session-picker-list").innerHTML = `
+        <div class="session-date-step">
+          <p class="session-date-prompt">What date is this session for?</p>
+          <div class="date-quick-btns">
+            <button class="btn-date-quick" data-date="${(() => { const d = new Date(today + "T00:00:00"); d.setDate(d.getDate() - 1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })()}">Yesterday</button>
+            <button class="btn-date-quick" data-date="${today}">Today</button>
+            <button class="btn-date-other">Pick A Date</button>
+          </div>
+        </div>`;
+      $("session-picker-list").querySelectorAll(".btn-date-quick").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const chosenDate = btn.dataset.date;
+          let preSelected = [];
+          try {
+            const sessions = await groupSessionsFetch;
+            preSelected = sessions.find(s => s.date === chosenDate)?.participants || [];
+          } catch {}
+          showInstructorPickerStep(participants => {
+            closeSessionPicker();
+            openGroupSession(group, chosenDate, group.students, participants);
+          }, preSelected, renderGroupDateStep, formatDateWithDay(chosenDate));
+        });
       });
-    });
-    $("session-picker-list").querySelector(".btn-date-other").addEventListener("click", () => {
-      const [ty, tm] = today.split("-").map(Number);
-      const displayDate = `${ty}-${String(tm).padStart(2,"0")}-01`;
-      // Render immediately so iPad doesn't see a frozen UI while waiting for network
-      renderGroupStartSessionCalendar(group, today, displayDate, new Set());
-      // Then load taken dates and re-render with blue dots
-      groupSessionsFetch
-        .then(sessions => {
-          const takenDates = new Set(sessions.map(s => s.date));
-          const sessionsByDate = new Map(sessions.map(s => [s.date, s.participants || []]));
-          renderGroupStartSessionCalendar(group, today, displayDate, takenDates, sessionsByDate);
-        })
-        .catch(() => {});
-    });
+      $("session-picker-list").querySelector(".btn-date-other").addEventListener("click", () => {
+        const [ty, tm] = today.split("-").map(Number);
+        const displayDate = `${ty}-${String(tm).padStart(2,"0")}-01`;
+        renderGroupStartSessionCalendar(group, today, displayDate, new Set(), new Map(), renderGroupDateStep);
+        groupSessionsFetch
+          .then(sessions => {
+            const takenDates = new Set(sessions.map(s => s.date));
+            const sessionsByDate = new Map(sessions.map(s => [s.date, s.participants || []]));
+            renderGroupStartSessionCalendar(group, today, displayDate, takenDates, sessionsByDate, renderGroupDateStep);
+          })
+          .catch(() => {});
+      });
+    };
+    renderGroupDateStep();
   });
   $("session-picker-list").querySelector(".choice-other").addEventListener("click", () => {
     closeSessionPicker();
