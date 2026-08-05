@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1427";
+const APP_VERSION = "1428";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -9800,7 +9800,12 @@ function getWorkflowState(data) {
     .sort(([,a],[,b]) => (a.order || 0) - (b.order || 0));
   const allFixed   = comments.length > 0 && comments.every(([,c]) => !!c.fixedByName);
   const noComments = comments.length === 0;
-  const ready = allP1Done && reviewSubmitted && allP3Done && (noComments || allFixed);
+  const p3Bypassed = !!noCorrectionsDecision;
+  const effectiveAllP3Done = allP3Done || p3Bypassed;
+  const ready = allP1Done && reviewSubmitted && effectiveAllP3Done && (noComments || allFixed);
+
+  // No-corrections decision — Daisy declares Phase 3 not needed
+  const noCorrectionsDecision = checks["no_corrections"] || null;
 
   // Phase 4 — Nigel exports to Word
   const p4Check = checks["p4_nigel"] || null;
@@ -9813,7 +9818,7 @@ function getWorkflowState(data) {
   return {
     p1Ids, p1Done, p1Check, allP1Done,
     reviewSubmitted, reviewUnlocked: allP1Done,
-    p3Ids, p3Done, p3Check, allP3Done,
+    p3Ids, p3Done, p3Check, allP3Done, p3Bypassed, noCorrectionsDecision,
     p4Check, p4Done,
     comments, allFixed, noComments, ready, revisionDone,
     rayDone: p1Done("ray"), daisyDone: p1Done("daisy"),
@@ -9919,6 +9924,9 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
   if (!ws.reviewSubmitted) {
     p3State = "locked";
     p3Body  = `<div class="wf-pill wf-pill--locked">🔒 Complete Phase 2 first</div>`;
+  } else if (ws.p3Bypassed) {
+    p3State = "done";
+    p3Body  = `<div class="wf-pill wf-pill--done">✓ No revisions needed</div>`;
   } else if (ws.p3Ids.length === 0) {
     p3State = "done";
     p3Body  = `<div class="wf-pill wf-pill--done">✓ No revision needed</div>`;
@@ -10150,7 +10158,7 @@ function renderStickyNoteContent(data, isGroup) {
   const liveText      = focusedCmtId ? activeEl.value : null;
 
   if (ws.comments.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="4" class="snote-empty">No corrections — click + Add Row to start.</td></tr>`;
+    tbody.innerHTML = "";
   } else {
     tbody.innerHTML = ws.comments.map(([id, c], i) => {
       const text = (focusedCmtId === id && liveText !== null) ? liveText : (c.text || "");
@@ -10260,13 +10268,24 @@ function setupStickyNote() {
 
   // ── Click delegation ─────────────────────────────────────────
   note.addEventListener("click", async e => {
-    // + Add Row
+    // + Add Correction
     if (e.target.id === "sticky-note-add-row-btn") {
       const { sid } = getCtx();
       if (!sid) return;
       _focusNewRow = true;
       try { await addReviewComment(sid, ""); }
       catch (err) { console.error("addReviewComment:", err); }
+      return;
+    }
+
+    // No corrections needed
+    if (e.target.id === "sticky-note-no-corrections-btn") {
+      const { sid, data } = getCtx();
+      if (!sid) return;
+      if (!confirm("Mark as no corrections needed? This will unlock Phase 4 for Nigel to export.")) return;
+      const checks = { ...(data?.checks || {}), no_corrections: { by: "daisy", at: Date.now() } };
+      try { await updateSessionChecks(sid, checks); }
+      catch (err) { console.error("no_corrections:", err); }
       return;
     }
 

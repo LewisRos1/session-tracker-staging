@@ -3091,6 +3091,22 @@ button.wf-pill:hover { filter: brightness(.93); }
 }
 .snote-add-row-btn:hover { background: #fef08a; }
 
+.snote-no-corrections-btn {
+  width: 100%;
+  margin-top: .35rem;
+  padding: .35rem;
+  background: none;
+  border: 1.5px solid #34d399;
+  border-radius: 6px;
+  color: #065f46;
+  font-size: .82rem;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: center;
+  transition: background .12s;
+}
+.snote-no-corrections-btn:hover { background: #d1fae5; }
+
 /* Phase shortcut pill at the bottom of the sticky note */
 .snote-footer {
   display: flex;
