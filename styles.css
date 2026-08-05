@@ -2875,11 +2875,9 @@ div.admin-note-editable:empty::before {
 }
 .wf-node--p2-active,
 .wf-node--corrections,
-.wf-node--pending {
-  border-color: #f87171; background: #fee2e2; color: #991b1b;
-}
+.wf-node--pending,
 .wf-node--nigel {
-  border-color: #d1d5db; background: #f9fafb; color: #6b7280;
+  border-color: #f87171; background: #fee2e2; color: #991b1b;
 }
 
 /* Status pills / badges inside nodes */
