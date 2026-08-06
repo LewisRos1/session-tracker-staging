@@ -172,12 +172,12 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1450";
+const APP_VERSION = "1451";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
-  { id: "ray",   name: "Rayhanah",  isMain: false },
   { id: "nigel", name: "Nigel",     isMain: false },
+  { id: "ray",   name: "Rayhanah",  isMain: false },
 ];
 
 // Show the instructor picker as a step inside the session-picker modal.
