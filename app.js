@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1446";
+const APP_VERSION = "1447";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -14788,7 +14788,7 @@ function renderStudentManageContent(student) {
           <div id="mn-s-name-section">${renderStudentNameDisplay(student)}</div>
         </div>
         <div>
-          <label class="admin-label">Short Name <span style="font-weight:400;color:var(--text-muted)">(reports)</span></label>
+          <label class="admin-label">Short Name (Used in Reports)</label>
           <input class="admin-input" id="mn-s-preferred-name" value="${escHtml(student.preferredName || "")}"
             placeholder="e.g. Ee Hyun" style="width:100%" />
           <div style="font-size:.75rem;color:var(--text-muted);margin-top:.25rem">Used in report paragraphs. Full name is used everywhere else.</div>
