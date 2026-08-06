@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1445";
+const APP_VERSION = "1446";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -4625,7 +4625,7 @@ async function monthlyGenerate() {
 
     const FULL_MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
     const monthName = FULL_MONTHS[month - 1];
-    const firstName = student.name.split(" ")[0];
+    const firstName = student.preferredName || student.name.split(" ")[0];
     const collected = monthlyCollectData(student, year, month, allSessions, excludedActivities);
     const { threeMonthData, miniData, aiData, sessionCount, threeMonthPeriodLabel, oneMonthPeriodLabel } = collected;
 
@@ -5146,7 +5146,7 @@ function monthlyDrawMiniVerticalBar(lastLabel, lastAvg, thisLabel, thisAvg) {
 }
 
 async function monthlyDownloadWord(student, year, month, monthName, sessionCount, threeMonthData, miniData, parsed, threeMonthPeriodLabel, oneMonthPeriodLabel) {
-  const firstName = student.name.split(" ")[0];
+  const firstName = student.preferredName || student.name.split(" ")[0];
   const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
   const focusTargets = activeTargets.filter(t => miniData[t.name]?.trend !== "up");
   const reportDate = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
@@ -14782,8 +14782,18 @@ function renderStudentManageContent(student) {
 
   const html = `
     <div class="admin-section" style="margin-bottom:1.5rem">
-      <label class="admin-label">Student Name</label>
-      <div id="mn-s-name-section">${renderStudentNameDisplay(student)}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:start">
+        <div>
+          <label class="admin-label">Full Name</label>
+          <div id="mn-s-name-section">${renderStudentNameDisplay(student)}</div>
+        </div>
+        <div>
+          <label class="admin-label">Short Name <span style="font-weight:400;color:var(--text-muted)">(reports)</span></label>
+          <input class="admin-input" id="mn-s-preferred-name" value="${escHtml(student.preferredName || "")}"
+            placeholder="e.g. Ee Hyun" style="width:100%" />
+          <div style="font-size:.75rem;color:var(--text-muted);margin-top:.25rem">Used in report paragraphs. Full name is used everywhere else.</div>
+        </div>
+      </div>
     </div>
     <div class="admin-section">
       <div id="mn-s-session-number-area">Loading…</div>
@@ -14801,6 +14811,13 @@ function renderStudentManageContent(student) {
 
   $("manage-modal-body").innerHTML = html;
   wireStudentNameSection(student);
+
+  $("mn-s-preferred-name").addEventListener("blur", async () => {
+    const val = $("mn-s-preferred-name").value.trim();
+    if (val === (student.preferredName || "")) return;
+    student.preferredName = val || null;
+    await saveStudent(student);
+  });
 
   renderSessionNumberSection(student);
 
