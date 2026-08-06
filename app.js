@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1463";
+const APP_VERSION = "1464";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -15287,14 +15287,14 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
         value="${escHtml(a.noteSentenceStarter || "")}">
     </div>
     <div class="mn-act-starter-wrap" data-idx="${idx}" style="${isMC ? "display:flex;flex-direction:column;gap:.3rem" : "display:none"}">
-      <span class="mn-act-starter-label" style="font-size:.95rem;color:#374151;font-weight:700">Sentence Starter (for Multiple Choice)</span>
+      <span class="mn-act-starter-label" style="font-size:.95rem;color:#374151;font-weight:700">${type === "starter_fixed_multi" ? "Sentence Starter (for Checkboxes)" : "Sentence Starter (for Multiple Choice)"}</span>
       <input class="admin-input mn-act-starter-text" data-idx="${idx}"
         placeholder="Enter Sentence Starter Here (Optional)"
         style="width:100%;min-width:0;box-sizing:border-box;border-color:#b8bcc4"
         value="${escHtml(a.sentenceStarter || "")}">
     </div>
     <div class="mn-opts-container" data-idx="${idx}" style="${isMC ? "" : "display:none"}">
-      <div class="mn-opts-type-label" data-idx="${idx}" style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">${type === "starter_fixed_multi" ? "Checkboxes" : "Multiple Choice Options"}</div>
+      <div class="mn-opts-type-label" data-idx="${idx}" style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">${type === "starter_fixed_multi" ? "Checkboxes Options" : "Multiple Choice Options"}</div>
       <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden;margin-bottom:.4rem">
         <div class="mn-opts-list" style="padding:.3rem .4rem .1rem">${(() => {
           const optsStr = a.inlineOptions || (a.remarkPresetId ? (state.remarkPresets.find(p=>p.id===a.remarkPresetId)?.options||[]).join("/") : "");
@@ -16975,7 +16975,8 @@ function renderTargetManageContent(student, target) {
         starterWrap.style.cssText = optsVis ? "display:flex;flex-direction:column;gap:.3rem" : "display:none";
         optsContainer.style.display  = optsVis ? "" : "none";
         const typeLabel = optsContainer.querySelector(".mn-opts-type-label");
-        if (typeLabel) typeLabel.textContent = type === "starter_fixed_multi" ? "Checkboxes" : "Multiple Choice Options";
+        if (typeLabel) typeLabel.textContent = type === "starter_fixed_multi" ? "Checkboxes Options" : "Multiple Choice Options";
+        if (starterLabel) starterLabel.textContent = type === "starter_fixed_multi" ? "Sentence Starter (for Checkboxes)" : "Sentence Starter (for Multiple Choice)";
         if (usesOpts) { acts[idx].inlineOptions = getOptsFromDom(idx).join("\x1F") || null; rebuildOptScores(idx); }
         target.predefinedActivities = acts;
         await saveTarget(); // always persist the type change immediately so re-renders don't revert it
@@ -18092,7 +18093,8 @@ function renderTemplateManageContent(template) {
       starterWrap.style.cssText = optsVis ? "display:flex;flex-direction:column;gap:.3rem" : "display:none";
       optsContainer.style.display  = optsVis ? "" : "none";
       const tmplTypeLabel = optsContainer.querySelector(".mn-opts-type-label");
-      if (tmplTypeLabel) tmplTypeLabel.textContent = type === "starter_fixed_multi" ? "Checkboxes" : "Multiple Choice Options";
+      if (tmplTypeLabel) tmplTypeLabel.textContent = type === "starter_fixed_multi" ? "Checkboxes Options" : "Multiple Choice Options";
+      if (starterLabel) starterLabel.textContent = type === "starter_fixed_multi" ? "Sentence Starter (for Checkboxes)" : "Sentence Starter (for Multiple Choice)";
       if (usesOpts) {
         acts[idx].inlineOptions = [...body.querySelectorAll(`.mn-opt-item[data-idx="${idx}"]`)].map(i => i.value.trim()).filter(Boolean).join("\x1F") || null;
       }
