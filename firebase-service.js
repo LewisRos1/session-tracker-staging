@@ -1009,22 +1009,21 @@ export async function getSessionById(sessionId) {
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
-/** Fetch recent sessions for a student, newest-first (for session picker). */
-export async function getRecentSessionsForStudent(studentId, maxCount = 60) {
+/** Fetch all sessions for a student, newest-first (for session picker and calendar ticks). */
+export async function getRecentSessionsForStudent(studentId) {
   // No orderBy here on purpose — combining where("studentId") with an
   // orderBy on a different field needs a Firestore composite index that
-  // doesn't exist in this project (confirmed: the v516/v517 attempts to add
-  // one both failed silently, since callers swallow the error). Sorting and
-  // slicing client-side is slower as a student's history grows, but it's
-  // guaranteed to work without needing any index to be created first.
+  // doesn't exist in this project. Sort client-side instead.
+  // No cap: callers need ALL sessions so the "Pick a date" calendar can
+  // show tick marks for every date with data, even for students who have
+  // had 60+ sessions (the old maxCount=60 cut off early dates).
   const snap = await getDocs(
     query(collection(db, "sessions"),
       where("studentId", "==", studentId))
   );
   return snap.docs
     .map(d => ({ id: d.id, ...d.data() }))
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, maxCount);
+    .sort((a, b) => b.date.localeCompare(a.date));
 }
 
 /** Fetch all sessions for a student, sorted oldest-first. */
