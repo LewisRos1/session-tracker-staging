@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1468";
+const APP_VERSION = "1469";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -8364,6 +8364,7 @@ function htmlForStorage(text) {
 // the markers into real tags.
 function formatActivityMarkup(text) {
   return escHtml(text || "")
+    .replace(/^\. /gm, "• ")
     .replace(/\*(.+?)\*/g, "<b>$1</b>")
     .replace(/_(.+?)_/g, "<u>$1</u>");
 }
@@ -15193,6 +15194,7 @@ function noteToHtml(text) {
   if (!text) return "";
   if (/<[a-z]/i.test(text)) return text;
   return escHtml(text)
+    .replace(/^\. /gm, "• ")
     .replace(/\*_([\s\S]+?)_\*/g, "<strong><u>$1</u></strong>")
     .replace(/_\*([\s\S]+?)\*_/g, "<strong><u>$1</u></strong>")
     .replace(/\*([\s\S]+?)\*/g, "<strong>$1</strong>")
