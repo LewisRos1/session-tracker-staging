@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1457";
+const APP_VERSION = "1458";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -20668,10 +20668,15 @@ function relativeTodoDate(dateStr) {
   const date = new Date(y, m-1, d);
   const diffDays = Math.round((today - date) / 86400000);
   const day = dayAbbr(dateStr);
-  const full = formatDate(dateStr); // "29 Jul 2026"
+  const full = formatDate(dateStr);
   if (diffDays === 0) return "Today";
   if (diffDays === 1) return `Yesterday, ${full}`;
-  if (diffDays <= 7) return `Last ${day}, ${full}`;
+  // Find Monday of the current week (getDay: 0=Sun → treat as 7)
+  const todayDow = today.getDay() || 7;
+  const thisWeekMon = new Date(today);
+  thisWeekMon.setDate(today.getDate() - (todayDow - 1));
+  if (date >= thisWeekMon) return `${day}, ${full}`; // same week — no "Last"
+  if (diffDays <= 14) return `Last ${day}, ${full}`; // previous week
   const weeks = Math.round(diffDays / 7);
   return `(${weeks} week${weeks > 1 ? "s" : ""} ago) ${day}, ${full}`;
 }
