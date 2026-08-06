@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1449";
+const APP_VERSION = "1450";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -2677,7 +2677,7 @@ async function hyrGenerate() {
 
     // Build prompt synchronously — then start fetch immediately so it runs in parallel with fake phases
     const periodLabel = period === "H1" ? `January–June ${year}` : `July–December ${year}`;
-    const firstName   = student.name.split(" ")[0];
+    const firstName   = student.preferredName || student.name.split(" ")[0];
     // Actual data start month (may differ from term start if student enrolled mid-term)
     const _hyrMonthAbbrs = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     const _hyrMonthFull  = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -3948,7 +3948,7 @@ function hyrParseAiResponse(text) {
 
 function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, parsed, breakdownData, chartData) {
   const periodLabel = period === "H1" ? `January–June ${year}` : `July–December ${year}`;
-  const firstName   = student.name.split(" ")[0];
+  const firstName   = student.preferredName || student.name.split(" ")[0];
   const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
   const tNames     = activeTargets.map(t => t.name);
   const n          = tNames.length;
@@ -4169,7 +4169,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
 
 
 async function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData, chartData) {
-  const firstName   = student.name.split(" ")[0];
+  const firstName   = student.preferredName || student.name.split(" ")[0];
   const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
   const n = activeTargets.length;
   const tNames = activeTargets.map(t => t.name);
