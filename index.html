@@ -81,18 +81,20 @@
     </header>
     <div class="home-body">
       <main class="home-main" id="home-main">
-        <section id="home-sec-db">
-          <div class="section-header">
-            <h2 class="section-title">MORE</h2>
-          </div>
-          <div id="student-database-button"></div>
-        </section>
-        <section id="home-sec-todo">
-          <div class="section-header">
-            <h2 class="section-title">TO DO LIST</h2>
-          </div>
-          <div id="todo-home-chips"></div>
-        </section>
+        <div style="display:flex;gap:2rem;flex-wrap:wrap;align-items:flex-start">
+          <section id="home-sec-db" style="flex:0 0 auto">
+            <div class="section-header">
+              <h2 class="section-title">MORE</h2>
+            </div>
+            <div id="student-database-button"></div>
+          </section>
+          <section id="home-sec-todo" style="flex:1;min-width:200px">
+            <div class="section-header">
+              <h2 class="section-title">TO DO LIST</h2>
+            </div>
+            <div id="todo-home-chips"></div>
+          </section>
+        </div>
         <section id="home-sec-individual">
           <div class="section-header">
             <h2 class="section-title">Individual Sessions</h2>
