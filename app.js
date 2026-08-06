@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1461";
+const APP_VERSION = "1462";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -7945,7 +7945,7 @@ function renderFedcTarget(target) {
           </div>`;
         } else {
         for (const rem of subRemarks) {
-          html += renderRemarkFields(rem, target, getActivityInlineOptions(sub), sub.sentenceStarter || null, sub.optionsMulti || false, null, sub.remarkHasNote || false, false, sub.optionScores || null, !!(sub.manualScore || sub.remarkHasNote || sub.inlineOptions || sub.remarkPresetId));
+          html += renderRemarkFields(rem, target, getActivityInlineOptions(sub), sub.sentenceStarter || null, sub.optionsMulti || false, null, sub.remarkHasNote || false, false, sub.optionScores || null, !!(sub.manualScore || sub.remarkHasNote || sub.inlineOptions || sub.remarkPresetId), sub.noteSentenceStarter || null);
         }
         if (subPending) {
           html += renderPendingRemarkFields(sub.name, subActId, sub.name, idx, target);
@@ -8048,7 +8048,7 @@ function renderFedcTarget(target) {
           const sid = state.currentSessionId;
           if (sid) migrateRemarksToNote(sid, { [rem.id]: { text: rescued, masteryNote: "" } }).catch(() => {});
         }
-        html += renderRemarkFields(rem, target, getActivityInlineOptions(pa), pa.sentenceStarter || null, pa.optionsMulti || false, mappedInfo, pa.remarkHasNote || false, pa.manualScore || false, pa.optionScores || null, !!(pa.manualScore || pa.remarkHasNote || pa.inlineOptions || pa.remarkPresetId));
+        html += renderRemarkFields(rem, target, getActivityInlineOptions(pa), pa.sentenceStarter || null, pa.optionsMulti || false, mappedInfo, pa.remarkHasNote || false, pa.manualScore || false, pa.optionScores || null, !!(pa.manualScore || pa.remarkHasNote || pa.inlineOptions || pa.remarkPresetId), pa.noteSentenceStarter || null);
       }
       if (isPending) {
         html += renderPendingRemarkFields(pendingKey, actId, pa.name, idx, target);
@@ -8553,7 +8553,7 @@ function toggleBulletSelection(el) {
 
 // ─── REMARK FIELDS ───────────────────────────────────────────
 
-function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false, manualScore = false, optionScores = null, noteCapable = false) {
+function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false, manualScore = false, optionScores = null, noteCapable = false, noteSentenceStarter = null) {
   const opts = parseOpts(inlineOptions);
 
   // Sync optionScore with current config whenever the target is re-rendered.
@@ -8701,7 +8701,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
   let noteField;
   if (noteCapable) {
     noteField = `<div class="entry-field entry-note-field" data-rem-id="${rem.id}">
-        <span class="field-label" contenteditable="false">Notes</span>
+        <span class="field-label" contenteditable="false">${escHtml(noteSentenceStarter || "Notes")}</span>
         <button class="btn-sketch" contenteditable="false" data-rem-id="${rem.id}" aria-label="Open sketch board">✏</button>
         <textarea class="field-input mastery-note-input" rows="1"
           data-rem-id="${rem.id}"
@@ -14397,7 +14397,8 @@ async function closeManageModal() {
       const nameEl    = $(`mn-act-name-${i}`);
       const detailsEl = $(`mn-act-details-${i}`);
       const titleEl   = $(`mn-act-title-${i}`);
-      const starterEl = $("manage-modal-body")?.querySelector(`.mn-act-starter-text[data-idx="${i}"]`);
+      const starterEl     = $("manage-modal-body")?.querySelector(`.mn-act-starter-text[data-idx="${i}"]`);
+      const noteStarterEl = $("manage-modal-body")?.querySelector(`.mn-act-note-starter-text[data-idx="${i}"]`);
       if (nameEl) {
         if (a.isNote || a.isExportNote) {
           a.text = nameEl.value;
@@ -14413,7 +14414,8 @@ async function closeManageModal() {
       if (titleEl && !a.isNote && !a.isExportNote && !a.isHeading && !a.isMaintainHeading && !a.isMaintain) {
         a.title = titleEl.value.trim();
       }
-      if (starterEl) a.sentenceStarter = starterEl.value.trim() || null;
+      if (starterEl)     a.sentenceStarter     = starterEl.value.trim() || null;
+      if (noteStarterEl) a.noteSentenceStarter = noteStarterEl.value.trim() || null;
     });
 
     // Block close if any newly-created parent activity still has no title.
@@ -15268,7 +15270,9 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
     : a.sentenceStarter ? ""
     : (a.inlineOptions && a.optionsMulti) ? "starter_fixed_multi"
     : (a.inlineOptions || a.remarkPresetId) ? "starter_fixed_note" : "";
+  const isMC = type === "starter_fixed_note" || type === "starter_fixed_multi";
   const showStarter = type !== "manual_score";
+  const starterLabel = isMC ? "Sentence Starter (for Multiple Choice)" : "Sentence Starter (for Note)";
   return `<div style="flex:1;display:flex;flex-direction:column;gap:.4rem;min-width:0">
     <select class="act-preset-select mn-act-preset" data-idx="${idx}" style="border-color:#b8bcc4">
       <option value="">Notes Only</option>
@@ -15277,13 +15281,20 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
       <option value="starter_fixed_multi"${type === "starter_fixed_multi" ? " selected" : ""}>Checkboxes</option>
     </select>
     <div class="mn-act-starter-wrap" data-idx="${idx}" style="${showStarter ? "display:flex;flex-direction:column;gap:.3rem" : "display:none"}">
-      <span style="font-size:.95rem;color:#374151;font-weight:700">Sentence Starter</span>
+      <span class="mn-act-starter-label" style="font-size:.95rem;color:#374151;font-weight:700">${starterLabel}</span>
       <input class="admin-input mn-act-starter-text" data-idx="${idx}"
         placeholder="Enter Sentence Starter Here (Optional)"
         style="width:100%;min-width:0;box-sizing:border-box;border-color:#b8bcc4"
         value="${escHtml(a.sentenceStarter || "")}">
     </div>
-    <div class="mn-opts-container" data-idx="${idx}" style="${showStarter ? "" : "display:none"}">
+    <div class="mn-act-note-starter-wrap" data-idx="${idx}" style="${isMC ? "display:flex;flex-direction:column;gap:.3rem" : "display:none"}">
+      <span style="font-size:.95rem;color:#374151;font-weight:700">Sentence Starter (for Note)</span>
+      <input class="admin-input mn-act-note-starter-text" data-idx="${idx}"
+        placeholder="Enter Sentence Starter Here (Optional)"
+        style="width:100%;min-width:0;box-sizing:border-box;border-color:#b8bcc4"
+        value="${escHtml(a.noteSentenceStarter || "")}">
+    </div>
+    <div class="mn-opts-container" data-idx="${idx}" style="${isMC ? "" : "display:none"}">
       <div class="mn-opts-type-label" data-idx="${idx}" style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">${type === "starter_fixed_multi" ? "Checkboxes" : "Multiple Options"}</div>
       <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden;margin-bottom:.4rem">
         <div class="mn-opts-list" style="padding:.3rem .4rem .1rem">${(() => {
@@ -16896,15 +16907,17 @@ function renderTargetManageContent(student, target) {
         : "";
 
       const body = $("manage-modal-body");
-      const starterWrap   = body.querySelector(`.mn-act-starter-wrap[data-idx="${idx}"]`);
-      const starterInput  = body.querySelector(`.mn-act-starter-text[data-idx="${idx}"]`);
-      const optsContainer = body.querySelector(`.mn-opts-container[data-idx="${idx}"]`);
+      const starterWrap      = body.querySelector(`.mn-act-starter-wrap[data-idx="${idx}"]`);
+      const starterLabel     = body.querySelector(`.mn-act-starter-wrap[data-idx="${idx}"] .mn-act-starter-label`);
+      const starterInput     = body.querySelector(`.mn-act-starter-text[data-idx="${idx}"]`);
+      const noteStarterWrap  = body.querySelector(`.mn-act-note-starter-wrap[data-idx="${idx}"]`);
+      const optsContainer    = body.querySelector(`.mn-opts-container[data-idx="${idx}"]`);
 
       const doChange = async () => {
         // Switching to Fixed Remark triggers a re-render to show the fixed remark textarea
         if (type === "fixed_remark") {
           if (acts[idx].fixedRemark === undefined) acts[idx].fixedRemark = "";
-          acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
+          acts[idx].sentenceStarter = null; acts[idx].noteSentenceStarter = null; acts[idx].remarkPresetId = null;
           acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false; delete acts[idx].manualScore;
           target.predefinedActivities = acts;
           await saveTarget();
@@ -16914,7 +16927,7 @@ function renderTargetManageContent(student, target) {
         // Switching to Manual Score — set flag and re-render so type detection updates
         if (type === "manual_score") {
           acts[idx].manualScore = true;
-          delete acts[idx].fixedRemark; acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
+          delete acts[idx].fixedRemark; acts[idx].sentenceStarter = null; acts[idx].noteSentenceStarter = null; acts[idx].remarkPresetId = null;
           acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false;
           target.predefinedActivities = acts;
           await saveTarget();
@@ -16926,7 +16939,7 @@ function renderTargetManageContent(student, target) {
         // Switching away from Fixed Remark — clear it and re-render to remove the textarea
         if (acts[idx].fixedRemark !== undefined) {
           delete acts[idx].fixedRemark;
-          acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
+          acts[idx].sentenceStarter = null; acts[idx].noteSentenceStarter = null; acts[idx].remarkPresetId = null;
           acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false; delete acts[idx].manualScore;
           target.predefinedActivities = acts;
           await saveTarget();
@@ -16936,7 +16949,7 @@ function renderTargetManageContent(student, target) {
         // Switching away from Manual Score
         if (acts[idx].manualScore) {
           delete acts[idx].manualScore;
-          acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
+          acts[idx].sentenceStarter = null; acts[idx].noteSentenceStarter = null; acts[idx].remarkPresetId = null;
           acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false;
           target.predefinedActivities = acts;
           await saveTarget();
@@ -16949,14 +16962,17 @@ function renderTargetManageContent(student, target) {
         const wasRemarkOnly = usesOpts
           && !acts[idx].inlineOptions && !acts[idx].remarkPresetId
           && !acts[idx].optionsMulti  && !acts[idx].remarkHasNote;
-        acts[idx].sentenceStarter = null;
-        acts[idx].remarkPresetId  = null;
+        acts[idx].sentenceStarter     = null;
+        acts[idx].noteSentenceStarter = null;
+        acts[idx].remarkPresetId      = null;
         if (!usesOpts) { acts[idx].inlineOptions = null; delete acts[idx].optionScores; }
         acts[idx].optionsMulti    = (type === "starter_fixed_multi");
         acts[idx].remarkHasNote   = (type === "starter_fixed_note");
         const starterVis = usesOpts || type === "";
         const optsVis    = usesOpts;
-        starterWrap.style.cssText    = starterVis ? "display:flex;flex-direction:column;gap:.3rem" : "display:none";
+        starterWrap.style.cssText = starterVis ? "display:flex;flex-direction:column;gap:.3rem" : "display:none";
+        if (starterLabel) starterLabel.textContent = optsVis ? "Sentence Starter (for Multiple Choice)" : "Sentence Starter (for Note)";
+        if (noteStarterWrap) noteStarterWrap.style.cssText = optsVis ? "display:flex;flex-direction:column;gap:.3rem" : "display:none";
         optsContainer.style.display  = optsVis ? "" : "none";
         const typeLabel = optsContainer.querySelector(".mn-opts-type-label");
         if (typeLabel) typeLabel.textContent = type === "starter_fixed_multi" ? "Checkboxes" : "Multiple Options";
@@ -17048,8 +17064,8 @@ function renderTargetManageContent(student, target) {
         <p style="font-size:.82rem;margin:0 0 .25rem;color:#374151;font-weight:600">Sessions with data:</p>
         <ul style="font-size:.82rem;color:#374151;margin:0 0 .75rem;padding-left:1.2rem;line-height:1.8">${sessionDateHtml}</ul>
         <p style="font-size:.84rem;margin:0 0 .35rem;color:#374151;font-weight:600">To change the activity type, please enter special password (only Lewis knows)</p>
-        <input id="act-type-pw" type="password" autocomplete="off" inputmode="numeric"
-          style="width:100%;box-sizing:border-box;padding:.45rem .6rem;border:2px solid #d1d5db;border-radius:.4rem;font-size:1.1rem;text-align:center;outline:none;margin-bottom:.3rem" placeholder="••••">
+        <input id="act-type-pw" type="password" autocomplete="off"
+          style="width:100%;box-sizing:border-box;padding:.45rem .6rem;border:2px solid #d1d5db;border-radius:.4rem;font-size:1.1rem;text-align:center;outline:none;margin-bottom:.3rem" placeholder="Enter password">
         <div id="act-type-pw-err" style="color:#dc2626;font-size:.82rem;margin-bottom:.5rem;min-height:1.1em"></div>
         <div style="display:flex;gap:.5rem">
           <button id="act-type-pw-cancel" style="flex:1;padding:.45rem;border:1px solid #d1d5db;border-radius:.4rem;background:#f9fafb;cursor:pointer;font-size:.85rem">Cancel</button>
@@ -18017,13 +18033,15 @@ function renderTemplateManageContent(template) {
     sel.addEventListener("change", async () => {
       const idx = Number(sel.dataset.idx);
       const body = $("manage-modal-body");
-      const starterWrap   = body.querySelector(`.mn-act-starter-wrap[data-idx="${idx}"]`);
-      const starterInput  = body.querySelector(`.mn-act-starter-text[data-idx="${idx}"]`);
-      const optsContainer = body.querySelector(`.mn-opts-container[data-idx="${idx}"]`);
+      const starterWrap     = body.querySelector(`.mn-act-starter-wrap[data-idx="${idx}"]`);
+      const starterLabel    = body.querySelector(`.mn-act-starter-wrap[data-idx="${idx}"] .mn-act-starter-label`);
+      const starterInput    = body.querySelector(`.mn-act-starter-text[data-idx="${idx}"]`);
+      const noteStarterWrap = body.querySelector(`.mn-act-note-starter-wrap[data-idx="${idx}"]`);
+      const optsContainer   = body.querySelector(`.mn-opts-container[data-idx="${idx}"]`);
       const type = sel.value;
       if (type === "fixed_remark") {
         if (acts[idx].fixedRemark === undefined) acts[idx].fixedRemark = "";
-        acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
+        acts[idx].sentenceStarter = null; acts[idx].noteSentenceStarter = null; acts[idx].remarkPresetId = null;
         acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false; delete acts[idx].manualScore;
         template.predefinedActivities = acts;
         await saveTemplateFn();
@@ -18032,7 +18050,7 @@ function renderTemplateManageContent(template) {
       }
       if (type === "manual_score") {
         acts[idx].manualScore = true;
-        delete acts[idx].fixedRemark; acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
+        delete acts[idx].fixedRemark; acts[idx].sentenceStarter = null; acts[idx].noteSentenceStarter = null; acts[idx].remarkPresetId = null;
         acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false;
         template.predefinedActivities = acts;
         await saveTemplateFn();
@@ -18043,7 +18061,7 @@ function renderTemplateManageContent(template) {
       }
       if (acts[idx].fixedRemark !== undefined) {
         delete acts[idx].fixedRemark;
-        acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
+        acts[idx].sentenceStarter = null; acts[idx].noteSentenceStarter = null; acts[idx].remarkPresetId = null;
         acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false; delete acts[idx].manualScore;
         template.predefinedActivities = acts;
         await saveTemplateFn();
@@ -18052,7 +18070,7 @@ function renderTemplateManageContent(template) {
       }
       if (acts[idx].manualScore) {
         delete acts[idx].manualScore;
-        acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
+        acts[idx].sentenceStarter = null; acts[idx].noteSentenceStarter = null; acts[idx].remarkPresetId = null;
         acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false;
         template.predefinedActivities = acts;
         await saveTemplateFn();
@@ -18062,14 +18080,17 @@ function renderTemplateManageContent(template) {
         return;
       }
       const usesOpts = (type === "starter_fixed_multi" || type === "starter_fixed_note");
-      acts[idx].sentenceStarter = null;
-      acts[idx].remarkPresetId  = null;
+      acts[idx].sentenceStarter     = null;
+      acts[idx].noteSentenceStarter = null;
+      acts[idx].remarkPresetId      = null;
       if (!usesOpts) { acts[idx].inlineOptions = null; delete acts[idx].optionScores; }
       acts[idx].optionsMulti    = (type === "starter_fixed_multi");
       acts[idx].remarkHasNote   = (type === "starter_fixed_note");
       const starterVis = usesOpts || type === "";
       const optsVis    = usesOpts;
-      starterWrap.style.cssText    = starterVis ? "display:flex;flex-direction:column;gap:.3rem" : "display:none";
+      starterWrap.style.cssText = starterVis ? "display:flex;flex-direction:column;gap:.3rem" : "display:none";
+      if (starterLabel) starterLabel.textContent = optsVis ? "Sentence Starter (for Multiple Choice)" : "Sentence Starter (for Note)";
+      if (noteStarterWrap) noteStarterWrap.style.cssText = optsVis ? "display:flex;flex-direction:column;gap:.3rem" : "display:none";
       optsContainer.style.display  = optsVis ? "" : "none";
       const tmplTypeLabel = optsContainer.querySelector(".mn-opts-type-label");
       if (tmplTypeLabel) tmplTypeLabel.textContent = type === "starter_fixed_multi" ? "Checkboxes" : "Multiple Options";
