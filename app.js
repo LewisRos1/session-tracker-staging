@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1464";
+const APP_VERSION = "1465";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -16939,7 +16939,7 @@ function renderTargetManageContent(student, target) {
         if (acts[idx].fixedRemark !== undefined) {
           delete acts[idx].fixedRemark;
           acts[idx].sentenceStarter = null; acts[idx].noteSentenceStarter = null; acts[idx].remarkPresetId = null;
-          acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false; delete acts[idx].manualScore;
+          acts[idx].inlineOptions = null; acts[idx].optionsMulti = (type === "starter_fixed_multi"); acts[idx].remarkHasNote = (type === "starter_fixed_note"); delete acts[idx].manualScore;
           target.predefinedActivities = acts;
           await saveTarget();
           renderTargetManageContent(student, target);
@@ -16949,7 +16949,7 @@ function renderTargetManageContent(student, target) {
         if (acts[idx].manualScore) {
           delete acts[idx].manualScore;
           acts[idx].sentenceStarter = null; acts[idx].noteSentenceStarter = null; acts[idx].remarkPresetId = null;
-          acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false;
+          acts[idx].inlineOptions = null; acts[idx].optionsMulti = (type === "starter_fixed_multi"); acts[idx].remarkHasNote = (type === "starter_fixed_note");
           target.predefinedActivities = acts;
           await saveTarget();
           const sp = $("manage-modal-body").scrollTop;
@@ -18063,7 +18063,7 @@ function renderTemplateManageContent(template) {
       if (acts[idx].fixedRemark !== undefined) {
         delete acts[idx].fixedRemark;
         acts[idx].sentenceStarter = null; acts[idx].noteSentenceStarter = null; acts[idx].remarkPresetId = null;
-        acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false; delete acts[idx].manualScore;
+        acts[idx].inlineOptions = null; acts[idx].optionsMulti = (type === "starter_fixed_multi"); acts[idx].remarkHasNote = (type === "starter_fixed_note"); delete acts[idx].manualScore;
         template.predefinedActivities = acts;
         await saveTemplateFn();
         renderTemplateManageContent(template);
@@ -18072,7 +18072,7 @@ function renderTemplateManageContent(template) {
       if (acts[idx].manualScore) {
         delete acts[idx].manualScore;
         acts[idx].sentenceStarter = null; acts[idx].noteSentenceStarter = null; acts[idx].remarkPresetId = null;
-        acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false;
+        acts[idx].inlineOptions = null; acts[idx].optionsMulti = (type === "starter_fixed_multi"); acts[idx].remarkHasNote = (type === "starter_fixed_note");
         template.predefinedActivities = acts;
         await saveTemplateFn();
         const sp = $("manage-modal-body").scrollTop;
