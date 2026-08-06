@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1454";
+const APP_VERSION = "1455";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -1379,18 +1379,12 @@ function showTodoSessionChoice(dateStr, sid, isGrp, subject) {
     <div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:520px;padding:1.25rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom))">
       <div style="font-size:.82rem;font-weight:600;color:var(--text-muted);margin-bottom:1rem;text-transform:uppercase;letter-spacing:.05em">${escHtml(subject.name)}</div>
       <button id="tsc-start" style="display:flex;align-items:center;gap:.75rem;width:100%;padding:.85rem 1rem;border:1.5px solid #e5e7eb;border-radius:10px;background:#fff;cursor:pointer;text-align:left;margin-bottom:.6rem">
-        <span style="font-size:1.3rem">▶</span>
-        <div>
-          <div style="font-weight:600;font-size:.95rem;color:#1f2937">Start Session</div>
-          <div style="font-size:.78rem;color:var(--text-muted)">Enter data for this session</div>
-        </div>
+        <span style="font-size:1.3rem">▶️</span>
+        <div style="font-weight:600;font-size:1.05rem;color:#1f2937">Start Session</div>
       </button>
       <button id="tsc-view" style="display:flex;align-items:center;gap:.75rem;width:100%;padding:.85rem 1rem;border:1.5px solid #e5e7eb;border-radius:10px;background:#fff;cursor:pointer;text-align:left;margin-bottom:.6rem">
-        <span style="font-size:1.3rem">📋</span>
-        <div>
-          <div style="font-weight:600;font-size:.95rem;color:#1f2937">View / Edit Past Session</div>
-          <div style="font-size:.78rem;color:var(--text-muted)">Review or update session records</div>
-        </div>
+        <span style="font-size:1.3rem">🗂️</span>
+        <div style="font-weight:600;font-size:1.05rem;color:#1f2937">View / Edit Past Session</div>
       </button>
       <button id="tsc-cancel" style="width:100%;padding:.7rem;border:none;background:transparent;cursor:pointer;color:var(--text-muted);font-size:.9rem">Cancel</button>
     </div>`;
@@ -1497,10 +1491,10 @@ function renderTodoTiles(results, filterInst = null) {
       return `<div class="todo-flat-card" data-session-id="${s.id}" data-subject-id="${escHtml(subjectId)}" data-is-group="${isGroup}" data-session-date="${escHtml(s.date || "")}"
           style="border:1.5px solid #e5e7eb;border-radius:12px;background:#fff;margin-bottom:.65rem;cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:.9rem 1rem;box-shadow:0 1px 3px rgba(0,0,0,.06);gap:.75rem">
         <div style="min-width:0">
-          <div style="font-size:.9rem;font-weight:600;color:#1f2937">${escHtml(name)}</div>
+          <div style="font-size:1.05rem;font-weight:600;color:#1f2937">${escHtml(name)}</div>
           <div style="display:flex;align-items:center;gap:.4rem;margin-top:.2rem;flex-wrap:wrap">
-            <span style="font-size:.78rem;color:var(--text-muted)">${escHtml(dateStr)}</span>
-            ${tasks.map(t => `<span style="font-size:.8rem;font-weight:600;padding:.15rem .55rem;border-radius:999px;${pillStyle(t)}">${escHtml(t)}</span>`).join("")}
+            <span style="font-size:.9rem;color:var(--text-muted)">${escHtml(dateStr)}</span>
+            ${tasks.map(t => `<span style="font-size:.92rem;font-weight:600;padding:.15rem .55rem;border-radius:999px;${pillStyle(t)}">${escHtml(t)}</span>`).join("")}
           </div>
         </div>
         <span style="color:#9ca3af;font-size:1.4rem;flex-shrink:0">›</span>
