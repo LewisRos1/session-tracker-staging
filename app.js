@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1467";
+const APP_VERSION = "1468";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -8693,12 +8693,16 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
 
   let noteField;
   if (noteCapable) {
-    noteField = `<div class="entry-field entry-note-field" data-rem-id="${rem.id}">
-        <span class="field-label" contenteditable="false">${escHtml(noteSentenceStarter || "Notes")}</span>
-        <button class="btn-sketch" contenteditable="false" data-rem-id="${rem.id}" aria-label="Open sketch board">✏</button>
-        <textarea class="field-input mastery-note-input" rows="1"
+    const noteTextarea = `<textarea class="field-input mastery-note-input" rows="1"
           data-rem-id="${rem.id}"
-          data-saved-html="${escHtml(rem.masteryNote || "")}">${escHtml(plainTextForEdit(rem.masteryNote || ""))}</textarea>
+          data-saved-html="${escHtml(rem.masteryNote || "")}">${escHtml(plainTextForEdit(rem.masteryNote || ""))}</textarea>`;
+    const noteInput = noteSentenceStarter
+      ? `<div class="remark-starter-wrap"><span class="remark-starter-prefix" contenteditable="false">${escHtml(noteSentenceStarter)}</span>${noteTextarea}</div>`
+      : noteTextarea;
+    noteField = `<div class="entry-field entry-note-field" data-rem-id="${rem.id}">
+        <span class="field-label" contenteditable="false">Notes</span>
+        <button class="btn-sketch" contenteditable="false" data-rem-id="${rem.id}" aria-label="Open sketch board">✏</button>
+        ${noteInput}
       </div>`;
   } else {
     noteField = _existingNote
@@ -19478,7 +19482,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
       if (remarks.length === 0) return renderGroupStudentPendingRow(studentName, actId, actName, target, true);
       const mappedInfo = resolveGroupMappedScoreDisplay(mappedPa, target, data, studentName);
       return remarks.map(([remId, rem]) => renderGroupStudentRow(
-        studentName, remId, rem, target, mappedInfo, inlineOptions, sentenceStarter, multiSelect, remarkHasNote, paEntry?.optionScores || null, noteCapableGrp
+        studentName, remId, rem, target, mappedInfo, inlineOptions, sentenceStarter, multiSelect, remarkHasNote, paEntry?.optionScores || null, noteCapableGrp, paEntry?.noteSentenceStarter || null
       )).join("");
     }).join("");
     return `<div class="entry-block entry-block-predefined" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">
@@ -19559,7 +19563,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
       bodyHtml = attendees.map(studentName => {
         const entry = byStudent[studentName]?.[i] || null;
         if (entry) return renderGroupStudentRow(
-          studentName, entry[0], entry[1], target, null, inlineOptions, sentenceStarter, multiSelect, remarkHasNote, paEntry?.optionScores || null, noteCapableGrp
+          studentName, entry[0], entry[1], target, null, inlineOptions, sentenceStarter, multiSelect, remarkHasNote, paEntry?.optionScores || null, noteCapableGrp, paEntry?.noteSentenceStarter || null
         );
         return isFreeText
           ? renderGroupStudentEmptyRow(studentName, actId, actName, target, isPredefined)
@@ -19637,7 +19641,7 @@ function renderGroupStudentTrialsOnlyRow(studentName, remId, rem, target) {
 // just with .group-remark-input instead of .remark-text-input for the
 // free-text fallback box, since this row is one attendee's slice of a
 // shared-activity card instead of a single student's own remark field.
-function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = null, inlineOptions = null, sentenceStarter = null, multiSelect = false, remarkHasNote = false, optionScores = null, noteCapable = false) {
+function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = null, inlineOptions = null, sentenceStarter = null, multiSelect = false, remarkHasNote = false, optionScores = null, noteCapable = false, noteSentenceStarter = null) {
   const trials = rem.trials || [];
   const regularBadges = trials.map((t, i) =>
     `<span class="trial-badge">${t === -1 ? "—" : t}<button class="btn-trial-delete btn-group-trial-del" data-rem-id="${remId}" data-idx="${i}">×</button></span>`
@@ -19711,12 +19715,16 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
 
   let noteField;
   if (noteCapable) {
+    const grpNoteTextarea = `<textarea class="field-input mastery-note-input" rows="1"
+          data-rem-id="${remId}"
+          data-saved-html="${escHtml(rem.masteryNote || "")}">${escHtml(plainTextForEdit(rem.masteryNote || ""))}</textarea>`;
+    const grpNoteInput = noteSentenceStarter
+      ? `<div class="remark-starter-wrap"><span class="remark-starter-prefix" contenteditable="false">${escHtml(noteSentenceStarter)}</span>${grpNoteTextarea}</div>`
+      : grpNoteTextarea;
     noteField = `<div class="entry-field entry-note-field" data-rem-id="${remId}">
         <span class="field-label" contenteditable="false">Notes</span>
         <button class="btn-sketch btn-group-sketch" contenteditable="false" data-rem-id="${remId}" aria-label="Open sketch board">✏</button>
-        <textarea class="field-input mastery-note-input" rows="1"
-          data-rem-id="${remId}"
-          data-saved-html="${escHtml(rem.masteryNote || "")}">${escHtml(plainTextForEdit(rem.masteryNote || ""))}</textarea>
+        ${grpNoteInput}
       </div>`;
   } else {
     noteField = _grpExistingNote
