@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1444";
+const APP_VERSION = "1445";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -10064,7 +10064,6 @@ async function handleCheckedByClick(e, isGroup) {
     $("session-picker-modal").classList.remove("hidden");
     $("session-picker-list").querySelector(".btn-inst-save").addEventListener("click", async () => {
       const participants = [...$("session-picker-list").querySelectorAll(".inst-edit-check:checked")].map(c => c.value);
-      if (!participants.length) { alert("Please select at least one instructor."); return; }
       closeSessionPicker();
       await updateSessionParticipants(getSid(), participants).catch(() => {});
     });
