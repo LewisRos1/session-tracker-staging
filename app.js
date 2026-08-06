@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1459";
+const APP_VERSION = "1460";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -7356,24 +7356,21 @@ async function openSession(student, existingSessionId = null, dateStr = null, pa
         // Auto-create an empty remark for "pick from options" activities
         // (Select one / Tick boxes / Sentence Starter + either, or + Select
         // One + Free Text) so the boss can start picking immediately
-        // instead of clicking "+ Add Remark & Trials" first. Free text and
-        // Sentence Starter + Free Text stay collapsed — there's nothing to
-        // pre-open for those. If any are created the Firestore write
-        // triggers another snapshot which will render — so we return early
-        // here to avoid a stale render. Wrapped in try/catch: an uncaught
-        // error here (e.g. malformed target config) would otherwise leave
-        // the screen stuck on "Loading…" forever, since nothing below this
-        // line would ever run.
+        // instead of clicking "+ Add Remark & Trials" first. Wrapped in
+        // try/catch so a malformed config never leaves the screen at "Loading…".
+        // We render immediately after (rather than waiting for the Firestore
+        // write's snapshot) so a delayed/missing follow-up snapshot can never
+        // cause a permanent stuck-loading state. The subsequent snapshot from
+        // the write will correct the display within ~100ms.
         try {
-          const structuredFilled = await autoFillStructuredRemarks(student, sessionId);
-          if (structuredFilled > 0) return;
+          await autoFillStructuredRemarks(student, sessionId);
         } catch (err) { console.error("autoFillStructuredRemarks failed:", err); }
       }
       // Mapped-score activities can become fillable any time during the
       // session (not just on open), so this check isn't gated to firstLoad.
+      // Same render-immediately approach: don't wait for the write's snapshot.
       try {
-        const mappedFilled = await autoFillMappedRemarks(student, sessionId);
-        if (mappedFilled > 0) return;
+        await autoFillMappedRemarks(student, sessionId);
       } catch (err) { console.error("autoFillMappedRemarks failed:", err); }
       try {
         await autoFillMaintainedRemarks(student, sessionId, state.selectedTargetName);
