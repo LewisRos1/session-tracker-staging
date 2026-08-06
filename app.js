@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1466";
+const APP_VERSION = "1467";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -7937,10 +7937,10 @@ function renderFedcTarget(target) {
             <span style="flex-shrink:0;align-self:flex-start;margin-top:.45rem;display:inline-block;background:#dbeafe;color:#1e40af;border-radius:.4rem;padding:.12rem .5rem;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Subactivity</span>
             <span class="field-value-fixed"><span style="color:#1e40af;font-weight:700;margin-right:.25rem">${subLabel})</span>${inactiveReasonBadge(sub)}${paDisplayHtml(sub)}</span>
           </div>`;
-        const _subNoOpts = (sub.remarkHasNote || (sub.optionsMulti && getActivityInlineOptions(sub))) && parseOpts(getActivityInlineOptions(sub)).length === 0;
+        const _subNoOpts = (sub.remarkHasNote || sub.optionsMulti) && parseOpts(getActivityInlineOptions(sub)).length === 0;
         if (_subNoOpts) {
           html += `<div class="entry-field" contenteditable="false">
-            <span class="field-label">Notes</span>
+            <span class="field-label">${sub.optionsMulti ? "CHECKBOXES" : "MULTIPLE CHOICE"}</span>
             <span style="color:#9ca3af;font-style:italic;font-size:.88rem">&lt;Please Add Options in Edit Target&gt;</span>
           </div>`;
         } else {
@@ -8020,17 +8020,10 @@ function renderFedcTarget(target) {
         }
       }
     } else {
-      const _paNoOpts = (pa.remarkHasNote || (pa.optionsMulti && getActivityInlineOptions(pa))) && parseOpts(getActivityInlineOptions(pa)).length === 0;
-      // Self-heal: stale optionsMulti=true with no inlineOptions — Edit Target shows Notes Only so clear the flag
-      if (pa.optionsMulti && !getActivityInlineOptions(pa) && !pa.remarkHasNote) {
-        pa.optionsMulti = false;
-        const student = state.currentStudent;
-        const tgt = student?.targets?.find(t => t.name === state.selectedTargetName);
-        if (tgt) { const si = state.students?.findIndex(s => s.id === student.id); if (si >= 0) state.students[si] = student; saveStudent(student).catch(() => {}); }
-      }
+      const _paNoOpts = (pa.remarkHasNote || pa.optionsMulti) && parseOpts(getActivityInlineOptions(pa)).length === 0;
       if (_paNoOpts) {
         html += `<div class="entry-field" contenteditable="false">
-          <span class="field-label">Notes</span>
+          <span class="field-label">${pa.optionsMulti ? "CHECKBOXES" : "MULTIPLE CHOICE"}</span>
           <span style="color:#9ca3af;font-style:italic;font-size:.88rem">&lt;Please Add Options in Edit Target&gt;</span>
         </div>`;
       } else {
@@ -19462,7 +19455,8 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
   const multiSelect     = paEntry?.optionsMulti || false;
   const remarkHasNote   = paEntry?.remarkHasNote || false;
   const noteCapableGrp  = !!(paEntry?.manualScore || paEntry?.remarkHasNote || paEntry?.inlineOptions || paEntry?.remarkPresetId);
-  const isFreeText      = parseOpts(inlineOptions).length === 0 && !sentenceStarter;
+  const noOpts          = (remarkHasNote || multiSelect) && parseOpts(inlineOptions).length === 0;
+  const isFreeText      = parseOpts(inlineOptions).length === 0 && !sentenceStarter && !noOpts;
 
   const noteRow = actNote && actNote.trim()
     ? `<div class="entry-field" contenteditable="false">
@@ -19519,12 +19513,17 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
         ${combineToggle}
       </div>
       ${noteRow}
-      <button class="btn-add-remark btn-group-add-remark-all" contenteditable="false"
-        data-act-id="${escHtml(actId || "")}"
-        data-act-name="${escHtml(actName)}"
-        data-target="${escHtml(target.name)}"
-        ${parentActivity ? `data-pa-parent="${escHtml(parentActivity)}"` : ""}
-        ${configId ? `data-cfg-id="${escHtml(configId)}"` : ""}>+ Add Remark &amp; Trials</button>
+      ${noOpts
+        ? `<div class="entry-field" contenteditable="false">
+            <span class="field-label">${multiSelect ? "CHECKBOXES" : "MULTIPLE CHOICE"}</span>
+            <span style="color:#9ca3af;font-style:italic;font-size:.88rem">&lt;Please Add Options in Edit Target&gt;</span>
+          </div>`
+        : `<button class="btn-add-remark btn-group-add-remark-all" contenteditable="false"
+            data-act-id="${escHtml(actId || "")}"
+            data-act-name="${escHtml(actName)}"
+            data-target="${escHtml(target.name)}"
+            ${parentActivity ? `data-pa-parent="${escHtml(parentActivity)}"` : ""}
+            ${configId ? `data-cfg-id="${escHtml(configId)}"` : ""}>+ Add Remark &amp; Trials</button>`}
     </div>`;
   }
 
