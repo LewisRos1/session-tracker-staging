@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1447";
+const APP_VERSION = "1448";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -1472,6 +1472,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
             <col style="width:42px">
             <col style="width:10%">
             <col style="width:10%">
+            <col style="width:10%">
             <col style="width:190px">
             <col style="width:110px">
             <col style="width:130px">
@@ -1484,6 +1485,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
               <th>No.</th>
               <th>First Name</th>
               <th>Last Name</th>
+              <th style="white-space:normal">Short Name (Used in Reports)</th>
               <th>Note</th>
               <th style="white-space:normal">Ready for Word Export</th>
               <th style="white-space:normal">Imported Excel data to Website</th>
@@ -1498,6 +1500,11 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
                 <td style="text-align:center">${i + 1}</td>
                 <td style="text-align:center">${escHtml(s.firstName || s.name.split(/\s+/)[0] || "")}</td>
                 <td style="text-align:center">${escHtml(s.lastName || s.name.split(/\s+/).slice(1).join(" ") || "")}</td>
+                <td style="text-align:center" onclick="event.stopPropagation()">
+                  <input class="admin-input db-shortname-input" data-id="${escHtml(s.id)}"
+                    value="${escHtml(s.preferredName || '')}" placeholder="—"
+                    style="width:100%;text-align:center" />
+                </td>
                 <td style="text-align:center" onclick="event.stopPropagation()">
                   <input class="admin-input db-note-input" data-id="${escHtml(s.id)}"
                     value="${escHtml(s.note || '')}" placeholder="—"
@@ -1547,6 +1554,18 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
       } finally {
         btn.disabled = false;
       }
+    });
+  });
+
+  $("student-registry-body").querySelectorAll(".db-shortname-input").forEach(input => {
+    input.addEventListener("blur", async () => {
+      const id = input.dataset.id;
+      const s = state.students.find(x => x.id === id);
+      if (!s) return;
+      const val = input.value.trim();
+      if (val === (s.preferredName || "")) return;
+      s.preferredName = val || null;
+      await saveStudent(s);
     });
   });
 
