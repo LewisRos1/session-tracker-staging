@@ -1118,6 +1118,8 @@ input.field-input::placeholder {
 
 .btn-remark-opt:hover { border-color: var(--primary); color: var(--primary); }
 
+.btn-remark-opt--multi { border-radius: 4px; }
+
 .btn-remark-opt.active {
   background: var(--primary);
   border-color: var(--primary);
