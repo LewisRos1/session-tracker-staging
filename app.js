@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1456";
+const APP_VERSION = "1457";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -1465,13 +1465,13 @@ function renderTodoTiles(results, filterInst = null) {
     const sorted = [...pending].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
 
     const mkFlatCard = s => {
-      const isGroup   = !!s.groupId;
-      const subjectId = s.studentId || s.groupId || "";
+      const isGroup   = !!s.groupId || !!s.workflowIsGroup;
+      const subjectId = s.studentId || s.groupId || s.workflowSubjectId || "";
       let name = s.workflowSubjectName || "";
       if (!name) {
         name = isGroup
-          ? (state.groups || []).find(g => g.id === s.groupId)?.name || s.groupName || "Unknown"
-          : (state.students || []).find(st => st.id === s.studentId)?.name || s.studentName || "Unknown";
+          ? (state.groups   || []).find(g => g.id === subjectId)?.name || s.groupName   || "Unknown"
+          : (state.students || []).find(st => st.id === subjectId)?.name || s.studentName || "Unknown";
       }
       const dateStr = s.date ? relativeTodoDate(s.date) : "Unknown date";
       const checks  = s.checks || {};
@@ -1513,11 +1513,17 @@ function renderTodoTiles(results, filterInst = null) {
         const sid       = card.dataset.sessionId;
         const subjectId = card.dataset.subjectId;
         const isGrp     = card.dataset.isGroup === "true";
-        const subject   = isGrp
+        let subject = isGrp
           ? (state.groups   || []).find(g => g.id === subjectId)
           : (state.students || []).find(s => s.id === subjectId);
-        if (!subject) return;
-        showTodoSessionChoice(card.dataset.sessionDate, sid, isGrp, subject);
+        // Fallback: try the other list in case isGroup flag is wrong
+        if (!subject) {
+          subject = isGrp
+            ? (state.students || []).find(s => s.id === subjectId)
+            : (state.groups   || []).find(g => g.id === subjectId);
+        }
+        if (!subject) { alert("Could not find this student or group. They may have been deleted."); return; }
+        showTodoSessionChoice(card.dataset.sessionDate, sid, !!(subject.students), subject);
       });
     });
   } else {
