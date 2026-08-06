@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1455";
+const APP_VERSION = "1456";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -1502,7 +1502,7 @@ function renderTodoTiles(results, filterInst = null) {
     };
 
     body.innerHTML = `
-      <div style="padding:1rem;max-width:600px">
+      <div style="padding:1rem;max-width:600px;margin:0 auto">
         ${pending.length === 0
           ? `<p style="color:var(--text-muted);padding:.5rem 0">All caught up! No pending tasks.</p>`
           : sorted.map(mkFlatCard).join("")}
