@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1448";
+const APP_VERSION = "1449";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -1470,8 +1470,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
         <table class="view-table">
           <colgroup>
             <col style="width:42px">
-            <col style="width:10%">
-            <col style="width:10%">
+            <col style="width:15%">
             <col style="width:10%">
             <col style="width:190px">
             <col style="width:110px">
@@ -1483,8 +1482,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
           <thead>
             <tr>
               <th>No.</th>
-              <th>First Name</th>
-              <th>Last Name</th>
+              <th>Full Name</th>
               <th style="white-space:normal">Short Name (Used in Reports)</th>
               <th>Note</th>
               <th style="white-space:normal">Ready for Word Export</th>
@@ -1498,8 +1496,11 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
             ${sorted.map((s, i) => `
               <tr class="registry-row" data-id="${escHtml(s.id)}" style="cursor:pointer">
                 <td style="text-align:center">${i + 1}</td>
-                <td style="text-align:center">${escHtml(s.firstName || s.name.split(/\s+/)[0] || "")}</td>
-                <td style="text-align:center">${escHtml(s.lastName || s.name.split(/\s+/).slice(1).join(" ") || "")}</td>
+                <td style="text-align:center" onclick="event.stopPropagation()">
+                  <input class="admin-input db-fullname-input" data-id="${escHtml(s.id)}"
+                    value="${escHtml(s.name || '')}"
+                    style="width:100%;text-align:center" />
+                </td>
                 <td style="text-align:center" onclick="event.stopPropagation()">
                   <input class="admin-input db-shortname-input" data-id="${escHtml(s.id)}"
                     value="${escHtml(s.preferredName || '')}" placeholder="—"
@@ -1554,6 +1555,24 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
       } finally {
         btn.disabled = false;
       }
+    });
+  });
+
+  $("student-registry-body").querySelectorAll(".db-fullname-input").forEach(input => {
+    input.addEventListener("keydown", e => { if (e.key === "Enter") input.blur(); });
+    input.addEventListener("blur", async () => {
+      const id = input.dataset.id;
+      const s = state.students.find(x => x.id === id);
+      if (!s) return;
+      const newName = input.value.trim();
+      if (!newName || newName === s.name) return;
+      const parts = newName.split(/\s+/);
+      const oldName = s.name;
+      s.firstName = parts[0];
+      s.lastName  = parts.slice(1).join(" ");
+      s.name      = newName;
+      await saveStudent(s);
+      propagateStudentRenameToGroups(s, oldName, newName);
     });
   });
 
@@ -14758,39 +14777,12 @@ function renderStudentNameDisplay(student) {
 // type) and no Save button, since each field autosaves on blur instead.
 function wireStudentNameSection(student) {
   $("btn-mn-rename")?.addEventListener("click", () => {
-    const firstName = student.firstName || student.name?.split(/\s+/)[0] || "";
-    const lastName  = student.lastName  || student.name?.split(/\s+/).slice(1).join(" ") || "";
-    $("mn-s-name-section").innerHTML = `
-      <div style="display:flex;gap:.6rem;align-items:flex-end;flex-wrap:wrap">
-        <div style="flex:1;min-width:8rem">
-          <div style="font-size:.75rem;font-weight:600;color:var(--text-muted);margin-bottom:.25rem">First Name</div>
-          <input class="admin-input" id="mn-s-firstname" value="${escHtml(firstName)}" style="width:100%" />
-        </div>
-        <div style="flex:1;min-width:8rem">
-          <div style="font-size:.75rem;font-weight:600;color:var(--text-muted);margin-bottom:.25rem">Last Name</div>
-          <input class="admin-input" id="mn-s-lastname" value="${escHtml(lastName)}" style="width:100%" />
-        </div>
-      </div>`;
-
-    const save = async () => {
-      const fn = $("mn-s-firstname").value.trim();
-      const ln = $("mn-s-lastname").value.trim();
-      if (!fn || !ln) return;
-      const newName = `${fn} ${ln}`;
-      if (fn === student.firstName && ln === student.lastName && newName === student.name) return;
-      const oldName = student.name;
-      student.firstName = fn;
-      student.lastName  = ln;
-      student.name      = newName;
-      await saveStudent(student);
-      propagateStudentRenameToGroups(student, oldName, newName);
-      $("manage-modal-title").textContent = newName;
-    };
-    [$("mn-s-firstname"), $("mn-s-lastname")].forEach(input => {
-      input.addEventListener("blur", save);
-      input.addEventListener("keydown", e => { if (e.key === "Enter") input.blur(); });
-    });
-    $("mn-s-firstname").focus();
+    $("manage-modal").classList.add("hidden");
+    openStudentRegistryScreen();
+    setTimeout(() => {
+      const input = document.querySelector(`.db-fullname-input[data-id="${student.id}"]`);
+      if (input) { input.focus(); input.select(); }
+    }, 100);
   });
 }
 
@@ -14801,18 +14793,8 @@ function renderStudentManageContent(student) {
 
   const html = `
     <div class="admin-section" style="margin-bottom:1.5rem">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:start">
-        <div>
-          <label class="admin-label">Full Name</label>
-          <div id="mn-s-name-section">${renderStudentNameDisplay(student)}</div>
-        </div>
-        <div>
-          <label class="admin-label">Short Name (Used in Reports)</label>
-          <input class="admin-input" id="mn-s-preferred-name" value="${escHtml(student.preferredName || "")}"
-            placeholder="e.g. Ee Hyun" style="width:100%" />
-          <div style="font-size:.75rem;color:var(--text-muted);margin-top:.25rem">Used in report paragraphs. Full name is used everywhere else.</div>
-        </div>
-      </div>
+      <label class="admin-label">Full Name</label>
+      <div id="mn-s-name-section">${renderStudentNameDisplay(student)}</div>
     </div>
     <div class="admin-section">
       <div id="mn-s-session-number-area">Loading…</div>
@@ -14830,13 +14812,6 @@ function renderStudentManageContent(student) {
 
   $("manage-modal-body").innerHTML = html;
   wireStudentNameSection(student);
-
-  $("mn-s-preferred-name").addEventListener("blur", async () => {
-    const val = $("mn-s-preferred-name").value.trim();
-    if (val === (student.preferredName || "")) return;
-    student.preferredName = val || null;
-    await saveStudent(student);
-  });
 
   renderSessionNumberSection(student);
 
