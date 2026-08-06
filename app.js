@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1451";
+const APP_VERSION = "1452";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -775,6 +775,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       state.reviewQueueItems = items;
       if ($("screen-home") && !$("screen-home").classList.contains("hidden")) {
         renderStudentDatabaseButton();
+        renderTodoHomeSection();
       }
     });
     showHome();
@@ -1016,6 +1017,7 @@ async function showHome() {
   renderExportButtons();
   renderHalfYearReportsSection();
   renderStudentDatabaseButton();
+  renderTodoHomeSection();
   runOneOffRepairs();
 }
 
@@ -1234,11 +1236,52 @@ function renderStudentDatabaseButton() {
   container.innerHTML = `<div class="info-btn-row">
     <button class="export-btn export-btn-all" id="btn-open-student-registry" style="margin-bottom:0">Student Database</button>
     <button class="export-btn" id="btn-open-ai-report">AI Report Generator</button>
-    <button class="export-btn" id="btn-open-todo">To Do List</button>
   </div>`;
   $("btn-open-student-registry").addEventListener("click", () => openStudentRegistryScreen());
   $("btn-open-ai-report").addEventListener("click", () => showScreen("screen-ai-report"));
-  $("btn-open-todo").addEventListener("click", () => openTodoScreen());
+}
+
+function renderTodoHomeSection() {
+  const container = $("todo-home-chips");
+  if (!container) return;
+  container.innerHTML = `<div class="info-btn-row" style="flex-wrap:wrap">
+    ${INSTRUCTORS.map(inst => `
+      <button class="export-btn todo-home-chip" data-id="${inst.id}"
+        style="display:flex;align-items:center;gap:.5rem;margin-bottom:0">
+        <span>${escHtml(inst.name)}</span>
+        <span class="todo-home-badge" data-id="${inst.id}"
+          style="background:#d1d5db;color:#6b7280;border-radius:999px;min-width:20px;height:20px;
+                 display:flex;align-items:center;justify-content:center;font-size:.72rem;
+                 font-weight:700;padding:0 5px;flex-shrink:0">…</span>
+      </button>`).join("")}
+  </div>`;
+  container.querySelectorAll(".todo-home-chip").forEach(btn => {
+    btn.addEventListener("click", () => openTodoScreen(btn.dataset.id));
+  });
+  loadTodoHomeCounts();
+}
+
+async function loadTodoHomeCounts() {
+  const results = await Promise.all(INSTRUCTORS.map(async inst => {
+    const sessions = await getSessionsWithParticipant(inst.id).catch(() => []);
+    const count = sessions.filter(s => {
+      const checks = s.checks || {};
+      const ws = getWorkflowState(s);
+      if (!checks[`p1_${inst.id}`]) return true;
+      if (inst.id === "daisy" && !s.reviewSubmitted) return true;
+      if (inst.id !== "daisy" && s.reviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) return true;
+      if (inst.id === "nigel" && ws.ready && !ws.p4Done) return true;
+      return false;
+    }).length;
+    return { id: inst.id, count };
+  }));
+  results.forEach(({ id, count }) => {
+    const badge = document.querySelector(`.todo-home-badge[data-id="${id}"]`);
+    if (!badge) return;
+    badge.textContent = count;
+    badge.style.background = count > 0 ? "#3b82f6" : "#d1d5db";
+    badge.style.color      = count > 0 ? "#fff"    : "#6b7280";
+  });
 }
 
 function openChecklistModal() {
@@ -1301,11 +1344,18 @@ function openChecklistModal() {
   });
 }
 
-async function openTodoScreen() {
+async function openTodoScreen(filterInstId = null) {
   showScreen("screen-todo");
-  renderTodoTiles(null); // show loading state
+  const filterInst = filterInstId ? INSTRUCTORS.find(i => i.id === filterInstId) : null;
 
-  const results = await Promise.all(INSTRUCTORS.map(async inst => {
+  // Update header title to instructor name when filtering
+  const titleEl = $("todo-screen-title");
+  if (titleEl) titleEl.textContent = filterInst ? `${filterInst.name}'s Tasks` : "To Do List";
+
+  renderTodoTiles(null, filterInst); // show loading state
+
+  const instsToLoad = filterInst ? [filterInst] : INSTRUCTORS;
+  const results = await Promise.all(instsToLoad.map(async inst => {
     const sessions = await getSessionsWithParticipant(inst.id).catch(() => []);
     const pending = sessions.filter(s => {
       const checks = s.checks || {};
@@ -1319,10 +1369,10 @@ async function openTodoScreen() {
     return { inst, pending };
   }));
 
-  renderTodoTiles(results);
+  renderTodoTiles(results, filterInst);
 }
 
-function renderTodoTiles(results) {
+function renderTodoTiles(results, filterInst = null) {
   const body = $("todo-body");
 
   if (!results) {
@@ -1377,27 +1427,39 @@ function renderTodoTiles(results) {
     </button>`;
   };
 
-  body.innerHTML = `
-    <div style="padding:1rem;display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;align-items:start">
-      ${results.map(({ inst, pending }) => {
-        const hasPending = pending.length > 0;
-        const sorted = [...pending].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-        return `
-        <div class="todo-col" style="border:1.5px solid #e5e7eb;border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.06)">
-          <button class="todo-col-header" data-id="${inst.id}"
-            style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:.9rem 1rem;border:none;background:#f9fafb;cursor:${hasPending ? "pointer" : "default"};text-align:left">
-            <div style="display:flex;align-items:center;gap:.5rem">
-              <span style="font-weight:700;font-size:.95rem;color:#1f2937">${escHtml(inst.name)}</span>
-              <span style="background:${pending.length > 0 ? '#3b82f6' : '#d1d5db'};color:${pending.length > 0 ? '#fff' : '#6b7280'};border-radius:999px;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;padding:0 5px;flex-shrink:0">${pending.length}</span>
+  if (filterInst) {
+    // Flat list for a single instructor (no collapsible)
+    const { inst, pending } = results[0];
+    const sorted = [...pending].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+    body.innerHTML = `
+      <div style="padding:1rem;max-width:600px">
+        ${pending.length === 0
+          ? `<p style="color:var(--text-muted);padding:.5rem 0">All caught up! No pending tasks.</p>`
+          : sorted.map(s => mkSessionRow(s, inst)).join("")}
+      </div>`;
+  } else {
+    body.innerHTML = `
+      <div style="padding:1rem;display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;align-items:start">
+        ${results.map(({ inst, pending }) => {
+          const hasPending = pending.length > 0;
+          const sorted = [...pending].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+          return `
+          <div class="todo-col" style="border:1.5px solid #e5e7eb;border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+            <button class="todo-col-header" data-id="${inst.id}"
+              style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:.9rem 1rem;border:none;background:#f9fafb;cursor:${hasPending ? "pointer" : "default"};text-align:left">
+              <div style="display:flex;align-items:center;gap:.5rem">
+                <span style="font-weight:700;font-size:.95rem;color:#1f2937">${escHtml(inst.name)}</span>
+                <span style="background:${pending.length > 0 ? '#3b82f6' : '#d1d5db'};color:${pending.length > 0 ? '#fff' : '#6b7280'};border-radius:999px;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;padding:0 5px;flex-shrink:0">${pending.length}</span>
+              </div>
+              ${hasPending ? `<span class="todo-chevron" style="color:#6b7280;font-size:1.5rem;line-height:1;transition:transform .2s;transform:rotate(-90deg)">▾</span>` : ""}
+            </button>
+            <div class="todo-col-body" data-id="${inst.id}" style="display:none">
+              ${hasPending ? sorted.map(s => mkSessionRow(s, inst)).join("") : ""}
             </div>
-            ${hasPending ? `<span class="todo-chevron" style="color:#6b7280;font-size:1.5rem;line-height:1;transition:transform .2s;transform:rotate(-90deg)">▾</span>` : ""}
-          </button>
-          <div class="todo-col-body" data-id="${inst.id}" style="display:none">
-            ${hasPending ? sorted.map(s => mkSessionRow(s, inst)).join("") : ""}
-          </div>
-        </div>`;
-      }).join("")}
-    </div>`;
+          </div>`;
+        }).join("")}
+      </div>`;
+  }
 
   // Toggle collapse
   body.querySelectorAll(".todo-col-header").forEach(btn => {
