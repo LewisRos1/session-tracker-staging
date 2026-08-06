@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1470";
+const APP_VERSION = "1471";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -8588,7 +8588,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
       <span class="field-label">Score</span>
       <input type="text" class="field-input remark-text-input" style="max-width:14rem"
         data-rem-id="${rem.id}" data-saved-html="${escHtml(currentVal)}"
-        data-manual-score="1"
+        data-manual-score="1" autocomplete="off"
         placeholder="e.g. 5/20, 25%, 25, 0.25"
         value="${escHtml(currentVal)}">${parsedHint}
       <button class="btn-icon btn-delete-remark" contenteditable="false"
