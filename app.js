@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1453";
+const APP_VERSION = "1454";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -1372,6 +1372,44 @@ async function openTodoScreen(filterInstId = null) {
   renderTodoTiles(results, filterInst);
 }
 
+function showTodoSessionChoice(dateStr, sid, isGrp, subject) {
+  const overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:flex-end;justify-content:center";
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:520px;padding:1.25rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom))">
+      <div style="font-size:.82rem;font-weight:600;color:var(--text-muted);margin-bottom:1rem;text-transform:uppercase;letter-spacing:.05em">${escHtml(subject.name)}</div>
+      <button id="tsc-start" style="display:flex;align-items:center;gap:.75rem;width:100%;padding:.85rem 1rem;border:1.5px solid #e5e7eb;border-radius:10px;background:#fff;cursor:pointer;text-align:left;margin-bottom:.6rem">
+        <span style="font-size:1.3rem">▶</span>
+        <div>
+          <div style="font-weight:600;font-size:.95rem;color:#1f2937">Start Session</div>
+          <div style="font-size:.78rem;color:var(--text-muted)">Enter data for this session</div>
+        </div>
+      </button>
+      <button id="tsc-view" style="display:flex;align-items:center;gap:.75rem;width:100%;padding:.85rem 1rem;border:1.5px solid #e5e7eb;border-radius:10px;background:#fff;cursor:pointer;text-align:left;margin-bottom:.6rem">
+        <span style="font-size:1.3rem">📋</span>
+        <div>
+          <div style="font-weight:600;font-size:.95rem;color:#1f2937">View / Edit Past Session</div>
+          <div style="font-size:.78rem;color:var(--text-muted)">Review or update session records</div>
+        </div>
+      </button>
+      <button id="tsc-cancel" style="width:100%;padding:.7rem;border:none;background:transparent;cursor:pointer;color:var(--text-muted);font-size:.9rem">Cancel</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  const close = () => overlay.remove();
+  overlay.addEventListener("click", e => { if (e.target === overlay) close(); });
+  overlay.querySelector("#tsc-cancel").addEventListener("click", close);
+  overlay.querySelector("#tsc-start").addEventListener("click", () => {
+    close();
+    const go = () => isGrp ? openGroupSession(subject, dateStr, subject.students) : openSession(subject, sid);
+    if (isOlderThan7Days(dateStr)) requirePassword(go, EXPIRED_MSG); else go();
+  });
+  overlay.querySelector("#tsc-view").addEventListener("click", () => {
+    close();
+    const go = () => isGrp ? openGroupSessionView(subject, sid) : openSessionView(subject, sid);
+    if (isOlderThan7Days(dateStr)) requirePassword(go, EXPIRED_MSG); else go();
+  });
+}
+
 function renderTodoTiles(results, filterInst = null) {
   const body = $("todo-body");
 
@@ -1428,15 +1466,66 @@ function renderTodoTiles(results, filterInst = null) {
   };
 
   if (filterInst) {
-    // Flat list for a single instructor (no collapsible)
+    // Flat card list for a single instructor
     const { inst, pending } = results[0];
     const sorted = [...pending].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+
+    const mkFlatCard = s => {
+      const isGroup   = !!s.groupId;
+      const subjectId = s.studentId || s.groupId || "";
+      let name = s.workflowSubjectName || "";
+      if (!name) {
+        name = isGroup
+          ? (state.groups || []).find(g => g.id === s.groupId)?.name || s.groupName || "Unknown"
+          : (state.students || []).find(st => st.id === s.studentId)?.name || s.studentName || "Unknown";
+      }
+      const dateStr = s.date ? relativeTodoDate(s.date) : "Unknown date";
+      const checks  = s.checks || {};
+      const ws      = getWorkflowState(s);
+      const tasks   = [];
+      if (!checks[`p1_${inst.id}`]) tasks.push("Enter Data");
+      if (inst.id === "daisy" && !s.reviewSubmitted) {
+        const nonDaisy = (s.participants || []).filter(id => id !== "daisy");
+        const p2Unlocked = nonDaisy.length > 0 ? nonDaisy.every(id => !!checks[`p1_${id}`]) : !!checks["p1_daisy"];
+        if (p2Unlocked) tasks.push("Check");
+      }
+      if (inst.id !== "daisy" && s.reviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) tasks.push("Revision");
+      if (inst.id === "nigel" && ws.ready && !ws.p4Done) tasks.push("Export");
+      const pillStyle = t => t === "Enter Data"
+        ? "background:#eff6ff;color:#1d4ed8"
+        : t === "Export" ? "background:#f0fdf4;color:#15803d" : "background:#fff7ed;color:#c2410c";
+      return `<div class="todo-flat-card" data-session-id="${s.id}" data-subject-id="${escHtml(subjectId)}" data-is-group="${isGroup}" data-session-date="${escHtml(s.date || "")}"
+          style="border:1.5px solid #e5e7eb;border-radius:12px;background:#fff;margin-bottom:.65rem;cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:.9rem 1rem;box-shadow:0 1px 3px rgba(0,0,0,.06);gap:.75rem">
+        <div style="min-width:0">
+          <div style="font-size:.9rem;font-weight:600;color:#1f2937">${escHtml(name)}</div>
+          <div style="display:flex;align-items:center;gap:.4rem;margin-top:.2rem;flex-wrap:wrap">
+            <span style="font-size:.78rem;color:var(--text-muted)">${escHtml(dateStr)}</span>
+            ${tasks.map(t => `<span style="font-size:.8rem;font-weight:600;padding:.15rem .55rem;border-radius:999px;${pillStyle(t)}">${escHtml(t)}</span>`).join("")}
+          </div>
+        </div>
+        <span style="color:#9ca3af;font-size:1.4rem;flex-shrink:0">›</span>
+      </div>`;
+    };
+
     body.innerHTML = `
       <div style="padding:1rem;max-width:600px">
         ${pending.length === 0
           ? `<p style="color:var(--text-muted);padding:.5rem 0">All caught up! No pending tasks.</p>`
-          : sorted.map(s => mkSessionRow(s, inst)).join("")}
+          : sorted.map(mkFlatCard).join("")}
       </div>`;
+
+    body.querySelectorAll(".todo-flat-card").forEach(card => {
+      card.addEventListener("click", () => {
+        const sid       = card.dataset.sessionId;
+        const subjectId = card.dataset.subjectId;
+        const isGrp     = card.dataset.isGroup === "true";
+        const subject   = isGrp
+          ? (state.groups   || []).find(g => g.id === subjectId)
+          : (state.students || []).find(s => s.id === subjectId);
+        if (!subject) return;
+        showTodoSessionChoice(card.dataset.sessionDate, sid, isGrp, subject);
+      });
+    });
   } else {
     body.innerHTML = `
       <div style="padding:1rem;display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;align-items:start">
