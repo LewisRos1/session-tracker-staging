@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1484";
+const APP_VERSION = "1485";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -2895,14 +2895,15 @@ Same rules: plain English, no jargon, no numbers, warm tone. Labels in ** bold. 
 ===ACTION_PLAN===
 These are the areas where ${firstName} has the lowest scores this term: ${bottom5Names.join(", ")}.
 
-Write one block for each target above, in the same order. Each block: EXACTLY 2 bullet points describing the 2 most important difficulties ${firstName} has in that area, then ONE STRATEGY line with a short practical recommendation for parents or teachers. Plain English, no jargon.
-${categorized.qualitative.length ? `\nAlso write one block for each of these qualitative targets (observed in sessions, no percentage scores): ${categorized.qualitative.map(r => r.name).join(", ")}.\n\nSame format: exactly 2 bullets about the 2 most important support needs, then a STRATEGY line.` : ""}
+Write one block for each target above, in the same order. Each block: EXACTLY 2 bullet points, each immediately followed by its own STRATEGY line — a short practical recommendation for that specific difficulty. Plain English, no jargon.
+${categorized.qualitative.length ? `\nAlso write one block for each of these qualitative targets (observed in sessions, no percentage scores): ${categorized.qualitative.map(r => r.name).join(", ")}.\n\nSame format: exactly 2 bullets, each with its own STRATEGY line immediately after.` : ""}
 
 Format EXACTLY as (one block per target):
 TARGET: [exact target name]
 • [Most important difficulty]
+STRATEGY: [One short practical recommendation for the difficulty above. Plain English.]
 • [Second most important difficulty]
-STRATEGY: [One short practical recommendation — what parents or teachers can do to help. Plain English.]
+STRATEGY: [One short practical recommendation for the difficulty above. Plain English.]
 ===END===`;
 
     // Start fetch immediately — fake phases will play while it runs in background
@@ -4070,9 +4071,9 @@ function hyrParseAiResponse(text) {
       const t = line.trim();
       if (t.startsWith("TARGET:")) {
         if (cur) out.actionPlanRows.push(cur);
-        cur = { target: t.slice(7).trim(), points: [], strategy: "" };
+        cur = { target: t.slice(7).trim(), points: [], strategies: [] };
       } else if (cur && t.startsWith("STRATEGY:")) {
-        cur.strategy = t.slice(9).trim();
+        cur.strategies.push(t.slice(9).trim());
       } else if (cur && (t.startsWith("•") || t.startsWith("-") || t.startsWith("*"))) {
         const pt = t.replace(/^[•\-\*]\s*/, "").trim();
         if (pt) cur.points.push(pt);
@@ -4246,15 +4247,22 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   h += `<h2 style="${SECTION_H2}">Section ${planSection}: Focus Areas</h2>`;
   h += `<p style="margin:.5rem 0 1rem;line-height:1.7">The table below highlights the areas where ${esc(firstName)} has the most room for improvement this term, along with recommendations for supporting their progress in each one.</p>`;
   if (parsed.actionPlanRows.length) {
-    const rows = parsed.actionPlanRows.map((r, idx) => {
-      const pts = (r.points || []).slice(0, 2).map(p => `<li style="margin:.25rem 0">${esc(p)}</li>`).join("");
-      const strat = r.strategy ? `<span style="color:#9ca3af">${esc(r.strategy)}</span>` : "";
-      return `<tr>
-        <td style="padding:.55rem .75rem;border:1px solid #e5e7eb;text-align:center;width:7.6%;color:#6b7280">${idx + 1}</td>
-        <td style="padding:.55rem .75rem;border:1px solid #e5e7eb;font-weight:600;vertical-align:top;text-align:center;width:25%">${esc(r.target || "")}</td>
-        <td style="padding:.55rem .75rem;border:1px solid #e5e7eb;vertical-align:top"><ol style="margin:0;padding-left:1.2rem;line-height:1.6">${pts}</ol></td>
-        <td style="padding:.55rem .75rem;border:1px solid #e5e7eb;vertical-align:top;font-size:.88rem;line-height:1.6">${strat}</td>
-      </tr>`;
+    const rows = parsed.actionPlanRows.flatMap((r, idx) => {
+      const pts    = (r.points    || []).slice(0, 2);
+      const strats = (r.strategies || []).slice(0, 2);
+      const cellB  = "padding:.5rem .75rem;border:1px solid #e5e7eb;vertical-align:top";
+      return [
+        `<tr>
+          <td rowspan="2" style="${cellB};text-align:center;width:7.6%;color:#6b7280;vertical-align:middle">${idx + 1}</td>
+          <td rowspan="2" style="${cellB};font-weight:600;text-align:center;width:25%;vertical-align:middle">${esc(r.target || "")}</td>
+          <td style="${cellB}">${esc(pts[0] || "")}</td>
+          <td style="${cellB};font-size:.88rem;color:#9ca3af">${esc(strats[0] || "")}</td>
+        </tr>`,
+        `<tr>
+          <td style="${cellB};border-top:1px solid #e5e7eb">${esc(pts[1] || "")}</td>
+          <td style="${cellB};border-top:1px solid #e5e7eb;font-size:.88rem;color:#9ca3af">${esc(strats[1] || "")}</td>
+        </tr>`
+      ];
     }).join("");
     h += `<table style="width:100%;border-collapse:collapse;font-size:.9rem;margin:.75rem 0">
       <thead><tr style="background:#f3f4f6">
@@ -4648,7 +4656,6 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     `The table below highlights the areas where ${firstName} has the most room for improvement this term, along with recommendations for supporting their progress in each one.`,
     { after: 220, align: AlignmentType.JUSTIFIED }
   ));
-  const AP_NUM_REFS = (parsed.actionPlanRows || []).map((_, i) => `hyr-ap-row-${i}`);
   const qualSet = new Set(categorized.qualitative.map(r => r.name));
   if (parsed.actionPlanRows?.length) {
     const HDR = "f3f4f6";
@@ -4659,24 +4666,29 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
       mkCell("Details", { bold: true, bg: HDR, size: 22, dxa: 5616, align: AlignmentType.CENTER }),
       mkCell("Recommendations & Strategies", { bold: true, bg: HDR, size: 22, dxa: 5616, align: AlignmentType.CENTER })
     ]});
-    const dataRows = (parsed.actionPlanRows || []).map((r, idx) => new TableRow({ children: [
-      mkCell(String(idx + 1), { align: AlignmentType.CENTER, dxa: 634 }),
-      mkCell(qualSet.has(r.target) ? `${r.target || ""} (Qualitative)` : r.target || "", { dxa: 2088, align: AlignmentType.CENTER }),
-      new TableCell({
-        width: { size: 5616, type: WidthType.DXA },
-        margins: { top: 100, bottom: 100, left: 150, right: 150 },
-        children: (r.points || []).length
-          ? (r.points || []).slice(0, 2).map(p => new Paragraph({ children: [new TextRun({ text: p, size: 22 })], numbering: { reference: AP_NUM_REFS[idx], level: 0 }, alignment: AlignmentType.JUSTIFIED, spacing: { before: 40, after: 80, ...LS } }))
-          : [new Paragraph({ children: [new TextRun({ text: "", size: 22 })], spacing: { before: 80, after: 80 } })]
-      }),
-      new TableCell({
-        width: { size: 5616, type: WidthType.DXA },
-        margins: { top: 100, bottom: 100, left: 150, right: 150 },
-        children: r.strategy
-          ? [new Paragraph({ children: [new TextRun({ text: r.strategy, size: 22, color: "9ca3af" })], alignment: AlignmentType.JUSTIFIED, spacing: { before: 80, after: 80 } })]
-          : [new Paragraph({ children: [new TextRun({ text: "", size: 22 })], spacing: { before: 80, after: 80 } })]
-      })
-    ]}));
+    const mkAPCell = (text, gray = false) => new TableCell({
+      width: { size: 5616, type: WidthType.DXA },
+      margins: { top: 80, bottom: 80, left: 150, right: 150 },
+      children: [new Paragraph({ children: [new TextRun({ text: text || "", size: 22, color: gray && text ? "9ca3af" : "000000" })], alignment: AlignmentType.JUSTIFIED, spacing: { before: 60, after: 60 } })]
+    });
+    const dataRows = (parsed.actionPlanRows || []).flatMap((r, idx) => {
+      const pts   = (r.points    || []).slice(0, 2);
+      const strats = (r.strategies || []).slice(0, 2);
+      const targetText = qualSet.has(r.target) ? `${r.target || ""} (Qualitative)` : r.target || "";
+      const row1 = new TableRow({ children: [
+        new TableCell({ rowSpan: 2, width: { size: 634, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, margins: { top: 100, bottom: 100, left: 150, right: 150 },
+          children: [new Paragraph({ children: [new TextRun({ text: String(idx + 1), size: 22 })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })] }),
+        new TableCell({ rowSpan: 2, width: { size: 2088, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, margins: { top: 100, bottom: 100, left: 150, right: 150 },
+          children: [new Paragraph({ children: [new TextRun({ text: targetText, size: 22, bold: true })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })] }),
+        mkAPCell(pts[0] || ""),
+        mkAPCell(strats[0] || "", true)
+      ]});
+      const row2 = new TableRow({ children: [
+        mkAPCell(pts[1] || ""),
+        mkAPCell(strats[1] || "", true)
+      ]});
+      return [row1, row2];
+    });
     actionPlanParas.push(new Table({ width: { size: 13954, type: WidthType.DXA }, rows: [headerRow, ...dataRows] }));
   }
 
@@ -4759,7 +4771,6 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
       { reference: BULLET_REF, levels: [{ level: 0, format: LevelFormat?.BULLET ?? "bullet", text: "", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } }, run: { fonts: { ascii: "Wingdings", hAnsi: "Wingdings", hint: "default" }, size: 22 } } }] },
       { reference: KI_NUM_REF,   levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 480, hanging: 240 } }, run: { size: 22 } } }] },
       { reference: KI_NUM_REF_2, levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 480, hanging: 240 } }, run: { size: 22 } } }] },
-      ...AP_NUM_REFS.map(ref => ({ reference: ref, levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 480, hanging: 240 } }, run: { size: 22 } } }] }))
     ] },
     sections: docSections
   });
