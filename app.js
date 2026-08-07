@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1500";
+const APP_VERSION = "1501";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -2629,7 +2629,16 @@ GLOBAL RULES (apply to every section):
 - CRITICAL: Any activity labelled "NOT TESTED this term" was never attempted during this period. The student's ability in that area is completely unknown — it could be easy or hard, we simply do not know. NEVER describe it as a weakness, a difficulty, or an area where the student struggles. NEVER mention it anywhere in the report. Treat it as if it does not exist.
 - CRITICAL: Write ONLY what the session remarks directly and explicitly state. Do NOT extrapolate or infer related skills. "Identifies a face" is NOT the same as "knows a name." "Follows a one-step instruction" is NOT the same as "follows two-step instructions." "Points to an object" is NOT the same as "can name it." Stay word-for-word within what was actually recorded — never assume a student can or cannot do something that was not directly observed.
 - CRITICAL: Some activities track NEGATIVE or PROBLEM BEHAVIOURS (e.g. snatching food, interrupting others, hitting, distracting behaviour). For these activities, scoring is INVERTED — a HIGH score (e.g. 3 out of 3) means the student did NOT exhibit the bad behaviour and showed good self-control, while a LOW score (e.g. 0) means the bad behaviour DID occur. Always interpret scores for problem/negative behaviour activities with this in mind: high = good, low = the behaviour occurred.
-- READABILITY: Write every section to a Flesch Reading Ease score of 60 to 70. Use short sentences, common words, and a natural conversational tone. ABA terms that parents need to know (e.g. "self-regulation", "prompt", "generalisation") are allowed, but always explain them in plain words in the same sentence if they appear.`;
+- READABILITY: Write every section to a Flesch Reading Ease score of 60 to 70. Use short sentences and a natural tone. ABA terms that parents need to know (e.g. "self-regulation", "prompt", "generalisation") are allowed, but always explain them in plain words in the same sentence if they appear.
+- WRITING STYLE: Write like a professional therapist's report — warm but precise. Follow these rules on every sentence:
+  • Verb choices: use "demonstrates" not "shows"; "requires support" or "would benefit from support" not "needs help"; "is able to" not "can"; "experiences difficulty" not "has difficulty"; "initiates" not "starts"; "attends to" not "pays attention to"; "request" not "ask for things".
+  • Soften negatives: describe challenging behaviours as "may display physical behaviours such as..." rather than naming them bluntly. Use "when faced with frustration" or "when expectations are not met" instead of "when he/she cannot get what he/she wants".
+  • Frame limitations with "remains": write "remains limited", "remains inconsistent", "remains emerging" — not "is still small", "does not consistently", "is still developing".
+  • Examples: always use "such as" not "like".
+  • Skills not yet present: write "has not yet developed", "not yet consistently", "emerging" — never "cannot yet" or blunt deficit statements.
+  • Areas needing work: write "would benefit from support in developing..." not "needs to learn...".
+  • Use clinical terms where appropriate: "expressive and receptive vocabulary", "emotional responses", "transitions" (not "when plans change"), "sensory experiences" (not "sensations"), "dressing tasks" (not "pants and socks"), "verbal communication" (not "speaking"), "distress" or "frustration" (not "upset").
+  • British spelling throughout: "behaviours", "recognised", "generalisation", "practise" (verb).`;
 
 let _hyrConfig = null;
 
