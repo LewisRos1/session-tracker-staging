@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1471";
+const APP_VERSION = "1473";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -5851,6 +5851,7 @@ async function maGetLastDataDate(student, target, pa) {
         return matchIds.some(actId => Object.values(sRems).some(r =>
           r.activityId === actId && (
             (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
+            (r.masteryNote || "").trim().length > 0 ||
             (r.trials || []).some(t => t !== null && t !== -1) ||
             (r.optionScore !== undefined && r.optionScore !== null)
           )
@@ -16108,14 +16109,6 @@ function renderTargetManageContent(student, target) {
       }
 
       // Regular activities — full data check + overlay (same as kebab delete)
-      if (!(item.name || "").trim()) {
-        acts.splice(idx, 1);
-        acts.forEach((a, i) => a.order = i);
-        target.predefinedActivities = acts;
-        await saveTarget();
-        renderTargetManageContent(student, target);
-        return;
-      }
       btn.disabled = true;
       btn.textContent = "⏳";
       let affected = 0;
@@ -16138,8 +16131,9 @@ function renderTargetManageContent(student, target) {
             return matchIds.some(actId => Object.values(sRems).some(r =>
               r.activityId === actId && (
                 (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
-                (r.trials || []).some(t => t !== null && t !== -1)
-              )
+                (r.masteryNote || "").trim().length > 0 ||
+                (r.trials || []).some(t => t !== null && t !== -1) ||
+                (r.optionScore !== undefined && r.optionScore !== null)
             ));
           });
         });
@@ -16280,14 +16274,6 @@ function renderTargetManageContent(student, target) {
           await saveTarget();
           renderTargetManageContent(student, target);
         } else {
-          if (!(pa.name || "").trim()) {
-            const actIdx = acts.indexOf(pa);
-            if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
-            target.predefinedActivities = acts;
-            await saveTarget();
-            renderTargetManageContent(student, target);
-            return;
-          }
           btn.disabled = true;
           btn.textContent = "Checking…";
           let affected = 0;
@@ -16311,8 +16297,9 @@ function renderTargetManageContent(student, target) {
                 return matchIds.some(actId => Object.values(sRems).some(r =>
                   r.activityId === actId && (
                     (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
-                    (r.trials || []).some(t => t !== null && t !== -1)
-                  )
+                    (r.masteryNote || "").trim().length > 0 ||
+                    (r.trials || []).some(t => t !== null && t !== -1) ||
+                    (r.optionScore !== undefined && r.optionScore !== null)
                 ));
               });
             });
@@ -16419,6 +16406,7 @@ function renderTargetManageContent(student, target) {
           return matchIds.some(actId => Object.values(sRems).some(r =>
             r.activityId === actId && (
               (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
+              (r.masteryNote || "").trim().length > 0 ||
               (r.trials || []).some(t => t !== null && t !== -1) || (r.optionScore !== undefined && r.optionScore !== null)
             )
           ));
@@ -16543,8 +16531,9 @@ function renderTargetManageContent(student, target) {
                 return matchIds.some(actId => Object.values(sRems).some(r =>
                   r.activityId === actId && (
                     (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
-                    (r.trials || []).some(t => t !== null && t !== -1)
-                  )
+                    (r.masteryNote || "").trim().length > 0 ||
+                    (r.trials || []).some(t => t !== null && t !== -1) ||
+                    (r.optionScore !== undefined && r.optionScore !== null)
                 ));
               });
             } catch (err) {
@@ -16661,6 +16650,7 @@ function renderTargetManageContent(student, target) {
           return matchIds.some(actId => Object.values(sRems).some(r =>
             r.activityId === actId && (
               (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
+              (r.masteryNote || "").trim().length > 0 ||
               (r.trials || []).some(t => t !== null && t !== -1) || (r.optionScore !== undefined && r.optionScore !== null)
             )
           ));
