@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1498";
+const APP_VERSION = "1499";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -217,7 +217,25 @@ window.debugTargetConfig = async function(studentName, targetName) {
   });
 };
 
-// 3) Deep-check a specific activity name (must match exactly what debugScanTarget shows):
+// 3) Clear legacy activeTo/activeFrom from all activities in a target:
+//    debugClearActivePeriod("Hayden Chan", "Math")
+window.debugClearActivePeriod = async function(studentName, targetName) {
+  const students = await loadStudentsConfig();
+  const student = students.find(s => s.name === studentName);
+  if (!student) { console.error("Student not found:", studentName); return; }
+  const target = (student.targets || []).find(t => t.name === targetName);
+  if (!target) { console.error("Target not found:", targetName); return; }
+  let cleared = 0;
+  (target.predefinedActivities || []).forEach(pa => {
+    if (pa.activeTo)   { delete pa.activeTo;   cleared++; }
+    if (pa.activeFrom) { delete pa.activeFrom; cleared++; }
+  });
+  if (!cleared) { console.log("Nothing to clear."); return; }
+  await saveStudent(student);
+  console.log(`Cleared ${cleared} date field(s) from ${targetName}. Refresh the page.`);
+};
+
+// 4) Deep-check a specific activity name (must match exactly what debugScanTarget shows):
 //    debugDeleteCheck("Hayden Chan", "Math", "Writing/Spelling Numbers in Letters")
 window.debugDeleteCheck = async function(studentName, targetName, activityName) {
   const students = await loadStudentsConfig();
