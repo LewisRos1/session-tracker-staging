@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1479";
+const APP_VERSION = "1480";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -2785,12 +2785,12 @@ async function hyrGenerate() {
   let inCancelMode = false;
   const setProgress = (pct, text) => {
     bar.style.width = pct + "%";
-    label.textContent = text;
-    if (!inCancelMode) btn.textContent = text;
+    label.textContent = text === "Done!" ? text : "";
+    if (text === "Done!") btn.textContent = text;
   };
 
   btn.disabled = true; progress.style.display = "";
-  setProgress(5, "Collecting session data…");
+  setProgress(5, "");
 
   try {
     const excludedActivities = new Set();
@@ -2917,9 +2917,9 @@ TARGET: [exact target name]
 
     // Fake phases run while fetch is already in flight
     await new Promise(r => setTimeout(r, 1000));
-    setProgress(20, "Processing data…");
+    setProgress(20, "");
     await new Promise(r => setTimeout(r, 1000));
-    setProgress(35, "Sending to AI (Approx. ~15 seconds)…");
+    setProgress(35, "");
     await new Promise(r => setTimeout(r, 500));
 
     // Switch button to Cancel
@@ -2935,11 +2935,12 @@ TARGET: [exact target name]
     _hyrAbortController = null;
     inCancelMode = false;
     btn.disabled = true;
+    btn.textContent = "Generate Report";
     btn.style.background = ""; btn.style.color = ""; btn.style.borderColor = "";
 
-    setProgress(70, "AI response received…");
+    setProgress(70, "");
     await new Promise(r => setTimeout(r, 600));
-    setProgress(85, "Writing report…");
+    setProgress(85, "");
     await new Promise(r => setTimeout(r, 700));
 
     if (!resp.ok) {
@@ -4782,12 +4783,13 @@ async function monthlyGenerate() {
   const label = $("hyr-progress-label");
   let inCancelMode = false;
   const setProgress = (pct, text) => {
-    bar.style.width = pct + "%"; label.textContent = text;
-    if (!inCancelMode) btn.textContent = text;
+    bar.style.width = pct + "%";
+    label.textContent = text === "Done!" ? text : "";
+    if (text === "Done!") btn.textContent = text;
   };
 
   btn.disabled = true; progress.style.display = "";
-  setProgress(5, "Collecting session data…");
+  setProgress(5, "");
   try {
     const excludedActivities = new Set();
     document.querySelectorAll(".hyr-act-cb[data-excluded='true']").forEach(b => {
@@ -4795,7 +4797,7 @@ async function monthlyGenerate() {
     });
 
     const allSessions = await getAllSessionsForStudent(studentId);
-    setProgress(15, "Processing data…");
+    setProgress(15, "");
 
     const FULL_MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
     const monthName = FULL_MONTHS[month - 1];
@@ -4856,9 +4858,9 @@ ${isFocus ? `===FOCUS: ${t.name}===
     });
 
     await new Promise(r => setTimeout(r, 800));
-    setProgress(25, "Processing data…");
+    setProgress(25, "");
     await new Promise(r => setTimeout(r, 800));
-    setProgress(38, "Sending to AI (Approx. ~15 seconds)…");
+    setProgress(38, "");
     await new Promise(r => setTimeout(r, 400));
 
     inCancelMode = true;
@@ -4870,11 +4872,12 @@ ${isFocus ? `===FOCUS: ${t.name}===
     _hyrAbortController = null;
     inCancelMode = false;
     btn.disabled = true;
+    btn.textContent = "Generate Report";
     btn.style.background = ""; btn.style.color = ""; btn.style.borderColor = "";
 
-    setProgress(72, "AI response received…");
+    setProgress(72, "");
     await new Promise(r => setTimeout(r, 500));
-    setProgress(86, "Writing report…");
+    setProgress(86, "");
     await new Promise(r => setTimeout(r, 600));
 
     if (!resp.ok) {
