@@ -2537,6 +2537,7 @@ div.admin-note-editable:empty::before {
   padding: .5rem 1.25rem .6rem;
   background: #f5f5ff;
   border-bottom: 1px solid var(--border);
+  overflow-x: auto;
 }
 
 .chk-inner {
@@ -2827,10 +2828,11 @@ div.admin-note-editable:empty::before {
 /* ─── Workflow Flowchart ─────────────────────────────────────── */
 .workflow-chart {
   display: grid;
-  grid-template-columns: 1fr 2.5rem 1fr 2.5rem 1fr 2.5rem 1fr;
+  grid-template-columns: minmax(140px,1fr) 2.5rem minmax(140px,1fr) 2.5rem minmax(140px,1fr) 2.5rem minmax(140px,1fr);
   grid-template-rows: auto auto;
-  align-items: stretch; /* equal heights */
+  align-items: stretch;
   gap: .5rem 0;
+  min-width: 640px;
 }
 
 /* Arrows fill their row-1 cell and center the SVG */

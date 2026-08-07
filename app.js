@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1501";
+const APP_VERSION = "1502";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -1572,7 +1572,7 @@ function renderTodoTiles(results, filterInst = null) {
       const ws      = getWorkflowState(s);
       const tasks   = [];
       if (!checks[`p1_${inst.id}`]) tasks.push("Enter Data");
-      if (inst.id === "daisy" && !s.reviewSubmitted) {
+      if (inst.id === "daisy" && !s.reviewSubmitted && !ws.daisyOnly) {
         const nonDaisy = (s.participants || []).filter(id => id !== "daisy");
         const p2Unlocked = nonDaisy.length > 0 ? nonDaisy.every(id => !!checks[`p1_${id}`]) : !!checks["p1_daisy"];
         if (p2Unlocked) tasks.push("Check");
