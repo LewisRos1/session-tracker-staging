@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1478";
+const APP_VERSION = "1479";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -4825,19 +4825,20 @@ ${activeTargets.map(t => {
   const td = threeMonthData[t.name] || {};
   const md = miniData[t.name] || {};
   const isFocus = md.trend !== "up";
-  return `===SUMMARY: ${t.name}===
-Past 3 months (${(td.labels||[]).join(", ")}): ${trendLabel(td.trend)}
-This month (${md.lastMonthLabel}→${md.thisMonthLabel}): ${trendLabel(md.trend)}
-Session data:
-${(aiData[t.name] || []).join("\n")}
-Write EXACTLY ONE short sentence (max 15 words) that adds meaning the parent cannot already see from the trend arrows. Do NOT describe or restate the trend direction — the arrows already show that. Instead: if both trends agree, say WHY or what it means for the child. If the two trends differ (e.g. stable overall but declined this month), explain what changed or what drove the shift. Give a real insight. Honest, warm, plain English. No jargon, no percentages, no trend words like "improved" or "declined".
+  return `TARGET: ${t.name}
+• Past 3 months (${(td.labels||[]).join(", ")}): ${trendLabel(td.trend)}
+• This month (${md.lastMonthLabel}→${md.thisMonthLabel}): ${trendLabel(md.trend)}
+Session data: ${(aiData[t.name] || []).join(" | ")}
+
+Now write your response for this target using EXACTLY these markers:
+===SUMMARY: ${t.name}===
+[Write EXACTLY ONE short sentence, max 15 words. Add meaning the parent cannot see from the arrows. Do NOT restate the trend — say WHY or what it means for the child. If the two trends differ (e.g. stable overall but declined this month), explain what changed or what drove the shift. Honest, warm, plain English. No jargon, no percentages, no trend words like "improved" or "declined".]
 ===END===
-${isFocus ? `
-===FOCUS: ${t.name}===
-Write EXACTLY ONE sentence about the single biggest struggle. Use the simplest everyday words — as if explaining to a parent on the phone with no therapy background. Short words, short sentence. Honest but kind. No jargon.
+${isFocus ? `===FOCUS: ${t.name}===
+[Write EXACTLY ONE sentence about the single biggest struggle. Simplest everyday words, as if explaining to a parent on the phone. Short, honest, kind. No jargon.]
 ===END===
 ===REC: ${t.name}===
-Write EXACTLY ONE short, practical recommendation — something specific parents or teachers can try to support this focus area. Plain everyday English, no jargon, no clinical terms.
+[Write EXACTLY ONE short practical recommendation — something specific parents or teachers can try. Plain English, no jargon.]
 ===END===` : ""}`;
 }).join("\n\n")}`;
 
