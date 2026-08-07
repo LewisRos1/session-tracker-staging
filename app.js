@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1505";
+const APP_VERSION = "1506";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8722,7 +8722,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
           <span class="field-label" contenteditable="false">Notes</span>
           <button class="btn-sketch" contenteditable="false" data-rem-id="${rem.id}" aria-label="Open sketch board">✏</button>
           <textarea class="field-input mastery-note-input" rows="1"
-            autocomplete="off"
+            autocomplete="new-password"
             data-rem-id="${rem.id}"
             data-saved-html="${escHtml(rem.masteryNote || "")}">${escHtml(plainTextForEdit(rem.masteryNote || ""))}</textarea>
         </div>`
@@ -8733,7 +8733,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
       <span class="field-label">Score</span>
       <input type="text" class="field-input remark-text-input" style="max-width:14rem"
         data-rem-id="${rem.id}" data-saved-html="${escHtml(currentVal)}"
-        data-manual-score="1" autocomplete="off"
+        data-manual-score="1" autocomplete="one-time-code"
         placeholder="e.g. 5/20, 25%, 25, 0.25"
         value="${escHtml(currentVal)}">${parsedHint}
       <button class="btn-icon btn-delete-remark" contenteditable="false"
