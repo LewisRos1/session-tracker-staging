@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1477";
+const APP_VERSION = "1478";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -8179,7 +8179,7 @@ function renderFedcTarget(target) {
     html += `<div style="margin-top:.75rem">
       ${renderSection('Mastered', '#059669', masteredPas)}
       ${renderSection('Discontinued', '#dc2626', discontinuedPas)}
-      ${renderSection('Other Inactive', '#6b7280', otherPas)}
+      ${renderSection('Inactive', '#6b7280', otherPas)}
     </div>`;
   }
 
@@ -14008,11 +14008,15 @@ function showDatePickerOverlay({ heading, infoHtml, minDate, defaultDate, confir
     overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem";
     const min = minDate || todayDateStr();
     const def = defaultDate && defaultDate >= min ? defaultDate : min;
+    const defFormatted = fmtPeriodDate(def) || def;
     overlay.innerHTML = `<div style="background:#fff;border-radius:.75rem;padding:1.5rem;max-width:400px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.22)">
       <div style="font-size:.93rem;font-weight:700;color:#111;margin-bottom:.55rem">${heading}</div>
       ${infoHtml ? `<div style="font-size:.85rem;color:#374151;margin-bottom:.9rem;line-height:1.6">${infoHtml}</div>` : ''}
       <label style="font-size:.82rem;font-weight:600;color:#374151;display:block;margin-bottom:.35rem">Please select the final date you want this activity to appear.</label>
-      <input type="date" id="dp-date-inp" value="${def}" min="${min}" style="width:100%;box-sizing:border-box;padding:.5rem .7rem;border:1.5px solid #d1d5db;border-radius:.4rem;font-size:.95rem;outline:none;margin-bottom:1rem">
+      <div style="position:relative;margin-bottom:1rem">
+        <input type="date" id="dp-date-inp" value="${def}" min="${min}" style="width:100%;box-sizing:border-box;padding:.5rem .7rem;border:1.5px solid #d1d5db;border-radius:.4rem;font-size:.95rem;outline:none;color:transparent;caret-color:transparent;background:#fff;cursor:pointer">
+        <div id="dp-date-display" style="position:absolute;top:0;left:0;bottom:0;right:2.5rem;padding:.5rem .7rem;font-size:.95rem;color:#111;pointer-events:none;display:flex;align-items:center">${defFormatted}</div>
+      </div>
       <div style="display:flex;gap:.6rem;justify-content:flex-end">
         <button class="dp-cancel" style="padding:.5rem 1rem;border:1px solid #d1d5db;border-radius:.4rem;background:#fff;cursor:pointer;font-size:.9rem">Cancel</button>
         <button class="dp-confirm" style="padding:.5rem 1rem;border:none;border-radius:.4rem;background:var(--primary);color:#fff;cursor:pointer;font-size:.9rem;font-weight:600">${confirmLabel}</button>
@@ -14020,6 +14024,8 @@ function showDatePickerOverlay({ heading, infoHtml, minDate, defaultDate, confir
     </div>`;
     document.body.appendChild(overlay);
     const inp = overlay.querySelector("#dp-date-inp");
+    const dpDisplay = overlay.querySelector("#dp-date-display");
+    inp.addEventListener("input", () => { dpDisplay.textContent = inp.value ? (fmtPeriodDate(inp.value) || inp.value) : "Select a date"; });
     const finish = val => { overlay.remove(); document.removeEventListener("keydown", onKey); resolve(val); };
     overlay.querySelector(".dp-cancel").addEventListener("click", () => finish(null));
     overlay.querySelector(".dp-confirm").addEventListener("click", () => {
@@ -16185,12 +16191,12 @@ function renderTargetManageContent(student, target) {
         const overlay = document.createElement("div");
         overlay.dataset.delOverlay = "1";
         overlay.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding-top:1.25rem;z-index:200;border-radius:.75rem;overflow-y:auto";
-        const _delLatest3 = [...affectedSessions].sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 3);
+        const _delLatest3 = [...affectedSessions].sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 5);
         const sessionDateList = affectedSessions.length > 0
-          ? `<p style="font-size:.82rem;margin:.4rem 0 .35rem;color:#374151;font-weight:600">Latest ${Math.min(affectedSessions.length, 3)} Session${Math.min(affectedSessions.length, 3) !== 1 ? "s" : ""} with Data:</p>
+          ? `<p style="font-size:.82rem;margin:.4rem 0 .35rem;color:#374151;font-weight:600">Latest ${Math.min(affectedSessions.length, 5)} Session${Math.min(affectedSessions.length, 5) !== 1 ? "s" : ""} with Data:</p>
              <ul style="font-size:.82rem;color:#374151;margin:0 0 .7rem;padding-left:0;list-style:none;line-height:1.9">${
                _delLatest3.map(s => `<li>• Session ${escHtml(String(s.sessionNumber || s.number || "?"))} — ${escHtml(formatDateWithDay(s.date))}</li>`).join("")
-             }${affectedSessions.length > 3 ? `<li style="color:#9ca3af">  …and ${affectedSessions.length - 3} more</li>` : ''}</ul>` : "";
+             }${affectedSessions.length > 5 ? `<li style="color:#9ca3af">  …and ${affectedSessions.length - 5} more</li>` : ''}</ul>` : "";
         const hasData = affected > 0;
         overlay.innerHTML = `<div style="background:#fff;padding:1.25rem;border-radius:.75rem;width:min(320px,92%);box-shadow:0 4px 24px rgba(0,0,0,.25);margin-bottom:1rem">
           <p style="font-size:.88rem;margin:0 0 .5rem;color:#111;font-weight:700">⚠️ Delete "${escHtml(item.title || item.name || 'this activity')}"?</p>
@@ -16352,12 +16358,12 @@ function renderTargetManageContent(student, target) {
             const overlay = document.createElement("div");
             overlay.dataset.delOverlay = "1";
             overlay.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding-top:1.25rem;z-index:200;border-radius:.75rem;overflow-y:auto";
-            const _delLatest3 = [...affectedSessions].sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 3);
+            const _delLatest3 = [...affectedSessions].sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 5);
             const sessionDateList = affectedSessions.length > 0
-              ? `<p style="font-size:.82rem;margin:.4rem 0 .35rem;color:#374151;font-weight:600">Latest ${Math.min(affectedSessions.length, 3)} Session${Math.min(affectedSessions.length, 3) !== 1 ? "s" : ""} with Data:</p>
+              ? `<p style="font-size:.82rem;margin:.4rem 0 .35rem;color:#374151;font-weight:600">Latest ${Math.min(affectedSessions.length, 5)} Session${Math.min(affectedSessions.length, 5) !== 1 ? "s" : ""} with Data:</p>
                  <ul style="font-size:.82rem;color:#374151;margin:0 0 .7rem;padding-left:0;list-style:none;line-height:1.9">${
                    _delLatest3.map(s => `<li>• Session ${escHtml(String(s.sessionNumber || s.number || "?"))} — ${escHtml(formatDateWithDay(s.date))}</li>`).join("")
-                 }${affectedSessions.length > 3 ? `<li style="color:#9ca3af">  …and ${affectedSessions.length - 3} more</li>` : ''}</ul>` : "";
+                 }${affectedSessions.length > 5 ? `<li style="color:#9ca3af">  …and ${affectedSessions.length - 5} more</li>` : ''}</ul>` : "";
             const hasData = affected > 0;
             overlay.innerHTML = `<div style="background:#fff;padding:1.25rem;border-radius:.75rem;width:min(320px,92%);box-shadow:0 4px 24px rgba(0,0,0,.25);margin-bottom:1rem">
               <p style="font-size:.88rem;margin:0 0 .5rem;color:#111;font-weight:700">⚠️ Delete "${escHtml(pa.title || pa.name || 'this activity')}"?</p>
@@ -16457,10 +16463,10 @@ function renderTargetManageContent(student, target) {
       btn.disabled = false; btn.textContent = origText;
       if (affectedSessions.length > 0) {
         const n = affectedSessions.length;
-        const latest3 = [...affectedSessions].sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 3);
+        const latest3 = [...affectedSessions].sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 5);
         const sessionList = `<ul style="font-size:.82rem;color:#374151;margin:.3rem 0 0;padding-left:1.2rem;line-height:1.8">${
           latest3.map(s => `<li>Session ${escHtml(String(s.sessionNumber || s.number || "?"))}: ${escHtml(formatDateWithDay(s.date))}</li>`).join("")
-        }${n > 3 ? `<li style="color:#9ca3af">…and ${n - 3} more</li>` : ''}</ul>`;
+        }${n > 5 ? `<li style="color:#9ca3af">…and ${n - 5} more</li>` : ''}</ul>`;
         const modalSheet = $("manage-modal").querySelector(".modal-sheet");
         modalSheet.querySelectorAll("[data-addsub-err]").forEach(el => el.remove());
         const errOverlay = document.createElement("div");
@@ -16582,10 +16588,10 @@ function renderTargetManageContent(student, target) {
             }
             if (affectedSessions.length > 0) {
               const n = affectedSessions.length;
-              const latest3 = [...affectedSessions].sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 3);
+              const latest3 = [...affectedSessions].sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 5);
               const sessionDateList = `<ul style="font-size:.82rem;color:#374151;margin:.3rem 0 0;padding-left:1.2rem;line-height:1.8">${
                 latest3.map(s => `<li>Session ${escHtml(String(s.sessionNumber || s.number || "?"))}: ${escHtml(formatDateWithDay(s.date))}</li>`).join("")
-              }${n > 3 ? `<li style="color:#9ca3af">…and ${n - 3} more</li>` : ''}</ul>`;
+              }${n > 5 ? `<li style="color:#9ca3af">…and ${n - 5} more</li>` : ''}</ul>`;
               showPicker(`<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:.4rem;padding:.5rem .7rem;font-size:.82rem;color:#dc2626;margin-bottom:.6rem">
                 <strong>"${escHtml(chosen.title || chosen.name)}"</strong> has data in ${n} session${n !== 1 ? 's' : ''} — it cannot become a parent activity.${sessionDateList}
               </div>`);
@@ -17201,7 +17207,7 @@ function renderTargetManageContent(student, target) {
       overlay.dataset.typeChangeOverlay = "1";
       overlay.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding-top:1.25rem;z-index:200;border-radius:.75rem;overflow-y:auto";
       const sortedSessions = sessionsWithData.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-      const shownSessions  = sortedSessions.slice(0, 3);
+      const shownSessions  = sortedSessions.slice(0, 5);
       const hiddenCount    = sortedSessions.length - shownSessions.length;
       const sessionDateHtml = shownSessions.map(s => `<li>Session ${escHtml(String(s.sessionNumber || s.number || "?"))}: ${escHtml(formatDateWithDay(s.date))}</li>`).join("")
         + (hiddenCount > 0 ? `<li style="color:#9ca3af">… and ${hiddenCount} earlier session${hiddenCount !== 1 ? "s" : ""}</li>` : "");
@@ -19455,7 +19461,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
     items.push(`<div style="margin-top:.75rem">
       ${renderGrpSection('Mastered', '#059669', grpMastered)}
       ${renderGrpSection('Discontinued', '#dc2626', grpDiscontinued)}
-      ${renderGrpSection('Other Inactive', '#6b7280', grpOther)}
+      ${renderGrpSection('Inactive', '#6b7280', grpOther)}
     </div>`);
   }
   return items;
