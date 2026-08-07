@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1482";
+const APP_VERSION = "1483";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -2787,7 +2787,7 @@ async function hyrGenerate() {
   let inCancelMode = false;
   const setProgress = (pct, text) => {
     bar.style.width = pct + "%";
-    label.textContent = text === "Done!" ? text : "";
+    label.textContent = text;
     if (text === "Done!") btn.textContent = text;
   };
 
@@ -2921,9 +2921,9 @@ STRATEGY: [One short practical recommendation — what parents or teachers can d
 
     // Fake phases run while fetch is already in flight
     await new Promise(r => setTimeout(r, 1000));
-    setProgress(20, "");
+    setProgress(20, "Processing data…");
     await new Promise(r => setTimeout(r, 1000));
-    setProgress(35, "");
+    setProgress(35, "Sending to AI (Approx. ~15 seconds)…");
     await new Promise(r => setTimeout(r, 500));
 
     // Switch button to Cancel
@@ -2942,9 +2942,9 @@ STRATEGY: [One short practical recommendation — what parents or teachers can d
     btn.textContent = "Generate Report";
     btn.style.background = ""; btn.style.color = ""; btn.style.borderColor = "";
 
-    setProgress(70, "");
+    setProgress(70, "AI response received…");
     await new Promise(r => setTimeout(r, 600));
-    setProgress(85, "");
+    setProgress(85, "Writing report…");
     await new Promise(r => setTimeout(r, 700));
 
     if (!resp.ok) {
@@ -4794,7 +4794,7 @@ async function monthlyGenerate() {
   let inCancelMode = false;
   const setProgress = (pct, text) => {
     bar.style.width = pct + "%";
-    label.textContent = text === "Done!" ? text : "";
+    label.textContent = text;
     if (text === "Done!") btn.textContent = text;
   };
 
@@ -4807,7 +4807,7 @@ async function monthlyGenerate() {
     });
 
     const allSessions = await getAllSessionsForStudent(studentId);
-    setProgress(15, "");
+    setProgress(15, "Processing data…");
 
     const FULL_MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
     const monthName = FULL_MONTHS[month - 1];
@@ -4868,9 +4868,9 @@ ${isFocus ? `===FOCUS: ${t.name}===
     });
 
     await new Promise(r => setTimeout(r, 800));
-    setProgress(25, "");
+    setProgress(25, "Processing data…");
     await new Promise(r => setTimeout(r, 800));
-    setProgress(38, "");
+    setProgress(38, "Sending to AI (Approx. ~15 seconds)…");
     await new Promise(r => setTimeout(r, 400));
 
     inCancelMode = true;
@@ -4885,9 +4885,9 @@ ${isFocus ? `===FOCUS: ${t.name}===
     btn.textContent = "Generate Report";
     btn.style.background = ""; btn.style.color = ""; btn.style.borderColor = "";
 
-    setProgress(72, "");
+    setProgress(72, "AI response received…");
     await new Promise(r => setTimeout(r, 500));
-    setProgress(86, "");
+    setProgress(86, "Writing report…");
     await new Promise(r => setTimeout(r, 600));
 
     if (!resp.ok) {
