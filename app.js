@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1493";
+const APP_VERSION = "1494";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -16427,15 +16427,18 @@ function renderTargetManageContent(student, target) {
             (acts || []).filter(a => a.parentActivity === paKey && !a.isHeading && !a.isNote && !a.isExportNote)
               .forEach(sub => toCheck.push({ name: sub.name, title: sub.title, paPA: paKey }));
             const _tmpRx2 = /\(temp(orary)?\)$/i;
+            console.log("[DEL-CHECK2] groupMode:", !!_groupForTargetEdit, "sessions:", allSessions.length, "toCheck:", JSON.stringify(toCheck));
             affectedSessions = allSessions.filter(s => {
               const sActs = s.activities || {}; const sRems = s.remarks || {};
               return toCheck.some(({ name, title, paPA }) => {
                 const matchIds = Object.entries(sActs).filter(([, a]) => {
                   if (a.targetName !== target.name) return false;
-                  if (_tmpRx2.test(a.activityName)) return false;
+                  const isTemp = _tmpRx2.test(a.activityName);
+                  if (isTemp) { console.log(`[DEL-CHECK2] s#${s.sessionNumber} SKIP-TEMP: "${a.activityName}"`); return false; }
                   if (!(a.activityName === name || (title && a.activityName === title))) return false;
                   return (paPA === null ? !a.parentActivity : a.parentActivity === paPA);
                 }).map(([id]) => id);
+                if (matchIds.length) console.log(`[DEL-CHECK2] s#${s.sessionNumber} MATCH actIds:`, matchIds, "name=", name, "title=", title);
                 return matchIds.some(actId => Object.values(sRems).some(r =>
                   r.activityId === actId && (
                     (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
