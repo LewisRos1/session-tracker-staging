@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1487";
+const APP_VERSION = "1488";
 
 // Temporary debug helper — call from F12 console:
 // debugDeleteCheck("Hayden Chan", "Math", "1 to 10, 21-20 , 31-40, 41-50, 51-60,61-70, 71 -80, 81 -90, 91- 100")
@@ -2567,7 +2567,8 @@ GLOBAL RULES (apply to every section):
 - CRITICAL: A remark of "IP", "In Progress", or an activity with NO remark AND NO score, means there was not enough time to do that activity in that session. This tells you nothing about the student's ability or progress. Do NOT comment on it, do NOT treat it as a missed attempt, and do NOT use it as evidence of difficulty or strength. Ignore these entries entirely when forming your observations.
 - CRITICAL: Any activity labelled "NOT TESTED this term" was never attempted during this period. The student's ability in that area is completely unknown — it could be easy or hard, we simply do not know. NEVER describe it as a weakness, a difficulty, or an area where the student struggles. NEVER mention it anywhere in the report. Treat it as if it does not exist.
 - CRITICAL: Write ONLY what the session remarks directly and explicitly state. Do NOT extrapolate or infer related skills. "Identifies a face" is NOT the same as "knows a name." "Follows a one-step instruction" is NOT the same as "follows two-step instructions." "Points to an object" is NOT the same as "can name it." Stay word-for-word within what was actually recorded — never assume a student can or cannot do something that was not directly observed.
-- CRITICAL: Some activities track NEGATIVE or PROBLEM BEHAVIOURS (e.g. snatching food, interrupting others, hitting, distracting behaviour). For these activities, scoring is INVERTED — a HIGH score (e.g. 3 out of 3) means the student did NOT exhibit the bad behaviour and showed good self-control, while a LOW score (e.g. 0) means the bad behaviour DID occur. Always interpret scores for problem/negative behaviour activities with this in mind: high = good, low = the behaviour occurred.`;
+- CRITICAL: Some activities track NEGATIVE or PROBLEM BEHAVIOURS (e.g. snatching food, interrupting others, hitting, distracting behaviour). For these activities, scoring is INVERTED — a HIGH score (e.g. 3 out of 3) means the student did NOT exhibit the bad behaviour and showed good self-control, while a LOW score (e.g. 0) means the bad behaviour DID occur. Always interpret scores for problem/negative behaviour activities with this in mind: high = good, low = the behaviour occurred.
+- READABILITY: Write every section to a Flesch Reading Ease score of 60 to 70. Use short sentences, common words, and a natural conversational tone. ABA terms that parents need to know (e.g. "self-regulation", "prompt", "generalisation") are allowed, but always explain them in plain words in the same sentence if they appear.`;
 
 let _hyrConfig = null;
 
@@ -2928,15 +2929,14 @@ Same rules: plain English, no jargon, no numbers, warm tone. Labels in ** bold. 
 ===ACTION_PLAN===
 These are the areas where ${firstName} has the lowest scores this term: ${bottom5Names.join(", ")}.
 
-Write one block for each target above, in the same order. Each block: EXACTLY 2 bullet points, each immediately followed by its own STRATEGY line — a short practical recommendation for that specific difficulty. Plain English, no jargon.
-${categorized.qualitative.length ? `\nAlso write one block for each of these qualitative targets (observed in sessions, no percentage scores): ${categorized.qualitative.map(r => r.name).join(", ")}.\n\nSame format: exactly 2 bullets, each with its own STRATEGY line immediately after.` : ""}
+Write one block for each target above, in the same order. Each block has up to 2 bullet points naming the key difficulties, then ONE overall RECOMMENDATION that covers both points together. Plain English, no jargon.
+${categorized.qualitative.length ? `\nAlso write one block for each of these qualitative targets (observed in sessions, no percentage scores): ${categorized.qualitative.map(r => r.name).join(", ")}.\n\nSame format: up to 2 bullets, then ONE overall RECOMMENDATION.` : ""}
 
 Format EXACTLY as (one block per target):
 TARGET: [exact target name]
 • [Most important difficulty]
-STRATEGY: [One short practical recommendation for the difficulty above. Plain English.]
-• [Second most important difficulty]
-STRATEGY: [One short practical recommendation for the difficulty above. Plain English.]
+• [Second most important difficulty — only if clearly distinct from the first]
+RECOMMENDATION: [One overall practical recommendation that addresses the difficulties above. Plain English.]
 ===END===`;
 
     // Start fetch immediately — fake phases will play while it runs in background
@@ -4104,9 +4104,9 @@ function hyrParseAiResponse(text) {
       const t = line.trim();
       if (t.startsWith("TARGET:")) {
         if (cur) out.actionPlanRows.push(cur);
-        cur = { target: t.slice(7).trim(), points: [], strategies: [] };
-      } else if (cur && t.startsWith("STRATEGY:")) {
-        cur.strategies.push(t.slice(9).trim());
+        cur = { target: t.slice(7).trim(), points: [], recommendation: "" };
+      } else if (cur && t.startsWith("RECOMMENDATION:")) {
+        cur.recommendation = t.slice(15).trim();
       } else if (cur && (t.startsWith("•") || t.startsWith("-") || t.startsWith("*"))) {
         const pt = t.replace(/^[•\-\*]\s*/, "").trim();
         if (pt) cur.points.push(pt);
@@ -4280,22 +4280,16 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   h += `<h2 style="${SECTION_H2}">Section ${planSection}: Focus Areas</h2>`;
   h += `<p style="margin:.5rem 0 1rem;line-height:1.7">The table below highlights the areas where ${esc(firstName)} has the most room for improvement this term, along with recommendations for supporting their progress in each one.</p>`;
   if (parsed.actionPlanRows.length) {
-    const rows = parsed.actionPlanRows.flatMap((r, idx) => {
-      const pts    = (r.points    || []).slice(0, 2);
-      const strats = (r.strategies || []).slice(0, 2);
-      const cellB  = "padding:.5rem .75rem;border:1px solid #e5e7eb;vertical-align:top";
-      return [
-        `<tr>
-          <td rowspan="2" style="${cellB};text-align:center;width:7.6%;color:#6b7280;vertical-align:middle">${idx + 1}</td>
-          <td rowspan="2" style="${cellB};font-weight:600;text-align:center;width:25%;vertical-align:middle">${esc(r.target || "")}</td>
-          <td style="${cellB}">${esc(pts[0] || "")}</td>
-          <td style="${cellB};font-size:.88rem;color:#9ca3af">${esc(strats[0] || "")}</td>
-        </tr>`,
-        `<tr>
-          <td style="${cellB};border-top:1px solid #e5e7eb">${esc(pts[1] || "")}</td>
-          <td style="${cellB};border-top:1px solid #e5e7eb;font-size:.88rem;color:#9ca3af">${esc(strats[1] || "")}</td>
-        </tr>`
-      ];
+    const rows = parsed.actionPlanRows.map((r, idx) => {
+      const pts   = (r.points || []).slice(0, 2);
+      const cellB = "padding:.5rem .75rem;border:1px solid #e5e7eb;vertical-align:top";
+      const detailsHtml = pts.map((p, i) => `${i + 1}. ${esc(p)}`).join("<br>");
+      return `<tr>
+        <td style="${cellB};text-align:center;width:7.6%;color:#6b7280">${idx + 1}</td>
+        <td style="${cellB};font-weight:600;text-align:center;width:25%">${esc(r.target || "")}</td>
+        <td style="${cellB}">${detailsHtml}</td>
+        <td style="${cellB};font-size:.88rem;color:#9ca3af">${esc(r.recommendation || "")}</td>
+      </tr>`;
     }).join("");
     h += `<table style="width:100%;border-collapse:collapse;font-size:.9rem;margin:.75rem 0">
       <thead><tr style="background:#f3f4f6">
@@ -4699,28 +4693,20 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
       mkCell("Details", { bold: true, bg: HDR, size: 22, dxa: 5616, align: AlignmentType.CENTER }),
       mkCell("Recommendations & Strategies", { bold: true, bg: HDR, size: 22, dxa: 5616, align: AlignmentType.CENTER })
     ]});
-    const mkAPCell = (text, gray = false) => new TableCell({
-      width: { size: 5616, type: WidthType.DXA },
-      margins: { top: 80, bottom: 80, left: 150, right: 150 },
-      children: [new Paragraph({ children: [new TextRun({ text: text || "", size: 22, color: gray && text ? "9ca3af" : "000000" })], alignment: AlignmentType.JUSTIFIED, spacing: { before: 60, after: 60 } })]
-    });
-    const dataRows = (parsed.actionPlanRows || []).flatMap((r, idx) => {
-      const pts   = (r.points    || []).slice(0, 2);
-      const strats = (r.strategies || []).slice(0, 2);
+    const dataRows = (parsed.actionPlanRows || []).map((r, idx) => {
+      const pts        = (r.points || []).slice(0, 2);
       const targetText = qualSet.has(r.target) ? `${r.target || ""} (Qualitative)` : r.target || "";
-      const row1 = new TableRow({ children: [
-        new TableCell({ rowSpan: 2, width: { size: 634, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, margins: { top: 100, bottom: 100, left: 150, right: 150 },
-          children: [new Paragraph({ children: [new TextRun({ text: String(idx + 1), size: 22 })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })] }),
-        new TableCell({ rowSpan: 2, width: { size: 2088, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, margins: { top: 100, bottom: 100, left: 150, right: 150 },
+      const detailParas = pts.length
+        ? pts.map((p, i) => new Paragraph({ children: [new TextRun({ text: `${i + 1}. ${p}`, size: 22 })], spacing: { before: i === 0 ? 60 : 40, after: i === pts.length - 1 ? 60 : 20 } }))
+        : [new Paragraph({ children: [new TextRun({ text: "", size: 22 })], spacing: { before: 60, after: 60 } })];
+      return new TableRow({ children: [
+        mkCell(String(idx + 1), { size: 22, align: AlignmentType.CENTER, dxa: 634 }),
+        new TableCell({ width: { size: 2088, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, margins: { top: 100, bottom: 100, left: 150, right: 150 },
           children: [new Paragraph({ children: [new TextRun({ text: targetText, size: 22, bold: true })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })] }),
-        mkAPCell(pts[0] || ""),
-        mkAPCell(strats[0] || "", true)
+        new TableCell({ width: { size: 5616, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 150, right: 150 }, children: detailParas }),
+        new TableCell({ width: { size: 5616, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 150, right: 150 },
+          children: [new Paragraph({ children: [new TextRun({ text: r.recommendation || "", size: 22, color: r.recommendation ? "9ca3af" : "000000" })], alignment: AlignmentType.JUSTIFIED, spacing: { before: 60, after: 60 } })] })
       ]});
-      const row2 = new TableRow({ children: [
-        mkAPCell(pts[1] || ""),
-        mkAPCell(strats[1] || "", true)
-      ]});
-      return [row1, row2];
     });
     actionPlanParas.push(new Table({ width: { size: 13954, type: WidthType.DXA }, rows: [headerRow, ...dataRows] }));
   }
