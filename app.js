@@ -172,7 +172,40 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1486";
+const APP_VERSION = "1487";
+
+// Temporary debug helper — call from F12 console:
+// debugDeleteCheck("Hayden Chan", "Math", "1 to 10, 21-20 , 31-40, 41-50, 51-60,61-70, 71 -80, 81 -90, 91- 100")
+window.debugDeleteCheck = async function(studentName, targetName, activityName) {
+  const students = await loadStudentsConfig();
+  const student = students.find(s => s.name === studentName);
+  if (!student) { console.error("Student not found:", studentName); return; }
+  const sessions = await getAllSessionsForStudent(student.id);
+  console.log(`Found ${sessions.length} sessions for ${studentName}`);
+  sessions.forEach(s => {
+    const sActs = s.activities || {};
+    const sRems = s.remarks || {};
+    const matchIds = Object.entries(sActs)
+      .filter(([, a]) => a.targetName === targetName && a.activityName === activityName)
+      .map(([id]) => id);
+    if (!matchIds.length) return;
+    matchIds.forEach(actId => {
+      const hits = Object.entries(sRems).filter(([, r]) => r.activityId === actId);
+      if (!hits.length) { console.log(`Session #${s.sessionNumber || s.id}: actId=${actId} — NO remarks`); return; }
+      hits.forEach(([rid, r]) => {
+        const hasText = (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0;
+        const hasMasteryNote = (r.masteryNote || "").trim().length > 0;
+        const hasTrials = (r.trials || []).some(t => t !== null && t !== -1);
+        const hasOption = r.optionScore !== undefined && r.optionScore !== null;
+        console.log(`Session #${s.sessionNumber || s.id} (${s.date}): actId=${actId} remId=${rid}`, {
+          activityEntry: sActs[actId],
+          remark: r,
+          flags: { hasText, hasMasteryNote, hasTrials, hasOption }
+        });
+      });
+    });
+  });
+};
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
