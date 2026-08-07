@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1481";
+const APP_VERSION = "1482";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -2532,6 +2532,8 @@ GLOBAL RULES (apply to every section):
 - NEVER use the em dash symbol (—) anywhere in the report. Use a comma, a full stop, or rewrite the sentence instead.
 - CRITICAL: A remark of "No Event" means the student did NOT perform or exhibit that behaviour or activity in that session. For negative/problem behaviours (e.g. snatching food, hitting, interrupting), "No Event" is a POSITIVE outcome — the bad behaviour simply did not occur. For skill or learning activities, "No Event" means the skill was not observed or demonstrated that session — treat it as neutral, not a failure. Do NOT treat "No Event" negatively in either case.
 - CRITICAL: A remark of "IP", "In Progress", or an activity with NO remark AND NO score, means there was not enough time to do that activity in that session. This tells you nothing about the student's ability or progress. Do NOT comment on it, do NOT treat it as a missed attempt, and do NOT use it as evidence of difficulty or strength. Ignore these entries entirely when forming your observations.
+- CRITICAL: Any activity labelled "NOT TESTED this term" was never attempted during this period. The student's ability in that area is completely unknown — it could be easy or hard, we simply do not know. NEVER describe it as a weakness, a difficulty, or an area where the student struggles. NEVER mention it anywhere in the report. Treat it as if it does not exist.
+- CRITICAL: Write ONLY what the session remarks directly and explicitly state. Do NOT extrapolate or infer related skills. "Identifies a face" is NOT the same as "knows a name." "Follows a one-step instruction" is NOT the same as "follows two-step instructions." "Points to an object" is NOT the same as "can name it." Stay word-for-word within what was actually recorded — never assume a student can or cannot do something that was not directly observed.
 - CRITICAL: Some activities track NEGATIVE or PROBLEM BEHAVIOURS (e.g. snatching food, interrupting others, hitting, distracting behaviour). For these activities, scoring is INVERTED — a HIGH score (e.g. 3 out of 3) means the student did NOT exhibit the bad behaviour and showed good self-control, while a LOW score (e.g. 0) means the bad behaviour DID occur. Always interpret scores for problem/negative behaviour activities with this in mind: high = good, low = the behaviour occurred.`;
 
 let _hyrConfig = null;
@@ -2878,6 +2880,8 @@ STRICT RULES — follow every one:
 - Do NOT say things like "modalities", "regulatory capacity", "situational influences", "low-demand contexts". Use real words instead — "free play", "good days and bad days", "room noise".
 - Do NOT summarise what the graph already shows. Add insight the graph cannot.
 - Warm and supportive, but completely honest. Never sugarcoat, but never sound cold.
+- ABSOLUTE: For Weaknesses, only name difficulties that are directly evidenced by remarks or low scores on TESTED activities. Never name a skill that was marked "NOT TESTED". Never extrapolate from one skill to another — if data shows "identifies face", write about face identification only, not about name recognition or any other skill not in the data.
+- ABSOLUTE: For Strengths, only name things the student was directly observed doing in sessions. Do not infer or generalise — if the student identified one person's face, do not write that they "know their family members" or "understand names". Use only what the remarks literally say.
 ===END===`).join("\n\n")}
 
 ${qualitativeWithData.map(r => `===OBSERVED: ${r.name}===
@@ -3156,7 +3160,7 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
         }
 
         if (allRemarks.length === 0) {
-          lines.push(`  • ${actName}: no data recorded`);
+          lines.push(`  • ${actName}: NOT TESTED this term — ignore completely, do not mention in any section`);
           continue;
         }
 
