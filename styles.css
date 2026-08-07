@@ -2900,7 +2900,8 @@ div.admin-note-editable:empty::before {
   font-size: .8rem;
   font-weight: 600;
   font-family: inherit;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
   width: fit-content;
   max-width: 100%;
   cursor: default;
