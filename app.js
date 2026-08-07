@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1506";
+const APP_VERSION = "1507";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -11777,7 +11777,13 @@ function setupEntryRemarkSaving(host, getSessionId, onIdle) {
     }, (el, html) => updateRemarkText(sid, el.dataset.remId, html));
 
     diffAndSave(".mastery-note-input[data-rem-id]", el => htmlForStorage(el.value),
-      (el, html) => updateRemarkNote(sid, el.dataset.remId, html));
+      (el, html) => {
+        const remId = el.dataset.remId;
+        [state.sessionData, state.groupSessionData].forEach(d => {
+          if (d?.remarks?.[remId]) d.remarks[remId].masteryNote = html;
+        });
+        return updateRemarkNote(sid, remId, html);
+      });
 
     diffAndSave(".activity-name-input[data-act-id]", el => el.value.trim(),
       (el, name) => {
