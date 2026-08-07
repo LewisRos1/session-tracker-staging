@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1499";
+const APP_VERSION = "1500";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -4754,11 +4754,12 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
       mkCell("Details", { bold: true, bg: HDR, size: 22, dxa: 5616, align: AlignmentType.CENTER }),
       mkCell("Recommendations & Strategies", { bold: true, bg: HDR, size: 22, dxa: 5616, align: AlignmentType.CENTER })
     ]});
+    const apNumRefs = (parsed.actionPlanRows || []).map((_, i) => `hyr-ap-${i}`);
     const dataRows = (parsed.actionPlanRows || []).map((r, idx) => {
       const pts        = (r.points || []).slice(0, 2);
       const targetText = qualSet.has(r.target) ? `${r.target || ""} (Qualitative)` : r.target || "";
       const detailParas = pts.length
-        ? pts.map((p, i) => new Paragraph({ children: [new TextRun({ text: `${i + 1}. ${p}`, size: 22 })], spacing: { before: i === 0 ? 60 : 40, after: i === pts.length - 1 ? 60 : 20 } }))
+        ? pts.map((p, i) => new Paragraph({ numbering: { reference: apNumRefs[idx], level: 0 }, children: [new TextRun({ text: p, size: 22 })], spacing: { before: i === 0 ? 60 : 20, after: i === pts.length - 1 ? 60 : 0 } }))
         : [new Paragraph({ children: [new TextRun({ text: "", size: 22 })], spacing: { before: 60, after: 60 } })];
       return new TableRow({ children: [
         mkCell(String(idx + 1), { size: 22, align: AlignmentType.CENTER, dxa: 634 }),
@@ -4851,6 +4852,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
       { reference: BULLET_REF, levels: [{ level: 0, format: LevelFormat?.BULLET ?? "bullet", text: "", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } }, run: { fonts: { ascii: "Wingdings", hAnsi: "Wingdings", hint: "default" }, size: 22 } } }] },
       { reference: KI_NUM_REF,   levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 480, hanging: 240 } }, run: { size: 22 } } }] },
       { reference: KI_NUM_REF_2, levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 480, hanging: 240 } }, run: { size: 22 } } }] },
+      ...(apNumRefs || []).map(ref => ({ reference: ref, levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 360, hanging: 260 } }, run: { size: 22 } } }] })),
     ] },
     sections: docSections
   });
