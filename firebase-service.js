@@ -377,6 +377,12 @@ export async function getSessionsWithParticipant(instructorId) {
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
+/** All sessions across all students/groups (used for Nigel's export queue since he is never in participants). */
+export async function getAllSessions() {
+  const snap = await getDocs(collection(db, "sessions"));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
 /** Real-time listener for sessions awaiting Daisy's review or Ray's corrections. */
 export function listenToReviewQueue(callback) {
   const q = query(collection(db, "sessions"),

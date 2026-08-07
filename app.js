@@ -86,6 +86,7 @@ import {
   markCommentFixed,
   listenToReviewQueue,
   getSessionsWithParticipant,
+  getAllSessions,
   signInWithPin,
   signOutUser,
   onAuthChange,
@@ -172,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1504";
+const APP_VERSION = "1505";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -1357,13 +1358,15 @@ function renderTodoHomeSection() {
 
 async function loadTodoHomeCounts() {
   const results = await Promise.all(INSTRUCTORS.map(async inst => {
-    const sessions = await getSessionsWithParticipant(inst.id).catch(() => []);
+    const sessions = inst.id === "nigel"
+      ? await getAllSessions().catch(() => [])
+      : await getSessionsWithParticipant(inst.id).catch(() => []);
     const count = sessions.filter(s => {
       const checks = s.checks || {};
       const ws = getWorkflowState(s);
-      if (!checks[`p1_${inst.id}`]) return true;
+      if (inst.id !== "nigel" && !checks[`p1_${inst.id}`]) return true;
       if (inst.id === "daisy" && !s.reviewSubmitted && !ws.daisyOnly) return true;
-      if (inst.id !== "daisy" && s.reviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) return true;
+      if (inst.id !== "daisy" && inst.id !== "nigel" && s.reviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) return true;
       if (inst.id === "nigel" && ws.ready && !ws.p4Done) return true;
       return false;
     }).length;
@@ -1450,13 +1453,15 @@ async function openTodoScreen(filterInstId = null) {
 
   const instsToLoad = filterInst ? [filterInst] : INSTRUCTORS;
   const results = await Promise.all(instsToLoad.map(async inst => {
-    const sessions = await getSessionsWithParticipant(inst.id).catch(() => []);
+    const sessions = inst.id === "nigel"
+      ? await getAllSessions().catch(() => [])
+      : await getSessionsWithParticipant(inst.id).catch(() => []);
     const pending = sessions.filter(s => {
       const checks = s.checks || {};
       const ws = getWorkflowState(s);
-      if (!checks[`p1_${inst.id}`]) return true;
+      if (inst.id !== "nigel" && !checks[`p1_${inst.id}`]) return true;
       if (inst.id === "daisy" && !s.reviewSubmitted && !ws.daisyOnly) return true;
-      if (inst.id !== "daisy" && s.reviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) return true;
+      if (inst.id !== "daisy" && inst.id !== "nigel" && s.reviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) return true;
       if (inst.id === "nigel" && ws.ready && !ws.p4Done) return true;
       return false;
     });
@@ -1523,14 +1528,14 @@ function renderTodoTiles(results, filterInst = null) {
 
     // Compute all pending tasks for this instructor on this session
     const tasks = [];
-    if (!checks[`p1_${inst.id}`]) tasks.push("Enter Data");
+    if (inst.id !== "nigel" && !checks[`p1_${inst.id}`]) tasks.push("Enter Data");
     if (inst.id === "daisy" && !s.reviewSubmitted && !ws.daisyOnly) {
       // Phase 2 only shows if it's unlocked (all non-Daisy p1 done)
       const nonDaisy = (s.participants || []).filter(id => id !== "daisy");
       const p2Unlocked = nonDaisy.length > 0 ? nonDaisy.every(id => !!checks[`p1_${id}`]) : !!checks["p1_daisy"];
       if (p2Unlocked) tasks.push("Check");
     }
-    if (inst.id !== "daisy" && s.reviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) tasks.push("Revision");
+    if (inst.id !== "daisy" && inst.id !== "nigel" && s.reviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) tasks.push("Revision");
     if (inst.id === "nigel" && ws.ready && !ws.p4Done) tasks.push("Export");
 
     const pillStyle = t => t === "Enter Data"
@@ -1571,13 +1576,13 @@ function renderTodoTiles(results, filterInst = null) {
       const checks  = s.checks || {};
       const ws      = getWorkflowState(s);
       const tasks   = [];
-      if (!checks[`p1_${inst.id}`]) tasks.push("Enter Data");
+      if (inst.id !== "nigel" && !checks[`p1_${inst.id}`]) tasks.push("Enter Data");
       if (inst.id === "daisy" && !s.reviewSubmitted && !ws.daisyOnly) {
         const nonDaisy = (s.participants || []).filter(id => id !== "daisy");
         const p2Unlocked = nonDaisy.length > 0 ? nonDaisy.every(id => !!checks[`p1_${id}`]) : !!checks["p1_daisy"];
         if (p2Unlocked) tasks.push("Check");
       }
-      if (inst.id !== "daisy" && s.reviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) tasks.push("Revision");
+      if (inst.id !== "daisy" && inst.id !== "nigel" && s.reviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) tasks.push("Revision");
       if (inst.id === "nigel" && ws.ready && !ws.p4Done) tasks.push("Export");
       const pillStyle = t => t === "Enter Data"
         ? "background:#eff6ff;color:#1d4ed8"
@@ -10273,7 +10278,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     nigelBody  = `<button class="wf-pill wf-pill--done" data-role="p4_nigel">✓ Nigel · ${escHtml(fmtCheckTimestamp(ws.p4Check?.at))}</button>`;
   } else {
     nigelState = "nigel-ready";
-    nigelBody  = `<button class="wf-pill wf-pill--attention" data-role="p4_nigel">○ Nigel: Export to Word</button>`;
+    nigelBody  = `<button class="wf-pill wf-pill--attention" data-role="p4_nigel">○ Nigel: Incomplete</button>`;
   }
   const nigelNode  = `<div class="wf-node wf-node--${nigelState}">
     <div class="wf-node-label">Phase 4: Export</div>
