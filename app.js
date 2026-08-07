@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1489";
+const APP_VERSION = "1490";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -194,7 +194,30 @@ window.debugScanTarget = async function(studentName, targetName) {
   console.table(counts);
 };
 
-// 2) Deep-check a specific activity name (must match exactly what debugScanTarget shows):
+// 2) Show config dates for all activities in a target — reveals hidden activeTo/activeFrom:
+//    debugTargetConfig("Hayden Chan", "Math")
+window.debugTargetConfig = async function(studentName, targetName) {
+  const students = await loadStudentsConfig();
+  const student = students.find(s => s.name === studentName);
+  if (!student) { console.error("Student not found:", studentName); return; }
+  const target = (student.targets || []).find(t => t.name === targetName);
+  if (!target) { console.error("Target not found:", targetName); return; }
+  const acts = target.predefinedActivities || [];
+  console.log(`${acts.length} activities in config for ${studentName} / ${targetName}:`);
+  acts.forEach((a, i) => {
+    const dateInfo = [];
+    if (a.activeFrom) dateInfo.push(`activeFrom: ${a.activeFrom}`);
+    if (a.activeTo)   dateInfo.push(`activeTo: ${a.activeTo}`);
+    if (a.masteredOn)    dateInfo.push(`masteredOn: ${a.masteredOn}`);
+    if (a.discontinuedOn) dateInfo.push(`discontinuedOn: ${a.discontinuedOn}`);
+    if (a.isCompleted) dateInfo.push("isCompleted");
+    if (a.isArchived)  dateInfo.push("isArchived");
+    if (a.isStopped)   dateInfo.push("isStopped");
+    console.log(`${i + 1}) ${a.title || a.name || "(heading)"}`, dateInfo.length ? dateInfo.join(", ") : "no date flags");
+  });
+};
+
+// 3) Deep-check a specific activity name (must match exactly what debugScanTarget shows):
 //    debugDeleteCheck("Hayden Chan", "Math", "Writing/Spelling Numbers in Letters")
 window.debugDeleteCheck = async function(studentName, targetName, activityName) {
   const students = await loadStudentsConfig();
