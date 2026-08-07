@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1496";
+const APP_VERSION = "1497";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -14539,7 +14539,6 @@ async function closeManageModal() {
         const dv = detailsEl.value.trim();
         const tv = titleEl ? titleEl.value.trim() : "";
         if (dv) a.name = dv;
-        else if (!a.name && tv) a.name = tv;
       }
       if (titleEl && !a.isNote && !a.isExportNote && !a.isHeading && !a.isMaintainHeading && !a.isMaintain) {
         a.title = titleEl.value.trim();
@@ -16259,7 +16258,7 @@ function renderTargetManageContent(student, target) {
             const matchIds = Object.entries(sActs).filter(([, a]) => {
               if (a.targetName !== target.name) return false;
               const isTemp = _tmpRx.test(a.activityName);
-              const nameOk = a.activityName === name || (title && a.activityName === title);
+              const nameOk = (name && a.activityName === name) || (title && a.activityName === title);
               if (!nameOk && !isTemp) return false;
               if (isTemp) return false;
               return (paPA === null ? !a.parentActivity : a.parentActivity === paPA);
@@ -16433,7 +16432,7 @@ function renderTargetManageContent(student, target) {
                   if (a.targetName !== target.name) return false;
                   const isTemp = _tmpRx2.test(a.activityName);
                   if (isTemp) return false;
-                  if (!(a.activityName === name || (title && a.activityName === title))) return false;
+                  if (!((name && a.activityName === name) || (title && a.activityName === title))) return false;
                   return (paPA === null ? !a.parentActivity : a.parentActivity === paPA);
                 }).map(([id]) => id);
                 return matchIds.some(actId => Object.values(sRems).some(r =>
