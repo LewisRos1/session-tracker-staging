@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1485";
+const APP_VERSION = "1486";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -14040,7 +14040,7 @@ function showDatePickerOverlay({ heading, infoHtml, minDate, defaultDate, confir
       <label style="font-size:.82rem;font-weight:600;color:#374151;display:block;margin-bottom:.35rem">Please select the final date you want this activity to appear.</label>
       <div style="position:relative;margin-bottom:1rem">
         <input type="date" id="dp-date-inp" value="${def}" min="${min}" style="width:100%;box-sizing:border-box;padding:.5rem .7rem;border:1.5px solid #d1d5db;border-radius:.4rem;font-size:.95rem;outline:none;color:transparent;caret-color:transparent;background:#fff;cursor:pointer">
-        <div id="dp-date-display" style="position:absolute;top:0;left:0;bottom:0;right:2.5rem;padding:.5rem .7rem;font-size:.95rem;color:#111;pointer-events:none;display:flex;align-items:center">${defFormatted}</div>
+        <div id="dp-date-display" style="position:absolute;top:0;left:0;bottom:0;right:2.5rem;padding:.5rem .7rem;font-size:.95rem;color:#111;pointer-events:none;display:flex;align-items:center;background:#fff;border-radius:.4rem 0 0 .4rem">${defFormatted}</div>
       </div>
       <div style="display:flex;gap:.6rem;justify-content:flex-end">
         <button class="dp-cancel" style="padding:.5rem 1rem;border:1px solid #d1d5db;border-radius:.4rem;background:#fff;cursor:pointer;font-size:.9rem">Cancel</button>
