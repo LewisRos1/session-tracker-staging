@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1490";
+const APP_VERSION = "1491";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -16251,13 +16251,17 @@ function renderTargetManageContent(student, target) {
         const toCheck = [{ name: item.name, title: item.title, paPA: item.parentActivity || null }];
         (acts || []).filter(a => a.parentActivity === paKey && !a.isHeading && !a.isNote && !a.isExportNote)
           .forEach(sub => toCheck.push({ name: sub.name, title: sub.title, paPA: paKey }));
+        const _tmpRx = /\(temp(orary)?\)$/i;
         affectedSessions = allSessions.filter(s => {
           const sActs = s.activities || {}; const sRems = s.remarks || {};
           return toCheck.some(({ name, title, paPA }) => {
-            const matchIds = Object.entries(sActs).filter(([, a]) =>
-              a.targetName === target.name && (a.activityName === name || (title && a.activityName === title)) &&
-              (paPA === null ? !a.parentActivity : a.parentActivity === paPA)
-            ).map(([id]) => id);
+            const cfgIsTemp = _tmpRx.test(name) || _tmpRx.test(title || "");
+            const matchIds = Object.entries(sActs).filter(([, a]) => {
+              if (a.targetName !== target.name) return false;
+              if (_tmpRx.test(a.activityName) && !cfgIsTemp) return false;
+              if (!(a.activityName === name || (title && a.activityName === title))) return false;
+              return (paPA === null ? !a.parentActivity : a.parentActivity === paPA);
+            }).map(([id]) => id);
             return matchIds.some(actId => Object.values(sRems).some(r =>
               r.activityId === actId && (
                 (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
@@ -16418,13 +16422,17 @@ function renderTargetManageContent(student, target) {
             const toCheck = [{ name: pa.name, title: pa.title, paPA: pa.parentActivity || null }];
             (acts || []).filter(a => a.parentActivity === paKey && !a.isHeading && !a.isNote && !a.isExportNote)
               .forEach(sub => toCheck.push({ name: sub.name, title: sub.title, paPA: paKey }));
+            const _tmpRx2 = /\(temp(orary)?\)$/i;
             affectedSessions = allSessions.filter(s => {
               const sActs = s.activities || {}; const sRems = s.remarks || {};
               return toCheck.some(({ name, title, paPA }) => {
-                const matchIds = Object.entries(sActs).filter(([, a]) =>
-                  a.targetName === target.name && (a.activityName === name || (title && a.activityName === title)) &&
-                  (paPA === null ? !a.parentActivity : a.parentActivity === paPA)
-                ).map(([id]) => id);
+                const cfgIsTemp = _tmpRx2.test(name) || _tmpRx2.test(title || "");
+                const matchIds = Object.entries(sActs).filter(([, a]) => {
+                  if (a.targetName !== target.name) return false;
+                  if (_tmpRx2.test(a.activityName) && !cfgIsTemp) return false;
+                  if (!(a.activityName === name || (title && a.activityName === title))) return false;
+                  return (paPA === null ? !a.parentActivity : a.parentActivity === paPA);
+                }).map(([id]) => id);
                 return matchIds.some(actId => Object.values(sRems).some(r =>
                   r.activityId === actId && (
                     (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
