@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1502";
+const APP_VERSION = "1503";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -1362,7 +1362,7 @@ async function loadTodoHomeCounts() {
       const checks = s.checks || {};
       const ws = getWorkflowState(s);
       if (!checks[`p1_${inst.id}`]) return true;
-      if (inst.id === "daisy" && !s.reviewSubmitted) return true;
+      if (inst.id === "daisy" && !s.reviewSubmitted && !ws.daisyOnly) return true;
       if (inst.id !== "daisy" && s.reviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) return true;
       if (inst.id === "nigel" && ws.ready && !ws.p4Done) return true;
       return false;
@@ -1455,7 +1455,7 @@ async function openTodoScreen(filterInstId = null) {
       const checks = s.checks || {};
       const ws = getWorkflowState(s);
       if (!checks[`p1_${inst.id}`]) return true;
-      if (inst.id === "daisy" && !s.reviewSubmitted) return true;
+      if (inst.id === "daisy" && !s.reviewSubmitted && !ws.daisyOnly) return true;
       if (inst.id !== "daisy" && s.reviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) return true;
       if (inst.id === "nigel" && ws.ready && !ws.p4Done) return true;
       return false;
@@ -8717,6 +8717,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
           <span class="field-label" contenteditable="false">Notes</span>
           <button class="btn-sketch" contenteditable="false" data-rem-id="${rem.id}" aria-label="Open sketch board">✏</button>
           <textarea class="field-input mastery-note-input" rows="1"
+            autocomplete="off"
             data-rem-id="${rem.id}"
             data-saved-html="${escHtml(rem.masteryNote || "")}">${escHtml(plainTextForEdit(rem.masteryNote || ""))}</textarea>
         </div>`
