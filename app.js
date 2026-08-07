@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1476";
+const APP_VERSION = "1477";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -10076,7 +10076,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     // Daisy entered alone — Phase 2 not needed
     p2State = ws.allP1Done ? "done" : "locked";
     p2Body  = ws.allP1Done
-      ? `<div class="wf-pill wf-pill--done">✓ Not needed</div>`
+      ? `<div class="wf-pill wf-pill--done">✓ Ms. Daisy is the only instructor for this session. No need to check.</div>`
       : `<div class="wf-pill wf-pill--locked">🔒 Complete Phase 1 first</div>`;
   } else if (!p2Unlocked) {
     // Non-Daisy participants still pending; fall back to all participants if no non-Daisy ones exist
@@ -10122,7 +10122,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     // Daisy entered alone — Phase 3 not needed
     p3State = ws.allP1Done ? "done" : "locked";
     p3Body  = ws.allP1Done
-      ? `<div class="wf-pill wf-pill--done">✓ Not needed</div>`
+      ? `<div class="wf-pill wf-pill--done">✓ Ms. Daisy is the only instructor for this session. No need to revise.</div>`
       : `<div class="wf-pill wf-pill--locked">🔒 Complete Phase 1 first</div>`;
   } else if (!ws.reviewSubmitted) {
     p3State = "locked";
