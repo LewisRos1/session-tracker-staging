@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1497";
+const APP_VERSION = "1498";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8502,7 +8502,7 @@ function paDisplayHtml(pa, showPlaceholder = false) {
     html = `<span style="font-style:italic;color:#9ca3af;font-size:.85rem">&lt;Please give this activity a title in Edit Target&gt;</span>`;
   }
   const detailsText = (pa.name || "").trim();
-  if (detailsText) {
+  if (detailsText && detailsText !== titleText) {
     html += `<span style="display:block;margin-top:.1rem;font-weight:400;text-decoration:none">${formatActivityMarkup(detailsText)}</span>`;
   }
   return html;
@@ -14545,6 +14545,8 @@ async function closeManageModal() {
       }
       if (starterEl)     a.sentenceStarter     = starterEl.value.trim() || null;
       if (noteStarterEl) a.noteSentenceStarter = noteStarterEl.value.trim() || null;
+      // Clean up v1496 corruption: name should never equal title (it's the details line)
+      if (a.name && a.title && a.name.trim() === a.title.trim()) a.name = "";
     });
 
     // Block close if any newly-created parent activity still has no title.
