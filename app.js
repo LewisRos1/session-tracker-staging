@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1495";
+const APP_VERSION = "1496";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -14539,6 +14539,7 @@ async function closeManageModal() {
         const dv = detailsEl.value.trim();
         const tv = titleEl ? titleEl.value.trim() : "";
         if (dv) a.name = dv;
+        else if (!a.name && tv) a.name = tv;
       }
       if (titleEl && !a.isNote && !a.isExportNote && !a.isHeading && !a.isMaintainHeading && !a.isMaintain) {
         a.title = titleEl.value.trim();
