@@ -172,10 +172,30 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1488";
+const APP_VERSION = "1489";
 
-// Temporary debug helper — call from F12 console:
-// debugDeleteCheck("Hayden Chan", "Math", "1 to 10, 21-20 , 31-40, 41-50, 51-60,61-70, 71 -80, 81 -90, 91- 100")
+// Debug helpers — call from F12 console
+// 1) List all stored activity names under a target:
+//    debugScanTarget("Hayden Chan", "Math")
+window.debugScanTarget = async function(studentName, targetName) {
+  const students = await loadStudentsConfig();
+  const student = students.find(s => s.name === studentName);
+  if (!student) { console.error("Student not found:", studentName); return; }
+  const sessions = await getAllSessionsForStudent(student.id);
+  console.log(`Scanning ${sessions.length} sessions for ${studentName} / ${targetName}...`);
+  const counts = {};
+  sessions.forEach(s => {
+    Object.values(s.activities || {}).forEach(a => {
+      if (a.targetName !== targetName) return;
+      const key = a.activityName || "(no name)";
+      counts[key] = (counts[key] || 0) + 1;
+    });
+  });
+  console.table(counts);
+};
+
+// 2) Deep-check a specific activity name (must match exactly what debugScanTarget shows):
+//    debugDeleteCheck("Hayden Chan", "Math", "Writing/Spelling Numbers in Letters")
 window.debugDeleteCheck = async function(studentName, targetName, activityName) {
   const students = await loadStudentsConfig();
   const student = students.find(s => s.name === studentName);
