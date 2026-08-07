@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1494";
+const APP_VERSION = "1495";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10878,7 +10878,7 @@ function buildTargetViewTable(target, data) {
         ).catch(() => {});
       }
       if (entry) matchedIds.add(entry[0]);
-      rows += viewActivityRows(displayNo, pa.name, entry?.[0] || null, data, target, true, pa);
+      rows += viewActivityRows(displayNo, pa.title || pa.name, entry?.[0] || null, data, target, true, pa);
     }
     // Silently delete unmatched records that have no meaningful data — these
     // are empty ghost duplicates from historical bugs. Records with real data
@@ -12793,7 +12793,7 @@ function buildGroupTargetViewTable(target, data, attendees) {
         ).catch(() => {});
       }
       if (entry2) matchedIds.add(entry2[0]);
-      rows += viewGroupActivityRows(no, pa.name, entry2?.[0] || null, data, target, attendees, true, pa);
+      rows += viewGroupActivityRows(no, pa.title || pa.name, entry2?.[0] || null, data, target, attendees, true, pa);
     }
     // Silently delete unmatched records with no meaningful data (empty ghosts).
     for (const [actId, act] of Object.entries(data.activities || {})) {
@@ -14538,7 +14538,7 @@ async function closeManageModal() {
       } else if (detailsEl && !a.isNote && !a.isExportNote && !a.isHeading && !a.isMaintainHeading && !a.isMaintain) {
         const dv = detailsEl.value.trim();
         const tv = titleEl ? titleEl.value.trim() : "";
-        if (dv || tv) a.name = dv;
+        if (dv) a.name = dv;
       }
       if (titleEl && !a.isNote && !a.isExportNote && !a.isHeading && !a.isMaintainHeading && !a.isMaintain) {
         a.title = titleEl.value.trim();
@@ -16252,7 +16252,6 @@ function renderTargetManageContent(student, target) {
         (acts || []).filter(a => a.parentActivity === paKey && !a.isHeading && !a.isNote && !a.isExportNote)
           .forEach(sub => toCheck.push({ name: sub.name, title: sub.title, paPA: paKey }));
         const _tmpRx = /\(temp(orary)?\)$/i;
-        console.log("[DEL-CHECK] toCheck:", JSON.stringify(toCheck), "sessions:", allSessions.length);
         affectedSessions = allSessions.filter(s => {
           const sActs = s.activities || {}; const sRems = s.remarks || {};
           const hit = toCheck.some(({ name, title, paPA }) => {
@@ -16261,10 +16260,9 @@ function renderTargetManageContent(student, target) {
               const isTemp = _tmpRx.test(a.activityName);
               const nameOk = a.activityName === name || (title && a.activityName === title);
               if (!nameOk && !isTemp) return false;
-              if (isTemp) { console.log(`[DEL-CHECK] session#${s.sessionNumber} TEMP-SKIP: "${a.activityName}"`); return false; }
+              if (isTemp) return false;
               return (paPA === null ? !a.parentActivity : a.parentActivity === paPA);
             }).map(([id]) => id);
-            if (matchIds.length) console.log(`[DEL-CHECK] session#${s.sessionNumber} matched actIds:`, matchIds, "name=", name, "title=", title);
             return matchIds.some(actId => Object.values(sRems).some(r =>
               r.activityId === actId && (
                 (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
@@ -16427,18 +16425,16 @@ function renderTargetManageContent(student, target) {
             (acts || []).filter(a => a.parentActivity === paKey && !a.isHeading && !a.isNote && !a.isExportNote)
               .forEach(sub => toCheck.push({ name: sub.name, title: sub.title, paPA: paKey }));
             const _tmpRx2 = /\(temp(orary)?\)$/i;
-            console.log("[DEL-CHECK2] groupMode:", !!_groupForTargetEdit, "sessions:", allSessions.length, "toCheck:", JSON.stringify(toCheck));
             affectedSessions = allSessions.filter(s => {
               const sActs = s.activities || {}; const sRems = s.remarks || {};
               return toCheck.some(({ name, title, paPA }) => {
                 const matchIds = Object.entries(sActs).filter(([, a]) => {
                   if (a.targetName !== target.name) return false;
                   const isTemp = _tmpRx2.test(a.activityName);
-                  if (isTemp) { console.log(`[DEL-CHECK2] s#${s.sessionNumber} SKIP-TEMP: "${a.activityName}"`); return false; }
+                  if (isTemp) return false;
                   if (!(a.activityName === name || (title && a.activityName === title))) return false;
                   return (paPA === null ? !a.parentActivity : a.parentActivity === paPA);
                 }).map(([id]) => id);
-                if (matchIds.length) console.log(`[DEL-CHECK2] s#${s.sessionNumber} MATCH actIds:`, matchIds, "name=", name, "title=", title);
                 return matchIds.some(actId => Object.values(sRems).some(r =>
                   r.activityId === actId && (
                     (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
