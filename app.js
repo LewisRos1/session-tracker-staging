@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1475";
+const APP_VERSION = "1476";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -1430,7 +1430,7 @@ function renderTodoTiles(results, filterInst = null) {
     // Compute all pending tasks for this instructor on this session
     const tasks = [];
     if (!checks[`p1_${inst.id}`]) tasks.push("Enter Data");
-    if (inst.id === "daisy" && !s.reviewSubmitted) {
+    if (inst.id === "daisy" && !s.reviewSubmitted && !ws.daisyOnly) {
       // Phase 2 only shows if it's unlocked (all non-Daisy p1 done)
       const nonDaisy = (s.participants || []).filter(id => id !== "daisy");
       const p2Unlocked = nonDaisy.length > 0 ? nonDaisy.every(id => !!checks[`p1_${id}`]) : !!checks["p1_daisy"];
@@ -9987,7 +9987,10 @@ function getWorkflowState(data) {
   const noComments = comments.length === 0;
   const p3Bypassed = !!noCorrectionsDecision;
   const effectiveAllP3Done = allP3Done || p3Bypassed;
-  const ready = allP1Done && reviewSubmitted && effectiveAllP3Done && (noComments || allFixed);
+
+  // If Daisy is the ONLY instructor, skip Phase 2 & 3 entirely — go straight to Phase 4
+  const daisyOnly = p1Ids.length === 1 && p1Ids[0] === "daisy";
+  const ready = allP1Done && (daisyOnly || (reviewSubmitted && effectiveAllP3Done && (noComments || allFixed)));
 
   // Phase 4 — Nigel exports to Word
   const p4Check = checks["p4_nigel"] || null;
@@ -10002,7 +10005,7 @@ function getWorkflowState(data) {
     reviewSubmitted, reviewUnlocked: allP1Done,
     p3Ids, p3Done, p3Check, allP3Done, p3Bypassed, noCorrectionsDecision,
     p4Check, p4Done,
-    comments, allFixed, noComments, ready, revisionDone,
+    comments, allFixed, noComments, ready, revisionDone, daisyOnly,
     rayDone: p1Done("ray"), daisyDone: p1Done("daisy"),
   };
 }
@@ -10069,7 +10072,13 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
 
   // ── Phase 2: Review & Feedback ───────────────────────────────
   let p2State, p2Body;
-  if (!p2Unlocked) {
+  if (ws.daisyOnly) {
+    // Daisy entered alone — Phase 2 not needed
+    p2State = ws.allP1Done ? "done" : "locked";
+    p2Body  = ws.allP1Done
+      ? `<div class="wf-pill wf-pill--done">✓ Not needed</div>`
+      : `<div class="wf-pill wf-pill--locked">🔒 Complete Phase 1 first</div>`;
+  } else if (!p2Unlocked) {
     // Non-Daisy participants still pending; fall back to all participants if no non-Daisy ones exist
     let pending = ws.p3Ids.filter(id => !ws.p1Done(id)).map(instName);
     if (pending.length === 0) {
@@ -10109,7 +10118,13 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
   };
 
   let p3State, p3Body;
-  if (!ws.reviewSubmitted) {
+  if (ws.daisyOnly) {
+    // Daisy entered alone — Phase 3 not needed
+    p3State = ws.allP1Done ? "done" : "locked";
+    p3Body  = ws.allP1Done
+      ? `<div class="wf-pill wf-pill--done">✓ Not needed</div>`
+      : `<div class="wf-pill wf-pill--locked">🔒 Complete Phase 1 first</div>`;
+  } else if (!ws.reviewSubmitted) {
     p3State = "locked";
     p3Body  = `<div class="wf-pill wf-pill--locked">🔒 Complete Phase 2 first</div>`;
   } else if (ws.p3Bypassed) {
