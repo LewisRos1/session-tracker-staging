@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1492";
+const APP_VERSION = "1493";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -16252,15 +16252,19 @@ function renderTargetManageContent(student, target) {
         (acts || []).filter(a => a.parentActivity === paKey && !a.isHeading && !a.isNote && !a.isExportNote)
           .forEach(sub => toCheck.push({ name: sub.name, title: sub.title, paPA: paKey }));
         const _tmpRx = /\(temp(orary)?\)$/i;
+        console.log("[DEL-CHECK] toCheck:", JSON.stringify(toCheck), "sessions:", allSessions.length);
         affectedSessions = allSessions.filter(s => {
           const sActs = s.activities || {}; const sRems = s.remarks || {};
-          return toCheck.some(({ name, title, paPA }) => {
+          const hit = toCheck.some(({ name, title, paPA }) => {
             const matchIds = Object.entries(sActs).filter(([, a]) => {
               if (a.targetName !== target.name) return false;
-              if (_tmpRx.test(a.activityName)) return false;
-              if (!(a.activityName === name || (title && a.activityName === title))) return false;
+              const isTemp = _tmpRx.test(a.activityName);
+              const nameOk = a.activityName === name || (title && a.activityName === title);
+              if (!nameOk && !isTemp) return false;
+              if (isTemp) { console.log(`[DEL-CHECK] session#${s.sessionNumber} TEMP-SKIP: "${a.activityName}"`); return false; }
               return (paPA === null ? !a.parentActivity : a.parentActivity === paPA);
             }).map(([id]) => id);
+            if (matchIds.length) console.log(`[DEL-CHECK] session#${s.sessionNumber} matched actIds:`, matchIds, "name=", name, "title=", title);
             return matchIds.some(actId => Object.values(sRems).some(r =>
               r.activityId === actId && (
                 (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
@@ -16270,6 +16274,7 @@ function renderTargetManageContent(student, target) {
               )
             ));
           });
+          return hit;
         });
         affected = affectedSessions.length;
       } catch { affected = -1; }
