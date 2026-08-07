@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1491";
+const APP_VERSION = "1492";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -16255,10 +16255,9 @@ function renderTargetManageContent(student, target) {
         affectedSessions = allSessions.filter(s => {
           const sActs = s.activities || {}; const sRems = s.remarks || {};
           return toCheck.some(({ name, title, paPA }) => {
-            const cfgIsTemp = _tmpRx.test(name) || _tmpRx.test(title || "");
             const matchIds = Object.entries(sActs).filter(([, a]) => {
               if (a.targetName !== target.name) return false;
-              if (_tmpRx.test(a.activityName) && !cfgIsTemp) return false;
+              if (_tmpRx.test(a.activityName)) return false;
               if (!(a.activityName === name || (title && a.activityName === title))) return false;
               return (paPA === null ? !a.parentActivity : a.parentActivity === paPA);
             }).map(([id]) => id);
@@ -16426,10 +16425,9 @@ function renderTargetManageContent(student, target) {
             affectedSessions = allSessions.filter(s => {
               const sActs = s.activities || {}; const sRems = s.remarks || {};
               return toCheck.some(({ name, title, paPA }) => {
-                const cfgIsTemp = _tmpRx2.test(name) || _tmpRx2.test(title || "");
                 const matchIds = Object.entries(sActs).filter(([, a]) => {
                   if (a.targetName !== target.name) return false;
-                  if (_tmpRx2.test(a.activityName) && !cfgIsTemp) return false;
+                  if (_tmpRx2.test(a.activityName)) return false;
                   if (!(a.activityName === name || (title && a.activityName === title))) return false;
                   return (paPA === null ? !a.parentActivity : a.parentActivity === paPA);
                 }).map(([id]) => id);
