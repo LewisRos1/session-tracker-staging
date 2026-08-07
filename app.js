@@ -172,7 +172,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1480";
+const APP_VERSION = "1481";
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
@@ -2891,14 +2891,14 @@ Same rules: plain English, no jargon, no numbers, warm tone. Labels in ** bold. 
 ===ACTION_PLAN===
 These are the areas where ${firstName} has the lowest scores this term: ${bottom5Names.join(", ")}.
 
-Write one block for each target above, in the same order. Each block: 2 to 3 short bullet points describing what ${firstName} specifically finds difficult in that area. Keep each point to one brief sentence. No strategies — just the specific difficulties.
-${categorized.qualitative.length ? `\nAlso write one block for each of these qualitative targets (observed in sessions, no percentage scores): ${categorized.qualitative.map(r => r.name).join(", ")}.\n\nSame format: 2 to 3 short bullet points about what ${firstName} most needs support with in this area. One brief sentence per bullet. No strategies.` : ""}
+Write one block for each target above, in the same order. Each block: EXACTLY 2 bullet points describing the 2 most important difficulties ${firstName} has in that area, then ONE STRATEGY line with a short practical recommendation for parents or teachers. Plain English, no jargon.
+${categorized.qualitative.length ? `\nAlso write one block for each of these qualitative targets (observed in sessions, no percentage scores): ${categorized.qualitative.map(r => r.name).join(", ")}.\n\nSame format: exactly 2 bullets about the 2 most important support needs, then a STRATEGY line.` : ""}
 
 Format EXACTLY as (one block per target):
 TARGET: [exact target name]
-• [Specific difficulty]
-• [Specific difficulty]
-• [Optional third difficulty]
+• [Most important difficulty]
+• [Second most important difficulty]
+STRATEGY: [One short practical recommendation — what parents or teachers can do to help. Plain English.]
 ===END===`;
 
     // Start fetch immediately — fake phases will play while it runs in background
@@ -4066,7 +4066,9 @@ function hyrParseAiResponse(text) {
       const t = line.trim();
       if (t.startsWith("TARGET:")) {
         if (cur) out.actionPlanRows.push(cur);
-        cur = { target: t.slice(7).trim(), points: [] };
+        cur = { target: t.slice(7).trim(), points: [], strategy: "" };
+      } else if (cur && t.startsWith("STRATEGY:")) {
+        cur.strategy = t.slice(9).trim();
       } else if (cur && (t.startsWith("•") || t.startsWith("-") || t.startsWith("*"))) {
         const pt = t.replace(/^[•\-\*]\s*/, "").trim();
         if (pt) cur.points.push(pt);
@@ -4189,10 +4191,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   if (parsed.biggestWins?.length || parsed.keyFocusAreas?.length) {
     const fmtKI = s => { const c = s.replace(/\*\*/g, ""); const i = c.indexOf(': '); return i > 0 ? `<strong>${esc(c.slice(0,i))}</strong>: ${esc(c.slice(i+2))}` : esc(c); };
     const bwItems = (parsed.biggestWins || []).map(s => `<li style="margin:.5rem 0;line-height:1.6">${fmtKI(s)}</li>`).join("");
-    const kfItems = (parsed.keyFocusAreas || []).map((s, i) => {
-      const strat = (parsed.keyFocusStrategies || [])[i] || "";
-      return `<li style="margin:.5rem 0;line-height:1.6">${fmtKI(s)}${strat ? `<br><span style="color:#9ca3af;font-size:.9em">${esc(strat)}</span>` : ""}</li>`;
-    }).join("");
+    const kfItems = (parsed.keyFocusAreas || []).map(s => `<li style="margin:.5rem 0;line-height:1.6">${fmtKI(s)}</li>`).join("");
     h += `<p style="margin:1.25rem 0 .75rem;line-height:1.7">Below are the top 4 most important wins and the 4 most critical focus areas that ${esc(firstName)} needs support with.</p>`;
     h += `<table style="width:100%;border-collapse:collapse;font-size:11pt;margin:1.25rem 0">
       <tbody>
@@ -4244,12 +4243,13 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   h += `<p style="margin:.5rem 0 1rem;line-height:1.7">The table below highlights the areas where ${esc(firstName)} has the most room for improvement this term, along with recommendations for supporting their progress in each one.</p>`;
   if (parsed.actionPlanRows.length) {
     const rows = parsed.actionPlanRows.map((r, idx) => {
-      const pts = (r.points || []).map(p => `<li style="margin:.25rem 0">${esc(p)}</li>`).join("");
+      const pts = (r.points || []).slice(0, 2).map(p => `<li style="margin:.25rem 0">${esc(p)}</li>`).join("");
+      const strat = r.strategy ? `<span style="color:#9ca3af">${esc(r.strategy)}</span>` : "";
       return `<tr>
         <td style="padding:.55rem .75rem;border:1px solid #e5e7eb;text-align:center;width:7.6%;color:#6b7280">${idx + 1}</td>
         <td style="padding:.55rem .75rem;border:1px solid #e5e7eb;font-weight:600;vertical-align:top;text-align:center;width:25%">${esc(r.target || "")}</td>
         <td style="padding:.55rem .75rem;border:1px solid #e5e7eb;vertical-align:top"><ol style="margin:0;padding-left:1.2rem;line-height:1.6">${pts}</ol></td>
-        <td style="padding:.55rem .75rem;border:1px solid #e5e7eb;vertical-align:top"></td>
+        <td style="padding:.55rem .75rem;border:1px solid #e5e7eb;vertical-align:top;font-size:.88rem;line-height:1.6">${strat}</td>
       </tr>`;
     }).join("");
     h += `<table style="width:100%;border-collapse:collapse;font-size:.9rem;margin:.75rem 0">
@@ -4601,7 +4601,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     });
     const kiRows = [
       new TableRow({ tableHeader: true, cantSplit: true, children: [mkKiColorCell("Biggest Wins",    "d1fae5", "16a34a"), mkKiNumberedCell(parsed.biggestWins    || [], KI_NUM_REF)] }),
-      new TableRow({                    cantSplit: true, children: [mkKiColorCell("Key Focus Areas",  "fef3c7", "d97706"), mkKiNumberedCell(parsed.keyFocusAreas  || [], KI_NUM_REF_2, parsed.keyFocusStrategies || [])] }),
+      new TableRow({                    cantSplit: true, children: [mkKiColorCell("Key Focus Areas",  "fef3c7", "d97706"), mkKiNumberedCell(parsed.keyFocusAreas  || [], KI_NUM_REF_2)] }),
     ];
     paragraphs.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: kiRows }));
     paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 280, after: 0 } }));
@@ -4662,10 +4662,16 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
         width: { size: 5616, type: WidthType.DXA },
         margins: { top: 100, bottom: 100, left: 150, right: 150 },
         children: (r.points || []).length
-          ? (r.points || []).map(p => new Paragraph({ children: [new TextRun({ text: p, size: 22 })], numbering: { reference: AP_NUM_REFS[idx], level: 0 }, alignment: AlignmentType.JUSTIFIED, spacing: { before: 40, after: 80, ...LS } }))
+          ? (r.points || []).slice(0, 2).map(p => new Paragraph({ children: [new TextRun({ text: p, size: 22 })], numbering: { reference: AP_NUM_REFS[idx], level: 0 }, alignment: AlignmentType.JUSTIFIED, spacing: { before: 40, after: 80, ...LS } }))
           : [new Paragraph({ children: [new TextRun({ text: "", size: 22 })], spacing: { before: 80, after: 80 } })]
       }),
-      mkCell("", { dxa: 5616 })
+      new TableCell({
+        width: { size: 5616, type: WidthType.DXA },
+        margins: { top: 100, bottom: 100, left: 150, right: 150 },
+        children: r.strategy
+          ? [new Paragraph({ children: [new TextRun({ text: r.strategy, size: 22, color: "9ca3af" })], alignment: AlignmentType.JUSTIFIED, spacing: { before: 80, after: 80 } })]
+          : [new Paragraph({ children: [new TextRun({ text: "", size: 22 })], spacing: { before: 80, after: 80 } })]
+      })
     ]}));
     actionPlanParas.push(new Table({ width: { size: 13954, type: WidthType.DXA }, rows: [headerRow, ...dataRows] }));
   }
