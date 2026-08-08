@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1509";
+const APP_VERSION = "1510";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -15770,7 +15770,10 @@ function renderTargetManageContent(student, target) {
                     <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subIdx}" data-idx="${subIdx}"
                       placeholder="Enter Activity Title Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
                   </div>
-                  <button class="mn-move-sub-act" data-idx="${subIdx}" title="Move to a different parent activity" style="flex-shrink:0;margin-top:.35rem;font-size:.78rem;padding:.25rem .5rem;background:#eff6ff;border:1px solid #bfdbfe;border-radius:.35rem;color:#1d4ed8;cursor:pointer;line-height:1.2">↳ Move to another Parent Activity</button>
+                  <div style="display:flex;flex-direction:column;gap:.3rem;flex-shrink:0;margin-top:.35rem">
+                    <button class="mn-move-sub-act" data-idx="${subIdx}" title="Move to a different parent activity" style="font-size:.78rem;padding:.25rem .5rem;background:#eff6ff;border:1px solid #bfdbfe;border-radius:.35rem;color:#1d4ed8;cursor:pointer;line-height:1.2;white-space:nowrap">↳ Move to another Parent Activity</button>
+                    <button class="mn-make-standalone" data-idx="${subIdx}" title="Make standalone activity" style="font-size:.78rem;padding:.25rem .5rem;background:#f0fdf4;border:1px solid #86efac;border-radius:.35rem;color:#15803d;cursor:pointer;line-height:1.2;white-space:nowrap">↗ Make standalone activity</button>
+                  </div>
                   <button class="btn-adm-del mn-del-sub-act" data-idx="${subIdx}" title="Delete sub-activity" style="flex-shrink:0;margin-top:.35rem">🗑</button>
                 </div>
               </div>
@@ -16690,34 +16693,10 @@ function renderTargetManageContent(student, target) {
           <div style="font-size:.88rem;font-weight:700;color:#111;margin-bottom:.25rem">↳ Move "${paLabel}" under:</div>
           <div style="font-size:.78rem;color:#6b7280;margin-bottom:.7rem">Select an activity to become its parent.</div>
           ${errorHtml}
-          <button id="mn-make-standalone-btn" style="width:100%;text-align:left;padding:.5rem .7rem;border:1px solid #d1fae5;border-radius:.4rem;background:#f0fdf4;cursor:pointer;font-size:.84rem;color:#065f46;margin-bottom:.4rem;display:block">
-            ↗ Make standalone activity
-            <span style="display:block;font-size:.75rem;color:#6b7280;font-weight:400;margin-top:.1rem">Removes it from its parent — becomes a main activity</span>
-          </button>
-          <div style="border-top:1px solid #e5e7eb;margin:.1rem 0 .5rem"></div>
           <div>${candHtml}</div>
           <button id="mn-move-cancel2" style="width:100%;padding:.4rem;border:1px solid #d1d5db;border-radius:.4rem;background:#f9fafb;cursor:pointer;font-size:.85rem;margin-top:.6rem">Cancel</button>
         </div>`;
         overlay.querySelector("#mn-move-cancel2").addEventListener("click", closeOverlay);
-        overlay.querySelector("#mn-make-standalone-btn").addEventListener("click", () => {
-          const oldParentKey = pa.parentActivity || null;
-          delete pa.parentActivity;
-          if (oldParentKey) {
-            const stillHasSubs = acts.some(a2 => a2 !== pa && a2.parentActivity === oldParentKey);
-            if (!stillHasSubs) {
-              const oldParent = acts.find(a2 => (a2.title || a2.name) === oldParentKey);
-              if (oldParent) delete oldParent.noRemark;
-            }
-          }
-          acts.forEach((a2, i) => a2.order = i);
-          target.predefinedActivities = acts;
-          closeOverlay();
-          saveTarget().then(() => {
-            const scrollPos = $("manage-modal-body").scrollTop;
-            renderTargetManageContent(student, target);
-            requestAnimationFrame(() => { const b = $("manage-modal-body"); if (b) b.scrollTop = scrollPos; });
-          });
-        });
         overlay.querySelectorAll(".mn-move-pick-btn").forEach(pickBtn => {
           pickBtn.addEventListener("click", async () => {
             const candIdx = Number(pickBtn.dataset.candIdx);
@@ -16797,6 +16776,29 @@ function renderTargetManageContent(student, target) {
       panel.style.display = open ? "none" : "block";
       if (arrow) arrow.textContent = open ? "▶" : "▼";
       if (!open) panel.querySelectorAll(".mn-inactive-name-input").forEach(autoResizeTextarea);
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-make-standalone").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const idx = Number(btn.dataset.idx);
+      const pa = acts[idx];
+      if (!pa) return;
+      const oldParentKey = pa.parentActivity || null;
+      delete pa.parentActivity;
+      if (oldParentKey) {
+        const stillHasSubs = acts.some(a2 => a2 !== pa && a2.parentActivity === oldParentKey);
+        if (!stillHasSubs) {
+          const oldParent = acts.find(a2 => (a2.title || a2.name) === oldParentKey);
+          if (oldParent) delete oldParent.noRemark;
+        }
+      }
+      acts.forEach((a2, i) => a2.order = i);
+      target.predefinedActivities = acts;
+      await saveTarget();
+      const scrollPos = $("manage-modal-body").scrollTop;
+      renderTargetManageContent(student, target);
+      requestAnimationFrame(() => { const b = $("manage-modal-body"); if (b) b.scrollTop = scrollPos; });
     });
   });
 
