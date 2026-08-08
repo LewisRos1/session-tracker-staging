@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1512";
+const APP_VERSION = "1513";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -1357,27 +1357,30 @@ function renderTodoHomeSection() {
 }
 
 async function loadTodoHomeCounts() {
-  const results = await Promise.all(INSTRUCTORS.map(async inst => {
-    const sessions = inst.id === "nigel"
-      ? await getAllSessions().catch(() => [])
-      : await getSessionsWithParticipant(inst.id).catch(() => []);
-    const count = sessions.filter(s => {
-      const checks = s.checks || {};
-      const ws = getWorkflowState(s);
-      if (inst.id !== "nigel" && !checks[`p1_${inst.id}`]) return true;
-      if (inst.id === "daisy" && !s.reviewSubmitted && !ws.daisyOnly) return true;
-      if (inst.id !== "daisy" && inst.id !== "nigel" && s.reviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) return true;
-      if (inst.id === "nigel" && ws.ready && !ws.p4Done) return true;
-      return false;
-    }).length;
-    return { id: inst.id, count };
-  }));
-  results.forEach(({ id, count }) => {
-    const badge = document.querySelector(`.todo-home-badge[data-id="${id}"]`);
-    if (!badge) return;
-    badge.textContent = count;
-    badge.style.background = count > 0 ? "#3b82f6" : "#d1d5db";
-    badge.style.color      = count > 0 ? "#fff"    : "#6b7280";
+  // Update each badge independently — one slow/failed query won't stall others
+  INSTRUCTORS.forEach(async inst => {
+    try {
+      const sessions = inst.id === "nigel"
+        ? await getAllSessions().catch(() => [])
+        : await getSessionsWithParticipant(inst.id).catch(() => []);
+      const count = sessions.reduce((n, s) => {
+        try {
+          const checks = s.checks || {};
+          const ws = getWorkflowState(s);
+          if (inst.id !== "nigel" && !checks[`p1_${inst.id}`]) return n + 1;
+          if (inst.id === "daisy" && !s.reviewSubmitted && !ws.daisyOnly) return n + 1;
+          if (inst.id !== "daisy" && inst.id !== "nigel" && s.reviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) return n + 1;
+          if (inst.id === "nigel" && ws.ready && !ws.p4Done) return n + 1;
+        } catch { /* skip malformed session */ }
+        return n;
+      }, 0);
+      const badge = document.querySelector(`.todo-home-badge[data-id="${inst.id}"]`);
+      if (badge) {
+        badge.textContent = count;
+        badge.style.background = count > 0 ? "#3b82f6" : "#d1d5db";
+        badge.style.color      = count > 0 ? "#fff"    : "#6b7280";
+      }
+    } catch { /* silently skip this instructor if query fails */ }
   });
 }
 
@@ -14141,9 +14144,10 @@ function showDatePickerOverlay({ heading, infoHtml, minDate, defaultDate, confir
       <div style="font-size:.93rem;font-weight:700;color:#111;margin-bottom:.55rem">${heading}</div>
       ${infoHtml ? `<div style="font-size:.85rem;color:#374151;margin-bottom:.9rem;line-height:1.6">${infoHtml}</div>` : ''}
       <label style="font-size:.82rem;font-weight:600;color:#374151;display:block;margin-bottom:.35rem">Please select the final date you want this activity to appear.</label>
-      <div style="position:relative;margin-bottom:1rem;border:1.5px solid #d1d5db;border-radius:.4rem;overflow:hidden;background:#fff;cursor:pointer">
-        <input type="date" id="dp-date-inp" value="${def}" min="${min}" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;box-sizing:border-box">
-        <div id="dp-date-display" style="padding:.5rem .7rem;font-size:.95rem;color:#111;pointer-events:none;display:flex;align-items:center">${defFormatted}<span style="margin-left:auto;padding-left:.5rem;font-size:1.1rem;color:#6b7280">🗓</span></div>
+      <style>#dp-date-inp::-webkit-calendar-picker-indicator{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}</style>
+      <div style="position:relative;margin-bottom:1rem;border:1.5px solid #d1d5db;border-radius:.4rem;background:#fff;cursor:pointer">
+        <input type="date" id="dp-date-inp" value="${def}" min="${min}" style="position:absolute;inset:0;width:100%;height:100%;border:none;background:transparent;color:transparent;caret-color:transparent;outline:none;cursor:pointer;box-sizing:border-box">
+        <div id="dp-date-display" style="padding:.5rem .7rem;font-size:.95rem;color:#111;pointer-events:none;display:flex;align-items:center">${defFormatted}<span style="margin-left:auto;padding-left:.5rem;font-size:1rem;color:#6b7280">🗓</span></div>
       </div>
       <div style="display:flex;gap:.6rem;justify-content:flex-end">
         <button class="dp-cancel" style="padding:.5rem 1rem;border:1px solid #d1d5db;border-radius:.4rem;background:#fff;cursor:pointer;font-size:.9rem">Cancel</button>
