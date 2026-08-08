@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1520";
+const APP_VERSION = "1521";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3200,7 +3200,7 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
 
       const avgs = [];
       for (const sess of mSessions) {
-        const avg = hyrCalcDailyAvg(sess, target);
+        const avg = hyrCalcDailyAvg(sess, target, targets);
         if (avg !== null) avgs.push(avg);
       }
       if (avgs.length === 0) { monthlyAvgs.push(`${mLabel}: no data`); chartValues.push(null); continue; }
@@ -3482,8 +3482,21 @@ function hyrLinearTrend(values) {
   return { tStart: clamp(intercept), tEnd: clamp(slope * (n - 1) + intercept) };
 }
 
-function hyrCalcDailyAvg(sess, target) {
-  // Mirror export.js calcDailyAverage exactly: average of per-remark averages
+function hyrParseManualScore(val) {
+  if (!val) return null;
+  const s = String(val).trim();
+  const frac = s.match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/);
+  if (frac) { const d = parseFloat(frac[2]); return d === 0 ? null : parseFloat(frac[1]) / d * 100; }
+  const pct = s.match(/^(\d+(?:\.\d+)?)\s*%$/);
+  if (pct) return parseFloat(pct[1]);
+  const num = s.match(/^(\d+(?:\.\d+)?)$/);
+  if (num) return parseFloat(num[1]);
+  return null;
+}
+
+function hyrCalcDailyAvg(sess, target, allTargets = [], visited = new Set()) {
+  if (visited.has(target.name)) return null;
+  visited.add(target.name);
   const snap = (sess.targetsSnapshot || []).find(t => t.name === target.name);
   const mp = ((snap ? (snap.maxPoints ?? target.maxPoints) : target.maxPoints) || 3);
   const sessionActs = Object.entries(sess.activities || {})
@@ -3492,8 +3505,22 @@ function hyrCalcDailyAvg(sess, target) {
   const avgs = [];
   for (const act of sessionActs) {
     if (act.isHeading || act.isNote || act.empty) continue;
+    if (act.isMapped) {
+      const mappedTarget = act.mappedTargetId ? allTargets.find(t => t.id === act.mappedTargetId) : null;
+      if (!mappedTarget) continue;
+      const hasRem = Object.values(sess.remarks || {}).some(r => r.activityId === act.id);
+      if (!hasRem) continue;
+      const mapped = hyrCalcDailyAvg(sess, mappedTarget, allTargets, new Set(visited));
+      if (mapped !== null) avgs.push(mapped);
+      continue;
+    }
     for (const rem of Object.values(sess.remarks || {})) {
       if (rem.activityId !== act.id) continue;
+      if (act.manualScore) {
+        const pct = hyrParseManualScore(hyrStripHtml(rem.text || "").trim());
+        if (pct !== null) avgs.push(pct);
+        continue;
+      }
       const trials = (rem.trials || []).filter(t => t !== -1);
       if (rem.optionScore !== undefined) trials.push(rem.optionScore);
       if (trials.length === 0) continue;
@@ -5116,8 +5143,9 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
     const tName = target.name;
 
     // Mini: this month vs last month + 1-month trend (2 points → direct delta)
+    const allTargets = student.targets || [];
     const computeAvg = sess => {
-      const avgs = sess.map(s => hyrCalcDailyAvg(s, target)).filter(v => v !== null);
+      const avgs = sess.map(s => hyrCalcDailyAvg(s, target, allTargets)).filter(v => v !== null);
       return avgs.length ? Math.round(avgs.reduce((a,b)=>a+b,0)/avgs.length) : null;
     };
     const lastMonthAvg = computeAvg(lastMonthSessions);
@@ -5133,7 +5161,7 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
       let tm = month - offset, ty = year;
       if (tm <= 0) { tm += 12; ty--; }
       const tmSess = allSessions.filter(s => { const [sy,sm] = s.date.split("-").map(Number); return sy === ty && sm === tm; });
-      const avgs = tmSess.map(s => hyrCalcDailyAvg(s, target)).filter(v => v !== null);
+      const avgs = tmSess.map(s => hyrCalcDailyAvg(s, target, allTargets)).filter(v => v !== null);
       tLabels.push(ABBRS[tm - 1]);
       tAvgs.push(avgs.length ? Math.round(avgs.reduce((a,b)=>a+b,0)/avgs.length) : null);
     }
