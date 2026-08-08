@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1513";
+const APP_VERSION = "1514";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -4762,6 +4762,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     { after: 220, align: AlignmentType.JUSTIFIED }
   ));
   const qualSet = new Set(categorized.qualitative.map(r => r.name));
+  let apNumRefs = [];
   if (parsed.actionPlanRows?.length) {
     const HDR = "f3f4f6";
     // No.=634, Target=2088, Details=5616, Strategy=5616 DXA (total 13954 = 9.69")
@@ -4771,7 +4772,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
       mkCell("Details", { bold: true, bg: HDR, size: 22, dxa: 5616, align: AlignmentType.CENTER }),
       mkCell("Recommendations & Strategies", { bold: true, bg: HDR, size: 22, dxa: 5616, align: AlignmentType.CENTER })
     ]});
-    const apNumRefs = (parsed.actionPlanRows || []).map((_, i) => `hyr-ap-${i}`);
+    apNumRefs = (parsed.actionPlanRows || []).map((_, i) => `hyr-ap-${i}`);
     const dataRows = (parsed.actionPlanRows || []).map((r, idx) => {
       const pts        = (r.points || []).slice(0, 2);
       const targetText = qualSet.has(r.target) ? `${r.target || ""} (Qualitative)` : r.target || "";
