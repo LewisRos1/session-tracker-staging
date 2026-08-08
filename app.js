@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1511";
+const APP_VERSION = "1512";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6132,7 +6132,7 @@ function renderManageActivityScreen(student) {
     const card = (pa, indent = false, orphanParent = '', num = null, subIdx = null, forceMaint = false) => {
       const nameHtml = paDisplayHtml(pa) || `<em style="color:#9ca3af;font-size:.85rem">Untitled</em>`;
       const badge = statusBadge(pa);
-      const parentTag = orphanParent ? `<span style="font-size:.71rem;color:#9ca3af;display:block;margin-top:.1rem">from Parent Activity: ${escHtml(orphanParent)}</span>` : '';
+      const parentTag = orphanParent ? `<span style="font-size:.85rem;color:#9ca3af;display:block;margin-top:.1rem">from Parent Activity: ${escHtml(orphanParent)}</span>` : '';
       const numTag = num !== null ? `<span style="color:#6b7280;font-weight:600;margin-right:.25rem">${num})</span>` :
                      subIdx !== null ? `<span style="color:#0369a1;font-weight:600;margin-right:.25rem">${String.fromCharCode(97 + subIdx)})</span>` : '';
       const isMaint = forceMaint || maIsMaintained(pa);
@@ -6212,7 +6212,7 @@ function renderManageActivityScreen(student) {
         const nameHtml = paDisplayHtml(sub) || `<em style="color:#9ca3af;font-size:.85rem">Untitled</em>`;
         const badge = statusBadge(sub, true);
         items += `<div data-pa-id="${escHtml(sub.id||'')}" style="background:${bgCard};border:1px solid ${borderCard};border-left:3px solid ${color};border-radius:.5rem;padding:.55rem .75rem .55rem .9rem;display:flex;align-items:flex-start;gap:.5rem;box-shadow:0 1px 3px rgba(0,0,0,.04)">
-          <div style="flex:1;min-width:0;line-height:1.5;white-space:pre-wrap">${nameHtml}<span style="font-size:.71rem;color:#9ca3af;display:block;margin-top:.1rem">from Parent Activity: ${escHtml(sub.parentActivity)}</span>${badge}</div>
+          <div style="flex:1;min-width:0;line-height:1.5;white-space:pre-wrap">${nameHtml}<span style="font-size:.85rem;color:#9ca3af;display:block;margin-top:.1rem">from Parent Activity: ${escHtml(sub.parentActivity)}</span>${badge}</div>
           ${kebabWrap(sub)}
         </div>`;
       });
@@ -14141,9 +14141,9 @@ function showDatePickerOverlay({ heading, infoHtml, minDate, defaultDate, confir
       <div style="font-size:.93rem;font-weight:700;color:#111;margin-bottom:.55rem">${heading}</div>
       ${infoHtml ? `<div style="font-size:.85rem;color:#374151;margin-bottom:.9rem;line-height:1.6">${infoHtml}</div>` : ''}
       <label style="font-size:.82rem;font-weight:600;color:#374151;display:block;margin-bottom:.35rem">Please select the final date you want this activity to appear.</label>
-      <div style="position:relative;margin-bottom:1rem">
-        <input type="date" id="dp-date-inp" value="${def}" min="${min}" style="width:100%;box-sizing:border-box;padding:.5rem .7rem;border:1.5px solid #d1d5db;border-radius:.4rem;font-size:.95rem;outline:none;color:transparent;caret-color:transparent;background:#fff;cursor:pointer">
-        <div id="dp-date-display" style="position:absolute;top:0;left:0;bottom:0;right:2.5rem;padding:.5rem .7rem;font-size:.95rem;color:#111;pointer-events:none;display:flex;align-items:center;background:#fff;border-radius:.4rem 0 0 .4rem">${defFormatted}</div>
+      <div style="position:relative;margin-bottom:1rem;border:1.5px solid #d1d5db;border-radius:.4rem;overflow:hidden;background:#fff;cursor:pointer">
+        <input type="date" id="dp-date-inp" value="${def}" min="${min}" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;box-sizing:border-box">
+        <div id="dp-date-display" style="padding:.5rem .7rem;font-size:.95rem;color:#111;pointer-events:none;display:flex;align-items:center">${defFormatted}<span style="margin-left:auto;padding-left:.5rem;font-size:1.1rem;color:#6b7280">🗓</span></div>
       </div>
       <div style="display:flex;gap:.6rem;justify-content:flex-end">
         <button class="dp-cancel" style="padding:.5rem 1rem;border:1px solid #d1d5db;border-radius:.4rem;background:#fff;cursor:pointer;font-size:.9rem">Cancel</button>
