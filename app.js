@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1507";
+const APP_VERSION = "1508";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -16586,7 +16586,7 @@ function renderTargetManageContent(student, target) {
             // activity, exclude it — it's an orphan from a deleted/recreated activity
             // with the same name, not data for the current one.
             if (a.configId && act.id && a.configId !== act.id) return false;
-            return a.activityName === act.name || (act.title && a.activityName === act.title);
+            return (act.name && a.activityName === act.name) || (act.title && a.activityName === act.title);
           }).map(([id]) => id);
           return matchIds.some(actId => Object.values(sRems).some(r =>
             r.activityId === actId && (
@@ -16710,7 +16710,7 @@ function renderTargetManageContent(student, target) {
                 const sActs = s.activities || {}; const sRems = s.remarks || {};
                 const matchIds = Object.entries(sActs).filter(([, a]) =>
                   a.targetName === target.name &&
-                  (a.activityName === chosen.name || (chosen.title && a.activityName === chosen.title)) &&
+                  ((chosen.name && a.activityName === chosen.name) || (chosen.title && a.activityName === chosen.title)) &&
                   !a.parentActivity
                 ).map(([id]) => id);
                 return matchIds.some(actId => Object.values(sRems).some(r =>
