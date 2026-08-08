@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1517";
+const APP_VERSION = "1518";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -2678,6 +2678,10 @@ function renderHalfYearReportsSection() {
         </select>
         <span id="hyr-period-loading" style="font-size:.85rem;color:var(--text-muted);white-space:nowrap;display:none">Checking…</span>
       </div>
+      <div id="hyr-row-session-type" style="display:none;gap:.75rem;align-items:center">
+        <span style="${labelStyle}">Session Type</span>
+        <select id="hyr-session-type-select" class="admin-input" style="flex:1;min-width:0;background:#fff;font-family:inherit;font-size:1rem"></select>
+      </div>
       <div id="hyr-row-type" style="display:none;gap:.75rem;align-items:center">
         <span style="${labelStyle}">Report Type</span>
         <select id="hyr-type-select" class="admin-input" style="flex:1;min-width:0;background:#fff;font-family:inherit;font-size:1rem">
@@ -2707,8 +2711,18 @@ function renderHalfYearReportsSection() {
     </div>`;
 
   let _hyrSessions = null;
+  let _hyrIndivSessions = [];
+  let _hyrGroupSessions = [];
 
   const resetBelowStudent = () => {
+    $("hyr-row-session-type").style.display = "none";
+    $("hyr-type-select").value = "";
+    $("hyr-row-type").style.display  = "none";
+    $("hyr-row-period").style.display = "none";
+    $("hyr-activity-filter").style.display = "none";
+  };
+
+  const resetBelowSessionType = () => {
     $("hyr-type-select").value = "";
     $("hyr-row-type").style.display  = "none";
     $("hyr-row-period").style.display = "none";
@@ -2724,17 +2738,48 @@ function renderHalfYearReportsSection() {
     const studentId = e.target.value;
     const loading = $("hyr-period-loading");
     _hyrSessions = null;
+    _hyrIndivSessions = [];
+    _hyrGroupSessions = [];
     resetBelowStudent();
     if (!studentId) return;
     loading.style.display = "";
     try {
-      _hyrSessions = await getAllSessionsForStudent(studentId);
-      $("hyr-row-type").style.display = "flex";
+      [_hyrIndivSessions, _hyrGroupSessions] = await Promise.all([
+        getIndividualSessionsForStudent(studentId).catch(() => []),
+        getGroupSessionsForStudent(studentId).catch(() => [])
+      ]);
+      const hasIndiv = _hyrIndivSessions.length > 0;
+      const hasGroup = _hyrGroupSessions.length > 0;
+      const sel = $("hyr-session-type-select");
+      if (hasIndiv && hasGroup) {
+        sel.innerHTML = `<option value="">— Select —</option><option value="individual">Individual</option><option value="group">Group</option>`;
+        $("hyr-row-session-type").style.display = "flex";
+      } else if (hasIndiv) {
+        sel.innerHTML = `<option value="individual">Individual</option>`;
+        _hyrSessions = _hyrIndivSessions;
+        $("hyr-row-session-type").style.display = "flex";
+        $("hyr-row-type").style.display = "flex";
+      } else if (hasGroup) {
+        sel.innerHTML = `<option value="group">Group</option>`;
+        _hyrSessions = _hyrGroupSessions;
+        $("hyr-row-session-type").style.display = "flex";
+        $("hyr-row-type").style.display = "flex";
+      } else {
+        sel.innerHTML = `<option value="">No sessions found</option>`;
+        $("hyr-row-session-type").style.display = "flex";
+      }
     } catch (err) {
       // silent
     } finally {
       loading.style.display = "none";
     }
+  });
+
+  $("hyr-session-type-select").addEventListener("change", e => {
+    const sessType = e.target.value;
+    resetBelowSessionType();
+    if (sessType === "individual") { _hyrSessions = _hyrIndivSessions; $("hyr-row-type").style.display = "flex"; }
+    else if (sessType === "group") { _hyrSessions = _hyrGroupSessions; $("hyr-row-type").style.display = "flex"; }
   });
 
   $("hyr-type-select").addEventListener("change", e => {
@@ -2882,8 +2927,9 @@ async function hyrGenerate() {
     return;
   }
 
-  const studentId  = $("hyr-student-select")?.value;
-  const periodVal  = $("hyr-period-select")?.value;
+  const studentId   = $("hyr-student-select")?.value;
+  const periodVal   = $("hyr-period-select")?.value;
+  const sessionType = $("hyr-session-type-select")?.value || "individual";
   if (!studentId) { alert("Please select a student first."); return; }
   if (!periodVal) { alert("Please select a semester first."); return; }
 
@@ -2912,7 +2958,7 @@ async function hyrGenerate() {
       excludedActivities.add(`${btn.dataset.target}|${btn.dataset.activity}`);
     });
 
-    const { text: dataText, chartData, breakdownData, trendRows, categorized } = await hyrCollectData(student, period, year, excludedActivities);
+    const { text: dataText, chartData, breakdownData, trendRows, categorized } = await hyrCollectData(student, period, year, excludedActivities, sessionType);
 
     // Build prompt synchronously — then start fetch immediately so it runs in parallel with fake phases
     const periodLabel = period === "H1" ? `January–June ${year}` : `July–December ${year}`;
@@ -3073,7 +3119,7 @@ RECOMMENDATION: [One overall practical recommendation that addresses the difficu
     setProgress(100, "Done!");
     await new Promise(r => setTimeout(r, 400));
 
-    await hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData, chartData);
+    await hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData, chartData, sessionType);
 
   } catch (err) {
     if (err.name !== "AbortError") alert("Failed to generate report:\n" + err.message);
@@ -3089,11 +3135,13 @@ RECOMMENDATION: [One overall practical recommendation that addresses the difficu
   }
 }
 
-async function hyrCollectData(student, period, year, excludedActivities = new Set()) {
+async function hyrCollectData(student, period, year, excludedActivities = new Set(), sessionType = "individual") {
   const [startMonth, endMonth] = period === "H1" ? [1, 6] : [7, 12];
   const shortMonths = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
-  const allSessions = await getAllSessionsForStudent(student.id);
+  const allSessions = sessionType === "group"
+    ? await getGroupSessionsForStudent(student.id)
+    : await getIndividualSessionsForStudent(student.id);
   const sessions = allSessions.filter(s => {
     const [y, m] = s.date.split("-").map(Number);
     return y === year && m >= startMonth && m <= endMonth;
@@ -4419,7 +4467,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
 }
 
 
-async function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData, chartData) {
+async function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData, chartData, sessionType = "individual") {
   const firstName   = student.preferredName || student.name.split(" ")[0];
   const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
   const n = activeTargets.length;
@@ -4560,7 +4608,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, ...CPL }
   }));
   paragraphs.push(new Paragraph({
-    children: [new TextRun({ text: `(${fullTermLabel})`, bold: true, size: 36, font: TNR })],
+    children: [new TextRun({ text: `${sessionType === "group" ? "Group" : "Individual"} Session (${fullTermLabel})`, bold: true, size: 36, font: TNR })],
     alignment: AlignmentType.CENTER, spacing: { before: 0, after: 640, ...CPL }
   }));
 
@@ -4917,7 +4965,10 @@ async function monthlyGenerate() {
       excludedActivities.add(`${b.dataset.target}|${b.dataset.activity}`);
     });
 
-    const allSessions = await getAllSessionsForStudent(studentId);
+    const sessionType = $("hyr-session-type-select")?.value || "individual";
+    const allSessions = sessionType === "group"
+      ? await getGroupSessionsForStudent(studentId)
+      : await getIndividualSessionsForStudent(studentId);
     setProgress(15, "Processing data…");
 
     const FULL_MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -5013,7 +5064,7 @@ ${isFocus ? `===FOCUS: ${t.name}===
     setProgress(100, "Done!");
     await new Promise(r => setTimeout(r, 400));
 
-    await monthlyDownloadWord(student, year, month, monthName, sessionCount, threeMonthData, miniData, parsed, threeMonthPeriodLabel, oneMonthPeriodLabel);
+    await monthlyDownloadWord(student, year, month, monthName, sessionCount, threeMonthData, miniData, parsed, threeMonthPeriodLabel, oneMonthPeriodLabel, sessionType);
   } catch (err) {
     if (err.name !== "AbortError") alert("Failed to generate monthly report:\n" + err.message);
   } finally {
@@ -5453,7 +5504,7 @@ function monthlyDrawMiniVerticalBar(lastLabel, lastAvg, thisLabel, thisAvg) {
   return { base64: canvas.toDataURL("image/png").split(",")[1], height: H, width: W };
 }
 
-async function monthlyDownloadWord(student, year, month, monthName, sessionCount, threeMonthData, miniData, parsed, threeMonthPeriodLabel, oneMonthPeriodLabel) {
+async function monthlyDownloadWord(student, year, month, monthName, sessionCount, threeMonthData, miniData, parsed, threeMonthPeriodLabel, oneMonthPeriodLabel, sessionType = "individual") {
   const firstName = student.preferredName || student.name.split(" ")[0];
   const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
   const focusTargets = activeTargets.filter(t => miniData[t.name]?.trend !== "up");
@@ -5530,7 +5581,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     alignment: AlignmentType.CENTER, spacing: { before: 480, after: 560, ...CPL }
   }));
   paragraphs.push(new Paragraph({ children: [new TextRun({ text: "Monthly Progress Report", bold: true, size: 72, font: TNR })], alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, ...CPL } }));
-  paragraphs.push(new Paragraph({ children: [new TextRun({ text: `(${monthName} ${year})`, bold: true, size: 36, font: TNR })], alignment: AlignmentType.CENTER, spacing: { before: 0, after: 640, ...CPL } }));
+  paragraphs.push(new Paragraph({ children: [new TextRun({ text: `${sessionType === "group" ? "Group" : "Individual"} Session (${monthName} ${year})`, bold: true, size: 36, font: TNR })], alignment: AlignmentType.CENTER, spacing: { before: 0, after: 640, ...CPL } }));
   const mkCoverLabel  = t => new Paragraph({ children: [new TextRun({ text: t, bold: true, size: 36, font: TNR })], alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, ...CPL } });
   const mkCoverShaded = (v, sz = 32) => new Paragraph({ shading: { type: "clear", fill: "D9D9D9", color: "auto" }, children: [new TextRun({ text: v, size: sz, font: TNR })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 160, ...CPL }, indent: { left: 120, right: 120 } });
   const mkCoverSpacer = () => new Paragraph({ children: [], spacing: { before: 0, after: 480, ...CPL } });
