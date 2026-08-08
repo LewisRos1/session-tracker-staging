@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1515";
+const APP_VERSION = "1516";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -2982,7 +2982,7 @@ ROW: Key Focus Strategy | [One short, practical recommendation for the focus are
 ${targetsWithData.map(r => `===OBSERVATION: ${r.name}===
 Write 2 to 3 bullets for ${firstName}'s parents about this target. Format each bullet with a bold label followed by plain (not bold) content. Use these labels:
 • **Strengths:** One specific thing ${firstName} is doing well — a real skill or behaviour they show in sessions.
-• **Weaknesses:** One honest challenge — name the exact situation, trigger, or level of support that causes difficulty. Be warm, not alarming.
+• **Weaknesses:** ONLY write a weakness if the session data below directly shows a genuine difficulty — a struggling remark, a behaviour that caused problems, or consistently low performance. If the data does not show a clear weakness, write exactly: "No notable areas of difficulty observed this term." NEVER invent or guess — if it is not in the session data, it does not exist.
 
 IMPORTANT: The label MUST be wrapped in ** for bold (e.g. **Strengths:** **Weaknesses:**). The content after the colon is NOT bold. Write exactly 2 bullets per target — Strengths and Weaknesses only. Do NOT add a Note bullet.
 
