@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1518";
+const APP_VERSION = "1519";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -5617,6 +5617,8 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     return bScore - aScore;
   });
 
+  let anyInsufficientPast3M = false;
+
   const summaryDataRows = sortedForSummary.map(target => {
     const tName = target.name;
     const td = threeMonthData[tName] || {};
@@ -5624,6 +5626,9 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     const hasLineData = (td.avgs || []).some(v => v !== null && v !== undefined);
     const hasMiniData = md.thisMonthAvg != null || md.lastMonthAvg != null;
     const isQualitative = !hasLineData && !hasMiniData;
+    const past3MonthCount = (td.avgs || []).filter(v => v !== null && v !== undefined).length;
+    const insufficientPast3M = !isQualitative && past3MonthCount < 2;
+    if (insufficientPast3M) anyInsufficientPast3M = true;
     const raw = parsed.summaries?.[tName];
     const sentence = Array.isArray(raw) ? (raw[0] || "") : (raw || "");
     const scoreText = (!isQualitative && md.thisMonthAvg != null) ? `${Math.round(md.thisMonthAvg)}%` : "—";
@@ -5637,7 +5642,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
       : [new Paragraph({ children: [new TextRun({ text: "—", size: 20, italics: true })], spacing: { before: 80, after: 80 } })];
     return new TableRow({ children: [
       mkCell(tDisplayName, { dxa: 1800, align: AlignmentType.CENTER }),
-      isQualitative ? mkCell("—", { dxa: 1260, align: AlignmentType.CENTER }) : mkTrendCell(td.trend || "stable", 1260),
+      (isQualitative || insufficientPast3M) ? mkCell("—", { dxa: 1260, align: AlignmentType.CENTER }) : mkTrendCell(td.trend || "stable", 1260),
       isQualitative ? mkCell("—", { dxa: 1260, align: AlignmentType.CENTER }) : mkTrendCell(md.trend || "stable", 1260),
       mkCell(scoreText, { dxa: 720, align: AlignmentType.CENTER }),
       new TableCell({ width: { size: 4457, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: remarkKids }),
@@ -5645,6 +5650,9 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     ]});
   });
   summaryParas.push(new Table({ width: { size: 13954, type: WidthType.DXA }, rows: [summaryHdrRow, ...summaryDataRows] }));
+  if (anyInsufficientPast3M) {
+    summaryParas.push(new Paragraph({ children: [new TextRun({ text: "— Insufficient historical data: fewer than 2 months of data recorded prior to this reporting month.", size: 18, color: "6b7280", italics: true })], spacing: { before: 140, after: 0 } }));
+  }
 
   // ── Appendix: side-by-side charts per target (portrait) ──
   const appendixParas = [];
