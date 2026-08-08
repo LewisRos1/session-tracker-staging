@@ -1055,6 +1055,15 @@ export async function getAllSessionsForGroup(groupId) {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
+export async function getAllGroupSessionsForStudent(studentId) {
+  const snap = await getDocs(
+    query(collection(db, "sessions"), where("attendeeIds", "array-contains", studentId))
+  );
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
 /** Fetch today's unfinished session IDs, keyed by studentId. */
 export async function getTodayUnfinishedStudentIds() {
   const today = getTodayString();

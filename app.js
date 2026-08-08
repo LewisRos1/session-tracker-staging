@@ -95,6 +95,7 @@ import {
   getGroupSessionsForStudent,
   getAllSessionsForStudent,
   getAllSessionsForGroup,
+  getAllGroupSessionsForStudent,
   changeSessionNumber,
   loadHalfYearReportConfig,
   saveHalfYearReportConfig,
@@ -173,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1519";
+const APP_VERSION = "1520";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3140,8 +3141,8 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
   const shortMonths = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
   const allSessions = sessionType === "group"
-    ? await getGroupSessionsForStudent(student.id)
-    : await getIndividualSessionsForStudent(student.id);
+    ? await getAllGroupSessionsForStudent(student.id)
+    : await getAllSessionsForStudent(student.id);
   const sessions = allSessions.filter(s => {
     const [y, m] = s.date.split("-").map(Number);
     return y === year && m >= startMonth && m <= endMonth;
@@ -4967,8 +4968,8 @@ async function monthlyGenerate() {
 
     const sessionType = $("hyr-session-type-select")?.value || "individual";
     const allSessions = sessionType === "group"
-      ? await getGroupSessionsForStudent(studentId)
-      : await getIndividualSessionsForStudent(studentId);
+      ? await getAllGroupSessionsForStudent(studentId)
+      : await getAllSessionsForStudent(studentId);
     setProgress(15, "Processing data…");
 
     const FULL_MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
