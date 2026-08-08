@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1510";
+const APP_VERSION = "1511";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -16811,6 +16811,10 @@ function renderTargetManageContent(student, target) {
       // Hide modal and navigate immediately — don't wait for Firestore save
       $("manage-modal").classList.add("hidden");
       const freshStudent = state.students.find(s => s.id === student.id) || student;
+      // Point the manage-activity screen at the same target that's open in Edit Target
+      const nonArchived = (freshStudent.targets || []).filter(t => !t.archived);
+      const tIdx = nonArchived.findIndex(t => t.name === target.name);
+      if (tIdx >= 0) _maSelectedTargetIdx = tIdx;
       openManageActivityScreen(freshStudent);
       maScrollAndBlink(paId);
       // Save in background (renderTargetContent inside will update a hidden screen — no flicker)
