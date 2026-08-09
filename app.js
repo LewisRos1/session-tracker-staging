@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1538";
+const APP_VERSION = "1539";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3148,6 +3148,20 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
     return y === year && m >= startMonth && m <= endMonth;
   });
 
+  // Targets that have ever produced a numeric score (across entire history, not just
+  // this report period) are quantitative — even if this period happens to have no scores.
+  const quantitativeTargetNames = new Set();
+  for (const sess of allSessions) {
+    for (const target of (student.targets || [])) {
+      if (quantitativeTargetNames.has(target.name)) continue;
+      const snap = (sess.targetsSnapshot || []).find(t => t.name === target.name);
+      const eff = snap ? { ...target, maxPoints: snap.maxPoints ?? target.maxPoints } : target;
+      if (calcDailyAverage(sess, eff, student.targets || []) !== null) {
+        quantitativeTargetNames.add(target.name);
+      }
+    }
+  }
+
   if (sessions.length === 0) {
     return {
       text: `No sessions recorded for this student in ${period} ${year}.`,
@@ -3463,7 +3477,7 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
   const categorized = {
     mostImproved: trendRows.filter(r => !r.noData && r.delta > 8),
     strengths:    trendRows.filter(r => !r.noData && Math.abs(r.delta) <= 8 && r.tEnd >= 80),
-    qualitative:  trendRows.filter(r => r.noData),
+    qualitative:  trendRows.filter(r => r.noData && !quantitativeTargetNames.has(r.name)),
     needsSupport: trendRows.filter(r => !r.noData && r.delta < -8),
     emerging:     trendRows.filter(r => !r.noData && Math.abs(r.delta) <= 8 && r.tEnd < 80),
   };
