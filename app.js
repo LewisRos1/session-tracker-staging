@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1526";
+const APP_VERSION = "1527";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -14848,6 +14848,12 @@ async function handleDiscontinueTarget(entity, target, isGroup) {
     : renderManageActivityScreen(entity);
 
   if (target.discontinuedOn) {
+    // Block restore if another active target already has the same name
+    const conflict = (entity.targets || []).some(t => t.id !== target.id && !t.discontinuedOn && t.name === target.name);
+    if (conflict) {
+      alert(`Cannot restore "${target.name}" — you already have an active target with that name.\n\nRename the existing active target first, then try restoring again.`);
+      return;
+    }
     // Restore
     delete target.discontinuedOn;
     const si = isGroup
