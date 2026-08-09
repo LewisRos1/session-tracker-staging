@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1539";
+const APP_VERSION = "1540";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3477,9 +3477,11 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
   const categorized = {
     mostImproved: trendRows.filter(r => !r.noData && r.delta > 8),
     strengths:    trendRows.filter(r => !r.noData && Math.abs(r.delta) <= 8 && r.tEnd >= 80),
-    qualitative:  trendRows.filter(r => r.noData && !quantitativeTargetNames.has(r.name)),
+    qualitative:  trendRows.filter(r => r.noData),
     needsSupport: trendRows.filter(r => !r.noData && r.delta < -8),
     emerging:     trendRows.filter(r => !r.noData && Math.abs(r.delta) <= 8 && r.tEnd < 80),
+    // Targets in qualitative that are actually quantitative (scores exist outside this period)
+    quantitativeNoData: new Set(trendRows.filter(r => r.noData && quantitativeTargetNames.has(r.name)).map(r => r.name)),
   };
 
   return { text: lines.join("\n"), chartData, breakdownData, trendRows, categorized };
@@ -4386,12 +4388,14 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   // Section 4: Observed Skills (qualitative)
   if (categorized.qualitative.length) {
     h += `<hr style="margin:2rem 0">`;
-    h += `<h2 style="${SECTION_H2}">Section 4: Observed Skills (No Quantitative Data)</h2>`;
+    h += `<h2 style="${SECTION_H2}">Section 4: Observed Skills</h2>`;
     categorized.qualitative.forEach((r, i) => {
       const hasObs = !!parsed.observed[r.name];
+      const isQnoData = categorized.quantitativeNoData.has(r.name);
+      const badge = isQnoData ? " <span style='font-weight:400;font-size:.8rem;color:#6b7280'>(No Data This Period)</span>" : " <span style='font-weight:400;font-size:.8rem;color:#6b7280'>(Qualitative)</span>";
       h += `<div style="margin-top:2rem">
-        <p style="font-weight:700;font-size:1rem;margin:0 0 .35rem">${ROMAN[i] || i + 1}. ${esc(r.name)}</p>
-        ${hasObs ? obsHtml(parsed.observed[r.name]) : `<p style="color:#9ca3af;font-style:italic">Tracked via session notes — no percentage scores recorded this period.</p>`}
+        <p style="font-weight:700;font-size:1rem;margin:0 0 .35rem">${ROMAN[i] || i + 1}. ${esc(r.name)}${badge}</p>
+        ${hasObs ? obsHtml(parsed.observed[r.name]) : `<p style="color:#9ca3af;font-style:italic">${isQnoData ? "No scores recorded this period — see session notes." : "Tracked via session notes — no percentage scores recorded this period."}</p>`}
       </div>`;
     });
   }
@@ -4784,7 +4788,8 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     const offset = chartTrendRows.length;
     categorized.qualitative.forEach((r, i) => {
       paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 280, after: 0 } }));
-      paragraphs.push(new Paragraph({ children: [new TextRun({ text: `${offset + i + 1}) ${r.name} (Qualitative)`, bold: true, size: 24 })], spacing: { before: 0, after: 80, ...LS } }));
+      const qualLabel = categorized.quantitativeNoData.has(r.name) ? "(No Data This Period)" : "(Qualitative)";
+      paragraphs.push(new Paragraph({ children: [new TextRun({ text: `${offset + i + 1}) ${r.name} ${qualLabel}`, bold: true, size: 24 })], spacing: { before: 0, after: 80, ...LS } }));
       const obs = parsed.observed?.[r.name];
       if (obs) {
         obs.split("\n").forEach(line => {
@@ -4820,7 +4825,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     apNumRefs = (parsed.actionPlanRows || []).map((_, i) => `hyr-ap-${i}`);
     const dataRows = (parsed.actionPlanRows || []).map((r, idx) => {
       const pts        = (r.points || []).slice(0, 2);
-      const targetText = qualSet.has(r.target) ? `${r.target || ""} (Qualitative)` : r.target || "";
+      const targetText = qualSet.has(r.target) ? `${r.target || ""} ${categorized.quantitativeNoData.has(r.target) ? "(No Data This Period)" : "(Qualitative)"}` : r.target || "";
       const detailParas = pts.length
         ? pts.map((p, i) => new Paragraph({ numbering: { reference: apNumRefs[idx], level: 0 }, children: [new TextRun({ text: p, size: 22 })], spacing: { before: i === 0 ? 60 : 20, after: i === pts.length - 1 ? 60 : 0 } }))
         : [new Paragraph({ children: [new TextRun({ text: "", size: 22 })], spacing: { before: 60, after: 60 } })];
