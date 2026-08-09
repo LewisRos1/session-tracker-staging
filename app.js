@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1532";
+const APP_VERSION = "1533";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6338,15 +6338,20 @@ function renderManageActivityScreen(student) {
   body.querySelector("#btn-ma-delete-target").addEventListener("click", async () => {
     const confirmed = await showDeleteTargetConfirm(student, target, _dangerSessionCount);
     if (!confirmed) return;
-    student.targets = student.targets.filter(t => t.id !== target.id);
-    student.targets.forEach((t, i) => t.order = i);
-    if (_maSelectedTargetIdx >= student.targets.length) _maSelectedTargetIdx = Math.max(0, student.targets.length - 1);
-    const si = state.students.findIndex(s => s.id === student.id);
-    if (si >= 0) state.students[si] = student;
-    if (state.selectedTargetName === target.name) state.selectedTargetName = student.targets[0]?.name || null;
-    await saveStudent(student);
-    await deleteTargetDataFromSessions(student.id, target.name);
-    renderManageActivityScreen(student);
+    // Re-read the freshest reference from state after the async confirm dialog —
+    // any pending Edit Target saves (fire-and-forget) may have updated state.students
+    // since this screen opened, and using the closure's student directly would
+    // overwrite those new activities with the stale snapshot.
+    const liveStudent = (state.students || []).find(s => s.id === student.id) || student;
+    liveStudent.targets = (liveStudent.targets || []).filter(t => t.id !== target.id);
+    liveStudent.targets.forEach((t, i) => t.order = i);
+    if (_maSelectedTargetIdx >= liveStudent.targets.length) _maSelectedTargetIdx = Math.max(0, liveStudent.targets.length - 1);
+    const si = state.students.findIndex(s => s.id === liveStudent.id);
+    if (si >= 0) state.students[si] = liveStudent;
+    if (state.selectedTargetName === target.name) state.selectedTargetName = liveStudent.targets[0]?.name || null;
+    await saveStudent(liveStudent);
+    await deleteTargetDataFromSessions(liveStudent.id, target.name);
+    renderManageActivityScreen(liveStudent);
   });
 
   document.getElementById("ma-target-select").addEventListener("change", function() {
