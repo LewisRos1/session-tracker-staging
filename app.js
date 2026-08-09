@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1523";
+const APP_VERSION = "1524";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6273,17 +6273,26 @@ function renderManageActivityScreen(student) {
       ${collapseSection('discontinued','🚩','#dc2626','#fff5f5','#fecaca',discontPas)}
     </div>`;
 
-  const dropHtml = `<div class="target-selector" style="position:static;margin-bottom:.8rem;display:flex;align-items:center;gap:.5rem">
+  const isDiscontinued = !!target.discontinuedOn;
+  const discBadge = isDiscontinued
+    ? `<div style="font-size:.8rem;color:#dc2626;font-weight:600;padding:.2rem .1rem .4rem;display:flex;align-items:center;gap:.35rem">
+        🛑 Discontinued since ${fmtPeriodDate(target.discontinuedOn)} — hidden from session dropdown
+      </div>`
+    : '';
+  const dropHtml = `<div class="target-selector" style="position:static;margin-bottom:${isDiscontinued ? '.3rem' : '.8rem'};display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
     <label class="target-label" style="flex-shrink:0">Target</label>
-    <select id="ma-target-select" class="target-dropdown" style="flex:1">
-      ${targets.map((t, i) => `<option value="${i}"${i === _maSelectedTargetIdx ? ' selected' : ''}>${escHtml(t.name)}</option>`).join('')}
+    <select id="ma-target-select" class="target-dropdown" style="flex:1;min-width:8rem">
+      ${targets.map((t, i) => `<option value="${i}"${i === _maSelectedTargetIdx ? ' selected' : ''}>${t.discontinuedOn ? '🛑 ' : ''}${escHtml(t.name)}</option>`).join('')}
     </select>
     <button id="btn-ma-rearrange-inline" class="btn-manage-targets">↕️ Rearrange Targets</button>
-  </div>`;
+    <button id="btn-ma-discontinue-target" class="btn-manage-targets" style="${isDiscontinued ? 'background:#d1fae5;color:#065f46;border-color:#6ee7b7' : 'background:#fff0f0;color:#dc2626;border-color:#fca5a5'}">${isDiscontinued ? '✅ Restore Target' : '🛑 Discontinue Target'}</button>
+  </div>${discBadge}`;
 
   body.innerHTML = dropHtml + html;
 
   body.querySelector("#btn-ma-rearrange-inline").addEventListener("click", () => showTargetReorderList(student));
+
+  body.querySelector("#btn-ma-discontinue-target").addEventListener("click", () => handleDiscontinueTarget(student, target, false));
 
   document.getElementById("ma-target-select").addEventListener("change", function() {
     _maSelectedTargetIdx = parseInt(this.value, 10);
@@ -7680,7 +7689,7 @@ function sortTargetsByOrder(targets) {
 
 function populateTargetDropdown(targets) {
   const sel = $("target-select");
-  const sorted = sortTargetsByOrder(targets);
+  const sorted = sortTargetsByOrder(targets).filter(t => !t.discontinuedOn);
   const placeholder = sorted.length === 0
     ? `<option value="" disabled selected>— no targets yet —</option>` : "";
   sel.innerHTML = placeholder +
@@ -14812,6 +14821,43 @@ function renderTargetReorderList(student) {
   });
 }
 
+async function handleDiscontinueTarget(entity, target, isGroup) {
+  const save = () => isGroup ? saveGroup(entity) : saveStudent(entity);
+  const rerender = () => isGroup
+    ? populateGroupTargetDropdown(entity.targets)
+    : renderManageActivityScreen(entity);
+
+  if (target.discontinuedOn) {
+    // Restore
+    delete target.discontinuedOn;
+    const si = isGroup
+      ? state.groups.findIndex(g => g.id === entity.id)
+      : state.students.findIndex(s => s.id === entity.id);
+    if (si >= 0) (isGroup ? state.groups : state.students)[si] = entity;
+    await save();
+    rerender();
+    return;
+  }
+
+  // Discontinue — pick a date
+  const pickedDate = await showDatePickerOverlay({
+    heading: '🛑 Discontinue Target',
+    infoHtml: `<strong>"${escHtml(target.name)}"</strong> will be hidden from the session dropdown from this date onwards. All past session data is preserved and will still appear in exports.`,
+    minDate: null,
+    defaultDate: todayDateStr(),
+    confirmLabel: 'Confirm 🛑'
+  });
+  if (!pickedDate) return;
+
+  target.discontinuedOn = pickedDate;
+  const si = isGroup
+    ? state.groups.findIndex(g => g.id === entity.id)
+    : state.students.findIndex(s => s.id === entity.id);
+  if (si >= 0) (isGroup ? state.groups : state.students)[si] = entity;
+  await save();
+  rerender();
+}
+
 function showAddTargetPicker(student) {
   _pendingActsCleanup = null;
   $("manage-modal-title").textContent = "Add Target";
@@ -19184,7 +19230,7 @@ function renderGroupSessionHeader(data) {
 function populateGroupTargetDropdown(targets) {
   const sel = $("group-target-select");
   if (!sel) return;
-  const sorted = sortTargetsByOrder(targets);
+  const sorted = sortTargetsByOrder(targets).filter(t => !t.discontinuedOn);
   const placeholder = sorted.length === 0
     ? `<option value="" disabled selected>— no targets yet —</option>` : "";
   sel.innerHTML = placeholder +
@@ -19206,6 +19252,20 @@ function populateGroupTargetDropdown(targets) {
   if (reorderBtn) {
     reorderBtn.classList.toggle("hidden", targets.length < 2);
     reorderBtn.onclick = () => showGroupTargetReorderList(state.currentGroup);
+  }
+
+  const discBtn = $("btn-group-discontinue-target");
+  if (discBtn) {
+    const selTgt = state.currentGroup?.targets.find(t => t.name === state.selectedGroupTargetName);
+    discBtn.classList.toggle("hidden", !state.selectedGroupTargetName);
+    if (selTgt) {
+      const isDisc = !!selTgt.discontinuedOn;
+      discBtn.textContent = isDisc ? '✅ Restore Target' : '🛑 Discontinue Target';
+      discBtn.style.background = isDisc ? '#d1fae5' : '#fff0f0';
+      discBtn.style.color      = isDisc ? '#065f46' : '#dc2626';
+      discBtn.style.borderColor = isDisc ? '#6ee7b7' : '#fca5a5';
+      discBtn.onclick = () => handleDiscontinueTarget(state.currentGroup, selTgt, true);
+    }
   }
 
   // Wire change handler — same pattern as individual session's populateTargetDropdown

@@ -276,6 +276,10 @@ function getAllTargets(student) {
   return student.targets || [];
 }
 
+function exportTargetDisplayName(t) {
+  return t.discontinuedOn ? "(Disc.) " + t.name : t.name;
+}
+
 // ── Shared sheets (entity-agnostic: work identically for a student or a group) ──
 
 function addSummarySheets(wb, allTargets, sessions) {
@@ -432,10 +436,10 @@ function addBaselineVsCurrentSheet(wb, entityName, allTargets, sortedSessions) {
       const abbr = m => { const [n, y] = m.split(" "); return `${n.slice(0, 3)} ${y}`; };
       const firstCell = scoreF !== null ? `${pct(scoreF)} (${abbr(targetFirstMonth)})` : "";
       const lastCell  = scoreL !== null ? `${pct(scoreL)} (${abbr(lastMonth)})`        : "";
-      ws.addRow([target.name, firstCell, lastCell]);
+      ws.addRow([exportTargetDisplayName(target), firstCell, lastCell]);
       rowOffset++;
       if (scoreF !== null && scoreL !== null && targetFirstMonth !== lastMonth) {
-        chartTargets.push({ name: target.name, first: Math.round(scoreF), last: Math.round(scoreL),
+        chartTargets.push({ name: exportTargetDisplayName(target), first: Math.round(scoreF), last: Math.round(scoreL),
           firstLabel: targetFirstMonth, lastLabel: lastMonth });
       }
     }
@@ -518,7 +522,7 @@ function addHalfYearChartsSheets(wb, allTargets, sessions) {
       const year = halfMonths[0].split(" ")[1];
       const halfEndLabel = halfMonths[halfMonths.length - 1].split(" ")[0].slice(0, 3);
       const dateRange = `${labels[0]} - ${halfEndLabel} ${year}`;
-      const base64 = renderTargetChart(stripActivityMarkup(target.name), yValues, dateRange, null, labels);
+      const base64 = renderTargetChart(stripActivityMarkup(exportTargetDisplayName(target)), yValues, dateRange, null, labels);
       const imgId  = wb.addImage({ base64, extension: "png" });
 
       const chartRow = ROW_OFFSET + Math.floor(chartIdx / 2) * 19;
@@ -599,14 +603,14 @@ function addTrendSummarySheet(wb, allTargets, sessions) {
         if (vals.length > 0) yValues.push(Math.round(avg(vals)));
       }
       if (yValues.length < 2) {
-        return { name: target.name, noData: true, single: yValues.length === 1, delta: -Infinity };
+        return { name: exportTargetDisplayName(target), noData: true, single: yValues.length === 1, delta: -Infinity };
       }
       const trend  = linearRegressionValues(yValues);
       const tStart = Math.round(trend[0]);
       const tEnd   = Math.round(trend[trend.length - 1]);
       const delta  = tEnd - tStart;
       const direction = Math.abs(delta) <= 8 ? "Stable" : delta > 0 ? "Improving" : "Declining";
-      return { name: target.name, tStart, tEnd, delta, direction, noData: false };
+      return { name: exportTargetDisplayName(target), tStart, tEnd, delta, direction, noData: false };
     });
 
     // Two sections: all numeric targets (descending delta) then qualitative (no score)
@@ -1181,8 +1185,8 @@ function addActivityBreakdownHalfSheets(wb, allTargets, sessions) {
       for (let i = 0; i < activityData.length; i += MAX_PER_CHART) chunks.push(activityData.slice(i, i + MAX_PER_CHART));
       for (let ci = 0; ci < chunks.length; ci++) {
         const pageSuffix = chunks.length > 1 ? ` [Page ${ci + 1} of ${chunks.length}]` : "";
-        const chartTitle = `${targetNum}) ${target.name} - Progress (${chartPeriodLabel})${pageSuffix}`;
-        const chartResult = renderActivityBreakdownChart(target.name, chunks[ci], chartPeriodLabel, chartTitle, false, ["Start of Term/Trendline", "End of Term/Trendline"]);
+        const chartTitle = `${targetNum}) ${exportTargetDisplayName(target)} - Progress (${chartPeriodLabel})${pageSuffix}`;
+        const chartResult = renderActivityBreakdownChart(exportTargetDisplayName(target), chunks[ci], chartPeriodLabel, chartTitle, false, ["Start of Term/Trendline", "End of Term/Trendline"]);
         if (!chartResult) continue;
         const { base64, height: chartH } = chartResult;
         const imgId = wb.addImage({ base64, extension: "png" });
@@ -1299,7 +1303,7 @@ function addActivityScoreSheet(wb, allTargets, sessions) {
     if (activities.length === 0) continue;
 
     // Target header row spanning all columns
-    const tRow = ws.addRow([target.name, `(${activities.length} activities)`, ...cols.map(() => "")]);
+    const tRow = ws.addRow([exportTargetDisplayName(target), `(${activities.length} activities)`, ...cols.map(() => "")]);
     tRow.height = 18;
     tRow.eachCell(cell => { cell.fill = TARGET_FILL; });
     tRow.getCell(1).font = { bold: true, color: { argb: "FF1e3a5f" } };
@@ -1397,7 +1401,7 @@ function addIndividualTargetSheets(wb, allTargets, sessions, studentName, includ
   for (const target of allTargets) {
     const { rows, monthHeaderRows, colHeaderRows, activityHeadingRows, masteredSepRows, discontinuedSepRows, extraSepRows, noteRows, sessionDateBlocks, spacerRows, grayRows, greenRows } =
       buildTargetSheet(target, sessions, allTargets, includeTrials);
-    const ws = wb.addWorksheet(target.name.slice(0, 31));
+    const ws = wb.addWorksheet(exportTargetDisplayName(target).slice(0, 31));
     rows.forEach(row => ws.addRow(row));
 
     // Col widths: Date | Activity | Remark | [Trials |] Score | Avg Score
@@ -2425,7 +2429,7 @@ function buildSummarySheet(allTargets, sessions) {
   rows.push(["Target", ...months]);
 
   for (const target of allTargets) {
-    const row = [target.name];
+    const row = [exportTargetDisplayName(target)];
     for (const month of months) {
       const monthSessions = sessions.filter(s => s.month === month);
       const dailyAvgs = monthSessions
@@ -2487,7 +2491,7 @@ function buildDetailedSummarySheet(allTargets, sessions) {
 
       amberCells.push({ rowIdx: rows.length, col: avgColIdx });
       rows.push([
-        target.name,
+        exportTargetDisplayName(target),
         ...sessionAvgs.map(v => v !== null ? pct(v) : ""),
         monthlyAvg !== null ? pct(monthlyAvg) : ""
       ]);
