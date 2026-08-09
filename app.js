@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1531";
+const APP_VERSION = "1532";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -14478,7 +14478,12 @@ function showGroupAddTargetPicker(group) {
     $("manage-modal").classList.add("hidden");
     const name = prompt("Target name:");
     if (!name?.trim()) return;
-    const t = { id: cfgId("gt"), name: name.trim(), maxPoints: 3, hasComment: false, fullName: "",
+    const trimmedName = name.trim();
+    if (group.targets.some(t => t.name === trimmedName)) {
+      alert(`A target named "${trimmedName}" already exists. Please use a different name.`);
+      return;
+    }
+    const t = { id: cfgId("gt"), name: trimmedName, maxPoints: 3, hasComment: false, fullName: "",
       order: group.targets.length, predefinedActivities: [], notes: [], isStructured: true };
     group.targets.push(t);
     const gi = state.groups.findIndex(g => g.id === group.id);
@@ -15026,8 +15031,13 @@ function showAddTargetPicker(student) {
     $("manage-modal").classList.add("hidden");
     const name = prompt("Target name:");
     if (!name?.trim()) return;
+    const trimmedName = name.trim();
+    if (student.targets.some(t => t.name === trimmedName)) {
+      alert(`A target named "${trimmedName}" already exists. Please use a different name.`);
+      return;
+    }
     const t = {
-      id: cfgId("t"), name: name.trim(),
+      id: cfgId("t"), name: trimmedName,
       maxPoints: 3, hasComment: false, fullName: "",
       order: student.targets.length,
       predefinedActivities: [], notes: [],
