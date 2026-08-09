@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1521";
+const APP_VERSION = "1522";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3502,11 +3502,26 @@ function hyrCalcDailyAvg(sess, target, allTargets = [], visited = new Set()) {
   const sessionActs = Object.entries(sess.activities || {})
     .filter(([, a]) => a.targetName === target.name)
     .map(([id, a]) => ({ id, ...a }));
+
+  // Build PA config lookup — manualScore/isMapped/mappedTargetId live on the PA,
+  // not on the session activity document (session only stores targetName/activityName/order).
+  const paById = {}, paByName = {};
+  for (const pa of (target.predefinedActivities || [])) {
+    if (pa.id) paById[pa.id] = pa;
+    const key = pa.title || pa.name;
+    if (key) paByName[key] = pa;
+  }
+  const resolvePA = act => (act.configId && paById[act.configId]) || paByName[act.activityName] || {};
+
   const avgs = [];
   for (const act of sessionActs) {
     if (act.isHeading || act.isNote || act.empty) continue;
-    if (act.isMapped) {
-      const mappedTarget = act.mappedTargetId ? allTargets.find(t => t.id === act.mappedTargetId) : null;
+    const pa = resolvePA(act);
+    const isMapped = act.isMapped || pa.isMapped;
+    const isManual = act.manualScore || pa.manualScore;
+    if (isMapped) {
+      const mappedTargetId = act.mappedTargetId || pa.mappedTargetId;
+      const mappedTarget = mappedTargetId ? allTargets.find(t => t.id === mappedTargetId) : null;
       if (!mappedTarget) continue;
       const hasRem = Object.values(sess.remarks || {}).some(r => r.activityId === act.id);
       if (!hasRem) continue;
@@ -3516,7 +3531,7 @@ function hyrCalcDailyAvg(sess, target, allTargets = [], visited = new Set()) {
     }
     for (const rem of Object.values(sess.remarks || {})) {
       if (rem.activityId !== act.id) continue;
-      if (act.manualScore) {
+      if (isManual) {
         const pct = hyrParseManualScore(hyrStripHtml(rem.text || "").trim());
         if (pct !== null) avgs.push(pct);
         continue;
