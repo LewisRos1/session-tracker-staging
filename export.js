@@ -106,7 +106,7 @@ function buildExcelRemarkCell(html, starter, masteryNote) {
 
   if (masteryNote) {
     if (richText.length > 0) richText[richText.length - 1].text += ` — ${masteryNote}`;
-    else richText.push({ text: ` — ${masteryNote}` });
+    else richText.push({ text: masteryNote });
   }
 
   if (richText.length === 0) return "";
