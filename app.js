@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1528";
+const APP_VERSION = "1529";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -16293,6 +16293,12 @@ function renderTargetManageContent(student, target) {
   $("mn-t-name").addEventListener("blur", async () => {
     const v = $("mn-t-name").value.trim();
     if (!v || v === target.name) return;
+    const ownerTargets = (_groupForTargetEdit || student).targets || [];
+    if (ownerTargets.some(t => t.id !== target.id && t.name === v)) {
+      alert(`A target named "${v}" already exists. Please use a different name.`);
+      $("mn-t-name").value = target.name;
+      return;
+    }
     const oldName = target.name;
     if (state.selectedTargetName === target.name) state.selectedTargetName = v;
     target.name = v;
