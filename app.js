@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1540";
+const APP_VERSION = "1541";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3475,11 +3475,16 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
   trendRows.sort((a, b) => (b.delta ?? -Infinity) - (a.delta ?? -Infinity));
 
   const categorized = {
-    mostImproved: trendRows.filter(r => !r.noData && r.delta > 8),
-    strengths:    trendRows.filter(r => !r.noData && Math.abs(r.delta) <= 8 && r.tEnd >= 80),
-    qualitative:  trendRows.filter(r => r.noData),
-    needsSupport: trendRows.filter(r => !r.noData && r.delta < -8),
-    emerging:     trendRows.filter(r => !r.noData && Math.abs(r.delta) <= 8 && r.tEnd < 80),
+  const _targetPos = {};
+  (student.targets || []).forEach((t, i) => { _targetPos[t.name] = i; });
+  const _byDropdown = (a, b) => ((_targetPos[a.name] ?? 999) - (_targetPos[b.name] ?? 999));
+
+  const categorized = {
+    mostImproved: trendRows.filter(r => !r.noData && r.delta > 8).sort(_byDropdown),
+    strengths:    trendRows.filter(r => !r.noData && Math.abs(r.delta) <= 8 && r.tEnd >= 80).sort(_byDropdown),
+    qualitative:  trendRows.filter(r => r.noData).sort(_byDropdown),
+    needsSupport: trendRows.filter(r => !r.noData && r.delta < -8).sort(_byDropdown),
+    emerging:     trendRows.filter(r => !r.noData && Math.abs(r.delta) <= 8 && r.tEnd < 80).sort(_byDropdown),
     // Targets in qualitative that are actually quantitative (scores exist outside this period)
     quantitativeNoData: new Set(trendRows.filter(r => r.noData && quantitativeTargetNames.has(r.name)).map(r => r.name)),
   };
