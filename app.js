@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1534";
+const APP_VERSION = "1535";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -15533,6 +15533,9 @@ function initDragSort(listEl, onReorder) {
     const newOrder = [...listEl.children]
       .filter(el => el !== placeholder)
       .map(el => Number(el.dataset.idx));
+    // Scroll the dropped item into view immediately after compact→expanded transition
+    // so the viewport stays on the drop position instead of jerking back to item 1.
+    dragEl.scrollIntoView({ block: "nearest" });
     dragEl = null;
     placeholder = null;
     // Suppress the synthetic click that the browser fires at the drop position —
@@ -16303,7 +16306,8 @@ function renderTargetManageContent(student, target) {
     await saveTarget();
     const scrollPos = $("manage-modal-body").scrollTop;
     renderTargetManageContent(student, target);
-    $("manage-modal-body").scrollTop = scrollPos;
+    // Restore scroll after re-render via rAF so layout is settled before assignment.
+    requestAnimationFrame(() => { $("manage-modal-body").scrollTop = scrollPos; });
   });
 
   $("mn-t-name").addEventListener("blur", async () => {
