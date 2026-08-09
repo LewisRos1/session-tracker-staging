@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1529";
+const APP_VERSION = "1530";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6275,7 +6275,8 @@ function renderManageActivityScreen(student) {
 
   html += `<div style="margin-top:2.5rem;border:1.5px solid #fca5a5;border-radius:.6rem;padding:1rem 1.2rem;background:#fff5f5">
     <div style="font-size:.75rem;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:.07em;margin-bottom:.3rem">⚠️ Danger Zone</div>
-    <div style="font-size:.82rem;color:#6b7280;margin-bottom:.8rem">Permanently deletes this target and <strong style="color:#374151">all</strong> its session data across every date. This cannot be undone.</div>
+    <div style="font-size:.82rem;color:#6b7280;margin-bottom:.55rem">Permanently deletes this target and <strong style="color:#374151">all</strong> its session data across every date. This cannot be undone.</div>
+    <div id="ma-danger-sessions" style="margin-bottom:.75rem;font-size:.82rem;color:#9ca3af">Loading session data…</div>
     <button id="btn-ma-delete-target" style="width:100%;padding:.6rem;background:#dc2626;color:#fff;border:none;border-radius:.4rem;cursor:pointer;font-size:.875rem;font-weight:600">🗑️ Delete Target</button>
   </div>`;
 
@@ -6300,8 +6301,42 @@ function renderManageActivityScreen(student) {
 
   body.querySelector("#btn-ma-discontinue-target").addEventListener("click", () => handleDiscontinueTarget(student, target, false));
 
+  // Async fill: load the last 5 sessions with data for this target and show them
+  // in the Danger Zone inline, so the boss sees what they're deleting before clicking.
+  let _dangerSessionCount = null;
+  getAllSessionsForStudent(student.id).then(allSessions => {
+    const el = body.querySelector("#ma-danger-sessions");
+    if (!el) return;
+    const withData = allSessions.filter(s => {
+      const ids = Object.entries(s.activities || {}).filter(([, a]) => a.targetName === target.name).map(([id]) => id);
+      return ids.some(actId => Object.values(s.remarks || {}).some(r =>
+        r.activityId === actId && (
+          (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
+          (r.masteryNote || "").trim().length > 0 ||
+          (r.trials || []).some(t => t !== null && t !== -1) ||
+          (r.optionScore !== undefined && r.optionScore !== null)
+        )
+      ));
+    }).sort((a, b) => b.date.localeCompare(a.date));
+    const recent = withData.slice(0, 5);
+    const total  = withData.length;
+    _dangerSessionCount = total;
+    if (total === 0) {
+      el.innerHTML = `<span style="color:#9ca3af;font-style:italic">No session data recorded for this target yet.</span>`;
+    } else {
+      el.innerHTML = `<div style="color:#6b7280;margin-bottom:.3rem">Last ${Math.min(total, 5)} session${recent.length !== 1 ? 's' : ''} with data${total > 5 ? ` (of ${total} total)` : ''}:</div>
+        <ul style="margin:.15rem 0 0 1.1rem;padding:0;color:#374151;line-height:1.75">
+          ${recent.map(s => `<li>${fmtPeriodDate(s.date)}${s.number ? ` — Session ${s.number}` : ''}</li>`).join('')}
+          ${total > 5 ? `<li style="color:#9ca3af;font-style:italic">…and ${total - 5} more</li>` : ''}
+        </ul>`;
+    }
+  }).catch(() => {
+    const el = body.querySelector("#ma-danger-sessions");
+    if (el) el.innerHTML = '';
+  });
+
   body.querySelector("#btn-ma-delete-target").addEventListener("click", async () => {
-    const confirmed = await showDeleteTargetConfirm(student, target);
+    const confirmed = await showDeleteTargetConfirm(student, target, _dangerSessionCount);
     if (!confirmed) return;
     student.targets = student.targets.filter(t => t.id !== target.id);
     student.targets.forEach((t, i) => t.order = i);
@@ -14841,42 +14876,19 @@ function renderTargetReorderList(student) {
   });
 }
 
-async function showDeleteTargetConfirm(student, target) {
-  const allSessions = await getAllSessionsForStudent(student.id);
-  const sessionsWithData = allSessions.filter(s => {
-    const sActs = s.activities || {};
-    const sRems = s.remarks || {};
-    const ids = Object.entries(sActs).filter(([, a]) => a.targetName === target.name).map(([id]) => id);
-    return ids.some(actId => Object.values(sRems).some(r =>
-      r.activityId === actId && (
-        (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
-        (r.masteryNote || "").trim().length > 0 ||
-        (r.trials || []).some(t => t !== null && t !== -1) ||
-        (r.optionScore !== undefined && r.optionScore !== null)
-      )
-    ));
-  }).sort((a, b) => b.date.localeCompare(a.date));
-
-  const recent = sessionsWithData.slice(0, 5);
-  const total  = sessionsWithData.length;
-
-  const bulletList = total > 0
-    ? `<div style="font-size:.82rem;color:#6b7280;margin:.25rem 0 .2rem">Last ${Math.min(total, 5)} session${recent.length !== 1 ? 's' : ''} with data${total > 5 ? ` (of ${total} total)` : ''}:</div>
-       <ul style="margin:.2rem 0 .75rem 1.1rem;padding:0;font-size:.83rem;color:#374151;line-height:1.7">
-         ${recent.map(s => `<li>${fmtPeriodDate(s.date)}${s.number ? ` (Session ${s.number})` : ''}</li>`).join('')}
-         ${total > 5 ? `<li style="color:#9ca3af;font-style:italic">…and ${total - 5} more</li>` : ''}
-       </ul>`
-    : `<div style="font-size:.83rem;color:#9ca3af;font-style:italic;margin:.25rem 0 .75rem">No session data recorded for this target yet.</div>`;
+function showDeleteTargetConfirm(student, target, sessionCount) {
+  const countLine = sessionCount === null
+    ? `All session data for <strong>"${escHtml(target.name)}"</strong> will be permanently deleted. Are you sure?`
+    : sessionCount === 0
+      ? `<strong>"${escHtml(target.name)}"</strong> has no session data. It will be permanently deleted. Are you sure?`
+      : `<strong>${sessionCount} session${sessionCount !== 1 ? 's' : ''}</strong> of data for <strong>"${escHtml(target.name)}"</strong> will be permanently deleted. Are you sure?`;
 
   return new Promise(resolve => {
     const overlay = document.createElement("div");
     overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem";
-    overlay.innerHTML = `<div style="background:#fff;border-radius:.75rem;padding:1.5rem;max-width:380px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.22)">
+    overlay.innerHTML = `<div style="background:#fff;border-radius:.75rem;padding:1.5rem;max-width:360px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.22)">
       <div style="font-size:.93rem;font-weight:700;color:#dc2626;margin-bottom:.5rem">🗑️ Delete Target</div>
-      <div style="font-size:.85rem;color:#374151;line-height:1.5;margin-bottom:.5rem">
-        <strong>"${escHtml(target.name)}"</strong> and all its session data will be permanently deleted. This cannot be undone.
-      </div>
-      ${bulletList}
+      <div style="font-size:.85rem;color:#374151;line-height:1.5;margin-bottom:.9rem">${countLine}</div>
       <div style="font-size:.82rem;font-weight:600;color:#374151;margin-bottom:.35rem">Type <strong>DELETE</strong> to confirm:</div>
       <input id="del-tgt-inp" type="text" autocomplete="off"
         style="width:100%;box-sizing:border-box;padding:.45rem .6rem;border:2px solid #d1d5db;border-radius:.4rem;font-size:1rem;text-align:center;outline:none;margin-bottom:.75rem" placeholder="DELETE">
