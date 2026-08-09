@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1530";
+const APP_VERSION = "1531";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -7738,6 +7738,14 @@ function updateSessionHeader() {
 // list, and the Word/Excel exports — keeps display order consistent with
 // whatever the boss last dragged it to, falling back to alphabetical for
 // any target predating the order field.
+function uniqueTargetName(existingTargets, baseName) {
+  const names = new Set(existingTargets.map(t => t.name));
+  if (!names.has(baseName)) return baseName;
+  let n = 1;
+  while (names.has(`${baseName} (${n})`)) n++;
+  return `${baseName} (${n})`;
+}
+
 function sortTargetsByOrder(targets) {
   return [...targets].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
 }
@@ -14508,17 +14516,11 @@ function showGroupDupFromCurrent(group) {
     const checked = [...$("manage-modal-body").querySelectorAll(".gdup-target-cb:checked")];
     if (!checked.length) { alert("Select at least one target to duplicate."); return; }
     const sources = checked.map(cb => group.targets.find(t => t.id === cb.dataset.targetId)).filter(Boolean);
-    const existing = new Set(group.targets.map(t => t.name));
-    const conflicts = sources.filter(s => existing.has(s.name + " (duplicate)"));
-    if (conflicts.length) {
-      alert(`Cannot duplicate — a target named "${conflicts[0].name} (duplicate)" already exists. Rename it first via Edit Target, then try again.`);
-      return;
-    }
     $("manage-modal").classList.add("hidden");
     let lastAdded = null;
     for (const source of sources) {
       const copy = JSON.parse(JSON.stringify(source));
-      copy.id = cfgId("gt"); copy.name = source.name + " (duplicate)"; copy.order = group.targets.length;
+      copy.id = cfgId("gt"); copy.name = uniqueTargetName(group.targets, source.name); copy.order = group.targets.length;
       group.targets.push(copy);
       lastAdded = copy;
     }
@@ -14577,17 +14579,11 @@ function showGroupDupFromOtherPickTarget(group, sourceGroup) {
     const checked = [...$("manage-modal-body").querySelectorAll(".gother-target-cb:checked")];
     if (!checked.length) { alert("Select at least one target."); return; }
     const sources = checked.map(cb => sorted.find(t => t.id === cb.dataset.targetId)).filter(Boolean);
-    const existing = new Set(group.targets.map(t => t.name));
-    const conflicts = sources.filter(s => existing.has(s.name + " (duplicate)"));
-    if (conflicts.length) {
-      alert(`Cannot duplicate — a target named "${conflicts[0].name} (duplicate)" already exists. Rename it first via Edit Target, then try again.`);
-      return;
-    }
     $("manage-modal").classList.add("hidden");
     let lastAdded = null;
     for (const source of sources) {
       const copy = JSON.parse(JSON.stringify(source));
-      copy.id = cfgId("gt"); copy.name = source.name + " (duplicate)"; copy.order = group.targets.length; copy.isStructured = true;
+      copy.id = cfgId("gt"); copy.name = uniqueTargetName(group.targets, source.name); copy.order = group.targets.length; copy.isStructured = true;
       group.targets.push(copy);
       lastAdded = copy;
     }
@@ -14626,7 +14622,7 @@ function showGroupDupFromTemplate(group) {
       const tmpl = state.templates.find(t => t.id === cb.dataset.tmplId);
       if (!tmpl) continue;
       const copy = {
-        id: cfgId("gt"), name: tmpl.name, maxPoints: tmpl.maxPoints || 3,
+        id: cfgId("gt"), name: uniqueTargetName(group.targets, tmpl.name), maxPoints: tmpl.maxPoints || 3,
         hasComment: false, fullName: "", order: group.targets.length,
         predefinedActivities: JSON.parse(JSON.stringify(tmpl.predefinedActivities || [])),
         notes: JSON.parse(JSON.stringify(tmpl.notes || [])), isStructured: true
@@ -15087,18 +15083,12 @@ function showDupFromCurrentStudent(student) {
     const checked = [...$("manage-modal-body").querySelectorAll(".dup-target-cb:checked")];
     if (!checked.length) { alert("Select at least one target to duplicate."); return; }
     const sources = checked.map(cb => student.targets.find(t => t.id === cb.dataset.targetId)).filter(Boolean);
-    const existing = new Set(student.targets.map(t => t.name));
-    const conflicts = sources.filter(s => existing.has(s.name + " (duplicate)"));
-    if (conflicts.length) {
-      alert(`Cannot duplicate — a target named "${conflicts[0].name} (duplicate)" already exists. Rename it first via Edit Target, then try again.`);
-      return;
-    }
     $("manage-modal").classList.add("hidden");
     let lastAdded = null;
     for (const source of sources) {
       const copy = JSON.parse(JSON.stringify(source));
       copy.id         = cfgId("t");
-      copy.name       = source.name + " (duplicate)";
+      copy.name       = uniqueTargetName(student.targets, source.name);
       copy.order      = student.targets.length;
       copy.templateId = null;
       student.targets.push(copy);
@@ -15193,18 +15183,12 @@ function showDupFromOtherStudent_pickTarget(student, sourceStudent) {
     const checked = [...$("manage-modal-body").querySelectorAll(".other-target-cb:checked")];
     if (!checked.length) { alert("Select at least one target to duplicate."); return; }
     const sources = checked.map(cb => sourceStudent.targets.find(t => t.id === cb.dataset.targetId)).filter(Boolean);
-    const existing = new Set(student.targets.map(t => t.name));
-    const conflicts = sources.filter(s => existing.has(s.name + " (duplicate)"));
-    if (conflicts.length) {
-      alert(`Cannot duplicate — a target named "${conflicts[0].name} (duplicate)" already exists. Rename it first via Edit Target, then try again.`);
-      return;
-    }
     $("manage-modal").classList.add("hidden");
     let lastAdded = null;
     for (const source of sources) {
       const copy = JSON.parse(JSON.stringify(source));
       copy.id           = cfgId("t");
-      copy.name         = source.name + " (duplicate)";
+      copy.name         = uniqueTargetName(student.targets, source.name);
       copy.order        = student.targets.length;
       copy.templateId   = null;
       copy.isStructured = true;
@@ -15250,7 +15234,7 @@ function showDupFromTemplate(student) {
       const tmpl = state.templates.find(t => t.id === cb.dataset.tmplId);
       if (!tmpl) continue;
       const copy = {
-        id: cfgId("t"), name: tmpl.name,
+        id: cfgId("t"), name: uniqueTargetName(student.targets, tmpl.name),
         maxPoints: tmpl.maxPoints || 3,
         hasComment: false, fullName: "",
         order: student.targets.length,
