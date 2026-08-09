@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1541";
+const APP_VERSION = "1542";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3474,7 +3474,6 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
   }
   trendRows.sort((a, b) => (b.delta ?? -Infinity) - (a.delta ?? -Infinity));
 
-  const categorized = {
   const _targetPos = {};
   (student.targets || []).forEach((t, i) => { _targetPos[t.name] = i; });
   const _byDropdown = (a, b) => ((_targetPos[a.name] ?? 999) - (_targetPos[b.name] ?? 999));
