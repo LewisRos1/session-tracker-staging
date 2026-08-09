@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1542";
+const APP_VERSION = "1543";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -4708,6 +4708,9 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 0, after: 280 } }));
   paragraphs.push(mkPara("Overall Progress", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true, pageBreak: true }));
   const chartTrendRows = [...trendRows.filter(r => !r.noData)].sort((a, b) => b.delta - a.delta);
+  const _wordTargetPos = {};
+  (student.targets || []).forEach((t, i) => { _wordTargetPos[t.name] = i; });
+  const sectionTrendRows = [...trendRows.filter(r => !r.noData)].sort((a, b) => ((_wordTargetPos[a.name] ?? 999) - (_wordTargetPos[b.name] ?? 999)));
   const ovTitle = `${student.name} (${monthRange} ${year} Progress)`;
   const ovDrawFn = hyrDrawOverviewChartC;
   const ovNativeW = 700;
@@ -4784,12 +4787,12 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     { after: 280, align: AlignmentType.JUSTIFIED }
   ));
   paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 0, after: 280 } }));
-  if (chartTrendRows.length) paragraphs.push(...targetSectionParas(chartTrendRows));
+  if (sectionTrendRows.length) paragraphs.push(...targetSectionParas(sectionTrendRows));
   else paragraphs.push(mkPara("No targets with sufficient data this term.", { italics: true, color: "9CA3AF" }));
 
   // Qualitative targets — continued numbering inline after numeric targets
   if (categorized.qualitative.length) {
-    const offset = chartTrendRows.length;
+    const offset = sectionTrendRows.length;
     categorized.qualitative.forEach((r, i) => {
       paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 280, after: 0 } }));
       const qualLabel = categorized.quantitativeNoData.has(r.name) ? "(No Data This Period)" : "(Qualitative)";
@@ -4826,8 +4829,9 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
       mkCell("Details", { bold: true, bg: HDR, size: 22, dxa: 5616, align: AlignmentType.CENTER }),
       mkCell("Recommendations & Strategies", { bold: true, bg: HDR, size: 22, dxa: 5616, align: AlignmentType.CENTER })
     ]});
-    apNumRefs = (parsed.actionPlanRows || []).map((_, i) => `hyr-ap-${i}`);
-    const dataRows = (parsed.actionPlanRows || []).map((r, idx) => {
+    const _apRows = [...(parsed.actionPlanRows || [])].sort((a, b) => ((_wordTargetPos[a.target] ?? 999) - (_wordTargetPos[b.target] ?? 999)));
+    apNumRefs = _apRows.map((_, i) => `hyr-ap-${i}`);
+    const dataRows = _apRows.map((r, idx) => {
       const pts        = (r.points || []).slice(0, 2);
       const targetText = qualSet.has(r.target) ? `${r.target || ""} ${categorized.quantitativeNoData.has(r.target) ? "(No Data This Period)" : "(Qualitative)"}` : r.target || "";
       const detailParas = pts.length
