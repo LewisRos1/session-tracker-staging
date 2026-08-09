@@ -1900,7 +1900,7 @@ function wordTargetRows(target, session, allTargets) {
         continue;
       }
       const subPa = (target.predefinedActivities || []).find(p => p.name === act.activityName);
-      const subStarter = (subPa?.inlineOptions || subPa?.remarkPresetId || subPa?.remarkHasNote) ? (subPa?.sentenceStarter || null) : null;
+      const subStarter = (subPa?.inlineOptions || subPa?.remarkPresetId || subPa?.remarkHasNote) ? ((subPa?.sentenceStarter && subPa.sentenceStarter !== "—") ? subPa.sentenceStarter : null) : null;
       let subFirst = true;
       for (const rem of subRemarks) {
         const validTrials = allScores(rem);
@@ -1925,7 +1925,7 @@ function wordTargetRows(target, session, allTargets) {
 
     const remarks = getRemarksForActivity(session, act.id).filter(hasRemarkContent);
     const _starterPa = (target.predefinedActivities || []).find(p => !p.isHeading && !p.isNote && p.name === act.activityName);
-    const starter = (_starterPa?.inlineOptions || _starterPa?.remarkPresetId || _starterPa?.remarkHasNote) ? (_starterPa?.sentenceStarter || null) : null;
+    const starter = (_starterPa?.inlineOptions || _starterPa?.remarkPresetId || _starterPa?.remarkHasNote) ? ((_starterPa?.sentenceStarter && _starterPa.sentenceStarter !== "—") ? _starterPa.sentenceStarter : null) : null;
 
     if (remarks.length === 0) {
       rows.push({ cells: [activityLabel, act.isMaintained ? "Maintain" : "", ""], actLines: buildActLines(act, activityLabel), isGray: act.isGray, isGreen: act.isGreen });
@@ -2731,7 +2731,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, mastere
         }
         const subRemarks = getRemarksForActivity(session, act.id).filter(hasRemarkContent);
         const subPa = (target.predefinedActivities || []).find(p => p.name === act.activityName);
-        const subStarter = (subPa?.inlineOptions || subPa?.remarkPresetId || subPa?.remarkHasNote) ? (subPa?.sentenceStarter || null) : null;
+        const subStarter = (subPa?.inlineOptions || subPa?.remarkPresetId || subPa?.remarkHasNote) ? ((subPa?.sentenceStarter && subPa.sentenceStarter !== "—") ? subPa.sentenceStarter : null) : null;
         if (subRemarks.length === 0) {
           const r = blankRow(); r[1] = subCell; rows.push(r);
         } else {
