@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1533";
+const APP_VERSION = "1534";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6085,7 +6085,7 @@ function maKebabOptions(pa, tName, isParent = false) {
 
 function openManageActivityScreen(student) {
   const sub = $("manage-activity-subtitle");
-  if (sub) sub.textContent = student.name;
+  if (sub) sub.textContent = student.name + (student.note ? ' ' + student.note : '');
   showScreen("screen-manage-activity");
   $("btn-manage-activity-back").onclick = showHome;
   // Hide the old header button — the button is now inline next to the dropdown
@@ -6560,7 +6560,7 @@ function showStudentChoice(student) {
   // Pre-fetch sessions as soon as the picker opens so the tick marks are
   // ready by the time the user navigates to "Pick A Date".
   const sessionsFetch = getRecentSessionsForStudent(student.id);
-  $("session-picker-title").textContent = student.name;
+  $("session-picker-title").textContent = student.name + (student.note ? ' ' + student.note : '');
   $("session-picker-list").innerHTML = `
     <div class="choice-list">
       <button class="choice-btn choice-today">
@@ -6628,7 +6628,7 @@ function showStudentChoice(student) {
 
 
     const renderDateStep = () => {
-      $("session-picker-title").textContent = student.name;
+      $("session-picker-title").textContent = student.name + (student.note ? ' ' + student.note : '');
       $("session-picker-list").innerHTML = `
         <div class="session-date-step">
           <p class="session-date-prompt">What date is this session for?</p>
@@ -6724,7 +6724,7 @@ function showStudentChoice(student) {
 
 // Page 1: month grid
 async function showSessionPicker(student) {
-  $("session-picker-title").textContent = student.name;
+  $("session-picker-title").textContent = student.name + (student.note ? ' ' + student.note : '');
   $("session-picker-list").innerHTML =
     `<div class="session-picker-loading">Loading sessions…</div>`;
   $("session-picker-modal").classList.remove("hidden");
@@ -6768,7 +6768,7 @@ async function showSessionPicker(student) {
 }
 
 function renderMonthGrid(student, byMonth, today, sessions) {
-  $("session-picker-title").textContent = student.name;
+  $("session-picker-title").textContent = student.name + (student.note ? ' ' + student.note : '');
 
   let html = `<div class="month-grid">
     <button class="month-grid-btn month-grid-btn-pickdate" data-action="pick-date">
@@ -7057,7 +7057,7 @@ function showGroupExportStudentPicker(group, mode) {
 // ─── GO TO ANOTHER SESSION ───────────────────────────────────
 // Opens session-picker starting at the current session's month.
 async function showGoToAnotherSession(student) {
-  $("session-picker-title").textContent = student.name;
+  $("session-picker-title").textContent = student.name + (student.note ? ' ' + student.note : '');
   $("session-picker-list").innerHTML = `<div class="session-picker-loading">Loading sessions…</div>`;
   $("session-picker-modal").classList.remove("hidden");
 
@@ -7105,7 +7105,7 @@ async function showGoToAnotherSession(student) {
 }
 
 function renderGoToMonthGrid(student, byMonth, today) {
-  $("session-picker-title").textContent = student.name;
+  $("session-picker-title").textContent = student.name + (student.note ? ' ' + student.note : '');
   let html = `<div class="month-grid">`;
   for (const month of byMonth.keys()) {
     const [name, year] = month.split(" ");
@@ -7152,7 +7152,7 @@ function renderGoToSessionsForMonth(student, month, monthSessions, byMonth, toda
 // jumps into live entry instead of View/Edit (openSession instead of
 // openSessionView) when a session is picked.
 async function showGoToAnotherSessionForEntry(student) {
-  $("session-picker-title").textContent = student.name;
+  $("session-picker-title").textContent = student.name + (student.note ? ' ' + student.note : '');
   $("session-picker-list").innerHTML = `<div class="session-picker-loading">Loading sessions…</div>`;
   $("session-picker-modal").classList.remove("hidden");
 
@@ -7199,7 +7199,7 @@ async function showGoToAnotherSessionForEntry(student) {
 }
 
 function renderGoToMonthGridEntry(student, byMonth, today, sessions) {
-  $("session-picker-title").textContent = student.name;
+  $("session-picker-title").textContent = student.name + (student.note ? ' ' + student.note : '');
   let html = `<div class="month-grid">
     <button class="month-grid-btn month-grid-btn-pickdate" data-action="pick-date">
       <span class="mgb-pickdate-label">Pick A Date</span>
@@ -7501,7 +7501,7 @@ async function openSession(student, existingSessionId = null, dateStr = null, pa
   state.renderPending      = false;
 
   showScreen("screen-session");
-  $("session-student-name").textContent = student.name;
+  $("session-student-name").textContent = student.name + (student.note ? ' ' + student.note : '');
   $("session-meta").textContent = "";
   $("target-content").innerHTML = `<div class="loading">Loading…</div>`;
   $("target-select").innerHTML  = `<option value="">— loading —</option>`;
@@ -10012,7 +10012,7 @@ async function openSessionView(student, sessionId) {
   state.viewActionsInFlight = 0;
 
   showScreen("screen-session-view");
-  $("view-student-name").textContent = student.name;
+  $("view-student-name").textContent = student.name + (student.note ? ' ' + student.note : '');
   $("view-session-meta").textContent = "";
   $("session-view-body").innerHTML = `<div class="loading">Loading…</div>`;
   _viewChkConfirmRole = null; clearTimeout(_viewChkConfirmTimer);
@@ -15299,7 +15299,7 @@ function wireStudentNameSection(student) {
 
 function renderStudentManageContent(student) {
   _pendingActsCleanup = null;
-  $("manage-modal-title").textContent = student.name;
+  $("manage-modal-title").textContent = student.name + (student.note ? ' ' + student.note : '');
   const isAssessment = student.type === "assessment";
 
   const html = `
@@ -15891,13 +15891,16 @@ function renderTargetManageContent(student, target) {
         <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
       </div>`;
     } else if (a.isMapped) {
+      manageActNo++;
       const mappedOptions = siblingTargets.map(t =>
         `<option value="${escHtml(t.id)}"${a.mappedTargetId === t.id ? " selected" : ""}>${escHtml(t.name)}</option>`
       ).join("");
 
       html += `<div class="admin-list-item" data-idx="${idx}">
         <span class="drag-handle">⠿</span>
-        <div style="flex:1;min-width:0">
+        <div style="flex:1;display:flex;gap:.5rem;align-items:flex-start">
+          <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;min-width:1.6rem;padding-top:.2rem">${manageActNo})</span>
+          <div style="flex:1;min-width:0">
           <div class="mn-act-compact-title">${paDisplayHtml(a, true)}</div>
           <div class="mn-act-body" style="display:flex;flex-direction:column;gap:.55rem">
             <div>
@@ -15935,11 +15938,13 @@ function renderTargetManageContent(student, target) {
               </select>
             </div>
           </div>
+          </div>
         </div>
         <div style="position:relative">
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:250px;overflow:hidden">
             <button class="mn-km-manage-act" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#0369a1">🪄 Manage Activity</button>
+            <button class="mn-km-convert-mapped" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#7c3aed">🔄 Convert to Regular Activity</button>
             <div style="display:flex;align-items:stretch">
               <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
               <span title="Permanently removes this activity and all of its session data. This cannot be undone." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
@@ -17328,6 +17333,17 @@ function renderTargetManageContent(student, target) {
       target.predefinedActivities = acts;
       await saveTarget();
       flashSaved(sel);
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-km-convert-mapped").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const idx = Number(btn.dataset.idx);
+      delete acts[idx].isMapped;
+      delete acts[idx].mappedTargetId;
+      target.predefinedActivities = acts;
+      await saveTarget();
+      renderTargetManageContent(student, target);
     });
   });
 
