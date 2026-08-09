@@ -2780,7 +2780,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, mastere
 
       const remarks = getRemarksForActivity(session, act.id).filter(hasRemarkContent);
       const _starterPaX = (target.predefinedActivities || []).find(p => !p.isHeading && !p.isNote && p.name === act.activityName);
-      const starter = (_starterPaX?.inlineOptions || _starterPaX?.remarkPresetId || _starterPaX?.remarkHasNote) ? (_starterPaX?.sentenceStarter || null) : null;
+      const starter = (_starterPaX?.inlineOptions || _starterPaX?.remarkPresetId || _starterPaX?.remarkHasNote) ? ((_starterPaX?.sentenceStarter && _starterPaX.sentenceStarter !== "—") ? _starterPaX.sentenceStarter : null) : null;
 
       if (remarks.length === 0) {
         if (act.isGray) grayRows.add(rows.length);
