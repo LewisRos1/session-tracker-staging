@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1525";
+const APP_VERSION = "1526";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -14187,7 +14187,7 @@ function showDatePickerOverlay({ heading, infoHtml, minDate, defaultDate, confir
       <label style="font-size:.82rem;font-weight:600;color:#374151;display:block;margin-bottom:.35rem">Please select the final date you want this ${dateLabel} to appear.</label>
       <style>#dp-date-inp::-webkit-calendar-picker-indicator{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}</style>
       <div style="position:relative;margin-bottom:1rem;border:1.5px solid #d1d5db;border-radius:.4rem;background:#fff;cursor:pointer">
-        <input type="date" id="dp-date-inp" value="${def}" min="${min}" style="position:absolute;inset:0;width:100%;height:100%;border:none;background:transparent;color:transparent;caret-color:transparent;outline:none;cursor:pointer;box-sizing:border-box">
+        <input type="date" id="dp-date-inp" value="${def}" min="${min}" style="position:absolute;inset:0;width:100%;height:100%;border:none;background:transparent;opacity:0;outline:none;cursor:pointer;box-sizing:border-box">
         <div id="dp-date-display" style="padding:.5rem .7rem;font-size:.95rem;color:#111;pointer-events:none;display:flex;align-items:center"><span id="dp-date-text">${defFormatted}</span><span style="margin-left:auto;padding-left:.5rem;font-size:1rem;color:#6b7280">🗓</span></div>
       </div>
       <div style="display:flex;gap:.6rem;justify-content:flex-end">
