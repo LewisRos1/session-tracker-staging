@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1527";
+const APP_VERSION = "1528";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6273,6 +6273,12 @@ function renderManageActivityScreen(student) {
       ${collapseSection('discontinued','🚩','#dc2626','#fff5f5','#fecaca',discontPas)}
     </div>`;
 
+  html += `<div style="margin-top:2.5rem;border:1.5px solid #fca5a5;border-radius:.6rem;padding:1rem 1.2rem;background:#fff5f5">
+    <div style="font-size:.75rem;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:.07em;margin-bottom:.3rem">⚠️ Danger Zone</div>
+    <div style="font-size:.82rem;color:#6b7280;margin-bottom:.8rem">Permanently deletes this target and <strong style="color:#374151">all</strong> its session data across every date. This cannot be undone.</div>
+    <button id="btn-ma-delete-target" style="width:100%;padding:.6rem;background:#dc2626;color:#fff;border:none;border-radius:.4rem;cursor:pointer;font-size:.875rem;font-weight:600">🗑️ Delete Target</button>
+  </div>`;
+
   const isDiscontinued = !!target.discontinuedOn;
   const discBadge = isDiscontinued
     ? `<div style="font-size:.8rem;color:#dc2626;font-weight:600;padding:.2rem .1rem .4rem;display:flex;align-items:center;gap:.35rem">
@@ -6293,6 +6299,20 @@ function renderManageActivityScreen(student) {
   body.querySelector("#btn-ma-rearrange-inline").addEventListener("click", () => showTargetReorderList(student));
 
   body.querySelector("#btn-ma-discontinue-target").addEventListener("click", () => handleDiscontinueTarget(student, target, false));
+
+  body.querySelector("#btn-ma-delete-target").addEventListener("click", async () => {
+    const confirmed = await showDeleteTargetConfirm(student, target);
+    if (!confirmed) return;
+    student.targets = student.targets.filter(t => t.id !== target.id);
+    student.targets.forEach((t, i) => t.order = i);
+    if (_maSelectedTargetIdx >= student.targets.length) _maSelectedTargetIdx = Math.max(0, student.targets.length - 1);
+    const si = state.students.findIndex(s => s.id === student.id);
+    if (si >= 0) state.students[si] = student;
+    if (state.selectedTargetName === target.name) state.selectedTargetName = student.targets[0]?.name || null;
+    await saveStudent(student);
+    await deleteTargetDataFromSessions(student.id, target.name);
+    renderManageActivityScreen(student);
+  });
 
   document.getElementById("ma-target-select").addEventListener("change", function() {
     _maSelectedTargetIdx = parseInt(this.value, 10);
@@ -14821,6 +14841,67 @@ function renderTargetReorderList(student) {
   });
 }
 
+async function showDeleteTargetConfirm(student, target) {
+  const allSessions = await getAllSessionsForStudent(student.id);
+  const sessionsWithData = allSessions.filter(s => {
+    const sActs = s.activities || {};
+    const sRems = s.remarks || {};
+    const ids = Object.entries(sActs).filter(([, a]) => a.targetName === target.name).map(([id]) => id);
+    return ids.some(actId => Object.values(sRems).some(r =>
+      r.activityId === actId && (
+        (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
+        (r.masteryNote || "").trim().length > 0 ||
+        (r.trials || []).some(t => t !== null && t !== -1) ||
+        (r.optionScore !== undefined && r.optionScore !== null)
+      )
+    ));
+  }).sort((a, b) => b.date.localeCompare(a.date));
+
+  const recent = sessionsWithData.slice(0, 5);
+  const total  = sessionsWithData.length;
+
+  const bulletList = total > 0
+    ? `<div style="font-size:.82rem;color:#6b7280;margin:.25rem 0 .2rem">Last ${Math.min(total, 5)} session${recent.length !== 1 ? 's' : ''} with data${total > 5 ? ` (of ${total} total)` : ''}:</div>
+       <ul style="margin:.2rem 0 .75rem 1.1rem;padding:0;font-size:.83rem;color:#374151;line-height:1.7">
+         ${recent.map(s => `<li>${fmtPeriodDate(s.date)}${s.number ? ` (Session ${s.number})` : ''}</li>`).join('')}
+         ${total > 5 ? `<li style="color:#9ca3af;font-style:italic">…and ${total - 5} more</li>` : ''}
+       </ul>`
+    : `<div style="font-size:.83rem;color:#9ca3af;font-style:italic;margin:.25rem 0 .75rem">No session data recorded for this target yet.</div>`;
+
+  return new Promise(resolve => {
+    const overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem";
+    overlay.innerHTML = `<div style="background:#fff;border-radius:.75rem;padding:1.5rem;max-width:380px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.22)">
+      <div style="font-size:.93rem;font-weight:700;color:#dc2626;margin-bottom:.5rem">🗑️ Delete Target</div>
+      <div style="font-size:.85rem;color:#374151;line-height:1.5;margin-bottom:.5rem">
+        <strong>"${escHtml(target.name)}"</strong> and all its session data will be permanently deleted. This cannot be undone.
+      </div>
+      ${bulletList}
+      <div style="font-size:.82rem;font-weight:600;color:#374151;margin-bottom:.35rem">Type <strong>DELETE</strong> to confirm:</div>
+      <input id="del-tgt-inp" type="text" autocomplete="off"
+        style="width:100%;box-sizing:border-box;padding:.45rem .6rem;border:2px solid #d1d5db;border-radius:.4rem;font-size:1rem;text-align:center;outline:none;margin-bottom:.75rem" placeholder="DELETE">
+      <div style="display:flex;gap:.5rem">
+        <button id="del-tgt-cancel" style="flex:1;padding:.5rem;border:1px solid #d1d5db;border-radius:.4rem;background:#f9fafb;cursor:pointer;font-size:.9rem">Cancel</button>
+        <button id="del-tgt-ok" disabled style="flex:1;padding:.5rem;border:none;border-radius:.4rem;background:#dc2626;color:#fff;cursor:pointer;font-size:.9rem;font-weight:600;opacity:.4">Delete Forever</button>
+      </div>
+    </div>`;
+    document.body.appendChild(overlay);
+    const inp   = overlay.querySelector("#del-tgt-inp");
+    const okBtn = overlay.querySelector("#del-tgt-ok");
+    inp.focus();
+    inp.addEventListener("input", () => {
+      const ok = inp.value === "DELETE";
+      okBtn.disabled = !ok;
+      okBtn.style.opacity = ok ? "1" : ".4";
+    });
+    const finish = val => { overlay.remove(); document.removeEventListener("keydown", onKey); resolve(val); };
+    overlay.querySelector("#del-tgt-cancel").addEventListener("click", () => finish(false));
+    okBtn.addEventListener("click", () => finish(true));
+    const onKey = e => { if (e.key === "Escape") finish(false); };
+    document.addEventListener("keydown", onKey);
+  });
+}
+
 async function getLastSessionDateForTarget(studentId, targetName) {
   const allSessions = await getAllSessionsForStudent(studentId);
   const dates = allSessions.filter(s => {
@@ -16159,7 +16240,7 @@ function renderTargetManageContent(student, target) {
     <div style="margin-top:2rem;padding-bottom:1.5rem">
       <button class="btn-primary-sm" id="btn-mn-done-target"
         style="width:100%;padding:.75rem;margin-bottom:.75rem">Done</button>
-      <button class="btn-adm-danger" id="btn-mn-del-target">Delete This Target</button>
+      ${_groupForTargetEdit ? `<button class="btn-adm-danger" id="btn-mn-del-target">Delete This Target</button>` : ''}
     </div>`;
 
   const _discOpen = $("mn-discontinued-section")?.style.display === "block";
