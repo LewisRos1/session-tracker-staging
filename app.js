@@ -104,7 +104,7 @@ import {
 import {
   exportStudentData, exportAllStudents, exportGroupMemberData,
   exportStudentSingleSessionWord, exportGroupMemberSingleSessionWord,
-  renderActivityBreakdownChart
+  renderActivityBreakdownChart, calcDailyAverage
 } from "./export.js";
 
 // ── SW update detection — must run at parse time, before DOMContentLoaded,
@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1522";
+const APP_VERSION = "1523";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3200,7 +3200,9 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
 
       const avgs = [];
       for (const sess of mSessions) {
-        const avg = hyrCalcDailyAvg(sess, target, targets);
+        const snap = (sess.targetsSnapshot || []).find(t => t.name === target.name);
+        const eff = snap ? { ...target, maxPoints: snap.maxPoints ?? target.maxPoints } : target;
+        const avg = calcDailyAverage(sess, eff, targets);
         if (avg !== null) avgs.push(avg);
       }
       if (avgs.length === 0) { monthlyAvgs.push(`${mLabel}: no data`); chartValues.push(null); continue; }
@@ -3482,68 +3484,6 @@ function hyrLinearTrend(values) {
   return { tStart: clamp(intercept), tEnd: clamp(slope * (n - 1) + intercept) };
 }
 
-function hyrParseManualScore(val) {
-  if (!val) return null;
-  const s = String(val).trim();
-  const frac = s.match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/);
-  if (frac) { const d = parseFloat(frac[2]); return d === 0 ? null : parseFloat(frac[1]) / d * 100; }
-  const pct = s.match(/^(\d+(?:\.\d+)?)\s*%$/);
-  if (pct) return parseFloat(pct[1]);
-  const num = s.match(/^(\d+(?:\.\d+)?)$/);
-  if (num) return parseFloat(num[1]);
-  return null;
-}
-
-function hyrCalcDailyAvg(sess, target, allTargets = [], visited = new Set()) {
-  if (visited.has(target.name)) return null;
-  visited.add(target.name);
-  const snap = (sess.targetsSnapshot || []).find(t => t.name === target.name);
-  const mp = ((snap ? (snap.maxPoints ?? target.maxPoints) : target.maxPoints) || 3);
-  const sessionActs = Object.entries(sess.activities || {})
-    .filter(([, a]) => a.targetName === target.name)
-    .map(([id, a]) => ({ id, ...a }));
-
-  // Build PA config lookup — manualScore/isMapped/mappedTargetId live on the PA,
-  // not on the session activity document (session only stores targetName/activityName/order).
-  const paById = {}, paByName = {};
-  for (const pa of (target.predefinedActivities || [])) {
-    if (pa.id) paById[pa.id] = pa;
-    const key = pa.title || pa.name;
-    if (key) paByName[key] = pa;
-  }
-  const resolvePA = act => (act.configId && paById[act.configId]) || paByName[act.activityName] || {};
-
-  const avgs = [];
-  for (const act of sessionActs) {
-    if (act.isHeading || act.isNote || act.empty) continue;
-    const pa = resolvePA(act);
-    const isMapped = act.isMapped || pa.isMapped;
-    const isManual = act.manualScore || pa.manualScore;
-    if (isMapped) {
-      const mappedTargetId = act.mappedTargetId || pa.mappedTargetId;
-      const mappedTarget = mappedTargetId ? allTargets.find(t => t.id === mappedTargetId) : null;
-      if (!mappedTarget) continue;
-      const hasRem = Object.values(sess.remarks || {}).some(r => r.activityId === act.id);
-      if (!hasRem) continue;
-      const mapped = hyrCalcDailyAvg(sess, mappedTarget, allTargets, new Set(visited));
-      if (mapped !== null) avgs.push(mapped);
-      continue;
-    }
-    for (const rem of Object.values(sess.remarks || {})) {
-      if (rem.activityId !== act.id) continue;
-      if (isManual) {
-        const pct = hyrParseManualScore(hyrStripHtml(rem.text || "").trim());
-        if (pct !== null) avgs.push(pct);
-        continue;
-      }
-      const trials = (rem.trials || []).filter(t => t !== -1);
-      if (rem.optionScore !== undefined) trials.push(rem.optionScore);
-      if (trials.length === 0) continue;
-      avgs.push(trials.reduce((a, b) => a + b, 0) / (trials.length * mp) * 100);
-    }
-  }
-  return avgs.length > 0 ? avgs.reduce((a, b) => a + b, 0) / avgs.length : null;
-}
 
 function hyrStripActPrefix(name) {
   // Remove leading "1) ", "12) ", "a) ", "b) " prefixes, including stacked ones like "1) b) "
@@ -5159,8 +5099,13 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
 
     // Mini: this month vs last month + 1-month trend (2 points → direct delta)
     const allTargets = student.targets || [];
+    const snapAvg = (s, tgt) => {
+      const snap = (s.targetsSnapshot || []).find(t => t.name === tgt.name);
+      const eff = snap ? { ...tgt, maxPoints: snap.maxPoints ?? tgt.maxPoints } : tgt;
+      return calcDailyAverage(s, eff, allTargets);
+    };
     const computeAvg = sess => {
-      const avgs = sess.map(s => hyrCalcDailyAvg(s, target, allTargets)).filter(v => v !== null);
+      const avgs = sess.map(s => snapAvg(s, target)).filter(v => v !== null);
       return avgs.length ? Math.round(avgs.reduce((a,b)=>a+b,0)/avgs.length) : null;
     };
     const lastMonthAvg = computeAvg(lastMonthSessions);
@@ -5176,7 +5121,7 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
       let tm = month - offset, ty = year;
       if (tm <= 0) { tm += 12; ty--; }
       const tmSess = allSessions.filter(s => { const [sy,sm] = s.date.split("-").map(Number); return sy === ty && sm === tm; });
-      const avgs = tmSess.map(s => hyrCalcDailyAvg(s, target, allTargets)).filter(v => v !== null);
+      const avgs = tmSess.map(s => snapAvg(s, target)).filter(v => v !== null);
       tLabels.push(ABBRS[tm - 1]);
       tAvgs.push(avgs.length ? Math.round(avgs.reduce((a,b)=>a+b,0)/avgs.length) : null);
     }

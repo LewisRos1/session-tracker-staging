@@ -3095,7 +3095,7 @@ function calcRemarkAvg(trials, maxPoints) {
 // sibling target by id; group-member exports already pre-filter `session`
 // down to one student's remarks before this is ever called, so the
 // per-attendee semantics fall out for free without any export-side branching.
-function calcDailyAverage(session, target, allTargets = [], visited = new Set()) {
+export function calcDailyAverage(session, target, allTargets = [], visited = new Set()) {
   if (visited.has(target.id)) return null;
   visited.add(target.id);
 
