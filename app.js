@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1548";
+const APP_VERSION = "1549";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3468,7 +3468,7 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
       continue;
     }
     const nonNull = cd.values.filter(v => v !== null && v !== undefined);
-    if (nonNull.length < 2) {
+    if (nonNull.length === 0) {
       trendRows.push({ name: target.name, noData: true, delta: -Infinity, labels: cd.labels, values: cd.values });
       continue;
     }
