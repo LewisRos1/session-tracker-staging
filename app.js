@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1557";
+const APP_VERSION = "1558";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -4382,9 +4382,9 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
     categorized.qualitative.forEach((r, i) => {
       const hasObs = !!parsed.observed[r.name];
       const isQnoData = categorized.quantitativeNoData.has(r.name);
-      const badgeText = isQnoData && !hasObs ? "(No Trials and Remarks this Period)"
-        : isQnoData && hasObs ? "(No Trials this Period)"
-        : !isQnoData && !hasObs ? "(No Remarks this Period)"
+      const badgeText = isQnoData && !hasObs ? "(No Trials and Remarks were recorded this Period)"
+        : isQnoData && hasObs ? "(No Trials this Period, only Remarks were recorded)"
+        : !isQnoData && !hasObs ? "(No Remarks this Period, only Trials were recorded)"
         : "(Qualitative)";
       const badge = ` <span style='font-weight:400;font-size:.8rem;color:#6b7280'>${badgeText}</span>`;
       h += `<div style="margin-top:2rem">
@@ -4753,9 +4753,9 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
       paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 280, after: 0 } }));
       const _isQND = categorized.quantitativeNoData.has(r.name);
       const _hasObs = !!parsed.observed?.[r.name];
-      const qualLabel = _isQND && !_hasObs ? "(No Trials and Remarks this Period)"
-        : _isQND && _hasObs ? "(No Trials this Period)"
-        : !_isQND && !_hasObs ? "(No Remarks this Period)"
+      const qualLabel = _isQND && !_hasObs ? "(No Trials and Remarks were recorded this Period)"
+        : _isQND && _hasObs ? "(No Trials this Period, only Remarks were recorded)"
+        : !_isQND && !_hasObs ? "(No Remarks this Period, only Trials were recorded)"
         : "(Qualitative)";
       paragraphs.push(new Paragraph({ children: [new TextRun({ text: `${offset + i + 1}) ${r.name} ${qualLabel}`, bold: true, size: 24 })], spacing: { before: 0, after: 80, ...LS } }));
       const obs = parsed.observed?.[r.name];
