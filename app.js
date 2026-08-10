@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1545";
+const APP_VERSION = "1546";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3223,6 +3223,11 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
         const eff = snap ? { ...target, maxPoints: snap.maxPoints ?? target.maxPoints } : target;
         const avg = calcDailyAverage(sess, eff, targets);
         if (avg !== null) avgs.push(avg);
+        else {
+          const tActs = Object.entries(sess.activities || {}).filter(([, a]) => a.targetName === target.name).map(([id, a]) => ({ id, name: a.activityName, isPred: a.isPredefined, configId: a.configId }));
+          const tRems = Object.values(sess.remarks || {}).filter(r => tActs.some(a => a.id === r.activityId)).slice(0, 5).map(r => ({ actId: r.activityId, trials: r.trials, opt: r.optionScore, txt: (r.text || "").slice(0, 40) }));
+          console.log(`[HYR] null avg: target="${target.name}" sess=${sess.date} acts=`, tActs, "rems=", tRems, "eff.predActs=", (eff.predefinedActivities || []).slice(0, 3).map(p => ({ id: p.id, name: p.name, title: p.title, activeFrom: p.activeFrom, activeTo: p.activeTo })));
+        }
       }
       if (avgs.length === 0) { monthlyAvgs.push(`${mLabel}: no data`); chartValues.push(null); continue; }
       const monthAvg = Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length);
@@ -4888,7 +4893,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   };
 
   const docSections = [{ properties: {}, footers, headers, children: paragraphs }];
-  if (actionPlanParas.length) docSections.push({ properties: landscapeProps, footers, headers, children: actionPlanParas });
+  if (actionPlanParas.length) docSections.push({ properties: portraitProps, footers, headers, children: actionPlanParas });
   if (appendixParas.length) docSections.push({ properties: portraitProps, footers, headers, children: appendixParas });
 
   const doc = new Document({
