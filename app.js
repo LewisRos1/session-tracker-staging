@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1550";
+const APP_VERSION = "1551";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3011,19 +3011,13 @@ Write exactly 5 sentences summing up ${firstName}'s overall progress this term i
 ===END===
 
 ===KEY_INSIGHTS===
-Based on all session data and observations, write exactly 8 rows in this format — short, scannable, memorable:
+Based on all session data and observations, write 5 to 7 Biggest Win rows — you MUST write at least 5, no fewer. Short, scannable, memorable:
 ROW: Biggest Win | [2-4 word label — write it directly, no ** markers]: [One short sentence — the specific achievement. Must be data-backed. If no genuine win exists, name the smallest real positive.]
 ROW: Biggest Win | [2-4 word label — write it directly, no ** markers]: [One short sentence — a second genuine success from a different area. Must be real, not filler.]
 ROW: Biggest Win | [2-4 word label — write it directly, no ** markers]: [One short sentence — a third win. Only real positives — do not invent.]
 ROW: Biggest Win | [2-4 word label — write it directly, no ** markers]: [One short sentence — a fourth data-backed achievement.]
-ROW: Key Focus Area | [2-4 word label — write it directly, no ** markers]: [One short sentence — what specifically is difficult and why it needs focus next term.]
-ROW: Key Focus Strategy | [One short, practical recommendation — what parents or teachers can try to help with the focus area above. Plain English, no jargon.]
-ROW: Key Focus Area | [2-4 word label — write it directly, no ** markers]: [One short sentence — a second area that needs work, with a specific detail.]
-ROW: Key Focus Strategy | [One short, practical recommendation for the focus area above.]
-ROW: Key Focus Area | [2-4 word label — write it directly, no ** markers]: [One short sentence — a third area to address next term. Be specific.]
-ROW: Key Focus Strategy | [One short, practical recommendation for the focus area above.]
-ROW: Key Focus Area | [2-4 word label — write it directly, no ** markers]: [One short sentence — a fourth focus area with a specific detail.]
-ROW: Key Focus Strategy | [One short, practical recommendation for the focus area above.]
+ROW: Biggest Win | [2-4 word label — write it directly, no ** markers]: [One short sentence — a fifth win from a different area. Must be real and data-backed.]
+...add a 6th and 7th row if the data supports additional genuine wins...
 ===END===
 
 ${targetsWithData.map(r => `===OBSERVATION: ${r.name}===
@@ -3054,18 +3048,18 @@ Same rules: plain English, no jargon, no numbers, warm tone. Labels in ** bold. 
 ===ACTION_PLAN===
 Review the full session picture for ${firstName} across all targets and all remarks this term. Identify the most important areas to work on and the most helpful strategies.
 
-Write EXACTLY 5 to 7 FOCUS AREAS — you MUST write at least 5, no fewer. Each is one concise sentence naming the specific difficulty or gap observed. Do not group by target name — write each point as a standalone observation.
+Write EXACTLY 5 to 7 FOCUS AREAS — you MUST write at least 5, no fewer. Each uses this format: [2-4 word label]: [one concise sentence naming the specific difficulty or gap observed.] Do not group by target name — write each point as a standalone observation.
 
-Then write EXACTLY 5 to 7 RECOMMENDATIONS — you MUST write at least 5, no fewer. Each is one clear actionable sentence. They do not need to pair with the focus areas above.
+Then write EXACTLY 5 to 7 RECOMMENDATIONS — you MUST write at least 5, no fewer. Each uses this format: [2-4 word label]: [one clear actionable sentence.] They do not need to pair with the focus areas above.
 
 Format EXACTLY as:
 FOCUS_AREAS:
-1. [First focus area]
-2. [Second focus area]
+1. [label]: [focus area sentence]
+2. [label]: [focus area sentence]
 ...
 RECOMMENDATIONS:
-1. [First recommendation]
-2. [Second recommendation]
+1. [label]: [recommendation sentence]
+2. [label]: [recommendation sentence]
 ...
 ===END===`;
 
@@ -4357,20 +4351,12 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   if (unchartedNotes.length) {
     h += `<p style="font-size:11pt;color:#9ca3af;font-style:italic;margin:0 0 1.25rem">${unchartedNotes.map(esc).join(" &nbsp;&bull;&nbsp; ")}</p>`;
   }
-  if (parsed.biggestWins?.length || parsed.keyFocusAreas?.length) {
+  if (parsed.biggestWins?.length) {
     const fmtKI = s => { const c = s.replace(/\*\*/g, ""); const i = c.indexOf(': '); return i > 0 ? `<strong>${esc(c.slice(0,i))}</strong>: ${esc(c.slice(i+2))}` : esc(c); };
-    const bwItems = (parsed.biggestWins || []).map(s => `<li style="margin:.5rem 0;line-height:1.6">${fmtKI(s)}</li>`).join("");
-    const kfItems = (parsed.keyFocusAreas || []).map(s => `<li style="margin:.5rem 0;line-height:1.6">${fmtKI(s)}</li>`).join("");
-    h += `<p style="margin:1.25rem 0 .75rem;line-height:1.7">Below are the top 4 most important wins and the 4 most critical focus areas that ${esc(firstName)} needs support with.</p>`;
-    h += `<table style="width:100%;border-collapse:collapse;font-size:11pt;margin:1.25rem 0">
-      <tbody>
-      <tr style="background:#f3f4f6">
-        <th style="padding:.6rem .85rem;border:1px solid #e5e7eb;text-align:center;font-weight:700;width:28%">Category</th>
-        <th style="padding:.6rem .85rem;border:1px solid #e5e7eb;text-align:center;font-weight:700">Top 4 Highlights</th>
-      </tr>
-      <tr><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;font-weight:700;text-align:center;vertical-align:middle;width:28%;white-space:nowrap">Biggest Wins</td><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;vertical-align:top"><ol style="margin:0;padding-left:1.4rem">${bwItems}</ol></td></tr>
-      <tr><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;font-weight:700;text-align:center;vertical-align:middle;white-space:nowrap">Key Focus Areas</td><td style="padding:.6rem .85rem;border:1px solid #e5e7eb;vertical-align:top"><ol style="margin:0;padding-left:1.4rem">${kfItems}</ol></td></tr>
-    </tbody></table>`;
+    h += `<p style="font-weight:700;font-size:1.05rem;margin:1.5rem 0 .5rem">Biggest Wins</p>`;
+    parsed.biggestWins.forEach(s => {
+      h += `<p style="margin:.4rem 0;line-height:1.7;font-size:11pt">${fmtKI(s)}</p>`;
+    });
   }
 
   h += `<hr style="margin:2rem 0">`;
@@ -4412,13 +4398,14 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   const planSection = categorized.qualitative.length ? "5" : "4";
   h += `<h2 style="${SECTION_H2}">Section ${planSection}: Focus Areas &amp; Recommendations</h2>`;
   h += `<p style="margin:.6rem 0 1.2rem;font-size:11pt;line-height:1.7">This section outlines the key areas requiring the most attention, and practical recommendations to support ${esc(firstName)}'s progress going forward.</p>`;
+  const fmtAP = s => { const c = s.replace(/\*\*/g, ""); const ci = c.indexOf(': '); return ci > 0 ? `<strong>${esc(c.slice(0,ci))}</strong>: ${esc(c.slice(ci+2))}` : esc(c); };
   if (parsed.focusAreas?.length) {
     h += `<p style="font-weight:700;margin:1.2rem 0 .4rem">Focus Areas</p>`;
-    h += `<ol style="margin:0;padding-left:2.5rem;line-height:1.8;font-size:11pt">${parsed.focusAreas.map(f => `<li style="margin-bottom:.4rem">${esc(f)}</li>`).join("")}</ol>`;
+    h += `<ol style="margin:0;padding-left:2.5rem;line-height:1.8;font-size:11pt">${parsed.focusAreas.map(f => `<li style="margin-bottom:.4rem">${fmtAP(f)}</li>`).join("")}</ol>`;
   }
   if (parsed.recommendations?.length) {
     h += `<p style="font-weight:700;margin:2rem 0 .4rem">Recommendations</p>`;
-    h += `<ol style="margin:0;padding-left:2.5rem;line-height:1.8;font-size:11pt">${parsed.recommendations.map(r => `<li style="margin-bottom:.4rem">${esc(r)}</li>`).join("")}</ol>`;
+    h += `<ol style="margin:0;padding-left:2.5rem;line-height:1.8;font-size:11pt">${parsed.recommendations.map(r => `<li style="margin-bottom:.4rem">${fmtAP(r)}</li>`).join("")}</ol>`;
   }
 
   // Section 6: Appendix
@@ -4490,8 +4477,6 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun, LevelFormat,
           Table, TableRow, TableCell, WidthType, PageOrientation, SectionType, Header, Footer, PageNumber, VerticalAlign } = window.docx;
   const BULLET_REF   = "hyr-bullets";
-  const KI_NUM_REF   = "hyr-ki-numbered";
-  const KI_NUM_REF_2 = "hyr-ki-numbered-2";
   const LS = { line: 276, lineRule: "auto" };
 
   function b64ToUint8(b64) {
@@ -4736,38 +4721,17 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   }
   if (wAllNames.length) paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 200, after: 0 } }));
 
-  paragraphs.push(mkPara("Biggest Wins & Key Focus Areas", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true, keepNext: true, pageBreak: true }));
-  if ((parsed.biggestWins?.length || parsed.keyFocusAreas?.length)) {
-    const mkKiColorCell = (text, fill, textColor) => new TableCell({
-      width: { size: 28, type: WidthType.PERCENTAGE },
-      verticalAlign: VerticalAlign.CENTER,
-      shading: { fill },
-      margins: { top: 120, bottom: 120, left: 150, right: 150 },
-      children: [new Paragraph({ children: [new TextRun({ text, bold: true, size: 22, color: textColor })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })]
+  paragraphs.push(mkPara("Biggest Wins", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true, keepNext: true, pageBreak: true }));
+  if (parsed.biggestWins?.length) {
+    parsed.biggestWins.forEach(s => {
+      const c = s.replace(/\*\*/g, "");
+      const ci = c.indexOf(': ');
+      const runs = ci > 0
+        ? [new TextRun({ text: c.slice(0, ci), bold: true, size: 22 }), new TextRun({ text: ': ' + c.slice(ci + 2), size: 22 })]
+        : [new TextRun({ text: c, size: 22 })];
+      paragraphs.push(new Paragraph({ children: runs, alignment: AlignmentType.BOTH, spacing: { before: 60, after: 60, ...LS } }));
     });
-    const mkKiNumberedCell = (items, numRef = KI_NUM_REF, strategies = null) => new TableCell({
-      width: { size: 72, type: WidthType.PERCENTAGE },
-      margins: { top: 100, bottom: 100, left: 150, right: 150 },
-      children: items.length
-        ? items.flatMap((s, i) => {
-            const c = s.replace(/\*\*/g, "");
-            const ci = c.indexOf(': ');
-            const runs = ci > 0
-              ? [new TextRun({ text: c.slice(0, ci), bold: true, size: 22 }), new TextRun({ text: ': ' + c.slice(ci + 2), size: 22 })]
-              : [new TextRun({ text: c, size: 22 })];
-            const paras = [new Paragraph({ children: runs, numbering: { reference: numRef, level: 0 }, alignment: AlignmentType.BOTH, spacing: { before: 40, after: strategies ? 20 : 120, ...LS } })];
-            const strat = strategies?.[i] || "";
-            if (strat) paras.push(new Paragraph({ children: [new TextRun({ text: strat, size: 20, color: "9ca3af", italics: true })], alignment: AlignmentType.BOTH, spacing: { before: 0, after: 100, ...LS } }));
-            return paras;
-          })
-        : [new Paragraph({ children: [new TextRun({ text: "", size: 22 })], spacing: { before: 80, after: 80 } })]
-    });
-    const kiRows = [
-      new TableRow({ tableHeader: true, cantSplit: true, children: [mkKiColorCell("Biggest Wins",    "d1fae5", "16a34a"), mkKiNumberedCell(parsed.biggestWins    || [], KI_NUM_REF)] }),
-      new TableRow({                    cantSplit: true, children: [mkKiColorCell("Key Focus Areas",  "fef3c7", "d97706"), mkKiNumberedCell(parsed.keyFocusAreas  || [], KI_NUM_REF_2)] }),
-    ];
-    paragraphs.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: kiRows }));
-    paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 280, after: 0 } }));
+    paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 120, after: 0 } }));
   }
 
   // ── Section 2: Target Progress ──────────────────────────────
@@ -4809,13 +4773,23 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   if (parsed.focusAreas?.length) {
     actionPlanParas.push(mkPara("Focus Areas", { heading: HeadingLevel.HEADING_2, before: 0, after: 100, size: 26, bold: true }));
     parsed.focusAreas.forEach((pt, i) => {
-      actionPlanParas.push(new Paragraph({ numbering: { reference: "hyr-focus-list", level: 0 }, children: [new TextRun({ text: pt, size: 22 })], spacing: { before: i === 0 ? 80 : 60, after: 60, ...LS } }));
+      const c = pt.replace(/\*\*/g, "");
+      const ci = c.indexOf(': ');
+      const runs = ci > 0
+        ? [new TextRun({ text: c.slice(0, ci), bold: true, size: 22 }), new TextRun({ text: ': ' + c.slice(ci + 2), size: 22 })]
+        : [new TextRun({ text: c, size: 22 })];
+      actionPlanParas.push(new Paragraph({ numbering: { reference: "hyr-focus-list", level: 0 }, children: runs, spacing: { before: i === 0 ? 80 : 60, after: 60, ...LS } }));
     });
   }
   if (parsed.recommendations?.length) {
     actionPlanParas.push(mkPara("Recommendations", { heading: HeadingLevel.HEADING_2, before: 480, after: 100, size: 26, bold: true }));
     parsed.recommendations.forEach((pt, i) => {
-      actionPlanParas.push(new Paragraph({ numbering: { reference: "hyr-rec-list", level: 0 }, children: [new TextRun({ text: pt, size: 22 })], spacing: { before: i === 0 ? 80 : 60, after: 60, ...LS } }));
+      const c = pt.replace(/\*\*/g, "");
+      const ci = c.indexOf(': ');
+      const runs = ci > 0
+        ? [new TextRun({ text: c.slice(0, ci), bold: true, size: 22 }), new TextRun({ text: ': ' + c.slice(ci + 2), size: 22 })]
+        : [new TextRun({ text: c, size: 22 })];
+      actionPlanParas.push(new Paragraph({ numbering: { reference: "hyr-rec-list", level: 0 }, children: runs, spacing: { before: i === 0 ? 80 : 60, after: 60, ...LS } }));
     });
   }
 
@@ -4896,9 +4870,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   const doc = new Document({
     numbering: { config: [
       { reference: BULLET_REF, levels: [{ level: 0, format: LevelFormat?.BULLET ?? "bullet", text: "", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } }, run: { fonts: { ascii: "Wingdings", hAnsi: "Wingdings", hint: "default" }, size: 22 } } }] },
-      { reference: KI_NUM_REF,   levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 480, hanging: 240 } }, run: { size: 22 } } }] },
-      { reference: KI_NUM_REF_2, levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 480, hanging: 240 } }, run: { size: 22 } } }] },
-      ...(apNumRefs || []).map(ref => ({ reference: ref, levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } }, run: { size: 22 } } }] })),
+...(apNumRefs || []).map(ref => ({ reference: ref, levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } }, run: { size: 22 } } }] })),
     ] },
     sections: docSections
   });
