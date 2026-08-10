@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1546";
+const APP_VERSION = "1547";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3224,9 +3224,9 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
         const avg = calcDailyAverage(sess, eff, targets);
         if (avg !== null) avgs.push(avg);
         else {
-          const tActs = Object.entries(sess.activities || {}).filter(([, a]) => a.targetName === target.name).map(([id, a]) => ({ id, name: a.activityName, isPred: a.isPredefined, configId: a.configId }));
-          const tRems = Object.values(sess.remarks || {}).filter(r => tActs.some(a => a.id === r.activityId)).slice(0, 5).map(r => ({ actId: r.activityId, trials: r.trials, opt: r.optionScore, txt: (r.text || "").slice(0, 40) }));
-          console.log(`[HYR] null avg: target="${target.name}" sess=${sess.date} acts=`, tActs, "rems=", tRems, "eff.predActs=", (eff.predefinedActivities || []).slice(0, 3).map(p => ({ id: p.id, name: p.name, title: p.title, activeFrom: p.activeFrom, activeTo: p.activeTo })));
+          const tActs = Object.entries(sess.activities || {}).filter(([, a]) => a.targetName === target.name).map(([id, a]) => `${a.activityName}[id=${id},cfgId=${a.configId},isPred=${a.isPredefined}]`);
+          const tRems = Object.values(sess.remarks || {}).filter(r => Object.entries(sess.activities || {}).filter(([, a]) => a.targetName === target.name).some(([id]) => id === r.activityId)).slice(0, 8).map(r => `actId=${r.activityId} trials=${JSON.stringify(r.trials||[])} opt=${r.optionScore} txt="${(r.text||"").replace(/<[^>]*>/g,"").slice(0,30)}"`);
+          console.log(`[HYR] null: target="${target.name}" sess=${sess.date}\n  acts: ${tActs.join(" | ")||"(none)"}\n  rems: ${tRems.join(" | ")||"(none)"}`);
         }
       }
       if (avgs.length === 0) { monthlyAvgs.push(`${mLabel}: no data`); chartValues.push(null); continue; }
