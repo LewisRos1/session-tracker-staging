@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1544";
+const APP_VERSION = "1545";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -4803,19 +4803,17 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   // ── Section: Focus Areas (landscape) ─────────────
   const actionPlanParas = [];
   actionPlanParas.push(mkPara(`Section ${nextSectionNum}: Focus Areas & Recommendations`, { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
-  const apNumRefs = [];
+  const apNumRefs = ["hyr-focus-list", "hyr-rec-list"];
   if (parsed.focusAreas?.length) {
     actionPlanParas.push(mkPara("Focus Areas", { heading: HeadingLevel.HEADING_2, before: 0, after: 100, size: 26, bold: true }));
     parsed.focusAreas.forEach((pt, i) => {
-      apNumRefs.push(`hyr-ap-fa-${i}`);
-      actionPlanParas.push(new Paragraph({ numbering: { reference: `hyr-ap-fa-${i}`, level: 0 }, children: [new TextRun({ text: pt, size: 22 })], spacing: { before: i === 0 ? 60 : 20, after: 20, ...LS } }));
+      actionPlanParas.push(new Paragraph({ numbering: { reference: "hyr-focus-list", level: 0 }, children: [new TextRun({ text: pt, size: 22 })], spacing: { before: i === 0 ? 60 : 20, after: 20, ...LS } }));
     });
   }
   if (parsed.recommendations?.length) {
     actionPlanParas.push(mkPara("Recommendations", { heading: HeadingLevel.HEADING_2, before: 280, after: 100, size: 26, bold: true }));
     parsed.recommendations.forEach((pt, i) => {
-      apNumRefs.push(`hyr-ap-rec-${i}`);
-      actionPlanParas.push(new Paragraph({ numbering: { reference: `hyr-ap-rec-${i}`, level: 0 }, children: [new TextRun({ text: pt, size: 22 })], spacing: { before: i === 0 ? 60 : 20, after: 20, ...LS } }));
+      actionPlanParas.push(new Paragraph({ numbering: { reference: "hyr-rec-list", level: 0 }, children: [new TextRun({ text: pt, size: 22 })], spacing: { before: i === 0 ? 60 : 20, after: 20, ...LS } }));
     });
   }
 
