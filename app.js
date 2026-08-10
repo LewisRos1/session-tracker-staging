@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1547";
+const APP_VERSION = "1548";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3223,11 +3223,6 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
         const eff = snap ? { ...target, maxPoints: snap.maxPoints ?? target.maxPoints } : target;
         const avg = calcDailyAverage(sess, eff, targets);
         if (avg !== null) avgs.push(avg);
-        else {
-          const tActs = Object.entries(sess.activities || {}).filter(([, a]) => a.targetName === target.name).map(([id, a]) => `${a.activityName}[id=${id},cfgId=${a.configId},isPred=${a.isPredefined}]`);
-          const tRems = Object.values(sess.remarks || {}).filter(r => Object.entries(sess.activities || {}).filter(([, a]) => a.targetName === target.name).some(([id]) => id === r.activityId)).slice(0, 8).map(r => `actId=${r.activityId} trials=${JSON.stringify(r.trials||[])} opt=${r.optionScore} txt="${(r.text||"").replace(/<[^>]*>/g,"").slice(0,30)}"`);
-          console.log(`[HYR] null: target="${target.name}" sess=${sess.date}\n  acts: ${tActs.join(" | ")||"(none)"}\n  rems: ${tRems.join(" | ")||"(none)"}`);
-        }
       }
       if (avgs.length === 0) { monthlyAvgs.push(`${mLabel}: no data`); chartValues.push(null); continue; }
       const monthAvg = Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length);
