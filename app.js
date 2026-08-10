@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1556";
+const APP_VERSION = "1557";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -4382,7 +4382,11 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
     categorized.qualitative.forEach((r, i) => {
       const hasObs = !!parsed.observed[r.name];
       const isQnoData = categorized.quantitativeNoData.has(r.name);
-      const badge = isQnoData ? " <span style='font-weight:400;font-size:.8rem;color:#6b7280'>(No Data This Period)</span>" : " <span style='font-weight:400;font-size:.8rem;color:#6b7280'>(Qualitative)</span>";
+      const badgeText = isQnoData && !hasObs ? "(No Trials and Remarks this Period)"
+        : isQnoData && hasObs ? "(No Trials this Period)"
+        : !isQnoData && !hasObs ? "(No Remarks this Period)"
+        : "(Qualitative)";
+      const badge = ` <span style='font-weight:400;font-size:.8rem;color:#6b7280'>${badgeText}</span>`;
       h += `<div style="margin-top:2rem">
         <p style="font-weight:700;font-size:1rem;margin:0 0 .35rem">${ROMAN[i] || i + 1}. ${esc(r.name)}${badge}</p>
         ${hasObs ? obsHtml(parsed.observed[r.name]) : `<p style="color:#9ca3af;font-style:italic">${isQnoData ? "No scores recorded this period — see session notes." : "Tracked via session notes — no percentage scores recorded this period."}</p>`}
@@ -4747,7 +4751,12 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     const offset = sectionTrendRows.length;
     categorized.qualitative.forEach((r, i) => {
       paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 280, after: 0 } }));
-      const qualLabel = categorized.quantitativeNoData.has(r.name) ? "(No Data This Period)" : "(Qualitative)";
+      const _isQND = categorized.quantitativeNoData.has(r.name);
+      const _hasObs = !!parsed.observed?.[r.name];
+      const qualLabel = _isQND && !_hasObs ? "(No Trials and Remarks this Period)"
+        : _isQND && _hasObs ? "(No Trials this Period)"
+        : !_isQND && !_hasObs ? "(No Remarks this Period)"
+        : "(Qualitative)";
       paragraphs.push(new Paragraph({ children: [new TextRun({ text: `${offset + i + 1}) ${r.name} ${qualLabel}`, bold: true, size: 24 })], spacing: { before: 0, after: 80, ...LS } }));
       const obs = parsed.observed?.[r.name];
       if (obs) {
