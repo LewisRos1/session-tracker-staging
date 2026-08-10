@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1554";
+const APP_VERSION = "1555";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -4354,7 +4354,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   if (parsed.biggestWins?.length) {
     const fmtKI = s => { const c = s.replace(/\*\*/g, ""); const i = c.indexOf(': '); return i > 0 ? `<strong>${esc(c.slice(0,i))}</strong>: ${esc(c.slice(i+2))}` : esc(c); };
     h += `<p style="font-weight:700;font-size:1.05rem;margin:1.5rem 0 .5rem">Key Improvements</p>`;
-    h += `<ol style="margin:0;padding-left:2.5rem;line-height:1.8;font-size:11pt">${parsed.biggestWins.map(s => `<li style="margin-bottom:.4rem">${fmtKI(s)}</li>`).join("")}</ol>`;
+    h += `<ol style="margin:0;padding-left:2.5rem;line-height:1.8;font-size:11pt;text-align:justify">${parsed.biggestWins.map(s => `<li style="margin-bottom:.4rem">${fmtKI(s)}</li>`).join("")}</ol>`;
   }
 
   h += `<hr style="margin:2rem 0">`;
@@ -4399,11 +4399,11 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   const fmtAP = s => { const c = s.replace(/\*\*/g, ""); const ci = c.indexOf(': '); return ci > 0 ? `<strong>${esc(c.slice(0,ci))}</strong>: ${esc(c.slice(ci+2))}` : esc(c); };
   if (parsed.focusAreas?.length) {
     h += `<p style="font-weight:700;margin:1.2rem 0 .4rem">Focus Areas</p>`;
-    h += `<ol style="margin:0;padding-left:2.5rem;line-height:1.8;font-size:11pt">${parsed.focusAreas.map(f => `<li style="margin-bottom:.4rem">${fmtAP(f)}</li>`).join("")}</ol>`;
+    h += `<ol style="margin:0;padding-left:2.5rem;line-height:1.8;font-size:11pt;text-align:justify">${parsed.focusAreas.map(f => `<li style="margin-bottom:.4rem">${fmtAP(f)}</li>`).join("")}</ol>`;
   }
   if (parsed.recommendations?.length) {
     h += `<p style="font-weight:700;margin:2rem 0 .4rem">Recommendations</p>`;
-    h += `<ol style="margin:0;padding-left:2.5rem;line-height:1.8;font-size:11pt">${parsed.recommendations.map(r => `<li style="margin-bottom:.4rem">${fmtAP(r)}</li>`).join("")}</ol>`;
+    h += `<ol style="margin:0;padding-left:2.5rem;line-height:1.8;font-size:11pt;text-align:justify;color:#6b7280">${parsed.recommendations.map(r => `<li style="margin-bottom:.4rem">${fmtAP(r)}</li>`).join("")}</ol>`;
   }
 
   // Section 6: Appendix
@@ -4727,7 +4727,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
       const runs = ci > 0
         ? [new TextRun({ text: c.slice(0, ci), bold: true, size: 22 }), new TextRun({ text: ': ' + c.slice(ci + 2), size: 22 })]
         : [new TextRun({ text: c, size: 22 })];
-      paragraphs.push(new Paragraph({ numbering: { reference: "hyr-bw-list", level: 0 }, children: runs, spacing: { before: i === 0 ? 80 : 60, after: 60, ...LS } }));
+      paragraphs.push(new Paragraph({ numbering: { reference: "hyr-bw-list", level: 0 }, children: runs, alignment: AlignmentType.BOTH, spacing: { before: i === 0 ? 80 : 60, after: 60, ...LS } }));
     });
     paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 120, after: 0 } }));
   }
@@ -4776,7 +4776,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
       const runs = ci > 0
         ? [new TextRun({ text: c.slice(0, ci), bold: true, size: 22 }), new TextRun({ text: ': ' + c.slice(ci + 2), size: 22 })]
         : [new TextRun({ text: c, size: 22 })];
-      actionPlanParas.push(new Paragraph({ numbering: { reference: "hyr-focus-list", level: 0 }, children: runs, spacing: { before: i === 0 ? 80 : 60, after: 60, ...LS } }));
+      actionPlanParas.push(new Paragraph({ numbering: { reference: "hyr-focus-list", level: 0 }, children: runs, alignment: AlignmentType.BOTH, spacing: { before: i === 0 ? 80 : 60, after: 60, ...LS } }));
     });
   }
   if (parsed.recommendations?.length) {
@@ -4785,9 +4785,9 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
       const c = pt.replace(/\*\*/g, "");
       const ci = c.indexOf(': ');
       const runs = ci > 0
-        ? [new TextRun({ text: c.slice(0, ci), bold: true, size: 22 }), new TextRun({ text: ': ' + c.slice(ci + 2), size: 22 })]
-        : [new TextRun({ text: c, size: 22 })];
-      actionPlanParas.push(new Paragraph({ numbering: { reference: "hyr-rec-list", level: 0 }, children: runs, spacing: { before: i === 0 ? 80 : 60, after: 60, ...LS } }));
+        ? [new TextRun({ text: c.slice(0, ci), bold: true, size: 22, color: "6b7280" }), new TextRun({ text: ': ' + c.slice(ci + 2), size: 22, color: "6b7280" })]
+        : [new TextRun({ text: c, size: 22, color: "6b7280" })];
+      actionPlanParas.push(new Paragraph({ numbering: { reference: "hyr-rec-list", level: 0 }, children: runs, alignment: AlignmentType.BOTH, spacing: { before: i === 0 ? 80 : 60, after: 60, ...LS } }));
     });
   }
 
