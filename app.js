@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1549";
+const APP_VERSION = "1550";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3054,9 +3054,9 @@ Same rules: plain English, no jargon, no numbers, warm tone. Labels in ** bold. 
 ===ACTION_PLAN===
 Review the full session picture for ${firstName} across all targets and all remarks this term. Identify the most important areas to work on and the most helpful strategies.
 
-Write exactly 5 to 7 FOCUS AREAS — the most critical things to address. Each is one concise sentence naming the specific difficulty or gap observed. Do not group by target name — write each point as a standalone observation.
+Write EXACTLY 5 to 7 FOCUS AREAS — you MUST write at least 5, no fewer. Each is one concise sentence naming the specific difficulty or gap observed. Do not group by target name — write each point as a standalone observation.
 
-Then write exactly 5 to 7 RECOMMENDATIONS — practical strategies a therapist or teacher can use. Each is one clear actionable sentence. They do not need to pair with the focus areas above.
+Then write EXACTLY 5 to 7 RECOMMENDATIONS — you MUST write at least 5, no fewer. Each is one clear actionable sentence. They do not need to pair with the focus areas above.
 
 Format EXACTLY as:
 FOCUS_AREAS:
@@ -4411,13 +4411,14 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   // Section 5: Focus Areas & Recommendations
   const planSection = categorized.qualitative.length ? "5" : "4";
   h += `<h2 style="${SECTION_H2}">Section ${planSection}: Focus Areas &amp; Recommendations</h2>`;
+  h += `<p style="margin:.6rem 0 1.2rem;font-size:11pt;line-height:1.7">This section outlines the key areas requiring the most attention, and practical recommendations to support ${esc(firstName)}'s progress going forward.</p>`;
   if (parsed.focusAreas?.length) {
     h += `<p style="font-weight:700;margin:1.2rem 0 .4rem">Focus Areas</p>`;
-    h += `<ol style="margin:0;padding-left:1.4rem;line-height:1.8">${parsed.focusAreas.map(f => `<li>${esc(f)}</li>`).join("")}</ol>`;
+    h += `<ol style="margin:0;padding-left:2.5rem;line-height:1.8;font-size:11pt">${parsed.focusAreas.map(f => `<li style="margin-bottom:.4rem">${esc(f)}</li>`).join("")}</ol>`;
   }
   if (parsed.recommendations?.length) {
-    h += `<p style="font-weight:700;margin:1.2rem 0 .4rem">Recommendations</p>`;
-    h += `<ol style="margin:0;padding-left:1.4rem;line-height:1.8">${parsed.recommendations.map(r => `<li>${esc(r)}</li>`).join("")}</ol>`;
+    h += `<p style="font-weight:700;margin:2rem 0 .4rem">Recommendations</p>`;
+    h += `<ol style="margin:0;padding-left:2.5rem;line-height:1.8;font-size:11pt">${parsed.recommendations.map(r => `<li style="margin-bottom:.4rem">${esc(r)}</li>`).join("")}</ol>`;
   }
 
   // Section 6: Appendix
@@ -4800,20 +4801,21 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
 
   const nextSectionNum = 3;
 
-  // ── Section: Focus Areas (landscape) ─────────────
+  // ── Section: Focus Areas & Recommendations (portrait) ───────
   const actionPlanParas = [];
   actionPlanParas.push(mkPara(`Section ${nextSectionNum}: Focus Areas & Recommendations`, { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
+  actionPlanParas.push(new Paragraph({ children: [new TextRun({ text: `This section outlines the key areas requiring the most attention, and practical recommendations to support ${firstName}'s progress going forward.`, size: 22 })], spacing: { before: 0, after: 200, ...LS } }));
   const apNumRefs = ["hyr-focus-list", "hyr-rec-list"];
   if (parsed.focusAreas?.length) {
     actionPlanParas.push(mkPara("Focus Areas", { heading: HeadingLevel.HEADING_2, before: 0, after: 100, size: 26, bold: true }));
     parsed.focusAreas.forEach((pt, i) => {
-      actionPlanParas.push(new Paragraph({ numbering: { reference: "hyr-focus-list", level: 0 }, children: [new TextRun({ text: pt, size: 22 })], spacing: { before: i === 0 ? 60 : 20, after: 20, ...LS } }));
+      actionPlanParas.push(new Paragraph({ numbering: { reference: "hyr-focus-list", level: 0 }, children: [new TextRun({ text: pt, size: 22 })], spacing: { before: i === 0 ? 80 : 60, after: 60, ...LS } }));
     });
   }
   if (parsed.recommendations?.length) {
-    actionPlanParas.push(mkPara("Recommendations", { heading: HeadingLevel.HEADING_2, before: 280, after: 100, size: 26, bold: true }));
+    actionPlanParas.push(mkPara("Recommendations", { heading: HeadingLevel.HEADING_2, before: 480, after: 100, size: 26, bold: true }));
     parsed.recommendations.forEach((pt, i) => {
-      actionPlanParas.push(new Paragraph({ numbering: { reference: "hyr-rec-list", level: 0 }, children: [new TextRun({ text: pt, size: 22 })], spacing: { before: i === 0 ? 60 : 20, after: 20, ...LS } }));
+      actionPlanParas.push(new Paragraph({ numbering: { reference: "hyr-rec-list", level: 0 }, children: [new TextRun({ text: pt, size: 22 })], spacing: { before: i === 0 ? 80 : 60, after: 60, ...LS } }));
     });
   }
 
@@ -4896,7 +4898,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
       { reference: BULLET_REF, levels: [{ level: 0, format: LevelFormat?.BULLET ?? "bullet", text: "", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } }, run: { fonts: { ascii: "Wingdings", hAnsi: "Wingdings", hint: "default" }, size: 22 } } }] },
       { reference: KI_NUM_REF,   levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 480, hanging: 240 } }, run: { size: 22 } } }] },
       { reference: KI_NUM_REF_2, levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 480, hanging: 240 } }, run: { size: 22 } } }] },
-      ...(apNumRefs || []).map(ref => ({ reference: ref, levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 360, hanging: 260 } }, run: { size: 22 } } }] })),
+      ...(apNumRefs || []).map(ref => ({ reference: ref, levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } }, run: { size: 22 } } }] })),
     ] },
     sections: docSections
   });
