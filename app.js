@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1551";
+const APP_VERSION = "1552";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -4354,9 +4354,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   if (parsed.biggestWins?.length) {
     const fmtKI = s => { const c = s.replace(/\*\*/g, ""); const i = c.indexOf(': '); return i > 0 ? `<strong>${esc(c.slice(0,i))}</strong>: ${esc(c.slice(i+2))}` : esc(c); };
     h += `<p style="font-weight:700;font-size:1.05rem;margin:1.5rem 0 .5rem">Biggest Wins</p>`;
-    parsed.biggestWins.forEach(s => {
-      h += `<p style="margin:.4rem 0;line-height:1.7;font-size:11pt">${fmtKI(s)}</p>`;
-    });
+    h += `<ol style="margin:0;padding-left:2.5rem;line-height:1.8;font-size:11pt">${parsed.biggestWins.map(s => `<li style="margin-bottom:.4rem">${fmtKI(s)}</li>`).join("")}</ol>`;
   }
 
   h += `<hr style="margin:2rem 0">`;
@@ -4723,13 +4721,13 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
 
   paragraphs.push(mkPara("Biggest Wins", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true, keepNext: true, pageBreak: true }));
   if (parsed.biggestWins?.length) {
-    parsed.biggestWins.forEach(s => {
+    parsed.biggestWins.forEach((s, i) => {
       const c = s.replace(/\*\*/g, "");
       const ci = c.indexOf(': ');
       const runs = ci > 0
         ? [new TextRun({ text: c.slice(0, ci), bold: true, size: 22 }), new TextRun({ text: ': ' + c.slice(ci + 2), size: 22 })]
         : [new TextRun({ text: c, size: 22 })];
-      paragraphs.push(new Paragraph({ children: runs, alignment: AlignmentType.BOTH, spacing: { before: 60, after: 60, ...LS } }));
+      paragraphs.push(new Paragraph({ numbering: { reference: "hyr-bw-list", level: 0 }, children: runs, spacing: { before: i === 0 ? 80 : 60, after: 60, ...LS } }));
     });
     paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 120, after: 0 } }));
   }
@@ -4870,7 +4868,8 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   const doc = new Document({
     numbering: { config: [
       { reference: BULLET_REF, levels: [{ level: 0, format: LevelFormat?.BULLET ?? "bullet", text: "", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } }, run: { fonts: { ascii: "Wingdings", hAnsi: "Wingdings", hint: "default" }, size: 22 } } }] },
-...(apNumRefs || []).map(ref => ({ reference: ref, levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } }, run: { size: 22 } } }] })),
+      { reference: "hyr-bw-list", levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } }, run: { size: 22 } } }] },
+      ...(apNumRefs || []).map(ref => ({ reference: ref, levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } }, run: { size: 22 } } }] })),
     ] },
     sections: docSections
   });
