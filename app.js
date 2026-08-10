@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1552";
+const APP_VERSION = "1553";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -4353,7 +4353,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   }
   if (parsed.biggestWins?.length) {
     const fmtKI = s => { const c = s.replace(/\*\*/g, ""); const i = c.indexOf(': '); return i > 0 ? `<strong>${esc(c.slice(0,i))}</strong>: ${esc(c.slice(i+2))}` : esc(c); };
-    h += `<p style="font-weight:700;font-size:1.05rem;margin:1.5rem 0 .5rem">Biggest Wins</p>`;
+    h += `<p style="font-weight:700;font-size:1.05rem;margin:1.5rem 0 .5rem">Key Strengths</p>`;
     h += `<ol style="margin:0;padding-left:2.5rem;line-height:1.8;font-size:11pt">${parsed.biggestWins.map(s => `<li style="margin-bottom:.4rem">${fmtKI(s)}</li>`).join("")}</ol>`;
   }
 
@@ -4719,7 +4719,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   }
   if (wAllNames.length) paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 200, after: 0 } }));
 
-  paragraphs.push(mkPara("Biggest Wins", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true, keepNext: true, pageBreak: true }));
+  paragraphs.push(mkPara("Key Strengths", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true, keepNext: true, pageBreak: true }));
   if (parsed.biggestWins?.length) {
     parsed.biggestWins.forEach((s, i) => {
       const c = s.replace(/\*\*/g, "");
