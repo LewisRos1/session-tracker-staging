@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1553";
+const APP_VERSION = "1554";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3011,13 +3011,13 @@ Write exactly 5 sentences summing up ${firstName}'s overall progress this term i
 ===END===
 
 ===KEY_INSIGHTS===
-Based on all session data and observations, write 5 to 7 Biggest Win rows — you MUST write at least 5, no fewer. Short, scannable, memorable:
-ROW: Biggest Win | [2-4 word label — write it directly, no ** markers]: [One short sentence — the specific achievement. Must be data-backed. If no genuine win exists, name the smallest real positive.]
-ROW: Biggest Win | [2-4 word label — write it directly, no ** markers]: [One short sentence — a second genuine success from a different area. Must be real, not filler.]
-ROW: Biggest Win | [2-4 word label — write it directly, no ** markers]: [One short sentence — a third win. Only real positives — do not invent.]
-ROW: Biggest Win | [2-4 word label — write it directly, no ** markers]: [One short sentence — a fourth data-backed achievement.]
-ROW: Biggest Win | [2-4 word label — write it directly, no ** markers]: [One short sentence — a fifth win from a different area. Must be real and data-backed.]
-...add a 6th and 7th row if the data supports additional genuine wins...
+Based on all session data and observations, write 5 to 7 Key Improvement rows — you MUST write at least 5, no fewer. Short, scannable, memorable:
+ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One short sentence — a specific, data-backed area where the student has improved. Must be real, not filler.]
+ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One short sentence — a second genuine improvement from a different area.]
+ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One short sentence — a third improvement. Only real progress — do not invent.]
+ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One short sentence — a fourth data-backed improvement.]
+ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One short sentence — a fifth improvement from a different area. Must be real and data-backed.]
+...add a 6th and 7th row if the data supports additional genuine improvements...
 ===END===
 
 ${targetsWithData.map(r => `===OBSERVATION: ${r.name}===
@@ -4212,7 +4212,7 @@ function hyrParseAiResponse(text) {
         const parts = t.slice(4).split("|");
         if (parts.length >= 2) {
           const key = parts[0].trim(), val = parts[1].trim();
-          if (key === "Biggest Win") out.biggestWins.push(val);
+          if (key === "Key Improvement") out.biggestWins.push(val);
           else if (key === "Key Focus Area") out.keyFocusAreas.push(val);
           else if (key === "Key Focus Strategy") out.keyFocusStrategies.push(val);
         }
@@ -4353,7 +4353,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   }
   if (parsed.biggestWins?.length) {
     const fmtKI = s => { const c = s.replace(/\*\*/g, ""); const i = c.indexOf(': '); return i > 0 ? `<strong>${esc(c.slice(0,i))}</strong>: ${esc(c.slice(i+2))}` : esc(c); };
-    h += `<p style="font-weight:700;font-size:1.05rem;margin:1.5rem 0 .5rem">Key Strengths</p>`;
+    h += `<p style="font-weight:700;font-size:1.05rem;margin:1.5rem 0 .5rem">Key Improvements</p>`;
     h += `<ol style="margin:0;padding-left:2.5rem;line-height:1.8;font-size:11pt">${parsed.biggestWins.map(s => `<li style="margin-bottom:.4rem">${fmtKI(s)}</li>`).join("")}</ol>`;
   }
 
@@ -4719,7 +4719,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   }
   if (wAllNames.length) paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 200, after: 0 } }));
 
-  paragraphs.push(mkPara("Key Strengths", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true, keepNext: true, pageBreak: true }));
+  paragraphs.push(mkPara("Key Improvements", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true, keepNext: true, pageBreak: true }));
   if (parsed.biggestWins?.length) {
     parsed.biggestWins.forEach((s, i) => {
       const c = s.replace(/\*\*/g, "");
