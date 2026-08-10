@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1555";
+const APP_VERSION = "1556";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -4398,7 +4398,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   h += `<p style="margin:.6rem 0 1.2rem;font-size:11pt;line-height:1.7">This section outlines the key areas requiring the most attention, and practical recommendations to support ${esc(firstName)}'s progress going forward.</p>`;
   const fmtAP = s => { const c = s.replace(/\*\*/g, ""); const ci = c.indexOf(': '); return ci > 0 ? `<strong>${esc(c.slice(0,ci))}</strong>: ${esc(c.slice(ci+2))}` : esc(c); };
   if (parsed.focusAreas?.length) {
-    h += `<p style="font-weight:700;margin:1.2rem 0 .4rem">Focus Areas</p>`;
+    h += `<p style="font-weight:700;margin:2.5rem 0 .4rem">Focus Areas</p>`;
     h += `<ol style="margin:0;padding-left:2.5rem;line-height:1.8;font-size:11pt;text-align:justify">${parsed.focusAreas.map(f => `<li style="margin-bottom:.4rem">${fmtAP(f)}</li>`).join("")}</ol>`;
   }
   if (parsed.recommendations?.length) {
@@ -4769,7 +4769,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   actionPlanParas.push(new Paragraph({ children: [new TextRun({ text: `This section outlines the key areas requiring the most attention, and practical recommendations to support ${firstName}'s progress going forward.`, size: 22 })], spacing: { before: 0, after: 200, ...LS } }));
   const apNumRefs = ["hyr-focus-list", "hyr-rec-list"];
   if (parsed.focusAreas?.length) {
-    actionPlanParas.push(mkPara("Focus Areas", { heading: HeadingLevel.HEADING_2, before: 0, after: 100, size: 26, bold: true }));
+    actionPlanParas.push(mkPara("Focus Areas", { heading: HeadingLevel.HEADING_2, before: 360, after: 100, size: 26, bold: true }));
     parsed.focusAreas.forEach((pt, i) => {
       const c = pt.replace(/\*\*/g, "");
       const ci = c.indexOf(': ');
