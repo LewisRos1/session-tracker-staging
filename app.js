@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1563";
+const APP_VERSION = "1564";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -482,6 +482,11 @@ let _sheetOriginEl = null;
 // When editing a target belonging to a group, this is set so that
 // renderTargetManageContent saves to the group instead of the student.
 let _groupForTargetEdit = null;
+let _actStartPickerSaveFn = null;
+let _actStartPickerIdx    = null;
+let _actStartPickerActs   = null;
+let _actStartPickerStudent = null;
+let _actStartPickerTarget  = null;
 
 // Tracks in-flight rename-propagation operations so the manage modal can show
 // "Syncing history…" while they run, and warn the boss if one fails silently.
@@ -14365,22 +14370,85 @@ function periodSectionHtml(activeFrom, activeTo, idx, withBorder, inactiveReason
 
 function actStartDateHtml(activeFrom, idx) {
   const btnLabel = activeFrom ? `Set Start Date (${fmtPeriodDate(activeFrom)})` : 'Set Start Date (None)';
-  const bg  = activeFrom ? '#ffffff' : '#f9fafb';
-  const col = activeFrom ? '#111827' : '#374151';
-  return `<div style="padding:.45rem .6rem;border-bottom:1px solid #f3f4f6">
-    <div style="position:relative">
-      <button class="mn-act-start-btn" data-idx="${idx}" style="width:100%;padding:.35rem .6rem;border:1px solid #d1d5db;border-radius:.3rem;background:${bg};cursor:pointer;font-size:.83rem;color:${col};text-align:left">📅 ${btnLabel}</button>
-      <div class="mn-act-start-panel" data-idx="${idx}" style="display:none;position:absolute;top:calc(100% + 4px);right:0;z-index:300;background:#fff;border:1px solid #e5e7eb;border-radius:.5rem;padding:.55rem;box-shadow:0 4px 16px rgba(0,0,0,.13);min-width:220px">
-        <div style="font-size:.78rem;color:#6b7280;margin-bottom:.4rem;line-height:1.4">What day do you want this activity to start appearing?</div>
-        <input type="date" class="mn-act-start-date" data-idx="${idx}" value="${activeFrom||''}" style="width:100%;font-size:.82rem;border:1px solid #d1d5db;border-radius:.35rem;padding:.25rem .35rem;margin-bottom:.35rem;box-sizing:border-box">
-        <div class="mn-act-start-err" data-idx="${idx}" style="display:none;font-size:.76rem;color:#dc2626;margin-bottom:.3rem;line-height:1.3"></div>
-        <div style="display:flex;gap:.35rem">
-          ${activeFrom ? `<button class="mn-act-start-clear" data-idx="${idx}" style="flex:1;padding:.28rem;font-size:.78rem;border:1px solid #fca5a5;border-radius:.35rem;background:#fee2e2;cursor:pointer;color:#dc2626">✕ Clear Date</button>` : ''}
-          <button class="mn-act-start-cancel" data-idx="${idx}" style="flex:1;padding:.28rem;font-size:.78rem;border:1px solid #d1d5db;border-radius:.35rem;background:#f9fafb;cursor:pointer;color:#6b7280">Cancel</button>
-        </div>
+  return `<button class="mn-act-start-btn" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151;white-space:nowrap">📅 ${btnLabel}</button>`;
+}
+
+function showActStartDatePicker() {
+  const act = _actStartPickerActs?.[_actStartPickerIdx];
+  const activeFrom = act?.activeFrom || '';
+  let overlay = document.getElementById('act-start-picker-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'act-start-picker-overlay';
+    document.body.appendChild(overlay);
+  }
+  overlay.innerHTML = `<div style="position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.45);display:flex;flex-direction:column;justify-content:flex-end" id="act-start-picker-backdrop">
+    <div style="background:#fff;border-radius:1.1rem 1.1rem 0 0;padding:1.3rem 1.3rem calc(env(safe-area-inset-bottom,0px) + 1.3rem);box-shadow:0 -4px 24px rgba(0,0,0,.14)">
+      <div style="font-weight:700;font-size:1rem;color:#111827;margin-bottom:.25rem">Set Start Date</div>
+      <div style="font-size:.85rem;color:#6b7280;margin-bottom:.85rem">What day do you want this activity to start appearing?</div>
+      <div id="act-start-picker-err" style="display:none;font-size:.82rem;color:#dc2626;margin-bottom:.5rem;line-height:1.4;padding:.4rem .6rem;background:#fee2e2;border-radius:.4rem"></div>
+      <input type="date" id="act-start-picker-inp" value="${activeFrom}" style="width:100%;font-size:1rem;border:1.5px solid #d1d5db;border-radius:.5rem;padding:.55rem .65rem;box-sizing:border-box;margin-bottom:.85rem">
+      <div style="display:flex;gap:.5rem">
+        ${activeFrom ? `<button id="act-start-picker-clear" style="flex:1;padding:.65rem;font-size:.9rem;border:1px solid #fca5a5;border-radius:.5rem;background:#fee2e2;cursor:pointer;color:#dc2626;font-weight:600">✕ Clear Date</button>` : ''}
+        <button id="act-start-picker-cancel" style="flex:1;padding:.65rem;font-size:.9rem;border:1px solid #d1d5db;border-radius:.5rem;background:#f9fafb;cursor:pointer;color:#6b7280;font-weight:600">Cancel</button>
       </div>
     </div>
   </div>`;
+  document.getElementById('act-start-picker-backdrop').onclick = e => { if (e.target.id === 'act-start-picker-backdrop') closeActStartDatePicker(); };
+  document.getElementById('act-start-picker-inp').addEventListener('change', handleActStartPickerChange);
+  const clearBtn = document.getElementById('act-start-picker-clear');
+  if (clearBtn) clearBtn.addEventListener('click', async () => { closeActStartDatePicker(); await _actStartPickerSaveFn(_actStartPickerIdx, 'activeFrom', null); });
+  document.getElementById('act-start-picker-cancel').addEventListener('click', closeActStartDatePicker);
+}
+
+function closeActStartDatePicker() {
+  const overlay = document.getElementById('act-start-picker-overlay');
+  if (overlay) overlay.innerHTML = '';
+}
+
+async function handleActStartPickerChange() {
+  const inp = document.getElementById('act-start-picker-inp');
+  const errDiv = document.getElementById('act-start-picker-err');
+  const value = inp?.value;
+  if (errDiv) { errDiv.style.display = 'none'; errDiv.textContent = ''; }
+  if (!value) return;
+  const act = _actStartPickerActs?.[_actStartPickerIdx];
+  if (!act) return;
+  const actName = act.title || act.name;
+  const allSessions = _groupForTargetEdit
+    ? await getAllSessionsForGroup(_groupForTargetEdit.id).catch(() => [])
+    : await getAllSessionsForStudent(_actStartPickerStudent.id).catch(() => []);
+  let oldestDate = null;
+  for (const session of allSessions) {
+    const sActs = session.activities || {};
+    const sRems = session.remarks || {};
+    const matchingActIds = Object.entries(sActs)
+      .filter(([, a]) => {
+        if (a.targetName !== _actStartPickerTarget.name) return false;
+        if (act.id && a.configId === act.id) return true;
+        return a.activityName === actName || (act.title && a.activityName === act.title);
+      })
+      .map(([id]) => id);
+    const hasData = matchingActIds.some(actId => Object.values(sRems).some(r =>
+      r.activityId === actId && (
+        (r.text || '').replace(/<[^>]*>/g, '').trim().length > 0 ||
+        (r.masteryNote || '').trim().length > 0 ||
+        (r.trials || []).some(t => t !== null && t !== -1) ||
+        (r.optionScore !== undefined && r.optionScore !== null)
+      )
+    ));
+    if (hasData && (!oldestDate || session.date < oldestDate)) oldestDate = session.date;
+  }
+  if (oldestDate && value > oldestDate) {
+    if (errDiv) {
+      errDiv.textContent = `The oldest recorded data for this activity is ${fmtPeriodDate(oldestDate)}. The start date cannot be later than this.`;
+      errDiv.style.display = 'block';
+    }
+    if (inp) inp.value = act.activeFrom || '';
+    return;
+  }
+  closeActStartDatePicker();
+  await _actStartPickerSaveFn(_actStartPickerIdx, 'activeFrom', value);
 }
 
 // ── Open / close ──────────────────────────────────────────────
@@ -15969,7 +16037,7 @@ function renderTargetManageContent(student, target) {
         </div>
         <div style="position:relative">
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
-          <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:250px;overflow:hidden">
+          <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:310px;overflow:hidden">
             <button class="mn-km-manage-act" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#0369a1">🪄 Manage Activity</button>
             <button class="mn-km-convert-mapped" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#7c3aed">🔄 Convert to Regular Activity</button>
             <div style="display:flex;align-items:stretch">
@@ -16086,7 +16154,7 @@ function renderTargetManageContent(student, target) {
           </div>
           <div style="position:relative">
             <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
-            <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:250px;overflow:hidden">
+            <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:310px;overflow:hidden">
               <button class="mn-km-manage-act" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#0369a1">🪄 Manage Activity</button>
               ${actStartDateHtml(a.activeFrom, idx)}
               <div style="display:flex;align-items:stretch">
@@ -16139,9 +16207,9 @@ function renderTargetManageContent(student, target) {
           </div>
           <div style="position:relative">
             <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
-            <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:250px;overflow:hidden">
+            <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:310px;overflow:hidden">
               <button class="mn-km-manage-act" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#0369a1">🪄 Manage Activity</button>
-              <button class="mn-km-move-to-parent" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">↪️ Make this activity into a Sub-activity</button>
+              <button class="mn-km-move-to-parent" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151;white-space:nowrap">↪️ Make this activity into a Sub-activity</button>
               <button class="mn-km-add-sub" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">➕ Add sub-activity</button>
               ${actStartDateHtml(a.activeFrom, idx)}
               <div style="display:flex;align-items:stretch">
@@ -17807,76 +17875,20 @@ function renderTargetManageContent(student, target) {
   };
   document.addEventListener("click", window._closePeriodPanels);
 
-  // Activity start date handlers
+  // Activity start date — opens global bottom sheet
   $("manage-modal-body").querySelectorAll(".mn-act-start-btn").forEach(btn => {
     btn.addEventListener("click", e => {
       e.stopPropagation();
-      const panel = $("manage-modal-body").querySelector(`.mn-act-start-panel[data-idx="${btn.dataset.idx}"]`);
-      $("manage-modal-body").querySelectorAll(".mn-act-start-panel").forEach(p => { if (p !== panel) p.style.display = "none"; });
-      if (panel) panel.style.display = panel.style.display === "none" ? "block" : "none";
+      // Close kebab before opening picker
+      $("manage-modal-body").querySelectorAll(".mn-kebab-menu").forEach(m => m.style.display = "none");
+      _actStartPickerSaveFn  = savePeriodField;
+      _actStartPickerIdx     = +btn.dataset.idx;
+      _actStartPickerActs    = acts;
+      _actStartPickerStudent = student;
+      _actStartPickerTarget  = target;
+      showActStartDatePicker();
     });
   });
-  $("manage-modal-body").querySelectorAll(".mn-act-start-date").forEach(inp => {
-    inp.addEventListener("change", async () => {
-      const idx = +inp.dataset.idx;
-      const value = inp.value;
-      const errDiv = $("manage-modal-body").querySelector(`.mn-act-start-err[data-idx="${idx}"]`);
-      if (errDiv) { errDiv.style.display = "none"; errDiv.textContent = ""; }
-      if (!value || !acts[idx]) return;
-      const act = acts[idx];
-      const actName = act.title || act.name;
-      const allSessions = _groupForTargetEdit
-        ? await getAllSessionsForGroup(_groupForTargetEdit.id).catch(() => [])
-        : await getAllSessionsForStudent(student.id).catch(() => []);
-      let oldestDate = null;
-      for (const session of allSessions) {
-        const sActs = session.activities || {};
-        const sRems = session.remarks || {};
-        const matchingActIds = Object.entries(sActs)
-          .filter(([, a]) => {
-            if (a.targetName !== target.name) return false;
-            if (act.id && a.configId === act.id) return true;
-            return a.activityName === actName || (act.title && a.activityName === act.title);
-          })
-          .map(([id]) => id);
-        const hasData = matchingActIds.some(actId => Object.values(sRems).some(r =>
-          r.activityId === actId && (
-            (r.text || "").replace(/<[^>]*>/g, "").trim().length > 0 ||
-            (r.masteryNote || "").trim().length > 0 ||
-            (r.trials || []).some(t => t !== null && t !== -1) ||
-            (r.optionScore !== undefined && r.optionScore !== null)
-          )
-        ));
-        if (hasData && (!oldestDate || session.date < oldestDate)) oldestDate = session.date;
-      }
-      if (oldestDate && value > oldestDate) {
-        if (errDiv) {
-          errDiv.textContent = `The oldest recorded data for this activity is ${fmtPeriodDate(oldestDate)}. The start date cannot be later than this.`;
-          errDiv.style.display = "block";
-        }
-        inp.value = acts[idx].activeFrom || "";
-        return;
-      }
-      savePeriodField(idx, "activeFrom", value);
-    });
-  });
-  $("manage-modal-body").querySelectorAll(".mn-act-start-clear").forEach(btn => {
-    btn.addEventListener("click", () => savePeriodField(+btn.dataset.idx, "activeFrom", null));
-  });
-  $("manage-modal-body").querySelectorAll(".mn-act-start-cancel").forEach(btn => {
-    btn.addEventListener("click", e => {
-      e.stopPropagation();
-      const panel = $("manage-modal-body").querySelector(`.mn-act-start-panel[data-idx="${btn.dataset.idx}"]`);
-      if (panel) panel.style.display = "none";
-    });
-  });
-  if (window._closeActStartPanels) document.removeEventListener("click", window._closeActStartPanels);
-  window._closeActStartPanels = e => {
-    if (!e.target.closest(".mn-act-start-panel,.mn-act-start-btn,.mn-act-start-date,.mn-act-start-clear,.mn-act-start-cancel,.mn-act-start-err")) {
-      $("manage-modal-body").querySelectorAll(".mn-act-start-panel").forEach(p => p.style.display = "none");
-    }
-  };
-  document.addEventListener("click", window._closeActStartPanels);
 
   const getOptsFromDom = idx =>
     [...$("manage-modal-body").querySelectorAll(`.mn-opt-item[data-idx="${idx}"]`)]
@@ -18320,7 +18332,7 @@ function renderTemplateManageContent(template) {
         </div>
         <div style="position:relative">
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
-          <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:250px;overflow:hidden">
+          <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:310px;overflow:hidden">
             <div style="display:flex;align-items:stretch">
               <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
             </div>
