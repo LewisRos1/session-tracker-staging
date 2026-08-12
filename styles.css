@@ -3050,7 +3050,7 @@ button.wf-pill:hover { filter: brightness(.93); }
 .snote-th-no   { width: 2rem; text-align: center; }
 .snote-th-tick { width: 2.2rem; text-align: center; }
 .snote-th-del  { width: 1.8rem; }
-.snote-th-text { text-align: center; }
+.snote-table thead .snote-th-text { text-align: center; }
 
 .snote-row td {
   padding: .3rem .35rem;
