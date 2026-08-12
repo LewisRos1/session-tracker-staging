@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1568";
+const APP_VERSION = "1569";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8115,7 +8115,7 @@ function renderFedcTarget(target) {
           <span class="field-label">Activity</span>
           <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${paDisplayHtml(pa, true)}</span>
           <div style="display:flex;align-items:center;gap:.35rem;flex-shrink:0;align-self:flex-start">
-            ${pa.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap">Activity Start Date:${fmtPeriodDate(pa.activeFrom)}</span>` : ""}
+            ${pa.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap">Activity Start Date: ${fmtPeriodDate(pa.activeFrom)}</span>` : ""}
             ${pa.id ? `<button class="btn-icon btn-edit-activity-pencil" contenteditable="false" data-pa-id="${escHtml(pa.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
           </div>
         </div>
@@ -8255,7 +8255,7 @@ function renderFedcTarget(target) {
         <span class="field-label">Activity</span>
         <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${paDisplayHtml(pa, true)}</span>
         <div style="display:flex;align-items:center;gap:.35rem;flex-shrink:0;align-self:flex-start">
-          ${pa.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap">Activity Start Date:${fmtPeriodDate(pa.activeFrom)}</span>` : ""}
+          ${pa.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap">Activity Start Date: ${fmtPeriodDate(pa.activeFrom)}</span>` : ""}
           ${pa.id ? `<button class="btn-icon btn-edit-activity-pencil" contenteditable="false" data-pa-id="${escHtml(pa.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
         </div>
       </div>`;
@@ -19861,7 +19861,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Activity</span>
           <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem"></span>${paDisplayHtml(pa, true)}</span>
-          ${pa.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Activity Start Date:${fmtPeriodDate(pa.activeFrom)}</span>` : ""}
+          ${pa.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Activity Start Date: ${fmtPeriodDate(pa.activeFrom)}</span>` : ""}
         </div>
       </div>`;
       children.forEach((sub, si) => {
@@ -20190,7 +20190,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
       <div class="entry-field" contenteditable="false">
         <span class="field-label">Activity</span>
         <span class="field-value-fixed">${formatActivityMarkup(actName)}</span>
-        ${paEntry?.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Activity Start Date:${fmtPeriodDate(paEntry.activeFrom)}</span>` : ""}
+        ${paEntry?.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Activity Start Date: ${fmtPeriodDate(paEntry.activeFrom)}</span>` : ""}
       </div>
       ${noteRow}
       <div class="entry-divider" contenteditable="false"></div>
@@ -20216,7 +20216,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
       <div class="entry-field" contenteditable="false">
         <span class="field-label">Activity</span>
         <span class="field-value-fixed">${inactiveReasonBadge(paEntry)}${formatActivityMarkup(actName)}</span>
-        ${paEntry?.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Activity Start Date:${fmtPeriodDate(paEntry.activeFrom)}</span>` : ""}
+        ${paEntry?.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Activity Start Date: ${fmtPeriodDate(paEntry.activeFrom)}</span>` : ""}
         ${combineToggle}
       </div>
       ${noteRow}
@@ -20291,7 +20291,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
     <div class="entry-field" contenteditable="false">
       <span class="field-label">Activity</span>
       <span class="field-value-fixed">${formatActivityMarkup(actName)}${inactiveReasonBadge(paEntry)}</span>
-      ${paEntry?.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Activity Start Date:${fmtPeriodDate(paEntry.activeFrom)}</span>` : ""}
+      ${paEntry?.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Activity Start Date: ${fmtPeriodDate(paEntry.activeFrom)}</span>` : ""}
       ${combineToggle}
     </div>
     ${noteRow}
