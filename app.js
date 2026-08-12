@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1571";
+const APP_VERSION = "1572";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -1366,7 +1366,7 @@ async function loadTodoHomeCounts() {
   // Update each badge independently — one slow/failed query won't stall others
   INSTRUCTORS.forEach(async inst => {
     try {
-      const sessions = inst.id === "nigel"
+      const sessions = (inst.id === "nigel" || inst.id === "daisy")
         ? await getAllSessions().catch(() => [])
         : await getSessionsWithParticipant(inst.id).catch(() => []);
       const count = sessions.reduce((n, s) => {
@@ -1374,7 +1374,9 @@ async function loadTodoHomeCounts() {
           const checks = s.checks || {};
           const ws = getWorkflowState(s);
           const isMonthly = (state.students || []).find(st => st.id === s.studentId)?.exportDuration === "monthly";
-          if (inst.id !== "nigel" && !checks[`p1_${inst.id}`]) return n + 1;
+          const isParticipant = (s.participants || []).includes(inst.id);
+          if (inst.id !== "nigel" && inst.id !== "daisy" && !checks[`p1_${inst.id}`]) return n + 1;
+          if (inst.id === "daisy" && isParticipant && !checks["p1_daisy"]) return n + 1;
           if (inst.id === "daisy" && !s.reviewSubmitted && !ws.daisyOnly) return n + 1;
           if (inst.id !== "daisy" && inst.id !== "nigel" && s.reviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) return n + 1;
           if (inst.id === "nigel" && ws.ready && !ws.p4Done && !isMonthly) return n + 1;
@@ -1463,14 +1465,16 @@ async function openTodoScreen(filterInstId = null) {
 
   const instsToLoad = filterInst ? [filterInst] : INSTRUCTORS;
   const results = await Promise.all(instsToLoad.map(async inst => {
-    const sessions = inst.id === "nigel"
+    const sessions = (inst.id === "nigel" || inst.id === "daisy")
       ? await getAllSessions().catch(() => [])
       : await getSessionsWithParticipant(inst.id).catch(() => []);
     const pending = sessions.filter(s => {
       const checks = s.checks || {};
       const ws = getWorkflowState(s);
       const isMonthly = (state.students || []).find(st => st.id === s.studentId)?.exportDuration === "monthly";
-      if (inst.id !== "nigel" && !checks[`p1_${inst.id}`]) return true;
+      const isParticipant = (s.participants || []).includes(inst.id);
+      if (inst.id !== "nigel" && inst.id !== "daisy" && !checks[`p1_${inst.id}`]) return true;
+      if (inst.id === "daisy" && isParticipant && !checks["p1_daisy"]) return true;
       if (inst.id === "daisy" && !s.reviewSubmitted && !ws.daisyOnly) return true;
       if (inst.id !== "daisy" && inst.id !== "nigel" && s.reviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) return true;
       if (inst.id === "nigel" && ws.ready && !ws.p4Done && !isMonthly) return true;
@@ -1537,10 +1541,12 @@ function renderTodoTiles(results, filterInst = null) {
     const checks  = s.checks || {};
     const ws      = getWorkflowState(s);
     const isMonthly = (state.students || []).find(st => st.id === s.studentId)?.exportDuration === "monthly";
+    const isParticipant = (s.participants || []).includes(inst.id);
 
     // Compute all pending tasks for this instructor on this session
     const tasks = [];
-    if (inst.id !== "nigel" && !checks[`p1_${inst.id}`]) tasks.push("Enter Data");
+    if (inst.id !== "nigel" && inst.id !== "daisy" && !checks[`p1_${inst.id}`]) tasks.push("Enter Data");
+    if (inst.id === "daisy" && isParticipant && !checks["p1_daisy"]) tasks.push("Enter Data");
     if (inst.id === "daisy" && !s.reviewSubmitted && !ws.daisyOnly) {
       // Phase 2 only shows if it's unlocked (all non-Daisy p1 done)
       const nonDaisy = (s.participants || []).filter(id => id !== "daisy");
@@ -1588,8 +1594,10 @@ function renderTodoTiles(results, filterInst = null) {
       const checks  = s.checks || {};
       const ws      = getWorkflowState(s);
       const isMonthly = (state.students || []).find(st => st.id === s.studentId)?.exportDuration === "monthly";
+      const isParticipant = (s.participants || []).includes(inst.id);
       const tasks   = [];
-      if (inst.id !== "nigel" && !checks[`p1_${inst.id}`]) tasks.push("Enter Data");
+      if (inst.id !== "nigel" && inst.id !== "daisy" && !checks[`p1_${inst.id}`]) tasks.push("Enter Data");
+      if (inst.id === "daisy" && isParticipant && !checks["p1_daisy"]) tasks.push("Enter Data");
       if (inst.id === "daisy" && !s.reviewSubmitted && !ws.daisyOnly) {
         const nonDaisy = (s.participants || []).filter(id => id !== "daisy");
         const p2Unlocked = nonDaisy.length > 0 ? nonDaisy.every(id => !!checks[`p1_${id}`]) : !!checks["p1_daisy"];
