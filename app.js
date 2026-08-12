@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1560";
+const APP_VERSION = "1561";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8089,6 +8089,7 @@ function renderFedcTarget(target) {
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Activity</span>
           <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${paDisplayHtml(pa, true)}</span>
+          ${pa.activeFrom ? `<span style="font-size:.72rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:center">Created: ${fmtPeriodDate(pa.activeFrom)}</span>` : ""}
           ${pa.id ? `<button class="btn-icon btn-edit-activity-pencil" contenteditable="false" data-pa-id="${escHtml(pa.id)}" title="Edit in Edit Target" style="flex-shrink:0;font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
         </div>
       </div>`;
@@ -8226,6 +8227,7 @@ function renderFedcTarget(target) {
       <div class="entry-field" contenteditable="false">
         <span class="field-label">Activity</span>
         <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${paDisplayHtml(pa, true)}</span>
+        ${pa.activeFrom ? `<span style="font-size:.72rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:center">Created: ${fmtPeriodDate(pa.activeFrom)}</span>` : ""}
         ${pa.id ? `<button class="btn-icon btn-edit-activity-pencil" contenteditable="false" data-pa-id="${escHtml(pa.id)}" title="Edit in Edit Target" style="flex-shrink:0;font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
       </div>`;
 
@@ -14337,6 +14339,23 @@ function periodSectionHtml(activeFrom, activeTo, idx, withBorder, inactiveReason
   </div>`;
 }
 
+function actStartDateHtml(activeFrom, idx) {
+  const label = activeFrom ? fmtPeriodDate(activeFrom) : 'Not set';
+  const bg  = activeFrom ? '#ffffff' : '#eff6ff';
+  const col = activeFrom ? '#111827' : '#6b7280';
+  return `<div style="padding:.45rem .6rem;border-bottom:1px solid #f3f4f6">
+    <div style="font-size:.84rem;color:inherit;margin-bottom:.35rem">📅 Start Date</div>
+    <div style="position:relative">
+      <button class="mn-act-start-btn" data-idx="${idx}" style="width:100%;padding:.28rem .4rem;border:1px solid #d1d5db;border-radius:.3rem;background:${bg};cursor:pointer;font-size:.8rem;color:${col};white-space:nowrap;text-align:center">${label}</button>
+      <div class="mn-act-start-panel" data-idx="${idx}" style="display:none;position:absolute;top:calc(100% + 3px);right:0;z-index:300;background:#fff;border:1px solid #e5e7eb;border-radius:.45rem;padding:.4rem;box-shadow:0 4px 14px rgba(0,0,0,.12);min-width:200px">
+        <input type="date" class="mn-act-start-date" data-idx="${idx}" value="${activeFrom||''}" style="width:100%;font-size:.8rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;margin-bottom:.3rem;box-sizing:border-box">
+        <div class="mn-act-start-err" data-idx="${idx}" style="display:none;font-size:.76rem;color:#dc2626;margin-bottom:.25rem;line-height:1.3"></div>
+        <button class="mn-act-start-clear" data-idx="${idx}" style="width:100%;padding:.25rem;font-size:.78rem;border:1px solid #bfdbfe;border-radius:.3rem;background:#eff6ff;cursor:pointer;color:#1d4ed8">Clear Start Date</button>
+      </div>
+    </div>
+  </div>`;
+}
+
 // ── Open / close ──────────────────────────────────────────────
 
 function openManageModal(student, targetOrNull, templateOrNull = null, remarkPresetOrNull = null, scrollToPaId = null) {
@@ -16042,6 +16061,7 @@ function renderTargetManageContent(student, target) {
             <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
             <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:250px;overflow:hidden">
               <button class="mn-km-manage-act" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#0369a1">🪄 Manage Activity</button>
+              ${actStartDateHtml(a.activeFrom, idx)}
               <div style="display:flex;align-items:stretch">
                 <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
                 <span title="Deletes this activity and all its sub-activities." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
@@ -16096,6 +16116,7 @@ function renderTargetManageContent(student, target) {
               <button class="mn-km-manage-act" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#0369a1">🪄 Manage Activity</button>
               <button class="mn-km-move-to-parent" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">↪️ Make this activity into a Sub-activity</button>
               <button class="mn-km-add-sub" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">➕ Add sub-activity</button>
+              ${actStartDateHtml(a.activeFrom, idx)}
               <div style="display:flex;align-items:stretch">
                 <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
                 <span title="Permanently removes this activity and all of its session data. This cannot be undone." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
@@ -17758,6 +17779,70 @@ function renderTargetManageContent(student, target) {
     }
   };
   document.addEventListener("click", window._closePeriodPanels);
+
+  // Activity start date handlers
+  $("manage-modal-body").querySelectorAll(".mn-act-start-btn").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const panel = $("manage-modal-body").querySelector(`.mn-act-start-panel[data-idx="${btn.dataset.idx}"]`);
+      $("manage-modal-body").querySelectorAll(".mn-act-start-panel").forEach(p => { if (p !== panel) p.style.display = "none"; });
+      if (panel) panel.style.display = panel.style.display === "none" ? "block" : "none";
+    });
+  });
+  $("manage-modal-body").querySelectorAll(".mn-act-start-date").forEach(inp => {
+    inp.addEventListener("change", async () => {
+      const idx = +inp.dataset.idx;
+      const value = inp.value;
+      const errDiv = $("manage-modal-body").querySelector(`.mn-act-start-err[data-idx="${idx}"]`);
+      if (errDiv) { errDiv.style.display = "none"; errDiv.textContent = ""; }
+      if (!value || !acts[idx]) return;
+      const act = acts[idx];
+      const actName = act.title || act.name;
+      const allSessions = _groupForTargetEdit
+        ? await getAllSessionsForGroup(_groupForTargetEdit.id).catch(() => [])
+        : await getAllSessionsForStudent(student.id).catch(() => []);
+      let oldestDate = null;
+      for (const session of allSessions) {
+        const sActs = session.activities || {};
+        const sRems = session.remarks || {};
+        const matchingActIds = Object.entries(sActs)
+          .filter(([, a]) => {
+            if (a.targetName !== target.name) return false;
+            if (act.id && a.configId === act.id) return true;
+            return a.activityName === actName || (act.title && a.activityName === act.title);
+          })
+          .map(([id]) => id);
+        const hasData = matchingActIds.some(actId => Object.values(sRems).some(r =>
+          r.activityId === actId && (
+            (r.text || "").replace(/<[^>]*>/g, "").trim().length > 0 ||
+            (r.masteryNote || "").trim().length > 0 ||
+            (r.trials || []).some(t => t !== null && t !== -1) ||
+            (r.optionScore !== undefined && r.optionScore !== null)
+          )
+        ));
+        if (hasData && (!oldestDate || session.date < oldestDate)) oldestDate = session.date;
+      }
+      if (oldestDate && value > oldestDate) {
+        if (errDiv) {
+          errDiv.textContent = `The oldest recorded data for this activity is ${fmtPeriodDate(oldestDate)}. The start date cannot be later than this.`;
+          errDiv.style.display = "block";
+        }
+        inp.value = acts[idx].activeFrom || "";
+        return;
+      }
+      savePeriodField(idx, "activeFrom", value);
+    });
+  });
+  $("manage-modal-body").querySelectorAll(".mn-act-start-clear").forEach(btn => {
+    btn.addEventListener("click", () => savePeriodField(+btn.dataset.idx, "activeFrom", null));
+  });
+  if (window._closeActStartPanels) document.removeEventListener("click", window._closeActStartPanels);
+  window._closeActStartPanels = e => {
+    if (!e.target.closest(".mn-act-start-panel,.mn-act-start-btn,.mn-act-start-date,.mn-act-start-clear,.mn-act-start-err")) {
+      $("manage-modal-body").querySelectorAll(".mn-act-start-panel").forEach(p => p.style.display = "none");
+    }
+  };
+  document.addEventListener("click", window._closeActStartPanels);
 
   const getOptsFromDom = idx =>
     [...$("manage-modal-body").querySelectorAll(`.mn-opt-item[data-idx="${idx}"]`)]
@@ -19718,6 +19803,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Activity</span>
           <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem"></span>${paDisplayHtml(pa, true)}</span>
+          ${pa.activeFrom ? `<span style="font-size:.72rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:center">Created: ${fmtPeriodDate(pa.activeFrom)}</span>` : ""}
         </div>
       </div>`;
       children.forEach((sub, si) => {
@@ -20046,6 +20132,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
       <div class="entry-field" contenteditable="false">
         <span class="field-label">Activity</span>
         <span class="field-value-fixed">${formatActivityMarkup(actName)}</span>
+        ${paEntry?.activeFrom ? `<span style="font-size:.72rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:center">Created: ${fmtPeriodDate(paEntry.activeFrom)}</span>` : ""}
       </div>
       ${noteRow}
       <div class="entry-divider" contenteditable="false"></div>
@@ -20071,6 +20158,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
       <div class="entry-field" contenteditable="false">
         <span class="field-label">Activity</span>
         <span class="field-value-fixed">${inactiveReasonBadge(paEntry)}${formatActivityMarkup(actName)}</span>
+        ${paEntry?.activeFrom ? `<span style="font-size:.72rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:center">Created: ${fmtPeriodDate(paEntry.activeFrom)}</span>` : ""}
         ${combineToggle}
       </div>
       ${noteRow}
@@ -20145,6 +20233,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
     <div class="entry-field" contenteditable="false">
       <span class="field-label">Activity</span>
       <span class="field-value-fixed">${formatActivityMarkup(actName)}${inactiveReasonBadge(paEntry)}</span>
+      ${paEntry?.activeFrom ? `<span style="font-size:.72rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:center">Created: ${fmtPeriodDate(paEntry.activeFrom)}</span>` : ""}
       ${combineToggle}
     </div>
     ${noteRow}
