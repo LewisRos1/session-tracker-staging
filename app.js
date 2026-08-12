@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1574";
+const APP_VERSION = "1575";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6862,7 +6862,16 @@ function renderSessionsForMonth(student, month, monthSessions, byMonth, today, s
 // be auto-deleted on the way out, same as any other empty session, if
 // nothing ends up typed into it).
 function renderPickDateCalendar(student, sessions, byMonth, today, displayDate, { backFn, onSelect } = {}) {
-  const sessionIdByDate = new Map(sessions.map(s => [s.date, s.id]));
+  const _strip = t => (t || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
+  const sessionHasData = s => {
+    if (Object.values(s.fedcComments || {}).some(c => _strip(c).length > 0)) return true;
+    return Object.values(s.remarks || {}).some(r =>
+      _strip(r.text).length > 0 ||
+      (r.trials || []).some(t => t !== null && t !== -1) ||
+      _strip(r.masteryNote).length > 0
+    );
+  };
+  const sessionIdByDate = new Map(sessions.filter(sessionHasData).map(s => [s.date, s.id]));
   const [y, m] = displayDate.split("-").map(Number);
   const monthLabel = new Date(y, m - 1, 1).toLocaleString("default", { month: "long", year: "numeric" });
   const [ty, tm] = today.split("-").map(Number);
