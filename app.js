@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1561";
+const APP_VERSION = "1562";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -1727,6 +1727,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
             <col style="width:15%">
             <col style="width:10%">
             <col style="width:190px">
+            <col style="width:120px">
             <col style="width:130px">
             <col style="width:130px">
             <col style="width:160px">
@@ -1738,6 +1739,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
               <th>Full Name</th>
               <th style="white-space:normal">Short Name (Used in AI Reports)</th>
               <th>Note</th>
+              <th style="white-space:normal">Export Duration</th>
               <th style="white-space:normal">Imported Excel data to Website</th>
               <th style="white-space:normal">Ready for AI H1 Report</th>
               <th style="white-space:normal">Latest Individual Session Recorded</th>
@@ -1762,6 +1764,9 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
                   <input class="admin-input db-note-input" data-id="${escHtml(s.id)}"
                     value="${escHtml(s.note || '')}" placeholder="—" autocomplete="off"
                     style="width:100%;text-align:center" />
+                </td>
+                <td style="text-align:center" onclick="event.stopPropagation()">
+                  ${(() => { const m = s.exportDuration === "monthly"; return `<button class="db-export-dur-pill" data-id="${escHtml(s.id)}" style="padding:.28rem .7rem;border-radius:999px;border:1px solid ${m ? '#d1d5db' : '#93c5fd'};background:${m ? '#f3f4f6' : '#dbeafe'};color:${m ? '#6b7280' : '#1d4ed8'};font-size:.78rem;font-weight:600;cursor:pointer;white-space:nowrap">${m ? 'Monthly' : 'Every Session'}</button>`; })()}
                 </td>
                 <td class="reg-excel-export-cell" data-id="${escHtml(s.id)}" style="text-align:center">…</td>
                 <td class="reg-ai-h1-cell" data-id="${escHtml(s.id)}" style="text-align:center">…</td>
@@ -1821,6 +1826,21 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
       s.note = note;
       await setStudentNote(id, note);
       renderExistingStudentButtons();
+    });
+  });
+
+  $("student-registry-body").querySelectorAll(".db-export-dur-pill").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const s = state.students.find(x => x.id === btn.dataset.id);
+      if (!s) return;
+      const newDur = s.exportDuration === "monthly" ? "every_session" : "monthly";
+      s.exportDuration = newDur;
+      const m = newDur === "monthly";
+      btn.textContent = m ? "Monthly" : "Every Session";
+      btn.style.background   = m ? "#f3f4f6" : "#dbeafe";
+      btn.style.color        = m ? "#6b7280" : "#1d4ed8";
+      btn.style.borderColor  = m ? "#d1d5db" : "#93c5fd";
+      await saveStudent(s);
     });
   });
 
@@ -10359,7 +10379,11 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
 
   // ── Phase 4: Export (Nigel) ───────────────────────────────────
   let nigelState, nigelBody;
-  if (!ws.ready) {
+  const isMonthlyExport = !isGroup && state.viewStudent?.exportDuration === "monthly";
+  if (isMonthlyExport) {
+    nigelState = "nigel-ready";
+    nigelBody  = `<div class="wf-pill wf-pill--locked">📅 Monthly report plan — no per-session export needed for this student</div>`;
+  } else if (!ws.ready) {
     nigelState = "locked";
     nigelBody  = `<div class="wf-pill wf-pill--locked">🔒 Complete previous phases first</div>`;
   } else if (confirmRole === "p4_nigel") {
