@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1570";
+const APP_VERSION = "1571";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -1373,10 +1373,11 @@ async function loadTodoHomeCounts() {
         try {
           const checks = s.checks || {};
           const ws = getWorkflowState(s);
+          const isMonthly = (state.students || []).find(st => st.id === s.studentId)?.exportDuration === "monthly";
           if (inst.id !== "nigel" && !checks[`p1_${inst.id}`]) return n + 1;
           if (inst.id === "daisy" && !s.reviewSubmitted && !ws.daisyOnly) return n + 1;
           if (inst.id !== "daisy" && inst.id !== "nigel" && s.reviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) return n + 1;
-          if (inst.id === "nigel" && ws.ready && !ws.p4Done) return n + 1;
+          if (inst.id === "nigel" && ws.ready && !ws.p4Done && !isMonthly) return n + 1;
         } catch { /* skip malformed session */ }
         return n;
       }, 0);
@@ -1468,10 +1469,11 @@ async function openTodoScreen(filterInstId = null) {
     const pending = sessions.filter(s => {
       const checks = s.checks || {};
       const ws = getWorkflowState(s);
+      const isMonthly = (state.students || []).find(st => st.id === s.studentId)?.exportDuration === "monthly";
       if (inst.id !== "nigel" && !checks[`p1_${inst.id}`]) return true;
       if (inst.id === "daisy" && !s.reviewSubmitted && !ws.daisyOnly) return true;
       if (inst.id !== "daisy" && inst.id !== "nigel" && s.reviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) return true;
-      if (inst.id === "nigel" && ws.ready && !ws.p4Done) return true;
+      if (inst.id === "nigel" && ws.ready && !ws.p4Done && !isMonthly) return true;
       return false;
     });
     return { inst, pending };
@@ -1534,6 +1536,7 @@ function renderTodoTiles(results, filterInst = null) {
     const dateStr = s.date ? relativeTodoDate(s.date) : "Unknown date";
     const checks  = s.checks || {};
     const ws      = getWorkflowState(s);
+    const isMonthly = (state.students || []).find(st => st.id === s.studentId)?.exportDuration === "monthly";
 
     // Compute all pending tasks for this instructor on this session
     const tasks = [];
@@ -1545,7 +1548,7 @@ function renderTodoTiles(results, filterInst = null) {
       if (p2Unlocked) tasks.push("Check");
     }
     if (inst.id !== "daisy" && inst.id !== "nigel" && s.reviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) tasks.push("Revision");
-    if (inst.id === "nigel" && ws.ready && !ws.p4Done) tasks.push("Export");
+    if (inst.id === "nigel" && ws.ready && !ws.p4Done && !isMonthly) tasks.push("Export");
 
     const pillStyle = t => t === "Enter Data"
       ? "background:#eff6ff;color:#1d4ed8"
@@ -1584,6 +1587,7 @@ function renderTodoTiles(results, filterInst = null) {
       const dateStr = s.date ? relativeTodoDate(s.date) : "Unknown date";
       const checks  = s.checks || {};
       const ws      = getWorkflowState(s);
+      const isMonthly = (state.students || []).find(st => st.id === s.studentId)?.exportDuration === "monthly";
       const tasks   = [];
       if (inst.id !== "nigel" && !checks[`p1_${inst.id}`]) tasks.push("Enter Data");
       if (inst.id === "daisy" && !s.reviewSubmitted && !ws.daisyOnly) {
@@ -1592,7 +1596,7 @@ function renderTodoTiles(results, filterInst = null) {
         if (p2Unlocked) tasks.push("Check");
       }
       if (inst.id !== "daisy" && inst.id !== "nigel" && s.reviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) tasks.push("Revision");
-      if (inst.id === "nigel" && ws.ready && !ws.p4Done) tasks.push("Export");
+      if (inst.id === "nigel" && ws.ready && !ws.p4Done && !isMonthly) tasks.push("Export");
       const pillStyle = t => t === "Enter Data"
         ? "background:#eff6ff;color:#1d4ed8"
         : t === "Export" ? "background:#f0fdf4;color:#15803d" : "background:#fff7ed;color:#c2410c";
@@ -10391,7 +10395,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
   const isMonthlyExport = !isGroup && state.viewStudent?.exportDuration === "monthly";
   if (isMonthlyExport) {
     nigelState = "nigel-ready";
-    nigelBody  = `<div class="wf-pill wf-pill--locked">📅 Monthly report plan — no per-session export needed for this student</div>`;
+    nigelBody  = `<div class="wf-pill wf-pill--done">✓ This student registered for the "Monthly Report" plan. No need to export this session.</div>`;
   } else if (!ws.ready) {
     nigelState = "locked";
     nigelBody  = `<div class="wf-pill wf-pill--locked">🔒 Complete previous phases first</div>`;
