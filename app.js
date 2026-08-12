@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1572";
+const APP_VERSION = "1573";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -1371,6 +1371,10 @@ async function loadTodoHomeCounts() {
         : await getSessionsWithParticipant(inst.id).catch(() => []);
       const count = sessions.reduce((n, s) => {
         try {
+          const subjectExists = s.groupId
+            ? (state.groups   || []).some(g  => g.id  === s.groupId)
+            : (state.students || []).some(st => st.id === s.studentId);
+          if (!subjectExists) return n;
           const checks = s.checks || {};
           const ws = getWorkflowState(s);
           const isMonthly = (state.students || []).find(st => st.id === s.studentId)?.exportDuration === "monthly";
@@ -1469,6 +1473,10 @@ async function openTodoScreen(filterInstId = null) {
       ? await getAllSessions().catch(() => [])
       : await getSessionsWithParticipant(inst.id).catch(() => []);
     const pending = sessions.filter(s => {
+      const subjectExists = s.groupId
+        ? (state.groups   || []).some(g  => g.id  === s.groupId)
+        : (state.students || []).some(st => st.id === s.studentId);
+      if (!subjectExists) return false;
       const checks = s.checks || {};
       const ws = getWorkflowState(s);
       const isMonthly = (state.students || []).find(st => st.id === s.studentId)?.exportDuration === "monthly";
