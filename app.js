@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1565";
+const APP_VERSION = "1567";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8115,7 +8115,7 @@ function renderFedcTarget(target) {
           <span class="field-label">Activity</span>
           <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${paDisplayHtml(pa, true)}</span>
           <div style="display:flex;align-items:center;gap:.35rem;flex-shrink:0;align-self:flex-start">
-            ${pa.activeFrom ? `<span style="color:#9ca3af;white-space:nowrap">Activity Custom Start Date: ${fmtPeriodDate(pa.activeFrom)}</span>` : ""}
+            ${pa.activeFrom ? `<span style="font-size:.5em;color:#9ca3af;white-space:nowrap">Activity Custom Start Date: ${fmtPeriodDate(pa.activeFrom)}</span>` : ""}
             ${pa.id ? `<button class="btn-icon btn-edit-activity-pencil" contenteditable="false" data-pa-id="${escHtml(pa.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
           </div>
         </div>
@@ -8255,7 +8255,7 @@ function renderFedcTarget(target) {
         <span class="field-label">Activity</span>
         <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${paDisplayHtml(pa, true)}</span>
         <div style="display:flex;align-items:center;gap:.35rem;flex-shrink:0;align-self:flex-start">
-          ${pa.activeFrom ? `<span style="color:#9ca3af;white-space:nowrap">Activity Custom Start Date: ${fmtPeriodDate(pa.activeFrom)}</span>` : ""}
+          ${pa.activeFrom ? `<span style="font-size:.5em;color:#9ca3af;white-space:nowrap">Activity Custom Start Date: ${fmtPeriodDate(pa.activeFrom)}</span>` : ""}
           ${pa.id ? `<button class="btn-icon btn-edit-activity-pencil" contenteditable="false" data-pa-id="${escHtml(pa.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
         </div>
       </div>`;
@@ -16042,6 +16042,7 @@ function renderTargetManageContent(student, target) {
         <div style="position:relative;align-self:flex-start">
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:310px;overflow:hidden">
+            ${actStartDateHtml(a.activeFrom, idx)}
             <button class="mn-km-manage-act" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#0369a1">🪄 Manage Activity</button>
             <button class="mn-km-convert-mapped" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#7c3aed">🔄 Convert to Regular Activity</button>
             <div style="display:flex;align-items:stretch">
@@ -16159,8 +16160,8 @@ function renderTargetManageContent(student, target) {
           <div style="position:relative;align-self:flex-start">
             <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
             <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:310px;overflow:hidden">
-              <button class="mn-km-manage-act" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#0369a1">🪄 Manage Activity</button>
               ${actStartDateHtml(a.activeFrom, idx)}
+              <button class="mn-km-manage-act" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#0369a1">🪄 Manage Activity</button>
               <div style="display:flex;align-items:stretch">
                 <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
                 <span title="Deletes this activity and all its sub-activities." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
@@ -16212,10 +16213,10 @@ function renderTargetManageContent(student, target) {
           <div style="position:relative;align-self:flex-start">
             <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
             <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:310px;overflow:hidden">
+              ${actStartDateHtml(a.activeFrom, idx)}
               <button class="mn-km-manage-act" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#0369a1">🪄 Manage Activity</button>
               <button class="mn-km-move-to-parent" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151;white-space:nowrap">↪️ Make this activity into a Sub-activity</button>
               <button class="mn-km-add-sub" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">➕ Add sub-activity</button>
-              ${actStartDateHtml(a.activeFrom, idx)}
               <div style="display:flex;align-items:stretch">
                 <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
                 <span title="Permanently removes this activity and all of its session data. This cannot be undone." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
@@ -19860,7 +19861,7 @@ function buildGroupItemsByActivity(target, data, attendees) {
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Activity</span>
           <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem"></span>${paDisplayHtml(pa, true)}</span>
-          ${pa.activeFrom ? `<span style="color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Activity Custom Start Date: ${fmtPeriodDate(pa.activeFrom)}</span>` : ""}
+          ${pa.activeFrom ? `<span style="font-size:.5em;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Activity Custom Start Date: ${fmtPeriodDate(pa.activeFrom)}</span>` : ""}
         </div>
       </div>`;
       children.forEach((sub, si) => {
@@ -20189,7 +20190,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
       <div class="entry-field" contenteditable="false">
         <span class="field-label">Activity</span>
         <span class="field-value-fixed">${formatActivityMarkup(actName)}</span>
-        ${paEntry?.activeFrom ? `<span style="color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Activity Custom Start Date: ${fmtPeriodDate(paEntry.activeFrom)}</span>` : ""}
+        ${paEntry?.activeFrom ? `<span style="font-size:.5em;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Activity Custom Start Date: ${fmtPeriodDate(paEntry.activeFrom)}</span>` : ""}
       </div>
       ${noteRow}
       <div class="entry-divider" contenteditable="false"></div>
@@ -20215,7 +20216,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
       <div class="entry-field" contenteditable="false">
         <span class="field-label">Activity</span>
         <span class="field-value-fixed">${inactiveReasonBadge(paEntry)}${formatActivityMarkup(actName)}</span>
-        ${paEntry?.activeFrom ? `<span style="color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Activity Custom Start Date: ${fmtPeriodDate(paEntry.activeFrom)}</span>` : ""}
+        ${paEntry?.activeFrom ? `<span style="font-size:.5em;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Activity Custom Start Date: ${fmtPeriodDate(paEntry.activeFrom)}</span>` : ""}
         ${combineToggle}
       </div>
       ${noteRow}
@@ -20290,7 +20291,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
     <div class="entry-field" contenteditable="false">
       <span class="field-label">Activity</span>
       <span class="field-value-fixed">${formatActivityMarkup(actName)}${inactiveReasonBadge(paEntry)}</span>
-      ${paEntry?.activeFrom ? `<span style="color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Activity Custom Start Date: ${fmtPeriodDate(paEntry.activeFrom)}</span>` : ""}
+      ${paEntry?.activeFrom ? `<span style="font-size:.5em;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Activity Custom Start Date: ${fmtPeriodDate(paEntry.activeFrom)}</span>` : ""}
       ${combineToggle}
     </div>
     ${noteRow}
