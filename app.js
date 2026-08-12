@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1562";
+const APP_VERSION = "1563";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -14364,17 +14364,20 @@ function periodSectionHtml(activeFrom, activeTo, idx, withBorder, inactiveReason
 }
 
 function actStartDateHtml(activeFrom, idx) {
-  const label = activeFrom ? fmtPeriodDate(activeFrom) : 'Not set';
-  const bg  = activeFrom ? '#ffffff' : '#eff6ff';
-  const col = activeFrom ? '#111827' : '#6b7280';
+  const btnLabel = activeFrom ? `Set Start Date (${fmtPeriodDate(activeFrom)})` : 'Set Start Date (None)';
+  const bg  = activeFrom ? '#ffffff' : '#f9fafb';
+  const col = activeFrom ? '#111827' : '#374151';
   return `<div style="padding:.45rem .6rem;border-bottom:1px solid #f3f4f6">
-    <div style="font-size:.84rem;color:inherit;margin-bottom:.35rem">📅 Start Date</div>
     <div style="position:relative">
-      <button class="mn-act-start-btn" data-idx="${idx}" style="width:100%;padding:.28rem .4rem;border:1px solid #d1d5db;border-radius:.3rem;background:${bg};cursor:pointer;font-size:.8rem;color:${col};white-space:nowrap;text-align:center">${label}</button>
-      <div class="mn-act-start-panel" data-idx="${idx}" style="display:none;position:absolute;top:calc(100% + 3px);right:0;z-index:300;background:#fff;border:1px solid #e5e7eb;border-radius:.45rem;padding:.4rem;box-shadow:0 4px 14px rgba(0,0,0,.12);min-width:200px">
-        <input type="date" class="mn-act-start-date" data-idx="${idx}" value="${activeFrom||''}" style="width:100%;font-size:.8rem;border:1px solid #d1d5db;border-radius:.3rem;padding:.2rem .3rem;margin-bottom:.3rem;box-sizing:border-box">
-        <div class="mn-act-start-err" data-idx="${idx}" style="display:none;font-size:.76rem;color:#dc2626;margin-bottom:.25rem;line-height:1.3"></div>
-        <button class="mn-act-start-clear" data-idx="${idx}" style="width:100%;padding:.25rem;font-size:.78rem;border:1px solid #bfdbfe;border-radius:.3rem;background:#eff6ff;cursor:pointer;color:#1d4ed8">Clear Start Date</button>
+      <button class="mn-act-start-btn" data-idx="${idx}" style="width:100%;padding:.35rem .6rem;border:1px solid #d1d5db;border-radius:.3rem;background:${bg};cursor:pointer;font-size:.83rem;color:${col};text-align:left">📅 ${btnLabel}</button>
+      <div class="mn-act-start-panel" data-idx="${idx}" style="display:none;position:absolute;top:calc(100% + 4px);right:0;z-index:300;background:#fff;border:1px solid #e5e7eb;border-radius:.5rem;padding:.55rem;box-shadow:0 4px 16px rgba(0,0,0,.13);min-width:220px">
+        <div style="font-size:.78rem;color:#6b7280;margin-bottom:.4rem;line-height:1.4">What day do you want this activity to start appearing?</div>
+        <input type="date" class="mn-act-start-date" data-idx="${idx}" value="${activeFrom||''}" style="width:100%;font-size:.82rem;border:1px solid #d1d5db;border-radius:.35rem;padding:.25rem .35rem;margin-bottom:.35rem;box-sizing:border-box">
+        <div class="mn-act-start-err" data-idx="${idx}" style="display:none;font-size:.76rem;color:#dc2626;margin-bottom:.3rem;line-height:1.3"></div>
+        <div style="display:flex;gap:.35rem">
+          ${activeFrom ? `<button class="mn-act-start-clear" data-idx="${idx}" style="flex:1;padding:.28rem;font-size:.78rem;border:1px solid #fca5a5;border-radius:.35rem;background:#fee2e2;cursor:pointer;color:#dc2626">✕ Clear Date</button>` : ''}
+          <button class="mn-act-start-cancel" data-idx="${idx}" style="flex:1;padding:.28rem;font-size:.78rem;border:1px solid #d1d5db;border-radius:.35rem;background:#f9fafb;cursor:pointer;color:#6b7280">Cancel</button>
+        </div>
       </div>
     </div>
   </div>`;
@@ -17860,9 +17863,16 @@ function renderTargetManageContent(student, target) {
   $("manage-modal-body").querySelectorAll(".mn-act-start-clear").forEach(btn => {
     btn.addEventListener("click", () => savePeriodField(+btn.dataset.idx, "activeFrom", null));
   });
+  $("manage-modal-body").querySelectorAll(".mn-act-start-cancel").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const panel = $("manage-modal-body").querySelector(`.mn-act-start-panel[data-idx="${btn.dataset.idx}"]`);
+      if (panel) panel.style.display = "none";
+    });
+  });
   if (window._closeActStartPanels) document.removeEventListener("click", window._closeActStartPanels);
   window._closeActStartPanels = e => {
-    if (!e.target.closest(".mn-act-start-panel,.mn-act-start-btn,.mn-act-start-date,.mn-act-start-clear,.mn-act-start-err")) {
+    if (!e.target.closest(".mn-act-start-panel,.mn-act-start-btn,.mn-act-start-date,.mn-act-start-clear,.mn-act-start-cancel,.mn-act-start-err")) {
       $("manage-modal-body").querySelectorAll(".mn-act-start-panel").forEach(p => p.style.display = "none");
     }
   };
