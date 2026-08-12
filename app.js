@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1569";
+const APP_VERSION = "1570";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -14389,7 +14389,7 @@ function showActStartDatePicker() {
   overlay.innerHTML = `<div style="position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.45);display:flex;flex-direction:column;justify-content:flex-end" id="act-start-picker-backdrop">
     <div style="background:#fff;border-radius:1.1rem 1.1rem 0 0;padding:1.3rem 1.3rem calc(env(safe-area-inset-bottom,0px) + 1.3rem);box-shadow:0 -4px 24px rgba(0,0,0,.14)">
       <div style="font-weight:700;font-size:1rem;color:#111827;margin-bottom:.25rem">Set Start Date</div>
-      <div style="font-size:.85rem;color:#6b7280;margin-bottom:.85rem">What day do you want this activity <strong style="color:#374151">(${escHtml(actName)})</strong> to start appearing?</div>
+      <div style="font-size:.85rem;color:#6b7280;margin-bottom:.85rem">What date do you want this activity <strong style="color:#374151">(${escHtml(actName)})</strong> to start appearing?</div>
       <div id="act-start-picker-err" style="display:none;font-size:.82rem;color:#dc2626;margin-bottom:.5rem;line-height:1.4;padding:.4rem .6rem;background:#fee2e2;border-radius:.4rem"></div>
       <input type="date" id="act-start-picker-inp" value="${activeFrom}" style="width:100%;font-size:1rem;border:1.5px solid #d1d5db;border-radius:.5rem;padding:.55rem .65rem;box-sizing:border-box;margin-bottom:.85rem">
       <div style="display:flex;gap:.5rem">
