@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1583";
+const APP_VERSION = "1585";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8576,29 +8576,32 @@ function renderFedcTargetWithSidebar(target, allPas, subActsByParent, sessionDat
   const pct = totalActs > 0 ? Math.round(totalWritten / totalActs * 100) : 0;
 
   const selectedPaSet = new Set(sections[selIdx].pas);
-  const sectionHeading = `<div contenteditable="false" style="font-size:.95rem;font-weight:700;color:#374151;padding-bottom:.5rem;border-bottom:2px solid #e5e7eb;margin-bottom:.1rem">${escHtml(sections[selIdx].name)}</div>`;
+  const sectionHeading = `<div contenteditable="false" style="font-size:1.43rem;font-weight:700;color:#374151;padding-bottom:.5rem;border-bottom:2px solid #e5e7eb;margin-bottom:.1rem">${escHtml(sections[selIdx].name)}</div>`;
   const mainContentHtml = renderFedcTarget(target, selectedPaSet);
 
   if (_sidebarCollapsed) {
-    const collapsedSidebar = `<div class="sec-sidebar" contenteditable="false" style="flex-shrink:0;border:1px solid #e5e7eb;border-radius:.5rem 0 0 .5rem;background:#fafafa;position:sticky;top:0;max-height:calc(100vh - 170px);overflow-y:auto;display:flex;flex-direction:column;align-items:center;padding:.4rem 0;gap:.35rem">
-      <button class="sec-toggle-btn" contenteditable="false" title="Show sections" style="background:none;border:none;cursor:pointer;font-size:1rem;color:var(--primary);padding:.3rem .4rem;line-height:1">▶</button>
-      ${sections.map((g, i) => `<div style="width:8px;height:8px;border-radius:50%;background:${i === selIdx ? 'var(--primary)' : '#d1d5db'};flex-shrink:0" title="${escHtml(g.name)}"></div>`).join('')}
-    </div>`;
-    return `<div class="sec-layout" style="display:flex;gap:0;align-items:flex-start">
-      ${collapsedSidebar}
-      <div class="sec-main" style="flex:1;min-width:0;padding-left:.75rem;display:flex;flex-direction:column;gap:.85rem">
+    return `<div class="sec-layout" contenteditable="false" style="display:flex;flex-direction:column;gap:0">
+      <div contenteditable="false" style="display:flex;align-items:center;gap:.6rem;padding:.3rem 0 .5rem;margin-bottom:.4rem;border-bottom:1px solid #e5e7eb">
+        <button class="sec-toggle-btn" contenteditable="false" title="Show sections" style="background:none;border:none;cursor:pointer;font-size:1.25rem;color:var(--primary);padding:.1rem .25rem;line-height:1;flex-shrink:0">☰</button>
+        <span style="font-size:.82rem;font-weight:700;color:#374151;white-space:nowrap">${totalWritten} of ${totalActs} written</span>
+        <div style="flex:1;background:#e5e7eb;border-radius:9999px;height:4px;max-width:100px">
+          <div style="background:var(--primary);height:100%;width:${pct}%;border-radius:9999px"></div>
+        </div>
+      </div>
+      <div class="sec-main" style="display:flex;flex-direction:column;gap:.85rem">
         ${sectionHeading}
         ${mainContentHtml}
       </div>
     </div>`;
   }
 
-  let sidebarHtml = `<div style="padding:.75rem .9rem .6rem;border-bottom:1px solid #e5e7eb;display:flex;align-items:flex-start;gap:.5rem">
-    <div style="flex:1;min-width:0">
-      <div style="font-size:.88rem;font-weight:700;color:#111827;margin-bottom:.35rem">${totalWritten} of ${totalActs} written</div>
-      <div style="background:#e5e7eb;border-radius:9999px;height:5px"><div style="background:var(--primary);height:100%;width:${pct}%;border-radius:9999px"></div></div>
-    </div>
-    <button class="sec-toggle-btn" contenteditable="false" title="Hide sections" style="background:none;border:none;cursor:pointer;font-size:.85rem;color:#9ca3af;padding:.1rem .2rem;flex-shrink:0;line-height:1;margin-top:.1rem">◀</button>
+  let sidebarHtml = `<div style="padding:.5rem .9rem .45rem;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between">
+    <span style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:130px">${escHtml(sections[selIdx].name)}</span>
+    <button class="sec-toggle-btn" contenteditable="false" title="Hide sections" style="background:none;border:none;cursor:pointer;font-size:1.3rem;color:#9ca3af;line-height:1;padding:.05rem .2rem;flex-shrink:0">×</button>
+  </div>
+  <div style="padding:.6rem .9rem .5rem;border-bottom:1px solid #e5e7eb">
+    <div style="font-size:.88rem;font-weight:700;color:#111827;margin-bottom:.35rem">${totalWritten} of ${totalActs} written</div>
+    <div style="background:#e5e7eb;border-radius:9999px;height:5px"><div style="background:var(--primary);height:100%;width:${pct}%;border-radius:9999px"></div></div>
   </div>`;
 
   sections.forEach((grp, i) => {
@@ -8611,8 +8614,8 @@ function renderFedcTargetWithSidebar(target, allPas, subActsByParent, sessionDat
     </button>`;
   });
 
-  return `<div class="sec-layout" style="display:flex;gap:0;align-items:flex-start">
-    <div class="sec-sidebar" contenteditable="false" style="width:190px;flex-shrink:0;border:1px solid #e5e7eb;border-radius:.5rem 0 0 .5rem;background:#fafafa;position:sticky;top:0;max-height:calc(100vh - 170px);overflow-y:auto">
+  return `<div class="sec-layout" style="display:flex;gap:0;align-items:stretch">
+    <div class="sec-sidebar" contenteditable="false" style="width:190px;flex-shrink:0;border-right:1px solid #e5e7eb;background:#fafafa;position:sticky;top:0;max-height:calc(100vh - 170px);overflow-y:auto">
       ${sidebarHtml}
     </div>
     <div class="sec-main" style="flex:1;min-width:0;padding-left:.75rem;display:flex;flex-direction:column;gap:.85rem">
@@ -20370,7 +20373,7 @@ function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByPa
   const pct = totalActs > 0 ? Math.round(totalWritten / totalActs * 100) : 0;
 
   const selectedPaSet = new Set(sections[selIdx].pas);
-  const grpSectionHeading = `<div contenteditable="false" style="font-size:.95rem;font-weight:700;color:#374151;padding-bottom:.5rem;border-bottom:2px solid #e5e7eb;margin-bottom:.1rem">${escHtml(sections[selIdx].name)}</div>`;
+  const grpSectionHeading = `<div contenteditable="false" style="font-size:1.43rem;font-weight:700;color:#374151;padding-bottom:.5rem;border-bottom:2px solid #e5e7eb;margin-bottom:.1rem">${escHtml(sections[selIdx].name)}</div>`;
   const mainItems = buildGroupItemsByActivity(target, data, attendees, selectedPaSet);
 
   // Manually added (non-predefined) activities always show below section content
@@ -20382,25 +20385,28 @@ function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByPa
     });
 
   if (_grpSidebarCollapsed) {
-    const collapsedSidebar = `<div class="grp-sec-sidebar" contenteditable="false" style="flex-shrink:0;border:1px solid #e5e7eb;border-radius:.5rem 0 0 .5rem;background:#fafafa;position:sticky;top:0;max-height:calc(100vh - 170px);overflow-y:auto;display:flex;flex-direction:column;align-items:center;padding:.4rem 0;gap:.35rem">
-      <button class="grp-sec-toggle-btn" contenteditable="false" title="Show sections" style="background:none;border:none;cursor:pointer;font-size:1rem;color:var(--primary);padding:.3rem .4rem;line-height:1">▶</button>
-      ${sections.map((g, i) => `<div style="width:8px;height:8px;border-radius:50%;background:${i === selIdx ? 'var(--primary)' : '#d1d5db'};flex-shrink:0" title="${escHtml(g.name)}"></div>`).join('')}
-    </div>`;
-    return [`<div class="sec-layout" style="display:flex;gap:0;align-items:flex-start">
-      ${collapsedSidebar}
-      <div class="grp-sec-main" style="flex:1;min-width:0;padding-left:.75rem;display:flex;flex-direction:column;gap:.85rem">
+    return [`<div class="sec-layout" contenteditable="false" style="display:flex;flex-direction:column;gap:0">
+      <div contenteditable="false" style="display:flex;align-items:center;gap:.6rem;padding:.3rem 0 .5rem;margin-bottom:.4rem;border-bottom:1px solid #e5e7eb">
+        <button class="grp-sec-toggle-btn" contenteditable="false" title="Show sections" style="background:none;border:none;cursor:pointer;font-size:1.25rem;color:var(--primary);padding:.1rem .25rem;line-height:1;flex-shrink:0">☰</button>
+        <span style="font-size:.82rem;font-weight:700;color:#374151;white-space:nowrap">${totalWritten} of ${totalActs} written</span>
+        <div style="flex:1;background:#e5e7eb;border-radius:9999px;height:4px;max-width:100px">
+          <div style="background:var(--primary);height:100%;width:${pct}%;border-radius:9999px"></div>
+        </div>
+      </div>
+      <div class="grp-sec-main" style="display:flex;flex-direction:column;gap:.85rem">
         ${grpSectionHeading}
         ${mainItems.join("")}
       </div>
     </div>`];
   }
 
-  let sidebarHtml = `<div style="padding:.75rem .9rem .6rem;border-bottom:1px solid #e5e7eb;display:flex;align-items:flex-start;gap:.5rem">
-    <div style="flex:1;min-width:0">
-      <div style="font-size:.88rem;font-weight:700;color:#111827;margin-bottom:.35rem">${totalWritten} of ${totalActs} written</div>
-      <div style="background:#e5e7eb;border-radius:9999px;height:5px"><div style="background:var(--primary);height:100%;width:${pct}%;border-radius:9999px"></div></div>
-    </div>
-    <button class="grp-sec-toggle-btn" contenteditable="false" title="Hide sections" style="background:none;border:none;cursor:pointer;font-size:.85rem;color:#9ca3af;padding:.1rem .2rem;flex-shrink:0;line-height:1;margin-top:.1rem">◀</button>
+  let sidebarHtml = `<div style="padding:.5rem .9rem .45rem;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between">
+    <span style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:130px">${escHtml(sections[selIdx].name)}</span>
+    <button class="grp-sec-toggle-btn" contenteditable="false" title="Hide sections" style="background:none;border:none;cursor:pointer;font-size:1.3rem;color:#9ca3af;line-height:1;padding:.05rem .2rem;flex-shrink:0">×</button>
+  </div>
+  <div style="padding:.6rem .9rem .5rem;border-bottom:1px solid #e5e7eb">
+    <div style="font-size:.88rem;font-weight:700;color:#111827;margin-bottom:.35rem">${totalWritten} of ${totalActs} written</div>
+    <div style="background:#e5e7eb;border-radius:9999px;height:5px"><div style="background:var(--primary);height:100%;width:${pct}%;border-radius:9999px"></div></div>
   </div>`;
 
   sections.forEach((grp, i) => {
@@ -20413,8 +20419,8 @@ function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByPa
     </button>`;
   });
 
-  return [`<div class="sec-layout" style="display:flex;gap:0;align-items:flex-start">
-    <div class="grp-sec-sidebar" contenteditable="false" style="width:190px;flex-shrink:0;border:1px solid #e5e7eb;border-radius:.5rem 0 0 .5rem;background:#fafafa;position:sticky;top:0;max-height:calc(100vh - 170px);overflow-y:auto">
+  return [`<div class="sec-layout" style="display:flex;gap:0;align-items:stretch">
+    <div class="grp-sec-sidebar" contenteditable="false" style="width:190px;flex-shrink:0;border-right:1px solid #e5e7eb;background:#fafafa;position:sticky;top:0;max-height:calc(100vh - 170px);overflow-y:auto">
       ${sidebarHtml}
     </div>
     <div class="grp-sec-main" style="flex:1;min-width:0;padding-left:.75rem;display:flex;flex-direction:column;gap:.85rem">
