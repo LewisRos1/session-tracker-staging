@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1588";
+const APP_VERSION = "1589";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -16303,11 +16303,15 @@ function renderTargetManageContent(student, target) {
                 <button class="mn-undo-maintain" data-idx="${subIdx}" style="font-size:.72rem;padding:.15rem .45rem;background:#dbeafe;border:1px solid #93c5fd;border-radius:.3rem;cursor:pointer;color:#1d4ed8">↩ Undo</button>
               </div>`
             : "";
+          const subCreatedLabel = sub.activeFrom ? fmtPeriodDate(sub.activeFrom) : '';
           return `<div style="margin-left:1.25rem;display:flex;gap:.4rem;align-items:flex-start;padding:.5rem .6rem;background:#f0f9ff;border:1px solid #bae6fd;border-left:3px solid #60a5fa;border-radius:.35rem">
             <span style="font-size:.75rem;font-weight:700;color:#0369a1;flex-shrink:0;min-width:1.4rem;padding-top:.2rem">${String.fromCharCode(97 + si)})</span>
             <div style="flex:1;display:flex;flex-direction:column;gap:.55rem">
               <div>
-                <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title</div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.28rem">
+                  <div style="font-size:.95rem;font-weight:700;color:#374151">Activity Title</div>
+                  ${subCreatedLabel ? `<span style="font-size:.72rem;color:#6b7280">Created: ${subCreatedLabel}</span>` : ''}
+                </div>
                 <div style="display:flex;gap:.4rem;align-items:flex-start">
                   <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden;flex:1">
                     <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
@@ -16317,11 +16321,16 @@ function renderTargetManageContent(student, target) {
                     <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subIdx}" data-idx="${subIdx}"
                       placeholder="Enter Activity Title Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
                   </div>
-                  <div style="display:flex;flex-direction:column;gap:.3rem;flex-shrink:0;margin-top:.35rem">
-                    <button class="mn-move-sub-act" data-idx="${subIdx}" title="Move to a different parent activity" style="font-size:.78rem;padding:.25rem .5rem;background:#eff6ff;border:1px solid #bfdbfe;border-radius:.35rem;color:#1d4ed8;cursor:pointer;line-height:1.2;white-space:nowrap">↳ Move to another Parent Activity</button>
-                    <button class="mn-make-standalone" data-idx="${subIdx}" title="Make standalone activity" style="font-size:.78rem;padding:.25rem .5rem;background:#f0fdf4;border:1px solid #86efac;border-radius:.35rem;color:#15803d;cursor:pointer;line-height:1.2;white-space:nowrap">↗ Make standalone activity</button>
+                  <div style="position:relative;align-self:flex-start;flex-shrink:0;margin-top:.35rem">
+                    <button class="btn-adm-del mn-sub-kebab-btn" data-idx="${subIdx}" title="Subactivity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
+                    <div class="mn-sub-kebab-menu" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:240px;overflow:hidden">
+                      <button class="mn-act-start-btn" data-idx="${subIdx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151;white-space:nowrap">📅 Set Start Date</button>
+                      <button class="mn-sub-km-manage" data-idx="${subIdx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#0369a1">🪄 Manage Subactivity</button>
+                      <button class="mn-move-sub-act" data-idx="${subIdx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151;white-space:nowrap">↳ Move to another Parent Activity</button>
+                      <button class="mn-make-standalone" data-idx="${subIdx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151;white-space:nowrap">↗ Make standalone activity</button>
+                      <button class="mn-del-sub-act" data-idx="${subIdx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Subactivity</button>
+                    </div>
                   </div>
-                  <button class="btn-adm-del mn-del-sub-act" data-idx="${subIdx}" title="Delete sub-activity" style="flex-shrink:0;margin-top:.35rem">🗑</button>
                 </div>
               </div>
               <div>
@@ -16336,9 +16345,11 @@ function renderTargetManageContent(student, target) {
                     rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(sub.name || '')}</textarea>
                 </div>
               </div>
-              <div>
-                <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Type</div>
-                ${subRemarkType}
+              <div class="mn-sub-act-body" data-idx="${subIdx}" style="display:none;flex-direction:column;gap:.55rem">
+                <div>
+                  <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Type</div>
+                  ${subRemarkType}
+                </div>
               </div>
               ${subFixedRemarkRow}
             </div>
@@ -16962,7 +16973,7 @@ function renderTargetManageContent(student, target) {
       const idx = btn.dataset.idx;
       const menu = $(`mn-km-${idx}`);
       const wasHidden = menu.style.display !== "block";
-      $("manage-modal-body").querySelectorAll(".mn-kebab-menu, .mn-inactive-km").forEach(m => m.style.display = "none");
+      $("manage-modal-body").querySelectorAll(".mn-kebab-menu, .mn-sub-kebab-menu, .mn-inactive-km").forEach(m => m.style.display = "none");
       if (wasHidden) {
         menu.style.top    = "100%";
         menu.style.bottom = "auto";
@@ -16977,6 +16988,34 @@ function renderTargetManageContent(student, target) {
         };
         setTimeout(() => document.addEventListener("click", closeMenu), 0);
       }
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-sub-kebab-btn").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const menu = btn.nextElementSibling;
+      const wasHidden = menu.style.display !== "block";
+      $("manage-modal-body").querySelectorAll(".mn-kebab-menu, .mn-sub-kebab-menu, .mn-inactive-km").forEach(m => m.style.display = "none");
+      if (wasHidden) {
+        menu.style.display = "block";
+        const closeMenu = ev => {
+          if (!menu.contains(ev.target)) { menu.style.display = "none"; document.removeEventListener("click", closeMenu); }
+        };
+        setTimeout(() => document.addEventListener("click", closeMenu), 0);
+      }
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-sub-km-manage").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const idx = btn.dataset.idx;
+      const body = $("manage-modal-body").querySelector(`.mn-sub-act-body[data-idx="${idx}"]`);
+      $("manage-modal-body").querySelectorAll(".mn-sub-kebab-menu").forEach(m => m.style.display = "none");
+      if (!body) return;
+      const isHidden = body.style.display === "none" || body.style.display === "";
+      body.style.display = isHidden ? "flex" : "none";
     });
   });
 
@@ -18476,7 +18515,7 @@ function renderTargetManageContent(student, target) {
 
   $("btn-mn-done-target").addEventListener("click", closeManageModal);
 
-  $("btn-mn-del-target").addEventListener("click", async () => {
+  $("btn-mn-del-target")?.addEventListener("click", async () => {
     const typed1 = prompt(`This will permanently delete "${target.name}" and ALL its session data across every date.\n\nType DELETE to confirm:`);
     if (typed1 !== "DELETE") return;
     const typed2 = prompt(`Are you absolutely sure? This cannot be undone.\n\nType DELETE again to permanently delete "${target.name}":`);
