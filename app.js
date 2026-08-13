@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1587";
+const APP_VERSION = "1588";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8596,7 +8596,7 @@ function renderFedcTargetWithSidebar(target, allPas, subActsByParent, sessionDat
   }
 
   let sidebarHtml = `<div style="padding:.5rem .9rem .45rem;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between">
-    <span style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:130px">${escHtml(sections[selIdx].name)}</span>
+    <span style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;font-weight:600">Menu</span>
     <button class="sec-toggle-btn" contenteditable="false" title="Hide sections" style="background:none;border:none;cursor:pointer;font-size:1.3rem;color:#9ca3af;line-height:1;padding:.05rem .2rem;flex-shrink:0">×</button>
   </div>
   <div style="padding:.6rem .9rem .5rem;border-bottom:1px solid #e5e7eb">
@@ -20401,7 +20401,7 @@ function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByPa
   }
 
   let sidebarHtml = `<div style="padding:.5rem .9rem .45rem;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between">
-    <span style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:130px">${escHtml(sections[selIdx].name)}</span>
+    <span style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;font-weight:600">Menu</span>
     <button class="grp-sec-toggle-btn" contenteditable="false" title="Hide sections" style="background:none;border:none;cursor:pointer;font-size:1.3rem;color:#9ca3af;line-height:1;padding:.05rem .2rem;flex-shrink:0">×</button>
   </div>
   <div style="padding:.6rem .9rem .5rem;border-bottom:1px solid #e5e7eb">
