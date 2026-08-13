@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1579";
+const APP_VERSION = "1580";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -7539,6 +7539,7 @@ async function openSession(student, existingSessionId = null, dateStr = null, pa
   state.pendingNewActivity = null;
   state.pendingNewRemark   = null;
   state.renderPending      = false;
+  _selectedSectionIdx      = 0;
 
   showScreen("screen-session");
   $("session-student-name").textContent = student.name + (student.note ? ' ' + student.note : '');
@@ -7848,6 +7849,7 @@ function populateTargetDropdown(targets) {
     // deleted as if it were never entered.
     await state.entryRemarkSaver?.flush();
     state.selectedTargetName = sel.value;
+    _selectedSectionIdx      = 0;
     _pendingNewActivity      = null;
     state.pendingNewActivity = null;
     state.pendingNewRemark   = null;
@@ -8028,9 +8030,61 @@ function renderTargetContent() {
   if (scrollHost) scrollHost.scrollTop = scrollTop;
 }
 
+// ─── SECTION SIDEBAR HELPERS ─────────────────────────────────
+
+// Groups active top-level (non-sub) activities by their section heading.
+// Activities before the first heading fall into an implicit "General" group.
+// Notes are included in the section for inline rendering; headings themselves are not.
+function groupPasBySections(target, dateStr) {
+  const sections = [];
+  let current = null;
+  for (const pa of (target.predefinedActivities || [])) {
+    if (!isActivityActive(pa, dateStr)) continue;
+    if (pa.parentActivity) continue;
+    if (pa.isHeading || pa.isMaintainHeading) {
+      current = { name: pa.name || "", headingPa: pa, pas: [] };
+      sections.push(current);
+    } else {
+      if (!current) { current = { name: "General", headingPa: null, pas: [] }; sections.push(current); }
+      current.pas.push(pa);
+    }
+  }
+  return sections;
+}
+
+// Returns true if a predefined activity has any written data in the current individual session.
+function paIsWritten(pa, target) {
+  if ((pa.fixedRemark !== undefined || pa.isMaintain) && !pa.maintained) return false;
+  const actData = findActivityByName(target.name, pa.title || pa.name, null, pa.id);
+  if (!actData) return false;
+  const stripH = t => (t || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+  return getRemarksForActivity(actData.id).some(r =>
+    stripH(r.text).length > 0 ||
+    (r.trials || []).some(t => t !== null && t !== -1) ||
+    (r.masteryNote || "").trim().length > 0
+  );
+}
+
+// Returns true if a predefined activity in a group session has data for any attendee.
+function grpPaIsWritten(pa, target, data) {
+  const grpAllActs = Object.entries(data.activities || {});
+  const actId = (pa.id && grpAllActs.find(([, a]) => a.configId === pa.id && a.targetName === target.name)?.[0])
+    || grpAllActs.find(([, a]) => a.targetName === target.name && a.activityName === pa.name && !a.parentActivity && !a.configId)?.[0]
+    || null;
+  if (!actId) return false;
+  const stripH = t => (t || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+  return Object.values(data.remarks || {}).some(r =>
+    r.activityId === actId && (
+      stripH(r.text).length > 0 ||
+      (r.trials || []).some(t => t !== null && t !== -1) ||
+      (r.masteryNote || "").trim().length > 0
+    )
+  );
+}
+
 // ─── FEDC TARGET ─────────────────────────────────────────────
 
-function renderFedcTarget(target) {
+function renderFedcTarget(target, _filterPaSet = null) {
   let html = "";
 
   const letters = "abcdefghij";
@@ -8070,12 +8124,18 @@ function renderFedcTarget(target) {
     }
   }
 
+  // Section headings present → sidebar layout (only for non-filtered calls)
+  if (!_filterPaSet && allPas.some(pa => pa.isHeading)) {
+    return renderFedcTargetWithSidebar(target, allPas, subActsByParent, sessionDateForFilter);
+  }
+
   allPas.forEach((pa, idx) => {
     if (!isActivityActive(pa, sessionDateForFilter)) return;
     // Sub-activities are rendered within their parent's group block
     if (pa.parentActivity) return;
     // Note item — render inline in order, styled like a section heading
     if (pa.isNote || pa.isExportNote) {
+      if (_filterPaSet && !_filterPaSet.has(pa)) return;
       if (pa.text) {
         const noteTag = pa.isExportNote
           ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.25rem">📄 Included in Word export</div>`
@@ -8092,6 +8152,7 @@ function renderFedcTarget(target) {
 
     // Heading rows — blue, gray, or green based on headingColor property
     if (pa.isHeading || pa.isMaintainHeading) {
+      if (_filterPaSet) return; // sidebar mode: section name shown in sidebar, not inline
       const isGray  = pa.headingColor === "gray" || pa.isMaintainHeading;
       const isGreen = pa.headingColor === "green";
       html += isGray
@@ -8103,6 +8164,7 @@ function renderFedcTarget(target) {
     }
 
     if (pa.isCompleted || pa.isArchived || pa.isStopped) return;
+    if (_filterPaSet && !_filterPaSet.has(pa)) return;
 
     actNum++;
     // Fixed remark activity — shown read-only with color block styling
@@ -8465,6 +8527,54 @@ function renderFedcTarget(target) {
   return html;
 }
 
+// ─── SECTION SIDEBAR LAYOUT (individual session) ─────────────
+
+function renderFedcTargetWithSidebar(target, allPas, subActsByParent, sessionDateForFilter) {
+  const sections = groupPasBySections(target, sessionDateForFilter);
+  if (!sections.length) return renderFedcTarget(target, new Set());
+
+  if (_selectedSectionIdx >= sections.length) _selectedSectionIdx = 0;
+  const selIdx = _selectedSectionIdx;
+
+  let totalActs = 0, totalWritten = 0;
+  const sectionStats = sections.map(grp => {
+    const countPas = grp.pas.filter(pa => !pa.isNote && !pa.isExportNote && !pa.isCompleted && !pa.isArchived && !pa.isStopped);
+    const written = countPas.filter(pa => paIsWritten(pa, target)).length;
+    totalActs += countPas.length;
+    totalWritten += written;
+    return { total: countPas.length, written };
+  });
+
+  const pct = totalActs > 0 ? Math.round(totalWritten / totalActs * 100) : 0;
+
+  let sidebarHtml = `<div style="padding:.75rem .9rem;border-bottom:1px solid #e5e7eb">
+    <div style="font-size:.88rem;font-weight:700;color:#111827;margin-bottom:.35rem">${totalWritten} of ${totalActs} written</div>
+    <div style="background:#e5e7eb;border-radius:9999px;height:5px"><div style="background:var(--primary);height:100%;width:${pct}%;border-radius:9999px"></div></div>
+  </div>`;
+
+  sections.forEach((grp, i) => {
+    const { total, written } = sectionStats[i];
+    const isAct = i === selIdx;
+    sidebarHtml += `<button class="sec-nav-btn" data-sec-idx="${i}" contenteditable="false"
+      style="width:100%;text-align:left;padding:.6rem .9rem;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;background:${isAct ? 'var(--primary-light)' : 'transparent'};border-left:3px solid ${isAct ? 'var(--primary)' : 'transparent'};border-radius:0">
+      <div style="font-size:.82rem;font-weight:${isAct ? '700' : '500'};color:${isAct ? 'var(--primary-dark)' : '#374151'};word-break:break-word;line-height:1.3">${escHtml(grp.name)}</div>
+      <div style="font-size:.72rem;color:#9ca3af;margin-top:.15rem">${written}/${total}</div>
+    </button>`;
+  });
+
+  const selectedPaSet = new Set(sections[selIdx].pas);
+  const mainContentHtml = renderFedcTarget(target, selectedPaSet);
+
+  return `<div class="sec-layout" style="display:flex;gap:0;align-items:flex-start">
+    <div class="sec-sidebar" contenteditable="false" style="width:165px;flex-shrink:0;border:1px solid #e5e7eb;border-radius:.5rem 0 0 .5rem;background:#fafafa;position:sticky;top:0;max-height:calc(100vh - 170px);overflow-y:auto">
+      ${sidebarHtml}
+    </div>
+    <div class="sec-main" style="flex:1;min-width:0;padding-left:.75rem">
+      ${mainContentHtml}
+    </div>
+  </div>`;
+}
+
 // ─── EXTRA ACTIVITIES (session-only) ─────────────────────────
 // Guards against iOS ghost-click (synthesized click ~300ms after touchend
 // landing on the freshly-rebuilt button and creating a second activity).
@@ -8472,6 +8582,11 @@ let _addActivityInFlight = false;
 // Pending new activity — local only, NOT written to Firestore until the user
 // types a name. Stores { actId, targetName, order, typedName, typedDetails, pendingIsBold, pendingIsUnderline }.
 let _pendingNewActivity = null;
+
+// Active section index for the sidebar layout (targets with section headings).
+// Reset to 0 whenever the target or session changes.
+let _selectedSectionIdx = 0;
+let _selectedGroupSectionIdx = 0;
 
 // A remark "has content" if its text (stripped of HTML) or note is non-empty.
 function remarkHasContent(r) {
@@ -9106,6 +9221,14 @@ function renderGhostRemarkFields(predRemName, actId, pa, paIdx, target) {
 
 function attachTargetListeners(target) {
   const c = $("target-content");
+
+  // Section sidebar navigation
+  c.querySelectorAll(".sec-nav-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      _selectedSectionIdx = parseInt(btn.dataset.secIdx, 10) || 0;
+      renderTargetContent();
+    });
+  });
 
   // Free-text boxes here are real <textarea>/<input> elements now, so their
   // own native Enter/backspace/Ctrl+A handling just works — only the app's
@@ -19599,6 +19722,7 @@ function populateGroupTargetDropdown(targets) {
     // for the same fix on the individual side.
     await state.entryGroupRemarkSaver?.flush();
     state.selectedGroupTargetName = sel.value || null;
+    _selectedGroupSectionIdx      = 0;
     if (prevTarget && prevTarget !== sel.value) {
       const prevTargetObj = (state.currentGroup?.targets || []).find(t => t.name === prevTarget);
       cleanupEmptyEntries(state.groupSessionId, state.groupSessionData, prevTarget, prevTargetObj).catch(() => {});
@@ -19849,7 +19973,7 @@ function renderGroupTargetContent() {
 }
 
 // "Group students together": activity is the heading, students are listed underneath
-function buildGroupItemsByActivity(target, data, attendees) {
+function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = null) {
   const items = [];
 
   // Predefined activities (with heading and note support)
@@ -19866,11 +19990,17 @@ function buildGroupItemsByActivity(target, data, attendees) {
   }
   const letters = "abcdefghij";
 
+  // Section headings present → sidebar layout (only for non-filtered calls)
+  if (!_grpFilterPaSet && allPas.some(pa => pa.isHeading)) {
+    return buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByParent, grpSessionDate);
+  }
+
   for (const pa of allPas) {
     if (!isActivityActive(pa, grpSessionDate)) continue;
     // Sub-activities rendered within their parent's group
     if (pa.parentActivity) continue;
     if (pa.isNote || pa.isExportNote) {
+      if (_grpFilterPaSet && !_grpFilterPaSet.has(pa)) continue;
       if (pa.text) {
         const noteTag = pa.isExportNote
           ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.25rem">📄 Included in Word export</div>`
@@ -19885,10 +20015,12 @@ function buildGroupItemsByActivity(target, data, attendees) {
       continue;
     }
     if (pa.isHeading) {
+      if (_grpFilterPaSet) continue; // sidebar mode: section name shown in sidebar, not inline
       items.push(`<div class="activity-group-heading" contenteditable="false">${escHtml(pa.name)}</div>`);
       continue;
     }
     if (pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || pa.isMaintainHeading) continue;
+    if (_grpFilterPaSet && !_grpFilterPaSet.has(pa)) continue;
 
     // Parent activity with sub-activities — render as connected group
     const children = grpSubsByParent.get(pa.name) || [];
@@ -19986,6 +20118,8 @@ function buildGroupItemsByActivity(target, data, attendees) {
     items.push(renderGroupActivityCard(pa.name, actId, target, data, attendees, pa.actNote, pa.isMapped ? pa : null, pa, true, null, pa.id));
   }
 
+  if (_grpFilterPaSet) return items; // sidebar mode: manual/inactive sections handled by sidebar wrapper
+
   // Manually added (non-predefined) activities
   Object.entries(data.activities || {})
     .filter(([, a]) => a.targetName === target.name && !a.isPredefined)
@@ -20049,6 +20183,65 @@ function buildGroupItemsByActivity(target, data, attendees) {
     </div>`);
   }
   return items;
+}
+
+// ─── SECTION SIDEBAR LAYOUT (group session) ──────────────────
+
+function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByParent, grpSessionDate) {
+  const sections = groupPasBySections(target, grpSessionDate);
+  if (!sections.length) return buildGroupItemsByActivity(target, data, attendees, new Set());
+
+  if (_selectedGroupSectionIdx >= sections.length) _selectedGroupSectionIdx = 0;
+  const selIdx = _selectedGroupSectionIdx;
+
+  let totalActs = 0, totalWritten = 0;
+  const sectionStats = sections.map(grp => {
+    const countPas = grp.pas.filter(pa =>
+      !pa.isNote && !pa.isExportNote && !pa.isCompleted && !pa.isArchived && !pa.isStopped &&
+      !pa.isMaintain && !pa.isMaintainHeading
+    );
+    const written = countPas.filter(pa => grpPaIsWritten(pa, target, data)).length;
+    totalActs += countPas.length;
+    totalWritten += written;
+    return { total: countPas.length, written };
+  });
+
+  const pct = totalActs > 0 ? Math.round(totalWritten / totalActs * 100) : 0;
+
+  let sidebarHtml = `<div style="padding:.75rem .9rem;border-bottom:1px solid #e5e7eb">
+    <div style="font-size:.88rem;font-weight:700;color:#111827;margin-bottom:.35rem">${totalWritten} of ${totalActs} written</div>
+    <div style="background:#e5e7eb;border-radius:9999px;height:5px"><div style="background:var(--primary);height:100%;width:${pct}%;border-radius:9999px"></div></div>
+  </div>`;
+
+  sections.forEach((grp, i) => {
+    const { total, written } = sectionStats[i];
+    const isAct = i === selIdx;
+    sidebarHtml += `<button class="grp-sec-nav-btn" data-sec-idx="${i}" contenteditable="false"
+      style="width:100%;text-align:left;padding:.6rem .9rem;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;background:${isAct ? 'var(--primary-light)' : 'transparent'};border-left:3px solid ${isAct ? 'var(--primary)' : 'transparent'};border-radius:0">
+      <div style="font-size:.82rem;font-weight:${isAct ? '700' : '500'};color:${isAct ? 'var(--primary-dark)' : '#374151'};word-break:break-word;line-height:1.3">${escHtml(grp.name)}</div>
+      <div style="font-size:.72rem;color:#9ca3af;margin-top:.15rem">${written}/${total}</div>
+    </button>`;
+  });
+
+  const selectedPaSet = new Set(sections[selIdx].pas);
+  const mainItems = buildGroupItemsByActivity(target, data, attendees, selectedPaSet);
+
+  // Manually added (non-predefined) activities always show below section content
+  Object.entries(data.activities || {})
+    .filter(([, a]) => a.targetName === target.name && !a.isPredefined)
+    .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
+    .forEach(([actId, act]) => {
+      mainItems.push(renderGroupActivityCard(act.activityName, actId, target, data, attendees));
+    });
+
+  return [`<div class="sec-layout" style="display:flex;gap:0;align-items:flex-start">
+    <div class="grp-sec-sidebar" contenteditable="false" style="width:165px;flex-shrink:0;border:1px solid #e5e7eb;border-radius:.5rem 0 0 .5rem;background:#fafafa;position:sticky;top:0;max-height:calc(100vh - 170px);overflow-y:auto">
+      ${sidebarHtml}
+    </div>
+    <div class="grp-sec-main" style="flex:1;min-width:0;padding-left:.75rem">
+      ${mainItems.join("")}
+    </div>
+  </div>`];
 }
 
 // "Group activities together": student is the heading, activities are listed underneath
@@ -20609,6 +20802,14 @@ function updateGroupAvgChips(target, data) {
 function attachGroupTargetListeners(target) {
   const c = $("group-target-content");
   if (!c) return;
+
+  // Section sidebar navigation
+  c.querySelectorAll(".grp-sec-nav-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      _selectedGroupSectionIdx = parseInt(btn.dataset.secIdx, 10) || 0;
+      renderGroupTargetContent();
+    });
+  });
 
   // Saving for .group-remark-input / .group-remark-input-combined is handled
   // by the shared merged-editing host (state.entryGroupRemarkSaver, set up in
