@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1582";
+const APP_VERSION = "1583";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8053,9 +8053,9 @@ function groupPasBySections(target, dateStr) {
 }
 
 // Returns true if a predefined activity has any written data in the current individual session.
-function paIsWritten(pa, target) {
+function paIsWritten(pa, target, parentName = null) {
   if ((pa.fixedRemark !== undefined || pa.isMaintain) && !pa.maintained) return false;
-  const actData = findActivityByName(target.name, pa.title || pa.name, null, pa.id);
+  const actData = findActivityByName(target.name, pa.title || pa.name, parentName, pa.id);
   if (!actData) return false;
   const stripH = t => (t || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
   return getRemarksForActivity(actData.id).some(r =>
@@ -8066,10 +8066,15 @@ function paIsWritten(pa, target) {
 }
 
 // Returns true if a predefined activity in a group session has data for any attendee.
-function grpPaIsWritten(pa, target, data) {
+function grpPaIsWritten(pa, target, data, parentName = null) {
   const grpAllActs = Object.entries(data.activities || {});
   const actId = (pa.id && grpAllActs.find(([, a]) => a.configId === pa.id && a.targetName === target.name)?.[0])
-    || grpAllActs.find(([, a]) => a.targetName === target.name && a.activityName === pa.name && !a.parentActivity && !a.configId)?.[0]
+    || grpAllActs.find(([, a]) => {
+        if (a.targetName !== target.name) return false;
+        if (a.activityName !== pa.name && a.activityName !== pa.title) return false;
+        if (a.configId) return false;
+        return parentName ? a.parentActivity === parentName : !a.parentActivity;
+      })?.[0]
     || null;
   if (!actId) return false;
   const stripH = t => (t || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
@@ -8169,8 +8174,8 @@ function renderFedcTarget(target, _filterPaSet = null) {
     actNum++;
     const writtenDot = _filterPaSet
       ? (paIsWritten(pa, target)
-        ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:#22c55e;color:#fff;font-size:.6rem;font-weight:900;margin-right:.3rem;flex-shrink:0">✓</span>`
-        : `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;border:2px solid #d1d5db;margin-right:.3rem;flex-shrink:0"></span>`)
+        ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:#22c55e;color:#fff;font-size:.6rem;font-weight:900;margin-right:.3rem;flex-shrink:0;align-self:flex-start;margin-top:.35rem">✓</span>`
+        : `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;border:2px solid #d1d5db;margin-right:.3rem;flex-shrink:0;align-self:flex-start;margin-top:.35rem"></span>`)
       : '';
     // Fixed remark activity — shown read-only with color block styling
     // pa.maintained supersedes the old fixedRemark/isMaintain flags — treat as free text.
@@ -8217,7 +8222,7 @@ function renderFedcTarget(target, _filterPaSet = null) {
       html += `<div class="entry-block" style="${pBorder}border-radius:var(--radius) var(--radius) 0 0;border-bottom:none;box-shadow:var(--shadow)">
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Activity</span>
-          <span class="field-value-fixed">${writtenDot}${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${paDisplayHtml(pa, true)}</span>
+          <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${paDisplayHtml(pa, true)}</span>
           <div style="display:flex;align-items:center;gap:.35rem;flex-shrink:0;align-self:flex-start">
             ${pa.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap">Activity Start Date: ${fmtPeriodDate(pa.activeFrom)}</span>` : ""}
             ${pa.id ? `<button class="btn-icon btn-edit-activity-pencil" contenteditable="false" data-pa-id="${escHtml(pa.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
@@ -8298,9 +8303,14 @@ function renderFedcTarget(target, _filterPaSet = null) {
         const subLabel   = letters[si];
         const isLast     = si === children.length - 1;
         const subRadius  = isLast ? '0 0 var(--radius) var(--radius)' : '0';
+        const subWrittenDot = _filterPaSet
+          ? (paIsWritten(sub, target, pa.title || pa.name)
+            ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:#22c55e;color:#fff;font-size:.6rem;font-weight:900;margin-right:.3rem;flex-shrink:0;align-self:flex-start;margin-top:.45rem">✓</span>`
+            : `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;border:2px solid #d1d5db;margin-right:.3rem;flex-shrink:0;align-self:flex-start;margin-top:.45rem"></span>`)
+          : '';
         html += `<div class="entry-block" style="border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);border-top:1px solid var(--border);border-radius:${subRadius};box-shadow:var(--shadow)">
           <div class="entry-field" contenteditable="false">
-            <span style="flex-shrink:0;align-self:flex-start;margin-top:.45rem;display:inline-block;background:#dbeafe;color:#1e40af;border-radius:.4rem;padding:.12rem .5rem;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Subactivity</span>
+            ${subWrittenDot}<span style="flex-shrink:0;align-self:flex-start;margin-top:.45rem;display:inline-block;background:#dbeafe;color:#1e40af;border-radius:.4rem;padding:.12rem .5rem;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Subactivity</span>
             <span class="field-value-fixed"><span style="color:#1e40af;font-weight:700;margin-right:.25rem">${subLabel})</span>${inactiveReasonBadge(sub)}${paDisplayHtml(sub)}</span>
           </div>`;
         const _subNoOpts = (sub.remarkHasNote || sub.optionsMulti) && parseOpts(getActivityInlineOptions(sub)).length === 0;
@@ -8356,7 +8366,7 @@ function renderFedcTarget(target, _filterPaSet = null) {
                         : '';
     html += `<div class="entry-block entry-block-predefined"${activityStyle}>
       <div class="entry-field" contenteditable="false">
-        <span class="field-label">Activity</span>
+        ${writtenDot}<span class="field-label">Activity</span>
         <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${paDisplayHtml(pa, true)}</span>
         <div style="display:flex;align-items:center;gap:.35rem;flex-shrink:0;align-self:flex-start">
           ${pa.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap">Activity Start Date: ${fmtPeriodDate(pa.activeFrom)}</span>` : ""}
@@ -8543,11 +8553,24 @@ function renderFedcTargetWithSidebar(target, allPas, subActsByParent, sessionDat
 
   let totalActs = 0, totalWritten = 0;
   const sectionStats = sections.map(grp => {
-    const countPas = grp.pas.filter(pa => !pa.isNote && !pa.isExportNote && !pa.isCompleted && !pa.isArchived && !pa.isStopped);
-    const written = countPas.filter(pa => paIsWritten(pa, target)).length;
-    totalActs += countPas.length;
-    totalWritten += written;
-    return { total: countPas.length, written };
+    let secTotal = 0, secWritten = 0;
+    for (const pa of grp.pas) {
+      if (pa.isNote || pa.isExportNote || pa.isCompleted || pa.isArchived || pa.isStopped) continue;
+      const children = subActsByParent.get(pa.title || pa.name) || [];
+      if (children.length > 0) {
+        for (const sub of children) {
+          if (sub.isCompleted || sub.isArchived || sub.isStopped) continue;
+          secTotal++;
+          if (paIsWritten(sub, target, pa.title || pa.name)) secWritten++;
+        }
+      } else {
+        secTotal++;
+        if (paIsWritten(pa, target)) secWritten++;
+      }
+    }
+    totalActs += secTotal;
+    totalWritten += secWritten;
+    return { total: secTotal, written: secWritten };
   });
 
   const pct = totalActs > 0 ? Math.round(totalWritten / totalActs * 100) : 0;
@@ -16051,6 +16074,16 @@ function renderTargetManageContent(student, target) {
     (_groupForTargetEdit ? saveGroup(_groupForTargetEdit) : saveStudent(student)).catch(() => {});
   }
 
+  // Backfill activeFrom: any activity/subactivity missing it gets "2026-01-01" as default
+  if (acts.some(a => !a.isHeading && !a.isMaintainHeading && !a.isNote && !a.isExportNote && a.activeFrom == null)) {
+    acts.forEach(a => {
+      if (!a.isHeading && !a.isMaintainHeading && !a.isNote && !a.isExportNote && a.activeFrom == null) {
+        a.activeFrom = "2026-01-01";
+      }
+    });
+    (_groupForTargetEdit ? saveGroup(_groupForTargetEdit) : saveStudent(student)).catch(() => {});
+  }
+
   const masteredActs     = acts.filter(a => !a.isHeading && !a.isNote && !a.isExportNote && !a.isMaintain && !a.isMaintainHeading && (a.masteredOn || a.isCompleted));
   const discontinuedActs = acts.filter(a => !a.isHeading && !a.isNote && !a.isExportNote && !a.isMaintain && !a.isMaintainHeading && (a.discontinuedOn || a.isArchived || a.isStopped));
   // Use the currently-loaded session's date (if any) so that when the user
@@ -17585,7 +17618,7 @@ function renderTargetManageContent(student, target) {
 
   $("btn-mn-add-act").addEventListener("click", () => {
     const btn = $("btn-mn-add-act"); if (btn) btn.disabled = true;
-    acts.push({ id: cfgId("a"), name: "", order: acts.length, createdOn: todayDateStr() });
+    acts.push({ id: cfgId("a"), name: "", order: acts.length, createdOn: todayDateStr(), activeFrom: todayDateStr() });
     target.predefinedActivities = acts;
     renderTargetManageContent(student, target);
     saveTarget().catch(() => {});
@@ -17695,7 +17728,7 @@ function renderTargetManageContent(student, target) {
       parentAct.noRemark = true;
       const siblingIdxs = acts.map((a2, i) => a2.parentActivity === _parentKey ? i : -1).filter(i => i >= 0);
       const insertAfter = siblingIdxs.length > 0 ? Math.max(...siblingIdxs) : parentIdx;
-      acts.splice(insertAfter + 1, 0, { id: cfgId("a"), name: "", parentActivity: _parentKey, order: 0, activeFrom: null });
+      acts.splice(insertAfter + 1, 0, { id: cfgId("a"), name: "", parentActivity: _parentKey, order: 0, activeFrom: todayDateStr(), createdOn: todayDateStr() });
       acts.forEach((a2, i) => a2.order = i);
       target.predefinedActivities = acts;
       const sp = $("manage-modal-body").scrollTop;
@@ -17710,20 +17743,107 @@ function renderTargetManageContent(student, target) {
       const idx = Number(btn.dataset.idx);
       const subAct = acts[idx];
       if (!subAct) return;
-      if (!confirm(`Delete sub-activity "${subAct.title || subAct.name || '(unnamed)'}"?`)) return;
-      const parentName = subAct.parentActivity;
-      acts.splice(idx, 1);
-      acts.forEach((a2, i) => a2.order = i);
-      // If no sub-activities remain, clear parent's noRemark
-      if (!acts.some(a2 => a2.parentActivity === parentName)) {
-        const parent = acts.find(a2 => (a2.title || a2.name) === parentName);
-        if (parent) delete parent.noRemark;
+
+      btn.disabled = true;
+      btn.textContent = "⏳";
+      let affected = 0;
+      let affectedSessions = [];
+      try {
+        const allSessions = _groupForTargetEdit
+          ? await getAllSessionsForGroup(_groupForTargetEdit.id)
+          : await getAllSessionsForStudent(student.id);
+        const paPA = subAct.parentActivity || null;
+        affectedSessions = allSessions.filter(s => {
+          const sActs = s.activities || {}; const sRems = s.remarks || {};
+          const matchIds = Object.entries(sActs).filter(([, a]) => {
+            if (a.targetName !== target.name) return false;
+            if (a.activityName !== subAct.name && a.activityName !== subAct.title) return false;
+            return paPA === null ? !a.parentActivity : a.parentActivity === paPA;
+          }).map(([id]) => id);
+          return matchIds.some(actId => Object.values(sRems).some(r =>
+            r.activityId === actId && (
+              (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
+              (r.masteryNote || "").trim().length > 0 ||
+              (r.trials || []).some(t => t !== null && t !== -1) ||
+              (r.optionScore !== undefined && r.optionScore !== null)
+            )
+          ));
+        });
+        affected = affectedSessions.length;
+      } catch { affected = -1; }
+      btn.disabled = false;
+      btn.textContent = "🗑";
+
+      const doDelete = async () => {
+        const parentName = subAct.parentActivity;
+        const savedIdx = acts.indexOf(subAct);
+        if (savedIdx >= 0) { acts.splice(savedIdx, 1); acts.forEach((a2, i) => a2.order = i); }
+        if (!acts.some(a2 => a2.parentActivity === parentName)) {
+          const parent = acts.find(a2 => (a2.title || a2.name) === parentName);
+          if (parent) delete parent.noRemark;
+        }
+        target.predefinedActivities = acts;
+        await saveTarget();
+        try {
+          await softDeleteActivityAcrossSessions(
+            _groupForTargetEdit ? "group" : "student",
+            _groupForTargetEdit ? _groupForTargetEdit.id   : student.id,
+            _groupForTargetEdit ? _groupForTargetEdit.name : student.name,
+            target.name, subAct.name, subAct.parentActivity || null
+          );
+        } catch (err) {
+          console.error("Failed to move sub-activity to trash:", err);
+        }
+        const sp = $("manage-modal-body").scrollTop;
+        renderTargetManageContent(student, target);
+        requestAnimationFrame(() => { const b = $("manage-modal-body"); if (b) b.scrollTop = sp; });
+      };
+
+      if (affected === 0) {
+        if (!confirm(`No past data found for this sub-activity — safe to delete.`)) return;
+        await doDelete();
+        return;
       }
-      target.predefinedActivities = acts;
-      await saveTarget();
-      const sp = $("manage-modal-body").scrollTop;
-      renderTargetManageContent(student, target);
-      requestAnimationFrame(() => { const b = $("manage-modal-body"); if (b) b.scrollTop = sp; });
+
+      const confirmWord = String(affected);
+      $("manage-modal").querySelectorAll("[data-del-overlay]").forEach(el => el.remove());
+      const overlay = document.createElement("div");
+      overlay.dataset.delOverlay = "1";
+      overlay.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding-top:1.25rem;z-index:200;border-radius:.75rem;overflow-y:auto";
+      const _latest5 = [...affectedSessions].sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 5);
+      const sessionDateList = `<p style="font-size:.82rem;margin:.4rem 0 .35rem;color:#374151;font-weight:600">Latest ${Math.min(affected, 5)} Session${Math.min(affected, 5) !== 1 ? "s" : ""} with Data:</p>
+        <ul style="font-size:.82rem;color:#374151;margin:0 0 .7rem;padding-left:0;list-style:none;line-height:1.9">${
+          _latest5.map(s => `<li>• Session ${escHtml(String(s.sessionNumber || s.number || "?"))} — ${escHtml(formatDateWithDay(s.date))}</li>`).join("")
+        }${affected > 5 ? `<li style="color:#9ca3af">  …and ${affected - 5} more</li>` : ''}</ul>`;
+      overlay.innerHTML = `<div style="background:#fff;padding:1.25rem;border-radius:.75rem;width:min(320px,92%);box-shadow:0 4px 24px rgba(0,0,0,.25);margin-bottom:1rem">
+        <p style="font-size:.88rem;margin:0 0 .5rem;color:#111;font-weight:700">⚠️ Delete "${escHtml(subAct.title || subAct.name || 'this sub-activity')}"?</p>
+        <p style="font-size:.84rem;margin:0 0 .4rem;color:#374151">This sub-activity contains data from ${affected} session${affected !== 1 ? "s" : ""}. Deleting it will permanently remove all associated data.</p>
+        ${sessionDateList}
+        <p style="font-size:.84rem;margin:0 0 .35rem;color:#374151">To confirm deletion, type: <strong>${confirmWord}</strong></p>
+        <input id="del-sub-input" type="text" autocomplete="off" inputmode="numeric"
+          style="width:100%;box-sizing:border-box;padding:.45rem .6rem;border:2px solid #d1d5db;border-radius:.4rem;font-size:1.1rem;text-align:center;outline:none;margin-bottom:.6rem" placeholder="${confirmWord}">
+        <div style="display:flex;gap:.5rem">
+          <button id="del-sub-cancel" style="flex:1;padding:.45rem;border:1px solid #d1d5db;border-radius:.4rem;background:#f9fafb;cursor:pointer;font-size:.85rem">Cancel</button>
+          <button id="del-sub-ok" disabled style="flex:1;padding:.45rem;border:none;border-radius:.4rem;background:#dc2626;color:#fff;cursor:pointer;font-size:.85rem;opacity:.4">Delete</button>
+        </div>
+      </div>`;
+      const modalSheet = $("manage-modal").querySelector(".modal-sheet");
+      modalSheet.style.position = "relative";
+      modalSheet.appendChild(overlay);
+      const inp = overlay.querySelector("#del-sub-input");
+      const okBtn = overlay.querySelector("#del-sub-ok");
+      inp.focus();
+      inp.addEventListener("input", () => {
+        const ok = inp.value === confirmWord;
+        okBtn.disabled = !ok;
+        okBtn.style.opacity = ok ? "1" : ".4";
+      });
+      overlay.querySelector("#del-sub-cancel").addEventListener("click", () => overlay.remove());
+      okBtn.addEventListener("click", async () => {
+        if (inp.value !== confirmWord) return;
+        overlay.remove();
+        await doDelete();
+      });
     });
   });
 
@@ -20227,14 +20347,24 @@ function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByPa
 
   let totalActs = 0, totalWritten = 0;
   const sectionStats = sections.map(grp => {
-    const countPas = grp.pas.filter(pa =>
-      !pa.isNote && !pa.isExportNote && !pa.isCompleted && !pa.isArchived && !pa.isStopped &&
-      !pa.isMaintain && !pa.isMaintainHeading
-    );
-    const written = countPas.filter(pa => grpPaIsWritten(pa, target, data)).length;
-    totalActs += countPas.length;
-    totalWritten += written;
-    return { total: countPas.length, written };
+    let secTotal = 0, secWritten = 0;
+    for (const pa of grp.pas) {
+      if (pa.isNote || pa.isExportNote || pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || pa.isMaintainHeading) continue;
+      const children = grpSubsByParent.get(pa.title || pa.name) || [];
+      if (children.length > 0) {
+        for (const sub of children) {
+          if (sub.isCompleted || sub.isArchived || sub.isStopped) continue;
+          secTotal++;
+          if (grpPaIsWritten(sub, target, data, pa.title || pa.name)) secWritten++;
+        }
+      } else {
+        secTotal++;
+        if (grpPaIsWritten(pa, target, data)) secWritten++;
+      }
+    }
+    totalActs += secTotal;
+    totalWritten += secWritten;
+    return { total: secTotal, written: secWritten };
   });
 
   const pct = totalActs > 0 ? Math.round(totalWritten / totalActs * 100) : 0;
@@ -20490,18 +20620,19 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
   const anyExpanded = actId && Object.values(data.remarks || {})
     .some(r => r.activityId === actId && attendees.includes(r.studentName));
 
-  const grpWrittenDot = _grpFilterPaSet
+  const isGrpParentAct = (target.predefinedActivities || []).some(p => p.parentActivity && p.parentActivity === actName);
+  const grpWrittenDot = (_grpFilterPaSet && !isGrpParentAct)
     ? (anyExpanded
-      ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:#22c55e;color:#fff;font-size:.6rem;font-weight:900;margin-right:.3rem;flex-shrink:0">✓</span>`
-      : `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;border:2px solid #d1d5db;margin-right:.3rem;flex-shrink:0"></span>`)
+      ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:#22c55e;color:#fff;font-size:.6rem;font-weight:900;margin-right:.3rem;flex-shrink:0;align-self:flex-start;margin-top:.35rem">✓</span>`
+      : `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;border:2px solid #d1d5db;margin-right:.3rem;flex-shrink:0;align-self:flex-start;margin-top:.35rem"></span>`)
     : '';
 
   // Collapsed: no data yet → single "+ Add Remark & Trials" button (like individual session)
   if (!anyExpanded) {
     return `<div class="entry-block entry-block-predefined" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">
       <div class="entry-field" contenteditable="false">
-        <span class="field-label">Activity</span>
-        <span class="field-value-fixed">${grpWrittenDot}${inactiveReasonBadge(paEntry)}${formatActivityMarkup(actName)}</span>
+        ${grpWrittenDot}<span class="field-label">Activity</span>
+        <span class="field-value-fixed">${inactiveReasonBadge(paEntry)}${formatActivityMarkup(actName)}</span>
         ${paEntry?.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Activity Start Date: ${fmtPeriodDate(paEntry.activeFrom)}</span>` : ""}
         ${combineToggle}
       </div>
@@ -20575,8 +20706,8 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
 
   return `<div class="entry-block entry-block-predefined" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">
     <div class="entry-field" contenteditable="false">
-      <span class="field-label">Activity</span>
-      <span class="field-value-fixed">${grpWrittenDot}${formatActivityMarkup(actName)}${inactiveReasonBadge(paEntry)}</span>
+      ${grpWrittenDot}<span class="field-label">Activity</span>
+      <span class="field-value-fixed">${formatActivityMarkup(actName)}${inactiveReasonBadge(paEntry)}</span>
       ${paEntry?.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Activity Start Date: ${fmtPeriodDate(paEntry.activeFrom)}</span>` : ""}
       ${combineToggle}
     </div>
