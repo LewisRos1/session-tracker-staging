@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1580";
+const APP_VERSION = "1582";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8167,6 +8167,11 @@ function renderFedcTarget(target, _filterPaSet = null) {
     if (_filterPaSet && !_filterPaSet.has(pa)) return;
 
     actNum++;
+    const writtenDot = _filterPaSet
+      ? (paIsWritten(pa, target)
+        ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:#22c55e;color:#fff;font-size:.6rem;font-weight:900;margin-right:.3rem;flex-shrink:0">✓</span>`
+        : `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;border:2px solid #d1d5db;margin-right:.3rem;flex-shrink:0"></span>`)
+      : '';
     // Fixed remark activity — shown read-only with color block styling
     // pa.maintained supersedes the old fixedRemark/isMaintain flags — treat as free text.
     const isFixed = (pa.fixedRemark !== undefined || pa.isMaintain) && !pa.maintained;
@@ -8212,7 +8217,7 @@ function renderFedcTarget(target, _filterPaSet = null) {
       html += `<div class="entry-block" style="${pBorder}border-radius:var(--radius) var(--radius) 0 0;border-bottom:none;box-shadow:var(--shadow)">
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Activity</span>
-          <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${paDisplayHtml(pa, true)}</span>
+          <span class="field-value-fixed">${writtenDot}${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${paDisplayHtml(pa, true)}</span>
           <div style="display:flex;align-items:center;gap:.35rem;flex-shrink:0;align-self:flex-start">
             ${pa.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap">Activity Start Date: ${fmtPeriodDate(pa.activeFrom)}</span>` : ""}
             ${pa.id ? `<button class="btn-icon btn-edit-activity-pencil" contenteditable="false" data-pa-id="${escHtml(pa.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
@@ -8547,9 +8552,30 @@ function renderFedcTargetWithSidebar(target, allPas, subActsByParent, sessionDat
 
   const pct = totalActs > 0 ? Math.round(totalWritten / totalActs * 100) : 0;
 
-  let sidebarHtml = `<div style="padding:.75rem .9rem;border-bottom:1px solid #e5e7eb">
-    <div style="font-size:.88rem;font-weight:700;color:#111827;margin-bottom:.35rem">${totalWritten} of ${totalActs} written</div>
-    <div style="background:#e5e7eb;border-radius:9999px;height:5px"><div style="background:var(--primary);height:100%;width:${pct}%;border-radius:9999px"></div></div>
+  const selectedPaSet = new Set(sections[selIdx].pas);
+  const sectionHeading = `<div contenteditable="false" style="font-size:.95rem;font-weight:700;color:#374151;padding-bottom:.5rem;border-bottom:2px solid #e5e7eb;margin-bottom:.1rem">${escHtml(sections[selIdx].name)}</div>`;
+  const mainContentHtml = renderFedcTarget(target, selectedPaSet);
+
+  if (_sidebarCollapsed) {
+    const collapsedSidebar = `<div class="sec-sidebar" contenteditable="false" style="flex-shrink:0;border:1px solid #e5e7eb;border-radius:.5rem 0 0 .5rem;background:#fafafa;position:sticky;top:0;max-height:calc(100vh - 170px);overflow-y:auto;display:flex;flex-direction:column;align-items:center;padding:.4rem 0;gap:.35rem">
+      <button class="sec-toggle-btn" contenteditable="false" title="Show sections" style="background:none;border:none;cursor:pointer;font-size:1rem;color:var(--primary);padding:.3rem .4rem;line-height:1">▶</button>
+      ${sections.map((g, i) => `<div style="width:8px;height:8px;border-radius:50%;background:${i === selIdx ? 'var(--primary)' : '#d1d5db'};flex-shrink:0" title="${escHtml(g.name)}"></div>`).join('')}
+    </div>`;
+    return `<div class="sec-layout" style="display:flex;gap:0;align-items:flex-start">
+      ${collapsedSidebar}
+      <div class="sec-main" style="flex:1;min-width:0;padding-left:.75rem;display:flex;flex-direction:column;gap:.85rem">
+        ${sectionHeading}
+        ${mainContentHtml}
+      </div>
+    </div>`;
+  }
+
+  let sidebarHtml = `<div style="padding:.75rem .9rem .6rem;border-bottom:1px solid #e5e7eb;display:flex;align-items:flex-start;gap:.5rem">
+    <div style="flex:1;min-width:0">
+      <div style="font-size:.88rem;font-weight:700;color:#111827;margin-bottom:.35rem">${totalWritten} of ${totalActs} written</div>
+      <div style="background:#e5e7eb;border-radius:9999px;height:5px"><div style="background:var(--primary);height:100%;width:${pct}%;border-radius:9999px"></div></div>
+    </div>
+    <button class="sec-toggle-btn" contenteditable="false" title="Hide sections" style="background:none;border:none;cursor:pointer;font-size:.85rem;color:#9ca3af;padding:.1rem .2rem;flex-shrink:0;line-height:1;margin-top:.1rem">◀</button>
   </div>`;
 
   sections.forEach((grp, i) => {
@@ -8562,14 +8588,12 @@ function renderFedcTargetWithSidebar(target, allPas, subActsByParent, sessionDat
     </button>`;
   });
 
-  const selectedPaSet = new Set(sections[selIdx].pas);
-  const mainContentHtml = renderFedcTarget(target, selectedPaSet);
-
   return `<div class="sec-layout" style="display:flex;gap:0;align-items:flex-start">
-    <div class="sec-sidebar" contenteditable="false" style="width:165px;flex-shrink:0;border:1px solid #e5e7eb;border-radius:.5rem 0 0 .5rem;background:#fafafa;position:sticky;top:0;max-height:calc(100vh - 170px);overflow-y:auto">
+    <div class="sec-sidebar" contenteditable="false" style="width:190px;flex-shrink:0;border:1px solid #e5e7eb;border-radius:.5rem 0 0 .5rem;background:#fafafa;position:sticky;top:0;max-height:calc(100vh - 170px);overflow-y:auto">
       ${sidebarHtml}
     </div>
-    <div class="sec-main" style="flex:1;min-width:0;padding-left:.75rem">
+    <div class="sec-main" style="flex:1;min-width:0;padding-left:.75rem;display:flex;flex-direction:column;gap:.85rem">
+      ${sectionHeading}
       ${mainContentHtml}
     </div>
   </div>`;
@@ -8583,10 +8607,11 @@ let _addActivityInFlight = false;
 // types a name. Stores { actId, targetName, order, typedName, typedDetails, pendingIsBold, pendingIsUnderline }.
 let _pendingNewActivity = null;
 
-// Active section index for the sidebar layout (targets with section headings).
-// Reset to 0 whenever the target or session changes.
+// Active section index and collapse state for the sidebar layout.
 let _selectedSectionIdx = 0;
 let _selectedGroupSectionIdx = 0;
+let _sidebarCollapsed = false;
+let _grpSidebarCollapsed = false;
 
 // A remark "has content" if its text (stripped of HTML) or note is non-empty.
 function remarkHasContent(r) {
@@ -9226,6 +9251,12 @@ function attachTargetListeners(target) {
   c.querySelectorAll(".sec-nav-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       _selectedSectionIdx = parseInt(btn.dataset.secIdx, 10) || 0;
+      renderTargetContent();
+    });
+  });
+  c.querySelectorAll(".sec-toggle-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      _sidebarCollapsed = !_sidebarCollapsed;
       renderTargetContent();
     });
   });
@@ -20208,9 +20239,38 @@ function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByPa
 
   const pct = totalActs > 0 ? Math.round(totalWritten / totalActs * 100) : 0;
 
-  let sidebarHtml = `<div style="padding:.75rem .9rem;border-bottom:1px solid #e5e7eb">
-    <div style="font-size:.88rem;font-weight:700;color:#111827;margin-bottom:.35rem">${totalWritten} of ${totalActs} written</div>
-    <div style="background:#e5e7eb;border-radius:9999px;height:5px"><div style="background:var(--primary);height:100%;width:${pct}%;border-radius:9999px"></div></div>
+  const selectedPaSet = new Set(sections[selIdx].pas);
+  const grpSectionHeading = `<div contenteditable="false" style="font-size:.95rem;font-weight:700;color:#374151;padding-bottom:.5rem;border-bottom:2px solid #e5e7eb;margin-bottom:.1rem">${escHtml(sections[selIdx].name)}</div>`;
+  const mainItems = buildGroupItemsByActivity(target, data, attendees, selectedPaSet);
+
+  // Manually added (non-predefined) activities always show below section content
+  Object.entries(data.activities || {})
+    .filter(([, a]) => a.targetName === target.name && !a.isPredefined)
+    .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
+    .forEach(([actId, act]) => {
+      mainItems.push(renderGroupActivityCard(act.activityName, actId, target, data, attendees));
+    });
+
+  if (_grpSidebarCollapsed) {
+    const collapsedSidebar = `<div class="grp-sec-sidebar" contenteditable="false" style="flex-shrink:0;border:1px solid #e5e7eb;border-radius:.5rem 0 0 .5rem;background:#fafafa;position:sticky;top:0;max-height:calc(100vh - 170px);overflow-y:auto;display:flex;flex-direction:column;align-items:center;padding:.4rem 0;gap:.35rem">
+      <button class="grp-sec-toggle-btn" contenteditable="false" title="Show sections" style="background:none;border:none;cursor:pointer;font-size:1rem;color:var(--primary);padding:.3rem .4rem;line-height:1">▶</button>
+      ${sections.map((g, i) => `<div style="width:8px;height:8px;border-radius:50%;background:${i === selIdx ? 'var(--primary)' : '#d1d5db'};flex-shrink:0" title="${escHtml(g.name)}"></div>`).join('')}
+    </div>`;
+    return [`<div class="sec-layout" style="display:flex;gap:0;align-items:flex-start">
+      ${collapsedSidebar}
+      <div class="grp-sec-main" style="flex:1;min-width:0;padding-left:.75rem;display:flex;flex-direction:column;gap:.85rem">
+        ${grpSectionHeading}
+        ${mainItems.join("")}
+      </div>
+    </div>`];
+  }
+
+  let sidebarHtml = `<div style="padding:.75rem .9rem .6rem;border-bottom:1px solid #e5e7eb;display:flex;align-items:flex-start;gap:.5rem">
+    <div style="flex:1;min-width:0">
+      <div style="font-size:.88rem;font-weight:700;color:#111827;margin-bottom:.35rem">${totalWritten} of ${totalActs} written</div>
+      <div style="background:#e5e7eb;border-radius:9999px;height:5px"><div style="background:var(--primary);height:100%;width:${pct}%;border-radius:9999px"></div></div>
+    </div>
+    <button class="grp-sec-toggle-btn" contenteditable="false" title="Hide sections" style="background:none;border:none;cursor:pointer;font-size:.85rem;color:#9ca3af;padding:.1rem .2rem;flex-shrink:0;line-height:1;margin-top:.1rem">◀</button>
   </div>`;
 
   sections.forEach((grp, i) => {
@@ -20223,22 +20283,12 @@ function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByPa
     </button>`;
   });
 
-  const selectedPaSet = new Set(sections[selIdx].pas);
-  const mainItems = buildGroupItemsByActivity(target, data, attendees, selectedPaSet);
-
-  // Manually added (non-predefined) activities always show below section content
-  Object.entries(data.activities || {})
-    .filter(([, a]) => a.targetName === target.name && !a.isPredefined)
-    .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
-    .forEach(([actId, act]) => {
-      mainItems.push(renderGroupActivityCard(act.activityName, actId, target, data, attendees));
-    });
-
   return [`<div class="sec-layout" style="display:flex;gap:0;align-items:flex-start">
-    <div class="grp-sec-sidebar" contenteditable="false" style="width:165px;flex-shrink:0;border:1px solid #e5e7eb;border-radius:.5rem 0 0 .5rem;background:#fafafa;position:sticky;top:0;max-height:calc(100vh - 170px);overflow-y:auto">
+    <div class="grp-sec-sidebar" contenteditable="false" style="width:190px;flex-shrink:0;border:1px solid #e5e7eb;border-radius:.5rem 0 0 .5rem;background:#fafafa;position:sticky;top:0;max-height:calc(100vh - 170px);overflow-y:auto">
       ${sidebarHtml}
     </div>
-    <div class="grp-sec-main" style="flex:1;min-width:0;padding-left:.75rem">
+    <div class="grp-sec-main" style="flex:1;min-width:0;padding-left:.75rem;display:flex;flex-direction:column;gap:.85rem">
+      ${grpSectionHeading}
       ${mainItems.join("")}
     </div>
   </div>`];
@@ -20440,12 +20490,18 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
   const anyExpanded = actId && Object.values(data.remarks || {})
     .some(r => r.activityId === actId && attendees.includes(r.studentName));
 
+  const grpWrittenDot = _grpFilterPaSet
+    ? (anyExpanded
+      ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:#22c55e;color:#fff;font-size:.6rem;font-weight:900;margin-right:.3rem;flex-shrink:0">✓</span>`
+      : `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;border:2px solid #d1d5db;margin-right:.3rem;flex-shrink:0"></span>`)
+    : '';
+
   // Collapsed: no data yet → single "+ Add Remark & Trials" button (like individual session)
   if (!anyExpanded) {
     return `<div class="entry-block entry-block-predefined" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">
       <div class="entry-field" contenteditable="false">
         <span class="field-label">Activity</span>
-        <span class="field-value-fixed">${inactiveReasonBadge(paEntry)}${formatActivityMarkup(actName)}</span>
+        <span class="field-value-fixed">${grpWrittenDot}${inactiveReasonBadge(paEntry)}${formatActivityMarkup(actName)}</span>
         ${paEntry?.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Activity Start Date: ${fmtPeriodDate(paEntry.activeFrom)}</span>` : ""}
         ${combineToggle}
       </div>
@@ -20520,7 +20576,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
   return `<div class="entry-block entry-block-predefined" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">
     <div class="entry-field" contenteditable="false">
       <span class="field-label">Activity</span>
-      <span class="field-value-fixed">${formatActivityMarkup(actName)}${inactiveReasonBadge(paEntry)}</span>
+      <span class="field-value-fixed">${grpWrittenDot}${formatActivityMarkup(actName)}${inactiveReasonBadge(paEntry)}</span>
       ${paEntry?.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Activity Start Date: ${fmtPeriodDate(paEntry.activeFrom)}</span>` : ""}
       ${combineToggle}
     </div>
@@ -20807,6 +20863,12 @@ function attachGroupTargetListeners(target) {
   c.querySelectorAll(".grp-sec-nav-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       _selectedGroupSectionIdx = parseInt(btn.dataset.secIdx, 10) || 0;
+      renderGroupTargetContent();
+    });
+  });
+  c.querySelectorAll(".grp-sec-toggle-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      _grpSidebarCollapsed = !_grpSidebarCollapsed;
       renderGroupTargetContent();
     });
   });
