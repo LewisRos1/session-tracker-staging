@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1578";
+const APP_VERSION = "1579";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -336,7 +336,7 @@ function requirePassword(onSuccess, message = "Enter password to continue") {
 }
 
 const LEGAL_WARNING = `<strong>Client data is confidential</strong> and must only be accessed, used, or shared for authorised purposes. Unauthorised <strong>downloading of client data</strong> without permission for personal use is <strong>strictly prohibited</strong>.<br><br>Any violation of this policy constitutes a serious breach of privacy law. Violators may be <strong>reported to the relevant authorities</strong> and may be subject to civil and criminal liability.`;
-const EXPIRED_MSG = `This session is over 7 days old and has expired for free viewing. A password is required to continue.<br><br>${LEGAL_WARNING}`;
+const EXPIRED_MSG = `This session is over 14 days old and has expired for free viewing. A password is required to continue.<br><br>${LEGAL_WARNING}`;
 const EXPORT_MSG  = `Enter password to continue.<br><br>${LEGAL_WARNING}`;
 
 function isOlderThan7Days(dateStr) {
@@ -344,7 +344,7 @@ function isOlderThan7Days(dateStr) {
   const [y, m, d] = dateStr.split("-").map(Number);
   const sessionDate = new Date(y, m - 1, d);
   const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 7);
+  cutoff.setDate(cutoff.getDate() - 14);
   cutoff.setHours(0, 0, 0, 0);
   return sessionDate < cutoff;
 }
