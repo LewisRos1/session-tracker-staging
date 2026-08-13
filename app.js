@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1589";
+const APP_VERSION = "1590";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8312,6 +8312,7 @@ function renderFedcTarget(target, _filterPaSet = null) {
           <div class="entry-field" contenteditable="false">
             ${subWrittenDot}<span style="flex-shrink:0;align-self:flex-start;margin-top:.45rem;display:inline-block;background:#dbeafe;color:#1e40af;border-radius:.4rem;padding:.12rem .5rem;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Subactivity</span>
             <span class="field-value-fixed"><span style="color:#1e40af;font-weight:700;margin-right:.25rem">${subLabel})</span>${inactiveReasonBadge(sub)}${paDisplayHtml(sub)}</span>
+            ${sub.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start;margin-top:.45rem">Created: ${fmtPeriodDate(sub.activeFrom)}</span>` : ""}
           </div>`;
         const _subNoOpts = (sub.remarkHasNote || sub.optionsMulti) && parseOpts(getActivityInlineOptions(sub)).length === 0;
         if (_subNoOpts) {
@@ -16364,7 +16365,10 @@ function renderTargetManageContent(student, target) {
               <div class="mn-act-compact-title">${paDisplayHtml(a, true)}</div>
               <div class="mn-act-body" style="display:flex;flex-direction:column;gap:.55rem">
               <div>
-                <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title</div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.28rem">
+                  <div style="font-size:.95rem;font-weight:700;color:#374151">Activity Title</div>
+                  ${a.activeFrom ? `<span style="font-size:.72rem;color:#6b7280">Created: ${fmtPeriodDate(a.activeFrom)}</span>` : ''}
+                </div>
                 <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
                   <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
                     <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${idx}" title="Bold (Ctrl+B)">B</button>
@@ -16418,7 +16422,10 @@ function renderTargetManageContent(student, target) {
               <div class="mn-act-compact-title">${paDisplayHtml(a, true)}</div>
               <div class="mn-act-body" style="display:flex;flex-direction:column;gap:.55rem">
               <div>
-                <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title</div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.28rem">
+                  <div style="font-size:.95rem;font-weight:700;color:#374151">Activity Title</div>
+                  ${a.activeFrom ? `<span style="font-size:.72rem;color:#6b7280">Created: ${fmtPeriodDate(a.activeFrom)}</span>` : ''}
+                </div>
                 <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
                   <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
                     <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${idx}" title="Bold (Ctrl+B)">B</button>
@@ -20294,6 +20301,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
           <div style="padding:.4rem .6rem;display:flex;align-items:center;gap:.45rem">
             <span style="flex-shrink:0;background:#dbeafe;color:#1e40af;border-radius:.4rem;padding:.12rem .5rem;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Subactivity</span>
             <span style="font-size:.85rem;font-weight:700;color:#374151"><span style="color:#1e40af">${letters[si]})</span> ${escHtml(sub.name)}</span>${inactiveReasonBadge(sub)}
+            ${sub.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;margin-left:auto">Created: ${fmtPeriodDate(sub.activeFrom)}</span>` : ""}
           </div>
           ${subCard}
         </div>`;
