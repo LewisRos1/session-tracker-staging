@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1602";
+const APP_VERSION = "1603";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -20518,7 +20518,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
           }
         }
         const isLast   = si === children.length - 1;
-        const subCard  = renderGroupActivityCard(sub.name, subActId, target, data, attendees, null, null, sub, true, sub.parentActivity, sub.id);
+        const subCard  = renderGroupActivityCard(sub.name, subActId, target, data, attendees, null, null, sub, true, sub.parentActivity, sub.id, _grpFilterPaSet);
         const subRadius = isLast ? '0 0 var(--radius) var(--radius)' : '0';
         groupHtml += `<div style="border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);border-top:1px solid var(--border);border-radius:${subRadius};overflow:hidden">
           <div style="padding:.4rem .6rem;display:flex;align-items:center;gap:.45rem">
@@ -20539,7 +20539,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
       || grpAllActs.find(([, a]) => a.targetName === target.name && a.activityName === pa.name && !a.parentActivity && !a.configId)?.[0]
       || null;
     if (actId && pa.id && !data.activities[actId]?.configId) data.activities[actId].configId = pa.id;
-    items.push(renderGroupActivityCard(pa.name, actId, target, data, attendees, pa.actNote, pa.isMapped ? pa : null, pa, true, null, pa.id));
+    items.push(renderGroupActivityCard(pa.name, actId, target, data, attendees, pa.actNote, pa.isMapped ? pa : null, pa, true, null, pa.id, _grpFilterPaSet));
   }
 
   if (_grpFilterPaSet && !_footerOnly) return items; // sidebar mode: manual/inactive sections handled by sidebar wrapper
@@ -20549,7 +20549,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
     .filter(([, a]) => a.targetName === target.name && !a.isPredefined)
     .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
     .forEach(([actId, act]) => {
-      items.push(renderGroupActivityCard(act.activityName, actId, target, data, attendees));
+      items.push(renderGroupActivityCard(act.activityName, actId, target, data, attendees, null, null, null, false, null, null, _grpFilterPaSet));
     });
 
   const grpInactivePas = (target.predefinedActivities || []).filter(pa =>
@@ -20849,7 +20849,7 @@ function renderGroupStudentRowCompact(remId, rem, target, mappedInfo = null) {
     ${trailingField}`;
 }
 
-function renderGroupActivityCard(actName, actId, target, data, attendees, actNote = null, mappedPa = null, paEntry = null, isPredefined = false, parentActivity = null, configId = null) {
+function renderGroupActivityCard(actName, actId, target, data, attendees, actNote = null, mappedPa = null, paEntry = null, isPredefined = false, parentActivity = null, configId = null, filterPaSet = null) {
   // Free-text activities (no preset options, no sentence starter) get a
   // ready-to-type empty box for a pending attendee instead of a "+ Add
   // Remark & Trials" button once the card is already expanded (see
@@ -20911,7 +20911,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
     .some(r => r.activityId === actId && attendees.includes(r.studentName));
 
   const isGrpParentAct = (target.predefinedActivities || []).some(p => p.parentActivity && p.parentActivity === actName);
-  const grpWrittenDot = (_grpFilterPaSet && !isGrpParentAct)
+  const grpWrittenDot = (filterPaSet && !isGrpParentAct)
     ? (anyExpanded
       ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:#22c55e;color:#fff;font-size:.6rem;font-weight:900;margin-right:.3rem;flex-shrink:0;align-self:flex-start;margin-top:.35rem">✓</span>`
       : `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;border:2px solid #d1d5db;margin-right:.3rem;flex-shrink:0;align-self:flex-start;margin-top:.35rem"></span>`)
