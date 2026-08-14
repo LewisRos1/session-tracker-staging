@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1603";
+const APP_VERSION = "1604";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -20052,8 +20052,19 @@ async function openGroupSession(group, dateStr, attendees, participants = null) 
 
 function renderGroupSessionHeader(data) {
   if (!data) return;
-  $("group-session-meta").textContent =
-    `Session ${data.sessionNumber} of ${(data.month || "").split(" ")[0]} · ${formatDate(data.date)}`;
+  const attendees = data.attendees || [];
+  const links = state.currentGroup?.studentLinks || {};
+  const psn = data.attendeePersonalSessionNumbers || {};
+  const studentParts = attendees.map(name => {
+    const sid = links[name];
+    const n = sid ? psn[sid] : null;
+    return n != null ? `${name} (Session ${n})` : name;
+  });
+  const datePart = data.date ? formatDate(data.date) : "";
+  const metaParts = studentParts.length > 0
+    ? [...studentParts, datePart].filter(Boolean)
+    : [`Session ${data.sessionNumber} of ${(data.month || "").split(" ")[0]}`, datePart].filter(Boolean);
+  $("group-session-meta").textContent = metaParts.join(" · ");
 }
 
 function populateGroupTargetDropdown(targets) {
@@ -20446,7 +20457,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
     if (_grpFilterPaSet && !_grpFilterPaSet.has(pa)) continue;
 
     // Parent activity with sub-activities — render as connected group
-    const children = grpSubsByParent.get(pa.name) || [];
+    const children = grpSubsByParent.get(pa.title || pa.name) || [];
     if (children.length > 0) {
       let groupHtml = `<div style="display:flex;flex-direction:column;gap:0">`;
       groupHtml += `<div class="entry-block" style="border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);border-radius:var(--radius) var(--radius) 0 0;border-bottom:none;box-shadow:var(--shadow)">
@@ -20459,7 +20470,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
       children.forEach((sub, si) => {
         let subActId = Object.entries(data.activities || {}).find(([, a]) =>
           (sub.id && a.configId === sub.id && a.targetName === target.name) ||
-          (a.targetName === target.name && a.activityName === sub.name && a.parentActivity === sub.parentActivity)
+          (a.targetName === target.name && a.activityName === (sub.title || sub.name) && a.parentActivity === sub.parentActivity)
         )?.[0] || null;
         // Extended-candidates fix (mirrors individual session): include records with no
         // configId that match by name+parent, in addition to configId-matched records.
@@ -20518,12 +20529,12 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
           }
         }
         const isLast   = si === children.length - 1;
-        const subCard  = renderGroupActivityCard(sub.name, subActId, target, data, attendees, null, null, sub, true, sub.parentActivity, sub.id, _grpFilterPaSet);
+        const subCard  = renderGroupActivityCard(sub.title || sub.name, subActId, target, data, attendees, null, null, sub, true, sub.parentActivity, sub.id, _grpFilterPaSet);
         const subRadius = isLast ? '0 0 var(--radius) var(--radius)' : '0';
         groupHtml += `<div style="border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);border-top:1px solid var(--border);border-radius:${subRadius};overflow:hidden">
           <div style="padding:.4rem .6rem;display:flex;align-items:center;gap:.45rem">
             <span style="flex-shrink:0;background:#dbeafe;color:#1e40af;border-radius:.4rem;padding:.12rem .5rem;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Subactivity</span>
-            <span style="font-size:.85rem;font-weight:700;color:#374151"><span style="color:#1e40af">${letters[si]})</span> ${escHtml(sub.name)}</span>${inactiveReasonBadge(sub)}
+            <span style="font-size:.85rem;font-weight:700;color:#374151"><span style="color:#1e40af">${letters[si]})</span> ${escHtml(sub.title || sub.name)}</span>${inactiveReasonBadge(sub)}
             ${sub.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;margin-left:auto">Created: ${fmtPeriodDate(sub.activeFrom)}</span>` : ""}
           </div>
           ${subCard}
@@ -20536,10 +20547,10 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
 
     const grpAllActs = Object.entries(data.activities || {});
     const actId = (pa.id && grpAllActs.find(([, a]) => a.configId === pa.id && a.targetName === target.name)?.[0])
-      || grpAllActs.find(([, a]) => a.targetName === target.name && a.activityName === pa.name && !a.parentActivity && !a.configId)?.[0]
+      || grpAllActs.find(([, a]) => a.targetName === target.name && a.activityName === (pa.title || pa.name) && !a.parentActivity && !a.configId)?.[0]
       || null;
     if (actId && pa.id && !data.activities[actId]?.configId) data.activities[actId].configId = pa.id;
-    items.push(renderGroupActivityCard(pa.name, actId, target, data, attendees, pa.actNote, pa.isMapped ? pa : null, pa, true, null, pa.id, _grpFilterPaSet));
+    items.push(renderGroupActivityCard(pa.title || pa.name, actId, target, data, attendees, pa.actNote, pa.isMapped ? pa : null, pa, true, null, pa.id, _grpFilterPaSet));
   }
 
   if (_grpFilterPaSet && !_footerOnly) return items; // sidebar mode: manual/inactive sections handled by sidebar wrapper
