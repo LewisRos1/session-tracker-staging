@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1622";
+const APP_VERSION = "1623";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -20418,6 +20418,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
     }
   }
 
+  let grpActNum = 0;
   for (const pa of allPas) {
     if (_footerOnly) continue; // predefined activities rendered in sections already; skip in footer
     // Group sessions: don't filter predefined activities by activeFrom date — they apply to all sessions
@@ -20449,11 +20450,12 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
     // Parent activity with sub-activities — render as connected group
     const children = grpSubsByParent.get(pa.title || pa.name) || [];
     if (children.length > 0) {
+      grpActNum++;
       let groupHtml = `<div style="display:flex;flex-direction:column;gap:0">`;
       groupHtml += `<div class="entry-block" style="border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);border-radius:var(--radius) var(--radius) 0 0;border-bottom:none;box-shadow:var(--shadow)">
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Activity</span>
-          <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem"></span>${paDisplayHtml(pa, true)}</span>
+          <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${grpActNum})</span>${paDisplayHtml(pa, true)}</span>
           ${(pa.createdOn || pa.activeFrom) ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(pa.createdOn || pa.activeFrom)}</span>` : ""}
         </div>
       </div>`;
@@ -20555,7 +20557,8 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
       || grpAllActs.find(([, a]) => a.targetName === target.name && a.activityName === (pa.title || pa.name) && !a.parentActivity && !a.configId)?.[0]
       || null;
     if (actId && pa.id && !data.activities[actId]?.configId) data.activities[actId].configId = pa.id;
-    items.push(renderGroupActivityCard(pa.title || pa.name, actId, target, data, attendees, pa.actNote, pa.isMapped ? pa : null, pa, true, null, pa.id, _grpFilterPaSet));
+    grpActNum++;
+    items.push(renderGroupActivityCard(pa.title || pa.name, actId, target, data, attendees, pa.actNote, pa.isMapped ? pa : null, pa, true, null, pa.id, _grpFilterPaSet, grpActNum));
   }
 
   if (_grpFilterPaSet && !_footerOnly) return items; // sidebar mode: manual/inactive sections handled by sidebar wrapper
@@ -20995,7 +20998,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
     return `${_outerOpen}
       ${suppressHeader ? "" : `<div class="entry-field" contenteditable="false">
         <span class="field-label">Activity</span>
-        <span class="field-value-fixed">${formatActivityMarkup(actName)}</span>
+        <span class="field-value-fixed">${actNum ? `<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>` : ""}${formatActivityMarkup(actName)}</span>
         ${(paEntry?.createdOn || paEntry?.activeFrom) ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(paEntry.createdOn || paEntry.activeFrom)}</span>` : ""}
         ${paEntry?.id ? `<button class="btn-icon btn-grp-edit-pencil" contenteditable="false" data-pa-id="${escHtml(paEntry.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
       </div>`}
@@ -21040,7 +21043,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
     return `${_outerOpen}
       ${suppressHeader ? "" : `<div class="entry-field" contenteditable="false">
         ${grpWrittenDot}<span class="field-label">Activity</span>
-        <span class="field-value-fixed">${inactiveReasonBadge(paEntry)}${formatActivityMarkup(actName)}</span>
+        <span class="field-value-fixed">${inactiveReasonBadge(paEntry)}${actNum ? `<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>` : ""}${formatActivityMarkup(actName)}</span>
         ${(paEntry?.createdOn || paEntry?.activeFrom) ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(paEntry.createdOn || paEntry.activeFrom)}</span>` : ""}
         ${paEntry?.id ? `<button class="btn-icon btn-grp-edit-pencil" contenteditable="false" data-pa-id="${escHtml(paEntry.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
       </div>`}
@@ -21111,7 +21114,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
   return `${_outerOpen}
     ${suppressHeader ? "" : `<div class="entry-field" contenteditable="false">
       ${grpWrittenDot}<span class="field-label">Activity</span>
-      <span class="field-value-fixed">${inactiveReasonBadge(paEntry)}${formatActivityMarkup(actName)}</span>
+      <span class="field-value-fixed">${inactiveReasonBadge(paEntry)}${actNum ? `<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>` : ""}${formatActivityMarkup(actName)}</span>
       ${(paEntry?.createdOn || paEntry?.activeFrom) ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(paEntry.createdOn || paEntry.activeFrom)}</span>` : ""}
       ${paEntry?.id ? `<button class="btn-icon btn-grp-edit-pencil" contenteditable="false" data-pa-id="${escHtml(paEntry.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
       ${combineToggle}
@@ -21119,7 +21122,6 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
     ${noteRow}
     ${suppressHeader ? "" : `<div class="entry-divider" contenteditable="false"></div>`}
     ${roundsBody}
-    ${suppressHeader ? "" : `<div class="entry-divider" contenteditable="false"></div>`}
     <button class="btn-add-remark btn-group-add-remark-more" contenteditable="false"
       data-act-id="${escHtml(actId || "")}"
       data-act-name="${escHtml(actName)}"
