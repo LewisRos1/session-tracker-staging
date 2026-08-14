@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1626";
+const APP_VERSION = "1627";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8712,8 +8712,8 @@ let _pendingNewActivity = null;
 // Active section index and collapse state for the sidebar layout.
 let _selectedSectionIdx = 0;
 let _selectedGroupSectionIdx = 0;
-let _sidebarCollapsed = false;
-let _grpSidebarCollapsed = false;
+let _sidebarCollapsed = true;
+let _grpSidebarCollapsed = true;
 // Scroll listeners for section auto-highlight — stored so they can be removed on re-render.
 let _secScrollListener = null;
 let _grpSecScrollListener = null;
