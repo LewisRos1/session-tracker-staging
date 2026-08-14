@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1601";
+const APP_VERSION = "1602";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6034,8 +6034,10 @@ async function repairLevenChuaSubActivities() {
 // MANAGE ACTIVITY SCREEN
 // ============================================================
 
-async function maGetLastDataDate(student, target, pa) {
-  const allSessions = await getAllSessionsForStudent(student.id);
+async function maGetLastDataDate(entity, target, pa, isGroup = false) {
+  const allSessions = isGroup
+    ? await getAllSessionsForGroup(entity.id)
+    : await getAllSessionsForStudent(entity.id);
 
   const getLatestFor = checkPa => {
     const checkName = checkPa.title || checkPa.name;
@@ -6115,6 +6117,8 @@ function maKebabOptions(pa, tName, isParent = false) {
 }
 
 function openManageActivityScreen(student) {
+  _maIsGroup = false;
+  _maSelectedTargetIdx = 0;
   const sub = $("manage-activity-subtitle");
   if (sub) sub.textContent = student.name + (student.note ? ' ' + student.note : '');
   showScreen("screen-manage-activity");
@@ -6124,12 +6128,24 @@ function openManageActivityScreen(student) {
   renderManageActivityScreen(student);
 }
 
-let _maSelectedTargetIdx = 0;
+function openGroupManageActivityScreen(group) {
+  _maIsGroup = true;
+  _maSelectedTargetIdx = 0;
+  const sub = $("manage-activity-subtitle");
+  if (sub) sub.textContent = group.name;
+  showScreen("screen-manage-activity");
+  $("btn-manage-activity-back").onclick = showHome;
+  $("btn-ma-reorder-targets")?.classList.add("hidden");
+  renderManageActivityScreen(group);
+}
 
-function renderManageActivityScreen(student) {
+let _maSelectedTargetIdx = 0;
+let _maIsGroup = false;
+
+function renderManageActivityScreen(entity) {
   const body = $("manage-activity-body");
   if (!body) return;
-  const targets = (student.targets || []).filter(t => !t.archived);
+  const targets = (entity.targets || []).filter(t => !t.archived);
   if (!targets.length) { body.innerHTML = `<div style="padding:1rem;color:#9ca3af;font-style:italic">No targets found.</div>`; return; }
   if (_maSelectedTargetIdx >= targets.length) _maSelectedTargetIdx = 0;
 
@@ -6165,7 +6181,7 @@ function renderManageActivityScreen(student) {
           repaired = true;
         });
       });
-      if (repaired) saveStudent(student).catch(() => {});
+      if (repaired) (_maIsGroup ? saveGroup(entity) : saveStudent(entity)).catch(() => {});
     }
 
     const masteredPas = activityPas.filter(p => maIsMastered(p));
@@ -6328,14 +6344,15 @@ function renderManageActivityScreen(student) {
 
   body.innerHTML = dropHtml + html;
 
-  body.querySelector("#btn-ma-rearrange-inline").addEventListener("click", () => showTargetReorderList(student));
+  body.querySelector("#btn-ma-rearrange-inline").addEventListener("click", () =>
+    _maIsGroup ? showGroupTargetReorderList(entity) : showTargetReorderList(entity));
 
-  body.querySelector("#btn-ma-discontinue-target").addEventListener("click", () => handleDiscontinueTarget(student, target, false));
+  body.querySelector("#btn-ma-discontinue-target").addEventListener("click", () => handleDiscontinueTarget(entity, target, _maIsGroup));
 
   // Async fill: load the last 5 sessions with data for this target and show them
   // in the Danger Zone inline, so the boss sees what they're deleting before clicking.
   let _dangerSessionCount = null;
-  getAllSessionsForStudent(student.id).then(allSessions => {
+  (_maIsGroup ? getAllSessionsForGroup(entity.id) : getAllSessionsForStudent(entity.id)).then(allSessions => {
     const el = body.querySelector("#ma-danger-sessions");
     if (!el) return;
     const withData = allSessions.filter(s => {
@@ -6367,27 +6384,33 @@ function renderManageActivityScreen(student) {
   });
 
   body.querySelector("#btn-ma-delete-target").addEventListener("click", async () => {
-    const confirmed = await showDeleteTargetConfirm(student, target, _dangerSessionCount);
+    const confirmed = await showDeleteTargetConfirm(entity, target, _dangerSessionCount);
     if (!confirmed) return;
     // Re-read the freshest reference from state after the async confirm dialog —
-    // any pending Edit Target saves (fire-and-forget) may have updated state.students
-    // since this screen opened, and using the closure's student directly would
+    // any pending Edit Target saves (fire-and-forget) may have updated state
+    // since this screen opened, and using the closure's entity directly would
     // overwrite those new activities with the stale snapshot.
-    const liveStudent = (state.students || []).find(s => s.id === student.id) || student;
-    liveStudent.targets = (liveStudent.targets || []).filter(t => t.id !== target.id);
-    liveStudent.targets.forEach((t, i) => t.order = i);
-    if (_maSelectedTargetIdx >= liveStudent.targets.length) _maSelectedTargetIdx = Math.max(0, liveStudent.targets.length - 1);
-    const si = state.students.findIndex(s => s.id === liveStudent.id);
-    if (si >= 0) state.students[si] = liveStudent;
-    if (state.selectedTargetName === target.name) state.selectedTargetName = liveStudent.targets[0]?.name || null;
-    await saveStudent(liveStudent);
-    await deleteTargetDataFromSessions(liveStudent.id, target.name);
-    renderManageActivityScreen(liveStudent);
+    const stateArr = _maIsGroup ? state.groups : state.students;
+    const liveEntity = (stateArr || []).find(e => e.id === entity.id) || entity;
+    liveEntity.targets = (liveEntity.targets || []).filter(t => t.id !== target.id);
+    liveEntity.targets.forEach((t, i) => t.order = i);
+    if (_maSelectedTargetIdx >= liveEntity.targets.length) _maSelectedTargetIdx = Math.max(0, liveEntity.targets.length - 1);
+    const si = stateArr.findIndex(e => e.id === liveEntity.id);
+    if (si >= 0) stateArr[si] = liveEntity;
+    if (!_maIsGroup && state.selectedTargetName === target.name) state.selectedTargetName = liveEntity.targets[0]?.name || null;
+    if (_maIsGroup) {
+      await saveGroup(liveEntity);
+      await deleteGroupTargetDataFromSessions(liveEntity.id, target.name);
+    } else {
+      await saveStudent(liveEntity);
+      await deleteTargetDataFromSessions(liveEntity.id, target.name);
+    }
+    renderManageActivityScreen(liveEntity);
   });
 
   document.getElementById("ma-target-select").addEventListener("change", function() {
     _maSelectedTargetIdx = parseInt(this.value, 10);
-    renderManageActivityScreen(student);
+    renderManageActivityScreen(entity);
   });
 
   // Collapse toggles
@@ -6426,7 +6449,7 @@ function renderManageActivityScreen(student) {
       const action = btn.dataset.action;
       const paId   = btn.dataset.paId;
       const tName  = btn.dataset.tname;
-      const target = student.targets.find(t => t.name === tName);
+      const target = entity.targets.find(t => t.name === tName);
       if (!target) return;
       const pa = (target.predefinedActivities || []).find(a => a.id === paId);
       if (!pa) return;
@@ -6439,7 +6462,7 @@ function renderManageActivityScreen(student) {
         const origText = btn.textContent;
         btn.disabled = true; btn.textContent = "Checking…";
         let result = { date: null, subName: null };
-        try { result = await maGetLastDataDate(student, target, pa); }
+        try { result = await maGetLastDataDate(entity, target, pa, _maIsGroup); }
         finally { btn.disabled = false; btn.textContent = origText; }
         return result;
       };
@@ -6554,10 +6577,11 @@ function renderManageActivityScreen(student) {
         pa.maintained = true; pa.activityColor = "gray";
       }
 
-      const si = state.students.findIndex(s => s.id === student.id);
-      if (si >= 0) state.students[si] = student;
-      renderManageActivityScreen(student);
-      saveStudent(student).catch(() => {});
+      const _maSaveArr = _maIsGroup ? state.groups : state.students;
+      const _maSi = _maSaveArr.findIndex(e => e.id === entity.id);
+      if (_maSi >= 0) _maSaveArr[_maSi] = entity;
+      renderManageActivityScreen(entity);
+      (_maIsGroup ? saveGroup(entity) : saveStudent(entity)).catch(() => {});
     });
   });
 }
@@ -14828,88 +14852,38 @@ function openManageModal(student, targetOrNull, templateOrNull = null, remarkPre
 
 // ── Manage Activities & Targets (group) ──────────────────────
 function showGroupManageActivityContent(group) {
-  _pendingActsCleanup = null;
-  $("manage-modal-title").textContent = "Manage Activities & Targets";
-  $("manage-modal-body").innerHTML = `
-    <div style="padding:2rem 1rem;display:flex;flex-direction:column;align-items:center;gap:.75rem">
-      <div style="font-size:.9rem;color:var(--text-muted)">Enter password to continue</div>
-      <input id="gma-gate-pw" type="password" class="admin-input"
-        style="width:200px;text-align:center;font-size:1rem"
-        placeholder="Enter password" autocomplete="new-password">
-      <div id="gma-gate-pw-err" style="font-size:.8rem;color:#dc2626;display:none">Incorrect password</div>
-      <button class="btn-primary-sm" id="gma-gate-pw-btn" style="padding:.5rem 1.5rem">Continue</button>
-    </div>`;
-  $("manage-modal").classList.remove("hidden");
-  const pwInput = $("gma-gate-pw");
-  pwInput.value = "";
+  // Password gate via a small overlay
+  const overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem";
+  overlay.innerHTML = `<div style="background:#fff;border-radius:.75rem;padding:1.75rem 1.5rem;max-width:340px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.22);display:flex;flex-direction:column;align-items:center;gap:.75rem">
+    <div style="font-size:1rem;font-weight:700;color:#374151">Manage Activities &amp; Targets</div>
+    <div style="font-size:.9rem;color:#6b7280">Enter password to continue</div>
+    <input id="gma-gate-pw" type="password" class="admin-input"
+      style="width:200px;text-align:center;font-size:1rem"
+      placeholder="Enter password" autocomplete="new-password">
+    <div id="gma-gate-pw-err" style="font-size:.8rem;color:#dc2626;display:none">Incorrect password</div>
+    <div style="display:flex;gap:.5rem">
+      <button id="gma-gate-cancel" style="flex:1;padding:.5rem .9rem;border:1px solid #d1d5db;border-radius:.4rem;background:#f9fafb;cursor:pointer;font-size:.9rem">Cancel</button>
+      <button id="gma-gate-pw-btn" class="btn-primary-sm" style="flex:1;padding:.5rem .9rem">Continue</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  const pwInput = overlay.querySelector("#gma-gate-pw");
   setTimeout(() => { pwInput.value = ""; pwInput.focus(); }, 50);
+  const remove = () => overlay.remove();
+  overlay.querySelector("#gma-gate-cancel").addEventListener("click", remove);
+  overlay.addEventListener("click", e => { if (e.target === overlay) remove(); });
   const checkPw = () => {
     if (pwInput.value !== "0823") {
-      $("gma-gate-pw-err").style.display = "";
+      overlay.querySelector("#gma-gate-pw-err").style.display = "";
       pwInput.value = "";
       return;
     }
-    renderGroupManageActivityContent(group);
+    remove();
+    openGroupManageActivityScreen(group);
   };
   pwInput.addEventListener("keydown", e => { if (e.key === "Enter") checkPw(); });
-  $("gma-gate-pw-btn").addEventListener("click", checkPw);
-}
-
-function renderGroupManageActivityContent(group) {
-  const sorted = sortTargetsByOrder(group.targets);
-  const active = sorted.filter(t => !t.discontinuedOn);
-  const disc   = sorted.filter(t => t.discontinuedOn);
-
-  $("manage-modal-body").innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:.75rem;padding-bottom:1.5rem">
-      <button class="btn-primary-sm" id="btn-gma-add" style="width:100%;padding:.65rem">+ Add Target</button>
-      ${sorted.length > 1 ? `<button class="btn-manage-targets" id="btn-gma-rearrange" style="width:100%;padding:.5rem .8rem">↕️ Rearrange Targets</button>` : ""}
-      ${active.length > 0 ? `
-        <div class="admin-section-title" style="margin-top:.25rem">Active Targets</div>
-        <div class="admin-list">
-          ${active.map(t => `
-            <button class="admin-list-item gma-target-btn" data-target-id="${escHtml(t.id)}"
-              style="cursor:pointer;gap:.75rem;text-align:left;width:100%;border:none;background:none;display:flex;align-items:center;padding:.65rem .75rem">
-              <span class="admin-item-name" style="flex:1">${escHtml(t.name)}</span>
-              <span style="font-size:.8rem;color:#6b7280">Edit ›</span>
-            </button>`).join("")}
-        </div>` : ""}
-      ${disc.length > 0 ? `
-        <div class="admin-section-title" style="margin-top:.25rem;opacity:.6">Discontinued Targets</div>
-        <div class="admin-list" style="opacity:.7">
-          ${disc.map(t => `
-            <button class="admin-list-item gma-target-btn" data-target-id="${escHtml(t.id)}"
-              style="cursor:pointer;gap:.75rem;text-align:left;width:100%;border:none;background:none;display:flex;align-items:center;padding:.65rem .75rem">
-              <span class="admin-item-name" style="flex:1">🛑 ${escHtml(t.name)}</span>
-              <span style="font-size:.8rem;color:#6b7280">Edit ›</span>
-            </button>`).join("")}
-        </div>` : ""}
-      ${active.length === 0 && disc.length === 0 ? `
-        <p style="color:#9ca3af;font-style:italic;padding:.5rem 0">No targets yet. Add one above.</p>` : ""}
-    </div>`;
-
-  $("btn-gma-add")?.addEventListener("click", () => showGroupAddTargetPicker(group));
-  $("btn-gma-rearrange")?.addEventListener("click", () => showGroupTargetReorderList(group));
-  $("manage-modal-body").querySelectorAll(".gma-target-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const tgt = group.targets.find(t => t.id === btn.dataset.targetId);
-      if (!tgt) return;
-      _groupForTargetEdit = group;
-      $("manage-modal-title").textContent = `Edit Target: ${tgt.name}`;
-      renderTargetManageContent(group, tgt);
-      // Inject a Back button so the boss can return to the targets list
-      const backBtn = document.createElement("button");
-      backBtn.className = "btn-manage-targets";
-      backBtn.style.cssText = "width:100%;margin-bottom:.75rem;padding:.45rem .8rem";
-      backBtn.textContent = "← Back to Targets";
-      backBtn.addEventListener("click", () => {
-        _groupForTargetEdit = null;
-        $("manage-modal-title").textContent = "Manage Activities & Targets";
-        renderGroupManageActivityContent(group);
-      });
-      $("manage-modal-body").prepend(backBtn);
-    });
-  });
+  overlay.querySelector("#gma-gate-pw-btn").addEventListener("click", checkPw);
 }
 
 // ── Group Add Target picker ───────────────────────────────────
@@ -15446,9 +15420,11 @@ async function getLastSessionDateForTarget(studentId, targetName) {
 
 async function handleDiscontinueTarget(entity, target, isGroup) {
   const save = () => isGroup ? saveGroup(entity) : saveStudent(entity);
-  const rerender = () => isGroup
-    ? populateGroupTargetDropdown(entity.targets)
-    : renderManageActivityScreen(entity);
+  const rerender = () => {
+    if (isGroup && _maIsGroup) renderManageActivityScreen(entity);
+    else if (isGroup) populateGroupTargetDropdown(entity.targets);
+    else renderManageActivityScreen(entity);
+  };
 
   if (target.discontinuedOn) {
     // Block restore if another active target already has the same name
@@ -20732,15 +20708,26 @@ function buildGroupItemsByStudent(target, data, attendees) {
   if (attendees.length === 0) {
     return [`<p class="empty-hint" contenteditable="false" style="padding:1.5rem">No attendees selected for this session.</p>`];
   }
-  const items = attendees.map(studentName => renderGroupStudentBlock(studentName, target, data));
+  const grpStudentDate = state.groupSessionData?.date || state.sessionData?.date || todayDateStr();
+  const items = attendees.map(studentName => {
+    try {
+      return renderGroupStudentBlock(studentName, target, data, grpStudentDate);
+    } catch (e) {
+      console.error("renderGroupStudentBlock failed for", studentName, e);
+      return `<div class="group-by-student-block" data-student="${escHtml(studentName)}">
+        <div class="activity-group-heading" contenteditable="false">${escHtml(studentName)}</div>
+        <p style="padding:1rem;color:#dc2626;font-size:.85rem">Error loading: ${escHtml(e?.message || String(e))}</p>
+      </div>`;
+    }
+  });
   return items;
 }
 
-function renderGroupStudentBlock(studentName, target, data) {
+function renderGroupStudentBlock(studentName, target, data, grpStudentDate = null) {
   // Section headings/notes aren't tied to a specific student, so they're skipped here —
   // only actual scoreable activities make sense nested under a student.
   const activityEntries = [];
-  const grpStudentDate = todayDateStr();
+  if (!grpStudentDate) grpStudentDate = state.groupSessionData?.date || todayDateStr();
   for (const pa of (target.predefinedActivities || [])) {
     if (!isActivityActive(pa, grpStudentDate)) continue;
     if (pa.isNote || pa.isExportNote || pa.isHeading || pa.isMaintainHeading || pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || (!pa.name && !pa.title)) continue;
