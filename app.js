@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1616";
+const APP_VERSION = "1617";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -20879,6 +20879,7 @@ function renderGroupStudentRowCompact(remId, rem, target, mappedInfo = null) {
       <textarea class="field-input group-remark-input" rows="1"
         data-rem-id="${remId}" placeholder="Remark…"
         data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>
+      <button class="btn-icon btn-group-del-student-remark" contenteditable="false" data-rem-id="${remId}" title="Delete remark">🗑</button>
     </div>
     ${trailingField}`;
 }
@@ -21027,10 +21028,6 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
 
     roundHtmls.push(`<div class="group-remark-round">
       ${bodyHtml}
-      <div class="group-round-footer" contenteditable="false">
-        <button class="btn-icon btn-group-del-round"
-          data-rem-ids="${roundRemIds.join(",")}" title="Remove">🗑</button>
-      </div>
     </div>`);
   }
 
@@ -21198,6 +21195,7 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
       <span class="field-label" contenteditable="false">${grpRemarkLabel}</span>
       ${sketchBtn}
       ${remarkContent}
+      <button class="btn-icon btn-group-del-student-remark" contenteditable="false" data-rem-id="${remId}" title="Delete remark">🗑</button>
     </div>
     ${noteField}
     ${trailingField}
