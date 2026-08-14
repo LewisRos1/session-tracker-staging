@@ -1899,7 +1899,7 @@ function wordTargetRows(target, session, allTargets) {
         rows.push({ cells: [subDisplayName, "", ""], actLines: subActLines, isGray: act.isGray, isGreen: act.isGreen });
         continue;
       }
-      const subPa = (target.predefinedActivities || []).find(p => p.name === act.activityName);
+      const subPa = act.configId ? (target.predefinedActivities || []).find(p => p.id === act.configId) : null;
       const subStarter = (subPa?.inlineOptions || subPa?.remarkPresetId || subPa?.remarkHasNote) ? ((subPa?.sentenceStarter && subPa.sentenceStarter !== "—") ? subPa.sentenceStarter : null) : null;
       let subFirst = true;
       for (const rem of subRemarks) {
@@ -1924,7 +1924,7 @@ function wordTargetRows(target, session, allTargets) {
     }
 
     const remarks = getRemarksForActivity(session, act.id).filter(hasRemarkContent);
-    const _starterPa = (target.predefinedActivities || []).find(p => !p.isHeading && !p.isNote && p.name === act.activityName);
+    const _starterPa = act.configId ? (target.predefinedActivities || []).find(p => p.id === act.configId) : null;
     const starter = (_starterPa?.inlineOptions || _starterPa?.remarkPresetId || _starterPa?.remarkHasNote) ? ((_starterPa?.sentenceStarter && _starterPa.sentenceStarter !== "—") ? _starterPa.sentenceStarter : null) : null;
 
     if (remarks.length === 0) {
@@ -2730,7 +2730,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, mastere
           continue;
         }
         const subRemarks = getRemarksForActivity(session, act.id).filter(hasRemarkContent);
-        const subPa = (target.predefinedActivities || []).find(p => p.name === act.activityName);
+        const subPa = act.configId ? (target.predefinedActivities || []).find(p => p.id === act.configId) : null;
         const subStarter = (subPa?.inlineOptions || subPa?.remarkPresetId || subPa?.remarkHasNote) ? ((subPa?.sentenceStarter && subPa.sentenceStarter !== "—") ? subPa.sentenceStarter : null) : null;
         if (subRemarks.length === 0) {
           const r = blankRow(); r[1] = subCell; rows.push(r);
@@ -2779,7 +2779,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, mastere
       }
 
       const remarks = getRemarksForActivity(session, act.id).filter(hasRemarkContent);
-      const _starterPaX = (target.predefinedActivities || []).find(p => !p.isHeading && !p.isNote && p.name === act.activityName);
+      const _starterPaX = act.configId ? (target.predefinedActivities || []).find(p => p.id === act.configId) : null;
       const starter = (_starterPaX?.inlineOptions || _starterPaX?.remarkPresetId || _starterPaX?.remarkHasNote) ? ((_starterPaX?.sentenceStarter && _starterPaX.sentenceStarter !== "—") ? _starterPaX.sentenceStarter : null) : null;
 
       if (remarks.length === 0) {
