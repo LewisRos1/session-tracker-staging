@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1597";
+const APP_VERSION = "1598";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -9343,9 +9343,8 @@ function attachTargetListeners(target) {
       const idx = parseInt(btn.dataset.secIdx, 10) || 0;
       const anchor = c.querySelector(`.sec-scroll-section[data-sec-anchor="${idx}"]`);
       if (anchor && _secScrollHost) {
-        const anchorRect = anchor.getBoundingClientRect();
-        const containerRect = _secScrollHost.getBoundingClientRect();
-        _secScrollHost.scrollBy({ top: anchorRect.top - containerRect.top - 8, behavior: "smooth" });
+        const targetScrollTop = _secScrollHost.scrollTop + anchor.getBoundingClientRect().top - _secScrollHost.getBoundingClientRect().top;
+        _secScrollHost.scrollTo({ top: targetScrollTop, behavior: "smooth" });
       }
     });
   });
@@ -21192,9 +21191,8 @@ function attachGroupTargetListeners(target) {
       const idx = parseInt(btn.dataset.secIdx, 10) || 0;
       const anchor = c.querySelector(`.grp-sec-scroll-section[data-sec-anchor="${idx}"]`);
       if (anchor && _grpSecScrollHost) {
-        const anchorRect = anchor.getBoundingClientRect();
-        const containerRect = _grpSecScrollHost.getBoundingClientRect();
-        _grpSecScrollHost.scrollBy({ top: anchorRect.top - containerRect.top - 8, behavior: "smooth" });
+        const targetScrollTop = _grpSecScrollHost.scrollTop + anchor.getBoundingClientRect().top - _grpSecScrollHost.getBoundingClientRect().top;
+        _grpSecScrollHost.scrollTo({ top: targetScrollTop, behavior: "smooth" });
       }
     });
   });
