@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1591";
+const APP_VERSION = "1592";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -7579,6 +7579,20 @@ async function openSession(student, existingSessionId = null, dateStr = null, pa
       const si = (state.students || []).findIndex(s => s.id === student.id);
       if (si >= 0) state.students[si] = student;
     }
+  } catch {}
+
+  // Backfill activeFrom on all activities that don't have one yet, without requiring Edit Target to be opened
+  try {
+    let _bfNeedsSave = false;
+    for (const t of (student.targets || [])) {
+      for (const a of (t.predefinedActivities || [])) {
+        if (!a.isHeading && !a.isMaintainHeading && !a.isNote && !a.isExportNote && a.activeFrom == null) {
+          a.activeFrom = "2026-01-01";
+          _bfNeedsSave = true;
+        }
+      }
+    }
+    if (_bfNeedsSave) saveStudent(student).catch(() => {});
   } catch {}
 
   try {
@@ -19791,6 +19805,20 @@ async function openGroupSession(group, dateStr, attendees, participants = null) 
   state.groupSessionData        = null;
   state.selectedGroupTargetName = null;
   state.groupRenderPending      = false;
+
+  // Backfill activeFrom on all group target activities that don't have one yet
+  try {
+    let _bfNeedsSave = false;
+    for (const t of (group.targets || [])) {
+      for (const a of (t.predefinedActivities || [])) {
+        if (!a.isHeading && !a.isMaintainHeading && !a.isNote && !a.isExportNote && a.activeFrom == null) {
+          a.activeFrom = "2026-01-01";
+          _bfNeedsSave = true;
+        }
+      }
+    }
+    if (_bfNeedsSave) saveGroup(group).catch(() => {});
+  } catch {}
 
   showScreen("screen-group-session");
   $("group-session-name").textContent = group.name;
