@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1600";
+const APP_VERSION = "1601";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -14826,6 +14826,92 @@ function openManageModal(student, targetOrNull, templateOrNull = null, remarkPre
   }
 }
 
+// ── Manage Activities & Targets (group) ──────────────────────
+function showGroupManageActivityContent(group) {
+  _pendingActsCleanup = null;
+  $("manage-modal-title").textContent = "Manage Activities & Targets";
+  $("manage-modal-body").innerHTML = `
+    <div style="padding:2rem 1rem;display:flex;flex-direction:column;align-items:center;gap:.75rem">
+      <div style="font-size:.9rem;color:var(--text-muted)">Enter password to continue</div>
+      <input id="gma-gate-pw" type="password" class="admin-input"
+        style="width:200px;text-align:center;font-size:1rem"
+        placeholder="Enter password" autocomplete="new-password">
+      <div id="gma-gate-pw-err" style="font-size:.8rem;color:#dc2626;display:none">Incorrect password</div>
+      <button class="btn-primary-sm" id="gma-gate-pw-btn" style="padding:.5rem 1.5rem">Continue</button>
+    </div>`;
+  $("manage-modal").classList.remove("hidden");
+  const pwInput = $("gma-gate-pw");
+  pwInput.value = "";
+  setTimeout(() => { pwInput.value = ""; pwInput.focus(); }, 50);
+  const checkPw = () => {
+    if (pwInput.value !== "0823") {
+      $("gma-gate-pw-err").style.display = "";
+      pwInput.value = "";
+      return;
+    }
+    renderGroupManageActivityContent(group);
+  };
+  pwInput.addEventListener("keydown", e => { if (e.key === "Enter") checkPw(); });
+  $("gma-gate-pw-btn").addEventListener("click", checkPw);
+}
+
+function renderGroupManageActivityContent(group) {
+  const sorted = sortTargetsByOrder(group.targets);
+  const active = sorted.filter(t => !t.discontinuedOn);
+  const disc   = sorted.filter(t => t.discontinuedOn);
+
+  $("manage-modal-body").innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:.75rem;padding-bottom:1.5rem">
+      <button class="btn-primary-sm" id="btn-gma-add" style="width:100%;padding:.65rem">+ Add Target</button>
+      ${sorted.length > 1 ? `<button class="btn-manage-targets" id="btn-gma-rearrange" style="width:100%;padding:.5rem .8rem">↕️ Rearrange Targets</button>` : ""}
+      ${active.length > 0 ? `
+        <div class="admin-section-title" style="margin-top:.25rem">Active Targets</div>
+        <div class="admin-list">
+          ${active.map(t => `
+            <button class="admin-list-item gma-target-btn" data-target-id="${escHtml(t.id)}"
+              style="cursor:pointer;gap:.75rem;text-align:left;width:100%;border:none;background:none;display:flex;align-items:center;padding:.65rem .75rem">
+              <span class="admin-item-name" style="flex:1">${escHtml(t.name)}</span>
+              <span style="font-size:.8rem;color:#6b7280">Edit ›</span>
+            </button>`).join("")}
+        </div>` : ""}
+      ${disc.length > 0 ? `
+        <div class="admin-section-title" style="margin-top:.25rem;opacity:.6">Discontinued Targets</div>
+        <div class="admin-list" style="opacity:.7">
+          ${disc.map(t => `
+            <button class="admin-list-item gma-target-btn" data-target-id="${escHtml(t.id)}"
+              style="cursor:pointer;gap:.75rem;text-align:left;width:100%;border:none;background:none;display:flex;align-items:center;padding:.65rem .75rem">
+              <span class="admin-item-name" style="flex:1">🛑 ${escHtml(t.name)}</span>
+              <span style="font-size:.8rem;color:#6b7280">Edit ›</span>
+            </button>`).join("")}
+        </div>` : ""}
+      ${active.length === 0 && disc.length === 0 ? `
+        <p style="color:#9ca3af;font-style:italic;padding:.5rem 0">No targets yet. Add one above.</p>` : ""}
+    </div>`;
+
+  $("btn-gma-add")?.addEventListener("click", () => showGroupAddTargetPicker(group));
+  $("btn-gma-rearrange")?.addEventListener("click", () => showGroupTargetReorderList(group));
+  $("manage-modal-body").querySelectorAll(".gma-target-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const tgt = group.targets.find(t => t.id === btn.dataset.targetId);
+      if (!tgt) return;
+      _groupForTargetEdit = group;
+      $("manage-modal-title").textContent = `Edit Target: ${tgt.name}`;
+      renderTargetManageContent(group, tgt);
+      // Inject a Back button so the boss can return to the targets list
+      const backBtn = document.createElement("button");
+      backBtn.className = "btn-manage-targets";
+      backBtn.style.cssText = "width:100%;margin-bottom:.75rem;padding:.45rem .8rem";
+      backBtn.textContent = "← Back to Targets";
+      backBtn.addEventListener("click", () => {
+        _groupForTargetEdit = null;
+        $("manage-modal-title").textContent = "Manage Activities & Targets";
+        renderGroupManageActivityContent(group);
+      });
+      $("manage-modal-body").prepend(backBtn);
+    });
+  });
+}
+
 // ── Group Add Target picker ───────────────────────────────────
 
 // ── Reorder Targets (group) — same mechanism as the individual-student version ──
@@ -19779,6 +19865,10 @@ function showGroupChoice(group) {
         <span class="choice-icon">✏️</span>
         <div class="choice-text"><div class="choice-label">Manage Group</div></div>
       </button>
+      <button class="choice-btn choice-manage-activity-group">
+        <span class="choice-icon">🪄</span>
+        <div class="choice-text"><div class="choice-label">Manage Activities & Targets</div></div>
+      </button>
       <button class="choice-btn choice-export-excel">
         <span class="choice-icon">📊</span>
         <div class="choice-text"><div class="choice-label">Export to Excel (Yearly Summary)</div></div>
@@ -19871,6 +19961,10 @@ function showGroupChoice(group) {
   $("session-picker-list").querySelector(".choice-manage").addEventListener("click", () => {
     closeSessionPicker();
     openGroupManageModal(group);
+  });
+  $("session-picker-list").querySelector(".choice-manage-activity-group").addEventListener("click", () => {
+    closeSessionPicker();
+    showGroupManageActivityContent(group);
   });
 }
 
@@ -19971,7 +20065,7 @@ async function openGroupSession(group, dateStr, attendees, participants = null) 
       // Re-check at fire time — see the matching comment in openSession's listener.
       setTimeout(() => {
         if (isGroupEntryBusy()) { state.groupRenderPending = true; }
-        else { renderGroupTargetContent(); }
+        else { try { renderGroupTargetContent(); } catch (e) { console.error("renderGroupTargetContent (snap):", e); } }
       }, 0);
     });
   } catch (err) {
@@ -20291,9 +20385,17 @@ function renderGroupTargetContent() {
 
   const attendees = state.groupAttendees;
   const groupLayout = target.groupLayout || "byActivity";
-  const items = groupLayout === "byStudent"
-    ? buildGroupItemsByStudent(target, data, attendees)
-    : buildGroupItemsByActivity(target, data, attendees);
+  let items;
+  try {
+    items = groupLayout === "byStudent"
+      ? buildGroupItemsByStudent(target, data, attendees)
+      : buildGroupItemsByActivity(target, data, attendees);
+  } catch (e) {
+    console.error("renderGroupTargetContent build failed:", e);
+    content.innerHTML = `<p class="empty-hint" contenteditable="false" style="padding:2rem;text-align:center">No targets added yet. Use the dropdown above to add one.</p>`;
+    updateGroupAvgChips(null, null);
+    return;
+  }
 
   const scrollHost = content.closest(".session-body");
   const scrollTop  = scrollHost?.scrollTop;
@@ -20317,7 +20419,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
   const items = [];
 
   // Predefined activities (with heading and note support)
-  const grpSessionDate = state.sessionData?.date || todayDateStr();
+  const grpSessionDate = state.groupSessionData?.date || state.sessionData?.date || todayDateStr();
   const allPas = target.predefinedActivities || [];
 
   // Pre-compute active sub-activities per parent
