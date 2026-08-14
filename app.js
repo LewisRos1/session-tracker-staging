@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1615";
+const APP_VERSION = "1616";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8085,11 +8085,11 @@ function renderTargetContent() {
 // Groups active top-level (non-sub) activities by their section heading.
 // Activities before the first heading fall into an implicit "General" group.
 // Notes are included in the section for inline rendering; headings themselves are not.
-function groupPasBySections(target, dateStr) {
+function groupPasBySections(target, dateStr, ignoreDate = false) {
   const sections = [];
   let current = null;
   for (const pa of (target.predefinedActivities || [])) {
-    if (!isActivityActive(pa, dateStr)) continue;
+    if (!ignoreDate && !isActivityActive(pa, dateStr)) continue;
     if (pa.parentActivity) continue;
     if (pa.isHeading || pa.isMaintainHeading) {
       current = { name: pa.name || "", headingPa: pa, pas: [] };
@@ -20399,10 +20399,10 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
   const grpSessionDate = state.groupSessionData?.date || state.sessionData?.date || todayDateStr();
   const allPas = target.predefinedActivities || [];
 
-  // Pre-compute active sub-activities per parent
+  // Pre-compute sub-activities per parent (group sessions: ignore activeFrom date)
   const grpSubsByParent = new Map();
   for (const pa of allPas) {
-    if (pa.parentActivity && isActivityActive(pa, grpSessionDate) && !pa.isCompleted && !pa.isArchived && !pa.isStopped) {
+    if (pa.parentActivity && !pa.isCompleted && !pa.isArchived && !pa.isStopped) {
       if (!grpSubsByParent.has(pa.parentActivity)) grpSubsByParent.set(pa.parentActivity, []);
       grpSubsByParent.get(pa.parentActivity).push(pa);
     }
@@ -20412,7 +20412,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
   // Use sidebar layout for all FEDC-style targets (matches individual session behaviour:
   // sidebar always shows when predefined activities exist, even if only "General" section)
   if (!_grpFilterPaSet && !_footerOnly && allPas.length > 0) {
-    const _sections = groupPasBySections(target, grpSessionDate);
+    const _sections = groupPasBySections(target, grpSessionDate, true);
     if (_sections.length > 0) {
       return buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByParent, grpSessionDate);
     }
@@ -20420,7 +20420,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
 
   for (const pa of allPas) {
     if (_footerOnly) continue; // predefined activities rendered in sections already; skip in footer
-    if (!isActivityActive(pa, grpSessionDate)) continue;
+    // Group sessions: don't filter predefined activities by activeFrom date — they apply to all sessions
     // Sub-activities rendered within their parent's group
     if (pa.parentActivity) continue;
     if (pa.isNote || pa.isExportNote) {
@@ -20553,8 +20553,10 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
       items.push(renderGroupActivityCard(act.activityName, actId, target, data, attendees, null, null, null, false, null, null, _grpFilterPaSet));
     });
 
+  // Group sessions: only show Mastered/Discontinued sections (not date-inactive activities)
   const grpInactivePas = (target.predefinedActivities || []).filter(pa =>
-    !isActivityActive(pa, grpSessionDate) && !pa.isCompleted && !pa.isArchived && !pa.isStopped
+    !pa.isCompleted && !pa.isArchived && !pa.isStopped &&
+    (pa.masteredOn || pa.discontinuedOn || pa.inactiveReason)
   );
   if (items.length === 0 && grpInactivePas.length === 0) {
     items.push(`<p class="empty-hint" contenteditable="false" style="padding:1.5rem">No activities yet. Add them under Edit Target.</p>`);
@@ -20613,7 +20615,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
 // ─── SECTION SIDEBAR LAYOUT (group session) ──────────────────
 
 function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByParent, grpSessionDate, layout = "byActivity") {
-  const sections = groupPasBySections(target, grpSessionDate);
+  const sections = groupPasBySections(target, grpSessionDate, true);
   if (!sections.length) {
     return layout === "byStudent"
       ? buildGroupItemsByStudent(target, data, attendees, new Set())
@@ -20719,12 +20721,12 @@ function buildGroupItemsByStudent(target, data, attendees, _grpFilterPaSet = nul
 
   // Route to sidebar for FEDC targets (matches byActivity behaviour)
   if (!_grpFilterPaSet && (target.predefinedActivities || []).length > 0) {
-    const _sections = groupPasBySections(target, grpStudentDate);
+    const _sections = groupPasBySections(target, grpStudentDate, true);
     if (_sections.length > 0) {
       const _allPas = target.predefinedActivities || [];
       const _grpSubs = new Map();
       for (const pa of _allPas) {
-        if (pa.parentActivity && isActivityActive(pa, grpStudentDate) && !pa.isCompleted && !pa.isArchived && !pa.isStopped) {
+        if (pa.parentActivity && !pa.isCompleted && !pa.isArchived && !pa.isStopped) {
           if (!_grpSubs.has(pa.parentActivity)) _grpSubs.set(pa.parentActivity, []);
           _grpSubs.get(pa.parentActivity).push(pa);
         }
@@ -20759,7 +20761,7 @@ function renderGroupStudentBlock(studentName, target, data, grpStudentDate = nul
   const activityEntries = [];
   if (!grpStudentDate) grpStudentDate = state.groupSessionData?.date || todayDateStr();
   for (const pa of (target.predefinedActivities || [])) {
-    if (!isActivityActive(pa, grpStudentDate)) continue;
+    // Group sessions: don't filter by activeFrom date — activities apply to all sessions
     if (_filterPaSet && !_filterPaSet.has(pa)) continue;
     if (pa.isNote || pa.isExportNote || pa.isHeading || pa.isMaintainHeading || pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || (!pa.name && !pa.title)) continue;
     const actId = Object.entries(data.activities || {})
