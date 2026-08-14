@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1611";
+const APP_VERSION = "1612";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -19895,8 +19895,22 @@ function showGroupChoice(group) {
         renderGroupStartSessionCalendar(group, today, displayDate, new Set(), new Map(), renderGroupDateStep);
         groupSessionsFetch
           .then(sessions => {
-            const takenDates = new Set(sessions.map(s => s.date));
-            const sessionsByDate = new Map(sessions.map(s => [s.date, s.participants || []]));
+            const _stripGC = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+            const grpHasData = s => {
+              if (Object.values(s.fedcComments || {}).some(c => _stripGC(c).length > 0)) return true;
+              return Object.values(s.remarks || {}).some(r =>
+                _stripGC(r.text).length > 0 ||
+                (r.trials || []).some(t => t !== null && t !== -1) ||
+                _stripGC(r.masteryNote).length > 0 ||
+                (r.optionScore !== undefined && r.optionScore !== null) ||
+                (r.selectedOptions || []).length > 0
+              );
+            };
+            const empties = sessions.filter(s => !grpHasData(s));
+            empties.forEach(s => deleteSession(s.id).catch(() => {}));
+            const dataSessions = sessions.filter(grpHasData);
+            const takenDates = new Set(dataSessions.map(s => s.date));
+            const sessionsByDate = new Map(dataSessions.map(s => [s.date, s.participants || []]));
             renderGroupStartSessionCalendar(group, today, displayDate, takenDates, sessionsByDate, renderGroupDateStep);
           })
           .catch(() => {});
