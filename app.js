@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1595";
+const APP_VERSION = "1596";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8029,6 +8029,8 @@ function renderTargetContent() {
   // doesn't yank the page back to the top.
   const scrollHost = container.closest(".session-body");
   const scrollTop  = scrollHost?.scrollTop;
+  // Also capture sec-main scroll — used when sidebar is expanded and sec-main is the scroll container
+  const secMainScrollTop = container.querySelector(".sec-main")?.scrollTop || 0;
   const captured = captureActiveEditState(container);
   try {
     container.innerHTML = target.predefinedActivities?.length > 0
@@ -8042,6 +8044,9 @@ function renderTargetContent() {
   attachTargetListeners(target);
   restoreActiveEditState(container, captured);
   if (scrollHost) scrollHost.scrollTop = scrollTop;
+  // Restore sec-main scroll position (expanded sidebar layout)
+  const newSecMain = container.querySelector(".sec-main");
+  if (newSecMain && secMainScrollTop > 0) newSecMain.scrollTop = secMainScrollTop;
   // Re-evaluate which section is active after scroll is restored
   if (_triggerSecNavUpdate) _triggerSecNavUpdate();
 }
@@ -8623,32 +8628,41 @@ function renderFedcTargetWithSidebar(target, allPas, subActsByParent, sessionDat
     </div>`;
   }
 
-  let sidebarHtml = `<div style="padding:.5rem .9rem .45rem;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between">
+  // Sidebar: fixed header (pinned) + scrollable nav buttons below
+  // sec-layout uses flex:1 + min-height:0 so the flex chain gives it a real height
+  // from the session-body → target-content → sec-layout chain, allowing sec-main
+  // to scroll independently. This is more reliable than position:sticky inside
+  // an overflow:hidden ancestor (.screen { overflow:hidden } breaks sticky).
+  let sidebarFixedHtml = `<div style="padding:.5rem .9rem .45rem;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
     <span style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;font-weight:600">Menu</span>
     <button class="sec-toggle-btn" contenteditable="false" title="Hide sections" style="background:none;border:none;cursor:pointer;font-size:1.3rem;color:#9ca3af;line-height:1;padding:.05rem .2rem;flex-shrink:0">×</button>
   </div>
-  <div style="padding:.6rem .9rem .5rem;border-bottom:1px solid #e5e7eb">
+  <div style="padding:.6rem .9rem .5rem;border-bottom:1px solid #e5e7eb;flex-shrink:0">
     <div style="font-size:.88rem;font-weight:700;color:#111827;margin-bottom:.35rem">${totalWritten} of ${totalActs} written</div>
     <div style="background:#e5e7eb;border-radius:9999px;height:5px"><div style="background:var(--primary);height:100%;width:${pct}%;border-radius:9999px"></div></div>
   </div>`;
 
+  let sidebarNavHtml = '';
   sections.forEach((grp, i) => {
     const { total, written } = sectionStats[i];
     // First section active initially; scroll listener updates dynamically
     const isAct = i === 0;
-    sidebarHtml += `<button class="sec-nav-btn" data-sec-idx="${i}" contenteditable="false"
+    sidebarNavHtml += `<button class="sec-nav-btn" data-sec-idx="${i}" contenteditable="false"
       style="width:100%;text-align:left;padding:.6rem .9rem;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;background:${isAct ? 'var(--primary-light)' : 'transparent'};border-left:3px solid ${isAct ? 'var(--primary)' : 'transparent'};border-radius:0">
       <div style="font-size:.82rem;font-weight:${isAct ? '700' : '500'};color:${isAct ? 'var(--primary-dark)' : '#374151'};word-break:break-word;line-height:1.3">${escHtml(grp.name)}</div>
       <div style="font-size:.72rem;color:#9ca3af;margin-top:.15rem">${written}/${total}</div>
     </button>`;
   });
 
-  // align-items:flex-start is required for position:sticky to work on the sidebar inside a flex row
-  return `<div class="sec-layout" style="display:flex;gap:0;align-items:flex-start">
-    <div class="sec-sidebar" contenteditable="false" style="width:190px;flex-shrink:0;border-right:1px solid #e5e7eb;background:#fafafa;position:sticky;top:0;max-height:calc(100vh - 170px);overflow-y:auto">
-      ${sidebarHtml}
+  // sec-layout: flex:1 + min-height:0 so it fills the flex chain without overflowing
+  // sec-sidebar: flex-column with pinned top and scrollable nav list
+  // sec-main: flex:1 + overflow-y:auto — the actual scroll container for section content
+  return `<div class="sec-layout" style="display:flex;gap:0;align-items:stretch;flex:1;min-height:0">
+    <div class="sec-sidebar" contenteditable="false" style="width:190px;flex-shrink:0;border-right:1px solid #e5e7eb;background:#fafafa;display:flex;flex-direction:column;min-height:0;overflow:hidden">
+      ${sidebarFixedHtml}
+      <div style="flex:1;overflow-y:auto">${sidebarNavHtml}</div>
     </div>
-    <div class="sec-main" style="flex:1;min-width:0;padding-left:.75rem;display:flex;flex-direction:column;gap:.85rem">
+    <div class="sec-main" style="flex:1;min-width:0;min-height:0;padding-left:.75rem;overflow-y:auto;display:flex;flex-direction:column;gap:.85rem">
       ${allSectionsHtml}
     </div>
   </div>`;
@@ -9309,10 +9323,16 @@ function attachTargetListeners(target) {
   const c = $("target-content");
 
   // Section sidebar navigation
+  // For expanded sidebar: sec-main is the scroll container (overflow-y:auto, fills flex chain height).
+  // For collapsed sidebar: falls back to session-body so page scrolling works normally.
+  const _secMainEl = c.querySelector(".sec-main[style*='overflow-y']");
+  const _secScrollHost = _secMainEl || c.closest(".session-body");
+
   // Remove any previous scroll listener before attaching a new one
-  const _secScrollHost = c.closest(".session-body");
-  if (_secScrollListener && _secScrollHost) {
-    _secScrollHost.removeEventListener("scroll", _secScrollListener);
+  if (_secScrollListener) {
+    // previous host might be sec-main or session-body — remove from both to be safe
+    c.querySelector(".sec-main")?.removeEventListener("scroll", _secScrollListener);
+    c.closest(".session-body")?.removeEventListener("scroll", _secScrollListener);
     _secScrollListener = null;
   }
   _triggerSecNavUpdate = null;
@@ -20263,12 +20283,17 @@ function renderGroupTargetContent() {
 
   const scrollHost = content.closest(".session-body");
   const scrollTop  = scrollHost?.scrollTop;
+  // Also capture grp-sec-main scroll for the expanded sidebar layout
+  const grpSecMainScrollTop = content.querySelector(".grp-sec-main")?.scrollTop || 0;
   const captured = captureActiveEditState(content);
   content.innerHTML = items.join("");
   updateGroupAvgChips(target, data);
   attachGroupTargetListeners(target);
   restoreActiveEditState(content, captured);
   if (scrollHost) scrollHost.scrollTop = scrollTop;
+  // Restore grp-sec-main scroll position (expanded sidebar layout)
+  const newGrpSecMain = content.querySelector(".grp-sec-main");
+  if (newGrpSecMain && grpSecMainScrollTop > 0) newGrpSecMain.scrollTop = grpSecMainScrollTop;
   // Re-evaluate which section is active after scroll is restored
   if (_triggerGrpSecNavUpdate) _triggerGrpSecNavUpdate();
 }
@@ -20548,32 +20573,34 @@ function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByPa
     </div>`];
   }
 
-  let sidebarHtml = `<div style="padding:.5rem .9rem .45rem;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between">
+  // Sidebar: pinned fixed header + scrollable nav buttons (same approach as individual)
+  let sidebarFixedHtml = `<div style="padding:.5rem .9rem .45rem;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
     <span style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;font-weight:600">Menu</span>
     <button class="grp-sec-toggle-btn" contenteditable="false" title="Hide sections" style="background:none;border:none;cursor:pointer;font-size:1.3rem;color:#9ca3af;line-height:1;padding:.05rem .2rem;flex-shrink:0">×</button>
   </div>
-  <div style="padding:.6rem .9rem .5rem;border-bottom:1px solid #e5e7eb">
+  <div style="padding:.6rem .9rem .5rem;border-bottom:1px solid #e5e7eb;flex-shrink:0">
     <div style="font-size:.88rem;font-weight:700;color:#111827;margin-bottom:.35rem">${totalWritten} of ${totalActs} written</div>
     <div style="background:#e5e7eb;border-radius:9999px;height:5px"><div style="background:var(--primary);height:100%;width:${pct}%;border-radius:9999px"></div></div>
   </div>`;
 
+  let sidebarNavHtml = '';
   sections.forEach((grp, i) => {
     const { total, written } = sectionStats[i];
     // First section active initially; scroll listener updates dynamically
     const isAct = i === 0;
-    sidebarHtml += `<button class="grp-sec-nav-btn" data-sec-idx="${i}" contenteditable="false"
+    sidebarNavHtml += `<button class="grp-sec-nav-btn" data-sec-idx="${i}" contenteditable="false"
       style="width:100%;text-align:left;padding:.6rem .9rem;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;background:${isAct ? 'var(--primary-light)' : 'transparent'};border-left:3px solid ${isAct ? 'var(--primary)' : 'transparent'};border-radius:0">
       <div style="font-size:.82rem;font-weight:${isAct ? '700' : '500'};color:${isAct ? 'var(--primary-dark)' : '#374151'};word-break:break-word;line-height:1.3">${escHtml(grp.name)}</div>
       <div style="font-size:.72rem;color:#9ca3af;margin-top:.15rem">${written}/${total}</div>
     </button>`;
   });
 
-  // align-items:flex-start required for position:sticky to work on the sidebar inside a flex row
-  return [`<div class="sec-layout" style="display:flex;gap:0;align-items:flex-start">
-    <div class="grp-sec-sidebar" contenteditable="false" style="width:190px;flex-shrink:0;border-right:1px solid #e5e7eb;background:#fafafa;position:sticky;top:0;max-height:calc(100vh - 170px);overflow-y:auto">
-      ${sidebarHtml}
+  return [`<div class="sec-layout" style="display:flex;gap:0;align-items:stretch;flex:1;min-height:0">
+    <div class="grp-sec-sidebar" contenteditable="false" style="width:190px;flex-shrink:0;border-right:1px solid #e5e7eb;background:#fafafa;display:flex;flex-direction:column;min-height:0;overflow:hidden">
+      ${sidebarFixedHtml}
+      <div style="flex:1;overflow-y:auto">${sidebarNavHtml}</div>
     </div>
-    <div class="grp-sec-main" style="flex:1;min-width:0;padding-left:.75rem;display:flex;flex-direction:column;gap:.85rem">
+    <div class="grp-sec-main" style="flex:1;min-width:0;min-height:0;padding-left:.75rem;overflow-y:auto;display:flex;flex-direction:column;gap:.85rem">
       ${allSectionsHtml}
     </div>
   </div>`];
@@ -21146,10 +21173,15 @@ function attachGroupTargetListeners(target) {
   if (!c) return;
 
   // Section sidebar navigation
-  // Remove any previous scroll listener before attaching a new one
-  const _grpSecScrollHost = c.closest(".session-body");
-  if (_grpSecScrollListener && _grpSecScrollHost) {
-    _grpSecScrollHost.removeEventListener("scroll", _grpSecScrollListener);
+  // For expanded sidebar: grp-sec-main is the scroll container (same pattern as individual).
+  // For collapsed: falls back to session-body.
+  const _grpSecMainEl = c.querySelector(".grp-sec-main[style*='overflow-y']");
+  const _grpSecScrollHost = _grpSecMainEl || c.closest(".session-body");
+
+  // Remove any previous scroll listener
+  if (_grpSecScrollListener) {
+    c.querySelector(".grp-sec-main")?.removeEventListener("scroll", _grpSecScrollListener);
+    c.closest(".session-body")?.removeEventListener("scroll", _grpSecScrollListener);
     _grpSecScrollListener = null;
   }
   _triggerGrpSecNavUpdate = null;
