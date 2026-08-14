@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1623";
+const APP_VERSION = "1624";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -21309,7 +21309,8 @@ function renderGroupStudentEmptyRow(studentName, actId, actName, target, isPrede
       <span class="group-student-name-label">${liveGroupAttendeeLabel(studentName)}</span>
     </div>
     <div class="entry-field">
-      <span class="field-label" contenteditable="false">Remark</span>
+      <span class="field-label" contenteditable="false">Notes</span>
+      <button class="btn-sketch btn-group-sketch" contenteditable="false" data-rem-id="" aria-label="Sketch">✏</button>
       <textarea class="field-input group-remark-input group-remark-input-empty" rows="1"
         placeholder="Remark…"
         data-act-id="${escHtml(actId || "")}"
