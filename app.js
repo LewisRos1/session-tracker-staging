@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1618";
+const APP_VERSION = "1619";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -20812,7 +20812,7 @@ function renderGroupStudentBlock(studentName, target, data, grpStudentDate = nul
   if (activityEntries.length === 0) return '';
 
   const cards = activityEntries.map(({ actId, actName, actNote, pa }) =>
-    renderGroupStudentActivityCard(studentName, actName, actId, target, data, actNote, pa?.isMapped ? pa : null, !!pa?.maintained)).join("");
+    renderGroupStudentActivityCard(studentName, actName, actId, target, data, actNote, pa?.isMapped ? pa : null, !!pa?.maintained, pa || null)).join("");
 
   return `<div class="group-by-student-block" data-student="${escHtml(studentName)}">
     <div class="activity-group-heading" contenteditable="false">${liveGroupAttendeeLabel(studentName)}</div>
@@ -20820,7 +20820,7 @@ function renderGroupStudentBlock(studentName, target, data, grpStudentDate = nul
   </div>`;
 }
 
-function renderGroupStudentActivityCard(studentName, actName, actId, target, data, actNote = null, mappedPa = null, isMaintained = false) {
+function renderGroupStudentActivityCard(studentName, actName, actId, target, data, actNote = null, mappedPa = null, isMaintained = false, pa = null) {
   const remarksForThisStudent = actId
     ? Object.entries(data.remarks || {})
         .filter(([, r]) => r.activityId === actId && r.studentName === studentName)
@@ -20852,6 +20852,8 @@ function renderGroupStudentActivityCard(studentName, actName, actId, target, dat
     <div class="entry-field" contenteditable="false">
       ${byStudentDot}<span class="field-label">Activity</span>
       <span class="field-value-fixed">${formatActivityMarkup(actName)}</span>
+      ${pa?.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(pa.activeFrom)}</span>` : ""}
+      ${pa?.id ? `<button class="btn-icon btn-grp-edit-pencil" contenteditable="false" data-pa-id="${escHtml(pa.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
     </div>
     ${noteRow}`;
 
@@ -20974,6 +20976,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
         <span class="field-label">Activity</span>
         <span class="field-value-fixed">${formatActivityMarkup(actName)}</span>
         ${paEntry?.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(paEntry.activeFrom)}</span>` : ""}
+        ${paEntry?.id ? `<button class="btn-icon btn-grp-edit-pencil" contenteditable="false" data-pa-id="${escHtml(paEntry.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
       </div>
       ${noteRow}
       <div class="entry-divider" contenteditable="false"></div>
@@ -21018,6 +21021,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
         ${grpWrittenDot}<span class="field-label">Activity</span>
         <span class="field-value-fixed">${inactiveReasonBadge(paEntry)}${formatActivityMarkup(actName)}</span>
         ${paEntry?.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(paEntry.activeFrom)}</span>` : ""}
+        ${paEntry?.id ? `<button class="btn-icon btn-grp-edit-pencil" contenteditable="false" data-pa-id="${escHtml(paEntry.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
       </div>
       ${noteRow}
       ${noOpts
@@ -21088,6 +21092,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
       ${grpWrittenDot}<span class="field-label">Activity</span>
       <span class="field-value-fixed">${formatActivityMarkup(actName)}${inactiveReasonBadge(paEntry)}</span>
       ${paEntry?.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(paEntry.activeFrom)}</span>` : ""}
+      ${paEntry?.id ? `<button class="btn-icon btn-grp-edit-pencil" contenteditable="false" data-pa-id="${escHtml(paEntry.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
       ${combineToggle}
     </div>
     ${noteRow}
@@ -21692,6 +21697,16 @@ function attachGroupTargetListeners(target) {
     });
   });
 
+  // Pencil: open Edit Target and scroll to this activity (group sessions)
+  c.querySelectorAll(".btn-grp-edit-pencil").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const paId = btn.dataset.paId;
+      const tgt = state.currentGroup?.targets.find(t => t.name === state.selectedGroupTargetName);
+      if (!tgt) return;
+      requirePassword(() => openGroupManageModal(state.currentGroup, tgt, paId), EXPORT_MSG);
+    });
+  });
+
   // Delete a single round (student-grouped layout)
   c.querySelectorAll(".btn-group-del-student-remark").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -21959,11 +21974,24 @@ function renderGroupSessionsForMonth(group, month, monthSessions, byMonth, sessi
 }
 
 // ── Group manage modal ───────────────────────────────────────
-function openGroupManageModal(group, target = null) {
+function openGroupManageModal(group, target = null, scrollToPaId = null) {
   $("manage-modal").classList.remove("hidden");
   if (target) {
     _groupForTargetEdit = group;
     renderTargetManageContent(group, target);
+    if (scrollToPaId) {
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const acts = target.predefinedActivities || [];
+        const idx = acts.findIndex(a => a.id === scrollToPaId);
+        if (idx < 0) return;
+        const modalBody = $("manage-modal-body");
+        const el = modalBody?.querySelector(`.admin-list-item[data-idx="${idx}"]`);
+        if (!el || !modalBody) return;
+        modalBody.scrollTop = el.offsetTop - 120;
+        el.classList.add("activity-cfg-blink");
+        el.addEventListener("animationend", () => el.classList.remove("activity-cfg-blink"), { once: true });
+      }));
+    }
   } else {
     _groupForTargetEdit = null;
     renderGroupManageContent(group);
