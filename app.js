@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1621";
+const APP_VERSION = "1622";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -21000,7 +21000,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
         ${paEntry?.id ? `<button class="btn-icon btn-grp-edit-pencil" contenteditable="false" data-pa-id="${escHtml(paEntry.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
       </div>`}
       ${noteRow}
-      <div class="entry-divider" contenteditable="false"></div>
+      ${suppressHeader ? "" : `<div class="entry-divider" contenteditable="false"></div>`}
       ${rows}
     </div>`;
   }
@@ -21117,9 +21117,9 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
       ${combineToggle}
     </div>`}
     ${noteRow}
-    <div class="entry-divider" contenteditable="false"></div>
+    ${suppressHeader ? "" : `<div class="entry-divider" contenteditable="false"></div>`}
     ${roundsBody}
-    <div class="entry-divider" contenteditable="false"></div>
+    ${suppressHeader ? "" : `<div class="entry-divider" contenteditable="false"></div>`}
     <button class="btn-add-remark btn-group-add-remark-more" contenteditable="false"
       data-act-id="${escHtml(actId || "")}"
       data-act-name="${escHtml(actName)}"
