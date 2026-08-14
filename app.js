@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1608";
+const APP_VERSION = "1609";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -20390,11 +20390,11 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
   }
   const letters = "abcdefghij";
 
-  // Use sidebar layout only for FEDC-style targets (real section headings, not just "General")
-  if (!_grpFilterPaSet && !_footerOnly) {
+  // Use sidebar layout for all FEDC-style targets (matches individual session behaviour:
+  // sidebar always shows when predefined activities exist, even if only "General" section)
+  if (!_grpFilterPaSet && !_footerOnly && allPas.length > 0) {
     const _sections = groupPasBySections(target, grpSessionDate);
-    const _hasSections = _sections.length > 1 || (_sections.length === 1 && _sections[0].name !== "General");
-    if (_hasSections) {
+    if (_sections.length > 0) {
       return buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByParent, grpSessionDate);
     }
   }
