@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1625";
+const APP_VERSION = "1626";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8627,9 +8627,14 @@ function renderFedcTargetWithSidebar(target, allPas, subActsByParent, sessionDat
 
   const pct = totalActs > 0 ? Math.round(totalWritten / totalActs * 100) : 0;
 
+  // Hide sections whose activities are all invisible (before start date / mastered / discontinued)
+  const _visData = sections.map((s, i) => ({ s, st: sectionStats[i] })).filter(({ st }) => st.total > 0);
+  if (_visData.length === 0) return renderFedcTarget(target, new Set());
+  if (_selectedSectionIdx >= _visData.length) _selectedSectionIdx = 0;
+
   // Render all sections continuously — each section wrapped in an anchor div for scroll tracking
   let allSectionsHtml = '';
-  sections.forEach((section, i) => {
+  _visData.forEach(({ s: section }, i) => {
     const sectionPaSet = new Set(section.pas);
     // _sectionOnly=true skips extras/inactive — those are rendered once at the end
     const secContent = renderFedcTarget(target, sectionPaSet, true);
@@ -8672,8 +8677,7 @@ function renderFedcTargetWithSidebar(target, allPas, subActsByParent, sessionDat
   </div>`;
 
   let sidebarNavHtml = '';
-  sections.forEach((grp, i) => {
-    const { total, written } = sectionStats[i];
+  _visData.forEach(({ s: grp, st: { total, written } }, i) => {
     // First section active initially; scroll listener updates dynamically
     const isAct = i === 0;
     sidebarNavHtml += `<button class="sec-nav-btn" data-sec-idx="${i}" contenteditable="false"
@@ -11226,19 +11230,22 @@ function buildTargetViewTable(target, data) {
     const parentActNames = new Set(
       (target.predefinedActivities || []).filter(p => p.parentActivity).map(p => p.parentActivity)
     );
+    let _pendingViewHeading = null;
     for (const pa of target.predefinedActivities) {
       if (!isActivityActive(pa, data.date)) continue;
       if (pa.isCompleted || pa.isArchived || pa.isStopped) continue;
       if (pa.isHeading || pa.isMaintainHeading) {
         const isGray = pa.headingColor === "gray" || pa.isMaintainHeading;
         const isGreen = pa.headingColor === "green";
-        rows += `<tr class="view-heading-row${isGray ? " view-gray-row" : isGreen ? " view-green-row" : ""}"><td colspan="6" contenteditable="false">${escHtml(pa.name)}</td></tr>`;
+        _pendingViewHeading = `<tr class="view-heading-row${isGray ? " view-gray-row" : isGreen ? " view-green-row" : ""}"><td colspan="6" contenteditable="false">${escHtml(pa.name)}</td></tr>`;
         continue;
       }
       if (pa.isNote || pa.isExportNote) {
+        if (_pendingViewHeading) { rows += _pendingViewHeading; _pendingViewHeading = null; }
         rows += `<tr class="view-note-row"><td colspan="6" contenteditable="false">${noteToHtml(pa.text)}</td></tr>`;
         continue;
       }
+      if (_pendingViewHeading) { rows += _pendingViewHeading; _pendingViewHeading = null; }
       const isSub = !!pa.parentActivity;
       // Skip orphaned sub-activities whose parent was deleted from the predefined config.
       // Edit Target hides them (line: if (a.parentActivity) return) but they still exist in
@@ -13175,19 +13182,22 @@ function buildGroupTargetViewTable(target, data, attendees) {
     const parentActNamesGrp = new Set(
       (target.predefinedActivities || []).filter(p => p.parentActivity).map(p => p.parentActivity)
     );
+    let _pendingGrpViewHeading = null;
     for (const pa of target.predefinedActivities) {
       if (!isActivityActive(pa, data.date)) continue;
       if (pa.isCompleted || pa.isArchived || pa.isStopped) continue;
       if (pa.isHeading || pa.isMaintainHeading) {
         const isGray = pa.headingColor === "gray" || pa.isMaintainHeading;
         const isGreenHdg = pa.headingColor === "green";
-        rows += `<tr class="view-heading-row${isGray ? " view-gray-row" : isGreenHdg ? " view-green-row" : ""}"><td colspan="7" contenteditable="false">${escHtml(pa.name)}</td></tr>`;
+        _pendingGrpViewHeading = `<tr class="view-heading-row${isGray ? " view-gray-row" : isGreenHdg ? " view-green-row" : ""}"><td colspan="7" contenteditable="false">${escHtml(pa.name)}</td></tr>`;
         continue;
       }
       if (pa.isNote || pa.isExportNote) {
+        if (_pendingGrpViewHeading) { rows += _pendingGrpViewHeading; _pendingGrpViewHeading = null; }
         rows += `<tr class="view-note-row"><td colspan="7" contenteditable="false">${noteToHtml(pa.text)}</td></tr>`;
         continue;
       }
+      if (_pendingGrpViewHeading) { rows += _pendingGrpViewHeading; _pendingGrpViewHeading = null; }
       if (!pa.parentActivity && parentActNamesGrp.has(pa.name)) {
         no++;
         Object.entries(data.activities || {})
@@ -20694,9 +20704,18 @@ function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByPa
 
   const pct = totalActs > 0 ? Math.round(totalWritten / totalActs * 100) : 0;
 
+  // Hide sections whose activities are all invisible (mastered / discontinued / stopped)
+  const _grpVisData = sections.map((s, i) => ({ s, st: sectionStats[i] })).filter(({ st }) => st.total > 0);
+  if (_grpVisData.length === 0) {
+    return layout === "byStudent"
+      ? buildGroupItemsByStudent(target, data, attendees, new Set())
+      : buildGroupItemsByActivity(target, data, attendees, new Set());
+  }
+  if (_selectedGroupSectionIdx >= _grpVisData.length) _selectedGroupSectionIdx = 0;
+
   // Render all sections continuously — each wrapped in an anchor div for scroll tracking
   let allSectionsHtml = '';
-  sections.forEach((section, i) => {
+  _grpVisData.forEach(({ s: section }, i) => {
     const sectionPaSet = new Set(section.pas);
     const sectionItems = layout === "byStudent"
       ? buildGroupItemsByStudent(target, data, attendees, sectionPaSet)
@@ -20736,8 +20755,7 @@ function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByPa
   </div>`;
 
   let sidebarNavHtml = '';
-  sections.forEach((grp, i) => {
-    const { total, written } = sectionStats[i];
+  _grpVisData.forEach(({ s: grp, st: { total, written } }, i) => {
     // First section active initially; scroll listener updates dynamically
     const isAct = i === 0;
     sidebarNavHtml += `<button class="grp-sec-nav-btn" data-sec-idx="${i}" contenteditable="false"
