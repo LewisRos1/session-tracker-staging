@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1594";
+const APP_VERSION = "1595";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8042,6 +8042,8 @@ function renderTargetContent() {
   attachTargetListeners(target);
   restoreActiveEditState(container, captured);
   if (scrollHost) scrollHost.scrollTop = scrollTop;
+  // Re-evaluate which section is active after scroll is restored
+  if (_triggerSecNavUpdate) _triggerSecNavUpdate();
 }
 
 // ─── SECTION SIDEBAR HELPERS ─────────────────────────────────
@@ -8103,7 +8105,7 @@ function grpPaIsWritten(pa, target, data, parentName = null) {
 
 // ─── FEDC TARGET ─────────────────────────────────────────────
 
-function renderFedcTarget(target, _filterPaSet = null) {
+function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
   let html = "";
 
   const letters = "abcdefghij";
@@ -8477,6 +8479,7 @@ function renderFedcTarget(target, _filterPaSet = null) {
     html += `</div>`;
   });
 
+  if (!_sectionOnly) {
   // Extra (session-only) activities + add button (renderExtraActivitiesSection
   // handles all non-predefined activities, the pending-name input, and the
   // "+ Add Activity" button — no separate manualActivities loop needed here).
@@ -8553,6 +8556,7 @@ function renderFedcTarget(target, _filterPaSet = null) {
       ${renderSection('Inactive', '#6b7280', otherPas)}
     </div>`;
   }
+  } // end if (!_sectionOnly)
 
   return html;
 }
@@ -8564,7 +8568,6 @@ function renderFedcTargetWithSidebar(target, allPas, subActsByParent, sessionDat
   if (!sections.length) return renderFedcTarget(target, new Set());
 
   if (_selectedSectionIdx >= sections.length) _selectedSectionIdx = 0;
-  const selIdx = _selectedSectionIdx;
 
   let totalActs = 0, totalWritten = 0;
   const sectionStats = sections.map(grp => {
@@ -8590,9 +8593,20 @@ function renderFedcTargetWithSidebar(target, allPas, subActsByParent, sessionDat
 
   const pct = totalActs > 0 ? Math.round(totalWritten / totalActs * 100) : 0;
 
-  const selectedPaSet = new Set(sections[selIdx].pas);
-  const sectionHeading = `<div contenteditable="false" style="font-size:1.43rem;font-weight:700;color:#374151;padding-bottom:.5rem;border-bottom:2px solid #e5e7eb;margin-bottom:.1rem">${escHtml(sections[selIdx].name)}</div>`;
-  const mainContentHtml = renderFedcTarget(target, selectedPaSet);
+  // Render all sections continuously — each section wrapped in an anchor div for scroll tracking
+  let allSectionsHtml = '';
+  sections.forEach((section, i) => {
+    const sectionPaSet = new Set(section.pas);
+    // _sectionOnly=true skips extras/inactive — those are rendered once at the end
+    const secContent = renderFedcTarget(target, sectionPaSet, true);
+    allSectionsHtml += `<div class="sec-scroll-section" data-sec-anchor="${i}" style="display:flex;flex-direction:column;gap:.85rem">
+      <div contenteditable="false" style="font-size:1.43rem;font-weight:700;color:#374151;padding-bottom:.5rem;border-bottom:2px solid #e5e7eb">${escHtml(section.name)}</div>
+      ${secContent}
+    </div>`;
+  });
+  // Extras (session-only activities + Add button) and inactive section — shown once after all sections
+  // renderFedcTarget with an empty Set skips all predefined activities but runs extras+inactive
+  allSectionsHtml += renderFedcTarget(target, new Set());
 
   if (_sidebarCollapsed) {
     return `<div class="sec-layout" contenteditable="false" style="display:flex;flex-direction:column;gap:0">
@@ -8604,8 +8618,7 @@ function renderFedcTargetWithSidebar(target, allPas, subActsByParent, sessionDat
         </div>
       </div>
       <div class="sec-main" style="display:flex;flex-direction:column;gap:.85rem">
-        ${sectionHeading}
-        ${mainContentHtml}
+        ${allSectionsHtml}
       </div>
     </div>`;
   }
@@ -8621,7 +8634,8 @@ function renderFedcTargetWithSidebar(target, allPas, subActsByParent, sessionDat
 
   sections.forEach((grp, i) => {
     const { total, written } = sectionStats[i];
-    const isAct = i === selIdx;
+    // First section active initially; scroll listener updates dynamically
+    const isAct = i === 0;
     sidebarHtml += `<button class="sec-nav-btn" data-sec-idx="${i}" contenteditable="false"
       style="width:100%;text-align:left;padding:.6rem .9rem;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;background:${isAct ? 'var(--primary-light)' : 'transparent'};border-left:3px solid ${isAct ? 'var(--primary)' : 'transparent'};border-radius:0">
       <div style="font-size:.82rem;font-weight:${isAct ? '700' : '500'};color:${isAct ? 'var(--primary-dark)' : '#374151'};word-break:break-word;line-height:1.3">${escHtml(grp.name)}</div>
@@ -8629,13 +8643,13 @@ function renderFedcTargetWithSidebar(target, allPas, subActsByParent, sessionDat
     </button>`;
   });
 
-  return `<div class="sec-layout" style="display:flex;gap:0;align-items:stretch">
+  // align-items:flex-start is required for position:sticky to work on the sidebar inside a flex row
+  return `<div class="sec-layout" style="display:flex;gap:0;align-items:flex-start">
     <div class="sec-sidebar" contenteditable="false" style="width:190px;flex-shrink:0;border-right:1px solid #e5e7eb;background:#fafafa;position:sticky;top:0;max-height:calc(100vh - 170px);overflow-y:auto">
       ${sidebarHtml}
     </div>
     <div class="sec-main" style="flex:1;min-width:0;padding-left:.75rem;display:flex;flex-direction:column;gap:.85rem">
-      ${sectionHeading}
-      ${mainContentHtml}
+      ${allSectionsHtml}
     </div>
   </div>`;
 }
@@ -8653,6 +8667,12 @@ let _selectedSectionIdx = 0;
 let _selectedGroupSectionIdx = 0;
 let _sidebarCollapsed = false;
 let _grpSidebarCollapsed = false;
+// Scroll listeners for section auto-highlight — stored so they can be removed on re-render.
+let _secScrollListener = null;
+let _grpSecScrollListener = null;
+// Force-update functions for nav highlighting (called after scroll position is restored).
+let _triggerSecNavUpdate = null;
+let _triggerGrpSecNavUpdate = null;
 
 // A remark "has content" if its text (stripped of HTML) or note is non-empty.
 function remarkHasContent(r) {
@@ -9289,10 +9309,24 @@ function attachTargetListeners(target) {
   const c = $("target-content");
 
   // Section sidebar navigation
+  // Remove any previous scroll listener before attaching a new one
+  const _secScrollHost = c.closest(".session-body");
+  if (_secScrollListener && _secScrollHost) {
+    _secScrollHost.removeEventListener("scroll", _secScrollListener);
+    _secScrollListener = null;
+  }
+  _triggerSecNavUpdate = null;
+
+  // Nav buttons: scroll to section anchor (no re-render)
   c.querySelectorAll(".sec-nav-btn").forEach(btn => {
     btn.addEventListener("click", () => {
-      _selectedSectionIdx = parseInt(btn.dataset.secIdx, 10) || 0;
-      renderTargetContent();
+      const idx = parseInt(btn.dataset.secIdx, 10) || 0;
+      const anchor = c.querySelector(`.sec-scroll-section[data-sec-anchor="${idx}"]`);
+      if (anchor && _secScrollHost) {
+        const anchorRect = anchor.getBoundingClientRect();
+        const containerRect = _secScrollHost.getBoundingClientRect();
+        _secScrollHost.scrollBy({ top: anchorRect.top - containerRect.top - 8, behavior: "smooth" });
+      }
     });
   });
   c.querySelectorAll(".sec-toggle-btn").forEach(btn => {
@@ -9301,6 +9335,43 @@ function attachTargetListeners(target) {
       renderTargetContent();
     });
   });
+
+  // Scroll listener: update active nav button based on scroll position
+  if (_secScrollHost && c.querySelector(".sec-scroll-section")) {
+    const updateActiveSection = () => {
+      const anchors = c.querySelectorAll(".sec-scroll-section[data-sec-anchor]");
+      if (!anchors.length) return;
+      const atBottom = _secScrollHost.scrollTop + _secScrollHost.clientHeight >= _secScrollHost.scrollHeight - 24;
+      let activeIdx = 0;
+      if (atBottom) {
+        activeIdx = anchors.length - 1;
+      } else {
+        const containerTop = _secScrollHost.getBoundingClientRect().top;
+        anchors.forEach(section => {
+          if (section.getBoundingClientRect().top <= containerTop + 8) {
+            activeIdx = parseInt(section.dataset.secAnchor, 10) || 0;
+          }
+        });
+      }
+      if (activeIdx === _selectedSectionIdx) return;
+      _selectedSectionIdx = activeIdx;
+      c.querySelectorAll(".sec-nav-btn").forEach(navBtn => {
+        const btnIdx = parseInt(navBtn.dataset.secIdx, 10);
+        const isActive = btnIdx === activeIdx;
+        navBtn.style.background = isActive ? 'var(--primary-light)' : 'transparent';
+        navBtn.style.borderLeft = `3px solid ${isActive ? 'var(--primary)' : 'transparent'}`;
+        const nameDiv = navBtn.querySelector("div:first-child");
+        if (nameDiv) {
+          nameDiv.style.fontWeight = isActive ? '700' : '500';
+          nameDiv.style.color = isActive ? 'var(--primary-dark)' : '#374151';
+        }
+      });
+    };
+    _secScrollListener = updateActiveSection;
+    _triggerSecNavUpdate = updateActiveSection;
+    _secScrollHost.addEventListener("scroll", _secScrollListener, { passive: true });
+    updateActiveSection(); // set initial state based on current scroll position
+  }
 
   // Free-text boxes here are real <textarea>/<input> elements now, so their
   // own native Enter/backspace/Ctrl+A handling just works — only the app's
@@ -20198,10 +20269,12 @@ function renderGroupTargetContent() {
   attachGroupTargetListeners(target);
   restoreActiveEditState(content, captured);
   if (scrollHost) scrollHost.scrollTop = scrollTop;
+  // Re-evaluate which section is active after scroll is restored
+  if (_triggerGrpSecNavUpdate) _triggerGrpSecNavUpdate();
 }
 
 // "Group students together": activity is the heading, students are listed underneath
-function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = null) {
+function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = null, _footerOnly = false) {
   const items = [];
 
   // Predefined activities (with heading and note support)
@@ -20218,8 +20291,8 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
   }
   const letters = "abcdefghij";
 
-  // Always use sidebar layout for non-filtered calls
-  if (!_grpFilterPaSet) {
+  // Always use sidebar layout for non-filtered calls (but not when called for footer-only)
+  if (!_grpFilterPaSet && !_footerOnly) {
     return buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByParent, grpSessionDate);
   }
 
@@ -20347,7 +20420,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
     items.push(renderGroupActivityCard(pa.name, actId, target, data, attendees, pa.actNote, pa.isMapped ? pa : null, pa, true, null, pa.id));
   }
 
-  if (_grpFilterPaSet) return items; // sidebar mode: manual/inactive sections handled by sidebar wrapper
+  if (_grpFilterPaSet && !_footerOnly) return items; // sidebar mode: manual/inactive sections handled by sidebar wrapper
 
   // Manually added (non-predefined) activities
   Object.entries(data.activities || {})
@@ -20421,7 +20494,6 @@ function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByPa
   if (!sections.length) return buildGroupItemsByActivity(target, data, attendees, new Set());
 
   if (_selectedGroupSectionIdx >= sections.length) _selectedGroupSectionIdx = 0;
-  const selIdx = _selectedGroupSectionIdx;
 
   let totalActs = 0, totalWritten = 0;
   const sectionStats = sections.map(grp => {
@@ -20447,17 +20519,19 @@ function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByPa
 
   const pct = totalActs > 0 ? Math.round(totalWritten / totalActs * 100) : 0;
 
-  const selectedPaSet = new Set(sections[selIdx].pas);
-  const grpSectionHeading = `<div contenteditable="false" style="font-size:1.43rem;font-weight:700;color:#374151;padding-bottom:.5rem;border-bottom:2px solid #e5e7eb;margin-bottom:.1rem">${escHtml(sections[selIdx].name)}</div>`;
-  const mainItems = buildGroupItemsByActivity(target, data, attendees, selectedPaSet);
-
-  // Manually added (non-predefined) activities always show below section content
-  Object.entries(data.activities || {})
-    .filter(([, a]) => a.targetName === target.name && !a.isPredefined)
-    .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
-    .forEach(([actId, act]) => {
-      mainItems.push(renderGroupActivityCard(act.activityName, actId, target, data, attendees));
-    });
+  // Render all sections continuously — each wrapped in an anchor div for scroll tracking
+  let allSectionsHtml = '';
+  sections.forEach((section, i) => {
+    const sectionPaSet = new Set(section.pas);
+    const sectionItems = buildGroupItemsByActivity(target, data, attendees, sectionPaSet);
+    allSectionsHtml += `<div class="grp-sec-scroll-section" data-sec-anchor="${i}" style="display:flex;flex-direction:column;gap:.85rem">
+      <div contenteditable="false" style="font-size:1.43rem;font-weight:700;color:#374151;padding-bottom:.5rem;border-bottom:2px solid #e5e7eb">${escHtml(section.name)}</div>
+      ${sectionItems.join("")}
+    </div>`;
+  });
+  // Footer: non-predefined (extra) activities and inactive section — rendered once after all sections
+  const footerItems = buildGroupItemsByActivity(target, data, attendees, null, true /* _footerOnly */);
+  if (footerItems.length) allSectionsHtml += `<div style="display:flex;flex-direction:column;gap:.85rem">${footerItems.join("")}</div>`;
 
   if (_grpSidebarCollapsed) {
     return [`<div class="sec-layout" contenteditable="false" style="display:flex;flex-direction:column;gap:0">
@@ -20469,8 +20543,7 @@ function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByPa
         </div>
       </div>
       <div class="grp-sec-main" style="display:flex;flex-direction:column;gap:.85rem">
-        ${grpSectionHeading}
-        ${mainItems.join("")}
+        ${allSectionsHtml}
       </div>
     </div>`];
   }
@@ -20486,7 +20559,8 @@ function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByPa
 
   sections.forEach((grp, i) => {
     const { total, written } = sectionStats[i];
-    const isAct = i === selIdx;
+    // First section active initially; scroll listener updates dynamically
+    const isAct = i === 0;
     sidebarHtml += `<button class="grp-sec-nav-btn" data-sec-idx="${i}" contenteditable="false"
       style="width:100%;text-align:left;padding:.6rem .9rem;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;background:${isAct ? 'var(--primary-light)' : 'transparent'};border-left:3px solid ${isAct ? 'var(--primary)' : 'transparent'};border-radius:0">
       <div style="font-size:.82rem;font-weight:${isAct ? '700' : '500'};color:${isAct ? 'var(--primary-dark)' : '#374151'};word-break:break-word;line-height:1.3">${escHtml(grp.name)}</div>
@@ -20494,13 +20568,13 @@ function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByPa
     </button>`;
   });
 
-  return [`<div class="sec-layout" style="display:flex;gap:0;align-items:stretch">
+  // align-items:flex-start required for position:sticky to work on the sidebar inside a flex row
+  return [`<div class="sec-layout" style="display:flex;gap:0;align-items:flex-start">
     <div class="grp-sec-sidebar" contenteditable="false" style="width:190px;flex-shrink:0;border-right:1px solid #e5e7eb;background:#fafafa;position:sticky;top:0;max-height:calc(100vh - 170px);overflow-y:auto">
       ${sidebarHtml}
     </div>
     <div class="grp-sec-main" style="flex:1;min-width:0;padding-left:.75rem;display:flex;flex-direction:column;gap:.85rem">
-      ${grpSectionHeading}
-      ${mainItems.join("")}
+      ${allSectionsHtml}
     </div>
   </div>`];
 }
@@ -21072,10 +21146,24 @@ function attachGroupTargetListeners(target) {
   if (!c) return;
 
   // Section sidebar navigation
+  // Remove any previous scroll listener before attaching a new one
+  const _grpSecScrollHost = c.closest(".session-body");
+  if (_grpSecScrollListener && _grpSecScrollHost) {
+    _grpSecScrollHost.removeEventListener("scroll", _grpSecScrollListener);
+    _grpSecScrollListener = null;
+  }
+  _triggerGrpSecNavUpdate = null;
+
+  // Nav buttons: scroll to section anchor (no re-render)
   c.querySelectorAll(".grp-sec-nav-btn").forEach(btn => {
     btn.addEventListener("click", () => {
-      _selectedGroupSectionIdx = parseInt(btn.dataset.secIdx, 10) || 0;
-      renderGroupTargetContent();
+      const idx = parseInt(btn.dataset.secIdx, 10) || 0;
+      const anchor = c.querySelector(`.grp-sec-scroll-section[data-sec-anchor="${idx}"]`);
+      if (anchor && _grpSecScrollHost) {
+        const anchorRect = anchor.getBoundingClientRect();
+        const containerRect = _grpSecScrollHost.getBoundingClientRect();
+        _grpSecScrollHost.scrollBy({ top: anchorRect.top - containerRect.top - 8, behavior: "smooth" });
+      }
     });
   });
   c.querySelectorAll(".grp-sec-toggle-btn").forEach(btn => {
@@ -21084,6 +21172,43 @@ function attachGroupTargetListeners(target) {
       renderGroupTargetContent();
     });
   });
+
+  // Scroll listener: update active nav button based on scroll position
+  if (_grpSecScrollHost && c.querySelector(".grp-sec-scroll-section")) {
+    const updateGrpActiveSection = () => {
+      const anchors = c.querySelectorAll(".grp-sec-scroll-section[data-sec-anchor]");
+      if (!anchors.length) return;
+      const atBottom = _grpSecScrollHost.scrollTop + _grpSecScrollHost.clientHeight >= _grpSecScrollHost.scrollHeight - 24;
+      let activeIdx = 0;
+      if (atBottom) {
+        activeIdx = anchors.length - 1;
+      } else {
+        const containerTop = _grpSecScrollHost.getBoundingClientRect().top;
+        anchors.forEach(section => {
+          if (section.getBoundingClientRect().top <= containerTop + 8) {
+            activeIdx = parseInt(section.dataset.secAnchor, 10) || 0;
+          }
+        });
+      }
+      if (activeIdx === _selectedGroupSectionIdx) return;
+      _selectedGroupSectionIdx = activeIdx;
+      c.querySelectorAll(".grp-sec-nav-btn").forEach(navBtn => {
+        const btnIdx = parseInt(navBtn.dataset.secIdx, 10);
+        const isActive = btnIdx === activeIdx;
+        navBtn.style.background = isActive ? 'var(--primary-light)' : 'transparent';
+        navBtn.style.borderLeft = `3px solid ${isActive ? 'var(--primary)' : 'transparent'}`;
+        const nameDiv = navBtn.querySelector("div:first-child");
+        if (nameDiv) {
+          nameDiv.style.fontWeight = isActive ? '700' : '500';
+          nameDiv.style.color = isActive ? 'var(--primary-dark)' : '#374151';
+        }
+      });
+    };
+    _grpSecScrollListener = updateGrpActiveSection;
+    _triggerGrpSecNavUpdate = updateGrpActiveSection;
+    _grpSecScrollHost.addEventListener("scroll", _grpSecScrollListener, { passive: true });
+    updateGrpActiveSection(); // set initial state based on current scroll position
+  }
 
   // Saving for .group-remark-input / .group-remark-input-combined is handled
   // by the shared merged-editing host (state.entryGroupRemarkSaver, set up in
