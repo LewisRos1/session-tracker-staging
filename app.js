@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1592";
+const APP_VERSION = "1593";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8597,8 +8597,8 @@ function renderFedcTargetWithSidebar(target, allPas, subActsByParent, sessionDat
   if (_sidebarCollapsed) {
     return `<div class="sec-layout" contenteditable="false" style="display:flex;flex-direction:column;gap:0">
       <div contenteditable="false" style="display:flex;align-items:center;gap:.6rem;padding:.3rem 0 .5rem;margin-bottom:.4rem;border-bottom:1px solid #e5e7eb">
-        <button class="sec-toggle-btn" contenteditable="false" title="Show sections" style="background:none;border:1.5px solid var(--primary);border-radius:.4rem;cursor:pointer;font-size:1.1rem;color:var(--primary);padding:.2rem .4rem;line-height:1;flex-shrink:0">☰</button>
-        <span style="font-size:.82rem;font-weight:700;color:#374151;white-space:nowrap">${totalWritten} of ${totalActs} written</span>
+        <button class="sec-toggle-btn" contenteditable="false" title="Show sections" style="background:none;border:1.5px solid var(--primary);border-radius:.4rem;cursor:pointer;font-size:1.21rem;color:var(--primary);padding:.2rem .4rem;line-height:1;flex-shrink:0">☰</button>
+        <span style="font-size:.9rem;font-weight:700;color:#374151;white-space:nowrap">${totalWritten} of ${totalActs} written</span>
         <div style="flex:1;background:#e5e7eb;border-radius:9999px;height:4px;max-width:100px">
           <div style="background:var(--primary);height:100%;width:${pct}%;border-radius:9999px"></div>
         </div>
@@ -20462,8 +20462,8 @@ function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByPa
   if (_grpSidebarCollapsed) {
     return [`<div class="sec-layout" contenteditable="false" style="display:flex;flex-direction:column;gap:0">
       <div contenteditable="false" style="display:flex;align-items:center;gap:.6rem;padding:.3rem 0 .5rem;margin-bottom:.4rem;border-bottom:1px solid #e5e7eb">
-        <button class="grp-sec-toggle-btn" contenteditable="false" title="Show sections" style="background:none;border:1.5px solid var(--primary);border-radius:.4rem;cursor:pointer;font-size:1.1rem;color:var(--primary);padding:.2rem .4rem;line-height:1;flex-shrink:0">☰</button>
-        <span style="font-size:.82rem;font-weight:700;color:#374151;white-space:nowrap">${totalWritten} of ${totalActs} written</span>
+        <button class="grp-sec-toggle-btn" contenteditable="false" title="Show sections" style="background:none;border:1.5px solid var(--primary);border-radius:.4rem;cursor:pointer;font-size:1.21rem;color:var(--primary);padding:.2rem .4rem;line-height:1;flex-shrink:0">☰</button>
+        <span style="font-size:.9rem;font-weight:700;color:#374151;white-space:nowrap">${totalWritten} of ${totalActs} written</span>
         <div style="flex:1;background:#e5e7eb;border-radius:9999px;height:4px;max-width:100px">
           <div style="background:var(--primary);height:100%;width:${pct}%;border-radius:9999px"></div>
         </div>
