@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1612";
+const APP_VERSION = "1613";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -20612,9 +20612,13 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
 
 // ─── SECTION SIDEBAR LAYOUT (group session) ──────────────────
 
-function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByParent, grpSessionDate) {
+function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByParent, grpSessionDate, layout = "byActivity") {
   const sections = groupPasBySections(target, grpSessionDate);
-  if (!sections.length) return buildGroupItemsByActivity(target, data, attendees, new Set());
+  if (!sections.length) {
+    return layout === "byStudent"
+      ? buildGroupItemsByStudent(target, data, attendees, new Set())
+      : buildGroupItemsByActivity(target, data, attendees, new Set());
+  }
 
   if (_selectedGroupSectionIdx >= sections.length) _selectedGroupSectionIdx = 0;
 
@@ -20646,14 +20650,16 @@ function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByPa
   let allSectionsHtml = '';
   sections.forEach((section, i) => {
     const sectionPaSet = new Set(section.pas);
-    const sectionItems = buildGroupItemsByActivity(target, data, attendees, sectionPaSet);
+    const sectionItems = layout === "byStudent"
+      ? buildGroupItemsByStudent(target, data, attendees, sectionPaSet)
+      : buildGroupItemsByActivity(target, data, attendees, sectionPaSet);
     allSectionsHtml += `<div class="grp-sec-scroll-section" data-sec-anchor="${i}" style="display:flex;flex-direction:column;gap:.85rem">
       <div contenteditable="false" style="font-size:1.43rem;font-weight:700;color:#374151;padding-bottom:.5rem;border-bottom:2px solid #e5e7eb">${escHtml(section.name)}</div>
       ${sectionItems.join("")}
     </div>`;
   });
-  // Footer: non-predefined (extra) activities and inactive section — rendered once after all sections
-  const footerItems = buildGroupItemsByActivity(target, data, attendees, null, true /* _footerOnly */);
+  // Footer: non-predefined (extra) activities — only for byActivity layout
+  const footerItems = layout === "byStudent" ? [] : buildGroupItemsByActivity(target, data, attendees, null, true /* _footerOnly */);
   if (footerItems.length) allSectionsHtml += `<div style="display:flex;flex-direction:column;gap:.85rem">${footerItems.join("")}</div>`;
 
   if (_grpSidebarCollapsed) {
@@ -20705,46 +20711,64 @@ function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByPa
 }
 
 // "Group activities together": student is the heading, activities are listed underneath
-function buildGroupItemsByStudent(target, data, attendees) {
+function buildGroupItemsByStudent(target, data, attendees, _grpFilterPaSet = null) {
   if (attendees.length === 0) {
     return [`<p class="empty-hint" contenteditable="false" style="padding:1.5rem">No attendees selected for this session.</p>`];
   }
   const grpStudentDate = state.groupSessionData?.date || state.sessionData?.date || todayDateStr();
-  const items = attendees.map(studentName => {
+
+  // Route to sidebar for FEDC targets (matches byActivity behaviour)
+  if (!_grpFilterPaSet && (target.predefinedActivities || []).length > 0) {
+    const _sections = groupPasBySections(target, grpStudentDate);
+    if (_sections.length > 0) {
+      return buildGroupItemsWithSidebar(target, data, attendees, null, null, grpStudentDate, "byStudent");
+    }
+  }
+
+  const items = [];
+  for (const studentName of attendees) {
     try {
-      return renderGroupStudentBlock(studentName, target, data, grpStudentDate);
+      const block = renderGroupStudentBlock(studentName, target, data, grpStudentDate, _grpFilterPaSet);
+      if (block) items.push(block);
+      else if (!_grpFilterPaSet) items.push(`<div class="group-by-student-block" data-student="${escHtml(studentName)}">
+        <div class="activity-group-heading" contenteditable="false">${liveGroupAttendeeLabel(studentName)}</div>
+        <p class="empty-hint" contenteditable="false" style="padding:1rem">No activities yet. Add them under Edit Target.</p>
+      </div>`);
     } catch (e) {
       console.error("renderGroupStudentBlock failed for", studentName, e);
-      return `<div class="group-by-student-block" data-student="${escHtml(studentName)}">
+      items.push(`<div class="group-by-student-block" data-student="${escHtml(studentName)}">
         <div class="activity-group-heading" contenteditable="false">${escHtml(studentName)}</div>
         <p style="padding:1rem;color:#dc2626;font-size:.85rem">Error loading: ${escHtml(e?.message || String(e))}</p>
-      </div>`;
+      </div>`);
     }
-  });
-  return items;
+  }
+  return items.length ? items : [`<p class="empty-hint" contenteditable="false" style="padding:1.5rem">No activities found.</p>`];
 }
 
-function renderGroupStudentBlock(studentName, target, data, grpStudentDate = null) {
+function renderGroupStudentBlock(studentName, target, data, grpStudentDate = null, _filterPaSet = null) {
   // Section headings/notes aren't tied to a specific student, so they're skipped here —
   // only actual scoreable activities make sense nested under a student.
   const activityEntries = [];
   if (!grpStudentDate) grpStudentDate = state.groupSessionData?.date || todayDateStr();
   for (const pa of (target.predefinedActivities || [])) {
     if (!isActivityActive(pa, grpStudentDate)) continue;
+    if (_filterPaSet && !_filterPaSet.has(pa)) continue;
     if (pa.isNote || pa.isExportNote || pa.isHeading || pa.isMaintainHeading || pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || (!pa.name && !pa.title)) continue;
     const actId = Object.entries(data.activities || {})
       .find(([, a]) => a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title)))?.[0] || null;
     activityEntries.push({ actId, actName: pa.title || pa.name, actNote: pa.actNote, pa });
   }
-  Object.entries(data.activities || {})
-    .filter(([, a]) => a.targetName === target.name && !a.isPredefined)
-    .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
-    .forEach(([actId, act]) => activityEntries.push({ actId, actName: act.activityName }));
+  if (!_filterPaSet) {
+    Object.entries(data.activities || {})
+      .filter(([, a]) => a.targetName === target.name && !a.isPredefined)
+      .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
+      .forEach(([actId, act]) => activityEntries.push({ actId, actName: act.activityName }));
+  }
 
-  const cards = activityEntries.length
-    ? activityEntries.map(({ actId, actName, actNote, pa }) =>
-        renderGroupStudentActivityCard(studentName, actName, actId, target, data, actNote, pa?.isMapped ? pa : null, !!pa?.maintained)).join("")
-    : `<p class="empty-hint" contenteditable="false" style="padding:1rem">No activities yet. Add them under Edit Target.</p>`;
+  if (activityEntries.length === 0) return '';
+
+  const cards = activityEntries.map(({ actId, actName, actNote, pa }) =>
+    renderGroupStudentActivityCard(studentName, actName, actId, target, data, actNote, pa?.isMapped ? pa : null, !!pa?.maintained)).join("");
 
   return `<div class="group-by-student-block" data-student="${escHtml(studentName)}">
     <div class="activity-group-heading" contenteditable="false">${liveGroupAttendeeLabel(studentName)}</div>
