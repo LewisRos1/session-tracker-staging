@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1619";
+const APP_VERSION = "1620";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -20454,7 +20454,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Activity</span>
           <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem"></span>${paDisplayHtml(pa, true)}</span>
-          ${pa.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(pa.activeFrom)}</span>` : ""}
+          ${(pa.createdOn || pa.activeFrom) ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(pa.createdOn || pa.activeFrom)}</span>` : ""}
         </div>
       </div>`;
       children.forEach((sub, si) => {
@@ -20519,13 +20519,28 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
           }
         }
         const isLast   = si === children.length - 1;
-        const subCard  = renderGroupActivityCard(sub.title || sub.name, subActId, target, data, attendees, null, null, sub, true, sub.parentActivity, sub.id, _grpFilterPaSet);
+        const _subHasContent = subActId && Object.values(data.remarks || {}).some(r => {
+          if (r.activityId !== subActId || !attendees.includes(r.studentName)) return false;
+          return (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
+            (r.trials || []).some(t => t !== null && t !== -1) ||
+            (r.masteryNote || "").trim().length > 0 ||
+            (r.optionScore !== undefined && r.optionScore !== null) ||
+            (r.selectedOptions || []).length > 0;
+        });
+        const _subDot = _grpFilterPaSet
+          ? (_subHasContent
+            ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:#22c55e;color:#fff;font-size:.6rem;font-weight:900;margin-right:.3rem;flex-shrink:0">✓</span>`
+            : `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;border:2px solid #d1d5db;margin-right:.3rem;flex-shrink:0"></span>`)
+          : "";
+        const subCard  = renderGroupActivityCard(sub.title || sub.name, subActId, target, data, attendees, null, null, sub, true, sub.parentActivity, sub.id, _grpFilterPaSet, 0, true);
         const subRadius = isLast ? '0 0 var(--radius) var(--radius)' : '0';
+        const _subCreatedDate = sub.createdOn || sub.activeFrom;
         groupHtml += `<div style="border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);border-top:1px solid var(--border);border-radius:${subRadius};overflow:hidden">
           <div style="padding:.4rem .6rem;display:flex;align-items:center;gap:.45rem">
-            <span style="flex-shrink:0;background:#dbeafe;color:#1e40af;border-radius:.4rem;padding:.12rem .5rem;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Subactivity</span>
+            ${_subDot}<span style="flex-shrink:0;background:#dbeafe;color:#1e40af;border-radius:.4rem;padding:.12rem .5rem;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Subactivity</span>
             <span style="font-size:.85rem;font-weight:700;color:#374151"><span style="color:#1e40af">${letters[si]})</span> ${escHtml(sub.title || sub.name)}</span>${inactiveReasonBadge(sub)}
-            ${sub.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;margin-left:auto">Created: ${fmtPeriodDate(sub.activeFrom)}</span>` : ""}
+            ${_subCreatedDate ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;margin-left:auto">Created: ${fmtPeriodDate(_subCreatedDate)}</span>` : ""}
+            ${sub.id ? `<button class="btn-icon btn-grp-edit-pencil" contenteditable="false" data-pa-id="${escHtml(sub.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
           </div>
           ${subCard}
         </div>`;
@@ -20934,7 +20949,7 @@ function renderGroupStudentRowCompact(remId, rem, target, mappedInfo = null) {
     ${trailingField}`;
 }
 
-function renderGroupActivityCard(actName, actId, target, data, attendees, actNote = null, mappedPa = null, paEntry = null, isPredefined = false, parentActivity = null, configId = null, filterPaSet = null) {
+function renderGroupActivityCard(actName, actId, target, data, attendees, actNote = null, mappedPa = null, paEntry = null, isPredefined = false, parentActivity = null, configId = null, filterPaSet = null, actNum = 0, suppressHeader = false) {
   // Free-text activities (no preset options, no sentence starter) get a
   // ready-to-type empty box for a pending attendee instead of a "+ Add
   // Remark & Trials" button once the card is already expanded (see
@@ -20972,12 +20987,12 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
       )).join("");
     }).join("");
     return `<div class="entry-block entry-block-predefined" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">
-      <div class="entry-field" contenteditable="false">
+      ${suppressHeader ? "" : `<div class="entry-field" contenteditable="false">
         <span class="field-label">Activity</span>
         <span class="field-value-fixed">${formatActivityMarkup(actName)}</span>
-        ${paEntry?.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(paEntry.activeFrom)}</span>` : ""}
+        ${(paEntry?.createdOn || paEntry?.activeFrom) ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(paEntry.createdOn || paEntry.activeFrom)}</span>` : ""}
         ${paEntry?.id ? `<button class="btn-icon btn-grp-edit-pencil" contenteditable="false" data-pa-id="${escHtml(paEntry.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
-      </div>
+      </div>`}
       ${noteRow}
       <div class="entry-divider" contenteditable="false"></div>
       ${rows}
@@ -21017,12 +21032,12 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
   // Collapsed: no data yet → single "+ Add Remark & Trials" button (like individual session)
   if (!anyExpanded) {
     return `<div class="entry-block entry-block-predefined" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">
-      <div class="entry-field" contenteditable="false">
+      ${suppressHeader ? "" : `<div class="entry-field" contenteditable="false">
         ${grpWrittenDot}<span class="field-label">Activity</span>
         <span class="field-value-fixed">${inactiveReasonBadge(paEntry)}${formatActivityMarkup(actName)}</span>
-        ${paEntry?.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(paEntry.activeFrom)}</span>` : ""}
+        ${(paEntry?.createdOn || paEntry?.activeFrom) ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(paEntry.createdOn || paEntry.activeFrom)}</span>` : ""}
         ${paEntry?.id ? `<button class="btn-icon btn-grp-edit-pencil" contenteditable="false" data-pa-id="${escHtml(paEntry.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
-      </div>
+      </div>`}
       ${noteRow}
       ${noOpts
         ? `<div class="entry-field" contenteditable="false">
@@ -21088,13 +21103,13 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
   ).join("");
 
   return `<div class="entry-block entry-block-predefined" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">
-    <div class="entry-field" contenteditable="false">
+    ${suppressHeader ? "" : `<div class="entry-field" contenteditable="false">
       ${grpWrittenDot}<span class="field-label">Activity</span>
-      <span class="field-value-fixed">${formatActivityMarkup(actName)}${inactiveReasonBadge(paEntry)}</span>
-      ${paEntry?.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(paEntry.activeFrom)}</span>` : ""}
+      <span class="field-value-fixed">${inactiveReasonBadge(paEntry)}${formatActivityMarkup(actName)}</span>
+      ${(paEntry?.createdOn || paEntry?.activeFrom) ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(paEntry.createdOn || paEntry.activeFrom)}</span>` : ""}
       ${paEntry?.id ? `<button class="btn-icon btn-grp-edit-pencil" contenteditable="false" data-pa-id="${escHtml(paEntry.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
       ${combineToggle}
-    </div>
+    </div>`}
     ${noteRow}
     <div class="entry-divider" contenteditable="false"></div>
     ${roundsBody}
