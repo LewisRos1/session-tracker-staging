@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1613";
+const APP_VERSION = "1614";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -20074,7 +20074,7 @@ function populateGroupTargetDropdown(targets) {
     manageBtn.classList.toggle("hidden", !state.selectedGroupTargetName);
     manageBtn.onclick = () => {
       const tgt = state.currentGroup?.targets.find(t => t.name === state.selectedGroupTargetName);
-      if (tgt) openGroupManageModal(state.currentGroup, tgt);
+      if (tgt) requirePassword(() => openGroupManageModal(state.currentGroup, tgt), EXPORT_MSG);
     };
   }
 
@@ -20721,7 +20721,15 @@ function buildGroupItemsByStudent(target, data, attendees, _grpFilterPaSet = nul
   if (!_grpFilterPaSet && (target.predefinedActivities || []).length > 0) {
     const _sections = groupPasBySections(target, grpStudentDate);
     if (_sections.length > 0) {
-      return buildGroupItemsWithSidebar(target, data, attendees, null, null, grpStudentDate, "byStudent");
+      const _allPas = target.predefinedActivities || [];
+      const _grpSubs = new Map();
+      for (const pa of _allPas) {
+        if (pa.parentActivity && isActivityActive(pa, grpStudentDate) && !pa.isCompleted && !pa.isArchived && !pa.isStopped) {
+          if (!_grpSubs.has(pa.parentActivity)) _grpSubs.set(pa.parentActivity, []);
+          _grpSubs.get(pa.parentActivity).push(pa);
+        }
+      }
+      return buildGroupItemsWithSidebar(target, data, attendees, _allPas, _grpSubs, grpStudentDate, "byStudent");
     }
   }
 
