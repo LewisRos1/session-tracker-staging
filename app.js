@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1609";
+const APP_VERSION = "1610";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -2564,7 +2564,12 @@ function renderExistingStudentButtons() {
   // Database page or a group roster picker) opts out of that default, so a
   // freshly-registered student doesn't show here until she actually +Adds
   // them via showRegisteredStudentPicker.
-  const students = state.students.filter(s => s.type !== "assessment" && s.type !== "unassigned");
+  // Also exclude any student whose name matches a group name — safeguard
+  // against accidentally created student records with group names.
+  const groupNames = new Set((state.groups || []).map(g => g.name));
+  const students = state.students.filter(s =>
+    s.type !== "assessment" && s.type !== "unassigned" && !groupNames.has(s.name)
+  );
   renderStudentList($("existing-student-buttons"), students, state.searchExisting);
 }
 
