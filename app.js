@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1624";
+const APP_VERSION = "1625";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -20806,6 +20806,7 @@ function renderGroupStudentBlock(studentName, target, data, grpStudentDate = nul
   // only actual scoreable activities make sense nested under a student.
   const activityEntries = [];
   if (!grpStudentDate) grpStudentDate = state.groupSessionData?.date || todayDateStr();
+  let byStudentActNum = 0;
   for (const pa of (target.predefinedActivities || [])) {
     // Group sessions: don't filter by activeFrom date — activities apply to all sessions
     if (_filterPaSet && !_filterPaSet.has(pa)) continue;
@@ -20818,7 +20819,8 @@ function renderGroupStudentBlock(studentName, target, data, grpStudentDate = nul
         if (pa.name && a.activityName === pa.name) return true;
         return false;
       })?.[0] || null;
-    activityEntries.push({ actId, actName: pa.title || pa.name, actNote: pa.actNote, pa });
+    if (!pa.parentActivity) byStudentActNum++;
+    activityEntries.push({ actId, actName: pa.title || pa.name, actNote: pa.actNote, pa, actNum: pa.parentActivity ? 0 : byStudentActNum });
   }
   if (!_filterPaSet) {
     Object.entries(data.activities || {})
@@ -20829,8 +20831,8 @@ function renderGroupStudentBlock(studentName, target, data, grpStudentDate = nul
 
   if (activityEntries.length === 0) return '';
 
-  const cards = activityEntries.map(({ actId, actName, actNote, pa }) =>
-    renderGroupStudentActivityCard(studentName, actName, actId, target, data, actNote, pa?.isMapped ? pa : null, !!pa?.maintained, pa || null)).join("");
+  const cards = activityEntries.map(({ actId, actName, actNote, pa, actNum }) =>
+    renderGroupStudentActivityCard(studentName, actName, actId, target, data, actNote, pa?.isMapped ? pa : null, !!pa?.maintained, pa || null, actNum || 0)).join("");
 
   return `<div class="group-by-student-block" data-student="${escHtml(studentName)}">
     <div class="activity-group-heading" contenteditable="false">${liveGroupAttendeeLabel(studentName)}</div>
@@ -20838,7 +20840,7 @@ function renderGroupStudentBlock(studentName, target, data, grpStudentDate = nul
   </div>`;
 }
 
-function renderGroupStudentActivityCard(studentName, actName, actId, target, data, actNote = null, mappedPa = null, isMaintained = false, pa = null) {
+function renderGroupStudentActivityCard(studentName, actName, actId, target, data, actNote = null, mappedPa = null, isMaintained = false, pa = null, actNum = 0) {
   const remarksForThisStudent = actId
     ? Object.entries(data.remarks || {})
         .filter(([, r]) => r.activityId === actId && r.studentName === studentName)
@@ -20869,8 +20871,8 @@ function renderGroupStudentActivityCard(studentName, actName, actId, target, dat
   let html = `<div class="entry-block entry-block-predefined" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">
     <div class="entry-field" contenteditable="false">
       ${byStudentDot}<span class="field-label">Activity</span>
-      <span class="field-value-fixed">${formatActivityMarkup(actName)}</span>
-      ${pa?.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(pa.activeFrom)}</span>` : ""}
+      <span class="field-value-fixed">${actNum ? `<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>` : ""}${formatActivityMarkup(actName)}</span>
+      ${(pa?.createdOn || pa?.activeFrom) ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(pa.createdOn || pa.activeFrom)}</span>` : ""}
       ${pa?.id ? `<button class="btn-icon btn-grp-edit-pencil" contenteditable="false" data-pa-id="${escHtml(pa.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
     </div>
     ${noteRow}`;
