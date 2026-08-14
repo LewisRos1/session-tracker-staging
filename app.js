@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1604";
+const APP_VERSION = "1605";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -14852,38 +14852,7 @@ function openManageModal(student, targetOrNull, templateOrNull = null, remarkPre
 
 // ── Manage Activities & Targets (group) ──────────────────────
 function showGroupManageActivityContent(group) {
-  // Password gate via a small overlay
-  const overlay = document.createElement("div");
-  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem";
-  overlay.innerHTML = `<div style="background:#fff;border-radius:.75rem;padding:1.75rem 1.5rem;max-width:340px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.22);display:flex;flex-direction:column;align-items:center;gap:.75rem">
-    <div style="font-size:1rem;font-weight:700;color:#374151">Manage Activities &amp; Targets</div>
-    <div style="font-size:.9rem;color:#6b7280">Enter password to continue</div>
-    <input id="gma-gate-pw" type="password" class="admin-input"
-      style="width:200px;text-align:center;font-size:1rem"
-      placeholder="Enter password" autocomplete="new-password">
-    <div id="gma-gate-pw-err" style="font-size:.8rem;color:#dc2626;display:none">Incorrect password</div>
-    <div style="display:flex;gap:.5rem">
-      <button id="gma-gate-cancel" style="flex:1;padding:.5rem .9rem;border:1px solid #d1d5db;border-radius:.4rem;background:#f9fafb;cursor:pointer;font-size:.9rem">Cancel</button>
-      <button id="gma-gate-pw-btn" class="btn-primary-sm" style="flex:1;padding:.5rem .9rem">Continue</button>
-    </div>
-  </div>`;
-  document.body.appendChild(overlay);
-  const pwInput = overlay.querySelector("#gma-gate-pw");
-  setTimeout(() => { pwInput.value = ""; pwInput.focus(); }, 50);
-  const remove = () => overlay.remove();
-  overlay.querySelector("#gma-gate-cancel").addEventListener("click", remove);
-  overlay.addEventListener("click", e => { if (e.target === overlay) remove(); });
-  const checkPw = () => {
-    if (pwInput.value !== "0823") {
-      overlay.querySelector("#gma-gate-pw-err").style.display = "";
-      pwInput.value = "";
-      return;
-    }
-    remove();
-    openGroupManageActivityScreen(group);
-  };
-  pwInput.addEventListener("keydown", e => { if (e.key === "Enter") checkPw(); });
-  overlay.querySelector("#gma-gate-pw-btn").addEventListener("click", checkPw);
+  requirePassword(() => openGroupManageActivityScreen(group), EXPORT_MSG);
 }
 
 // ── Group Add Target picker ───────────────────────────────────
