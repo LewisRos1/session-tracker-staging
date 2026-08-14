@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1605";
+const APP_VERSION = "1606";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -20904,7 +20904,6 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
         ${grpWrittenDot}<span class="field-label">Activity</span>
         <span class="field-value-fixed">${inactiveReasonBadge(paEntry)}${formatActivityMarkup(actName)}</span>
         ${paEntry?.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(paEntry.activeFrom)}</span>` : ""}
-        ${combineToggle}
       </div>
       ${noteRow}
       ${noOpts
