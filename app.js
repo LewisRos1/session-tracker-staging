@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1599";
+const APP_VERSION = "1600";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -15051,7 +15051,7 @@ function showGroupDupFromTemplate(group) {
       if (!tmpl) continue;
       const copy = {
         id: cfgId("gt"), name: uniqueTargetName(group.targets, tmpl.name), maxPoints: tmpl.maxPoints || 3,
-        hasComment: false, fullName: "", order: group.targets.length,
+        hasComment: false, fullName: "", order: group.targets.length, groupLayout: "byActivity",
         predefinedActivities: JSON.parse(JSON.stringify(tmpl.predefinedActivities || [])),
         notes: JSON.parse(JSON.stringify(tmpl.notes || [])), isStructured: true
       };
@@ -15063,7 +15063,7 @@ function showGroupDupFromTemplate(group) {
     await saveGroup(group);
     if (lastAdded) state.selectedGroupTargetName = lastAdded.name;
     populateGroupTargetDropdown(group.targets);
-    renderGroupTargetContent();
+    try { renderGroupTargetContent(); } catch(e) { console.error("renderGroupTargetContent after template dup:", e); }
     if (lastAdded && checked.length === 1) openGroupManageModal(group, lastAdded);
   });
 }
@@ -20276,7 +20276,13 @@ function renderGroupTargetContent() {
   if (!content) return;
   const group   = state.currentGroup;
   const data    = state.groupSessionData;
-  const target  = group?.targets.find(t => t.name === state.selectedGroupTargetName);
+  let   target  = group?.targets.find(t => t.name === state.selectedGroupTargetName);
+  // Fallback: if state says a target is selected but it's not found (brief state mismatch),
+  // auto-select the first available target so the screen never gets stuck on "No targets added yet"
+  if (!target && state.selectedGroupTargetName && group?.targets.length) {
+    const fallback = sortTargetsByOrder(group.targets).find(t => !t.discontinuedOn);
+    if (fallback) { state.selectedGroupTargetName = fallback.name; target = fallback; populateGroupTargetDropdown(group.targets); }
+  }
   if (!target || !data) {
     content.innerHTML = `<p class="empty-hint" contenteditable="false" style="padding:2rem;text-align:center">No targets added yet. Use the dropdown above to add one.</p>`;
     updateGroupAvgChips(null, null);
