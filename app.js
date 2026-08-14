@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1607";
+const APP_VERSION = "1608";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -7593,36 +7593,36 @@ async function openSession(student, existingSessionId = null, dateStr = null, pa
   state.entryEnterKeyCleanup = setupEntryEnterKeyDelegation($("target-content"),
     () => getEffectiveTargets().find(t => t.name === state.selectedTargetName));
 
-  // Refresh student data from Firestore now that the loading screen is visible,
-  // so target config changes made on another device are picked up.
+  // Run student refresh + session lookup in parallel — previously sequential
+  // (two Firestore round-trips in series). Running both at once cuts loading time roughly in half.
   try {
-    const fresh = await getStudentById(student.id);
+    const [fresh, sessionId] = await Promise.all([
+      getStudentById(student.id).catch(() => null),
+      existingSessionId
+        ? Promise.resolve(existingSessionId)
+        : getOrCreateSessionForDate(student.id, dateStr || getTodayString(), student.targets)
+    ]);
+
     if (fresh) {
       Object.assign(student, fresh);
       state.currentStudent = student;
       const si = (state.students || []).findIndex(s => s.id === student.id);
       if (si >= 0) state.students[si] = student;
     }
-  } catch {}
 
-  // Backfill activeFrom on all activities that don't have one yet, without requiring Edit Target to be opened
-  try {
-    let _bfNeedsSave = false;
-    for (const t of (student.targets || [])) {
-      for (const a of (t.predefinedActivities || [])) {
-        if (!a.isHeading && !a.isMaintainHeading && !a.isNote && !a.isExportNote && a.activeFrom == null) {
-          a.activeFrom = "2026-01-01";
-          _bfNeedsSave = true;
+    // Backfill activeFrom on all activities that don't have one yet
+    try {
+      let _bfNeedsSave = false;
+      for (const t of (student.targets || [])) {
+        for (const a of (t.predefinedActivities || [])) {
+          if (!a.isHeading && !a.isMaintainHeading && !a.isNote && !a.isExportNote && a.activeFrom == null) {
+            a.activeFrom = "2026-01-01";
+            _bfNeedsSave = true;
+          }
         }
       }
-    }
-    if (_bfNeedsSave) saveStudent(student).catch(() => {});
-  } catch {}
-
-  try {
-    const sessionId = existingSessionId
-      ? existingSessionId
-      : await getOrCreateSessionForDate(student.id, dateStr || getTodayString(), student.targets);
+      if (_bfNeedsSave) saveStudent(student).catch(() => {});
+    } catch {}
     state.currentSessionId = sessionId;
     if (participants && !existingSessionId) {
       updateSessionParticipants(sessionId, participants).catch(() => {});
