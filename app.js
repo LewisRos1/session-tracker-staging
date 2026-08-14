@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1590";
+const APP_VERSION = "1591";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8129,8 +8129,8 @@ function renderFedcTarget(target, _filterPaSet = null) {
     }
   }
 
-  // Section headings present → sidebar layout (only for non-filtered calls)
-  if (!_filterPaSet && allPas.some(pa => pa.isHeading)) {
+  // Always use sidebar layout for non-filtered calls
+  if (!_filterPaSet) {
     return renderFedcTargetWithSidebar(target, allPas, subActsByParent, sessionDateForFilter);
   }
 
@@ -20190,8 +20190,8 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
   }
   const letters = "abcdefghij";
 
-  // Section headings present → sidebar layout (only for non-filtered calls)
-  if (!_grpFilterPaSet && allPas.some(pa => pa.isHeading)) {
+  // Always use sidebar layout for non-filtered calls
+  if (!_grpFilterPaSet) {
     return buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByParent, grpSessionDate);
   }
 
