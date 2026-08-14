@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1620";
+const APP_VERSION = "1621";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -20970,6 +20970,12 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
       </div>`
     : "";
 
+  // When used as a sub-card (suppressHeader=true), the outer subactivity wrapper already
+  // provides the border/shadow/radius — use plain padding-only div to avoid double border.
+  const _outerOpen = suppressHeader
+    ? `<div style="padding:.5rem .85rem" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">`
+    : `<div class="entry-block entry-block-predefined" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">`;
+
   // Mapped-score activities have no trials/combine-remarks concept at all —
   // bypass the rounds/combine machinery below entirely and just list every
   // attendee's own remark + their own per-attendee mapped score.
@@ -20986,7 +20992,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
         studentName, remId, rem, target, mappedInfo, inlineOptions, sentenceStarter, multiSelect, remarkHasNote, paEntry?.optionScores || null, noteCapableGrp, paEntry?.noteSentenceStarter || null
       )).join("");
     }).join("");
-    return `<div class="entry-block entry-block-predefined" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">
+    return `${_outerOpen}
       ${suppressHeader ? "" : `<div class="entry-field" contenteditable="false">
         <span class="field-label">Activity</span>
         <span class="field-value-fixed">${formatActivityMarkup(actName)}</span>
@@ -21031,7 +21037,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
 
   // Collapsed: no data yet → single "+ Add Remark & Trials" button (like individual session)
   if (!anyExpanded) {
-    return `<div class="entry-block entry-block-predefined" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">
+    return `${_outerOpen}
       ${suppressHeader ? "" : `<div class="entry-field" contenteditable="false">
         ${grpWrittenDot}<span class="field-label">Activity</span>
         <span class="field-value-fixed">${inactiveReasonBadge(paEntry)}${formatActivityMarkup(actName)}</span>
@@ -21102,7 +21108,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
     (i > 0 ? `<div class="entry-divider entry-divider-round" contenteditable="false"></div>` : ``) + r
   ).join("");
 
-  return `<div class="entry-block entry-block-predefined" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">
+  return `${_outerOpen}
     ${suppressHeader ? "" : `<div class="entry-field" contenteditable="false">
       ${grpWrittenDot}<span class="field-label">Activity</span>
       <span class="field-value-fixed">${inactiveReasonBadge(paEntry)}${formatActivityMarkup(actName)}</span>
