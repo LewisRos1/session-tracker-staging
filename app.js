@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1627";
+const APP_VERSION = "1628";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -20586,7 +20586,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
     !pa.isCompleted && !pa.isArchived && !pa.isStopped &&
     (pa.masteredOn || pa.discontinuedOn || pa.inactiveReason)
   );
-  if (items.length === 0 && grpInactivePas.length === 0) {
+  if (!_footerOnly && items.length === 0 && grpInactivePas.length === 0) {
     items.push(`<p class="empty-hint" contenteditable="false" style="padding:1.5rem">No activities yet. Add them under Edit Target.</p>`);
   }
   if (grpInactivePas.length > 0) {
