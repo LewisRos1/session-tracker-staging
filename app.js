@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1598";
+const APP_VERSION = "1599";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -19933,6 +19933,7 @@ async function openGroupSession(group, dateStr, attendees, participants = null) 
         const stillValid = preservedGroupTargetName && group.targets.some(t => t.name === preservedGroupTargetName);
         state.selectedGroupTargetName = stillValid ? preservedGroupTargetName : (sortTargetsByOrder(group.targets)[0]?.name || null);
         populateGroupTargetDropdown(group.targets);
+        try { renderGroupTargetContent(); } catch (e) { console.error("renderGroupTargetContent (init) failed:", e); }
         if (state.selectedGroupTargetName) {
           try {
             const filled = await autoFillGroupSession(group, sid, data, state.selectedGroupTargetName, attendees);
@@ -20006,24 +20007,32 @@ function populateGroupTargetDropdown(targets) {
     };
   }
 
-  const reorderBtn = $("btn-group-reorder-targets");
-  if (reorderBtn) {
-    reorderBtn.classList.toggle("hidden", targets.length < 2);
-    reorderBtn.onclick = () => showGroupTargetReorderList(state.currentGroup);
-  }
-
-  const discBtn = $("btn-group-discontinue-target");
-  if (discBtn) {
-    const selTgt = state.currentGroup?.targets.find(t => t.name === state.selectedGroupTargetName);
-    discBtn.classList.toggle("hidden", !state.selectedGroupTargetName);
-    if (selTgt) {
-      const isDisc = !!selTgt.discontinuedOn;
-      discBtn.textContent = isDisc ? '✅ Restore Target' : '🛑 Discontinue Target';
-      discBtn.style.background = isDisc ? '#d1fae5' : '#fff0f0';
-      discBtn.style.color      = isDisc ? '#065f46' : '#dc2626';
-      discBtn.style.borderColor = isDisc ? '#6ee7b7' : '#fca5a5';
-      discBtn.onclick = () => handleDiscontinueTarget(state.currentGroup, selTgt, true);
-    }
+  const editInstBtn = $("btn-group-edit-instructors");
+  if (editInstBtn) {
+    editInstBtn.classList.remove("hidden");
+    editInstBtn.onclick = () => {
+      const curParticipants = state.groupSessionData?.participants || [];
+      $("session-picker-title").textContent = "Edit Instructors";
+      $("session-picker-list").innerHTML = `
+        <div style="padding:1.5rem 1.25rem;display:flex;flex-direction:column;align-items:center">
+          <p style="margin:0 0 1.25rem;font-weight:600;color:#374151;text-align:center">Who is facilitating this session?</p>
+          <div style="width:100%;max-width:320px">
+            ${INSTRUCTORS.map(inst => `
+              <label style="display:flex;align-items:center;justify-content:center;gap:.85rem;padding:.75rem 0;cursor:pointer;font-size:1rem;border-bottom:1px solid #f3f4f6">
+                <input type="checkbox" class="inst-edit-check" value="${inst.id}"${curParticipants.includes(inst.id) ? " checked" : ""}
+                  style="width:1.2rem;height:1.2rem;accent-color:#3b82f6;cursor:pointer;flex-shrink:0">
+                <span style="color:#1f2937;width:7rem">${escHtml(inst.name)}</span>
+              </label>`).join("")}
+          </div>
+          <button class="btn-inst-save export-btn" style="margin-top:1.5rem;width:100%;padding:.85rem;font-size:1rem;text-align:center">Save</button>
+        </div>`;
+      $("session-picker-modal").classList.remove("hidden");
+      $("session-picker-list").querySelector(".btn-inst-save").addEventListener("click", async () => {
+        const participants = [...$("session-picker-list").querySelectorAll(".inst-edit-check:checked")].map(c => c.value);
+        closeSessionPicker();
+        await updateSessionParticipants(state.groupSessionId, participants).catch(() => {});
+      });
+    };
   }
 
   // Wire change handler — same pattern as individual session's populateTargetDropdown
@@ -20315,12 +20324,17 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
   }
   const letters = "abcdefghij";
 
-  // Always use sidebar layout for non-filtered calls (but not when called for footer-only)
+  // Use sidebar layout only for FEDC-style targets (real section headings, not just "General")
   if (!_grpFilterPaSet && !_footerOnly) {
-    return buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByParent, grpSessionDate);
+    const _sections = groupPasBySections(target, grpSessionDate);
+    const _hasSections = _sections.length > 1 || (_sections.length === 1 && _sections[0].name !== "General");
+    if (_hasSections) {
+      return buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByParent, grpSessionDate);
+    }
   }
 
   for (const pa of allPas) {
+    if (_footerOnly) continue; // predefined activities rendered in sections already; skip in footer
     if (!isActivityActive(pa, grpSessionDate)) continue;
     // Sub-activities rendered within their parent's group
     if (pa.parentActivity) continue;
