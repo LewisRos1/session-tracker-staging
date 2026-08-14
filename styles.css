@@ -807,6 +807,7 @@ html, body {
 
 .target-content {
   flex: 1;
+  min-height: 0;
   padding: 1rem;
   display: flex;
   flex-direction: column;
