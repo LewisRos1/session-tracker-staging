@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1617";
+const APP_VERSION = "1618";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -20624,6 +20624,26 @@ function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByPa
 
   if (_selectedGroupSectionIdx >= sections.length) _selectedGroupSectionIdx = 0;
 
+  const _statStrip = t => (t || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+  const grpActIdFor = pa => Object.entries(data.activities || {})
+    .find(([, a]) => {
+      if (a.targetName !== target.name) return false;
+      if (pa.id && a.configId === pa.id) return true;
+      if (pa.title && a.activityName === pa.title) return true;
+      if (pa.name && a.activityName === pa.name) return true;
+      return false;
+    })?.[0] || null;
+  const grpStudentHasContent = (actId, studentName) =>
+    !!actId && Object.values(data.remarks || {}).some(r =>
+      r.activityId === actId && r.studentName === studentName && (
+        _statStrip(r.text).length > 0 ||
+        (r.trials || []).some(t => t !== null && t !== -1) ||
+        _statStrip(r.masteryNote).length > 0 ||
+        (r.optionScore !== undefined && r.optionScore !== null) ||
+        (r.selectedOptions || []).length > 0
+      )
+    );
+
   let totalActs = 0, totalWritten = 0;
   const sectionStats = sections.map(grp => {
     let secTotal = 0, secWritten = 0;
@@ -20633,12 +20653,20 @@ function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByPa
       if (children.length > 0) {
         for (const sub of children) {
           if (sub.isCompleted || sub.isArchived || sub.isStopped) continue;
-          secTotal++;
-          if (grpPaIsWritten(sub, target, data, pa.title || pa.name)) secWritten++;
+          if (layout === "byStudent") {
+            for (const sName of attendees) { secTotal++; if (grpStudentHasContent(grpActIdFor(sub), sName)) secWritten++; }
+          } else {
+            secTotal++;
+            if (grpPaIsWritten(sub, target, data, pa.title || pa.name)) secWritten++;
+          }
         }
       } else {
-        secTotal++;
-        if (grpPaIsWritten(pa, target, data)) secWritten++;
+        if (layout === "byStudent") {
+          for (const sName of attendees) { secTotal++; if (grpStudentHasContent(grpActIdFor(pa), sName)) secWritten++; }
+        } else {
+          secTotal++;
+          if (grpPaIsWritten(pa, target, data)) secWritten++;
+        }
       }
     }
     totalActs += secTotal;
@@ -20765,7 +20793,13 @@ function renderGroupStudentBlock(studentName, target, data, grpStudentDate = nul
     if (_filterPaSet && !_filterPaSet.has(pa)) continue;
     if (pa.isNote || pa.isExportNote || pa.isHeading || pa.isMaintainHeading || pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || (!pa.name && !pa.title)) continue;
     const actId = Object.entries(data.activities || {})
-      .find(([, a]) => a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title)))?.[0] || null;
+      .find(([, a]) => {
+        if (a.targetName !== target.name) return false;
+        if (pa.id && a.configId === pa.id) return true;
+        if (pa.title && a.activityName === pa.title) return true;
+        if (pa.name && a.activityName === pa.name) return true;
+        return false;
+      })?.[0] || null;
     activityEntries.push({ actId, actName: pa.title || pa.name, actNote: pa.actNote, pa });
   }
   if (!_filterPaSet) {
@@ -20800,9 +20834,23 @@ function renderGroupStudentActivityCard(studentName, actName, actId, target, dat
       </div>`
     : "";
 
+  const _stripBys = t => (t || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+  const byStudentIsWritten = actId && Object.values(data.remarks || {}).some(r =>
+    r.activityId === actId && r.studentName === studentName && (
+      _stripBys(r.text).length > 0 ||
+      (r.trials || []).some(t => t !== null && t !== -1) ||
+      (_stripBys(r.masteryNote)).length > 0 ||
+      (r.optionScore !== undefined && r.optionScore !== null) ||
+      (r.selectedOptions || []).length > 0
+    )
+  );
+  const byStudentDot = byStudentIsWritten
+    ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:#22c55e;color:#fff;font-size:.6rem;font-weight:900;margin-right:.3rem;flex-shrink:0;align-self:flex-start;margin-top:.35rem">✓</span>`
+    : `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;border:2px solid #d1d5db;margin-right:.3rem;flex-shrink:0;align-self:flex-start;margin-top:.35rem"></span>`;
+
   let html = `<div class="entry-block entry-block-predefined" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">
     <div class="entry-field" contenteditable="false">
-      <span class="field-label">Activity</span>
+      ${byStudentDot}<span class="field-label">Activity</span>
       <span class="field-value-fixed">${formatActivityMarkup(actName)}</span>
     </div>
     ${noteRow}`;
