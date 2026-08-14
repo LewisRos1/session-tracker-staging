@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1614";
+const APP_VERSION = "1615";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -17807,7 +17807,7 @@ function renderTargetManageContent(student, target) {
 
   $("btn-mn-add-act").addEventListener("click", () => {
     const btn = $("btn-mn-add-act"); if (btn) btn.disabled = true;
-    acts.push({ id: cfgId("a"), name: "", order: acts.length, createdOn: todayDateStr(), activeFrom: todayDateStr() });
+    acts.push({ id: cfgId("a"), name: "", order: acts.length, createdOn: todayDateStr(), activeFrom: _maIsGroup ? null : todayDateStr() });
     target.predefinedActivities = acts;
     renderTargetManageContent(student, target);
     saveTarget().catch(() => {});
@@ -17917,7 +17917,7 @@ function renderTargetManageContent(student, target) {
       parentAct.noRemark = true;
       const siblingIdxs = acts.map((a2, i) => a2.parentActivity === _parentKey ? i : -1).filter(i => i >= 0);
       const insertAfter = siblingIdxs.length > 0 ? Math.max(...siblingIdxs) : parentIdx;
-      acts.splice(insertAfter + 1, 0, { id: cfgId("a"), name: "", parentActivity: _parentKey, order: 0, activeFrom: todayDateStr(), createdOn: todayDateStr() });
+      acts.splice(insertAfter + 1, 0, { id: cfgId("a"), name: "", parentActivity: _parentKey, order: 0, activeFrom: _maIsGroup ? null : todayDateStr(), createdOn: todayDateStr() });
       acts.forEach((a2, i) => a2.order = i);
       target.predefinedActivities = acts;
       const sp = $("manage-modal-body").scrollTop;
