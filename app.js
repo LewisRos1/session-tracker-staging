@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1606";
+const APP_VERSION = "1607";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -20026,8 +20026,10 @@ function renderGroupSessionHeader(data) {
   const psn = data.attendeePersonalSessionNumbers || {};
   const studentParts = attendees.map(name => {
     const sid = links[name];
+    const student = sid ? (state.students || []).find(s => s.id === sid) : null;
+    const displayName = student?.preferredName || name;
     const n = sid ? psn[sid] : null;
-    return n != null ? `${name} (Session ${n})` : name;
+    return n != null ? `${displayName} (Session ${n})` : displayName;
   });
   const datePart = data.date ? formatDate(data.date) : "";
   const metaParts = studentParts.length > 0
