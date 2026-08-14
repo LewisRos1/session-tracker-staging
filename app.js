@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1610";
+const APP_VERSION = "1611";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -20831,7 +20831,6 @@ function renderGroupStudentRowCompact(remId, rem, target, mappedInfo = null) {
       <textarea class="field-input group-remark-input" rows="1"
         data-rem-id="${remId}" placeholder="Remark…"
         data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>
-      <button class="btn-icon btn-group-del-student-remark" contenteditable="false" data-rem-id="${remId}" title="Delete remark">🗑</button>
     </div>
     ${trailingField}`;
 }
@@ -20897,9 +20896,20 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
   const anyExpanded = actId && Object.values(data.remarks || {})
     .some(r => r.activityId === actId && attendees.includes(r.studentName));
 
+  // Green dot: only when there's actual content (text, trials, note, selected option)
+  const _stripDot = t => (t || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+  const grpHasRealContent = actId && Object.values(data.remarks || {}).some(r => {
+    if (r.activityId !== actId || !attendees.includes(r.studentName)) return false;
+    return _stripDot(r.text).length > 0 ||
+      (r.trials || []).some(t => t !== null && t !== -1) ||
+      (r.masteryNote || "").trim().length > 0 ||
+      (r.optionScore !== undefined && r.optionScore !== null) ||
+      (r.selectedOptions || []).length > 0;
+  });
+
   const isGrpParentAct = (target.predefinedActivities || []).some(p => p.parentActivity && p.parentActivity === actName);
   const grpWrittenDot = (filterPaSet && !isGrpParentAct)
-    ? (anyExpanded
+    ? (grpHasRealContent
       ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:#22c55e;color:#fff;font-size:.6rem;font-weight:900;margin-right:.3rem;flex-shrink:0;align-self:flex-start;margin-top:.35rem">✓</span>`
       : `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;border:2px solid #d1d5db;margin-right:.3rem;flex-shrink:0;align-self:flex-start;margin-top:.35rem"></span>`)
     : '';
@@ -21140,7 +21150,6 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
       <span class="field-label" contenteditable="false">${grpRemarkLabel}</span>
       ${sketchBtn}
       ${remarkContent}
-      <button class="btn-icon btn-group-del-student-remark" contenteditable="false" data-rem-id="${remId}" title="Delete remark">🗑</button>
     </div>
     ${noteField}
     ${trailingField}
