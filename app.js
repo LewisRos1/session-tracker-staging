@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1637";
+const APP_VERSION = "1638";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -11521,7 +11521,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
   const inlineOptions   = paEntry ? getActivityInlineOptions(paEntry) : null;
   const sentenceStarter = paEntry?.sentenceStarter || null;
   const multiSelect     = paEntry?.optionsMulti || false;
-  const remarkHasNote   = paEntry?.remarkHasNote || false;
+  const remarkHasNote   = paEntry ? !!(paEntry.remarkHasNote || inlineOptions || paEntry.manualScore) : false;
   const mappedInfo      = paEntry?.isMapped ? resolveViewMappedScoreDisplay(paEntry, data) : null;
   const isGrayAct       = isPredefined && (_maintained || paEntry?.activityColor === "gray" || paEntry?.isMaintainLive);
   const isGreenAct      = isPredefined && paEntry?.activityColor === "green";
@@ -13492,7 +13492,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
   const inlineOptions   = paEntry ? getActivityInlineOptions(paEntry) : null;
   const sentenceStarter = paEntry?.sentenceStarter || null;
   const multiSelect     = paEntry?.optionsMulti || false;
-  const remarkHasNote   = paEntry?.remarkHasNote || false;
+  const remarkHasNote   = paEntry ? !!(paEntry.remarkHasNote || inlineOptions || paEntry.manualScore) : false;
   const opts            = parseOpts(inlineOptions);
   const isGrayAct       = isPredefined && (_maintained || paEntry?.activityColor === "gray" || paEntry?.isMaintainLive);
   const isGreenAct      = isPredefined && paEntry?.activityColor === "green";
