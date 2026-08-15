@@ -1937,13 +1937,17 @@ function wordTargetRows(target, session, allTargets) {
     let first = true;
     for (const rem of remarks) {
       const validTrials = allScores(rem);
-      const remarkAvg   = act.isMapped ? mappedScore : calcRemarkAvg(validTrials, target.maxPoints);
-      const masteryNote = stripRemarkHtml(rem.masteryNote || "");
       const text        = stripRemarkHtml(rem.text);
+      const masteryNote = stripRemarkHtml(rem.masteryNote || "");
+      const remarkAvg   = act.isMapped    ? mappedScore
+                        : act.manualScore ? parseManualScore(text)
+                        : calcRemarkAvg(validTrials, target.maxPoints);
       rows.push({
         cells: [first ? activityLabel : "", "", remarkAvg !== null ? pct(remarkAvg) : ""],
         actLines: first ? buildActLines(act, activityLabel) : null,
-        remarkLines: buildRemarkLines(starter, text, masteryNote),
+        remarkLines: act.manualScore
+          ? buildRemarkLines("Manual Score", text, masteryNote)
+          : buildRemarkLines(starter, text, masteryNote),
         isGray: act.isGray,
         isGreen: act.isGreen
       });
