@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1629";
+const APP_VERSION = "1630";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -21105,11 +21105,11 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
     let bodyHtml;
     if (combineRemarks && presentEntries.length > 0) {
       const sharedText = presentEntries[0][2].text;
-      bodyHtml = renderGroupCombinedRemarkRow(roundRemIds, sharedText)
+      bodyHtml = renderGroupCombinedRemarkRow(roundRemIds, sharedText, attendees)
         + presentEntries.map(([studentName, remId, rem]) =>
             renderGroupStudentTrialsOnlyRow(studentName, remId, rem, target)).join("")
         + pendingNames.map(studentName =>
-            renderGroupStudentPendingRow(studentName, actId, actName, target)).join("");
+            renderGroupStudentPendingTrialsOnlyRow(studentName, actId, actName, target)).join("");
     } else {
       bodyHtml = attendees.map(studentName => {
         const entry = byStudent[studentName]?.[i] || null;
@@ -21152,14 +21152,20 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
 }
 
 // Shared remark box used by all students in a round when "Combine" is active
-function renderGroupCombinedRemarkRow(remIds, text) {
+function renderGroupCombinedRemarkRow(remIds, text, attendeeNames = []) {
   const idList = remIds.join(",");
-  return `<div class="entry-field">
-    <span class="field-label" contenteditable="false">Remark</span>
-    <button class="btn-sketch btn-group-sketch-combined" contenteditable="false" data-rem-ids="${idList}" aria-label="Open sketch board">✏</button>
-    <textarea class="field-input group-remark-input-combined" rows="1"
-      data-rem-ids="${idList}" placeholder="Remark…"
-      data-saved-html="${escHtml(text || "")}">${escHtml(plainTextForEdit(text))}</textarea>
+  const namesLabel = attendeeNames.map(n => escHtml(n)).join(" &amp; ");
+  return `<div class="group-student-section">
+    <div class="group-student-name-row" contenteditable="false">
+      <span class="group-student-name-label">${namesLabel}</span>
+    </div>
+    <div class="entry-field">
+      <span class="field-label" contenteditable="false">Notes</span>
+      <button class="btn-sketch btn-group-sketch-combined" contenteditable="false" data-rem-ids="${idList}" aria-label="Open sketch board">✏</button>
+      <textarea class="field-input group-remark-input-combined" rows="1"
+        data-rem-ids="${idList}" placeholder="Remark…"
+        data-saved-html="${escHtml(text || "")}">${escHtml(plainTextForEdit(text))}</textarea>
+    </div>
   </div>`;
 }
 
@@ -21311,6 +21317,32 @@ function renderGroupStudentPendingRow(studentName, actId, actName, target, mappe
         data-act-id="${escHtml(actId || "")}"
         data-act-name="${escHtml(actName)}"
         data-target="${escHtml(target.name)}">+ Add Remark${mapped ? "" : " &amp; Trials"}</button>
+    </div>
+  </div>`;
+}
+
+// Combined-remarks mode: pending student shows a Trials row with +Trial that
+// auto-creates their remark first (instead of showing "+ Add Remark & Trials").
+function renderGroupStudentPendingTrialsOnlyRow(studentName, actId, actName, target) {
+  return `<div class="group-student-section group-student-pending" contenteditable="false"
+    data-student="${escHtml(studentName)}"
+    data-act-id="${escHtml(actId || "")}"
+    data-act-name="${escHtml(actName)}"
+    data-target="${escHtml(target.name)}">
+    <div class="group-student-name-row" contenteditable="false">
+      <span class="group-student-name-label">${liveGroupAttendeeLabel(studentName)}</span>
+    </div>
+    <div class="entry-field" contenteditable="false">
+      <span class="field-label">Trials</span>
+      <div class="trials-row">
+        <div class="trials-badges"></div>
+        <button class="btn-primary-sm btn-group-pending-add-trial"
+          data-student="${escHtml(studentName)}"
+          data-act-id="${escHtml(actId || "")}"
+          data-act-name="${escHtml(actName)}"
+          data-target="${escHtml(target.name)}"
+          onmousedown="event.preventDefault()">+ Trial</button>
+      </div>
     </div>
   </div>`;
 }
@@ -21701,6 +21733,22 @@ function attachGroupTargetListeners(target) {
       const remId = btn.dataset.remId;
       state.scorePicker = { open: true, remId, isGroup: true };
       openScorePicker(remId, target);
+    });
+  });
+
+  // + Trial for a pending student in combined-remarks mode — create their remark first, then open score picker
+  c.querySelectorAll(".btn-group-pending-add-trial").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      try {
+        const { remId } = await ensureGroupActivityAndRemark(btn);
+        renderGroupTargetContent();
+        state.scorePicker = { open: true, remId, isGroup: true };
+        openScorePicker(remId, target);
+      } catch (err) {
+        btn.disabled = false;
+        alert("Couldn't add trial — check your connection and try again.\n\n" + err.message);
+      }
     });
   });
 
