@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1631";
+const APP_VERSION = "1632";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -21609,8 +21609,7 @@ function attachGroupTargetListeners(target) {
       const current = !!data?.activities?.[actId]?.combineRemarks;
 
       if (!current) {
-        // Turning ON: any round where 2+ students already have their OWN separate text
-        // will collapse to the first student's text — confirm before discarding the rest.
+        // Turning ON: check what text exists so we can warn before losing data.
         const attendees = state.groupAttendees || [];
         const byStudent = {};
         for (const studentName of attendees) {
@@ -21623,29 +21622,41 @@ function attachGroupTargetListeners(target) {
         const stripEmpty = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
 
         const remIdsToClear = [];
-        let conflict = null;
+        let conflictMulti  = null; // 2+ students have different text — deletion needed
+        let conflictSingle = null; // exactly 1 student has text — just a notification
         for (let i = 0; i < maxRounds; i++) {
           const present = attendees
             .map(name => ({ name, rem: byStudent[name][i] }))
             .filter(e => e.rem);
           if (present.length < 2) continue;
-          const [kept, ...others] = present;
-          const keptHasText = stripEmpty(kept.rem.text).length > 0;
-          for (const other of others) {
-            if (keptHasText && stripEmpty(other.rem.text).length > 0) {
-              if (!conflict) conflict = { keptName: kept.name, clearedName: other.name };
-              remIdsToClear.push(other.rem.id);
+          const withText = present.filter(e => stripEmpty(e.rem.text).length > 0);
+          if (withText.length === 0) continue;
+          if (withText.length === 1) {
+            // One student has text; the shared combined remark will use it
+            if (!conflictSingle) conflictSingle = { name: withText[0].name };
+          } else {
+            // Multiple students have different text — first attendee is kept, rest cleared
+            const [kept, ...others] = present;
+            for (const other of others) {
+              if (stripEmpty(other.rem.text).length > 0) {
+                if (!conflictMulti) conflictMulti = { keptName: kept.name, clearedName: other.name };
+                remIdsToClear.push(other.rem.id);
+              }
             }
           }
         }
 
-        if (remIdsToClear.length > 0) {
+        if (conflictMulti) {
           const ok = confirm(
-            `${conflict.clearedName}'s remark will be deleted and ${conflict.keptName}'s remark will be kept after combining. Continue?`
+            `${conflictMulti.clearedName}'s remark will be deleted. ${conflictMulti.keptName}'s remark will be kept and shared with all students. Continue?`
           );
           if (!ok) return;
           btn.disabled = true;
           for (const remId of remIdsToClear) await updateRemarkText(state.groupSessionId, remId, "");
+        } else if (conflictSingle) {
+          const names = attendees.join(" & ");
+          const ok = confirm(`${names} will share ${conflictSingle.name}'s remark. Continue?`);
+          if (!ok) return;
         }
       }
 
