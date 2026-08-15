@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1635";
+const APP_VERSION = "1636";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8650,7 +8650,7 @@ function renderFedcTargetWithSidebar(target, allPas, subActsByParent, sessionDat
   if (_sidebarCollapsed) {
     return `<div class="sec-layout" contenteditable="false" style="display:flex;flex-direction:column;gap:0">
       <div contenteditable="false" style="display:flex;align-items:center;gap:.6rem;padding:.3rem 0 .5rem;margin-bottom:.4rem;border-bottom:1px solid #e5e7eb">
-        <button class="sec-toggle-btn" contenteditable="false" title="Show sections" style="background:none;border:1.5px solid var(--primary);border-radius:.4rem;cursor:pointer;font-size:1.21rem;color:var(--primary);padding:.2rem .4rem;line-height:1;flex-shrink:0">☰</button>
+        <button class="sec-toggle-btn" contenteditable="false" title="Show sections" onmousedown="event.preventDefault()" style="background:none;border:1.5px solid var(--primary);border-radius:.4rem;cursor:pointer;font-size:1.21rem;color:var(--primary);padding:.2rem .4rem;line-height:1;flex-shrink:0">☰</button>
         <span style="font-size:.9rem;font-weight:700;color:#374151;white-space:nowrap">${totalWritten} of ${totalActs} written</span>
         <div style="flex:1;background:#e5e7eb;border-radius:9999px;height:4px;max-width:100px">
           <div style="background:var(--primary);height:100%;width:${pct}%;border-radius:9999px"></div>
@@ -8680,7 +8680,7 @@ function renderFedcTargetWithSidebar(target, allPas, subActsByParent, sessionDat
   _visData.forEach(({ s: grp, st: { total, written } }, i) => {
     // First section active initially; scroll listener updates dynamically
     const isAct = i === 0;
-    sidebarNavHtml += `<button class="sec-nav-btn" data-sec-idx="${i}" contenteditable="false"
+    sidebarNavHtml += `<button class="sec-nav-btn" data-sec-idx="${i}" contenteditable="false" onmousedown="event.preventDefault()"
       style="width:100%;text-align:left;padding:.6rem .9rem;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;background:${isAct ? 'var(--primary-light)' : 'transparent'};border-left:3px solid ${isAct ? 'var(--primary)' : 'transparent'};border-radius:0">
       <div style="font-size:.82rem;font-weight:${isAct ? '700' : '500'};color:${isAct ? 'var(--primary-dark)' : '#374151'};word-break:break-word;line-height:1.3">${escHtml(grp.name)}</div>
       <div style="font-size:.72rem;color:#9ca3af;margin-top:.15rem">${written}/${total}</div>
@@ -13483,7 +13483,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
   }
 
   const combineToggle = actId
-    ? `<button class="btn-combine-toggle${combineFlagForAct ? " active" : ""}" data-act-id="${escHtml(actId)}">
+    ? `<button class="btn-combine-toggle${combineFlagForAct ? " active" : ""}" data-act-id="${escHtml(actId)}" onmousedown="event.preventDefault()">
         ${combineFlagForAct ? "Combined Remarks" : "Separate Remarks"}
       </button>`
     : "";
@@ -20732,7 +20732,7 @@ function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByPa
   if (_grpSidebarCollapsed) {
     return [`<div class="sec-layout" contenteditable="false" style="display:flex;flex-direction:column;gap:0">
       <div contenteditable="false" style="display:flex;align-items:center;gap:.6rem;padding:.3rem 0 .5rem;margin-bottom:.4rem;border-bottom:1px solid #e5e7eb">
-        <button class="grp-sec-toggle-btn" contenteditable="false" title="Show sections" style="background:none;border:1.5px solid var(--primary);border-radius:.4rem;cursor:pointer;font-size:1.21rem;color:var(--primary);padding:.2rem .4rem;line-height:1;flex-shrink:0">☰</button>
+        <button class="grp-sec-toggle-btn" contenteditable="false" title="Show sections" onmousedown="event.preventDefault()" style="background:none;border:1.5px solid var(--primary);border-radius:.4rem;cursor:pointer;font-size:1.21rem;color:var(--primary);padding:.2rem .4rem;line-height:1;flex-shrink:0">☰</button>
         <span style="font-size:.9rem;font-weight:700;color:#374151;white-space:nowrap">${totalWritten} of ${totalActs} written</span>
         <div style="flex:1;background:#e5e7eb;border-radius:9999px;height:4px;max-width:100px">
           <div style="background:var(--primary);height:100%;width:${pct}%;border-radius:9999px"></div>
@@ -20758,7 +20758,7 @@ function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByPa
   _grpVisData.forEach(({ s: grp, st: { total, written } }, i) => {
     // First section active initially; scroll listener updates dynamically
     const isAct = i === 0;
-    sidebarNavHtml += `<button class="grp-sec-nav-btn" data-sec-idx="${i}" contenteditable="false"
+    sidebarNavHtml += `<button class="grp-sec-nav-btn" data-sec-idx="${i}" contenteditable="false" onmousedown="event.preventDefault()"
       style="width:100%;text-align:left;padding:.6rem .9rem;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;background:${isAct ? 'var(--primary-light)' : 'transparent'};border-left:3px solid ${isAct ? 'var(--primary)' : 'transparent'};border-radius:0">
       <div style="font-size:.82rem;font-weight:${isAct ? '700' : '500'};color:${isAct ? 'var(--primary-dark)' : '#374151'};word-break:break-word;line-height:1.3">${escHtml(grp.name)}</div>
       <div style="font-size:.72rem;color:#9ca3af;margin-top:.15rem">${written}/${total}</div>
@@ -21031,7 +21031,8 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
   const combineRemarks = !!(actId && data.activities?.[actId]?.combineRemarks);
   const combineToggle = actId
     ? `<button class="btn-combine-toggle ${combineRemarks ? "active" : ""}" data-act-id="${escHtml(actId)}"
-        title="${combineRemarks ? "Split back into separate remark boxes" : "Share one remark box for everyone in this activity"}">
+        title="${combineRemarks ? "Split back into separate remark boxes" : "Share one remark box for everyone in this activity"}"
+        onmousedown="event.preventDefault()">
         ${combineRemarks ? "Combined Remarks" : "Separate Remarks"}
       </button>`
     : "";
