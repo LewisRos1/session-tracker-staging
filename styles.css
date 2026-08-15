@@ -2274,6 +2274,7 @@ div.admin-note-editable:empty::before {
   display: flex;
   align-items: center;
   gap: .3rem;
+  width: 100%;
 }
 /* When a note textarea is present, stack starter row + notes vertically */
 .view-starter-wrap-note {
@@ -3509,6 +3510,7 @@ button.wf-pill:hover { filter: brightness(.93); }
 .view-comment-edit {
   flex: 1;
   width: 100%;
+  box-sizing: border-box;
   border: 1px solid #b0b7c3;
   border-radius: 4px;
   font-family: var(--font);

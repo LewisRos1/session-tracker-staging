@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1640";
+const APP_VERSION = "1641";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -11638,7 +11638,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
     ri === 0 ? no : null,
     ri === 0 ? actCell : null,
     rem, target, inlineOptions, sentenceStarter, multiSelect, mappedInfo, remarkHasNote, rowClass,
-    paEntry?.optionScores || null
+    paEntry?.optionScores || null, paEntry?.manualScore || false
   )).join("");
 }
 
@@ -11671,7 +11671,43 @@ function buildTrialCellsHtml(rem, maxPts) {
     `<button class="view-add-trial" data-rem-id="${escHtml(rem.id)}">+</button>`;
 }
 
-function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false, rowClass = "", optionScores = null) {
+function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false, rowClass = "", optionScores = null, manualScore = false) {
+  // Manual score: render score input + = XX% hint; notes below; no trials
+  if (manualScore) {
+    const currentVal = rem.text ? plainTextForEdit(rem.text).trim() : "";
+    const parsed = parseManualScore(currentVal);
+    const parsedPct = parsed !== null ? Math.round(parsed * 10) / 10 : null;
+    const hintHtml = `<span class="view-manual-score-hint" data-rem-id="${escHtml(rem.id)}"
+      style="font-size:.85rem;color:#6b7280;white-space:nowrap${parsedPct === null ? ";display:none" : ""}">${parsedPct !== null ? `= ${parsedPct}%` : ""}</span>`;
+    const scoreInput = `<div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+      <input type="text" class="view-manual-score-input" data-rem-id="${escHtml(rem.id)}"
+        data-saved-html="${escHtml(currentVal)}" value="${escHtml(currentVal)}"
+        placeholder="e.g. 5/20, 25%"
+        style="width:9rem;min-width:0;border:1px solid #b0b7c3;border-radius:4px;padding:.25rem .4rem;font-size:.85rem;font-family:var(--font);background:#fff;outline:none;box-sizing:border-box">
+      ${hintHtml}
+    </div>`;
+    const noteCell = `<div style="margin-top:.3rem">
+      <textarea class="view-mastery-note" rows="1" data-rem-id="${escHtml(rem.id)}"
+        data-saved-html="${escHtml(rem.masteryNote || "")}"
+        placeholder="Notes…">${escHtml(plainTextForEdit(rem.masteryNote))}</textarea>
+    </div>`;
+    const remarkCell = `<div contenteditable="false">${scoreInput}${noteCell}</div>`;
+    const scoreColDisplay = parsedPct !== null ? parsedPct + "%" : "";
+    return `<tr${rowClass ? ` class="${rowClass}"` : ""}>
+      <td class="vcol-no" contenteditable="false">${no !== null ? no : ""}</td>
+      <td class="vcol-act" contenteditable="false">${actName !== null ? actName : ""}</td>
+      <td class="vcol-rem" contenteditable="false">${remarkCell}</td>
+      <td class="vcol-trials" contenteditable="false">&nbsp;</td>
+      <td class="vcol-total" contenteditable="false">&nbsp;</td>
+      <td class="vcol-score" contenteditable="false">
+        <div style="display:flex;align-items:center;gap:.3rem;justify-content:flex-end">
+          <span class="view-manual-score-pct" data-rem-id="${escHtml(rem.id)}">${scoreColDisplay}</span>
+          <button class="view-rem-del" data-rem-id="${escHtml(rem.id)}" title="Delete remark">×</button>
+        </div>
+      </td>
+    </tr>`;
+  }
+
   const maxPts = target.maxPoints || 3;
   const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts, rem.optionScore);
   const trialCells = mappedInfo
@@ -12094,6 +12130,12 @@ function setupViewRemarkSaving(body, getSessionId, counterKey, onIdle, getData) 
 
     diffAndSave(".view-remark-edit[data-rem-id]:not(.view-remark-empty)", el => htmlForStorage(el.value),
       (el, html) => updateRemarkText(sid, el.dataset.remId, html));
+
+    diffAndSave(".view-manual-score-input[data-rem-id]", el => {
+      const val = el.value.trim();
+      if (val && validateManualScore(val) !== null) return el.dataset.savedHtml;
+      return val;
+    }, (el, val) => updateRemarkText(sid, el.dataset.remId, val));
 
     diffAndSave(".view-mastery-note[data-rem-id]", el => htmlForStorage(el.value),
       (el, html) => updateRemarkNote(sid, el.dataset.remId, html));
@@ -12690,6 +12732,40 @@ function attachViewListeners() {
   const body = $("session-view-body");
 
   body.querySelectorAll("textarea.view-remark-edit, textarea.view-mastery-note").forEach(autoResizeTextarea);
+
+  // ── Manual score input: sanitise, live hint update, blur validation ───
+  body.querySelectorAll(".view-manual-score-input").forEach(input => {
+    const msSanitize = raw => {
+      let s = raw.replace(/[^0-9./%]/g, "");
+      const pctIdx = s.indexOf("%"); if (pctIdx !== -1) s = s.slice(0, pctIdx + 1);
+      const slashIdx = s.indexOf("/");
+      if (slashIdx !== -1) s = s.slice(0, slashIdx + 1) + s.slice(slashIdx + 1).replace(/\//g, "");
+      return s.replace(/\.{2,}/g, ".");
+    };
+    const getHint = () => body.querySelector(`.view-manual-score-hint[data-rem-id="${input.dataset.remId}"]`);
+    const getPct  = () => input.closest("tr")?.querySelector(".view-manual-score-pct");
+    input.addEventListener("input", () => {
+      const san = msSanitize(input.value);
+      if (input.value !== san) {
+        const pos = input.selectionStart - (input.value.length - san.length);
+        input.value = san;
+        input.setSelectionRange(Math.max(0, pos), Math.max(0, pos));
+      }
+      const parsed = parseManualScore(san.trim());
+      const pct = parsed !== null ? Math.round(parsed * 10) / 10 : null;
+      const hint = getHint();
+      if (hint) { if (pct !== null) { hint.textContent = `= ${pct}%`; hint.style.display = ""; } else { hint.textContent = ""; hint.style.display = "none"; } }
+      const pctEl = getPct(); if (pctEl) pctEl.textContent = pct !== null ? pct + "%" : "";
+    });
+    let _alerting = false;
+    input.addEventListener("blur", () => {
+      if (_alerting) return;
+      const err = validateManualScore(input.value.trim());
+      if (!err) return;
+      _alerting = true; alert(err); _alerting = false;
+      setTimeout(() => input.focus(), 0);
+    });
+  });
 
   bindViewTrialCellListeners(body);
 
