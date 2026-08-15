@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1653";
+const APP_VERSION = "1654";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -7599,21 +7599,33 @@ async function openSession(student, existingSessionId = null, dateStr = null, pa
   state.entryEnterKeyCleanup = setupEntryEnterKeyDelegation($("target-content"),
     () => getEffectiveTargets().find(t => t.name === state.selectedTargetName));
 
-  // Run student refresh + session lookup in parallel — previously sequential
-  // (two Firestore round-trips in series). Running both at once cuts loading time roughly in half.
+  // When the session ID is already known, start the listener immediately so
+  // onSnapshot can serve from the Firestore cache while the student-config
+  // refresh happens in the background. When the ID isn't known yet we still
+  // need getOrCreateSessionForDate first, but student refresh runs in parallel.
   try {
-    const [fresh, sessionId] = await Promise.all([
-      getStudentById(student.id).catch(() => null),
-      existingSessionId
-        ? Promise.resolve(existingSessionId)
-        : getOrCreateSessionForDate(student.id, dateStr || getTodayString(), student.targets)
-    ]);
-
-    if (fresh) {
-      Object.assign(student, fresh);
-      state.currentStudent = student;
-      const si = (state.students || []).findIndex(s => s.id === student.id);
-      if (si >= 0) state.students[si] = student;
+    let sessionId;
+    if (existingSessionId) {
+      sessionId = existingSessionId;
+      getStudentById(student.id).then(fresh => {
+        if (!fresh) return;
+        Object.assign(student, fresh);
+        state.currentStudent = student;
+        const si = (state.students || []).findIndex(s => s.id === student.id);
+        if (si >= 0) state.students[si] = student;
+      }).catch(() => {});
+    } else {
+      const [fresh, sid] = await Promise.all([
+        getStudentById(student.id).catch(() => null),
+        getOrCreateSessionForDate(student.id, dateStr || getTodayString(), student.targets)
+      ]);
+      sessionId = sid;
+      if (fresh) {
+        Object.assign(student, fresh);
+        state.currentStudent = student;
+        const si = (state.students || []).findIndex(s => s.id === student.id);
+        if (si >= 0) state.students[si] = student;
+      }
     }
 
     // Backfill activeFrom on all activities that don't have one yet
