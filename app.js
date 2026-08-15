@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1648";
+const APP_VERSION = "1649";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -13545,8 +13545,9 @@ function buildGroupTargetViewTable(target, data, attendees) {
 }
 
 function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPredefined = true, paConfig = null) {
-  const rounds = actId ? viewGroupGetRounds(data, actId, attendees) : [];
+  const rounds           = actId ? viewGroupGetRounds(data, actId, attendees) : [];
   const combineFlagForAct = !!(actId && data.activities?.[actId]?.combineRemarks);
+  const combineRoundsMap  = (actId && data.activities?.[actId]?.combineRounds) || {};
 
   const grpActConfigId = actId ? data.activities?.[actId]?.configId : null;
   const paEntry = paConfig || (isPredefined
@@ -13753,9 +13754,13 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
 
   let firstRowOverall = true;
   let html = "";
-  for (const round of rounds) {
+  for (let ri = 0; ri < rounds.length; ri++) {
+    const round = rounds[ri];
     const presentEntries  = round.filter(e => !e.pending);
-    const combineThisRound = combineFlagForAct && presentEntries.length > 1;
+    const combineFlag = Object.prototype.hasOwnProperty.call(combineRoundsMap, ri)
+      ? !!combineRoundsMap[ri]
+      : combineFlagForAct;
+    const combineThisRound = combineFlag && presentEntries.length > 1;
     const sharedRemIds     = combineThisRound ? presentEntries.map(e => e.id) : null;
     const sharedText       = combineThisRound ? presentEntries[0].text : null;
     let usedRowspanCell    = false;
