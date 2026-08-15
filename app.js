@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1638";
+const APP_VERSION = "1639";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -11537,7 +11537,8 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
            data-target="${escHtml(target.name)}"
            data-is-predefined="${isPredefined}"
            data-parent-activity="${escHtml(paConfig?.parentActivity || "")}"
-           data-config-id="${escHtml(paConfig?.id || "")}">${_maintained ? "Maintain" : ""}</textarea>`;
+           data-config-id="${escHtml(paConfig?.id || "")}"
+           placeholder="${_maintained ? "" : "Notes…"}">${_maintained ? "Maintain" : ""}</textarea>`;
       const addTrialBtn = mappedInfo
         ? ""
         : `<button class="view-add-trial-new" data-act-id="${escHtml(actId || "")}"
@@ -11708,7 +11709,7 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
 
   const optSelect = makeViewOpts(rem.id, rem.text)
     || `<textarea class="view-remark-edit" rows="1" data-rem-id="${escHtml(rem.id)}"
-          data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`;
+          placeholder="Notes…" data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`;
 
   // Show the note textarea if the current type includes it, OR if the remark
   // already has a masteryNote saved (e.g. type was +Free Text in the past and
@@ -13512,7 +13513,8 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
             data-is-predefined="${isPredefined}"
             data-student="${escHtml(studentName)}"
             data-parent-activity="${escHtml(paConfig?.parentActivity || "")}"
-            data-config-id="${escHtml(paConfig?.id || "")}"></textarea>
+            data-config-id="${escHtml(paConfig?.id || "")}"
+            placeholder="Notes…"></textarea>
         </td>
         <td class="vcol-trials" contenteditable="false">
           <button class="view-group-add-trial-new" data-act-id="${escHtml(actId || "")}"
@@ -13712,6 +13714,7 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
       remarkTd = `<td class="vcol-rem" contenteditable="false" rowspan="${combineOpts.rowspan}">
         <textarea class="view-remark-edit group-remark-input-combined" rows="1"
           data-rem-ids="${idList}"
+          placeholder="Notes…"
           data-saved-html="${escHtml(combineOpts.sharedText || "")}">${escHtml(plainTextForEdit(combineOpts.sharedText))}</textarea>
       </td>`;
     } else {
@@ -13735,7 +13738,7 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
 
       const optSelect = makeViewOpts(rem.id, rem.text)
         || `<textarea class="view-remark-edit" rows="1" data-rem-id="${escHtml(rem.id)}"
-              data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`;
+              placeholder="Notes…" data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`;
 
       const showNote = remarkHasNote || !!(rem.masteryNote && rem.masteryNote.trim().length > 0);
       const noteField = showNote
