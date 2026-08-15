@@ -267,11 +267,24 @@ export async function getOrCreateSessionForDate(studentId, dateStr, targets = []
     notes: t.notes || [], hasComment: t.hasComment || false, fullName: t.fullName || ""
   }));
 
-  const ref = await addDoc(collection(db, "sessions"), {
-    studentId, date: dateStr, month, sessionNumber,
-    finished: false, activities: {}, remarks: {}, fedcComments: {},
-    targetsSnapshot, createdAt: serverTimestamp()
-  });
+  let ref;
+  try {
+    ref = await addDoc(collection(db, "sessions"), {
+      studentId, date: dateStr, month, sessionNumber,
+      finished: false, activities: {}, remarks: {}, fedcComments: {},
+      targetsSnapshot, createdAt: serverTimestamp()
+    });
+  } catch (err) {
+    // Firebase offline-persistence can replay a stale queued write and get
+    // "Document already exists" if another tab or a prior sync already landed
+    // the doc on the server. Recover by re-fetching to return the real ID.
+    if (err.message?.includes("Document already exists")) {
+      const refetched = await getIndividualSessionsForStudent(studentId);
+      const found = refetched.find(s => s.date === dateStr);
+      if (found) return found.id;
+    }
+    throw err;
+  }
   return ref.id;
 }
 
@@ -1177,12 +1190,22 @@ export async function getOrCreateGroupSessionForDate(groupId, dateStr, targets =
     predefinedActivities: t.predefinedActivities || [],
     notes: t.notes || [], hasComment: t.hasComment || false, fullName: t.fullName || ""
   }));
-  const ref = await addDoc(collection(db, "sessions"), {
-    groupId, date: dateStr, month, sessionNumber, attendees,
-    attendeeIds: linkedIds, attendeePersonalSessionNumbers,
-    finished: false, activities: {}, remarks: {}, fedcComments: {},
-    targetsSnapshot, createdAt: serverTimestamp()
-  });
+  let ref;
+  try {
+    ref = await addDoc(collection(db, "sessions"), {
+      groupId, date: dateStr, month, sessionNumber, attendees,
+      attendeeIds: linkedIds, attendeePersonalSessionNumbers,
+      finished: false, activities: {}, remarks: {}, fedcComments: {},
+      targetsSnapshot, createdAt: serverTimestamp()
+    });
+  } catch (err) {
+    if (err.message?.includes("Document already exists")) {
+      const refetchedSnap = await getDocs(query(collection(db, "sessions"), where("groupId", "==", groupId)));
+      const refetchedDoc  = refetchedSnap.docs.find(d => d.data().date === dateStr);
+      if (refetchedDoc) return refetchedDoc.id;
+    }
+    throw err;
+  }
   return ref.id;
 }
 
