@@ -2234,6 +2234,7 @@ div.admin-note-editable:empty::before {
   font-size: .85rem;
   font-family: var(--font);
   color: var(--text);
+  padding: .3rem .4rem;
   padding: .15rem .3rem;
   border: 1px solid #b0b7c3;
   border-radius: 4px;
@@ -2281,12 +2282,14 @@ div.admin-note-editable:empty::before {
   flex-direction: column;
   align-items: stretch;
   gap: .4rem;
+  padding-bottom: .3rem;
 }
 .view-starter-top-row {
   display: flex;
   align-items: center;
   gap: .3rem;
   flex-wrap: wrap;
+  padding: .3rem .4rem 0;
 }
 .view-starter-prefix {
   font-size: .8rem;
@@ -3382,6 +3385,10 @@ button.wf-pill:hover { filter: brightness(.93); }
    collapse shorter than one real text line, leaving the caret visibly taller
    than the box until text is typed and forces the row to grow. */
 .vcol-rem > .view-remark-edit { min-height: max(1.8rem, 100%); }
+/* Wrapper divs fill the full cell width; padding moves inside children */
+.vcol-rem > .view-starter-wrap,
+.vcol-rem > .view-manual-score-wrap { padding: 0; min-height: max(1.8rem, 100%); }
+.view-manual-score-wrap { display: flex; flex-direction: column; gap: .3rem; padding-bottom: .3rem; }
 .vcol-trials { width: 155px; }
 .vcol-total  { width: 54px; text-align: center; white-space: nowrap; }
 .vcol-score  { width: 82px; text-align: center; font-weight: 600; white-space: nowrap; }

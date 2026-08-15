@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1641";
+const APP_VERSION = "1642";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10019,7 +10019,7 @@ async function autoFillStructuredRemarks(student, sessionId) {
   const toFill = [];
   for (const target of (student.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
-      if (pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || pa.isMaintainHeading) continue;
+      if (pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || pa.isMaintainHeading || pa.maintained) continue;
       if (!isAutoOpenRemarkType(pa)) continue;
       const paParent = pa.parentActivity || null;
       const paConfigId = pa.id || null;
@@ -10190,7 +10190,17 @@ async function autoFillMaintainedRemarks(student, sessionId, selectedTargetName 
       let actId = canonical?.[0] || null;
       if (actId) {
         const existingRems = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === actId);
-        if (existingRems.length > 0) continue;
+        if (existingRems.length > 1) {
+          // Cleanup: remove extra unmodified "Maintain" placeholders (race-created duplicates)
+          const stripE = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
+          for (const [dupeId, dupeRem] of existingRems.slice(1)) {
+            if (stripE(dupeRem.text) === "Maintain" && !stripE(dupeRem.masteryNote) && !(dupeRem.trials || []).some(t => t >= 0)) {
+              delete data.remarks[dupeId];
+              deleteRemark(sessionId, dupeId).catch(() => {});
+            }
+          }
+        }
+        if (Object.entries(data.remarks || {}).some(([, r]) => r.activityId === actId)) continue;
       }
       const key = `${sessionId}:${target.name}:${pa.name}:maintained`;
       if (maintainedRemarkAutoFillInFlight.has(key)) continue;
@@ -11679,19 +11689,18 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
     const parsedPct = parsed !== null ? Math.round(parsed * 10) / 10 : null;
     const hintHtml = `<span class="view-manual-score-hint" data-rem-id="${escHtml(rem.id)}"
       style="font-size:.85rem;color:#6b7280;white-space:nowrap${parsedPct === null ? ";display:none" : ""}">${parsedPct !== null ? `= ${parsedPct}%` : ""}</span>`;
-    const scoreInput = `<div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+    const scoreInput = `<div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.3rem .4rem .15rem">
       <input type="text" class="view-manual-score-input" data-rem-id="${escHtml(rem.id)}"
         data-saved-html="${escHtml(currentVal)}" value="${escHtml(currentVal)}"
         placeholder="e.g. 5/20, 25%"
         style="width:9rem;min-width:0;border:1px solid #b0b7c3;border-radius:4px;padding:.25rem .4rem;font-size:.85rem;font-family:var(--font);background:#fff;outline:none;box-sizing:border-box">
       ${hintHtml}
+      <span style="margin-left:auto;font-size:.7rem;font-weight:700;color:#6b7280;letter-spacing:.05em;white-space:nowrap">MANUAL SCORE</span>
     </div>`;
-    const noteCell = `<div style="margin-top:.3rem">
-      <textarea class="view-mastery-note" rows="1" data-rem-id="${escHtml(rem.id)}"
-        data-saved-html="${escHtml(rem.masteryNote || "")}"
-        placeholder="Notes…">${escHtml(plainTextForEdit(rem.masteryNote))}</textarea>
-    </div>`;
-    const remarkCell = `<div contenteditable="false">${scoreInput}${noteCell}</div>`;
+    const noteCell = `<textarea class="view-mastery-note" rows="1" data-rem-id="${escHtml(rem.id)}"
+      data-saved-html="${escHtml(rem.masteryNote || "")}"
+      placeholder="Notes…">${escHtml(plainTextForEdit(rem.masteryNote))}</textarea>`;
+    const remarkCell = `<div class="view-manual-score-wrap" contenteditable="false">${scoreInput}${noteCell}</div>`;
     const scoreColDisplay = parsedPct !== null ? parsedPct + "%" : "";
     return `<tr${rowClass ? ` class="${rowClass}"` : ""}>
       <td class="vcol-no" contenteditable="false">${no !== null ? no : ""}</td>
@@ -12155,7 +12164,7 @@ function setupViewRemarkSaving(body, getSessionId, counterKey, onIdle, getData) 
       // dataset.creating already reset to "false" by the first call's
       // completion and the same typed text still sitting in the box, and
       // creates a second, duplicate remark with identical text.
-      if (!text || el.dataset.creating === "true" || el.dataset.remId) return;
+      if (!text || text === "Maintain" || el.dataset.creating === "true" || el.dataset.remId) return;
       el.dataset.creating = "true";
       state[counterKey]++;
       const create = async () => {
@@ -13764,7 +13773,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
 
       html += viewGroupRemarkRow(
         noVal, actVal, entry.studentName, entry, target,
-        inlineOptions, sentenceStarter, multiSelect, combineOpts, null, remarkHasNote, rowClass, paEntry?.optionScores || null
+        inlineOptions, sentenceStarter, multiSelect, combineOpts, null, remarkHasNote, rowClass, paEntry?.optionScores || null, paEntry?.manualScore || false
       );
       firstRowOverall = false;
     }
@@ -13772,7 +13781,41 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
   return html;
 }
 
-function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, combineOpts = null, mappedInfo = null, remarkHasNote = false, rowClass = "", optionScores = null) {
+function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, combineOpts = null, mappedInfo = null, remarkHasNote = false, rowClass = "", optionScores = null, manualScore = false) {
+  if (manualScore) {
+    const currentVal = rem.text ? plainTextForEdit(rem.text).trim() : "";
+    const parsed = parseManualScore(currentVal);
+    const parsedPct = parsed !== null ? Math.round(parsed * 10) / 10 : null;
+    const hintHtml = `<span class="view-manual-score-hint" data-rem-id="${escHtml(rem.id)}"
+      style="font-size:.85rem;color:#6b7280;white-space:nowrap${parsedPct === null ? ";display:none" : ""}">${parsedPct !== null ? `= ${parsedPct}%` : ""}</span>`;
+    const scoreInput = `<div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.3rem .4rem .15rem">
+      <input type="text" class="view-manual-score-input" data-rem-id="${escHtml(rem.id)}"
+        data-saved-html="${escHtml(currentVal)}" value="${escHtml(currentVal)}"
+        placeholder="e.g. 5/20, 25%"
+        style="width:9rem;min-width:0;border:1px solid #b0b7c3;border-radius:4px;padding:.25rem .4rem;font-size:.85rem;font-family:var(--font);background:#fff;outline:none;box-sizing:border-box">
+      ${hintHtml}
+      <span style="margin-left:auto;font-size:.7rem;font-weight:700;color:#6b7280;letter-spacing:.05em;white-space:nowrap">MANUAL SCORE</span>
+    </div>`;
+    const noteCell = `<textarea class="view-mastery-note" rows="1" data-rem-id="${escHtml(rem.id)}"
+      data-saved-html="${escHtml(rem.masteryNote || "")}"
+      placeholder="Notes…">${escHtml(plainTextForEdit(rem.masteryNote))}</textarea>`;
+    const remarkCell = `<div class="view-manual-score-wrap" contenteditable="false">${scoreInput}${noteCell}</div>`;
+    const scoreColDisplay = parsedPct !== null ? parsedPct + "%" : "";
+    return `<tr${rowClass ? ` class="${rowClass}"` : ""}>
+      <td class="vcol-no" contenteditable="false">${no !== null ? no : ""}</td>
+      <td class="vcol-act" contenteditable="false">${actName !== null ? actName : ""}</td>
+      <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(studentName)}</td>
+      <td class="vcol-rem" contenteditable="false">${remarkCell}</td>
+      <td class="vcol-trials" contenteditable="false">&nbsp;</td>
+      <td class="vcol-total" contenteditable="false">&nbsp;</td>
+      <td class="vcol-score" contenteditable="false">
+        <div style="display:flex;align-items:center;gap:.3rem;justify-content:flex-end">
+          <span class="view-manual-score-pct" data-rem-id="${escHtml(rem.id)}">${scoreColDisplay}</span>
+          <button class="view-rem-del" data-rem-id="${escHtml(rem.id)}" title="Delete remark">×</button>
+        </div>
+      </td>
+    </tr>`;
+  }
   const maxPts = target.maxPoints || 3;
   const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts, rem.optionScore);
   const trialCells = mappedInfo
@@ -13966,6 +14009,40 @@ function attachGroupViewListeners() {
   const sid  = () => state.viewGroupSessionId;
 
   body.querySelectorAll("textarea.view-remark-edit, textarea.view-mastery-note").forEach(autoResizeTextarea);
+
+  // ── Manual score input: sanitise, live hint update, blur validation ───
+  body.querySelectorAll(".view-manual-score-input").forEach(input => {
+    const msSanitize = raw => {
+      let s = raw.replace(/[^0-9./%]/g, "");
+      const pctIdx = s.indexOf("%"); if (pctIdx !== -1) s = s.slice(0, pctIdx + 1);
+      const slashIdx = s.indexOf("/");
+      if (slashIdx !== -1) s = s.slice(0, slashIdx + 1) + s.slice(slashIdx + 1).replace(/\//g, "");
+      return s.replace(/\.{2,}/g, ".");
+    };
+    const getHint = () => body.querySelector(`.view-manual-score-hint[data-rem-id="${input.dataset.remId}"]`);
+    const getPct  = () => input.closest("tr")?.querySelector(".view-manual-score-pct");
+    input.addEventListener("input", () => {
+      const san = msSanitize(input.value);
+      if (input.value !== san) {
+        const pos = input.selectionStart - (input.value.length - san.length);
+        input.value = san;
+        input.setSelectionRange(Math.max(0, pos), Math.max(0, pos));
+      }
+      const parsed = parseManualScore(san.trim());
+      const pct = parsed !== null ? Math.round(parsed * 10) / 10 : null;
+      const hint = getHint();
+      if (hint) { if (pct !== null) { hint.textContent = `= ${pct}%`; hint.style.display = ""; } else { hint.textContent = ""; hint.style.display = "none"; } }
+      const pctEl = getPct(); if (pctEl) pctEl.textContent = pct !== null ? pct + "%" : "";
+    });
+    let _alerting = false;
+    input.addEventListener("blur", () => {
+      if (_alerting) return;
+      const err = validateManualScore(input.value.trim());
+      if (!err) return;
+      _alerting = true; alert(err); _alerting = false;
+      setTimeout(() => input.focus(), 0);
+    });
+  });
 
   const wrap = fn => withViewAction("viewGroupActionsInFlight", "viewGroupRenderPending", isGroupViewBusy, renderGroupSessionView, fn);
 
