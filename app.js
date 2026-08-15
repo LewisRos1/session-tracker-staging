@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1636";
+const APP_VERSION = "1637";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -9217,7 +9217,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
 
   const optBtns = makeOptPills(rem.id, rem.text)
     || `<textarea class="field-input remark-text-input" rows="1"
-        data-rem-id="${rem.id}" data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`;
+        data-rem-id="${rem.id}" placeholder="Notes…" data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`;
 
   // Sketch board button only shown when there's a free-text input (no preset opt pills)
   const sketchBtn = opts.length === 0
@@ -9231,7 +9231,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
       <span class="remark-starter-prefix" contenteditable="false">${escHtml(sentenceStarter)}</span>
       ${makeOptPills(rem.id, rem.text)
         || `<textarea class="field-input remark-text-input" rows="1"
-            data-rem-id="${rem.id}" data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`
+            data-rem-id="${rem.id}" placeholder="Notes…" data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`
       }
     </div>`;
   } else {
@@ -20965,7 +20965,7 @@ function renderGroupStudentRowCompact(remId, rem, target, mappedInfo = null) {
       <span class="field-label" contenteditable="false">Remark</span>
       <button class="btn-sketch btn-group-sketch" contenteditable="false" data-rem-id="${remId}" aria-label="Open sketch board">✏</button>
       <textarea class="field-input group-remark-input" rows="1"
-        data-rem-id="${remId}" placeholder="Remark…"
+        data-rem-id="${remId}" placeholder="Notes…"
         data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>
       <button class="btn-icon btn-group-del-student-remark" contenteditable="false" data-rem-id="${remId}" title="Delete remark">🗑</button>
     </div>
@@ -21164,7 +21164,7 @@ function renderGroupCombinedRemarkRow(remIds, text, attendeeNames = []) {
       <span class="field-label" contenteditable="false">Notes</span>
       <button class="btn-sketch btn-group-sketch-combined" contenteditable="false" data-rem-ids="${idList}" aria-label="Open sketch board">✏</button>
       <textarea class="field-input group-remark-input-combined" rows="1"
-        data-rem-ids="${idList}" placeholder="Remark…"
+        data-rem-ids="${idList}" placeholder="Notes…"
         data-saved-html="${escHtml(text || "")}">${escHtml(plainTextForEdit(text))}</textarea>
     </div>
   </div>`;
@@ -21248,7 +21248,7 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
   }
 
   const freeTextBox = `<textarea class="field-input group-remark-input" rows="1"
-      data-rem-id="${remId}" placeholder="Remark…"
+      data-rem-id="${remId}" placeholder="Notes…"
       data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`;
 
   const sketchBtn = opts.length === 0
@@ -21365,7 +21365,7 @@ function renderGroupStudentEmptyRow(studentName, actId, actName, target, isPrede
       <span class="field-label" contenteditable="false">Notes</span>
       <button class="btn-sketch btn-group-sketch" contenteditable="false" data-rem-id="" aria-label="Sketch">✏</button>
       <textarea class="field-input group-remark-input group-remark-input-empty" rows="1"
-        placeholder="Remark…"
+        placeholder="Notes…"
         data-act-id="${escHtml(actId || "")}"
         data-act-name="${escHtml(actName)}"
         data-target="${escHtml(target.name)}"

@@ -3322,14 +3322,14 @@ button.wf-pill:hover { filter: brightness(.93); }
   font-weight: 700;
   text-align: center;
   padding: .55rem .7rem;
-  border: 1px solid var(--border);
+  border: 1px solid #b0b7c3;
   border-bottom: 2px solid var(--primary);
   white-space: nowrap;
 }
 
 .view-table td {
   padding: .4rem .6rem;
-  border: 1px solid var(--border);
+  border: 1px solid #b0b7c3;
   vertical-align: middle;
   color: var(--text);
 }
