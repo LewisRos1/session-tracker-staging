@@ -766,6 +766,14 @@ export async function updateActivityCombineRemarks(sessionId, actId, combine, re
   await updateDoc(doc(db, "sessions", sessionId), updates);
 }
 
+export async function updateActivityRoundCombine(sessionId, actId, roundIdx, combine, remarkTextUpdates = {}) {
+  const updates = { [`activities.${actId}.combineRounds.${roundIdx}`]: combine };
+  for (const [remId, text] of Object.entries(remarkTextUpdates)) {
+    updates[`remarks.${remId}.text`] = text;
+  }
+  await updateDoc(doc(db, "sessions", sessionId), updates);
+}
+
 export async function deleteRemark(sessionId, remId) {
   await updateDoc(doc(db, "sessions", sessionId), {
     [`remarks.${remId}`]: deleteField()

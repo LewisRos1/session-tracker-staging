@@ -1076,11 +1076,8 @@ input.field-input::placeholder {
 
 .btn-add-remark:hover { opacity: .75; }
 
-/* Combine/Separate remarks toggle — sits to the right of "Activity" in a group activity card */
+/* Combine/Separate remarks toggle — top-right of each round block */
 .btn-combine-toggle {
-  flex-shrink: 0;
-  align-self: flex-start;
-  margin-top: .3rem;
   padding: .3rem .6rem;
   border: 1.5px solid var(--border);
   border-radius: 999px;
@@ -3611,6 +3608,11 @@ button.wf-pill:hover { filter: brightness(.93); }
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+.group-round-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: -.25rem;
 }
 .group-round-footer {
   display: flex;

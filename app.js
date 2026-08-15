@@ -16,6 +16,7 @@ import {
   updateActivityName,
   updateActivityTitle,
   updateActivityCombineRemarks,
+  updateActivityRoundCombine,
   addRemark,
   updateRemarkText,
   updateRemarkNote,
@@ -174,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1647";
+const APP_VERSION = "1648";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -21286,14 +21287,8 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
     </div>`;
   }
 
-  const combineRemarks = !!(actId && data.activities?.[actId]?.combineRemarks);
-  const combineToggle = actId
-    ? `<button class="btn-combine-toggle ${combineRemarks ? "active" : ""}" data-act-id="${escHtml(actId)}"
-        title="${combineRemarks ? "Split back into separate remark boxes" : "Share one remark box for everyone in this activity"}"
-        onmousedown="event.preventDefault()">
-        ${combineRemarks ? "Combined Remarks" : "Separate Remarks"}
-      </button>`
-    : "";
+  const combineRemarks   = !!(actId && data.activities?.[actId]?.combineRemarks);
+  const combineRoundsMap = (actId && data.activities?.[actId]?.combineRounds) || {};
 
   // Check if any attendee already has a remark for this activity
   const anyExpanded = actId && Object.values(data.remarks || {})
@@ -21361,8 +21356,19 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
     }
     const roundRemIds = presentEntries.map(([, remId]) => remId);
 
+    const combineThisRound = Object.prototype.hasOwnProperty.call(combineRoundsMap, i)
+      ? !!combineRoundsMap[i]
+      : combineRemarks;
+    const roundToggle = actId
+      ? `<div class="group-round-header" contenteditable="false">
+           <button class="btn-combine-toggle${combineThisRound ? " active" : ""}" data-act-id="${escHtml(actId)}" data-round-idx="${i}" onmousedown="event.preventDefault()">
+             ${combineThisRound ? "Combined Remarks" : "Separate Remarks"}
+           </button>
+         </div>`
+      : "";
+
     let bodyHtml;
-    if (combineRemarks && presentEntries.length > 0) {
+    if (combineThisRound && presentEntries.length > 0) {
       const sharedText = presentEntries[0][2].text;
       bodyHtml = renderGroupCombinedRemarkRow(roundRemIds, sharedText, attendees)
         + presentEntries.map(([studentName, remId, rem]) =>
@@ -21382,6 +21388,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
     }
 
     roundHtmls.push(`<div class="group-remark-round">
+      ${roundToggle}
       ${bodyHtml}
     </div>`);
   }
@@ -21396,7 +21403,6 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
       <span class="field-value-fixed">${inactiveReasonBadge(paEntry)}${actNum ? `<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>` : ""}${formatActivityMarkup(actName)}</span>
       ${(paEntry?.createdOn || paEntry?.activeFrom) ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(paEntry.createdOn || paEntry.activeFrom)}</span>` : ""}
       ${paEntry?.id ? `<button class="btn-icon btn-grp-edit-pencil" contenteditable="false" data-pa-id="${escHtml(paEntry.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
-      ${combineToggle}
     </div>`}
     ${noteRow}
     ${suppressHeader ? "" : `<div class="entry-divider" contenteditable="false"></div>`}
@@ -21861,12 +21867,17 @@ function attachGroupTargetListeners(target) {
     });
   });
 
-  // Combine/Separate remarks toggle (per activity, this session only)
+  // Combine/Separate remarks toggle (per round, this session only)
   c.querySelectorAll(".btn-combine-toggle").forEach(btn => {
     btn.addEventListener("click", async () => {
-      const actId = btn.dataset.actId;
-      const data = state.groupSessionData;
-      const current = !!data?.activities?.[actId]?.combineRemarks;
+      const actId    = btn.dataset.actId;
+      const roundIdx = parseInt(btn.dataset.roundIdx ?? "0");
+      const data     = state.groupSessionData;
+      const combineRoundsMap = data?.activities?.[actId]?.combineRounds || {};
+      const combineRemarks   = !!(data?.activities?.[actId]?.combineRemarks);
+      const current = Object.prototype.hasOwnProperty.call(combineRoundsMap, roundIdx)
+        ? !!combineRoundsMap[roundIdx]
+        : combineRemarks;
       const attendees = state.groupAttendees || [];
       const stripEmpty = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
 
@@ -21881,27 +21892,20 @@ function attachGroupTargetListeners(target) {
         return byStudent;
       };
 
-      // remarkTextUpdates accumulates all remark text changes — written atomically
-      // with the combineRemarks flag so only one Firestore snapshot fires (no flash).
       const remarkTextUpdates = {};
 
       if (!current) {
-        // ── Turning ON ──────────────────────────────────────────────────────
+        // ── Turning ON for this round ────────────────────────────────────────
         const byStudent = buildByStudent();
-        const maxRounds = Math.max(...Object.values(byStudent).map(arr => arr.length), 0);
         let conflictMulti  = null;
         let conflictSingle = null;
 
-        for (let i = 0; i < maxRounds; i++) {
-          const present = attendees
-            .map(name => ({ name, rem: byStudent[name][i] }))
-            .filter(e => e.rem);
-          if (present.length < 2) continue;
+        const present = attendees
+          .map(name => ({ name, rem: byStudent[name]?.[roundIdx] }))
+          .filter(e => e.rem);
+        if (present.length >= 2) {
           const withText = present.filter(e => stripEmpty(e.rem.text).length > 0);
-          if (withText.length === 0) continue;
-
           if (withText.length === 1) {
-            // One student has text — propagate to others so combined textarea shows it
             if (!conflictSingle) conflictSingle = { name: withText[0].name };
             const srcText = withText[0].rem.text;
             for (const other of present) {
@@ -21909,10 +21913,9 @@ function attachGroupTargetListeners(target) {
               remarkTextUpdates[other.rem.id] = srcText;
               if (data.remarks?.[other.rem.id]) data.remarks[other.rem.id].text = srcText;
             }
-          } else {
+          } else if (withText.length > 1) {
             const allSame = withText.every(e => stripEmpty(e.rem.text) === stripEmpty(withText[0].rem.text));
             if (!allSame) {
-              // Genuinely different text — keep first attendee's, clear the rest
               const [kept, ...others] = present;
               for (const other of others) {
                 if (stripEmpty(other.rem.text).length > 0) {
@@ -21922,7 +21925,6 @@ function attachGroupTargetListeners(target) {
                 }
               }
             }
-            // All same text → switch directly, no popup needed
           }
         }
 
@@ -21937,18 +21939,13 @@ function attachGroupTargetListeners(target) {
           if (!ok) return;
         }
       } else {
-        // ── Turning OFF ─────────────────────────────────────────────────────
-        // Propagate the shared text (first student's remark = what combined showed)
-        // to all other students so both show the same remark after separating.
+        // ── Turning OFF for this round ───────────────────────────────────────
         const byStudent = buildByStudent();
-        const maxRounds = Math.max(...Object.values(byStudent).map(arr => arr.length), 0);
-
-        for (let i = 0; i < maxRounds; i++) {
-          const present = attendees
-            .map(name => ({ name, rem: byStudent[name][i] }))
-            .filter(e => e.rem);
-          if (present.length < 2) continue;
-          const sharedText = present[0].rem.text; // first student = combined textarea content
+        const present = attendees
+          .map(name => ({ name, rem: byStudent[name]?.[roundIdx] }))
+          .filter(e => e.rem);
+        if (present.length >= 2) {
+          const sharedText = present[0].rem.text;
           for (const other of present.slice(1)) {
             if ((other.rem.text || "") !== sharedText) {
               remarkTextUpdates[other.rem.id] = sharedText;
@@ -21959,8 +21956,7 @@ function attachGroupTargetListeners(target) {
       }
 
       btn.disabled = true;
-      // Single atomic write: combineRemarks flag + all remark text changes together
-      await updateActivityCombineRemarks(state.groupSessionId, actId, !current, remarkTextUpdates);
+      await updateActivityRoundCombine(state.groupSessionId, actId, roundIdx, !current, remarkTextUpdates);
     });
   });
 
