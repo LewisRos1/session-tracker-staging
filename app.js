@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1642";
+const APP_VERSION = "1643";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -11690,12 +11690,12 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
     const hintHtml = `<span class="view-manual-score-hint" data-rem-id="${escHtml(rem.id)}"
       style="font-size:.85rem;color:#6b7280;white-space:nowrap${parsedPct === null ? ";display:none" : ""}">${parsedPct !== null ? `= ${parsedPct}%` : ""}</span>`;
     const scoreInput = `<div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.3rem .4rem .15rem">
+      <span style="font-size:.7rem;font-weight:700;color:#6b7280;letter-spacing:.05em;white-space:nowrap">MANUAL SCORE</span>
       <input type="text" class="view-manual-score-input" data-rem-id="${escHtml(rem.id)}"
         data-saved-html="${escHtml(currentVal)}" value="${escHtml(currentVal)}"
         placeholder="e.g. 5/20, 25%"
         style="width:9rem;min-width:0;border:1px solid #b0b7c3;border-radius:4px;padding:.25rem .4rem;font-size:.85rem;font-family:var(--font);background:#fff;outline:none;box-sizing:border-box">
       ${hintHtml}
-      <span style="margin-left:auto;font-size:.7rem;font-weight:700;color:#6b7280;letter-spacing:.05em;white-space:nowrap">MANUAL SCORE</span>
     </div>`;
     const noteCell = `<textarea class="view-mastery-note" rows="1" data-rem-id="${escHtml(rem.id)}"
       data-saved-html="${escHtml(rem.masteryNote || "")}"
@@ -13789,12 +13789,12 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
     const hintHtml = `<span class="view-manual-score-hint" data-rem-id="${escHtml(rem.id)}"
       style="font-size:.85rem;color:#6b7280;white-space:nowrap${parsedPct === null ? ";display:none" : ""}">${parsedPct !== null ? `= ${parsedPct}%` : ""}</span>`;
     const scoreInput = `<div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.3rem .4rem .15rem">
+      <span style="font-size:.7rem;font-weight:700;color:#6b7280;letter-spacing:.05em;white-space:nowrap">MANUAL SCORE</span>
       <input type="text" class="view-manual-score-input" data-rem-id="${escHtml(rem.id)}"
         data-saved-html="${escHtml(currentVal)}" value="${escHtml(currentVal)}"
         placeholder="e.g. 5/20, 25%"
         style="width:9rem;min-width:0;border:1px solid #b0b7c3;border-radius:4px;padding:.25rem .4rem;font-size:.85rem;font-family:var(--font);background:#fff;outline:none;box-sizing:border-box">
       ${hintHtml}
-      <span style="margin-left:auto;font-size:.7rem;font-weight:700;color:#6b7280;letter-spacing:.05em;white-space:nowrap">MANUAL SCORE</span>
     </div>`;
     const noteCell = `<textarea class="view-mastery-note" rows="1" data-rem-id="${escHtml(rem.id)}"
       data-saved-html="${escHtml(rem.masteryNote || "")}"
