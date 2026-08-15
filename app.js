@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1633";
+const APP_VERSION = "1634";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -21638,14 +21638,19 @@ function attachGroupTargetListeners(target) {
             const targetRemIds = present.filter(e => e.name !== withText[0].name).map(e => e.rem.id);
             if (targetRemIds.length) propagations.push({ text: withText[0].rem.text, remIds: targetRemIds });
           } else {
-            // Multiple students have different text — first attendee is kept, rest cleared
-            const [kept, ...others] = present;
-            for (const other of others) {
-              if (stripEmpty(other.rem.text).length > 0) {
-                if (!conflictMulti) conflictMulti = { keptName: kept.name, clearedName: other.name };
-                remIdsToClear.push(other.rem.id);
+            // Multiple students have text — check if they're all identical first
+            const allSame = withText.every(e => stripEmpty(e.rem.text) === stripEmpty(withText[0].rem.text));
+            if (!allSame) {
+              // Genuinely different text — first attendee is kept, rest cleared
+              const [kept, ...others] = present;
+              for (const other of others) {
+                if (stripEmpty(other.rem.text).length > 0) {
+                  if (!conflictMulti) conflictMulti = { keptName: kept.name, clearedName: other.name };
+                  remIdsToClear.push(other.rem.id);
+                }
               }
             }
+            // If all same (e.g. after a previous combine→separate cycle): switch directly, no popup
           }
         }
 
