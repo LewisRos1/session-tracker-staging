@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1639";
+const APP_VERSION = "1640";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -9131,6 +9131,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
             autocomplete="new-password"
             data-rem-id="${rem.id}"
             data-saved-html="${escHtml(rem.masteryNote || "")}">${escHtml(plainTextForEdit(rem.masteryNote || ""))}</textarea>
+          <span class="entry-note-spacer" contenteditable="false" aria-hidden="true"></span>
         </div>`
       : "";
     return `
@@ -9255,6 +9256,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
         <span class="field-label" contenteditable="false">Notes</span>
         <button class="btn-sketch" contenteditable="false" data-rem-id="${rem.id}" aria-label="Open sketch board">✏</button>
         ${noteInput}
+        <span class="entry-note-spacer" contenteditable="false" aria-hidden="true"></span>
       </div>`;
   } else {
     noteField = _existingNote
@@ -21283,6 +21285,7 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
         <span class="field-label" contenteditable="false">Notes</span>
         <button class="btn-sketch btn-group-sketch" contenteditable="false" data-rem-id="${remId}" aria-label="Open sketch board">✏</button>
         ${grpNoteInput}
+        <span class="entry-note-spacer" contenteditable="false" aria-hidden="true"></span>
       </div>`;
   } else {
     noteField = _grpExistingNote

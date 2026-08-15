@@ -894,6 +894,8 @@ html, body {
   align-items: flex-start;
   gap: .5rem;
 }
+/* Phantom spacer in note rows so textarea right-edge aligns with the 🗑 delete button in the main remark row */
+.entry-note-spacer { min-width: 32px; flex-shrink: 0; }
 
 .field-label {
   font-size: .75rem;
