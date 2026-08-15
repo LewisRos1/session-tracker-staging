@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1634";
+const APP_VERSION = "1635";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -21607,10 +21607,10 @@ function attachGroupTargetListeners(target) {
       const actId = btn.dataset.actId;
       const data = state.groupSessionData;
       const current = !!data?.activities?.[actId]?.combineRemarks;
+      const attendees = state.groupAttendees || [];
+      const stripEmpty = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
 
-      if (!current) {
-        // Turning ON: check what text exists so we can warn before losing data.
-        const attendees = state.groupAttendees || [];
+      const buildByStudent = () => {
         const byStudent = {};
         for (const studentName of attendees) {
           byStudent[studentName] = Object.entries(data.remarks || {})
@@ -21618,13 +21618,20 @@ function attachGroupTargetListeners(target) {
             .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
             .map(([id, r]) => ({ id, ...r }));
         }
-        const maxRounds = Math.max(...Object.values(byStudent).map(arr => arr.length), 0);
-        const stripEmpty = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
+        return byStudent;
+      };
 
-        const remIdsToClear = [];
-        const propagations  = []; // { text, remIds } — copy source text to empty remIds so combined shows it
-        let conflictMulti  = null; // 2+ students have different text — deletion needed
-        let conflictSingle = null; // exactly 1 student has text — notify + propagate
+      // remarkTextUpdates accumulates all remark text changes — written atomically
+      // with the combineRemarks flag so only one Firestore snapshot fires (no flash).
+      const remarkTextUpdates = {};
+
+      if (!current) {
+        // ── Turning ON ──────────────────────────────────────────────────────
+        const byStudent = buildByStudent();
+        const maxRounds = Math.max(...Object.values(byStudent).map(arr => arr.length), 0);
+        let conflictMulti  = null;
+        let conflictSingle = null;
+
         for (let i = 0; i < maxRounds; i++) {
           const present = attendees
             .map(name => ({ name, rem: byStudent[name][i] }))
@@ -21632,25 +21639,30 @@ function attachGroupTargetListeners(target) {
           if (present.length < 2) continue;
           const withText = present.filter(e => stripEmpty(e.rem.text).length > 0);
           if (withText.length === 0) continue;
+
           if (withText.length === 1) {
-            // One student has text — collect remIds that need it copied so combined renders correctly
+            // One student has text — propagate to others so combined textarea shows it
             if (!conflictSingle) conflictSingle = { name: withText[0].name };
-            const targetRemIds = present.filter(e => e.name !== withText[0].name).map(e => e.rem.id);
-            if (targetRemIds.length) propagations.push({ text: withText[0].rem.text, remIds: targetRemIds });
+            const srcText = withText[0].rem.text;
+            for (const other of present) {
+              if (other.name === withText[0].name) continue;
+              remarkTextUpdates[other.rem.id] = srcText;
+              if (data.remarks?.[other.rem.id]) data.remarks[other.rem.id].text = srcText;
+            }
           } else {
-            // Multiple students have text — check if they're all identical first
             const allSame = withText.every(e => stripEmpty(e.rem.text) === stripEmpty(withText[0].rem.text));
             if (!allSame) {
-              // Genuinely different text — first attendee is kept, rest cleared
+              // Genuinely different text — keep first attendee's, clear the rest
               const [kept, ...others] = present;
               for (const other of others) {
                 if (stripEmpty(other.rem.text).length > 0) {
                   if (!conflictMulti) conflictMulti = { keptName: kept.name, clearedName: other.name };
-                  remIdsToClear.push(other.rem.id);
+                  remarkTextUpdates[other.rem.id] = "";
+                  if (data.remarks?.[other.rem.id]) data.remarks[other.rem.id].text = "";
                 }
               }
             }
-            // If all same (e.g. after a previous combine→separate cycle): switch directly, no popup
+            // All same text → switch directly, no popup needed
           }
         }
 
@@ -21659,26 +21671,36 @@ function attachGroupTargetListeners(target) {
             `${conflictMulti.clearedName}'s remark will be deleted. ${conflictMulti.keptName}'s remark will be kept and shared with all students. Continue?`
           );
           if (!ok) return;
-          btn.disabled = true;
-          for (const remId of remIdsToClear) await updateRemarkText(state.groupSessionId, remId, "");
         } else if (conflictSingle) {
           const names = attendees.join(" & ");
           const ok = confirm(`${names} will share ${conflictSingle.name}'s remark. Continue?`);
           if (!ok) return;
-          btn.disabled = true;
-          // Propagate the source text to all other students' remarks so the combined
-          // textarea (which always shows presentEntries[0].text) has the right content.
-          for (const { text, remIds } of propagations) {
-            for (const remId of remIds) {
-              if (data.remarks?.[remId]) data.remarks[remId].text = text;
-              await updateRemarkText(state.groupSessionId, remId, text);
+        }
+      } else {
+        // ── Turning OFF ─────────────────────────────────────────────────────
+        // Propagate the shared text (first student's remark = what combined showed)
+        // to all other students so both show the same remark after separating.
+        const byStudent = buildByStudent();
+        const maxRounds = Math.max(...Object.values(byStudent).map(arr => arr.length), 0);
+
+        for (let i = 0; i < maxRounds; i++) {
+          const present = attendees
+            .map(name => ({ name, rem: byStudent[name][i] }))
+            .filter(e => e.rem);
+          if (present.length < 2) continue;
+          const sharedText = present[0].rem.text; // first student = combined textarea content
+          for (const other of present.slice(1)) {
+            if ((other.rem.text || "") !== sharedText) {
+              remarkTextUpdates[other.rem.id] = sharedText;
+              if (data.remarks?.[other.rem.id]) data.remarks[other.rem.id].text = sharedText;
             }
           }
         }
       }
 
       btn.disabled = true;
-      await updateActivityCombineRemarks(state.groupSessionId, actId, !current);
+      // Single atomic write: combineRemarks flag + all remark text changes together
+      await updateActivityCombineRemarks(state.groupSessionId, actId, !current, remarkTextUpdates);
     });
   });
 
