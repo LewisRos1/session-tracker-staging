@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1643";
+const APP_VERSION = "1644";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -11682,6 +11682,9 @@ function buildTrialCellsHtml(rem, maxPts) {
 }
 
 function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false, rowClass = "", optionScores = null, manualScore = false) {
+  const _sv = t => (t || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+  const _remEmpty = !_sv(rem.text) && !_sv(rem.masteryNote) && !(rem.trials || []).some(t => t >= 0) && rem.optionScore === undefined;
+  const delBtn = _remEmpty ? "" : `<button class="view-rem-del" data-rem-id="${escHtml(rem.id)}" title="Delete remark">×</button>`;
   // Manual score: render score input + = XX% hint; notes below; no trials
   if (manualScore) {
     const currentVal = rem.text ? plainTextForEdit(rem.text).trim() : "";
@@ -11711,7 +11714,7 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
       <td class="vcol-score" contenteditable="false">
         <div style="display:flex;align-items:center;gap:.3rem;justify-content:flex-end">
           <span class="view-manual-score-pct" data-rem-id="${escHtml(rem.id)}">${scoreColDisplay}</span>
-          <button class="view-rem-del" data-rem-id="${escHtml(rem.id)}" title="Delete remark">×</button>
+          ${delBtn}
         </div>
       </td>
     </tr>`;
@@ -11799,7 +11802,7 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
     <td class="vcol-score" contenteditable="false">
       <div style="display:flex;align-items:center;gap:.3rem;justify-content:flex-end">
         <span>${scoreDisplay}</span>
-        <button class="view-rem-del" data-rem-id="${escHtml(rem.id)}" title="Delete remark">×</button>
+        ${delBtn}
       </div>
     </td>
   </tr>`;
@@ -13782,6 +13785,9 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
 }
 
 function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, combineOpts = null, mappedInfo = null, remarkHasNote = false, rowClass = "", optionScores = null, manualScore = false) {
+  const _sv2 = t => (t || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+  const _remEmpty2 = !_sv2(rem.text) && !_sv2(rem.masteryNote) && !(rem.trials || []).some(t => t >= 0) && rem.optionScore === undefined;
+  const delBtn2 = _remEmpty2 ? "" : `<button class="view-rem-del" data-rem-id="${escHtml(rem.id)}" title="Delete remark">×</button>`;
   if (manualScore) {
     const currentVal = rem.text ? plainTextForEdit(rem.text).trim() : "";
     const parsed = parseManualScore(currentVal);
@@ -13811,7 +13817,7 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
       <td class="vcol-score" contenteditable="false">
         <div style="display:flex;align-items:center;gap:.3rem;justify-content:flex-end">
           <span class="view-manual-score-pct" data-rem-id="${escHtml(rem.id)}">${scoreColDisplay}</span>
-          <button class="view-rem-del" data-rem-id="${escHtml(rem.id)}" title="Delete remark">×</button>
+          ${delBtn2}
         </div>
       </td>
     </tr>`;
@@ -13903,7 +13909,7 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
     <td class="vcol-score" contenteditable="false">
       <div style="display:flex;align-items:center;gap:.3rem;justify-content:flex-end">
         <span>${scoreDisplay}</span>
-        <button class="view-rem-del" data-rem-id="${escHtml(rem.id)}" title="Delete remark">×</button>
+        ${delBtn2}
       </div>
     </td>
   </tr>`;
