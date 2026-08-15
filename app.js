@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1651";
+const APP_VERSION = "1652";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -14264,8 +14264,9 @@ function attachGroupViewListeners() {
         }
       }
 
-      btn.disabled = true;
-      await updateActivityRoundCombine(sid(), actId, roundIdx, !current, remarkTextUpdates);
+      (data.activities[actId].combineRounds ??= {})[roundIdx] = !current;
+      renderGroupSessionView();
+      updateActivityRoundCombine(sid(), actId, roundIdx, !current, remarkTextUpdates).catch(console.error);
     }));
   });
 
@@ -22007,8 +22008,9 @@ function attachGroupTargetListeners(target) {
         }
       }
 
-      btn.disabled = true;
-      await updateActivityRoundCombine(state.groupSessionId, actId, roundIdx, !current, remarkTextUpdates);
+      (data.activities[actId].combineRounds ??= {})[roundIdx] = !current;
+      renderGroupTargetContent();
+      updateActivityRoundCombine(state.groupSessionId, actId, roundIdx, !current, remarkTextUpdates).catch(console.error);
     });
   });
 
