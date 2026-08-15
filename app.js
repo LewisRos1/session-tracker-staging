@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1650";
+const APP_VERSION = "1651";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -13656,7 +13656,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
             : `<div style="padding:.4rem .6rem">${_gMsg}</div>`;
           return `<tr${rowClass ? ` class="${rowClass}"` : ""}>
             <td class="vcol-no" contenteditable="false">${idx === 0 ? no : ""}</td>
-            <td class="vcol-act" contenteditable="false">${idx === 0 ? actCellWithToggle : ""}</td>
+            <td class="vcol-act" contenteditable="false">${idx === 0 ? actCell : ""}</td>
             <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(studentName)}</td>
             <td class="vcol-rem" contenteditable="false">${_gCell}</td>
             <td class="vcol-trials" contenteditable="false">&nbsp;</td>
@@ -13667,7 +13667,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
       }
       return attendees.map((studentName, idx) => `<tr${rowClass ? ` class="${rowClass}"` : ""}>
         <td class="vcol-no" contenteditable="false">${idx === 0 ? no : ""}</td>
-        <td class="vcol-act" contenteditable="false">${idx === 0 ? actCellWithToggle : ""}</td>
+        <td class="vcol-act" contenteditable="false">${idx === 0 ? actCell : ""}</td>
         <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(studentName)}</td>
         <td class="vcol-rem" contenteditable="false">
           <textarea class="view-remark-edit view-remark-empty" rows="1"
@@ -13733,7 +13733,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
       }
       return `<tr${rowClass ? ` class="${rowClass}"` : ""}>
         <td class="vcol-no" contenteditable="false">${idx === 0 ? no : ""}</td>
-        <td class="vcol-act" contenteditable="false">${idx === 0 ? actCellWithToggle : ""}</td>
+        <td class="vcol-act" contenteditable="false">${idx === 0 ? actCell : ""}</td>
         <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(studentName)}</td>
         <td class="vcol-rem" contenteditable="false">${gRemCell}</td>
         <td class="vcol-trials" contenteditable="false">
