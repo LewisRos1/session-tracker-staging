@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1632";
+const APP_VERSION = "1633";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -21622,8 +21622,9 @@ function attachGroupTargetListeners(target) {
         const stripEmpty = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
 
         const remIdsToClear = [];
+        const propagations  = []; // { text, remIds } — copy source text to empty remIds so combined shows it
         let conflictMulti  = null; // 2+ students have different text — deletion needed
-        let conflictSingle = null; // exactly 1 student has text — just a notification
+        let conflictSingle = null; // exactly 1 student has text — notify + propagate
         for (let i = 0; i < maxRounds; i++) {
           const present = attendees
             .map(name => ({ name, rem: byStudent[name][i] }))
@@ -21632,8 +21633,10 @@ function attachGroupTargetListeners(target) {
           const withText = present.filter(e => stripEmpty(e.rem.text).length > 0);
           if (withText.length === 0) continue;
           if (withText.length === 1) {
-            // One student has text; the shared combined remark will use it
+            // One student has text — collect remIds that need it copied so combined renders correctly
             if (!conflictSingle) conflictSingle = { name: withText[0].name };
+            const targetRemIds = present.filter(e => e.name !== withText[0].name).map(e => e.rem.id);
+            if (targetRemIds.length) propagations.push({ text: withText[0].rem.text, remIds: targetRemIds });
           } else {
             // Multiple students have different text — first attendee is kept, rest cleared
             const [kept, ...others] = present;
@@ -21657,6 +21660,15 @@ function attachGroupTargetListeners(target) {
           const names = attendees.join(" & ");
           const ok = confirm(`${names} will share ${conflictSingle.name}'s remark. Continue?`);
           if (!ok) return;
+          btn.disabled = true;
+          // Propagate the source text to all other students' remarks so the combined
+          // textarea (which always shows presentEntries[0].text) has the right content.
+          for (const { text, remIds } of propagations) {
+            for (const remId of remIds) {
+              if (data.remarks?.[remId]) data.remarks[remId].text = text;
+              await updateRemarkText(state.groupSessionId, remId, text);
+            }
+          }
         }
       }
 
