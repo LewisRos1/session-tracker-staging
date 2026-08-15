@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1645";
+const APP_VERSION = "1646";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -11543,6 +11543,20 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
     const opts = parseOpts(inlineOptions);
     const showEmpty = opts.length === 0;
     if (showEmpty) {
+      if ((remarkHasNote || multiSelect) && !paEntry?.manualScore) {
+        const _lbl = multiSelect ? "CHECKBOXES" : "MULTIPLE CHOICE";
+        return `<tr${rowClass ? ` class="${rowClass}"` : ""}>
+          <td class="vcol-no" contenteditable="false">${no}</td>
+          <td class="vcol-act" contenteditable="false">${actCell}</td>
+          <td class="vcol-rem" contenteditable="false" style="padding:.4rem .6rem">
+            <span class="field-label">${_lbl}</span>
+            <span style="color:#9ca3af;font-style:italic;font-size:.88rem">&lt;Please Add Options in Edit Target&gt;</span>
+          </td>
+          <td class="vcol-trials" contenteditable="false">&nbsp;</td>
+          <td class="vcol-total" contenteditable="false">&nbsp;</td>
+          <td class="vcol-score" contenteditable="false">&nbsp;</td>
+        </tr>`;
+      }
       const emptyCell = `<textarea class="view-remark-edit view-remark-empty" rows="1"
            data-act-id="${escHtml(actId || "")}"
            data-act-name="${escHtml(actName)}"
@@ -11757,6 +11771,20 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
     }).join("")}${removedBadge}</div>`;
   }
 
+  if ((remarkHasNote || multiSelect) && opts.length === 0) {
+    const _lbl2 = multiSelect ? "CHECKBOXES" : "MULTIPLE CHOICE";
+    return `<tr${rowClass ? ` class="${rowClass}"` : ""}>
+      <td class="vcol-no" contenteditable="false">${no !== null ? no : ""}</td>
+      <td class="vcol-act" contenteditable="false">${actName !== null ? actName : ""}</td>
+      <td class="vcol-rem" contenteditable="false" style="padding:.4rem .6rem">
+        <span class="field-label">${_lbl2}</span>
+        <span style="color:#9ca3af;font-style:italic;font-size:.88rem">&lt;Please Add Options in Edit Target&gt;</span>
+      </td>
+      <td class="vcol-trials" contenteditable="false">&nbsp;</td>
+      <td class="vcol-total" contenteditable="false">&nbsp;</td>
+      <td class="vcol-score" contenteditable="false">&nbsp;</td>
+    </tr>`;
+  }
   const optSelect = makeViewOpts(rem.id, rem.text)
     || `<textarea class="view-remark-edit" rows="1" data-rem-id="${escHtml(rem.id)}"
           placeholder="Notes…" data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`;
@@ -13591,6 +13619,21 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
 
   if (rounds.length === 0) {
     if (opts.length === 0) {
+      if ((remarkHasNote || multiSelect) && !paEntry?.manualScore) {
+        const _lbl = multiSelect ? "CHECKBOXES" : "MULTIPLE CHOICE";
+        return attendees.map((studentName, idx) => `<tr${rowClass ? ` class="${rowClass}"` : ""}>
+          <td class="vcol-no" contenteditable="false">${idx === 0 ? no : ""}</td>
+          <td class="vcol-act" contenteditable="false">${idx === 0 ? actCellWithToggle : ""}</td>
+          <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(studentName)}</td>
+          <td class="vcol-rem" contenteditable="false" style="padding:.4rem .6rem">
+            <span class="field-label">${_lbl}</span>
+            <span style="color:#9ca3af;font-style:italic;font-size:.88rem">&lt;Please Add Options in Edit Target&gt;</span>
+          </td>
+          <td class="vcol-trials" contenteditable="false">&nbsp;</td>
+          <td class="vcol-total" contenteditable="false">&nbsp;</td>
+          <td class="vcol-score" contenteditable="false">&nbsp;</td>
+        </tr>`).join("");
+      }
       return attendees.map((studentName, idx) => `<tr${rowClass ? ` class="${rowClass}"` : ""}>
         <td class="vcol-no" contenteditable="false">${idx === 0 ? no : ""}</td>
         <td class="vcol-act" contenteditable="false">${idx === 0 ? actCellWithToggle : ""}</td>
@@ -13847,6 +13890,13 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
     } else {
       const opts = parseOpts(inlineOptions);
 
+      if ((remarkHasNote || multiSelect) && opts.length === 0) {
+        const _lbl3 = multiSelect ? "CHECKBOXES" : "MULTIPLE CHOICE";
+        remarkTd = `<td class="vcol-rem" contenteditable="false" style="padding:.4rem .6rem">
+          <span class="field-label">${_lbl3}</span>
+          <span style="color:#9ca3af;font-style:italic;font-size:.88rem">&lt;Please Add Options in Edit Target&gt;</span>
+        </td>`;
+      } else {
       const makeViewOpts = (remId, remText) => {
         if (opts.length === 0) return null;
         if (multiSelect) {
@@ -13896,6 +13946,7 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
         remarkCell = optSelect;
       }
       remarkTd = `<td class="vcol-rem" contenteditable="false">${remarkCell}</td>`;
+      } // end else (has opts)
     }
   }
 
