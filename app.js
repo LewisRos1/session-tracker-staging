@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1662";
+const APP_VERSION = "1663";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -14730,7 +14730,8 @@ function renderGoToGroupSessionsForMonthEntry(group, month, monthSessions, byMon
       closeSessionPicker();
       if (sid === state.groupSessionId) return;
       const picked = sorted.find(s => s.id === sid);
-      openGroupSession(group, picked.date, group.students);
+      const open = () => openGroupSession(group, picked.date, group.students);
+      if (isOlderThan7Days(picked.date)) { requirePassword(open, EXPIRED_MSG); } else { open(); }
     });
   });
 }
@@ -22134,8 +22135,8 @@ function renderGroupSessionsForMonth(group, month, monthSessions, byMonth, sessi
   $("session-picker-list").querySelectorAll(".session-list-item").forEach(item => {
     item.addEventListener("click", () => {
       closeSessionPicker();
-      // Open the table-based view/edit screen for the chosen past session
-      openGroupSessionView(group, item.dataset.sessionId);
+      const open = () => openGroupSessionView(group, item.dataset.sessionId);
+      if (isOlderThan7Days(item.dataset.sessionDate)) { requirePassword(open, EXPIRED_MSG); } else { open(); }
     });
   });
 }
