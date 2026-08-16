@@ -756,23 +756,6 @@ export async function updateActivityTitle(sessionId, actId, title, isBold, isUnd
   });
 }
 
-// remarkTextUpdates: { [remId]: text } — extra remark text fields to write atomically
-// with the combineRemarks flag so the listener fires only once (no intermediate flash).
-export async function updateActivityCombineRemarks(sessionId, actId, combine, remarkTextUpdates = {}) {
-  const updates = { [`activities.${actId}.combineRemarks`]: combine };
-  for (const [remId, text] of Object.entries(remarkTextUpdates)) {
-    updates[`remarks.${remId}.text`] = text;
-  }
-  await updateDoc(doc(db, "sessions", sessionId), updates);
-}
-
-export async function updateActivityRoundCombine(sessionId, actId, roundIdx, combine, remarkTextUpdates = {}) {
-  const updates = { [`activities.${actId}.combineRounds.${roundIdx}`]: combine };
-  for (const [remId, text] of Object.entries(remarkTextUpdates)) {
-    updates[`remarks.${remId}.text`] = text;
-  }
-  await updateDoc(doc(db, "sessions", sessionId), updates);
-}
 
 export async function deleteRemark(sessionId, remId) {
   await updateDoc(doc(db, "sessions", sessionId), {
