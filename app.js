@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1661";
+const APP_VERSION = "1662";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -13356,7 +13356,11 @@ function viewGroupGetRounds(data, actId, attendees) {
 }
 
 function groupAttendeeLabel(studentName) {
-  return escHtml(firstNameOf(studentName));
+  const group = state.viewGroup;
+  const links = group?.studentLinks || {};
+  const sid = links[studentName];
+  const student = sid ? (state.students || []).find(s => s.id === sid) : null;
+  return escHtml(student?.preferredName || firstNameOf(studentName));
 }
 
 function buildGroupTargetViewTable(target, data, attendees) {
@@ -21164,7 +21168,10 @@ function renderGroupStudentActivityCard(studentName, actName, actId, target, dat
 // Live-entry-screen counterpart of groupAttendeeLabel (View/Edit Past
 // Sessions) — same idea, reads the live screen's globals instead.
 function liveGroupAttendeeLabel(studentName) {
-  return escHtml(studentName);
+  const links = state.currentGroup?.studentLinks || {};
+  const sid = links[studentName];
+  const student = sid ? (state.students || []).find(s => s.id === sid) : null;
+  return escHtml(student?.preferredName || firstNameOf(studentName));
 }
 
 function firstNameOf(name) {
