@@ -2131,7 +2131,8 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
             bold: r.style === "heading",
             italics: r.style === "note",
             fill: mergeFill,
-            color: mergeColor
+            color: mergeColor,
+            align: (r.isGrayHeading || r.isGreenHeading || r.isRedHeading) ? AlignmentType.CENTER : AlignmentType.JUSTIFIED
           })]
         }));
         }
@@ -2332,7 +2333,7 @@ export async function exportGroupMemberSingleSessionWord(studentName, groups, se
     return;
   }
 
-  const sessionLabel    = "Session [Number]";
+  const sessionLabel    = "Session [Please Insert Number]";
   const allTargets      = unionTargetsByName(groups).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
   const filteredSession = { ...sessionToUse, remarks: filteredRemarks };
   const blob = await buildSingleSessionWordBlob(studentName, sessionLabel, allTargets, filteredSession);
