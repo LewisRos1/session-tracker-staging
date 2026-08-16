@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1670";
+const APP_VERSION = "1671";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -20830,10 +20830,11 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
       items.push(renderGroupActivityCard(act.activityName, actId, target, data, attendees, null, null, null, false, null, null, _grpFilterPaSet));
     });
 
-  // Group sessions: only show Mastered/Discontinued sections (not date-inactive activities)
+  // Only show in the inactive section if the activity is actually inactive on this session's date
   const grpInactivePas = (target.predefinedActivities || []).filter(pa =>
     !pa.isCompleted && !pa.isArchived && !pa.isStopped &&
-    (pa.masteredOn || pa.discontinuedOn || pa.inactiveReason)
+    (pa.masteredOn || pa.discontinuedOn || pa.inactiveReason) &&
+    !isActivityActive(pa, data.date)
   );
   if (!_footerOnly && items.length === 0 && grpInactivePas.length === 0) {
     items.push(`<p class="empty-hint" contenteditable="false" style="padding:1.5rem">No activities yet. Add them under Edit Target.</p>`);
