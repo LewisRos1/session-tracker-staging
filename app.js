@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1671";
+const APP_VERSION = "1672";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -15003,7 +15003,8 @@ function actStartDateHtml(activeFrom, idx) {
 
 function showActStartDatePicker() {
   const act = _actStartPickerActs?.[_actStartPickerIdx];
-  const activeFrom = act?.activeFrom || '';
+  const hasExistingDate = !!act?.activeFrom;
+  const activeFrom = act?.activeFrom || todayDateStr();
   const actName = (act?.title || act?.name || '').replace(/<[^>]*>/g, '').trim();
   let overlay = document.getElementById('act-start-picker-overlay');
   if (!overlay) {
@@ -15018,7 +15019,7 @@ function showActStartDatePicker() {
       <div id="act-start-picker-err" style="display:none;font-size:.82rem;color:#dc2626;margin-bottom:.5rem;line-height:1.4;padding:.4rem .6rem;background:#fee2e2;border-radius:.4rem"></div>
       <input type="date" id="act-start-picker-inp" value="${activeFrom}" style="width:100%;font-size:1rem;border:1.5px solid #d1d5db;border-radius:.5rem;padding:.55rem .65rem;box-sizing:border-box;margin-bottom:.85rem">
       <div style="display:flex;gap:.5rem">
-        ${activeFrom ? `<button id="act-start-picker-clear" style="flex:1;padding:.65rem;font-size:.9rem;border:1px solid #fca5a5;border-radius:.5rem;background:#fee2e2;cursor:pointer;color:#dc2626;font-weight:600">✕ Clear Date</button>` : ''}
+        ${hasExistingDate ? `<button id="act-start-picker-clear" style="flex:1;padding:.65rem;font-size:.9rem;border:1px solid #fca5a5;border-radius:.5rem;background:#fee2e2;cursor:pointer;color:#dc2626;font-weight:600">✕ Clear Date</button>` : ''}
         <button id="act-start-picker-cancel" style="flex:1;padding:.65rem;font-size:.9rem;border:1px solid #d1d5db;border-radius:.5rem;background:#f9fafb;cursor:pointer;color:#6b7280;font-weight:600">Cancel</button>
       </div>
     </div>
@@ -15044,6 +15045,11 @@ async function handleActStartPickerChange() {
   const act = _actStartPickerActs?.[_actStartPickerIdx];
   if (!act) return;
   const actName = act.title || act.name;
+  if (!_actStartPickerStudent && !_groupForTargetEdit) {
+    closeActStartDatePicker();
+    await _actStartPickerSaveFn(_actStartPickerIdx, 'activeFrom', value);
+    return;
+  }
   const allSessions = _groupForTargetEdit
     ? await getAllSessionsForGroup(_groupForTargetEdit.id).catch(() => [])
     : await getAllSessionsForStudent(_actStartPickerStudent.id).catch(() => []);
@@ -16640,15 +16646,21 @@ function renderTargetManageContent(student, target) {
           <div style="flex:1;min-width:0">
           <div class="mn-act-compact-title">${paDisplayHtml(a, true)}</div>
           <div class="mn-act-body" style="display:flex;flex-direction:column;gap:.55rem">
-            <div>
-              <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title</div>
-              <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
-                <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
-                  <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${idx}" title="Bold (Ctrl+B)">B</button>
-                  <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${idx}" title="Underline (Ctrl+U)">U</button>
+            <div style="display:flex;gap:.6rem;align-items:flex-start">
+              <div style="flex-shrink:0">
+                <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Start Date</div>
+                <button class="mn-act-start-btn" data-idx="${idx}" style="padding:.35rem .65rem;border:1.5px solid #d1d5db;border-radius:.4rem;background:#f0f9ff;cursor:pointer;font-size:.82rem;color:#374151;white-space:nowrap;display:block">📅 ${a.activeFrom ? fmtPeriodDate(a.activeFrom) : 'Set date'}</button>
+              </div>
+              <div style="flex:1">
+                <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title</div>
+                <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
+                  <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                    <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${idx}" title="Bold (Ctrl+B)">B</button>
+                    <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${idx}" title="Underline (Ctrl+U)">U</button>
+                  </div>
+                  <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
+                    placeholder="Enter Activity Title Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
                 </div>
-                <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
-                  placeholder="Enter Activity Title Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
               </div>
             </div>
             <div>
@@ -16680,7 +16692,6 @@ function renderTargetManageContent(student, target) {
         <div style="position:relative;align-self:flex-start">
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:310px;overflow:hidden">
-            ${actStartDateHtml(a.activeFrom, idx)}
             <button class="mn-km-manage-act" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#0369a1">🪄 Manage Activity</button>
             <button class="mn-km-convert-mapped" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#7c3aed">🔄 Convert to Regular Activity</button>
             <div style="display:flex;align-items:stretch">
@@ -16719,23 +16730,25 @@ function renderTargetManageContent(student, target) {
             <span style="font-size:.75rem;font-weight:700;color:#0369a1;flex-shrink:0;min-width:1.4rem;padding-top:.2rem">${String.fromCharCode(97 + si)})</span>
             <div style="flex:1;display:flex;flex-direction:column;gap:.55rem">
               <div>
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.28rem">
-                  <div style="font-size:.95rem;font-weight:700;color:#374151">Activity Title</div>
-                  ${subCreatedLabel ? `<span style="font-size:.72rem;color:#6b7280">Created: ${subCreatedLabel}</span>` : ''}
-                </div>
                 <div style="display:flex;gap:.4rem;align-items:flex-start">
-                  <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden;flex:1">
-                    <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
-                      <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${subIdx}" title="Bold (Ctrl+B)">B</button>
-                      <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${subIdx}" title="Underline (Ctrl+U)">U</button>
-                    </div>
-                    <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subIdx}" data-idx="${subIdx}"
-                      placeholder="Enter Activity Title Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+                  <div style="flex-shrink:0">
+                    <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Start Date</div>
+                    <button class="mn-act-start-btn" data-idx="${subIdx}" style="padding:.35rem .65rem;border:1.5px solid #d1d5db;border-radius:.4rem;background:#f0f9ff;cursor:pointer;font-size:.82rem;color:#374151;white-space:nowrap;display:block">📅 ${sub.activeFrom ? fmtPeriodDate(sub.activeFrom) : 'Set date'}</button>
                   </div>
-                  <div style="position:relative;align-self:flex-start;flex-shrink:0;margin-top:.35rem">
+                  <div style="flex:1">
+                    <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title</div>
+                    <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
+                      <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                        <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${subIdx}" title="Bold (Ctrl+B)">B</button>
+                        <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${subIdx}" title="Underline (Ctrl+U)">U</button>
+                      </div>
+                      <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subIdx}" data-idx="${subIdx}"
+                        placeholder="Enter Activity Title Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+                    </div>
+                  </div>
+                  <div style="position:relative;align-self:flex-start;flex-shrink:0;margin-top:1.6rem">
                     <button class="btn-adm-del mn-sub-kebab-btn" data-idx="${subIdx}" title="Subactivity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
                     <div class="mn-sub-kebab-menu" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:240px;overflow:hidden">
-                      <button class="mn-act-start-btn" data-idx="${subIdx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151;white-space:nowrap">📅 Set Start Date</button>
                       <button class="mn-sub-km-manage" data-idx="${subIdx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#0369a1">🪄 Manage Subactivity</button>
                       <button class="mn-move-sub-act" data-idx="${subIdx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151;white-space:nowrap">↳ Move to another Parent Activity</button>
                       <button class="mn-make-standalone" data-idx="${subIdx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151;white-space:nowrap">↗ Make standalone activity</button>
@@ -16774,18 +16787,21 @@ function renderTargetManageContent(student, target) {
             <div style="flex:1;min-width:0">
               <div class="mn-act-compact-title">${paDisplayHtml(a, true)}</div>
               <div class="mn-act-body" style="display:flex;flex-direction:column;gap:.55rem">
-              <div>
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.28rem">
-                  <div style="font-size:.95rem;font-weight:700;color:#374151">Activity Title</div>
-                  ${a.activeFrom ? `<span style="font-size:.72rem;color:#6b7280">Created: ${fmtPeriodDate(a.activeFrom)}</span>` : ''}
+              <div style="display:flex;gap:.6rem;align-items:flex-start">
+                <div style="flex-shrink:0">
+                  <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Start Date</div>
+                  <button class="mn-act-start-btn" data-idx="${idx}" style="padding:.35rem .65rem;border:1.5px solid #d1d5db;border-radius:.4rem;background:#f0f9ff;cursor:pointer;font-size:.82rem;color:#374151;white-space:nowrap;display:block">📅 ${a.activeFrom ? fmtPeriodDate(a.activeFrom) : 'Set date'}</button>
                 </div>
-                <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
-                  <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
-                    <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${idx}" title="Bold (Ctrl+B)">B</button>
-                    <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${idx}" title="Underline (Ctrl+U)">U</button>
+                <div style="flex:1">
+                  <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title</div>
+                  <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
+                    <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                      <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${idx}" title="Bold (Ctrl+B)">B</button>
+                      <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${idx}" title="Underline (Ctrl+U)">U</button>
+                    </div>
+                    <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
+                      placeholder="Enter Activity Title Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
                   </div>
-                  <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
-                    placeholder="Enter Activity Title Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
                 </div>
               </div>
               <div>
@@ -16812,7 +16828,6 @@ function renderTargetManageContent(student, target) {
           <div style="position:relative;align-self:flex-start">
             <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
             <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:310px;overflow:hidden">
-              ${actStartDateHtml(a.activeFrom, idx)}
               <button class="mn-km-manage-act" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#0369a1">🪄 Manage Activity</button>
               <div style="display:flex;align-items:stretch">
                 <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
@@ -16831,18 +16846,21 @@ function renderTargetManageContent(student, target) {
             <div style="flex:1;min-width:0">
               <div class="mn-act-compact-title">${paDisplayHtml(a, true)}</div>
               <div class="mn-act-body" style="display:flex;flex-direction:column;gap:.55rem">
-              <div>
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.28rem">
-                  <div style="font-size:.95rem;font-weight:700;color:#374151">Activity Title</div>
-                  ${a.activeFrom ? `<span style="font-size:.72rem;color:#6b7280">Created: ${fmtPeriodDate(a.activeFrom)}</span>` : ''}
+              <div style="display:flex;gap:.6rem;align-items:flex-start">
+                <div style="flex-shrink:0">
+                  <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Start Date</div>
+                  <button class="mn-act-start-btn" data-idx="${idx}" style="padding:.35rem .65rem;border:1.5px solid #d1d5db;border-radius:.4rem;background:#f0f9ff;cursor:pointer;font-size:.82rem;color:#374151;white-space:nowrap;display:block">📅 ${a.activeFrom ? fmtPeriodDate(a.activeFrom) : 'Set date'}</button>
                 </div>
-                <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
-                  <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
-                    <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${idx}" title="Bold (Ctrl+B)">B</button>
-                    <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${idx}" title="Underline (Ctrl+U)">U</button>
+                <div style="flex:1">
+                  <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title</div>
+                  <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
+                    <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                      <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${idx}" title="Bold (Ctrl+B)">B</button>
+                      <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${idx}" title="Underline (Ctrl+U)">U</button>
+                    </div>
+                    <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
+                      placeholder="Enter Activity Title Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
                   </div>
-                  <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
-                    placeholder="Enter Activity Title Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
                 </div>
               </div>
               <div>
@@ -16868,7 +16886,6 @@ function renderTargetManageContent(student, target) {
           <div style="position:relative;align-self:flex-start">
             <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
             <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:310px;overflow:hidden">
-              ${actStartDateHtml(a.activeFrom, idx)}
               <button class="mn-km-manage-act" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#0369a1">🪄 Manage Activity</button>
               <button class="mn-km-move-to-parent" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151;white-space:nowrap">↪️ Make this activity into a Sub-activity</button>
               <button class="mn-km-add-sub" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">➕ Add sub-activity</button>
@@ -19090,6 +19107,10 @@ function renderTemplateManageContent(template) {
       html += `<div class="admin-list-item" data-idx="${idx}"${actItemStyle}>
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
+          <div style="display:flex;align-items:center;gap:.4rem">
+            <span style="font-size:.8rem;font-weight:700;color:#6b7280;white-space:nowrap">Start Date:</span>
+            <button class="mn-act-start-btn" data-idx="${idx}" style="padding:.2rem .5rem;border:1.5px solid #d1d5db;border-radius:.35rem;background:#f0f9ff;cursor:pointer;font-size:.8rem;color:#374151;white-space:nowrap">📅 ${a.activeFrom ? fmtPeriodDate(a.activeFrom) : 'Set date'}</button>
+          </div>
           <div style="display:flex;align-items:center;gap:.35rem">
             <label style="display:flex;align-items:center;gap:.15rem;font-size:.78rem;cursor:pointer;flex-shrink:0;user-select:none" title="Bold">
               <input type="checkbox" class="mn-act-bold-cb" data-idx="${idx}"${a.isBold ? ' checked' : ''}><b>B</b>
@@ -19633,6 +19654,24 @@ function renderTemplateManageContent(template) {
         };
         setTimeout(() => document.addEventListener("click", closeMenu), 0);
       }
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-act-start-btn").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      _actStartPickerSaveFn = async (idx, field, value) => {
+        if (!acts[idx]) return;
+        acts[idx][field] = value || null;
+        template.predefinedActivities = acts;
+        await saveTemplateFn();
+        renderTemplateManageContent(template);
+      };
+      _actStartPickerIdx     = +btn.dataset.idx;
+      _actStartPickerActs    = acts;
+      _actStartPickerStudent = null;
+      _actStartPickerTarget  = null;
+      showActStartDatePicker();
     });
   });
 
