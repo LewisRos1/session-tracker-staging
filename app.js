@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1679";
+const APP_VERSION = "1680";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3225,6 +3225,25 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
     return y === year && m >= startMonth && m <= endMonth;
   });
 
+  // For group sessions, filter each session's remarks down to just this student's
+  // data. Group sessions store one remark per attendee per activity; without this
+  // filter, calcDailyAverage blends all attendees' scores into one wrong average.
+  const _filterGroupSess = sessionType === "group"
+    ? sess => {
+        const sessGroup = (state.groups || []).find(g => g.id === sess.groupId);
+        const links = sessGroup?.studentLinks || {};
+        const nameEntry = Object.entries(links).find(([, id]) => id === student.id);
+        const attendeeName = nameEntry ? nameEntry[0] : null;
+        if (!attendeeName) return sess;
+        return {
+          ...sess,
+          remarks: Object.fromEntries(
+            Object.entries(sess.remarks || {}).filter(([, r]) => r.studentName === attendeeName)
+          )
+        };
+      }
+    : sess => sess;
+
   // Targets that have ever produced a numeric score (across entire history, not just
   // this report period) are quantitative — even if this period happens to have no scores.
   const quantitativeTargetNames = new Set();
@@ -3252,6 +3271,7 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
   const targetMap = {};
 
   for (const sess of sessions) {
+    const filteredSess = _filterGroupSess(sess);
     const [, m] = sess.date.split("-").map(Number);
     const monthLabel = shortMonths[m - 1];
 
@@ -3263,7 +3283,7 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
     for (const tName of targetNames) {
       if (!targetMap[tName]) targetMap[tName] = {};
       if (!targetMap[tName][monthLabel]) targetMap[tName][monthLabel] = [];
-      targetMap[tName][monthLabel].push(sess);
+      targetMap[tName][monthLabel].push(filteredSess);
     }
   }
 
@@ -3359,15 +3379,16 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
         const hyrAliases  = paKeyToAliases[actName] || [];
         const hyrConfigId = paKeyToConfigId[actName];
         for (const sess of sessions) {
+          const filteredSess = _filterGroupSess(sess);
           // Use map key as ID fallback to match hyrCalcDailyAvg
-          const sessActEntry = Object.entries(sess.activities || {}).find(
+          const sessActEntry = Object.entries(filteredSess.activities || {}).find(
             ([, a]) => (a.activityName === actName || hyrAliases.includes(a.activityName) || (hyrConfigId && a.configId === hyrConfigId)) &&
                        (a.targetName === tName || a.target === tName)
           );
           if (!sessActEntry) continue;
           const [sessActKey, sessAct] = sessActEntry;
           const sessActId = sessAct.id || sessActKey;
-          const remarks = Object.values(sess.remarks || {})
+          const remarks = Object.values(filteredSess.remarks || {})
             .filter(r => r.activityId === sessActId)
             .filter(r => r.text || (r.trials || []).length > 0);
           for (const rem of remarks) {
@@ -3453,14 +3474,15 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
       const aliases = (pa.title && pa.name && pa.title !== pa.name) ? [pa.name] : [];
       const monthly = {};
       for (const sess of sessions) {
-        const entry = Object.entries(sess.activities || {}).find(
+        const filteredSess = _filterGroupSess(sess);
+        const entry = Object.entries(filteredSess.activities || {}).find(
           ([, a]) => (a.activityName === paKey || aliases.includes(a.activityName) || (pa.id && a.configId === pa.id)) &&
                      (a.targetName === tName || a.target === tName)
         );
         if (!entry) continue;
         const [sKey, sAct] = entry;
         const sId = sAct.id || sKey;
-        for (const rem of Object.values(sess.remarks || {}).filter(r => r.activityId === sId)) {
+        for (const rem of Object.values(filteredSess.remarks || {}).filter(r => r.activityId === sId)) {
           const trials = (rem.trials || []).filter(t => t !== -1);
           if (rem.optionScore !== undefined) trials.push(rem.optionScore);
           if (!trials.length) continue;
@@ -5014,7 +5036,7 @@ async function monthlyGenerate() {
     const firstName = student.preferredName || student.name.split(" ")[0];
     const _mGrpTargets = sessionType === "group" ? getGroupEffectiveTargets(studentId) : null;
     const effectiveStudent = _mGrpTargets ? { ...student, targets: _mGrpTargets } : student;
-    const collected = monthlyCollectData(effectiveStudent, year, month, allSessions, excludedActivities);
+    const collected = monthlyCollectData(effectiveStudent, year, month, allSessions, excludedActivities, sessionType);
     const { threeMonthData, miniData, aiData, sessionCount, threeMonthPeriodLabel, oneMonthPeriodLabel } = collected;
 
     const activeTargets = (effectiveStudent.targets || []).filter(t => !t.isArchived && !t.isStopped);
@@ -5131,9 +5153,25 @@ function monthlyComputeTrend(values) {
   return delta > 8 ? "up" : delta < -8 ? "down" : "stable";
 }
 
-function monthlyCollectData(student, year, month, allSessions, excludedActivities = new Set()) {
+function monthlyCollectData(student, year, month, allSessions, excludedActivities = new Set(), sessionType = "individual") {
   const ABBRS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
+
+  const _filterGroupSess = sessionType === "group"
+    ? sess => {
+        const sessGroup = (state.groups || []).find(g => g.id === sess.groupId);
+        const links = sessGroup?.studentLinks || {};
+        const nameEntry = Object.entries(links).find(([, id]) => id === student.id);
+        const attendeeName = nameEntry ? nameEntry[0] : null;
+        if (!attendeeName) return sess;
+        return {
+          ...sess,
+          remarks: Object.fromEntries(
+            Object.entries(sess.remarks || {}).filter(([, r]) => r.studentName === attendeeName)
+          )
+        };
+      }
+    : sess => sess;
 
   const thisMonthSessions = allSessions.filter(s => { const [y,m] = s.date.split("-").map(Number); return y === year && m === month; });
   let lastYear = year, lastMonth = month - 1;
@@ -5219,14 +5257,15 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
       const configId = paKeyToConfigId[actName];
       const allRemarks = [];
       for (const sess of thisMonthSessions) {
-        const entry = Object.entries(sess.activities || {}).find(
+        const filteredSess = _filterGroupSess(sess);
+        const entry = Object.entries(filteredSess.activities || {}).find(
           ([,a]) => (a.activityName === actName || aliases.includes(a.activityName) || (configId && a.configId === configId)) &&
                     (a.targetName === tName || a.target === tName)
         );
         if (!entry) continue;
         const [sKey, sAct] = entry;
         const sId = sAct.id || sKey;
-        for (const rem of Object.values(sess.remarks || {})) {
+        for (const rem of Object.values(filteredSess.remarks || {})) {
           if (rem.activityId !== sId) continue;
           const trials = (rem.trials || []).filter(t => t !== -1);
           if (rem.optionScore !== undefined) trials.push(rem.optionScore);
