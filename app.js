@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1660";
+const APP_VERSION = "1661";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -7825,7 +7825,7 @@ function updateSessionHeader() {
   // count) — no longer scoped to "this month", so it's shown plainly
   // rather than as "X of [Month]".
   $("session-meta").textContent =
-    `Session ${d.sessionNumber} · ${formatDate(d.date)}`;
+    `Session ${d.sessionNumber} · ${formatDateWithDay(d.date)}${relativeDaySuffix(d.date)}`;
 }
 
 
@@ -20295,7 +20295,9 @@ async function openGroupSession(group, dateStr, attendees, participants = null) 
 
 function renderGroupSessionHeader(data) {
   if (!data) return;
-  $("group-session-meta").textContent = data.date ? formatDateWithDay(data.date) : "";
+  $("group-session-meta").textContent = data.date
+    ? `${formatDateWithDay(data.date)}${relativeDaySuffix(data.date)}`
+    : "";
 }
 
 function populateGroupTargetDropdown(targets) {
@@ -22436,7 +22438,19 @@ function relativeTodoDate(dateStr) {
   return `(${weeks} week${weeks > 1 ? "s" : ""} ago) ${day}, ${full}`;
 }
 function relativeDaySuffix(dateStr) {
-  return dateStr === getTodayString() ? " (Today)" : "";
+  if (dateStr === getTodayString()) return " (Today)";
+  if (dateStr === getYesterdayString()) return " (Yesterday)";
+  const todayDate = new Date(); todayDate.setHours(0, 0, 0, 0);
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  const todayDow = todayDate.getDay() || 7;
+  const thisWeekMon = new Date(todayDate);
+  thisWeekMon.setDate(todayDate.getDate() - (todayDow - 1));
+  if (date >= thisWeekMon) return " (This Week)";
+  const lastWeekMon = new Date(thisWeekMon);
+  lastWeekMon.setDate(thisWeekMon.getDate() - 7);
+  if (date >= lastWeekMon) return " (Last Week)";
+  return "";
 }
 function getYesterdayString() {
   const d = new Date();
