@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1681";
+const APP_VERSION = "1682";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3068,14 +3068,14 @@ Write exactly 5 sentences summing up ${firstName}'s overall progress this term i
 ===END===
 
 ===KEY_INSIGHTS===
-Based on all session data and observations, write EXACTLY 7 Key Improvement rows — no more, no fewer. Short, scannable, memorable:
-ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One short sentence — a specific, data-backed area where the student has improved. Must be real, not filler.]
-ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One short sentence — a second genuine improvement from a different area.]
-ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One short sentence — a third improvement. Only real progress — do not invent.]
-ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One short sentence — a fourth data-backed improvement.]
-ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One short sentence — a fifth improvement from a different area. Must be real and data-backed.]
-ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One short sentence — a sixth improvement. Must be real, from a different area.]
-ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One short sentence — a seventh and final improvement. Must be genuine and data-backed.]
+Based on all session data and observations, write EXACTLY 7 Key Improvement rows — no more, no fewer. Each row must include a specific observed detail, example, or moment drawn directly from the session remarks — not a general description. Use the student's name or a pronoun naturally; you may alternate.
+ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One or two sentences — name the specific improvement AND include a concrete detail, quote, or example from the session remarks that shows it. Must be real, not filler.]
+ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One or two sentences — a second genuine improvement from a different area, grounded in a specific observed moment or example.]
+ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One or two sentences — a third improvement with a real detail from the remarks. Only real progress — do not invent.]
+ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One or two sentences — a fourth data-backed improvement with a specific example or observed behaviour.]
+ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One or two sentences — a fifth improvement from a different area, with a concrete detail from the session data.]
+ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One or two sentences — a sixth improvement with a specific observed moment. Must be real, from a different area.]
+ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One or two sentences — a seventh and final improvement grounded in a specific example or remark from sessions.]
 ===END===
 
 ${targetsWithData.map(r => `===OBSERVATION: ${r.name}===
