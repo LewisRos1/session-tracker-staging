@@ -2910,11 +2910,11 @@ function getAllActivitiesForTarget(session, target) {
       subLabelCounters[pa.parentActivity] = si + 1;
       const subLabel = String.fromCharCode(97 + si);
       const parentPa = (target.predefinedActivities || []).find(p => !p.parentActivity && (p.title || p.name) === pa.parentActivity);
-      const subStatusPrefix = pa.discontinuedOn ? '(Discontinued) '
-        : pa.masteredOn ? '(Mastered) '
+      const subStatusPrefix = pa.discontinuedOn ? `(Discontinued on ${fmtDate(pa.discontinuedOn)}) `
+        : pa.masteredOn ? `(Mastered on ${fmtDate(pa.masteredOn)}) `
         : pa.maintained ? '(Maintained) '
-        : parentPa?.discontinuedOn ? '(Discontinued) '
-        : parentPa?.masteredOn ? '(Mastered) '
+        : parentPa?.discontinuedOn ? `(Discontinued on ${fmtDate(parentPa.discontinuedOn)}) `
+        : parentPa?.masteredOn ? `(Mastered on ${fmtDate(parentPa.masteredOn)}) `
         : parentPa?.maintained ? '(Maintained) '
         : '';
       const subActName = subStatusPrefix + (pa.title || pa.name);
@@ -2932,7 +2932,7 @@ function getAllActivitiesForTarget(session, target) {
     if (pa.masteredOn) {
       const _sAct = claimAct(pa);
       const _paKey = pa.title || pa.name;
-      const _name = `x) (Mastered) ${_paKey}`;
+      const _name = `x) (Mastered on ${fmtDate(pa.masteredOn)}) ${_paKey}`;
       const _subs = (target.predefinedActivities || []).filter(p => p.parentActivity === _paKey);
       const _subText = _subs.length > 0 ? _subs.map((p, i) => `${String.fromCharCode(97 + i)}. ${p.title || p.name}`).join("\n") : null;
       const _extra = { activityDisplayDetails: _subText || (pa.title ? (pa.name || null) : null), activityTitleBold: !!pa.isBold, activityTitleUnderline: !!pa.isUnderline };
@@ -2943,7 +2943,7 @@ function getAllActivitiesForTarget(session, target) {
     if (pa.discontinuedOn) {
       const _sAct = claimAct(pa);
       const _paKey = pa.title || pa.name;
-      const _name = `x) (Discontinued) ${_paKey}`;
+      const _name = `x) (Discontinued on ${fmtDate(pa.discontinuedOn)}) ${_paKey}`;
       const _subs = (target.predefinedActivities || []).filter(p => p.parentActivity === _paKey);
       const _subText = _subs.length > 0 ? _subs.map((p, i) => `${String.fromCharCode(97 + i)}. ${p.title || p.name}`).join("\n") : null;
       const _extra = { activityDisplayDetails: _subText || (pa.title ? (pa.name || null) : null), activityTitleBold: !!pa.isBold, activityTitleUnderline: !!pa.isUnderline };
