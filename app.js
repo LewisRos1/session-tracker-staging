@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1666";
+const APP_VERSION = "1667";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6470,14 +6470,14 @@ function renderManageActivityScreen(entity) {
         const sourcePart = latestSubName
           ? `The last recorded session for the sub-activity <strong>"${escHtml(_stripMk(latestSubName))}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>.`
           : `The last recorded session for <strong>"${paDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>.`;
-        return `${sourcePart} So, ${restrictionText.charAt(0).toLowerCase() + restrictionText.slice(1)} <strong>${fmtPeriodDate(minDate)}</strong> onwards.`;
+        return `${sourcePart} ${restrictionText} <strong>${fmtPeriodDate(minDate)}</strong>. This activity will stop showing from <strong>${fmtPeriodDate(addOneDay(minDate))}</strong> onwards.`;
       };
       if (action === 'master' || action === 'discontinue') {
         const { date: latestDate, subName: latestSubName } = await _maLoadLatest();
-        const minDate = latestDate ? addOneDay(latestDate) : todayDateStr();
+        const minDate = latestDate || todayDateStr();
         const restrictionText = action === 'master'
-          ? 'You can only mark this activity as mastered from'
-          : 'You can only discontinue this activity from';
+          ? 'The earliest you can mark this as mastered is'
+          : 'The earliest you can discontinue this activity is';
         const infoHtml = _buildInfoHtml(latestDate, minDate, latestSubName, restrictionText);
         const pickedDate = await showDatePickerOverlay({
           heading: action === 'master' ? '⭐ Mark as Mastered' : '🚩 Discontinue Activity',
@@ -6512,8 +6512,8 @@ function renderManageActivityScreen(entity) {
         }
       } else if (action === 'change-master-date') {
         const { date: latestDate, subName: latestSubName } = await _maLoadLatest();
-        const minDate = latestDate ? addOneDay(latestDate) : todayDateStr();
-        const infoHtml = _buildInfoHtml(latestDate, minDate, latestSubName, 'You can only set the mastered date from');
+        const minDate = latestDate || todayDateStr();
+        const infoHtml = _buildInfoHtml(latestDate, minDate, latestSubName, 'The earliest you can set the mastered date is');
         const pickedDate = await showDatePickerOverlay({
           heading: '📅 Change Mastered Date',
           infoHtml,
@@ -6525,8 +6525,8 @@ function renderManageActivityScreen(entity) {
         pa.masteredOn = pickedDate;
       } else if (action === 'change-disc-date') {
         const { date: latestDate, subName: latestSubName } = await _maLoadLatest();
-        const minDate = latestDate ? addOneDay(latestDate) : todayDateStr();
-        const infoHtml = _buildInfoHtml(latestDate, minDate, latestSubName, 'You can only set the discontinued date from');
+        const minDate = latestDate || todayDateStr();
+        const infoHtml = _buildInfoHtml(latestDate, minDate, latestSubName, 'The earliest you can set the discontinued date is');
         const pickedDate = await showDatePickerOverlay({
           heading: '📅 Change Discontinued Date',
           infoHtml,
@@ -17892,10 +17892,10 @@ function renderTargetManageContent(student, target) {
         }).map(s => s.date).sort();
         latestDate = dates[dates.length - 1] || null;
       } finally { btn.disabled = false; btn.textContent = origText; }
-      const minDate = latestDate ? addOneDay(latestDate) : todayDateStr();
+      const minDate = latestDate || todayDateStr();
       const _paName = escHtml(pa.title || pa.name || '');
       const infoHtml = latestDate
-        ? `The last recorded session for <strong>"${_paName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>. So, you can only set this date from <strong>${fmtPeriodDate(minDate)}</strong> onwards.`
+        ? `The last recorded session for <strong>"${_paName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>. The earliest you can set this date is <strong>${fmtPeriodDate(minDate)}</strong>. This activity will stop showing from <strong>${fmtPeriodDate(addOneDay(minDate))}</strong> onwards.`
         : `No previous session data was found for <strong>"${_paName}"</strong>.`;
       const current = type === "mastered" ? pa.masteredOn : pa.discontinuedOn;
       const pickedDate = await showDatePickerOverlay({
