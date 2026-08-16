@@ -2298,14 +2298,10 @@ export async function exportGroupMemberSingleSessionWord(studentName, groups, se
     return;
   }
 
-  const studentId      = groups.map(g => g.studentLinks?.[studentName]).find(Boolean);
-  const personalNumber = studentId ? sessionToUse.attendeePersonalSessionNumbers?.[studentId] : null;
-  const sessionLabel   = personalNumber != null ? `Session ${personalNumber}` : "";
-
   const allTargets      = unionTargetsByName(groups).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
   const filteredSession = { ...sessionToUse, remarks: filteredRemarks };
-  const blob = await buildSingleSessionWordBlob(studentName, sessionLabel, allTargets, filteredSession);
-  downloadBlob(blob, formatExportFilenameWord(studentName, sessionLabel, sessionToUse.date));
+  const blob = await buildSingleSessionWordBlob(studentName, "", allTargets, filteredSession);
+  downloadBlob(blob, formatExportFilenameWord(studentName, "", sessionToUse.date));
 }
 
 // `groups` is optional (defaults to none, so existing callers that only

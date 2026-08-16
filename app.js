@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1656";
+const APP_VERSION = "1657";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -1763,7 +1763,6 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
             <col style="width:130px">
             <col style="width:130px">
             <col style="width:160px">
-            <col style="width:150px">
           </colgroup>
           <thead>
             <tr>
@@ -1775,7 +1774,6 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
               <th style="white-space:normal">Imported Excel data to Website</th>
               <th style="white-space:normal">Ready for AI H1 Report</th>
               <th style="white-space:normal">Latest Individual Session Recorded</th>
-              <th style="white-space:normal">Latest Group Session Recorded</th>
             </tr>
           </thead>
           <tbody id="student-registry-tbody">
@@ -1803,7 +1801,6 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
                 <td class="reg-excel-export-cell" data-id="${escHtml(s.id)}" style="text-align:center">…</td>
                 <td class="reg-ai-h1-cell" data-id="${escHtml(s.id)}" style="text-align:center">…</td>
                 <td class="reg-indiv-num" data-id="${escHtml(s.id)}" style="text-align:center">…</td>
-                <td class="reg-group-num" data-id="${escHtml(s.id)}" style="text-align:center">…</td>
               </tr>`).join("")}
           </tbody>
         </table>
@@ -1892,9 +1889,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
       getGroupSessionsForStudent(s.id).catch(() => [])
     ]).then(([indiv, group]) => {
       const indivCell = body.querySelector(`.reg-indiv-num[data-id="${s.id}"]`);
-      const groupCell = body.querySelector(`.reg-group-num[data-id="${s.id}"]`);
       if (indivCell) indivCell.textContent = latestNumber(indiv) || "—";
-      if (groupCell) groupCell.textContent = latestNumber(group) || "—";
 
       const excelCell = body.querySelector(`.reg-excel-export-cell[data-id="${s.id}"]`);
       if (!excelCell) return;
@@ -13291,7 +13286,7 @@ function renderGroupSessionView() {
   if (!data || !group) return;
 
   $("group-view-session-meta").innerHTML =
-    `Session ${data.sessionNumber}: ${formatDateWithDay(data.date)}${relativeDaySuffix(data.date)}`
+    `${formatDateWithDay(data.date)}${relativeDaySuffix(data.date)}`
     + ` <button class="btn-edit-session-date">Edit Date</button>`;
 
   const delBtn = $("btn-group-delete-session");
@@ -14618,7 +14613,10 @@ function renderGoToGroupSessionsForMonth(group, month, monthSessions, byMonth, t
   const sorted  = [...monthSessions].sort((a, b) => a.date.localeCompare(b.date));
   const display = [...sorted].reverse();
   let html = `<button class="btn-picker-back">← Back</button>`;
-  html += renderSessionListRows(sorted, display, today, { isCurrentId: state.viewGroupSessionId });
+  html += renderSessionListRows(sorted, display, today, {
+    isCurrentId: state.viewGroupSessionId,
+    renderLabel: (s, dateLabel) => `<strong>${escHtml(dateLabel)}</strong>`
+  });
   const list = $("session-picker-list");
   list.innerHTML = html;
   list.querySelector(".btn-picker-back").addEventListener("click", () => {
@@ -14713,7 +14711,10 @@ function renderGoToGroupSessionsForMonthEntry(group, month, monthSessions, byMon
   const sorted  = [...monthSessions].sort((a, b) => a.date.localeCompare(b.date));
   const display = [...sorted].reverse();
   let html = `<button class="btn-picker-back">← Back</button>`;
-  html += renderSessionListRows(sorted, display, today, { isCurrentId: state.groupSessionId });
+  html += renderSessionListRows(sorted, display, today, {
+    isCurrentId: state.groupSessionId,
+    renderLabel: (s, dateLabel) => `<strong>${escHtml(dateLabel)}</strong>`
+  });
   const list = $("session-picker-list");
   list.innerHTML = html;
   list.querySelector(".btn-picker-back").addEventListener("click", () => {
@@ -16081,14 +16082,10 @@ async function renderSessionNumberSection(student) {
     resequenceIndividualSessions(student.id).catch(() => {});  // fix in Firestore
   }
 
-  area.innerHTML = `
-    <div id="mn-s-sessnum-individual"></div>
-    <div id="mn-s-sessnum-group" style="margin-top:1.1rem"></div>`;
+  area.innerHTML = `<div id="mn-s-sessnum-individual"></div>`;
 
   renderSessionNumberKindSubsection(student, "individual", "Individual Sessions",
     indivSorted, $("mn-s-sessnum-individual"));
-  renderSessionNumberKindSubsection(student, "group", "Group Sessions",
-    groupSessions.sort((a, b) => a.date.localeCompare(b.date)), $("mn-s-sessnum-group"));
 }
 
 function renderSessionNumberKindSubsection(student, kind, label, sessions, container) {
@@ -20298,21 +20295,7 @@ async function openGroupSession(group, dateStr, attendees, participants = null) 
 
 function renderGroupSessionHeader(data) {
   if (!data) return;
-  const attendees = data.attendees || [];
-  const links = state.currentGroup?.studentLinks || {};
-  const psn = data.attendeePersonalSessionNumbers || {};
-  const studentParts = attendees.map(name => {
-    const sid = links[name];
-    const student = sid ? (state.students || []).find(s => s.id === sid) : null;
-    const displayName = student?.preferredName || name;
-    const n = sid ? psn[sid] : null;
-    return n != null ? `${displayName} (Session ${n})` : displayName;
-  });
-  const datePart = data.date ? formatDate(data.date) : "";
-  const metaParts = studentParts.length > 0
-    ? [...studentParts, datePart].filter(Boolean)
-    : [`Session ${data.sessionNumber} of ${(data.month || "").split(" ")[0]}`, datePart].filter(Boolean);
-  $("group-session-meta").textContent = metaParts.join(" · ");
+  $("group-session-meta").textContent = data.date ? formatDateWithDay(data.date) : "";
 }
 
 function populateGroupTargetDropdown(targets) {
@@ -22133,18 +22116,7 @@ function renderGroupSessionsForMonth(group, month, monthSessions, byMonth, sessi
   const today   = getTodayString();
   let html = `<button class="btn-picker-back">← Back</button>`;
   html += renderSessionListRows(sorted, display, today, {
-    // Group sessions have no one shared session number — each attendee has
-    // their own personal lifetime number (a newer/more experienced kid in
-    // the same group can be on a very different number) — so the headline
-    // is just the date, with one "Name — Session N" line per attendee below.
-    renderLabel: (s, dateLabel) => {
-      const attendeeLines = (s.attendees || []).map(name => {
-        const studentId = group.studentLinks?.[name];
-        const num = studentId ? s.attendeePersonalSessionNumbers?.[studentId] : null;
-        return `<div class="session-list-date">${escHtml(name)}${num != null ? ` — Session ${num}` : ""}</div>`;
-      }).join("");
-      return `<strong>${escHtml(dateLabel)}</strong>${attendeeLines}`;
-    }
+    renderLabel: (s, dateLabel) => `<strong>${escHtml(dateLabel)}</strong>`
   });
   $("session-picker-list").innerHTML = html;
   $("session-picker-list").querySelector(".btn-picker-back").addEventListener("click", () =>
