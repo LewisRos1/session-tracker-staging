@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1678";
+const APP_VERSION = "1679";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -2893,7 +2893,9 @@ function renderHalfYearReportsSection() {
     const studentId = $("hyr-student-select").value;
     const student = state.students.find(s => s.id === studentId);
     if (!student) return;
-    hyrPopulateActivityFilter(student, studentId, e.target.value);
+    const _pSessType = $("hyr-session-type-select")?.value || "individual";
+    const _pGrpTargets = _pSessType === "group" ? getGroupEffectiveTargets(studentId) : null;
+    hyrPopulateActivityFilter(_pGrpTargets ? { ...student, targets: _pGrpTargets } : student, studentId, e.target.value);
     actFilter.style.display = "";
   });
 
@@ -3012,7 +3014,9 @@ async function hyrGenerate() {
       excludedActivities.add(`${btn.dataset.target}|${btn.dataset.activity}`);
     });
 
-    const { text: dataText, chartData, breakdownData, trendRows, categorized } = await hyrCollectData(student, period, year, excludedActivities, sessionType);
+    const _grpTargets = sessionType === "group" ? getGroupEffectiveTargets(studentId) : null;
+    const effectiveStudent = _grpTargets ? { ...student, targets: _grpTargets } : student;
+    const { text: dataText, chartData, breakdownData, trendRows, categorized } = await hyrCollectData(effectiveStudent, period, year, excludedActivities, sessionType);
 
     // Build prompt synchronously — then start fetch immediately so it runs in parallel with fake phases
     const periodLabel = period === "H1" ? `January–June ${year}` : `July–December ${year}`;
@@ -3187,6 +3191,26 @@ RECOMMENDATIONS:
     progress.style.display = "none";
     bar.style.width = "0%";
   }
+}
+
+// For group-session reports, return the merged targets from all groups the
+// student belongs to. Group targets are the source of truth for group sessions
+// — student.targets may be stale or empty for group-only students.
+function getGroupEffectiveTargets(studentId) {
+  const studentGroups = (state.groups || []).filter(g =>
+    Object.values(g.studentLinks || {}).includes(studentId)
+  );
+  if (studentGroups.length === 0) return null;
+  const seen = new Set();
+  const targets = [];
+  for (const g of studentGroups) {
+    for (const t of (g.targets || [])) {
+      if (seen.has(t.name)) continue;
+      seen.add(t.name);
+      targets.push(t);
+    }
+  }
+  return targets.length > 0 ? targets : null;
 }
 
 async function hyrCollectData(student, period, year, excludedActivities = new Set(), sessionType = "individual") {
@@ -4988,10 +5012,12 @@ async function monthlyGenerate() {
     const FULL_MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
     const monthName = FULL_MONTHS[month - 1];
     const firstName = student.preferredName || student.name.split(" ")[0];
-    const collected = monthlyCollectData(student, year, month, allSessions, excludedActivities);
+    const _mGrpTargets = sessionType === "group" ? getGroupEffectiveTargets(studentId) : null;
+    const effectiveStudent = _mGrpTargets ? { ...student, targets: _mGrpTargets } : student;
+    const collected = monthlyCollectData(effectiveStudent, year, month, allSessions, excludedActivities);
     const { threeMonthData, miniData, aiData, sessionCount, threeMonthPeriodLabel, oneMonthPeriodLabel } = collected;
 
-    const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
+    const activeTargets = (effectiveStudent.targets || []).filter(t => !t.isArchived && !t.isStopped);
     const focusTargets = activeTargets.filter(t => miniData[t.name]?.trend !== "up");
     const excludedList = excludedActivities.size > 0
       ? [...excludedActivities].map(k => { const [t, a] = k.split("|"); return `  - ${a} (under target: ${t})`; }).join("\n")
