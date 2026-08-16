@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1658";
+const APP_VERSION = "1659";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -14615,7 +14615,7 @@ function renderGoToGroupSessionsForMonth(group, month, monthSessions, byMonth, t
   let html = `<button class="btn-picker-back">← Back</button>`;
   html += renderSessionListRows(sorted, display, today, {
     isCurrentId: state.viewGroupSessionId,
-    renderLabel: (s, dateLabel) => `<strong>${escHtml(dateLabel)}</strong>`
+    renderLabel: (s, dateLabel) => escHtml(dateLabel)
   });
   const list = $("session-picker-list");
   list.innerHTML = html;
@@ -14713,7 +14713,7 @@ function renderGoToGroupSessionsForMonthEntry(group, month, monthSessions, byMon
   let html = `<button class="btn-picker-back">← Back</button>`;
   html += renderSessionListRows(sorted, display, today, {
     isCurrentId: state.groupSessionId,
-    renderLabel: (s, dateLabel) => `<strong>${escHtml(dateLabel)}</strong>`
+    renderLabel: (s, dateLabel) => escHtml(dateLabel)
   });
   const list = $("session-picker-list");
   list.innerHTML = html;
@@ -22116,7 +22116,7 @@ function renderGroupSessionsForMonth(group, month, monthSessions, byMonth, sessi
   const today   = getTodayString();
   let html = `<button class="btn-picker-back">← Back</button>`;
   html += renderSessionListRows(sorted, display, today, {
-    renderLabel: (s, dateLabel) => `<strong>${escHtml(dateLabel)}</strong>`
+    renderLabel: (s, dateLabel) => escHtml(dateLabel)
   });
   $("session-picker-list").innerHTML = html;
   $("session-picker-list").querySelector(".btn-picker-back").addEventListener("click", () =>
