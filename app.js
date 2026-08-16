@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1672";
+const APP_VERSION = "1673";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -16649,7 +16649,7 @@ function renderTargetManageContent(student, target) {
             <div style="display:flex;gap:.6rem;align-items:flex-start">
               <div style="flex-shrink:0">
                 <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Start Date</div>
-                <button class="mn-act-start-btn" data-idx="${idx}" style="padding:.35rem .65rem;border:1.5px solid #d1d5db;border-radius:.4rem;background:#f0f9ff;cursor:pointer;font-size:.82rem;color:#374151;white-space:nowrap;display:block">📅 ${a.activeFrom ? fmtPeriodDate(a.activeFrom) : 'Set date'}</button>
+                <button class="mn-act-start-btn" data-idx="${idx}" style="padding:.35rem .65rem;border:1.5px solid #d1d5db;border-radius:.4rem;background:#f0f9ff;cursor:pointer;font-size:.95rem;color:#374151;white-space:nowrap;display:block">📅 ${a.activeFrom ? fmtPeriodDate(a.activeFrom) : 'Set date'}</button>
               </div>
               <div style="flex:1">
                 <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title</div>
@@ -16733,7 +16733,7 @@ function renderTargetManageContent(student, target) {
                 <div style="display:flex;gap:.4rem;align-items:flex-start">
                   <div style="flex-shrink:0">
                     <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Start Date</div>
-                    <button class="mn-act-start-btn" data-idx="${subIdx}" style="padding:.35rem .65rem;border:1.5px solid #d1d5db;border-radius:.4rem;background:#f0f9ff;cursor:pointer;font-size:.82rem;color:#374151;white-space:nowrap;display:block">📅 ${sub.activeFrom ? fmtPeriodDate(sub.activeFrom) : 'Set date'}</button>
+                    <button class="mn-act-start-btn" data-idx="${subIdx}" style="padding:.35rem .65rem;border:1.5px solid #d1d5db;border-radius:.4rem;background:#f0f9ff;cursor:pointer;font-size:.95rem;color:#374151;white-space:nowrap;display:block">📅 ${sub.activeFrom ? fmtPeriodDate(sub.activeFrom) : 'Set date'}</button>
                   </div>
                   <div style="flex:1">
                     <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title</div>
@@ -16790,7 +16790,7 @@ function renderTargetManageContent(student, target) {
               <div style="display:flex;gap:.6rem;align-items:flex-start">
                 <div style="flex-shrink:0">
                   <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Start Date</div>
-                  <button class="mn-act-start-btn" data-idx="${idx}" style="padding:.35rem .65rem;border:1.5px solid #d1d5db;border-radius:.4rem;background:#f0f9ff;cursor:pointer;font-size:.82rem;color:#374151;white-space:nowrap;display:block">📅 ${a.activeFrom ? fmtPeriodDate(a.activeFrom) : 'Set date'}</button>
+                  <button class="mn-act-start-btn" data-idx="${idx}" style="padding:.35rem .65rem;border:1.5px solid #d1d5db;border-radius:.4rem;background:#f0f9ff;cursor:pointer;font-size:.95rem;color:#374151;white-space:nowrap;display:block">📅 ${a.activeFrom ? fmtPeriodDate(a.activeFrom) : 'Set date'}</button>
                 </div>
                 <div style="flex:1">
                   <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title</div>
@@ -16849,7 +16849,7 @@ function renderTargetManageContent(student, target) {
               <div style="display:flex;gap:.6rem;align-items:flex-start">
                 <div style="flex-shrink:0">
                   <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Start Date</div>
-                  <button class="mn-act-start-btn" data-idx="${idx}" style="padding:.35rem .65rem;border:1.5px solid #d1d5db;border-radius:.4rem;background:#f0f9ff;cursor:pointer;font-size:.82rem;color:#374151;white-space:nowrap;display:block">📅 ${a.activeFrom ? fmtPeriodDate(a.activeFrom) : 'Set date'}</button>
+                  <button class="mn-act-start-btn" data-idx="${idx}" style="padding:.35rem .65rem;border:1.5px solid #d1d5db;border-radius:.4rem;background:#f0f9ff;cursor:pointer;font-size:.95rem;color:#374151;white-space:nowrap;display:block">📅 ${a.activeFrom ? fmtPeriodDate(a.activeFrom) : 'Set date'}</button>
                 </div>
                 <div style="flex:1">
                   <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title</div>
@@ -18094,7 +18094,8 @@ function renderTargetManageContent(student, target) {
 
   $("btn-mn-add-act").addEventListener("click", () => {
     const btn = $("btn-mn-add-act"); if (btn) btn.disabled = true;
-    acts.push({ id: cfgId("a"), name: "", order: acts.length, createdOn: todayDateStr(), activeFrom: todayDateStr() });
+    const _newActDate = _groupForTargetEdit ? (state.groupSessionData?.date || todayDateStr()) : (state.sessionData?.date || todayDateStr());
+    acts.push({ id: cfgId("a"), name: "", order: acts.length, createdOn: todayDateStr(), activeFrom: _newActDate });
     target.predefinedActivities = acts;
     renderTargetManageContent(student, target);
     saveTarget().catch(() => {});
@@ -18204,7 +18205,8 @@ function renderTargetManageContent(student, target) {
       parentAct.noRemark = true;
       const siblingIdxs = acts.map((a2, i) => a2.parentActivity === _parentKey ? i : -1).filter(i => i >= 0);
       const insertAfter = siblingIdxs.length > 0 ? Math.max(...siblingIdxs) : parentIdx;
-      acts.splice(insertAfter + 1, 0, { id: cfgId("a"), name: "", parentActivity: _parentKey, order: 0, activeFrom: todayDateStr(), createdOn: todayDateStr() });
+      const _newSubActDate = _groupForTargetEdit ? (state.groupSessionData?.date || todayDateStr()) : (state.sessionData?.date || todayDateStr());
+      acts.splice(insertAfter + 1, 0, { id: cfgId("a"), name: "", parentActivity: _parentKey, order: 0, activeFrom: _newSubActDate, createdOn: todayDateStr() });
       acts.forEach((a2, i) => a2.order = i);
       target.predefinedActivities = acts;
       const sp = $("manage-modal-body").scrollTop;
@@ -19109,7 +19111,7 @@ function renderTemplateManageContent(template) {
         <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
           <div style="display:flex;align-items:center;gap:.4rem">
             <span style="font-size:.8rem;font-weight:700;color:#6b7280;white-space:nowrap">Start Date:</span>
-            <button class="mn-act-start-btn" data-idx="${idx}" style="padding:.2rem .5rem;border:1.5px solid #d1d5db;border-radius:.35rem;background:#f0f9ff;cursor:pointer;font-size:.8rem;color:#374151;white-space:nowrap">📅 ${a.activeFrom ? fmtPeriodDate(a.activeFrom) : 'Set date'}</button>
+            <button class="mn-act-start-btn" data-idx="${idx}" style="padding:.2rem .5rem;border:1.5px solid #d1d5db;border-radius:.35rem;background:#f0f9ff;cursor:pointer;font-size:.95rem;color:#374151;white-space:nowrap">📅 ${a.activeFrom ? fmtPeriodDate(a.activeFrom) : 'Set date'}</button>
           </div>
           <div style="display:flex;align-items:center;gap:.35rem">
             <label style="display:flex;align-items:center;gap:.15rem;font-size:.78rem;cursor:pointer;flex-shrink:0;user-select:none" title="Bold">
