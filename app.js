@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1669";
+const APP_VERSION = "1670";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -21271,7 +21271,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
       ${suppressHeader ? "" : `<div class="entry-field" contenteditable="false">
         <span class="field-label">Activity</span>
         <span class="field-value-fixed">${actNum ? `<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>` : ""}${paEntry ? paDisplayHtml(paEntry, true) : formatActivityMarkup(actName)}</span>
-        ${(paEntry?.activeFrom || paEntry?.createdOn) ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(paEntry.createdOn || paEntry.activeFrom)}</span>` : ""}
+        ${(paEntry?.activeFrom || paEntry?.createdOn) ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(paEntry.activeFrom || paEntry.createdOn)}</span>` : ""}
         ${paEntry?.id ? `<button class="btn-icon btn-grp-edit-pencil" contenteditable="false" data-pa-id="${escHtml(paEntry.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
       </div>`}
       ${noteRow}
@@ -21308,7 +21308,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
       ${suppressHeader ? "" : `<div class="entry-field" contenteditable="false">
         ${grpWrittenDot}<span class="field-label">Activity</span>
         <span class="field-value-fixed">${inactiveReasonBadge(paEntry)}${actNum ? `<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>` : ""}${paEntry ? paDisplayHtml(paEntry, true) : formatActivityMarkup(actName)}</span>
-        ${(paEntry?.activeFrom || paEntry?.createdOn) ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(paEntry.createdOn || paEntry.activeFrom)}</span>` : ""}
+        ${(paEntry?.activeFrom || paEntry?.createdOn) ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(paEntry.activeFrom || paEntry.createdOn)}</span>` : ""}
         ${paEntry?.id ? `<button class="btn-icon btn-grp-edit-pencil" contenteditable="false" data-pa-id="${escHtml(paEntry.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
       </div>`}
       ${noteRow}
@@ -21369,7 +21369,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
     ${suppressHeader ? "" : `<div class="entry-field" contenteditable="false">
       ${grpWrittenDot}<span class="field-label">Activity</span>
       <span class="field-value-fixed">${inactiveReasonBadge(paEntry)}${actNum ? `<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>` : ""}${paEntry ? paDisplayHtml(paEntry, true) : formatActivityMarkup(actName)}</span>
-      ${(paEntry?.activeFrom || paEntry?.createdOn) ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(paEntry.createdOn || paEntry.activeFrom)}</span>` : ""}
+      ${(paEntry?.activeFrom || paEntry?.createdOn) ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(paEntry.activeFrom || paEntry.createdOn)}</span>` : ""}
       ${paEntry?.id ? `<button class="btn-icon btn-grp-edit-pencil" contenteditable="false" data-pa-id="${escHtml(paEntry.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
     </div>`}
     ${noteRow}
