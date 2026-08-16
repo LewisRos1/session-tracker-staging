@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1668";
+const APP_VERSION = "1669";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -18077,7 +18077,7 @@ function renderTargetManageContent(student, target) {
 
   $("btn-mn-add-act").addEventListener("click", () => {
     const btn = $("btn-mn-add-act"); if (btn) btn.disabled = true;
-    acts.push({ id: cfgId("a"), name: "", order: acts.length, createdOn: todayDateStr(), activeFrom: _maIsGroup ? null : todayDateStr() });
+    acts.push({ id: cfgId("a"), name: "", order: acts.length, createdOn: todayDateStr(), activeFrom: todayDateStr() });
     target.predefinedActivities = acts;
     renderTargetManageContent(student, target);
     saveTarget().catch(() => {});
@@ -18187,7 +18187,7 @@ function renderTargetManageContent(student, target) {
       parentAct.noRemark = true;
       const siblingIdxs = acts.map((a2, i) => a2.parentActivity === _parentKey ? i : -1).filter(i => i >= 0);
       const insertAfter = siblingIdxs.length > 0 ? Math.max(...siblingIdxs) : parentIdx;
-      acts.splice(insertAfter + 1, 0, { id: cfgId("a"), name: "", parentActivity: _parentKey, order: 0, activeFrom: _maIsGroup ? null : todayDateStr(), createdOn: todayDateStr() });
+      acts.splice(insertAfter + 1, 0, { id: cfgId("a"), name: "", parentActivity: _parentKey, order: 0, activeFrom: todayDateStr(), createdOn: todayDateStr() });
       acts.forEach((a2, i) => a2.order = i);
       target.predefinedActivities = acts;
       const sp = $("manage-modal-body").scrollTop;
@@ -20671,7 +20671,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
   // Use sidebar layout for all FEDC-style targets (matches individual session behaviour:
   // sidebar always shows when predefined activities exist, even if only "General" section)
   if (!_grpFilterPaSet && !_footerOnly && allPas.length > 0) {
-    const _sections = groupPasBySections(target, grpSessionDate, true);
+    const _sections = groupPasBySections(target, grpSessionDate);
     if (_sections.length > 0) {
       return buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByParent, grpSessionDate);
     }
@@ -20715,7 +20715,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Activity</span>
           <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${grpActNum})</span>${paDisplayHtml(pa, true)}</span>
-          ${(pa.createdOn || pa.activeFrom) ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(pa.createdOn || pa.activeFrom)}</span>` : ""}
+          ${(pa.activeFrom || pa.createdOn) ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(pa.activeFrom || pa.createdOn)}</span>` : ""}
         </div>
       </div>`;
       children.forEach((sub, si) => {
@@ -20795,7 +20795,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
           : "";
         const subCard  = renderGroupActivityCard(sub.title || sub.name, subActId, target, data, attendees, null, null, sub, true, sub.parentActivity, sub.id, _grpFilterPaSet, 0, true);
         const subRadius = isLast ? '0 0 var(--radius) var(--radius)' : '0';
-        const _subCreatedDate = sub.createdOn || sub.activeFrom;
+        const _subCreatedDate = sub.activeFrom || sub.createdOn;
         groupHtml += `<div style="border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);border-top:1px solid var(--border);border-radius:${subRadius};overflow:hidden">
           <div style="padding:.4rem .6rem;display:flex;align-items:center;gap:.45rem">
             ${_subDot}<span style="flex-shrink:0;background:#dbeafe;color:#1e40af;border-radius:.4rem;padding:.12rem .5rem;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Subactivity</span>
@@ -20892,7 +20892,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
 // ─── SECTION SIDEBAR LAYOUT (group session) ──────────────────
 
 function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByParent, grpSessionDate, layout = "byActivity") {
-  const sections = groupPasBySections(target, grpSessionDate, true);
+  const sections = groupPasBySections(target, grpSessionDate);
   if (!sections.length) {
     return layout === "byStudent"
       ? buildGroupItemsByStudent(target, data, attendees, new Set())
@@ -21034,7 +21034,7 @@ function buildGroupItemsByStudent(target, data, attendees, _grpFilterPaSet = nul
 
   // Route to sidebar for FEDC targets (matches byActivity behaviour)
   if (!_grpFilterPaSet && (target.predefinedActivities || []).length > 0) {
-    const _sections = groupPasBySections(target, grpStudentDate, true);
+    const _sections = groupPasBySections(target, grpStudentDate);
     if (_sections.length > 0) {
       const _allPas = target.predefinedActivities || [];
       const _grpSubs = new Map();
@@ -21139,7 +21139,7 @@ function renderGroupStudentActivityCard(studentName, actName, actId, target, dat
     <div class="entry-field" contenteditable="false">
       ${byStudentDot}<span class="field-label">Activity</span>
       <span class="field-value-fixed">${actNum ? `<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>` : ""}${pa ? paDisplayHtml(pa, true) : formatActivityMarkup(actName)}</span>
-      ${(pa?.createdOn || pa?.activeFrom) ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(pa.createdOn || pa.activeFrom)}</span>` : ""}
+      ${(pa?.activeFrom || pa?.createdOn) ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(pa.activeFrom || pa.createdOn)}</span>` : ""}
       ${pa?.id ? `<button class="btn-icon btn-grp-edit-pencil" contenteditable="false" data-pa-id="${escHtml(pa.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
     </div>
     ${noteRow}`;
@@ -21271,7 +21271,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
       ${suppressHeader ? "" : `<div class="entry-field" contenteditable="false">
         <span class="field-label">Activity</span>
         <span class="field-value-fixed">${actNum ? `<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>` : ""}${paEntry ? paDisplayHtml(paEntry, true) : formatActivityMarkup(actName)}</span>
-        ${(paEntry?.createdOn || paEntry?.activeFrom) ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(paEntry.createdOn || paEntry.activeFrom)}</span>` : ""}
+        ${(paEntry?.activeFrom || paEntry?.createdOn) ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(paEntry.createdOn || paEntry.activeFrom)}</span>` : ""}
         ${paEntry?.id ? `<button class="btn-icon btn-grp-edit-pencil" contenteditable="false" data-pa-id="${escHtml(paEntry.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
       </div>`}
       ${noteRow}
@@ -21308,7 +21308,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
       ${suppressHeader ? "" : `<div class="entry-field" contenteditable="false">
         ${grpWrittenDot}<span class="field-label">Activity</span>
         <span class="field-value-fixed">${inactiveReasonBadge(paEntry)}${actNum ? `<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>` : ""}${paEntry ? paDisplayHtml(paEntry, true) : formatActivityMarkup(actName)}</span>
-        ${(paEntry?.createdOn || paEntry?.activeFrom) ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(paEntry.createdOn || paEntry.activeFrom)}</span>` : ""}
+        ${(paEntry?.activeFrom || paEntry?.createdOn) ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(paEntry.createdOn || paEntry.activeFrom)}</span>` : ""}
         ${paEntry?.id ? `<button class="btn-icon btn-grp-edit-pencil" contenteditable="false" data-pa-id="${escHtml(paEntry.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
       </div>`}
       ${noteRow}
@@ -21369,7 +21369,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
     ${suppressHeader ? "" : `<div class="entry-field" contenteditable="false">
       ${grpWrittenDot}<span class="field-label">Activity</span>
       <span class="field-value-fixed">${inactiveReasonBadge(paEntry)}${actNum ? `<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>` : ""}${paEntry ? paDisplayHtml(paEntry, true) : formatActivityMarkup(actName)}</span>
-      ${(paEntry?.createdOn || paEntry?.activeFrom) ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(paEntry.createdOn || paEntry.activeFrom)}</span>` : ""}
+      ${(paEntry?.activeFrom || paEntry?.createdOn) ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(paEntry.createdOn || paEntry.activeFrom)}</span>` : ""}
       ${paEntry?.id ? `<button class="btn-icon btn-grp-edit-pencil" contenteditable="false" data-pa-id="${escHtml(paEntry.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
     </div>`}
     ${noteRow}
