@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1674";
+const APP_VERSION = "1675";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:

@@ -1836,7 +1836,39 @@ function wordTargetRows(target, session, allTargets) {
       continue;
     }
 
-    if (act.isMasteredSeparator || act.isMastered || act.isStoppedSeparator || act.isStopped) continue;
+    if (act.isMasteredSeparator) {
+      rows.push({ merge: true, text: "— Mastered —", style: "heading", isGreenHeading: true });
+      continue;
+    }
+    if (act.isStoppedSeparator) {
+      rows.push({ merge: true, text: act.activityName || "— Discontinued —", style: "heading", isRedHeading: true });
+      continue;
+    }
+    if (act.isMastered || act.isStopped) {
+      if (act.empty) {
+        rows.push({ cells: [act.activityName, "", ""], actLines: buildActLines(act, act.activityName) });
+        continue;
+      }
+      const _inactRemarks = getRemarksForActivity(session, act.id).filter(hasRemarkContent);
+      if (_inactRemarks.length === 0) {
+        rows.push({ cells: [act.activityName, "", ""], actLines: buildActLines(act, act.activityName) });
+        continue;
+      }
+      let _inactFirst = true;
+      for (const rem of _inactRemarks) {
+        const validTrials = allScores(rem);
+        const remarkAvg = calcRemarkAvg(validTrials, target.maxPoints);
+        const text = stripRemarkHtml(rem.text);
+        const masteryNote = stripRemarkHtml(rem.masteryNote || "");
+        rows.push({
+          cells: [_inactFirst ? act.activityName : "", "", remarkAvg !== null ? pct(remarkAvg) : ""],
+          actLines: _inactFirst ? buildActLines(act, act.activityName) : null,
+          remarkLines: buildRemarkLines(null, text, masteryNote)
+        });
+        _inactFirst = false;
+      }
+      continue;
+    }
     if (act.isExtraSeparator) {
       rows.push({ merge: true, text: "Extra", style: "heading" });
       continue;
@@ -2086,9 +2118,11 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
         } else {
         const mergeFill = r.isGrayHeading ? "D9D9D9"
           : r.isGreenHeading ? "A9D18E"
+          : r.isRedHeading ? "FECACA"
           : (r.style === "heading" ? TARGET_FILL : (r.style === "note" ? NOTE_FILL : null));
         const mergeColor = r.isGrayHeading ? "000000"
           : r.isGreenHeading ? "111827"
+          : r.isRedHeading ? "7F1D1D"
           : (r.style === "heading" ? TARGET_TEXT_COLOR : (r.style === "note" ? NOTE_TEXT_COLOR : null));
         tableRows.push(new TableRow({
           children: [cell(r.text, {
