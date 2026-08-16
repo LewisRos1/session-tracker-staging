@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1665";
+const APP_VERSION = "1666";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8124,23 +8124,33 @@ function paIsWritten(pa, target, parentName = null) {
 // Returns true if a predefined activity in a group session has data for any attendee.
 function grpPaIsWritten(pa, target, data, parentName = null) {
   const grpAllActs = Object.entries(data.activities || {});
-  const actId = (pa.id && grpAllActs.find(([, a]) => a.configId === pa.id && a.targetName === target.name)?.[0])
-    || grpAllActs.find(([, a]) => {
-        if (a.targetName !== target.name) return false;
-        if (a.activityName !== pa.name && a.activityName !== pa.title) return false;
-        if (a.configId) return false;
-        return parentName ? a.parentActivity === parentName : !a.parentActivity;
-      })?.[0]
-    || null;
-  if (!actId) return false;
   const stripH = t => (t || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
-  return Object.values(data.remarks || {}).some(r =>
-    r.activityId === actId && (
-      stripH(r.text).length > 0 ||
-      (r.trials || []).some(t => t !== null && t !== -1) ||
-      (r.masteryNote || "").trim().length > 0
-    )
+  const hasContent = r =>
+    stripH(r.text).length > 0 ||
+    (r.trials || []).some(t => t !== null && t !== -1) ||
+    (r.masteryNote || "").trim().length > 0 ||
+    (r.optionScore !== undefined && r.optionScore !== null) ||
+    (r.selectedOptions || []).length > 0;
+
+  // Prefer exact configId match — if found, check that specific record only.
+  if (pa.id) {
+    const actId = grpAllActs.find(([, a]) => a.configId === pa.id && a.targetName === target.name)?.[0];
+    if (actId) return Object.values(data.remarks || {}).some(r => r.activityId === actId && hasContent(r));
+  }
+
+  // No configId match — collect ALL records matching by name (title or details),
+  // so a stale pa.name stub doesn't shadow a pa.title record that has real data.
+  const candidateIds = new Set(
+    grpAllActs
+      .filter(([, a]) => {
+        if (a.targetName !== target.name) return false;
+        if (a.activityName !== (pa.title || pa.name) && a.activityName !== pa.name && a.activityName !== pa.title) return false;
+        return parentName ? a.parentActivity === parentName : !a.parentActivity;
+      })
+      .map(([id]) => id)
   );
+  if (candidateIds.size === 0) return false;
+  return Object.values(data.remarks || {}).some(r => candidateIds.has(r.activityId) && hasContent(r));
 }
 
 // ─── FEDC TARGET ─────────────────────────────────────────────
@@ -20415,10 +20425,11 @@ async function autoFillGroupSession(group, sessionId, data, targetName, attendee
   let created = 0;
   const predefined = (target.predefinedActivities || []).filter(pa => !pa.isHeading && !pa.isNote);
   for (const pa of predefined) {
+    const actName = pa.title || pa.name;
     const hasActivity = Object.values(data.activities || {})
-      .some(a => a.targetName === targetName && a.activityName === pa.name);
+      .some(a => a.targetName === targetName && (a.activityName === actName || a.activityName === pa.name));
     if (!hasActivity) {
-      await addActivity(sessionId, targetName, pa.name, Date.now(), true);
+      await addActivity(sessionId, targetName, actName, Date.now(), true);
       created++;
     }
   }
