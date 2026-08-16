@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1655";
+const APP_VERSION = "1656";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -12788,6 +12788,71 @@ function showViewAddRemarkPicker(targetName) {
   });
 }
 
+function showGroupViewAddRemarkPicker(targetName) {
+  const data = state.viewGroupSessionData;
+  const target = getViewGroupEffectiveTargets().find(t => t.name === targetName);
+  const dateStr = data?.date;
+  const attendees = data?.attendees || (state.viewGroup?.students || []).filter(Boolean);
+
+  const choices = [];
+  if (target?.predefinedActivities?.length > 0) {
+    let no = 0;
+    const matchedIds = new Set();
+    for (const pa of target.predefinedActivities) {
+      if (!isActivityActive(pa, dateStr)) continue;
+      if (pa.isHeading || pa.isMaintainHeading || pa.isNote || pa.isExportNote ||
+          pa.isMaintain || pa.isCompleted || pa.isArchived || pa.isStopped) continue;
+      no++;
+      const entry = Object.entries(data?.activities || {})
+        .find(([, a]) => a.targetName === targetName && (a.activityName === pa.name || (pa.title && a.activityName === pa.title)));
+      const rounds = entry ? viewGroupGetRounds(data, entry[0], attendees) : [];
+      if (entry && rounds.length > 0) {
+        matchedIds.add(entry[0]);
+        choices.push({ actId: entry[0], name: pa.name, no });
+      }
+    }
+    Object.entries(data?.activities || {})
+      .filter(([actId, a]) => a.targetName === targetName && !matchedIds.has(actId) && viewGroupGetRounds(data, actId, attendees).length > 0)
+      .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
+      .forEach(([actId, a]) => { no++; choices.push({ actId, name: a.activityName, no }); });
+  } else {
+    Object.entries(data?.activities || {})
+      .filter(([actId, a]) => a.targetName === targetName && viewGroupGetRounds(data, actId, attendees).length > 0)
+      .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
+      .forEach(([actId, a], i) => choices.push({ actId, name: a.activityName, no: i + 1 }));
+  }
+
+  $("session-picker-title").textContent = "Add Remark & Trials to which Activity?";
+  $("session-picker-list").innerHTML = choices.length
+    ? `<div class="choice-list">` + choices.map(c => `
+        <button class="choice-btn grp-view-add-remark-choice" data-act-id="${escHtml(c.actId)}">
+          <div class="choice-text"><div class="choice-label">${escHtml(c.no + ". " + c.name)}</div></div>
+        </button>`).join("") + `</div>`
+    : `<p class="empty-hint">No activities with a remark yet — use the textarea or + button on an activity row to start one.</p>`;
+  $("session-picker-modal").classList.remove("hidden");
+
+  $("session-picker-list").querySelectorAll(".grp-view-add-remark-choice").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const actId = btn.dataset.actId;
+      closeSessionPicker();
+      const d = state.viewGroupSessionData;
+      d.remarks = d.remarks || {};
+      const order = Date.now();
+      const remIds = attendees.map(() => generateId("r"));
+      attendees.forEach((studentName, i) => {
+        d.remarks[remIds[i]] = { activityId: actId, studentName, text: "", trials: [], order: order + i };
+      });
+      renderViewOrDefer("viewGroupRenderPending", isGroupViewBusy, renderGroupSessionView);
+      addGroupRemarksBatch(state.viewGroupSessionId, attendees.map(studentName => ({ actId, studentName })), remIds)
+        .catch(err => {
+          remIds.forEach(id => delete d.remarks[id]);
+          renderViewOrDefer("viewGroupRenderPending", isGroupViewBusy, renderGroupSessionView);
+          alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
+        });
+    });
+  });
+}
+
 function attachViewListeners() {
   const body = $("session-view-body");
 
@@ -13539,6 +13604,7 @@ function buildGroupTargetViewTable(target, data, attendees) {
         <tbody>${rows}</tbody>
       </table>
     </div>
+    <button class="view-add-remark-target-group" data-target="${escHtml(target.name)}">+ Add Remark &amp; Trials</button>
   </div>`;
 }
 
@@ -14079,6 +14145,10 @@ function bindGroupViewTrialCellListeners(container) {
 function attachGroupViewListeners() {
   const body = $("group-session-view-body");
   const sid  = () => state.viewGroupSessionId;
+
+  body.querySelectorAll(".view-add-remark-target-group").forEach(btn => {
+    btn.addEventListener("click", () => showGroupViewAddRemarkPicker(btn.dataset.target));
+  });
 
   body.querySelectorAll("textarea.view-remark-edit, textarea.view-mastery-note").forEach(autoResizeTextarea);
 
