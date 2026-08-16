@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1680";
+const APP_VERSION = "1681";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3177,7 +3177,7 @@ RECOMMENDATIONS:
     setProgress(100, "Done!");
     await new Promise(r => setTimeout(r, 400));
 
-    await hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData, chartData, sessionType);
+    await hyrDownloadWord(effectiveStudent, period, year, trendRows, categorized, parsed, breakdownData, chartData, sessionType);
 
   } catch (err) {
     if (err.name !== "AbortError") alert("Failed to generate report:\n" + err.message);
@@ -5126,7 +5126,7 @@ ${isFocus ? `===FOCUS: ${t.name}===
     setProgress(100, "Done!");
     await new Promise(r => setTimeout(r, 400));
 
-    await monthlyDownloadWord(student, year, month, monthName, sessionCount, threeMonthData, miniData, parsed, threeMonthPeriodLabel, oneMonthPeriodLabel, sessionType);
+    await monthlyDownloadWord(effectiveStudent, year, month, monthName, sessionCount, threeMonthData, miniData, parsed, threeMonthPeriodLabel, oneMonthPeriodLabel, sessionType);
   } catch (err) {
     if (err.name !== "AbortError") alert("Failed to generate monthly report:\n" + err.message);
   } finally {
