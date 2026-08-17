@@ -2926,8 +2926,11 @@ button.wf-pill:hover { filter: brightness(.93); }
   grid-column: 3 / 8;
   grid-row: 2;
   display: flex;
-  justify-content: center;
   padding-top: .3rem;
+}
+.wf-note-wrap .wf-note-btn {
+  width: 100%;
+  text-align: center;
 }
 .wf-export-wrap {
   grid-column: 9;
