@@ -3096,6 +3096,23 @@ button.wf-pill:hover { filter: brightness(.93); }
 }
 .snote-textarea:focus { outline: 2px solid #f59e0b; border-radius: 3px; }
 
+.snote-assign-tag {
+  display: inline-block;
+  margin-bottom: .25rem;
+  padding: .1rem .45rem;
+  font-size: .72rem;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px solid #d97706;
+  background: #fef3c7;
+  color: #92400e;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: background .1s;
+}
+.snote-assign-tag:hover { background: #fde68a; }
+
 .snote-add-row-btn {
   width: 100%;
   margin-top: .4rem;

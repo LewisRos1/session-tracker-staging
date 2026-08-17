@@ -83,6 +83,7 @@ import {
   setRevisionDone,
   updateReviewCommentText,
   markCommentFixed,
+  updateCommentAssignment,
   listenToReviewQueue,
   getSessionsWithParticipant,
   getAllSessions,
@@ -173,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1705";
+const APP_VERSION = "1706";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10610,6 +10611,16 @@ function getWorkflowState(data) {
     .sort(([,a],[,b]) => (a.order || 0) - (b.order || 0));
   const allFixed   = comments.length > 0 && comments.every(([,c]) => !!c.fixedByName);
   const noComments = comments.length === 0;
+
+  // Per-person: a comment belongs to a person if assignedTo is empty/missing (all) or includes their id
+  const commentsForPerson = id => comments.filter(([, c]) => {
+    const a = c.assignedTo;
+    return !a || a.length === 0 || a.includes(id);
+  });
+  const allFixedForPerson = id => {
+    const mine = commentsForPerson(id);
+    return mine.length === 0 || mine.every(([, c]) => !!c.fixedByName);
+  };
   const p3Bypassed = !!noCorrectionsDecision;
   const effectiveAllP3Done = allP3Done || p3Bypassed;
 
@@ -10650,7 +10661,7 @@ function getWorkflowState(data) {
     p3Ids, p3Done, p3Check, allP3Done, p3Bypassed, noCorrectionsDecision, effectiveAllP3Done,
     p4DaisyCheck, reviewSubmitted2,
     p4Check, p4Done,
-    comments, allFixed, noComments, ready, revisionDone, daisyOnly,
+    comments, allFixed, noComments, commentsForPerson, allFixedForPerson, ready, revisionDone, daisyOnly,
     rayDone: p1Done("ray"), daisyDone: p1Done("daisy"),
   };
 }
@@ -11051,9 +11062,10 @@ async function handleCheckedByClick(e, isGroup) {
       const ws     = getWorkflowState(data);
       const id     = role.slice(3);
       const newDone = !ws.p3Done(id);
-      if (newDone && ws.comments.length > 0 && !ws.allFixed) {
-        const unfixed = ws.comments.filter(([,c]) => !c.fixedByName).length;
-        _phase3Error = `${unfixed} correction${unfixed > 1 ? "s" : ""} still unticked.`;
+      if (newDone && !ws.allFixedForPerson(id)) {
+        const myComments = ws.commentsForPerson(id);
+        const unfixed = myComments.filter(([, c]) => !c.fixedByName).length;
+        _phase3Error = `${unfixed} correction${unfixed > 1 ? "s" : ""} assigned to ${(INSTRUCTORS.find(i => i.id === id) || { name: id }).name} still unticked.`;
         rerender();
         setTimeout(() => { _phase3Error = null; rerender(); }, 3500);
         return true;
@@ -11129,14 +11141,25 @@ function renderStickyNoteContent(data, isGroup) {
   // Keep live value so re-render doesn't lose in-flight text
   const liveText      = focusedCmtId ? activeEl.value : null;
 
+  const instName = id => (INSTRUCTORS.find(i => i.id === id) || { name: id }).name;
+  const showAssignTag = ws.p3Ids.length > 1;
+
   if (ws.comments.length === 0) {
     tbody.innerHTML = "";
   } else {
     tbody.innerHTML = ws.comments.map(([id, c], i) => {
       const text = (focusedCmtId === id && liveText !== null) ? liveText : (c.text || "");
+      let assignTag = "";
+      if (showAssignTag) {
+        const assigned = c.assignedTo || [];
+        const label = assigned.length === 1
+          ? `→ ${instName(assigned[0])}`
+          : "→ All";
+        assignTag = `<button class="snote-assign-tag" data-cmt-id="${id}" title="Click to change assignee">${escHtml(label)}</button>`;
+      }
       return `<tr class="snote-row${c.fixedByName ? " snote-row--done" : ""}">
         <td class="snote-no">${i + 1}</td>
-        <td class="snote-text"><textarea class="snote-textarea" data-cmt-id="${id}" rows="1" placeholder="Type here…">${escHtml(text)}</textarea></td>
+        <td class="snote-text">${assignTag}<textarea class="snote-textarea" data-cmt-id="${id}" rows="1" placeholder="Type here…">${escHtml(text)}</textarea></td>
         <td class="snote-tick"><input type="checkbox" class="snote-check" data-cmt-id="${id}" ${c.fixedByName ? "checked" : ""}></td>
         <td class="snote-del"><button class="snote-del-btn" data-cmt-id="${id}" title="Delete row">🗑</button></td>
       </tr>`;
@@ -11325,6 +11348,30 @@ function setupStickyNote() {
     }
 
 
+    // Cycle assignee tag
+    const assignTag = e.target.closest(".snote-assign-tag");
+    if (assignTag) {
+      const { sid, data } = getCtx();
+      if (!sid) return;
+      const cmtId = assignTag.dataset.cmtId;
+      const ws2   = getWorkflowState(data);
+      const cmt   = (data?.reviewComments || {})[cmtId];
+      if (!cmt) return;
+      // Cycle: [] (all) → [p3Ids[0]] → [p3Ids[1]] → ... → [] (all)
+      const current = cmt.assignedTo || [];
+      let nextAssigned;
+      if (current.length === 0) {
+        nextAssigned = [ws2.p3Ids[0]];
+      } else {
+        const idx = ws2.p3Ids.indexOf(current[0]);
+        const nextIdx = idx + 1;
+        nextAssigned = nextIdx < ws2.p3Ids.length ? [ws2.p3Ids[nextIdx]] : [];
+      }
+      try { await updateCommentAssignment(sid, cmtId, nextAssigned); }
+      catch (err) { console.error("updateCommentAssignment:", err); }
+      return;
+    }
+
     // Tick/untick checkbox
     const chk = e.target.closest(".snote-check");
     if (chk) {
@@ -11333,12 +11380,21 @@ function setupStickyNote() {
       const cmtId  = chk.dataset.cmtId;
       const fixing = chk.checked;
       try {
-        await markCommentFixed(sid, cmtId, fixing ? "Rayhanah" : null);
-        // Unticking a correction means revision not done — reset Phase 3
+        await markCommentFixed(sid, cmtId, fixing ? "Done" : null);
+        // Unticking a correction means the assigned person(s) haven't finished — reset their Phase 3 ticks
         if (!fixing) {
+          const ws2 = getWorkflowState(data);
+          const cmt = (data?.reviewComments || {})[cmtId];
+          const assigned = cmt?.assignedTo || [];
+          // Affected = those assigned to this correction (empty = everyone in Phase 3)
+          const affected = ws2.p3Ids.filter(id => !assigned.length || assigned.includes(id));
           const checks = { ...(data?.checks || {}) };
-          const p3Keys = Object.keys(checks).filter(k => k.startsWith("p3_"));
-          if (p3Keys.length) { p3Keys.forEach(k => delete checks[k]); await updateSessionChecks(sid, checks).catch(() => {}); }
+          let changed = false;
+          affected.forEach(id => { if (checks[`p3_${id}`]) { delete checks[`p3_${id}`]; changed = true; } });
+          if (changed) {
+            delete checks["p4_daisy"]; delete checks["p4_nigel"];
+            await updateSessionChecks(sid, checks).catch(() => {});
+          }
         }
       }
       catch (err) { console.error("markCommentFixed:", err); }

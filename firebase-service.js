@@ -383,6 +383,13 @@ export async function markCommentFixed(sessionId, commentId, fixedByName) {
   }
 }
 
+/** Update assignedTo list on a review comment ([] = all participants responsible). */
+export async function updateCommentAssignment(sessionId, commentId, assignedTo) {
+  await updateDoc(doc(db, "sessions", sessionId), {
+    [`reviewComments.${commentId}.assignedTo`]: assignedTo
+  });
+}
+
 /** All sessions where a given instructor id appears in the participants array. */
 export async function getSessionsWithParticipant(instructorId) {
   const q = query(collection(db, "sessions"), where("participants", "array-contains", instructorId));
