@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1688";
+const APP_VERSION = "1689";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10588,11 +10588,22 @@ function getWorkflowState(data) {
   const p3Bypassed = !!noCorrectionsDecision;
   const effectiveAllP3Done = allP3Done || p3Bypassed;
 
-  // If Daisy is the ONLY instructor, skip Phase 2 & 3 entirely — go straight to Phase 4
+  // If Daisy is the ONLY instructor, skip Phases 2, 3 & 4 entirely — go straight to Phase 5
   const daisyOnly = p1Ids.length === 1 && p1Ids[0] === "daisy";
-  const ready = allP1Done && (daisyOnly || (reviewSubmitted && effectiveAllP3Done && (noComments || allFixed)));
 
-  // Phase 4 — Nigel exports to Word
+  // Phase 4: Check #2 — Ms. Daisy
+  // Backcompat: old sessions where Export (p4_nigel) was ticked before Check #2 existed —
+  // treat Check #2 as implicitly done using Export's timestamp, so nothing breaks.
+  const p4DaisyRaw   = checks["p4_daisy"] || null;
+  const p4DaisyCompat = !p4DaisyRaw && checks["p4_nigel"]
+    ? { by: "daisy", at: checks["p4_nigel"].at, compat: true }
+    : null;
+  const p4DaisyCheck  = p4DaisyRaw || p4DaisyCompat;
+  const reviewSubmitted2 = !!p4DaisyCheck;
+
+  const ready = allP1Done && (daisyOnly || (reviewSubmitted && effectiveAllP3Done && reviewSubmitted2 && (noComments || allFixed)));
+
+  // Phase 5 — Nigel exports to Word
   const p4Check = checks["p4_nigel"] || null;
   const p4Done  = !!p4Check;
 
@@ -10603,7 +10614,8 @@ function getWorkflowState(data) {
   return {
     p1Ids, p1Done, p1Check, allP1Done,
     reviewSubmitted, reviewUnlocked: allP1Done,
-    p3Ids, p3Done, p3Check, allP3Done, p3Bypassed, noCorrectionsDecision,
+    p3Ids, p3Done, p3Check, allP3Done, p3Bypassed, noCorrectionsDecision, effectiveAllP3Done,
+    p4DaisyCheck, reviewSubmitted2,
     p4Check, p4Done,
     comments, allFixed, noComments, ready, revisionDone, daisyOnly,
     rayDone: p1Done("ray"), daisyDone: p1Done("daisy"),
@@ -10702,7 +10714,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     p2Body  = `<button class="wf-pill wf-pill--done" data-role="phase2">✓ Ms. Daisy · ${escHtml(fmtCheckTimestamp(data.reviewSubmittedAt))}</button>`;
   }
   const p2Node = `<div class="wf-node wf-node--${p2State}">
-    <div class="wf-node-label">Phase 2: Check</div>
+    <div class="wf-node-label">Phase 2: Check #1</div>
     <div class="wf-node-body">${p2Body}</div>
   </div>`;
 
@@ -10743,7 +10755,34 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     ${_phase3Error ? `<div class="wf-error-msg">⚠ ${escHtml(_phase3Error)}</div>` : ""}
   </div>`;
 
-  // ── Phase 4: Export (Nigel) ───────────────────────────────────
+  // ── Phase 4: Check #2 (Ms. Daisy) ───────────────────────────
+  let p4State, p4Body;
+  if (ws.daisyOnly) {
+    p4State = ws.allP1Done ? "done" : "locked";
+    p4Body  = ws.allP1Done
+      ? `<div class="wf-pill wf-pill--done">✓ Ms. Daisy is the only instructor. No need to check.</div>`
+      : `<div class="wf-pill wf-pill--locked">🔒 Complete Phase 1 first</div>`;
+  } else if (!ws.effectiveAllP3Done) {
+    p4State = "locked";
+    p4Body  = `<div class="wf-pill wf-pill--locked">🔒 Complete Phase 3 first</div>`;
+  } else if (confirmRole === "p4_daisy") {
+    p4State = "p2-active";
+    p4Body  = mkConfirm("p4_daisy", ws.reviewSubmitted2 ? "Undo? This will also uncheck Export." : "Mark as reviewed?");
+  } else if (ws.reviewSubmitted2) {
+    // Static (no data-role) if compat — Export was already ticked on this session before Check #2 existed
+    const role = ws.p4DaisyCheck?.compat ? "" : ` data-role="p4_daisy"`;
+    p4State = "done";
+    p4Body  = `<button class="wf-pill wf-pill--done"${role}>✓ Ms. Daisy · ${escHtml(fmtCheckTimestamp(ws.p4DaisyCheck.at))}</button>`;
+  } else {
+    p4State = "p2-active";
+    p4Body  = `<button class="wf-pill wf-pill--attention" data-role="p4_daisy">○ Ms. Daisy: Incomplete</button>`;
+  }
+  const p4Node = `<div class="wf-node wf-node--${p4State}">
+    <div class="wf-node-label">Phase 4: Check #2</div>
+    <div class="wf-node-body">${p4Body}</div>
+  </div>`;
+
+  // ── Phase 5: Export (Nigel) ───────────────────────────────────
   let nigelState, nigelBody;
   const isMonthlyExport = !isGroup && state.viewStudent?.exportDuration === "monthly";
   if (isMonthlyExport) {
@@ -10763,7 +10802,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     nigelBody  = `<button class="wf-pill wf-pill--attention" data-role="p4_nigel">○ Nigel: Incomplete</button>`;
   }
   const nigelNode  = `<div class="wf-node wf-node--${nigelState}">
-    <div class="wf-node-label">Phase 4: Export</div>
+    <div class="wf-node-label">Phase 5: Export</div>
     <div class="wf-node-body">${nigelBody}</div>
   </div>`;
 
@@ -10780,7 +10819,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
 
   return `<div class="checked-by-strip" contenteditable="false">
     <div class="workflow-chart">
-      ${p1Node}${arrow}${p2Node}${arrow}${p3Node}${arrow}${nigelNode}
+      ${p1Node}${arrow}${p2Node}${arrow}${p3Node}${arrow}${p4Node}${arrow}${nigelNode}
       ${noteTrigger}
       ${exportTrigger}
     </div>
@@ -10927,6 +10966,12 @@ async function handleCheckedByClick(e, isGroup) {
           const newStatus = updatedCmts.length > 0 ? "ray_pending" : null;
           await updateWorkflowStatus(sid, newStatus, getSubjectMeta());
         } else {
+          // Cascade: unticking Phase 2 invalidates Phase 3, 4 and 5
+          const checks = { ...(data?.checks || {}) };
+          Object.keys(checks).filter(k => k.startsWith("p3_")).forEach(k => delete checks[k]);
+          delete checks["p4_daisy"];
+          delete checks["p4_nigel"];
+          await updateSessionChecks(sid, checks);
           await updateWorkflowStatus(sid, "daisy_pending", getSubjectMeta());
         }
       } catch (err) { console.error("togglePhase2:", err); }
@@ -10943,13 +10988,33 @@ async function handleCheckedByClick(e, isGroup) {
       }
       _phase3Error = null;
       const checks  = { ...(data?.checks || {}) };
-      if (newDone) { checks[role] = { by: id, at: Date.now() }; } else { delete checks[role]; }
+      if (newDone) {
+        checks[role] = { by: id, at: Date.now() };
+      } else {
+        delete checks[role];
+        // Cascade: unticking Phase 3 invalidates Phase 4 and 5
+        delete checks["p4_daisy"];
+        delete checks["p4_nigel"];
+      }
       try {
         await updateSessionChecks(sid, checks);
         const ws2    = getWorkflowState({ ...data, checks });
         const allDone = ws2.allP3Done && ws2.p3Ids.length > 0;
         await updateWorkflowStatus(sid, allDone ? null : "ray_pending", getSubjectMeta());
       } catch (err) { console.error("updateSessionChecks p3:", err); }
+    } else if (role === "p4_daisy") {
+      const ws      = getWorkflowState(data);
+      const newDone = !ws.reviewSubmitted2;
+      const checks  = { ...(data?.checks || {}) };
+      if (newDone) {
+        checks["p4_daisy"] = { by: "daisy", at: Date.now() };
+      } else {
+        // Unticking Check #2 cascades — Export is now invalid too
+        delete checks["p4_daisy"];
+        delete checks["p4_nigel"];
+      }
+      try { await updateSessionChecks(sid, checks); }
+      catch (err) { console.error("updateSessionChecks p4_daisy:", err); }
     } else if (role === "p4_nigel") {
       const ws      = getWorkflowState(data);
       const newDone = !ws.p4Done;
