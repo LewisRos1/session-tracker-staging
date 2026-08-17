@@ -512,15 +512,17 @@ export async function addActivity(sessionId, targetName, activityName, order, is
 // in a single Firestore write so no intermediate snapshot can arrive between
 // the two — which would cause "+Add Remark & Trials" to flash briefly before
 // the remark landed in a second snapshot.
-export async function addAutoFillActivityAndRemark(sessionId, targetName, activityName, order, parentActivity = null, configId = null) {
+export async function addAutoFillActivityAndRemark(sessionId, targetName, activityName, order, parentActivity = null, configId = null, masteryNote = "") {
   const actId = generateId("a");
   const remId = generateId("r");
   const actData = { targetName, activityName, order, isPredefined: true };
   if (parentActivity) actData.parentActivity = parentActivity;
   if (configId) actData.configId = configId;
+  const remData = { activityId: actId, text: "", trials: [], order: Date.now() };
+  if (masteryNote) remData.masteryNote = masteryNote;
   await updateDoc(doc(db, "sessions", sessionId), {
     [`activities.${actId}`]: actData,
-    [`remarks.${remId}`]: { activityId: actId, text: "", trials: [], order: Date.now() }
+    [`remarks.${remId}`]: remData
   });
   return actId;
 }
@@ -739,9 +741,10 @@ export async function cleanupExpiredTrash() {
 // remId can be supplied by the caller (e.g. to write a remark into local
 // state immediately, before this write reaches the server, so the UI
 // doesn't have to wait on the round trip) — otherwise one is generated here.
-export async function addRemark(sessionId, actId, text, predefinedKey = null, remId = generateId("r")) {
+export async function addRemark(sessionId, actId, text, predefinedKey = null, remId = generateId("r"), masteryNote = "") {
   const data = { activityId: actId, text, trials: [], order: Date.now() };
   if (predefinedKey !== null) data.predefinedKey = predefinedKey;
+  if (masteryNote) data.masteryNote = masteryNote;
   await updateDoc(doc(db, "sessions", sessionId), {
     [`remarks.${remId}`]: data
   });
@@ -1523,9 +1526,11 @@ export async function renameGroupRemarkOptionAcrossSessions(groupId, targetName,
 }
 
 /** Add a remark for a specific student in a group session. */
-export async function addGroupRemark(sessionId, actId, studentName, text = "", remId = generateId("r")) {
+export async function addGroupRemark(sessionId, actId, studentName, text = "", remId = generateId("r"), masteryNote = "") {
+  const data = { activityId: actId, studentName, text, trials: [], order: Date.now() };
+  if (masteryNote) data.masteryNote = masteryNote;
   await updateDoc(doc(db, "sessions", sessionId), {
-    [`remarks.${remId}`]: { activityId: actId, studentName, text, trials: [], order: Date.now() }
+    [`remarks.${remId}`]: data
   });
   return remId;
 }
