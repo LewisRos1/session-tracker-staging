@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1703";
+const APP_VERSION = "1704";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -1386,6 +1386,7 @@ async function loadTodoHomeCounts() {
             if (p2Unlocked) return n + 1;
           }
           if (inst.id !== "daisy" && inst.id !== "nigel" && ws.effectiveReviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) return n + 1;
+          if (inst.id === "daisy" && !ws.daisyOnly && ws.effectiveReviewSubmitted && ws.effectiveAllP3Done && !ws.reviewSubmitted2) return n + 1;
           if (inst.id === "nigel" && ws.ready && !ws.p4Done && !isMonthly) return n + 1;
         } catch { /* skip malformed session */ }
         return n;
@@ -1496,6 +1497,7 @@ async function openTodoScreen(filterInstId = null) {
         if (p2Unlocked) return true;
       }
       if (inst.id !== "daisy" && inst.id !== "nigel" && ws.effectiveReviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) return true;
+      if (inst.id === "daisy" && !ws.daisyOnly && ws.effectiveReviewSubmitted && ws.effectiveAllP3Done && !ws.reviewSubmitted2) return true;
       if (inst.id === "nigel" && ws.ready && !ws.p4Done && !isMonthly) return true;
       return false;
     });
