@@ -329,6 +329,15 @@ export async function addReviewComment(sessionId, text, forInstructor = null) {
   return id;
 }
 
+/** Set a correction's status: null (empty) | "fixed" (✓) | "rejected" (✗). */
+export async function setCommentStatus(sessionId, commentId, status) {
+  await updateDoc(doc(db, "sessions", sessionId), {
+    [`reviewComments.${commentId}.fixedByName`]: status === "fixed" ? "Done" : null,
+    [`reviewComments.${commentId}.fixedAt`]:     status === "fixed" ? new Date().toISOString() : null,
+    [`reviewComments.${commentId}.fixStatus`]:   status,
+  });
+}
+
 /** Delete a review comment. */
 export async function deleteReviewComment(sessionId, commentId) {
   await updateDoc(doc(db, "sessions", sessionId), {

@@ -2957,6 +2957,13 @@ button.wf-pill:hover { filter: brightness(.93); }
 .wf-note-btn:hover { background: #ddd6fe; border-color: #a78bfa; }
 .wf-note-btn.has-note { background: #c4b5fd; border-color: #7c3aed; color: #3b0764; }
 
+.wf-p3-hint {
+  font-size: .73rem;
+  color: #b91c1c;
+  margin-top: .4rem;
+  font-style: italic;
+  line-height: 1.4;
+}
 .wf-p4-hint {
   font-size: .73rem;
   color: var(--text-muted);
@@ -3087,9 +3094,20 @@ button.wf-pill:hover { filter: brightness(.93); }
 .snote-no   { color: #92400e; font-weight: 600; text-align: right; padding-right: .6rem; }
 .snote-text { word-break: break-word; }
 .snote-tick { text-align: center; vertical-align: middle; }
-.snote-check { cursor: pointer; width: 1rem; height: 1rem; accent-color: #10b981; display: block; margin: 0 auto; }
-.snote-check:disabled { cursor: not-allowed; opacity: .35; }
+.snote-status-btn {
+  width: 1.5rem; height: 1.5rem;
+  border-radius: 50%; border: 1.5px solid #d1d5db;
+  background: white; cursor: pointer;
+  font-size: .85rem; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0; margin: 0 auto; line-height: 1;
+  transition: background .1s, border-color .1s;
+}
+.snote-status--empty  { color: #9ca3af; }
+.snote-status--fixed  { background: #d1fae5; border-color: #10b981; color: #065f46; }
+.snote-status--rejected { background: #fee2e2; border-color: #ef4444; color: #b91c1c; }
 .snote-row--done .snote-text { text-decoration: line-through; opacity: .6; }
+.snote-row--rejected .snote-text { color: #ef4444; }
 .snote-empty { color: #92400e; opacity: .7; font-style: italic; font-size: .82rem; padding: .5rem .35rem; }
 
 .snote-textarea {

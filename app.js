@@ -83,6 +83,7 @@ import {
   setRevisionDone,
   updateReviewCommentText,
   markCommentFixed,
+  setCommentStatus,
   updateCommentAssignment,
   listenToReviewQueue,
   getSessionsWithParticipant,
@@ -174,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1722";
+const APP_VERSION = "1723";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10577,6 +10578,13 @@ let _focusNewRow            = false;
 let _phase3Error            = null; // error string shown in Phase 3 node, auto-clears
 const _textareaDebounce     = new Map();
 
+// Returns null | "fixed" | "rejected" for a correction entry.
+function getCmtStatus(c) {
+  if (c.fixStatus) return c.fixStatus;  // new field ("fixed" | "rejected")
+  if (c.fixedByName) return "fixed";    // backward compat
+  return null;
+}
+
 function getWorkflowState(data) {
   const checks       = data?.checks || {};
   const participants = data?.participants || [];
@@ -10623,8 +10631,9 @@ function getWorkflowState(data) {
   });
   const allFixedFor = id => {
     const mine = commentsFor(id);
-    return mine.length === 0 || mine.every(([, c]) => !!c.fixedByName);
+    return mine.length === 0 || mine.every(([, c]) => getCmtStatus(c) === "fixed");
   };
+  const allFixed = comments.length > 0 && comments.every(([, c]) => getCmtStatus(c) === "fixed");
 
   // ── No-corrections per instructor ─────────────────────────────
   // New keys: checks.no_corr_<id>
@@ -10643,7 +10652,6 @@ function getWorkflowState(data) {
   const p3Done  = id => !!p3Check(id);
   const allP3Done = p3Ids.length === 0 || p3Ids.every(id => p3Done(id) || noCorr(id));
   const p3Bypassed = p3Ids.length === 0 || p3Ids.every(noCorr);
-  const allFixed   = comments.length > 0 && comments.every(([, c]) => !!c.fixedByName);
   const noComments = comments.length === 0;
 
   // ── Phase 4: per-instructor Check #2 (Daisy) ──────────────────
@@ -10849,10 +10857,13 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     p3State = ws.allP3Done ? "done" : (anyUnlocked ? "corrections" : "locked");
     p3Body  = ws.p3Ids.map(mkPill3).join("");
   }
+  const hasRejections = !ws.daisyOnly && ws.p3Ids.some(id =>
+    ws.commentsFor(id).some(([, c]) => getCmtStatus(c) === "rejected"));
   const p3Node = `<div class="wf-node wf-node--${p3State}">
     <div class="wf-node-label">Phase 3: Revision</div>
     <div class="wf-node-body">${p3Body}</div>
     ${_phase3Error ? `<div class="wf-error-msg">⚠ ${escHtml(_phase3Error)}</div>` : ""}
+    ${hasRejections ? `<div class="wf-p3-hint">✗ Crosses indicate that Ms. Daisy has reviewed the work and errors are still present.</div>` : ""}
   </div>`;
 
   // ── Phase 4: Check #2 — per instructor, unlocks after their Phase 3 ──
@@ -10886,7 +10897,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     p4State = ws.allP4Done ? "done" : (anyUnlocked4 ? "p2-active" : "locked");
     p4Body  = ws.p3Ids.map(mkPill4).join("");
     if (!ws.allP4Done) {
-      p4Body += `<div class="wf-p4-hint">If their work still contains errors, go to their list of corrections, untick the relevant items, and add an extra note if needed.</div>`;
+      p4Body += `<div class="wf-p4-hint">If their work still contains errors, go to their list of corrections and click any incorrect ticks to change them into crosses. Add an extra note if needed.</div>`;
     }
   }
   const p4Node = `<div class="wf-node wf-node--${p4State}">
@@ -11148,7 +11159,7 @@ async function handleCheckedByClick(e, isGroup) {
       const id     = role.slice(3);
       const newDone = !ws.p3Done(id);
       if (newDone && !ws.allFixedFor(id)) {
-        const unticked = ws.commentsFor(id).filter(([, c]) => !c.fixedByName);
+        const unticked = ws.commentsFor(id).filter(([, c]) => getCmtStatus(c) !== "fixed");
         const n = unticked.length;
         _phase3Error = `${n} correction${n > 1 ? "s" : ""} still unticked.`;
         rerender();
@@ -11232,10 +11243,15 @@ function renderStickyNoteContent(data, isGroup) {
   } else {
     tbody.innerHTML = visible.map(([id, c], i) => {
       const text = (focusedCmtId === id && liveText !== null) ? liveText : (c.text || "");
-      return `<tr class="snote-row${c.fixedByName ? " snote-row--done" : ""}">
+      const st = getCmtStatus(c);
+      const [stIcon, stCls] = st === "fixed" ? ["✓", "snote-status--fixed"]
+        : st === "rejected" ? ["✗", "snote-status--rejected"]
+        : ["○", "snote-status--empty"];
+      const rowCls = st === "fixed" ? " snote-row--done" : st === "rejected" ? " snote-row--rejected" : "";
+      return `<tr class="snote-row${rowCls}">
         <td class="snote-no">${i + 1}</td>
         <td class="snote-text"><textarea class="snote-textarea" data-cmt-id="${id}" rows="1" placeholder="Type here…">${escHtml(text)}</textarea></td>
-        <td class="snote-tick"><input type="checkbox" class="snote-check" data-cmt-id="${id}" ${c.fixedByName ? "checked" : ""}></td>
+        <td class="snote-tick"><button class="snote-status-btn ${stCls}" data-cmt-id="${id}" title="Click to change status">${stIcon}</button></td>
         <td class="snote-del"><button class="snote-del-btn" data-cmt-id="${id}" title="Delete row">🗑</button></td>
       </tr>`;
     }).join("");
@@ -11436,19 +11452,21 @@ function setupStickyNote() {
       return;
     }
 
-    // Tick/untick checkbox
-    const chk = e.target.closest(".snote-check");
-    if (chk) {
+    // 3-state status button: empty → fixed (✓) → rejected (✗) → empty
+    const statusBtn = e.target.closest(".snote-status-btn");
+    if (statusBtn) {
       const { sid, data } = getCtx();
       if (!sid) return;
-      const cmtId  = chk.dataset.cmtId;
-      const fixing = chk.checked;
+      const cmtId = statusBtn.dataset.cmtId;
+      const cmt   = (data?.reviewComments || {})[cmtId];
+      if (!cmt) return;
+      const current = getCmtStatus(cmt);
+      const next = current === null ? "fixed" : current === "fixed" ? "rejected" : null;
       try {
-        await markCommentFixed(sid, cmtId, fixing ? "Done" : null);
-        if (!fixing) {
-          // Unticking — reset Phase 3 for the relevant instructor
-          const cmt = (data?.reviewComments || {})[cmtId];
-          const instId = cmt?.forInstructor || _stickyNoteInstructorId;
+        await setCommentStatus(sid, cmtId, next);
+        // Leaving "fixed" state → reset this instructor's Phase 3 & 4
+        if (next !== "fixed") {
+          const instId = cmt.forInstructor || _stickyNoteInstructorId;
           const ws2 = getWorkflowState(data);
           const affected = instId ? [instId] : ws2.p3Ids;
           const checks = { ...(data?.checks || {}) };
@@ -11459,8 +11477,7 @@ function setupStickyNote() {
           });
           if (changed) { delete checks["p4_nigel"]; await updateSessionChecks(sid, checks).catch(() => {}); }
         }
-      }
-      catch (err) { console.error("markCommentFixed:", err); }
+      } catch (err) { console.error("setCommentStatus:", err); }
       return;
     }
 
