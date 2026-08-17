@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1716";
+const APP_VERSION = "1717";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10875,7 +10875,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     p4State = ws.allP4Done ? "done" : (anyUnlocked4 ? "p2-active" : "locked");
     p4Body  = ws.p3Ids.map(mkPill4).join("");
     if (!ws.allP4Done) {
-      p4Body += `<div class="wf-p4-hint">If work still contains errors, untick the correction in their List of Corrections and add a new note.</div>`;
+      p4Body += `<div class="wf-p4-hint">If their work still contains errors, go to their list of corrections, untick the relevant items, and add an extra note if needed.</div>`;
     }
   }
   const p4Node = `<div class="wf-node wf-node--${p4State}">
