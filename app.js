@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1719";
+const APP_VERSION = "1720";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10612,24 +10612,7 @@ function getWorkflowState(data) {
   const p2EffDone = id => p2CheckDone(id) && !p2CheckStale(id);
   const allP2Done = p3Ids.length > 0 && p3Ids.every(p2EffDone);
 
-  // ── No-corrections per instructor ─────────────────────────────
-  // New keys: checks.no_corr_<id>
-  // Backward compat: old no_corrections covers all p3Ids when no new keys exist.
-  const hasAnyNewNoCorr = p3Ids.some(id => !!checks[`no_corr_${id}`]);
-  const noCorrOld = checks["no_corrections"] || null;
-  const noCorr = id => {
-    if (checks[`no_corr_${id}`]) return true;
-    if (!hasAnyNewNoCorr && !!noCorrOld) return true;
-    return false;
-  };
-
-  // ── Phase 3: Revision ──────────────────────────────────────────
-  const p3Check = id => checks[`p3_${id}`] || null;
-  const p3Done  = id => !!p3Check(id);
-  const allP3Done = p3Ids.length === 0 || p3Ids.every(id => p3Done(id) || noCorr(id));
-  const p3Bypassed = p3Ids.length === 0 || p3Ids.every(noCorr);
-
-  // ── Comments per instructor ────────────────────────────────────
+  // ── Comments per instructor (computed first — needed by noCorr override) ──
   const comments = Object.entries(data?.reviewComments || {})
     .sort(([,a],[,b]) => (a.order || 0) - (b.order || 0));
   const commentsFor = id => comments.filter(([, c]) => {
@@ -10642,6 +10625,24 @@ function getWorkflowState(data) {
     const mine = commentsFor(id);
     return mine.length === 0 || mine.every(([, c]) => !!c.fixedByName);
   };
+
+  // ── No-corrections per instructor ─────────────────────────────
+  // New keys: checks.no_corr_<id>
+  // Backward compat: old no_corrections covers all p3Ids when no new keys exist.
+  const hasAnyNewNoCorr = p3Ids.some(id => !!checks[`no_corr_${id}`]);
+  const noCorrOld = checks["no_corrections"] || null;
+  const noCorr = id => {
+    const flagSet = !!(checks[`no_corr_${id}`] || (!hasAnyNewNoCorr && noCorrOld));
+    if (!flagSet) return false;
+    // Override stale flag: if real corrections exist in the list, bypass is cancelled
+    return !commentsFor(id).some(([, c]) => (c.text || "").trim());
+  };
+
+  // ── Phase 3: Revision ──────────────────────────────────────────
+  const p3Check = id => checks[`p3_${id}`] || null;
+  const p3Done  = id => !!p3Check(id);
+  const allP3Done = p3Ids.length === 0 || p3Ids.every(id => p3Done(id) || noCorr(id));
+  const p3Bypassed = p3Ids.length === 0 || p3Ids.every(noCorr);
   const allFixed   = comments.length > 0 && comments.every(([, c]) => !!c.fixedByName);
   const noComments = comments.length === 0;
 
