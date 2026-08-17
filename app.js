@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1730";
+const APP_VERSION = "1731";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10131,7 +10131,7 @@ async function autoFillStructuredRemarks(student, sessionId) {
       // For maintained non-Notes-Only activities on/after the maintained date, pre-fill
       // the note field with "Maintain" so the user sees it immediately without typing.
       const _sDate = state.sessionData?.date || null;
-      const maintNote = (pa.maintained && (pa.remarkHasNote || pa.sentenceStarter || pa.noteSentenceStarter) && _sDate && _sDate >= (pa.maintainedAt || "2026-01-01"))
+      const maintNote = (pa.maintained && _sDate && _sDate >= (pa.maintainedAt || "2026-01-01"))
         ? "Maintain" : "";
       toFill.push({ target, pa, actId, key, paParent, paConfigId, maintNote });
     }
@@ -10317,6 +10317,13 @@ async function cleanupEmptyEntries(sessionId, data, targetName, target = null, i
   // empty one isn't stale data, it's the activity waiting to auto-fill. Treat
   // them as exempt so this cleanup never races that auto-fill and deletes it.
   const mappedNames   = new Set((target?.predefinedActivities || []).filter(pa => pa.isMapped).map(pa => pa.name));
+  // Maintained non-Notes-Only activities always keep their auto-created placeholder
+  // remark so the proper UI (checkboxes/MC/manual score) stays visible on revisit.
+  const maintainedStructuredNames = new Set(
+    (target?.predefinedActivities || [])
+      .filter(pa => pa.maintained && (getActivityInlineOptions(pa) || pa.optionsMulti || pa.manualScore))
+      .map(pa => pa.title || pa.name)
+  );
   // Auto-open activities (Select One / Tickbox / Sentence Starter + select) get
   // an empty placeholder remark on session open so the user can pick immediately.
   // During a target switch (isLeaving = false) keep them — they're waiting for input.
@@ -10326,7 +10333,7 @@ async function cleanupEmptyEntries(sessionId, data, targetName, target = null, i
     ? new Set()
     : new Set((target?.predefinedActivities || []).filter(pa => isAutoOpenRemarkType(pa)).map(pa => pa.title || pa.name));
   const acts = Object.entries(data.activities || {})
-    .filter(([, a]) => a.targetName === targetName && !mappedNames.has(a.activityName) && !autoOpenNames.has(a.activityName));
+    .filter(([, a]) => a.targetName === targetName && !mappedNames.has(a.activityName) && !maintainedStructuredNames.has(a.activityName) && !autoOpenNames.has(a.activityName));
   const stripEmpty = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
   for (const [actId, act] of acts) {
     const rems = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === actId);
@@ -12479,7 +12486,7 @@ async function autoFillViewStructuredRemarks(student, sessionId, data) {
       const key = `${sessionId}:${target.name}:${paConfigId || pa.name}:${paParent || ""}:view`;
       if (structuredRemarkAutoFillInFlight.has(key)) continue;
       structuredRemarkAutoFillInFlight.add(key);
-      const _vMaintNote = (pa.maintained && (pa.remarkHasNote || pa.sentenceStarter || pa.noteSentenceStarter) && sessionDate && sessionDate >= (pa.maintainedAt || "2026-01-01"))
+      const _vMaintNote = (pa.maintained && sessionDate && sessionDate >= (pa.maintainedAt || "2026-01-01"))
         ? "Maintain" : "";
       try {
         if (existingActId) {
@@ -12621,7 +12628,7 @@ async function autoFillViewGroupStructuredRemarks(group, sessionId, data) {
         const key = `${sessionId}:${target.name}:${pa.id || pa.name}:${studentName}:view`;
         if (structuredRemarkAutoFillInFlight.has(key)) continue;
         structuredRemarkAutoFillInFlight.add(key);
-        const _vgMaintNote = (pa.maintained && (pa.remarkHasNote || pa.sentenceStarter || pa.noteSentenceStarter) && data.date && data.date >= (pa.maintainedAt || "2026-01-01"))
+        const _vgMaintNote = (pa.maintained && data.date && data.date >= (pa.maintainedAt || "2026-01-01"))
           ? "Maintain" : "";
         try {
           if (!actId) {
@@ -21088,7 +21095,7 @@ async function autoFillGroupStructuredRemarks(group, sessionId, data, targetName
       .find(([, a]) => a.targetName === targetName && (a.activityName === pa.name || (pa.title && a.activityName === pa.title) || (pa.id && a.configId === pa.id)));
     const actId = existingAct?.[0];
     if (!actId) continue;
-    const _gsMaintNote = (pa.maintained && (pa.remarkHasNote || pa.sentenceStarter || pa.noteSentenceStarter) && data.date && data.date >= (pa.maintainedAt || "2026-01-01"))
+    const _gsMaintNote = (pa.maintained && data.date && data.date >= (pa.maintainedAt || "2026-01-01"))
       ? "Maintain" : "";
     for (const studentName of attendees) {
       const hasRemark = Object.values(data.remarks || {})
