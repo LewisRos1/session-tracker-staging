@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1683";
+const APP_VERSION = "1684";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -1760,8 +1760,6 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
             <col style="width:10%">
             <col style="width:190px">
             <col style="width:120px">
-            <col style="width:130px">
-            <col style="width:130px">
             <col style="width:160px">
           </colgroup>
           <thead>
@@ -1771,8 +1769,6 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
               <th style="white-space:normal">Short Name (Used in AI Reports)</th>
               <th>Note</th>
               <th style="white-space:normal">Report Type</th>
-              <th style="white-space:normal">Imported Excel data to Website</th>
-              <th style="white-space:normal">Ready for AI H1 Report</th>
               <th style="white-space:normal">Latest Individual Session Recorded</th>
             </tr>
           </thead>
@@ -1798,8 +1794,6 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
                 <td style="text-align:center" onclick="event.stopPropagation()">
                   ${(() => { const m = s.exportDuration === "monthly"; return `<button class="db-export-dur-pill" data-id="${escHtml(s.id)}" style="padding:.28rem .7rem;border-radius:999px;border:1px solid ${m ? '#d1d5db' : '#93c5fd'};background:${m ? '#f3f4f6' : '#dbeafe'};color:${m ? '#6b7280' : '#1d4ed8'};font-size:.78rem;font-weight:600;cursor:pointer;white-space:nowrap">${m ? 'Monthly' : 'Every Session'}</button>`; })()}
                 </td>
-                <td class="reg-excel-export-cell" data-id="${escHtml(s.id)}" style="text-align:center">…</td>
-                <td class="reg-ai-h1-cell" data-id="${escHtml(s.id)}" style="text-align:center">…</td>
                 <td class="reg-indiv-num" data-id="${escHtml(s.id)}" style="text-align:center">…</td>
               </tr>`).join("")}
           </tbody>
@@ -1884,95 +1878,9 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
 
   const latestNumber = sessions => sessions.reduce((max, s) => Math.max(max, s.number || 0), 0);
   sorted.forEach(s => {
-    Promise.all([
-      getIndividualSessionsForStudent(s.id).catch(() => []),
-      getGroupSessionsForStudent(s.id).catch(() => [])
-    ]).then(([indiv, group]) => {
+    getIndividualSessionsForStudent(s.id).catch(() => []).then(indiv => {
       const indivCell = body.querySelector(`.reg-indiv-num[data-id="${s.id}"]`);
       if (indivCell) indivCell.textContent = latestNumber(indiv) || "—";
-
-      const excelCell = body.querySelector(`.reg-excel-export-cell[data-id="${s.id}"]`);
-      if (!excelCell) return;
-      const hasIndiv = indiv.length > 0;
-      const hasGroup = group.length > 0;
-      if (!hasIndiv && !hasGroup) {
-        excelCell.textContent = "—";
-        const aiH1CellEmpty = body.querySelector(`.reg-ai-h1-cell[data-id="${s.id}"]`);
-        if (aiH1CellEmpty) aiH1CellEmpty.textContent = "—";
-        return;
-      }
-      excelCell.innerHTML = "";
-      const makeBtn = (type, isReady) => {
-        const btn = document.createElement("button");
-        btn.className = "btn-excel-export-ready" + (isReady ? " is-ready" : "");
-        btn.dataset.id   = s.id;
-        btn.dataset.type = type;
-        btn.dataset.ready = isReady ? "1" : "0";
-        btn.textContent = (type === "indiv" ? "Indiv: " : "Group: ") + (isReady ? "✓ Ready" : "No");
-        btn.addEventListener("click", async e => {
-          e.stopPropagation();
-          const currentlyReady = btn.dataset.ready === "1";
-          const action = currentlyReady ? "mark as NOT ready" : "mark as READY";
-          const label = type === "indiv" ? "Individual" : "Group";
-          if (!confirm(`Are you sure you want to ${action} for Excel export (${label})?\n\n${s.name}`)) return;
-          const newReady = !currentlyReady;
-          btn.disabled = true;
-          try {
-            await setStudentExcelExportReady(s.id, type, newReady);
-            if (type === "indiv") s.readyForExcelExportIndiv = newReady;
-            else s.readyForExcelExportGroup = newReady;
-            btn.dataset.ready = newReady ? "1" : "0";
-            btn.textContent = (type === "indiv" ? "Indiv: " : "Group: ") + (newReady ? "✓ Ready" : "No");
-            btn.classList.toggle("is-ready", newReady);
-          } finally {
-            btn.disabled = false;
-          }
-        });
-        return btn;
-      };
-      const wrap = document.createElement("div");
-      wrap.style.cssText = "display:flex;flex-direction:row;gap:4px;align-items:center;justify-content:center;flex-wrap:wrap";
-      if (hasIndiv) wrap.appendChild(makeBtn("indiv", !!s.readyForExcelExportIndiv));
-      if (hasGroup) wrap.appendChild(makeBtn("group", !!s.readyForExcelExportGroup));
-      excelCell.appendChild(wrap);
-
-      const aiH1Cell = body.querySelector(`.reg-ai-h1-cell[data-id="${s.id}"]`);
-      if (!aiH1Cell) return;
-      if (!hasIndiv && !hasGroup) { aiH1Cell.textContent = "—"; return; }
-      aiH1Cell.innerHTML = "";
-      const makeAiBtn = (type, isReady) => {
-        const btn = document.createElement("button");
-        btn.className = "btn-ai-h1-ready" + (isReady ? " is-ready" : "");
-        btn.dataset.id   = s.id;
-        btn.dataset.type = type;
-        btn.dataset.ready = isReady ? "1" : "0";
-        btn.textContent = (type === "indiv" ? "Indiv: " : "Group: ") + (isReady ? "✓ Ready" : "No");
-        btn.addEventListener("click", async e => {
-          e.stopPropagation();
-          const currentlyReady = btn.dataset.ready === "1";
-          const action = currentlyReady ? "mark as NOT ready" : "mark as READY";
-          const label = type === "indiv" ? "Individual" : "Group";
-          if (!confirm(`Are you sure you want to ${action} for AI H1 Report (${label})?\n\n${s.name}`)) return;
-          const newReady = !currentlyReady;
-          btn.disabled = true;
-          try {
-            await setStudentAiH1ReportReady(s.id, type, newReady);
-            if (type === "indiv") s.readyForAiH1Indiv = newReady;
-            else s.readyForAiH1Group = newReady;
-            btn.dataset.ready = newReady ? "1" : "0";
-            btn.textContent = (type === "indiv" ? "Indiv: " : "Group: ") + (newReady ? "✓ Ready" : "No");
-            btn.classList.toggle("is-ready", newReady);
-          } finally {
-            btn.disabled = false;
-          }
-        });
-        return btn;
-      };
-      const aiWrap = document.createElement("div");
-      aiWrap.style.cssText = "display:flex;flex-direction:row;gap:4px;align-items:center;justify-content:center;flex-wrap:wrap";
-      if (hasIndiv) aiWrap.appendChild(makeAiBtn("indiv", !!s.readyForAiH1Indiv));
-      if (hasGroup) aiWrap.appendChild(makeAiBtn("group", !!s.readyForAiH1Group));
-      aiH1Cell.appendChild(aiWrap);
     });
   });
 }
