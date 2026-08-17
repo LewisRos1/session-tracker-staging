@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1726";
+const APP_VERSION = "1727";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6555,8 +6555,8 @@ function renderManageActivityScreen(entity) {
         // Maintained date must be at least the day after the last session (so "Maintain" doesn't overwrite existing notes)
         const rawMin = latestDate ? addOneDay(latestDate) : todayDateStr();
         const infoHtml = latestDate
-          ? `The last recorded session for <strong>"${paDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>. The earliest you can maintain this activity is <strong>${fmtPeriodDate(rawMin)}</strong>. From this date, sessions will auto-fill with a "Maintain" note.`
-          : `No previous session data was found for <strong>"${paDisplayName}"</strong>. From this date, sessions will auto-fill with a "Maintain" note.`;
+          ? `The last recorded session for <strong>"${paDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>. The earliest you can maintain this activity is <strong>${fmtPeriodDate(rawMin)}</strong>. From this date onwards, this activity will automatically have a note "Maintain" for every session.`
+          : `No previous session data was found for <strong>"${paDisplayName}"</strong>. From this date onwards, this activity will automatically have a note "Maintain" for every session.`;
         const pickedDate = await showDatePickerOverlay({
           heading: '🆗 Maintain Activity',
           infoHtml,
