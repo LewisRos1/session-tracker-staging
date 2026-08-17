@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1710";
+const APP_VERSION = "1711";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -11065,12 +11065,15 @@ async function handleCheckedByClick(e, isGroup) {
       if (newDone && !ws.allFixedForPerson(id)) {
         const myComments = ws.commentsForPerson(id);
         const unticked = myComments.filter(([, c]) => !c.fixedByName);
-        const hasUnassigned = unticked.some(([, c]) => !c.assignedTo || c.assignedTo.length === 0);
+        const multiInstructor = ws.p3Ids.length > 1;
+        const hasUnassigned = multiInstructor && unticked.some(([, c]) => !c.assignedTo || c.assignedTo.length === 0);
         if (hasUnassigned) {
           _phase3Error = "Some corrections have not been assigned to an instructor. Kindly remind Ms. Daisy to assign them.";
         } else {
           const n = unticked.length;
-          _phase3Error = `${n} correction${n > 1 ? "s" : ""} assigned to ${(INSTRUCTORS.find(i => i.id === id) || { name: id }).name} still unticked.`;
+          _phase3Error = multiInstructor
+            ? `${n} correction${n > 1 ? "s" : ""} assigned to ${(INSTRUCTORS.find(i => i.id === id) || { name: id }).name} still unticked.`
+            : `${n} correction${n > 1 ? "s" : ""} still unticked.`;
         }
         rerender();
         setTimeout(() => { _phase3Error = null; rerender(); }, 3500);
