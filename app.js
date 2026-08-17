@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1700";
+const APP_VERSION = "1701";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -1380,12 +1380,12 @@ async function loadTodoHomeCounts() {
           const isParticipant = (s.participants || []).includes(inst.id);
           if (inst.id !== "nigel" && inst.id !== "daisy" && !checks[`p1_${inst.id}`]) return n + 1;
           if (inst.id === "daisy" && isParticipant && !checks["p1_daisy"]) return n + 1;
-          if (inst.id === "daisy" && !s.reviewSubmitted && !ws.daisyOnly) {
+          if (inst.id === "daisy" && !ws.effectiveReviewSubmitted && !ws.daisyOnly) {
             const nonDaisy = (s.participants || []).filter(id => id !== "daisy");
             const p2Unlocked = nonDaisy.length > 0 ? nonDaisy.every(id => !!checks[`p1_${id}`]) : !!checks["p1_daisy"];
             if (p2Unlocked) return n + 1;
           }
-          if (inst.id !== "daisy" && inst.id !== "nigel" && s.reviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) return n + 1;
+          if (inst.id !== "daisy" && inst.id !== "nigel" && ws.effectiveReviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) return n + 1;
           if (inst.id === "nigel" && ws.ready && !ws.p4Done && !isMonthly) return n + 1;
         } catch { /* skip malformed session */ }
         return n;
