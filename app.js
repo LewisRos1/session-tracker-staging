@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1682";
+const APP_VERSION = "1683";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -11198,10 +11198,16 @@ function setupStickyNote() {
   note.addEventListener("click", async e => {
     // + Add Correction
     if (e.target.id === "sticky-note-add-row-btn") {
-      const { sid } = getCtx();
+      const { sid, data } = getCtx();
       if (!sid) return;
       _focusNewRow = true;
-      try { await addReviewComment(sid, ""); }
+      try {
+        await addReviewComment(sid, "");
+        // New correction means Phase 3 is no longer done — reset all p3 ticks
+        const checks = { ...(data?.checks || {}) };
+        const p3Keys = Object.keys(checks).filter(k => k.startsWith("p3_"));
+        if (p3Keys.length) { p3Keys.forEach(k => delete checks[k]); await updateSessionChecks(sid, checks).catch(() => {}); }
+      }
       catch (err) { console.error("addReviewComment:", err); }
       return;
     }
@@ -11210,11 +11216,19 @@ function setupStickyNote() {
     // Tick/untick checkbox
     const chk = e.target.closest(".snote-check");
     if (chk) {
-      const { sid } = getCtx();
+      const { sid, data } = getCtx();
       if (!sid) return;
       const cmtId  = chk.dataset.cmtId;
       const fixing = chk.checked;
-      try { await markCommentFixed(sid, cmtId, fixing ? "Rayhanah" : null); }
+      try {
+        await markCommentFixed(sid, cmtId, fixing ? "Rayhanah" : null);
+        // Unticking a correction means revision not done — reset Phase 3
+        if (!fixing) {
+          const checks = { ...(data?.checks || {}) };
+          const p3Keys = Object.keys(checks).filter(k => k.startsWith("p3_"));
+          if (p3Keys.length) { p3Keys.forEach(k => delete checks[k]); await updateSessionChecks(sid, checks).catch(() => {}); }
+        }
+      }
       catch (err) { console.error("markCommentFixed:", err); }
       return;
     }

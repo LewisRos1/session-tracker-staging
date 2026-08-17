@@ -2964,6 +2964,7 @@ button.wf-pill:hover { filter: brightness(.93); }
   width: 470px;
   min-width: 280px;
   min-height: 200px;
+  max-height: 70vh;
   resize: both;
   overflow: hidden;
   background: #fef9c3;
@@ -3033,6 +3034,9 @@ button.wf-pill:hover { filter: brightness(.93); }
   border-bottom: 1.5px solid #f59e0b;
   border-right: 1px solid #f59e0b;
   padding: .25rem .35rem .3rem;
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 .snote-table thead th:last-child { border-right: none; }
 .snote-th-no   { width: 2rem; text-align: center; }
@@ -3050,8 +3054,8 @@ button.wf-pill:hover { filter: brightness(.93); }
 .snote-row:last-child td { border-bottom: none; }
 .snote-no   { color: #92400e; font-weight: 600; text-align: right; padding-right: .6rem; }
 .snote-text { word-break: break-word; }
-.snote-tick { text-align: center; }
-.snote-check { cursor: pointer; width: 1rem; height: 1rem; accent-color: #10b981; }
+.snote-tick { text-align: center; vertical-align: middle; }
+.snote-check { cursor: pointer; width: 1rem; height: 1rem; accent-color: #10b981; display: block; margin: 0 auto; }
 .snote-row--done .snote-text { text-decoration: line-through; opacity: .6; }
 .snote-empty { color: #92400e; opacity: .7; font-style: italic; font-size: .82rem; padding: .5rem .35rem; }
 
