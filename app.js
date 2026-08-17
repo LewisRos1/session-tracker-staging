@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1715";
+const APP_VERSION = "1716";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -11412,10 +11412,11 @@ function setupStickyNote() {
         const id = _stickyNoteInstructorId;
         let changed = false;
         if (id) {
-          if (checks[`p3_${id}`]) { delete checks[`p3_${id}`]; changed = true; }
+          if (checks[`p3_${id}`])       { delete checks[`p3_${id}`];       changed = true; }
           if (checks[`p4_check_${id}`]) { delete checks[`p4_check_${id}`]; changed = true; }
+          if (checks[`no_corr_${id}`])  { delete checks[`no_corr_${id}`];  changed = true; }
         } else {
-          const p3Keys = Object.keys(checks).filter(k => k.startsWith("p3_"));
+          const p3Keys = Object.keys(checks).filter(k => k.startsWith("p3_") || k.startsWith("no_corr_") || k === "no_corrections");
           if (p3Keys.length) { p3Keys.forEach(k => delete checks[k]); changed = true; }
         }
         if (changed) { delete checks["p4_nigel"]; await updateSessionChecks(sid, checks).catch(() => {}); }
