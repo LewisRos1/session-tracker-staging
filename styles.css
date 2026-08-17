@@ -2926,6 +2926,8 @@ button.wf-pill:hover { filter: brightness(.93); }
   grid-column: 3 / 8;
   grid-row: 2;
   display: flex;
+  flex-direction: column;
+  gap: .3rem;
   padding-top: .3rem;
 }
 .wf-note-wrap .wf-note-btn {
@@ -2954,6 +2956,14 @@ button.wf-pill:hover { filter: brightness(.93); }
 }
 .wf-note-btn:hover { background: #ddd6fe; border-color: #a78bfa; }
 .wf-note-btn.has-note { background: #c4b5fd; border-color: #7c3aed; color: #3b0764; }
+
+.wf-p4-hint {
+  font-size: .73rem;
+  color: var(--text-muted);
+  margin-top: .4rem;
+  font-style: italic;
+  line-height: 1.4;
+}
 
 /* chk-export-btn keeps its pill style but sits in the grid */
 .wf-export-wrap .chk-export-btn { margin: 0; }

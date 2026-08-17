@@ -319,10 +319,12 @@ export async function updateWorkflowStatus(sessionId, status, meta = {}) {
 }
 
 /** Add a review comment from Daisy. Returns the new comment ID. */
-export async function addReviewComment(sessionId, text) {
+export async function addReviewComment(sessionId, text, forInstructor = null) {
   const id = generateId("cmt");
+  const cmtData = { text, fixedByName: null, fixedAt: null, order: Date.now() };
+  if (forInstructor) cmtData.forInstructor = forInstructor;
   await updateDoc(doc(db, "sessions", sessionId), {
-    [`reviewComments.${id}`]: { text, fixedByName: null, fixedAt: null, order: Date.now() }
+    [`reviewComments.${id}`]: cmtData
   });
   return id;
 }
