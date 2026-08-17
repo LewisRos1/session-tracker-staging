@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1693";
+const APP_VERSION = "1694";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10770,9 +10770,13 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     p4Body  = ws.allP1Done
       ? `<div class="wf-pill wf-pill--done">✓ Ms. Daisy is the only instructor. No need to check.</div>`
       : `<div class="wf-pill wf-pill--locked">🔒 Complete Phase 1 first</div>`;
-  } else if (!ws.effectiveAllP3Done) {
+  } else if (!p2Unlocked || !ws.reviewSubmitted || !ws.effectiveAllP3Done) {
     p4State = "locked";
-    p4Body  = `<div class="wf-pill wf-pill--locked">🔒 Complete Phase 3 first</div>`;
+    const p3Pending = ws.p3Ids.filter(id => !ws.p3Done(id)).map(instName);
+    const p4LockMsg = p3Pending.length > 0
+      ? p3Pending.join(" & ") + " to complete Phase 3 first"
+      : "Complete Phase 3 first";
+    p4Body  = `<div class="wf-pill wf-pill--locked">🔒 ${escHtml(p4LockMsg)}</div>`;
   } else if (confirmRole === "p4_daisy") {
     p4State = "p2-active";
     p4Body  = mkConfirm("p4_daisy", ws.reviewSubmitted2 ? "Undo? This will also uncheck Export." : "Mark as reviewed?");
