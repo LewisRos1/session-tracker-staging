@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1691";
+const APP_VERSION = "1692";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10594,11 +10594,17 @@ function getWorkflowState(data) {
   const daisyOnly = p1Ids.length === 1 && p1Ids[0] === "daisy";
 
   // Phase 4: Check #2 — Ms. Daisy
-  // Backcompat: old sessions where Export (p4_nigel) was ticked before Check #2 existed —
-  // treat Check #2 as implicitly done using Export's timestamp, so nothing breaks.
-  const p4DaisyRaw   = checks["p4_daisy"] || null;
-  const p4DaisyCompat = !p4DaisyRaw && checks["p4_nigel"]
-    ? { by: "daisy", at: checks["p4_nigel"].at, compat: true }
+  // Backcompat: sessions completed before Phase 4 existed (2026-08-17) should auto-complete.
+  // Two cases: (1) p4_nigel already ticked (non-monthly), (2) session was fully reviewed
+  // before the cutoff date (covers Monthly Report sessions where p4_nigel is never set).
+  const PHASE4_ADDED_AT  = new Date("2026-08-17").getTime();
+  const p4DaisyRaw       = checks["p4_daisy"] || null;
+  const p4DaisyCompat    = !p4DaisyRaw
+    ? (checks["p4_nigel"]
+        ? { by: "daisy", at: checks["p4_nigel"].at, compat: true }
+        : (reviewSubmitted && effectiveAllP3Done && (data?.reviewSubmittedAt || 0) > 0 && data.reviewSubmittedAt < PHASE4_ADDED_AT
+            ? { by: "daisy", at: data.reviewSubmittedAt, compat: true }
+            : null))
     : null;
   const p4DaisyCheck  = p4DaisyRaw || p4DaisyCompat;
   const reviewSubmitted2 = !!p4DaisyCheck;
