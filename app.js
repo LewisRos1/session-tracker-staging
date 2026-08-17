@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1721";
+const APP_VERSION = "1722";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10665,7 +10665,11 @@ function getWorkflowState(data) {
         const p3RevAt = p3Check(id)?.at || 0;
         if (p3RevAt === 0 || nigelAt >= p3RevAt) return true;
       }
-      if (reviewSubmittedOld && allP3Done && (data?.reviewSubmittedAt || 0) > 0 && data.reviewSubmittedAt < PHASE4_ADDED_AT) return true;
+      if (reviewSubmittedOld && p3Done(id) && (data?.reviewSubmittedAt || 0) > 0 && data.reviewSubmittedAt < PHASE4_ADDED_AT) {
+        // Only valid if this instructor's Phase 3 revision was also done before the new system
+        const p3RevAt = p3Check(id)?.at || 0;
+        if (p3RevAt === 0 || p3RevAt < PHASE4_ADDED_AT) return true;
+      }
     }
     return false;
   };
