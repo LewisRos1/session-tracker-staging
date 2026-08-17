@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1712";
+const APP_VERSION = "1713";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -18673,11 +18673,28 @@ function renderTargetManageContent(student, target) {
         }
         // Switching away from Manual Score
         if (acts[idx].manualScore) {
+          const actName2  = acts[idx].name;
+          const actCfgId2 = acts[idx].id;
           delete acts[idx].manualScore;
           acts[idx].sentenceStarter = null; acts[idx].noteSentenceStarter = null; acts[idx].remarkPresetId = null;
           acts[idx].inlineOptions = null; acts[idx].optionsMulti = (type === "starter_fixed_multi"); acts[idx].remarkHasNote = (type === "starter_fixed_note");
           target.predefinedActivities = acts;
           await saveTarget();
+          // Clear rem.text (score number) from all remarks; rem.masteryNote (notes) and rem.trials stay untouched
+          getAllSessionsForStudent(student.id).then(async sessions => {
+            for (const sess of sessions) {
+              const matchActIds = Object.entries(sess.activities || {})
+                .filter(([, a]) => a.configId === actCfgId2 || a.activityName === actName2)
+                .map(([id]) => id);
+              const changes = {};
+              for (const [remId, rem] of Object.entries(sess.remarks || {})) {
+                if (!matchActIds.includes(rem.activityId)) continue;
+                if (!(rem.text || "").trim()) continue;
+                changes[remId] = { text: "", masteryNote: rem.masteryNote || "" };
+              }
+              if (Object.keys(changes).length > 0) await migrateRemarksToNote(sess.id, changes);
+            }
+          }).catch(err => console.error("manual-score → notes migration failed:", err));
           const sp = $("manage-modal-body").scrollTop;
           renderTargetManageContent(student, target);
           $("manage-modal-body").scrollTop = sp;
