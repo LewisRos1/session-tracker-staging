@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1704";
+const APP_VERSION = "1705";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -1385,7 +1385,7 @@ async function loadTodoHomeCounts() {
             const p2Unlocked = nonDaisy.length > 0 ? nonDaisy.every(id => !!checks[`p1_${id}`]) : !!checks["p1_daisy"];
             if (p2Unlocked) return n + 1;
           }
-          if (inst.id !== "daisy" && inst.id !== "nigel" && ws.effectiveReviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) return n + 1;
+          if (inst.id !== "daisy" && ws.effectiveReviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) return n + 1;
           if (inst.id === "daisy" && !ws.daisyOnly && ws.effectiveReviewSubmitted && ws.effectiveAllP3Done && !ws.reviewSubmitted2) return n + 1;
           if (inst.id === "nigel" && ws.ready && !ws.p4Done && !isMonthly) return n + 1;
         } catch { /* skip malformed session */ }
@@ -1496,7 +1496,7 @@ async function openTodoScreen(filterInstId = null) {
         const p2Unlocked = nonDaisy.length > 0 ? nonDaisy.every(id => !!checks[`p1_${id}`]) : !!checks["p1_daisy"];
         if (p2Unlocked) return true;
       }
-      if (inst.id !== "daisy" && inst.id !== "nigel" && ws.effectiveReviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) return true;
+      if (inst.id !== "daisy" && ws.effectiveReviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) return true;
       if (inst.id === "daisy" && !ws.daisyOnly && ws.effectiveReviewSubmitted && ws.effectiveAllP3Done && !ws.reviewSubmitted2) return true;
       if (inst.id === "nigel" && ws.ready && !ws.p4Done && !isMonthly) return true;
       return false;
@@ -1574,7 +1574,7 @@ function renderTodoTiles(results, filterInst = null) {
       const p2Unlocked = nonDaisy.length > 0 ? nonDaisy.every(id => !!checks[`p1_${id}`]) : !!checks["p1_daisy"];
       if (p2Unlocked) tasks.push("Check #1");
     }
-    if (inst.id !== "daisy" && inst.id !== "nigel" && ws.effectiveReviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) tasks.push("Revision");
+    if (inst.id !== "daisy" && ws.effectiveReviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) tasks.push("Revision");
     if (inst.id === "daisy" && !ws.daisyOnly && ws.effectiveReviewSubmitted && ws.effectiveAllP3Done && !ws.reviewSubmitted2) tasks.push("Check #2");
     if (inst.id === "nigel" && ws.ready && !ws.p4Done && !isMonthly) tasks.push("Export");
 
@@ -1630,7 +1630,7 @@ function renderTodoTiles(results, filterInst = null) {
         const p2Unlocked = nonDaisy.length > 0 ? nonDaisy.every(id => !!checks[`p1_${id}`]) : !!checks["p1_daisy"];
         if (p2Unlocked) tasks.push("Check #1");
       }
-      if (inst.id !== "daisy" && inst.id !== "nigel" && ws.effectiveReviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) tasks.push("Revision");
+      if (inst.id !== "daisy" && ws.effectiveReviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) tasks.push("Revision");
       if (inst.id === "daisy" && !ws.daisyOnly && ws.effectiveReviewSubmitted && ws.effectiveAllP3Done && !ws.reviewSubmitted2) tasks.push("Check #2");
       if (inst.id === "nigel" && ws.ready && !ws.p4Done && !isMonthly) tasks.push("Export");
       const pillStyle = t => t === "Enter Data"
