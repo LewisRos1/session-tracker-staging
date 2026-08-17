@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1706";
+const APP_VERSION = "1707";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -11153,8 +11153,8 @@ function renderStickyNoteContent(data, isGroup) {
       if (showAssignTag) {
         const assigned = c.assignedTo || [];
         const label = assigned.length === 1
-          ? `→ ${instName(assigned[0])}`
-          : "→ All";
+          ? instName(assigned[0])
+          : "Assign Instructor";
         assignTag = `<button class="snote-assign-tag" data-cmt-id="${id}" title="Click to change assignee">${escHtml(label)}</button>`;
       }
       return `<tr class="snote-row${c.fixedByName ? " snote-row--done" : ""}">
