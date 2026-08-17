@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1695";
+const APP_VERSION = "1696";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10574,6 +10574,15 @@ function getWorkflowState(data) {
   // Phase 2 — always Daisy, uses reviewSubmitted flag
   const reviewSubmitted = !!data?.reviewSubmitted;
 
+  // Stale detection: if any Phase 1 tick is NEWER than the Phase 2 submission,
+  // Daisy reviewed data before it was entered — logically impossible, treat as not submitted.
+  const newestP1At = p1Ids.reduce((m, id) => Math.max(m, (checks[`p1_${id}`]?.at || 0)), 0);
+  const reviewIsStale = reviewSubmitted
+    && newestP1At > 0
+    && (data?.reviewSubmittedAt || 0) > 0
+    && data.reviewSubmittedAt < newestP1At;
+  const effectiveReviewSubmitted = reviewSubmitted && !reviewIsStale;
+
   // Phase 3 — Phase 1 participants except Daisy
   const p3Ids   = p1Ids.filter(id => id !== "daisy");
   const p3Check = id => checks[`p3_${id}`] || null;
@@ -10611,7 +10620,7 @@ function getWorkflowState(data) {
   const p4DaisyCheck  = p4DaisyRaw || p4DaisyCompat;
   const reviewSubmitted2 = !!p4DaisyCheck;
 
-  const ready = allP1Done && (daisyOnly || (reviewSubmitted && effectiveAllP3Done && reviewSubmitted2 && (noComments || allFixed)));
+  const ready = allP1Done && (daisyOnly || (effectiveReviewSubmitted && effectiveAllP3Done && reviewSubmitted2 && (noComments || allFixed)));
 
   // Phase 5 — Nigel exports to Word
   const p4Check = checks["p4_nigel"] || null;
@@ -10623,7 +10632,7 @@ function getWorkflowState(data) {
 
   return {
     p1Ids, p1Done, p1Check, allP1Done,
-    reviewSubmitted, reviewUnlocked: allP1Done,
+    reviewSubmitted, effectiveReviewSubmitted, reviewIsStale, reviewUnlocked: allP1Done,
     p3Ids, p3Done, p3Check, allP3Done, p3Bypassed, noCorrectionsDecision, effectiveAllP3Done,
     p4DaisyCheck, reviewSubmitted2,
     p4Check, p4Done,
@@ -10715,8 +10724,8 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     p2Body  = `<div class="wf-pill wf-pill--locked">🔒 ${escHtml(pendingStr)}</div>`;
   } else if (confirmRole === "phase2") {
     p2State = "p2-active";
-    p2Body  = mkConfirm("phase2", ws.reviewSubmitted ? "Undo Phase 2?" : "Mark as reviewed?");
-  } else if (!ws.reviewSubmitted) {
+    p2Body  = mkConfirm("phase2", ws.effectiveReviewSubmitted ? "Undo Phase 2?" : "Mark as reviewed?");
+  } else if (!ws.effectiveReviewSubmitted) {
     p2State = "p2-active";
     p2Body  = `<button class="wf-pill wf-pill--attention" data-role="phase2">○ Ms. Daisy: Incomplete</button>`;
   } else {
@@ -10746,7 +10755,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     p3Body  = ws.allP1Done
       ? `<div class="wf-pill wf-pill--done">✓ Ms. Daisy is the only instructor for this session. No need to revise.</div>`
       : `<div class="wf-pill wf-pill--locked">🔒 Complete Phase 1 first</div>`;
-  } else if (!p2Unlocked || !ws.reviewSubmitted) {
+  } else if (!p2Unlocked || !ws.effectiveReviewSubmitted) {
     p3State = "locked";
     p3Body  = `<div class="wf-pill wf-pill--locked">🔒 Ms. Daisy to complete Phase 2 first</div>`;
   } else if (ws.p3Bypassed) {
@@ -10772,7 +10781,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     p4Body  = ws.allP1Done
       ? `<div class="wf-pill wf-pill--done">✓ Ms. Daisy is the only instructor. No need to check.</div>`
       : `<div class="wf-pill wf-pill--locked">🔒 Complete Phase 1 first</div>`;
-  } else if (!p2Unlocked || !ws.reviewSubmitted || !ws.effectiveAllP3Done) {
+  } else if (!p2Unlocked || !ws.effectiveReviewSubmitted || !ws.effectiveAllP3Done) {
     p4State = "locked";
     const p3Pending = ws.p3Ids.filter(id => !ws.p3Done(id)).map(instName);
     const p4LockMsg = p3Pending.length > 0
@@ -10948,7 +10957,19 @@ async function handleCheckedByClick(e, isGroup) {
     if (role.startsWith("p1_")) {
       const checks  = { ...(data?.checks || {}) };
       const wasDone = !!checks[role];
-      if (wasDone) { delete checks[role]; } else { checks[role] = { by: role.slice(3), at: Date.now() }; }
+      const participantId = role.slice(3);
+      if (wasDone) {
+        delete checks[role];
+        // Cascade: unticking a non-Daisy Phase 1 pill invalidates Phase 2 (and downstream).
+        // Daisy cannot have reviewed data that hasn't been entered yet.
+        if (participantId !== "daisy" && data?.reviewSubmitted) {
+          Object.keys(checks).filter(k => k.startsWith("p3_")).forEach(k => delete checks[k]);
+          delete checks["p4_daisy"]; delete checks["p4_nigel"]; delete checks["no_corrections"];
+          await setReviewSubmitted(sid, false);
+        }
+      } else {
+        checks[role] = { by: participantId, at: Date.now() };
+      }
       try {
         await updateSessionChecks(sid, checks);
         const ws2 = getWorkflowState({ ...data, checks });
@@ -10960,11 +10981,20 @@ async function handleCheckedByClick(e, isGroup) {
       } catch (err) { console.error("updateSessionChecks p1:", err); }
     } else if (role === "phase2") {
       const ws      = getWorkflowState(data);
-      const newDone = !ws.reviewSubmitted;
+      // Use effectiveReviewSubmitted so a stale Phase 2 counts as "not submitted" —
+      // clicking submits fresh instead of toggling off a review that predated the data entry.
+      const newDone = !ws.effectiveReviewSubmitted;
       try {
-        await setReviewSubmitted(sid, newDone);
-
         if (newDone) {
+          // If Phase 2 was stale, clear any stale Phase 3/4/5 data before re-submitting
+          if (ws.reviewIsStale) {
+            const staleChecks = { ...(data?.checks || {}) };
+            Object.keys(staleChecks).filter(k => k.startsWith("p3_")).forEach(k => delete staleChecks[k]);
+            delete staleChecks["p4_daisy"]; delete staleChecks["p4_nigel"]; delete staleChecks["no_corrections"];
+            await updateSessionChecks(sid, staleChecks);
+          }
+          await setReviewSubmitted(sid, true);
+
           // Auto-delete empty correction rows
           const allCmts   = Object.entries(data?.reviewComments || {});
           const emptyIds  = allCmts.filter(([, c]) => !(c.text || "").trim()).map(([id]) => id);
@@ -10974,8 +11004,9 @@ async function handleCheckedByClick(e, isGroup) {
           const hasRealCorrections = allCmts.some(([, c]) => (c.text || "").trim());
           if (!hasRealCorrections) {
             if (confirm("List of Corrections is empty, confirm no revisions needed?")) {
-              const checks = { ...(data?.checks || {}), no_corrections: { by: "daisy", at: Date.now() } };
-              await updateSessionChecks(sid, checks);
+              const freshChecks = { ...(data?.checks || {}), no_corrections: { by: "daisy", at: Date.now() } };
+              Object.keys(freshChecks).filter(k => k.startsWith("p3_") || k === "p4_daisy" || k === "p4_nigel").forEach(k => delete freshChecks[k]);
+              await updateSessionChecks(sid, freshChecks);
             }
           }
 
@@ -10986,9 +11017,9 @@ async function handleCheckedByClick(e, isGroup) {
           // Cascade: unticking Phase 2 invalidates Phase 3, 4 and 5
           const checks = { ...(data?.checks || {}) };
           Object.keys(checks).filter(k => k.startsWith("p3_")).forEach(k => delete checks[k]);
-          delete checks["p4_daisy"];
-          delete checks["p4_nigel"];
+          delete checks["p4_daisy"]; delete checks["p4_nigel"]; delete checks["no_corrections"];
           await updateSessionChecks(sid, checks);
+          await setReviewSubmitted(sid, false);
           await updateWorkflowStatus(sid, "daisy_pending", getSubjectMeta());
         }
       } catch (err) { console.error("togglePhase2:", err); }
