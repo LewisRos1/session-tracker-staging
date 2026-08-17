@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1708";
+const APP_VERSION = "1709";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -11064,8 +11064,14 @@ async function handleCheckedByClick(e, isGroup) {
       const newDone = !ws.p3Done(id);
       if (newDone && !ws.allFixedForPerson(id)) {
         const myComments = ws.commentsForPerson(id);
-        const unfixed = myComments.filter(([, c]) => !c.fixedByName).length;
-        _phase3Error = `${unfixed} correction${unfixed > 1 ? "s" : ""} assigned to ${(INSTRUCTORS.find(i => i.id === id) || { name: id }).name} still unticked.`;
+        const unticked = myComments.filter(([, c]) => !c.fixedByName);
+        const hasUnassigned = unticked.some(([, c]) => !c.assignedTo || c.assignedTo.length === 0);
+        if (hasUnassigned) {
+          _phase3Error = "Instructor not yet assigned for some corrections. Remind Ms. Daisy to assign.";
+        } else {
+          const n = unticked.length;
+          _phase3Error = `${n} correction${n > 1 ? "s" : ""} assigned to ${(INSTRUCTORS.find(i => i.id === id) || { name: id }).name} still unticked.`;
+        }
         rerender();
         setTimeout(() => { _phase3Error = null; rerender(); }, 3500);
         return true;
@@ -11160,7 +11166,7 @@ function renderStickyNoteContent(data, isGroup) {
       return `<tr class="snote-row${c.fixedByName ? " snote-row--done" : ""}">
         <td class="snote-no">${i + 1}</td>
         <td class="snote-text">${assignTag}<textarea class="snote-textarea" data-cmt-id="${id}" rows="1" placeholder="Type here…">${escHtml(text)}</textarea></td>
-        <td class="snote-tick"><input type="checkbox" class="snote-check" data-cmt-id="${id}" ${c.fixedByName ? "checked" : ""}></td>
+        <td class="snote-tick"><input type="checkbox" class="snote-check" data-cmt-id="${id}" ${c.fixedByName ? "checked" : ""} ${showAssignTag && (!c.assignedTo || c.assignedTo.length === 0) ? "disabled title=\"Assign an instructor first\"" : ""}></td>
         <td class="snote-del"><button class="snote-del-btn" data-cmt-id="${id}" title="Delete row">🗑</button></td>
       </tr>`;
     }).join("");
@@ -11375,6 +11381,7 @@ function setupStickyNote() {
     // Tick/untick checkbox
     const chk = e.target.closest(".snote-check");
     if (chk) {
+      if (chk.disabled) return;
       const { sid, data } = getCtx();
       if (!sid) return;
       const cmtId  = chk.dataset.cmtId;
