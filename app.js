@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1731";
+const APP_VERSION = "1732";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10120,7 +10120,19 @@ async function autoFillStructuredRemarks(student, sessionId) {
         })
         .map(([id]) => id);
       const allRemarkActIds = new Set(Object.values(data.remarks || {}).map(r => r.activityId));
-      if (allCandidateIds.some(id => allRemarkActIds.has(id))) continue;
+      if (allCandidateIds.some(id => allRemarkActIds.has(id))) {
+        // Remark exists — patch empty masteryNote to "Maintain" for maintained activities
+        if (pa.maintained) {
+          for (const candId of allCandidateIds) {
+            for (const [remId, r] of Object.entries(data.remarks || {})) {
+              if (r.activityId !== candId) continue;
+              if (!(r.masteryNote || "").replace(/<[^>]*>/g, "").trim())
+                updateRemarkNote(sessionId, remId, "Maintain").catch(() => {});
+            }
+          }
+        }
+        continue;
+      }
       const existingAct = allCandidateIds.length > 0
         ? allActs.find(([id]) => id === allCandidateIds[0])
         : null;
@@ -10128,11 +10140,7 @@ async function autoFillStructuredRemarks(student, sessionId) {
       const key = `${sessionId}:${target.name}:${paConfigId || pa.name}:${paParent || ""}`;
       if (structuredRemarkAutoFillInFlight.has(key)) continue;
       structuredRemarkAutoFillInFlight.add(key);
-      // For maintained non-Notes-Only activities on/after the maintained date, pre-fill
-      // the note field with "Maintain" so the user sees it immediately without typing.
-      const _sDate = state.sessionData?.date || null;
-      const maintNote = (pa.maintained && _sDate && _sDate >= (pa.maintainedAt || "2026-01-01"))
-        ? "Maintain" : "";
+      const maintNote = pa.maintained ? "Maintain" : "";
       toFill.push({ target, pa, actId, key, paParent, paConfigId, maintNote });
     }
   }
@@ -12481,13 +12489,23 @@ async function autoFillViewStructuredRemarks(student, sessionId, data) {
         })
         .map(([id]) => id);
       const remarkActIds = new Set(Object.values(data.remarks || {}).map(r => r.activityId));
-      if (candidateIds.some(id => remarkActIds.has(id))) continue;
+      if (candidateIds.some(id => remarkActIds.has(id))) {
+        if (pa.maintained) {
+          for (const candId of candidateIds) {
+            for (const [remId, r] of Object.entries(data.remarks || {})) {
+              if (r.activityId !== candId) continue;
+              if (!(r.masteryNote || "").replace(/<[^>]*>/g, "").trim())
+                updateRemarkNote(sessionId, remId, "Maintain").catch(() => {});
+            }
+          }
+        }
+        continue;
+      }
       const existingActId = candidateIds[0] || null;
       const key = `${sessionId}:${target.name}:${paConfigId || pa.name}:${paParent || ""}:view`;
       if (structuredRemarkAutoFillInFlight.has(key)) continue;
       structuredRemarkAutoFillInFlight.add(key);
-      const _vMaintNote = (pa.maintained && sessionDate && sessionDate >= (pa.maintainedAt || "2026-01-01"))
-        ? "Maintain" : "";
+      const _vMaintNote = pa.maintained ? "Maintain" : "";
       try {
         if (existingActId) {
           await addRemark(sessionId, existingActId, "", null, undefined, _vMaintNote);
@@ -12624,12 +12642,20 @@ async function autoFillViewGroupStructuredRemarks(group, sessionId, data) {
       for (const studentName of attendees) {
         const hasRemark = actId && Object.values(data.remarks || {})
           .some(r => r.activityId === actId && r.studentName === studentName);
-        if (hasRemark) continue;
+        if (hasRemark) {
+          if (pa.maintained) {
+            for (const [remId, r] of Object.entries(data.remarks || {})) {
+              if (r.activityId !== actId || r.studentName !== studentName) continue;
+              if (!(r.masteryNote || "").replace(/<[^>]*>/g, "").trim())
+                updateRemarkNote(sessionId, remId, "Maintain").catch(() => {});
+            }
+          }
+          continue;
+        }
         const key = `${sessionId}:${target.name}:${pa.id || pa.name}:${studentName}:view`;
         if (structuredRemarkAutoFillInFlight.has(key)) continue;
         structuredRemarkAutoFillInFlight.add(key);
-        const _vgMaintNote = (pa.maintained && data.date && data.date >= (pa.maintainedAt || "2026-01-01"))
-          ? "Maintain" : "";
+        const _vgMaintNote = pa.maintained ? "Maintain" : "";
         try {
           if (!actId) {
             actId = await addActivity(sessionId, target.name, pa.title || pa.name, pa.order ?? 0, true);
@@ -21095,12 +21121,20 @@ async function autoFillGroupStructuredRemarks(group, sessionId, data, targetName
       .find(([, a]) => a.targetName === targetName && (a.activityName === pa.name || (pa.title && a.activityName === pa.title) || (pa.id && a.configId === pa.id)));
     const actId = existingAct?.[0];
     if (!actId) continue;
-    const _gsMaintNote = (pa.maintained && data.date && data.date >= (pa.maintainedAt || "2026-01-01"))
-      ? "Maintain" : "";
+    const _gsMaintNote = pa.maintained ? "Maintain" : "";
     for (const studentName of attendees) {
       const hasRemark = Object.values(data.remarks || {})
         .some(r => r.activityId === actId && r.studentName === studentName);
-      if (hasRemark) continue;
+      if (hasRemark) {
+        if (pa.maintained) {
+          for (const [remId, r] of Object.entries(data.remarks || {})) {
+            if (r.activityId !== actId || r.studentName !== studentName) continue;
+            if (!(r.masteryNote || "").replace(/<[^>]*>/g, "").trim())
+              updateRemarkNote(sessionId, remId, "Maintain").catch(() => {});
+          }
+        }
+        continue;
+      }
       const key = `${sessionId}:${targetName}:${pa.id || pa.name}:${studentName}`;
       if (structuredRemarkAutoFillInFlight.has(key)) continue;
       structuredRemarkAutoFillInFlight.add(key);
