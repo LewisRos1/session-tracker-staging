@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1702";
+const APP_VERSION = "1703";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -11011,7 +11011,6 @@ async function handleCheckedByClick(e, isGroup) {
           if (!hasRealCorrections) {
             // Ask BEFORE submitting Phase 2 — Cancel means Daisy wants to add corrections first
             if (!confirm("List of Corrections is empty, confirm no revisions needed?")) {
-              openStickyNote(sid, !!isGroup, data);
               rerender();
               return;
             }
