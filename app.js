@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1699";
+const APP_VERSION = "1700";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -1410,9 +1410,13 @@ function openChecklistModal() {
     return;
   }
 
-  const daisyItems = items.filter(i => i.workflowStatus === "daisy_pending")
+  // Stale sessions: workflowStatus="ray_pending" but Phase 2 timestamp is older than Phase 1 ticks.
+  // These belong in Daisy's queue (she needs to re-review) not Rayhanah's.
+  const rawRayItems   = items.filter(i => i.workflowStatus === "ray_pending");
+  const staleRayItems = rawRayItems.filter(i => getWorkflowState(i).reviewIsStale);
+  const daisyItems = [...items.filter(i => i.workflowStatus === "daisy_pending"), ...staleRayItems]
     .sort((a, b) => (a.workflowDate || a.date || "").localeCompare(b.workflowDate || b.date || ""));
-  const rayItems = items.filter(i => i.workflowStatus === "ray_pending")
+  const rayItems = rawRayItems.filter(i => !getWorkflowState(i).reviewIsStale)
     .sort((a, b) => (a.workflowDate || a.date || "").localeCompare(b.workflowDate || b.date || ""));
 
   const itemHtml = item => {
@@ -1562,14 +1566,14 @@ function renderTodoTiles(results, filterInst = null) {
     const tasks = [];
     if (inst.id !== "nigel" && inst.id !== "daisy" && !checks[`p1_${inst.id}`]) tasks.push("Enter Data");
     if (inst.id === "daisy" && isParticipant && !checks["p1_daisy"]) tasks.push("Enter Data");
-    if (inst.id === "daisy" && !s.reviewSubmitted && !ws.daisyOnly) {
+    if (inst.id === "daisy" && !ws.effectiveReviewSubmitted && !ws.daisyOnly) {
       // Phase 2 (Check #1) only shows if it's unlocked (all non-Daisy p1 done)
       const nonDaisy = (s.participants || []).filter(id => id !== "daisy");
       const p2Unlocked = nonDaisy.length > 0 ? nonDaisy.every(id => !!checks[`p1_${id}`]) : !!checks["p1_daisy"];
       if (p2Unlocked) tasks.push("Check #1");
     }
-    if (inst.id !== "daisy" && inst.id !== "nigel" && s.reviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) tasks.push("Revision");
-    if (inst.id === "daisy" && !ws.daisyOnly && s.reviewSubmitted && ws.effectiveAllP3Done && !ws.reviewSubmitted2) tasks.push("Check #2");
+    if (inst.id !== "daisy" && inst.id !== "nigel" && ws.effectiveReviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) tasks.push("Revision");
+    if (inst.id === "daisy" && !ws.daisyOnly && ws.effectiveReviewSubmitted && ws.effectiveAllP3Done && !ws.reviewSubmitted2) tasks.push("Check #2");
     if (inst.id === "nigel" && ws.ready && !ws.p4Done && !isMonthly) tasks.push("Export");
 
     const pillStyle = t => t === "Enter Data"
@@ -1595,7 +1599,12 @@ function renderTodoTiles(results, filterInst = null) {
   if (filterInst) {
     // Flat card list for a single instructor
     const { inst, pending } = results[0];
-    const sorted = [...pending].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+    // For non-Daisy instructors, exclude sessions where Phase 2 is stale —
+    // those belong in Daisy's queue, not theirs.
+    const effectivePending = (inst.id !== "daisy" && inst.id !== "nigel")
+      ? pending.filter(s => !getWorkflowState(s).reviewIsStale)
+      : pending;
+    const sorted = [...effectivePending].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
 
     const mkFlatCard = s => {
       const isGroup   = !!s.groupId || !!s.workflowIsGroup;
@@ -1614,13 +1623,13 @@ function renderTodoTiles(results, filterInst = null) {
       const tasks   = [];
       if (inst.id !== "nigel" && inst.id !== "daisy" && !checks[`p1_${inst.id}`]) tasks.push("Enter Data");
       if (inst.id === "daisy" && isParticipant && !checks["p1_daisy"]) tasks.push("Enter Data");
-      if (inst.id === "daisy" && !s.reviewSubmitted && !ws.daisyOnly) {
+      if (inst.id === "daisy" && !ws.effectiveReviewSubmitted && !ws.daisyOnly) {
         const nonDaisy = (s.participants || []).filter(id => id !== "daisy");
         const p2Unlocked = nonDaisy.length > 0 ? nonDaisy.every(id => !!checks[`p1_${id}`]) : !!checks["p1_daisy"];
         if (p2Unlocked) tasks.push("Check #1");
       }
-      if (inst.id !== "daisy" && inst.id !== "nigel" && s.reviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) tasks.push("Revision");
-      if (inst.id === "daisy" && !ws.daisyOnly && s.reviewSubmitted && ws.effectiveAllP3Done && !ws.reviewSubmitted2) tasks.push("Check #2");
+      if (inst.id !== "daisy" && inst.id !== "nigel" && ws.effectiveReviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) tasks.push("Revision");
+      if (inst.id === "daisy" && !ws.daisyOnly && ws.effectiveReviewSubmitted && ws.effectiveAllP3Done && !ws.reviewSubmitted2) tasks.push("Check #2");
       if (inst.id === "nigel" && ws.ready && !ws.p4Done && !isMonthly) tasks.push("Export");
       const pillStyle = t => t === "Enter Data"
         ? "background:#eff6ff;color:#1d4ed8"
@@ -1640,7 +1649,7 @@ function renderTodoTiles(results, filterInst = null) {
 
     body.innerHTML = `
       <div style="padding:1rem;max-width:600px;margin:0 auto">
-        ${pending.length === 0
+        ${sorted.length === 0
           ? `<p style="color:var(--text-muted);padding:.5rem 0">All caught up! No pending tasks.</p>`
           : sorted.map(mkFlatCard).join("")}
       </div>`;
@@ -10973,10 +10982,13 @@ async function handleCheckedByClick(e, isGroup) {
       try {
         await updateSessionChecks(sid, checks);
         const ws2 = getWorkflowState({ ...data, checks });
-        if (ws2.allP1Done && !data?.reviewSubmitted) {
+        if (ws2.allP1Done && (!data?.reviewSubmitted || ws2.reviewIsStale)) {
+          // Phase 1 complete and Phase 2 not done / stale → Daisy's turn
           await updateWorkflowStatus(sid, "daisy_pending", getSubjectMeta());
-        } else if (!ws2.allP1Done && data?.workflowStatus === "daisy_pending") {
-          await updateWorkflowStatus(sid, null);
+        } else if (!ws2.allP1Done) {
+          if (data?.workflowStatus === "daisy_pending" || data?.workflowStatus === "ray_pending") {
+            await updateWorkflowStatus(sid, null);
+          }
         }
       } catch (err) { console.error("updateSessionChecks p1:", err); }
     } else if (role === "phase2") {
@@ -10986,6 +10998,23 @@ async function handleCheckedByClick(e, isGroup) {
       const newDone = !ws.effectiveReviewSubmitted;
       try {
         if (newDone) {
+          // Auto-delete empty correction rows first (before any confirm dialog)
+          const allCmts  = Object.entries(data?.reviewComments || {});
+          const emptyIds = allCmts.filter(([, c]) => !(c.text || "").trim()).map(([id]) => id);
+          await Promise.all(emptyIds.map(id => deleteReviewComment(sid, id).catch(() => {})));
+
+          const hasRealCorrections = allCmts.some(([, c]) => (c.text || "").trim());
+          let skipPhase3 = false;
+          if (!hasRealCorrections) {
+            // Ask BEFORE submitting Phase 2 — Cancel means Daisy wants to add corrections first
+            if (!confirm("List of Corrections is empty, confirm no revisions needed?")) {
+              openStickyNote(sid, !!isGroup, data);
+              rerender();
+              return;
+            }
+            skipPhase3 = true;
+          }
+
           // If Phase 2 was stale, clear any stale Phase 3/4/5 data before re-submitting
           if (ws.reviewIsStale) {
             const staleChecks = { ...(data?.checks || {}) };
@@ -10995,19 +11024,10 @@ async function handleCheckedByClick(e, isGroup) {
           }
           await setReviewSubmitted(sid, true);
 
-          // Auto-delete empty correction rows
-          const allCmts   = Object.entries(data?.reviewComments || {});
-          const emptyIds  = allCmts.filter(([, c]) => !(c.text || "").trim()).map(([id]) => id);
-          await Promise.all(emptyIds.map(id => deleteReviewComment(sid, id).catch(() => {})));
-
-          // If no real corrections remain, ask about skipping Phase 3
-          const hasRealCorrections = allCmts.some(([, c]) => (c.text || "").trim());
-          if (!hasRealCorrections) {
-            if (confirm("List of Corrections is empty, confirm no revisions needed?")) {
-              const freshChecks = { ...(data?.checks || {}), no_corrections: { by: "daisy", at: Date.now() } };
-              Object.keys(freshChecks).filter(k => k.startsWith("p3_") || k === "p4_daisy" || k === "p4_nigel").forEach(k => delete freshChecks[k]);
-              await updateSessionChecks(sid, freshChecks);
-            }
+          if (skipPhase3) {
+            const freshChecks = { ...(data?.checks || {}), no_corrections: { by: "daisy", at: Date.now() } };
+            Object.keys(freshChecks).filter(k => k.startsWith("p3_") || k === "p4_daisy" || k === "p4_nigel").forEach(k => delete freshChecks[k]);
+            await updateSessionChecks(sid, freshChecks);
           }
 
           const updatedCmts = allCmts.filter(([id, c]) => !emptyIds.includes(id) && (c.text || "").trim());
