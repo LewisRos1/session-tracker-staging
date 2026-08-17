@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1725";
+const APP_VERSION = "1726";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -901,6 +901,11 @@ async function migrateGrayActivitiesToMaintained() {
       if (a.activityColor === "gray" && !a.maintained
           && !a.isHeading && !a.isMaintainHeading && !a.isNote && !a.isExportNote) {
         a.maintained = true;
+        changed = true;
+      }
+      // Backfill maintainedAt for all maintained activities that don't have a date yet.
+      if (a.maintained && !a.maintainedAt && !a.isHeading && !a.isMaintainHeading) {
+        a.maintainedAt = "2026-01-01";
         changed = true;
       }
     }
@@ -6102,9 +6107,9 @@ function maKebabOptions(pa, tName, isParent = false) {
     `<button class="ma-opt-btn" data-action="${action}" data-pa-id="${id}" data-tname="${tn}" style="${s}${extra}">${label}</button>`;
   const status = maGetStatus(pa);
   if (status === 'active') return btn('master','⭐ Activity Mastered') + btn('discontinue','🚩 Discontinue Activity',';color:#dc2626') + (!isParent ? btn('maintain','🆗 Maintain Activity',';color:#0369a1') : '');
-  if (status === 'maintained') return btn('master','⭐ Activity Mastered') + btn('discontinue','🚩 Discontinue Activity',';color:#dc2626') + btn('restore','↩ Restore to Active',';color:#4b5563');
-  if (status === 'mastered') return btn('change-master-date','📅 Change Mastered Date') + btn('change-discontinued','🚩 Change to Discontinued',';color:#dc2626') + (!isParent ? btn('change-maintain','🆗 Change to Maintain',';color:#0369a1') : '') + btn('restore','↩ Restore to Active',';color:#4b5563');
-  return btn('change-disc-date','📅 Change Discontinued Date') + btn('change-mastered','⭐ Change to Mastered') + (!isParent ? btn('change-maintain','🆗 Change to Maintain',';color:#0369a1') : '') + btn('restore','↩ Restore to Active',';color:#4b5563');
+  if (status === 'maintained') return btn('change-maintain-date','📅 Change Maintained Date') + btn('master','⭐ Activity Mastered') + btn('discontinue','🚩 Discontinue Activity',';color:#dc2626') + btn('unmaintain','↩ Un-maintain Activity',';color:#4b5563');
+  if (status === 'mastered') return btn('change-master-date','📅 Change Mastered Date') + btn('change-discontinued','🚩 Change to Discontinued',';color:#dc2626') + btn('restore','↩ Restore to Active',';color:#4b5563');
+  return btn('change-disc-date','📅 Change Discontinued Date') + btn('change-mastered','⭐ Change to Mastered') + btn('restore','↩ Restore to Active',';color:#4b5563');
 }
 
 function openManageActivityScreen(student) {
@@ -6177,7 +6182,8 @@ function renderManageActivityScreen(entity) {
 
     const masteredPas = activityPas.filter(p => maIsMastered(p));
     const discontPas  = activityPas.filter(p => maIsDiscont(p));
-    const maintPas    = activityPas.filter(p => maIsMaintained(p));
+    // maintPas = maintained-only (not also mastered/discontinued — those go to their collapsed sections)
+    const maintPas    = activityPas.filter(p => maIsMaintained(p) && !maIsMastered(p) && !maIsDiscont(p));
     const activePas   = activityPas.filter(p => maIsActive(p));
     const activeTopLevel = activePas.filter(p => !p.parentActivity);
     const activeSubs     = activePas.filter(p => !!p.parentActivity);
@@ -6196,9 +6202,12 @@ function renderManageActivityScreen(entity) {
     const statusBadge = (pa, small = false) => {
       const s = maGetStatus(pa);
       const sz = small ? 'font-size:.71rem' : 'font-size:.73rem';
-      if (s === 'mastered')    return `<span style="${sz};display:inline-block;margin-top:.25rem;background:#d1fae5;color:#059669;font-weight:600;padding:.1rem .5rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ Mastered${pa.masteredOn ? ` ${fmtPeriodDate(pa.masteredOn)}` : ''}</span>`;
-      if (s === 'discontinued') return `<span style="${sz};display:inline-block;margin-top:.25rem;background:#fee2e2;color:#dc2626;font-weight:600;padding:.1rem .5rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 Discontinued${pa.discontinuedOn ? ` ${fmtPeriodDate(pa.discontinuedOn)}` : ''}</span>`;
-      if (s === 'maintained')  return `<span style="${sz};display:inline-block;margin-top:.25rem;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.1rem .5rem;border-radius:.3rem;border:1px solid #d1d5db">🆗 Maintained</span>`;
+      const maintBadge = pa.maintained
+        ? `<span style="${sz};display:inline-block;margin-top:.25rem;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.1rem .5rem;border-radius:.3rem;border:1px solid #d1d5db">🆗 Maintained${pa.maintainedAt ? ` ${fmtPeriodDate(pa.maintainedAt)}` : ''}</span> `
+        : '';
+      if (s === 'mastered')    return maintBadge + `<span style="${sz};display:inline-block;margin-top:.25rem;background:#d1fae5;color:#059669;font-weight:600;padding:.1rem .5rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ Mastered${pa.masteredOn ? ` ${fmtPeriodDate(pa.masteredOn)}` : ''}</span>`;
+      if (s === 'discontinued') return maintBadge + `<span style="${sz};display:inline-block;margin-top:.25rem;background:#fee2e2;color:#dc2626;font-weight:600;padding:.1rem .5rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 Discontinued${pa.discontinuedOn ? ` ${fmtPeriodDate(pa.discontinuedOn)}` : ''}</span>`;
+      if (s === 'maintained')  return maintBadge;
       return '';
     };
 
@@ -6238,7 +6247,7 @@ function renderManageActivityScreen(entity) {
         continue;
       }
 
-      if (!maIsActive(pa) && !maIsMaintained(pa)) continue;
+      if (!maIsActive(pa) && !(maIsMaintained(pa) && !maIsMastered(pa) && !maIsDiscont(pa))) continue;
 
       actNum++;
       activeHtml += card(pa, false, '', actNum);
@@ -6466,7 +6475,9 @@ function renderManageActivityScreen(entity) {
       };
       if (action === 'master' || action === 'discontinue') {
         const { date: latestDate, subName: latestSubName } = await _maLoadLatest();
-        const minDate = latestDate || todayDateStr();
+        const rawMin = latestDate || todayDateStr();
+        // Can't master/discontinue before the maintained date
+        const minDate = (pa.maintainedAt && pa.maintainedAt > rawMin) ? pa.maintainedAt : rawMin;
         const restrictionText = action === 'master'
           ? 'The earliest you can mark this as mastered is'
           : 'The earliest you can discontinue this activity is';
@@ -6488,23 +6499,33 @@ function renderManageActivityScreen(entity) {
           (target.predefinedActivities || []).filter(a => a.parentActivity === paKey && maIsActive(a)).forEach(fn);
         };
         if (action === 'master') {
-          delete pa.maintained; delete pa.activityColor; delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped; delete pa.inactiveReason;
+          // Keep maintained flags so both tags show in the collapsed section
+          const wasMaintained = !!pa.maintained;
+          delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped; delete pa.inactiveReason;
+          if (!wasMaintained) { delete pa.maintained; delete pa.activityColor; delete pa.maintainedAt; }
           pa.masteredOn = pickedDate;
           _cascadeToSubs(sub => {
-            delete sub.maintained; delete sub.activityColor; delete sub.discontinuedOn; delete sub.isArchived; delete sub.isStopped; delete sub.inactiveReason;
+            const subWasMaintained = !!sub.maintained;
+            delete sub.discontinuedOn; delete sub.isArchived; delete sub.isStopped; delete sub.inactiveReason;
+            if (!subWasMaintained) { delete sub.maintained; delete sub.activityColor; delete sub.maintainedAt; }
             sub.masteredOn = pickedDate;
           });
         } else {
-          delete pa.maintained; delete pa.activityColor; delete pa.masteredOn; delete pa.isCompleted; delete pa.inactiveReason;
+          const wasMaintained = !!pa.maintained;
+          delete pa.masteredOn; delete pa.isCompleted; delete pa.inactiveReason;
+          if (!wasMaintained) { delete pa.maintained; delete pa.activityColor; delete pa.maintainedAt; }
           pa.discontinuedOn = pickedDate;
           _cascadeToSubs(sub => {
-            delete sub.maintained; delete sub.activityColor; delete sub.masteredOn; delete sub.isCompleted; delete sub.inactiveReason;
+            const subWasMaintained = !!sub.maintained;
+            delete sub.masteredOn; delete sub.isCompleted; delete sub.inactiveReason;
+            if (!subWasMaintained) { delete sub.maintained; delete sub.activityColor; delete sub.maintainedAt; }
             sub.discontinuedOn = pickedDate;
           });
         }
       } else if (action === 'change-master-date') {
         const { date: latestDate, subName: latestSubName } = await _maLoadLatest();
-        const minDate = latestDate || todayDateStr();
+        const rawMin = latestDate || todayDateStr();
+        const minDate = (pa.maintainedAt && pa.maintainedAt > rawMin) ? pa.maintainedAt : rawMin;
         const infoHtml = _buildInfoHtml(latestDate, minDate, latestSubName, 'The earliest you can set the mastered date is');
         const pickedDate = await showDatePickerOverlay({
           heading: '📅 Change Mastered Date',
@@ -6517,7 +6538,8 @@ function renderManageActivityScreen(entity) {
         pa.masteredOn = pickedDate;
       } else if (action === 'change-disc-date') {
         const { date: latestDate, subName: latestSubName } = await _maLoadLatest();
-        const minDate = latestDate || todayDateStr();
+        const rawMin = latestDate || todayDateStr();
+        const minDate = (pa.maintainedAt && pa.maintainedAt > rawMin) ? pa.maintainedAt : rawMin;
         const infoHtml = _buildInfoHtml(latestDate, minDate, latestSubName, 'The earliest you can set the discontinued date is');
         const pickedDate = await showDatePickerOverlay({
           heading: '📅 Change Discontinued Date',
@@ -6529,23 +6551,62 @@ function renderManageActivityScreen(entity) {
         if (!pickedDate) return;
         pa.discontinuedOn = pickedDate;
       } else if (action === 'maintain') {
-        const ok = await showAutoDateConfirm({ message: `This ${actWord} will be labelled 🆗 Maintained. It will still appear in sessions.`, confirmLabel: "Confirm 🆗" });
-        if (!ok) return;
+        const { date: latestDate } = await _maLoadLatest();
+        // Maintained date must be at least the day after the last session (so "Maintain" doesn't overwrite existing notes)
+        const rawMin = latestDate ? addOneDay(latestDate) : todayDateStr();
+        const infoHtml = latestDate
+          ? `The last recorded session for <strong>"${paDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>. The earliest you can maintain this activity is <strong>${fmtPeriodDate(rawMin)}</strong>. From this date, sessions will auto-fill with a "Maintain" note.`
+          : `No previous session data was found for <strong>"${paDisplayName}"</strong>. From this date, sessions will auto-fill with a "Maintain" note.`;
+        const pickedDate = await showDatePickerOverlay({
+          heading: '🆗 Maintain Activity',
+          infoHtml,
+          minDate: rawMin,
+          defaultDate: rawMin,
+          confirmLabel: 'Confirm 🆗'
+        });
+        if (!pickedDate) return;
         delete pa.masteredOn; delete pa.isCompleted; delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped; delete pa.inactiveReason;
-        pa.maintained = true; pa.activityColor = "gray";
+        pa.maintained = true; pa.activityColor = "gray"; pa.maintainedAt = pickedDate;
+      } else if (action === 'change-maintain-date') {
+        const { date: latestDate } = await _maLoadLatest();
+        const rawMin = latestDate ? addOneDay(latestDate) : todayDateStr();
+        const infoHtml = latestDate
+          ? `The last recorded session for <strong>"${paDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>. The earliest you can set the maintained date is <strong>${fmtPeriodDate(rawMin)}</strong>.`
+          : `No previous session data was found for <strong>"${paDisplayName}"</strong>.`;
+        const pickedDate = await showDatePickerOverlay({
+          heading: '📅 Change Maintained Date',
+          infoHtml,
+          minDate: rawMin,
+          defaultDate: pa.maintainedAt || rawMin,
+          confirmLabel: 'Save Date'
+        });
+        if (!pickedDate) return;
+        pa.maintainedAt = pickedDate;
+      } else if (action === 'unmaintain') {
+        const ok = await showAutoDateConfirm({ message: `This ${actWord} will be un-maintained and restored to active status.`, confirmLabel: "Un-maintain ↩" });
+        if (!ok) return;
+        delete pa.maintained; delete pa.activityColor; delete pa.maintainedAt;
+        if (!pa.parentActivity) {
+          const paKey = pa._linkKey || pa.title || pa.name;
+          if (paKey) (target.predefinedActivities || []).filter(a => a.parentActivity === paKey && maIsMaintained(a) && !maIsMastered(a) && !maIsDiscont(a)).forEach(sub => {
+            delete sub.maintained; delete sub.activityColor; delete sub.maintainedAt;
+          });
+        }
       } else if (action === 'restore') {
-        const ok = await showAutoDateConfirm({ message: `This ${actWord} will be restored to active status.`, confirmLabel: "Restore ↩" });
+        const isMaintBase = !!pa.maintained;
+        const restoreLabel = isMaintBase ? 'maintained' : 'active';
+        const ok = await showAutoDateConfirm({ message: `This ${actWord} will be restored to ${restoreLabel} status.`, confirmLabel: "Restore ↩" });
         if (!ok) return;
         delete pa.masteredOn; delete pa.isCompleted; delete pa.inactiveReason;
         delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped;
-        delete pa.maintained; delete pa.activityColor;
+        if (!isMaintBase) { delete pa.maintained; delete pa.activityColor; delete pa.maintainedAt; }
         // Restore sub-activities when parent is restored
         if (!pa.parentActivity) {
           const paKey = pa._linkKey || pa.title || pa.name;
           if (paKey) (target.predefinedActivities || []).filter(a => a.parentActivity === paKey).forEach(sub => {
             delete sub.masteredOn; delete sub.isCompleted; delete sub.inactiveReason;
             delete sub.discontinuedOn; delete sub.isArchived; delete sub.isStopped;
-            delete sub.maintained; delete sub.activityColor;
+            if (!isMaintBase) { delete sub.maintained; delete sub.activityColor; delete sub.maintainedAt; }
           });
         }
       } else if (action === 'change-discontinued') {
@@ -8485,15 +8546,18 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
         html += renderPendingRemarkFields(pendingKey, actId, pa.name, idx, target);
       } else if (pa.maintained && remarks.length === 0) {
         const addLabel = pa.isMapped ? "Score" : pa.manualScore ? "Remark &amp; Score" : "Remark &amp; Trials";
+        // Only show "Maintain" default and auto-fill on/after the maintained date
+        const _maintAt = pa.maintainedAt || "2026-01-01";
+        const _showMaintDefault = sessionDateForFilter >= _maintAt;
         html += `<div class="entry-divider" contenteditable="false"></div>
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Notes</span>
-          <textarea class="field-input maintained-remark-pending" rows="1"
+          <textarea class="field-input${_showMaintDefault ? " maintained-remark-pending" : ""}" rows="1"
             data-act-id="${actId || ""}"
             data-pa-name="${escHtml(pa.name || pa.title)}"
             data-pa-order="${idx}"
             data-cfg-id="${escHtml(pa.id || "")}"
-            data-target="${escHtml(target.name)}">Maintain</textarea>
+            data-target="${escHtml(target.name)}">${_showMaintDefault ? "Maintain" : ""}</textarea>
         </div>
         <button class="btn-add-remark" contenteditable="false"
           data-pending-key="${escHtml(pendingKey)}"
@@ -8501,7 +8565,7 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
           data-pa-name="${escHtml(pa.name || pa.title)}"
           data-pa-order="${idx}"
           data-is-mapped="${pa.isMapped ? "1" : ""}"
-          data-is-maintained="1"
+          data-is-maintained="${_showMaintDefault ? "1" : ""}"
           data-cfg-id="${escHtml(pa.id || "")}"
           data-target="${escHtml(target.name)}">+ Add ${addLabel}</button>`;
       } else {
@@ -8557,11 +8621,14 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
       const fixedText = pa.fixedRemark !== undefined ? pa.fixedRemark : pa.isMaintain ? (pa.maintainRemark ?? "") : null;
       const _masteredDate = pa.masteredOn || (pa.inactiveReason === 'mastered' ? "2026-06-30" : null);
       const _isDiscontinued = pa.discontinuedOn || pa.inactiveReason === 'discontinued';
-      const statusBadge = _masteredDate
+      const _inactMaintBadge = pa.maintained
+        ? `<span style="font-size:.72rem;color:#6b7280;font-weight:600;white-space:nowrap;display:block;margin-bottom:.1rem">🆗 Maintained${pa.maintainedAt ? ` on ${fmtPeriodDate(pa.maintainedAt)}` : ''}</span>`
+        : '';
+      const statusBadge = _inactMaintBadge + (_masteredDate
         ? `<span style="font-size:.72rem;color:#059669;font-weight:600;white-space:nowrap;display:block;margin-bottom:.1rem">⭐ Mastered on ${fmtPeriodDate(_masteredDate)}</span>`
         : _isDiscontinued
         ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap;display:block;margin-bottom:.1rem">🚩 ${pa.discontinuedOn ? `Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}` : 'Discontinued'}</span>`
-        : '';
+        : '');
       const subActs = allPas.filter(p => p.parentActivity === (pa.title || pa.name) && !p.isCompleted && !p.isArchived && !p.isStopped && !p.masteredOn && !p.discontinuedOn);
       const subHtml = subActs.length ? `<div style="display:flex;flex-direction:column;gap:.1rem;padding:.2rem 0 .1rem 1.25rem">
         ${subActs.map((sub, si) => `<div style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:#9ca3af"><span style="flex-shrink:0">${String.fromCharCode(97 + si)})</span><span>${escHtml(sub.name || '')}</span></div>`).join('')}
@@ -10184,6 +10251,9 @@ async function autoFillMaintainedRemarks(student, sessionId, selectedTargetName 
       ? currentFill : bgFill;
     for (const pa of (target.predefinedActivities || [])) {
       if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || (!pa.name && !pa.title)) continue;
+      // Only auto-fill "Maintain" for sessions on or after the maintained date
+      const _paMaintAt = pa.maintainedAt || "2026-01-01";
+      if (data.date && data.date < _paMaintAt) continue;
       // Match by name OR by configId so a character-level name mismatch never spawns a duplicate.
       const allMatches = Object.entries(data.activities || {})
         .filter(([, a]) => a.targetName === target.name && !a.parentActivity &&
@@ -11644,13 +11714,14 @@ function buildTargetViewTable(target, data) {
           ))
           .forEach(([id]) => matchedIds.add(id));
         const _paMastered = pa.masteredOn || (pa.inactiveReason === 'mastered' ? "2026-06-30" : null);
-        const paBadge = pa.maintained
-          ? `<span style="font-size:.72rem;color:#6b7280;font-weight:600;white-space:nowrap">(🆗 Maintained)</span> `
-          : pa.discontinuedOn
+        const _paMaintBadge = pa.maintained
+          ? `<span style="font-size:.72rem;color:#6b7280;font-weight:600;white-space:nowrap">(🆗 Maintained${pa.maintainedAt ? ` on ${fmtPeriodDate(pa.maintainedAt)}` : ''})</span> `
+          : '';
+        const paBadge = _paMaintBadge + (pa.discontinuedOn
           ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap">(🚩 ${fmtPeriodDate(pa.discontinuedOn)})</span> `
           : _paMastered
           ? `<span style="font-size:.72rem;color:#059669;font-weight:600;white-space:nowrap">(⭐ ${fmtPeriodDate(_paMastered)})</span> `
-          : '';
+          : '');
         rows += `<tr style="background:#f3f4f6">
           <td class="vcol-no" contenteditable="false" style="color:#6b7280">${displayNo}</td>
           <td class="vcol-act" colspan="5" contenteditable="false" style="font-weight:600">${paBadge}${paDisplayHtml(pa)}</td>
@@ -11868,13 +11939,15 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
     || (parentEntry?.inactiveReason === 'mastered' ? "2026-06-30" : null)
     || null;
   const _maintained     = !!(paEntry?.maintained   || parentEntry?.maintained);
-  const statusBadge = _maintained
-    ? `<span style="font-size:.72rem;color:#6b7280;font-weight:600;white-space:nowrap">(🆗 Maintained)</span> `
-    : _discontinuedOn
+  const _maintainedAt   = paEntry?.maintainedAt || parentEntry?.maintainedAt || null;
+  const _maintBadge = _maintained
+    ? `<span style="font-size:.72rem;color:#6b7280;font-weight:600;white-space:nowrap">(🆗 Maintained${_maintainedAt ? ` on ${fmtPeriodDate(_maintainedAt)}` : ''})</span> `
+    : '';
+  const statusBadge = _maintBadge + (_discontinuedOn
     ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap">(🚩 ${fmtPeriodDate(_discontinuedOn)})</span> `
     : _masteredOn
     ? `<span style="font-size:.72rem;color:#059669;font-weight:600;white-space:nowrap">(⭐ ${fmtPeriodDate(_masteredOn)})</span> `
-    : '';
+    : '');
 
   const actCell = isPredefined
     ? statusBadge + (paEntry ? paDisplayHtml(paEntry) : formatActivityMarkup(actName)) + (paEntry?.actNote?.trim() ? `<div class="view-act-note">${formatActivityMarkup(paEntry.actNote)}</div>` : "")
@@ -11931,7 +12004,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
            data-is-predefined="${isPredefined}"
            data-parent-activity="${escHtml(paConfig?.parentActivity || "")}"
            data-config-id="${escHtml(paConfig?.id || "")}"
-           placeholder="${_maintained ? "" : "Notes…"}">${_maintained ? "Maintain" : ""}</textarea>`;
+           placeholder="${_maintained && data.date >= (_maintainedAt || "2026-01-01") ? "" : "Notes…"}">${_maintained && data.date >= (_maintainedAt || "2026-01-01") ? "Maintain" : ""}</textarea>`;
       const addTrialBtn = mappedInfo
         ? ""
         : `<button class="view-add-trial-new" data-act-id="${escHtml(actId || "")}"
@@ -12326,6 +12399,9 @@ async function autoFillViewMaintainedRemarks(student, sessionId, data) {
   for (const target of (student.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
       if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || (!pa.name && !pa.title)) continue;
+      // Only auto-fill "Maintain" for sessions on or after the maintained date
+      const _viewMaintAt = pa.maintainedAt || "2026-01-01";
+      if (data.date && data.date < _viewMaintAt) continue;
       const allMatches = Object.entries(data.activities || {})
         .filter(([, a]) => a.targetName === target.name && !a.parentActivity &&
                            (a.activityName === pa.name || (pa.title && a.activityName === pa.title) || (pa.id && a.configId === pa.id)));
@@ -13756,13 +13832,14 @@ function buildGroupTargetViewTable(target, data, attendees) {
           .filter(([, a]) => a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title)))
           .forEach(([id]) => matchedIds.add(id));
         const _paGrpMastered = pa.masteredOn || (pa.inactiveReason === 'mastered' ? "2026-06-30" : null);
-        const paBadgeGrp = pa.maintained
-          ? `<span style="font-size:.72rem;color:#6b7280;font-weight:600;white-space:nowrap">(🆗 Maintained)</span> `
-          : pa.discontinuedOn
+        const _paGrpMaintBadge = pa.maintained
+          ? `<span style="font-size:.72rem;color:#6b7280;font-weight:600;white-space:nowrap">(🆗 Maintained${pa.maintainedAt ? ` on ${fmtPeriodDate(pa.maintainedAt)}` : ''})</span> `
+          : '';
+        const paBadgeGrp = _paGrpMaintBadge + (pa.discontinuedOn
           ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap">(🚩 ${fmtPeriodDate(pa.discontinuedOn)})</span> `
           : _paGrpMastered
           ? `<span style="font-size:.72rem;color:#059669;font-weight:600;white-space:nowrap">(⭐ ${fmtPeriodDate(_paGrpMastered)})</span> `
-          : '';
+          : '');
         rows += `<tr style="background:#f3f4f6">
           <td class="vcol-no" contenteditable="false" style="color:#6b7280">${no}</td>
           <td class="vcol-act" colspan="6" contenteditable="false" style="font-weight:600">${paBadgeGrp}${paDisplayHtml(pa)}</td>
@@ -13973,13 +14050,15 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
     || (parentEntry?.inactiveReason === 'mastered' ? "2026-06-30" : null)
     || null;
   const _maintained     = !!(paEntry?.maintained   || parentEntry?.maintained);
-  const statusBadge = _maintained
-    ? `<span style="font-size:.72rem;color:#6b7280;font-weight:600;white-space:nowrap">(🆗 Maintained)</span> `
-    : _discontinuedOn
+  const _maintainedAt   = paEntry?.maintainedAt || parentEntry?.maintainedAt || null;
+  const _maintBadge = _maintained
+    ? `<span style="font-size:.72rem;color:#6b7280;font-weight:600;white-space:nowrap">(🆗 Maintained${_maintainedAt ? ` on ${fmtPeriodDate(_maintainedAt)}` : ''})</span> `
+    : '';
+  const statusBadge = _maintBadge + (_discontinuedOn
     ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap">(🚩 ${fmtPeriodDate(_discontinuedOn)})</span> `
     : _masteredOn
     ? `<span style="font-size:.72rem;color:#059669;font-weight:600;white-space:nowrap">(⭐ ${fmtPeriodDate(_masteredOn)})</span> `
-    : '';
+    : '');
 
   const actCell = isPredefined
     ? statusBadge + (paEntry ? paDisplayHtml(paEntry) : formatActivityMarkup(actName)) + (paEntry?.actNote?.trim() ? `<div class="view-act-note">${formatActivityMarkup(paEntry.actNote)}</div>` : "")
@@ -15187,16 +15266,17 @@ function todayDateStr() {
 
 function inactiveReasonBadge(pa) {
   const _badgeBase = "display:inline-flex;align-items:center;border-radius:.35rem;padding:.1rem .5rem;font-size:.93rem;font-weight:700;white-space:nowrap;margin-right:.4rem;vertical-align:middle;line-height:1.2";
+  let badges = '';
+  if (pa?.maintained)
+    badges += `<span style="${_badgeBase};background:#e5e7eb;border:1px solid #9ca3af;color:#374151">🆗 Maintained${pa.maintainedAt ? ` on ${fmtPeriodDate(pa.maintainedAt)}` : ''}</span>`;
   const masteredDate = pa?.masteredOn || (pa?.inactiveReason === 'mastered' ? "2026-06-30" : null);
   if (masteredDate)
-    return `<span style="${_badgeBase};background:#d1fae5;border:1px solid #6ee7b7;color:#059669">⭐ Mastered on ${fmtPeriodDate(masteredDate)}</span>`;
-  if (pa?.discontinuedOn || pa?.inactiveReason === 'discontinued') {
-    const label = pa.discontinuedOn ? `🚩 Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}` : '● Discontinued';
-    return `<span style="${_badgeBase};background:#fee2e2;border:1px solid #fca5a5;color:#dc2626">${label}</span>`;
+    badges += `<span style="${_badgeBase};background:#d1fae5;border:1px solid #6ee7b7;color:#059669">⭐ Mastered on ${fmtPeriodDate(masteredDate)}</span>`;
+  else if (pa?.discontinuedOn || pa?.inactiveReason === 'discontinued') {
+    const label = pa?.discontinuedOn ? `🚩 Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}` : '● Discontinued';
+    badges += `<span style="${_badgeBase};background:#fee2e2;border:1px solid #fca5a5;color:#dc2626">${label}</span>`;
   }
-  if (pa?.maintained)
-    return `<span style="${_badgeBase};background:#e5e7eb;border:1px solid #9ca3af;color:#374151">🆗 Maintained</span>`;
-  return '';
+  return badges;
 }
 
 function showAutoDateConfirm({ message, confirmLabel }) {
@@ -18248,7 +18328,9 @@ function renderTargetManageContent(student, target) {
         }).map(s => s.date).sort();
         latestDate = dates[dates.length - 1] || null;
       } finally { btn.disabled = false; btn.textContent = origText; }
-      const minDate = latestDate || todayDateStr();
+      const rawMin = latestDate || todayDateStr();
+      // Can't set mastered/discontinued date before the maintained date
+      const minDate = (pa.maintainedAt && pa.maintainedAt > rawMin) ? pa.maintainedAt : rawMin;
       const _paName = escHtml(pa.title || pa.name || '');
       const infoHtml = latestDate
         ? `The last recorded session for <strong>"${_paName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>. The earliest you can set this date is <strong>${fmtPeriodDate(minDate)}</strong>. This activity will stop showing from <strong>${fmtPeriodDate(addOneDay(minDate))}</strong> onwards.`
@@ -21548,6 +21630,9 @@ function renderGroupStudentActivityCard(studentName, actName, actId, target, dat
     html += renderGroupStudentRowCompact(remId, rem, target, mappedInfo);
   }
 
+  // Only show "Maintain" default on/after the maintained date
+  const _grpMaintAt = pa?.maintainedAt || "2026-01-01";
+  const _grpShowMaintDefault = isMaintained && data.date >= _grpMaintAt;
   if (remarksForThisStudent.length === 0 && isMaintained) {
     html += `<div class="entry-field">
       <span class="field-label" contenteditable="false">Remark</span>
@@ -21556,8 +21641,8 @@ function renderGroupStudentActivityCard(studentName, actName, actId, target, dat
         data-act-name="${escHtml(actName)}"
         data-target="${escHtml(target.name)}"
         data-is-predefined="true"
-        data-is-maintained="true"
-        data-student="${escHtml(studentName)}">Maintain</textarea>
+        data-is-maintained="${_grpShowMaintDefault ? "true" : "false"}"
+        data-student="${escHtml(studentName)}">${_grpShowMaintDefault ? "Maintain" : ""}</textarea>
     </div>`;
   } else {
     html += remarksForThisStudent.length === 0
