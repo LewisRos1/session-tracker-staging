@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1689";
+const APP_VERSION = "1690";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -1563,12 +1563,13 @@ function renderTodoTiles(results, filterInst = null) {
     if (inst.id !== "nigel" && inst.id !== "daisy" && !checks[`p1_${inst.id}`]) tasks.push("Enter Data");
     if (inst.id === "daisy" && isParticipant && !checks["p1_daisy"]) tasks.push("Enter Data");
     if (inst.id === "daisy" && !s.reviewSubmitted && !ws.daisyOnly) {
-      // Phase 2 only shows if it's unlocked (all non-Daisy p1 done)
+      // Phase 2 (Check #1) only shows if it's unlocked (all non-Daisy p1 done)
       const nonDaisy = (s.participants || []).filter(id => id !== "daisy");
       const p2Unlocked = nonDaisy.length > 0 ? nonDaisy.every(id => !!checks[`p1_${id}`]) : !!checks["p1_daisy"];
-      if (p2Unlocked) tasks.push("Check");
+      if (p2Unlocked) tasks.push("Check #1");
     }
     if (inst.id !== "daisy" && inst.id !== "nigel" && s.reviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) tasks.push("Revision");
+    if (inst.id === "daisy" && !ws.daisyOnly && s.reviewSubmitted && ws.effectiveAllP3Done && !ws.reviewSubmitted2) tasks.push("Check #2");
     if (inst.id === "nigel" && ws.ready && !ws.p4Done && !isMonthly) tasks.push("Export");
 
     const pillStyle = t => t === "Enter Data"
@@ -1616,9 +1617,10 @@ function renderTodoTiles(results, filterInst = null) {
       if (inst.id === "daisy" && !s.reviewSubmitted && !ws.daisyOnly) {
         const nonDaisy = (s.participants || []).filter(id => id !== "daisy");
         const p2Unlocked = nonDaisy.length > 0 ? nonDaisy.every(id => !!checks[`p1_${id}`]) : !!checks["p1_daisy"];
-        if (p2Unlocked) tasks.push("Check");
+        if (p2Unlocked) tasks.push("Check #1");
       }
       if (inst.id !== "daisy" && inst.id !== "nigel" && s.reviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) tasks.push("Revision");
+      if (inst.id === "daisy" && !ws.daisyOnly && s.reviewSubmitted && ws.effectiveAllP3Done && !ws.reviewSubmitted2) tasks.push("Check #2");
       if (inst.id === "nigel" && ws.ready && !ws.p4Done && !isMonthly) tasks.push("Export");
       const pillStyle = t => t === "Enter Data"
         ? "background:#eff6ff;color:#1d4ed8"
