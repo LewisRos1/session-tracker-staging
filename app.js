@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1714";
+const APP_VERSION = "1715";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -1564,9 +1564,17 @@ function renderTodoTiles(results, filterInst = null) {
     if (inst.id !== "nigel" && inst.id !== "daisy" && !checks[`p1_${inst.id}`]) tasks.push("Enter Data");
     if (inst.id === "daisy" && isParticipant && !checks["p1_daisy"]) tasks.push("Enter Data");
     if (inst.id === "nigel" && isParticipant && !checks["p1_nigel"]) tasks.push("Enter Data");
-    if (inst.id === "daisy" && !ws.daisyOnly && ws.p3Ids.some(id => ws.p1Done(id) && !ws.p2EffDone(id))) tasks.push("Check #1");
+    if (inst.id === "daisy" && !ws.daisyOnly) {
+      ws.p3Ids.filter(id => ws.p1Done(id) && !ws.p2EffDone(id)).forEach(id => {
+        tasks.push("Check " + (INSTRUCTORS.find(i => i.id === id) || { name: id }).name[0] + "#1");
+      });
+    }
     if (inst.id !== "daisy" && isParticipant && ws.p2EffDone(inst.id) && !ws.noCorr(inst.id) && !ws.p3Done(inst.id)) tasks.push("Revision");
-    if (inst.id === "daisy" && !ws.daisyOnly && ws.p3Ids.some(id => ws.p3Done(id) && !ws.p4CheckDone(id))) tasks.push("Check #2");
+    if (inst.id === "daisy" && !ws.daisyOnly) {
+      ws.p3Ids.filter(id => ws.p3Done(id) && !ws.p4CheckDone(id)).forEach(id => {
+        tasks.push("Check " + (INSTRUCTORS.find(i => i.id === id) || { name: id }).name[0] + "#2");
+      });
+    }
     if (inst.id === "nigel" && ws.ready && !ws.p4Done && !isMonthly) tasks.push("Export");
 
     const pillStyle = t => t === "Enter Data"
@@ -1617,9 +1625,17 @@ function renderTodoTiles(results, filterInst = null) {
       if (inst.id !== "nigel" && inst.id !== "daisy" && !checks[`p1_${inst.id}`]) tasks.push("Enter Data");
       if (inst.id === "daisy" && isParticipant && !checks["p1_daisy"]) tasks.push("Enter Data");
       if (inst.id === "nigel" && isParticipant && !checks["p1_nigel"]) tasks.push("Enter Data");
-      if (inst.id === "daisy" && !ws.daisyOnly && ws.p3Ids.some(id => ws.p1Done(id) && !ws.p2EffDone(id))) tasks.push("Check #1");
+      if (inst.id === "daisy" && !ws.daisyOnly) {
+        ws.p3Ids.filter(id => ws.p1Done(id) && !ws.p2EffDone(id)).forEach(id => {
+          tasks.push("Check " + (INSTRUCTORS.find(i => i.id === id) || { name: id }).name[0] + "#1");
+        });
+      }
       if (inst.id !== "daisy" && isParticipant && ws.p2EffDone(inst.id) && !ws.noCorr(inst.id) && !ws.p3Done(inst.id)) tasks.push("Revision");
-      if (inst.id === "daisy" && !ws.daisyOnly && ws.p3Ids.some(id => ws.p3Done(id) && !ws.p4CheckDone(id))) tasks.push("Check #2");
+      if (inst.id === "daisy" && !ws.daisyOnly) {
+        ws.p3Ids.filter(id => ws.p3Done(id) && !ws.p4CheckDone(id)).forEach(id => {
+          tasks.push("Check " + (INSTRUCTORS.find(i => i.id === id) || { name: id }).name[0] + "#2");
+        });
+      }
       if (inst.id === "nigel" && ws.ready && !ws.p4Done && !isMonthly) tasks.push("Export");
       const pillStyle = t => t === "Enter Data"
         ? "background:#eff6ff;color:#1d4ed8"
@@ -10768,8 +10784,8 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     const at     = ws.p2CheckAt(id);
     if (confirmRole === role) return mkConfirm(role, done ? `Undo check for ${name}?` : `Check ${name}'s work?`);
     if (done && !stale) return `<button class="wf-pill wf-pill--done" data-role="${role}">✓ ${escHtml(name)} · ${escHtml(fmtCheckTimestamp(at))}</button>`;
-    if (stale) return `<button class="wf-pill wf-pill--attention" data-role="${role}">⚠ Re-check ${escHtml(name)} (Phase 1 updated)</button>`;
-    return `<button class="wf-pill wf-pill--attention" data-role="${role}">○ Check ${escHtml(name)}'s Work</button>`;
+    if (stale) return `<button class="wf-pill wf-pill--attention" data-role="${role}">⚠ Ms. Daisy: Re-check ${escHtml(name)} (Phase 1 updated)</button>`;
+    return `<button class="wf-pill wf-pill--attention" data-role="${role}">○ Ms. Daisy: Check ${escHtml(name)}'s Work</button>`;
   };
 
   let p2State, p2Body;
@@ -10842,7 +10858,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     const at   = ws.p4CheckRaw(id)?.at;
     if (confirmRole === role) return mkConfirm(role, done ? `Undo check for ${name}?` : `Check ${name}'s corrections?`);
     if (done) return `<button class="wf-pill wf-pill--done" data-role="${role}">✓ ${escHtml(name)} · ${at ? escHtml(fmtCheckTimestamp(at)) : "auto"}</button>`;
-    return `<button class="wf-pill wf-pill--attention" data-role="${role}">○ Check ${escHtml(name)}'s Work</button>`;
+    return `<button class="wf-pill wf-pill--attention" data-role="${role}">○ Ms. Daisy: Check ${escHtml(name)}'s Work</button>`;
   };
 
   let p4State, p4Body;
