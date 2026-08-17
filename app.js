@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1727";
+const APP_VERSION = "1728";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6060,7 +6060,8 @@ async function maGetLastDataDate(entity, target, pa, isGroup = false) {
             (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
             (r.masteryNote || "").trim().length > 0 ||
             (r.trials || []).some(t => t !== null && t !== -1) ||
-            (r.optionScore !== undefined && r.optionScore !== null)
+            (r.optionScore !== undefined && r.optionScore !== null) ||
+            (r.selectedOptions || []).length > 0
           )
         ));
       })
@@ -8544,8 +8545,8 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
       }
       if (isPending) {
         html += renderPendingRemarkFields(pendingKey, actId, pa.name, idx, target);
-      } else if (pa.maintained && remarks.length === 0) {
-        const addLabel = pa.isMapped ? "Score" : pa.manualScore ? "Remark &amp; Score" : "Remark &amp; Trials";
+      } else if (pa.maintained && remarks.length === 0 && !getActivityInlineOptions(pa) && !pa.optionsMulti && !pa.manualScore) {
+        const addLabel = "Remark &amp; Trials";
         // Only show "Maintain" default and auto-fill on/after the maintained date
         const _maintAt = pa.maintainedAt || "2026-01-01";
         const _showMaintDefault = sessionDateForFilter >= _maintAt;
@@ -12531,6 +12532,52 @@ async function autoFillViewGroupMappedRemarks(group, sessionId, data) {
   return count;
 }
 
+// Group View/Edit Past Sessions counterpart of autoFillViewMaintainedRemarks.
+// Creates "Maintain" remark per attendee for maintained Notes-Only activities
+// on sessions on/after the maintained date, mirroring the individual view logic.
+async function autoFillViewGroupMaintainedRemarks(group, sessionId, data) {
+  const hasRealData = Object.values(data.remarks || {}).some(r =>
+    (r.text && r.text.trim()) || (r.trials || []).some(t => t >= 0) || r.optionScore !== undefined
+  );
+  if (!hasRealData) return 0;
+  const attendees = data.attendees || (group.students || []).filter(Boolean);
+  let count = 0;
+  for (const target of (group.targets || [])) {
+    for (const pa of (target.predefinedActivities || [])) {
+      if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || (!pa.name && !pa.title)) continue;
+      const _maintAt = pa.maintainedAt || "2026-01-01";
+      if (data.date && data.date < _maintAt) continue;
+      const allMatches = Object.entries(data.activities || {})
+        .filter(([, a]) => a.targetName === target.name && !a.parentActivity &&
+                           (a.activityName === pa.name || (pa.title && a.activityName === pa.title) || (pa.id && a.configId === pa.id)));
+      const canonical = allMatches.find(([, a]) => pa.id && a.configId === pa.id) || allMatches[0] || null;
+      let actId = canonical?.[0] || null;
+      if (!actId) {
+        const actKey = `viewgrp:${sessionId}:${target.name}:${pa.name}:maintained:act`;
+        if (maintainedRemarkAutoFillInFlight.has(actKey)) continue;
+        maintainedRemarkAutoFillInFlight.add(actKey);
+        try {
+          actId = await addActivity(sessionId, target.name, pa.name, pa.order ?? 0, true);
+        } catch { maintainedRemarkAutoFillInFlight.delete(actKey); continue; }
+        maintainedRemarkAutoFillInFlight.delete(actKey);
+      }
+      for (const studentName of attendees) {
+        const hasRemark = Object.values(data.remarks || {})
+          .some(r => r.activityId === actId && r.studentName === studentName);
+        if (hasRemark) continue;
+        const key = `viewgrp:${sessionId}:${target.name}:${pa.name}:${studentName}:maintained`;
+        if (maintainedRemarkAutoFillInFlight.has(key)) continue;
+        maintainedRemarkAutoFillInFlight.add(key);
+        try {
+          await addGroupRemark(sessionId, actId, studentName, "Maintain");
+          count++;
+        } finally { maintainedRemarkAutoFillInFlight.delete(key); }
+      }
+    }
+  }
+  return count;
+}
+
 // Group View/Edit Past Sessions counterpart of autoFillViewStructuredRemarks.
 // Creates one empty placeholder remark per attendee for each auto-open activity
 // that was cleaned up on session leave, so they show as clickable buttons
@@ -13639,6 +13686,10 @@ async function openGroupSessionView(group, sessionId) {
         if (filled > 0) return; // the write triggers another snapshot, which renders
       } catch (err) { console.error("autoFillViewGroupMappedRemarks failed:", err); }
       try {
+        const maintainedFilled = await autoFillViewGroupMaintainedRemarks(group, sessionId, data);
+        if (maintainedFilled > 0) return;
+      } catch (err) { console.error("autoFillViewGroupMaintainedRemarks failed:", err); }
+      try {
         const structuredFilled = await autoFillViewGroupStructuredRemarks(group, sessionId, data);
         if (structuredFilled > 0) return;
       } catch (err) { console.error("autoFillViewGroupStructuredRemarks failed:", err); }
@@ -14166,7 +14217,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
             data-student="${escHtml(studentName)}"
             data-parent-activity="${escHtml(paConfig?.parentActivity || "")}"
             data-config-id="${escHtml(paConfig?.id || "")}"
-            placeholder="Notes…"></textarea>
+            placeholder="${_maintained && data.date >= (_maintainedAt || "2026-01-01") ? "" : "Notes…"}">${_maintained && data.date >= (_maintainedAt || "2026-01-01") ? "Maintain" : ""}</textarea>
         </td>
         <td class="vcol-trials" contenteditable="false">
           <button class="view-group-add-trial-new" data-act-id="${escHtml(actId || "")}"
@@ -21630,10 +21681,11 @@ function renderGroupStudentActivityCard(studentName, actName, actId, target, dat
     html += renderGroupStudentRowCompact(remId, rem, target, mappedInfo);
   }
 
-  // Only show "Maintain" default on/after the maintained date
+  // Only show "Maintain" default on/after the maintained date, and only for Notes Only activities
   const _grpMaintAt = pa?.maintainedAt || "2026-01-01";
   const _grpShowMaintDefault = isMaintained && data.date >= _grpMaintAt;
-  if (remarksForThisStudent.length === 0 && isMaintained) {
+  const _grpIsNotesOnly = !getActivityInlineOptions(pa) && !pa?.optionsMulti && !pa?.manualScore;
+  if (remarksForThisStudent.length === 0 && isMaintained && _grpIsNotesOnly) {
     html += `<div class="entry-field">
       <span class="field-label" contenteditable="false">Remark</span>
       <textarea class="field-input group-remark-input group-remark-input-empty" rows="1"
