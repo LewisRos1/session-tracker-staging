@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1692";
+const APP_VERSION = "1693";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10744,9 +10744,9 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     p3Body  = ws.allP1Done
       ? `<div class="wf-pill wf-pill--done">✓ Ms. Daisy is the only instructor for this session. No need to revise.</div>`
       : `<div class="wf-pill wf-pill--locked">🔒 Complete Phase 1 first</div>`;
-  } else if (!ws.reviewSubmitted) {
+  } else if (!p2Unlocked || !ws.reviewSubmitted) {
     p3State = "locked";
-    p3Body  = `<div class="wf-pill wf-pill--locked">🔒 Complete Phase 2 first</div>`;
+    p3Body  = `<div class="wf-pill wf-pill--locked">🔒 Ms. Daisy to complete Phase 2 first</div>`;
   } else if (ws.p3Bypassed) {
     p3State = "done";
     p3Body  = `<div class="wf-pill wf-pill--done">✓ No revisions needed</div>`;
@@ -10793,7 +10793,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
   // ── Phase 5: Export (Nigel) ───────────────────────────────────
   let nigelState, nigelBody;
   const isMonthlyExport = !isGroup && state.viewStudent?.exportDuration === "monthly";
-  if (isMonthlyExport) {
+  if (isMonthlyExport && ws.ready) {
     nigelState = "nigel-ready";
     nigelBody  = `<div class="wf-pill wf-pill--done">✓ This student registered for the "Monthly Report" plan. No need to export this session.</div>`;
   } else if (!ws.ready) {
