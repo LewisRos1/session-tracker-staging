@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1718";
+const APP_VERSION = "1719";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -1566,13 +1566,13 @@ function renderTodoTiles(results, filterInst = null) {
     if (inst.id === "nigel" && isParticipant && !checks["p1_nigel"]) tasks.push("Enter Data");
     if (inst.id === "daisy" && !ws.daisyOnly) {
       ws.p3Ids.filter(id => ws.p1Done(id) && !ws.p2EffDone(id)).forEach(id => {
-        tasks.push((INSTRUCTORS.find(i => i.id === id) || { name: id }).name[0] + "1");
+        tasks.push("Check " + (INSTRUCTORS.find(i => i.id === id) || { name: id }).name[0] + "1");
       });
     }
     if (inst.id !== "daisy" && isParticipant && ws.p2EffDone(inst.id) && !ws.noCorr(inst.id) && !ws.p3Done(inst.id)) tasks.push("Revision");
     if (inst.id === "daisy" && !ws.daisyOnly) {
       ws.p3Ids.filter(id => ws.p3Done(id) && !ws.p4CheckDone(id)).forEach(id => {
-        tasks.push((INSTRUCTORS.find(i => i.id === id) || { name: id }).name[0] + "2");
+        tasks.push("Check " + (INSTRUCTORS.find(i => i.id === id) || { name: id }).name[0] + "2");
       });
     }
     if (inst.id === "nigel" && ws.ready && !ws.p4Done && !isMonthly) tasks.push("Export");
@@ -1627,13 +1627,13 @@ function renderTodoTiles(results, filterInst = null) {
       if (inst.id === "nigel" && isParticipant && !checks["p1_nigel"]) tasks.push("Enter Data");
       if (inst.id === "daisy" && !ws.daisyOnly) {
         ws.p3Ids.filter(id => ws.p1Done(id) && !ws.p2EffDone(id)).forEach(id => {
-          tasks.push((INSTRUCTORS.find(i => i.id === id) || { name: id }).name[0] + "1");
+          tasks.push("Check " + (INSTRUCTORS.find(i => i.id === id) || { name: id }).name[0] + "1");
         });
       }
       if (inst.id !== "daisy" && isParticipant && ws.p2EffDone(inst.id) && !ws.noCorr(inst.id) && !ws.p3Done(inst.id)) tasks.push("Revision");
       if (inst.id === "daisy" && !ws.daisyOnly) {
         ws.p3Ids.filter(id => ws.p3Done(id) && !ws.p4CheckDone(id)).forEach(id => {
-          tasks.push((INSTRUCTORS.find(i => i.id === id) || { name: id }).name[0] + "2");
+          tasks.push("Check " + (INSTRUCTORS.find(i => i.id === id) || { name: id }).name[0] + "2");
         });
       }
       if (inst.id === "nigel" && ws.ready && !ws.p4Done && !isMonthly) tasks.push("Export");
