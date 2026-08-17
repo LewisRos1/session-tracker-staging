@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1687";
+const APP_VERSION = "1688";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -11225,6 +11225,13 @@ function setupStickyNote() {
     // Auto-grow
     ta.style.height = "auto";
     ta.style.height = ta.scrollHeight + "px";
+    // Keep bottom of focused textarea visible inside the scroll container
+    const scrollEl = note.querySelector(".snote-list-scroll");
+    if (scrollEl) {
+      const taBottom  = ta.getBoundingClientRect().bottom;
+      const boxBottom = scrollEl.getBoundingClientRect().bottom;
+      if (taBottom > boxBottom) scrollEl.scrollTop += taBottom - boxBottom + 6;
+    }
     // Debounce save
     if (_textareaDebounce.has(cmtId)) clearTimeout(_textareaDebounce.get(cmtId));
     _textareaDebounce.set(cmtId, setTimeout(async () => {
