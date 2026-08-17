@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1701";
+const APP_VERSION = "1702";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -1490,12 +1490,12 @@ async function openTodoScreen(filterInstId = null) {
       const isParticipant = (s.participants || []).includes(inst.id);
       if (inst.id !== "nigel" && inst.id !== "daisy" && !checks[`p1_${inst.id}`]) return true;
       if (inst.id === "daisy" && isParticipant && !checks["p1_daisy"]) return true;
-      if (inst.id === "daisy" && !s.reviewSubmitted && !ws.daisyOnly) {
+      if (inst.id === "daisy" && !ws.effectiveReviewSubmitted && !ws.daisyOnly) {
         const nonDaisy = (s.participants || []).filter(id => id !== "daisy");
         const p2Unlocked = nonDaisy.length > 0 ? nonDaisy.every(id => !!checks[`p1_${id}`]) : !!checks["p1_daisy"];
         if (p2Unlocked) return true;
       }
-      if (inst.id !== "daisy" && inst.id !== "nigel" && s.reviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) return true;
+      if (inst.id !== "daisy" && inst.id !== "nigel" && ws.effectiveReviewSubmitted && !checks[`p3_${inst.id}`] && !ws.p3Bypassed) return true;
       if (inst.id === "nigel" && ws.ready && !ws.p4Done && !isMonthly) return true;
       return false;
     });
@@ -10583,13 +10583,16 @@ function getWorkflowState(data) {
   // Phase 2 — always Daisy, uses reviewSubmitted flag
   const reviewSubmitted = !!data?.reviewSubmitted;
 
-  // Stale detection: if any Phase 1 tick is NEWER than the Phase 2 submission,
-  // Daisy reviewed data before it was entered — logically impossible, treat as not submitted.
-  const newestP1At = p1Ids.reduce((m, id) => Math.max(m, (checks[`p1_${id}`]?.at || 0)), 0);
+  // Stale detection: if a NON-DAISY Phase 1 tick is NEWER than the Phase 2 submission,
+  // Daisy reviewed another instructor's data before it was entered — logically impossible.
+  // Daisy's own Phase 1 timestamp is irrelevant (she reviews others' work, not her own).
+  const newestNonDaisyP1At = p1Ids
+    .filter(id => id !== "daisy")
+    .reduce((m, id) => Math.max(m, (checks[`p1_${id}`]?.at || 0)), 0);
   const reviewIsStale = reviewSubmitted
-    && newestP1At > 0
+    && newestNonDaisyP1At > 0
     && (data?.reviewSubmittedAt || 0) > 0
-    && data.reviewSubmittedAt < newestP1At;
+    && data.reviewSubmittedAt < newestNonDaisyP1At;
   const effectiveReviewSubmitted = reviewSubmitted && !reviewIsStale;
 
   // Phase 3 — Phase 1 participants except Daisy
