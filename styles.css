@@ -2966,7 +2966,6 @@ button.wf-pill:hover { filter: brightness(.93); }
   min-width: 280px;
   min-height: 200px;
   max-height: 80vh;
-  resize: both;
   overflow: hidden;
   background: #fef9c3;
   border: 1.5px solid #fde047;
@@ -3018,7 +3017,19 @@ button.wf-pill:hover { filter: brightness(.93); }
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  padding-bottom: 4px;
 }
+
+/* ─ Custom edge-resize handles (N/S/E/W only — no corners) ─ */
+.snote-resize-n, .snote-resize-s, .snote-resize-e, .snote-resize-w {
+  position: absolute;
+  z-index: 10000;
+  user-select: none;
+}
+.snote-resize-n { top:    0; left:  8px; right:  8px; height: 6px; cursor: ns-resize; }
+.snote-resize-s { bottom: 0; left:  8px; right:  8px; height: 6px; cursor: ns-resize; }
+.snote-resize-e { top:  8px; bottom: 8px; right:  0;  width:  6px; cursor: ew-resize; }
+.snote-resize-w { top:  8px; bottom: 8px; left:   0;  width:  6px; cursor: ew-resize; }
 
 /* Corrections table */
 .snote-table {

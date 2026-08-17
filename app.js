@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1685";
+const APP_VERSION = "1686";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10976,6 +10976,10 @@ function renderStickyNoteContent(data, isGroup) {
 
   const ws = getWorkflowState(data);
 
+  // Preserve scroll position — Firestore round-trip resets scrollTop to 0 after save
+  const scrollEl   = tbody.closest(".snote-list-scroll");
+  const savedScroll = scrollEl ? scrollEl.scrollTop : 0;
+
   // Preserve focused textarea and caret position across re-renders
   const activeEl      = document.activeElement;
   const focusedCmtId  = activeEl?.classList.contains("snote-textarea") ? activeEl.dataset.cmtId : null;
@@ -11012,12 +11016,16 @@ function renderStickyNoteContent(data, isGroup) {
     }
   }
 
-  // Focus newly added row
+  // Focus newly added row (and let scroll follow naturally)
+  const isNewRow = _focusNewRow;
   if (_focusNewRow) {
     _focusNewRow = false;
     const all = tbody.querySelectorAll(".snote-textarea");
     if (all.length > 0) all[all.length - 1].focus();
   }
+
+  // Restore scroll position (skip if adding a new row — let it scroll to bottom naturally)
+  if (scrollEl && savedScroll > 0 && !isNewRow) scrollEl.scrollTop = savedScroll;
 
 }
 
@@ -11026,11 +11034,14 @@ function openStickyNote(sessionId, isGroup, data) {
   _stickyNoteIsGroup   = !!isGroup;
   const el = document.getElementById("sticky-note");
   if (!el) return;
-  if (!el.dataset.positioned) {
-    el.style.right = "20px";
-    el.style.top   = "110px";
-    el.style.left  = "";
-  }
+  // Always reset to default size + position so resize doesn't persist between opens
+  el.style.width   = "";
+  el.style.height  = "";
+  el.style.top     = "110px";
+  el.style.right   = "20px";
+  el.style.left    = "";
+  el.style.bottom  = "";
+  delete el.dataset.positioned;
   el.classList.remove("hidden");
   renderStickyNoteContent(data, isGroup);
 }
@@ -11076,6 +11087,57 @@ function setupStickyNote() {
   handle.addEventListener("touchstart", e => { const t = e.touches[0]; startDrag(t.clientX, t.clientY); }, { passive: false });
   document.addEventListener("touchmove", e => { if (!dragging) return; const t = e.touches[0]; onMove(t.clientX, t.clientY); e.preventDefault(); }, { passive: false });
   document.addEventListener("touchend", () => { dragging = false; });
+
+  // ── Edge resize (N/S/E/W — no corners) ───────────────────────
+  const MIN_W = 280, MIN_H = 200;
+
+  function startEdgeResize(startCX, startCY, dir) {
+    // Convert to left-anchored so we can modify left/top directly
+    if (!note.dataset.positioned) {
+      const r = note.getBoundingClientRect();
+      note.style.left  = r.left + "px";
+      note.style.right = "";
+      note.style.top   = r.top  + "px";
+      note.dataset.positioned = "1";
+    }
+    const r  = note.getBoundingClientRect();
+    const sw = r.width, sh = r.height, sl = r.left, st = r.top;
+
+    function move(cx, cy) {
+      const dx = cx - startCX, dy = cy - startCY;
+      if (dir === "n") {
+        const h = Math.max(MIN_H, sh - dy);
+        note.style.height = h + "px";
+        note.style.top    = (st + sh - h) + "px";
+      } else if (dir === "s") {
+        note.style.height = Math.max(MIN_H, sh + dy) + "px";
+      } else if (dir === "e") {
+        note.style.width  = Math.max(MIN_W, sw + dx) + "px";
+      } else if (dir === "w") {
+        const w = Math.max(MIN_W, sw - dx);
+        note.style.width  = w + "px";
+        note.style.left   = (sl + sw - w) + "px";
+      }
+    }
+    function onMM(ev) { move(ev.clientX, ev.clientY); }
+    function onTM(ev) { const t = ev.touches[0]; move(t.clientX, t.clientY); ev.preventDefault(); }
+    function cleanup() {
+      document.removeEventListener("mousemove", onMM);
+      document.removeEventListener("mouseup",   cleanup);
+      document.removeEventListener("touchmove", onTM);
+      document.removeEventListener("touchend",  cleanup);
+    }
+    document.addEventListener("mousemove", onMM);
+    document.addEventListener("mouseup",   cleanup);
+    document.addEventListener("touchmove", onTM, { passive: false });
+    document.addEventListener("touchend",  cleanup);
+  }
+
+  note.querySelectorAll("[data-dir]").forEach(handle => {
+    const dir = handle.dataset.dir;
+    handle.addEventListener("mousedown", e => { e.preventDefault(); startEdgeResize(e.clientX, e.clientY, dir); });
+    handle.addEventListener("touchstart", e => { const t = e.touches[0]; e.preventDefault(); startEdgeResize(t.clientX, t.clientY, dir); }, { passive: false });
+  });
 
   closeEl.addEventListener("click", async () => {
     // Auto-delete empty rows before closing
