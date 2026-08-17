@@ -173,7 +173,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1694";
+const APP_VERSION = "1695";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10602,9 +10602,11 @@ function getWorkflowState(data) {
   const p4DaisyCompat    = !p4DaisyRaw
     ? (checks["p4_nigel"]
         ? { by: "daisy", at: checks["p4_nigel"].at, compat: true }
-        : (reviewSubmitted && effectiveAllP3Done && (data?.reviewSubmittedAt || 0) > 0 && data.reviewSubmittedAt < PHASE4_ADDED_AT
-            ? { by: "daisy", at: data.reviewSubmittedAt, compat: true }
-            : null))
+        : (p3Bypassed  // No revisions needed → Check #2 auto-skipped
+            ? { by: "daisy", at: checks["no_corrections"]?.at || data?.reviewSubmittedAt || Date.now(), compat: true, reason: "no_corrections" }
+            : (reviewSubmitted && effectiveAllP3Done && (data?.reviewSubmittedAt || 0) > 0 && data.reviewSubmittedAt < PHASE4_ADDED_AT
+                ? { by: "daisy", at: data.reviewSubmittedAt, compat: true }
+                : null)))
     : null;
   const p4DaisyCheck  = p4DaisyRaw || p4DaisyCompat;
   const reviewSubmitted2 = !!p4DaisyCheck;
@@ -10780,6 +10782,9 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
   } else if (confirmRole === "p4_daisy") {
     p4State = "p2-active";
     p4Body  = mkConfirm("p4_daisy", ws.reviewSubmitted2 ? "Undo? This will also uncheck Export." : "Mark as reviewed?");
+  } else if (ws.p4DaisyCheck?.reason === "no_corrections") {
+    p4State = "done";
+    p4Body  = `<div class="wf-pill wf-pill--done">✓ No revisions needed — Check #2 not required</div>`;
   } else if (ws.reviewSubmitted2) {
     // Static (no data-role) if compat — Export was already ticked on this session before Check #2 existed
     const role = ws.p4DaisyCheck?.compat ? "" : ` data-role="p4_daisy"`;
@@ -11012,21 +11017,26 @@ async function handleCheckedByClick(e, isGroup) {
         await updateSessionChecks(sid, checks);
         const ws2    = getWorkflowState({ ...data, checks });
         const allDone = ws2.allP3Done && ws2.p3Ids.length > 0;
-        await updateWorkflowStatus(sid, allDone ? null : "ray_pending", getSubjectMeta());
+        // Phase 3 done → Daisy now needs to do Check #2 (Phase 4)
+        await updateWorkflowStatus(sid, allDone ? "daisy_pending" : "ray_pending", getSubjectMeta());
       } catch (err) { console.error("updateSessionChecks p3:", err); }
     } else if (role === "p4_daisy") {
       const ws      = getWorkflowState(data);
       const newDone = !ws.reviewSubmitted2;
       const checks  = { ...(data?.checks || {}) };
-      if (newDone) {
-        checks["p4_daisy"] = { by: "daisy", at: Date.now() };
-      } else {
-        // Unticking Check #2 cascades — Export is now invalid too
-        delete checks["p4_daisy"];
-        delete checks["p4_nigel"];
-      }
-      try { await updateSessionChecks(sid, checks); }
-      catch (err) { console.error("updateSessionChecks p4_daisy:", err); }
+      try {
+        if (newDone) {
+          checks["p4_daisy"] = { by: "daisy", at: Date.now() };
+          await updateSessionChecks(sid, checks);
+          await updateWorkflowStatus(sid, null, getSubjectMeta());
+        } else {
+          // Unticking Check #2 cascades — Export is now invalid too
+          delete checks["p4_daisy"];
+          delete checks["p4_nigel"];
+          await updateSessionChecks(sid, checks);
+          await updateWorkflowStatus(sid, "daisy_pending", getSubjectMeta());
+        }
+      } catch (err) { console.error("updateSessionChecks p4_daisy:", err); }
     } else if (role === "p4_nigel") {
       const ws      = getWorkflowState(data);
       const newDone = !ws.p4Done;
