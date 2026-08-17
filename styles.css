@@ -2816,11 +2816,11 @@ div.admin-note-editable:empty::before {
 /* ─── Workflow Flowchart ─────────────────────────────────────── */
 .workflow-chart {
   display: grid;
-  grid-template-columns: minmax(140px,1fr) 2.5rem minmax(140px,1fr) 2.5rem minmax(140px,1fr) 2.5rem minmax(140px,1fr);
+  grid-template-columns: minmax(0,1fr) 2rem minmax(0,1fr) 2rem minmax(0,1fr) 2rem minmax(0,1fr) 2rem minmax(0,1fr);
   grid-template-rows: auto auto;
   align-items: stretch;
   gap: .5rem 0;
-  min-width: 640px;
+  min-width: 720px;
 }
 
 /* Arrows fill their row-1 cell and center the SVG */
@@ -2923,14 +2923,14 @@ button.wf-pill:hover { filter: brightness(.93); }
 
 /* Row 2 triggers */
 .wf-note-wrap {
-  grid-column: 3 / 6;
+  grid-column: 3 / 8;
   grid-row: 2;
   display: flex;
   justify-content: center;
   padding-top: .3rem;
 }
 .wf-export-wrap {
-  grid-column: 7;
+  grid-column: 9;
   grid-row: 2;
   display: flex;
   justify-content: center;
@@ -3264,7 +3264,7 @@ button.wf-pill:hover { filter: brightness(.93); }
   .checked-by-pill  { font-size: .74rem; padding: .25rem .7rem; }
   .chk-export-btn   { font-size: .74rem; padding: .25rem .7rem; }
   .workflow-chart {
-    grid-template-columns: 1fr 1.8rem 1fr 1.8rem 1fr 1.8rem 1fr;
+    grid-template-columns: minmax(0,1fr) 1.5rem minmax(0,1fr) 1.5rem minmax(0,1fr) 1.5rem minmax(0,1fr) 1.5rem minmax(0,1fr);
   }
   .wf-node { font-size: .78rem; padding: .45rem .5rem; }
   .sticky-note { width: calc(100vw - 24px); right: 12px; }
