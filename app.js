@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1720";
+const APP_VERSION = "1721";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10658,7 +10658,13 @@ function getWorkflowState(data) {
     if (noCorr(id)) return true; // no corrections → Check #2 auto-skipped
     if (!hasAnyNewP4) {
       if (p4DaisyOld) return true;
-      if (checks["p4_nigel"]) return true;
+      if (checks["p4_nigel"]) {
+        // Only valid if Nigel exported AFTER this instructor's Phase 3 revision.
+        // If p3 happened after the export, the export pre-dates the revision — Daisy still needs to check.
+        const nigelAt = checks["p4_nigel"]?.at || 0;
+        const p3RevAt = p3Check(id)?.at || 0;
+        if (p3RevAt === 0 || nigelAt >= p3RevAt) return true;
+      }
       if (reviewSubmittedOld && allP3Done && (data?.reviewSubmittedAt || 0) > 0 && data.reviewSubmittedAt < PHASE4_ADDED_AT) return true;
     }
     return false;
@@ -10858,7 +10864,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     const done = ws.p4CheckDone(id);
     const at   = ws.p4CheckRaw(id)?.at;
     if (confirmRole === role) return mkConfirm(role, done ? `Undo check for ${name}?` : `Check ${name}'s corrections?`);
-    if (done) return `<button class="wf-pill wf-pill--done" data-role="${role}">✓ ${escHtml(name)} · ${at ? escHtml(fmtCheckTimestamp(at)) : "auto"}</button>`;
+    if (done) return `<button class="wf-pill wf-pill--done" data-role="${role}">✓ ${escHtml(name)} · ${at ? escHtml(fmtCheckTimestamp(at)) : "Ms. Daisy"}</button>`;
     return `<button class="wf-pill wf-pill--attention" data-role="${role}">○ Ms. Daisy: Check ${escHtml(name)}'s Work</button>`;
   };
 
