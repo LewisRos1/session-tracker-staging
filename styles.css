@@ -2962,9 +2962,10 @@ button.wf-pill:hover { filter: brightness(.93); }
   top: 110px;
   right: 20px;
   width: 470px;
+  height: 380px;
   min-width: 280px;
   min-height: 200px;
-  max-height: 70vh;
+  max-height: 80vh;
   resize: both;
   overflow: hidden;
   background: #fef9c3;
@@ -3007,9 +3008,16 @@ button.wf-pill:hover { filter: brightness(.93); }
   gap: .5rem;
   padding: .6rem .7rem .75rem;
   user-select: text;
-  overflow-y: auto;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
+}
+
+.snote-list-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* Corrections table */
@@ -3040,8 +3048,8 @@ button.wf-pill:hover { filter: brightness(.93); }
 }
 .snote-table thead th:last-child { border-right: none; }
 .snote-th-no   { width: 2rem; text-align: center; }
-.snote-th-tick { width: 2.2rem; text-align: center; }
 .snote-th-del  { width: 1.8rem; }
+.snote-table thead th.snote-th-tick { width: 2.2rem; text-align: center; }
 .snote-table thead .snote-th-text { text-align: center; }
 
 .snote-row td {

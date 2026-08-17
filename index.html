@@ -416,17 +416,19 @@
       <button class="sticky-note-close" id="btn-sticky-note-close" title="Close">✕</button>
     </div>
     <div class="sticky-note-body">
-      <table class="snote-table">
-        <thead>
-          <tr>
-            <th class="snote-th-no">No.</th>
-            <th class="snote-th-text">Correction</th>
-            <th class="snote-th-tick">✓</th>
-            <th class="snote-th-del"></th>
-          </tr>
-        </thead>
-        <tbody id="sticky-note-rows"></tbody>
-      </table>
+      <div class="snote-list-scroll">
+        <table class="snote-table">
+          <thead>
+            <tr>
+              <th class="snote-th-no">No.</th>
+              <th class="snote-th-text">Correction</th>
+              <th class="snote-th-tick">✓</th>
+              <th class="snote-th-del"></th>
+            </tr>
+          </thead>
+          <tbody id="sticky-note-rows"></tbody>
+        </table>
+      </div>
       <button id="sticky-note-add-row-btn" class="snote-add-row-btn">+ Add Correction</button>
     </div>
   </div>
