@@ -174,7 +174,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1711";
+const APP_VERSION = "1712";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -1381,6 +1381,7 @@ async function loadTodoHomeCounts() {
           const isParticipant = (s.participants || []).includes(inst.id);
           if (inst.id !== "nigel" && inst.id !== "daisy" && !checks[`p1_${inst.id}`]) return n + 1;
           if (inst.id === "daisy" && isParticipant && !checks["p1_daisy"]) return n + 1;
+          if (inst.id === "nigel" && isParticipant && !checks["p1_nigel"]) return n + 1;
           if (inst.id === "daisy" && !ws.effectiveReviewSubmitted && !ws.daisyOnly) {
             const nonDaisy = (s.participants || []).filter(id => id !== "daisy");
             const p2Unlocked = nonDaisy.length > 0 ? nonDaisy.every(id => !!checks[`p1_${id}`]) : !!checks["p1_daisy"];
@@ -1492,6 +1493,7 @@ async function openTodoScreen(filterInstId = null) {
       const isParticipant = (s.participants || []).includes(inst.id);
       if (inst.id !== "nigel" && inst.id !== "daisy" && !checks[`p1_${inst.id}`]) return true;
       if (inst.id === "daisy" && isParticipant && !checks["p1_daisy"]) return true;
+      if (inst.id === "nigel" && isParticipant && !checks["p1_nigel"]) return true;
       if (inst.id === "daisy" && !ws.effectiveReviewSubmitted && !ws.daisyOnly) {
         const nonDaisy = (s.participants || []).filter(id => id !== "daisy");
         const p2Unlocked = nonDaisy.length > 0 ? nonDaisy.every(id => !!checks[`p1_${id}`]) : !!checks["p1_daisy"];
@@ -1569,6 +1571,7 @@ function renderTodoTiles(results, filterInst = null) {
     const tasks = [];
     if (inst.id !== "nigel" && inst.id !== "daisy" && !checks[`p1_${inst.id}`]) tasks.push("Enter Data");
     if (inst.id === "daisy" && isParticipant && !checks["p1_daisy"]) tasks.push("Enter Data");
+    if (inst.id === "nigel" && isParticipant && !checks["p1_nigel"]) tasks.push("Enter Data");
     if (inst.id === "daisy" && !ws.effectiveReviewSubmitted && !ws.daisyOnly) {
       // Phase 2 (Check #1) only shows if it's unlocked (all non-Daisy p1 done)
       const nonDaisy = (s.participants || []).filter(id => id !== "daisy");
@@ -1626,6 +1629,7 @@ function renderTodoTiles(results, filterInst = null) {
       const tasks   = [];
       if (inst.id !== "nigel" && inst.id !== "daisy" && !checks[`p1_${inst.id}`]) tasks.push("Enter Data");
       if (inst.id === "daisy" && isParticipant && !checks["p1_daisy"]) tasks.push("Enter Data");
+      if (inst.id === "nigel" && isParticipant && !checks["p1_nigel"]) tasks.push("Enter Data");
       if (inst.id === "daisy" && !ws.effectiveReviewSubmitted && !ws.daisyOnly) {
         const nonDaisy = (s.participants || []).filter(id => id !== "daisy");
         const p2Unlocked = nonDaisy.length > 0 ? nonDaisy.every(id => !!checks[`p1_${id}`]) : !!checks["p1_daisy"];
