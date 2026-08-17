@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1723";
+const APP_VERSION = "1724";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -11159,9 +11159,13 @@ async function handleCheckedByClick(e, isGroup) {
       const id     = role.slice(3);
       const newDone = !ws.p3Done(id);
       if (newDone && !ws.allFixedFor(id)) {
-        const unticked = ws.commentsFor(id).filter(([, c]) => getCmtStatus(c) !== "fixed");
-        const n = unticked.length;
-        _phase3Error = `${n} correction${n > 1 ? "s" : ""} still unticked.`;
+        const notFixed = ws.commentsFor(id).filter(([, c]) => getCmtStatus(c) !== "fixed");
+        const nEmpty    = notFixed.filter(([, c]) => getCmtStatus(c) === null).length;
+        const nRejected = notFixed.filter(([, c]) => getCmtStatus(c) === "rejected").length;
+        const parts = [];
+        if (nEmpty > 0)    parts.push(`${nEmpty} empty (○)`);
+        if (nRejected > 0) parts.push(`${nRejected} crossed by Ms. Daisy (✗)`);
+        _phase3Error = `All corrections must be ticked ✓ to complete. ${parts.join(" and ")} — tick or resolve before marking done.`;
         rerender();
         setTimeout(() => { _phase3Error = null; rerender(); }, 3500);
         return true;
