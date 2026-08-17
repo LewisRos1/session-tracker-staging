@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1724";
+const APP_VERSION = "1725";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10897,7 +10897,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     p4State = ws.allP4Done ? "done" : (anyUnlocked4 ? "p2-active" : "locked");
     p4Body  = ws.p3Ids.map(mkPill4).join("");
     if (!ws.allP4Done) {
-      p4Body += `<div class="wf-p4-hint">If their work still contains errors, go to their list of corrections and click any incorrect ticks to change them into crosses. Add an extra note if needed.</div>`;
+      p4Body += `<div class="wf-p4-hint">If their work still contains errors, go to their list of corrections and click any incorrect ticks (✓) to change them into crosses (✗). Add an extra note if needed.</div>`;
     }
   }
   const p4Node = `<div class="wf-node wf-node--${p4State}">
@@ -11250,7 +11250,7 @@ function renderStickyNoteContent(data, isGroup) {
       const st = getCmtStatus(c);
       const [stIcon, stCls] = st === "fixed" ? ["✓", "snote-status--fixed"]
         : st === "rejected" ? ["✗", "snote-status--rejected"]
-        : ["○", "snote-status--empty"];
+        : ["", "snote-status--empty"];
       const rowCls = st === "fixed" ? " snote-row--done" : st === "rejected" ? " snote-row--rejected" : "";
       return `<tr class="snote-row${rowCls}">
         <td class="snote-no">${i + 1}</td>
