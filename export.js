@@ -219,7 +219,7 @@ function buildExcelActivityCell(text, suffix) {
 
 function richTextActivityWithNote(activityName, note) {
   const actCell = buildExcelActivityCell(activityName);
-  const noteRun = { text: `\nNote: ${note}`, font: STYLE_NOTE.font };
+  const noteRun = { text: `\nRemark: ${note}`, font: STYLE_NOTE.font };
   if (typeof actCell === "string") return { richText: [{ text: actCell }, noteRun] };
   return { richText: [...actCell.richText, noteRun] };
 }
@@ -1736,7 +1736,7 @@ function buildRemarkLines(starter, text, masteryNote) {
   if (masteryNote) {
     if (lines.length > 0) lines.push([{ text: "" }]);
     masteryNote.split("\n").forEach((ln, i) => {
-      if (i === 0) lines.push([{ text: "Note: ", bold: true }, { text: ln }]);
+      if (i === 0) lines.push([{ text: "Remark: ", bold: true }, { text: ln }]);
       else lines.push([{ text: ln }]);
     });
   }
@@ -2111,7 +2111,7 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
             return parseInlineMarkupLine(cleanLine);
           });
           if (noteLines.length === 0) noteLines.push([{ text: "" }]);
-          const allNoteLines = [[{ text: "Note:", bold: true }], ...noteLines];
+          const allNoteLines = [[{ text: "Remark:", bold: true }], ...noteLines];
           tableRows.push(new TableRow({
             children: [richCell(allNoteLines, { fill: "FEF3C7", colSpan: 3, width: WORD_COL_TOTAL, align: AlignmentType.LEFT })]
           }));
@@ -2671,7 +2671,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, mastere
           .replace(/<[^>]*>/g, "")
           .replace(/\n{3,}/g, "\n\n")
           .trim());
-        const r = blankRow(); r[1] = `Note: ${noteText}`; rows.push(r);
+        const r = blankRow(); r[1] = `Remark: ${noteText}`; rows.push(r);
         continue;
       }
 
@@ -2684,7 +2684,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, mastere
           .replace(/<[^>]*>/g, "")
           .replace(/\n{3,}/g, "\n\n")
           .trim());
-        const r = blankRow(); r[1] = `Note: ${noteText}`; rows.push(r);
+        const r = blankRow(); r[1] = `Remark: ${noteText}`; rows.push(r);
         continue;
       }
 

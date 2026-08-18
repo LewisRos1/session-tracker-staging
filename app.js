@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1756";
+const APP_VERSION = "1757";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8355,7 +8355,7 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
           <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${paDisplayHtml(pa)}</span>
         </div>
         <div class="entry-field" contenteditable="false">
-          <span class="field-label">Notes</span>
+          <span class="field-label">Remark</span>
           <span class="field-value-fixed" style="white-space:pre-wrap;color:#111827">${formatActivityMarkup(fixedText)}</span>
         </div>
       </div>`;
@@ -8592,7 +8592,7 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
         const _showMaintDefault = sessionDateForFilter >= _maintAt;
         html += `<div class="entry-divider" contenteditable="false"></div>
         <div class="entry-field" contenteditable="false">
-          <span class="field-label">Notes</span>
+          <span class="field-label">Remark</span>
           <textarea class="field-input${_showMaintDefault ? " maintained-remark-pending" : ""}" rows="1"
             data-act-id="${actId || ""}"
             data-pa-name="${escHtml(pa.name || pa.title)}"
@@ -8680,7 +8680,7 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
           <span class="field-value-fixed">${statusBadge}${paDisplayHtml(pa, true)}</span>
         </div>
         ${fixedText !== null ? `<div class="entry-field" contenteditable="false">
-          <span class="field-label">Notes</span>
+          <span class="field-label">Remark</span>
           <span class="field-value-fixed" style="white-space:pre-wrap">${formatActivityMarkup(fixedText)}</span>
         </div>` : ''}
         ${subHtml}
@@ -9241,7 +9241,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
     const parsedHint = `<span class="manual-score-hint" data-rem-id="${rem.id}" style="font-size:.93rem;font-family:inherit;color:#9ca3af;margin-left:.5rem;white-space:nowrap;align-self:center${parsedPct === null ? ";display:none" : ""}">${escHtml(parsedHintText)}</span>`;
     const msNoteField = noteCapable
       ? `<div class="entry-field entry-note-field" data-rem-id="${rem.id}">
-          <span class="field-label" contenteditable="false">Notes</span>
+          <span class="field-label" contenteditable="false">Remark</span>
           <button class="btn-sketch" contenteditable="false" data-rem-id="${rem.id}" aria-label="Open sketch board">✏</button>
           <textarea class="field-input mastery-note-input" rows="1"
             autocomplete="new-password"
@@ -9334,7 +9334,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
 
   const optBtns = makeOptPills(rem.id, rem.text)
     || `<textarea class="field-input remark-text-input" rows="1"
-        data-rem-id="${rem.id}" placeholder="Notes…" data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`;
+        data-rem-id="${rem.id}" placeholder="Remark…" data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`;
 
   // Sketch board button only shown when there's a free-text input (no preset opt pills)
   const sketchBtn = opts.length === 0
@@ -9348,7 +9348,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
       <span class="remark-starter-prefix" contenteditable="false">${escHtml(sentenceStarter)}</span>
       ${makeOptPills(rem.id, rem.text)
         || `<textarea class="field-input remark-text-input" rows="1"
-            data-rem-id="${rem.id}" placeholder="Notes…" data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`
+            data-rem-id="${rem.id}" placeholder="Remark…" data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`
       }
     </div>`;
   } else {
@@ -9369,7 +9369,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
       ? `<div class="remark-starter-wrap"><span class="remark-starter-prefix" contenteditable="false">${escHtml(noteSentenceStarter)}</span>${noteTextarea}</div>`
       : noteTextarea;
     noteField = `<div class="entry-field entry-note-field" data-rem-id="${rem.id}">
-        <span class="field-label" contenteditable="false">Notes</span>
+        <span class="field-label" contenteditable="false">Remark</span>
         <button class="btn-sketch" contenteditable="false" data-rem-id="${rem.id}" aria-label="Open sketch board">✏</button>
         ${noteInput}
         <span class="entry-note-spacer" contenteditable="false" aria-hidden="true"></span>
@@ -9377,7 +9377,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
   } else {
     noteField = _existingNote
       ? `<div class="entry-field">
-          <span class="field-label" contenteditable="false">Notes</span>
+          <span class="field-label" contenteditable="false">Remark</span>
           <div style="font-size:.78rem;color:#9ca3af;font-style:italic">Old data: ${escHtml(_existingNote)}</div>
         </div>`
       : "";
@@ -12084,7 +12084,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
                data-target="${escHtml(target.name)}" data-is-predefined="${isPredefined}"
                data-parent-activity="${escHtml(paConfig?.parentActivity || "")}"
                data-config-id="${escHtml(paConfig?.id || "")}"
-               placeholder="Notes…"></textarea>` : "";
+               placeholder="Remark…"></textarea>` : "";
         const _noOptsCell = remarkHasNote
           ? `<div class="view-starter-wrap view-starter-wrap-note" contenteditable="false">
                <div class="view-starter-top-row">${_noOptsMsg}</div>
@@ -12165,7 +12165,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
            data-target="${escHtml(target.name)}" data-is-predefined="${isPredefined}"
            data-parent-activity="${escHtml(paConfig?.parentActivity || "")}"
            data-config-id="${escHtml(paConfig?.id || "")}"
-           placeholder="Notes…"></textarea>`
+           placeholder="Remark…"></textarea>`
       : "";
     let emptyRemCell;
     if (sentenceStarter && remarkHasNote) {
@@ -12259,7 +12259,7 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
     </div>`;
     const noteCell = `<textarea class="view-mastery-note" rows="1" data-rem-id="${escHtml(rem.id)}"
       data-saved-html="${escHtml(rem.masteryNote || "")}"
-      placeholder="Notes…">${escHtml(plainTextForEdit(rem.masteryNote))}</textarea>`;
+      placeholder="Remark…">${escHtml(plainTextForEdit(rem.masteryNote))}</textarea>`;
     const remarkCell = `<div class="view-manual-score-wrap" contenteditable="false">${scoreInput}${noteCell}</div>`;
     const scoreColDisplay = parsedPct !== null ? parsedPct + "%" : "";
     return `<tr${rowClass ? ` class="${rowClass}"` : ""}>
@@ -12321,7 +12321,7 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
     const _note2 = remarkHasNote
       ? `<textarea class="view-mastery-note" rows="1" data-rem-id="${escHtml(rem.id)}"
            data-saved-html="${escHtml(rem.masteryNote || "")}"
-           placeholder="Notes…">${escHtml(plainTextForEdit(rem.masteryNote))}</textarea>` : "";
+           placeholder="Remark…">${escHtml(plainTextForEdit(rem.masteryNote))}</textarea>` : "";
     const _cell2 = remarkHasNote
       ? `<div class="view-starter-wrap view-starter-wrap-note" contenteditable="false">
            <div class="view-starter-top-row">${_msg2}</div>
@@ -12339,7 +12339,7 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
   }
   const optSelect = makeViewOpts(rem.id, rem.text)
     || `<textarea class="view-remark-edit" rows="1" data-rem-id="${escHtml(rem.id)}"
-          placeholder="Notes…" data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`;
+          placeholder="Remark…" data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`;
 
   // Show the note textarea if the current type includes it, OR if the remark
   // already has a masteryNote saved (e.g. type was +Free Text in the past and
@@ -12348,7 +12348,7 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
   const noteField = showNote
     ? `<textarea class="view-mastery-note" rows="1" data-rem-id="${escHtml(rem.id)}"
         data-saved-html="${escHtml(rem.masteryNote || "")}"
-        placeholder="Notes…">${escHtml(plainTextForEdit(rem.masteryNote))}</textarea>`
+        placeholder="Remark…">${escHtml(plainTextForEdit(rem.masteryNote))}</textarea>`
     : "";
 
   let remarkCell;
@@ -14321,7 +14321,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
                  data-act-id="${escHtml(actId || "")}" data-act-name="${escHtml(actName)}"
                  data-target="${escHtml(target.name)}" data-is-predefined="${isPredefined}"
                  data-student="${escHtml(studentName)}"
-                 placeholder="Notes…"></textarea>` : "";
+                 placeholder="Remark…"></textarea>` : "";
           const _gCell = remarkHasNote
             ? `<div class="view-starter-wrap view-starter-wrap-note" contenteditable="false">
                  <div class="view-starter-top-row">${_gMsg}</div>
@@ -14385,7 +14385,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
              data-act-id="${escHtml(actId || "")}" data-act-name="${escHtml(actName)}"
              data-target="${escHtml(target.name)}" data-is-predefined="${isPredefined}"
              data-student="${escHtml(studentName)}"
-             placeholder="Notes…"></textarea>`
+             placeholder="Remark…"></textarea>`
         : "";
       let gRemCell;
       if (sentenceStarter && remarkHasNote) {
@@ -14480,7 +14480,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
                data-act-id="${escHtml(actId || "")}" data-act-name="${escHtml(actName)}"
                data-target="${escHtml(target.name)}" data-is-predefined="${isPredefined}"
                data-student="${escHtml(entry.studentName)}"
-               placeholder="Notes…"></textarea>`
+               placeholder="Remark…"></textarea>`
           : "";
         let pRemCell;
         if (sentenceStarter && remarkHasNote) {
@@ -14544,7 +14544,7 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
     </div>`;
     const noteCell = `<textarea class="view-mastery-note" rows="1" data-rem-id="${escHtml(rem.id)}"
       data-saved-html="${escHtml(rem.masteryNote || "")}"
-      placeholder="Notes…">${escHtml(plainTextForEdit(rem.masteryNote))}</textarea>`;
+      placeholder="Remark…">${escHtml(plainTextForEdit(rem.masteryNote))}</textarea>`;
     const remarkCell = `<div class="view-manual-score-wrap" contenteditable="false">${scoreInput}${noteCell}</div>`;
     const scoreColDisplay = parsedPct !== null ? parsedPct + "%" : "";
     return `<tr${rowClass ? ` class="${rowClass}"` : ""}>
@@ -14583,7 +14583,7 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
         const _note3 = remarkHasNote
           ? `<textarea class="view-mastery-note" rows="1" data-rem-id="${escHtml(rem.id)}"
                data-saved-html="${escHtml(rem.masteryNote || "")}"
-               placeholder="Notes…">${escHtml(plainTextForEdit(rem.masteryNote))}</textarea>` : "";
+               placeholder="Remark…">${escHtml(plainTextForEdit(rem.masteryNote))}</textarea>` : "";
         const _cell3 = remarkHasNote
           ? `<div class="view-starter-wrap view-starter-wrap-note" contenteditable="false">
                <div class="view-starter-top-row">${_msg3}</div>
@@ -14610,13 +14610,13 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
 
       const optSelect = makeViewOpts(rem.id, rem.text)
         || `<textarea class="view-remark-edit" rows="1" data-rem-id="${escHtml(rem.id)}"
-              placeholder="Notes…" data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`;
+              placeholder="Remark…" data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`;
 
       const showNote = remarkHasNote || !!(rem.masteryNote && rem.masteryNote.trim().length > 0);
       const noteField = showNote
         ? `<textarea class="view-mastery-note" rows="1" data-rem-id="${escHtml(rem.id)}"
             data-saved-html="${escHtml(rem.masteryNote || "")}"
-            placeholder="Notes…">${escHtml(plainTextForEdit(rem.masteryNote))}</textarea>`
+            placeholder="Remark…">${escHtml(plainTextForEdit(rem.masteryNote))}</textarea>`
         : "";
 
       let remarkCell;
@@ -15556,9 +15556,9 @@ function fmtPeriodDate(d) {
 }
 
 function presetLabel(val) {
-  return { "": "Notes Only", fixed_remark: "Fixed Remark", manual_score: "Manual Score",
+  return { "": "Remark Only", fixed_remark: "Fixed Remark", manual_score: "Manual Score",
     starter_fixed: "Multiple Choice", starter_fixed_multi: "Checkboxes",
-    starter_fixed_note: "Multiple Choice" }[val] ?? "Notes Only";
+    starter_fixed_note: "Multiple Choice" }[val] ?? "Remark Only";
 }
 
 function periodSectionHtml(activeFrom, activeTo, idx, withBorder, inactiveReason) {
@@ -17000,13 +17000,13 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
   const showStarter = type !== "manual_score";
   return `<div style="flex:1;display:flex;flex-direction:column;gap:.4rem;min-width:0">
     <select class="act-preset-select mn-act-preset" data-idx="${idx}" style="border-color:#b8bcc4">
-      <option value="">Notes Only</option>
+      <option value="">Remark Only</option>
       <option value="manual_score"${type === "manual_score" ? " selected" : ""}>Manual Score</option>
       <option value="starter_fixed_note"${type === "starter_fixed_note" ? " selected" : ""}>Multiple Choice</option>
       <option value="starter_fixed_multi"${type === "starter_fixed_multi" ? " selected" : ""}>Checkboxes</option>
     </select>
     <div class="mn-act-note-starter-wrap" data-idx="${idx}" style="${showStarter ? "display:flex;flex-direction:column;gap:.3rem" : "display:none"}">
-      <span style="font-size:.95rem;color:#374151;font-weight:700">Sentence Starter (for Note)</span>
+      <span style="font-size:.95rem;color:#374151;font-weight:700">Sentence Starter (for Remark)</span>
       <input class="admin-input mn-act-note-starter-text" data-idx="${idx}"
         placeholder="Enter Sentence Starter Here (Optional)"
         style="width:100%;min-width:0;box-sizing:border-box;border-color:#b8bcc4"
@@ -21948,7 +21948,7 @@ function renderGroupStudentRowCompact(remId, rem, target, mappedInfo = null) {
       <span class="field-label" contenteditable="false">Remark</span>
       <button class="btn-sketch btn-group-sketch" contenteditable="false" data-rem-id="${remId}" aria-label="Open sketch board">✏</button>
       <textarea class="field-input group-remark-input" rows="1"
-        data-rem-id="${remId}" placeholder="Notes…"
+        data-rem-id="${remId}" placeholder="Remark…"
         data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>
       <button class="btn-icon btn-group-del-student-remark" contenteditable="false" data-rem-id="${remId}" title="Delete remark">🗑</button>
     </div>
@@ -22175,7 +22175,7 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
   }
 
   const freeTextBox = `<textarea class="field-input group-remark-input" rows="1"
-      data-rem-id="${remId}" placeholder="Notes…"
+      data-rem-id="${remId}" placeholder="Remark…"
       data-saved-html="${escHtml(rem.text || "")}">${escHtml(plainTextForEdit(rem.text))}</textarea>`;
 
   const sketchBtn = opts.length === 0
@@ -22204,7 +22204,7 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
       ? `<div class="remark-starter-wrap"><span class="remark-starter-prefix" contenteditable="false">${escHtml(noteSentenceStarter)}</span>${grpNoteTextarea}</div>`
       : grpNoteTextarea;
     noteField = `<div class="entry-field entry-note-field" data-rem-id="${remId}">
-        <span class="field-label" contenteditable="false">Notes</span>
+        <span class="field-label" contenteditable="false">Remark</span>
         <button class="btn-sketch btn-group-sketch" contenteditable="false" data-rem-id="${remId}" aria-label="Open sketch board">✏</button>
         ${grpNoteInput}
         <span class="entry-note-spacer" contenteditable="false" aria-hidden="true"></span>
@@ -22212,7 +22212,7 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
   } else {
     noteField = _grpExistingNote
       ? `<div class="entry-field" contenteditable="false">
-          <span class="field-label">Notes</span>
+          <span class="field-label">Remark</span>
           <div style="font-size:.78rem;color:#9ca3af;font-style:italic">Old data: ${escHtml(_grpExistingNote)}</div>
         </div>`
       : "";
@@ -22265,10 +22265,10 @@ function renderGroupStudentEmptyRow(studentName, actId, actName, target, isPrede
       <span class="group-student-name-label">${liveGroupAttendeeLabel(studentName)}</span>
     </div>
     <div class="entry-field">
-      <span class="field-label" contenteditable="false">Notes</span>
+      <span class="field-label" contenteditable="false">Remark</span>
       <button class="btn-sketch btn-group-sketch" contenteditable="false" data-rem-id="" aria-label="Sketch">✏</button>
       <textarea class="field-input group-remark-input group-remark-input-empty" rows="1"
-        placeholder="Notes…"
+        placeholder="Remark…"
         data-act-id="${escHtml(actId || "")}"
         data-act-name="${escHtml(actName)}"
         data-target="${escHtml(target.name)}"
