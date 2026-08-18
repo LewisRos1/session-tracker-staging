@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1733";
+const APP_VERSION = "1734";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10966,7 +10966,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     const name = instName(id);
     const role = `p4_check_${id}`;
     if (ws.noCorr(id)) {
-      return `<div class="wf-pill wf-pill--done">✓ ${escHtml(name)}: No revisions — Check #2 not required</div>`;
+      return `<div class="wf-pill wf-pill--done">✓ Ms. Daisy: No revisions — Check #2 not required for ${escHtml(name)}</div>`;
     }
     if (!ws.p3Done(id)) {
       return `<div class="wf-pill wf-pill--locked">🔒 ${escHtml(name)}: Awaiting revision</div>`;
@@ -11030,9 +11030,13 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     ${noteIds.length === 0
       ? `<button class="wf-note-btn" data-action="open-note" data-inst-id="">📝 List of Corrections</button>`
       : noteIds.map(id => {
-          const cnt  = ws.commentsFor(id).length;
+          const idComments = ws.commentsFor(id);
+          const cnt  = idComments.length;
           const name = instName(id);
-          return `<button class="wf-note-btn${cnt > 0 ? " has-note" : ""}" data-action="open-note" data-inst-id="${escHtml(id)}">
+          const allFixed  = cnt > 0 && idComments.every(([, c]) => getCmtStatus(c) === "fixed");
+          const hasIssue  = cnt > 0 && !allFixed;
+          const colorCls  = allFixed ? " wf-note-btn--green" : (hasIssue ? " wf-note-btn--red" : "");
+          return `<button class="wf-note-btn${cnt > 0 ? " has-note" : ""}${colorCls}" data-action="open-note" data-inst-id="${escHtml(id)}">
             📝 List of Corrections – ${escHtml(name)}${cnt > 0 ? ` (${cnt})` : ""}
           </button>`;
         }).join("")}
