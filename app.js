@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1743";
+const APP_VERSION = "1744";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6552,11 +6552,14 @@ function renderManageActivityScreen(entity) {
         if (!pickedDate) return;
         pa.discontinuedOn = pickedDate;
       } else if (action === 'maintain') {
-        const { date: latestDate } = await _maLoadLatest();
+        const { date: latestDate, subName: latestSubName } = await _maLoadLatest();
         // Maintained date must be at least the day after the last session (so "Maintain" doesn't overwrite existing notes)
         const rawMin = latestDate ? addOneDay(latestDate) : todayDateStr();
+        const _maintSource = latestSubName
+          ? `The last recorded session for the sub-activity <strong>"${escHtml(_stripMk(latestSubName))}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>.`
+          : `The last recorded session for <strong>"${paDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>.`;
         const infoHtml = latestDate
-          ? `The last recorded session for <strong>"${paDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>. The earliest you can maintain this activity is <strong>${fmtPeriodDate(rawMin)}</strong>. From this date onwards, this activity will automatically have a note "Maintain" for every session.`
+          ? `${_maintSource} The earliest you can maintain this activity is <strong>${fmtPeriodDate(rawMin)}</strong>. From this date onwards, this activity will automatically have a note "Maintain" for every session.`
           : `No previous session data was found for <strong>"${paDisplayName}"</strong>. From this date onwards, this activity will automatically have a note "Maintain" for every session.`;
         const pickedDate = await showDatePickerOverlay({
           heading: '🆗 Maintain Activity',
@@ -6569,10 +6572,13 @@ function renderManageActivityScreen(entity) {
         delete pa.masteredOn; delete pa.isCompleted; delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped; delete pa.inactiveReason;
         pa.maintained = true; pa.activityColor = "gray"; pa.maintainedAt = pickedDate;
       } else if (action === 'change-maintain-date') {
-        const { date: latestDate } = await _maLoadLatest();
+        const { date: latestDate, subName: latestSubName } = await _maLoadLatest();
         const rawMin = latestDate ? addOneDay(latestDate) : todayDateStr();
+        const _chMaintSource = latestSubName
+          ? `The last recorded session for the sub-activity <strong>"${escHtml(_stripMk(latestSubName))}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>.`
+          : `The last recorded session for <strong>"${paDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>.`;
         const infoHtml = latestDate
-          ? `The last recorded session for <strong>"${paDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>. The earliest you can set the maintained date is <strong>${fmtPeriodDate(rawMin)}</strong>.`
+          ? `${_chMaintSource} The earliest you can set the maintained date is <strong>${fmtPeriodDate(rawMin)}</strong>.`
           : `No previous session data was found for <strong>"${paDisplayName}"</strong>.`;
         const pickedDate = await showDatePickerOverlay({
           heading: '📅 Change Maintained Date',
