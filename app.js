@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1751";
+const APP_VERSION = "1752";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10152,11 +10152,11 @@ async function autoFillStructuredRemarks(student, sessionId) {
         // Remark exists — patch empty masteryNote to "Maintain" for sessions on/after maintained date
         if (pa.maintained && _sOnOrAfterMaint) {
           for (const candId of allCandidateIds) {
-            for (const [remId, r] of Object.entries(data.remarks || {})) {
-              if (r.activityId !== candId) continue;
-              if (!(r.masteryNote || "").replace(/<[^>]*>/g, "").trim())
-                updateRemarkNote(sessionId, remId, "Maintain").catch(() => {});
-            }
+            const actRems = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === candId);
+            if (actRems.length !== 1) continue; // user added extra remarks — don't touch them
+            const [[remId, r]] = actRems;
+            if (!(r.masteryNote || "").replace(/<[^>]*>/g, "").trim())
+              updateRemarkNote(sessionId, remId, "Maintain").catch(() => {});
           }
         }
         continue;
@@ -10369,10 +10369,21 @@ async function cleanupEmptyEntries(sessionId, data, targetName, target = null, i
     ? new Set()
     : new Set((target?.predefinedActivities || []).filter(pa => isAutoOpenRemarkType(pa)).map(pa => pa.title || pa.name));
   const acts = Object.entries(data.activities || {})
-    .filter(([, a]) => a.targetName === targetName && !mappedNames.has(a.activityName) && !maintainedStructuredNames.has(a.activityName) && !autoOpenNames.has(a.activityName));
+    .filter(([, a]) => a.targetName === targetName && !mappedNames.has(a.activityName) && !autoOpenNames.has(a.activityName));
   const stripEmpty = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
   for (const [actId, act] of acts) {
     const rems = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === actId);
+    if (maintainedStructuredNames.has(act.activityName)) {
+      // Keep the auto-fill "Maintain" placeholder; delete only empty extras the user added via "+"
+      if (rems.length <= 1) continue;
+      const sorted = [...rems].sort(([, a], [, b]) => (a.order || 0) - (b.order || 0));
+      for (const [remId, r] of sorted.slice(1)) {
+        const realTrials = (r.trials || []).filter(t => t !== -1);
+        if (!stripEmpty(r.text).length && !stripEmpty(r.masteryNote).length && realTrials.length === 0 && r.optionScore === undefined)
+          await deleteRemark(sessionId, remId);
+      }
+      continue;
+    }
     // Extra (session-only) activities with no name AND no remarks are orphans
     // from abandoned "+Add Activity" presses - clean them up here.
     if (rems.length === 0 && !act.isPredefined && !stripEmpty(act.activityName)) {
@@ -12540,11 +12551,11 @@ async function autoFillViewStructuredRemarks(student, sessionId, data) {
       if (candidateIds.some(id => remarkActIds.has(id))) {
         if (pa.maintained && _vOnOrAfterMaint) {
           for (const candId of candidateIds) {
-            for (const [remId, r] of Object.entries(data.remarks || {})) {
-              if (r.activityId !== candId) continue;
-              if (!(r.masteryNote || "").replace(/<[^>]*>/g, "").trim())
-                updateRemarkNote(sessionId, remId, "Maintain").catch(() => {});
-            }
+            const actRems = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === candId);
+            if (actRems.length !== 1) continue; // user added extra remarks — don't touch them
+            const [[remId, r]] = actRems;
+            if (!(r.masteryNote || "").replace(/<[^>]*>/g, "").trim())
+              updateRemarkNote(sessionId, remId, "Maintain").catch(() => {});
           }
         }
         continue;
@@ -12694,8 +12705,9 @@ async function autoFillViewGroupStructuredRemarks(group, sessionId, data) {
           .some(r => r.activityId === actId && r.studentName === studentName);
         if (hasRemark) {
           if (pa.maintained && _vgOnOrAfterMaint) {
-            for (const [remId, r] of Object.entries(data.remarks || {})) {
-              if (r.activityId !== actId || r.studentName !== studentName) continue;
+            const studentRems = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === actId && r.studentName === studentName);
+            if (studentRems.length === 1) {
+              const [[remId, r]] = studentRems;
               if (!(r.masteryNote || "").replace(/<[^>]*>/g, "").trim())
                 updateRemarkNote(sessionId, remId, "Maintain").catch(() => {});
             }
@@ -21179,8 +21191,9 @@ async function autoFillGroupStructuredRemarks(group, sessionId, data, targetName
         .some(r => r.activityId === actId && r.studentName === studentName);
       if (hasRemark) {
         if (pa.maintained && _gsOnOrAfterMaint) {
-          for (const [remId, r] of Object.entries(data.remarks || {})) {
-            if (r.activityId !== actId || r.studentName !== studentName) continue;
+          const studentRems = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === actId && r.studentName === studentName);
+          if (studentRems.length === 1) {
+            const [[remId, r]] = studentRems;
             if (!(r.masteryNote || "").replace(/<[^>]*>/g, "").trim())
               updateRemarkNote(sessionId, remId, "Maintain").catch(() => {});
           }
