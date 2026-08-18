@@ -9,6 +9,7 @@ import { initializeApp }    from "https://www.gstatic.com/firebasejs/10.14.1/fir
 import {
   initializeFirestore,
   persistentLocalCache,
+  persistentMultipleTabManager,
   collection,
   doc,
   addDoc,
@@ -34,9 +35,10 @@ import { FIREBASE_CONFIG } from "./config.js";
 
 const app = initializeApp(FIREBASE_CONFIG);
 
-// Enable offline persistence (IndexedDB cache)
+// Enable offline persistence with multi-tab support so opening a second tab
+// doesn't fall back to memory cache and lose offline writes.
 const db = initializeFirestore(app, {
-  localCache: persistentLocalCache()
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
 });
 
 // ─── AUTH ────────────────────────────────────────────────────
