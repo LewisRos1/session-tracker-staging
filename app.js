@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1760";
+const APP_VERSION = "1761";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8627,6 +8627,29 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
     !isActivityActive(pa, sessionDateForFilter) && !pa.isCompleted && !pa.isArchived && !pa.isStopped
   );
   if (inactivePas.length > 0) {
+    // Top-level inactive items (not sub-activities)
+    const inactiveTopLevel = inactivePas.filter(pa => !pa.parentActivity);
+    const inactiveTopLevelKeys = new Set(
+      inactiveTopLevel
+        .filter(p => !p.isHeading && !p.isMaintainHeading && !p.isNote && !p.isExportNote)
+        .map(p => p.title || p.name).filter(Boolean)
+    );
+    // Orphan subs: inactive sub whose parent is NOT also inactive (parent is still active)
+    const inactiveOrphanSubs = inactivePas.filter(pa =>
+      pa.parentActivity && !inactiveTopLevelKeys.has(pa.parentActivity)
+    );
+    const allRenderItems = [...inactiveTopLevel, ...inactiveOrphanSubs];
+
+    const _inactSubCard = (sub, si, color) => {
+      const subName = paDisplayHtml(sub, true) || `<em style="color:#9ca3af;font-size:.85rem">Untitled</em>`;
+      const subMast = sub.masteredOn ? `<span style="font-size:.71rem;display:inline-block;margin-top:.2rem;background:#d1fae5;color:#059669;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ Mastered ${fmtPeriodDate(sub.masteredOn)}</span> ` : '';
+      const subDisc = sub.discontinuedOn ? `<span style="font-size:.71rem;display:inline-block;margin-top:.2rem;background:#fee2e2;color:#dc2626;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 Discontinued ${fmtPeriodDate(sub.discontinuedOn)}</span> ` : '';
+      return `<div style="margin-left:1.4rem;background:var(--white);border:1px solid #e5e7eb;border-left:3px solid ${color};border-radius:.5rem;padding:.45rem .7rem .45rem .8rem;display:flex;align-items:flex-start;gap:.4rem;box-shadow:0 1px 3px rgba(0,0,0,.04)">
+        <span style="font-size:.75rem;font-weight:700;color:${color};flex-shrink:0;min-width:1.2rem;padding-top:.1rem">${String.fromCharCode(97 + si)})</span>
+        <div style="flex:1;min-width:0;line-height:1.5;white-space:pre-wrap">${subMast}${subDisc}${subName}</div>
+      </div>`;
+    };
+
     const renderInactiveItem = (pa, num) => {
       if (pa.isHeading || pa.isMaintainHeading) {
         const isGrayH  = pa.headingColor === "gray" || pa.isMaintainHeading;
@@ -8660,32 +8683,54 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
         : _isDiscontinued
         ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap;display:block;margin-bottom:.1rem">🚩 ${pa.discontinuedOn ? `Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}` : 'Discontinued'}</span>`
         : '');
-      const subActs = allPas.filter(p => p.parentActivity === (pa.title || pa.name) && !p.isCompleted && !p.isArchived && !p.isStopped && !p.masteredOn && !p.discontinuedOn);
-      const subHtml = subActs.length ? `<div style="display:flex;flex-direction:column;gap:.1rem;padding:.2rem 0 .1rem 1.25rem">
-        ${subActs.map((sub, si) => `<div style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:#9ca3af"><span style="flex-shrink:0">${String.fromCharCode(97 + si)})</span><span>${escHtml(sub.name || '')}</span></div>`).join('')}
-      </div>` : '';
-      return `<div class="entry-block entry-block-predefined" style="opacity:.6;pointer-events:none">
-        <div class="entry-field" contenteditable="false">
-          <span class="field-label">ACTIVITY ${num})</span>
-          <span class="field-value-fixed">${statusBadge}${paDisplayHtml(pa, true)}</span>
+      // Orphan sub: show with "from Parent Activity" label
+      if (pa.parentActivity) {
+        return `<div class="entry-block entry-block-predefined" style="opacity:.6;pointer-events:none">
+          <div class="entry-field" contenteditable="false">
+            <span class="field-label">ACTIVITY ${num})</span>
+            <span class="field-value-fixed">${statusBadge}${paDisplayHtml(pa, true)}<span style="font-size:.8rem;color:#9ca3af;display:block;margin-top:.15rem">from Parent Activity: ${escHtml(pa.parentActivity)}</span></span>
+          </div>
+        </div>`;
+      }
+      // Gather ALL sub-activities of this parent (active or inactive for this date)
+      const subActs = allPas.filter(p =>
+        p.parentActivity === (pa.title || pa.name) && !p.isCompleted && !p.isArchived && !p.isStopped
+      );
+      const _inactColor = _masteredDate ? '#059669' : _isDiscontinued ? '#dc2626' : '#9ca3af';
+      const subHtml = subActs.length
+        ? `<div style="display:flex;flex-direction:column;gap:.3rem;margin-top:.3rem">${subActs.map((sub, si) => _inactSubCard(sub, si, _inactColor)).join('')}</div>`
+        : '';
+      return `<div style="display:flex;flex-direction:column">
+        <div class="entry-block entry-block-predefined" style="opacity:.6;pointer-events:none">
+          <div class="entry-field" contenteditable="false">
+            <span class="field-label">ACTIVITY ${num})</span>
+            <span class="field-value-fixed">${statusBadge}${paDisplayHtml(pa, true)}</span>
+          </div>
+          ${fixedText !== null ? `<div class="entry-field" contenteditable="false">
+            <span class="field-label">Remark</span>
+            <span class="field-value-fixed" style="white-space:pre-wrap">${formatActivityMarkup(fixedText)}</span>
+          </div>` : ''}
         </div>
-        ${fixedText !== null ? `<div class="entry-field" contenteditable="false">
-          <span class="field-label">Remark</span>
-          <span class="field-value-fixed" style="white-space:pre-wrap">${formatActivityMarkup(fixedText)}</span>
-        </div>` : ''}
         ${subHtml}
       </div>`;
     };
-    const realInactive = inactivePas.filter(pa => !pa.isNote && !pa.isExportNote && !pa.isHeading && !pa.isMaintainHeading);
+    const realInactive = allRenderItems.filter(pa => !pa.isNote && !pa.isExportNote && !pa.isHeading && !pa.isMaintainHeading);
     const masteredPas     = realInactive.filter(pa => pa.masteredOn || pa.inactiveReason === 'mastered');
     const discontinuedPas = realInactive.filter(pa => pa.discontinuedOn || pa.inactiveReason === 'discontinued');
     const otherPas        = realInactive.filter(pa => !pa.masteredOn && !pa.discontinuedOn && !pa.inactiveReason);
+    const _countPa = pa => {
+      if (pa.parentActivity) return 1;
+      const subs = allPas.filter(p => p.parentActivity === (pa.title || pa.name) && !p.isCompleted && !p.isArchived && !p.isStopped);
+      return subs.length > 0 ? subs.length : 1;
+    };
     const renderSection = (label, color, pas) => {
       if (pas.length === 0) return '';
-      const items = pas.map((pa, i) => renderInactiveItem(pa, i + 1)).filter(Boolean).join('');
+      let itemNum = 0;
+      const items = pas.map(pa => { itemNum++; return renderInactiveItem(pa, itemNum); }).filter(Boolean).join('');
+      const totalCount = pas.reduce((acc, pa) => acc + _countPa(pa), 0);
       return `<div style="margin-top:.5rem">
         <button class="btn-inactive-toggle" contenteditable="false" style="display:flex;align-items:center;gap:.4rem;width:100%;padding:.4rem .6rem;background:none;border:1px dashed #d1d5db;border-radius:.4rem;cursor:pointer;font-size:.8rem;color:${color};text-align:left">
-          <span class="inactive-chevron" style="font-size:.7rem">▶</span> ${label} (${pas.length})
+          <span class="inactive-chevron" style="font-size:.7rem">▶</span> ${label} (${totalCount})
         </button>
         <div class="inactive-list" style="display:none;flex-direction:column;gap:.25rem;margin-top:.35rem">${items}</div>
       </div>`;
@@ -21556,6 +21601,28 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
     items.push(`<p class="empty-hint" contenteditable="false" style="padding:1.5rem">No activities yet. Add them under Edit Target.</p>`);
   }
   if (grpInactivePas.length > 0) {
+    const allGrpPas = target.predefinedActivities || [];
+    const grpInactiveTopLevel = grpInactivePas.filter(pa => !pa.parentActivity);
+    const grpInactiveTopLevelKeys = new Set(
+      grpInactiveTopLevel
+        .filter(p => !p.isHeading && !p.isMaintainHeading && !p.isNote && !p.isExportNote)
+        .map(p => p.title || p.name).filter(Boolean)
+    );
+    const grpInactiveOrphanSubs = grpInactivePas.filter(pa =>
+      pa.parentActivity && !grpInactiveTopLevelKeys.has(pa.parentActivity)
+    );
+    const allGrpRenderItems = [...grpInactiveTopLevel, ...grpInactiveOrphanSubs];
+
+    const _grpInactSubCard = (sub, si, color) => {
+      const subName = paDisplayHtml(sub, true) || `<em style="color:#9ca3af;font-size:.85rem">Untitled</em>`;
+      const subMast = sub.masteredOn ? `<span style="font-size:.71rem;display:inline-block;margin-top:.2rem;background:#d1fae5;color:#059669;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ Mastered ${fmtPeriodDate(sub.masteredOn)}</span> ` : '';
+      const subDisc = sub.discontinuedOn ? `<span style="font-size:.71rem;display:inline-block;margin-top:.2rem;background:#fee2e2;color:#dc2626;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 Discontinued ${fmtPeriodDate(sub.discontinuedOn)}</span> ` : '';
+      return `<div style="margin-left:1.4rem;background:var(--white);border:1px solid #e5e7eb;border-left:3px solid ${color};border-radius:.5rem;padding:.45rem .7rem .45rem .8rem;display:flex;align-items:flex-start;gap:.4rem;box-shadow:0 1px 3px rgba(0,0,0,.04)">
+        <span style="font-size:.75rem;font-weight:700;color:${color};flex-shrink:0;min-width:1.2rem;padding-top:.1rem">${String.fromCharCode(97 + si)})</span>
+        <div style="flex:1;min-width:0;line-height:1.5;white-space:pre-wrap">${subMast}${subDisc}${subName}</div>
+      </div>`;
+    };
+
     const renderGrpInactiveItem = (pa, num) => {
       if (pa.isHeading || pa.isMaintainHeading) return `<div class="activity-group-heading" contenteditable="false" style="opacity:.3">${escHtml(pa.name || "")}</div>`;
       if (pa.isNote || pa.isExportNote) {
@@ -21578,23 +21645,50 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
         : _grpIsDiscontinued
         ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap;display:block;margin-bottom:.1rem">🚩 ${pa.discontinuedOn ? `Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}` : 'Discontinued'}</span>`
         : '';
-      const grpSubActs = (target.predefinedActivities || []).filter(p => p.parentActivity === pa.name && !p.isCompleted && !p.isArchived && !p.isStopped && !p.masteredOn && !p.discontinuedOn);
-      const grpSubHtml = grpSubActs.length ? `<div style="display:flex;flex-direction:column;gap:.1rem;padding:.2rem 0 .1rem 1.25rem">
-        ${grpSubActs.map((sub, si) => `<div style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:#9ca3af"><span style="flex-shrink:0">${String.fromCharCode(97 + si)})</span><span>${escHtml(sub.name || '')}</span></div>`).join('')}
-      </div>` : '';
-      return `<div class="entry-block entry-block-predefined" style="opacity:.6;pointer-events:none"><div class="entry-field" contenteditable="false"><span class="field-label">ACTIVITY ${num})</span><span class="field-value-fixed">${grpStatusBadge}${paDisplayHtml(pa, true)}</span></div>${grpSubHtml}</div>`;
+      if (pa.parentActivity) {
+        return `<div class="entry-block entry-block-predefined" style="opacity:.6;pointer-events:none">
+          <div class="entry-field" contenteditable="false">
+            <span class="field-label">ACTIVITY ${num})</span>
+            <span class="field-value-fixed">${grpStatusBadge}${paDisplayHtml(pa, true)}<span style="font-size:.8rem;color:#9ca3af;display:block;margin-top:.15rem">from Parent Activity: ${escHtml(pa.parentActivity)}</span></span>
+          </div>
+        </div>`;
+      }
+      const grpSubActs = allGrpPas.filter(p =>
+        p.parentActivity === (pa.title || pa.name) && !p.isCompleted && !p.isArchived && !p.isStopped
+      );
+      const _grpInactColor = _grpMasteredDate ? '#059669' : _grpIsDiscontinued ? '#dc2626' : '#9ca3af';
+      const grpSubHtml = grpSubActs.length
+        ? `<div style="display:flex;flex-direction:column;gap:.3rem;margin-top:.3rem">${grpSubActs.map((sub, si) => _grpInactSubCard(sub, si, _grpInactColor)).join('')}</div>`
+        : '';
+      return `<div style="display:flex;flex-direction:column">
+        <div class="entry-block entry-block-predefined" style="opacity:.6;pointer-events:none">
+          <div class="entry-field" contenteditable="false">
+            <span class="field-label">ACTIVITY ${num})</span>
+            <span class="field-value-fixed">${grpStatusBadge}${paDisplayHtml(pa, true)}</span>
+          </div>
+        </div>
+        ${grpSubHtml}
+      </div>`;
     };
-    const grpReal = grpInactivePas.filter(pa => !pa.isNote && !pa.isExportNote && !pa.isHeading && !pa.isMaintainHeading);
+    const grpReal = allGrpRenderItems.filter(pa => !pa.isNote && !pa.isExportNote && !pa.isHeading && !pa.isMaintainHeading);
     const grpMastered     = grpReal.filter(pa => pa.masteredOn || pa.inactiveReason === 'mastered');
     const grpDiscontinued = grpReal.filter(pa => pa.discontinuedOn || pa.inactiveReason === 'discontinued');
     const grpOther        = grpReal.filter(pa => !pa.masteredOn && !pa.discontinuedOn && !pa.inactiveReason);
+    const _grpCountPa = pa => {
+      if (pa.parentActivity) return 1;
+      const subs = allGrpPas.filter(p => p.parentActivity === (pa.title || pa.name) && !p.isCompleted && !p.isArchived && !p.isStopped);
+      return subs.length > 0 ? subs.length : 1;
+    };
     const renderGrpSection = (label, color, pas) => {
       if (pas.length === 0) return '';
+      let grpItemNum = 0;
+      const grpItems = pas.map(pa => { grpItemNum++; return renderGrpInactiveItem(pa, grpItemNum); }).filter(Boolean).join('');
+      const grpTotalCount = pas.reduce((acc, pa) => acc + _grpCountPa(pa), 0);
       return `<div style="margin-top:.5rem">
         <button class="btn-inactive-toggle" contenteditable="false" style="display:flex;align-items:center;gap:.4rem;width:100%;padding:.4rem .6rem;background:none;border:1px dashed #d1d5db;border-radius:.4rem;cursor:pointer;font-size:.8rem;color:${color};text-align:left">
-          <span class="inactive-chevron" style="font-size:.7rem">▶</span> ${label} (${pas.length})
+          <span class="inactive-chevron" style="font-size:.7rem">▶</span> ${label} (${grpTotalCount})
         </button>
-        <div class="inactive-list" style="display:none;flex-direction:column;gap:.25rem;margin-top:.35rem">${pas.map((pa, i) => renderGrpInactiveItem(pa, i + 1)).filter(Boolean).join('')}</div>
+        <div class="inactive-list" style="display:none;flex-direction:column;gap:.25rem;margin-top:.35rem">${grpItems}</div>
       </div>`;
     };
     items.push(`<div style="margin-top:.75rem;padding-bottom:1.5rem">
