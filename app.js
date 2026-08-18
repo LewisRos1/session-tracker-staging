@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1759";
+const APP_VERSION = "1760";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6794,10 +6794,6 @@ function showStudentChoice(student) {
   });
   $("session-picker-list").querySelector(".choice-other").addEventListener("click", () => {
     showSessionPicker(student);
-  });
-  $("session-picker-list").querySelector(".choice-manage").addEventListener("click", () => {
-    closeSessionPicker();
-    openManageModal(student, null);
   });
   $("session-picker-list").querySelector(".choice-manage-activity").addEventListener("click", () => {
     closeSessionPicker();
