@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1740";
+const APP_VERSION = "1741";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10957,7 +10957,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
   const p3Node = `<div class="wf-node wf-node--${p3State}">
     <div class="wf-node-label">Phase 3: Revision</div>
     <div class="wf-node-body">${p3Body}</div>
-    ${_phase3Error ? `<div class="wf-error-msg">⚠ ${escHtml(_phase3Error)}</div>` : ""}
+    ${_phase3Error ? `<div class="wf-error-msg">${escHtml(_phase3Error)}</div>` : ""}
     ${hasRejections ? `<div class="wf-p3-hint">✗ Crosses indicate that Ms. Daisy has reviewed the work and errors are still present.</div>` : ""}
   </div>`;
 
@@ -11258,12 +11258,8 @@ async function handleCheckedByClick(e, isGroup) {
       const newDone = !ws.p3Done(id);
       if (newDone && !ws.allFixedFor(id)) {
         const notFixed = ws.commentsFor(id).filter(([, c]) => getCmtStatus(c) !== "fixed");
-        const nEmpty    = notFixed.filter(([, c]) => getCmtStatus(c) === null).length;
-        const nRejected = notFixed.filter(([, c]) => getCmtStatus(c) === "rejected").length;
-        const parts = [];
-        if (nEmpty > 0)    parts.push(`${nEmpty} empty (○)`);
-        if (nRejected > 0) parts.push(`${nRejected} crossed by Ms. Daisy (✗)`);
-        _phase3Error = `All corrections must be ticked ✓ to complete. ${parts.join(" and ")} — tick or resolve before marking done.`;
+        const nRemain = notFixed.length;
+        _phase3Error = `⚠ ${nRemain} task${nRemain === 1 ? "" : "s"} remain${nRemain === 1 ? "s" : ""} in the List of Corrections. Tick ${nRemain === 1 ? "it" : "them"} (✓) to complete this phase.`;
         rerender();
         return true;
       }
