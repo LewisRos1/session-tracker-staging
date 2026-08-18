@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1744";
+const APP_VERSION = "1745";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -7843,34 +7843,47 @@ async function leaveSession() {
 
   if (sessionId && data) {
     const stripEmpty = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
-    const currentTargetNames = new Set((student?.targets || []).map(t => t.name));
     const fedcHasData = Object.values(data.fedcComments || {}).some(c => stripEmpty(c).length > 0);
     const remarkHasData = Object.values(data.remarks || {}).some(r => {
       const act = (data.activities || {})[r.activityId];
       if (!act) return false;
-      const rText   = stripEmpty(r.text);
-      const rNote   = stripEmpty(r.masteryNote);
-      const rTrials = (r.trials || []).filter(t => t !== null && t !== -1);
-      // An unmodified auto-filled "Maintain" placeholder is not real user data.
-      // Only count it if the user actually added trials, edited the text, or added a note.
-      if (rText === "Maintain" && rTrials.length === 0 && !rNote) {
+      const rText    = stripEmpty(r.text);
+      const rNote    = stripEmpty(r.masteryNote);
+      const rTrials  = (r.trials || []).filter(t => t !== null && t !== -1);
+      const rOption  = r.optionScore !== undefined && r.optionScore !== null;
+      const rSelected = (r.selectedOptions || []).length > 0;
+      // Auto-fill "Maintain": Notes-Only puts it in text; structured puts it in masteryNote.
+      // Not real data unless the user also added trials/options or changed the text.
+      const isAutoFillMaintain =
+        ((rText === "Maintain" && !rNote) || (rNote === "Maintain" && !rText)) &&
+        rTrials.length === 0 && !rOption && !rSelected;
+      if (isAutoFillMaintain) {
         const pa = (student?.targets || []).flatMap(t => t.predefinedActivities || [])
           .find(p => p.maintained && (p.name === act.activityName || (p.id && p.id === act.configId)));
         if (pa) return false;
       }
-      // Count data under ANY targetName — if a target was renamed and the
-      // propagation didn't finish, activities under the old name still contain
-      // real data that must not make this session look "empty" and get deleted.
-      return rText.length > 0 || rTrials.length > 0 || rNote.length > 0;
+      return rText.length > 0 || rTrials.length > 0 || rNote.length > 0 || rOption || rSelected;
     });
+    // Always clean up empty entries per target.
+    const allTargetNames = new Set(Object.values(data.activities || {}).map(a => a.targetName));
+    allTargetNames.forEach(name => {
+      const target = (student?.targets || []).find(t => t.name === name);
+      cleanupEmptyEntries(sessionId, data, name, target, true).catch(() => {});
+    });
+    // If no real data was entered, strip auto-fill "Maintain" placeholders so the calendar
+    // doesn't show ✓ for a session the user immediately quit. Session itself is kept.
     if (!fedcHasData && !remarkHasData) {
-      deleteEmptyIndividualSession(sessionId, student.id, data.date).catch(() => {});
-    } else {
-      const allTargetNames = new Set(Object.values(data.activities || {}).map(a => a.targetName));
-      allTargetNames.forEach(name => {
-        const target = (student?.targets || []).find(t => t.name === name);
-        cleanupEmptyEntries(sessionId, data, name, target, true).catch(() => {});
-      });
+      const maintainRemIds = Object.entries(data.remarks || {})
+        .filter(([, r]) => {
+          const rText = stripEmpty(r.text);
+          const rNote = stripEmpty(r.masteryNote);
+          return (rText === "Maintain" || rNote === "Maintain") &&
+                 !(r.trials || []).some(t => t !== null && t !== -1) &&
+                 !(r.optionScore !== undefined && r.optionScore !== null) &&
+                 !(r.selectedOptions || []).length;
+        })
+        .map(([id]) => id);
+      if (maintainRemIds.length > 0) deleteRemarksBatch(sessionId, maintainRemIds).catch(() => {});
     }
   }
 
@@ -10612,32 +10625,42 @@ async function leaveSessionView() {
 
   if (sessionId && data) {
     const stripEmpty = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
-    const currentTargetNames = new Set((student?.targets || []).map(t => t.name));
     const fedcHasData = Object.values(data.fedcComments || {}).some(c => stripEmpty(c).length > 0);
     const remarkHasData = Object.values(data.remarks || {}).some(r => {
       const act = (data.activities || {})[r.activityId];
       if (!act) return false;
-      const rText   = stripEmpty(r.text);
-      const rNote   = stripEmpty(r.masteryNote);
-      const rTrials = (r.trials || []).filter(t => t !== null && t !== -1);
-      if (rText === "Maintain" && rTrials.length === 0 && !rNote) {
+      const rText    = stripEmpty(r.text);
+      const rNote    = stripEmpty(r.masteryNote);
+      const rTrials  = (r.trials || []).filter(t => t !== null && t !== -1);
+      const rOption  = r.optionScore !== undefined && r.optionScore !== null;
+      const rSelected = (r.selectedOptions || []).length > 0;
+      const isAutoFillMaintain =
+        ((rText === "Maintain" && !rNote) || (rNote === "Maintain" && !rText)) &&
+        rTrials.length === 0 && !rOption && !rSelected;
+      if (isAutoFillMaintain) {
         const pa = (student?.targets || []).flatMap(t => t.predefinedActivities || [])
           .find(p => p.maintained && (p.name === act.activityName || (p.id && p.id === act.configId)));
         if (pa) return false;
       }
-      // Count data under ANY targetName — if a target was renamed and the
-      // propagation didn't finish, activities under the old name still contain
-      // real data that must not make this session look "empty" and get deleted.
-      return rText.length > 0 || rTrials.length > 0 || rNote.length > 0;
+      return rText.length > 0 || rTrials.length > 0 || rNote.length > 0 || rOption || rSelected;
+    });
+    const allTargetNames = new Set(Object.values(data.activities || {}).map(a => a.targetName));
+    allTargetNames.forEach(name => {
+      const target = (student?.targets || []).find(t => t.name === name);
+      cleanupEmptyEntries(sessionId, data, name, target, true).catch(() => {});
     });
     if (!fedcHasData && !remarkHasData) {
-      deleteEmptyIndividualSession(sessionId, student.id, data.date).catch(() => {});
-    } else {
-      const allTargetNames = new Set(Object.values(data.activities || {}).map(a => a.targetName));
-      allTargetNames.forEach(name => {
-        const target = (student?.targets || []).find(t => t.name === name);
-        cleanupEmptyEntries(sessionId, data, name, target, true).catch(() => {});
-      });
+      const maintainRemIds = Object.entries(data.remarks || {})
+        .filter(([, r]) => {
+          const rText = stripEmpty(r.text);
+          const rNote = stripEmpty(r.masteryNote);
+          return (rText === "Maintain" || rNote === "Maintain") &&
+                 !(r.trials || []).some(t => t !== null && t !== -1) &&
+                 !(r.optionScore !== undefined && r.optionScore !== null) &&
+                 !(r.selectedOptions || []).length;
+        })
+        .map(([id]) => id);
+      if (maintainRemIds.length > 0) deleteRemarksBatch(sessionId, maintainRemIds).catch(() => {});
     }
   }
 
