@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1732";
+const APP_VERSION = "1733";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10897,7 +10897,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     const stale  = ws.p2CheckStale(id);
     const at     = ws.p2CheckAt(id);
     if (confirmRole === role) return mkConfirm(role, done ? `Undo check for ${name}?` : `Check ${name}'s work?`);
-    if (done && !stale) return `<button class="wf-pill wf-pill--done" data-role="${role}">✓ ${escHtml(name)} · ${escHtml(fmtCheckTimestamp(at))}</button>`;
+    if (done && !stale) return `<button class="wf-pill wf-pill--done" data-role="${role}">✓ Ms. Daisy: Checked ${escHtml(name)}'s Work · ${escHtml(fmtCheckTimestamp(at))}</button>`;
     if (stale) return `<button class="wf-pill wf-pill--attention" data-role="${role}">⚠ Ms. Daisy: Re-check ${escHtml(name)} (Phase 1 updated)</button>`;
     return `<button class="wf-pill wf-pill--attention" data-role="${role}">○ Ms. Daisy: Check ${escHtml(name)}'s Work</button>`;
   };
@@ -10974,7 +10974,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     const done = ws.p4CheckDone(id);
     const at   = ws.p4CheckRaw(id)?.at;
     if (confirmRole === role) return mkConfirm(role, done ? `Undo check for ${name}?` : `Check ${name}'s corrections?`);
-    if (done) return `<button class="wf-pill wf-pill--done" data-role="${role}">✓ ${escHtml(name)} · ${at ? escHtml(fmtCheckTimestamp(at)) : "Ms. Daisy"}</button>`;
+    if (done) return `<button class="wf-pill wf-pill--done" data-role="${role}">✓ Ms. Daisy: Checked ${escHtml(name)}'s Work · ${at ? escHtml(fmtCheckTimestamp(at)) : ""}</button>`;
     return `<button class="wf-pill wf-pill--attention" data-role="${role}">○ Ms. Daisy: Check ${escHtml(name)}'s Work</button>`;
   };
 
