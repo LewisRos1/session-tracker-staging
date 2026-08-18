@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1747";
+const APP_VERSION = "1748";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6219,13 +6219,9 @@ function renderManageActivityScreen(entity) {
       const numTag = num !== null ? `<span style="color:#6b7280;font-weight:600;margin-right:.25rem">${num})</span>` :
                      subIdx !== null ? `<span style="color:#0369a1;font-weight:600;margin-right:.25rem">${String.fromCharCode(97 + subIdx)})</span>` : '';
       const isMaint = forceMaint || maIsMaintained(pa);
-      const borderLeft = indent
-        ? (isMaint ? 'border-left:3px solid #9ca3af' : 'border-left:3px solid #60a5fa')
-        : (isMaint ? 'border-left:3px solid #9ca3af' : 'border-left:3px solid var(--primary)');
-      const bg = indent
-        ? (isMaint ? 'background:#f3f4f6' : 'background:#f0f9ff')
-        : (isMaint ? 'background:#f9fafb' : 'background:#fff');
-      const ml = indent ? 'margin-left:1.4rem;' : '';
+      const borderLeft = isMaint ? 'border-left:3px solid #9ca3af' : 'border-left:3px solid var(--primary)';
+      const bg = isMaint ? 'background:#f3f4f6' : 'background:#fff';
+      const ml = indent ? 'margin-left:2.8rem;' : '';
       return `<div data-pa-id="${escHtml(pa.id||'')}" style="${ml}${bg};border:1px solid #e5e7eb;${borderLeft};border-radius:.5rem;padding:.6rem .75rem .6rem .9rem;display:flex;align-items:flex-start;gap:.5rem;box-shadow:0 1px 3px rgba(0,0,0,.06)">
         <div style="flex:1;min-width:0;line-height:1.5;white-space:pre-wrap">${numTag}${nameHtml}${parentTag}${badge}</div>
         ${kebabWrap(pa)}
@@ -8360,7 +8356,7 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
     // Parent activity with sub-activities — render as a connected visual group
     const children = subActsByParent.get(pa.title || pa.name) || [];
     if (children.length > 0) {
-      const isGrayP  = pa.activityColor === "gray" || pa.isMaintainLive;
+      const isGrayP  = pa.activityColor === "gray" || pa.isMaintainLive || pa.maintained;
       const isGreenP = pa.activityColor === "green";
       const pBorder  = isGreenP ? 'border:1px solid #a9d18e;border-left:4px solid #70ad47;background:#e2efda;'
                      : isGrayP  ? 'border:1px solid #e5e7eb;border-left:4px solid #d1d5db;background:#f3f4f6;'
@@ -8507,7 +8503,7 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
     const isPending  = state.pendingNewRemark?.pendingKey === pendingKey;
     const mappedInfo = pa.isMapped ? resolveMappedScoreDisplay(pa) : null;
 
-    const isGrayActivity  = pa.activityColor === "gray" || pa.isMaintainLive;
+    const isGrayActivity  = pa.activityColor === "gray" || pa.isMaintainLive || pa.maintained;
     const isGreenActivity = pa.activityColor === "green";
     const activityStyle = isGrayActivity  ? ' style="background:#f3f4f6;border:1px solid #e5e7eb;border-left:4px solid #d1d5db"'
                         : isGreenActivity ? ' style="background:#e2efda;border:1px solid #a9d18e;border-left:4px solid #70ad47"'
@@ -21386,8 +21382,13 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
     const children = grpSubsByParent.get(pa.title || pa.name) || [];
     if (children.length > 0) {
       grpActNum++;
+      const grpIsGrayP = pa.activityColor === "gray" || pa.isMaintainLive || pa.maintained;
+      const grpIsGreenP = pa.activityColor === "green";
+      const grpPBorder = grpIsGreenP ? 'border:1px solid #a9d18e;border-left:4px solid #70ad47;background:#e2efda;'
+                       : grpIsGrayP  ? 'border:1px solid #e5e7eb;border-left:4px solid #d1d5db;background:#f3f4f6;'
+                       : 'border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);';
       let groupHtml = `<div style="display:flex;flex-direction:column;gap:0">`;
-      groupHtml += `<div class="entry-block" style="border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);border-radius:var(--radius) var(--radius) 0 0;border-bottom:none;box-shadow:var(--shadow)">
+      groupHtml += `<div class="entry-block" style="${grpPBorder}border-radius:var(--radius) var(--radius) 0 0;border-bottom:none;box-shadow:var(--shadow)">
         <div class="entry-field" contenteditable="false">
           <span class="field-label">Activity</span>
           <span class="field-value-fixed">${inactiveReasonBadge(pa)}<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${grpActNum})</span>${paDisplayHtml(pa, true)}</span>
@@ -21928,9 +21929,11 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
 
   // When used as a sub-card (suppressHeader=true), the outer subactivity wrapper already
   // provides the border/shadow/radius — use plain padding-only div to avoid double border.
+  const _grpCardIsGray = !suppressHeader && (paEntry?.activityColor === "gray" || paEntry?.isMaintainLive || paEntry?.maintained);
+  const _grpCardGrayStyle = _grpCardIsGray ? ' style="background:#f3f4f6;border:1px solid #e5e7eb;border-left:4px solid #d1d5db"' : '';
   const _outerOpen = suppressHeader
     ? `<div style="padding:.5rem .85rem" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">`
-    : `<div class="entry-block entry-block-predefined" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">`;
+    : `<div class="entry-block entry-block-predefined"${_grpCardGrayStyle} data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">`;
 
   // Mapped-score activities have no trials/combine-remarks concept at all —
   // bypass the rounds/combine machinery below entirely and just list every
