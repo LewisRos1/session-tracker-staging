@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1746";
+const APP_VERSION = "1747";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -7877,10 +7877,18 @@ async function leaveSession() {
         .filter(([, r]) => {
           const rText = stripEmpty(r.text);
           const rNote = stripEmpty(r.masteryNote);
-          return (rText === "Maintain" || rNote === "Maintain") &&
-                 !(r.trials || []).some(t => t !== null && t !== -1) &&
-                 !(r.optionScore !== undefined && r.optionScore !== null) &&
-                 !(r.selectedOptions || []).length;
+          if (!(rText === "Maintain" || rNote === "Maintain")) return false;
+          if ((r.trials || []).some(t => t !== null && t !== -1)) return false;
+          if (r.optionScore !== undefined && r.optionScore !== null) return false;
+          if ((r.selectedOptions || []).length) return false;
+          // Only delete auto-fills: activity must be maintained AND session must be on/after
+          // pa.maintainedAt. Sessions before that date had "Maintain" typed by the boss — keep.
+          const act = (data.activities || {})[r.activityId];
+          if (!act) return false;
+          const pa = (student?.targets || []).flatMap(t => t.predefinedActivities || [])
+            .find(p => p.maintained && (p.name === act.activityName || (p.id && p.id === act.configId)));
+          if (!pa) return false;
+          return data.date >= (pa.maintainedAt || "2026-01-01");
         })
         .map(([id]) => id);
       if (maintainRemIds.length > 0) deleteRemarksBatch(sessionId, maintainRemIds).catch(() => {});
@@ -10656,10 +10664,18 @@ async function leaveSessionView() {
         .filter(([, r]) => {
           const rText = stripEmpty(r.text);
           const rNote = stripEmpty(r.masteryNote);
-          return (rText === "Maintain" || rNote === "Maintain") &&
-                 !(r.trials || []).some(t => t !== null && t !== -1) &&
-                 !(r.optionScore !== undefined && r.optionScore !== null) &&
-                 !(r.selectedOptions || []).length;
+          if (!(rText === "Maintain" || rNote === "Maintain")) return false;
+          if ((r.trials || []).some(t => t !== null && t !== -1)) return false;
+          if (r.optionScore !== undefined && r.optionScore !== null) return false;
+          if ((r.selectedOptions || []).length) return false;
+          // Only delete auto-fills: activity must be maintained AND session must be on/after
+          // pa.maintainedAt. Sessions before that date had "Maintain" typed by the boss — keep.
+          const act = (data.activities || {})[r.activityId];
+          if (!act) return false;
+          const pa = (student?.targets || []).flatMap(t => t.predefinedActivities || [])
+            .find(p => p.maintained && (p.name === act.activityName || (p.id && p.id === act.configId)));
+          if (!pa) return false;
+          return data.date >= (pa.maintainedAt || "2026-01-01");
         })
         .map(([id]) => id);
       if (maintainRemIds.length > 0) deleteRemarksBatch(sessionId, maintainRemIds).catch(() => {});
@@ -21206,30 +21222,53 @@ async function leaveGroupSession() {
   state.selectedGroupTargetName = null;
 
   if (sessionId && data) {
-    // Delete if no useful data
-    const hasData = Object.values(data.remarks || {}).some(r => {
-      const strip = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
-      const text = strip(r.text);
-      // "Maintain" placed by autofill doesn't count as real recorded data — mirrors
-      // the same exclusion in leaveSession for individual sessions.
-      if (text === "Maintain" && !(r.trials || []).some(t => t !== -1) && !r.note) {
+    const _gStrip = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
+    const remarkHasData = Object.values(data.remarks || {}).some(r => {
+      const rText    = _gStrip(r.text);
+      const rNote    = _gStrip(r.masteryNote);
+      const rTrials  = (r.trials || []).filter(t => t !== null && t !== -1);
+      const rOption  = r.optionScore !== undefined && r.optionScore !== null;
+      const rSelected = (r.selectedOptions || []).length > 0;
+      const isAutoFillMaintain =
+        ((rText === "Maintain" && !rNote) || (rNote === "Maintain" && !rText)) &&
+        rTrials.length === 0 && !rOption && !rSelected;
+      if (isAutoFillMaintain) {
         const act = data.activities?.[r.activityId];
         const tgt = (group?.targets || []).find(t => t.name === act?.targetName);
         const pa = (tgt?.predefinedActivities || []).find(p =>
           p.maintained && (p.name === act?.activityName || (p.id && p.id === act?.configId))
         );
-        if (pa) return false;
+        if (pa && data.date >= (pa.maintainedAt || "2026-01-01")) return false;
       }
-      return text.length > 0 || (r.trials || []).some(t => t !== -1);
+      return rText.length > 0 || rTrials.length > 0 || rNote.length > 0 || rOption || rSelected;
     });
-    if (!hasData) {
-      deleteSession(sessionId).catch(() => {});
-    } else {
-      const allTargetNames = new Set(Object.values(data.activities || {}).map(a => a.targetName));
-      allTargetNames.forEach(name => {
-        const target = (group?.targets || []).find(t => t.name === name);
-        cleanupEmptyEntries(sessionId, data, name, target, true).catch(() => {});
-      });
+    // Always clean up empty entries per target.
+    const allTargetNames = new Set(Object.values(data.activities || {}).map(a => a.targetName));
+    allTargetNames.forEach(name => {
+      const target = (group?.targets || []).find(t => t.name === name);
+      cleanupEmptyEntries(sessionId, data, name, target, true).catch(() => {});
+    });
+    // If no real data, strip auto-fill "Maintain" placeholders. Session is always kept.
+    if (!remarkHasData) {
+      const maintainRemIds = Object.entries(data.remarks || {})
+        .filter(([, r]) => {
+          const rText = _gStrip(r.text);
+          const rNote = _gStrip(r.masteryNote);
+          if (!(rText === "Maintain" || rNote === "Maintain")) return false;
+          if ((r.trials || []).some(t => t !== null && t !== -1)) return false;
+          if (r.optionScore !== undefined && r.optionScore !== null) return false;
+          if ((r.selectedOptions || []).length) return false;
+          const act = data.activities?.[r.activityId];
+          if (!act) return false;
+          const tgt = (group?.targets || []).find(t => t.name === act.targetName);
+          const pa = (tgt?.predefinedActivities || []).find(p =>
+            p.maintained && (p.name === act.activityName || (p.id && p.id === act.configId))
+          );
+          if (!pa) return false;
+          return data.date >= (pa.maintainedAt || "2026-01-01");
+        })
+        .map(([id]) => id);
+      if (maintainRemIds.length > 0) deleteRemarksBatch(sessionId, maintainRemIds).catch(() => {});
     }
   }
   showHome();
