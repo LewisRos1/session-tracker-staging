@@ -2947,10 +2947,10 @@ function getAllActivitiesForTarget(session, target) {
       const parentPa = (target.predefinedActivities || []).find(p => !p.parentActivity && (p.title || p.name) === pa.parentActivity);
       const subStatusPrefix = pa.discontinuedOn ? `(Discontinued on ${fmtDate(pa.discontinuedOn)}) `
         : pa.masteredOn ? `(Mastered on ${fmtDate(pa.masteredOn)}) `
-        : pa.maintained ? '(Maintained) '
+        : pa.maintained ? `(Maintained${pa.maintainedAt ? ` on ${fmtDate(pa.maintainedAt)}` : ''}) `
         : parentPa?.discontinuedOn ? `(Discontinued on ${fmtDate(parentPa.discontinuedOn)}) `
         : parentPa?.masteredOn ? `(Mastered on ${fmtDate(parentPa.masteredOn)}) `
-        : parentPa?.maintained ? '(Maintained) '
+        : parentPa?.maintained ? `(Maintained${parentPa.maintainedAt ? ` on ${fmtDate(parentPa.maintainedAt)}` : ''}) `
         : '';
       const subActName = subStatusPrefix + (pa.title || pa.name);
       const sessionAct = claimAct(pa);
@@ -2989,7 +2989,7 @@ function getAllActivitiesForTarget(session, target) {
 
     // All remaining paths are real activities — assign sequential number
     exportActNum++;
-    const _exportStatusPrefix = pa.maintained ? '(Maintained) ' : '';
+    const _exportStatusPrefix = pa.maintained ? `(Maintained${pa.maintainedAt ? ` on ${fmtDate(pa.maintainedAt)}` : ''}) ` : '';
     const _paDisplayBase = pa.title || pa.name;
     const numberedName = `${exportActNum}) ${_exportStatusPrefix}${_paDisplayBase}`;
     const paExtraProps = { activityDisplayDetails: pa.title ? (pa.name || null) : null, activityTitleBold: !!pa.isBold, activityTitleUnderline: !!pa.isUnderline };
