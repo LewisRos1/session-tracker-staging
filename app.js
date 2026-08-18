@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1741";
+const APP_VERSION = "1742";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -11259,7 +11259,7 @@ async function handleCheckedByClick(e, isGroup) {
       if (newDone && !ws.allFixedFor(id)) {
         const notFixed = ws.commentsFor(id).filter(([, c]) => getCmtStatus(c) !== "fixed");
         const nRemain = notFixed.length;
-        _phase3Error = `⚠ ${nRemain} task${nRemain === 1 ? "" : "s"} remain${nRemain === 1 ? "s" : ""} in the List of Corrections. Tick ${nRemain === 1 ? "it" : "them"} (✓) to complete this phase.`;
+        _phase3Error = `⚠ ${nRemain} task${nRemain === 1 ? "" : "s"} remain${nRemain === 1 ? "s" : ""} in the "List of Corrections – ${instName(id)}". Tick ${nRemain === 1 ? "it" : "them"} (✓) to complete this phase.`;
         rerender();
         return true;
       }
