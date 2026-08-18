@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1758";
+const APP_VERSION = "1759";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -17368,7 +17368,7 @@ function renderTargetManageContent(student, target) {
                     rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(sub.name || '')}</textarea>
                 </div>
               </div>
-              <div class="mn-sub-act-body" data-idx="${subIdx}" style="display:none;flex-direction:column;gap:.55rem">
+              <div class="mn-sub-act-body" data-idx="${subIdx}" style="display:flex;flex-direction:column;gap:.55rem">
                 <div>
                   <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Type</div>
                   ${subRemarkType}
@@ -18265,7 +18265,7 @@ function renderTargetManageContent(student, target) {
       act.noRemark = true;
       const subId = cfgId("a");
       const paKey = act._linkKey || act.title || act.name;
-      const newSub = { id: subId, title: "", name: "", parentActivity: paKey, order: 0 };
+      const newSub = { id: subId, title: "", name: "", parentActivity: paKey, order: 0, activeFrom: act.activeFrom || null, createdOn: todayDateStr() };
       acts.splice(idx + 1, 0, newSub);
       acts.forEach((a2, i) => a2.order = i);
       target.predefinedActivities = acts;
