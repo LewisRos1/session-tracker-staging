@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1755";
+const APP_VERSION = "1756";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -7613,6 +7613,13 @@ async function openSession(student, existingSessionId = null, dateStr = null, pa
   // only a genuine student switch starts fresh.
   const preservedTargetName = state.currentStudent?.id === student.id ? state.selectedTargetName : null;
 
+  // Capture the outgoing session before wiping state — "Go To Another Session" skips
+  // leaveSession, so we run the same empty-entry cleanup here instead.
+  const _prevSessionId = state.currentSessionId;
+  const _prevData      = state.sessionData;
+  const _prevStudent   = state.currentStudent;
+  if (_prevSessionId && _prevData) await state.entryRemarkSaver?.flush();
+
   // Show the session screen immediately — before any network call — so
   // closing the picker never flashes the home screen while we fetch.
   state.currentStudent     = student;
@@ -7639,6 +7646,13 @@ async function openSession(student, existingSessionId = null, dateStr = null, pa
 
   if (state.fbUnsubscribe) { state.fbUnsubscribe(); state.fbUnsubscribe = null; }
   state.entryRemarkSaver?.cleanup();
+  if (_prevSessionId && _prevData && _prevStudent) {
+    const _allTgtNames = new Set(Object.values(_prevData.activities || {}).map(a => a.targetName));
+    _allTgtNames.forEach(name => {
+      const target = (_prevStudent.targets || []).find(t => t.name === name);
+      cleanupEmptyEntries(_prevSessionId, _prevData, name, target, true).catch(() => {});
+    });
+  }
   state.entryRemarkSaver = setupEntryRemarkSaving($("target-content"), () => state.currentSessionId, () => {
     if (!state.renderPending || state.entryActionsInFlight > 0) return;
     if (document.activeElement === $("target-select")) return;
@@ -20860,8 +20874,20 @@ async function openGroupSession(group, dateStr, attendees, participants = null) 
   // another date for the SAME group should keep the currently-viewed
   // target, not reset to the first one in sort order.
   const preservedGroupTargetName = state.currentGroup?.id === group.id ? state.selectedGroupTargetName : null;
+  // Same as openSession — capture outgoing session for cleanup before teardown.
+  const _prevGrpSessionId = state.groupSessionId;
+  const _prevGrpData      = state.groupSessionData;
+  const _prevGroup        = state.currentGroup;
+  if (_prevGrpSessionId && _prevGrpData) await state.entryGroupRemarkSaver?.flush();
   if (state.fbGroupUnsubscribe) { state.fbGroupUnsubscribe(); state.fbGroupUnsubscribe = null; }
   state.entryGroupRemarkSaver?.cleanup();
+  if (_prevGrpSessionId && _prevGrpData && _prevGroup) {
+    const _allGrpTgtNames = new Set(Object.values(_prevGrpData.activities || {}).map(a => a.targetName));
+    _allGrpTgtNames.forEach(name => {
+      const target = (_prevGroup.targets || []).find(t => t.name === name);
+      cleanupEmptyEntries(_prevGrpSessionId, _prevGrpData, name, target, true).catch(() => {});
+    });
+  }
   state.entryGroupRemarkSaver = setupEntryRemarkSaving($("group-target-content"), () => state.groupSessionId, () => {
     if (!state.groupRenderPending || state.entryGroupActionsInFlight > 0) return;
     if (document.activeElement === $("group-target-select")) return;
