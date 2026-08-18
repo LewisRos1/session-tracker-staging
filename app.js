@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1742";
+const APP_VERSION = "1743";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10720,7 +10720,9 @@ function getWorkflowState(data) {
     .sort(([,a],[,b]) => (a.order || 0) - (b.order || 0));
   const commentsFor = id => comments.filter(([, c]) => {
     if (c.forInstructor) return c.forInstructor === id;
-    // Legacy: empty/missing assignedTo = all; specific = named person
+    // Multi-instructor sessions: corrections without forInstructor must not bleed across
+    // instructors. Only use the legacy assignedTo fallback for single-instructor sessions.
+    if (p3Ids.length > 1) return false;
     const a = c.assignedTo;
     return !a || a.length === 0 || a.includes(id);
   });
