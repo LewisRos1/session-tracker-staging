@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1736";
+const APP_VERSION = "1737";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10966,7 +10966,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     const name = instName(id);
     const role = `p4_check_${id}`;
     if (ws.noCorr(id)) {
-      return `<div class="wf-pill wf-pill--done">✓ Ms. Daisy: No revisions — Check #2 not required for ${escHtml(name)}</div>`;
+      return `<div class="wf-pill wf-pill--done">✓ Ms. Daisy: ${escHtml(name)} has no mistakes - Check #2 not required</div>`;
     }
     if (!ws.p3Done(id)) {
       return `<div class="wf-pill wf-pill--locked">🔒 ${escHtml(name)}: Awaiting revision</div>`;
