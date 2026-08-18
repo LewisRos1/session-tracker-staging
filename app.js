@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1752";
+const APP_VERSION = "1753";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8686,7 +8686,7 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
         <div class="inactive-list" style="display:none;flex-direction:column;gap:.25rem;margin-top:.35rem">${items}</div>
       </div>`;
     };
-    html += `<div style="margin-top:.75rem">
+    html += `<div style="margin-top:.75rem;padding-bottom:1.5rem">
       ${renderSection('Mastered', '#059669', masteredPas)}
       ${renderSection('Discontinued', '#dc2626', discontinuedPas)}
       ${renderSection('Inactive', '#6b7280', otherPas)}
@@ -21574,7 +21574,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
         <div class="inactive-list" style="display:none;flex-direction:column;gap:.25rem;margin-top:.35rem">${pas.map((pa, i) => renderGrpInactiveItem(pa, i + 1)).filter(Boolean).join('')}</div>
       </div>`;
     };
-    items.push(`<div style="margin-top:.75rem">
+    items.push(`<div style="margin-top:.75rem;padding-bottom:1.5rem">
       ${renderGrpSection('Mastered', '#059669', grpMastered)}
       ${renderGrpSection('Discontinued', '#dc2626', grpDiscontinued)}
       ${renderGrpSection('Inactive', '#6b7280', grpOther)}
