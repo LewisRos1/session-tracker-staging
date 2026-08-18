@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1757";
+const APP_VERSION = "1758";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6686,12 +6686,6 @@ function showStudentChoice(student) {
         <span class="choice-icon">🗂️</span>
         <div class="choice-text">
           <div class="choice-label">View/Edit Past Sessions</div>
-        </div>
-      </button>
-      <button class="choice-btn choice-manage">
-        <span class="choice-icon">✏️</span>
-        <div class="choice-text">
-          <div class="choice-label">Manage Student</div>
         </div>
       </button>
       <button class="choice-btn choice-manage-activity">
