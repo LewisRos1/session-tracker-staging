@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1750";
+const APP_VERSION = "1751";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6062,12 +6062,10 @@ async function maGetLastDataDate(entity, target, pa, isGroup = false) {
           const rTrials = (r.trials || []).some(t => t !== null && t !== -1);
           const rOpt = r.optionScore !== undefined && r.optionScore !== null;
           const rSel = (r.selectedOptions || []).length > 0;
-          // Auto-fill "Maintain" placeholders aren't real boss-entered data
-          if ((rText === "Maintain" || rNote === "Maintain") && !rTrials && !rOpt && !rSel &&
-              checkPa.maintained && s.date >= (checkPa.maintainedAt || "2026-01-01")) return false;
-          const hasContent = rText.length > 0 || rNote.length > 0 || rTrials || rOpt || rSel;
-          if (hasContent) console.log(`[lastDate:"${checkPa.name}"] counted session ${s.date}:`, { text: rText, note: rNote, trials: rTrials, opt: rOpt, sel: rSel, rawRemark: r });
-          return hasContent;
+          // "Maintain" alone (auto-fill or written during a maintained period) is not
+          // real therapy data — never count it for last-data-date purposes.
+          if ((rText === "Maintain" || rNote === "Maintain") && !rTrials && !rOpt && !rSel) return false;
+          return rText.length > 0 || rNote.length > 0 || rTrials || rOpt || rSel;
         }));
       })
       .map(s => s.date).sort();
@@ -6080,7 +6078,7 @@ async function maGetLastDataDate(entity, target, pa, isGroup = false) {
   // date accounts for data recorded against any of its children.
   const paKey = pa._linkKey || pa.title || pa.name;
   const subPas = !pa.parentActivity && paKey
-    ? (target.predefinedActivities || []).filter(a => a.parentActivity === paKey && !a.isHeading && !a.isNote && !a.isExportNote)
+    ? (target.predefinedActivities || []).filter(a => a.parentActivity === paKey && !a.isHeading && !a.isNote && !a.isExportNote && !a.isMaintain && !a.isMaintainHeading)
     : [];
 
   let subDate = null, subName = null;
