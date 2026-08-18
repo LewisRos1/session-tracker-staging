@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1763";
+const APP_VERSION = "1764";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -11109,7 +11109,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     const at   = ws.p4CheckRaw(id)?.at;
     if (confirmRole === role) return mkConfirm(role, done ? `Undo check for ${name}?` : `Check ${name}'s corrections?`);
     if (done) return `<button class="wf-pill wf-pill--done" data-role="${role}">✓ Ms. Daisy · ${at ? escHtml(fmtCheckTimestamp(at)) : ""}</button>`;
-    return `<button class="wf-pill wf-pill--attention" data-role="${role}">○ Ms. Daisy: Check ${escHtml(name)}'s Work</button>`;
+    return `<button class="wf-pill wf-pill--attention" data-role="${role}">○ Ms. Daisy: Check ${escHtml(name)}'s Corrected Work</button>`;
   };
 
   let p4State, p4Body;
@@ -11167,7 +11167,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
           const idComments = ws.commentsFor(id);
           const cnt  = idComments.length;
           const name = instName(id);
-          const allFixed  = cnt === 0 || idComments.every(([, c]) => getCmtStatus(c) === "fixed");
+          const allFixed  = cnt > 0 && idComments.every(([, c]) => getCmtStatus(c) === "fixed");
           const colorCls  = allFixed ? " wf-note-btn--green" : " wf-note-btn--red";
           return `<button class="wf-note-btn${cnt > 0 ? " has-note" : ""}${colorCls}" data-action="open-note" data-inst-id="${escHtml(id)}">
             📝 List of Corrections – ${escHtml(name)}${cnt > 0 ? ` (${cnt})` : ""}
