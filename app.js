@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1748";
+const APP_VERSION = "1749";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6055,15 +6055,20 @@ async function maGetLastDataDate(entity, target, pa, isGroup = false) {
             return checkParent ? (!a.parentActivity || a.parentActivity === checkParent) : !a.parentActivity;
           })
           .map(([id]) => id);
-        return matchIds.some(actId => Object.values(sRems).some(r =>
-          r.activityId === actId && (
-            (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
-            (r.masteryNote || "").trim().length > 0 ||
-            (r.trials || []).some(t => t !== null && t !== -1) ||
-            (r.optionScore !== undefined && r.optionScore !== null) ||
-            (r.selectedOptions || []).length > 0
-          )
-        ));
+        return matchIds.some(actId => Object.values(sRems).some(r => {
+          if (r.activityId !== actId) return false;
+          const rText = (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+          const rNote = (r.masteryNote || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+          const rTrials = (r.trials || []).some(t => t !== null && t !== -1);
+          const rOpt = r.optionScore !== undefined && r.optionScore !== null;
+          const rSel = (r.selectedOptions || []).length > 0;
+          // Auto-fill "Maintain" placeholders aren't real boss-entered data
+          if ((rText === "Maintain" || rNote === "Maintain") && !rTrials && !rOpt && !rSel &&
+              checkPa.maintained && s.date >= (checkPa.maintainedAt || "2026-01-01")) return false;
+          const hasContent = rText.length > 0 || rNote.length > 0 || rTrials || rOpt || rSel;
+          if (hasContent) console.log(`[lastDate:"${checkPa.name}"] counted session ${s.date}:`, { text: rText, note: rNote, trials: rTrials, opt: rOpt, sel: rSel, rawRemark: r });
+          return hasContent;
+        }));
       })
       .map(s => s.date).sort();
     return dates[dates.length - 1] || null;
