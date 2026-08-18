@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1753";
+const APP_VERSION = "1754";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10369,7 +10369,10 @@ async function cleanupEmptyEntries(sessionId, data, targetName, target = null, i
     ? new Set()
     : new Set((target?.predefinedActivities || []).filter(pa => isAutoOpenRemarkType(pa)).map(pa => pa.title || pa.name));
   const acts = Object.entries(data.activities || {})
-    .filter(([, a]) => a.targetName === targetName && !mappedNames.has(a.activityName) && !autoOpenNames.has(a.activityName));
+    .filter(([, a]) => a.targetName === targetName && !mappedNames.has(a.activityName) &&
+      // Always process maintained-structured activities so extra empty remarks get cleaned up,
+      // even during target-switch when autoOpenNames would normally skip them.
+      (!autoOpenNames.has(a.activityName) || maintainedStructuredNames.has(a.activityName)));
   const stripEmpty = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
   for (const [actId, act] of acts) {
     const rems = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === actId);
@@ -10379,8 +10382,12 @@ async function cleanupEmptyEntries(sessionId, data, targetName, target = null, i
       const sorted = [...rems].sort(([, a], [, b]) => (a.order || 0) - (b.order || 0));
       for (const [remId, r] of sorted.slice(1)) {
         const realTrials = (r.trials || []).filter(t => t !== -1);
-        if (!stripEmpty(r.text).length && !stripEmpty(r.masteryNote).length && realTrials.length === 0 && r.optionScore === undefined)
-          await deleteRemark(sessionId, remId);
+        const rText = stripEmpty(r.text);
+        const rNote = stripEmpty(r.masteryNote);
+        const isEmpty = !rText.length && !rNote.length && realTrials.length === 0 && r.optionScore === undefined;
+        // Also catch extras that got "Maintain" patched in before v1752 — those are still throwaways
+        const isMaintainOnly = (rText === "Maintain" || rNote === "Maintain") && realTrials.length === 0 && r.optionScore === undefined;
+        if (isEmpty || isMaintainOnly) await deleteRemark(sessionId, remId);
       }
       continue;
     }
