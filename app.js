@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1745";
+const APP_VERSION = "1746";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10139,9 +10139,11 @@ async function autoFillStructuredRemarks(student, sessionId) {
         })
         .map(([id]) => id);
       const allRemarkActIds = new Set(Object.values(data.remarks || {}).map(r => r.activityId));
+      const _sMaintAt = pa.maintainedAt || "2026-01-01";
+      const _sOnOrAfterMaint = !data.date || data.date >= _sMaintAt;
       if (allCandidateIds.some(id => allRemarkActIds.has(id))) {
-        // Remark exists — patch empty masteryNote to "Maintain" for maintained activities
-        if (pa.maintained) {
+        // Remark exists — patch empty masteryNote to "Maintain" for sessions on/after maintained date
+        if (pa.maintained && _sOnOrAfterMaint) {
           for (const candId of allCandidateIds) {
             for (const [remId, r] of Object.entries(data.remarks || {})) {
               if (r.activityId !== candId) continue;
@@ -10159,7 +10161,7 @@ async function autoFillStructuredRemarks(student, sessionId) {
       const key = `${sessionId}:${target.name}:${paConfigId || pa.name}:${paParent || ""}`;
       if (structuredRemarkAutoFillInFlight.has(key)) continue;
       structuredRemarkAutoFillInFlight.add(key);
-      const maintNote = pa.maintained ? "Maintain" : "";
+      const maintNote = pa.maintained && _sOnOrAfterMaint ? "Maintain" : "";
       toFill.push({ target, pa, actId, key, paParent, paConfigId, maintNote });
     }
   }
@@ -12518,8 +12520,10 @@ async function autoFillViewStructuredRemarks(student, sessionId, data) {
         })
         .map(([id]) => id);
       const remarkActIds = new Set(Object.values(data.remarks || {}).map(r => r.activityId));
+      const _vMaintAt = pa.maintainedAt || "2026-01-01";
+      const _vOnOrAfterMaint = !sessionDate || sessionDate >= _vMaintAt;
       if (candidateIds.some(id => remarkActIds.has(id))) {
-        if (pa.maintained) {
+        if (pa.maintained && _vOnOrAfterMaint) {
           for (const candId of candidateIds) {
             for (const [remId, r] of Object.entries(data.remarks || {})) {
               if (r.activityId !== candId) continue;
@@ -12534,7 +12538,7 @@ async function autoFillViewStructuredRemarks(student, sessionId, data) {
       const key = `${sessionId}:${target.name}:${paConfigId || pa.name}:${paParent || ""}:view`;
       if (structuredRemarkAutoFillInFlight.has(key)) continue;
       structuredRemarkAutoFillInFlight.add(key);
-      const _vMaintNote = pa.maintained ? "Maintain" : "";
+      const _vMaintNote = pa.maintained && _vOnOrAfterMaint ? "Maintain" : "";
       try {
         if (existingActId) {
           await addRemark(sessionId, existingActId, "", null, undefined, _vMaintNote);
@@ -12668,11 +12672,13 @@ async function autoFillViewGroupStructuredRemarks(group, sessionId, data) {
         .find(([, a]) => a.targetName === target.name &&
           (a.activityName === pa.name || (pa.title && a.activityName === pa.title) || (pa.id && a.configId === pa.id)));
       let actId = existingAct?.[0] || null;
+      const _vgMaintAt = pa.maintainedAt || "2026-01-01";
+      const _vgOnOrAfterMaint = !data.date || data.date >= _vgMaintAt;
       for (const studentName of attendees) {
         const hasRemark = actId && Object.values(data.remarks || {})
           .some(r => r.activityId === actId && r.studentName === studentName);
         if (hasRemark) {
-          if (pa.maintained) {
+          if (pa.maintained && _vgOnOrAfterMaint) {
             for (const [remId, r] of Object.entries(data.remarks || {})) {
               if (r.activityId !== actId || r.studentName !== studentName) continue;
               if (!(r.masteryNote || "").replace(/<[^>]*>/g, "").trim())
@@ -12684,7 +12690,7 @@ async function autoFillViewGroupStructuredRemarks(group, sessionId, data) {
         const key = `${sessionId}:${target.name}:${pa.id || pa.name}:${studentName}:view`;
         if (structuredRemarkAutoFillInFlight.has(key)) continue;
         structuredRemarkAutoFillInFlight.add(key);
-        const _vgMaintNote = pa.maintained ? "Maintain" : "";
+        const _vgMaintNote = pa.maintained && _vgOnOrAfterMaint ? "Maintain" : "";
         try {
           if (!actId) {
             actId = await addActivity(sessionId, target.name, pa.title || pa.name, pa.order ?? 0, true);
@@ -21150,12 +21156,14 @@ async function autoFillGroupStructuredRemarks(group, sessionId, data, targetName
       .find(([, a]) => a.targetName === targetName && (a.activityName === pa.name || (pa.title && a.activityName === pa.title) || (pa.id && a.configId === pa.id)));
     const actId = existingAct?.[0];
     if (!actId) continue;
-    const _gsMaintNote = pa.maintained ? "Maintain" : "";
+    const _gsMaintAt = pa.maintainedAt || "2026-01-01";
+    const _gsOnOrAfterMaint = !data.date || data.date >= _gsMaintAt;
+    const _gsMaintNote = pa.maintained && _gsOnOrAfterMaint ? "Maintain" : "";
     for (const studentName of attendees) {
       const hasRemark = Object.values(data.remarks || {})
         .some(r => r.activityId === actId && r.studentName === studentName);
       if (hasRemark) {
-        if (pa.maintained) {
+        if (pa.maintained && _gsOnOrAfterMaint) {
           for (const [remId, r] of Object.entries(data.remarks || {})) {
             if (r.activityId !== actId || r.studentName !== studentName) continue;
             if (!(r.masteryNote || "").replace(/<[^>]*>/g, "").trim())
