@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1738";
+const APP_VERSION = "1739";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -11265,7 +11265,7 @@ async function handleCheckedByClick(e, isGroup) {
         if (nRejected > 0) parts.push(`${nRejected} crossed by Ms. Daisy (✗)`);
         _phase3Error = `All corrections must be ticked ✓ to complete. ${parts.join(" and ")} — tick or resolve before marking done.`;
         rerender();
-        setTimeout(() => { _phase3Error = null; rerender(); }, 3500);
+        setTimeout(() => { _phase3Error = null; rerender(); }, 20000);
         return true;
       }
       _phase3Error = null;
