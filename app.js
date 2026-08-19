@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1766";
+const APP_VERSION = "1767";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -1475,7 +1475,7 @@ function openChecklistModal() {
           if (student) openSessionView(student, sid);
         }
       };
-      if (isOlderThan7Days(btn.dataset.sessionDate)) { requirePassword(doOpen, EXPIRED_MSG); } else { doOpen(); }
+      doOpen(); // todo list items always have a pending task — auto-open regardless of age
     });
   });
 }
@@ -1541,13 +1541,12 @@ function showTodoSessionChoice(dateStr, sid, isGrp, subject) {
   overlay.querySelector("#tsc-cancel").addEventListener("click", close);
   overlay.querySelector("#tsc-start").addEventListener("click", () => {
     close();
-    const go = () => isGrp ? openGroupSession(subject, dateStr, subject.students) : openSession(subject, sid);
-    if (isOlderThan7Days(dateStr)) requirePassword(go, EXPIRED_MSG); else go();
+    // This overlay is only shown from the todo list — session has a pending task, auto-open.
+    (isGrp ? openGroupSession(subject, dateStr, subject.students) : openSession(subject, sid));
   });
   overlay.querySelector("#tsc-view").addEventListener("click", () => {
     close();
-    const go = () => isGrp ? openGroupSessionView(subject, sid) : openSessionView(subject, sid);
-    if (isOlderThan7Days(dateStr)) requirePassword(go, EXPIRED_MSG); else go();
+    isGrp ? openGroupSessionView(subject, sid) : openSessionView(subject, sid);
   });
 }
 
@@ -1746,7 +1745,7 @@ function renderTodoTiles(results, filterInst = null) {
           if (student) openSessionView(student, sid);
         }
       };
-      if (isOlderThan7Days(btn.dataset.sessionDate)) { requirePassword(doOpen, EXPIRED_MSG); } else { doOpen(); }
+      doOpen(); // todo list items always have a pending task — auto-open regardless of age
     });
   });
 }
@@ -6935,7 +6934,8 @@ function renderSessionsForMonth(student, month, monthSessions, byMonth, today, s
     item.addEventListener("click", () => {
       closeSessionPicker();
       const open = () => openSessionView(student, item.dataset.sessionId);
-      if (isOlderThan7Days(item.dataset.sessionDate)) { requirePassword(open, EXPIRED_MSG); } else { open(); }
+      const sess = monthSessions.find(s => s.id === item.dataset.sessionId);
+      if (isOlderThan7Days(item.dataset.sessionDate) && !sessionHasPendingTask(sess)) { requirePassword(open, EXPIRED_MSG); } else { open(); }
     });
   });
 }
@@ -7017,7 +7017,8 @@ function renderPickDateCalendar(student, sessions, byMonth, today, displayDate, 
         if (onSelect) onSelect(student, sessionId);
         else openSessionView(student, sessionId);
       };
-      if (isOlderThan7Days(ds)) { requirePassword(doOpen, EXPIRED_MSG); } else { doOpen(); }
+      const _sessForDate = sessions.find(s => s.date === ds);
+      if (isOlderThan7Days(ds) && !sessionHasPendingTask(_sessForDate)) { requirePassword(doOpen, EXPIRED_MSG); } else { doOpen(); }
     });
   });
 }
@@ -7264,7 +7265,8 @@ function renderGoToSessionsForMonth(student, month, monthSessions, byMonth, toda
       closeSessionPicker();
       if (sid !== state.viewSessionId) {
         const open = () => openSessionView(student, sid);
-        if (isOlderThan7Days(item.dataset.sessionDate)) { requirePassword(open, EXPIRED_MSG); } else { open(); }
+        const _sess = monthSessions.find(s => s.id === sid);
+        if (isOlderThan7Days(item.dataset.sessionDate) && !sessionHasPendingTask(_sess)) { requirePassword(open, EXPIRED_MSG); } else { open(); }
       }
     });
   });
