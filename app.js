@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1771";
+const APP_VERSION = "1772";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -13684,7 +13684,7 @@ function attachViewListeners() {
         await updateRemarkText(state.viewSessionId, btn.dataset.remId, newText);
         if (!isNaN(scoreVal) && !isActive) {
           await setOptionScore(state.viewSessionId, btn.dataset.remId, scoreVal);
-        } else {
+        } else if (prevOptScore !== undefined) {
           await clearOptionScore(state.viewSessionId, btn.dataset.remId);
         }
       } catch (err) {
@@ -14995,7 +14995,7 @@ function attachGroupViewListeners() {
         await updateRemarkText(sid(), btn.dataset.remId, newText);
         if (!isNaN(scoreVal) && !isActive) {
           await setOptionScore(sid(), btn.dataset.remId, scoreVal);
-        } else {
+        } else if (prevOptScore !== undefined) {
           await clearOptionScore(sid(), btn.dataset.remId);
         }
       } catch (err) {
