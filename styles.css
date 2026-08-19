@@ -1115,7 +1115,7 @@ input.field-input::placeholder {
 }
 .view-remark-multi-btn {
   padding: .3rem .65rem;
-  border: 1.5px solid var(--border);
+  border: 1.5px solid #374151;
   border-radius: 20px;
   background: var(--surface);
   color: var(--text);
