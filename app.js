@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1765";
+const APP_VERSION = "1766";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -337,7 +337,7 @@ function requirePassword(onSuccess, message = "Enter password to continue") {
 }
 
 const LEGAL_WARNING = `<strong>Client data is confidential</strong> and must only be accessed, used, or shared for authorised purposes. Unauthorised <strong>downloading of client data</strong> without permission for personal use is <strong>strictly prohibited</strong>.<br><br>Any violation of this policy constitutes a serious breach of privacy law. Violators may be <strong>reported to the relevant authorities</strong> and may be subject to civil and criminal liability.`;
-const EXPIRED_MSG = `This session is over 15 days old and has expired for free viewing. A password is required to continue.<br><br>${LEGAL_WARNING}`;
+const EXPIRED_MSG = `This session is over 7 days old and has expired for free viewing. A password is required to continue.<br><br>${LEGAL_WARNING}`;
 const EXPORT_MSG  = `Enter password to continue.<br><br>${LEGAL_WARNING}`;
 
 function isOlderThan7Days(dateStr) {
@@ -345,9 +345,20 @@ function isOlderThan7Days(dateStr) {
   const [y, m, d] = dateStr.split("-").map(Number);
   const sessionDate = new Date(y, m - 1, d);
   const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 15);
+  cutoff.setDate(cutoff.getDate() - 7);
   cutoff.setHours(0, 0, 0, 0);
   return sessionDate < cutoff;
+}
+
+function sessionHasPendingTask(s) {
+  if (!s) return false;
+  const ws = getWorkflowState(s);
+  if (ws.p1Ids.some(id => !ws.p1Done(id))) return true;
+  if (!ws.daisyOnly && ws.p3Ids.some(id => ws.p1Done(id) && !ws.p2EffDone(id))) return true;
+  if (ws.p3Ids.some(id => ws.p2EffDone(id) && !ws.noCorr(id) && !ws.p3Done(id))) return true;
+  if (!ws.daisyOnly && ws.p3Ids.some(id => ws.p3Done(id) && !ws.p4CheckDone(id))) return true;
+  if (ws.ready && !ws.p4Done) return true;
+  return false;
 }
 
 // ─── STATE ───────────────────────────────────────────────────
@@ -10221,7 +10232,22 @@ async function autoFillStructuredRemarks(student, sessionId) {
         if (pa.maintained && _sOnOrAfterMaint) {
           for (const candId of allCandidateIds) {
             const actRems = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === candId);
-            if (actRems.length !== 1) continue; // user added extra remarks — don't touch them
+            if (actRems.length > 1) {
+              const _isMaintainAutoFill = ([, r]) =>
+                !(r.text || "").trim() &&
+                (r.masteryNote || "").replace(/<[^>]*>/g, "").trim() === "Maintain" &&
+                !(r.trials || []).some(t => t >= 0) &&
+                r.optionScore === undefined;
+              const autoFillRems = actRems.filter(_isMaintainAutoFill);
+              const realRems     = actRems.filter(e => !_isMaintainAutoFill(e));
+              if (autoFillRems.length > 0 && realRems.length > 0) {
+                const toDelete = autoFillRems.map(([id]) => id);
+                for (const remId of toDelete) delete data.remarks[remId];
+                deleteRemarksBatch(sessionId, toDelete).catch(() => {});
+              }
+              continue;
+            }
+            if (actRems.length !== 1) continue;
             const [[remId, r]] = actRems;
             const _remHasContent = !!(r.text || "").trim()
               || !!(r.masteryNote || "").replace(/<[^>]*>/g, "").trim()
@@ -10233,6 +10259,15 @@ async function autoFillStructuredRemarks(student, sessionId) {
         }
         continue;
       }
+      // Guard: don't create a duplicate when a name-matched activity already has a remark
+      const _sNameMatchHasRemark = allActs.some(([actId2, a2]) => {
+        if (a2.targetName !== target.name) return false;
+        const _nOk = (pa.name && a2.activityName === pa.name) || (pa.title && a2.activityName === pa.title);
+        if (!_nOk) return false;
+        const _pOk = paParent ? (!a2.parentActivity || a2.parentActivity === paParent) : !a2.parentActivity;
+        return _pOk && allRemarkActIds.has(actId2);
+      });
+      if (_sNameMatchHasRemark) continue;
       const existingAct = allCandidateIds.length > 0
         ? allActs.find(([id]) => id === allCandidateIds[0])
         : null;
@@ -11927,8 +11962,8 @@ function buildTargetViewTable(target, data) {
             for (const r of Object.values(data.remarks || {})) {
               if (r.activityId !== actId) continue;
               s += (r.trials || []).filter(t => t !== null && t !== -1).length * 100;
-              if ((r.masteryNote || "").trim()) s += 50;
-              if ((r.text || "").trim()) s += 10;
+              if ((r.text || "").trim()) s += 80;  // chip/option selection outweighs note-only
+              if ((r.masteryNote || "").replace(/<[^>]*>/g, "").trim()) s += 50;
               if (r.optionScore !== undefined) s += 5;
             }
             return s;
@@ -12631,7 +12666,25 @@ async function autoFillViewStructuredRemarks(student, sessionId, data) {
         if (pa.maintained && _vOnOrAfterMaint) {
           for (const candId of candidateIds) {
             const actRems = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === candId);
-            if (actRems.length !== 1) continue; // user added extra remarks — don't touch them
+            // Clean up existing "Maintain"-only auto-fill duplicates: if one remark is an empty
+            // auto-fill placeholder (no chip selection, no real note, just masteryNote="Maintain")
+            // and another remark has real content, delete the auto-fill one.
+            if (actRems.length > 1) {
+              const _isMaintainAutoFill = ([, r]) =>
+                !(r.text || "").trim() &&
+                (r.masteryNote || "").replace(/<[^>]*>/g, "").trim() === "Maintain" &&
+                !(r.trials || []).some(t => t >= 0) &&
+                r.optionScore === undefined;
+              const autoFillRems = actRems.filter(_isMaintainAutoFill);
+              const realRems     = actRems.filter(e => !_isMaintainAutoFill(e));
+              if (autoFillRems.length > 0 && realRems.length > 0) {
+                const toDelete = autoFillRems.map(([id]) => id);
+                for (const remId of toDelete) delete data.remarks[remId];
+                deleteRemarksBatch(sessionId, toDelete).catch(() => {});
+              }
+              continue;
+            }
+            if (actRems.length !== 1) continue;
             const [[remId, r]] = actRems;
             const _remHasContent = !!(r.text || "").trim()
               || !!(r.masteryNote || "").replace(/<[^>]*>/g, "").trim()
@@ -12643,6 +12696,16 @@ async function autoFillViewStructuredRemarks(student, sessionId, data) {
         }
         continue;
       }
+      // Guard: if any name-matched activity (even with a stale/different configId) already has
+      // a remark, don't create a duplicate — the renderer will pick it up via name-based match.
+      const _nameMatchHasRemark = allActs.some(([actId2, a2]) => {
+        if (a2.targetName !== target.name) return false;
+        const _nOk = (pa.name && a2.activityName === pa.name) || (pa.title && a2.activityName === pa.title);
+        if (!_nOk) return false;
+        const _pOk = paParent ? (!a2.parentActivity || a2.parentActivity === paParent) : !a2.parentActivity;
+        return _pOk && remarkActIds.has(actId2);
+      });
+      if (_nameMatchHasRemark) continue;
       const existingActId = candidateIds[0] || null;
       const key = `${sessionId}:${target.name}:${paConfigId || pa.name}:${paParent || ""}:view`;
       if (structuredRemarkAutoFillInFlight.has(key)) continue;
