@@ -1130,6 +1130,9 @@ input.field-input::placeholder {
   color: var(--white);
   font-weight: 600;
 }
+.view-remark-multi-btn--rect,
+.view-multi-create-btn,
+.view-group-multi-create-btn { border-radius: 4px; }
 .view-remark-single-btn,
 .view-single-create-btn,
 .view-group-single-create-btn,

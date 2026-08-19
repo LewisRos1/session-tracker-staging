@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1767";
+const APP_VERSION = "1768";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -14724,7 +14724,7 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
         if (multiSelect) {
           const sel = (remText || "").split(", ").map(s => s.trim()).filter(Boolean);
           return `<div class="view-remark-multi-opts" contenteditable="false">${opts.map(opt =>
-            `<button class="view-remark-multi-btn${sel.includes(opt) ? " active" : ""}"
+            `<button class="view-remark-multi-btn view-remark-multi-btn--rect${sel.includes(opt) ? " active" : ""}"
               data-rem-id="${escHtml(remId)}" data-opt="${escHtml(opt)}">${escHtml(opt)}</button>`
           ).join("")}</div>`;
         }
