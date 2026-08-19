@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1768";
+const APP_VERSION = "1769";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -11950,7 +11950,11 @@ function buildTargetViewTable(target, data) {
         .filter(([id, a]) => a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title) || (pa.id && a.configId === pa.id)) && !matchedIds.has(id));
       // Does an activity have at least one remark with real content?
       const actHasData = id => Object.values(data.remarks || {}).some(r =>
-        r.activityId === id && ((r.text || "").trim() || (r.trials || []).some(t => t >= 0))
+        r.activityId === id && (
+          (r.text || "").trim() ||
+          (r.trials || []).some(t => t >= 0) ||
+          (r.masteryNote || "").replace(/<[^>]*>/g, "").trim()
+        )
       );
       // When multiple records share the same configId (race: two devices both called
       // autoFillStructuredRemarks before either write landed), score by data richness
@@ -11984,7 +11988,8 @@ function buildTargetViewTable(target, data) {
         }
       }
       // If the configId-matched record has no real data, fall through to name-based lookup.
-      if (isSub && entry && !actHasData(entry[0])) entry = null;
+      // Also applies to maintained top-level activities so the Maintain-only remark isn't discarded.
+      if ((isSub || pa.maintained) && entry && !actHasData(entry[0])) entry = null;
       if (!entry) {
         if (isSub) {
           // All current config name/title keys — records whose parentActivity is NOT in this
@@ -12045,7 +12050,8 @@ function buildTargetViewTable(target, data) {
         const r = data.remarks[remId];
         return r && (
           (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
-          (r.trials || []).some(t => t !== null && t !== -1)
+          (r.trials || []).some(t => t !== null && t !== -1) ||
+          (r.masteryNote || "").replace(/<[^>]*>/g, "").trim().length > 0
         );
       });
       if (!hasData) {
@@ -12244,7 +12250,8 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
       emptySelHtml = `<div class="view-remark-multi-opts" contenteditable="false">${opts.map(opt =>
         `<button class="view-multi-create-btn" data-opt="${escHtml(opt)}"
           data-act-id="${escHtml(actId || "")}" data-act-name="${escHtml(actName)}"
-          data-target-name="${escHtml(target.name)}" data-is-predefined="${isPredefined}">${escHtml(opt)}</button>`
+          data-target-name="${escHtml(target.name)}" data-is-predefined="${isPredefined}"
+          data-maintained="${_maintained}">${escHtml(opt)}</button>`
       ).join("")}${_orphanBadge}</div>`;
     } else {
       emptySelHtml = `<div class="view-remark-multi-opts" contenteditable="false">${opts.map(opt => {
@@ -12588,11 +12595,9 @@ async function autoFillViewMappedRemarks(student, sessionId, data) {
 }
 
 // View/Edit Past Sessions counterpart of autoFillMaintainedRemarks.
+// No hasRealData guard: maintained activities always show "Maintain" regardless
+// of whether other activities in the session have data.
 async function autoFillViewMaintainedRemarks(student, sessionId, data) {
-  const hasRealData = Object.values(data.remarks || {}).some(r =>
-    (r.text && r.text.trim()) || (r.trials || []).some(t => t >= 0) || r.optionScore !== undefined
-  );
-  if (!hasRealData) return 0;
   let count = 0;
   for (const target of (student.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
@@ -12634,16 +12639,17 @@ async function autoFillViewMaintainedRemarks(student, sessionId, data) {
 // time the user clicks, the record already exists and only a single
 // updateRemarkText write is needed (no intermediate-state risk).
 async function autoFillViewStructuredRemarks(student, sessionId, data) {
-  // Same guard as autoFillViewMaintainedRemarks: skip fully-empty sessions.
+  // Non-maintained activities are skipped in empty sessions (no real data yet),
+  // but maintained activities always get their "Maintain" auto-fill regardless.
   const hasRealData = Object.values(data.remarks || {}).some(r =>
     (r.text && r.text.trim()) || (r.trials || []).some(t => t >= 0) || r.optionScore !== undefined
   );
-  if (!hasRealData) return 0;
   const sessionDate = data.date || null;
   let count = 0;
   for (const target of (student.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
       if (!isAutoOpenRemarkType(pa)) continue;
+      if (!pa.maintained && !hasRealData) continue;
       const _viewIsNotesOnly = !getActivityInlineOptions(pa) && !pa.optionsMulti && !pa.manualScore;
       if ((pa.maintained && _viewIsNotesOnly) || pa.isMapped) continue;
       if (!isActivityActive(pa, sessionDate)) continue;
@@ -12688,11 +12694,9 @@ async function autoFillViewStructuredRemarks(student, sessionId, data) {
             }
             if (actRems.length !== 1) continue;
             const [[remId, r]] = actRems;
-            const _remHasContent = !!(r.text || "").trim()
-              || !!(r.masteryNote || "").replace(/<[^>]*>/g, "").trim()
-              || ((r.selectedOptions || []).length > 0)
-              || (r.optionScore !== undefined && r.optionScore !== null);
-            if (!_remHasContent)
+            // Only check if masteryNote is already set — chip selection or text doesn't block it.
+            const _hasMaintainNote = !!(r.masteryNote || "").replace(/<[^>]*>/g, "").trim();
+            if (!_hasMaintainNote)
               updateRemarkNote(sessionId, remId, "Maintain").catch(() => {});
           }
         }
@@ -12781,11 +12785,8 @@ async function autoFillViewGroupMappedRemarks(group, sessionId, data) {
 // Group View/Edit Past Sessions counterpart of autoFillViewMaintainedRemarks.
 // Creates "Maintain" remark per attendee for maintained Notes-Only activities
 // on sessions on/after the maintained date, mirroring the individual view logic.
+// No hasRealData guard: maintained activities always show "Maintain" regardless of other session data.
 async function autoFillViewGroupMaintainedRemarks(group, sessionId, data) {
-  const hasRealData = Object.values(data.remarks || {}).some(r =>
-    (r.text && r.text.trim()) || (r.trials || []).some(t => t >= 0) || r.optionScore !== undefined
-  );
-  if (!hasRealData) return 0;
   const attendees = data.attendees || (group.students || []).filter(Boolean);
   let count = 0;
   for (const target of (group.targets || [])) {
@@ -12834,12 +12835,12 @@ async function autoFillViewGroupStructuredRemarks(group, sessionId, data) {
   const hasRealData = Object.values(data.remarks || {}).some(r =>
     (r.text && r.text.trim()) || (r.trials || []).some(t => t >= 0) || r.optionScore !== undefined
   );
-  if (!hasRealData) return 0;
   const attendees = data.attendees || (group.students || []).filter(Boolean);
   let count = 0;
   for (const target of (group.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
       if (!isAutoOpenRemarkType(pa)) continue;
+      if (!pa.maintained && !hasRealData) continue;
       const _vgIsNotesOnly = !getActivityInlineOptions(pa) && !pa.optionsMulti && !pa.manualScore;
       if ((pa.maintained && _vgIsNotesOnly) || pa.isMapped) continue;
       const existingAct = Object.entries(data.activities || {})
@@ -13803,6 +13804,7 @@ function attachViewListeners() {
       const targetName = btn.dataset.targetName;
       const actName = btn.dataset.actName;
       const isPredef = btn.dataset.isPredefined === "true";
+      const isMaintained = btn.dataset.maintained === "true";
       const isNewAct = !btn.dataset.actId;
       const actId = btn.dataset.actId || generateId("a");
       const remId = generateId("r");
@@ -13812,10 +13814,11 @@ function attachViewListeners() {
       data.remarks = data.remarks || {};
       if (isNewAct) data.activities[actId] = { targetName, activityName: actName, order, isPredefined: isPredef };
       data.remarks[remId] = { activityId: actId, text: val, trials: [], order };
+      if (isMaintained) data.remarks[remId].masteryNote = "Maintain";
       renderSessionView();
       try {
         if (isNewAct) await addActivity(state.viewSessionId, targetName, actName, order, isPredef, actId);
-        await addRemark(state.viewSessionId, actId, val, null, remId);
+        await addRemark(state.viewSessionId, actId, val, null, remId, isMaintained ? "Maintain" : "");
       } catch (err) {
         if (isNewAct) delete data.activities[actId];
         delete data.remarks[remId];
@@ -14273,7 +14276,8 @@ function buildGroupTargetViewTable(target, data, attendees) {
         const r = data.remarks[remId];
         return r && (
           (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
-          (r.trials || []).some(t => t !== null && t !== -1)
+          (r.trials || []).some(t => t !== null && t !== -1) ||
+          (r.masteryNote || "").replace(/<[^>]*>/g, "").trim().length > 0
         );
       });
       if (!hasData) {
@@ -14498,7 +14502,8 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
         gSelHtml = `<div class="view-remark-multi-opts" contenteditable="false">${opts.map(opt =>
           `<button class="view-group-multi-create-btn" data-opt="${escHtml(opt)}"
             data-act-id="${escHtml(actId || "")}" data-act-name="${escHtml(actName)}"
-            data-target-name="${escHtml(target.name)}" data-student="${escHtml(studentName)}">${escHtml(opt)}</button>`
+            data-target-name="${escHtml(target.name)}" data-student="${escHtml(studentName)}"
+            data-maintained="${_maintained}">${escHtml(opt)}</button>`
         ).join("")}</div>`;
       } else {
         gSelHtml = `<div class="view-remark-multi-opts" contenteditable="false">${opts.map(opt =>
@@ -14593,7 +14598,8 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
           pSelHtml = `<div class="view-remark-multi-opts" contenteditable="false">${opts.map(opt =>
             `<button class="view-group-multi-create-btn" data-opt="${escHtml(opt)}"
               data-act-id="${escHtml(actId || "")}" data-act-name="${escHtml(actName)}"
-              data-target-name="${escHtml(target.name)}" data-student="${escHtml(entry.studentName)}">${escHtml(opt)}</button>`
+              data-target-name="${escHtml(target.name)}" data-student="${escHtml(entry.studentName)}"
+              data-maintained="${_maintained}">${escHtml(opt)}</button>`
           ).join("")}</div>`;
         } else {
           pSelHtml = `<div class="view-remark-multi-opts" contenteditable="false">${opts.map(opt =>
@@ -15167,6 +15173,7 @@ function attachGroupViewListeners() {
       const actName = btn.dataset.actName;
       const studentName = btn.dataset.student;
       const val = btn.dataset.opt;
+      const isMaintained = btn.dataset.maintained === "true";
       data.activities = data.activities || {};
       data.remarks = data.remarks || {};
       let actId = btn.dataset.actId || Object.entries(data.activities)
@@ -15179,10 +15186,11 @@ function attachGroupViewListeners() {
       }
       const remId = generateId("r");
       data.remarks[remId] = { activityId: actId, studentName, text: val, trials: [], order: actOrder };
+      if (isMaintained) data.remarks[remId].masteryNote = "Maintain";
       renderGroupSessionView();
       try {
         if (isNewAct) await addActivity(sid(), targetName, actName, actOrder, true, actId);
-        await addGroupRemark(sid(), actId, studentName, val, remId);
+        await addGroupRemark(sid(), actId, studentName, val, remId, isMaintained ? "Maintain" : "");
       } catch (err) {
         if (isNewAct) delete data.activities[actId];
         delete data.remarks[remId];
