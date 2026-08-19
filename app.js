@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1764";
+const APP_VERSION = "1765";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10223,7 +10223,11 @@ async function autoFillStructuredRemarks(student, sessionId) {
             const actRems = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === candId);
             if (actRems.length !== 1) continue; // user added extra remarks — don't touch them
             const [[remId, r]] = actRems;
-            if (!(r.masteryNote || "").replace(/<[^>]*>/g, "").trim())
+            const _remHasContent = !!(r.text || "").trim()
+              || !!(r.masteryNote || "").replace(/<[^>]*>/g, "").trim()
+              || ((r.selectedOptions || []).length > 0)
+              || (r.optionScore !== undefined && r.optionScore !== null);
+            if (!_remHasContent)
               updateRemarkNote(sessionId, remId, "Maintain").catch(() => {});
           }
         }
@@ -12629,7 +12633,11 @@ async function autoFillViewStructuredRemarks(student, sessionId, data) {
             const actRems = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === candId);
             if (actRems.length !== 1) continue; // user added extra remarks — don't touch them
             const [[remId, r]] = actRems;
-            if (!(r.masteryNote || "").replace(/<[^>]*>/g, "").trim())
+            const _remHasContent = !!(r.text || "").trim()
+              || !!(r.masteryNote || "").replace(/<[^>]*>/g, "").trim()
+              || ((r.selectedOptions || []).length > 0)
+              || (r.optionScore !== undefined && r.optionScore !== null);
+            if (!_remHasContent)
               updateRemarkNote(sessionId, remId, "Maintain").catch(() => {});
           }
         }
