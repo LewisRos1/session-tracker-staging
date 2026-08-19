@@ -526,7 +526,7 @@ export async function addAutoFillActivityAndRemark(sessionId, targetName, activi
     [`activities.${actId}`]: actData,
     [`remarks.${remId}`]: remData
   });
-  return actId;
+  return { actId, remId };
 }
 
 export async function deleteActivity(sessionId, actId, remarkIds) {

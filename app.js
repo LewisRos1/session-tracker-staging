@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1770";
+const APP_VERSION = "1771";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10718,8 +10718,8 @@ async function openSessionView(student, sessionId) {
         if (maintainedFilled > 0) return;
       } catch (err) { console.error("autoFillViewMaintainedRemarks failed:", err); }
       try {
-        const structuredFilled = await autoFillViewStructuredRemarks(student, sessionId, data);
-        if (structuredFilled > 0) return;
+        // Local state updated optimistically inside — fall through to render immediately.
+        await autoFillViewStructuredRemarks(student, sessionId, data);
       } catch (err) { console.error("autoFillViewStructuredRemarks failed:", err); }
       if (isViewBusy() || state.viewActionsInFlight > 0) { state.viewRenderPending = true; }
       else               { renderSessionView(); }
@@ -11209,8 +11209,8 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
           const cnt  = idComments.length;
           const name = instName(id);
           const allFixed  = cnt > 0 && idComments.every(([, c]) => getCmtStatus(c) === "fixed");
-          const colorCls  = allFixed ? " wf-note-btn--green" : " wf-note-btn--red";
-          return `<button class="wf-note-btn${cnt > 0 ? " has-note" : ""}${colorCls}" data-action="open-note" data-inst-id="${escHtml(id)}">
+          const colorCls  = cnt === 0 ? "" : allFixed ? " wf-note-btn--green" : " wf-note-btn--red";
+          return `<button class="wf-note-btn${colorCls}" data-action="open-note" data-inst-id="${escHtml(id)}">
             📝 List of Corrections – ${escHtml(name)}${cnt > 0 ? ` (${cnt})` : ""}
           </button>`;
         }).join("")}
@@ -12719,9 +12719,17 @@ async function autoFillViewStructuredRemarks(student, sessionId, data) {
       const _vMaintNote = pa.maintained && _vOnOrAfterMaint ? "Maintain" : "";
       try {
         if (existingActId) {
-          await addRemark(sessionId, existingActId, "", null, undefined, _vMaintNote);
+          const _preRemId = generateId("r");
+          await addRemark(sessionId, existingActId, "", null, _preRemId, _vMaintNote);
+          // Update local state optimistically so render shows view-remark-single-btn immediately.
+          data.remarks = data.remarks || {};
+          data.remarks[_preRemId] = { activityId: existingActId, text: "", trials: [], order: Date.now(), ...(_vMaintNote ? { masteryNote: _vMaintNote } : {}) };
         } else {
-          await addAutoFillActivityAndRemark(sessionId, target.name, pa.title || pa.name, pa.order ?? 0, paParent, paConfigId, _vMaintNote);
+          const { actId: _newActId, remId: _newRemId } = await addAutoFillActivityAndRemark(sessionId, target.name, pa.title || pa.name, pa.order ?? 0, paParent, paConfigId, _vMaintNote);
+          data.activities = data.activities || {};
+          data.activities[_newActId] = { targetName: target.name, activityName: pa.title || pa.name, order: pa.order ?? 0, isPredefined: true, ...(paParent ? { parentActivity: paParent } : {}), ...(paConfigId ? { configId: paConfigId } : {}) };
+          data.remarks = data.remarks || {};
+          data.remarks[_newRemId] = { activityId: _newActId, text: "", trials: [], order: Date.now(), ...(_vMaintNote ? { masteryNote: _vMaintNote } : {}) };
         }
         count++;
       } catch { /* silent — next snapshot will retry */ }
@@ -12870,8 +12878,13 @@ async function autoFillViewGroupStructuredRemarks(group, sessionId, data) {
         try {
           if (!actId) {
             actId = await addActivity(sessionId, target.name, pa.title || pa.name, pa.order ?? 0, true);
+            data.activities = data.activities || {};
+            data.activities[actId] = { targetName: target.name, activityName: pa.title || pa.name, order: pa.order ?? 0, isPredefined: true };
           }
-          await addGroupRemark(sessionId, actId, studentName, "", undefined, _vgMaintNote);
+          const _vgPreRemId = generateId("r");
+          await addGroupRemark(sessionId, actId, studentName, "", _vgPreRemId, _vgMaintNote);
+          data.remarks = data.remarks || {};
+          data.remarks[_vgPreRemId] = { activityId: actId, studentName, text: "", trials: [], order: Date.now(), ...(_vgMaintNote ? { masteryNote: _vgMaintNote } : {}) };
           count++;
         } catch { /* silent */ }
         finally { structuredRemarkAutoFillInFlight.delete(key); }
@@ -13955,8 +13968,8 @@ async function openGroupSessionView(group, sessionId) {
         if (maintainedFilled > 0) return;
       } catch (err) { console.error("autoFillViewGroupMaintainedRemarks failed:", err); }
       try {
-        const structuredFilled = await autoFillViewGroupStructuredRemarks(group, sessionId, data);
-        if (structuredFilled > 0) return;
+        // Local state updated optimistically inside — fall through to render immediately.
+        await autoFillViewGroupStructuredRemarks(group, sessionId, data);
       } catch (err) { console.error("autoFillViewGroupStructuredRemarks failed:", err); }
       if (isGroupViewBusy() || state.viewGroupActionsInFlight > 0) { state.viewGroupRenderPending = true; }
       else                   { renderGroupSessionView(); }
