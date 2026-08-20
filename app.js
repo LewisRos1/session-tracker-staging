@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1787";
+const APP_VERSION = "1788";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8725,7 +8725,7 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
       const subName = paDisplayHtml(sub, true) || `<em style="color:#9ca3af;font-size:.85rem">Untitled</em>`;
       const subMast = sub.masteredOn ? `<span style="font-size:.71rem;display:inline-block;margin-top:.2rem;background:#d1fae5;color:#059669;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ Mastered ${fmtPeriodDate(sub.masteredOn)}</span> ` : '';
       const subDisc = sub.discontinuedOn ? `<span style="font-size:.71rem;display:inline-block;margin-top:.2rem;background:#fee2e2;color:#dc2626;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 Discontinued ${fmtPeriodDate(sub.discontinuedOn)}</span> ` : '';
-      return `<div style="margin-left:1.4rem;background:var(--white);border:1px solid #e5e7eb;border-left:3px solid ${color};border-radius:.5rem;padding:.45rem .7rem .45rem .8rem;display:flex;align-items:flex-start;gap:.4rem;box-shadow:0 1px 3px rgba(0,0,0,.04)">
+      return `<div style="margin-left:1.4rem;background:var(--white);border:1px solid #e5e7eb;border-left:3px solid ${color};border-radius:.5rem;padding:.45rem .7rem .45rem .8rem;display:flex;align-items:flex-start;gap:.4rem;box-shadow:0 1px 3px rgba(0,0,0,.04);opacity:.6">
         <span style="font-size:.75rem;font-weight:700;color:${color};flex-shrink:0;min-width:1.2rem;padding-top:.1rem">${String.fromCharCode(97 + si)})</span>
         <div style="flex:1;min-width:0;line-height:1.5;white-space:pre-wrap">${subMast}${subDisc}${subName}</div>
       </div>`;
@@ -22361,7 +22361,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
       const subName = paDisplayHtml(sub, true) || `<em style="color:#9ca3af;font-size:.85rem">Untitled</em>`;
       const subMast = sub.masteredOn ? `<span style="font-size:.71rem;display:inline-block;margin-top:.2rem;background:#d1fae5;color:#059669;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ Mastered ${fmtPeriodDate(sub.masteredOn)}</span> ` : '';
       const subDisc = sub.discontinuedOn ? `<span style="font-size:.71rem;display:inline-block;margin-top:.2rem;background:#fee2e2;color:#dc2626;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 Discontinued ${fmtPeriodDate(sub.discontinuedOn)}</span> ` : '';
-      return `<div style="margin-left:1.4rem;background:var(--white);border:1px solid #e5e7eb;border-left:3px solid ${color};border-radius:.5rem;padding:.45rem .7rem .45rem .8rem;display:flex;align-items:flex-start;gap:.4rem;box-shadow:0 1px 3px rgba(0,0,0,.04)">
+      return `<div style="margin-left:1.4rem;background:var(--white);border:1px solid #e5e7eb;border-left:3px solid ${color};border-radius:.5rem;padding:.45rem .7rem .45rem .8rem;display:flex;align-items:flex-start;gap:.4rem;box-shadow:0 1px 3px rgba(0,0,0,.04);opacity:.6">
         <span style="font-size:.75rem;font-weight:700;color:${color};flex-shrink:0;min-width:1.2rem;padding-top:.1rem">${String.fromCharCode(97 + si)})</span>
         <div style="flex:1;min-width:0;line-height:1.5;white-space:pre-wrap">${subMast}${subDisc}${subName}</div>
       </div>`;
