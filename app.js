@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1779";
+const APP_VERSION = "1780";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3405,26 +3405,20 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
           ? Math.round(scored.reduce((a, b) => a + b.avg, 0) / scored.length)
           : null;
 
-        // First and last month samples
-        const firstRem = allRemarks[0];
-        const lastRem  = allRemarks[allRemarks.length - 1];
-        const [, fm] = firstRem.date.split("-").map(Number);
-        const [, lm] = lastRem.date.split("-").map(Number);
-
         let actLine = `  • ${actName}`;
         const _hyrStatusLabel = paKeyToStatus[actName];
         if (_hyrStatusLabel) actLine += ` [${_hyrStatusLabel}]`;
         if (overallAvg !== null) actLine += ` (overall avg ${overallAvg}%)`;
         lines.push(actLine);
 
-        const _hyrRemLine = (r, label) => {
+        for (const rem of allRemarks) {
+          const [, _rm, _rd] = rem.date.split("-").map(Number);
+          const _dateLabel = `${_rd} ${shortMonths[_rm - 1]}`;
           const parts = [];
-          if (r.text) parts.push(`"${r.text.substring(0, 200).trim()}"`);
-          if (r.avg !== null) parts.push(`[${r.avg}%]`);
-          if (parts.length > 0) lines.push(`    - ${label}: ${parts.join(" ")}`);
-        };
-        _hyrRemLine(firstRem, `Early (${shortMonths[fm - 1]})`);
-        if (lastRem !== firstRem) _hyrRemLine(lastRem, `Recent (${shortMonths[lm - 1]})`);
+          if (rem.text) parts.push(`"${rem.text.substring(0, 200).trim()}"`);
+          if (rem.avg !== null) parts.push(`[${rem.avg}%]`);
+          if (parts.length > 0) lines.push(`    - ${_dateLabel}: ${parts.join(" ")}`);
+        }
       }
     }
 
@@ -5267,10 +5261,12 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
       const _mStatusLabel = paKeyToStatusM[actName];
       lines.push(`  • ${actDisplayNames[actName]||actName}${_mStatusLabel ? ` [${_mStatusLabel}]` : ""}${avgLine}`);
       for (const rem of allRemarks) {
+        const [, _mm, _md] = rem.date.split("-").map(Number);
+        const _mDateLabel = `${_md} ${ABBRS[_mm - 1]}`;
         const _mParts = [];
         if (rem.text) _mParts.push(`"${rem.text.substring(0, 200).trim()}"`);
         if (rem.avg !== null) _mParts.push(`[${rem.avg}%]`);
-        if (_mParts.length > 0) lines.push(`    - ${_mParts.join(" ")}`);
+        if (_mParts.length > 0) lines.push(`    - ${_mDateLabel}: ${_mParts.join(" ")}`);
       }
     }
     // Per-target comment boxes
