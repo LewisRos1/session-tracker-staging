@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1788";
+const APP_VERSION = "1789";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -9479,7 +9479,7 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
   // Note field: shown immediately if there's existing data; otherwise hidden until
   // user clicks [+ Note]. For activities that had noteCapable=false in the past
   // but somehow have note data, show an "Old data" fallback.
-  const remarkLabel = multiSelect ? "Checkboxes" : (opts.length > 0 ? "Multiple Choice" : "Notes");
+  const remarkLabel = multiSelect ? "Checkboxes" : (opts.length > 0 ? "Multiple Choice" : "Remark");
 
   let noteField;
   if (noteCapable) {
@@ -10460,6 +10460,12 @@ async function autoFillMaintainedRemarks(student, sessionId, selectedTargetName 
       // Non-Notes-Only activities (checkbox/MC/manual score) show their real UI via
       // autoFillStructuredRemarks; only Notes-Only gets a "Maintain" text remark here.
       if (getActivityInlineOptions(pa) || pa.optionsMulti || pa.manualScore) continue;
+      // Skip if this activity is already being tracked as a sub-activity in the session
+      // (e.g. maintained flag left over from when it was top-level before being made a sub-activity)
+      if (Object.values(data.activities || {}).some(
+        a => a.targetName === target.name && a.parentActivity &&
+             (a.activityName === (pa.title || pa.name))
+      )) continue;
       // Only auto-fill "Maintain" for sessions on or after the maintained date
       const _paMaintAt = pa.maintainedAt || "2026-01-01";
       if (data.date && data.date < _paMaintAt) continue;
