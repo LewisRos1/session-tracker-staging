@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1782";
+const APP_VERSION = "1783";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -18869,7 +18869,9 @@ function renderTargetManageContent(student, target) {
           : await getAllSessionsForStudent(student.id);
         const paName = pa.title || pa.name;
         const paParent = pa.parentActivity || null;
+        const _capDate = type === "mastered" ? pa.masteredOn : pa.discontinuedOn;
         const dates = allSessions.filter(s => {
+          if (_capDate && s.date > _capDate) return false;
           const sActs = s.activities || {}; const sRems = s.remarks || {};
           const matchIds = Object.entries(sActs).filter(([, a]) => {
             if (a.targetName !== target.name) return false;
