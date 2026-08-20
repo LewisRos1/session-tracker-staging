@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1789";
+const APP_VERSION = "1790";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -7803,7 +7803,7 @@ async function openSession(student, existingSessionId = null, dateStr = null, pa
           if (!tc) continue;
           const inConfig = (tc.predefinedActivities || []).some(pa =>
             (act.configId && pa.id && pa.id === act.configId) ||
-            pa.name === act.activityName || pa.title === act.activityName
+            (act.activityName && (pa.name === act.activityName || pa.title === act.activityName))
           );
           if (inConfig) continue;
           const remEntries = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === actId);
@@ -10403,7 +10403,7 @@ async function autoFillMappedRemarks(student, sessionId) {
   await Promise.all(toFill.map(async item => {
     if (!item.actId) {
       try {
-        item.actId = await addActivity(sessionId, item.target.name, item.pa.name, item.pa.order ?? 0, true);
+        item.actId = await addActivity(sessionId, item.target.name, item.pa.title || item.pa.name, item.pa.order ?? 0, true);
       } catch (err) {
         mappedRemarkAutoFillInFlight.delete(item.key);
         item.actId = null;
@@ -10432,7 +10432,7 @@ async function _runMaintainedFills(sessionId, items) {
   await Promise.all(items.map(async item => {
     if (!item.actId) {
       try {
-        item.actId = await addActivity(sessionId, item.target.name, item.pa.name, item.pa.order ?? 0, true);
+        item.actId = await addActivity(sessionId, item.target.name, item.pa.title || item.pa.name, item.pa.order ?? 0, true);
       } catch { maintainedRemarkAutoFillInFlight.delete(item.key); item.actId = null; }
     }
   }));
@@ -10469,10 +10469,11 @@ async function autoFillMaintainedRemarks(student, sessionId, selectedTargetName 
       // Only auto-fill "Maintain" for sessions on or after the maintained date
       const _paMaintAt = pa.maintainedAt || "2026-01-01";
       if (data.date && data.date < _paMaintAt) continue;
-      // Match by name OR by configId so a character-level name mismatch never spawns a duplicate.
+      // Match by configId first, then by non-empty title/name. Never match by empty name —
+      // that would false-positive against orphan records that also have activityName:"".
       const allMatches = Object.entries(data.activities || {})
         .filter(([, a]) => a.targetName === target.name && !a.parentActivity &&
-                           (a.activityName === pa.name || (pa.title && a.activityName === pa.title) || (pa.id && a.configId === pa.id)));
+                           ((pa.id && a.configId === pa.id) || (pa.title && a.activityName === pa.title) || (pa.name && a.activityName === pa.name)));
       // Prefer the activity that has configId set (the original predefined one).
       const canonical = allMatches.find(([, a]) => pa.id && a.configId === pa.id) || allMatches[0] || null;
       // Delete any name-only duplicates that lack configId — leftovers from the old bug.
