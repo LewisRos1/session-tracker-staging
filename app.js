@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1796";
+const APP_VERSION = "1797";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -17345,6 +17345,20 @@ function renderTargetManageContent(student, target) {
 
   const acts = target.predefinedActivities;
 
+  const saveTarget = async () => {
+    const i = student.targets.findIndex(t => t.id === target.id);
+    if (i >= 0) student.targets[i] = target;
+    if (_groupForTargetEdit) {
+      const gi = state.groups.findIndex(g => g.id === _groupForTargetEdit.id);
+      if (gi >= 0) state.groups[gi] = _groupForTargetEdit;
+      await saveGroup(_groupForTargetEdit);
+    } else {
+      const si = state.students.findIndex(s => s.id === student.id);
+      if (si >= 0) state.students[si] = student;
+      await saveStudent(student);
+    }
+  };
+
   // Auto-restore sub-activities whose parent was deleted (e.g. empty parent
   // discarded on modal close). Without this they become permanently invisible.
   {
@@ -18124,20 +18138,6 @@ function renderTargetManageContent(student, target) {
   if (_discOpen) { const s = $("mn-discontinued-section"); if (s) { s.style.display = "block"; const a = s.previousElementSibling?.querySelector(".mn-toggle-arrow"); if (a) a.textContent = "▼"; s.querySelectorAll(".mn-act-details-input").forEach(autoResizeTextarea); } }
   if (_mastOpen) { const s = $("mn-mastered-section"); if (s) { s.style.display = "block"; const a = s.previousElementSibling?.querySelector(".mn-toggle-arrow"); if (a) a.textContent = "▼"; s.querySelectorAll(".mn-act-details-input").forEach(autoResizeTextarea); } }
   $("manage-modal-body").querySelectorAll(".admin-list-item textarea").forEach(autoResizeTextarea);
-
-  const saveTarget = async () => {
-    const i = student.targets.findIndex(t => t.id === target.id);
-    if (i >= 0) student.targets[i] = target;
-    if (_groupForTargetEdit) {
-      const gi = state.groups.findIndex(g => g.id === _groupForTargetEdit.id);
-      if (gi >= 0) state.groups[gi] = _groupForTargetEdit;
-      await saveGroup(_groupForTargetEdit);
-    } else {
-      const si = state.students.findIndex(s => s.id === student.id);
-      if (si >= 0) state.students[si] = student;
-      await saveStudent(student);
-    }
-  };
 
   _pendingActsCleanup = { acts, save: saveTarget };
 
