@@ -90,8 +90,10 @@ function buildExcelRemarkCell(html, starter, masteryNote) {
   const richText = [];
 
   if (starter) {
-    if (!hasContent) return "";
-    richText.push({ text: `${starter}: ` });
+    // If no chip/text was selected but notes exist, skip the starter prefix
+    // (the starter introduces the chip text, not the notes).
+    if (!hasContent && !masteryNote) return "";
+    if (hasContent) richText.push({ text: `${starter}: ` });
   }
 
   for (const seg of merged) {
@@ -1719,9 +1721,11 @@ export async function exportGroupMemberData(studentName, groups, includeTrials =
 // after an em dash, so it reads as its own paragraph rather than a caption.
 function buildRemarkLines(starter, text, masteryNote) {
   const lines = [];
-  if (starter || text) {
+  if (text) {
     // Only the first line gets the bold starter prefix — further lines of a
     // multi-line remark continue as plain text, same paragraph.
+    // If there's no chip/text selected, skip the starter header entirely
+    // (the starter labels the chip; without a chip it's meaningless noise).
     (text || "").split("\n").forEach((ln, i) => {
       if (i === 0) {
         const runs = [];
