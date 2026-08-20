@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1794";
+const APP_VERSION = "1795";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -17681,7 +17681,7 @@ function renderTargetManageContent(student, target) {
               <div style="display:flex;gap:.6rem;align-items:flex-start">
                 <div style="flex-shrink:0">
                   <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Start Date</div>
-                  <button class="mn-parent-start-date-btn" data-idx="${idx}" style="padding:.35rem .65rem;border:1.5px solid #d1d5db;border-radius:.4rem;background:#f3f4f6;cursor:not-allowed;font-size:.95rem;color:#6b7280;white-space:nowrap;display:block" title="Automatically set from earliest sub-activity">📅 ${_parentStartDate ? fmtPeriodDate(_parentStartDate) : 'No dates set'}</button>
+                  <button class="mn-parent-start-date-btn" data-idx="${idx}" style="padding:.35rem .65rem;border:1.5px solid #b91c1c;border-radius:.4rem;background:#dc2626;cursor:not-allowed;font-size:.95rem;color:#ffffff;white-space:nowrap;display:block" title="Automatically set from earliest sub-activity">📅 ${_parentStartDate ? fmtPeriodDate(_parentStartDate) : 'No dates set'}</button>
                 </div>
                 <div style="flex:1">
                   <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title</div>
