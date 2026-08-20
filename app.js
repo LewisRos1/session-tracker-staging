@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1777";
+const APP_VERSION = "1778";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3401,12 +3401,14 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
         if (overallAvg !== null) actLine += ` (overall avg ${overallAvg}%)`;
         lines.push(actLine);
 
-        if (firstRem.text) {
-          lines.push(`    - Early (${shortMonths[fm - 1]}): "${firstRem.text.substring(0, 200).trim()}"`);
-        }
-        if (lastRem !== firstRem && lastRem.text) {
-          lines.push(`    - Recent (${shortMonths[lm - 1]}): "${lastRem.text.substring(0, 200).trim()}"`);
-        }
+        const _hyrRemLine = (r, label) => {
+          const parts = [];
+          if (r.text) parts.push(`"${r.text.substring(0, 200).trim()}"`);
+          if (r.avg !== null) parts.push(`[${r.avg}%]`);
+          if (parts.length > 0) lines.push(`    - ${label}: ${parts.join(" ")}`);
+        };
+        _hyrRemLine(firstRem, `Early (${shortMonths[fm - 1]})`);
+        if (lastRem !== firstRem) _hyrRemLine(lastRem, `Recent (${shortMonths[lm - 1]})`);
       }
     }
 
@@ -5235,7 +5237,10 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
       const avgLine = scored.length ? ` (avg ${Math.round(scored.reduce((a,b)=>a+b.avg,0)/scored.length)}%)` : "";
       lines.push(`  • ${actDisplayNames[actName]||actName}${avgLine}`);
       for (const rem of allRemarks) {
-        if (rem.text) lines.push(`    - "${rem.text.substring(0, 200).trim()}"`);
+        const _mParts = [];
+        if (rem.text) _mParts.push(`"${rem.text.substring(0, 200).trim()}"`);
+        if (rem.avg !== null) _mParts.push(`[${rem.avg}%]`);
+        if (_mParts.length > 0) lines.push(`    - ${_mParts.join(" ")}`);
       }
     }
     // Per-target comment boxes
