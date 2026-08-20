@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1793";
+const APP_VERSION = "1794";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -19036,20 +19036,21 @@ function renderTargetManageContent(student, target) {
           : `The last recorded session for <strong>"${paDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>.`;
         return `${src} ${restrictionText} <strong>${fmtPeriodDate(minDate)}</strong>. This activity will stop showing from <strong>${fmtPeriodDate(addOneDay(minDate))}</strong> onwards.`;
       };
-      const _cascadeToSubs = fn => {
+      const _isSubActive = sub => !sub.masteredOn && !sub.discontinuedOn && !sub.isArchived && !sub.isStopped && !sub.isCompleted;
+      const _cascadeToActiveSubs = fn => {
         if (pa.parentActivity) return;
         const paKey = pa._linkKey || pa.title || pa.name;
         if (!paKey) return;
-        (target.predefinedActivities || []).filter(a => a.parentActivity === paKey).forEach(fn);
+        (target.predefinedActivities || []).filter(a => a.parentActivity === paKey && _isSubActive(a)).forEach(fn);
       };
 
       if (action === 'master' || action === 'discontinue') {
         if (!pa.parentActivity) {
           const paKey = pa._linkKey || pa.title || pa.name;
-          const subCount = paKey ? (target.predefinedActivities || []).filter(a => a.parentActivity === paKey).length : 0;
-          if (subCount > 0) {
+          const activeSubs = paKey ? (target.predefinedActivities || []).filter(a => a.parentActivity === paKey && _isSubActive(a)) : [];
+          if (activeSubs.length > 0) {
             const verb = action === 'master' ? 'mastered' : 'discontinued';
-            const ok = await showAutoDateConfirm({ message: `This parent activity has ${subCount} sub-activit${subCount === 1 ? 'y' : 'ies'}. If you ${action === 'master' ? 'master' : 'discontinue'} this activity, all its sub-activities will also be ${verb} on the same date. Do you want to proceed?`, confirmLabel: "Yes, proceed" });
+            const ok = await showAutoDateConfirm({ message: `This parent activity has ${activeSubs.length} active sub-activit${activeSubs.length === 1 ? 'y' : 'ies'}. If you ${action === 'master' ? 'master' : 'discontinue'} this activity, all its active sub-activities will also be ${verb} on the same date. Do you want to proceed?`, confirmLabel: "Yes, proceed" });
             if (!ok) return;
           }
         }
@@ -19070,14 +19071,14 @@ function renderTargetManageContent(student, target) {
           delete pa.maintained; delete pa.activityColor; delete pa.maintainedAt;
           delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped; delete pa.inactiveReason;
           pa.masteredOn = pickedDate;
-          _cascadeToSubs(sub => {
+          _cascadeToActiveSubs(sub => {
             delete sub.maintained; delete sub.activityColor; delete sub.maintainedAt;
             delete sub.discontinuedOn; delete sub.isArchived; delete sub.isStopped; delete sub.inactiveReason;
             sub.masteredOn = pickedDate;
           });
         } else {
           pa.discontinuedOn = pickedDate;
-          _cascadeToSubs(sub => {
+          _cascadeToActiveSubs(sub => {
             const subWasMaintained = !!sub.maintained;
             delete sub.masteredOn; delete sub.isCompleted; delete sub.inactiveReason;
             if (!subWasMaintained) { delete sub.maintained; delete sub.activityColor; delete sub.maintainedAt; }
