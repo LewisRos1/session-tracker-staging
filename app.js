@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1781";
+const APP_VERSION = "1782";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8753,15 +8753,15 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
         </div>`;
       }
       const fixedText = pa.fixedRemark !== undefined ? pa.fixedRemark : pa.isMaintain ? (pa.maintainRemark ?? "") : null;
-      const _masteredDate = pa.masteredOn || (pa.inactiveReason === 'mastered' ? "2026-06-30" : null);
+      const _masteredDate = pa.masteredOn || (pa.inactiveReason === 'mastered' ? todayDateStr() : null);
       const _isDiscontinued = pa.discontinuedOn || pa.inactiveReason === 'discontinued';
       const _inactMaintBadge = pa.maintained
-        ? `<span style="font-size:.72rem;color:#6b7280;font-weight:600;white-space:nowrap;display:block;margin-bottom:.1rem">🆗 Maintained${pa.maintainedAt ? ` on ${fmtPeriodDate(pa.maintainedAt)}` : ''}</span>`
+        ? `<span style="font-size:.72rem;color:#6b7280;font-weight:600;white-space:nowrap;display:inline-block;margin-right:.35rem;padding:.05rem .4rem;background:#f3f4f6;border:1px solid #d1d5db;border-radius:.3rem">🆗 Maintained on ${fmtPeriodDate(pa.maintainedAt || todayDateStr())}</span>`
         : '';
       const statusBadge = _inactMaintBadge + (_masteredDate
-        ? `<span style="font-size:.72rem;color:#059669;font-weight:600;white-space:nowrap;display:block;margin-bottom:.1rem">⭐ Mastered on ${fmtPeriodDate(_masteredDate)}</span>`
+        ? `<span style="font-size:.72rem;color:#059669;font-weight:600;white-space:nowrap;display:inline-block;margin-right:.35rem;padding:.05rem .4rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.3rem">⭐ Mastered on ${fmtPeriodDate(_masteredDate)}</span>`
         : _isDiscontinued
-        ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap;display:block;margin-bottom:.1rem">🚩 ${pa.discontinuedOn ? `Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}` : 'Discontinued'}</span>`
+        ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap;display:inline-block;margin-right:.35rem;padding:.05rem .4rem;background:#fee2e2;border:1px solid #fca5a5;border-radius:.3rem">🚩 Discontinued on ${fmtPeriodDate(pa.discontinuedOn || todayDateStr())}</span>`
         : '');
       // Gather ALL sub-activities of this parent (active or inactive for this date)
       const subActs = allPas.filter(p =>
@@ -22001,13 +22001,16 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
         </div>`;
       }
       if (!pa.name && !pa.title) return '';
-      const _grpMasteredDate = pa.masteredOn || (pa.inactiveReason === 'mastered' ? "2026-06-30" : null);
+      const _grpMasteredDate = pa.masteredOn || (pa.inactiveReason === 'mastered' ? todayDateStr() : null);
       const _grpIsDiscontinued = pa.discontinuedOn || pa.inactiveReason === 'discontinued';
-      const grpStatusBadge = _grpMasteredDate
-        ? `<span style="font-size:.72rem;color:#059669;font-weight:600;white-space:nowrap;display:block;margin-bottom:.1rem">⭐ Mastered on ${fmtPeriodDate(_grpMasteredDate)}</span>`
-        : _grpIsDiscontinued
-        ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap;display:block;margin-bottom:.1rem">🚩 ${pa.discontinuedOn ? `Discontinued on ${fmtPeriodDate(pa.discontinuedOn)}` : 'Discontinued'}</span>`
+      const _grpMaintBadge = pa.maintained
+        ? `<span style="font-size:.72rem;color:#6b7280;font-weight:600;white-space:nowrap;display:inline-block;margin-right:.35rem;padding:.05rem .4rem;background:#f3f4f6;border:1px solid #d1d5db;border-radius:.3rem">🆗 Maintained on ${fmtPeriodDate(pa.maintainedAt || todayDateStr())}</span>`
         : '';
+      const grpStatusBadge = _grpMaintBadge + (_grpMasteredDate
+        ? `<span style="font-size:.72rem;color:#059669;font-weight:600;white-space:nowrap;display:inline-block;margin-right:.35rem;padding:.05rem .4rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.3rem">⭐ Mastered on ${fmtPeriodDate(_grpMasteredDate)}</span>`
+        : _grpIsDiscontinued
+        ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap;display:inline-block;margin-right:.35rem;padding:.05rem .4rem;background:#fee2e2;border:1px solid #fca5a5;border-radius:.3rem">🚩 Discontinued on ${fmtPeriodDate(pa.discontinuedOn || todayDateStr())}</span>`
+        : '');
       const grpSubActs = allGrpPas.filter(p =>
         p.parentActivity === (pa.title || pa.name) && !p.isCompleted && !p.isArchived && !p.isStopped
       );
