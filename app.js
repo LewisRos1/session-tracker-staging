@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1778";
+const APP_VERSION = "1779";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3286,18 +3286,25 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
     const paKeyToAliases  = {};  // canonical display name → [legacy activityName variants]
     const paKeyToConfigId = {};  // canonical display name → pa.id
     const hyrLegacyToKey  = {};  // legacy pa.name (details text) → canonical display name
+    const paKeyToManualScore = {}; // canonical display name → true if manualScore activity
+    const paKeyToStatus = {};      // canonical display name → "mastered"|"discontinued"|"maintained"
     for (const pa of (target.predefinedActivities || [])) {
-      if (!pa.masteredOn && !pa.discontinuedOn && !pa.isCompleted && !pa.isArchived && !pa.isStopped) {
-        const key = pa.title || pa.name;
-        if (!key) continue;
+      const key = pa.title || pa.name;
+      if (!key) continue;
+      if (pa.manualScore) paKeyToManualScore[key] = true;
+      const _isActive = !pa.masteredOn && !pa.discontinuedOn && !pa.isCompleted && !pa.isArchived && !pa.isStopped;
+      if (_isActive) {
         if (pa.id) paKeyToConfigId[key] = pa.id;
         actNames.add(key);
         actDisplayNames[key] = key;
+        if (pa.maintained) paKeyToStatus[key] = "maintained";
         if (pa.title && pa.name && pa.title !== pa.name) {
           if (!paKeyToAliases[key]) paKeyToAliases[key] = [];
           paKeyToAliases[key].push(pa.name);
           hyrLegacyToKey[pa.name] = key;
         }
+      } else {
+        paKeyToStatus[key] = pa.masteredOn ? "mastered" : "discontinued";
       }
     }
     // Consolidate any legacy names added from session data into the canonical key
@@ -3334,10 +3341,17 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
           const remarks = Object.values(filteredSess.remarks || {})
             .filter(r => r.activityId === sessActId)
             .filter(r => r.text || (r.trials || []).length > 0 || hyrStripHtml(r.masteryNote || "").trim());
+          const _isManual = paKeyToManualScore[actName] || false;
           for (const rem of remarks) {
             const trials = (rem.trials || []).filter(t => t !== -1);
             if (rem.optionScore !== undefined) trials.push(rem.optionScore);
-            const avg = trials.length > 0 ? Math.round(trials.reduce((a, b) => a + b, 0) / (trials.length * (target.maxPoints || 3)) * 100) : null;
+            let avg;
+            if (_isManual) {
+              const _pct = parseManualScore(hyrStripHtml(rem.text || "").trim());
+              avg = _pct !== null ? Math.round(_pct) : null;
+            } else {
+              avg = trials.length > 0 ? Math.round(trials.reduce((a, b) => a + b, 0) / (trials.length * (target.maxPoints || 3)) * 100) : null;
+            }
             const _hText = hyrStripHtml(rem.text || "");
             const _hNote = hyrStripHtml(rem.masteryNote || "").trim();
             const _hCombined = _hText && _hNote ? `${_hText} / ${_hNote}` : _hText || _hNote;
@@ -3398,6 +3412,8 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
         const [, lm] = lastRem.date.split("-").map(Number);
 
         let actLine = `  • ${actName}`;
+        const _hyrStatusLabel = paKeyToStatus[actName];
+        if (_hyrStatusLabel) actLine += ` [${_hyrStatusLabel}]`;
         if (overallAvg !== null) actLine += ` (overall avg ${overallAvg}%)`;
         lines.push(actLine);
 
@@ -5185,17 +5201,23 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
     lines.push(`This month (${thisMonthLabel}): ${thisMonthAvg !== null ? thisMonthAvg + "%" : "no data"}`);
 
     const paKeyToAliases = {}, paKeyToConfigId = {}, legacyToKey = {};
+    const paKeyToManualScoreM = {}, paKeyToStatusM = {};
     const actNames = new Set(), actDisplayNames = {};
     for (const pa of (target.predefinedActivities || [])) {
       const key = pa.title || pa.name; if (!key) continue;
-      if (pa.id) paKeyToConfigId[key] = pa.id;
-      if (!pa.masteredOn && !pa.discontinuedOn && !pa.isCompleted && !pa.isArchived && !pa.isStopped) {
+      if (pa.manualScore) paKeyToManualScoreM[key] = true;
+      const _mActive = !pa.masteredOn && !pa.discontinuedOn && !pa.isCompleted && !pa.isArchived && !pa.isStopped;
+      if (_mActive) {
+        if (pa.id) paKeyToConfigId[key] = pa.id;
         actNames.add(key); actDisplayNames[key] = key;
+        if (pa.maintained) paKeyToStatusM[key] = "maintained";
         if (pa.title && pa.name && pa.title !== pa.name) {
           if (!paKeyToAliases[key]) paKeyToAliases[key] = [];
           paKeyToAliases[key].push(pa.name);
           legacyToKey[pa.name] = key;
         }
+      } else {
+        paKeyToStatusM[key] = pa.masteredOn ? "mastered" : "discontinued";
       }
     }
     for (const sess of thisMonthSessions) {
@@ -5221,11 +5243,18 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
         if (!entry) continue;
         const [sKey, sAct] = entry;
         const sId = sAct.id || sKey;
+        const _mIsManual = paKeyToManualScoreM[actName] || false;
         for (const rem of Object.values(filteredSess.remarks || {})) {
           if (rem.activityId !== sId) continue;
           const trials = (rem.trials || []).filter(t => t !== -1);
           if (rem.optionScore !== undefined) trials.push(rem.optionScore);
-          const avg = trials.length ? Math.round(trials.reduce((a,b)=>a+b,0)/(trials.length*(target.maxPoints||3))*100) : null;
+          let avg;
+          if (_mIsManual) {
+            const _pct = parseManualScore(hyrStripHtml(rem.text || "").trim());
+            avg = _pct !== null ? Math.round(_pct) : null;
+          } else {
+            avg = trials.length ? Math.round(trials.reduce((a,b)=>a+b,0)/(trials.length*(target.maxPoints||3))*100) : null;
+          }
           const text = hyrStripHtml(rem.text || "");
           const _mNote = hyrStripHtml(rem.masteryNote || "").trim();
           const _mCombined = text && _mNote ? `${text} / ${_mNote}` : text || _mNote;
@@ -5235,7 +5264,8 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
       allRemarks.sort((a,b) => a.date.localeCompare(b.date));
       const scored = allRemarks.filter(r => r.avg !== null);
       const avgLine = scored.length ? ` (avg ${Math.round(scored.reduce((a,b)=>a+b.avg,0)/scored.length)}%)` : "";
-      lines.push(`  • ${actDisplayNames[actName]||actName}${avgLine}`);
+      const _mStatusLabel = paKeyToStatusM[actName];
+      lines.push(`  • ${actDisplayNames[actName]||actName}${_mStatusLabel ? ` [${_mStatusLabel}]` : ""}${avgLine}`);
       for (const rem of allRemarks) {
         const _mParts = [];
         if (rem.text) _mParts.push(`"${rem.text.substring(0, 200).trim()}"`);
