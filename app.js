@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1785";
+const APP_VERSION = "1786";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -17655,18 +17655,6 @@ function renderTargetManageContent(student, target) {
                   </div>
                 </div>
               </div>
-              <div>
-                <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Details</div>
-                <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
-                  <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
-                    <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${idx}" title="Bold (Ctrl+B)">B</button>
-                    <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${idx}" title="Underline (Ctrl+U)">U</button>
-                    <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${idx}" title="Bullet (Ctrl+Shift+L)">•</button>
-                  </div>
-                  <textarea class="admin-input mn-act-details-input" id="mn-act-details-${idx}" data-idx="${idx}"
-                    rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(a.name || '')}</textarea>
-                </div>
-              </div>
               ${subActsHtml}
               ${maintainedRowSub}
               <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
@@ -17784,7 +17772,7 @@ function renderTargetManageContent(student, target) {
               <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${globalIdx}" data-idx="${globalIdx}" placeholder="Enter Activity Title Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
             </div>
           </div>
-          <div>
+          ${acts.some(a2 => a2.parentActivity === (a.title || a.name)) ? '' : `<div>
             <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Details</div>
             <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
               <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
@@ -17794,7 +17782,7 @@ function renderTargetManageContent(student, target) {
               </div>
               <textarea class="admin-input mn-act-details-input" id="mn-act-details-${globalIdx}" data-idx="${globalIdx}" rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(a.name || '')}</textarea>
             </div>
-          </div>
+          </div>`}
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.3rem;flex-shrink:0">
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.2rem">
@@ -17816,7 +17804,7 @@ function renderTargetManageContent(student, target) {
       myMastSubs.forEach((sub, si) => {
         const subCi = masteredActs.indexOf(sub);
         const subGlobalIdx = acts.indexOf(sub);
-        const subMastBadge = sub.masteredOn ? `<span style="font-size:.71rem;display:inline-block;background:#d1fae5;color:#059669;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ ${fmtPeriodDate(sub.masteredOn)}</span>` : '';
+        const subMastBadge = sub.masteredOn ? `<span style="font-size:.71rem;display:inline-block;background:#d1fae5;color:#059669;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ Mastered ${fmtPeriodDate(sub.masteredOn)}</span>` : '';
         const subMaintBadge = sub.maintained ? `<span style="font-size:.71rem;display:inline-block;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.08rem .4rem;border-radius:.3rem;border:1px solid #d1d5db">🆗</span>` : '';
         html += `<div style="display:flex;align-items:flex-start;gap:.4rem;background:#ecfdf5;border:1px solid #a7f3d0;border-left:3px solid #059669;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem;padding:.35rem .5rem .35rem 0">
           <span style="font-size:.8rem;color:#059669;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
@@ -17867,7 +17855,7 @@ function renderTargetManageContent(student, target) {
         subs.forEach((sub, si) => {
           const subCi = masteredActs.indexOf(sub);
           const subGlobalIdx = acts.indexOf(sub);
-          const subMastBadge = sub.masteredOn ? `<span style="font-size:.71rem;display:inline-block;background:#d1fae5;color:#059669;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ ${fmtPeriodDate(sub.masteredOn)}</span>` : '';
+          const subMastBadge = sub.masteredOn ? `<span style="font-size:.71rem;display:inline-block;background:#d1fae5;color:#059669;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ Mastered ${fmtPeriodDate(sub.masteredOn)}</span>` : '';
           html += `<div style="display:flex;align-items:flex-start;gap:.4rem;background:#ecfdf5;border:1px solid #a7f3d0;border-left:3px solid #059669;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem;padding:.35rem .5rem .35rem 0">
             <span style="font-size:.8rem;color:#059669;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
             <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
@@ -17943,7 +17931,7 @@ function renderTargetManageContent(student, target) {
               <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${globalIdx}" data-idx="${globalIdx}" placeholder="Enter Activity Title Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
             </div>
           </div>
-          <div>
+          ${acts.some(a2 => a2.parentActivity === (a.title || a.name)) ? '' : `<div>
             <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Details</div>
             <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
               <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
@@ -17953,7 +17941,7 @@ function renderTargetManageContent(student, target) {
               </div>
               <textarea class="admin-input mn-act-details-input" id="mn-act-details-${globalIdx}" data-idx="${globalIdx}" rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(a.name || '')}</textarea>
             </div>
-          </div>
+          </div>`}
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.3rem;flex-shrink:0">
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.2rem">
@@ -17975,7 +17963,7 @@ function renderTargetManageContent(student, target) {
       myDiscSubs.forEach((sub, si) => {
         const subCi = discontinuedActs.indexOf(sub);
         const subGlobalIdx = acts.indexOf(sub);
-        const subDiscBadge = sub.discontinuedOn ? `<span style="font-size:.71rem;display:inline-block;background:#fee2e2;color:#dc2626;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 ${fmtPeriodDate(sub.discontinuedOn)}</span>` : '';
+        const subDiscBadge = sub.discontinuedOn ? `<span style="font-size:.71rem;display:inline-block;background:#fee2e2;color:#dc2626;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 Discontinued ${fmtPeriodDate(sub.discontinuedOn)}</span>` : '';
         const subMaintBadge2 = sub.maintained ? `<span style="font-size:.71rem;display:inline-block;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.08rem .4rem;border-radius:.3rem;border:1px solid #d1d5db">🆗</span>` : '';
         html += `<div style="display:flex;align-items:flex-start;gap:.4rem;background:#fff5f5;border:1px solid #fca5a5;border-left:3px solid #dc2626;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem;padding:.35rem .5rem .35rem 0">
           <span style="font-size:.8rem;color:#dc2626;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
@@ -18026,7 +18014,7 @@ function renderTargetManageContent(student, target) {
         subs.forEach((sub, si) => {
           const subCi = discontinuedActs.indexOf(sub);
           const subGlobalIdx = acts.indexOf(sub);
-          const subDiscBadge = sub.discontinuedOn ? `<span style="font-size:.71rem;display:inline-block;background:#fee2e2;color:#dc2626;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 ${fmtPeriodDate(sub.discontinuedOn)}</span>` : '';
+          const subDiscBadge = sub.discontinuedOn ? `<span style="font-size:.71rem;display:inline-block;background:#fee2e2;color:#dc2626;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 Discontinued ${fmtPeriodDate(sub.discontinuedOn)}</span>` : '';
           html += `<div style="display:flex;align-items:flex-start;gap:.4rem;background:#fff5f5;border:1px solid #fca5a5;border-left:3px solid #dc2626;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem;padding:.35rem .5rem .35rem 0">
             <span style="font-size:.8rem;color:#dc2626;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
             <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
@@ -20368,7 +20356,7 @@ function renderTemplateManageContent(template) {
               <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${globalIdx}" data-idx="${globalIdx}" placeholder="Enter Activity Title Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
             </div>
           </div>
-          <div>
+          ${acts.some(a2 => a2.parentActivity === (a.title || a.name)) ? '' : `<div>
             <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Details</div>
             <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
               <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
@@ -20378,7 +20366,7 @@ function renderTemplateManageContent(template) {
               </div>
               <textarea class="admin-input mn-act-details-input" id="mn-act-details-${globalIdx}" data-idx="${globalIdx}" rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(a.name || '')}</textarea>
             </div>
-          </div>
+          </div>`}
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.3rem;flex-shrink:0">
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.2rem">
@@ -20400,7 +20388,7 @@ function renderTemplateManageContent(template) {
       myMastSubs.forEach((sub, si) => {
         const subCi = masteredActs.indexOf(sub);
         const subGlobalIdx = acts.indexOf(sub);
-        const subMastBadge = sub.masteredOn ? `<span style="font-size:.71rem;display:inline-block;background:#d1fae5;color:#059669;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ ${fmtPeriodDate(sub.masteredOn)}</span>` : '';
+        const subMastBadge = sub.masteredOn ? `<span style="font-size:.71rem;display:inline-block;background:#d1fae5;color:#059669;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ Mastered ${fmtPeriodDate(sub.masteredOn)}</span>` : '';
         const subMaintBadge = sub.maintained ? `<span style="font-size:.71rem;display:inline-block;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.08rem .4rem;border-radius:.3rem;border:1px solid #d1d5db">🆗</span>` : '';
         html += `<div style="display:flex;align-items:flex-start;gap:.4rem;background:#ecfdf5;border:1px solid #a7f3d0;border-left:3px solid #059669;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem;padding:.35rem .5rem .35rem 0">
           <span style="font-size:.8rem;color:#059669;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
@@ -20451,7 +20439,7 @@ function renderTemplateManageContent(template) {
         subs.forEach((sub, si) => {
           const subCi = masteredActs.indexOf(sub);
           const subGlobalIdx = acts.indexOf(sub);
-          const subMastBadge = sub.masteredOn ? `<span style="font-size:.71rem;display:inline-block;background:#d1fae5;color:#059669;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ ${fmtPeriodDate(sub.masteredOn)}</span>` : '';
+          const subMastBadge = sub.masteredOn ? `<span style="font-size:.71rem;display:inline-block;background:#d1fae5;color:#059669;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ Mastered ${fmtPeriodDate(sub.masteredOn)}</span>` : '';
           html += `<div style="display:flex;align-items:flex-start;gap:.4rem;background:#ecfdf5;border:1px solid #a7f3d0;border-left:3px solid #059669;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem;padding:.35rem .5rem .35rem 0">
             <span style="font-size:.8rem;color:#059669;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
             <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
@@ -20527,7 +20515,7 @@ function renderTemplateManageContent(template) {
               <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${globalIdx}" data-idx="${globalIdx}" placeholder="Enter Activity Title Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
             </div>
           </div>
-          <div>
+          ${acts.some(a2 => a2.parentActivity === (a.title || a.name)) ? '' : `<div>
             <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Details</div>
             <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
               <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
@@ -20537,7 +20525,7 @@ function renderTemplateManageContent(template) {
               </div>
               <textarea class="admin-input mn-act-details-input" id="mn-act-details-${globalIdx}" data-idx="${globalIdx}" rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(a.name || '')}</textarea>
             </div>
-          </div>
+          </div>`}
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.3rem;flex-shrink:0">
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.2rem">
@@ -20559,7 +20547,7 @@ function renderTemplateManageContent(template) {
       myDiscSubs.forEach((sub, si) => {
         const subCi = discontinuedActs.indexOf(sub);
         const subGlobalIdx = acts.indexOf(sub);
-        const subDiscBadge = sub.discontinuedOn ? `<span style="font-size:.71rem;display:inline-block;background:#fee2e2;color:#dc2626;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 ${fmtPeriodDate(sub.discontinuedOn)}</span>` : '';
+        const subDiscBadge = sub.discontinuedOn ? `<span style="font-size:.71rem;display:inline-block;background:#fee2e2;color:#dc2626;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 Discontinued ${fmtPeriodDate(sub.discontinuedOn)}</span>` : '';
         const subMaintBadge2 = sub.maintained ? `<span style="font-size:.71rem;display:inline-block;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.08rem .4rem;border-radius:.3rem;border:1px solid #d1d5db">🆗</span>` : '';
         html += `<div style="display:flex;align-items:flex-start;gap:.4rem;background:#fff5f5;border:1px solid #fca5a5;border-left:3px solid #dc2626;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem;padding:.35rem .5rem .35rem 0">
           <span style="font-size:.8rem;color:#dc2626;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
@@ -20610,7 +20598,7 @@ function renderTemplateManageContent(template) {
         subs.forEach((sub, si) => {
           const subCi = discontinuedActs.indexOf(sub);
           const subGlobalIdx = acts.indexOf(sub);
-          const subDiscBadge = sub.discontinuedOn ? `<span style="font-size:.71rem;display:inline-block;background:#fee2e2;color:#dc2626;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 ${fmtPeriodDate(sub.discontinuedOn)}</span>` : '';
+          const subDiscBadge = sub.discontinuedOn ? `<span style="font-size:.71rem;display:inline-block;background:#fee2e2;color:#dc2626;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 Discontinued ${fmtPeriodDate(sub.discontinuedOn)}</span>` : '';
           html += `<div style="display:flex;align-items:flex-start;gap:.4rem;background:#fff5f5;border:1px solid #fca5a5;border-left:3px solid #dc2626;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem;padding:.35rem .5rem .35rem 0">
             <span style="font-size:.8rem;color:#dc2626;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
             <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
