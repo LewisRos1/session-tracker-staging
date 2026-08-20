@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1772";
+const APP_VERSION = "1773";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -399,7 +399,8 @@ const state = {
   viewSessionId:      null,
   viewSessionData:    null,
   fbViewUnsubscribe:    null,
-  viewRenderPending:    false,
+  viewRenderPending:      false,
+  viewSnapshotRenderTimer: null,
   viewClickDelegate:    null,
   // Group sessions
   groups:                  [],
@@ -416,7 +417,8 @@ const state = {
   viewGroupSessionId:     null,
   viewGroupSessionData:   null,
   fbViewGroupUnsubscribe: null,
-  viewGroupRenderPending: false,
+  viewGroupRenderPending:      false,
+  viewGroupSnapshotRenderTimer: null,
   // Review queue (home screen checklist for pending review work)
   reviewQueueItems:        [],
   reviewQueueUnsubscribe:  null,
@@ -10721,8 +10723,24 @@ async function openSessionView(student, sessionId) {
         // Local state updated optimistically inside — fall through to render immediately.
         await autoFillViewStructuredRemarks(student, sessionId, data);
       } catch (err) { console.error("autoFillViewStructuredRemarks failed:", err); }
-      if (isViewBusy() || state.viewActionsInFlight > 0) { state.viewRenderPending = true; }
-      else               { renderSessionView(); }
+      if (isViewBusy() || state.viewActionsInFlight > 0) {
+        state.viewRenderPending = true;
+      } else {
+        // Debounce snapshot-triggered renders by 250 ms. Server echo snapshots
+        // (Firestore's ack of our own write) arrive after viewActionsInFlight
+        // already dropped to 0 and can rebuild the DOM between a mousedown and
+        // mouseup, swallowing the click. withViewAction's own render (in finally)
+        // fires immediately and is unaffected by this timer.
+        state.viewRenderPending = true;
+        clearTimeout(state.viewSnapshotRenderTimer);
+        state.viewSnapshotRenderTimer = setTimeout(() => {
+          state.viewSnapshotRenderTimer = null;
+          if (state.viewRenderPending && !isViewBusy()) {
+            state.viewRenderPending = false;
+            renderSessionView();
+          }
+        }, 250);
+      }
     });
   } catch (err) {
     $("session-view-body").innerHTML =
@@ -13971,8 +13989,19 @@ async function openGroupSessionView(group, sessionId) {
         // Local state updated optimistically inside — fall through to render immediately.
         await autoFillViewGroupStructuredRemarks(group, sessionId, data);
       } catch (err) { console.error("autoFillViewGroupStructuredRemarks failed:", err); }
-      if (isGroupViewBusy() || state.viewGroupActionsInFlight > 0) { state.viewGroupRenderPending = true; }
-      else                   { renderGroupSessionView(); }
+      if (isGroupViewBusy() || state.viewGroupActionsInFlight > 0) {
+        state.viewGroupRenderPending = true;
+      } else {
+        state.viewGroupRenderPending = true;
+        clearTimeout(state.viewGroupSnapshotRenderTimer);
+        state.viewGroupSnapshotRenderTimer = setTimeout(() => {
+          state.viewGroupSnapshotRenderTimer = null;
+          if (state.viewGroupRenderPending && !isGroupViewBusy()) {
+            state.viewGroupRenderPending = false;
+            renderGroupSessionView();
+          }
+        }, 250);
+      }
     });
   } catch (err) {
     $("group-session-view-body").innerHTML =
