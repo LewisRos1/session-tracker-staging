@@ -3099,7 +3099,8 @@ function getRemarksForActivity(session, actId) {
 function hasRemarkContent(rem) {
   const hasText   = stripRemarkHtml(rem.text || "").trim() !== "";
   const hasTrials = allScores(rem).length > 0;
-  return hasText || hasTrials;
+  const hasNote   = stripRemarkHtml(rem.masteryNote || "").trim() !== "";
+  return hasText || hasTrials || hasNote;
 }
 
 // ─── CALCULATIONS ────────────────────────────────────────────

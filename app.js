@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1774";
+const APP_VERSION = "1775";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -12226,7 +12226,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
            data-is-predefined="${isPredefined}"
            data-parent-activity="${escHtml(paConfig?.parentActivity || "")}"
            data-config-id="${escHtml(paConfig?.id || "")}"
-           placeholder="${_maintained && data.date >= (_maintainedAt || "2026-01-01") ? "" : "Notes…"}">${_maintained && data.date >= (_maintainedAt || "2026-01-01") ? "Maintain" : ""}</textarea>`;
+           placeholder="${_maintained && data.date >= (_maintainedAt || "2026-01-01") ? "" : "Remark…"}">${_maintained && data.date >= (_maintainedAt || "2026-01-01") ? "Maintain" : ""}</textarea>`;
       const addTrialBtn = mappedInfo
         ? ""
         : `<button class="view-add-trial-new" data-act-id="${escHtml(actId || "")}"
@@ -14528,7 +14528,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
             data-student="${escHtml(studentName)}"
             data-parent-activity="${escHtml(paConfig?.parentActivity || "")}"
             data-config-id="${escHtml(paConfig?.id || "")}"
-            placeholder="${_maintained && data.date >= (_maintainedAt || "2026-01-01") ? "" : "Notes…"}">${_maintained && data.date >= (_maintainedAt || "2026-01-01") ? "Maintain" : ""}</textarea>
+            placeholder="${_maintained && data.date >= (_maintainedAt || "2026-01-01") ? "" : "Remark…"}">${_maintained && data.date >= (_maintainedAt || "2026-01-01") ? "Maintain" : ""}</textarea>
         </td>
         <td class="vcol-trials" contenteditable="false">
           <button class="view-group-add-trial-new" data-act-id="${escHtml(actId || "")}"
