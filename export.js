@@ -3037,15 +3037,16 @@ function getAllActivitiesForTarget(session, target) {
     const colorProps = (pa.activityColor === "gray" || pa.isMaintainLive) ? { isGray: true }
                      : pa.activityColor === "green" ? { isGreen: true } : {};
     const manualScoreProp = pa.manualScore ? { manualScore: true } : {};
+    const _isMaintainedForSession = !!pa.maintained && (session.date >= (pa.maintainedAt || "2026-01-01"));
     if (sessionAct) {
       usedIds.add(sessionAct.id);
       result.push(pa.isMapped
-        ? { ...sessionAct, activityName: numberedName, isMapped: true, mappedTargetId: pa.mappedTargetId || null, ...colorProps, isMaintained: !!pa.maintained, ...paExtraProps }
-        : { ...sessionAct, activityName: numberedName, ...colorProps, ...manualScoreProp, isMaintained: !!pa.maintained, ...paExtraProps });
+        ? { ...sessionAct, activityName: numberedName, isMapped: true, mappedTargetId: pa.mappedTargetId || null, ...colorProps, isMaintained: _isMaintainedForSession, ...paExtraProps }
+        : { ...sessionAct, activityName: numberedName, ...colorProps, ...manualScoreProp, isMaintained: _isMaintainedForSession, ...paExtraProps });
     } else {
       result.push({
         id: null, activityName: numberedName, isPredefined: true, empty: true,
-        isMapped: pa.isMapped || false, mappedTargetId: pa.mappedTargetId || null, ...colorProps, ...manualScoreProp, isMaintained: !!pa.maintained, ...paExtraProps
+        isMapped: pa.isMapped || false, mappedTargetId: pa.mappedTargetId || null, ...colorProps, ...manualScoreProp, isMaintained: _isMaintainedForSession, ...paExtraProps
       });
     }
   }

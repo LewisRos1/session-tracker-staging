@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1773";
+const APP_VERSION = "1774";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -12730,6 +12730,8 @@ async function autoFillViewStructuredRemarks(student, sessionId, data) {
         return _pOk && remarkActIds.has(actId2);
       });
       if (_nameMatchHasRemark) continue;
+      // Don't create placeholder records for maintained activities in pre-maintained sessions.
+      if (pa.maintained && !_vOnOrAfterMaint) continue;
       const existingActId = candidateIds[0] || null;
       const key = `${sessionId}:${target.name}:${paConfigId || pa.name}:${paParent || ""}:view`;
       if (structuredRemarkAutoFillInFlight.has(key)) continue;
@@ -12889,6 +12891,7 @@ async function autoFillViewGroupStructuredRemarks(group, sessionId, data) {
           }
           continue;
         }
+        if (pa.maintained && !_vgOnOrAfterMaint) continue;
         const key = `${sessionId}:${target.name}:${pa.id || pa.name}:${studentName}:view`;
         if (structuredRemarkAutoFillInFlight.has(key)) continue;
         structuredRemarkAutoFillInFlight.add(key);
