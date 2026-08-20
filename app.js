@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1791";
+const APP_VERSION = "1792";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8428,7 +8428,7 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
 
     // Parent activity with sub-activities — render as a connected visual group
     const children = subActsByParent.get(pa.title || pa.name) || [];
-    if (pa.noRemark && children.length === 0) { actNum--; return; } // was a container; all subs now inactive
+    { const _pk2 = pa.title || pa.name; if (_pk2 && children.length === 0 && allPas.some(p => p.parentActivity === _pk2 && !p.isCompleted && !p.isArchived && !p.isStopped)) { actNum--; return; } } // parent with all subs now inactive
     if (children.length > 0) {
       const isGrayP  = pa.activityColor === "gray" || pa.isMaintainLive || pa.maintained;
       const isGreenP = pa.activityColor === "green";
@@ -8853,8 +8853,11 @@ function renderFedcTargetWithSidebar(target, allPas, subActsByParent, sessionDat
           if (paIsWritten(sub, target, pa.title || pa.name)) secWritten++;
         }
       } else if (!pa.noRemark) {
-        secTotal++;
-        if (paIsWritten(pa, target)) secWritten++;
+        const _pk2 = pa.title || pa.name;
+        if (!(_pk2 && allPas.some(p => p.parentActivity === _pk2 && !p.isCompleted && !p.isArchived && !p.isStopped))) {
+          secTotal++;
+          if (paIsWritten(pa, target)) secWritten++;
+        }
       }
     }
     totalActs += secTotal;
@@ -17298,6 +17301,21 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
   </div>`;
 }
 
+function mnSubStatusKebabHtml(sub, subIdx) {
+  const s = `width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem`;
+  const btn = (action, label, extra = '') =>
+    `<button class="mn-sub-km-status-btn" data-idx="${subIdx}" data-action="${action}" style="${s}${extra}">${label}</button>`;
+  if (sub.maintained) {
+    return btn('change-maintain-date', '📅 Change Maintained Date') +
+           btn('master', '⭐ Sub-activity Mastered') +
+           btn('discontinue', '🚩 Discontinue Sub-activity', ';color:#dc2626') +
+           btn('unmaintain', '↩ Un-maintain Sub-activity', ';color:#4b5563');
+  }
+  return btn('master', '⭐ Sub-activity Mastered') +
+         btn('discontinue', '🚩 Discontinue Sub-activity', ';color:#dc2626') +
+         btn('maintain', '🆗 Maintain Sub-activity', ';color:#0369a1');
+}
+
 function mnStatusKebabHtml(a, idx, isParent = false) {
   const s = `width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem`;
   const btn = (action, label, extra = '') =>
@@ -17615,7 +17633,7 @@ function renderTargetManageContent(student, target) {
                   <div style="position:relative;align-self:flex-start;flex-shrink:0;margin-top:1.6rem">
                     <button class="btn-adm-del mn-sub-kebab-btn" data-idx="${subIdx}" title="Subactivity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
                     <div class="mn-sub-kebab-menu" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:240px;overflow:hidden">
-                      <button class="mn-sub-km-manage" data-idx="${subIdx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#0369a1">🪄 Manage Subactivity</button>
+                      ${mnSubStatusKebabHtml(sub, subIdx)}
                       <button class="mn-move-sub-act" data-idx="${subIdx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151;white-space:nowrap">↳ Move to another Parent Activity</button>
                       <button class="mn-make-standalone" data-idx="${subIdx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151;white-space:nowrap">↗ Make standalone activity</button>
                       <button class="mn-del-sub-act" data-idx="${subIdx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Subactivity</button>
@@ -17873,7 +17891,10 @@ function renderTargetManageContent(student, target) {
       const _omGroups = {};
       for (const s of _orphanMastSubs) { const pk = s.parentActivity; if (!_omGroups[pk]) _omGroups[pk] = []; _omGroups[pk].push(s); }
       Object.entries(_omGroups).forEach(([pk, subs]) => {
-        html += `<div style="padding:.3rem .6rem;background:#f0fdf4;border:1px dashed #6ee7b7;border-radius:.35rem;margin-bottom:.1rem;font-size:.8rem;color:#059669;font-weight:600">From: ${escHtml(pk)}</div>`;
+        const _omParent = acts.find(a => (a.title || a.name) === pk && !a.parentActivity);
+        const _omParentTitle = _omParent ? (paDisplayHtml(_omParent, true) || escHtml(pk)) : escHtml(pk);
+        const _omParentCreated = _omParent?.activeFrom ? `<span style="font-size:.71rem;color:#9ca3af;margin-left:.4rem">Created ${fmtPeriodDate(_omParent.activeFrom)}</span>` : '';
+        html += `<div style="display:flex;align-items:center;gap:.5rem;background:#f0f9ff;border:1px solid #bae6fd;border-left:3px solid #60a5fa;border-radius:.35rem;margin-bottom:.35rem;padding:.45rem .75rem"><span style="font-size:.85rem;font-weight:700;color:#1e40af;flex:1;min-width:0">${_omParentTitle}</span><span style="font-size:.71rem;background:#dbeafe;color:#1d4ed8;font-weight:600;padding:.05rem .4rem;border-radius:.3rem;border:1px solid #93c5fd;white-space:nowrap;flex-shrink:0">Still Active</span>${_omParentCreated}</div>`;
         subs.forEach((sub, si) => {
           const subCi = masteredActs.indexOf(sub);
           const subGlobalIdx = acts.indexOf(sub);
@@ -18032,7 +18053,10 @@ function renderTargetManageContent(student, target) {
       const _odGroups = {};
       for (const s of _orphanDiscSubs) { const pk = s.parentActivity; if (!_odGroups[pk]) _odGroups[pk] = []; _odGroups[pk].push(s); }
       Object.entries(_odGroups).forEach(([pk, subs]) => {
-        html += `<div style="padding:.3rem .6rem;background:#fff5f5;border:1px dashed #fca5a5;border-radius:.35rem;margin-bottom:.1rem;font-size:.8rem;color:#dc2626;font-weight:600">From: ${escHtml(pk)}</div>`;
+        const _odParent = acts.find(a => (a.title || a.name) === pk && !a.parentActivity);
+        const _odParentTitle = _odParent ? (paDisplayHtml(_odParent, true) || escHtml(pk)) : escHtml(pk);
+        const _odParentCreated = _odParent?.activeFrom ? `<span style="font-size:.71rem;color:#9ca3af;margin-left:.4rem">Created ${fmtPeriodDate(_odParent.activeFrom)}</span>` : '';
+        html += `<div style="display:flex;align-items:center;gap:.5rem;background:#f0f9ff;border:1px solid #bae6fd;border-left:3px solid #60a5fa;border-radius:.35rem;margin-bottom:.35rem;padding:.45rem .75rem"><span style="font-size:.85rem;font-weight:700;color:#1e40af;flex:1;min-width:0">${_odParentTitle}</span><span style="font-size:.71rem;background:#dbeafe;color:#1d4ed8;font-weight:600;padding:.05rem .4rem;border-radius:.3rem;border:1px solid #93c5fd;white-space:nowrap;flex-shrink:0">Still Active</span>${_odParentCreated}</div>`;
         subs.forEach((sub, si) => {
           const subCi = discontinuedActs.indexOf(sub);
           const subGlobalIdx = acts.indexOf(sub);
@@ -18502,15 +18526,82 @@ function renderTargetManageContent(student, target) {
     });
   });
 
-  $("manage-modal-body").querySelectorAll(".mn-sub-km-manage").forEach(btn => {
-    btn.addEventListener("click", e => {
-      e.stopPropagation();
-      const idx = btn.dataset.idx;
-      const body = $("manage-modal-body").querySelector(`.mn-sub-act-body[data-idx="${idx}"]`);
-      $("manage-modal-body").querySelectorAll(".mn-sub-kebab-menu").forEach(m => m.style.display = "none");
-      if (!body) return;
-      const isHidden = body.style.display === "none" || body.style.display === "";
-      body.style.display = isHidden ? "flex" : "none";
+  $("manage-modal-body").querySelectorAll(".mn-sub-km-status-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const idx = Number(btn.dataset.idx);
+      const action = btn.dataset.action;
+      const sub = acts[idx];
+      if (!sub) return;
+      $("manage-modal-body").querySelectorAll(".mn-kebab-menu,.mn-sub-kebab-menu").forEach(m => m.style.display = "none");
+      const _stripMk = s => (s || "").replace(/\*_([\s\S]+?)_\*/g, "$1").replace(/_\*([\s\S]+?)\*_/g, "$1").replace(/\*([\s\S]+?)\*/g, "$1").replace(/_([\s\S]+?)_/g, "$1");
+      const subDisplayName = escHtml(_stripMk(sub.title || sub.name || ''));
+      const _loadLatestSub = async () => {
+        const origText = btn.textContent;
+        btn.disabled = true; btn.textContent = "Checking…";
+        let result = { date: null, subName: null };
+        try { result = await maGetLastDataDate(_groupForTargetEdit || student, target, sub, !!_groupForTargetEdit); }
+        finally { btn.disabled = false; btn.textContent = origText; }
+        return result;
+      };
+      if (action === 'master' || action === 'discontinue') {
+        const { date: latestDate } = await _loadLatestSub();
+        const rawMin = latestDate || todayDateStr();
+        const minDate = (sub.maintainedAt && sub.maintainedAt > rawMin) ? sub.maintainedAt : rawMin;
+        const restrictionText = action === 'master'
+          ? 'The earliest you can mark this as mastered is'
+          : 'The earliest you can discontinue this sub-activity is';
+        const infoHtml = latestDate
+          ? `The last recorded session for <strong>"${subDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>. ${restrictionText} <strong>${fmtPeriodDate(minDate)}</strong>. This sub-activity will stop showing from <strong>${fmtPeriodDate(addOneDay(minDate))}</strong> onwards.`
+          : `No previous session data was found for <strong>"${subDisplayName}"</strong>.`;
+        const pickedDate = await showDatePickerOverlay({
+          heading: action === 'master' ? '⭐ Mark Sub-activity as Mastered' : '🚩 Discontinue Sub-activity',
+          infoHtml, minDate, defaultDate: minDate,
+          confirmLabel: action === 'master' ? 'Confirm ⭐' : 'Confirm 🚩'
+        });
+        if (!pickedDate) return;
+        if (action === 'master') {
+          delete sub.maintained; delete sub.activityColor; delete sub.maintainedAt;
+          delete sub.discontinuedOn; delete sub.isArchived; delete sub.isStopped; delete sub.inactiveReason;
+          sub.masteredOn = pickedDate;
+        } else {
+          sub.discontinuedOn = pickedDate;
+          delete sub.masteredOn; delete sub.isCompleted; delete sub.inactiveReason;
+        }
+      } else if (action === 'maintain') {
+        const { date: latestDate } = await _loadLatestSub();
+        const rawMin = latestDate ? addOneDay(latestDate) : todayDateStr();
+        const infoHtml = latestDate
+          ? `The last recorded session for <strong>"${subDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>. The earliest you can maintain this sub-activity is <strong>${fmtPeriodDate(rawMin)}</strong>. From this date onwards, this sub-activity will automatically have a note "Maintain" for every session.`
+          : `No previous session data was found for <strong>"${subDisplayName}"</strong>. From this date onwards, this sub-activity will automatically have a note "Maintain" for every session.`;
+        const pickedDate = await showDatePickerOverlay({
+          heading: '🆗 Maintain Sub-activity', infoHtml, minDate: rawMin, defaultDate: rawMin, confirmLabel: 'Confirm 🆗'
+        });
+        if (!pickedDate) return;
+        delete sub.masteredOn; delete sub.isCompleted; delete sub.discontinuedOn; delete sub.isArchived; delete sub.isStopped; delete sub.inactiveReason;
+        sub.maintained = true; sub.activityColor = "gray"; sub.maintainedAt = pickedDate;
+      } else if (action === 'change-maintain-date') {
+        const { date: latestDate } = await _loadLatestSub();
+        const rawMin = latestDate ? addOneDay(latestDate) : todayDateStr();
+        const infoHtml = latestDate
+          ? `The last recorded session for <strong>"${subDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>. The earliest you can set the maintained date is <strong>${fmtPeriodDate(rawMin)}</strong>.`
+          : `No previous session data was found for <strong>"${subDisplayName}"</strong>.`;
+        const pickedDate = await showDatePickerOverlay({
+          heading: '📅 Change Maintained Date', infoHtml, minDate: rawMin, defaultDate: sub.maintainedAt || rawMin, confirmLabel: 'Save Date'
+        });
+        if (!pickedDate) return;
+        sub.maintainedAt = pickedDate;
+      } else if (action === 'unmaintain') {
+        const ok = await showAutoDateConfirm({ message: `This sub-activity will be un-maintained and restored to active status.`, confirmLabel: "Un-maintain ↩" });
+        if (!ok) return;
+        delete sub.maintained; delete sub.activityColor; delete sub.maintainedAt;
+      }
+      target.predefinedActivities = acts;
+      const scrollPos = $("manage-modal-body").scrollTop;
+      await saveTarget();
+      renderTargetManageContent(student, target);
+      if (state.sessionData) renderTargetContent();
+      if (state.groupSessionData) renderGroupTargetContent();
+      requestAnimationFrame(() => { const b = $("manage-modal-body"); if (b) b.scrollTop = scrollPos; });
     });
   });
 
@@ -19117,6 +19208,20 @@ function renderTargetManageContent(student, target) {
       const type = btn.dataset.inactiveType;
       const pa = type === "mastered" ? masteredActs[ci] : discontinuedActs[ci];
       if (!pa) return;
+      if (!pa.parentActivity) {
+        const paKey = pa._linkKey || pa.title || pa.name;
+        if (paKey) {
+          const affectedSubs = acts.filter(a => a.parentActivity === paKey && (type === "mastered" ? !!a.masteredOn : !!a.discontinuedOn));
+          if (affectedSubs.length > 0) {
+            const ok = await showAutoDateConfirm({ message: `Restoring this activity to active will also restore all its sub-activities. To restore only a specific sub-activity, use the sub-activity's kebab menu in the Mastered/Discontinued section.`, confirmLabel: "Restore All ↩" });
+            if (!ok) return;
+            affectedSubs.forEach(sub => {
+              if (type === "mastered") { delete sub.masteredOn; delete sub.isCompleted; }
+              else { delete sub.discontinuedOn; delete sub.isArchived; delete sub.isStopped; }
+            });
+          }
+        }
+      }
       if (type === "mastered") { delete pa.masteredOn; delete pa.isCompleted; }
       else { delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped; }
       await saveTarget();
@@ -20472,7 +20577,10 @@ function renderTemplateManageContent(template) {
       const _omGroups = {};
       for (const s of _orphanMastSubs) { const pk = s.parentActivity; if (!_omGroups[pk]) _omGroups[pk] = []; _omGroups[pk].push(s); }
       Object.entries(_omGroups).forEach(([pk, subs]) => {
-        html += `<div style="padding:.3rem .6rem;background:#f0fdf4;border:1px dashed #6ee7b7;border-radius:.35rem;margin-bottom:.1rem;font-size:.8rem;color:#059669;font-weight:600">From: ${escHtml(pk)}</div>`;
+        const _omParent = acts.find(a => (a.title || a.name) === pk && !a.parentActivity);
+        const _omParentTitle = _omParent ? (paDisplayHtml(_omParent, true) || escHtml(pk)) : escHtml(pk);
+        const _omParentCreated = _omParent?.activeFrom ? `<span style="font-size:.71rem;color:#9ca3af;margin-left:.4rem">Created ${fmtPeriodDate(_omParent.activeFrom)}</span>` : '';
+        html += `<div style="display:flex;align-items:center;gap:.5rem;background:#f0f9ff;border:1px solid #bae6fd;border-left:3px solid #60a5fa;border-radius:.35rem;margin-bottom:.35rem;padding:.45rem .75rem"><span style="font-size:.85rem;font-weight:700;color:#1e40af;flex:1;min-width:0">${_omParentTitle}</span><span style="font-size:.71rem;background:#dbeafe;color:#1d4ed8;font-weight:600;padding:.05rem .4rem;border-radius:.3rem;border:1px solid #93c5fd;white-space:nowrap;flex-shrink:0">Still Active</span>${_omParentCreated}</div>`;
         subs.forEach((sub, si) => {
           const subCi = masteredActs.indexOf(sub);
           const subGlobalIdx = acts.indexOf(sub);
@@ -20631,7 +20739,10 @@ function renderTemplateManageContent(template) {
       const _odGroups = {};
       for (const s of _orphanDiscSubs) { const pk = s.parentActivity; if (!_odGroups[pk]) _odGroups[pk] = []; _odGroups[pk].push(s); }
       Object.entries(_odGroups).forEach(([pk, subs]) => {
-        html += `<div style="padding:.3rem .6rem;background:#fff5f5;border:1px dashed #fca5a5;border-radius:.35rem;margin-bottom:.1rem;font-size:.8rem;color:#dc2626;font-weight:600">From: ${escHtml(pk)}</div>`;
+        const _odParent = acts.find(a => (a.title || a.name) === pk && !a.parentActivity);
+        const _odParentTitle = _odParent ? (paDisplayHtml(_odParent, true) || escHtml(pk)) : escHtml(pk);
+        const _odParentCreated = _odParent?.activeFrom ? `<span style="font-size:.71rem;color:#9ca3af;margin-left:.4rem">Created ${fmtPeriodDate(_odParent.activeFrom)}</span>` : '';
+        html += `<div style="display:flex;align-items:center;gap:.5rem;background:#f0f9ff;border:1px solid #bae6fd;border-left:3px solid #60a5fa;border-radius:.35rem;margin-bottom:.35rem;padding:.45rem .75rem"><span style="font-size:.85rem;font-weight:700;color:#1e40af;flex:1;min-width:0">${_odParentTitle}</span><span style="font-size:.71rem;background:#dbeafe;color:#1d4ed8;font-weight:600;padding:.05rem .4rem;border-radius:.3rem;border:1px solid #93c5fd;white-space:nowrap;flex-shrink:0">Still Active</span>${_odParentCreated}</div>`;
         subs.forEach((sub, si) => {
           const subCi = discontinuedActs.indexOf(sub);
           const subGlobalIdx = acts.indexOf(sub);
@@ -22171,7 +22282,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
   // Pre-compute sub-activities per parent (group sessions: ignore activeFrom date)
   const grpSubsByParent = new Map();
   for (const pa of allPas) {
-    if (pa.parentActivity && !pa.isCompleted && !pa.isArchived && !pa.isStopped) {
+    if (pa.parentActivity && !pa.isCompleted && !pa.isArchived && !pa.isStopped && !pa.masteredOn && !pa.discontinuedOn) {
       if (!grpSubsByParent.has(pa.parentActivity)) grpSubsByParent.set(pa.parentActivity, []);
       grpSubsByParent.get(pa.parentActivity).push(pa);
     }
@@ -22218,7 +22329,9 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
 
     // Parent activity with sub-activities — render as connected group
     const children = grpSubsByParent.get(pa.title || pa.name) || [];
-    if (pa.noRemark && children.length === 0) continue; // was a container; all subs now inactive
+    const _grpPaKey = pa.title || pa.name;
+    const _grpHasAnySubs = _grpPaKey && allPas.some(p => p.parentActivity === _grpPaKey && !p.isCompleted && !p.isArchived && !p.isStopped);
+    if (_grpHasAnySubs && children.length === 0) continue; // parent with all subs now inactive
     if (children.length > 0) {
       grpActNum++;
       const grpIsGrayP = pa.activityColor === "gray" || pa.isMaintainLive || pa.maintained;
