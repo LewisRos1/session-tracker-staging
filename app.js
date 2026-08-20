@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1784";
+const APP_VERSION = "1785";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -17815,18 +17815,43 @@ function renderTargetManageContent(student, target) {
       </div>`;
       myMastSubs.forEach((sub, si) => {
         const subCi = masteredActs.indexOf(sub);
+        const subGlobalIdx = acts.indexOf(sub);
         const subMastBadge = sub.masteredOn ? `<span style="font-size:.71rem;display:inline-block;background:#d1fae5;color:#059669;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ ${fmtPeriodDate(sub.masteredOn)}</span>` : '';
-        const subMaintBadge = sub.maintained ? `<span style="font-size:.71rem;display:inline-block;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.08rem .4rem;border-radius:.3rem;border:1px solid #d1d5db">🆗</span> ` : '';
-        html += `<div style="display:flex;align-items:center;gap:.4rem;padding:.28rem .5rem .28rem 1.1rem;background:#ecfdf5;border:1px solid #a7f3d0;border-left:3px solid #059669;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem">
-          <span style="font-size:.75rem;color:#059669;font-weight:700;flex-shrink:0">${String.fromCharCode(97 + si)})</span>
-          <span style="flex:1;font-size:.83rem;color:#374151;font-weight:500">${escHtml(sub.title || sub.name || "")}</span>
-          <div style="display:flex;align-items:center;gap:.25rem;flex-shrink:0">${subMaintBadge}${subMastBadge}</div>
-          <div style="position:relative;flex-shrink:0">
-            <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="mastered" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#a7f3d0;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#059669">⋮</button>
-            <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
-              <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Mastered Date</button>
-              <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
-              <button class="btn-mn-switch-status" data-completed-idx="${subCi}" data-from="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#6b7280">🚩 Change to Discontinued</button>
+        const subMaintBadge = sub.maintained ? `<span style="font-size:.71rem;display:inline-block;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.08rem .4rem;border-radius:.3rem;border:1px solid #d1d5db">🆗</span>` : '';
+        html += `<div style="display:flex;align-items:flex-start;gap:.4rem;background:#ecfdf5;border:1px solid #a7f3d0;border-left:3px solid #059669;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem;padding:.35rem .5rem .35rem 0">
+          <span style="font-size:.8rem;color:#059669;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
+          <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
+            <div>
+              <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Title</div>
+              <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
+                <div style="display:flex;gap:.2rem;padding:.25rem .4rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                  <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${subGlobalIdx}" title="Bold (Ctrl+B)">B</button>
+                  <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${subGlobalIdx}" title="Underline (Ctrl+U)">U</button>
+                </div>
+                <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subGlobalIdx}" data-idx="${subGlobalIdx}" placeholder="Enter Activity Title Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+              </div>
+            </div>
+            <div>
+              <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Details</div>
+              <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
+                <div style="display:flex;gap:.2rem;padding:.25rem .4rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                  <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bold (Ctrl+B)">B</button>
+                  <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Underline (Ctrl+U)">U</button>
+                  <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
+                </div>
+                <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subGlobalIdx}" data-idx="${subGlobalIdx}" rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(sub.name || '')}</textarea>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.25rem;flex-shrink:0;padding-top:.3rem">
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.15rem">${subMaintBadge}${subMastBadge}</div>
+            <div style="position:relative">
+              <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="mastered" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#a7f3d0;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#059669">⋮</button>
+              <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
+                <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Mastered Date</button>
+                <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
+                <button class="btn-mn-switch-status" data-completed-idx="${subCi}" data-from="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#6b7280">🚩 Change to Discontinued</button>
+              </div>
             </div>
           </div>
         </div>`;
@@ -17841,17 +17866,42 @@ function renderTargetManageContent(student, target) {
         html += `<div style="padding:.3rem .6rem;background:#f0fdf4;border:1px dashed #6ee7b7;border-radius:.35rem;margin-bottom:.1rem;font-size:.8rem;color:#059669;font-weight:600">From: ${escHtml(pk)}</div>`;
         subs.forEach((sub, si) => {
           const subCi = masteredActs.indexOf(sub);
+          const subGlobalIdx = acts.indexOf(sub);
           const subMastBadge = sub.masteredOn ? `<span style="font-size:.71rem;display:inline-block;background:#d1fae5;color:#059669;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ ${fmtPeriodDate(sub.masteredOn)}</span>` : '';
-          html += `<div style="display:flex;align-items:center;gap:.4rem;padding:.28rem .5rem .28rem 1.1rem;background:#ecfdf5;border:1px solid #a7f3d0;border-left:3px solid #059669;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem">
-            <span style="font-size:.75rem;color:#059669;font-weight:700;flex-shrink:0">${String.fromCharCode(97 + si)})</span>
-            <span style="flex:1;font-size:.83rem;color:#374151;font-weight:500">${escHtml(sub.title || sub.name || "")}</span>
-            <div style="flex-shrink:0">${subMastBadge}</div>
-            <div style="position:relative;flex-shrink:0">
-              <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="mastered" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#a7f3d0;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#059669">⋮</button>
-              <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
-                <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Mastered Date</button>
-                <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
-                <button class="btn-mn-switch-status" data-completed-idx="${subCi}" data-from="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#6b7280">🚩 Change to Discontinued</button>
+          html += `<div style="display:flex;align-items:flex-start;gap:.4rem;background:#ecfdf5;border:1px solid #a7f3d0;border-left:3px solid #059669;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem;padding:.35rem .5rem .35rem 0">
+            <span style="font-size:.8rem;color:#059669;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
+            <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
+              <div>
+                <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Title</div>
+                <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
+                  <div style="display:flex;gap:.2rem;padding:.25rem .4rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                    <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${subGlobalIdx}" title="Bold (Ctrl+B)">B</button>
+                    <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${subGlobalIdx}" title="Underline (Ctrl+U)">U</button>
+                  </div>
+                  <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subGlobalIdx}" data-idx="${subGlobalIdx}" placeholder="Enter Activity Title Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+                </div>
+              </div>
+              <div>
+                <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Details</div>
+                <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
+                  <div style="display:flex;gap:.2rem;padding:.25rem .4rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                    <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bold (Ctrl+B)">B</button>
+                    <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Underline (Ctrl+U)">U</button>
+                    <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
+                  </div>
+                  <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subGlobalIdx}" data-idx="${subGlobalIdx}" rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(sub.name || '')}</textarea>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.25rem;flex-shrink:0;padding-top:.3rem">
+              <div style="flex-shrink:0">${subMastBadge}</div>
+              <div style="position:relative">
+                <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="mastered" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#a7f3d0;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#059669">⋮</button>
+                <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
+                  <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Mastered Date</button>
+                  <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
+                  <button class="btn-mn-switch-status" data-completed-idx="${subCi}" data-from="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#6b7280">🚩 Change to Discontinued</button>
+                </div>
               </div>
             </div>
           </div>`;
@@ -17924,18 +17974,43 @@ function renderTargetManageContent(student, target) {
       </div>`;
       myDiscSubs.forEach((sub, si) => {
         const subCi = discontinuedActs.indexOf(sub);
+        const subGlobalIdx = acts.indexOf(sub);
         const subDiscBadge = sub.discontinuedOn ? `<span style="font-size:.71rem;display:inline-block;background:#fee2e2;color:#dc2626;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 ${fmtPeriodDate(sub.discontinuedOn)}</span>` : '';
-        const subMaintBadge2 = sub.maintained ? `<span style="font-size:.71rem;display:inline-block;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.08rem .4rem;border-radius:.3rem;border:1px solid #d1d5db">🆗</span> ` : '';
-        html += `<div style="display:flex;align-items:center;gap:.4rem;padding:.28rem .5rem .28rem 1.1rem;background:#fff5f5;border:1px solid #fca5a5;border-left:3px solid #dc2626;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem">
-          <span style="font-size:.75rem;color:#dc2626;font-weight:700;flex-shrink:0">${String.fromCharCode(97 + si)})</span>
-          <span style="flex:1;font-size:.83rem;color:#374151;font-weight:500">${escHtml(sub.title || sub.name || "")}</span>
-          <div style="display:flex;align-items:center;gap:.25rem;flex-shrink:0">${subMaintBadge2}${subDiscBadge}</div>
-          <div style="position:relative;flex-shrink:0">
-            <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#fca5a5;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#dc2626">⋮</button>
-            <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
-              <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Discontinued Date</button>
-              <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
-              <button class="btn-mn-switch-status" data-completed-idx="${subCi}" data-from="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#059669">⭐ Change to Mastered</button>
+        const subMaintBadge2 = sub.maintained ? `<span style="font-size:.71rem;display:inline-block;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.08rem .4rem;border-radius:.3rem;border:1px solid #d1d5db">🆗</span>` : '';
+        html += `<div style="display:flex;align-items:flex-start;gap:.4rem;background:#fff5f5;border:1px solid #fca5a5;border-left:3px solid #dc2626;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem;padding:.35rem .5rem .35rem 0">
+          <span style="font-size:.8rem;color:#dc2626;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
+          <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
+            <div>
+              <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Title</div>
+              <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
+                <div style="display:flex;gap:.2rem;padding:.25rem .4rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                  <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${subGlobalIdx}" title="Bold (Ctrl+B)">B</button>
+                  <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${subGlobalIdx}" title="Underline (Ctrl+U)">U</button>
+                </div>
+                <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subGlobalIdx}" data-idx="${subGlobalIdx}" placeholder="Enter Activity Title Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+              </div>
+            </div>
+            <div>
+              <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Details</div>
+              <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
+                <div style="display:flex;gap:.2rem;padding:.25rem .4rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                  <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bold (Ctrl+B)">B</button>
+                  <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Underline (Ctrl+U)">U</button>
+                  <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
+                </div>
+                <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subGlobalIdx}" data-idx="${subGlobalIdx}" rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(sub.name || '')}</textarea>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.25rem;flex-shrink:0;padding-top:.3rem">
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.15rem">${subMaintBadge2}${subDiscBadge}</div>
+            <div style="position:relative">
+              <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#fca5a5;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#dc2626">⋮</button>
+              <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
+                <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Discontinued Date</button>
+                <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
+                <button class="btn-mn-switch-status" data-completed-idx="${subCi}" data-from="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#059669">⭐ Change to Mastered</button>
+              </div>
             </div>
           </div>
         </div>`;
@@ -17950,17 +18025,42 @@ function renderTargetManageContent(student, target) {
         html += `<div style="padding:.3rem .6rem;background:#fff5f5;border:1px dashed #fca5a5;border-radius:.35rem;margin-bottom:.1rem;font-size:.8rem;color:#dc2626;font-weight:600">From: ${escHtml(pk)}</div>`;
         subs.forEach((sub, si) => {
           const subCi = discontinuedActs.indexOf(sub);
+          const subGlobalIdx = acts.indexOf(sub);
           const subDiscBadge = sub.discontinuedOn ? `<span style="font-size:.71rem;display:inline-block;background:#fee2e2;color:#dc2626;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 ${fmtPeriodDate(sub.discontinuedOn)}</span>` : '';
-          html += `<div style="display:flex;align-items:center;gap:.4rem;padding:.28rem .5rem .28rem 1.1rem;background:#fff5f5;border:1px solid #fca5a5;border-left:3px solid #dc2626;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem">
-            <span style="font-size:.75rem;color:#dc2626;font-weight:700;flex-shrink:0">${String.fromCharCode(97 + si)})</span>
-            <span style="flex:1;font-size:.83rem;color:#374151;font-weight:500">${escHtml(sub.title || sub.name || "")}</span>
-            <div style="flex-shrink:0">${subDiscBadge}</div>
-            <div style="position:relative;flex-shrink:0">
-              <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#fca5a5;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#dc2626">⋮</button>
-              <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
-                <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Discontinued Date</button>
-                <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
-                <button class="btn-mn-switch-status" data-completed-idx="${subCi}" data-from="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#059669">⭐ Change to Mastered</button>
+          html += `<div style="display:flex;align-items:flex-start;gap:.4rem;background:#fff5f5;border:1px solid #fca5a5;border-left:3px solid #dc2626;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem;padding:.35rem .5rem .35rem 0">
+            <span style="font-size:.8rem;color:#dc2626;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
+            <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
+              <div>
+                <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Title</div>
+                <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
+                  <div style="display:flex;gap:.2rem;padding:.25rem .4rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                    <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${subGlobalIdx}" title="Bold (Ctrl+B)">B</button>
+                    <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${subGlobalIdx}" title="Underline (Ctrl+U)">U</button>
+                  </div>
+                  <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subGlobalIdx}" data-idx="${subGlobalIdx}" placeholder="Enter Activity Title Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+                </div>
+              </div>
+              <div>
+                <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Details</div>
+                <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
+                  <div style="display:flex;gap:.2rem;padding:.25rem .4rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                    <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bold (Ctrl+B)">B</button>
+                    <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Underline (Ctrl+U)">U</button>
+                    <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
+                  </div>
+                  <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subGlobalIdx}" data-idx="${subGlobalIdx}" rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(sub.name || '')}</textarea>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.25rem;flex-shrink:0;padding-top:.3rem">
+              <div style="flex-shrink:0">${subDiscBadge}</div>
+              <div style="position:relative">
+                <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#fca5a5;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#dc2626">⋮</button>
+                <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
+                  <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Discontinued Date</button>
+                  <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
+                  <button class="btn-mn-switch-status" data-completed-idx="${subCi}" data-from="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#059669">⭐ Change to Mastered</button>
+                </div>
               </div>
             </div>
           </div>`;
@@ -20299,18 +20399,43 @@ function renderTemplateManageContent(template) {
       </div>`;
       myMastSubs.forEach((sub, si) => {
         const subCi = masteredActs.indexOf(sub);
+        const subGlobalIdx = acts.indexOf(sub);
         const subMastBadge = sub.masteredOn ? `<span style="font-size:.71rem;display:inline-block;background:#d1fae5;color:#059669;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ ${fmtPeriodDate(sub.masteredOn)}</span>` : '';
-        const subMaintBadge = sub.maintained ? `<span style="font-size:.71rem;display:inline-block;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.08rem .4rem;border-radius:.3rem;border:1px solid #d1d5db">🆗</span> ` : '';
-        html += `<div style="display:flex;align-items:center;gap:.4rem;padding:.28rem .5rem .28rem 1.1rem;background:#ecfdf5;border:1px solid #a7f3d0;border-left:3px solid #059669;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem">
-          <span style="font-size:.75rem;color:#059669;font-weight:700;flex-shrink:0">${String.fromCharCode(97 + si)})</span>
-          <span style="flex:1;font-size:.83rem;color:#374151;font-weight:500">${escHtml(sub.title || sub.name || "")}</span>
-          <div style="display:flex;align-items:center;gap:.25rem;flex-shrink:0">${subMaintBadge}${subMastBadge}</div>
-          <div style="position:relative;flex-shrink:0">
-            <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="mastered" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#a7f3d0;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#059669">⋮</button>
-            <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
-              <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Mastered Date</button>
-              <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
-              <button class="btn-mn-switch-status" data-completed-idx="${subCi}" data-from="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#6b7280">🚩 Change to Discontinued</button>
+        const subMaintBadge = sub.maintained ? `<span style="font-size:.71rem;display:inline-block;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.08rem .4rem;border-radius:.3rem;border:1px solid #d1d5db">🆗</span>` : '';
+        html += `<div style="display:flex;align-items:flex-start;gap:.4rem;background:#ecfdf5;border:1px solid #a7f3d0;border-left:3px solid #059669;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem;padding:.35rem .5rem .35rem 0">
+          <span style="font-size:.8rem;color:#059669;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
+          <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
+            <div>
+              <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Title</div>
+              <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
+                <div style="display:flex;gap:.2rem;padding:.25rem .4rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                  <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${subGlobalIdx}" title="Bold (Ctrl+B)">B</button>
+                  <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${subGlobalIdx}" title="Underline (Ctrl+U)">U</button>
+                </div>
+                <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subGlobalIdx}" data-idx="${subGlobalIdx}" placeholder="Enter Activity Title Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+              </div>
+            </div>
+            <div>
+              <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Details</div>
+              <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
+                <div style="display:flex;gap:.2rem;padding:.25rem .4rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                  <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bold (Ctrl+B)">B</button>
+                  <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Underline (Ctrl+U)">U</button>
+                  <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
+                </div>
+                <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subGlobalIdx}" data-idx="${subGlobalIdx}" rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(sub.name || '')}</textarea>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.25rem;flex-shrink:0;padding-top:.3rem">
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.15rem">${subMaintBadge}${subMastBadge}</div>
+            <div style="position:relative">
+              <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="mastered" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#a7f3d0;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#059669">⋮</button>
+              <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
+                <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Mastered Date</button>
+                <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
+                <button class="btn-mn-switch-status" data-completed-idx="${subCi}" data-from="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#6b7280">🚩 Change to Discontinued</button>
+              </div>
             </div>
           </div>
         </div>`;
@@ -20325,17 +20450,42 @@ function renderTemplateManageContent(template) {
         html += `<div style="padding:.3rem .6rem;background:#f0fdf4;border:1px dashed #6ee7b7;border-radius:.35rem;margin-bottom:.1rem;font-size:.8rem;color:#059669;font-weight:600">From: ${escHtml(pk)}</div>`;
         subs.forEach((sub, si) => {
           const subCi = masteredActs.indexOf(sub);
+          const subGlobalIdx = acts.indexOf(sub);
           const subMastBadge = sub.masteredOn ? `<span style="font-size:.71rem;display:inline-block;background:#d1fae5;color:#059669;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ ${fmtPeriodDate(sub.masteredOn)}</span>` : '';
-          html += `<div style="display:flex;align-items:center;gap:.4rem;padding:.28rem .5rem .28rem 1.1rem;background:#ecfdf5;border:1px solid #a7f3d0;border-left:3px solid #059669;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem">
-            <span style="font-size:.75rem;color:#059669;font-weight:700;flex-shrink:0">${String.fromCharCode(97 + si)})</span>
-            <span style="flex:1;font-size:.83rem;color:#374151;font-weight:500">${escHtml(sub.title || sub.name || "")}</span>
-            <div style="flex-shrink:0">${subMastBadge}</div>
-            <div style="position:relative;flex-shrink:0">
-              <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="mastered" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#a7f3d0;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#059669">⋮</button>
-              <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
-                <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Mastered Date</button>
-                <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
-                <button class="btn-mn-switch-status" data-completed-idx="${subCi}" data-from="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#6b7280">🚩 Change to Discontinued</button>
+          html += `<div style="display:flex;align-items:flex-start;gap:.4rem;background:#ecfdf5;border:1px solid #a7f3d0;border-left:3px solid #059669;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem;padding:.35rem .5rem .35rem 0">
+            <span style="font-size:.8rem;color:#059669;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
+            <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
+              <div>
+                <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Title</div>
+                <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
+                  <div style="display:flex;gap:.2rem;padding:.25rem .4rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                    <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${subGlobalIdx}" title="Bold (Ctrl+B)">B</button>
+                    <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${subGlobalIdx}" title="Underline (Ctrl+U)">U</button>
+                  </div>
+                  <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subGlobalIdx}" data-idx="${subGlobalIdx}" placeholder="Enter Activity Title Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+                </div>
+              </div>
+              <div>
+                <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Details</div>
+                <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
+                  <div style="display:flex;gap:.2rem;padding:.25rem .4rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                    <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bold (Ctrl+B)">B</button>
+                    <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Underline (Ctrl+U)">U</button>
+                    <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
+                  </div>
+                  <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subGlobalIdx}" data-idx="${subGlobalIdx}" rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(sub.name || '')}</textarea>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.25rem;flex-shrink:0;padding-top:.3rem">
+              <div style="flex-shrink:0">${subMastBadge}</div>
+              <div style="position:relative">
+                <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="mastered" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#a7f3d0;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#059669">⋮</button>
+                <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
+                  <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Mastered Date</button>
+                  <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
+                  <button class="btn-mn-switch-status" data-completed-idx="${subCi}" data-from="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#6b7280">🚩 Change to Discontinued</button>
+                </div>
               </div>
             </div>
           </div>`;
@@ -20408,18 +20558,43 @@ function renderTemplateManageContent(template) {
       </div>`;
       myDiscSubs.forEach((sub, si) => {
         const subCi = discontinuedActs.indexOf(sub);
+        const subGlobalIdx = acts.indexOf(sub);
         const subDiscBadge = sub.discontinuedOn ? `<span style="font-size:.71rem;display:inline-block;background:#fee2e2;color:#dc2626;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 ${fmtPeriodDate(sub.discontinuedOn)}</span>` : '';
-        const subMaintBadge2 = sub.maintained ? `<span style="font-size:.71rem;display:inline-block;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.08rem .4rem;border-radius:.3rem;border:1px solid #d1d5db">🆗</span> ` : '';
-        html += `<div style="display:flex;align-items:center;gap:.4rem;padding:.28rem .5rem .28rem 1.1rem;background:#fff5f5;border:1px solid #fca5a5;border-left:3px solid #dc2626;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem">
-          <span style="font-size:.75rem;color:#dc2626;font-weight:700;flex-shrink:0">${String.fromCharCode(97 + si)})</span>
-          <span style="flex:1;font-size:.83rem;color:#374151;font-weight:500">${escHtml(sub.title || sub.name || "")}</span>
-          <div style="display:flex;align-items:center;gap:.25rem;flex-shrink:0">${subMaintBadge2}${subDiscBadge}</div>
-          <div style="position:relative;flex-shrink:0">
-            <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#fca5a5;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#dc2626">⋮</button>
-            <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
-              <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Discontinued Date</button>
-              <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
-              <button class="btn-mn-switch-status" data-completed-idx="${subCi}" data-from="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#059669">⭐ Change to Mastered</button>
+        const subMaintBadge2 = sub.maintained ? `<span style="font-size:.71rem;display:inline-block;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.08rem .4rem;border-radius:.3rem;border:1px solid #d1d5db">🆗</span>` : '';
+        html += `<div style="display:flex;align-items:flex-start;gap:.4rem;background:#fff5f5;border:1px solid #fca5a5;border-left:3px solid #dc2626;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem;padding:.35rem .5rem .35rem 0">
+          <span style="font-size:.8rem;color:#dc2626;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
+          <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
+            <div>
+              <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Title</div>
+              <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
+                <div style="display:flex;gap:.2rem;padding:.25rem .4rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                  <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${subGlobalIdx}" title="Bold (Ctrl+B)">B</button>
+                  <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${subGlobalIdx}" title="Underline (Ctrl+U)">U</button>
+                </div>
+                <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subGlobalIdx}" data-idx="${subGlobalIdx}" placeholder="Enter Activity Title Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+              </div>
+            </div>
+            <div>
+              <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Details</div>
+              <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
+                <div style="display:flex;gap:.2rem;padding:.25rem .4rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                  <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bold (Ctrl+B)">B</button>
+                  <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Underline (Ctrl+U)">U</button>
+                  <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
+                </div>
+                <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subGlobalIdx}" data-idx="${subGlobalIdx}" rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(sub.name || '')}</textarea>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.25rem;flex-shrink:0;padding-top:.3rem">
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.15rem">${subMaintBadge2}${subDiscBadge}</div>
+            <div style="position:relative">
+              <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#fca5a5;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#dc2626">⋮</button>
+              <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
+                <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Discontinued Date</button>
+                <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
+                <button class="btn-mn-switch-status" data-completed-idx="${subCi}" data-from="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#059669">⭐ Change to Mastered</button>
+              </div>
             </div>
           </div>
         </div>`;
@@ -20434,17 +20609,42 @@ function renderTemplateManageContent(template) {
         html += `<div style="padding:.3rem .6rem;background:#fff5f5;border:1px dashed #fca5a5;border-radius:.35rem;margin-bottom:.1rem;font-size:.8rem;color:#dc2626;font-weight:600">From: ${escHtml(pk)}</div>`;
         subs.forEach((sub, si) => {
           const subCi = discontinuedActs.indexOf(sub);
+          const subGlobalIdx = acts.indexOf(sub);
           const subDiscBadge = sub.discontinuedOn ? `<span style="font-size:.71rem;display:inline-block;background:#fee2e2;color:#dc2626;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 ${fmtPeriodDate(sub.discontinuedOn)}</span>` : '';
-          html += `<div style="display:flex;align-items:center;gap:.4rem;padding:.28rem .5rem .28rem 1.1rem;background:#fff5f5;border:1px solid #fca5a5;border-left:3px solid #dc2626;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem">
-            <span style="font-size:.75rem;color:#dc2626;font-weight:700;flex-shrink:0">${String.fromCharCode(97 + si)})</span>
-            <span style="flex:1;font-size:.83rem;color:#374151;font-weight:500">${escHtml(sub.title || sub.name || "")}</span>
-            <div style="flex-shrink:0">${subDiscBadge}</div>
-            <div style="position:relative;flex-shrink:0">
-              <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#fca5a5;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#dc2626">⋮</button>
-              <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
-                <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Discontinued Date</button>
-                <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
-                <button class="btn-mn-switch-status" data-completed-idx="${subCi}" data-from="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#059669">⭐ Change to Mastered</button>
+          html += `<div style="display:flex;align-items:flex-start;gap:.4rem;background:#fff5f5;border:1px solid #fca5a5;border-left:3px solid #dc2626;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem;padding:.35rem .5rem .35rem 0">
+            <span style="font-size:.8rem;color:#dc2626;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
+            <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
+              <div>
+                <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Title</div>
+                <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
+                  <div style="display:flex;gap:.2rem;padding:.25rem .4rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                    <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${subGlobalIdx}" title="Bold (Ctrl+B)">B</button>
+                    <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${subGlobalIdx}" title="Underline (Ctrl+U)">U</button>
+                  </div>
+                  <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subGlobalIdx}" data-idx="${subGlobalIdx}" placeholder="Enter Activity Title Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+                </div>
+              </div>
+              <div>
+                <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Details</div>
+                <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
+                  <div style="display:flex;gap:.2rem;padding:.25rem .4rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                    <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bold (Ctrl+B)">B</button>
+                    <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Underline (Ctrl+U)">U</button>
+                    <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
+                  </div>
+                  <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subGlobalIdx}" data-idx="${subGlobalIdx}" rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(sub.name || '')}</textarea>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.25rem;flex-shrink:0;padding-top:.3rem">
+              <div style="flex-shrink:0">${subDiscBadge}</div>
+              <div style="position:relative">
+                <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#fca5a5;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#dc2626">⋮</button>
+                <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
+                  <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Discontinued Date</button>
+                  <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
+                  <button class="btn-mn-switch-status" data-completed-idx="${subCi}" data-from="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#059669">⭐ Change to Mastered</button>
+                </div>
               </div>
             </div>
           </div>`;
