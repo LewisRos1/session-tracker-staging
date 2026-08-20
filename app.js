@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1797";
+const APP_VERSION = "1798";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6840,7 +6840,14 @@ function showStudentChoice(student) {
               return Object.values(s.remarks || {}).some(r => {
                 const act = (s.activities || {})[r.activityId];
                 if (!act || !curTgtNames.has(act.targetName)) return false;
-                return stripE(r.text).length > 0 || (r.trials || []).some(t => t !== null && t !== -1) || stripE(r.masteryNote).length > 0;
+                const rText = stripE(r.text);
+                const rNote = stripE(r.masteryNote);
+                const rTrials = (r.trials || []).some(t => t !== null && t !== -1);
+                const rOpt = r.optionScore !== undefined && r.optionScore !== null;
+                const rSel = (r.selectedOptions || []).length > 0;
+                const rScore = r.score !== undefined && r.score !== null && r.score !== "";
+                if (rText === "Maintain" && !rTrials && !rOpt && !rSel && !rScore && !rNote) return false;
+                return rText.length > 0 || rNote.length > 0 || rTrials || rOpt || rSel || rScore;
               });
             };
             const empties = sessions.filter(s => !hasData(s));
@@ -21743,13 +21750,16 @@ function showGroupChoice(group) {
             const _stripGC = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
             const grpHasData = s => {
               if (Object.values(s.fedcComments || {}).some(c => _stripGC(c).length > 0)) return true;
-              return Object.values(s.remarks || {}).some(r =>
-                _stripGC(r.text).length > 0 ||
-                (r.trials || []).some(t => t !== null && t !== -1) ||
-                _stripGC(r.masteryNote).length > 0 ||
-                (r.optionScore !== undefined && r.optionScore !== null) ||
-                (r.selectedOptions || []).length > 0
-              );
+              return Object.values(s.remarks || {}).some(r => {
+                const rText = _stripGC(r.text);
+                const rNote = _stripGC(r.masteryNote);
+                const rTrials = (r.trials || []).some(t => t !== null && t !== -1);
+                const rOpt = r.optionScore !== undefined && r.optionScore !== null;
+                const rSel = (r.selectedOptions || []).length > 0;
+                const rScore = r.score !== undefined && r.score !== null && r.score !== "";
+                if (rText === "Maintain" && !rTrials && !rOpt && !rSel && !rScore && !rNote) return false;
+                return rText.length > 0 || rNote.length > 0 || rTrials || rOpt || rSel || rScore;
+              });
             };
             const empties = sessions.filter(s => !grpHasData(s));
             empties.forEach(s => deleteSession(s.id).catch(() => {}));
