@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1790";
+const APP_VERSION = "1791";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -17646,6 +17646,13 @@ function renderTargetManageContent(student, target) {
           </div>`;
         }).join('');
         const maintainedRowSub = "";
+        const _parentStartDate = subActs.reduce((min, s) =>
+          (!min || (s.activeFrom && s.activeFrom < min)) ? s.activeFrom : min, null);
+        if (a.activeFrom !== _parentStartDate) {
+          a.activeFrom = _parentStartDate;
+          target.predefinedActivities = acts;
+          saveTarget().catch(() => {});
+        }
         html += `<div class="admin-list-item" data-idx="${idx}"${actItemStyle}>
           <span class="drag-handle">⠿</span>
           <div style="flex:1;display:flex;gap:.5rem;align-items:flex-start">
@@ -17656,7 +17663,7 @@ function renderTargetManageContent(student, target) {
               <div style="display:flex;gap:.6rem;align-items:flex-start">
                 <div style="flex-shrink:0">
                   <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Start Date</div>
-                  <button class="mn-act-start-btn" data-idx="${idx}" style="padding:.35rem .65rem;border:1.5px solid #d1d5db;border-radius:.4rem;background:#f0f9ff;cursor:pointer;font-size:.95rem;color:#374151;white-space:nowrap;display:block">📅 ${a.activeFrom ? fmtPeriodDate(a.activeFrom) : 'Set date'}</button>
+                  <button class="mn-parent-start-date-btn" data-idx="${idx}" style="padding:.35rem .65rem;border:1.5px solid #d1d5db;border-radius:.4rem;background:#f3f4f6;cursor:not-allowed;font-size:.95rem;color:#6b7280;white-space:nowrap;display:block" title="Automatically set from earliest sub-activity">📅 ${_parentStartDate ? fmtPeriodDate(_parentStartDate) : 'No dates set'}</button>
                 </div>
                 <div style="flex:1">
                   <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title</div>
@@ -19879,6 +19886,14 @@ function renderTargetManageContent(student, target) {
       _actStartPickerStudent = student;
       _actStartPickerTarget  = target;
       showActStartDatePicker();
+    });
+  });
+
+  // Parent activity start date — locked, shows alert when clicked
+  $("manage-modal-body").querySelectorAll(".mn-parent-start-date-btn").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      alert("This date is set automatically based on the earliest sub-activity start date. You cannot change it manually.");
     });
   });
 
