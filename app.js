@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1792";
+const APP_VERSION = "1793";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -19044,6 +19044,15 @@ function renderTargetManageContent(student, target) {
       };
 
       if (action === 'master' || action === 'discontinue') {
+        if (!pa.parentActivity) {
+          const paKey = pa._linkKey || pa.title || pa.name;
+          const subCount = paKey ? (target.predefinedActivities || []).filter(a => a.parentActivity === paKey).length : 0;
+          if (subCount > 0) {
+            const verb = action === 'master' ? 'mastered' : 'discontinued';
+            const ok = await showAutoDateConfirm({ message: `This parent activity has ${subCount} sub-activit${subCount === 1 ? 'y' : 'ies'}. If you ${action === 'master' ? 'master' : 'discontinue'} this activity, all its sub-activities will also be ${verb} on the same date. Do you want to proceed?`, confirmLabel: "Yes, proceed" });
+            if (!ok) return;
+          }
+        }
         const { date: latestDate, subName: latestSubName } = await _loadLatest();
         const rawMin = latestDate || todayDateStr();
         const minDate = (pa.maintainedAt && pa.maintainedAt > rawMin) ? pa.maintainedAt : rawMin;
