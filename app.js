@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1786";
+const APP_VERSION = "1787";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8691,7 +8691,8 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
 
   // Inactive predefined activities section
   const inactivePas = allPas.filter(pa =>
-    !isActivityActive(pa, sessionDateForFilter) && !pa.isCompleted && !pa.isArchived && !pa.isStopped
+    !isActivityActive(pa, sessionDateForFilter) && !pa.isCompleted && !pa.isStopped &&
+    (!pa.isArchived || pa.discontinuedOn)
   );
   if (inactivePas.length > 0) {
     // Top-level inactive items (not sub-activities)
@@ -17355,6 +17356,13 @@ function renderTargetManageContent(student, target) {
     (_groupForTargetEdit ? saveGroup(_groupForTargetEdit) : saveStudent(student)).catch(() => {});
   }
 
+  // Self-heal: clear isArchived from discontinued activities (set by old bug in btn-mn-switch-status)
+  {
+    let _archFixed = false;
+    acts.forEach(a => { if (a.isArchived && a.discontinuedOn) { delete a.isArchived; _archFixed = true; } });
+    if (_archFixed) (_groupForTargetEdit ? saveGroup(_groupForTargetEdit) : saveStudent(student)).catch(() => {});
+  }
+
   const masteredActs     = acts.filter(a => !a.isHeading && !a.isNote && !a.isExportNote && !a.isMaintain && !a.isMaintainHeading && (a.masteredOn || a.isCompleted));
   const discontinuedActs = acts.filter(a => !a.isHeading && !a.isNote && !a.isExportNote && !a.isMaintain && !a.isMaintainHeading && (a.discontinuedOn || a.isArchived || a.isStopped));
   // Use the currently-loaded session's date (if any) so that when the user
@@ -20179,6 +20187,13 @@ function renderTemplateManageContent(template) {
     saveTemplate(template).catch(() => {});
   }
 
+  // Self-heal: clear isArchived from discontinued activities (set by old bug in btn-mn-switch-status)
+  {
+    let _archFixed2 = false;
+    acts.forEach(a => { if (a.isArchived && a.discontinuedOn) { delete a.isArchived; _archFixed2 = true; } });
+    if (_archFixed2) saveTemplate(template).catch(() => {});
+  }
+
   const masteredActs     = acts.filter(a => !a.isHeading && !a.isNote && !a.isExportNote && !a.isMaintain && !a.isMaintainHeading && (a.masteredOn || a.isCompleted));
   const discontinuedActs = acts.filter(a => !a.isHeading && !a.isNote && !a.isExportNote && !a.isMaintain && !a.isMaintainHeading && (a.discontinuedOn || a.isArchived || a.isStopped));
 
@@ -22311,7 +22326,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
 
   // Only show in the inactive section if the activity is actually inactive on this session's date
   const grpInactivePas = (target.predefinedActivities || []).filter(pa =>
-    !pa.isCompleted && !pa.isArchived && !pa.isStopped &&
+    !pa.isCompleted && !pa.isStopped && (!pa.isArchived || pa.discontinuedOn) &&
     (pa.masteredOn || pa.discontinuedOn || pa.inactiveReason) &&
     !isActivityActive(pa, data.date)
   );
