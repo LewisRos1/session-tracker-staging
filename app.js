@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1783";
+const APP_VERSION = "1784";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10455,7 +10455,7 @@ async function autoFillMaintainedRemarks(student, sessionId, selectedTargetName 
     const bucket = (selectedTargetName === null || target.name === selectedTargetName)
       ? currentFill : bgFill;
     for (const pa of (target.predefinedActivities || [])) {
-      if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || (!pa.name && !pa.title)) continue;
+      if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || (!pa.name && !pa.title) || pa.parentActivity) continue;
       // Non-Notes-Only activities (checkbox/MC/manual score) show their real UI via
       // autoFillStructuredRemarks; only Notes-Only gets a "Maintain" text remark here.
       if (getActivityInlineOptions(pa) || pa.optionsMulti || pa.manualScore) continue;
@@ -12670,7 +12670,7 @@ async function autoFillViewMaintainedRemarks(student, sessionId, data) {
   let count = 0;
   for (const target of (student.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
-      if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || (!pa.name && !pa.title)) continue;
+      if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || (!pa.name && !pa.title) || pa.parentActivity) continue;
       // Non-Notes-Only activities handled by autoFillViewStructuredRemarks
       if (getActivityInlineOptions(pa) || pa.optionsMulti || pa.manualScore) continue;
       // Only auto-fill "Maintain" for sessions on or after the maintained date
@@ -12870,7 +12870,7 @@ async function autoFillViewGroupMaintainedRemarks(group, sessionId, data) {
   let count = 0;
   for (const target of (group.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
-      if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || (!pa.name && !pa.title)) continue;
+      if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || (!pa.name && !pa.title) || pa.parentActivity) continue;
       // Non-Notes-Only activities handled by autoFillViewGroupStructuredRemarks
       if (getActivityInlineOptions(pa) || pa.optionsMulti || pa.manualScore) continue;
       const _maintAt = pa.maintainedAt || "2026-01-01";
@@ -17754,19 +17754,25 @@ function renderTargetManageContent(student, target) {
   html += `</div>`;
 
   if (masteredActs.length > 0) {
+    const _mastTopLevel = masteredActs.filter(a => !a.parentActivity);
+    const _mastSubs     = masteredActs.filter(a => !!a.parentActivity);
+    const _mastSubParentKeys = new Set(_mastSubs.map(s => s.parentActivity));
+    const _mastTopLevelKeys  = new Set(_mastTopLevel.map(a => a.title || a.name));
+    const _mastCount = _mastTopLevel.filter(a => !_mastSubParentKeys.has(a.title || a.name)).length + _mastSubs.length;
     html += `<div style="margin-top:1.25rem">
       <button class="mn-collapsed-toggle" data-section="mastered" style="display:flex;align-items:center;gap:.5rem;background:none;border:none;cursor:pointer;width:100%;padding:.25rem 0;font-size:.85rem;font-weight:700;color:#374151">
         <span class="mn-toggle-arrow" style="font-size:.75rem">▶</span>
-        Mastered (${masteredActs.length})
+        Mastered (${_mastCount})
       </button>
       <div id="mn-mastered-section" style="display:none">`;
-    masteredActs.forEach((a, ci) => {
+    _mastTopLevel.forEach(a => {
+      const ci = masteredActs.indexOf(a);
       const globalIdx = acts.indexOf(a);
       const _mnMastBadge = a.masteredOn ? `<span style="font-size:.71rem;display:inline-block;background:#d1fae5;color:#059669;font-weight:600;padding:.1rem .5rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ Mastered ${fmtPeriodDate(a.masteredOn)}</span>` : '';
       const _mnMaintBadge = a.maintained ? `<span style="font-size:.71rem;display:inline-block;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.1rem .5rem;border-radius:.3rem;border:1px solid #d1d5db">🆗 Maintained${a.maintainedAt ? ` ${fmtPeriodDate(a.maintainedAt)}` : ''}</span>` : '';
       const _mnCreatedLabel = a.activeFrom ? `Created ${fmtPeriodDate(a.activeFrom)}` : 'Created';
-      const subActs = acts.filter(a2 => a2.parentActivity === (a.title || a.name) && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
-      html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
+      const myMastSubs = _mastSubs.filter(s => s.parentActivity === (a.title || a.name));
+      html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:${myMastSubs.length ? '.1rem' : '.35rem'}">
         <div style="flex:1;display:flex;flex-direction:column;gap:.4rem">
           <div>
             <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Title</div>
@@ -17807,31 +17813,75 @@ function renderTargetManageContent(student, target) {
           </div>
         </div>
       </div>`;
-      subActs.forEach((sub, si) => {
-        html += `<div style="display:flex;align-items:center;gap:.4rem;padding:.25rem .5rem .25rem 1.25rem;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem">
-          <span style="font-size:.75rem;color:#059669;flex-shrink:0">${String.fromCharCode(97 + si)})</span>
-          <span style="flex:1;font-size:.8rem;color:#374151">${escHtml(sub.name || "")}</span>
+      myMastSubs.forEach((sub, si) => {
+        const subCi = masteredActs.indexOf(sub);
+        const subMastBadge = sub.masteredOn ? `<span style="font-size:.71rem;display:inline-block;background:#d1fae5;color:#059669;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ ${fmtPeriodDate(sub.masteredOn)}</span>` : '';
+        const subMaintBadge = sub.maintained ? `<span style="font-size:.71rem;display:inline-block;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.08rem .4rem;border-radius:.3rem;border:1px solid #d1d5db">🆗</span> ` : '';
+        html += `<div style="display:flex;align-items:center;gap:.4rem;padding:.28rem .5rem .28rem 1.1rem;background:#ecfdf5;border:1px solid #a7f3d0;border-left:3px solid #059669;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem">
+          <span style="font-size:.75rem;color:#059669;font-weight:700;flex-shrink:0">${String.fromCharCode(97 + si)})</span>
+          <span style="flex:1;font-size:.83rem;color:#374151;font-weight:500">${escHtml(sub.title || sub.name || "")}</span>
+          <div style="display:flex;align-items:center;gap:.25rem;flex-shrink:0">${subMaintBadge}${subMastBadge}</div>
+          <div style="position:relative;flex-shrink:0">
+            <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="mastered" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#a7f3d0;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#059669">⋮</button>
+            <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
+              <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Mastered Date</button>
+              <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
+              <button class="btn-mn-switch-status" data-completed-idx="${subCi}" data-from="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#6b7280">🚩 Change to Discontinued</button>
+            </div>
+          </div>
         </div>`;
       });
-      if (subActs.length) html += `<div style="margin-bottom:.35rem"></div>`;
+      if (myMastSubs.length) html += `<div style="margin-bottom:.35rem"></div>`;
     });
+    const _orphanMastSubs = _mastSubs.filter(s => !_mastTopLevelKeys.has(s.parentActivity));
+    if (_orphanMastSubs.length > 0) {
+      const _omGroups = {};
+      for (const s of _orphanMastSubs) { const pk = s.parentActivity; if (!_omGroups[pk]) _omGroups[pk] = []; _omGroups[pk].push(s); }
+      Object.entries(_omGroups).forEach(([pk, subs]) => {
+        html += `<div style="padding:.3rem .6rem;background:#f0fdf4;border:1px dashed #6ee7b7;border-radius:.35rem;margin-bottom:.1rem;font-size:.8rem;color:#059669;font-weight:600">From: ${escHtml(pk)}</div>`;
+        subs.forEach((sub, si) => {
+          const subCi = masteredActs.indexOf(sub);
+          const subMastBadge = sub.masteredOn ? `<span style="font-size:.71rem;display:inline-block;background:#d1fae5;color:#059669;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ ${fmtPeriodDate(sub.masteredOn)}</span>` : '';
+          html += `<div style="display:flex;align-items:center;gap:.4rem;padding:.28rem .5rem .28rem 1.1rem;background:#ecfdf5;border:1px solid #a7f3d0;border-left:3px solid #059669;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem">
+            <span style="font-size:.75rem;color:#059669;font-weight:700;flex-shrink:0">${String.fromCharCode(97 + si)})</span>
+            <span style="flex:1;font-size:.83rem;color:#374151;font-weight:500">${escHtml(sub.title || sub.name || "")}</span>
+            <div style="flex-shrink:0">${subMastBadge}</div>
+            <div style="position:relative;flex-shrink:0">
+              <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="mastered" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#a7f3d0;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#059669">⋮</button>
+              <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
+                <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Mastered Date</button>
+                <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
+                <button class="btn-mn-switch-status" data-completed-idx="${subCi}" data-from="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#6b7280">🚩 Change to Discontinued</button>
+              </div>
+            </div>
+          </div>`;
+        });
+        html += `<div style="margin-bottom:.35rem"></div>`;
+      });
+    }
     html += `</div></div>`;
   }
 
   if (discontinuedActs.length > 0) {
+    const _discTopLevel = discontinuedActs.filter(a => !a.parentActivity);
+    const _discSubs     = discontinuedActs.filter(a => !!a.parentActivity);
+    const _discSubParentKeys = new Set(_discSubs.map(s => s.parentActivity));
+    const _discTopLevelKeys  = new Set(_discTopLevel.map(a => a.title || a.name));
+    const _discCount = _discTopLevel.filter(a => !_discSubParentKeys.has(a.title || a.name)).length + _discSubs.length;
     html += `<div style="margin-top:.5rem">
       <button class="mn-collapsed-toggle" data-section="discontinued" style="display:flex;align-items:center;gap:.5rem;background:none;border:none;cursor:pointer;width:100%;padding:.25rem 0;font-size:.85rem;font-weight:700;color:#374151">
         <span class="mn-toggle-arrow" style="font-size:.75rem">▶</span>
-        Discontinued (${discontinuedActs.length})
+        Discontinued (${_discCount})
       </button>
       <div id="mn-discontinued-section" style="display:none">`;
-    discontinuedActs.forEach((a, ci) => {
+    _discTopLevel.forEach(a => {
+      const ci = discontinuedActs.indexOf(a);
       const globalIdx = acts.indexOf(a);
       const _mnDiscBadge = a.discontinuedOn ? `<span style="font-size:.71rem;display:inline-block;background:#fee2e2;color:#dc2626;font-weight:600;padding:.1rem .5rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 Discontinued ${fmtPeriodDate(a.discontinuedOn)}</span>` : '';
       const _mnMaintBadge2 = a.maintained ? `<span style="font-size:.71rem;display:inline-block;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.1rem .5rem;border-radius:.3rem;border:1px solid #d1d5db">🆗 Maintained${a.maintainedAt ? ` ${fmtPeriodDate(a.maintainedAt)}` : ''}</span>` : '';
       const _mnCreatedLabel2 = a.activeFrom ? `Created ${fmtPeriodDate(a.activeFrom)}` : 'Created';
-      const subActs = acts.filter(a2 => a2.parentActivity === (a.title || a.name) && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
-      html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
+      const myDiscSubs = _discSubs.filter(s => s.parentActivity === (a.title || a.name));
+      html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:${myDiscSubs.length ? '.1rem' : '.35rem'}">
         <div style="flex:1;display:flex;flex-direction:column;gap:.4rem">
           <div>
             <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Title</div>
@@ -17872,14 +17922,52 @@ function renderTargetManageContent(student, target) {
           </div>
         </div>
       </div>`;
-      subActs.forEach((sub, si) => {
-        html += `<div style="display:flex;align-items:center;gap:.4rem;padding:.25rem .5rem .25rem 1.25rem;background:#f9fafb;border:1px solid #f3f4f6;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem">
-          <span style="font-size:.75rem;color:#9ca3af;flex-shrink:0">${String.fromCharCode(97 + si)})</span>
-          <span style="flex:1;font-size:.8rem;color:#6b7280">${escHtml(sub.name || "")}</span>
+      myDiscSubs.forEach((sub, si) => {
+        const subCi = discontinuedActs.indexOf(sub);
+        const subDiscBadge = sub.discontinuedOn ? `<span style="font-size:.71rem;display:inline-block;background:#fee2e2;color:#dc2626;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 ${fmtPeriodDate(sub.discontinuedOn)}</span>` : '';
+        const subMaintBadge2 = sub.maintained ? `<span style="font-size:.71rem;display:inline-block;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.08rem .4rem;border-radius:.3rem;border:1px solid #d1d5db">🆗</span> ` : '';
+        html += `<div style="display:flex;align-items:center;gap:.4rem;padding:.28rem .5rem .28rem 1.1rem;background:#fff5f5;border:1px solid #fca5a5;border-left:3px solid #dc2626;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem">
+          <span style="font-size:.75rem;color:#dc2626;font-weight:700;flex-shrink:0">${String.fromCharCode(97 + si)})</span>
+          <span style="flex:1;font-size:.83rem;color:#374151;font-weight:500">${escHtml(sub.title || sub.name || "")}</span>
+          <div style="display:flex;align-items:center;gap:.25rem;flex-shrink:0">${subMaintBadge2}${subDiscBadge}</div>
+          <div style="position:relative;flex-shrink:0">
+            <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#fca5a5;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#dc2626">⋮</button>
+            <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
+              <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Discontinued Date</button>
+              <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
+              <button class="btn-mn-switch-status" data-completed-idx="${subCi}" data-from="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#059669">⭐ Change to Mastered</button>
+            </div>
+          </div>
         </div>`;
       });
-      if (subActs.length) html += `<div style="margin-bottom:.35rem"></div>`;
+      if (myDiscSubs.length) html += `<div style="margin-bottom:.35rem"></div>`;
     });
+    const _orphanDiscSubs = _discSubs.filter(s => !_discTopLevelKeys.has(s.parentActivity));
+    if (_orphanDiscSubs.length > 0) {
+      const _odGroups = {};
+      for (const s of _orphanDiscSubs) { const pk = s.parentActivity; if (!_odGroups[pk]) _odGroups[pk] = []; _odGroups[pk].push(s); }
+      Object.entries(_odGroups).forEach(([pk, subs]) => {
+        html += `<div style="padding:.3rem .6rem;background:#fff5f5;border:1px dashed #fca5a5;border-radius:.35rem;margin-bottom:.1rem;font-size:.8rem;color:#dc2626;font-weight:600">From: ${escHtml(pk)}</div>`;
+        subs.forEach((sub, si) => {
+          const subCi = discontinuedActs.indexOf(sub);
+          const subDiscBadge = sub.discontinuedOn ? `<span style="font-size:.71rem;display:inline-block;background:#fee2e2;color:#dc2626;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 ${fmtPeriodDate(sub.discontinuedOn)}</span>` : '';
+          html += `<div style="display:flex;align-items:center;gap:.4rem;padding:.28rem .5rem .28rem 1.1rem;background:#fff5f5;border:1px solid #fca5a5;border-left:3px solid #dc2626;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem">
+            <span style="font-size:.75rem;color:#dc2626;font-weight:700;flex-shrink:0">${String.fromCharCode(97 + si)})</span>
+            <span style="flex:1;font-size:.83rem;color:#374151;font-weight:500">${escHtml(sub.title || sub.name || "")}</span>
+            <div style="flex-shrink:0">${subDiscBadge}</div>
+            <div style="position:relative;flex-shrink:0">
+              <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#fca5a5;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#dc2626">⋮</button>
+              <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
+                <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Discontinued Date</button>
+                <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
+                <button class="btn-mn-switch-status" data-completed-idx="${subCi}" data-from="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#059669">⭐ Change to Mastered</button>
+              </div>
+            </div>
+          </div>`;
+        });
+        html += `<div style="margin-bottom:.35rem"></div>`;
+      });
+    }
     html += `</div></div>`;
   }
 
@@ -18934,8 +19022,8 @@ function renderTargetManageContent(student, target) {
         const pa = masteredActs[ci];
         if (!pa) return;
         const date = pa.masteredOn || new Date().toISOString().split("T")[0];
-        delete pa.masteredOn; delete pa.isCompleted;
-        pa.discontinuedOn = date; pa.isArchived = true;
+        delete pa.masteredOn; delete pa.isCompleted; delete pa.inactiveReason;
+        pa.discontinuedOn = date;
       } else {
         const pa = discontinuedActs[ci];
         if (!pa) return;
@@ -20150,19 +20238,25 @@ function renderTemplateManageContent(template) {
   html += `</div>`;
 
   if (masteredActs.length > 0) {
+    const _mastTopLevel = masteredActs.filter(a => !a.parentActivity);
+    const _mastSubs     = masteredActs.filter(a => !!a.parentActivity);
+    const _mastSubParentKeys = new Set(_mastSubs.map(s => s.parentActivity));
+    const _mastTopLevelKeys  = new Set(_mastTopLevel.map(a => a.title || a.name));
+    const _mastCount = _mastTopLevel.filter(a => !_mastSubParentKeys.has(a.title || a.name)).length + _mastSubs.length;
     html += `<div style="margin-top:1.25rem">
       <button class="mn-collapsed-toggle" data-section="mastered" style="display:flex;align-items:center;gap:.5rem;background:none;border:none;cursor:pointer;width:100%;padding:.25rem 0;font-size:.85rem;font-weight:700;color:#374151">
         <span class="mn-toggle-arrow" style="font-size:.75rem">▶</span>
-        Mastered (${masteredActs.length})
+        Mastered (${_mastCount})
       </button>
       <div id="mn-mastered-section" style="display:none">`;
-    masteredActs.forEach((a, ci) => {
+    _mastTopLevel.forEach(a => {
+      const ci = masteredActs.indexOf(a);
       const globalIdx = acts.indexOf(a);
       const _mnMastBadge = a.masteredOn ? `<span style="font-size:.71rem;display:inline-block;background:#d1fae5;color:#059669;font-weight:600;padding:.1rem .5rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ Mastered ${fmtPeriodDate(a.masteredOn)}</span>` : '';
       const _mnMaintBadge = a.maintained ? `<span style="font-size:.71rem;display:inline-block;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.1rem .5rem;border-radius:.3rem;border:1px solid #d1d5db">🆗 Maintained${a.maintainedAt ? ` ${fmtPeriodDate(a.maintainedAt)}` : ''}</span>` : '';
       const _mnCreatedLabel = a.activeFrom ? `Created ${fmtPeriodDate(a.activeFrom)}` : 'Created';
-      const subActs = acts.filter(a2 => a2.parentActivity === (a.title || a.name) && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
-      html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
+      const myMastSubs = _mastSubs.filter(s => s.parentActivity === (a.title || a.name));
+      html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:${myMastSubs.length ? '.1rem' : '.35rem'}">
         <div style="flex:1;display:flex;flex-direction:column;gap:.4rem">
           <div>
             <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Title</div>
@@ -20203,31 +20297,75 @@ function renderTemplateManageContent(template) {
           </div>
         </div>
       </div>`;
-      subActs.forEach((sub, si) => {
-        html += `<div style="display:flex;align-items:center;gap:.4rem;padding:.25rem .5rem .25rem 1.25rem;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem">
-          <span style="font-size:.75rem;color:#059669;flex-shrink:0">${String.fromCharCode(97 + si)})</span>
-          <span style="flex:1;font-size:.8rem;color:#374151">${escHtml(sub.name || "")}</span>
+      myMastSubs.forEach((sub, si) => {
+        const subCi = masteredActs.indexOf(sub);
+        const subMastBadge = sub.masteredOn ? `<span style="font-size:.71rem;display:inline-block;background:#d1fae5;color:#059669;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ ${fmtPeriodDate(sub.masteredOn)}</span>` : '';
+        const subMaintBadge = sub.maintained ? `<span style="font-size:.71rem;display:inline-block;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.08rem .4rem;border-radius:.3rem;border:1px solid #d1d5db">🆗</span> ` : '';
+        html += `<div style="display:flex;align-items:center;gap:.4rem;padding:.28rem .5rem .28rem 1.1rem;background:#ecfdf5;border:1px solid #a7f3d0;border-left:3px solid #059669;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem">
+          <span style="font-size:.75rem;color:#059669;font-weight:700;flex-shrink:0">${String.fromCharCode(97 + si)})</span>
+          <span style="flex:1;font-size:.83rem;color:#374151;font-weight:500">${escHtml(sub.title || sub.name || "")}</span>
+          <div style="display:flex;align-items:center;gap:.25rem;flex-shrink:0">${subMaintBadge}${subMastBadge}</div>
+          <div style="position:relative;flex-shrink:0">
+            <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="mastered" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#a7f3d0;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#059669">⋮</button>
+            <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
+              <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Mastered Date</button>
+              <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
+              <button class="btn-mn-switch-status" data-completed-idx="${subCi}" data-from="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#6b7280">🚩 Change to Discontinued</button>
+            </div>
+          </div>
         </div>`;
       });
-      if (subActs.length) html += `<div style="margin-bottom:.35rem"></div>`;
+      if (myMastSubs.length) html += `<div style="margin-bottom:.35rem"></div>`;
     });
+    const _orphanMastSubs = _mastSubs.filter(s => !_mastTopLevelKeys.has(s.parentActivity));
+    if (_orphanMastSubs.length > 0) {
+      const _omGroups = {};
+      for (const s of _orphanMastSubs) { const pk = s.parentActivity; if (!_omGroups[pk]) _omGroups[pk] = []; _omGroups[pk].push(s); }
+      Object.entries(_omGroups).forEach(([pk, subs]) => {
+        html += `<div style="padding:.3rem .6rem;background:#f0fdf4;border:1px dashed #6ee7b7;border-radius:.35rem;margin-bottom:.1rem;font-size:.8rem;color:#059669;font-weight:600">From: ${escHtml(pk)}</div>`;
+        subs.forEach((sub, si) => {
+          const subCi = masteredActs.indexOf(sub);
+          const subMastBadge = sub.masteredOn ? `<span style="font-size:.71rem;display:inline-block;background:#d1fae5;color:#059669;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ ${fmtPeriodDate(sub.masteredOn)}</span>` : '';
+          html += `<div style="display:flex;align-items:center;gap:.4rem;padding:.28rem .5rem .28rem 1.1rem;background:#ecfdf5;border:1px solid #a7f3d0;border-left:3px solid #059669;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem">
+            <span style="font-size:.75rem;color:#059669;font-weight:700;flex-shrink:0">${String.fromCharCode(97 + si)})</span>
+            <span style="flex:1;font-size:.83rem;color:#374151;font-weight:500">${escHtml(sub.title || sub.name || "")}</span>
+            <div style="flex-shrink:0">${subMastBadge}</div>
+            <div style="position:relative;flex-shrink:0">
+              <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="mastered" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#a7f3d0;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#059669">⋮</button>
+              <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
+                <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Mastered Date</button>
+                <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
+                <button class="btn-mn-switch-status" data-completed-idx="${subCi}" data-from="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#6b7280">🚩 Change to Discontinued</button>
+              </div>
+            </div>
+          </div>`;
+        });
+        html += `<div style="margin-bottom:.35rem"></div>`;
+      });
+    }
     html += `</div></div>`;
   }
 
   if (discontinuedActs.length > 0) {
+    const _discTopLevel = discontinuedActs.filter(a => !a.parentActivity);
+    const _discSubs     = discontinuedActs.filter(a => !!a.parentActivity);
+    const _discSubParentKeys = new Set(_discSubs.map(s => s.parentActivity));
+    const _discTopLevelKeys  = new Set(_discTopLevel.map(a => a.title || a.name));
+    const _discCount = _discTopLevel.filter(a => !_discSubParentKeys.has(a.title || a.name)).length + _discSubs.length;
     html += `<div style="margin-top:.5rem">
       <button class="mn-collapsed-toggle" data-section="discontinued" style="display:flex;align-items:center;gap:.5rem;background:none;border:none;cursor:pointer;width:100%;padding:.25rem 0;font-size:.85rem;font-weight:700;color:#374151">
         <span class="mn-toggle-arrow" style="font-size:.75rem">▶</span>
-        Discontinued (${discontinuedActs.length})
+        Discontinued (${_discCount})
       </button>
       <div id="mn-discontinued-section" style="display:none">`;
-    discontinuedActs.forEach((a, ci) => {
+    _discTopLevel.forEach(a => {
+      const ci = discontinuedActs.indexOf(a);
       const globalIdx = acts.indexOf(a);
       const _mnDiscBadge = a.discontinuedOn ? `<span style="font-size:.71rem;display:inline-block;background:#fee2e2;color:#dc2626;font-weight:600;padding:.1rem .5rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 Discontinued ${fmtPeriodDate(a.discontinuedOn)}</span>` : '';
       const _mnMaintBadge2 = a.maintained ? `<span style="font-size:.71rem;display:inline-block;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.1rem .5rem;border-radius:.3rem;border:1px solid #d1d5db">🆗 Maintained${a.maintainedAt ? ` ${fmtPeriodDate(a.maintainedAt)}` : ''}</span>` : '';
       const _mnCreatedLabel2 = a.activeFrom ? `Created ${fmtPeriodDate(a.activeFrom)}` : 'Created';
-      const subActs = acts.filter(a2 => a2.parentActivity === (a.title || a.name) && !a2.masteredOn && !a2.discontinuedOn && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
-      html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:${subActs.length ? '.1rem' : '.35rem'}">
+      const myDiscSubs = _discSubs.filter(s => s.parentActivity === (a.title || a.name));
+      html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:${myDiscSubs.length ? '.1rem' : '.35rem'}">
         <div style="flex:1;display:flex;flex-direction:column;gap:.4rem">
           <div>
             <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Title</div>
@@ -20268,14 +20406,52 @@ function renderTemplateManageContent(template) {
           </div>
         </div>
       </div>`;
-      subActs.forEach((sub, si) => {
-        html += `<div style="display:flex;align-items:center;gap:.4rem;padding:.25rem .5rem .25rem 1.25rem;background:#f9fafb;border:1px solid #f3f4f6;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem">
-          <span style="font-size:.75rem;color:#9ca3af;flex-shrink:0">${String.fromCharCode(97 + si)})</span>
-          <span style="flex:1;font-size:.8rem;color:#6b7280">${escHtml(sub.name || "")}</span>
+      myDiscSubs.forEach((sub, si) => {
+        const subCi = discontinuedActs.indexOf(sub);
+        const subDiscBadge = sub.discontinuedOn ? `<span style="font-size:.71rem;display:inline-block;background:#fee2e2;color:#dc2626;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 ${fmtPeriodDate(sub.discontinuedOn)}</span>` : '';
+        const subMaintBadge2 = sub.maintained ? `<span style="font-size:.71rem;display:inline-block;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.08rem .4rem;border-radius:.3rem;border:1px solid #d1d5db">🆗</span> ` : '';
+        html += `<div style="display:flex;align-items:center;gap:.4rem;padding:.28rem .5rem .28rem 1.1rem;background:#fff5f5;border:1px solid #fca5a5;border-left:3px solid #dc2626;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem">
+          <span style="font-size:.75rem;color:#dc2626;font-weight:700;flex-shrink:0">${String.fromCharCode(97 + si)})</span>
+          <span style="flex:1;font-size:.83rem;color:#374151;font-weight:500">${escHtml(sub.title || sub.name || "")}</span>
+          <div style="display:flex;align-items:center;gap:.25rem;flex-shrink:0">${subMaintBadge2}${subDiscBadge}</div>
+          <div style="position:relative;flex-shrink:0">
+            <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#fca5a5;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#dc2626">⋮</button>
+            <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
+              <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Discontinued Date</button>
+              <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
+              <button class="btn-mn-switch-status" data-completed-idx="${subCi}" data-from="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#059669">⭐ Change to Mastered</button>
+            </div>
+          </div>
         </div>`;
       });
-      if (subActs.length) html += `<div style="margin-bottom:.35rem"></div>`;
+      if (myDiscSubs.length) html += `<div style="margin-bottom:.35rem"></div>`;
     });
+    const _orphanDiscSubs = _discSubs.filter(s => !_discTopLevelKeys.has(s.parentActivity));
+    if (_orphanDiscSubs.length > 0) {
+      const _odGroups = {};
+      for (const s of _orphanDiscSubs) { const pk = s.parentActivity; if (!_odGroups[pk]) _odGroups[pk] = []; _odGroups[pk].push(s); }
+      Object.entries(_odGroups).forEach(([pk, subs]) => {
+        html += `<div style="padding:.3rem .6rem;background:#fff5f5;border:1px dashed #fca5a5;border-radius:.35rem;margin-bottom:.1rem;font-size:.8rem;color:#dc2626;font-weight:600">From: ${escHtml(pk)}</div>`;
+        subs.forEach((sub, si) => {
+          const subCi = discontinuedActs.indexOf(sub);
+          const subDiscBadge = sub.discontinuedOn ? `<span style="font-size:.71rem;display:inline-block;background:#fee2e2;color:#dc2626;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 ${fmtPeriodDate(sub.discontinuedOn)}</span>` : '';
+          html += `<div style="display:flex;align-items:center;gap:.4rem;padding:.28rem .5rem .28rem 1.1rem;background:#fff5f5;border:1px solid #fca5a5;border-left:3px solid #dc2626;border-radius:.35rem;margin-bottom:.1rem;margin-left:.75rem">
+            <span style="font-size:.75rem;color:#dc2626;font-weight:700;flex-shrink:0">${String.fromCharCode(97 + si)})</span>
+            <span style="flex:1;font-size:.83rem;color:#374151;font-weight:500">${escHtml(sub.title || sub.name || "")}</span>
+            <div style="flex-shrink:0">${subDiscBadge}</div>
+            <div style="position:relative;flex-shrink:0">
+              <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#fca5a5;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#dc2626">⋮</button>
+              <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
+                <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Discontinued Date</button>
+                <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
+                <button class="btn-mn-switch-status" data-completed-idx="${subCi}" data-from="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#059669">⭐ Change to Mastered</button>
+              </div>
+            </div>
+          </div>`;
+        });
+        html += `<div style="margin-bottom:.35rem"></div>`;
+      });
+    }
     html += `</div></div>`;
   }
 
@@ -20852,8 +21028,8 @@ function renderTemplateManageContent(template) {
         const pa = masteredActs[ci];
         if (!pa) return;
         const date = pa.masteredOn || new Date().toISOString().split("T")[0];
-        delete pa.masteredOn; delete pa.isCompleted;
-        pa.discontinuedOn = date; pa.isArchived = true;
+        delete pa.masteredOn; delete pa.isCompleted; delete pa.inactiveReason;
+        pa.discontinuedOn = date;
       } else {
         const pa = discontinuedActs[ci];
         if (!pa) return;
@@ -21543,7 +21719,7 @@ async function autoFillGroupMaintainedRemarks(group, sessionId, attendees) {
   let count = 0;
   for (const target of (group.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
-      if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || (!pa.name && !pa.title)) continue;
+      if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || (!pa.name && !pa.title) || pa.parentActivity) continue;
       // Non-Notes-Only activities handled by autoFillGroupStructuredRemarks
       if (getActivityInlineOptions(pa) || pa.optionsMulti || pa.manualScore) continue;
       // Only auto-fill "Maintain" for sessions on or after the maintained date
