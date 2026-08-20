@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1776";
+const APP_VERSION = "1777";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3333,12 +3333,15 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
           const sessActId = sessAct.id || sessActKey;
           const remarks = Object.values(filteredSess.remarks || {})
             .filter(r => r.activityId === sessActId)
-            .filter(r => r.text || (r.trials || []).length > 0);
+            .filter(r => r.text || (r.trials || []).length > 0 || hyrStripHtml(r.masteryNote || "").trim());
           for (const rem of remarks) {
             const trials = (rem.trials || []).filter(t => t !== -1);
             if (rem.optionScore !== undefined) trials.push(rem.optionScore);
             const avg = trials.length > 0 ? Math.round(trials.reduce((a, b) => a + b, 0) / (trials.length * (target.maxPoints || 3)) * 100) : null;
-            allRemarks.push({ date: sess.date, text: hyrStripHtml(rem.text || ""), avg });
+            const _hText = hyrStripHtml(rem.text || "");
+            const _hNote = hyrStripHtml(rem.masteryNote || "").trim();
+            const _hCombined = _hText && _hNote ? `${_hText} / ${_hNote}` : _hText || _hNote;
+            allRemarks.push({ date: sess.date, text: _hCombined, avg });
           }
         }
         allRemarks.sort((a, b) => a.date.localeCompare(b.date));
@@ -3405,6 +3408,14 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
           lines.push(`    - Recent (${shortMonths[lm - 1]}): "${lastRem.text.substring(0, 200).trim()}"`);
         }
       }
+    }
+
+    // Per-target comment boxes (same data Excel shows as "Comment" rows)
+    if (target.hasComment) {
+      const tComments = sessions
+        .map(s => hyrStripHtml((s.fedcComments || {})[sanitizeKey(target.name)] || "").trim())
+        .filter(Boolean);
+      if (tComments.length > 0) lines.push(`Comments: ${tComments.join("; ")}`);
     }
 
     // Build breakdown chart from predefined activities only (numbered, in order)
@@ -5214,7 +5225,9 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
           if (rem.optionScore !== undefined) trials.push(rem.optionScore);
           const avg = trials.length ? Math.round(trials.reduce((a,b)=>a+b,0)/(trials.length*(target.maxPoints||3))*100) : null;
           const text = hyrStripHtml(rem.text || "");
-          if (text || avg !== null) allRemarks.push({ date: sess.date, text, avg });
+          const _mNote = hyrStripHtml(rem.masteryNote || "").trim();
+          const _mCombined = text && _mNote ? `${text} / ${_mNote}` : text || _mNote;
+          if (_mCombined || avg !== null) allRemarks.push({ date: sess.date, text: _mCombined, avg });
         }
       }
       allRemarks.sort((a,b) => a.date.localeCompare(b.date));
@@ -5224,6 +5237,13 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
       for (const rem of allRemarks) {
         if (rem.text) lines.push(`    - "${rem.text.substring(0, 200).trim()}"`);
       }
+    }
+    // Per-target comment boxes
+    if (target.hasComment) {
+      const tComments = thisMonthSessions
+        .map(s => hyrStripHtml((s.fedcComments || {})[sanitizeKey(target.name)] || "").trim())
+        .filter(Boolean);
+      if (tComments.length > 0) lines.push(`Comments: ${tComments.join("; ")}`);
     }
     aiData[tName] = lines;
   }
