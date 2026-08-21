@@ -2948,10 +2948,10 @@ function getAllActivitiesForTarget(session, target) {
       const parentPa = (target.predefinedActivities || []).find(p => !p.parentActivity && (p.title || p.name) === pa.parentActivity);
       const subStatusPrefix = pa.discontinuedOn ? `(Discontinued on ${fmtDate(pa.discontinuedOn)}) `
         : pa.masteredOn ? `(Mastered on ${fmtDate(pa.masteredOn)}) `
-        : pa.maintained ? `(Maintained${pa.maintainedAt ? ` on ${fmtDate(pa.maintainedAt)}` : ''}) `
+        : pa.maintained ? `(Maintained on ${fmtDate(pa.maintainedAt || "2026-08-21")}) `
         : parentPa?.discontinuedOn ? `(Discontinued on ${fmtDate(parentPa.discontinuedOn)}) `
         : parentPa?.masteredOn ? `(Mastered on ${fmtDate(parentPa.masteredOn)}) `
-        : parentPa?.maintained ? `(Maintained${parentPa.maintainedAt ? ` on ${fmtDate(parentPa.maintainedAt)}` : ''}) `
+        : parentPa?.maintained ? `(Maintained on ${fmtDate(parentPa.maintainedAt || "2026-08-21")}) `
         : '';
       const subActName = subStatusPrefix + (pa.title || pa.name);
       const sessionAct = claimAct(pa);
@@ -2990,7 +2990,7 @@ function getAllActivitiesForTarget(session, target) {
 
     // All remaining paths are real activities — assign sequential number
     exportActNum++;
-    const _exportStatusPrefix = pa.maintained ? `(Maintained${pa.maintainedAt ? ` on ${fmtDate(pa.maintainedAt)}` : ''}) ` : '';
+    const _exportStatusPrefix = pa.maintained ? `(Maintained on ${fmtDate(pa.maintainedAt || "2026-08-21")}) ` : '';
     const _paDisplayBase = pa.title || pa.name;
     const numberedName = `${exportActNum}) ${_exportStatusPrefix}${_paDisplayBase}`;
     const paExtraProps = { activityDisplayDetails: pa.title ? (pa.name || null) : null, activityTitleBold: !!pa.isBold, activityTitleUnderline: !!pa.isUnderline };
@@ -3038,7 +3038,7 @@ function getAllActivitiesForTarget(session, target) {
     const colorProps = (pa.activityColor === "gray" || pa.isMaintainLive) ? { isGray: true }
                      : pa.activityColor === "green" ? { isGreen: true } : {};
     const manualScoreProp = pa.manualScore ? { manualScore: true } : {};
-    const _isMaintainedForSession = !!pa.maintained && (session.date >= (pa.maintainedAt || "2026-01-01"));
+    const _isMaintainedForSession = !!pa.maintained && (session.date >= (pa.maintainedAt || "2026-08-21"));
     if (sessionAct) {
       usedIds.add(sessionAct.id);
       result.push(pa.isMapped
