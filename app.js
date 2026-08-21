@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1800";
+const APP_VERSION = "1801";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -906,6 +906,44 @@ function markLoggedInToday() {
   localStorage.setItem(LAST_LOGIN_DATE_KEY, getTodayString());
 }
 
+// Maps studentId → Map(targetName → baseline activity count).
+// Populated once from the fresh Firestore load in loadAppData().
+// safeSaveStudent() refuses any write that would shrink a target's
+// activity list below this baseline — blocks stale-data overwrites.
+const _studentPaBaseline = new Map();
+
+function _captureStudentBaseline(students) {
+  for (const s of students) {
+    const tMap = new Map();
+    for (const t of (s.targets || [])) {
+      const n = (t.predefinedActivities || [])
+        .filter(p => !p.isHeading && !p.isNote && !p.isExportNote && !p.isMaintainHeading).length;
+      if (n > 0) tMap.set(t.name, n);
+    }
+    if (tMap.size > 0) _studentPaBaseline.set(s.id, tMap);
+  }
+}
+
+async function safeSaveStudent(student) {
+  const baseline = _studentPaBaseline.get(student.id);
+  if (baseline) {
+    for (const t of (student.targets || [])) {
+      const expected = baseline.get(t.name) || 0;
+      if (expected === 0) continue;
+      const actual = (t.predefinedActivities || [])
+        .filter(p => !p.isHeading && !p.isNote && !p.isExportNote && !p.isMaintainHeading).length;
+      if (actual < expected) {
+        console.error(
+          `[safeSaveStudent] BLOCKED: "${student.name}/${t.name}" would drop ` +
+          `from ${expected} → ${actual} activities. Stale local data detected — save cancelled.`
+        );
+        return;
+      }
+    }
+  }
+  await saveStudent(student);
+}
+
 async function migrateGrayActivitiesToMaintained() {
   const migrateActs = acts => {
     if (!Array.isArray(acts)) return false;
@@ -914,11 +952,6 @@ async function migrateGrayActivitiesToMaintained() {
       if (a.activityColor === "gray" && !a.maintained
           && !a.isHeading && !a.isMaintainHeading && !a.isNote && !a.isExportNote) {
         a.maintained = true;
-        changed = true;
-      }
-      // Backfill maintainedAt for all maintained activities that don't have a date yet.
-      if (a.maintained && !a.maintainedAt && !a.isHeading && !a.isMaintainHeading) {
-        a.maintainedAt = "2026-08-21";
         changed = true;
       }
     }
@@ -930,7 +963,7 @@ async function migrateGrayActivitiesToMaintained() {
     for (const t of (student.targets || [])) {
       if (migrateActs(t.predefinedActivities)) dirty = true;
     }
-    if (dirty) saves.push(saveStudent(student));
+    if (dirty) saves.push(safeSaveStudent(student));
   }
   for (const group of (state.groups || [])) {
     let dirty = false;
@@ -964,6 +997,7 @@ async function loadAppData() {
       students = CONFIG.INITIAL_STUDENTS;
     }
     state.students = students;
+    _captureStudentBaseline(students);
   } else {
     state.students = CONFIG.INITIAL_STUDENTS;
   }
@@ -1173,7 +1207,7 @@ function runOneOffRepairs() {
         if (changed) await saveFn(entity);
       }
     };
-    await applyMigration(state.students, s => saveStudent(s));
+    await applyMigration(state.students, s => safeSaveStudent(s));
     await applyMigration(state.groups,   g => saveGroup(g));
   })().catch(err => console.error("runOneOffRepairs (masteredOn migration) failed:", err));
 
