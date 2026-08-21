@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1801";
+const APP_VERSION = "1802";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -24160,7 +24160,13 @@ function findActivityByName(targetName, activityName, parentActivity = null, con
       return null;
     }
     const adopt = entries.find(e => byName(e) && !e[1].parentActivity && !e[1].configId);
-    return adopt ? { id: adopt[0], ...adopt[1] } : null;
+    if (adopt) return { id: adopt[0], ...adopt[1] };
+    // Stale-configId fallback: the session record has an old configId (from before a
+    // predefined activity was re-saved with a new ID). The View/Edit screen matches by
+    // name and finds it; Start Session was silently blocked here. Only adopt when the
+    // name match is unambiguous — exactly one top-level candidate with that activity name.
+    const staleCands = entries.filter(e => byName(e) && !e[1].parentActivity);
+    return staleCands.length === 1 ? { id: staleCands[0][0], ...staleCands[0][1] } : null;
   }
   if (parentActivity) {
     const exact = entries.find(e => byName(e) && e[1].parentActivity === parentActivity);
