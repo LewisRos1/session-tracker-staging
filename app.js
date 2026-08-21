@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1798";
+const APP_VERSION = "1799";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -313,9 +313,9 @@ function requirePassword(onSuccess, message = "Enter password to continue") {
   $("manage-modal-body").innerHTML = `
     <div style="padding:2rem 1rem;display:flex;flex-direction:column;align-items:center;gap:.75rem">
       <div style="font-size:.85rem;color:var(--text-muted);text-align:center;max-width:260px;line-height:1.5">${message}</div>
-      <input id="req-pw-input" type="password" class="admin-input"
-        style="width:200px;text-align:center;font-size:1rem"
-        placeholder="Enter password" autocomplete="new-password">
+      <input id="req-pw-input" type="text" class="admin-input"
+        style="width:200px;text-align:center;font-size:1rem;-webkit-text-security:disc"
+        placeholder="Enter password" autocomplete="off">
       <div id="req-pw-err" style="font-size:.8rem;color:#dc2626;display:none">Incorrect password</div>
       <button class="btn-primary-sm" id="req-pw-btn" style="padding:.5rem 1.5rem">Continue</button>
     </div>`;
@@ -5904,9 +5904,9 @@ async function hyrOpenSettings() {
   $("manage-modal-body").innerHTML = `
     <div style="padding:2rem 1rem;display:flex;flex-direction:column;align-items:center;gap:.75rem">
       <div style="font-size:.9rem;color:var(--text-muted)">Enter password to continue</div>
-      <input id="hyr-settings-pw" type="password" class="admin-input"
-        style="width:200px;text-align:center;font-size:1rem"
-        placeholder="Enter password" autocomplete="new-password">
+      <input id="hyr-settings-pw" type="text" class="admin-input"
+        style="width:200px;text-align:center;font-size:1rem;-webkit-text-security:disc"
+        placeholder="Enter password" autocomplete="off">
       <div id="hyr-settings-pw-err" style="font-size:.8rem;color:#dc2626;display:none">Incorrect password</div>
     </div>`;
   $("manage-modal").classList.remove("hidden");
@@ -6871,9 +6871,9 @@ function showStudentChoice(student) {
     $("manage-modal-body").innerHTML = `
       <div style="padding:2rem 1rem;display:flex;flex-direction:column;align-items:center;gap:.75rem">
         <div style="font-size:.9rem;color:var(--text-muted)">Enter password to continue</div>
-        <input id="ma-gate-pw" type="password" class="admin-input"
-          style="width:200px;text-align:center;font-size:1rem"
-          placeholder="Enter password" autocomplete="new-password">
+        <input id="ma-gate-pw" type="text" class="admin-input"
+          style="width:200px;text-align:center;font-size:1rem;-webkit-text-security:disc"
+          placeholder="Enter password" autocomplete="off">
         <div id="ma-gate-pw-err" style="font-size:.8rem;color:#dc2626;display:none">Incorrect password</div>
         <button class="btn-primary-sm" id="ma-gate-pw-btn" style="padding:.5rem 1.5rem">Continue</button>
       </div>`;
@@ -15954,9 +15954,9 @@ function openManageModal(student, targetOrNull, templateOrNull = null, remarkPre
     $("manage-modal-body").innerHTML = `
       <div style="padding:2rem 1rem;display:flex;flex-direction:column;align-items:center;gap:.75rem">
         <div style="font-size:.9rem;color:var(--text-muted)">Enter password to continue</div>
-        <input id="edit-target-pw" type="password" class="admin-input"
-          style="width:200px;text-align:center;font-size:1rem"
-          placeholder="Enter password" autocomplete="new-password">
+        <input id="edit-target-pw" type="text" class="admin-input"
+          style="width:200px;text-align:center;font-size:1rem;-webkit-text-security:disc"
+          placeholder="Enter password" autocomplete="off">
         <div id="edit-target-pw-err" style="font-size:.8rem;color:#dc2626;display:none">Incorrect password</div>
       </div>`;
     const pwInput = $("edit-target-pw");
@@ -19842,8 +19842,8 @@ function renderTargetManageContent(student, target) {
         <p style="font-size:.82rem;margin:0 0 .25rem;color:#374151;font-weight:600">Sessions with data:</p>
         <ul style="font-size:.82rem;color:#374151;margin:0 0 .75rem;padding-left:1.2rem;line-height:1.8">${sessionDateHtml}</ul>
         <p style="font-size:.84rem;margin:0 0 .35rem;color:#374151;font-weight:600">To change the activity type, please enter special password (only Lewis knows)</p>
-        <input id="act-type-pw" type="password" autocomplete="new-password" value=""
-          style="width:100%;box-sizing:border-box;padding:.45rem .6rem;border:2px solid #d1d5db;border-radius:.4rem;font-size:1.1rem;text-align:center;outline:none;margin-bottom:.3rem" placeholder="Enter password">
+        <input id="act-type-pw" type="text" autocomplete="off" value=""
+          style="width:100%;box-sizing:border-box;padding:.45rem .6rem;border:2px solid #d1d5db;border-radius:.4rem;font-size:1.1rem;text-align:center;outline:none;margin-bottom:.3rem;-webkit-text-security:disc" placeholder="Enter password">
         <div id="act-type-pw-err" style="color:#dc2626;font-size:.82rem;margin-bottom:.5rem;min-height:1.1em"></div>
         <div style="display:flex;gap:.5rem">
           <button id="act-type-pw-cancel" style="flex:1;padding:.45rem;border:1px solid #d1d5db;border-radius:.4rem;background:#f9fafb;cursor:pointer;font-size:.85rem">Cancel</button>
