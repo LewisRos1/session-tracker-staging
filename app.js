@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1807";
+const APP_VERSION = "1808";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -9085,10 +9085,19 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
 
   const _existingNote = (rem.masteryNote || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
 
-  // Remark Only (No Trials): the whole Trials row is omitted — no label, no
-  // badges, no "+ Trial" button — so the activity can never gain a score.
+  // Remark Only (No Trials): the Trials row stays visible so the layout matches
+  // every other activity, but the button is greyed out and inert (no
+  // .btn-add-trial class, so no click listener is ever bound to it) — the
+  // activity can never gain a score.
   const trailingField = noTrials
-    ? ``
+    ? `<div class="entry-field" contenteditable="false">
+        <span class="field-label">Trials</span>
+        <div class="trials-row">
+          <div class="trials-badges"></div>
+          <button class="btn-primary-sm btn-trial-not-required" disabled
+            style="background:#e5e7eb;color:#9ca3af;border-color:#e5e7eb;cursor:default;box-shadow:none">+ Trial (Not Required)</button>
+        </div>
+      </div>`
     : mappedInfo
     ? `<div class="entry-field" contenteditable="false">
         <span class="field-label">${escHtml(mappedInfo.label)}</span>
@@ -12026,7 +12035,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
         data-parent-activity="${escHtml(paConfig?.parentActivity || "")}"
         data-config-id="${escHtml(paConfig?.id || "")}">+</button>`;
       const emptyTrialsContent = paConfig?.noTrials
-        ? `<span class="view-trials-disabled" style="color:#9ca3af;font-style:italic">Trials are disabled for this activity</span>`
+        ? `<span class="view-trials-disabled" style="color:#9ca3af;font-style:italic">Trials are not required for this activity</span>`
         : mappedInfo
         ? `<span class="view-mapped-label">${escHtml(mappedInfo.label)}</span>`
         : (addTrialBtn || "&nbsp;");
@@ -12099,7 +12108,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
       emptyRemCell = emptySelHtml;
     }
     const emptyTrialBtn = paConfig?.noTrials
-      ? `<span class="view-trials-disabled" style="color:#9ca3af;font-style:italic">Trials are disabled for this activity</span>`
+      ? `<span class="view-trials-disabled" style="color:#9ca3af;font-style:italic">Trials are not required for this activity</span>`
       : mappedInfo
       ? `<span class="view-mapped-label">${escHtml(mappedInfo.label)}</span>`
       : `<button class="view-add-trial-new" data-act-id="${escHtml(actId || "")}"
@@ -12292,7 +12301,7 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
     <td class="vcol-no" contenteditable="false">${no !== null ? no : ""}</td>
     <td class="vcol-act" contenteditable="false">${actName !== null ? actName : ""}</td>
     <td class="vcol-rem" contenteditable="false">${remarkCell}</td>
-    <td class="vcol-trials" contenteditable="false">${noTrials ? `<span class="view-trials-disabled" style="color:#9ca3af;font-style:italic">Trials are disabled for this activity</span>` : trialCells}</td>
+    <td class="vcol-trials" contenteditable="false">${noTrials ? `<span class="view-trials-disabled" style="color:#9ca3af;font-style:italic">Trials are not required for this activity</span>` : trialCells}</td>
     <td class="vcol-total" contenteditable="false">${noTrials ? "&nbsp;" : totalCell}</td>
     <td class="vcol-score" contenteditable="false">
       <div style="display:flex;align-items:center;gap:.3rem;justify-content:flex-end">
@@ -14326,7 +14335,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
             placeholder="${_maintained && data.date >= (_maintainedAt || "2026-01-01") ? "" : "Remark…"}">${_maintained && data.date >= (_maintainedAt || "2026-01-01") ? "Maintain" : ""}</textarea>
         </td>
         <td class="vcol-trials" contenteditable="false">
-          ${paEntry?.noTrials ? `<span class="view-trials-disabled" style="color:#9ca3af;font-style:italic">Trials are disabled for this activity</span>` : `<button class="view-group-add-trial-new" data-act-id="${escHtml(actId || "")}"
+          ${paEntry?.noTrials ? `<span class="view-trials-disabled" style="color:#9ca3af;font-style:italic">Trials are not required for this activity</span>` : `<button class="view-group-add-trial-new" data-act-id="${escHtml(actId || "")}"
             data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
             data-is-predefined="${isPredefined}" data-student="${escHtml(studentName)}">+</button>`}
         </td>
@@ -14383,7 +14392,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
         <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(studentName)}</td>
         <td class="vcol-rem" contenteditable="false">${gRemCell}</td>
         <td class="vcol-trials" contenteditable="false">
-          ${paEntry?.noTrials ? `<span class="view-trials-disabled" style="color:#9ca3af;font-style:italic">Trials are disabled for this activity</span>` : `<button class="view-group-add-trial-new" data-act-id="${escHtml(actId || "")}"
+          ${paEntry?.noTrials ? `<span class="view-trials-disabled" style="color:#9ca3af;font-style:italic">Trials are not required for this activity</span>` : `<button class="view-group-add-trial-new" data-act-id="${escHtml(actId || "")}"
             data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
             data-is-predefined="${isPredefined}" data-student="${escHtml(studentName)}">+</button>`}
         </td>
@@ -14421,7 +14430,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
                 data-student="${escHtml(entry.studentName)}"></textarea>
             </td>
             <td class="vcol-trials" contenteditable="false">
-              ${paEntry?.noTrials ? `<span class="view-trials-disabled" style="color:#9ca3af;font-style:italic">Trials are disabled for this activity</span>` : `<button class="view-group-add-trial-new" data-act-id="${escHtml(actId || "")}"
+              ${paEntry?.noTrials ? `<span class="view-trials-disabled" style="color:#9ca3af;font-style:italic">Trials are not required for this activity</span>` : `<button class="view-group-add-trial-new" data-act-id="${escHtml(actId || "")}"
                 data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
                 data-is-predefined="${isPredefined}" data-student="${escHtml(entry.studentName)}">+</button>`}
             </td>
@@ -14622,7 +14631,7 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
     <td class="vcol-act" contenteditable="false">${actName !== null ? actName : ""}</td>
     <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(studentName)}</td>
     ${remarkTd}
-    <td class="vcol-trials" contenteditable="false">${noTrials ? `<span class="view-trials-disabled" style="color:#9ca3af;font-style:italic">Trials are disabled for this activity</span>` : trialCells}</td>
+    <td class="vcol-trials" contenteditable="false">${noTrials ? `<span class="view-trials-disabled" style="color:#9ca3af;font-style:italic">Trials are not required for this activity</span>` : trialCells}</td>
     <td class="vcol-total" contenteditable="false">${noTrials ? "&nbsp;" : totalCell}</td>
     <td class="vcol-score" contenteditable="false">
       <div style="display:flex;align-items:center;gap:.3rem;justify-content:flex-end">
@@ -22700,9 +22709,17 @@ function renderGroupStudentRowCompact(remId, rem, target, mappedInfo = null, noT
   const optBadge = rem.optionScore !== undefined
     ? `<span class="trial-badge trial-badge--option">${rem.optionScore}</span>` : "";
   const badges = regularBadges + optBadge;
-  // Remark Only (No Trials) drops the Trials row entirely — see renderRemarkFields.
+  // Remark Only (No Trials) keeps the Trials row but greys the button out and
+  // leaves it inert — see renderRemarkFields.
   const trailingField = noTrials
-    ? ``
+    ? `<div class="entry-field" contenteditable="false">
+        <span class="field-label">Trials</span>
+        <div class="trials-row">
+          <div class="trials-badges"></div>
+          <button class="btn-primary-sm btn-trial-not-required" disabled
+            style="background:#e5e7eb;color:#9ca3af;border-color:#e5e7eb;cursor:default;box-shadow:none">+ Trial (Not Required)</button>
+        </div>
+      </div>`
     : mappedInfo
     ? `<div class="entry-field" contenteditable="false">
         <span class="field-label">${escHtml(mappedInfo.label)}</span>
@@ -22907,9 +22924,17 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
   const badges = regularBadges + optBadge;
   const _grpExistingNote = (rem.masteryNote || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
 
-  // Remark Only (No Trials) drops the Trials row entirely — see renderRemarkFields.
+  // Remark Only (No Trials) keeps the Trials row but greys the button out and
+  // leaves it inert — see renderRemarkFields.
   const trailingField = noTrials
-    ? ``
+    ? `<div class="entry-field" contenteditable="false">
+        <span class="field-label">Trials</span>
+        <div class="trials-row">
+          <div class="trials-badges"></div>
+          <button class="btn-primary-sm btn-trial-not-required" disabled
+            style="background:#e5e7eb;color:#9ca3af;border-color:#e5e7eb;cursor:default;box-shadow:none">+ Trial (Not Required)</button>
+        </div>
+      </div>`
     : mappedInfo
     ? `<div class="entry-field" contenteditable="false">
         <span class="field-label">${escHtml(mappedInfo.label)}</span>
