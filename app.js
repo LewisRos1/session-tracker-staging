@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1811";
+const APP_VERSION = "1812";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8815,7 +8815,9 @@ function renderExtraActivitiesSection(target) {
         data-target="${escHtml(target.name)}">+ Add Remark &amp; Trials</button>
     </div>`;
   } else {
-    html += `<button class="btn-add-session-activity" style="display:block;margin-top:.6rem;padding:.55rem .9rem;background:transparent;border:1.5px dashed #a5b4fc;border-radius:.5rem;cursor:pointer;font-size:.85rem;color:#6366f1;margin-left:auto;margin-right:auto" contenteditable="false">+ Add Activity (only for this session, not saved to the target permanently)</button>`;
+    // margin-bottom keeps the dashed button clear of the bottom of the scroll
+    // area — without it the border sits flush against the window edge.
+    html += `<button class="btn-add-session-activity" style="display:block;margin-top:.6rem;margin-bottom:2.5rem;padding:.55rem .9rem;background:transparent;border:1.5px dashed #a5b4fc;border-radius:.5rem;cursor:pointer;font-size:.85rem;color:#6366f1;margin-left:auto;margin-right:auto" contenteditable="false">+ Add Activity (only for this session, not saved to the target permanently)</button>`;
   }
   return html;
 }
