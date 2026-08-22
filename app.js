@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1810";
+const APP_VERSION = "1811";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -237,68 +237,6 @@ window.debugClearActivePeriod = async function(studentName, targetName) {
   if (!cleared) { console.log("Nothing to clear."); return; }
   await saveStudent(student);
   console.log(`Cleared ${cleared} date field(s) from ${targetName}. Refresh the page.`);
-};
-
-// 3b) TEMPORARY — rehearsal helpers for the v1809 mapped-score migration.
-// Staging already migrated at v1806, so its activities no longer carry the
-// isMapped flag and the migration can't be observed there any more. These put
-// a chosen STAGING activity back into the old mapped state so the real
-// migration can be watched running on throwaway data before live is promoted.
-// Delete both once the migration has been verified on live.
-//    debugMakeMapped("TEST yas", "Self-Regulation", "do it like u")
-window.debugMakeMapped = async function(studentName, targetName, activityName, mappedTargetName = null) {
-  const students = await loadStudentsConfig();
-  const student = students.find(s => s.name === studentName);
-  if (!student) { console.error("Student not found:", studentName); return; }
-  const target = (student.targets || []).find(t => t.name === targetName);
-  if (!target) { console.error("Target not found:", targetName, "— available:", (student.targets || []).map(t => t.name)); return; }
-  const acts = target.predefinedActivities || [];
-  const pa = acts.find(a => (a.title || a.name) === activityName || a.name === activityName);
-  if (!pa) { console.error("Activity not found:", activityName, "— available:", acts.map(a => a.title || a.name)); return; }
-  const other = (student.targets || []).find(t => t.id !== target.id && (!mappedTargetName || t.name === mappedTargetName));
-  pa.isMapped = true;
-  pa.mappedTargetId = other ? other.id : null;
-  delete pa.noTrials;
-  await saveStudent(student);
-  console.log("Flagged as a mapped-score activity again:", {
-    activity: pa.title || pa.name, mappedTo: other ? other.name : "(none)"
-  });
-  console.log("Now RELOAD the page — the migration should convert it to Remark Only (No Trials) and clear any trials recorded against it.");
-};
-
-// Reports an activity's type flags plus every trial/option score still stored
-// against it, so the before/after of the migration is visible.
-//    debugActivityScoring("TEST yas", "Self-Regulation", "do it like u")
-window.debugActivityScoring = async function(studentName, targetName, activityName) {
-  const students = await loadStudentsConfig();
-  const student = students.find(s => s.name === studentName);
-  if (!student) { console.error("Student not found:", studentName); return; }
-  const target = (student.targets || []).find(t => t.name === targetName);
-  const pa = (target?.predefinedActivities || []).find(a => (a.title || a.name) === activityName || a.name === activityName);
-  if (!pa) { console.error("Activity not found:", activityName); return; }
-  console.log("CONFIG:", {
-    isMapped: !!pa.isMapped, noTrials: !!pa.noTrials, manualScore: !!pa.manualScore,
-    inlineOptions: pa.inlineOptions || null, optionsMulti: !!pa.optionsMulti, remarkHasNote: !!pa.remarkHasNote
-  });
-  const sessions = await getAllSessionsForStudent(student.id);
-  const rows = [];
-  for (const s of sessions) {
-    const ids = Object.entries(s.activities || {})
-      .filter(([, a]) => (pa.id && a.configId === pa.id) || (pa.name && a.activityName === pa.name) || (pa.title && a.activityName === pa.title))
-      .map(([id]) => id);
-    for (const rem of Object.values(s.remarks || {})) {
-      if (!ids.includes(rem.activityId)) continue;
-      rows.push({
-        date: s.date,
-        remark: (rem.text || "").replace(/<[^>]*>/g, "").slice(0, 40),
-        note: (rem.masteryNote || "").replace(/<[^>]*>/g, "").slice(0, 40),
-        trials: JSON.stringify(rem.trials || []),
-        optionScore: rem.optionScore ?? ""
-      });
-    }
-  }
-  console.log(`SESSION DATA (${rows.length} remark row(s)):`);
-  console.table(rows);
 };
 
 // 4) Deep-check a specific activity name (must match exactly what debugScanTarget shows):
