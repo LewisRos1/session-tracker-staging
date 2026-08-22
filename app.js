@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1808";
+const APP_VERSION = "1809";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -1372,32 +1372,74 @@ async function migrateAwayFromMasteryType() {
 // averages therefore drop that value — on the live screen and in Excel/AI
 // reports for past periods too, since those read this config rather than a
 // stored historical copy.
+// A mapped activity's score came entirely from another target's average, so it
+// becomes "Remark Only (No Trials)" — no trials, no options, no score of any
+// kind. Any Multiple Choice / Checkbox / Manual Score setup layered on top is
+// cleared too, otherwise a recorded option's points would keep counting toward
+// the target average and the activity would not really be score-free.
 function convertMappedActivity(pa) {
   delete pa.isMapped;
   delete pa.mappedTargetId;
+  pa.noTrials = true;
+  delete pa.manualScore; delete pa.fixedRemark; delete pa.optionScores;
+  pa.sentenceStarter = null; pa.remarkPresetId = null;
+  pa.inlineOptions = null; pa.optionsMulti = false; pa.remarkHasNote = false;
+}
+
+// Clears recorded trials/option scores from past sessions for the given
+// activities. Runs BEFORE the config is saved: if it fails partway the isMapped
+// flag is still set, so the whole migration simply retries on the next load
+// rather than leaving scores stranded under an already-converted activity.
+async function stripScoringForMappedActivities(loadSessions, pas) {
+  let sessions = [];
+  try { sessions = await loadSessions(); } catch { return; }
+  for (const sess of sessions) {
+    const matchIds = Object.entries(sess.activities || {})
+      .filter(([, a]) => pas.some(pa =>
+        (pa.id && a.configId === pa.id) ||
+        (pa.name && a.activityName === pa.name) ||
+        (pa.title && a.activityName === pa.title)))
+      .map(([id]) => id);
+    if (matchIds.length === 0) continue;
+    const changes = {};
+    for (const [remId, rem] of Object.entries(sess.remarks || {})) {
+      if (!matchIds.includes(rem.activityId)) continue;
+      const hasScoring = (rem.trials || []).some(t => t !== null && t !== -1)
+        || rem.optionScore !== undefined
+        || (rem.selectedOptions || []).length > 0;
+      if (!hasScoring) continue;
+      // A typed note is a real remark and wins the single remaining box; a bare
+      // option selection is left as plain text (it carries no score once the
+      // option config is gone).
+      const note = (rem.masteryNote || "").trim();
+      changes[remId] = note
+        ? { text: rem.masteryNote, masteryNote: "" }
+        : { text: rem.text || "", masteryNote: "" };
+    }
+    if (Object.keys(changes).length > 0) await stripRemarkScoringData(sess.id, changes);
+  }
 }
 
 async function migrateAwayFromMappedScoreType() {
   for (const student of state.students) {
-    let changed = false;
-    for (const target of (student.targets || [])) {
-      for (const pa of (target.predefinedActivities || [])) {
-        if (pa.isMapped) { convertMappedActivity(pa); changed = true; }
-      }
-    }
-    if (changed) await safeSaveStudent(student);
+    const mapped = (student.targets || [])
+      .flatMap(t => (t.predefinedActivities || []).filter(pa => pa.isMapped));
+    if (mapped.length === 0) continue;
+    await stripScoringForMappedActivities(() => getAllSessionsForStudent(student.id), mapped);
+    mapped.forEach(convertMappedActivity);
+    await safeSaveStudent(student);
   }
   for (const group of state.groups) {
-    let changed = false;
-    for (const target of (group.targets || [])) {
-      for (const pa of (target.predefinedActivities || [])) {
-        if (pa.isMapped) { convertMappedActivity(pa); changed = true; }
-      }
-    }
-    if (changed) await saveGroup(group);
+    const mapped = (group.targets || [])
+      .flatMap(t => (t.predefinedActivities || []).filter(pa => pa.isMapped));
+    if (mapped.length === 0) continue;
+    await stripScoringForMappedActivities(() => getAllSessionsForGroup(group.id), mapped);
+    mapped.forEach(convertMappedActivity);
+    await saveGroup(group);
   }
   // Templates never had the "+ Add Activity & Mapped Score" button, but one
   // could hold a mapped activity copied in from a target — cheap to cover.
+  // Templates hold no session data, so there's nothing to strip.
   for (const template of state.templates) {
     let changed = false;
     for (const pa of (template.predefinedActivities || [])) {
@@ -7836,6 +7878,11 @@ function calcDaysAverage(target, visited = new Set()) {
   const avgs = [];
   const maxPts = target.maxPoints || 3;
   for (const act of getActivitiesForTarget(target.name)) {
+    // "Remark Only (No Trials)" contributes nothing, whatever is still stored
+    // against it — the type's guarantee shouldn't depend on the data being clean.
+    if ((target.predefinedActivities || []).some(p => p.noTrials &&
+        (p.name === act.activityName || (p.title && p.title === act.activityName) ||
+         (act.configId && p.id === act.configId)))) continue;
     const pa = (target.predefinedActivities || []).find(p => p.isMapped &&
         (p.name === act.activityName || (act.configId && p.id === act.configId)));
     if (pa) {

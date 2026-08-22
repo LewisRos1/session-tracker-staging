@@ -1972,7 +1972,8 @@ function wordTargetRows(target, session, allTargets) {
       const validTrials = allScores(rem);
       const text        = stripRemarkHtml(rem.text);
       const masteryNote = stripRemarkHtml(rem.masteryNote || "");
-      const remarkAvg   = act.isMapped    ? mappedScore
+      const remarkAvg   = act.noTrials    ? null
+                        : act.isMapped    ? mappedScore
                         : act.manualScore ? parseManualScore(text)
                         : calcRemarkAvg(validTrials, target.maxPoints);
       rows.push({
@@ -2833,13 +2834,15 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, mastere
         if (act.isGray) grayRows.add(rows.length);
         if (act.isGreen) greenRows.add(rows.length);
         const validTrials = allScores(rem);
-        const remarkAvg   = act.isMapped ? mappedScore : calcRemarkAvg(validTrials, target.maxPoints);
+        const remarkAvg   = act.noTrials ? null
+                          : act.isMapped ? mappedScore
+                          : calcRemarkAvg(validTrials, target.maxPoints);
         const masteryNote = stripRemarkHtml(rem.masteryNote || "");
         const r = blankRow();
         r[1] = firstRemark ? activityCell : "";
         r[2] = buildExcelRemarkCell(rem.text, starter, masteryNote);
         if (includeTrials) {
-          r[3] = trialsList(rem.optionScore !== undefined ? [...(rem.trials || []), rem.optionScore] : rem.trials);
+          r[3] = act.noTrials ? "" : trialsList(rem.optionScore !== undefined ? [...(rem.trials || []), rem.optionScore] : rem.trials);
           r[4] = remarkAvg !== null ? pct(remarkAvg) : "";
         } else {
           r[3] = remarkAvg !== null ? pct(remarkAvg) : "";
@@ -3038,16 +3041,19 @@ function getAllActivitiesForTarget(session, target) {
     const colorProps = (pa.activityColor === "gray" || pa.isMaintainLive) ? { isGray: true }
                      : pa.activityColor === "green" ? { isGreen: true } : {};
     const manualScoreProp = pa.manualScore ? { manualScore: true } : {};
+    // "Remark Only (No Trials)" — carried through so the score column and the
+    // daily average both ignore it no matter what is still stored on it.
+    const noTrialsProp = pa.noTrials ? { noTrials: true } : {};
     const _isMaintainedForSession = !!pa.maintained && (session.date >= (pa.maintainedAt || "2026-08-21"));
     if (sessionAct) {
       usedIds.add(sessionAct.id);
       result.push(pa.isMapped
         ? { ...sessionAct, activityName: numberedName, isMapped: true, mappedTargetId: pa.mappedTargetId || null, ...colorProps, isMaintained: _isMaintainedForSession, ...paExtraProps }
-        : { ...sessionAct, activityName: numberedName, ...colorProps, ...manualScoreProp, isMaintained: _isMaintainedForSession, ...paExtraProps });
+        : { ...sessionAct, activityName: numberedName, ...colorProps, ...manualScoreProp, ...noTrialsProp, isMaintained: _isMaintainedForSession, ...paExtraProps });
     } else {
       result.push({
         id: null, activityName: numberedName, isPredefined: true, empty: true,
-        isMapped: pa.isMapped || false, mappedTargetId: pa.mappedTargetId || null, ...colorProps, ...manualScoreProp, isMaintained: _isMaintainedForSession, ...paExtraProps
+        isMapped: pa.isMapped || false, mappedTargetId: pa.mappedTargetId || null, ...colorProps, ...manualScoreProp, ...noTrialsProp, isMaintained: _isMaintainedForSession, ...paExtraProps
       });
     }
   }
@@ -3145,6 +3151,8 @@ export function calcDailyAverage(session, target, allTargets = [], visited = new
   const avgs = [];
   for (const act of getAllActivitiesForTarget(session, target)) {
     if (act.isHeading || act.isNote || act.isExportNote || act.empty || act.isMasteredSeparator || act.isStoppedSeparator || act.isMaintainSeparator || act.isMaintain || act.isMaintainHeading) continue;
+    // "Remark Only (No Trials)" never contributes to the daily average.
+    if (act.noTrials) continue;
     if (act.isMapped) {
       if (getRemarksForActivity(session, act.id).length === 0) continue;
       const a = resolveExportMappedScore(act, session, allTargets, visited);
