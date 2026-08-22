@@ -1812,17 +1812,43 @@ function buildActLines(act, label) {
   return titleLines;
 }
 
+// True when a section heading at index i still has at least one ordinary
+// activity row under it, i.e. before the next heading or separator. Mastered
+// and discontinued activities are collected into their own sections further
+// down, so once every activity a heading introduced has been mastered or
+// discontinued, nothing is left between it and the next heading.
+//
+// This reads the already-date-filtered list from getAllActivitiesForTarget, so
+// it is inherently per-session: a past session (when those activities were
+// still running) keeps its headings exactly as before, and the heading itself
+// is never deleted from the target setup — it simply isn't drawn where it has
+// nothing to introduce.
+function wordHeadingHasContent(activities, i) {
+  for (let j = i + 1; j < activities.length; j++) {
+    const a = activities[j];
+    if (a.isHeading || a.isGreenHeading || a.isMaintainHeading) return false;
+    if (a.isMasteredSeparator || a.isStoppedSeparator || a.isMaintainSeparator) return false;
+    if (a.isNote || a.isExportNote) continue;
+    if (a.isMastered || a.isStopped) continue;
+    return true;
+  }
+  return false;
+}
+
 function wordTargetRows(target, session, allTargets) {
   const rows = [];
   const activities = getAllActivitiesForTarget(session, target);
 
-  for (const act of activities) {
+  for (let ai = 0; ai < activities.length; ai++) {
+    const act = activities[ai];
     if (act.isHeading) {
+      if (!wordHeadingHasContent(activities, ai)) continue;
       rows.push({ merge: true, text: act.activityName, style: "heading" });
       continue;
     }
 
     if (act.isGreenHeading) {
+      if (!wordHeadingHasContent(activities, ai)) continue;
       rows.push({ merge: true, text: act.activityName, style: "heading", isGreenHeading: true });
       continue;
     }
@@ -1878,6 +1904,7 @@ function wordTargetRows(target, session, allTargets) {
     if (act.isMaintainSeparator) continue;
 
     if (act.isMaintainHeading) {
+      if (!wordHeadingHasContent(activities, ai)) continue;
       rows.push({ merge: true, text: act.activityName, style: "heading", isGrayHeading: true });
       continue;
     }

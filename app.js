@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1812";
+const APP_VERSION = "1813";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -17883,7 +17883,9 @@ function renderTargetManageContent(student, target) {
       <div id="mn-emptyheadings-section" style="display:none">`;
     _emptyHeadingRows.forEach(({ a, idx }) => {
       html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .5rem;background:#f9fafb;border:1px dashed #d1d5db;border-radius:.4rem;margin-bottom:.35rem">
-        <div style="flex:1;min-width:0;font-size:.85rem;color:#374151;font-weight:600;overflow-wrap:break-word">${escHtml(a.name || "(untitled heading)")}</div>
+        <textarea class="admin-input mn-empty-heading-input" data-idx="${idx}" rows="1"
+          placeholder="Enter Section Heading"
+          style="flex:1;min-width:0;font-size:.85rem;font-weight:600;resize:none;overflow-y:hidden">${escHtml(a.name || "")}</textarea>
         <span style="font-size:.71rem;color:#9ca3af;white-space:nowrap">All activities mastered/discontinued</span>
         <button class="btn-mn-restore-empty-heading" data-idx="${idx}" style="font-size:.78rem;padding:.3rem .6rem;color:#1d4ed8;background:#eff6ff;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;white-space:nowrap">↑ Restore to active list</button>
         <button class="btn-mn-del-empty-heading" data-idx="${idx}" style="font-size:.78rem;padding:.3rem .6rem;color:#dc2626;background:none;border:1px solid #fca5a5;border-radius:.35rem;cursor:pointer">🗑️ Delete</button>
@@ -18756,6 +18758,29 @@ function renderTargetManageContent(student, target) {
   // local, non-persisted override (no save needed): it just lets this heading
   // render inline again so a new activity can be dragged under it. Delete
   // mirrors the regular heading delete in .mn-hkm-opt above.
+  // Empty headings stay renameable in place. A heading lives only in the target
+  // setup (it is never copied into a session), so renaming one updates it
+  // everywhere it is drawn, past sessions and past exports included. Deliberately
+  // does NOT call propagateActivityRename — a heading is not an activity, and
+  // pushing its name through that path is what let heading renames hijack
+  // same-named activities in v606.
+  $("manage-modal-body").querySelectorAll(".mn-empty-heading-input").forEach(inp => {
+    autoResizeTextarea(inp);
+    inp.addEventListener("input", () => autoResizeTextarea(inp));
+    inp.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); inp.blur(); } });
+    inp.addEventListener("blur", async () => {
+      const idx = Number(inp.dataset.idx);
+      const pa = acts[idx];
+      if (!pa) return;
+      const v = inp.value.trim();
+      if (v === (pa.name || "")) return;
+      pa.name = v;
+      target.predefinedActivities = acts;
+      await saveTarget();
+      flashSaved(inp);
+    });
+  });
+
   $("manage-modal-body").querySelectorAll(".btn-mn-restore-empty-heading").forEach(btn => {
     btn.addEventListener("click", () => {
       const idx = Number(btn.dataset.idx);
