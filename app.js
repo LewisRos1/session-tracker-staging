@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1805";
+const APP_VERSION = "1806";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -1240,6 +1240,9 @@ function runOneOffRepairs() {
   migrateAwayFromMasteryType()
     .catch(err => console.error("runOneOffRepairs (mastery removal) failed:", err));
 
+  migrateAwayFromMappedScoreType()
+    .catch(err => console.error("runOneOffRepairs (mapped-score removal) failed:", err));
+
   // v608 Data Integrity Check backlog — confirmed batch 1. Every pair here
   // was surfaced by the report and manually reviewed (not auto-merged):
   // either a wording/typo cleanup of the same activity, a list
@@ -1352,6 +1355,52 @@ async function migrateAwayFromMasteryType() {
     let changed = false;
     for (const pa of (template.predefinedActivities || [])) {
       if (pa.isMastery) { convertMasteryActivity(pa); changed = true; }
+    }
+    if (changed) await saveTemplate(template);
+  }
+}
+
+// The "Add Activity & Mapped Score" type was removed in v1806. Converting is a
+// pure config flip — the activity keeps its id, name/title, Activity Details,
+// start date, Activity Type and every remark already recorded against it; only
+// the mapped-score behaviour goes away.
+//
+// Deliberate consequence, confirmed before building: a mapped activity used to
+// contribute its mapped target's average as a score toward THIS target's
+// average, and a plain activity with no trials contributes nothing. Target
+// averages therefore drop that value — on the live screen and in Excel/AI
+// reports for past periods too, since those read this config rather than a
+// stored historical copy.
+function convertMappedActivity(pa) {
+  delete pa.isMapped;
+  delete pa.mappedTargetId;
+}
+
+async function migrateAwayFromMappedScoreType() {
+  for (const student of state.students) {
+    let changed = false;
+    for (const target of (student.targets || [])) {
+      for (const pa of (target.predefinedActivities || [])) {
+        if (pa.isMapped) { convertMappedActivity(pa); changed = true; }
+      }
+    }
+    if (changed) await safeSaveStudent(student);
+  }
+  for (const group of state.groups) {
+    let changed = false;
+    for (const target of (group.targets || [])) {
+      for (const pa of (target.predefinedActivities || [])) {
+        if (pa.isMapped) { convertMappedActivity(pa); changed = true; }
+      }
+    }
+    if (changed) await saveGroup(group);
+  }
+  // Templates never had the "+ Add Activity & Mapped Score" button, but one
+  // could hold a mapped activity copied in from a target — cheap to cover.
+  for (const template of state.templates) {
+    let changed = false;
+    for (const pa of (template.predefinedActivities || [])) {
+      if (pa.isMapped) { convertMappedActivity(pa); changed = true; }
     }
     if (changed) await saveTemplate(template);
   }
@@ -17092,10 +17141,6 @@ function renderTargetManageContent(student, target) {
     ? (state.groupSessionData?.date || todayDateStr())
     : (state.sessionData?.date || todayDateStr());
   const _refDateLabel = fmtPeriodDate(_refDate);
-  // Other targets this target's mapped-score activities can point at — never
-  // itself (self-mapping would make a target's average depend on itself).
-  const siblingTargets = (_groupForTargetEdit ? _groupForTargetEdit.targets : student.targets)
-    .filter(t => t.id !== target.id);
 
   let html = `
     <div class="admin-section">
@@ -17234,74 +17279,6 @@ function renderTargetManageContent(student, target) {
           </div>
         </div>
         <button class="btn-adm-del mn-del-act" data-idx="${idx}">🗑</button>
-      </div>`;
-    } else if (a.isMapped) {
-      manageActNo++;
-      const mappedOptions = siblingTargets.map(t =>
-        `<option value="${escHtml(t.id)}"${a.mappedTargetId === t.id ? " selected" : ""}>${escHtml(t.name)}</option>`
-      ).join("");
-
-      html += `<div class="admin-list-item" data-idx="${idx}">
-        <span class="drag-handle">⠿</span>
-        <div style="flex:1;display:flex;gap:.5rem;align-items:flex-start">
-          <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;min-width:1.6rem;padding-top:.2rem">${manageActNo})</span>
-          <div style="flex:1;min-width:0">
-          <div class="mn-act-compact-title">${paDisplayHtml(a, true)}</div>
-          <div class="mn-act-body" style="display:flex;flex-direction:column;gap:.55rem">
-            <div style="display:flex;gap:.6rem;align-items:flex-start">
-              <div style="flex-shrink:0">
-                <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Start Date</div>
-                <button class="mn-act-start-btn" data-idx="${idx}" style="padding:.35rem .65rem;border:1.5px solid #d1d5db;border-radius:.4rem;background:#f0f9ff;cursor:pointer;font-size:.95rem;color:#374151;white-space:nowrap;display:block">📅 ${a.activeFrom ? fmtPeriodDate(a.activeFrom) : 'Set date'}</button>
-              </div>
-              <div style="flex:1">
-                <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title</div>
-                <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
-                  <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
-                    <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-title-${idx}" title="Bold (Ctrl+B)">B</button>
-                    <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-title-${idx}" title="Underline (Ctrl+U)">U</button>
-                  </div>
-                  <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
-                    placeholder="Enter Activity Title Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
-                </div>
-              </div>
-            </div>
-            <div>
-              <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Details</div>
-              <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
-                <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
-                  <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${idx}" title="Bold (Ctrl+B)">B</button>
-                  <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${idx}" title="Underline (Ctrl+U)">U</button>
-                  <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${idx}" title="Bullet (Ctrl+Shift+L)">•</button>
-                </div>
-                <textarea class="admin-input mn-act-details-input" id="mn-act-details-${idx}" data-idx="${idx}"
-                  rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(a.name || '')}</textarea>
-              </div>
-            </div>
-            <div>
-              <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Type</div>
-              ${buildRemarkTypeControls(a, idx, target.maxPoints || 3)}
-            </div>
-            <div style="display:flex;align-items:center;gap:.5rem">
-              <span style="font-size:.85rem;color:#6b7280;white-space:nowrap;font-weight:600">Mapped To Which Target's Average:</span>
-              <select class="admin-input mn-mapped-target-select" data-idx="${idx}" style="flex:1;border-color:#b8bcc4">
-                <option value="">— select target —</option>
-                ${mappedOptions}
-              </select>
-            </div>
-          </div>
-          </div>
-        </div>
-        <div style="position:relative;align-self:flex-start">
-          <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
-          <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:310px;overflow:hidden">
-            ${mnStatusKebabHtml(a, idx, false)}
-            <button class="mn-km-convert-mapped" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#7c3aed">🔄 Convert to Regular Activity</button>
-            <div style="display:flex;align-items:stretch">
-              <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
-              <span title="Permanently removes this activity and all of its session data. This cannot be undone." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
-            </div>
-          </div>
-        </div>
       </div>`;
     } else {
       // Sub-activities are rendered inline within their parent's row — skip them here
@@ -17849,7 +17826,6 @@ function renderTargetManageContent(student, target) {
       <button class="btn-admin-add" id="btn-mn-add-act" style="flex:0 0 auto;width:auto">+ Add Activity</button>
       <button class="btn-admin-add" id="btn-mn-add-heading" style="flex:0 0 auto;width:auto">+ Add Section Heading</button>
       <button class="btn-admin-add" id="btn-mn-add-note" style="flex:0 0 auto;width:auto">+ Add Note</button>
-      <button class="btn-admin-add" id="btn-mn-add-mapped" style="flex:0 0 auto;width:auto">+ Add Activity &amp; Mapped Score</button>
     </div>
     <div style="margin-top:2rem;padding-bottom:1.5rem">
       <button class="btn-primary-sm" id="btn-mn-done-target"
@@ -19165,35 +19141,6 @@ function renderTargetManageContent(student, target) {
       const toExport = sel.value === "export";
       if (toExport) { delete acts[idx].isNote; acts[idx].isExportNote = true; }
       else { delete acts[idx].isExportNote; acts[idx].isNote = true; }
-      target.predefinedActivities = acts;
-      await saveTarget();
-      renderTargetManageContent(student, target);
-    });
-  });
-
-  $("btn-mn-add-mapped").addEventListener("click", () => {
-    const btn = $("btn-mn-add-mapped"); if (btn) btn.disabled = true;
-    acts.push({ id: cfgId("m"), isMapped: true, name: "", mappedTargetId: null, order: acts.length, createdOn: todayDateStr() });
-    target.predefinedActivities = acts;
-    renderTargetManageContent(student, target);
-    saveTarget().catch(() => {});
-  });
-
-  $("manage-modal-body").querySelectorAll(".mn-mapped-target-select").forEach(sel => {
-    sel.addEventListener("change", async () => {
-      const idx = Number(sel.dataset.idx);
-      acts[idx].mappedTargetId = sel.value || null;
-      target.predefinedActivities = acts;
-      await saveTarget();
-      flashSaved(sel);
-    });
-  });
-
-  $("manage-modal-body").querySelectorAll(".mn-km-convert-mapped").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const idx = Number(btn.dataset.idx);
-      delete acts[idx].isMapped;
-      delete acts[idx].mappedTargetId;
       target.predefinedActivities = acts;
       await saveTarget();
       renderTargetManageContent(student, target);
