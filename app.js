@@ -175,7 +175,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1804";
+const APP_VERSION = "1805";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6382,7 +6382,7 @@ function showStudentChoice(student) {
       <button class="choice-btn choice-manage-activity">
         <span class="choice-icon">🪄</span>
         <div class="choice-text">
-          <div class="choice-label">Manage Activity & Targets</div>
+          <div class="choice-label">Manage Targets</div>
         </div>
       </button>
       <button class="choice-btn choice-export-excel">
@@ -6495,7 +6495,7 @@ function showStudentChoice(student) {
   });
   $("session-picker-list").querySelector(".choice-manage-activity").addEventListener("click", () => {
     closeSessionPicker();
-    $("manage-modal-title").textContent = "Manage Activity & Targets";
+    $("manage-modal-title").textContent = "Manage Targets";
     $("manage-modal-body").innerHTML = `
       <div style="padding:2rem 1rem;display:flex;flex-direction:column;align-items:center;gap:.75rem">
         <div style="font-size:.9rem;color:var(--text-muted)">Enter password to continue</div>
@@ -15657,7 +15657,7 @@ function openManageModal(student, targetOrNull, templateOrNull = null, remarkPre
   }
 }
 
-// ── Manage Activities & Targets (group) ──────────────────────
+// ── Manage Targets (group) ───────────────────────────────────
 function showGroupManageActivityContent(group) {
   requirePassword(() => openGroupManageActivityScreen(group), EXPORT_MSG);
 }
@@ -21408,7 +21408,7 @@ function showGroupChoice(group) {
       </button>
       <button class="choice-btn choice-manage-activity-group">
         <span class="choice-icon">🪄</span>
-        <div class="choice-text"><div class="choice-label">Manage Activities & Targets</div></div>
+        <div class="choice-text"><div class="choice-label">Manage Targets</div></div>
       </button>
       <button class="choice-btn choice-export-excel">
         <span class="choice-icon">📊</span>
