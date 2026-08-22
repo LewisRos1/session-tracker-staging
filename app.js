@@ -29,6 +29,7 @@ import {
   deleteStudentConfig,
   setStudentNote,
   migrateRemarksToNote,
+  stripRemarkScoringData,
   setStudentWordExportReady,
   setStudentExcelExportReady,
   setStudentAiH1ReportReady,
@@ -175,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1806";
+const APP_VERSION = "1807";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8322,7 +8323,7 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
           const sid = state.currentSessionId;
           if (sid) migrateRemarksToNote(sid, { [rem.id]: { text: rescued, masteryNote: "" } }).catch(() => {});
         }
-        html += renderRemarkFields(rem, target, getActivityInlineOptions(pa), pa.sentenceStarter || null, pa.optionsMulti || false, mappedInfo, pa.remarkHasNote || false, pa.manualScore || false, pa.optionScores || null, !!(pa.manualScore || pa.remarkHasNote || pa.inlineOptions || pa.remarkPresetId), pa.noteSentenceStarter || null);
+        html += renderRemarkFields(rem, target, getActivityInlineOptions(pa), pa.sentenceStarter || null, pa.optionsMulti || false, mappedInfo, pa.remarkHasNote || false, pa.manualScore || false, pa.optionScores || null, !!(pa.manualScore || pa.remarkHasNote || pa.inlineOptions || pa.remarkPresetId), pa.noteSentenceStarter || null, pa.noTrials || false);
       }
       if (isPending) {
         html += renderPendingRemarkFields(pendingKey, actId, pa.name, idx, target);
@@ -8351,7 +8352,7 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
           data-cfg-id="${escHtml(pa.id || "")}"
           data-target="${escHtml(target.name)}">+ Add ${addLabel}</button>`;
       } else {
-        const addLabel = pa.isMapped ? "Score" : pa.manualScore ? "Remark &amp; Score" : "Remark &amp; Trials";
+        const addLabel = pa.isMapped ? "Score" : pa.manualScore ? "Remark &amp; Score" : pa.noTrials ? "Remark" : "Remark &amp; Trials";
         html += `<button class="btn-add-remark" contenteditable="false"
           data-pending-key="${escHtml(pendingKey)}"
           data-act-id="${actId || ""}"
@@ -9021,7 +9022,7 @@ function toggleBulletSelection(el) {
 
 // ─── REMARK FIELDS ───────────────────────────────────────────
 
-function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false, manualScore = false, optionScores = null, noteCapable = false, noteSentenceStarter = null) {
+function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false, manualScore = false, optionScores = null, noteCapable = false, noteSentenceStarter = null, noTrials = false) {
   const opts = parseOpts(inlineOptions);
 
   // Sync optionScore with current config whenever the target is re-rendered.
@@ -9084,7 +9085,11 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
 
   const _existingNote = (rem.masteryNote || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
 
-  const trailingField = mappedInfo
+  // Remark Only (No Trials): the whole Trials row is omitted — no label, no
+  // badges, no "+ Trial" button — so the activity can never gain a score.
+  const trailingField = noTrials
+    ? ``
+    : mappedInfo
     ? `<div class="entry-field" contenteditable="false">
         <span class="field-label">${escHtml(mappedInfo.label)}</span>
         <span class="field-value-fixed">${mappedInfo.pct !== null ? mappedInfo.pct + "%" : "—"}</span>
@@ -12020,7 +12025,9 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
         data-is-predefined="${isPredefined}"
         data-parent-activity="${escHtml(paConfig?.parentActivity || "")}"
         data-config-id="${escHtml(paConfig?.id || "")}">+</button>`;
-      const emptyTrialsContent = mappedInfo
+      const emptyTrialsContent = paConfig?.noTrials
+        ? `<span class="view-trials-disabled" style="color:#9ca3af;font-style:italic">Trials are disabled for this activity</span>`
+        : mappedInfo
         ? `<span class="view-mapped-label">${escHtml(mappedInfo.label)}</span>`
         : (addTrialBtn || "&nbsp;");
       const emptyScoreContent = mappedInfo
@@ -12091,7 +12098,9 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
     } else {
       emptyRemCell = emptySelHtml;
     }
-    const emptyTrialBtn = mappedInfo
+    const emptyTrialBtn = paConfig?.noTrials
+      ? `<span class="view-trials-disabled" style="color:#9ca3af;font-style:italic">Trials are disabled for this activity</span>`
+      : mappedInfo
       ? `<span class="view-mapped-label">${escHtml(mappedInfo.label)}</span>`
       : `<button class="view-add-trial-new" data-act-id="${escHtml(actId || "")}"
           data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
@@ -12111,7 +12120,7 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
     ri === 0 ? no : null,
     ri === 0 ? actCell : null,
     rem, target, inlineOptions, sentenceStarter, multiSelect, mappedInfo, remarkHasNote, rowClass,
-    paEntry?.optionScores || null, paEntry?.manualScore || false
+    paEntry?.optionScores || null, paEntry?.manualScore || false, paEntry?.noTrials || false
   )).join("");
 }
 
@@ -12144,7 +12153,7 @@ function buildTrialCellsHtml(rem, maxPts) {
     `<button class="view-add-trial" data-rem-id="${escHtml(rem.id)}">+</button>`;
 }
 
-function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false, rowClass = "", optionScores = null, manualScore = false) {
+function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false, rowClass = "", optionScores = null, manualScore = false, noTrials = false) {
   const _sv = t => (t || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
   const _remEmpty = !_sv(rem.text) && !_sv(rem.masteryNote) && !(rem.trials || []).some(t => t >= 0) && rem.optionScore === undefined;
   const delBtn = _remEmpty ? "" : `<button class="view-rem-del" data-rem-id="${escHtml(rem.id)}" title="Delete remark">×</button>`;
@@ -12283,11 +12292,11 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
     <td class="vcol-no" contenteditable="false">${no !== null ? no : ""}</td>
     <td class="vcol-act" contenteditable="false">${actName !== null ? actName : ""}</td>
     <td class="vcol-rem" contenteditable="false">${remarkCell}</td>
-    <td class="vcol-trials" contenteditable="false">${trialCells}</td>
-    <td class="vcol-total" contenteditable="false">${totalCell}</td>
+    <td class="vcol-trials" contenteditable="false">${noTrials ? `<span class="view-trials-disabled" style="color:#9ca3af;font-style:italic">Trials are disabled for this activity</span>` : trialCells}</td>
+    <td class="vcol-total" contenteditable="false">${noTrials ? "&nbsp;" : totalCell}</td>
     <td class="vcol-score" contenteditable="false">
       <div style="display:flex;align-items:center;gap:.3rem;justify-content:flex-end">
-        <span>${scoreDisplay}</span>
+        <span>${noTrials ? "" : scoreDisplay}</span>
         ${delBtn}
       </div>
     </td>
@@ -14317,9 +14326,9 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
             placeholder="${_maintained && data.date >= (_maintainedAt || "2026-01-01") ? "" : "Remark…"}">${_maintained && data.date >= (_maintainedAt || "2026-01-01") ? "Maintain" : ""}</textarea>
         </td>
         <td class="vcol-trials" contenteditable="false">
-          <button class="view-group-add-trial-new" data-act-id="${escHtml(actId || "")}"
+          ${paEntry?.noTrials ? `<span class="view-trials-disabled" style="color:#9ca3af;font-style:italic">Trials are disabled for this activity</span>` : `<button class="view-group-add-trial-new" data-act-id="${escHtml(actId || "")}"
             data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
-            data-is-predefined="${isPredefined}" data-student="${escHtml(studentName)}">+</button>
+            data-is-predefined="${isPredefined}" data-student="${escHtml(studentName)}">+</button>`}
         </td>
         <td class="vcol-total" contenteditable="false">&nbsp;</td>
         <td class="vcol-score" contenteditable="false">&nbsp;</td>
@@ -14374,9 +14383,9 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
         <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(studentName)}</td>
         <td class="vcol-rem" contenteditable="false">${gRemCell}</td>
         <td class="vcol-trials" contenteditable="false">
-          <button class="view-group-add-trial-new" data-act-id="${escHtml(actId || "")}"
+          ${paEntry?.noTrials ? `<span class="view-trials-disabled" style="color:#9ca3af;font-style:italic">Trials are disabled for this activity</span>` : `<button class="view-group-add-trial-new" data-act-id="${escHtml(actId || "")}"
             data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
-            data-is-predefined="${isPredefined}" data-student="${escHtml(studentName)}">+</button>
+            data-is-predefined="${isPredefined}" data-student="${escHtml(studentName)}">+</button>`}
         </td>
         <td class="vcol-total" contenteditable="false">&nbsp;</td>
         <td class="vcol-score" contenteditable="false">&nbsp;</td>
@@ -14412,9 +14421,9 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
                 data-student="${escHtml(entry.studentName)}"></textarea>
             </td>
             <td class="vcol-trials" contenteditable="false">
-              <button class="view-group-add-trial-new" data-act-id="${escHtml(actId || "")}"
+              ${paEntry?.noTrials ? `<span class="view-trials-disabled" style="color:#9ca3af;font-style:italic">Trials are disabled for this activity</span>` : `<button class="view-group-add-trial-new" data-act-id="${escHtml(actId || "")}"
                 data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
-                data-is-predefined="${isPredefined}" data-student="${escHtml(entry.studentName)}">+</button>
+                data-is-predefined="${isPredefined}" data-student="${escHtml(entry.studentName)}">+</button>`}
             </td>
             <td class="vcol-total" contenteditable="false">&nbsp;</td>
             <td class="vcol-score" contenteditable="false">&nbsp;</td>
@@ -14480,7 +14489,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
 
       html += viewGroupRemarkRow(
         noVal, actVal, entry.studentName, entry, target,
-        inlineOptions, sentenceStarter, multiSelect, null, remarkHasNote, rowClass, paEntry?.optionScores || null, paEntry?.manualScore || false
+        inlineOptions, sentenceStarter, multiSelect, null, remarkHasNote, rowClass, paEntry?.optionScores || null, paEntry?.manualScore || false, paEntry?.noTrials || false
       );
       firstRowOverall = false;
     }
@@ -14488,7 +14497,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
   return html;
 }
 
-function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false, rowClass = "", optionScores = null, manualScore = false) {
+function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false, rowClass = "", optionScores = null, manualScore = false, noTrials = false) {
   const _sv2 = t => (t || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
   const _remEmpty2 = !_sv2(rem.text) && !_sv2(rem.masteryNote) && !(rem.trials || []).some(t => t >= 0) && rem.optionScore === undefined;
   const delBtn2 = _remEmpty2 ? "" : `<button class="view-rem-del" data-rem-id="${escHtml(rem.id)}" title="Delete remark">×</button>`;
@@ -14613,11 +14622,11 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
     <td class="vcol-act" contenteditable="false">${actName !== null ? actName : ""}</td>
     <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(studentName)}</td>
     ${remarkTd}
-    <td class="vcol-trials" contenteditable="false">${trialCells}</td>
-    <td class="vcol-total" contenteditable="false">${totalCell}</td>
+    <td class="vcol-trials" contenteditable="false">${noTrials ? `<span class="view-trials-disabled" style="color:#9ca3af;font-style:italic">Trials are disabled for this activity</span>` : trialCells}</td>
+    <td class="vcol-total" contenteditable="false">${noTrials ? "&nbsp;" : totalCell}</td>
     <td class="vcol-score" contenteditable="false">
       <div style="display:flex;align-items:center;gap:.3rem;justify-content:flex-end">
-        <span>${scoreDisplay}</span>
+        <span>${noTrials ? "" : scoreDisplay}</span>
         ${delBtn2}
       </div>
     </td>
@@ -16955,7 +16964,10 @@ function parseManualScore(val) {
 // field is captured (free text / preset options / sentence starter),
 // independently of where the Score comes from.
 function buildRemarkTypeControls(a, idx, maxPts = 3) {
-  const type = a.manualScore ? "manual_score"
+  // noTrials is checked first: it's "Remark Only" plus a no-trials flag, so it
+  // carries none of the other type markers and would otherwise fall through to "".
+  const type = a.noTrials ? "no_trials"
+    : a.manualScore ? "manual_score"
     : a.remarkHasNote ? "starter_fixed_note"
     : (a.sentenceStarter && a.inlineOptions && a.optionsMulti) ? "starter_fixed_multi"
     : (a.sentenceStarter && a.inlineOptions) ? "starter_fixed_note"
@@ -16967,6 +16979,7 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
   return `<div style="flex:1;display:flex;flex-direction:column;gap:.4rem;min-width:0">
     <select class="act-preset-select mn-act-preset" data-idx="${idx}" style="border-color:#b8bcc4">
       <option value="">Remark Only</option>
+      <option value="no_trials"${type === "no_trials" ? " selected" : ""}>Remark Only (No Trials)</option>
       <option value="manual_score"${type === "manual_score" ? " selected" : ""}>Manual Score</option>
       <option value="starter_fixed_note"${type === "starter_fixed_note" ? " selected" : ""}>Multiple Choice</option>
       <option value="starter_fixed_multi"${type === "starter_fixed_multi" ? " selected" : ""}>Checkboxes</option>
@@ -19336,7 +19349,18 @@ function renderTargetManageContent(student, target) {
   // Shared per render: cache the sessions fetch so rapid type changes don't each fire a separate Firestore query.
   // Token increments on every change; stale handlers bail out after the await.
   let _sessionsPromise = null;
-  const getSessionsCached = () => { if (!_sessionsPromise) _sessionsPromise = getAllSessionsForStudent(student.id); return _sessionsPromise; };
+  // Group targets are edited through this same function with the group passed in
+  // as `student`, so querying by studentId found nothing — the past-data password
+  // gate never fired and none of the type-change data migrations below ever ran
+  // for a group. Pick the query that matches the entity actually being edited.
+  const getSessionsCached = () => {
+    if (!_sessionsPromise) {
+      _sessionsPromise = _groupForTargetEdit
+        ? getAllSessionsForGroup(_groupForTargetEdit.id)
+        : getAllSessionsForStudent(student.id);
+    }
+    return _sessionsPromise;
+  };
   let _typeChangeToken = 0;
 
   $("manage-modal-body").querySelectorAll(".mn-act-preset").forEach(sel => {
@@ -19345,7 +19369,8 @@ function renderTargetManageContent(student, target) {
       const idx = Number(sel.dataset.idx);
       const pa  = acts[idx];
       const type = sel.value;
-      const oldType = pa.optionsMulti ? "starter_fixed_multi"
+      const oldType = pa.noTrials ? "no_trials"
+        : pa.optionsMulti ? "starter_fixed_multi"
         : pa.remarkHasNote ? "starter_fixed_note"
         : pa.manualScore   ? "manual_score"
         : pa.fixedRemark !== undefined ? "fixed_remark"
@@ -19359,6 +19384,48 @@ function renderTargetManageContent(student, target) {
       const optsContainer    = body.querySelector(`.mn-opts-container[data-idx="${idx}"]`);
 
       const doChange = async () => {
+        // Switching to Remark Only (No Trials) — same shape as Remark Only (keeps
+        // its optional Sentence Starter) plus a noTrials flag, and every trace of
+        // scoring is stripped from past sessions so nothing lingers invisibly and
+        // keeps counting toward the target average or exports.
+        if (type === "no_trials") {
+          const actName2  = acts[idx].name;
+          const actCfgId2 = acts[idx].id;
+          acts[idx].noTrials = true;
+          delete acts[idx].manualScore; delete acts[idx].fixedRemark;
+          acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
+          acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false;
+          delete acts[idx].optionScores;
+          target.predefinedActivities = acts;
+          await saveTarget();
+          getSessionsCached().then(async sessions => {
+            for (const sess of sessions) {
+              const matchActIds = Object.entries(sess.activities || {})
+                .filter(([, a]) => (actCfgId2 && a.configId === actCfgId2) || a.activityName === actName2)
+                .map(([id]) => id);
+              const changes = {};
+              for (const [remId, rem] of Object.entries(sess.remarks || {})) {
+                if (!matchActIds.includes(rem.activityId)) continue;
+                // A typed note wins over a Multiple Choice/Checkbox selection —
+                // the selection is score data and is being deleted, the note is a
+                // real remark and is what the single remaining box should show.
+                const note = (rem.masteryNote || "").trim();
+                changes[remId] = note
+                  ? { text: rem.masteryNote, masteryNote: "" }
+                  : { text: rem.text || "", masteryNote: "" };
+              }
+              if (Object.keys(changes).length > 0) await stripRemarkScoringData(sess.id, changes);
+            }
+          }).catch(err => console.error("no-trials scoring strip failed:", err));
+          const sp = $("manage-modal-body").scrollTop;
+          renderTargetManageContent(student, target);
+          $("manage-modal-body").scrollTop = sp;
+          if (state.sessionData) renderTargetContent();
+          return;
+        }
+        // Switching away from Remark Only (No Trials) — trials become available
+        // again; remarks already written are plain text and carry over untouched.
+        delete acts[idx].noTrials;
         // Switching to Fixed Remark triggers a re-render to show the fixed remark textarea
         if (type === "fixed_remark") {
           if (acts[idx].fixedRemark === undefined) acts[idx].fixedRemark = "";
@@ -19490,18 +19557,27 @@ function renderTargetManageContent(student, target) {
       const actCfgId = pa.id || null;
       const actName  = pa.name || pa.title || "";
       let sessionsWithData = [];
+      // Tracked separately from sessionsWithData: the red "this will be deleted"
+      // warning must only appear when there is actually scoring data to delete,
+      // not merely because the activity has remarks written.
+      let hasScoringData = false;
       try {
         const allSess = await getSessionsCached();
         for (const sess of allSess) {
           const matchActIds = Object.entries(sess.activities || {})
             .filter(([, a]) => (actCfgId && a.configId === actCfgId) || (actName && a.activityName === actName))
             .map(([id]) => id);
-          const hasData = matchActIds.length > 0 && Object.values(sess.remarks || {})
-            .some(rem => {
-              if (!matchActIds.includes(rem.activityId)) return false;
-              const txt = (rem.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
-              return txt || rem.masteryNote || (rem.trials && rem.trials.length > 0) || rem.optionScore !== undefined;
-            });
+          const matchRems = matchActIds.length === 0 ? [] : Object.values(sess.remarks || {})
+            .filter(rem => matchActIds.includes(rem.activityId));
+          const hasData = matchRems.some(rem => {
+            const txt = (rem.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+            return txt || rem.masteryNote || (rem.trials && rem.trials.length > 0) || rem.optionScore !== undefined;
+          });
+          if (matchRems.some(rem =>
+            (rem.trials || []).some(t => t !== null && t !== -1) ||
+            rem.optionScore !== undefined ||
+            (rem.selectedOptions || []).length > 0
+          )) hasScoringData = true;
           if (hasData) sessionsWithData.push(sess);
         }
       } catch (e) { /* proceed without gate on error */ }
@@ -19527,6 +19603,7 @@ function renderTargetManageContent(student, target) {
         <p style="font-size:.88rem;margin:0 0 .5rem;color:#111;font-weight:700">⚠️ This activity has data in <strong>${sessionsWithData.length} past session${sessionsWithData.length !== 1 ? "s" : ""}</strong>.</p>
         <p style="font-size:.82rem;margin:0 0 .25rem;color:#374151;font-weight:600">Sessions with data:</p>
         <ul style="font-size:.82rem;color:#374151;margin:0 0 .75rem;padding-left:1.2rem;line-height:1.8">${sessionDateHtml}</ul>
+        ${type === "no_trials" && hasScoringData ? `<p style="font-size:.83rem;margin:0 0 .75rem;color:#dc2626;font-weight:700;line-height:1.5">WARNING: All past trial scores, multiple choice and checkbox selections for this activity will be permanently deleted. Only remarks you have written will be kept.</p>` : ``}
         <p style="font-size:.84rem;margin:0 0 .35rem;color:#374151;font-weight:600">To change the activity type, please enter special password (only Lewis knows)</p>
         <input id="act-type-pw" type="text" autocomplete="off" value=""
           style="width:100%;box-sizing:border-box;padding:.45rem .6rem;border:2px solid #d1d5db;border-radius:.4rem;font-size:1.1rem;text-align:center;outline:none;margin-bottom:.3rem;-webkit-text-security:disc" placeholder="Enter password">
@@ -20743,6 +20820,22 @@ function renderTemplateManageContent(template) {
       const noteStarterWrap = body.querySelector(`.mn-act-note-starter-wrap[data-idx="${idx}"]`);
       const optsContainer   = body.querySelector(`.mn-opts-container[data-idx="${idx}"]`);
       const type = sel.value;
+      // Remark Only (No Trials) — templates hold no session data, so there's
+      // nothing to strip here, just the config flip. See the Edit Target
+      // handler for the full version.
+      if (type === "no_trials") {
+        acts[idx].noTrials = true;
+        delete acts[idx].manualScore; delete acts[idx].fixedRemark; delete acts[idx].optionScores;
+        acts[idx].sentenceStarter = null; acts[idx].remarkPresetId = null;
+        acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false;
+        template.predefinedActivities = acts;
+        await saveTemplateFn();
+        const spNT = $("manage-modal-body").scrollTop;
+        renderTemplateManageContent(template);
+        $("manage-modal-body").scrollTop = spNT;
+        return;
+      }
+      delete acts[idx].noTrials;
       if (type === "fixed_remark") {
         if (acts[idx].fixedRemark === undefined) acts[idx].fixedRemark = "";
         acts[idx].sentenceStarter = null; acts[idx].noteSentenceStarter = null; acts[idx].remarkPresetId = null;
@@ -22552,7 +22645,7 @@ function renderGroupStudentActivityCard(studentName, actName, actId, target, dat
   const mappedInfo = mappedPa ? resolveGroupMappedScoreDisplay(mappedPa, target, data, studentName) : null;
 
   for (const [remId, rem] of remarksForThisStudent) {
-    html += renderGroupStudentRowCompact(remId, rem, target, mappedInfo);
+    html += renderGroupStudentRowCompact(remId, rem, target, mappedInfo, pa?.noTrials || false);
   }
 
   // Only show "Maintain" default on/after the maintained date, and only for Notes Only activities
@@ -22576,10 +22669,10 @@ function renderGroupStudentActivityCard(studentName, actName, actId, target, dat
           data-student="${escHtml(studentName)}"
           data-act-id="${escHtml(actId || "")}"
           data-act-name="${escHtml(actName)}"
-          data-target="${escHtml(target.name)}">+ Add Remark${mappedPa ? "" : " &amp; Trials"}</button>`
+          data-target="${escHtml(target.name)}">+ Add Remark${(mappedPa || pa?.noTrials) ? "" : " &amp; Trials"}</button>`
       : `<button class="btn-add-remark btn-group-add-remark-student-more" contenteditable="false"
           data-act-id="${escHtml(actId || "")}"
-          data-student="${escHtml(studentName)}">+ Add Remark${mappedPa ? "" : " &amp; Trials"}</button>`;
+          data-student="${escHtml(studentName)}">+ Add Remark${(mappedPa || pa?.noTrials) ? "" : " &amp; Trials"}</button>`;
   }
 
   html += `</div>`;
@@ -22599,7 +22692,7 @@ function firstNameOf(name) {
   return (name || "").trim().split(/\s+/)[0] || name;
 }
 
-function renderGroupStudentRowCompact(remId, rem, target, mappedInfo = null) {
+function renderGroupStudentRowCompact(remId, rem, target, mappedInfo = null, noTrials = false) {
   const trials = rem.trials || [];
   const regularBadges = trials.map((t, i) =>
     `<span class="trial-badge">${t === -1 ? "—" : t}<button class="btn-trial-delete btn-group-trial-del" data-rem-id="${remId}" data-idx="${i}">×</button></span>`
@@ -22607,7 +22700,10 @@ function renderGroupStudentRowCompact(remId, rem, target, mappedInfo = null) {
   const optBadge = rem.optionScore !== undefined
     ? `<span class="trial-badge trial-badge--option">${rem.optionScore}</span>` : "";
   const badges = regularBadges + optBadge;
-  const trailingField = mappedInfo
+  // Remark Only (No Trials) drops the Trials row entirely — see renderRemarkFields.
+  const trailingField = noTrials
+    ? ``
+    : mappedInfo
     ? `<div class="entry-field" contenteditable="false">
         <span class="field-label">${escHtml(mappedInfo.label)}</span>
         <span class="field-value-fixed">${mappedInfo.pct !== null ? mappedInfo.pct + "%" : "—"}</span>
@@ -22675,7 +22771,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
       if (remarks.length === 0) return renderGroupStudentPendingRow(studentName, actId, actName, target, true);
       const mappedInfo = resolveGroupMappedScoreDisplay(mappedPa, target, data, studentName);
       return remarks.map(([remId, rem]) => renderGroupStudentRow(
-        studentName, remId, rem, target, mappedInfo, inlineOptions, sentenceStarter, multiSelect, remarkHasNote, paEntry?.optionScores || null, noteCapableGrp, paEntry?.noteSentenceStarter || null
+        studentName, remId, rem, target, mappedInfo, inlineOptions, sentenceStarter, multiSelect, remarkHasNote, paEntry?.optionScores || null, noteCapableGrp, paEntry?.noteSentenceStarter || null, paEntry?.noTrials || false
       )).join("");
     }).join("");
     return `${_outerOpen}
@@ -22760,7 +22856,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
     const bodyHtml = attendees.map(studentName => {
       const entry = byStudent[studentName]?.[i] || null;
       if (entry) return renderGroupStudentRow(
-        studentName, entry[0], entry[1], target, null, inlineOptions, sentenceStarter, multiSelect, remarkHasNote, paEntry?.optionScores || null, noteCapableGrp, paEntry?.noteSentenceStarter || null
+        studentName, entry[0], entry[1], target, null, inlineOptions, sentenceStarter, multiSelect, remarkHasNote, paEntry?.optionScores || null, noteCapableGrp, paEntry?.noteSentenceStarter || null, paEntry?.noTrials || false
       );
       return isFreeText
         ? renderGroupStudentEmptyRow(studentName, actId, actName, target, isPredefined)
@@ -22801,7 +22897,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
 // just with .group-remark-input instead of .remark-text-input for the
 // free-text fallback box, since this row is one attendee's slice of a
 // shared-activity card instead of a single student's own remark field.
-function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = null, inlineOptions = null, sentenceStarter = null, multiSelect = false, remarkHasNote = false, optionScores = null, noteCapable = false, noteSentenceStarter = null) {
+function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = null, inlineOptions = null, sentenceStarter = null, multiSelect = false, remarkHasNote = false, optionScores = null, noteCapable = false, noteSentenceStarter = null, noTrials = false) {
   const trials = rem.trials || [];
   const regularBadges = trials.map((t, i) =>
     `<span class="trial-badge">${t === -1 ? "—" : t}<button class="btn-trial-delete btn-group-trial-del" data-rem-id="${remId}" data-idx="${i}">×</button></span>`
@@ -22811,7 +22907,10 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
   const badges = regularBadges + optBadge;
   const _grpExistingNote = (rem.masteryNote || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
 
-  const trailingField = mappedInfo
+  // Remark Only (No Trials) drops the Trials row entirely — see renderRemarkFields.
+  const trailingField = noTrials
+    ? ``
+    : mappedInfo
     ? `<div class="entry-field" contenteditable="false">
         <span class="field-label">${escHtml(mappedInfo.label)}</span>
         <span class="field-value-fixed">${mappedInfo.pct !== null ? mappedInfo.pct + "%" : "—"}</span>

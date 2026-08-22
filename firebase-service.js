@@ -871,6 +871,25 @@ export async function migrateRemarksToNote(sessionId, changes) {
   await updateDoc(doc(db, "sessions", sessionId), updateData);
 }
 
+// Strips every trace of scoring from a set of remarks in one write — used when
+// an activity is switched to "Remark Only (No Trials)", which has no trials and
+// no options, so any recorded trial scores / option selections would otherwise
+// linger invisibly and keep counting toward the target average and exports.
+// changes: { [remId]: { text: string, masteryNote: string } }
+export async function stripRemarkScoringData(sessionId, changes) {
+  const updateData = {};
+  for (const [remId, vals] of Object.entries(changes)) {
+    updateData[`remarks.${remId}.text`]            = vals.text;
+    updateData[`remarks.${remId}.masteryNote`]     = vals.masteryNote;
+    updateData[`remarks.${remId}.trials`]          = [];
+    updateData[`remarks.${remId}.optionScore`]     = deleteField();
+    // Legacy field — only ever read elsewhere, never written, but old records
+    // can still carry it and it counts as "has data" in several checks.
+    updateData[`remarks.${remId}.selectedOptions`] = deleteField();
+  }
+  await updateDoc(doc(db, "sessions", sessionId), updateData);
+}
+
 /** Toggle the "Ready for Word Export" flag on a student document. */
 export async function setStudentWordExportReady(studentId, ready) {
   await updateDoc(doc(db, "students", studentId), { readyForWordExport: ready });
