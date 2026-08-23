@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1833";
+const APP_VERSION = "1834";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -17389,8 +17389,8 @@ function mnRegroupInactiveCards(bodyEl, acts) {
   if (!src) return;
   const segOf = mnSegmentOf(acts);
   const meta = {
-    mastered:     { label: "Mastered",     emoji: "⭐", color: "#059669" },
-    discontinued: { label: "Discontinued", emoji: "🚩", color: "#dc2626" }
+    mastered:     { label: "Mastered Activities",     emoji: "⭐", color: "#059669" },
+    discontinued: { label: "Discontinued Activities", emoji: "🚩", color: "#dc2626" }
   };
   for (const kind of ["mastered", "discontinued"]) {
     const panel = src.querySelector(`#mn-${kind}-section`);
@@ -17409,7 +17409,10 @@ function mnRegroupInactiveCards(bodyEl, acts) {
         group.style.cssText = "margin:.35rem 0 .15rem";
         group.innerHTML =
           `<button class="mn-inact-toggle" style="display:flex;align-items:center;gap:.45rem;background:none;border:none;cursor:pointer;width:100%;padding:.25rem 0;font-size:.83rem;font-weight:700;color:${m.color};text-align:left">` +
-            `<span class="mn-inact-arrow" style="font-size:.7rem">▶</span>${m.emoji} ${m.label} (<span class="mn-inact-count">0</span>)` +
+            // Label and count share one span: the button is a flex row with a gap,
+            // so leaving them as loose text nodes rendered as "Mastered ( 3 )".
+            `<span class="mn-inact-arrow" style="font-size:.7rem">▶</span>` +
+            `<span>${m.emoji} ${m.label} (<span class="mn-inact-count">0</span>)</span>` +
           `</button><div class="mn-inact-body" style="display:none"></div>`;
         holder.appendChild(group);
       }
