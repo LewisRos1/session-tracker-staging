@@ -808,7 +808,10 @@ html, body {
 .target-content {
   flex: 1;
   min-height: 0;
-  padding: 1rem;
+  /* Extra bottom padding so whatever ends the list — the dashed "+ Add Activity"
+     button or the Mastered/Discontinued sections — never sits flush against the
+     window edge, without each of them needing its own large margin. */
+  padding: 1rem 1rem 2.25rem;
   display: flex;
   flex-direction: column;
   gap: .85rem;

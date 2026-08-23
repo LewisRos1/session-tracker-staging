@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1831";
+const APP_VERSION = "1832";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8598,7 +8598,7 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
     };
     const _inactRow = (pa, marker, isSub) => {
       const name = paDisplayHtml(pa, true) || `<em style="color:#9ca3af;font-size:.85rem">Untitled</em>`;
-      return `<div contenteditable="false" style="display:flex;align-items:flex-start;gap:.5rem;padding:.3rem .5rem;${isSub ? 'margin-left:1.5rem;' : ''}opacity:.65">
+      return `<div contenteditable="false" style="display:flex;align-items:flex-start;gap:.5rem;padding:.3rem .5rem;${isSub ? 'margin-left:1.5rem;' : ''}">
         <span style="font-size:.8rem;font-weight:700;color:${isSub ? '#0369a1' : '#6b7280'};flex-shrink:0;min-width:1.4rem">${marker}</span>
         <span style="flex:1;min-width:0;font-size:.88rem;line-height:1.45;white-space:pre-wrap">${name}</span>
         ${_inactDateBadge(pa)}
@@ -8616,7 +8616,7 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
       );
       if (subActs.length === 0) return _inactRow(pa, `${num})`, false);
       const parentName = paDisplayHtml(pa, true) || `<em style="color:#9ca3af;font-size:.85rem">Untitled</em>`;
-      return `<div contenteditable="false" style="display:flex;align-items:flex-start;gap:.5rem;padding:.3rem .5rem;opacity:.65">
+      return `<div contenteditable="false" style="display:flex;align-items:flex-start;gap:.5rem;padding:.3rem .5rem">
           <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;min-width:1.4rem">${num})</span>
           <span style="flex:1;min-width:0;font-size:.88rem;line-height:1.45;white-space:pre-wrap">${parentName}</span>
         </div>${subActs.map((sub, si) => _inactRow(sub, `${String.fromCharCode(97 + si)})`, true)).join('')}`;
@@ -8625,7 +8625,7 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
     // for context but, as above, carries no date of its own.
     const _renderOrphanGroup = ({ parentPa, parentKey, subs }, num) => {
       const parentName = parentPa ? (paDisplayHtml(parentPa, true) || escHtml(parentKey)) : escHtml(parentKey);
-      return `<div contenteditable="false" style="display:flex;align-items:flex-start;gap:.5rem;padding:.3rem .5rem;opacity:.65">
+      return `<div contenteditable="false" style="display:flex;align-items:flex-start;gap:.5rem;padding:.3rem .5rem">
           <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;min-width:1.4rem">${num})</span>
           <span style="flex:1;min-width:0;font-size:.88rem;line-height:1.45;white-space:pre-wrap">${parentName}</span>
         </div>${subs.map((sub, si) => _inactRow(sub, `${String.fromCharCode(97 + si)})`, true)).join('')}`;
@@ -8659,7 +8659,7 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
         <div class="inactive-list" style="display:none;flex-direction:column;gap:.25rem;margin-top:.35rem">${topItems}${orphanItems}</div>
       </div>`;
     };
-    html += `<div style="margin-top:.75rem;padding-bottom:1.5rem">
+    html += `<div style="margin-top:.4rem">
       ${renderSection('Mastered Activities', '#059669', masteredPas, 'mastered')}
       ${renderSection('Discontinued Activities', '#dc2626', discontinuedPas, 'discontinued')}
       ${renderSection('Inactive Activities', '#6b7280', otherPas, 'other')}
@@ -8921,9 +8921,10 @@ function renderExtraActivitiesSection(target) {
         data-target="${escHtml(target.name)}">+ Add Remark &amp; Trials</button>
     </div>`;
   } else {
-    // margin-bottom keeps the dashed button clear of the bottom of the scroll
-    // area — without it the border sits flush against the window edge.
-    html += `<button class="btn-add-session-activity" style="display:block;margin-top:.6rem;margin-bottom:2.5rem;padding:.55rem .9rem;background:transparent;border:1.5px dashed #a5b4fc;border-radius:.5rem;cursor:pointer;font-size:.85rem;color:#6366f1;margin-left:auto;margin-right:auto" contenteditable="false">+ Add Activity (only for this session, not saved to the target permanently)</button>`;
+    // Small bottom margin only — .target-content now carries the padding that
+    // keeps the last element clear of the window edge, so a big margin here just
+    // opened a gap between this button and the Mastered/Discontinued sections.
+    html += `<button class="btn-add-session-activity" style="display:block;margin-top:.6rem;margin-bottom:.6rem;padding:.55rem .9rem;background:transparent;border:1.5px dashed #a5b4fc;border-radius:.5rem;cursor:pointer;font-size:.85rem;color:#6366f1;margin-left:auto;margin-right:auto" contenteditable="false">+ Add Activity (only for this session, not saved to the target permanently)</button>`;
   }
   return html;
 }
