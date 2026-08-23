@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1821";
+const APP_VERSION = "1822";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -17044,9 +17044,13 @@ function initDragSort(listEl, onReorder) {
     delete dragEl._savedStyle;
     if (placeholder?.parentNode) placeholder.parentNode.insertBefore(dragEl, placeholder);
     placeholder?.remove();
+    // Elements without a data-idx (e.g. Edit Target's per-section holders for the
+    // collapsed mastered/discontinued groups) sit in this list but aren't rows —
+    // skip them so they don't land in newOrder as NaN.
     const newOrder = [...listEl.children]
-      .filter(el => el !== placeholder)
-      .map(el => Number(el.dataset.idx));
+      .filter(el => el !== placeholder && el.dataset.idx !== undefined)
+      .map(el => Number(el.dataset.idx))
+      .filter(Number.isFinite);
     // Scroll the dropped item into view immediately after compact→expanded transition
     // so the viewport stays on the drop position instead of jerking back to item 1.
     dragEl.scrollIntoView({ block: "nearest" });
@@ -17272,6 +17276,141 @@ function mnStatusKebabHtml(a, idx, isParent = false) {
          (!isParent ? btn('maintain','🆗 Maintain Activity',';color:#0369a1') : '');
 }
 
+// ─── EDIT TARGET: SECTION SEGMENTS ───────────────────────────
+// Every activity belongs to the section heading that precedes it in the array;
+// anything before the first heading belongs to the leading segment, keyed -1.
+// Drives both where each heading's collapsed mastered/discontinued groups go
+// and what a heading drag has to carry with it.
+function mnSegmentInfo(acts) {
+  const segOf = new Map();
+  const counts = new Map();
+  const blank = () => ({ active: 0, mastered: 0, discontinued: 0 });
+  counts.set(-1, blank());
+  let seg = -1;
+  (acts || []).forEach((a, i) => {
+    if (a.isHeading || a.isMaintainHeading) {
+      seg = i;
+      segOf.set(i, i);
+      if (!counts.has(i)) counts.set(i, blank());
+      return;
+    }
+    segOf.set(i, seg);
+    if (a.isNote || a.isExportNote) return;
+    if (a.parentActivity) return;             // sub-activities ride with their parent
+    if (!a.name && !a.title) return;
+    if (!counts.has(seg)) counts.set(seg, blank());
+    if (a.masteredOn || a.isCompleted) counts.get(seg).mastered++;
+    else if (a.discontinuedOn || a.isArchived || a.isStopped) counts.get(seg).discontinued++;
+    else counts.get(seg).active++;
+  });
+  return { segOf, counts };
+}
+
+// Rebuilds the activities array after a drag in Edit Target.
+//
+// newOrder holds only the indices of rows that are actually draggable: headings,
+// notes and active top-level activities. Everything else has to be carried along
+// rather than left behind — sub-activities ride with their parent, and a
+// heading's mastered/discontinued activities ride with the heading, so dragging a
+// section moves the whole block. Anything somehow unaccounted for is appended at
+// the end rather than dropped, so a reorder can never lose an activity.
+function mnReorderActs(acts, newOrder) {
+  const isHeading = i => !!(acts[i] && (acts[i].isHeading || acts[i].isMaintainHeading));
+  const isInactive = a => !!(a && (a.isCompleted || a.isArchived || a.isStopped || a.masteredOn || a.discontinuedOn));
+
+  // Which indices each heading owns (everything up to the next heading), and the
+  // leading run that precedes the first heading.
+  const owned = new Map();
+  const leading = [];
+  let cur = null;
+  acts.forEach((a, i) => {
+    if (a.isHeading || a.isMaintainHeading) { cur = i; owned.set(i, []); return; }
+    if (cur === null) leading.push(i); else owned.get(cur).push(i);
+  });
+
+  const used = new Set();
+  const result = [];
+  const emit = i => {
+    if (used.has(i) || !acts[i]) return;
+    used.add(i);
+    result.push(acts[i]);
+    const key = acts[i].title || acts[i].name;
+    if (!key) return;
+    acts.forEach((a2, j) => {
+      if (!used.has(j) && a2.parentActivity === key) { used.add(j); result.push(a2); }
+    });
+  };
+
+  // Inactive items ahead of the first heading have no heading to travel with, so
+  // they stay pinned at the top.
+  leading.filter(i => isInactive(acts[i]) && !acts[i].parentActivity).forEach(emit);
+
+  for (const i of newOrder) {
+    emit(i);
+    if (isHeading(i)) {
+      (owned.get(i) || [])
+        .filter(j => !acts[j].parentActivity && isInactive(acts[j]))
+        .forEach(emit);
+    }
+  }
+
+  acts.forEach((_, i) => emit(i));   // safety net: nothing is ever dropped
+  result.forEach((a, i) => { a.order = i; });
+  return result;
+}
+
+// Moves every card built into the hidden #mn-inactive-source into a collapsed
+// group under the heading it belongs to, then removes the staging container.
+// Runs after innerHTML but before listeners are attached, so the handlers bound
+// afterwards find the cards wherever they ended up.
+function mnRegroupInactiveCards(bodyEl, acts) {
+  const src = bodyEl.querySelector("#mn-inactive-source");
+  if (!src) return;
+  const { segOf } = mnSegmentInfo(acts);
+  const meta = {
+    mastered:     { label: "Mastered",     emoji: "⭐", color: "#059669" },
+    discontinued: { label: "Discontinued", emoji: "🚩", color: "#dc2626" }
+  };
+  for (const kind of ["mastered", "discontinued"]) {
+    const panel = src.querySelector(`#mn-${kind}-section`);
+    if (!panel) continue;
+    for (const card of [...panel.querySelectorAll(":scope > .mn-inact-card")]) {
+      const gi = Number(card.dataset.globalIdx);
+      const key = Number.isFinite(gi) && segOf.has(gi) ? segOf.get(gi) : -1;
+      const holder = bodyEl.querySelector(`.mn-seg-groups[data-seg="${key}"]`);
+      if (!holder) continue;
+      let group = holder.querySelector(`.mn-inact-group[data-kind="${kind}"]`);
+      if (!group) {
+        const m = meta[kind];
+        group = document.createElement("div");
+        group.className = "mn-inact-group";
+        group.dataset.kind = kind;
+        group.style.cssText = "margin:.35rem 0 .15rem";
+        group.innerHTML =
+          `<button class="mn-inact-toggle" style="display:flex;align-items:center;gap:.45rem;background:none;border:none;cursor:pointer;width:100%;padding:.25rem 0;font-size:.83rem;font-weight:700;color:${m.color};text-align:left">` +
+            `<span class="mn-inact-arrow" style="font-size:.7rem">▶</span>${m.emoji} ${m.label} (<span class="mn-inact-count">0</span>)` +
+          `</button><div class="mn-inact-body" style="display:none"></div>`;
+        holder.appendChild(group);
+      }
+      group.querySelector(".mn-inact-body").appendChild(card);
+      group.querySelector(".mn-inact-count").textContent =
+        String(group.querySelectorAll(".mn-inact-body > .mn-inact-card").length);
+    }
+  }
+  src.remove();
+  bodyEl.querySelectorAll(".mn-inact-toggle").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const panel = btn.nextElementSibling;
+      const arrow = btn.querySelector(".mn-inact-arrow");
+      if (!panel) return;
+      const open = panel.style.display !== "none";
+      panel.style.display = open ? "none" : "block";
+      if (arrow) arrow.textContent = open ? "▶" : "▼";
+      if (!open) panel.querySelectorAll(".mn-act-details-input,.mn-inactive-name-input").forEach(autoResizeTextarea);
+    });
+  });
+}
+
 function renderTargetManageContent(student, target) {
   $("manage-modal-title").textContent = target.name;
   target.predefinedActivities = normalizeActivitiesFormat(target.predefinedActivities || []);
@@ -17389,6 +17528,12 @@ function renderTargetManageContent(student, target) {
     <div class="admin-section-title">Activities & Notes</div>
     <div class="admin-list" id="mn-act-list">`;
 
+  // One empty holder per segment, emitted where that segment ends. The collapsed
+  // mastered/discontinued groups get moved into these by mnRegroupInactiveCards.
+  const _segInfo = mnSegmentInfo(acts);
+  let _curSeg = -1;
+  const _flushSeg = () => { html += `<div class="mn-seg-groups" data-seg="${_curSeg}"></div>`; };
+
   let manageActNo = 0;
   acts.forEach((a, idx) => {
     if (a.isCompleted || a.isArchived || a.isStopped || a.masteredOn || a.discontinuedOn) return;
@@ -17398,6 +17543,8 @@ function renderTargetManageContent(student, target) {
     // list, which made whichever heading happened to be last reappear with the new
     // activity under it.
     if (a.isHeading || a.isMaintainHeading) {
+      _flushSeg();
+      _curSeg = idx;
       const isGray = a.headingColor === "gray" || a.isMaintainHeading;
       const isGreen = a.headingColor === "green";
       const hdgBg = isGray ? "#9ca3af" : isGreen ? "#a9d18e" : null;
@@ -17406,6 +17553,15 @@ function renderTargetManageContent(student, target) {
         <span class="drag-handle"${hdgBg ? ` style="color:${hdgTextColor}"` : ''}>⠿</span>
         <textarea class="admin-input mn-heading-input" id="mn-act-name-${idx}" data-idx="${idx}"
           rows="1" placeholder="Enter Section Heading" style="flex:1${hdgBg ? `;background:${hdgBg};color:${hdgTextColor}` : ""}">${escHtml(a.name || "")}</textarea>
+        ${(() => {
+          // Says what this heading is carrying, so dragging it is not a leap of
+          // faith — everything counted here moves with the heading.
+          const c = _segInfo.counts.get(idx) || { active: 0, mastered: 0, discontinued: 0 };
+          const parts = [`${c.active} active`];
+          if (c.mastered) parts.push(`${c.mastered} mastered`);
+          if (c.discontinued) parts.push(`${c.discontinued} discontinued`);
+          return `<span style="font-size:.66rem;white-space:nowrap;flex-shrink:0;opacity:.8;color:${hdgBg ? hdgTextColor : "#6b7280"}">${parts.join(" · ")}</span>`;
+        })()}
         <div style="position:relative">
           <button class="btn-adm-del mn-heading-color-btn" data-idx="${idx}" title="Heading options" style="font-size:1.15rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-heading-color-menu" id="mn-hkm-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:190px;overflow:hidden">
@@ -17667,7 +17823,16 @@ function renderTargetManageContent(student, target) {
     }
   });
 
+  _flushSeg();   // holder for the final segment
   html += `</div>`;
+
+  // The two blocks below still build the mastered/discontinued cards exactly as
+  // they always have, but into a hidden staging container. Right after the HTML
+  // is inserted, mnRegroupInactiveCards() moves each card into a collapsed group
+  // under the section heading it belongs to and removes this container. Building
+  // them here and relocating the DOM afterwards keeps ~300 lines of card markup —
+  // and every handler that targets it — completely untouched.
+  html += `<div id="mn-inactive-source" style="display:none">`;
 
   if (masteredActs.length > 0) {
     const _mastTopLevel = masteredActs.filter(a => !a.parentActivity);
@@ -17688,7 +17853,7 @@ function renderTargetManageContent(student, target) {
       const _mnMaintBadge = a.maintained ? `<span style="font-size:.71rem;display:inline-block;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.1rem .5rem;border-radius:.3rem;border:1px solid #d1d5db">🆗 Maintained${a.maintainedAt ? ` ${fmtPeriodDate(a.maintainedAt)}` : ''}</span>` : '';
       const _mnCreatedLabel = a.activeFrom ? `Created ${fmtPeriodDate(a.activeFrom)}` : 'Created';
       const myMastSubs = _mastSubs.filter(s => s.parentActivity === (a.title || a.name));
-      html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:${myMastSubs.length ? '.1rem' : '.35rem'}">
+      html += `<div class="mn-inact-card" data-global-idx="${globalIdx}" style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:${myMastSubs.length ? '.1rem' : '.35rem'}">
         <div style="flex:1;display:flex;flex-direction:column;gap:.4rem">
           <div>
             <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Title</div>
@@ -17734,7 +17899,7 @@ function renderTargetManageContent(student, target) {
         const subGlobalIdx = acts.indexOf(sub);
         const subMastBadge = sub.masteredOn ? `<span style="font-size:.71rem;display:inline-block;background:#d1fae5;color:#059669;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ Mastered ${fmtPeriodDate(sub.masteredOn)}</span>` : '';
         const subMaintBadge = sub.maintained ? `<span style="font-size:.71rem;display:inline-block;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.08rem .4rem;border-radius:.3rem;border:1px solid #d1d5db">🆗</span>` : '';
-        html += `<div style="display:flex;align-items:flex-start;gap:.4rem;background:#ecfdf5;border:1px solid #a7f3d0;border-left:3px solid #059669;border-radius:.35rem;margin-bottom:.1rem;margin-left:3rem;padding:.35rem .5rem .35rem 0">
+        html += `<div class="mn-inact-card" data-global-idx="${subGlobalIdx}" style="display:flex;align-items:flex-start;gap:.4rem;background:#ecfdf5;border:1px solid #a7f3d0;border-left:3px solid #059669;border-radius:.35rem;margin-bottom:.1rem;margin-left:3rem;padding:.35rem .5rem .35rem 0">
           <span style="font-size:.8rem;color:#059669;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
           <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
             <div>
@@ -17787,7 +17952,7 @@ function renderTargetManageContent(student, target) {
           const subCi = masteredActs.indexOf(sub);
           const subGlobalIdx = acts.indexOf(sub);
           const subMastBadge = sub.masteredOn ? `<span style="font-size:.71rem;display:inline-block;background:#d1fae5;color:#059669;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ Mastered ${fmtPeriodDate(sub.masteredOn)}</span>` : '';
-          html += `<div style="display:flex;align-items:flex-start;gap:.4rem;background:#ecfdf5;border:1px solid #a7f3d0;border-left:3px solid #059669;border-radius:.35rem;margin-bottom:.1rem;margin-left:3rem;padding:.35rem .5rem .35rem 0">
+          html += `<div class="mn-inact-card" data-global-idx="${subGlobalIdx}" style="display:flex;align-items:flex-start;gap:.4rem;background:#ecfdf5;border:1px solid #a7f3d0;border-left:3px solid #059669;border-radius:.35rem;margin-bottom:.1rem;margin-left:3rem;padding:.35rem .5rem .35rem 0">
             <span style="font-size:.8rem;color:#059669;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
             <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
               <div>
@@ -17850,7 +18015,7 @@ function renderTargetManageContent(student, target) {
       const _mnMaintBadge2 = a.maintained ? `<span style="font-size:.71rem;display:inline-block;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.1rem .5rem;border-radius:.3rem;border:1px solid #d1d5db">🆗 Maintained${a.maintainedAt ? ` ${fmtPeriodDate(a.maintainedAt)}` : ''}</span>` : '';
       const _mnCreatedLabel2 = a.activeFrom ? `Created ${fmtPeriodDate(a.activeFrom)}` : 'Created';
       const myDiscSubs = _discSubs.filter(s => s.parentActivity === (a.title || a.name));
-      html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:${myDiscSubs.length ? '.1rem' : '.35rem'}">
+      html += `<div class="mn-inact-card" data-global-idx="${globalIdx}" style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:${myDiscSubs.length ? '.1rem' : '.35rem'}">
         <div style="flex:1;display:flex;flex-direction:column;gap:.4rem">
           <div>
             <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Title</div>
@@ -17949,7 +18114,7 @@ function renderTargetManageContent(student, target) {
           const subCi = discontinuedActs.indexOf(sub);
           const subGlobalIdx = acts.indexOf(sub);
           const subDiscBadge = sub.discontinuedOn ? `<span style="font-size:.71rem;display:inline-block;background:#fee2e2;color:#dc2626;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 Discontinued ${fmtPeriodDate(sub.discontinuedOn)}</span>` : '';
-          html += `<div style="display:flex;align-items:flex-start;gap:.4rem;background:#fff5f5;border:1px solid #fca5a5;border-left:3px solid #dc2626;border-radius:.35rem;margin-bottom:.1rem;margin-left:3rem;padding:.35rem .5rem .35rem 0">
+          html += `<div class="mn-inact-card" data-global-idx="${subGlobalIdx}" style="display:flex;align-items:flex-start;gap:.4rem;background:#fff5f5;border:1px solid #fca5a5;border-left:3px solid #dc2626;border-radius:.35rem;margin-bottom:.1rem;margin-left:3rem;padding:.35rem .5rem .35rem 0">
             <span style="font-size:.8rem;color:#dc2626;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
             <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
               <div>
@@ -17993,6 +18158,8 @@ function renderTargetManageContent(student, target) {
     html += `</div></div>`;
   }
 
+  html += `</div>`; // close #mn-inactive-source
+
   html += `
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.25rem">
       <button class="btn-admin-add" id="btn-mn-add-act" style="flex:0 0 auto;width:auto">+ Add Activity</button>
@@ -18005,11 +18172,10 @@ function renderTargetManageContent(student, target) {
       ${_groupForTargetEdit ? `<button class="btn-adm-danger" id="btn-mn-del-target">Delete This Target</button>` : ''}
     </div>`;
 
-  const _discOpen = $("mn-discontinued-section")?.style.display === "block";
-  const _mastOpen = $("mn-mastered-section")?.style.display === "block";
   $("manage-modal-body").innerHTML = html;
-  if (_discOpen) { const s = $("mn-discontinued-section"); if (s) { s.style.display = "block"; const a = s.previousElementSibling?.querySelector(".mn-toggle-arrow"); if (a) a.textContent = "▼"; s.querySelectorAll(".mn-act-details-input").forEach(autoResizeTextarea); } }
-  if (_mastOpen) { const s = $("mn-mastered-section"); if (s) { s.style.display = "block"; const a = s.previousElementSibling?.querySelector(".mn-toggle-arrow"); if (a) a.textContent = "▼"; s.querySelectorAll(".mn-act-details-input").forEach(autoResizeTextarea); } }
+  // Relocate the mastered/discontinued cards under their headings before any
+  // listener is bound, so every handler below finds them in their final home.
+  mnRegroupInactiveCards($("manage-modal-body"), acts);
   $("manage-modal-body").querySelectorAll(".admin-list-item textarea").forEach(autoResizeTextarea);
 
   _pendingActsCleanup = { acts, save: saveTarget };
@@ -18020,29 +18186,7 @@ function renderTargetManageContent(student, target) {
   }
 
   initDragSort($("mn-act-list"), async newOrder => {
-    // newOrder only contains indices of top-level drag rows (sub-activities are rendered
-    // inline inside their parent and don't have their own drag rows). Re-attach each
-    // parent's sub-activities immediately after it so they're not dropped from the array.
-    // Mastered/Discontinued activities and empty headings in the collapsed sections below
-    // are ALSO top-level items not present in newOrder (they're not rendered as drag rows) —
-    // walk the full original array and keep any such item exactly where it already was,
-    // instead of only keeping what happened to be visible in the dragged list. Without this,
-    // reordering two ordinary activities would silently wipe every archived one.
-    const topLevel = newOrder.map(oldIdx => acts[oldIdx]);
-    const visibleIdxSet = new Set(newOrder);
-    let vi = 0;
-    const result = [];
-    const appendWithSubs = a => {
-      result.push(a);
-      const key = a.title || a.name;
-      if (key) result.push(...acts.filter(a2 => a2.parentActivity === key));
-    };
-    acts.forEach((a, origIdx) => {
-      if (a.parentActivity) return; // subs are appended right after their parent above, never independently
-      appendWithSubs(visibleIdxSet.has(origIdx) ? topLevel[vi++] : a);
-    });
-    result.forEach((a, i) => a.order = i);
-    target.predefinedActivities = result;
+    target.predefinedActivities = mnReorderActs(acts, newOrder);
     await saveTarget();
     const scrollPos = $("manage-modal-body").scrollTop;
     renderTargetManageContent(student, target);
@@ -20262,9 +20406,16 @@ function renderTemplateManageContent(template) {
     <div class="admin-section-title">Activities & Notes</div>
     <div class="admin-list" id="mn-act-list">`;
 
+  // See renderTargetManageContent for what these holders are.
+  const _segInfo = mnSegmentInfo(acts);
+  let _curSeg = -1;
+  const _flushSeg = () => { html += `<div class="mn-seg-groups" data-seg="${_curSeg}"></div>`; };
+
   acts.forEach((a, idx) => {
     if (a.masteredOn || a.discontinuedOn || a.isCompleted || a.isArchived || a.isStopped) return;
     if (a.isHeading || a.isMaintainHeading) {
+      _flushSeg();
+      _curSeg = idx;
       const isGray = a.headingColor === "gray" || a.isMaintainHeading;
       const isGreen = a.headingColor === "green";
       const hdgBg = isGray ? "#9ca3af" : isGreen ? "#a9d18e" : null;
@@ -20273,6 +20424,15 @@ function renderTemplateManageContent(template) {
         <span class="drag-handle"${hdgBg ? ` style="color:${hdgTextColor}"` : ''}>⠿</span>
         <textarea class="admin-input mn-heading-input" id="mn-act-name-${idx}" data-idx="${idx}"
           rows="1" placeholder="Enter Section Heading" style="flex:1${hdgBg ? `;background:${hdgBg};color:${hdgTextColor}` : ""}">${escHtml(a.name || "")}</textarea>
+        ${(() => {
+          // Says what this heading is carrying, so dragging it is not a leap of
+          // faith — everything counted here moves with the heading.
+          const c = _segInfo.counts.get(idx) || { active: 0, mastered: 0, discontinued: 0 };
+          const parts = [`${c.active} active`];
+          if (c.mastered) parts.push(`${c.mastered} mastered`);
+          if (c.discontinued) parts.push(`${c.discontinued} discontinued`);
+          return `<span style="font-size:.66rem;white-space:nowrap;flex-shrink:0;opacity:.8;color:${hdgBg ? hdgTextColor : "#6b7280"}">${parts.join(" · ")}</span>`;
+        })()}
         <div style="position:relative">
           <button class="btn-adm-del mn-heading-color-btn" data-idx="${idx}" title="Heading options" style="font-size:1.15rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-heading-color-menu" id="mn-hkm-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:190px;overflow:hidden">
@@ -20387,7 +20547,16 @@ function renderTemplateManageContent(template) {
     }
   });
 
+  _flushSeg();   // holder for the final segment
   html += `</div>`;
+
+  // The two blocks below still build the mastered/discontinued cards exactly as
+  // they always have, but into a hidden staging container. Right after the HTML
+  // is inserted, mnRegroupInactiveCards() moves each card into a collapsed group
+  // under the section heading it belongs to and removes this container. Building
+  // them here and relocating the DOM afterwards keeps ~300 lines of card markup —
+  // and every handler that targets it — completely untouched.
+  html += `<div id="mn-inactive-source" style="display:none">`;
 
   if (masteredActs.length > 0) {
     const _mastTopLevel = masteredActs.filter(a => !a.parentActivity);
@@ -20408,7 +20577,7 @@ function renderTemplateManageContent(template) {
       const _mnMaintBadge = a.maintained ? `<span style="font-size:.71rem;display:inline-block;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.1rem .5rem;border-radius:.3rem;border:1px solid #d1d5db">🆗 Maintained${a.maintainedAt ? ` ${fmtPeriodDate(a.maintainedAt)}` : ''}</span>` : '';
       const _mnCreatedLabel = a.activeFrom ? `Created ${fmtPeriodDate(a.activeFrom)}` : 'Created';
       const myMastSubs = _mastSubs.filter(s => s.parentActivity === (a.title || a.name));
-      html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:${myMastSubs.length ? '.1rem' : '.35rem'}">
+      html += `<div class="mn-inact-card" data-global-idx="${globalIdx}" style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:${myMastSubs.length ? '.1rem' : '.35rem'}">
         <div style="flex:1;display:flex;flex-direction:column;gap:.4rem">
           <div>
             <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Title</div>
@@ -20454,7 +20623,7 @@ function renderTemplateManageContent(template) {
         const subGlobalIdx = acts.indexOf(sub);
         const subMastBadge = sub.masteredOn ? `<span style="font-size:.71rem;display:inline-block;background:#d1fae5;color:#059669;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ Mastered ${fmtPeriodDate(sub.masteredOn)}</span>` : '';
         const subMaintBadge = sub.maintained ? `<span style="font-size:.71rem;display:inline-block;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.08rem .4rem;border-radius:.3rem;border:1px solid #d1d5db">🆗</span>` : '';
-        html += `<div style="display:flex;align-items:flex-start;gap:.4rem;background:#ecfdf5;border:1px solid #a7f3d0;border-left:3px solid #059669;border-radius:.35rem;margin-bottom:.1rem;margin-left:3rem;padding:.35rem .5rem .35rem 0">
+        html += `<div class="mn-inact-card" data-global-idx="${subGlobalIdx}" style="display:flex;align-items:flex-start;gap:.4rem;background:#ecfdf5;border:1px solid #a7f3d0;border-left:3px solid #059669;border-radius:.35rem;margin-bottom:.1rem;margin-left:3rem;padding:.35rem .5rem .35rem 0">
           <span style="font-size:.8rem;color:#059669;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
           <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
             <div>
@@ -20507,7 +20676,7 @@ function renderTemplateManageContent(template) {
           const subCi = masteredActs.indexOf(sub);
           const subGlobalIdx = acts.indexOf(sub);
           const subMastBadge = sub.masteredOn ? `<span style="font-size:.71rem;display:inline-block;background:#d1fae5;color:#059669;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ Mastered ${fmtPeriodDate(sub.masteredOn)}</span>` : '';
-          html += `<div style="display:flex;align-items:flex-start;gap:.4rem;background:#ecfdf5;border:1px solid #a7f3d0;border-left:3px solid #059669;border-radius:.35rem;margin-bottom:.1rem;margin-left:3rem;padding:.35rem .5rem .35rem 0">
+          html += `<div class="mn-inact-card" data-global-idx="${subGlobalIdx}" style="display:flex;align-items:flex-start;gap:.4rem;background:#ecfdf5;border:1px solid #a7f3d0;border-left:3px solid #059669;border-radius:.35rem;margin-bottom:.1rem;margin-left:3rem;padding:.35rem .5rem .35rem 0">
             <span style="font-size:.8rem;color:#059669;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
             <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
               <div>
@@ -20570,7 +20739,7 @@ function renderTemplateManageContent(template) {
       const _mnMaintBadge2 = a.maintained ? `<span style="font-size:.71rem;display:inline-block;background:#f3f4f6;color:#6b7280;font-weight:600;padding:.1rem .5rem;border-radius:.3rem;border:1px solid #d1d5db">🆗 Maintained${a.maintainedAt ? ` ${fmtPeriodDate(a.maintainedAt)}` : ''}</span>` : '';
       const _mnCreatedLabel2 = a.activeFrom ? `Created ${fmtPeriodDate(a.activeFrom)}` : 'Created';
       const myDiscSubs = _discSubs.filter(s => s.parentActivity === (a.title || a.name));
-      html += `<div style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:${myDiscSubs.length ? '.1rem' : '.35rem'}">
+      html += `<div class="mn-inact-card" data-global-idx="${globalIdx}" style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:${myDiscSubs.length ? '.1rem' : '.35rem'}">
         <div style="flex:1;display:flex;flex-direction:column;gap:.4rem">
           <div>
             <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Title</div>
@@ -20669,7 +20838,7 @@ function renderTemplateManageContent(template) {
           const subCi = discontinuedActs.indexOf(sub);
           const subGlobalIdx = acts.indexOf(sub);
           const subDiscBadge = sub.discontinuedOn ? `<span style="font-size:.71rem;display:inline-block;background:#fee2e2;color:#dc2626;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 Discontinued ${fmtPeriodDate(sub.discontinuedOn)}</span>` : '';
-          html += `<div style="display:flex;align-items:flex-start;gap:.4rem;background:#fff5f5;border:1px solid #fca5a5;border-left:3px solid #dc2626;border-radius:.35rem;margin-bottom:.1rem;margin-left:3rem;padding:.35rem .5rem .35rem 0">
+          html += `<div class="mn-inact-card" data-global-idx="${subGlobalIdx}" style="display:flex;align-items:flex-start;gap:.4rem;background:#fff5f5;border:1px solid #fca5a5;border-left:3px solid #dc2626;border-radius:.35rem;margin-bottom:.1rem;margin-left:3rem;padding:.35rem .5rem .35rem 0">
             <span style="font-size:.8rem;color:#dc2626;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
             <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
               <div>
@@ -20713,6 +20882,8 @@ function renderTemplateManageContent(template) {
     html += `</div></div>`;
   }
 
+  html += `</div>`; // close #mn-inactive-source
+
   html += `
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.25rem">
       <button class="btn-admin-add" id="btn-mn-add-act" style="flex:0 0 auto;width:auto">+ Add Activity</button>
@@ -20725,11 +20896,9 @@ function renderTemplateManageContent(template) {
       <button class="btn-adm-danger" id="btn-mn-del-template">Delete Template</button>
     </div>`;
 
-  const _tDiscOpen = $("mn-discontinued-section")?.style.display === "block";
-  const _tMastOpen = $("mn-mastered-section")?.style.display === "block";
   $("manage-modal-body").innerHTML = html;
-  if (_tDiscOpen) { const s = $("mn-discontinued-section"); if (s) { s.style.display = "block"; const a = s.previousElementSibling?.querySelector(".mn-toggle-arrow"); if (a) a.textContent = "▼"; } }
-  if (_tMastOpen) { const s = $("mn-mastered-section"); if (s) { s.style.display = "block"; const a = s.previousElementSibling?.querySelector(".mn-toggle-arrow"); if (a) a.textContent = "▼"; } }
+  // See renderTargetManageContent — relocate before listeners are bound.
+  mnRegroupInactiveCards($("manage-modal-body"), acts);
   $("manage-modal-body").querySelectorAll(".admin-list-item textarea").forEach(autoResizeTextarea);
 
   const saveTemplateFn = async () => {
@@ -20747,15 +20916,10 @@ function renderTemplateManageContent(template) {
   }
 
   initDragSort($("mn-act-list"), async newOrder => {
-    const topLevel = newOrder.map(oldIdx => acts[oldIdx]);
-    const result = [];
-    for (const a of topLevel) {
-      result.push(a);
-      const key = a.title || a.name;
-      if (key) result.push(...acts.filter(a2 => a2.parentActivity === key));
-    }
-    result.forEach((a, i) => a.order = i);
-    template.predefinedActivities = result;
+    // Was rebuilding from newOrder alone, which silently dropped every mastered
+    // or discontinued activity (they aren't draggable rows) — same bug the target
+    // editor had. mnReorderActs carries them along with their heading.
+    template.predefinedActivities = mnReorderActs(acts, newOrder);
     await saveTemplateFn();
     const scrollPos = $("manage-modal-body").scrollTop;
     renderTemplateManageContent(template);
