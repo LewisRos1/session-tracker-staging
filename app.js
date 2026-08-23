@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1818";
+const APP_VERSION = "1819";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6357,16 +6357,23 @@ function renderInactiveListScreen(entity) {
   for (const target of targets) {
     const { mastered, discontinued } = inactiveActivitiesForTarget(target);
     const discTag = target.discontinuedOn
-      ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;margin-left:.4rem">🛑 Discontinued</span>` : "";
-    html += `<div style="margin-bottom:1.6rem">
-      <div style="font-size:1rem;font-weight:700;color:var(--primary-dark);border-bottom:2px solid var(--primary-light);padding-bottom:.3rem;margin-bottom:.5rem">${escHtml(target.name)}${discTag}</div>`;
+      ? `<span style="font-size:.7rem;background:rgba(255,255,255,.25);color:#fff;font-weight:700;padding:.12rem .5rem;border-radius:.3rem;white-space:nowrap;flex-shrink:0">🛑 Discontinued</span>` : "";
+    // Each target is its own bordered card with a solid header strip, so where
+    // one target's activities end and the next begins is unmistakable.
+    html += `<div style="margin-bottom:1.1rem;border:1px solid #dfe3ec;border-radius:.6rem;overflow:hidden;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.07)">
+      <div style="display:flex;align-items:center;gap:.6rem;background:var(--primary);padding:.6rem .9rem">
+        <span style="font-size:.64rem;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:#fff;opacity:.75;flex-shrink:0">Target</span>
+        <span style="flex:1;min-width:0;font-size:1.02rem;font-weight:700;color:#fff;overflow-wrap:break-word">${escHtml(target.name)}</span>
+        ${discTag}
+      </div>
+      <div style="padding:.55rem .9rem .7rem">`;
     if (mastered.length === 0 && discontinued.length === 0) {
-      html += `<div style="font-size:.85rem;color:#9ca3af;font-style:italic;padding:.2rem .1rem">None</div>`;
+      html += `<div style="font-size:.85rem;color:#9ca3af;font-style:italic;padding:.15rem .1rem">None</div>`;
     } else {
       html += groupHtml("Mastered", "⭐", "#059669", "#d1fae5", "#6ee7b7", mastered, "mastered");
       html += groupHtml("Discontinued", "🚩", "#dc2626", "#fee2e2", "#fca5a5", discontinued, "discontinued");
     }
-    html += `</div>`;
+    html += `</div></div>`;
   }
 
   body.innerHTML = html;
