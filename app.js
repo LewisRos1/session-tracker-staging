@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1819";
+const APP_VERSION = "1820";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6337,7 +6337,10 @@ function renderInactiveListScreen(entity) {
     const id = `inact-${kind}-${seq++}`;
     const rows = list.map(pa => {
       const date = kind === "mastered" ? pa.masteredOn : pa.discontinuedOn;
-      const badge = `<span style="font-size:.72rem;white-space:nowrap;background:${bg};color:${color};font-weight:600;padding:.1rem .5rem;border-radius:.3rem;border:1px solid ${border}">${emoji} ${label}${date ? ` ${fmtPeriodDate(date)}` : ""}</span>`;
+      // The group header above already says Mastered/Discontinued, so the row
+      // badge only needs the date. Falls back to the word for old records that
+      // carry the flag without a date.
+      const badge = `<span style="font-size:.72rem;white-space:nowrap;background:${bg};color:${color};font-weight:600;padding:.1rem .5rem;border-radius:.3rem;border:1px solid ${border}">${emoji} ${date ? fmtPeriodDate(date) : label}</span>`;
       const indent = pa.parentActivity ? "margin-left:1.4rem;" : "";
       return `<div style="${indent}display:flex;align-items:flex-start;gap:.6rem;padding:.4rem .55rem;border-bottom:1px solid #f3f4f6">
         <span style="flex:1;min-width:0;font-size:.88rem;color:#374151;overflow-wrap:break-word">${escHtml(_inactStripMk(pa.title || pa.name))}</span>
@@ -6357,13 +6360,15 @@ function renderInactiveListScreen(entity) {
   for (const target of targets) {
     const { mastered, discontinued } = inactiveActivitiesForTarget(target);
     const discTag = target.discontinuedOn
-      ? `<span style="font-size:.7rem;background:rgba(255,255,255,.25);color:#fff;font-weight:700;padding:.12rem .5rem;border-radius:.3rem;white-space:nowrap;flex-shrink:0">🛑 Discontinued</span>` : "";
-    // Each target is its own bordered card with a solid header strip, so where
-    // one target's activities end and the next begins is unmistakable.
+      ? `<span style="font-size:.7rem;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;font-weight:700;padding:.12rem .5rem;border-radius:.3rem;white-space:nowrap;flex-shrink:0">🛑 Discontinued</span>` : "";
+    // Each target is its own bordered card with a header strip, so where one
+    // target's activities end and the next begins is unmistakable. The strip is
+    // deliberately a pale tint rather than the solid --primary used by the page's
+    // top bar, so the two don't read as the same kind of thing.
     html += `<div style="margin-bottom:1.1rem;border:1px solid #dfe3ec;border-radius:.6rem;overflow:hidden;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.07)">
-      <div style="display:flex;align-items:center;gap:.6rem;background:var(--primary);padding:.6rem .9rem">
-        <span style="font-size:.64rem;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:#fff;opacity:.75;flex-shrink:0">Target</span>
-        <span style="flex:1;min-width:0;font-size:1.02rem;font-weight:700;color:#fff;overflow-wrap:break-word">${escHtml(target.name)}</span>
+      <div style="display:flex;align-items:center;gap:.6rem;background:var(--primary-light);border-bottom:1px solid #c7d2fe;padding:.6rem .9rem">
+        <span style="font-size:.64rem;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--primary-dark);opacity:.7;flex-shrink:0">Target</span>
+        <span style="flex:1;min-width:0;font-size:1.02rem;font-weight:700;color:var(--primary-dark);overflow-wrap:break-word">${escHtml(target.name)}</span>
         ${discTag}
       </div>
       <div style="padding:.55rem .9rem .7rem">`;
@@ -6585,7 +6590,7 @@ function showStudentChoice(student) {
       <button class="choice-btn choice-inactive-list">
         <span class="choice-icon">📋</span>
         <div class="choice-text">
-          <div class="choice-label">List of Discontinued &amp; Mastered Activities</div>
+          <div class="choice-label">List of Mastered &amp; Discontinued Activities</div>
         </div>
       </button>
       <button class="choice-btn choice-export-excel">
@@ -21575,7 +21580,7 @@ function showGroupChoice(group) {
       </button>
       <button class="choice-btn choice-inactive-list-group">
         <span class="choice-icon">📋</span>
-        <div class="choice-text"><div class="choice-label">List of Discontinued &amp; Mastered Activities</div></div>
+        <div class="choice-text"><div class="choice-label">List of Mastered &amp; Discontinued Activities</div></div>
       </button>
       <button class="choice-btn choice-export-excel">
         <span class="choice-icon">📊</span>
