@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1825";
+const APP_VERSION = "1826";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -15633,6 +15633,29 @@ function inactiveReasonBadge(pa) {
   return badges;
 }
 
+// Single-button acknowledgement popup, for a rule the user has to actively
+// dismiss. An inline red line inside a sheet is easy to miss — this can't be.
+// z-index sits above showDatePickerOverlay so it works from inside those sheets.
+function showAlertOverlay({ title = "⚠️ Not allowed", message, okLabel = "OK" }) {
+  return new Promise(resolve => {
+    const overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:10001;display:flex;align-items:center;justify-content:center;padding:1rem";
+    overlay.innerHTML =
+      `<div style="background:#fff;border-radius:.75rem;padding:1.35rem 1.5rem;max-width:390px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.25)">` +
+      `<div style="font-size:1rem;font-weight:700;color:#b91c1c;margin-bottom:.55rem">${title}</div>` +
+      `<div style="font-size:.92rem;color:#374151;margin-bottom:1.25rem;line-height:1.65">${message}</div>` +
+      `<div style="display:flex;justify-content:flex-end">` +
+      `<button class="dp-ok" style="padding:.55rem 1.6rem;border:none;border-radius:.4rem;background:var(--primary);color:#fff;cursor:pointer;font-size:.9rem;font-weight:600">${okLabel}</button>` +
+      `</div></div>`;
+    document.body.appendChild(overlay);
+    const finish = () => { overlay.remove(); document.removeEventListener("keydown", onKey); resolve(); };
+    const onKey = e => { if (e.key === "Escape" || e.key === "Enter") { e.preventDefault(); finish(); } };
+    overlay.querySelector(".dp-ok").addEventListener("click", finish);
+    document.addEventListener("keydown", onKey);
+    overlay.querySelector(".dp-ok").focus();
+  });
+}
+
 function showAutoDateConfirm({ message, confirmLabel }) {
   return new Promise(resolve => {
     const overlay = document.createElement("div");
@@ -15859,11 +15882,13 @@ async function handleActStartPickerChange() {
     if (hasData && (!oldestDate || session.date < oldestDate)) oldestDate = session.date;
   }
   if (oldestDate && value > oldestDate) {
-    if (errDiv) {
-      errDiv.textContent = `The oldest recorded data for this activity is ${fmtPeriodDate(oldestDate)}, so the earliest start date you can set is ${fmtPeriodDate(oldestDate)}.`;
-      errDiv.style.display = 'block';
-    }
     if (inp) inp.value = act.activeFrom || '';
+    await showAlertOverlay({
+      title: "⚠️ Start date is too late",
+      message: `This activity already has recorded data as far back as <strong>${fmtPeriodDate(oldestDate)}</strong>. ` +
+               `Setting the start date later than that would hide sessions that already have data in them, ` +
+               `so the earliest start date you can choose is <strong>${fmtPeriodDate(oldestDate)}</strong>.`
+    });
     return;
   }
   closeActStartDatePicker();
