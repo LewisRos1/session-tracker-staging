@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1814";
+const APP_VERSION = "1815";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -15570,6 +15570,17 @@ function isActivityActive(pa, dateStr) {
   if (pa.activeTo   && dateStr > pa.activeTo)   return false;
   return true;
 }
+
+// Earliest date an activity may be marked mastered/discontinued. With recorded
+// session data that's the last session with data — the activity has to stay
+// visible up to and including the day it was last used. With no data at all
+// there's nothing to preserve, so it falls back to the day the activity was
+// created (its Start Date) rather than today: an activity that was never used
+// should stop appearing from where it began, not from whenever it happens to be
+// cleaned up. Older records with no creation date recorded fall back to today.
+function statusChangeFloorDate(pa, latestDate) {
+  return latestDate || pa.activeFrom || pa.createdOn || todayDateStr();
+}
 // View/Edit uses > (strict) instead of >= so sessions on the exact
 // discontinuation/mastery date still show — the user may have entered data
 // that day before deciding to discontinue the activity.
@@ -18332,14 +18343,17 @@ function renderTargetManageContent(student, target) {
       };
       if (action === 'master' || action === 'discontinue') {
         const { date: latestDate } = await _loadLatestSub();
-        const rawMin = latestDate || todayDateStr();
+        const rawMin = statusChangeFloorDate(sub, latestDate);
         const minDate = (sub.maintainedAt && sub.maintainedAt > rawMin) ? sub.maintainedAt : rawMin;
         const restrictionText = action === 'master'
           ? 'The earliest you can mark this as mastered is'
           : 'The earliest you can discontinue this sub-activity is';
+        const _subCreated = sub.activeFrom || sub.createdOn;
         const infoHtml = latestDate
           ? `The last recorded session for <strong>"${subDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>. ${restrictionText} <strong>${fmtPeriodDate(minDate)}</strong>. This sub-activity will stop showing from <strong>${fmtPeriodDate(addOneDay(minDate))}</strong> onwards.`
-          : `No previous session data was found for <strong>"${subDisplayName}"</strong>.`;
+          : (_subCreated && minDate === _subCreated
+            ? `No previous session data was found for <strong>"${subDisplayName}"</strong>. Defaulting to <strong>${fmtPeriodDate(_subCreated)}</strong>, the date this sub-activity was created.`
+            : `No previous session data was found for <strong>"${subDisplayName}"</strong>.`);
         const pickedDate = await showDatePickerOverlay({
           heading: action === 'master' ? '⭐ Mark Sub-activity as Mastered' : '🚩 Discontinue Sub-activity',
           infoHtml, minDate, defaultDate: minDate,
@@ -18848,7 +18862,14 @@ function renderTargetManageContent(student, target) {
         return result;
       };
       const _buildInfo = (latestDate, minDate, latestSubName, restrictionText) => {
-        if (!latestDate) return `No previous session data was found for <strong>"${paDisplayName}"</strong>.`;
+        if (!latestDate) {
+          const created = pa.activeFrom || pa.createdOn;
+          // Only claim it's the creation date when that's genuinely what the
+          // default landed on — a maintained date can push the floor later.
+          return created && minDate === created
+            ? `No previous session data was found for <strong>"${paDisplayName}"</strong>. Defaulting to <strong>${fmtPeriodDate(created)}</strong>, the date this activity was created.`
+            : `No previous session data was found for <strong>"${paDisplayName}"</strong>.`;
+        }
         const src = latestSubName
           ? `The last recorded session for the sub-activity <strong>"${escHtml(_stripMk(latestSubName))}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>.`
           : `The last recorded session for <strong>"${paDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>.`;
@@ -18873,7 +18894,7 @@ function renderTargetManageContent(student, target) {
           }
         }
         const { date: latestDate, subName: latestSubName } = await _loadLatest();
-        const rawMin = latestDate || todayDateStr();
+        const rawMin = statusChangeFloorDate(pa, latestDate);
         const minDate = (pa.maintainedAt && pa.maintainedAt > rawMin) ? pa.maintainedAt : rawMin;
         const restrictionText = action === 'master'
           ? 'The earliest you can mark this as mastered is'
@@ -19007,7 +19028,10 @@ function renderTargetManageContent(student, target) {
         }).map(s => s.date).sort();
         latestDate = dates[dates.length - 1] || null;
       } finally { btn.disabled = false; btn.textContent = origText; }
-      const rawMin = latestDate || todayDateStr();
+      // Same floor as marking it in the first place — otherwise an activity
+      // mastered on its creation date could not have that date re-picked here,
+      // and the picker would open on a date below its own minimum.
+      const rawMin = statusChangeFloorDate(pa, latestDate);
       // Can't set mastered/discontinued date before the maintained date
       const minDate = (pa.maintainedAt && pa.maintainedAt > rawMin) ? pa.maintainedAt : rawMin;
       const _paName = escHtml(pa.title || pa.name || '');
