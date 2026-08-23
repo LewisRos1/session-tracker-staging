@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1816";
+const APP_VERSION = "1817";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6292,6 +6292,115 @@ function maGetStatus(pa) {
   return 'active';
 }
 
+// ─── MASTERED & DISCONTINUED LIST (read-only) ────────────────
+// A convenience view of what Edit Target already holds: every mastered or
+// discontinued activity, grouped by target and by the section heading it sits
+// under. Purely presentational — it changes nothing and offers no actions, so
+// it reads straight from the same predefinedActivities array without touching it.
+
+function _inactStripMk(s) {
+  return (s || "")
+    .replace(/\*_([\s\S]+?)_\*/g, "$1").replace(/_\*([\s\S]+?)\*_/g, "$1")
+    .replace(/\*([\s\S]+?)\*/g, "$1").replace(/_([\s\S]+?)_/g, "$1");
+}
+
+// Walks a target's activities in order, bucketing mastered/discontinued ones
+// into the section they fall under. Activities before the first heading land in
+// a leading section with no name. Mastered wins when a record somehow carries
+// both flags, matching how Edit Target's two lists are built.
+function inactiveSectionsForTarget(target) {
+  const sections = [];
+  let cur = { heading: null, mastered: [], discontinued: [] };
+  sections.push(cur);
+  for (const pa of (target.predefinedActivities || [])) {
+    if (pa.isHeading || pa.isMaintainHeading) {
+      cur = { heading: pa.name || "(untitled heading)", mastered: [], discontinued: [] };
+      sections.push(cur);
+      continue;
+    }
+    if (pa.isNote || pa.isExportNote || pa.isMaintain) continue;
+    if (!pa.name && !pa.title) continue;
+    if (pa.masteredOn || pa.isCompleted) cur.mastered.push(pa);
+    else if (pa.discontinuedOn || pa.isArchived || pa.isStopped) cur.discontinued.push(pa);
+  }
+  return sections.filter(s => s.mastered.length > 0 || s.discontinued.length > 0);
+}
+
+function renderInactiveListScreen(entity) {
+  const body = $("inactive-list-body");
+  if (!body) return;
+  // Discontinued targets stay (their history is the point of this page); archived
+  // ones are hidden everywhere else in the app, so they stay hidden here too.
+  const targets = sortTargetsByOrder([...(entity.targets || [])].filter(t => !t.archived));
+  if (!targets.length) {
+    body.innerHTML = `<div style="padding:1rem;color:#9ca3af;font-style:italic">No targets found.</div>`;
+    return;
+  }
+
+  let seq = 0;
+  const groupHtml = (label, emoji, color, bg, border, list, kind) => {
+    if (!list.length) return "";
+    const id = `inact-${kind}-${seq++}`;
+    const rows = list.map(pa => {
+      const date = kind === "mastered" ? pa.masteredOn : pa.discontinuedOn;
+      const badge = `<span style="font-size:.72rem;white-space:nowrap;background:${bg};color:${color};font-weight:600;padding:.1rem .5rem;border-radius:.3rem;border:1px solid ${border}">${emoji} ${label}${date ? ` ${fmtPeriodDate(date)}` : ""}</span>`;
+      const indent = pa.parentActivity ? "margin-left:1.4rem;" : "";
+      return `<div style="${indent}display:flex;align-items:flex-start;gap:.6rem;padding:.4rem .55rem;border-bottom:1px solid #f3f4f6">
+        <span style="flex:1;min-width:0;font-size:.88rem;color:#374151;overflow-wrap:break-word">${escHtml(_inactStripMk(pa.title || pa.name))}</span>
+        ${badge}
+      </div>`;
+    }).join("");
+    return `<div style="margin-top:.4rem">
+      <button class="inact-toggle" data-panel="${id}" style="display:flex;align-items:center;gap:.45rem;background:none;border:none;cursor:pointer;width:100%;padding:.3rem 0;font-size:.84rem;font-weight:700;color:${color};text-align:left">
+        <span class="inact-arrow" style="font-size:.7rem">▶</span>
+        ${emoji} ${label} (${list.length})
+      </button>
+      <div id="${id}" style="display:none;border:1px solid ${border};border-radius:.45rem;overflow:hidden;background:#fff">${rows}</div>
+    </div>`;
+  };
+
+  let html = "";
+  for (const target of targets) {
+    const sections = inactiveSectionsForTarget(target);
+    const discTag = target.discontinuedOn
+      ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;margin-left:.4rem">🛑 Discontinued</span>` : "";
+    html += `<div style="margin-bottom:1.6rem">
+      <div style="font-size:1rem;font-weight:700;color:var(--primary-dark);border-bottom:2px solid var(--primary-light);padding-bottom:.3rem;margin-bottom:.5rem">${escHtml(target.name)}${discTag}</div>`;
+    if (sections.length === 0) {
+      html += `<div style="font-size:.85rem;color:#9ca3af;font-style:italic;padding:.2rem .1rem">None</div>`;
+    } else {
+      for (const s of sections) {
+        if (s.heading !== null) {
+          html += `<div style="background:var(--primary-light);color:var(--primary-dark);border-left:4px solid var(--primary);border-radius:var(--radius-sm);padding:.35rem .8rem;font-size:.78rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-top:.6rem">${escHtml(s.heading)}</div>`;
+        }
+        html += groupHtml("Mastered", "⭐", "#059669", "#d1fae5", "#6ee7b7", s.mastered, "mastered");
+        html += groupHtml("Discontinued", "🚩", "#dc2626", "#fee2e2", "#fca5a5", s.discontinued, "discontinued");
+      }
+    }
+    html += `</div>`;
+  }
+
+  body.innerHTML = html;
+  body.querySelectorAll(".inact-toggle").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const panel = document.getElementById(btn.dataset.panel);
+      const arrow = btn.querySelector(".inact-arrow");
+      if (!panel) return;
+      const open = panel.style.display !== "none";
+      panel.style.display = open ? "none" : "block";
+      if (arrow) arrow.textContent = open ? "▶" : "▼";
+    });
+  });
+}
+
+function openInactiveListScreen(entity, label) {
+  const sub = $("inactive-list-subtitle");
+  if (sub) sub.textContent = label;
+  showScreen("screen-inactive-list");
+  $("btn-inactive-list-back").onclick = showHome;
+  renderInactiveListScreen(entity);
+}
+
 function openManageActivityScreen(student) {
   _maIsGroup = false;
   _maSelectedTargetIdx = 0;
@@ -6477,6 +6586,12 @@ function showStudentChoice(student) {
           <div class="choice-label">Manage Targets</div>
         </div>
       </button>
+      <button class="choice-btn choice-inactive-list">
+        <span class="choice-icon">📋</span>
+        <div class="choice-text">
+          <div class="choice-label">List of Discontinued &amp; Mastered Activities</div>
+        </div>
+      </button>
       <button class="choice-btn choice-export-excel">
         <span class="choice-icon">📊</span>
         <div class="choice-text">
@@ -6585,6 +6700,11 @@ function showStudentChoice(student) {
   $("session-picker-list").querySelector(".choice-other").addEventListener("click", () => {
     showSessionPicker(student);
   });
+  $("session-picker-list").querySelector(".choice-inactive-list").addEventListener("click", () => {
+    closeSessionPicker();
+    openInactiveListScreen(student, student.name + (student.note ? ' ' + student.note : ''));
+  });
+
   $("session-picker-list").querySelector(".choice-manage-activity").addEventListener("click", () => {
     closeSessionPicker();
     $("manage-modal-title").textContent = "Manage Targets";
@@ -21457,6 +21577,10 @@ function showGroupChoice(group) {
         <span class="choice-icon">🪄</span>
         <div class="choice-text"><div class="choice-label">Manage Targets</div></div>
       </button>
+      <button class="choice-btn choice-inactive-list-group">
+        <span class="choice-icon">📋</span>
+        <div class="choice-text"><div class="choice-label">List of Discontinued &amp; Mastered Activities</div></div>
+      </button>
       <button class="choice-btn choice-export-excel">
         <span class="choice-icon">📊</span>
         <div class="choice-text"><div class="choice-label">Export to Excel (Yearly Summary)</div></div>
@@ -21570,6 +21694,11 @@ function showGroupChoice(group) {
   $("session-picker-list").querySelector(".choice-manage-activity-group").addEventListener("click", () => {
     closeSessionPicker();
     showGroupManageActivityContent(group);
+  });
+
+  $("session-picker-list").querySelector(".choice-inactive-list-group").addEventListener("click", () => {
+    closeSessionPicker();
+    openInactiveListScreen(group, group.name);
   });
 }
 
