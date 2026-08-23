@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1815";
+const APP_VERSION = "1816";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -17137,12 +17137,6 @@ function mnStatusKebabHtml(a, idx, isParent = false) {
          (!isParent ? btn('maintain','🆗 Maintain Activity',';color:#0369a1') : '');
 }
 
-// Heading ids the boss has manually pulled back out of the "no activities"
-// collapsed section (see renderTargetManageContent) so she can drag a new
-// activity under them again. Ids are globally unique (cfgId), so this can
-// safely persist for the app session without being scoped to one target.
-const _mnForceShowHeadingIds = new Set();
-
 function renderTargetManageContent(student, target) {
   $("manage-modal-title").textContent = target.name;
   target.predefinedActivities = normalizeActivitiesFormat(target.predefinedActivities || []);
@@ -17260,32 +17254,14 @@ function renderTargetManageContent(student, target) {
     <div class="admin-section-title">Activities & Notes</div>
     <div class="admin-list" id="mn-act-list">`;
 
-  // A heading is "empty" once every real activity under it (before the next
-  // heading) has been mastered/discontinued — notes don't count as content.
-  // Purely a display-time classification: doesn't touch array order or the
-  // heading objects, so historical section grouping (exports, AI reports,
-  // groupPasBySections) is unaffected. Empty headings render in the collapsed
-  // "no activities" section below instead of floating inline with nothing
-  // under them.
-  const emptyHeadingIdxs = new Set();
-  acts.forEach((a, idx) => {
-    if (!a.isHeading && !a.isMaintainHeading) return;
-    let hasContent = false;
-    for (let j = idx + 1; j < acts.length; j++) {
-      const b = acts[j];
-      if (b.isHeading || b.isMaintainHeading) break;
-      if (b.isNote || b.isExportNote) continue;
-      if (b.isCompleted || b.isArchived || b.isStopped || b.masteredOn || b.discontinuedOn) continue;
-      hasContent = true;
-      break;
-    }
-    if (!hasContent) emptyHeadingIdxs.add(idx);
-  });
-
   let manageActNo = 0;
   acts.forEach((a, idx) => {
     if (a.isCompleted || a.isArchived || a.isStopped || a.masteredOn || a.discontinuedOn) return;
-    if ((a.isHeading || a.isMaintainHeading) && emptyHeadingIdxs.has(idx) && !_mnForceShowHeadingIds.has(a.id)) return;
+    // Headings always render in place. Hiding "empty" ones (v1803) fought the two
+    // commonest actions: a brand-new heading is empty by definition so it vanished
+    // the instant it was created, and "+ Add Activity" appends to the end of the
+    // list, which made whichever heading happened to be last reappear with the new
+    // activity under it.
     if (a.isHeading || a.isMaintainHeading) {
       const isGray = a.headingColor === "gray" || a.isMaintainHeading;
       const isGreen = a.headingColor === "green";
@@ -17882,29 +17858,6 @@ function renderTargetManageContent(student, target) {
     html += `</div></div>`;
   }
 
-  const _emptyHeadingRows = acts
-    .map((a, idx) => ({ a, idx }))
-    .filter(({ a, idx }) => (a.isHeading || a.isMaintainHeading) && emptyHeadingIdxs.has(idx) && !_mnForceShowHeadingIds.has(a.id));
-  if (_emptyHeadingRows.length > 0) {
-    html += `<div style="margin-top:.5rem">
-      <button class="mn-collapsed-toggle" data-section="emptyheadings" style="display:flex;align-items:center;gap:.5rem;background:none;border:none;cursor:pointer;width:100%;padding:.25rem 0;font-size:.85rem;font-weight:700;color:#374151">
-        <span class="mn-toggle-arrow" style="font-size:.75rem">▶</span>
-        Section Headings with No Activities (${_emptyHeadingRows.length})
-      </button>
-      <div id="mn-emptyheadings-section" style="display:none">`;
-    _emptyHeadingRows.forEach(({ a, idx }) => {
-      html += `<div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .5rem;background:#f9fafb;border:1px dashed #d1d5db;border-radius:.4rem;margin-bottom:.35rem">
-        <textarea class="admin-input mn-empty-heading-input" data-idx="${idx}" rows="1"
-          placeholder="Enter Section Heading"
-          style="flex:1;min-width:0;font-size:.85rem;font-weight:600;resize:none;overflow-y:hidden">${escHtml(a.name || "")}</textarea>
-        <span style="font-size:.71rem;color:#9ca3af;white-space:nowrap">All activities mastered/discontinued</span>
-        <button class="btn-mn-restore-empty-heading" data-idx="${idx}" style="font-size:.78rem;padding:.3rem .6rem;color:#1d4ed8;background:#eff6ff;border:1px solid #bfdbfe;border-radius:.35rem;cursor:pointer;white-space:nowrap">↑ Restore to active list</button>
-        <button class="btn-mn-del-empty-heading" data-idx="${idx}" style="font-size:.78rem;padding:.3rem .6rem;color:#dc2626;background:none;border:1px solid #fca5a5;border-radius:.35rem;cursor:pointer">🗑️ Delete</button>
-      </div>`;
-    });
-    html += `</div></div>`;
-  }
-
   html += `
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.25rem">
       <button class="btn-admin-add" id="btn-mn-add-act" style="flex:0 0 auto;width:auto">+ Add Activity</button>
@@ -17919,11 +17872,9 @@ function renderTargetManageContent(student, target) {
 
   const _discOpen = $("mn-discontinued-section")?.style.display === "block";
   const _mastOpen = $("mn-mastered-section")?.style.display === "block";
-  const _emptyHOpen = $("mn-emptyheadings-section")?.style.display === "block";
   $("manage-modal-body").innerHTML = html;
   if (_discOpen) { const s = $("mn-discontinued-section"); if (s) { s.style.display = "block"; const a = s.previousElementSibling?.querySelector(".mn-toggle-arrow"); if (a) a.textContent = "▼"; s.querySelectorAll(".mn-act-details-input").forEach(autoResizeTextarea); } }
   if (_mastOpen) { const s = $("mn-mastered-section"); if (s) { s.style.display = "block"; const a = s.previousElementSibling?.querySelector(".mn-toggle-arrow"); if (a) a.textContent = "▼"; s.querySelectorAll(".mn-act-details-input").forEach(autoResizeTextarea); } }
-  if (_emptyHOpen) { const s = $("mn-emptyheadings-section"); if (s) { s.style.display = "block"; const a = s.previousElementSibling?.querySelector(".mn-toggle-arrow"); if (a) a.textContent = "▼"; } }
   $("manage-modal-body").querySelectorAll(".admin-list-item textarea").forEach(autoResizeTextarea);
 
   _pendingActsCleanup = { acts, save: saveTarget };
@@ -18765,57 +18716,6 @@ function renderTargetManageContent(student, target) {
       panel.style.display = open ? "none" : "block";
       if (arrow) arrow.textContent = open ? "▶" : "▼";
       if (!open) panel.querySelectorAll(".mn-inactive-name-input").forEach(autoResizeTextarea);
-    });
-  });
-
-  // Empty-heading dropdown actions — see emptyHeadingIdxs above. Restore is a
-  // local, non-persisted override (no save needed): it just lets this heading
-  // render inline again so a new activity can be dragged under it. Delete
-  // mirrors the regular heading delete in .mn-hkm-opt above.
-  // Empty headings stay renameable in place. A heading lives only in the target
-  // setup (it is never copied into a session), so renaming one updates it
-  // everywhere it is drawn, past sessions and past exports included. Deliberately
-  // does NOT call propagateActivityRename — a heading is not an activity, and
-  // pushing its name through that path is what let heading renames hijack
-  // same-named activities in v606.
-  $("manage-modal-body").querySelectorAll(".mn-empty-heading-input").forEach(inp => {
-    autoResizeTextarea(inp);
-    inp.addEventListener("input", () => autoResizeTextarea(inp));
-    inp.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); inp.blur(); } });
-    inp.addEventListener("blur", async () => {
-      const idx = Number(inp.dataset.idx);
-      const pa = acts[idx];
-      if (!pa) return;
-      const v = inp.value.trim();
-      if (v === (pa.name || "")) return;
-      pa.name = v;
-      target.predefinedActivities = acts;
-      await saveTarget();
-      flashSaved(inp);
-    });
-  });
-
-  $("manage-modal-body").querySelectorAll(".btn-mn-restore-empty-heading").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const idx = Number(btn.dataset.idx);
-      const pa = acts[idx];
-      if (!pa) return;
-      _mnForceShowHeadingIds.add(pa.id);
-      renderTargetManageContent(student, target);
-    });
-  });
-
-  $("manage-modal-body").querySelectorAll(".btn-mn-del-empty-heading").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const idx = Number(btn.dataset.idx);
-      const pa = acts[idx];
-      if (!pa) return;
-      if (!confirm(`Delete section heading "${pa.name}"?`)) return;
-      const actIdx = acts.indexOf(pa);
-      if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
-      target.predefinedActivities = acts;
-      await saveTarget();
-      renderTargetManageContent(student, target);
     });
   });
 
