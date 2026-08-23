@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1820";
+const APP_VERSION = "1821";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6335,14 +6335,28 @@ function renderInactiveListScreen(entity) {
   const groupHtml = (label, emoji, color, bg, border, list, kind) => {
     if (!list.length) return "";
     const id = `inact-${kind}-${seq++}`;
+    // Numbering runs within each group: top-level activities get 1) 2) 3), and
+    // sub-activities get a) b) c) restarting under each parent. map() runs in
+    // order, so plain counters in this closure are enough.
+    let actNum = 0, subNum = 0;
     const rows = list.map(pa => {
       const date = kind === "mastered" ? pa.masteredOn : pa.discontinuedOn;
       // The group header above already says Mastered/Discontinued, so the row
       // badge only needs the date. Falls back to the word for old records that
       // carry the flag without a date.
       const badge = `<span style="font-size:.72rem;white-space:nowrap;background:${bg};color:${color};font-weight:600;padding:.1rem .5rem;border-radius:.3rem;border:1px solid ${border}">${emoji} ${date ? fmtPeriodDate(date) : label}</span>`;
-      const indent = pa.parentActivity ? "margin-left:1.4rem;" : "";
-      return `<div style="${indent}display:flex;align-items:flex-start;gap:.6rem;padding:.4rem .55rem;border-bottom:1px solid #f3f4f6">
+      const isSub = !!pa.parentActivity;
+      let marker;
+      if (isSub) {
+        marker = `<span style="flex-shrink:0;font-size:.85rem;font-weight:700;color:#0369a1;min-width:1.3rem">${String.fromCharCode(97 + subNum)})</span>`;
+        subNum++;
+      } else {
+        actNum++; subNum = 0;
+        marker = `<span style="flex-shrink:0;font-size:.85rem;font-weight:700;color:#6b7280;min-width:1.3rem">${actNum})</span>`;
+      }
+      const indent = isSub ? "margin-left:1.4rem;" : "";
+      return `<div style="${indent}display:flex;align-items:flex-start;gap:.5rem;padding:.4rem .55rem;border-bottom:1px solid #f3f4f6">
+        ${marker}
         <span style="flex:1;min-width:0;font-size:.88rem;color:#374151;overflow-wrap:break-word">${escHtml(_inactStripMk(pa.title || pa.name))}</span>
         ${badge}
       </div>`;
