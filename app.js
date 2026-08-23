@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1824";
+const APP_VERSION = "1825";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -17051,8 +17051,11 @@ function initDragSort(listEl, onReorder) {
       .filter(el => el !== placeholder && el.dataset.idx !== undefined)
       .map(el => Number(el.dataset.idx))
       .filter(Number.isFinite);
-    // Scroll the dropped item into view immediately after compact→expanded transition
-    // so the viewport stays on the drop position instead of jerking back to item 1.
+    // Which row was actually dropped, so the caller can bring it back into view
+    // after its re-render. Restoring the old scrollTop instead is what made drops
+    // feel like they jerked away: rows are collapsed while dragging and expand
+    // again afterwards, so the same scroll offset lands somewhere else entirely.
+    const movedIdx = Number(dragEl.dataset.idx);
     dragEl.scrollIntoView({ block: "nearest" });
     dragEl = null;
     placeholder = null;
@@ -17060,7 +17063,7 @@ function initDragSort(listEl, onReorder) {
     // otherwise buttons (e.g. "Add Sub-activity") under the release point get clicked.
     document.addEventListener('click', e => { e.stopPropagation(); e.preventDefault(); },
       { capture: true, once: true });
-    onReorder(newOrder);
+    onReorder(newOrder, Number.isFinite(movedIdx) ? movedIdx : null);
   };
 
   listEl.addEventListener('pointerup',     endDrag);
@@ -17289,6 +17292,22 @@ function mnSegmentOf(acts) {
     segOf.set(i, seg);
   });
   return segOf;
+}
+
+// After a drag re-renders the list, scrolls the row that was moved back into
+// view and blinks it, so the drop lands somewhere predictable. Called instead of
+// restoring the pre-drag scrollTop, which pointed at the wrong place once the
+// collapsed drag rows expanded back to full height.
+function mnScrollToMovedRow(newIdx) {
+  if (newIdx == null || newIdx < 0) return;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const body = $("manage-modal-body");
+    const el = body?.querySelector(`#mn-act-list > [data-idx="${newIdx}"]`);
+    if (!el) return;
+    el.scrollIntoView({ block: "center" });
+    el.classList.add("activity-cfg-blink");
+    el.addEventListener("animationend", () => el.classList.remove("activity-cfg-blink"), { once: true });
+  }));
 }
 
 // Rebuilds the activities array after a drag in Edit Target.
@@ -18162,13 +18181,13 @@ function renderTargetManageContent(student, target) {
     saveTarget().catch(() => {});
   }
 
-  initDragSort($("mn-act-list"), async newOrder => {
-    target.predefinedActivities = mnReorderActs(acts, newOrder);
+  initDragSort($("mn-act-list"), async (newOrder, movedIdx) => {
+    const moved = movedIdx != null ? acts[movedIdx] : null;
+    const result = mnReorderActs(acts, newOrder);
+    target.predefinedActivities = result;
     await saveTarget();
-    const scrollPos = $("manage-modal-body").scrollTop;
     renderTargetManageContent(student, target);
-    // Restore scroll after re-render via rAF so layout is settled before assignment.
-    requestAnimationFrame(() => { $("manage-modal-body").scrollTop = scrollPos; });
+    mnScrollToMovedRow(moved ? result.indexOf(moved) : -1);
   });
 
   $("mn-t-name").addEventListener("blur", async () => {
@@ -20884,15 +20903,16 @@ function renderTemplateManageContent(template) {
     saveTemplateFn().catch(() => {});
   }
 
-  initDragSort($("mn-act-list"), async newOrder => {
+  initDragSort($("mn-act-list"), async (newOrder, movedIdx) => {
     // Was rebuilding from newOrder alone, which silently dropped every mastered
     // or discontinued activity (they aren't draggable rows) — same bug the target
     // editor had. mnReorderActs carries them along with their heading.
-    template.predefinedActivities = mnReorderActs(acts, newOrder);
+    const moved = movedIdx != null ? acts[movedIdx] : null;
+    const result = mnReorderActs(acts, newOrder);
+    template.predefinedActivities = result;
     await saveTemplateFn();
-    const scrollPos = $("manage-modal-body").scrollTop;
     renderTemplateManageContent(template);
-    $("manage-modal-body").scrollTop = scrollPos;
+    mnScrollToMovedRow(moved ? result.indexOf(moved) : -1);
   });
 
   $("mn-t-name").addEventListener("blur", async () => {
