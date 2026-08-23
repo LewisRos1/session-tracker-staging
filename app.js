@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1829";
+const APP_VERSION = "1830";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -18267,13 +18267,16 @@ function renderTargetManageContent(student, target) {
     if (e.key === "Enter") { e.preventDefault(); $("mn-t-name").blur(); }
   });
 
-  $("manage-modal-body").querySelectorAll(".admin-pts-btn").forEach(btn => {
+  // [data-pts] scopes this to the real Max Points buttons — the Collapsed View
+  // toggle reuses .admin-pts-btn for its styling and would otherwise be caught
+  // here, setting maxPoints to NaN.
+  $("manage-modal-body").querySelectorAll(".admin-pts-btn[data-pts]").forEach(btn => {
     btn.addEventListener("click", async () => {
       const newPts = Number(btn.dataset.pts);
       if (newPts === target.maxPoints) return;
       if (!confirm(`Change max points to ${newPts}? This will affect how scores are calculated for this target.`)) return;
       target.maxPoints = newPts;
-      $("manage-modal-body").querySelectorAll(".admin-pts-btn").forEach(b =>
+      $("manage-modal-body").querySelectorAll(".admin-pts-btn[data-pts]").forEach(b =>
         b.classList.toggle("active", b.dataset.pts === btn.dataset.pts));
       await saveTarget();
     });
@@ -20469,6 +20472,13 @@ function renderTemplateManageContent(template) {
         <button class="admin-pts-btn ${(template.maxPoints || 3) === 4 ? "active" : ""}" data-pts="4">4</button>
       </div>
     </div>
+    <div class="admin-section admin-row">
+      <label class="admin-label">Collapsed View</label>
+      <div class="admin-pts-group">
+        <button class="admin-pts-btn mn-collapse-toggle-btn ${_mnCollapsedView ? "" : "active"}" data-collapsed="0">Off</button>
+        <button class="admin-pts-btn mn-collapse-toggle-btn ${_mnCollapsedView ? "active" : ""}" data-collapsed="1">On</button>
+      </div>
+    </div>
 
     <div class="admin-section-title">Activities & Notes</div>
     <div class="admin-list" id="mn-act-list">`;
@@ -20568,7 +20578,9 @@ function renderTemplateManageContent(template) {
       const actItemStyle = actBaseBg ? ` style="${actBaseBg}"` : '';
       html += `<div class="admin-list-item" data-idx="${idx}"${actItemStyle}>
         <span class="drag-handle">⠿</span>
-        <div style="flex:1;display:flex;flex-direction:column;gap:.3rem">
+        <div style="flex:1;min-width:0">
+          <div class="mn-act-compact-title">${paDisplayHtml(a, true)}</div>
+          <div class="mn-act-body" style="display:flex;flex-direction:column;gap:.3rem">
           <div style="display:flex;align-items:center;gap:.4rem">
             <span style="font-size:.8rem;font-weight:700;color:#6b7280;white-space:nowrap">Start Date:</span>
             <button class="mn-act-start-btn" data-idx="${idx}" style="padding:.2rem .5rem;border:1.5px solid #d1d5db;border-radius:.35rem;background:#f0f9ff;cursor:pointer;font-size:.95rem;color:#374151;white-space:nowrap">📅 ${a.activeFrom ? fmtPeriodDate(a.activeFrom) : 'Set date'}</button>
@@ -20593,6 +20605,7 @@ function renderTemplateManageContent(template) {
           <div style="display:flex;align-items:flex-start;gap:.5rem">
             <span style="font-size:.93rem;color:#374151;white-space:nowrap;font-weight:700;padding-top:.3rem">Activity Type:</span>
             ${remarkTypeSelect}
+          </div>
           </div>
         </div>
         <div style="position:relative;align-self:flex-start">
@@ -20958,6 +20971,7 @@ function renderTemplateManageContent(template) {
   $("manage-modal-body").innerHTML = html;
   // See renderTargetManageContent — relocate before listeners are bound.
   mnRegroupInactiveCards($("manage-modal-body"), acts);
+  $("mn-act-list")?.classList.toggle("mn-collapsed-view", _mnCollapsedView);
   $("manage-modal-body").querySelectorAll(".admin-list-item textarea").forEach(autoResizeTextarea);
 
   const saveTemplateFn = async () => {
@@ -20998,14 +21012,28 @@ function renderTemplateManageContent(template) {
     if (e.key === "Enter") { e.preventDefault(); $("mn-t-name").blur(); }
   });
 
-  $("manage-modal-body").querySelectorAll(".admin-pts-btn").forEach(btn => {
+  // [data-pts] scopes this to the real Max Points buttons — the Collapsed View
+  // toggle reuses .admin-pts-btn for its styling and would otherwise be caught
+  // here, setting maxPoints to NaN.
+  $("manage-modal-body").querySelectorAll(".admin-pts-btn[data-pts]").forEach(btn => {
     btn.addEventListener("click", async () => {
       const newPts = Number(btn.dataset.pts);
       if (newPts === (template.maxPoints || 3)) return;
       template.maxPoints = newPts;
-      $("manage-modal-body").querySelectorAll(".admin-pts-btn").forEach(b =>
+      $("manage-modal-body").querySelectorAll(".admin-pts-btn[data-pts]").forEach(b =>
         b.classList.toggle("active", b.dataset.pts === btn.dataset.pts));
       await saveTemplateFn();
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-collapse-toggle-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const on = btn.dataset.collapsed === "1";
+      if (on === _mnCollapsedView) return;
+      _mnCollapsedView = on;
+      $("manage-modal-body").querySelectorAll(".mn-collapse-toggle-btn").forEach(b =>
+        b.classList.toggle("active", (b.dataset.collapsed === "1") === on));
+      $("mn-act-list")?.classList.toggle("mn-collapsed-view", on);
     });
   });
 
