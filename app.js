@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1817";
+const APP_VERSION = "1818";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6304,26 +6304,20 @@ function _inactStripMk(s) {
     .replace(/\*([\s\S]+?)\*/g, "$1").replace(/_([\s\S]+?)_/g, "$1");
 }
 
-// Walks a target's activities in order, bucketing mastered/discontinued ones
-// into the section they fall under. Activities before the first heading land in
-// a leading section with no name. Mastered wins when a record somehow carries
+// Collects a target's mastered/discontinued activities into two flat lists, in
+// the order they appear in the target. Section headings are ignored — this page
+// is a plain roll-up per target. Mastered wins when a record somehow carries
 // both flags, matching how Edit Target's two lists are built.
-function inactiveSectionsForTarget(target) {
-  const sections = [];
-  let cur = { heading: null, mastered: [], discontinued: [] };
-  sections.push(cur);
+function inactiveActivitiesForTarget(target) {
+  const mastered = [], discontinued = [];
   for (const pa of (target.predefinedActivities || [])) {
-    if (pa.isHeading || pa.isMaintainHeading) {
-      cur = { heading: pa.name || "(untitled heading)", mastered: [], discontinued: [] };
-      sections.push(cur);
-      continue;
-    }
+    if (pa.isHeading || pa.isMaintainHeading) continue;
     if (pa.isNote || pa.isExportNote || pa.isMaintain) continue;
     if (!pa.name && !pa.title) continue;
-    if (pa.masteredOn || pa.isCompleted) cur.mastered.push(pa);
-    else if (pa.discontinuedOn || pa.isArchived || pa.isStopped) cur.discontinued.push(pa);
+    if (pa.masteredOn || pa.isCompleted) mastered.push(pa);
+    else if (pa.discontinuedOn || pa.isArchived || pa.isStopped) discontinued.push(pa);
   }
-  return sections.filter(s => s.mastered.length > 0 || s.discontinued.length > 0);
+  return { mastered, discontinued };
 }
 
 function renderInactiveListScreen(entity) {
@@ -6361,21 +6355,16 @@ function renderInactiveListScreen(entity) {
 
   let html = "";
   for (const target of targets) {
-    const sections = inactiveSectionsForTarget(target);
+    const { mastered, discontinued } = inactiveActivitiesForTarget(target);
     const discTag = target.discontinuedOn
       ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;margin-left:.4rem">🛑 Discontinued</span>` : "";
     html += `<div style="margin-bottom:1.6rem">
       <div style="font-size:1rem;font-weight:700;color:var(--primary-dark);border-bottom:2px solid var(--primary-light);padding-bottom:.3rem;margin-bottom:.5rem">${escHtml(target.name)}${discTag}</div>`;
-    if (sections.length === 0) {
+    if (mastered.length === 0 && discontinued.length === 0) {
       html += `<div style="font-size:.85rem;color:#9ca3af;font-style:italic;padding:.2rem .1rem">None</div>`;
     } else {
-      for (const s of sections) {
-        if (s.heading !== null) {
-          html += `<div style="background:var(--primary-light);color:var(--primary-dark);border-left:4px solid var(--primary);border-radius:var(--radius-sm);padding:.35rem .8rem;font-size:.78rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-top:.6rem">${escHtml(s.heading)}</div>`;
-        }
-        html += groupHtml("Mastered", "⭐", "#059669", "#d1fae5", "#6ee7b7", s.mastered, "mastered");
-        html += groupHtml("Discontinued", "🚩", "#dc2626", "#fee2e2", "#fca5a5", s.discontinued, "discontinued");
-      }
+      html += groupHtml("Mastered", "⭐", "#059669", "#d1fae5", "#6ee7b7", mastered, "mastered");
+      html += groupHtml("Discontinued", "🚩", "#dc2626", "#fee2e2", "#fca5a5", discontinued, "discontinued");
     }
     html += `</div>`;
   }
