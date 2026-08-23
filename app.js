@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1832";
+const APP_VERSION = "1833";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8734,7 +8734,7 @@ function renderFedcTargetWithSidebar(target, allPas, subActsByParent, sessionDat
           <div style="background:var(--primary);height:100%;width:${pct}%;border-radius:9999px"></div>
         </div>
       </div>
-      <div class="sec-main" style="display:flex;flex-direction:column;gap:.85rem">
+      <div class="sec-main" style="display:flex;flex-direction:column;gap:.85rem;padding-bottom:2.5rem">
         ${allSectionsHtml}
       </div>
     </div>`;
@@ -8773,7 +8773,7 @@ function renderFedcTargetWithSidebar(target, allPas, subActsByParent, sessionDat
       ${sidebarFixedHtml}
       <div style="flex:1;overflow-y:auto">${sidebarNavHtml}</div>
     </div>
-    <div class="sec-main" style="flex:1;min-width:0;min-height:0;padding-left:.75rem;overflow-y:auto;display:flex;flex-direction:column;gap:.85rem">
+    <div class="sec-main" style="flex:1;min-width:0;min-height:0;padding-left:.75rem;padding-bottom:2.5rem;overflow-y:auto;display:flex;flex-direction:column;gap:.85rem">
       ${allSectionsHtml}
     </div>
   </div>`;
