@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1822";
+const APP_VERSION = "1823";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -17281,29 +17281,14 @@ function mnStatusKebabHtml(a, idx, isParent = false) {
 // anything before the first heading belongs to the leading segment, keyed -1.
 // Drives both where each heading's collapsed mastered/discontinued groups go
 // and what a heading drag has to carry with it.
-function mnSegmentInfo(acts) {
+function mnSegmentOf(acts) {
   const segOf = new Map();
-  const counts = new Map();
-  const blank = () => ({ active: 0, mastered: 0, discontinued: 0 });
-  counts.set(-1, blank());
   let seg = -1;
   (acts || []).forEach((a, i) => {
-    if (a.isHeading || a.isMaintainHeading) {
-      seg = i;
-      segOf.set(i, i);
-      if (!counts.has(i)) counts.set(i, blank());
-      return;
-    }
+    if (a.isHeading || a.isMaintainHeading) { seg = i; segOf.set(i, i); return; }
     segOf.set(i, seg);
-    if (a.isNote || a.isExportNote) return;
-    if (a.parentActivity) return;             // sub-activities ride with their parent
-    if (!a.name && !a.title) return;
-    if (!counts.has(seg)) counts.set(seg, blank());
-    if (a.masteredOn || a.isCompleted) counts.get(seg).mastered++;
-    else if (a.discontinuedOn || a.isArchived || a.isStopped) counts.get(seg).discontinued++;
-    else counts.get(seg).active++;
   });
-  return { segOf, counts };
+  return segOf;
 }
 
 // Rebuilds the activities array after a drag in Edit Target.
@@ -17366,7 +17351,7 @@ function mnReorderActs(acts, newOrder) {
 function mnRegroupInactiveCards(bodyEl, acts) {
   const src = bodyEl.querySelector("#mn-inactive-source");
   if (!src) return;
-  const { segOf } = mnSegmentInfo(acts);
+  const segOf = mnSegmentOf(acts);
   const meta = {
     mastered:     { label: "Mastered",     emoji: "⭐", color: "#059669" },
     discontinued: { label: "Discontinued", emoji: "🚩", color: "#dc2626" }
@@ -17530,7 +17515,6 @@ function renderTargetManageContent(student, target) {
 
   // One empty holder per segment, emitted where that segment ends. The collapsed
   // mastered/discontinued groups get moved into these by mnRegroupInactiveCards.
-  const _segInfo = mnSegmentInfo(acts);
   let _curSeg = -1;
   const _flushSeg = () => { html += `<div class="mn-seg-groups" data-seg="${_curSeg}"></div>`; };
 
@@ -17553,15 +17537,6 @@ function renderTargetManageContent(student, target) {
         <span class="drag-handle"${hdgBg ? ` style="color:${hdgTextColor}"` : ''}>⠿</span>
         <textarea class="admin-input mn-heading-input" id="mn-act-name-${idx}" data-idx="${idx}"
           rows="1" placeholder="Enter Section Heading" style="flex:1${hdgBg ? `;background:${hdgBg};color:${hdgTextColor}` : ""}">${escHtml(a.name || "")}</textarea>
-        ${(() => {
-          // Says what this heading is carrying, so dragging it is not a leap of
-          // faith — everything counted here moves with the heading.
-          const c = _segInfo.counts.get(idx) || { active: 0, mastered: 0, discontinued: 0 };
-          const parts = [`${c.active} active`];
-          if (c.mastered) parts.push(`${c.mastered} mastered`);
-          if (c.discontinued) parts.push(`${c.discontinued} discontinued`);
-          return `<span style="font-size:.66rem;white-space:nowrap;flex-shrink:0;opacity:.8;color:${hdgBg ? hdgTextColor : "#6b7280"}">${parts.join(" · ")}</span>`;
-        })()}
         <div style="position:relative">
           <button class="btn-adm-del mn-heading-color-btn" data-idx="${idx}" title="Heading options" style="font-size:1.15rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-heading-color-menu" id="mn-hkm-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:190px;overflow:hidden">
@@ -20407,7 +20382,6 @@ function renderTemplateManageContent(template) {
     <div class="admin-list" id="mn-act-list">`;
 
   // See renderTargetManageContent for what these holders are.
-  const _segInfo = mnSegmentInfo(acts);
   let _curSeg = -1;
   const _flushSeg = () => { html += `<div class="mn-seg-groups" data-seg="${_curSeg}"></div>`; };
 
@@ -20424,15 +20398,6 @@ function renderTemplateManageContent(template) {
         <span class="drag-handle"${hdgBg ? ` style="color:${hdgTextColor}"` : ''}>⠿</span>
         <textarea class="admin-input mn-heading-input" id="mn-act-name-${idx}" data-idx="${idx}"
           rows="1" placeholder="Enter Section Heading" style="flex:1${hdgBg ? `;background:${hdgBg};color:${hdgTextColor}` : ""}">${escHtml(a.name || "")}</textarea>
-        ${(() => {
-          // Says what this heading is carrying, so dragging it is not a leap of
-          // faith — everything counted here moves with the heading.
-          const c = _segInfo.counts.get(idx) || { active: 0, mastered: 0, discontinued: 0 };
-          const parts = [`${c.active} active`];
-          if (c.mastered) parts.push(`${c.mastered} mastered`);
-          if (c.discontinued) parts.push(`${c.discontinued} discontinued`);
-          return `<span style="font-size:.66rem;white-space:nowrap;flex-shrink:0;opacity:.8;color:${hdgBg ? hdgTextColor : "#6b7280"}">${parts.join(" · ")}</span>`;
-        })()}
         <div style="position:relative">
           <button class="btn-adm-del mn-heading-color-btn" data-idx="${idx}" title="Heading options" style="font-size:1.15rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-heading-color-menu" id="mn-hkm-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:190px;overflow:hidden">
