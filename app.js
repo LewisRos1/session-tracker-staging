@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1828";
+const APP_VERSION = "1829";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -15898,6 +15898,7 @@ async function handleActStartPickerChange() {
 // ── Open / close ──────────────────────────────────────────────
 
 function openManageModal(student, targetOrNull, templateOrNull = null, remarkPresetOrNull = null, scrollToPaId = null) {
+  _mnCollapsedView = false;   // always opens expanded — see the declaration
   $("manage-modal").classList.remove("hidden");
   if (remarkPresetOrNull) {
     renderRemarkPresetManageContent(remarkPresetOrNull);
@@ -17316,6 +17317,13 @@ function mnStatusKebabHtml(a, idx, isParent = false) {
          (!isParent ? btn('maintain','🆗 Maintain Activity',';color:#0369a1') : '');
 }
 
+// Collapsed view in Edit Target — title-only rows, no detail fields and no
+// mastered/discontinued groups, while drag handles and ⋮ menus stay live.
+// Deliberately NOT persisted: it resets to off every time the editor is opened
+// (see openManageModal / openGroupManageModal), so nobody is surprised by a
+// half-empty-looking screen they don't remember switching on.
+let _mnCollapsedView = false;
+
 // ─── EDIT TARGET: SECTION SEGMENTS ───────────────────────────
 // Every activity belongs to the section heading that precedes it in the array;
 // anything before the first heading belongs to the leading segment, keyed -1.
@@ -17545,6 +17553,13 @@ function renderTargetManageContent(student, target) {
         <button class="admin-pts-btn ${target.maxPoints === 4 ? "active" : ""}" data-pts="4">4</button>
       </div>
     </div>
+    <div class="admin-section admin-row">
+      <label class="admin-label">Collapsed View</label>
+      <div class="admin-pts-group">
+        <button class="admin-pts-btn mn-collapse-toggle-btn ${_mnCollapsedView ? "" : "active"}" data-collapsed="0">Off</button>
+        <button class="admin-pts-btn mn-collapse-toggle-btn ${_mnCollapsedView ? "active" : ""}" data-collapsed="1">On</button>
+      </div>
+    </div>
     ${_groupForTargetEdit ? `
     <div class="admin-section">
       <div class="admin-label-row">
@@ -17755,6 +17770,9 @@ function renderTargetManageContent(student, target) {
             <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;min-width:1.6rem;padding-top:.2rem">${manageActNo})</span>
             <div style="flex:1;min-width:0">
               <div class="mn-act-compact-title">${paDisplayHtml(a, true)}</div>
+              ${subActs.length ? `<div class="mn-sub-compact-list">${subActs.map((sub, si) =>
+                `<div class="mn-sub-compact">${String.fromCharCode(97 + si)}) ${formatActivityMarkup(sub.title || sub.name || "")}</div>`
+              ).join("")}</div>` : ""}
               <div class="mn-act-body" style="display:flex;flex-direction:column;gap:.55rem">
               <div style="display:flex;gap:.6rem;align-items:flex-start">
                 <div style="flex-shrink:0">
@@ -18209,6 +18227,7 @@ function renderTargetManageContent(student, target) {
   // Relocate the mastered/discontinued cards under their headings before any
   // listener is bound, so every handler below finds them in their final home.
   mnRegroupInactiveCards($("manage-modal-body"), acts);
+  $("mn-act-list")?.classList.toggle("mn-collapsed-view", _mnCollapsedView);
   $("manage-modal-body").querySelectorAll(".admin-list-item textarea").forEach(autoResizeTextarea);
 
   _pendingActsCleanup = { acts, save: saveTarget };
@@ -18257,6 +18276,17 @@ function renderTargetManageContent(student, target) {
       $("manage-modal-body").querySelectorAll(".admin-pts-btn").forEach(b =>
         b.classList.toggle("active", b.dataset.pts === btn.dataset.pts));
       await saveTarget();
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-collapse-toggle-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const on = btn.dataset.collapsed === "1";
+      if (on === _mnCollapsedView) return;
+      _mnCollapsedView = on;
+      $("manage-modal-body").querySelectorAll(".mn-collapse-toggle-btn").forEach(b =>
+        b.classList.toggle("active", (b.dataset.collapsed === "1") === on));
+      $("mn-act-list")?.classList.toggle("mn-collapsed-view", on);
     });
   });
 
@@ -24025,6 +24055,7 @@ function renderGroupSessionsForMonth(group, month, monthSessions, byMonth, sessi
 
 // ── Group manage modal ───────────────────────────────────────
 function openGroupManageModal(group, target = null, scrollToPaId = null) {
+  _mnCollapsedView = false;   // always opens expanded — see the declaration
   $("manage-modal").classList.remove("hidden");
   if (target) {
     _groupForTargetEdit = group;

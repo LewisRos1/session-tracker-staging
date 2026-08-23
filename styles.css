@@ -1733,6 +1733,24 @@ input.field-input::placeholder {
    the list stays compact while a section is being moved. */
 .is-reordering .mn-seg-groups { display: none !important; }
 
+/* Collapsed view — the same title-only rows as drag mode, but held on by the
+   toggle rather than only while a drag is in progress. Sub-activities live
+   inside .mn-act-body, so a separate read-only list of their titles is shown in
+   its place; drag handles and the ⋮ menus stay live. */
+.mn-sub-compact-list { display: none; }
+.mn-collapsed-view .mn-act-compact-title { display: block; }
+.mn-collapsed-view .mn-act-body { display: none !important; }
+.mn-collapsed-view .mn-seg-groups { display: none !important; }
+.mn-collapsed-view .mn-sub-compact-list { display: block; }
+.mn-sub-compact {
+  font-size: .84rem;
+  color: #0369a1;
+  padding: .1rem 0 .1rem .9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .admin-item-name {
   flex: 1;
   font-size: .97rem;
