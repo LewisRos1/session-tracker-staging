@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1830";
+const APP_VERSION = "1831";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8588,82 +8588,47 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
     const _orphanGroupsFor = sec => [..._orphanSubGroups.entries()]
       .filter(([k]) => k.endsWith(`|${sec}`)).map(([, v]) => v);
 
-    const _inactSubCard = (sub, si, color) => {
-      const subName = paDisplayHtml(sub, true) || `<em style="color:#9ca3af;font-size:.85rem">Untitled</em>`;
-      const subMast = sub.masteredOn ? `<span style="font-size:.71rem;display:inline-block;margin-top:.2rem;background:#d1fae5;color:#059669;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ Mastered ${fmtPeriodDate(sub.masteredOn)}</span> ` : '';
-      const subDisc = sub.discontinuedOn ? `<span style="font-size:.71rem;display:inline-block;margin-top:.2rem;background:#fee2e2;color:#dc2626;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 Discontinued ${fmtPeriodDate(sub.discontinuedOn)}</span> ` : '';
-      return `<div style="margin-left:1.4rem;background:var(--white);border:1px solid #e5e7eb;border-left:3px solid ${color};border-radius:.5rem;padding:.45rem .7rem .45rem .8rem;display:flex;align-items:flex-start;gap:.4rem;box-shadow:0 1px 3px rgba(0,0,0,.04);opacity:.6">
-        <span style="font-size:.75rem;font-weight:700;color:${color};flex-shrink:0;min-width:1.2rem;padding-top:.1rem">${String.fromCharCode(97 + si)})</span>
-        <div style="flex:1;min-width:0;line-height:1.5;white-space:pre-wrap">${subMast}${subDisc}${subName}</div>
+    // A plain one-line row: marker, name, and the date it happened. Used for both
+    // top-level activities and sub-activities so these sections read as a simple
+    // list rather than a stack of cards.
+    const _inactDateBadge = pa => {
+      if (pa.masteredOn) return `<span style="font-size:.71rem;white-space:nowrap;flex-shrink:0;background:#d1fae5;color:#059669;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ ${fmtPeriodDate(pa.masteredOn)}</span>`;
+      if (pa.discontinuedOn) return `<span style="font-size:.71rem;white-space:nowrap;flex-shrink:0;background:#fee2e2;color:#dc2626;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 ${fmtPeriodDate(pa.discontinuedOn)}</span>`;
+      return '';
+    };
+    const _inactRow = (pa, marker, isSub) => {
+      const name = paDisplayHtml(pa, true) || `<em style="color:#9ca3af;font-size:.85rem">Untitled</em>`;
+      return `<div contenteditable="false" style="display:flex;align-items:flex-start;gap:.5rem;padding:.3rem .5rem;${isSub ? 'margin-left:1.5rem;' : ''}opacity:.65">
+        <span style="font-size:.8rem;font-weight:700;color:${isSub ? '#0369a1' : '#6b7280'};flex-shrink:0;min-width:1.4rem">${marker}</span>
+        <span style="flex:1;min-width:0;font-size:.88rem;line-height:1.45;white-space:pre-wrap">${name}</span>
+        ${_inactDateBadge(pa)}
       </div>`;
     };
 
+    // Activities only — section headings and notes are left out of these
+    // sections entirely. A parent carries no date of its own: mastering or
+    // discontinuing a parent applies the same date to its sub-activities, so
+    // the dates on the sub rows already say it.
     const renderInactiveItem = (pa, num) => {
-      if (pa.isHeading || pa.isMaintainHeading) {
-        const isGrayH  = pa.headingColor === "gray" || pa.isMaintainHeading;
-        const isGreenH = pa.headingColor === "green";
-        return isGrayH
-          ? `<div class="activity-group-heading" contenteditable="false" style="opacity:.3;background:#9ca3af;border-color:#6b7280;color:#ffffff">${escHtml(pa.name || "")}</div>`
-          : isGreenH
-          ? `<div class="activity-group-heading" contenteditable="false" style="opacity:.3;background:#a9d18e;border-color:#70ad47;color:#1a4731">${escHtml(pa.name || "")}</div>`
-          : `<div class="activity-group-heading" contenteditable="false" style="opacity:.3">${escHtml(pa.name || "")}</div>`;
-      }
-      if (pa.isNote || pa.isExportNote) {
-        if (!pa.text) return '';
-        const noteTag = pa.isExportNote
-          ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.25rem">📄 Included in Word export</div>`
-          : `<div style="font-size:.82rem;color:#9a3412;margin-bottom:.25rem">🔒 This note is for ZORA's use only. Excluded from Word report</div>`;
-        return `<div class="entry-block" contenteditable="false" style="border-left:4px solid #f59e0b;opacity:.3">
-          <div class="entry-field">
-            <span class="field-label" style="color:#b45309">Note</span>
-            <div style="flex:1;font-size:.93rem;font-weight:600">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
-          </div>
-        </div>`;
-      }
-      const fixedText = pa.fixedRemark !== undefined ? pa.fixedRemark : pa.isMaintain ? (pa.maintainRemark ?? "") : null;
-      const _masteredDate = pa.masteredOn || (pa.inactiveReason === 'mastered' ? todayDateStr() : null);
-      const _isDiscontinued = pa.discontinuedOn || pa.inactiveReason === 'discontinued';
-      const _inactMaintBadge = pa.maintained
-        ? `<span style="font-size:.72rem;color:#6b7280;font-weight:600;white-space:nowrap;display:inline-block;margin-right:.35rem;padding:.05rem .4rem;background:#f3f4f6;border:1px solid #d1d5db;border-radius:.3rem">🆗 Maintained on ${fmtPeriodDate(pa.maintainedAt || "2026-08-21")}</span>`
-        : '';
-      const statusBadge = _inactMaintBadge + (_masteredDate
-        ? `<span style="font-size:.72rem;color:#059669;font-weight:600;white-space:nowrap;display:inline-block;margin-right:.35rem;padding:.05rem .4rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.3rem">⭐ Mastered on ${fmtPeriodDate(_masteredDate)}</span>`
-        : _isDiscontinued
-        ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap;display:inline-block;margin-right:.35rem;padding:.05rem .4rem;background:#fee2e2;border:1px solid #fca5a5;border-radius:.3rem">🚩 Discontinued on ${fmtPeriodDate(pa.discontinuedOn || todayDateStr())}</span>`
-        : '');
-      // Gather ALL sub-activities of this parent (active or inactive for this date)
+      if (pa.isHeading || pa.isMaintainHeading || pa.isNote || pa.isExportNote) return '';
       const subActs = allPas.filter(p =>
         p.parentActivity === (pa.title || pa.name) && !p.isCompleted && !p.isArchived && !p.isStopped
       );
-      const _inactColor = _masteredDate ? '#059669' : _isDiscontinued ? '#dc2626' : '#9ca3af';
-      const subHtml = subActs.length
-        ? `<div style="display:flex;flex-direction:column;gap:.3rem;margin-top:.3rem">${subActs.map((sub, si) => _inactSubCard(sub, si, _inactColor)).join('')}</div>`
-        : '';
-      return `<div style="display:flex;flex-direction:column">
-        <div class="entry-block entry-block-predefined" style="opacity:.6;pointer-events:none">
-          <div class="entry-field" contenteditable="false">
-            <span class="field-label">ACTIVITY ${num})</span>
-            <span class="field-value-fixed">${statusBadge}${paDisplayHtml(pa, true)}</span>
-          </div>
-          ${fixedText !== null ? `<div class="entry-field" contenteditable="false">
-            <span class="field-label">Remark</span>
-            <span class="field-value-fixed" style="white-space:pre-wrap">${formatActivityMarkup(fixedText)}</span>
-          </div>` : ''}
-        </div>
-        ${subHtml}
-      </div>`;
+      if (subActs.length === 0) return _inactRow(pa, `${num})`, false);
+      const parentName = paDisplayHtml(pa, true) || `<em style="color:#9ca3af;font-size:.85rem">Untitled</em>`;
+      return `<div contenteditable="false" style="display:flex;align-items:flex-start;gap:.5rem;padding:.3rem .5rem;opacity:.65">
+          <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;min-width:1.4rem">${num})</span>
+          <span style="flex:1;min-width:0;font-size:.88rem;line-height:1.45;white-space:pre-wrap">${parentName}</span>
+        </div>${subActs.map((sub, si) => _inactRow(sub, `${String.fromCharCode(97 + si)})`, true)).join('')}`;
     };
-    const _renderOrphanGroup = ({ parentPa, parentKey, subs }, num, color) => {
+    // Sub-activities whose parent is still active — the parent heads the group
+    // for context but, as above, carries no date of its own.
+    const _renderOrphanGroup = ({ parentPa, parentKey, subs }, num) => {
       const parentName = parentPa ? (paDisplayHtml(parentPa, true) || escHtml(parentKey)) : escHtml(parentKey);
-      return `<div style="display:flex;flex-direction:column">
-        <div class="entry-block entry-block-predefined" style="opacity:.6;pointer-events:none">
-          <div class="entry-field" contenteditable="false">
-            <span class="field-label">ACTIVITY ${num})</span>
-            <span class="field-value-fixed">${parentName}</span>
-          </div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:.3rem;margin-top:.3rem">${subs.map((sub, si) => _inactSubCard(sub, si, color)).join('')}</div>
-      </div>`;
+      return `<div contenteditable="false" style="display:flex;align-items:flex-start;gap:.5rem;padding:.3rem .5rem;opacity:.65">
+          <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;min-width:1.4rem">${num})</span>
+          <span style="flex:1;min-width:0;font-size:.88rem;line-height:1.45;white-space:pre-wrap">${parentName}</span>
+        </div>${subs.map((sub, si) => _inactRow(sub, `${String.fromCharCode(97 + si)})`, true)).join('')}`;
     };
     const realInactive = inactiveTopLevel.filter(pa => !pa.isNote && !pa.isExportNote && !pa.isHeading && !pa.isMaintainHeading);
     const masteredPas     = realInactive.filter(pa => pa.masteredOn || pa.inactiveReason === 'mastered');
@@ -8677,8 +8642,14 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
       const orphanGroups = _orphanGroupsFor(secKey);
       if (pas.length === 0 && orphanGroups.length === 0) return '';
       let itemNum = 0;
-      const topItems = pas.map(pa => { itemNum++; return renderInactiveItem(pa, itemNum); }).filter(Boolean).join('');
-      const orphanItems = orphanGroups.map(g => { itemNum++; return _renderOrphanGroup(g, itemNum, color); }).join('');
+      // Headings/notes render as '' and must not consume a number, so only count
+      // up once a row was actually produced.
+      const topItems = pas.map(pa => {
+        const row = renderInactiveItem(pa, itemNum + 1);
+        if (row) itemNum++;
+        return row;
+      }).filter(Boolean).join('');
+      const orphanItems = orphanGroups.map(g => { itemNum++; return _renderOrphanGroup(g, itemNum); }).join('');
       const totalCount = pas.reduce((acc, pa) => acc + _countPa(pa), 0)
         + orphanGroups.reduce((acc, g) => acc + g.subs.length, 0);
       return `<div style="margin-top:.5rem">
@@ -8689,9 +8660,9 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
       </div>`;
     };
     html += `<div style="margin-top:.75rem;padding-bottom:1.5rem">
-      ${renderSection('Mastered', '#059669', masteredPas, 'mastered')}
-      ${renderSection('Discontinued', '#dc2626', discontinuedPas, 'discontinued')}
-      ${renderSection('Inactive', '#6b7280', otherPas, 'other')}
+      ${renderSection('Mastered Activities', '#059669', masteredPas, 'mastered')}
+      ${renderSection('Discontinued Activities', '#dc2626', discontinuedPas, 'discontinued')}
+      ${renderSection('Inactive Activities', '#6b7280', otherPas, 'other')}
     </div>`;
   }
   } // end if (!_sectionOnly)
@@ -19134,7 +19105,7 @@ function renderTargetManageContent(student, target) {
           const activeSubs = paKey ? (target.predefinedActivities || []).filter(a => a.parentActivity === paKey && _isSubActive(a)) : [];
           if (activeSubs.length > 0) {
             const verb = action === 'master' ? 'mastered' : 'discontinued';
-            const ok = await showAutoDateConfirm({ message: `This parent activity has ${activeSubs.length} active sub-activit${activeSubs.length === 1 ? 'y' : 'ies'}. If you ${action === 'master' ? 'master' : 'discontinue'} this activity, all its active sub-activities will also be ${verb} on the same date. Do you want to proceed?`, confirmLabel: "Yes, proceed" });
+            const ok = await showAutoDateConfirm({ message: `This parent activity has ${activeSubs.length} active sub-activit${activeSubs.length === 1 ? 'y' : 'ies'}. If you ${action === 'master' ? 'master' : 'discontinue'} this activity, all its active sub-activities will also be ${verb} on the same date. Do you want to proceed to choose the date of mastery/discontinuation?`, confirmLabel: "Yes, proceed" });
             if (!ok) return;
           }
         }
