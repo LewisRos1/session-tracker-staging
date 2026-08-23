@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1827";
+const APP_VERSION = "1828";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -17019,8 +17019,18 @@ function initDragSort(listEl, onReorder) {
     e.preventDefault();
     e.stopPropagation();
 
-    // Instantly collapse all cards to compact rows; measure AFTER so placeholder matches
+    // Collapsing every card to a compact row shrinks the list dramatically, which
+    // yanks the grabbed block up the page (and can clamp the scroll position on
+    // top of that) — so picking anything up looked like it flew off somewhere.
+    // Measure the row either side of the collapse and scroll by the difference,
+    // leaving it exactly where it was on screen while everything else collapses
+    // around it.
+    const beforeTop = item.getBoundingClientRect().top;
     listEl.classList.add('is-reordering');
+    if (scrollEl) {
+      const shift = item.getBoundingClientRect().top - beforeTop;
+      if (shift) scrollEl.scrollTop += shift;
+    }
     const rect = item.getBoundingClientRect();
     // Pin cursor to the card's center (where ⠿ sits due to align-items:center)
     offsetY = rect.height / 2;
@@ -17035,8 +17045,10 @@ function initDragSort(listEl, onReorder) {
     dragEl._savedStyle = dragEl.style.cssText;   // preserve inline styles (e.g. display:flex on opt rows)
     dragEl.style.cssText =
       (dragEl._savedStyle ? dragEl._savedStyle + ';' : '') +
+      // Start under the cursor rather than at the row's own top, so the compact
+      // row doesn't visibly snap the first time the pointer moves.
       `position:fixed;left:${rect.left}px;width:${rect.width}px;` +
-      `top:${rect.top}px;z-index:9999;opacity:.85;` +
+      `top:${e.clientY - offsetY}px;z-index:9999;opacity:.85;` +
       `box-shadow:0 4px 16px rgba(0,0,0,.2);pointer-events:none;`;
 
     listEl.setPointerCapture(e.pointerId);
