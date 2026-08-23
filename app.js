@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1826";
+const APP_VERSION = "1827";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -20081,11 +20081,15 @@ function renderTargetManageContent(student, target) {
     });
   });
 
-  // Parent activity start date — locked, shows alert when clicked
+  // Parent activity start date — locked; explain what to change instead.
   $("manage-modal-body").querySelectorAll(".mn-parent-start-date-btn").forEach(btn => {
     btn.addEventListener("click", e => {
       e.stopPropagation();
-      alert("This date is set automatically based on the earliest sub-activity start date. You cannot change it manually.");
+      showAlertOverlay({
+        title: "⚠️ Start date is set automatically",
+        message: "You cannot change the parent activity's start date. Instead, you need to change the start date of the sub-activities. " +
+                 "The parent activity will naturally just take the earliest start date of the sub-activities.<br><br>If unsure, ask Lewis."
+      });
     });
   });
 
