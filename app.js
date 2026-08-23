@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1823";
+const APP_VERSION = "1824";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -17515,8 +17515,12 @@ function renderTargetManageContent(student, target) {
 
   // One empty holder per segment, emitted where that segment ends. The collapsed
   // mastered/discontinued groups get moved into these by mnRegroupInactiveCards.
-  let _curSeg = -1;
-  const _flushSeg = () => { html += `<div class="mn-seg-groups" data-seg="${_curSeg}"></div>`; };
+  // One empty holder per section, sitting directly beneath its heading (and one
+  // at the very top for anything before the first heading). mnRegroupInactiveCards
+  // moves that section's collapsed Mastered/Discontinued groups into it, so they
+  // read as part of the heading rather than trailing the section's activities.
+  const _segHolder = seg => `<div class="mn-seg-groups" data-seg="${seg}"></div>`;
+  html += _segHolder(-1);
 
   let manageActNo = 0;
   acts.forEach((a, idx) => {
@@ -17527,8 +17531,6 @@ function renderTargetManageContent(student, target) {
     // list, which made whichever heading happened to be last reappear with the new
     // activity under it.
     if (a.isHeading || a.isMaintainHeading) {
-      _flushSeg();
-      _curSeg = idx;
       const isGray = a.headingColor === "gray" || a.isMaintainHeading;
       const isGreen = a.headingColor === "green";
       const hdgBg = isGray ? "#9ca3af" : isGreen ? "#a9d18e" : null;
@@ -17550,6 +17552,7 @@ function renderTargetManageContent(student, target) {
           </div>
         </div>
       </div>`;
+      html += _segHolder(idx);
     } else if (a.isNote || a.isExportNote) {
       const _editRef3    = state.sessionData?.date || todayDateStr();
       const noteInactive = !isActivityActive(a, _editRef3);
@@ -17798,7 +17801,6 @@ function renderTargetManageContent(student, target) {
     }
   });
 
-  _flushSeg();   // holder for the final segment
   html += `</div>`;
 
   // The two blocks below still build the mastered/discontinued cards exactly as
@@ -20382,14 +20384,16 @@ function renderTemplateManageContent(template) {
     <div class="admin-list" id="mn-act-list">`;
 
   // See renderTargetManageContent for what these holders are.
-  let _curSeg = -1;
-  const _flushSeg = () => { html += `<div class="mn-seg-groups" data-seg="${_curSeg}"></div>`; };
+  // One empty holder per section, sitting directly beneath its heading (and one
+  // at the very top for anything before the first heading). mnRegroupInactiveCards
+  // moves that section's collapsed Mastered/Discontinued groups into it, so they
+  // read as part of the heading rather than trailing the section's activities.
+  const _segHolder = seg => `<div class="mn-seg-groups" data-seg="${seg}"></div>`;
+  html += _segHolder(-1);
 
   acts.forEach((a, idx) => {
     if (a.masteredOn || a.discontinuedOn || a.isCompleted || a.isArchived || a.isStopped) return;
     if (a.isHeading || a.isMaintainHeading) {
-      _flushSeg();
-      _curSeg = idx;
       const isGray = a.headingColor === "gray" || a.isMaintainHeading;
       const isGreen = a.headingColor === "green";
       const hdgBg = isGray ? "#9ca3af" : isGreen ? "#a9d18e" : null;
@@ -20411,6 +20415,7 @@ function renderTemplateManageContent(template) {
           </div>
         </div>
       </div>`;
+      html += _segHolder(idx);
     } else if (a.isNote || a.isExportNote) {
       const _editRef3    = state.sessionData?.date || todayDateStr();
       const noteInactive = !isActivityActive(a, _editRef3);
@@ -20512,7 +20517,6 @@ function renderTemplateManageContent(template) {
     }
   });
 
-  _flushSeg();   // holder for the final segment
   html += `</div>`;
 
   // The two blocks below still build the mastered/discontinued cards exactly as
