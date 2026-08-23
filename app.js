@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1834";
+const APP_VERSION = "1835";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -17311,6 +17311,25 @@ function mnSegmentOf(acts) {
   return segOf;
 }
 
+// Reorders one parent's sub-activities among themselves. A sub can only move
+// within its own parent, so the slots those subs occupy in the array stay put
+// and only their contents are permuted — nothing else in the target shifts, and
+// a sub can never silently change parent. Bails out unchanged if the counts
+// don't line up, rather than risk writing a mangled list.
+function mnReorderSubs(acts, parentKey, newOrder) {
+  // Only the slots the dragged subs already occupied get permuted. Taking the
+  // positions from newOrder rather than from "every sub of this parent" matters:
+  // the visible list leaves out mastered/discontinued subs, so those two sets
+  // differ whenever a parent has any, and anything else would misalign them.
+  const reordered = newOrder.map(i => acts[i]);
+  if (reordered.some(a => !a || a.parentActivity !== parentKey)) return null;
+  const positions = newOrder.slice().sort((x, y) => x - y);
+  const result = acts.slice();
+  positions.forEach((pos, k) => { result[pos] = reordered[k]; });
+  result.forEach((a, i) => { a.order = i; });
+  return result;
+}
+
 // After a drag re-renders the list, scrolls the row that was moved back into
 // view and blinks it, so the drop lands somewhere predictable. Called instead of
 // restoring the pre-drag scrollTop, which pointed at the wrong place once the
@@ -17678,7 +17697,8 @@ function renderTargetManageContent(student, target) {
               </div>`
             : "";
           const subCreatedLabel = sub.activeFrom ? fmtPeriodDate(sub.activeFrom) : '';
-          return `<div style="margin-left:1.25rem;display:flex;gap:.4rem;align-items:flex-start;padding:.5rem .6rem;background:#f0f9ff;border:1px solid #bae6fd;border-left:3px solid #60a5fa;border-radius:.35rem">
+          return `<div class="mn-sub-item" data-idx="${subIdx}" style="margin-left:1.25rem;display:flex;gap:.4rem;align-items:flex-start;padding:.5rem .6rem;background:#f0f9ff;border:1px solid #bae6fd;border-left:3px solid #60a5fa;border-radius:.35rem">
+            <span class="drag-handle" style="flex-shrink:0;padding-top:.15rem">⠿</span>
             <span style="font-size:.75rem;font-weight:700;color:#0369a1;flex-shrink:0;min-width:1.4rem;padding-top:.2rem">${String.fromCharCode(97 + si)})</span>
             <div style="flex:1;display:flex;flex-direction:column;gap:.55rem">
               <div>
@@ -17745,8 +17765,8 @@ function renderTargetManageContent(student, target) {
             <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;min-width:1.6rem;padding-top:.2rem">${manageActNo})</span>
             <div style="flex:1;min-width:0">
               <div class="mn-act-compact-title">${paDisplayHtml(a, true)}</div>
-              ${subActs.length ? `<div class="mn-sub-compact-list">${subActs.map((sub, si) =>
-                `<div class="mn-sub-compact">${String.fromCharCode(97 + si)}) ${formatActivityMarkup(sub.title || sub.name || "")}</div>`
+              ${subActs.length ? `<div class="mn-sub-compact-list" data-parent-key="${escHtml(_paKey || "")}">${subActs.map((sub, si) =>
+                `<div class="mn-sub-compact" data-idx="${acts.indexOf(sub)}"><span class="drag-handle" style="font-size:.95rem">⠿</span>${String.fromCharCode(97 + si)}) ${formatActivityMarkup(sub.title || sub.name || "")}</div>`
               ).join("")}</div>` : ""}
               <div class="mn-act-body" style="display:flex;flex-direction:column;gap:.55rem">
               <div style="display:flex;gap:.6rem;align-items:flex-start">
@@ -17766,7 +17786,7 @@ function renderTargetManageContent(student, target) {
                   </div>
                 </div>
               </div>
-              ${subActsHtml}
+              <div class="mn-sub-list" data-parent-key="${escHtml(_paKey || "")}">${subActsHtml}</div>
               ${maintainedRowSub}
               <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
                 <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:#f9fafb;border:1px solid #d1d5db;border-radius:.35rem;color:#374151;cursor:pointer">+ Add Sub-activity</button>
@@ -18219,6 +18239,20 @@ function renderTargetManageContent(student, target) {
     await saveTarget();
     renderTargetManageContent(student, target);
     mnScrollToMovedRow(moved ? result.indexOf(moved) : -1);
+  });
+
+  // Sub-activities reorder within their own parent, in both the expanded blocks
+  // and the collapsed compact rows.
+  $("manage-modal-body").querySelectorAll(".mn-sub-list, .mn-sub-compact-list").forEach(list => {
+    initDragSort(list, async newOrder => {
+      const result = mnReorderSubs(acts, list.dataset.parentKey || "", newOrder);
+      if (!result) { renderTargetManageContent(student, target); return; }
+      target.predefinedActivities = result;
+      await saveTarget();
+      const sp = $("manage-modal-body").scrollTop;
+      renderTargetManageContent(student, target);
+      requestAnimationFrame(() => { const b = $("manage-modal-body"); if (b) b.scrollTop = sp; });
+    });
   });
 
   $("mn-t-name").addEventListener("blur", async () => {
