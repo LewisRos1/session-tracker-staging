@@ -194,7 +194,8 @@ const STYLE_NOTE = {
 // Returns a plain string when no markup is present, { richText: [...] } otherwise.
 // An optional plain-text suffix (e.g. " (Mastered ✓)") is appended at the end.
 function buildExcelActivityCell(text, suffix) {
-  const lines = parseInlineMarkup(text || "");
+  // Mirrors the website's ". " → "• " display substitution (see bulletifyActivityText).
+  const lines = parseInlineMarkup(bulletifyActivityText(text || ""));
   const richText = [];
   let hasFormatting = false;
   lines.forEach((lineRuns, lineIdx) => {
@@ -226,11 +227,21 @@ function richTextActivityWithNote(activityName, note) {
   return { richText: [...actCell.richText, noteRun] };
 }
 
+// The website renders a line that starts with ". " as a bullet — see
+// formatActivityMarkup in app.js, which does exactly this substitution at
+// display time while the stored text keeps the full stop. Exports print the
+// stored text verbatim, so without mirroring it the same line reads
+// "• Low: ..." on screen and ". Low: ..." in the document. Applied only to
+// activity titles/details, matching where the website applies it.
+function bulletifyActivityText(text) {
+  return (text || "").replace(/^\. /gm, "• ");
+}
+
 // Appends activityDisplayDetails (description/bullets) below an already-built cell.
 function appendActivityDetails(cell, details) {
   if (!details) return cell;
   const detailRuns = [];
-  parseInlineMarkup(details).forEach((lineRuns, lineIdx) => {
+  parseInlineMarkup(bulletifyActivityText(details)).forEach((lineRuns, lineIdx) => {
     if (lineIdx > 0) detailRuns.push({ text: "\n" });
     for (const run of lineRuns) {
       if (!run.text) continue;
@@ -1804,11 +1815,13 @@ function parseInlineMarkupLine(line) {
 function buildActLines(act, label) {
   const titleBold = act.activityTitleBold || act.activityIsBold || false;
   const titleUnderline = act.activityTitleUnderline || act.activityIsUnderline || false;
+  // bulletifyActivityText mirrors the website's ". " → "• " display substitution.
+  const labelText = bulletifyActivityText(label);
   const titleLines = (titleBold || titleUnderline)
-    ? label.split("\n").map(line => [{ text: line, bold: titleBold, underline: titleUnderline }])
-    : parseInlineMarkup(label);
+    ? labelText.split("\n").map(line => [{ text: line, bold: titleBold, underline: titleUnderline }])
+    : parseInlineMarkup(labelText);
   const details = act.activityDisplayDetails;
-  if (details) return [...titleLines, ...parseInlineMarkup(details)];
+  if (details) return [...titleLines, ...parseInlineMarkup(bulletifyActivityText(details))];
   return titleLines;
 }
 
