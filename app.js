@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1847";
+const APP_VERSION = "1848";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8700,10 +8700,22 @@ let _grpSecScrollListener = null;
 let _triggerSecNavUpdate = null;
 let _triggerGrpSecNavUpdate = null;
 
-// A remark "has content" if its text (stripped of HTML) or note is non-empty.
+// A remark "has content" if its text (stripped of HTML), its mastery note, or a
+// real trial is non-empty.
+//
+// This used to read r.remarkText and r.note — field names that don't exist on a
+// remark. Every caller passes a raw Firestore remark, whose fields are text /
+// masteryNote / trials, so the function always returned falsy: it never once
+// reported that a remark had content. That made the snapshot sweep above delete
+// nameless extra activities even when they held real typed remarks. Read the
+// actual field names, and count trials as content too.
 function remarkHasContent(r) {
-  return ((r.remarkText || "").replace(/<[^>]*>/g, "").replace(/&[a-z]+;/gi, " ").trim()) ||
-    ((r.note || "").trim());
+  if (!r) return false;
+  const strip = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/&[a-z]+;/gi, " ").trim();
+  return strip(r.text).length > 0
+      || strip(r.masteryNote).length > 0
+      || (r.trials || []).some(t => t !== null && t !== -1)
+      || r.optionScore !== undefined;
 }
 
 // Builds a test for "predefined session record whose config entry has gone
