@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1844";
+const APP_VERSION = "1845";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -219,6 +219,73 @@ window.debugTargetConfig = async function(studentName, targetName) {
     if (a.isStopped)   dateInfo.push("isStopped");
     console.log(`${i + 1}) ${a.title || a.name || "(heading)"}`, dateInfo.length ? dateInfo.join(", ") : "no date flags");
   });
+};
+
+// 2b) READ-ONLY. Compare what the session records contain against what the
+//     target config still lists, and show everything needed to rebuild the
+//     activities that the pre-2026-08-23 reorder bug deleted from the config.
+//     Writes nothing — the full result is also left on window.__recoveryPlan.
+//     debugRecoveryPlan("Hayden Chan", "Math")
+window.debugRecoveryPlan = async function(studentName, targetName) {
+  const students = await loadStudentsConfig();
+  const student = students.find(s => s.name === studentName);
+  if (!student) { console.error("Student not found:", studentName); return; }
+  const target = (student.targets || []).find(t => t.name === targetName);
+  if (!target) { console.error("Target not found:", targetName); return; }
+
+  const acts = target.predefinedActivities || [];
+  const cfgIds   = new Set(acts.map(a => a.id).filter(Boolean));
+  const cfgNames = new Set(acts.flatMap(a => [a.name, a.title]).filter(Boolean));
+
+  const sessions = await getAllSessionsForStudent(student.id);
+  const found = {};   // key -> record we are building up
+
+  for (const s of sessions) {
+    const date = s.date || s.sessionDate || "(no date)";
+    const remarksByAct = {};
+    Object.values(s.remarks || {}).forEach(r => {
+      (remarksByAct[r.activityId] ||= []).push(r);
+    });
+    for (const [actId, a] of Object.entries(s.activities || {})) {
+      if (a.targetName !== targetName) continue;
+      const name = a.activityName || a.activityTitle || "(no name)";
+      const key  = a.configId || name;
+      const rec = found[key] ||= {
+        name, title: a.activityTitle || "", configId: a.configId || "",
+        parentActivity: a.parentActivity || "",
+        sessions: 0, withText: 0, withTrials: 0,
+        firstDate: date, lastDate: date, orders: new Set()
+      };
+      rec.sessions++;
+      if (date < rec.firstDate) rec.firstDate = date;
+      if (date > rec.lastDate)  rec.lastDate  = date;
+      if (typeof a.order === "number") rec.orders.add(a.order);
+      for (const r of (remarksByAct[actId] || [])) {
+        if ((r.text || "").trim()) rec.withText++;
+        if ((r.trials || []).length) rec.withTrials++;
+      }
+    }
+  }
+
+  const rows = Object.values(found).map(r => ({
+    ...r,
+    orders: [...r.orders].sort((a, b) => a - b).join(","),
+    inConfig: (r.configId && cfgIds.has(r.configId)) || cfgNames.has(r.name)
+  })).sort((a, b) => (a.lastDate < b.lastDate ? 1 : a.lastDate > b.lastDate ? -1 : 0));
+
+  const missing = rows.filter(r => !r.inConfig);
+  console.log(`${studentName} / ${targetName}: ${sessions.length} sessions, ` +
+    `${acts.length} config entries, ${rows.length} distinct activities in session data, ` +
+    `${missing.length} MISSING from config.`);
+  console.table(rows.map(r => ({
+    Activity: r.name.length > 60 ? r.name.slice(0, 57) + "..." : r.name,
+    InConfig: r.inConfig ? "yes" : "MISSING",
+    Sessions: r.sessions, Remarks: r.withText, Trials: r.withTrials,
+    First: r.firstDate, Last: r.lastDate, Orders: r.orders, ConfigId: r.configId || "-"
+  })));
+  window.__recoveryPlan = { student: studentName, target: targetName, config: acts, rows, missing };
+  console.log("Full data left on window.__recoveryPlan — run: copy(JSON.stringify(window.__recoveryPlan.missing, null, 2))");
+  return `${missing.length} missing`;
 };
 
 // 3) Clear legacy activeTo/activeFrom from all activities in a target:
