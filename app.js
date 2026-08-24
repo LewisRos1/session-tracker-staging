@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1841";
+const APP_VERSION = "1842";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -16870,8 +16870,12 @@ function initDragSort(listEl, onReorder) {
       if (shift) scrollEl.scrollTop += shift;
     }
     const rect = item.getBoundingClientRect();
-    // Pin cursor to the card's center (where ⠿ sits due to align-items:center)
-    offsetY = rect.height / 2;
+    // Anchor to where the row actually ended up, not to the cursor. The scroll
+    // compensation above gets clamped near either end of the list — there is no
+    // room left to scroll — so the row can finish somewhere other than under the
+    // pointer. Deriving the offset from the row means the floating copy starts
+    // exactly on top of it either way, instead of snapping elsewhere on pickup.
+    offsetY = e.clientY - rect.top;
     lastY   = e.clientY;
 
     placeholder = document.createElement('div');
@@ -16883,10 +16887,8 @@ function initDragSort(listEl, onReorder) {
     dragEl._savedStyle = dragEl.style.cssText;   // preserve inline styles (e.g. display:flex on opt rows)
     dragEl.style.cssText =
       (dragEl._savedStyle ? dragEl._savedStyle + ';' : '') +
-      // Start under the cursor rather than at the row's own top, so the compact
-      // row doesn't visibly snap the first time the pointer moves.
       `position:fixed;left:${rect.left}px;width:${rect.width}px;` +
-      `top:${e.clientY - offsetY}px;z-index:9999;opacity:.85;` +
+      `top:${rect.top}px;z-index:9999;opacity:.85;` +
       `box-shadow:0 4px 16px rgba(0,0,0,.2);pointer-events:none;`;
 
     listEl.setPointerCapture(e.pointerId);
@@ -16897,6 +16899,15 @@ function initDragSort(listEl, onReorder) {
     if (!dragEl) return;
     lastY = e.clientY;
     dragEl.style.top = (e.clientY - offsetY) + 'px';
+
+    // Probe with the dragged card's own midpoint rather than the raw pointer
+    // position. The two can differ once the pickup scroll compensation is
+    // clamped, and using the pointer then drops the row wherever the cursor
+    // happens to sit — which is how a drag could jump into another section
+    // before it had really begun. The card is what the user sees, so the
+    // placeholder follows the card.
+    const dragRect = dragEl.getBoundingClientRect();
+    const probeY = dragRect.top + dragRect.height / 2;
 
     const items = [...listEl.children].filter(el => el !== dragEl && el !== placeholder);
     let inserted = false;
@@ -16915,7 +16926,7 @@ function initDragSort(listEl, onReorder) {
       }
       const top    = item.getBoundingClientRect().top;
       const bottom = lastEl.getBoundingClientRect().bottom;
-      if (e.clientY < top + (bottom - top) / 2) {
+      if (probeY < top + (bottom - top) / 2) {
         listEl.insertBefore(placeholder, item);
         inserted = true;
         break;
