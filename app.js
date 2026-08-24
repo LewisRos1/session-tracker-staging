@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1845";
+const APP_VERSION = "1846";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -11923,8 +11923,15 @@ function buildTargetViewTable(target, data) {
       }
     }
     // Manually-added (session-only) extra activities — rendered under an "Extra" heading.
+    // Predefined records are included too, not just session-only ones: if an
+    // activity is deleted from the target config on purpose, the confirm-by-typing
+    // flow purges its session records, so a predefined record that still has data
+    // but matches no config entry is always accidental damage (the pre-2026-08-23
+    // reorder bug wiped mastered activities out of predefinedActivities). Without
+    // this they match nothing and render nowhere, silently hiding real work.
+    // Anything data-less was already deleted by the sweep above.
     const extraViewActs = Object.entries(data.activities || {})
-      .filter(([actId, a]) => a.targetName === target.name && !matchedIds.has(actId) && !a.isPredefined && !a.parentActivity && a.activityName?.trim())
+      .filter(([actId, a]) => a.targetName === target.name && !matchedIds.has(actId) && !a.parentActivity && a.activityName?.trim())
       .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0));
     if (extraViewActs.length > 0) {
       rows += `<tr class="view-heading-row"><td colspan="6" contenteditable="false">Extra</td></tr>`;
@@ -14179,11 +14186,15 @@ function buildGroupTargetViewTable(target, data, attendees) {
         deleteActivity(state.viewGroupSessionId, actId, remIds).catch(() => {});
       }
     }
-    // Manually-added (non-predefined) activities not matched above.
-    // Skip isPredefined records and sub-activities (parentActivity set) — those belonged to a
-    // config activity that has since been removed. Sub-activities are never manually entered.
+    // Activities not matched above — both manually-added ones and predefined
+    // records whose config entry has gone missing. See the matching comment in
+    // buildTargetViewTable: a deliberate delete purges its session records, so a
+    // predefined record that still has data but matches no config entry is
+    // accidental damage and must still render rather than vanish. Sub-activities
+    // (parentActivity set) stay excluded — they can't stand on their own.
+    // Anything data-less was already deleted by the sweep above.
     Object.entries(data.activities || {})
-      .filter(([actId, a]) => a.targetName === target.name && !matchedIds.has(actId) && !a.isPredefined && !a.parentActivity)
+      .filter(([actId, a]) => a.targetName === target.name && !matchedIds.has(actId) && !a.parentActivity)
       .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
       .forEach(([actId, act]) => {
         no++;

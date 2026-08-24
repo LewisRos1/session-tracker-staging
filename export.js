@@ -3098,13 +3098,29 @@ function getAllActivitiesForTarget(session, target) {
     }
   }
 
-  // Collect non-predefined (session-only) activities, numbered from 1)
+  // Collect unclaimed activities, numbered from 1). Predefined records are
+  // included, not just session-only ones: deleting an activity from the target
+  // config on purpose purges its session records (the confirm-by-typing flow),
+  // so a predefined record that no PA claimed is accidental damage — the
+  // pre-2026-08-23 reorder bug wiped mastered activities out of
+  // predefinedActivities and left their session data stranded. Excluding them
+  // here silently dropped real remarks from Excel, Word and the AI reports.
+  // Sub-activities (parentActivity set) stay excluded — they can't stand alone.
   const extraActivities = [];
   let extraNum = 0;
+  const orphanHasData = actId => Object.values(session.remarks || {}).some(r =>
+    r.activityId === actId && (
+      (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
+      (r.trials || []).some(t => t !== null && t !== -1) ||
+      (r.masteryNote || "").replace(/<[^>]*>/g, "").trim().length > 0
+    ));
   for (const act of sessionActs) {
     if (usedIds.has(act.id)) continue;
-    if (act.isPredefined || act.parentActivity) continue;
+    if (act.parentActivity) continue;
     if (!act.activityName?.trim()) continue;
+    // Only surface stranded predefined records that actually hold data — empty
+    // ghosts from historical bugs must not become blank rows in the export.
+    if (act.isPredefined && !orphanHasData(act.id)) continue;
     extraNum++;
     // If activityTitle is set, use it as the label; the old activityName becomes Details
     const extraLabel = act.activityTitle || act.activityName;
