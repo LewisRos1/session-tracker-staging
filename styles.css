@@ -1732,9 +1732,10 @@ input.field-input::placeholder {
 }
 .is-reordering .mn-act-compact-title { display: block; }
 .is-reordering .mn-act-body { display: none !important; }
-/* A heading's collapsed Mastered/Discontinued groups hide during a drag too, so
-   the list stays compact while a section is being moved. */
-.is-reordering .mn-seg-groups { display: none !important; }
+/* During a drag the Mastered/Discontinued group headers stay put, so you can
+   still see which section you're dropping into. Only an opened group's contents
+   collapse, keeping the list short enough to drag through. */
+.is-reordering .mn-inact-panel { display: none !important; }
 
 /* Collapsed view — the same title-only rows as drag mode, but held on by the
    toggle rather than only while a drag is in progress. Sub-activities live
