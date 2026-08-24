@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1848";
+const APP_VERSION = "1849";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8489,48 +8489,6 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
     const _orphanGroupsFor = sec => [..._orphanSubGroups.entries()]
       .filter(([k]) => k.endsWith(`|${sec}`)).map(([, v]) => v);
 
-    // A plain one-line row: marker, name, and the date it happened. Used for both
-    // top-level activities and sub-activities so these sections read as a simple
-    // list rather than a stack of cards.
-    const _inactDateBadge = pa => {
-      if (pa.masteredOn) return `<span style="font-size:.71rem;white-space:nowrap;flex-shrink:0;background:#d1fae5;color:#059669;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ ${fmtPeriodDate(pa.masteredOn)}</span>`;
-      if (pa.discontinuedOn) return `<span style="font-size:.71rem;white-space:nowrap;flex-shrink:0;background:#fee2e2;color:#dc2626;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 ${fmtPeriodDate(pa.discontinuedOn)}</span>`;
-      return '';
-    };
-    const _inactRow = (pa, marker, isSub) => {
-      const name = paDisplayHtml(pa, true) || `<em style="color:#9ca3af;font-size:.85rem">Untitled</em>`;
-      return `<div contenteditable="false" style="display:flex;align-items:flex-start;gap:.5rem;padding:.3rem .5rem;${isSub ? 'margin-left:1.5rem;' : ''}">
-        <span style="font-size:.8rem;font-weight:700;color:${isSub ? '#0369a1' : '#6b7280'};flex-shrink:0;min-width:1.4rem">${marker}</span>
-        <span style="flex:1;min-width:0;font-size:.88rem;line-height:1.45;white-space:pre-wrap">${name}</span>
-        ${_inactDateBadge(pa)}
-      </div>`;
-    };
-
-    // Activities only — section headings and notes are left out of these
-    // sections entirely. A parent carries no date of its own: mastering or
-    // discontinuing a parent applies the same date to its sub-activities, so
-    // the dates on the sub rows already say it.
-    const renderInactiveItem = (pa, num) => {
-      if (pa.isHeading || pa.isMaintainHeading || pa.isNote || pa.isExportNote) return '';
-      const subActs = allPas.filter(p =>
-        p.parentActivity === (pa.title || pa.name) && !p.isCompleted && !p.isArchived && !p.isStopped
-      );
-      if (subActs.length === 0) return _inactRow(pa, `${num})`, false);
-      const parentName = paDisplayHtml(pa, true) || `<em style="color:#9ca3af;font-size:.85rem">Untitled</em>`;
-      return `<div contenteditable="false" style="display:flex;align-items:flex-start;gap:.5rem;padding:.3rem .5rem">
-          <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;min-width:1.4rem">${num})</span>
-          <span style="flex:1;min-width:0;font-size:.88rem;line-height:1.45;white-space:pre-wrap">${parentName}</span>
-        </div>${subActs.map((sub, si) => _inactRow(sub, `${String.fromCharCode(97 + si)})`, true)).join('')}`;
-    };
-    // Sub-activities whose parent is still active — the parent heads the group
-    // for context but, as above, carries no date of its own.
-    const _renderOrphanGroup = ({ parentPa, parentKey, subs }, num) => {
-      const parentName = parentPa ? (paDisplayHtml(parentPa, true) || escHtml(parentKey)) : escHtml(parentKey);
-      return `<div contenteditable="false" style="display:flex;align-items:flex-start;gap:.5rem;padding:.3rem .5rem">
-          <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;min-width:1.4rem">${num})</span>
-          <span style="flex:1;min-width:0;font-size:.88rem;line-height:1.45;white-space:pre-wrap">${parentName}</span>
-        </div>${subs.map((sub, si) => _inactRow(sub, `${String.fromCharCode(97 + si)})`, true)).join('')}`;
-    };
     const realInactive = inactiveTopLevel.filter(pa => !pa.isNote && !pa.isExportNote && !pa.isHeading && !pa.isMaintainHeading);
     const masteredPas     = realInactive.filter(pa => pa.masteredOn || pa.inactiveReason === 'mastered');
     const discontinuedPas = realInactive.filter(pa => pa.discontinuedOn || pa.inactiveReason === 'discontinued');
@@ -8539,31 +8497,16 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
       const subs = allPas.filter(p => p.parentActivity === (pa.title || pa.name) && !p.isCompleted && !p.isArchived && !p.isStopped);
       return subs.length > 0 ? subs.length : 1;
     };
-    const renderSection = (label, color, pas, secKey) => {
+    const renderSection = (label, color, pas, secKey, dateHeader) => {
       const orphanGroups = _orphanGroupsFor(secKey);
-      if (pas.length === 0 && orphanGroups.length === 0) return '';
-      let itemNum = 0;
-      // Headings/notes render as '' and must not consume a number, so only count
-      // up once a row was actually produced.
-      const topItems = pas.map(pa => {
-        const row = renderInactiveItem(pa, itemNum + 1);
-        if (row) itemNum++;
-        return row;
-      }).filter(Boolean).join('');
-      const orphanItems = orphanGroups.map(g => { itemNum++; return _renderOrphanGroup(g, itemNum); }).join('');
       const totalCount = pas.reduce((acc, pa) => acc + _countPa(pa), 0)
         + orphanGroups.reduce((acc, g) => acc + g.subs.length, 0);
-      return `<div style="margin-top:.5rem">
-        <button class="btn-inactive-toggle" contenteditable="false" style="display:flex;align-items:center;gap:.4rem;width:100%;padding:.4rem .6rem;background:none;border:1px dashed #d1d5db;border-radius:.4rem;cursor:pointer;font-size:.8rem;color:${color};text-align:left">
-          <span class="inactive-chevron" style="font-size:.7rem">▶</span> ${label} (${totalCount})
-        </button>
-        <div class="inactive-list" style="display:none;flex-direction:column;gap:.25rem;margin-top:.35rem">${topItems}${orphanItems}</div>
-      </div>`;
+      return renderInactiveStatusSection({ label, color, pas, orphanGroups, allPas, dateHeader, totalCount });
     };
     html += `<div style="margin-top:.4rem">
-      ${renderSection('Mastered Activities', '#059669', masteredPas, 'mastered')}
-      ${renderSection('Discontinued Activities', '#dc2626', discontinuedPas, 'discontinued')}
-      ${renderSection('Inactive Activities', '#6b7280', otherPas, 'other')}
+      ${renderSection('Mastered Activities', '#059669', masteredPas, 'mastered', 'Mastered On')}
+      ${renderSection('Discontinued Activities', '#dc2626', discontinuedPas, 'discontinued', 'Discontinued On')}
+      ${renderSection('Inactive Activities', '#6b7280', otherPas, 'other', 'Date')}
     </div>`;
   }
   } // end if (!_sectionOnly)
@@ -8735,6 +8678,94 @@ function makeStrandedPredefinedTest(target, data) {
     && !((a.configId && cfgIds.has(a.configId))
          || cfgNames.has(a.activityName) || cfgNames.has(a.activityTitle))
     && hasData(actId);
+}
+
+// Renders one collapsed status section (Mastered / Discontinued / Inactive) at
+// the bottom of a Start Session screen as a table, so every activity lines up
+// with its own date instead of the date floating at the end of a wrapped line.
+//
+// Shared by the individual and group screens so the two can't drift apart.
+//
+// Sub-activities get their OWN rows rather than being nested in the parent's
+// cell: a sub can be mastered or discontinued on a different date from its
+// parent, so each needs its own date cell. A parent that has subs shows no date
+// of its own — the sub rows carry them.
+//
+// Note that multi-line activity details (e.g. "a. Movement / b. Written / c.
+// Application - worksheets") are NOT sub-activities — they're the activity's own
+// details text and stay inside the Activity cell, which is why it keeps
+// white-space:pre-wrap.
+function renderInactiveStatusSection({ label, color, pas, orphanGroups, allPas, dateHeader, totalCount }) {
+  if (pas.length === 0 && orphanGroups.length === 0) return '';
+
+  const _cellBase   = 'padding:.32rem .5rem;border-bottom:1px solid #f3f4f6;vertical-align:top';
+  const _numCell    = `${_cellBase};font-size:.78rem;font-weight:700;color:#6b7280;white-space:nowrap;width:2.6rem`;
+  const _subNumCell = `${_cellBase};font-size:.78rem;font-weight:700;color:#0369a1;white-space:nowrap;text-align:right`;
+  const _nameCell   = `${_cellBase};font-size:.88rem;line-height:1.45;white-space:pre-wrap;word-break:break-word`;
+  const _dateCell   = `${_cellBase};font-size:.78rem;white-space:nowrap;text-align:right;width:7.5rem`;
+
+  const dateText = pa => {
+    if (pa.masteredOn)     return `<span style="color:#059669;font-weight:600">${fmtPeriodDate(pa.masteredOn)}</span>`;
+    if (pa.discontinuedOn) return `<span style="color:#dc2626;font-weight:600">${fmtPeriodDate(pa.discontinuedOn)}</span>`;
+    return `<span style="color:#d1d5db">—</span>`;
+  };
+  const nameOf = pa => paDisplayHtml(pa, true) || `<em style="color:#9ca3af;font-size:.85rem">Untitled</em>`;
+
+  const row = (pa, marker, isSub) => `<tr>
+      <td style="${isSub ? _subNumCell : _numCell}">${marker}</td>
+      <td style="${_nameCell}${isSub ? ';padding-left:1.5rem' : ''}">${nameOf(pa)}</td>
+      <td style="${_dateCell}">${dateText(pa)}</td>
+    </tr>`;
+
+  const subsOf = pa => allPas.filter(p =>
+    p.parentActivity === (pa.title || pa.name) && !p.isCompleted && !p.isArchived && !p.isStopped);
+  const subRows = subs => subs.map((sub, si) => row(sub, `${String.fromCharCode(97 + si)})`, true)).join('');
+
+  let itemNum = 0;
+  const topRows = pas.map(pa => {
+    if (pa.isHeading || pa.isMaintainHeading || pa.isNote || pa.isExportNote) return '';
+    itemNum++;
+    const subs = subsOf(pa);
+    // A parent with subs carries no date of its own — see the note above.
+    return subs.length === 0
+      ? row(pa, `${itemNum})`, false)
+      : `<tr>
+          <td style="${_numCell}">${itemNum})</td>
+          <td style="${_nameCell}">${nameOf(pa)}</td>
+          <td style="${_dateCell}"><span style="color:#d1d5db">—</span></td>
+        </tr>${subRows(subs)}`;
+  }).filter(Boolean).join('');
+
+  // Sub-activities whose parent is still active: the parent heads the group for
+  // context only, so it gets no number and no date.
+  const orphanRows = orphanGroups.map(({ parentPa, parentKey, subs }) => {
+    itemNum++;
+    const parentName = parentPa ? (paDisplayHtml(parentPa, true) || escHtml(parentKey)) : escHtml(parentKey);
+    return `<tr>
+        <td style="${_numCell}">${itemNum})</td>
+        <td style="${_nameCell}">${parentName}</td>
+        <td style="${_dateCell}"><span style="color:#d1d5db">—</span></td>
+      </tr>${subRows(subs)}`;
+  }).join('');
+
+  const _th = 'padding:.3rem .5rem;font-size:.72rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.02em;border-bottom:1px solid #e5e7eb;background:#f9fafb';
+  return `<div style="margin-top:.5rem">
+    <button class="btn-inactive-toggle" contenteditable="false" style="display:flex;align-items:center;gap:.4rem;width:100%;padding:.4rem .6rem;background:none;border:1px dashed #d1d5db;border-radius:.4rem;cursor:pointer;font-size:.8rem;color:${color};text-align:left">
+      <span class="inactive-chevron" style="font-size:.7rem">▶</span> ${label} (${totalCount})
+    </button>
+    <div class="inactive-list" style="display:none;flex-direction:column;margin-top:.35rem">
+      <div style="overflow-x:auto;width:100%">
+        <table contenteditable="false" style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:.4rem">
+          <thead><tr>
+            <th style="${_th};text-align:left">No.</th>
+            <th style="${_th};text-align:left">Activity</th>
+            <th style="${_th};text-align:right">${escHtml(dateHeader)}</th>
+          </tr></thead>
+          <tbody>${topRows}${orphanRows}</tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
 }
 
 // An extra (session-only) activity is an orphan if it has no name and none of
@@ -22619,70 +22650,6 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
     const _grpOrphanGroupsFor = sec => [..._grpOrphanSubGroups.entries()]
       .filter(([k]) => k.endsWith(`|${sec}`)).map(([, v]) => v);
 
-    const _grpInactSubCard = (sub, si, color) => {
-      const subName = paDisplayHtml(sub, true) || `<em style="color:#9ca3af;font-size:.85rem">Untitled</em>`;
-      const subMast = sub.masteredOn ? `<span style="font-size:.71rem;display:inline-block;margin-top:.2rem;background:#d1fae5;color:#059669;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #6ee7b7">⭐ Mastered ${fmtPeriodDate(sub.masteredOn)}</span> ` : '';
-      const subDisc = sub.discontinuedOn ? `<span style="font-size:.71rem;display:inline-block;margin-top:.2rem;background:#fee2e2;color:#dc2626;font-weight:600;padding:.08rem .45rem;border-radius:.3rem;border:1px solid #fca5a5">🚩 Discontinued ${fmtPeriodDate(sub.discontinuedOn)}</span> ` : '';
-      return `<div style="margin-left:1.4rem;background:var(--white);border:1px solid #e5e7eb;border-left:3px solid ${color};border-radius:.5rem;padding:.45rem .7rem .45rem .8rem;display:flex;align-items:flex-start;gap:.4rem;box-shadow:0 1px 3px rgba(0,0,0,.04);opacity:.6">
-        <span style="font-size:.75rem;font-weight:700;color:${color};flex-shrink:0;min-width:1.2rem;padding-top:.1rem">${String.fromCharCode(97 + si)})</span>
-        <div style="flex:1;min-width:0;line-height:1.5;white-space:pre-wrap">${subMast}${subDisc}${subName}</div>
-      </div>`;
-    };
-
-    const renderGrpInactiveItem = (pa, num) => {
-      if (pa.isHeading || pa.isMaintainHeading) return `<div class="activity-group-heading" contenteditable="false" style="opacity:.3">${escHtml(pa.name || "")}</div>`;
-      if (pa.isNote || pa.isExportNote) {
-        if (!pa.text) return '';
-        const noteTag = pa.isExportNote
-          ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.25rem">📄 Included in Word export</div>`
-          : `<div style="font-size:.82rem;color:#9a3412;margin-bottom:.25rem">🔒 This note is for ZORA's use only. Excluded from Word report</div>`;
-        return `<div class="entry-block" contenteditable="false" style="border-left:4px solid #f59e0b;opacity:.3">
-          <div class="entry-field">
-            <span class="field-label" style="color:#b45309">Note</span>
-            <div style="flex:1;font-size:.93rem;font-weight:600">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
-          </div>
-        </div>`;
-      }
-      if (!pa.name && !pa.title) return '';
-      const _grpMasteredDate = pa.masteredOn || (pa.inactiveReason === 'mastered' ? todayDateStr() : null);
-      const _grpIsDiscontinued = pa.discontinuedOn || pa.inactiveReason === 'discontinued';
-      const _grpMaintBadge = pa.maintained
-        ? `<span style="font-size:.72rem;color:#6b7280;font-weight:600;white-space:nowrap;display:inline-block;margin-right:.35rem;padding:.05rem .4rem;background:#f3f4f6;border:1px solid #d1d5db;border-radius:.3rem">🆗 Maintained on ${fmtPeriodDate(pa.maintainedAt || "2026-08-21")}</span>`
-        : '';
-      const grpStatusBadge = _grpMaintBadge + (_grpMasteredDate
-        ? `<span style="font-size:.72rem;color:#059669;font-weight:600;white-space:nowrap;display:inline-block;margin-right:.35rem;padding:.05rem .4rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.3rem">⭐ Mastered on ${fmtPeriodDate(_grpMasteredDate)}</span>`
-        : _grpIsDiscontinued
-        ? `<span style="font-size:.72rem;color:#dc2626;font-weight:600;white-space:nowrap;display:inline-block;margin-right:.35rem;padding:.05rem .4rem;background:#fee2e2;border:1px solid #fca5a5;border-radius:.3rem">🚩 Discontinued on ${fmtPeriodDate(pa.discontinuedOn || todayDateStr())}</span>`
-        : '');
-      const grpSubActs = allGrpPas.filter(p =>
-        p.parentActivity === (pa.title || pa.name) && !p.isCompleted && !p.isArchived && !p.isStopped
-      );
-      const _grpInactColor = _grpMasteredDate ? '#059669' : _grpIsDiscontinued ? '#dc2626' : '#9ca3af';
-      const grpSubHtml = grpSubActs.length
-        ? `<div style="display:flex;flex-direction:column;gap:.3rem;margin-top:.3rem">${grpSubActs.map((sub, si) => _grpInactSubCard(sub, si, _grpInactColor)).join('')}</div>`
-        : '';
-      return `<div style="display:flex;flex-direction:column">
-        <div class="entry-block entry-block-predefined" style="opacity:.6;pointer-events:none">
-          <div class="entry-field" contenteditable="false">
-            <span class="field-label">ACTIVITY ${num})</span>
-            <span class="field-value-fixed">${grpStatusBadge}${paDisplayHtml(pa, true)}</span>
-          </div>
-        </div>
-        ${grpSubHtml}
-      </div>`;
-    };
-    const _grpRenderOrphanGroup = ({ parentPa, parentKey, subs }, num, color) => {
-      const parentName = parentPa ? (paDisplayHtml(parentPa, true) || escHtml(parentKey)) : escHtml(parentKey);
-      return `<div style="display:flex;flex-direction:column">
-        <div class="entry-block entry-block-predefined" style="opacity:.6;pointer-events:none">
-          <div class="entry-field" contenteditable="false">
-            <span class="field-label">ACTIVITY ${num})</span>
-            <span class="field-value-fixed">${parentName}</span>
-          </div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:.3rem;margin-top:.3rem">${subs.map((sub, si) => _grpInactSubCard(sub, si, color)).join('')}</div>
-      </div>`;
-    };
     const grpReal = grpInactiveTopLevel.filter(pa => !pa.isNote && !pa.isExportNote && !pa.isHeading && !pa.isMaintainHeading);
     const grpMastered     = grpReal.filter(pa => pa.masteredOn || pa.inactiveReason === 'mastered');
     const grpDiscontinued = grpReal.filter(pa => pa.discontinuedOn || pa.inactiveReason === 'discontinued');
@@ -22691,25 +22658,17 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
       const subs = allGrpPas.filter(p => p.parentActivity === (pa.title || pa.name) && !p.isCompleted && !p.isArchived && !p.isStopped);
       return subs.length > 0 ? subs.length : 1;
     };
-    const renderGrpSection = (label, color, pas, secKey) => {
+    const renderGrpSection = (label, color, pas, secKey, dateHeader) => {
       const orphanGroups = _grpOrphanGroupsFor(secKey);
-      if (pas.length === 0 && orphanGroups.length === 0) return '';
-      let grpItemNum = 0;
-      const grpTopItems = pas.map(pa => { grpItemNum++; return renderGrpInactiveItem(pa, grpItemNum); }).filter(Boolean).join('');
-      const grpOrphanItems = orphanGroups.map(g => { grpItemNum++; return _grpRenderOrphanGroup(g, grpItemNum, color); }).join('');
       const grpTotalCount = pas.reduce((acc, pa) => acc + _grpCountPa(pa), 0)
         + orphanGroups.reduce((acc, g) => acc + g.subs.length, 0);
-      return `<div style="margin-top:.5rem">
-        <button class="btn-inactive-toggle" contenteditable="false" style="display:flex;align-items:center;gap:.4rem;width:100%;padding:.4rem .6rem;background:none;border:1px dashed #d1d5db;border-radius:.4rem;cursor:pointer;font-size:.8rem;color:${color};text-align:left">
-          <span class="inactive-chevron" style="font-size:.7rem">▶</span> ${label} (${grpTotalCount})
-        </button>
-        <div class="inactive-list" style="display:none;flex-direction:column;gap:.25rem;margin-top:.35rem">${grpTopItems}${grpOrphanItems}</div>
-      </div>`;
+      return renderInactiveStatusSection({ label, color, pas, orphanGroups,
+        allPas: allGrpPas, dateHeader, totalCount: grpTotalCount });
     };
     items.push(`<div style="margin-top:.75rem;padding-bottom:1.5rem">
-      ${renderGrpSection('Mastered', '#059669', grpMastered, 'mastered')}
-      ${renderGrpSection('Discontinued', '#dc2626', grpDiscontinued, 'discontinued')}
-      ${renderGrpSection('Inactive', '#6b7280', grpOther, 'other')}
+      ${renderGrpSection('Mastered Activities', '#059669', grpMastered, 'mastered', 'Mastered On')}
+      ${renderGrpSection('Discontinued Activities', '#dc2626', grpDiscontinued, 'discontinued', 'Discontinued On')}
+      ${renderGrpSection('Inactive Activities', '#6b7280', grpOther, 'other', 'Date')}
     </div>`);
   }
   return items;
