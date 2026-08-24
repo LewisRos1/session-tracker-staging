@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1837";
+const APP_VERSION = "1838";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -17049,11 +17049,23 @@ function initDragSort(listEl, onReorder) {
   const endDrag = () => {
     if (!dragEl) return;
     if (scrollRaf) { cancelAnimationFrame(scrollRaf); scrollRaf = null; }
-    listEl.classList.remove('is-reordering');
+    // Put the row back into normal flow at the drop position while the list is
+    // still compact, note where it sits, then expand and scroll by the
+    // difference — the same compensation used when the drag started. Without
+    // this the cards re-expanding underneath shove the drop point off-screen.
     dragEl.style.cssText = dragEl._savedStyle || '';
     delete dragEl._savedStyle;
     if (placeholder?.parentNode) placeholder.parentNode.insertBefore(dragEl, placeholder);
     placeholder?.remove();
+    const topWhileCompact = dragEl.getBoundingClientRect().top;
+    listEl.classList.remove('is-reordering');
+    if (scrollEl) {
+      const shift = dragEl.getBoundingClientRect().top - topWhileCompact;
+      if (shift) scrollEl.scrollTop += shift;
+    }
+    // Where the dropped row now sits on screen. The caller re-renders and then
+    // restores this exact position, so the view never jumps.
+    const anchorTop = dragEl.getBoundingClientRect().top;
     // Elements without a data-idx (e.g. Edit Target's per-section holders for the
     // collapsed mastered/discontinued groups) sit in this list but aren't rows —
     // skip them so they don't land in newOrder as NaN.
@@ -17061,19 +17073,15 @@ function initDragSort(listEl, onReorder) {
       .filter(el => el !== placeholder && el.dataset.idx !== undefined)
       .map(el => Number(el.dataset.idx))
       .filter(Number.isFinite);
-    // Which row was actually dropped, so the caller can bring it back into view
-    // after its re-render. Restoring the old scrollTop instead is what made drops
-    // feel like they jerked away: rows are collapsed while dragging and expand
-    // again afterwards, so the same scroll offset lands somewhere else entirely.
+    // Which row was dropped, so the caller can find it again after re-rendering.
     const movedIdx = Number(dragEl.dataset.idx);
-    dragEl.scrollIntoView({ block: "nearest" });
     dragEl = null;
     placeholder = null;
     // Suppress the synthetic click that the browser fires at the drop position —
     // otherwise buttons (e.g. "Add Sub-activity") under the release point get clicked.
     document.addEventListener('click', e => { e.stopPropagation(); e.preventDefault(); },
       { capture: true, once: true });
-    onReorder(newOrder, Number.isFinite(movedIdx) ? movedIdx : null);
+    onReorder(newOrder, Number.isFinite(movedIdx) ? movedIdx : null, anchorTop);
   };
 
   listEl.addEventListener('pointerup',     endDrag);
@@ -17334,13 +17342,19 @@ function mnReorderSubs(acts, parentKey, newOrder) {
 // view and blinks it, so the drop lands somewhere predictable. Called instead of
 // restoring the pre-drag scrollTop, which pointed at the wrong place once the
 // collapsed drag rows expanded back to full height.
-function mnScrollToMovedRow(newIdx) {
+function mnScrollToMovedRow(newIdx, anchorTop) {
   if (newIdx == null || newIdx < 0) return;
   requestAnimationFrame(() => requestAnimationFrame(() => {
     const body = $("manage-modal-body");
     const el = body?.querySelector(`#mn-act-list > [data-idx="${newIdx}"]`);
     if (!el) return;
-    el.scrollIntoView({ block: "center" });
+    // Put the row back at the exact screen position it was released at. Anything
+    // else — centring it, or restoring the old scrollTop — moves the page under
+    // the user and reads as the list jerking away after the drop.
+    if (body && anchorTop != null) {
+      const delta = el.getBoundingClientRect().top - anchorTop;
+      if (delta) body.scrollTop += delta;
+    }
     el.classList.add("activity-cfg-blink");
     el.addEventListener("animationend", () => el.classList.remove("activity-cfg-blink"), { once: true });
   }));
@@ -18263,26 +18277,31 @@ function renderTargetManageContent(student, target) {
     saveTarget().catch(() => {});
   }
 
-  initDragSort($("mn-act-list"), async (newOrder, movedIdx) => {
+  initDragSort($("mn-act-list"), async (newOrder, movedIdx, anchorTop) => {
     const moved = movedIdx != null ? acts[movedIdx] : null;
     const result = mnReorderActs(acts, newOrder);
     target.predefinedActivities = result;
     await saveTarget();
     renderTargetManageContent(student, target);
-    mnScrollToMovedRow(moved ? result.indexOf(moved) : -1);
+    mnScrollToMovedRow(moved ? result.indexOf(moved) : -1, anchorTop);
   });
 
   // Sub-activities reorder within their own parent, in both the expanded blocks
   // and the collapsed compact rows.
   $("manage-modal-body").querySelectorAll(".mn-sub-list, .mn-sub-compact-list").forEach(list => {
-    initDragSort(list, async newOrder => {
+    initDragSort(list, async (newOrder, movedIdx, anchorTop) => {
+      const moved = movedIdx != null ? acts[movedIdx] : null;
       const result = mnReorderSubs(acts, list.dataset.parentKey || "", newOrder);
       if (!result) { renderTargetManageContent(student, target); return; }
       target.predefinedActivities = result;
       await saveTarget();
-      const sp = $("manage-modal-body").scrollTop;
       renderTargetManageContent(student, target);
-      requestAnimationFrame(() => { const b = $("manage-modal-body"); if (b) b.scrollTop = sp; });
+      // A sub lives inside its parent's row, so anchor on the parent to hold the
+      // view still — the sub itself isn't a direct child of #mn-act-list.
+      const parentIdx = moved
+        ? result.findIndex(a => !a.parentActivity && (a._linkKey || a.title || a.name) === moved.parentActivity)
+        : -1;
+      mnScrollToMovedRow(parentIdx, anchorTop);
     });
   });
 
@@ -21028,7 +21047,7 @@ function renderTemplateManageContent(template) {
     saveTemplateFn().catch(() => {});
   }
 
-  initDragSort($("mn-act-list"), async (newOrder, movedIdx) => {
+  initDragSort($("mn-act-list"), async (newOrder, movedIdx, anchorTop) => {
     // Was rebuilding from newOrder alone, which silently dropped every mastered
     // or discontinued activity (they aren't draggable rows) — same bug the target
     // editor had. mnReorderActs carries them along with their heading.
@@ -21037,7 +21056,7 @@ function renderTemplateManageContent(template) {
     template.predefinedActivities = result;
     await saveTemplateFn();
     renderTemplateManageContent(template);
-    mnScrollToMovedRow(moved ? result.indexOf(moved) : -1);
+    mnScrollToMovedRow(moved ? result.indexOf(moved) : -1, anchorTop);
   });
 
   $("mn-t-name").addEventListener("blur", async () => {
