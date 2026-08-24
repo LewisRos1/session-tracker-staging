@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1839";
+const APP_VERSION = "1840";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6292,130 +6292,6 @@ function maGetStatus(pa) {
   return 'active';
 }
 
-// ─── MASTERED & DISCONTINUED LIST (read-only) ────────────────
-// A convenience view of what Edit Target already holds: every mastered or
-// discontinued activity, grouped by target and by the section heading it sits
-// under. Purely presentational — it changes nothing and offers no actions, so
-// it reads straight from the same predefinedActivities array without touching it.
-
-function _inactStripMk(s) {
-  return (s || "")
-    .replace(/\*_([\s\S]+?)_\*/g, "$1").replace(/_\*([\s\S]+?)\*_/g, "$1")
-    .replace(/\*([\s\S]+?)\*/g, "$1").replace(/_([\s\S]+?)_/g, "$1");
-}
-
-// Collects a target's mastered/discontinued activities into two flat lists, in
-// the order they appear in the target. Section headings are ignored — this page
-// is a plain roll-up per target. Mastered wins when a record somehow carries
-// both flags, matching how Edit Target's two lists are built.
-function inactiveActivitiesForTarget(target) {
-  const mastered = [], discontinued = [];
-  for (const pa of (target.predefinedActivities || [])) {
-    if (pa.isHeading || pa.isMaintainHeading) continue;
-    if (pa.isNote || pa.isExportNote || pa.isMaintain) continue;
-    if (!pa.name && !pa.title) continue;
-    if (pa.masteredOn || pa.isCompleted) mastered.push(pa);
-    else if (pa.discontinuedOn || pa.isArchived || pa.isStopped) discontinued.push(pa);
-  }
-  return { mastered, discontinued };
-}
-
-function renderInactiveListScreen(entity) {
-  const body = $("inactive-list-body");
-  if (!body) return;
-  // Discontinued targets stay (their history is the point of this page); archived
-  // ones are hidden everywhere else in the app, so they stay hidden here too.
-  const targets = sortTargetsByOrder([...(entity.targets || [])].filter(t => !t.archived));
-  if (!targets.length) {
-    body.innerHTML = `<div style="padding:1rem;color:#9ca3af;font-style:italic">No targets found.</div>`;
-    return;
-  }
-
-  let seq = 0;
-  const groupHtml = (label, emoji, color, bg, border, list, kind) => {
-    if (!list.length) return "";
-    const id = `inact-${kind}-${seq++}`;
-    // Numbering runs within each group: top-level activities get 1) 2) 3), and
-    // sub-activities get a) b) c) restarting under each parent. map() runs in
-    // order, so plain counters in this closure are enough.
-    let actNum = 0, subNum = 0;
-    const rows = list.map(pa => {
-      const date = kind === "mastered" ? pa.masteredOn : pa.discontinuedOn;
-      // The group header above already says Mastered/Discontinued, so the row
-      // badge only needs the date. Falls back to the word for old records that
-      // carry the flag without a date.
-      const badge = `<span style="font-size:.72rem;white-space:nowrap;background:${bg};color:${color};font-weight:600;padding:.1rem .5rem;border-radius:.3rem;border:1px solid ${border}">${emoji} ${date ? fmtPeriodDate(date) : label}</span>`;
-      const isSub = !!pa.parentActivity;
-      let marker;
-      if (isSub) {
-        marker = `<span style="flex-shrink:0;font-size:.85rem;font-weight:700;color:#0369a1;min-width:1.3rem">${String.fromCharCode(97 + subNum)})</span>`;
-        subNum++;
-      } else {
-        actNum++; subNum = 0;
-        marker = `<span style="flex-shrink:0;font-size:.85rem;font-weight:700;color:#6b7280;min-width:1.3rem">${actNum})</span>`;
-      }
-      const indent = isSub ? "margin-left:1.4rem;" : "";
-      return `<div style="${indent}display:flex;align-items:flex-start;gap:.5rem;padding:.4rem .55rem;border-bottom:1px solid #f3f4f6">
-        ${marker}
-        <span style="flex:1;min-width:0;font-size:.88rem;color:#374151;overflow-wrap:break-word">${escHtml(_inactStripMk(pa.title || pa.name))}</span>
-        ${badge}
-      </div>`;
-    }).join("");
-    return `<div style="margin-top:.4rem">
-      <button class="inact-toggle" data-panel="${id}" style="display:flex;align-items:center;gap:.45rem;background:none;border:none;cursor:pointer;width:100%;padding:.3rem 0;font-size:.84rem;font-weight:700;color:${color};text-align:left">
-        <span class="inact-arrow" style="font-size:.7rem">▶</span>
-        ${emoji} ${label} (${list.length})
-      </button>
-      <div id="${id}" style="display:none;border:1px solid ${border};border-radius:.45rem;overflow:hidden;background:#fff">${rows}</div>
-    </div>`;
-  };
-
-  let html = "";
-  for (const target of targets) {
-    const { mastered, discontinued } = inactiveActivitiesForTarget(target);
-    const discTag = target.discontinuedOn
-      ? `<span style="font-size:.7rem;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;font-weight:700;padding:.12rem .5rem;border-radius:.3rem;white-space:nowrap;flex-shrink:0">🛑 Discontinued</span>` : "";
-    // Each target is its own bordered card with a header strip, so where one
-    // target's activities end and the next begins is unmistakable. The strip is
-    // deliberately a pale tint rather than the solid --primary used by the page's
-    // top bar, so the two don't read as the same kind of thing.
-    html += `<div style="margin-bottom:1.1rem;border:1px solid #dfe3ec;border-radius:.6rem;overflow:hidden;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.07)">
-      <div style="display:flex;align-items:center;gap:.6rem;background:var(--primary-light);border-bottom:1px solid #c7d2fe;padding:.6rem .9rem">
-        <span style="font-size:.64rem;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--primary-dark);opacity:.7;flex-shrink:0">Target</span>
-        <span style="flex:1;min-width:0;font-size:1.02rem;font-weight:700;color:var(--primary-dark);overflow-wrap:break-word">${escHtml(target.name)}</span>
-        ${discTag}
-      </div>
-      <div style="padding:.55rem .9rem .7rem">`;
-    if (mastered.length === 0 && discontinued.length === 0) {
-      html += `<div style="font-size:.85rem;color:#9ca3af;font-style:italic;padding:.15rem .1rem">None</div>`;
-    } else {
-      html += groupHtml("Mastered", "⭐", "#059669", "#d1fae5", "#6ee7b7", mastered, "mastered");
-      html += groupHtml("Discontinued", "🚩", "#dc2626", "#fee2e2", "#fca5a5", discontinued, "discontinued");
-    }
-    html += `</div></div>`;
-  }
-
-  body.innerHTML = html;
-  body.querySelectorAll(".inact-toggle").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const panel = document.getElementById(btn.dataset.panel);
-      const arrow = btn.querySelector(".inact-arrow");
-      if (!panel) return;
-      const open = panel.style.display !== "none";
-      panel.style.display = open ? "none" : "block";
-      if (arrow) arrow.textContent = open ? "▶" : "▼";
-    });
-  });
-}
-
-function openInactiveListScreen(entity, label) {
-  const sub = $("inactive-list-subtitle");
-  if (sub) sub.textContent = label;
-  showScreen("screen-inactive-list");
-  $("btn-inactive-list-back").onclick = showHome;
-  renderInactiveListScreen(entity);
-}
-
 function openManageActivityScreen(student) {
   _maIsGroup = false;
   _maSelectedTargetIdx = 0;
@@ -6601,12 +6477,6 @@ function showStudentChoice(student) {
           <div class="choice-label">Manage Targets</div>
         </div>
       </button>
-      <button class="choice-btn choice-inactive-list">
-        <span class="choice-icon">📋</span>
-        <div class="choice-text">
-          <div class="choice-label">List of Mastered &amp; Discontinued Activities</div>
-        </div>
-      </button>
       <button class="choice-btn choice-export-excel">
         <span class="choice-icon">📊</span>
         <div class="choice-text">
@@ -6715,11 +6585,6 @@ function showStudentChoice(student) {
   $("session-picker-list").querySelector(".choice-other").addEventListener("click", () => {
     showSessionPicker(student);
   });
-  $("session-picker-list").querySelector(".choice-inactive-list").addEventListener("click", () => {
-    closeSessionPicker();
-    openInactiveListScreen(student, student.name + (student.note ? ' ' + student.note : ''));
-  });
-
   $("session-picker-list").querySelector(".choice-manage-activity").addEventListener("click", () => {
     closeSessionPicker();
     $("manage-modal-title").textContent = "Manage Targets";
@@ -21916,10 +21781,6 @@ function showGroupChoice(group) {
         <span class="choice-icon">🪄</span>
         <div class="choice-text"><div class="choice-label">Manage Targets</div></div>
       </button>
-      <button class="choice-btn choice-inactive-list-group">
-        <span class="choice-icon">📋</span>
-        <div class="choice-text"><div class="choice-label">List of Mastered &amp; Discontinued Activities</div></div>
-      </button>
       <button class="choice-btn choice-export-excel">
         <span class="choice-icon">📊</span>
         <div class="choice-text"><div class="choice-label">Export to Excel (Yearly Summary)</div></div>
@@ -22035,10 +21896,6 @@ function showGroupChoice(group) {
     showGroupManageActivityContent(group);
   });
 
-  $("session-picker-list").querySelector(".choice-inactive-list-group").addEventListener("click", () => {
-    closeSessionPicker();
-    openInactiveListScreen(group, group.name);
-  });
 }
 
 // ── Open group session ───────────────────────────────────────
