@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1849";
+const APP_VERSION = "1850";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8698,11 +8698,11 @@ function makeStrandedPredefinedTest(target, data) {
 function renderInactiveStatusSection({ label, color, pas, orphanGroups, allPas, dateHeader, totalCount }) {
   if (pas.length === 0 && orphanGroups.length === 0) return '';
 
-  const _cellBase   = 'padding:.32rem .5rem;border-bottom:1px solid #f3f4f6;vertical-align:top';
-  const _numCell    = `${_cellBase};font-size:.78rem;font-weight:700;color:#6b7280;white-space:nowrap;width:2.6rem`;
-  const _subNumCell = `${_cellBase};font-size:.78rem;font-weight:700;color:#0369a1;white-space:nowrap;text-align:right`;
+  const _cellBase   = 'padding:.32rem .5rem;border:1px solid #000;vertical-align:top';
+  const _numCell    = `${_cellBase};font-size:.78rem;font-weight:700;color:#6b7280;white-space:nowrap;width:2.6rem;text-align:center`;
+  const _subNumCell = `${_cellBase};font-size:.78rem;font-weight:700;color:#0369a1;white-space:nowrap;text-align:center`;
   const _nameCell   = `${_cellBase};font-size:.88rem;line-height:1.45;white-space:pre-wrap;word-break:break-word`;
-  const _dateCell   = `${_cellBase};font-size:.78rem;white-space:nowrap;text-align:right;width:7.5rem`;
+  const _dateCell   = `${_cellBase};font-size:.78rem;white-space:nowrap;text-align:center;width:7.5rem`;
 
   const dateText = pa => {
     if (pa.masteredOn)     return `<span style="color:#059669;font-weight:600">${fmtPeriodDate(pa.masteredOn)}</span>`;
@@ -8748,18 +8748,18 @@ function renderInactiveStatusSection({ label, color, pas, orphanGroups, allPas, 
       </tr>${subRows(subs)}`;
   }).join('');
 
-  const _th = 'padding:.3rem .5rem;font-size:.72rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.02em;border-bottom:1px solid #e5e7eb;background:#f9fafb';
+  const _th = 'padding:.3rem .5rem;font-size:.72rem;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.02em;border:1px solid #000;background:#f3f4f6;text-align:center;vertical-align:middle';
   return `<div style="margin-top:.5rem">
     <button class="btn-inactive-toggle" contenteditable="false" style="display:flex;align-items:center;gap:.4rem;width:100%;padding:.4rem .6rem;background:none;border:1px dashed #d1d5db;border-radius:.4rem;cursor:pointer;font-size:.8rem;color:${color};text-align:left">
       <span class="inactive-chevron" style="font-size:.7rem">▶</span> ${label} (${totalCount})
     </button>
     <div class="inactive-list" style="display:none;flex-direction:column;margin-top:.35rem">
       <div style="overflow-x:auto;width:100%">
-        <table contenteditable="false" style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:.4rem">
+        <table contenteditable="false" style="width:100%;border-collapse:collapse;border:1px solid #000">
           <thead><tr>
-            <th style="${_th};text-align:left">No.</th>
-            <th style="${_th};text-align:left">Activity</th>
-            <th style="${_th};text-align:right">${escHtml(dateHeader)}</th>
+            <th style="${_th}">No.</th>
+            <th style="${_th}">Activity</th>
+            <th style="${_th}">${escHtml(dateHeader)}</th>
           </tr></thead>
           <tbody>${topRows}${orphanRows}</tbody>
         </table>
