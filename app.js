@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1843";
+const APP_VERSION = "1844";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -370,7 +370,6 @@ const state = {
   remarkPresets:      [],
   searchExisting:     "",
   searchAssessment:   "",
-  searchTemplate:     "",
   currentStudent:     null,
   currentSessionId:   null,
   sessionData:        null,
@@ -1003,7 +1002,16 @@ async function loadAppData() {
     state.students = CONFIG.INITIAL_STUDENTS;
   }
 
-  if (templatesR.status === "fulfilled") state.templates = templatesR.value;
+  // Templates were removed as a feature in v1844. Nothing creates or reads them
+  // any more (every target is created with templateId:null, and the old
+  // syncTemplateToStudents was never called), so any leftover template docs are
+  // orphans — delete them once. Student/group targets are untouched by this.
+  if (templatesR.status === "fulfilled") {
+    state.templates = [];
+    for (const t of templatesR.value) {
+      deleteTemplate(t.id).catch(() => {});
+    }
+  }
   if (groupsR.status === "fulfilled") state.groups = groupsR.value;
   if (presetsR.status === "fulfilled") state.remarkPresets = presetsR.value;
 }
@@ -1161,14 +1169,13 @@ async function showHome() {
   const verEl = document.getElementById("app-version");
   if (verEl) verEl.textContent = versionLineText();
   // Clear section searches when returning home
-  state.searchExisting = ""; state.searchAssessment = ""; state.searchTemplate = "";
+  state.searchExisting = ""; state.searchAssessment = "";
   state.searchGroup = "";
-  [$("search-existing"), $("search-assessment"), $("search-template"), $("search-group")]
+  [$("search-existing"), $("search-assessment"), $("search-group")]
     .forEach(el => { if (el) el.value = ""; });
   renderExistingStudentButtons();
   renderGroupButtons();
   renderAssessmentStudentButtons();
-  renderTemplateButtons();
   renderExportButtons();
   renderHalfYearReportsSection();
   renderStudentDatabaseButton();
@@ -1453,11 +1460,10 @@ $("btn-logout")?.addEventListener("click", () => {
   signOutUser();
 });
 
-// ── Add student / template from home screen ───────────────────
+// ── Add student / group from home screen ──────────────────────
 
 $("btn-add-existing-student").addEventListener("click", () => showRegisteredStudentPicker("existing"));
 $("btn-add-assessment-student").addEventListener("click", () => showRegisteredStudentPicker("assessment"));
-$("btn-add-template").addEventListener("click", addNewTemplate);
 $("btn-add-group").addEventListener("click", addNewGroup);
 $("search-existing").addEventListener("input", e => {
   state.searchExisting = e.target.value;
@@ -1470,10 +1476,6 @@ $("search-group").addEventListener("input", e => {
 $("search-assessment").addEventListener("input", e => {
   state.searchAssessment = e.target.value;
   renderAssessmentStudentButtons();
-});
-$("search-template").addEventListener("input", e => {
-  state.searchTemplate = e.target.value;
-  renderTemplateButtons();
 });
 
 function renderStudentDatabaseButton() {
@@ -2573,22 +2575,6 @@ async function assignStudentToBucket(student, targetType) {
   else renderAssessmentStudentButtons();
 }
 
-async function addNewTemplate() {
-  const name = prompt("Template name:");
-  if (!name?.trim()) return;
-  const t = {
-    id: cfgId("tmpl"),
-    name: name.trim(),
-    order: state.templates.length,
-    predefinedActivities: [],
-    notes: [],
-    maxPoints: 3
-  };
-  state.templates.push(t);
-  await saveTemplate(t);
-  renderTemplateButtons();
-  openManageModal(null, null, t);
-}
 
 // ── Render helpers ────────────────────────────────────────────
 
@@ -2678,37 +2664,6 @@ function renderAssessmentStudentButtons() {
   renderStudentList($("assessment-student-buttons"), students, state.searchAssessment);
 }
 
-function renderTemplateButtons() {
-  const container = $("template-buttons");
-  if (!container) return;
-  const q = state.searchTemplate.toLowerCase();
-  const filtered = state.templates
-    .filter(t => !q || t.name.toLowerCase().includes(q))
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-  let html = "";
-  if (filtered.length === 0 && !q) {
-    html = `<p class="empty-hint">No templates yet.</p>`;
-  } else if (filtered.length === 0) {
-    html = `<p class="empty-hint">No matches.</p>`;
-  } else {
-    html = `<div class="roster-list">` +
-      filtered.map(t => `
-        <button class="roster-item" data-id="${t.id}">
-          <span class="roster-item-name">${escHtml(t.name)}</span>
-        </button>
-      `).join("") +
-      `</div>`;
-  }
-  container.innerHTML = html;
-
-  container.querySelectorAll(".roster-item").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const tmpl = state.templates.find(t => t.id === btn.dataset.id);
-      if (tmpl) openManageModal(null, null, tmpl);
-    });
-  });
-}
 
 function renderExportButtons() {
   const exportAllContainer = $("export-all-button");
@@ -15835,7 +15790,6 @@ function showGroupAddTargetPicker(group) {
   const hasDup       = group.targets.length > 0;
   const otherGroups  = state.groups.filter(g => g.id !== group.id && g.targets?.length > 0);
   const hasOther     = otherGroups.length > 0;
-  const hasTemplates = state.templates.length > 0;
 
   $("manage-modal-body").innerHTML = `
     <div style="display:flex;flex-direction:column;gap:.6rem">
@@ -15850,10 +15804,6 @@ function showGroupAddTargetPicker(group) {
       ${hasOther ? `<button class="btn-target-type" id="btn-gadd-dup-other">
         <span class="btn-target-label">Duplicate Target from Another Group</span>
         <span class="btn-target-desc">Duplicate a target from a different group</span>
-      </button>` : ""}
-      ${hasTemplates ? `<button class="btn-target-type" id="btn-gadd-dup-tmpl">
-        <span class="btn-target-label">Duplicate from Template</span>
-        <span class="btn-target-desc">Duplicate a template as an individual target</span>
       </button>` : ""}
     </div>`;
   $("manage-modal-body").scrollTop = 0;
@@ -15882,7 +15832,6 @@ function showGroupAddTargetPicker(group) {
 
   $("btn-gadd-dup-current")?.addEventListener("click", () => showGroupDupFromCurrent(group));
   $("btn-gadd-dup-other")?.addEventListener("click", () => showGroupDupFromOther(group, otherGroups));
-  $("btn-gadd-dup-tmpl")?.addEventListener("click", () => showGroupDupFromTemplate(group));
 }
 
 function showGroupDupFromCurrent(group) {
@@ -15986,48 +15935,6 @@ function showGroupDupFromOtherPickTarget(group, sourceGroup) {
   });
 }
 
-function showGroupDupFromTemplate(group) {
-  const sortedTmpls = [...state.templates].sort((a, b) => a.name.localeCompare(b.name));
-  $("manage-modal-body").innerHTML = `
-    <div class="admin-section-title" style="margin-bottom:.5rem">Choose templates to duplicate</div>
-    <div class="admin-list">
-      ${sortedTmpls.map(t => `
-        <label class="admin-list-item" style="cursor:pointer;gap:.75rem">
-          <input type="checkbox" class="gtmpl-cb" data-tmpl-id="${escHtml(t.id)}"
-            style="width:20px;height:20px;flex-shrink:0;cursor:pointer" />
-          <span class="admin-item-name">${escHtml(t.name)}</span>
-        </label>`).join("")}
-    </div>
-    <button class="btn-primary-sm" id="btn-gtmpl-dup" style="width:100%;margin-top:.75rem;padding:.75rem">Duplicate Selected</button>
-    <button class="btn-adm-secondary" id="btn-gdup-back" style="width:100%;margin-top:.5rem;padding:.65rem">← Back</button>`;
-
-  $("btn-gdup-back").addEventListener("click", () => showGroupAddTargetPicker(group));
-  $("btn-gtmpl-dup").addEventListener("click", async () => {
-    const checked = [...$("manage-modal-body").querySelectorAll(".gtmpl-cb:checked")];
-    if (!checked.length) { alert("Select at least one template."); return; }
-    $("manage-modal").classList.add("hidden");
-    let lastAdded = null;
-    for (const cb of checked) {
-      const tmpl = state.templates.find(t => t.id === cb.dataset.tmplId);
-      if (!tmpl) continue;
-      const copy = {
-        id: cfgId("gt"), name: uniqueTargetName(group.targets, tmpl.name), maxPoints: tmpl.maxPoints || 3,
-        hasComment: false, fullName: "", order: group.targets.length, groupLayout: "byActivity",
-        predefinedActivities: JSON.parse(JSON.stringify(tmpl.predefinedActivities || [])),
-        notes: JSON.parse(JSON.stringify(tmpl.notes || [])), isStructured: true
-      };
-      group.targets.push(copy); lastAdded = copy;
-    }
-    const gi = state.groups.findIndex(g => g.id === group.id);
-    if (gi >= 0) state.groups[gi] = group;
-    await state.entryGroupRemarkSaver?.flush();
-    await saveGroup(group);
-    if (lastAdded) state.selectedGroupTargetName = lastAdded.name;
-    populateGroupTargetDropdown(group.targets);
-    try { renderGroupTargetContent(); } catch(e) { console.error("renderGroupTargetContent after template dup:", e); }
-    if (lastAdded && checked.length === 1) openGroupManageModal(group, lastAdded);
-  });
-}
 
 async function closeManageModal() {
   $("manage-modal").classList.add("hidden");
@@ -16191,7 +16098,6 @@ async function closeManageModal() {
   // Always refresh all home screen sections
   renderExistingStudentButtons();
   renderAssessmentStudentButtons();
-  renderTemplateButtons();
   renderExportButtons();
   renderHalfYearReportsSection();
   renderGroupButtons();
@@ -16387,7 +16293,6 @@ function showAddTargetPicker(student) {
   const hasDuplicatable  = student.targets.length > 0;
   const otherStudents    = state.students.filter(s => s.id !== student.id);
   const hasOtherStudents = otherStudents.length > 0;
-  const hasTemplates     = state.templates.length > 0;
 
   const html = `
     <div style="display:flex;flex-direction:column;gap:.6rem">
@@ -16402,10 +16307,6 @@ function showAddTargetPicker(student) {
       ${hasOtherStudents ? `<button class="btn-target-type" id="btn-duplicate-from-other">
         <span class="btn-target-label">Duplicate Target from Another Student</span>
         <span class="btn-target-desc">Duplicate a target from a different student</span>
-      </button>` : ""}
-      ${hasTemplates ? `<button class="btn-target-type" id="btn-duplicate-from-template">
-        <span class="btn-target-label">Duplicate from Template</span>
-        <span class="btn-target-desc">Duplicate a template as an individual target</span>
       </button>` : ""}
     </div>`;
 
@@ -16451,9 +16352,6 @@ function showAddTargetPicker(student) {
     showDupFromOtherStudent_pickStudent(student, otherStudents);
   });
 
-  $("btn-duplicate-from-template")?.addEventListener("click", () => {
-    showDupFromTemplate(student);
-  });
 }
 
 function showDupFromCurrentStudent(student) {
@@ -16601,56 +16499,6 @@ function showDupFromOtherStudent_pickTarget(student, sourceStudent) {
   });
 }
 
-function showDupFromTemplate(student) {
-  const sortedTmpls = [...state.templates].sort((a, b) => a.name.localeCompare(b.name));
-  $("manage-modal-body").innerHTML = `
-    <div class="admin-section-title" style="margin-bottom:.5rem">Choose templates to duplicate</div>
-    <div class="admin-list">
-      ${sortedTmpls.map(t => `
-        <label class="admin-list-item" style="cursor:pointer;gap:.75rem">
-          <input type="checkbox" class="tmpl-source-cb" data-tmpl-id="${escHtml(t.id)}"
-            style="width:20px;height:20px;flex-shrink:0;cursor:pointer" />
-          <span class="admin-item-name">${escHtml(t.name)}</span>
-        </label>`).join("")}
-    </div>
-    <button class="btn-primary-sm" id="btn-confirm-tmpl-dup"
-      style="width:100%;margin-top:.75rem;padding:.75rem">Duplicate Selected</button>
-    <button class="btn-adm-secondary" id="btn-dup-back"
-      style="width:100%;margin-top:.5rem;padding:.65rem">← Back</button>`;
-
-  $("btn-dup-back").addEventListener("click", () => showAddTargetPicker(student));
-
-  $("btn-confirm-tmpl-dup").addEventListener("click", async () => {
-    const checked = [...$("manage-modal-body").querySelectorAll(".tmpl-source-cb:checked")];
-    if (checked.length === 0) { alert("Select at least one template to duplicate."); return; }
-
-    $("manage-modal").classList.add("hidden");
-    let lastAdded = null;
-    for (const cb of checked) {
-      const tmpl = state.templates.find(t => t.id === cb.dataset.tmplId);
-      if (!tmpl) continue;
-      const copy = {
-        id: cfgId("t"), name: uniqueTargetName(student.targets, tmpl.name),
-        maxPoints: tmpl.maxPoints || 3,
-        hasComment: false, fullName: "",
-        order: student.targets.length,
-        predefinedActivities: JSON.parse(JSON.stringify(tmpl.predefinedActivities || [])),
-        notes: JSON.parse(JSON.stringify(tmpl.notes || [])),
-        templateId: null, isStructured: true
-      };
-      student.targets.push(copy);
-      lastAdded = copy;
-    }
-    const si = state.students.findIndex(s => s.id === student.id);
-    if (si >= 0) state.students[si] = student;
-    await state.entryRemarkSaver?.flush();
-    await saveStudent(student);
-    if (lastAdded) state.selectedTargetName = lastAdded.name;
-    populateTargetDropdown(student.targets);
-    renderTargetContent();
-    if (lastAdded && checked.length === 1) openManageModal(student, lastAdded);
-  });
-}
 
 // ── Remark preset management content ─────────────────────────
 
