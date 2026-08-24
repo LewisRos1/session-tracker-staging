@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1842";
+const APP_VERSION = "1843";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -16857,26 +16857,24 @@ function initDragSort(listEl, onReorder) {
     e.preventDefault();
     e.stopPropagation();
 
-    // Collapsing every card to a compact row shrinks the list dramatically, which
-    // yanks the grabbed block up the page (and can clamp the scroll position on
-    // top of that) — so picking anything up looked like it flew off somewhere.
-    // Measure the row either side of the collapse and scroll by the difference,
-    // leaving it exactly where it was on screen while everything else collapses
-    // around it.
-    const beforeTop = item.getBoundingClientRect().top;
+    // Collapsing every card to a compact row shrinks the list dramatically, so
+    // without help the grabbed block ends up nowhere near the pointer. Scroll so
+    // the collapsed row sits centred on the cursor: the handle is grabbed in the
+    // middle of a tall card, so preserving the card's top edge instead would
+    // leave the row hanging far above the finger.
+    const cursorY = e.clientY;
     listEl.classList.add('is-reordering');
     if (scrollEl) {
-      const shift = item.getBoundingClientRect().top - beforeTop;
+      const r = item.getBoundingClientRect();
+      const shift = r.top - (cursorY - r.height / 2);
       if (shift) scrollEl.scrollTop += shift;
     }
     const rect = item.getBoundingClientRect();
-    // Anchor to where the row actually ended up, not to the cursor. The scroll
-    // compensation above gets clamped near either end of the list — there is no
-    // room left to scroll — so the row can finish somewhere other than under the
-    // pointer. Deriving the offset from the row means the floating copy starts
-    // exactly on top of it either way, instead of snapping elsewhere on pickup.
-    offsetY = e.clientY - rect.top;
-    lastY   = e.clientY;
+    // Clamped so the row always touches the pointer even when the scroll above
+    // ran out of room — near either end of the list there is nothing left to
+    // scroll, and an unclamped offset would leave a visible gap.
+    offsetY = Math.min(Math.max(cursorY - rect.top, 0), rect.height);
+    lastY   = cursorY;
 
     placeholder = document.createElement('div');
     placeholder.className = 'drag-placeholder';
@@ -16888,7 +16886,7 @@ function initDragSort(listEl, onReorder) {
     dragEl.style.cssText =
       (dragEl._savedStyle ? dragEl._savedStyle + ';' : '') +
       `position:fixed;left:${rect.left}px;width:${rect.width}px;` +
-      `top:${rect.top}px;z-index:9999;opacity:.85;` +
+      `top:${cursorY - offsetY}px;z-index:9999;opacity:.85;` +
       `box-shadow:0 4px 16px rgba(0,0,0,.2);pointer-events:none;`;
 
     listEl.setPointerCapture(e.pointerId);
