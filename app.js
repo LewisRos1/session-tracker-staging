@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1838";
+const APP_VERSION = "1839";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -17035,9 +17035,22 @@ function initDragSort(listEl, onReorder) {
 
     const items = [...listEl.children].filter(el => el !== dragEl && el !== placeholder);
     let inserted = false;
-    for (const item of items) {
-      const { top, height } = item.getBoundingClientRect();
-      if (e.clientY < top + height / 2) {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      // A section heading and the Mastered/Discontinued groups directly beneath
+      // it are one unit: dropping between them would put a row above a heading's
+      // own groups, which reads as belonging to the heading above. Measure the
+      // pair as a single block, so the drop lands either above the heading or
+      // below the groups — never in between.
+      let lastEl = item;
+      const next = items[i + 1];
+      if (item.classList.contains("mn-heading-item") && next && next.classList.contains("mn-seg-groups")) {
+        lastEl = next;
+        i++;
+      }
+      const top    = item.getBoundingClientRect().top;
+      const bottom = lastEl.getBoundingClientRect().bottom;
+      if (e.clientY < top + (bottom - top) / 2) {
         listEl.insertBefore(placeholder, item);
         inserted = true;
         break;
