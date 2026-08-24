@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1846";
+const APP_VERSION = "1847";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -7544,6 +7544,14 @@ async function openSession(student, existingSessionId = null, dateStr = null, pa
         // they were already auto-filled into session data as maintained activities).
         // Without this, stale session records survive in Firestore forever and
         // autoFillMaintainedRemarks re-fills them on every snapshot.
+        //
+        // ONLY empty records may be deleted here. This sweep used to delete
+        // unconditionally, which turned the pre-2026-08-23 reorder bug into
+        // permanent data loss: that bug dropped mastered activities out of
+        // predefinedActivities, and then merely opening a session deleted those
+        // activities' remarks from Firestore. A deliberate delete purges its own
+        // session records through the confirm-by-typing flow, so a stale record
+        // that still holds data is always accidental — it must be kept and shown.
         const staleActIds = [];
         const staleRemIds = [];
         for (const [actId, act] of Object.entries(data.activities || {})) {
@@ -7556,6 +7564,12 @@ async function openSession(student, existingSessionId = null, dateStr = null, pa
           );
           if (inConfig) continue;
           const remEntries = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === actId);
+          const hasData = remEntries.some(([, r]) =>
+            (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
+            (r.trials || []).some(t => t !== null && t !== -1) ||
+            (r.masteryNote || "").replace(/<[^>]*>/g, "").trim().length > 0
+          );
+          if (hasData) continue;   // stranded but real — never delete
           staleActIds.push(actId);
           for (const [remId] of remEntries) staleRemIds.push(remId);
           delete data.activities[actId];
@@ -8692,6 +8706,25 @@ function remarkHasContent(r) {
     ((r.note || "").trim());
 }
 
+// Builds a test for "predefined session record whose config entry has gone
+// missing, and which still holds real data". Used by the group entry screens;
+// see renderExtraActivitiesSection for why these must keep rendering.
+function makeStrandedPredefinedTest(target, data) {
+  const pas      = target.predefinedActivities || [];
+  const cfgIds   = new Set(pas.map(p => p.id).filter(Boolean));
+  const cfgNames = new Set(pas.flatMap(p => [p.name, p.title]).filter(Boolean));
+  const hasData  = actId => Object.values(data.remarks || {}).some(r =>
+    r.activityId === actId && (
+      (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
+      (r.trials || []).some(t => t !== null && t !== -1) ||
+      (r.masteryNote || "").replace(/<[^>]*>/g, "").trim().length > 0
+    ));
+  return (actId, a) => a.isPredefined && !a.parentActivity
+    && !((a.configId && cfgIds.has(a.configId))
+         || cfgNames.has(a.activityName) || cfgNames.has(a.activityTitle))
+    && hasData(actId);
+}
+
 // An extra (session-only) activity is an orphan if it has no name and none of
 // its remarks contain any actual content. Empty-name activities with empty
 // remark records (from "+Add Remark & Trials" being clicked then abandoned)
@@ -8705,10 +8738,24 @@ function isOrphanExtraActivity(a) {
 // Used by both renderFedcTarget (appended after predefined activities) and
 // renderRegularTarget (which has nothing else to render).
 function renderExtraActivitiesSection(target) {
+  // A predefined record whose config entry no longer exists is stranded: nothing
+  // above renders it, so its remarks would be invisible in this session. Deleting
+  // an activity on purpose purges its session records (the confirm-by-typing
+  // flow), so a stranded record that still holds data is always accidental
+  // damage — show it here rather than let real work disappear.
+  const _pas      = target.predefinedActivities || [];
+  const _cfgIds   = new Set(_pas.map(p => p.id).filter(Boolean));
+  const _cfgNames = new Set(_pas.flatMap(p => [p.name, p.title]).filter(Boolean));
+  const isStranded = a => a.isPredefined && !a.parentActivity
+    && !((a.configId && _cfgIds.has(a.configId))
+         || _cfgNames.has(a.activityName) || _cfgNames.has(a.activityTitle))
+    && getRemarksForActivity(a.id).some(remarkHasContent);
+
   const seen = new Set();
   const extraActs = getActivitiesForTarget(target.name)
     .filter(a => {
-      if (a.isPredefined || a.parentActivity) return false;
+      if (a.parentActivity) return false;
+      if (a.isPredefined && !isStranded(a)) return false;
       // Hide any orphan activities (empty name + no substantive remarks) that
       // slipped through from old sessions — the snapshot stripping should have
       // removed them already, but this is a belt-and-suspenders guard.
@@ -22517,9 +22564,11 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
 
   if (_grpFilterPaSet && !_footerOnly) return items; // sidebar mode: manual/inactive sections handled by sidebar wrapper
 
-  // Manually added (non-predefined) activities
+  // Manually added (non-predefined) activities, plus any stranded predefined
+  // records whose config entry has gone missing but which still hold data.
+  const _grpStranded = makeStrandedPredefinedTest(target, data);
   Object.entries(data.activities || {})
-    .filter(([, a]) => a.targetName === target.name && !a.isPredefined)
+    .filter(([actId, a]) => a.targetName === target.name && (!a.isPredefined || _grpStranded(actId, a)))
     .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
     .forEach(([actId, act]) => {
       items.push(renderGroupActivityCard(act.activityName, actId, target, data, attendees, null, null, null, false, null, null, _grpFilterPaSet));
@@ -22855,8 +22904,11 @@ function renderGroupStudentBlock(studentName, target, data, grpStudentDate = nul
     activityEntries.push({ actId, actName: pa.title || pa.name, actNote: pa.actNote, pa, actNum: pa.parentActivity ? 0 : byStudentActNum });
   }
   if (!_filterPaSet) {
+    // Stranded predefined records (config entry gone, data still present) are
+    // included alongside the manually-added ones — see makeStrandedPredefinedTest.
+    const _stranded = makeStrandedPredefinedTest(target, data);
     Object.entries(data.activities || {})
-      .filter(([, a]) => a.targetName === target.name && !a.isPredefined)
+      .filter(([actId, a]) => a.targetName === target.name && (!a.isPredefined || _stranded(actId, a)))
       .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
       .forEach(([actId, act]) => activityEntries.push({ actId, actName: act.activityName }));
   }
