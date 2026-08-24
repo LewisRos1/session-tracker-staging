@@ -1743,8 +1743,13 @@ input.field-input::placeholder {
 .mn-sub-compact-list { display: none; }
 .mn-collapsed-view .mn-act-compact-title { display: block; }
 .mn-collapsed-view .mn-act-body { display: none !important; }
-.mn-collapsed-view .mn-seg-groups { display: none !important; }
 .mn-collapsed-view .mn-sub-compact-list { display: block; }
+/* A heading's Mastered/Discontinued groups stay visible in collapsed view so the
+   counts are still there; opening one shows title-only rows rather than the full
+   editable cards, matching the rest of the mode. */
+.mn-inact-compact-body { display: none; }
+.mn-collapsed-view .mn-inact-body { display: none !important; }
+.mn-collapsed-view .mn-inact-compact-body { display: block; }
 .mn-sub-compact {
   font-size: .84rem;
   color: #0369a1;

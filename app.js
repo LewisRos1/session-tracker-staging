@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1835";
+const APP_VERSION = "1836";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -17432,10 +17432,41 @@ function mnRegroupInactiveCards(bodyEl, acts) {
             // so leaving them as loose text nodes rendered as "Mastered ( 3 )".
             `<span class="mn-inact-arrow" style="font-size:.7rem">▶</span>` +
             `<span>${m.emoji} ${m.label} (<span class="mn-inact-count">0</span>)</span>` +
-          `</button><div class="mn-inact-body" style="display:none"></div>`;
+          `</button>` +
+          // Two bodies, one shown at a time by CSS: the full editable cards in
+          // normal view, and title-only rows in collapsed view. Building the
+          // compact rows here avoids touching the card markup at all.
+          `<div class="mn-inact-panel" style="display:none">` +
+            `<div class="mn-inact-body"></div>` +
+            `<div class="mn-inact-compact-body"></div>` +
+          `</div>`;
         holder.appendChild(group);
       }
       group.querySelector(".mn-inact-body").appendChild(card);
+
+      // Matching compact row: number top-level entries, letter their subs.
+      const pa = acts[gi];
+      if (pa) {
+        const compact = group.querySelector(".mn-inact-compact-body");
+        const isSub = !!pa.parentActivity;
+        if (isSub) {
+          group.dataset.subSeq = String(Number(group.dataset.subSeq || 0) + 1);
+        } else {
+          group.dataset.topSeq = String(Number(group.dataset.topSeq || 0) + 1);
+          group.dataset.subSeq = "0";
+        }
+        const marker = isSub
+          ? `${String.fromCharCode(96 + Number(group.dataset.subSeq))})`
+          : `${group.dataset.topSeq})`;
+        const row = document.createElement("div");
+        row.className = "mn-inact-compact-row";
+        row.style.cssText = `display:flex;align-items:center;gap:.4rem;padding:.12rem 0;${isSub ? "padding-left:1.5rem;" : ""}font-size:.84rem`;
+        row.innerHTML =
+          `<span style="font-weight:700;color:${isSub ? "#0369a1" : "#6b7280"};flex-shrink:0;min-width:1.3rem">${marker}</span>` +
+          `<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${formatActivityMarkup(pa.title || pa.name || "")}</span>`;
+        compact.appendChild(row);
+      }
+
       group.querySelector(".mn-inact-count").textContent =
         String(group.querySelectorAll(".mn-inact-body > .mn-inact-card").length);
     }
