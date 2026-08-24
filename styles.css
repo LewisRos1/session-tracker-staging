@@ -1719,7 +1719,11 @@ input.field-input::placeholder {
   border-radius: var(--radius-sm);
 }
 
-/* Compact drag mode — snap cards to title-only rows while reordering */
+/* Two ways into the same compact layout: .mn-collapsed-view is held on by the
+   toggle, .is-reordering is applied for the duration of a drag. Every rule below
+   lists both so a drag looks exactly like Collapsed View being switched on —
+   title-only activity rows, sub-activity titles beneath their parent, and the
+   Mastered/Discontinued groups shown as compact rows rather than full cards. */
 .mn-act-compact-title {
   display: none;
   font-size: .9rem;
@@ -1730,26 +1734,27 @@ input.field-input::placeholder {
   text-overflow: ellipsis;
   padding: .05rem 0;
 }
-.is-reordering .mn-act-compact-title { display: block; }
-.is-reordering .mn-act-body { display: none !important; }
-/* During a drag the Mastered/Discontinued group headers stay put, so you can
-   still see which section you're dropping into. Only an opened group's contents
-   collapse, keeping the list short enough to drag through. */
-.is-reordering .mn-inact-panel { display: none !important; }
-
-/* Collapsed view — the same title-only rows as drag mode, but held on by the
-   toggle rather than only while a drag is in progress. Sub-activities live
-   inside .mn-act-body, so a separate read-only list of their titles is shown in
-   its place; drag handles and the ⋮ menus stay live. */
-.mn-sub-compact-list { display: none; }
-.mn-collapsed-view .mn-act-compact-title { display: block; }
-.mn-collapsed-view .mn-act-body { display: none !important; }
-.mn-collapsed-view .mn-sub-compact-list { display: block; }
-/* A heading's Mastered/Discontinued groups stay visible in collapsed view so the
-   counts are still there; opening one shows title-only rows rather than the full
-   editable cards, matching the rest of the mode. */
+.mn-sub-compact-list   { display: none; }
 .mn-inact-compact-body { display: none; }
+
+.is-reordering .mn-act-compact-title,
+.mn-collapsed-view .mn-act-compact-title { display: block; }
+
+.is-reordering .mn-act-body,
+.mn-collapsed-view .mn-act-body { display: none !important; }
+
+/* Sub-activities live inside .mn-act-body, so their titles are shown from a
+   separate list that takes its place. */
+.is-reordering .mn-sub-compact-list,
+.mn-collapsed-view .mn-sub-compact-list { display: block; }
+
+/* The group headers stay visible either way, so the counts are there and you can
+   see which section you're dropping into; opening one shows title-only rows
+   instead of the full editable cards. */
+.is-reordering .mn-inact-body,
 .mn-collapsed-view .mn-inact-body { display: none !important; }
+
+.is-reordering .mn-inact-compact-body,
 .mn-collapsed-view .mn-inact-compact-body { display: block; }
 .mn-sub-compact {
   font-size: .84rem;
