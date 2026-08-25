@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1891";
+const APP_VERSION = "1892";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3267,14 +3267,14 @@ ROW: Key Improvement | [2-4 word label]: [What he did. Why it matters.]
 ===END===
 
 ${targetsWithData.map(r => `===OBSERVATION: ${r.name}===
-Strength: [Two sentences naming one specific thing ${firstName} does well in this target. Say what was actually observed in sessions, not a general compliment.]
-Weakness: [Two sentences naming a genuine difficulty in this target. ONLY write one if the session data directly shows it - a struggling remark, a behaviour that caused problems, or consistently low performance. If the data shows no clear weakness, write exactly: No notable areas of difficulty observed this term. NEVER invent or guess.]
+Strength: [One or two sentences naming one specific thing ${firstName} does well in this target. Say what was actually observed in sessions, not a general compliment.]
+Weakness: [One or two sentences naming a genuine difficulty in this target. ONLY write one if the session data directly shows it - a struggling remark, a behaviour that caused problems, or consistently low performance. If the data shows no clear weakness, write exactly: No notable areas of difficulty observed this term. NEVER invent or guess.]
 ===END===`).join("\n\n")}
 
 FORMAT FOR EVERY OBSERVATION BLOCK: exactly two lines, one starting "Strength:" and one starting "Weakness:". No bullet points, no asterisks, no extra lines, no "Note:" line.
 
 RULES FOR EVERY OBSERVATION BLOCK:
-- Exactly two sentences after each label. Pick the two MOST important things; do not list everything.
+- ONE or TWO sentences after each label, whichever the point genuinely needs. One clear sentence is better than the same point stretched across two. Only write a second sentence if it adds something the first does not. Never pad to reach two, and never list everything - pick what matters most.
 - NO numbers, percentages, or month references. Parents see those in the graph.
 - Plain English, Grade 6-8 reading level. No clinical jargon.
 - Do NOT say things like "modalities", "regulatory capacity", "situational influences", "low-demand contexts". Use real words instead: "free play", "good days and bad days", "room noise".
@@ -3284,8 +3284,8 @@ RULES FOR EVERY OBSERVATION BLOCK:
 - ABSOLUTE: For Strength, only name things the student was directly observed doing in sessions. Do not infer or generalise: if the student identified one person's face, do not write that they "know their family members" or "understand names". Use only what the remarks literally say.
 
 ${qualitativeWithData.map(r => `===OBSERVED: ${r.name}===
-Strength: [Two sentences about something positive noticed in this skill area - a real behaviour, moment or improvement.]
-Weakness: [Two sentences about something still developing or difficult, explained kindly with a specific example if the data provides one.]
+Strength: [One or two sentences about something positive noticed in this skill area - a real behaviour, moment or improvement.]
+Weakness: [One or two sentences about something still developing or difficult, explained kindly with a specific example if the data provides one.]
 ===END===`).join("\n\n")}
 
 The OBSERVED blocks follow exactly the same format and the same rules as the OBSERVATION blocks above.
