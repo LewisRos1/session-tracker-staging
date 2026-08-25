@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1896";
+const APP_VERSION = "1897";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3349,7 +3349,7 @@ RECOMMENDATIONS:
     await new Promise(r => setTimeout(r, 1000));
     setProgress(20, "Processing data…");
     await new Promise(r => setTimeout(r, 1000));
-    setProgress(35, "Sending to AI (Approx. ~30 seconds)…");
+    setProgress(35, "Sending to AI (Approx. ~1 min)…");
     await new Promise(r => setTimeout(r, 500));
 
     // Switch button to Cancel
@@ -5578,7 +5578,7 @@ ${(aiData[t.name] || []).join("\n")}`;
     await new Promise(r => setTimeout(r, 800));
     setProgress(25, "Processing data…");
     await new Promise(r => setTimeout(r, 800));
-    setProgress(38, "Sending to AI (Approx. ~30 seconds)…");
+    setProgress(38, "Sending to AI (Approx. ~1 min)…");
     await new Promise(r => setTimeout(r, 400));
 
     inCancelMode = true;
