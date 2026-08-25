@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1855";
+const APP_VERSION = "1856";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3231,7 +3231,7 @@ RECOMMENDATIONS:
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         model: "claude-sonnet-5",
-        max_tokens: 8192,
+        max_tokens: 16000,
         system: "You are a professional therapy report writer. Follow the requested format exactly.",
         messages: [{ role: "user", content: aiPrompt }]
       }),
@@ -3272,8 +3272,17 @@ RECOMMENDATIONS:
     }
 
     const data = await resp.json();
-    const reportText = data.content?.[0]?.text || "";
-    if (!reportText) throw new Error("Empty response from Claude.");
+    // Take every text block, not content[0]. Sonnet 5 thinks by default, so the
+    // first block is a thinking block and content[0].text is undefined - which is
+    // what "Empty response from Claude" was really reporting.
+    const reportText = (data.content || [])
+      .filter(b => b && b.type === "text" && b.text)
+      .map(b => b.text).join("\n").trim();
+    if (!reportText) {
+      throw new Error(data.stop_reason === "max_tokens"
+        ? "The response hit the token limit before finishing. Try again, or tell Claude Code to raise max_tokens."
+        : `Empty response from Claude (stop_reason: ${data.stop_reason || "unknown"}).`);
+    }
 
     const parsed = hyrParseAiResponse(reportText);
 
@@ -5270,7 +5279,7 @@ ${(aiData[t.name] || []).join("\n")}`;
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         model: "claude-sonnet-5",
-        max_tokens: 8192,
+        max_tokens: 16000,
         system: "You are a professional therapy report writer. Follow the requested format exactly.",
         messages: [{ role: "user", content: aiPrompt }]
       }),
@@ -5305,8 +5314,17 @@ ${(aiData[t.name] || []).join("\n")}`;
       throw new Error(err.error?.message || `API error ${resp.status}`);
     }
     const data = await resp.json();
-    const reportText = data.content?.[0]?.text || "";
-    if (!reportText) throw new Error("Empty response from Claude.");
+    // Take every text block, not content[0]. Sonnet 5 thinks by default, so the
+    // first block is a thinking block and content[0].text is undefined - which is
+    // what "Empty response from Claude" was really reporting.
+    const reportText = (data.content || [])
+      .filter(b => b && b.type === "text" && b.text)
+      .map(b => b.text).join("\n").trim();
+    if (!reportText) {
+      throw new Error(data.stop_reason === "max_tokens"
+        ? "The response hit the token limit before finishing. Try again, or tell Claude Code to raise max_tokens."
+        : `Empty response from Claude (stop_reason: ${data.stop_reason || "unknown"}).`);
+    }
 
     const parsed = monthlyParseAiResponse(reportText);
     setProgress(100, "Done!");
