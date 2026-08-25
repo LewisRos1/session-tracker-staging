@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1868";
+const APP_VERSION = "1869";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -2787,7 +2787,11 @@ GLOBAL RULES (apply to every section):
 - CRITICAL: Write ONLY what the session remarks directly and explicitly state. Do NOT extrapolate or infer related skills. "Identifies a face" is NOT the same as "knows a name." "Follows a one-step instruction" is NOT the same as "follows two-step instructions." "Points to an object" is NOT the same as "can name it." Stay word-for-word within what was actually recorded — never assume a student can or cannot do something that was not directly observed.
 - CRITICAL: Some activities track NEGATIVE or PROBLEM BEHAVIOURS (e.g. snatching food, interrupting others, hitting, distracting behaviour). For these activities, scoring is INVERTED — a HIGH score (e.g. 3 out of 3) means the student did NOT exhibit the bad behaviour and showed good self-control, while a LOW score (e.g. 0) means the bad behaviour DID occur. Always interpret scores for problem/negative behaviour activities with this in mind: high = good, low = the behaviour occurred.
 - READABILITY: Write every section to a Flesch Reading Ease score of 60 to 70. Use short sentences and a natural tone. ABA terms that parents need to know (e.g. "self-regulation", "prompt", "generalisation") are allowed, but always explain them in plain words in the same sentence if they appear.
-- SENTENCE STRUCTURE: Write complete sentences, never fragments. Start each point with the subject, e.g. "He greeted a new friend..." or "Hayden explained...", not with a bare verb like "Greeted a new friend...".
+- SENTENCE STRUCTURE: Write complete sentences, never fragments.
+  • ONE IDEA PER SENTENCE. If a sentence describes more than two actions, split it. "After initially refusing to correct his worksheet, Hayden used his regulation board to request a break and returned to a calm state to finish the task" stacks four actions; write it as two sentences instead.
+  • Put actions in the order they happened.
+  • Put a short clarification in brackets rather than interrupting the sentence with it. Write "manage transitions (i.e. changes to his expected routine)", not "manage transitions, meaning changes to his expected routine, while staying focused".
+  • Start each point with the subject, e.g. "He greeted a new friend..." or "Hayden explained...", not with a bare verb like "Greeted a new friend...".
   • When a point states something observed AND what it means, write it as TWO sentences. The first says what happened. The second says what it shows, and begins with a phrase such as "This shows...", "This reflects...", "This demonstrates...", or "This highlights...".
   • NEVER join an observation to its meaning with a dash or a hyphen, and never use the phrase "this matters because".
   • Do not stack clauses. If a sentence carries more than two commas, split it into two sentences.
@@ -5267,11 +5271,13 @@ async function monthlyGenerate() {
     const comparisonLabel = _cmpLabels.length >= 2
       ? `${_cmpLabels[0]}-${_cmpLabels[_cmpLabels.length - 1]}`
       : "the earlier months";
-    // Spelled-out version for the prose. "the past 3 months (April to June)"
-    // lands better for a parent than bare month names.
+    // Spelled-out month range, used as ONE fixed name for the baseline period.
+    // An earlier version said "the past 3 months (April to June)" everywhere,
+    // which the model then repeated in full each time and made the paragraph
+    // tiring to read. The prompt now names the period once and sticks to it.
     const _fullOf = ab => FULL_MONTHS[["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].indexOf(ab)] || ab;
     const comparisonLabelFull = _cmpLabels.length >= 2
-      ? `the past 3 months (${_fullOf(_cmpLabels[0])} to ${_fullOf(_cmpLabels[_cmpLabels.length - 1])})`
+      ? `${_fullOf(_cmpLabels[0])} to ${_fullOf(_cmpLabels[_cmpLabels.length - 1])}`
       : "the earlier months";
     const comparisonAvailable = activeTargets.some(t => {
       const avgs = (threeMonthData[t.name] || {}).avgs || [];
@@ -5312,14 +5318,27 @@ Wrong, opens with a date: "On 20 July, Hayden apologised to a peer after acciden
 
 ===COMPARISON===
 [${comparisonAvailable
-  ? `Write 2 to 3 sentences comparing where ${firstName} is now with where he or she was over ${comparisonLabelFull}. Say plainly whether things are moving forward, holding steady, or slipping, and name what specifically changed. Base it on the monthly averages and the remarks in the session data below. NO numbers and NO percentages - describe the change in words. Be honest: if it has been steady rather than improving, say so warmly but do not dress it up as progress.
+  ? `Write THREE short paragraphs, separated by a blank line.
 
-Whenever you refer to that earlier period, write it as "${comparisonLabelFull}" rather than naming the months on their own. Write "Over the past 3 months (April to June) his mood varied", never "Over April to June his mood varied". Naming the window each time makes it clear to a parent what is being compared.`
-  : `Write exactly this sentence and nothing else: "There is not enough earlier data yet to compare this month against - the next few reports will start to show the bigger picture."`}]
+TIME REFERENCES - use ONE naming system throughout so the reader never has to work out which period you mean:
+  • Call the earlier period "the ${comparisonLabelFull} period", and call it nothing else. Never "the past 3 months", never a bare month name on its own, never a mixture.
+  • Call the reported month "the most recent month". Never "this month" and never name the month.
+  • Name each period at most ONCE per paragraph. Repeating the window in every sentence is what makes this section tiring to read.
+
+Paragraph 1: how ${firstName} was over the ${comparisonLabelFull} period.
+Paragraph 2: what changed in the most recent month.
+Paragraph 3: what has not changed, or any difficulty that persists. Be honest here; if things held steady rather than improved, say so plainly.
+
+NO numbers and NO percentages anywhere - describe the change in words. One idea per sentence.`
+  : `Write exactly this sentence and nothing else: "There is not enough earlier data yet to compare this month against, and the next few reports will start to show the bigger picture."`}]
 ===END===
 
 ===FOCUS_NEXT===
-[Write 2 to 3 points naming what will be worked on next month, phrased as what is being built towards rather than as a list of problems. Each is one or two complete sentences. Vary how each one opens rather than starting every point with the same words. Base them on genuine difficulties in the data, never invent one to fill a slot.]
+[Write 2 to 3 points naming what will be worked on next month, phrased as what is being built towards rather than as a list of problems. Each is one or two complete sentences.
+
+Write them from the team's point of view, opening with "We will" and varying the verb: "We will continue building on...", "We will also support...", "We will work on helping...". Do not open every point with an identical phrase, and do not start with "Next we are working towards".
+
+Where useful, say what it builds on, e.g. "This builds on his existing ability to follow instructions." Base them on genuine difficulties in the data, never invent one to fill a slot.]
 - [focus]
 - [focus]
 ===END===
@@ -6074,7 +6093,11 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   }
 
   summaryParas.push(mkSectionHead(comparisonHeading));
-  summaryParas.push(mkBody(parsed.comparison || "\u2014"));
+  // Rendered as separate paragraphs. One dense block covering three different
+  // time frames is exactly what made this section hard to read.
+  const _cmpParas = (parsed.comparison || "").split(/\r?\n+/).map(t => t.trim()).filter(Boolean);
+  if (_cmpParas.length) _cmpParas.forEach(t => summaryParas.push(mkBody(t)));
+  else summaryParas.push(mkBody("—"));
 
   summaryParas.push(mkSectionHead("What we're working towards"));
   if ((parsed.focusNext || []).length) {
