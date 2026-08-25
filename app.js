@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1850";
+const APP_VERSION = "1851";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3146,7 +3146,7 @@ async function hyrGenerate() {
 
     const aiPrompt = `${HYR_DEFAULT_PROMPT}
 ${excludedList ? `\nEXCLUDED ACTIVITIES — ABSOLUTE RULE: The following activities have been deliberately excluded from this report by the author. They are NOT present in the session data below. Do NOT mention, reference, discuss, or draw any conclusions about them anywhere in the report — not in the executive summary, not in key insights, not in any target or observation section. Treat them as if they do not exist:\n${excludedList}\n` : ""}
-Student: ${student.name}${student.note ? ` ${student.note}` : ""}
+Student: ${student.name}
 ${student.note ? `Student Program Note: ${student.note}\n` : ""}Reporting Period: ${aiReportingPeriod}
 
 SESSION DATA:
@@ -3488,7 +3488,14 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
           const sessActId = sessAct.id || sessActKey;
           const remarks = Object.values(filteredSess.remarks || {})
             .filter(r => r.activityId === sessActId)
-            .filter(r => r.text || (r.trials || []).length > 0 || hyrStripHtml(r.masteryNote || "").trim());
+            // A multiple-choice / checkbox selection with no typed remark is still
+            // real data, so optionScore (and the legacy selectedOptions) count as
+            // content here — without them the whole activity was dropped from the
+            // report as if it had never been worked on.
+            .filter(r => r.text || (r.trials || []).length > 0
+                      || hyrStripHtml(r.masteryNote || "").trim()
+                      || r.optionScore !== undefined
+                      || (r.selectedOptions || []).length > 0);
           const _isManual = paKeyToManualScore[actName] || false;
           for (const rem of remarks) {
             const trials = (rem.trials || []).filter(t => t !== -1);
@@ -3563,7 +3570,9 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
           const [, _rm, _rd] = rem.date.split("-").map(Number);
           const _dateLabel = `${_rd} ${shortMonths[_rm - 1]}`;
           const parts = [];
-          if (rem.text) parts.push(`"${rem.text.substring(0, 200).trim()}"`);
+          // Full remark text — no truncation. A cut-off remark loses exactly the
+          // detail the report is meant to be grounded in.
+          if (rem.text) parts.push(`"${rem.text.trim()}"`);
           if (rem.avg !== null) parts.push(`[${rem.avg}%]`);
           if (parts.length > 0) lines.push(`    - ${_dateLabel}: ${parts.join(" ")}`);
         }
@@ -5163,7 +5172,7 @@ async function monthlyGenerate() {
 
     const aiPrompt = `${HYR_DEFAULT_PROMPT}
 ${excludedList ? `\nEXCLUDED ACTIVITIES — ABSOLUTE RULE: The following activities have been deliberately excluded from this report. Do NOT mention, reference, or draw conclusions about them anywhere:\n${excludedList}\n` : ""}
-Student: ${student.name}${student.note ? ` ${student.note}` : ""}
+Student: ${student.name}
 ${student.note ? `Student Program Note: ${student.note}\n` : ""}Reporting Month: ${monthName} ${year}
 Number of sessions this month: ${sessionCount}
 
@@ -5400,7 +5409,10 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
           const text = hyrStripHtml(rem.text || "");
           const _mNote = hyrStripHtml(rem.masteryNote || "").trim();
           const _mCombined = text && _mNote ? `${text} / ${_mNote}` : text || _mNote;
-          if (_mCombined || avg !== null) allRemarks.push({ date: sess.date, text: _mCombined, avg });
+          // Option selections count as content even with no typed remark — see the
+          // matching filter in hyrCollectData.
+          if (_mCombined || avg !== null || rem.optionScore !== undefined || (rem.selectedOptions || []).length > 0)
+            allRemarks.push({ date: sess.date, text: _mCombined, avg });
         }
       }
       allRemarks.sort((a,b) => a.date.localeCompare(b.date));
@@ -5412,7 +5424,8 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
         const [, _mm, _md] = rem.date.split("-").map(Number);
         const _mDateLabel = `${_md} ${ABBRS[_mm - 1]}`;
         const _mParts = [];
-        if (rem.text) _mParts.push(`"${rem.text.substring(0, 200).trim()}"`);
+        // Full remark text — see the matching note in hyrCollectData.
+        if (rem.text) _mParts.push(`"${rem.text.trim()}"`);
         if (rem.avg !== null) _mParts.push(`[${rem.avg}%]`);
         if (_mParts.length > 0) lines.push(`    - ${_mDateLabel}: ${_mParts.join(" ")}`);
       }
