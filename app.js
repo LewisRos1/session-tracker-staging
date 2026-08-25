@@ -30,6 +30,8 @@ import {
   setStudentNote,
   migrateRemarksToNote,
   stripRemarkScoringData,
+  recordAiCost,
+  getAiCostTotal,
   setStudentWordExportReady,
   setStudentExcelExportReady,
   setStudentAiH1ReportReady,
@@ -176,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1888";
+const APP_VERSION = "1889";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -2771,6 +2773,66 @@ function renderExportButtons() {
 
 // ─── HALF YEAR REPORTS ───────────────────────────────────────
 
+// ── AI report cost ────────────────────────────────────────────
+// Anthropic bills per million tokens. Sonnet 5 launched on introductory
+// pricing which ends 2026-08-31, so the rate depends on the date the report
+// was generated. UPDATE THESE if the model or the published rates change -
+// a stale rate here reports a confident wrong number, which is worse than
+// showing none. Rates: https://claude.com/pricing
+const AI_MODEL = "claude-sonnet-5";
+const AI_RATES = {
+  intro:    { until: "2026-08-31", inPerM: 2.00, outPerM: 10.00 },
+  standard: {                      inPerM: 3.00, outPerM: 15.00 }
+};
+
+/** Cost in USD for one response, from the usage block the API returns. */
+function aiCostUsd(usage) {
+  if (!usage) return 0;
+  const today = todayDateStr();
+  const r = today <= AI_RATES.intro.until ? AI_RATES.intro : AI_RATES.standard;
+  // Cache reads and writes are billed differently, but nothing here uses
+  // caching yet; counted as plain input so the figure can't silently miss spend.
+  const inTok = (usage.input_tokens || 0)
+    + (usage.cache_creation_input_tokens || 0) + (usage.cache_read_input_tokens || 0);
+  const outTok = usage.output_tokens || 0;
+  return (inTok / 1e6) * r.inPerM + (outTok / 1e6) * r.outPerM;
+}
+
+const aiMonthKey = () => todayDateStr().slice(0, 7);
+const fmtUsd = v => "$" + (v < 0.01 && v > 0 ? v.toFixed(4) : v.toFixed(2));
+
+/** Records one report's cost, then refreshes the line under the Generate button. */
+async function aiTrackCost(usage, kind) {
+  const usd = aiCostUsd(usage);
+  const inTok = (usage?.input_tokens || 0) + (usage?.cache_creation_input_tokens || 0) + (usage?.cache_read_input_tokens || 0);
+  console.log(`[AI cost] ${kind}: ${fmtUsd(usd)} (${inTok.toLocaleString()} in / ${(usage?.output_tokens || 0).toLocaleString()} out, ${AI_MODEL})`);
+  try {
+    await recordAiCost(aiMonthKey(), usd, kind);
+  } catch (err) {
+    console.error("Couldn't record AI cost:", err);   // never block the report
+  }
+  renderAiCostLine(usd, usage);
+}
+
+/** Last report's cost plus the running total for this month. */
+async function renderAiCostLine(lastUsd = null, usage = null) {
+  const el = $("hyr-cost-line");
+  if (!el) return;
+  let totalTxt = "";
+  try {
+    const { totalUsd, reportCount } = await getAiCostTotal(aiMonthKey());
+    if (reportCount > 0) {
+      const monthName = ["January","February","March","April","May","June","July","August","September","October","November","December"][Number(aiMonthKey().slice(5, 7)) - 1];
+      totalTxt = `${monthName} total: ${fmtUsd(totalUsd)} over ${reportCount} report${reportCount === 1 ? "" : "s"}`;
+    }
+  } catch (_) {}
+  const lastTxt = lastUsd === null ? "" :
+    `Last report: ${fmtUsd(lastUsd)} (${((usage?.input_tokens || 0)).toLocaleString()} in / ${(usage?.output_tokens || 0).toLocaleString()} out)`;
+  const parts = [lastTxt, totalTxt].filter(Boolean);
+  el.textContent = parts.join("  ·  ");
+  el.style.display = parts.length ? "" : "none";
+}
+
 const HYR_DEFAULT_PROMPT = `You are writing a half-year progress report for parents. Keep everything warm, honest, and easy to read.
 
 GLOBAL RULES (apply to every section):
@@ -2868,11 +2930,15 @@ function renderHalfYearReportsSection() {
         </div>
         <div id="hyr-progress-label" style="font-size:.82rem;color:var(--text-muted);margin-top:.45rem;text-align:center"></div>
       </div>
+      <div id="hyr-cost-line" style="display:none;font-size:.78rem;color:var(--text-muted);text-align:center;margin-top:.1rem"></div>
       <div id="hyr-activity-filter" class="hyr-excl-pulse" style="display:none;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:1rem 1.1rem">
         <div style="font-size:.875rem;font-weight:600;color:#374151;margin-bottom:.8rem">Select the activities you want to <span style="text-decoration:underline;font-weight:800">EXCLUDE</span> from the Appendix:</div>
         <div id="hyr-act-filter-list" style="display:flex;flex-direction:column;gap:1.1rem"></div>
       </div>
     </div>`;
+
+  // Show this month's running total straight away, before any report is made.
+  renderAiCostLine();
 
   let _hyrSessions = null;
   let _hyrIndivSessions = [];
@@ -3299,6 +3365,7 @@ RECOMMENDATIONS:
         : `Empty response from Claude (stop_reason: ${data.stop_reason || "unknown"}).`);
     }
 
+    aiTrackCost(data.usage, "halfYear");
     const parsed = hyrParseAiResponse(reportText);
 
     setProgress(100, "Done!");
@@ -5518,6 +5585,7 @@ ${(aiData[t.name] || []).join("\n")}`;
         : `Empty response from Claude (stop_reason: ${data.stop_reason || "unknown"}).`);
     }
 
+    aiTrackCost(data.usage, "monthly");
     const parsed = monthlyParseAiResponse(reportText);
     setProgress(100, "Done!");
     await new Promise(r => setTimeout(r, 400));

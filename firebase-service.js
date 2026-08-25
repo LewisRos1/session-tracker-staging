@@ -23,7 +23,8 @@ import {
   onSnapshot,
   deleteField,
   serverTimestamp,
-  writeBatch
+  writeBatch,
+  increment
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import {
   getAuth,
@@ -1582,4 +1583,29 @@ export async function clearRemark(sessionId, remId) {
     [`remarks.${remId}.text`]: "",
     [`remarks.${remId}.trials`]: []
   });
+}
+
+// ── AI report cost tracking ───────────────────────────────────
+// One document per calendar month, e.g. aiUsage/2026-08, holding a running
+// total. increment() is atomic server-side, so two people generating reports
+// at the same time can't overwrite each other's addition.
+
+/** Add one report's cost to the running total for its month. */
+export async function recordAiCost(monthKey, usd, kind) {
+  const ref = doc(db, "aiUsage", monthKey);
+  await setDoc(ref, {
+    month: monthKey,
+    totalUsd: increment(usd),
+    reportCount: increment(1),
+    [`${kind}Usd`]: increment(usd),
+    [`${kind}Count`]: increment(1),
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+}
+
+/** Running total for a month. Returns zeroes when nothing has been spent yet. */
+export async function getAiCostTotal(monthKey) {
+  const snap = await getDoc(doc(db, "aiUsage", monthKey));
+  const d = snap.exists() ? snap.data() : {};
+  return { totalUsd: d.totalUsd || 0, reportCount: d.reportCount || 0 };
 }
