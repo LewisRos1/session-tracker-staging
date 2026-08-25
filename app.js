@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1871";
+const APP_VERSION = "1872";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -5286,9 +5286,11 @@ async function monthlyGenerate() {
     });
     // Name the months in the heading rather than saying "a few months ago", so a
     // parent can see exactly what the comparison is against.
+    // The heading no longer names the months. The prose names the period itself
+    // ("the April to June period"), so putting it in both was repetition.
     const comparisonHeading = comparisonAvailable
-      ? `Compared to the past 3 months (${comparisonLabel})`
-      : "Compared to the earlier months";
+      ? "Progress over the past three months"
+      : "Progress so far";
 
     const aiPrompt = `${HYR_DEFAULT_PROMPT}
 ${excludedList ? `\nEXCLUDED ACTIVITIES — ABSOLUTE RULE: The following activities have been deliberately excluded from this report. Do NOT mention, reference, or draw conclusions about them anywhere:\n${excludedList}\n` : ""}
