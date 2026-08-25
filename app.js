@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1883";
+const APP_VERSION = "1884";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -5149,7 +5149,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
         children: [new Paragraph({ children: [new TextRun({ text: txt, bold: true, size: 22 })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })]
       });
       const mastRows = [new TableRow({ tableHeader: true, children: [
-        mkMastHdr("No.", 700), mkMastHdr("Activity", 4900), mkMastHdr("Target", 2360), mkMastHdr("Mastered On", 1400)
+        mkMastHdr("No.", 700), mkMastHdr("Target", 2360), mkMastHdr("Activity", 4900), mkMastHdr("Mastered On", 1400)
       ]})];
       const byTarget = new Map();
       for (const m of hyrMastered) {
@@ -5165,16 +5165,14 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
         // See the monthly builder: Target is a merged column, not a band.
         items.forEach((m, i) => {
           hyrMastNo++;
-          const cells = [
-            mkCell(`${hyrMastNo})`, { dxa: 700, align: AlignmentType.CENTER, size: 20 }),
-            mkCell(m.activity, { dxa: 4900 })
-          ];
+          const cells = [mkCell(`${hyrMastNo})`, { dxa: 700, align: AlignmentType.CENTER, size: 20 })];
           if (i === 0) cells.push(new TableCell({
             rowSpan: items.length, width: { size: 2360, type: WidthType.DXA },
             verticalAlign: VerticalAlign.CENTER,
             margins: { top: 100, bottom: 100, left: 150, right: 150 },
             children: [new Paragraph({ children: [new TextRun({ text: tName, size: 20 })], spacing: { before: 80, after: 80 } })]
           }));
+          cells.push(mkCell(m.activity, { dxa: 4900 }));
           cells.push(mkCell(fmtPeriodDate(m.on), { dxa: 1400, align: AlignmentType.CENTER, size: 20 }));
           mastRows.push(new TableRow({ children: cells }));
         });
@@ -6254,8 +6252,8 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     // not repeated, and numbering restarts inside each group.
     const mastRows = [new TableRow({ tableHeader: true, children: [
       mkHdrCell("No.", "", 700),
-      mkHdrCell("Activity", "", 4900),
       mkHdrCell("Target", "", 2360),
+      mkHdrCell("Activity", "", 4900),
       mkHdrCell("Mastered On", "", 1400)
     ]})];
     const byTarget = new Map();
@@ -6269,18 +6267,16 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     for (const [tName, items] of byTarget) {
       items.forEach((m, i) => {
         mastNo++;
-        const cells = [
-          mkCell(`${mastNo})`, { dxa: 700, align: AlignmentType.CENTER, size: 20 }),
-          mkCell(m.activity, { dxa: 4900 })
-        ];
+        const cells = [mkCell(`${mastNo})`, { dxa: 700, align: AlignmentType.CENTER, size: 20 })];
         // Only the first row of a group carries the Target cell; rowSpan merges
-        // it down over the rest.
+        // it down over the rest, and later rows simply omit that column.
         if (i === 0) cells.push(new TableCell({
           rowSpan: items.length, width: { size: 2360, type: WidthType.DXA },
           verticalAlign: VerticalAlign.CENTER,
           margins: { top: 100, bottom: 100, left: 150, right: 150 },
           children: [new Paragraph({ children: [new TextRun({ text: tName, size: 20 })], spacing: { before: 80, after: 80 } })]
         }));
+        cells.push(mkCell(m.activity, { dxa: 4900 }));
         cells.push(mkCell(fmtPeriodDate(m.on), { dxa: 1400, align: AlignmentType.CENTER, size: 20 }));
         mastRows.push(new TableRow({ children: cells }));
       });
