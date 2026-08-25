@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1870";
+const APP_VERSION = "1871";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -2792,7 +2792,8 @@ GLOBAL RULES (apply to every section):
   • Put actions in the order they happened.
   • Put a short clarification in brackets rather than interrupting the sentence with it. Write "manage transitions (i.e. changes to his expected routine)", not "manage transitions, meaning changes to his expected routine, while staying focused".
   • Start each point with the subject, e.g. "He greeted a new friend..." or "Hayden explained...", not with a bare verb like "Greeted a new friend...".
-  • When a point states something observed AND what it means, write it as TWO sentences. The first says what happened. The second says what it shows, and begins with a phrase such as "This shows...", "This reflects...", "This demonstrates...", or "This highlights...".
+  • When a point states something observed AND what it means, write it as TWO sentences. The first says what happened. The second says what it means.
+  • VARY how that second sentence opens. Do NOT cycle through "This shows", "This reflects", "This demonstrates", "This highlights" as a set - that reads as a template. Across a list of five points, AT MOST TWO may begin with "This". Other ways in: "indicating that...", "suggesting that...", "a sign that...", "supporting his ability to...", or simply state the significance directly with no label at all. Read your points back: if they all open the same way, rewrite them.
   • NEVER join an observation to its meaning with a dash or a hyphen, and never use the phrase "this matters because".
   • Do not stack clauses. If a sentence carries more than two commas, split it into two sentences.
 - WRITING STYLE: Write like a professional therapist's report — warm but precise. Follow these rules on every sentence:
@@ -5329,18 +5330,25 @@ TIME REFERENCES - use ONE naming system throughout so the reader never has to wo
   • Call the reported month "the most recent month". Never "this month" and never name the month.
   • Name each period at most ONCE per paragraph. Repeating the window in every sentence is what makes this section tiring to read.
 
-Paragraph 1: how ${firstName} was over the ${comparisonLabelFull} period.
-Paragraph 2: what changed in the most recent month.
-Paragraph 3: what has not changed, or any difficulty that persists. Be honest here; if things held steady rather than improved, say so plainly.
+Each paragraph does ONE job and nothing else:
+Paragraph 1 - the earlier pattern. How ${firstName} was over the ${comparisonLabelFull} period.
+Paragraph 2 - current progress. What improved in the most recent month.
+Paragraph 3 - what still needs work. Be honest; if something held steady rather than improved, say so plainly.
 
-NO numbers and NO percentages anywhere - describe the change in words. One idea per sentence.`
+Do not carry a job into the wrong paragraph. Paragraph 1 does not mention recent progress, and paragraph 2 does not raise difficulties.
+
+If performance both varied AND improved, say so explicitly rather than leaving the reader to reconcile it: "Although his scores varied from month to month, the overall direction was upward."
+
+Do NOT describe a score as simply "low" or "high" with nothing to compare it to - a parent has no way to judge that. Write "below the consistency we would expect" or "not yet consistent" instead.
+
+NO numbers and NO percentages anywhere - describe the change in words. One idea per sentence. Do not chain a whole behaviour sequence into one sentence: split the trigger and the response from what it means for communication.`
   : `Write exactly this sentence and nothing else: "There is not enough earlier data yet to compare this month against, and the next few reports will start to show the bigger picture."`}]
 ===END===
 
 ===FOCUS_NEXT===
 [Write 2 to 3 points naming what will be worked on next month, phrased as what is being built towards rather than as a list of problems. Each is one or two complete sentences.
 
-Write them from the team's point of view, opening with "We will" and varying the verb: "We will continue building on...", "We will also support...", "We will work on helping...". Do not open every point with an identical phrase, and do not start with "Next we are working towards".
+Write them from the team's point of view, but VARY how each one opens. Do NOT begin every point with "We will" - three points all starting that way reads as a template. Rotate the shape: "Continued support will be provided to...", "Focus will also be placed on...", "Support will continue in developing...", "Another area of focus is...". At most ONE point may begin with "We will". Never start with "Next we are working towards".
 
 Where useful, say what it builds on, e.g. "This builds on his existing ability to follow instructions." Base them on genuine difficulties in the data, never invent one to fill a slot.]
 - [focus]
