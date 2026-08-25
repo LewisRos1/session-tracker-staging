@@ -31,7 +31,7 @@ import {
   migrateRemarksToNote,
   stripRemarkScoringData,
   recordAiCost,
-  getAiCostTotal,
+  getAiCostAllTime,
   setStudentWordExportReady,
   setStudentExcelExportReady,
   setStudentAiH1ReportReady,
@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1893";
+const APP_VERSION = "1894";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -2825,7 +2825,7 @@ async function renderAiCostLine(lastUsd = null, usage = null) {
   if (!el) return;
   let totalTxt = "";
   try {
-    const { totalUsd, reportCount } = await getAiCostTotal(aiMonthKey());
+    const { totalUsd, reportCount } = await getAiCostAllTime();
     if (reportCount > 0) {
       totalTxt = `Total spent so far: ${fmtMyr(totalUsd)} over ${reportCount} report${reportCount === 1 ? "" : "s"}`;
     }

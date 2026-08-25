@@ -1609,3 +1609,20 @@ export async function getAiCostTotal(monthKey) {
   const d = snap.exists() ? snap.data() : {};
   return { totalUsd: d.totalUsd || 0, reportCount: d.reportCount || 0 };
 }
+
+/**
+ * All-time total, summed from the monthly documents rather than kept as its own
+ * counter. A separate all-time counter would need seeding from the months that
+ * already exist and could drift out of step with them; summing cannot. One
+ * document per month means a handful of tiny reads.
+ */
+export async function getAiCostAllTime() {
+  const snap = await getDocs(collection(db, "aiUsage"));
+  let totalUsd = 0, reportCount = 0;
+  snap.forEach(d => {
+    const v = d.data();
+    totalUsd += v.totalUsd || 0;
+    reportCount += v.reportCount || 0;
+  });
+  return { totalUsd, reportCount };
+}
