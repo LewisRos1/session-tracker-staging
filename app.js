@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1879";
+const APP_VERSION = "1880";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -2777,6 +2777,7 @@ GLOBAL RULES (apply to every section):
 - Be honest and sympathetic. Do NOT say positive things that are not supported by the data — false reassurance misleads parents and damages trust. Be kind in how you say things, not in what you choose to leave out.
 - NEVER use the em dash symbol (—) anywhere in the report. Use a comma, a full stop, or rewrite the sentence instead.
 - CRITICAL: A remark of "No Event" means the student did NOT perform or exhibit that behaviour or activity in that session. For negative/problem behaviours (e.g. snatching food, hitting, interrupting), "No Event" is a POSITIVE outcome — the bad behaviour simply did not occur. For skill or learning activities, "No Event" means the skill was not observed or demonstrated that session — treat it as neutral, not a failure. Do NOT treat "No Event" negatively in either case.
+- CRITICAL: CHECK EVERY STATUS DATE AGAINST THE REPORTING PERIOD. Each activity carries its dates, e.g. "[started 25 Feb 2026, mastered on 20 Aug 2026]". An activity counts as mastered, discontinued or maintained IN THIS REPORT only if that date falls INSIDE the reporting period named above. If the date is after the period ends, the student was still working on that activity throughout this period: describe it that way, and NEVER write that it was mastered, completed, or finished this term. If the date is before the period starts, it was already mastered before this period began and is not an achievement of this term either. Read the date, compare it to the reporting period, and only then decide how to describe it.
 - PROGRAM STATUS — these four words have fixed meanings in this service. They appear as an activity status and sometimes as the remark text itself. Use these meanings exactly; never infer a meaning from the word alone:
   • In Progress (also written "IP"): the program is not currently implemented in this session due to scheduling priorities assigned to other active programs. It says NOTHING about the student's ability or progress. Do NOT comment on it, do NOT treat it as a missed attempt, and do NOT use it as evidence of difficulty or strength. Ignore these entries entirely when forming your observations. An activity with NO remark AND NO score means the same thing and is ignored the same way.
   • Acquisition: the program is currently being taught to the learner.
