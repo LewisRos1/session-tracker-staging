@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1882";
+const APP_VERSION = "1883";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -5149,7 +5149,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
         children: [new Paragraph({ children: [new TextRun({ text: txt, bold: true, size: 22 })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })]
       });
       const mastRows = [new TableRow({ tableHeader: true, children: [
-        mkMastHdr("No.", 800), mkMastHdr("Activity", 7160), mkMastHdr("Mastered On", 1400)
+        mkMastHdr("No.", 700), mkMastHdr("Activity", 4900), mkMastHdr("Target", 2360), mkMastHdr("Mastered On", 1400)
       ]})];
       const byTarget = new Map();
       for (const m of hyrMastered) {
@@ -5157,19 +5157,27 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
         byTarget.get(m.target).push(m);
       }
       // Target order follows the website, the same as Section 2 and the charts.
+      // Continuous numbering down the whole table - see the monthly builder.
+      let hyrMastNo = 0;
       const _ord = a => (_wordTargetPos[a] ?? 999);
       for (const tName of [...byTarget.keys()].sort((a, b) => _ord(a) - _ord(b))) {
         const items = byTarget.get(tName).sort((a, b) => a.on.localeCompare(b.on));
-        mastRows.push(new TableRow({ children: [new TableCell({
-          columnSpan: 3, width: { size: 9360, type: WidthType.DXA },
-          margins: { top: 90, bottom: 90, left: 150, right: 150 }, shading: { fill: "eff6ff" },
-          children: [new Paragraph({ children: [new TextRun({ text: tName, bold: true, size: 21, color: "1e40af" })], spacing: { before: 40, after: 40 } })]
-        })]}));
-        items.forEach((m, i) => mastRows.push(new TableRow({ children: [
-          mkCell(`${i + 1})`, { dxa: 800, align: AlignmentType.CENTER, size: 20 }),
-          mkCell(m.activity, { dxa: 7160 }),
-          mkCell(fmtPeriodDate(m.on), { dxa: 1400, align: AlignmentType.CENTER, size: 20 })
-        ]})));
+        // See the monthly builder: Target is a merged column, not a band.
+        items.forEach((m, i) => {
+          hyrMastNo++;
+          const cells = [
+            mkCell(`${hyrMastNo})`, { dxa: 700, align: AlignmentType.CENTER, size: 20 }),
+            mkCell(m.activity, { dxa: 4900 })
+          ];
+          if (i === 0) cells.push(new TableCell({
+            rowSpan: items.length, width: { size: 2360, type: WidthType.DXA },
+            verticalAlign: VerticalAlign.CENTER,
+            margins: { top: 100, bottom: 100, left: 150, right: 150 },
+            children: [new Paragraph({ children: [new TextRun({ text: tName, size: 20 })], spacing: { before: 80, after: 80 } })]
+          }));
+          cells.push(mkCell(fmtPeriodDate(m.on), { dxa: 1400, align: AlignmentType.CENTER, size: 20 }));
+          mastRows.push(new TableRow({ children: cells }));
+        });
       }
       appendixParas.push(new Table({ width: { size: 9360, type: WidthType.DXA }, rows: mastRows }));
     } else {
@@ -6240,9 +6248,14 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     // Grouped by target, with the target as a tinted band spanning the row, so a
     // target name isn't repeated down a column. Numbering restarts inside each
     // band, matching how the app lists mastered activities per target.
+    // Target is a labelled column rather than a tinted band. A band showed the
+    // grouping but never said what the grouping WAS, so a parent had no way to
+    // know those were targets. The cell is merged down its group so the name is
+    // not repeated, and numbering restarts inside each group.
     const mastRows = [new TableRow({ tableHeader: true, children: [
-      mkHdrCell("No.", "", 800),
-      mkHdrCell("Activity", "", 7160),
+      mkHdrCell("No.", "", 700),
+      mkHdrCell("Activity", "", 4900),
+      mkHdrCell("Target", "", 2360),
       mkHdrCell("Mastered On", "", 1400)
     ]})];
     const byTarget = new Map();
@@ -6250,18 +6263,27 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
       if (!byTarget.has(m.target)) byTarget.set(m.target, []);
       byTarget.get(m.target).push(m);
     }
+    // Numbering runs straight down the table rather than restarting per target,
+    // so the last number is the total mastered this month.
+    let mastNo = 0;
     for (const [tName, items] of byTarget) {
-      mastRows.push(new TableRow({ children: [new TableCell({
-        columnSpan: 3, width: { size: 9360, type: WidthType.DXA },
-        margins: { top: 90, bottom: 90, left: 150, right: 150 },
-        shading: { fill: "eff6ff" },
-        children: [new Paragraph({ children: [new TextRun({ text: tName, bold: true, size: 21, color: "1e40af" })], spacing: { before: 40, after: 40 } })]
-      })]}));
-      items.forEach((m, i) => mastRows.push(new TableRow({ children: [
-        mkCell(`${i + 1})`, { dxa: 800, align: AlignmentType.CENTER, size: 20 }),
-        mkCell(m.activity, { dxa: 7160 }),
-        mkCell(fmtPeriodDate(m.on), { dxa: 1400, align: AlignmentType.CENTER, size: 20 })
-      ]})));
+      items.forEach((m, i) => {
+        mastNo++;
+        const cells = [
+          mkCell(`${mastNo})`, { dxa: 700, align: AlignmentType.CENTER, size: 20 }),
+          mkCell(m.activity, { dxa: 4900 })
+        ];
+        // Only the first row of a group carries the Target cell; rowSpan merges
+        // it down over the rest.
+        if (i === 0) cells.push(new TableCell({
+          rowSpan: items.length, width: { size: 2360, type: WidthType.DXA },
+          verticalAlign: VerticalAlign.CENTER,
+          margins: { top: 100, bottom: 100, left: 150, right: 150 },
+          children: [new Paragraph({ children: [new TextRun({ text: tName, size: 20 })], spacing: { before: 80, after: 80 } })]
+        }));
+        cells.push(mkCell(fmtPeriodDate(m.on), { dxa: 1400, align: AlignmentType.CENTER, size: 20 }));
+        mastRows.push(new TableRow({ children: cells }));
+      });
     }
     summaryParas.push(new Table({ width: { size: 9360, type: WidthType.DXA }, rows: mastRows }));
   } else {
