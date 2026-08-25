@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1899";
+const APP_VERSION = "1900";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6372,6 +6372,14 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   // a parent reads, not back matter. They flow on from the prose rather than
   // starting a forced new page.
   summaryParas.push(mkSectionHead(`Score Summary (${monthName} ${year})`));
+  // A parent seeing a bar chart for the first time has no way to know which
+  // direction is good. Scoring is already inverted for problem behaviours, so
+  // "higher is better" holds for every target and is safe to state plainly.
+  summaryParas.push(mkPara(
+    `Each bar shows the average score for one target this month, out of 100%. `
+    + `A higher bar means ${firstName} met the goal more often, so 100% means the goal `
+    + `was reached every time it was tried.`,
+    { align: AlignmentType.BOTH, after: 140 }));
 
   scoreRows.sort((a, b) => b.score - a.score);
   const barChart = scoreRows.length ? monthlyDrawScoreBarChart(scoreRows) : null;
@@ -6393,7 +6401,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
         text: `Some targets, such as ${qualitativeNames.length > 1
           ? qualitativeNames.slice(0, -1).join(", ") + " and " + qualitativeNames[qualitativeNames.length - 1]
           : qualitativeNames[0]}, are tracked through observations rather than scores, so they are not displayed in the chart.`,
-        size: 18, color: "6b7280", italics: true })],
+        size: 22, color: "6b7280", italics: true })],
       alignment: AlignmentType.BOTH, spacing: { before: 100, after: 0 }
     }));
   }
