@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1852";
+const APP_VERSION = "1853";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3169,7 +3169,12 @@ ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [O
 ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One or two sentences — a seventh and final improvement grounded in a specific example or remark from sessions.]
 ===END===
 
-${targetsWithData.map(r => `===OBSERVATION: ${r.name}===
+${targetsWithData.length === 0 ? "" : `===OBSERVATION SECTIONS — write ONE block for EACH target listed below===
+Produce one block per target, in this exact order, using these exact markers:
+
+${targetsWithData.map(r => `===OBSERVATION: ${r.name}===\n[your bullets]\n===END===`).join("\n")}
+
+The rules below apply to EVERY one of those blocks:
 Write 2 to 3 bullets for ${firstName}'s parents about this target. Format each bullet with a bold label followed by plain (not bold) content. Use these labels:
 • **Strengths:** One specific thing ${firstName} is doing well — a real skill or behaviour they show in sessions.
 • **Weaknesses:** ONLY write a weakness if the session data below directly shows a genuine difficulty — a struggling remark, a behaviour that caused problems, or consistently low performance. If the data does not show a clear weakness, write exactly: "No notable areas of difficulty observed this term." NEVER invent or guess — if it is not in the session data, it does not exist.
@@ -3183,16 +3188,19 @@ STRICT RULES — follow every one:
 - Do NOT summarise what the graph already shows. Add insight the graph cannot.
 - Warm and supportive, but completely honest. Never sugarcoat, but never sound cold.
 - ABSOLUTE: For Weaknesses, only name difficulties that are directly evidenced by remarks or low scores in the data provided. If an activity has no data at all, it does not appear here — do not invent it as a weakness. Never extrapolate from one skill to another — if data shows "identifies face", write about face identification only, not about name recognition or any other skill not in the data. If there are no genuine weaknesses to report, write that there are no notable areas of difficulty observed this term.
-- ABSOLUTE: For Strengths, only name things the student was directly observed doing in sessions. Do not infer or generalise — if the student identified one person's face, do not write that they "know their family members" or "understand names". Use only what the remarks literally say.
-===END===`).join("\n\n")}
+- ABSOLUTE: For Strengths, only name things the student was directly observed doing in sessions. Do not infer or generalise — if the student identified one person's face, do not write that they "know their family members" or "understand names". Use only what the remarks literally say.`}
 
-${qualitativeWithData.map(r => `===OBSERVED: ${r.name}===
-Write 2 to 3 bullets about ${r.name} based on what was observed in sessions and any notes or remarks recorded.
+${qualitativeWithData.length === 0 ? "" : `===OBSERVED SECTIONS — write ONE block for EACH area listed below===
+Produce one block per area, in this exact order, using these exact markers:
+
+${qualitativeWithData.map(r => `===OBSERVED: ${r.name}===\n[your bullets]\n===END===`).join("\n")}
+
+The rules below apply to EVERY one of those blocks:
+Write 2 to 3 bullets about the named area based on what was observed in sessions and any notes or remarks recorded.
 • **Strengths:** Something positive noticed about this skill area — a real behaviour, moment, or improvement.
 • **Weaknesses:** Something still developing or difficult — explained kindly with a specific example if possible.
 
-Same rules: plain English, no jargon, no numbers, warm tone. Labels in ** bold. Write exactly 2 bullets — Strengths and Weaknesses only. Do NOT add a Note bullet.
-===END===`).join("\n\n")}
+Same rules: plain English, no jargon, no numbers, warm tone. Labels in ** bold. Write exactly 2 bullets — Strengths and Weaknesses only. Do NOT add a Note bullet.`}
 
 ===ACTION_PLAN===
 Review the full session picture for ${firstName} across all targets and all remarks this term. Identify the most important areas to work on and the most helpful strategies.
@@ -3213,6 +3221,10 @@ RECOMMENDATIONS:
 ===END===`;
 
     // Start fetch immediately — fake phases will play while it runs in background
+    // Prompt size, so we can see what we are actually sending before deciding
+    // what to trim. ~4 chars per token is a rough but serviceable estimate.
+    console.log(`[AI half-year prompt] ${aiPrompt.length.toLocaleString()} chars `
+      + `(~${Math.round(aiPrompt.length / 4).toLocaleString()} tokens) — ${student.name}, ${aiReportingPeriod}`);
     _hyrAbortController = new AbortController();
     const fetchPromise = fetch("https://session-tracker-ai.wang-loys22.workers.dev", {
       method: "POST",
@@ -3589,9 +3601,21 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
         }
         lines.push(`    Monthly: ${_actMonthly.join(", ")}`);
 
-        for (const rem of allRemarks) {
-          const [, _rm, _rd] = rem.date.split("-").map(Number);
-          const _dateLabel = `${_rd} ${shortMonths[_rm - 1]}`;
+        // Runs of consecutive sessions with an identical remark share one line, with
+        // every date listed. Maintained activities auto-fill "Maintain" every week,
+        // so this collapses a lot of repetition without losing a single date. It
+        // stays CONSECUTIVE-only so the lines remain in chronological order — a run
+        // that is interrupted by a different remark splits into two runs, and the
+        // interesting remark keeps its own line where it happened.
+        const _sig = r => `${r.text || ""}|${r.avg === null ? "" : r.avg}|${(r.trials || []).join(",")}`;
+        for (let i = 0; i < allRemarks.length; ) {
+          const rem = allRemarks[i];
+          let j = i + 1;
+          while (j < allRemarks.length && _sig(allRemarks[j]) === _sig(rem)) j++;
+          const dateLabels = allRemarks.slice(i, j).map(r2 => {
+            const [, _m2, _d2] = r2.date.split("-").map(Number);
+            return `${_d2} ${shortMonths[_m2 - 1]}`;
+          });
           const parts = [];
           // Full remark text — no truncation. A cut-off remark loses exactly the
           // detail the report is meant to be grounded in.
@@ -3599,7 +3623,8 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
           if (rem.avg !== null) parts.push(`[${rem.avg}%]`);
           // Raw trials: 1,3,2 and 2,2,2 average the same but mean different things.
           if (rem.trials && rem.trials.length) parts.push(`trials ${rem.trials.join(", ")}`);
-          if (parts.length > 0) lines.push(`    - ${_dateLabel}: ${parts.join(" ")}`);
+          if (parts.length > 0) lines.push(`    - ${dateLabels.join(", ")}: ${parts.join(" ")}`);
+          i = j;
         }
       }
     }
@@ -5226,6 +5251,8 @@ ${isFocus ? `===FOCUS: ${t.name}===
 ===END===` : ""}`;
 }).join("\n\n")}`;
 
+    console.log(`[AI monthly prompt] ${aiPrompt.length.toLocaleString()} chars `
+      + `(~${Math.round(aiPrompt.length / 4).toLocaleString()} tokens) — ${student.name}, ${monthName} ${year}`);
     _hyrAbortController = new AbortController();
     const fetchPromise = fetch("https://session-tracker-ai.wang-loys22.workers.dev", {
       method: "POST",
@@ -5484,15 +5511,23 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
       }
       lines.push(`    Monthly: ${_mWindow.join(", ")}`);
 
-      for (const rem of allRemarks) {
-        const [, _mm, _md] = rem.date.split("-").map(Number);
-        const _mDateLabel = `${_md} ${ABBRS[_mm - 1]}`;
+      // Consecutive identical remarks share a line — see the note in hyrCollectData.
+      const _mSig = r => `${r.text || ""}|${r.avg === null ? "" : r.avg}|${(r.trials || []).join(",")}`;
+      for (let i = 0; i < allRemarks.length; ) {
+        const rem = allRemarks[i];
+        let j = i + 1;
+        while (j < allRemarks.length && _mSig(allRemarks[j]) === _mSig(rem)) j++;
+        const _mDateLabel = allRemarks.slice(i, j).map(r2 => {
+          const [, _m2, _d2] = r2.date.split("-").map(Number);
+          return `${_d2} ${ABBRS[_m2 - 1]}`;
+        }).join(", ");
         const _mParts = [];
         // Full remark text — see the matching note in hyrCollectData.
         if (rem.text) _mParts.push(`"${rem.text.trim()}"`);
         if (rem.avg !== null) _mParts.push(`[${rem.avg}%]`);
         if (rem.trials && rem.trials.length) _mParts.push(`trials ${rem.trials.join(", ")}`);
         if (_mParts.length > 0) lines.push(`    - ${_mDateLabel}: ${_mParts.join(" ")}`);
+        i = j;
       }
     }
     // Per-target comment boxes
