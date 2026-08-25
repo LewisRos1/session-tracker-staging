@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1878";
+const APP_VERSION = "1879";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3172,8 +3172,8 @@ Write exactly 5 sentences summing up ${firstName}'s overall progress this term i
 ===END===
 
 ===KEY_INSIGHTS===
-Based on all session data and observations, write EXACTLY 7 Key Improvement rows — no more, no fewer. Each row must include a specific observed detail, example, or moment drawn directly from the session remarks — not a general description. Use the student's name or a pronoun naturally; you may alternate.
-ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One or two sentences — name the specific improvement AND include a concrete detail, quote, or example from the session remarks that shows it. Must be real, not filler.]
+Based on all session data and observations, write EXACTLY 7 Key Improvement rows — no more, no fewer. NEVER quote a session remark word for word and NEVER use quotation marks around anything taken from the data. Rewrite what was recorded in your own words as a normal sentence. Write "he wrote the numbers 1 to 100 without a mistake", not: he wrote numbers 1 to 100 "in one shot without mistakes". A parent should not be able to tell which words came from the therapist's notes. Do NOT quote a date either. Each row must include a specific observed detail, example, or moment drawn directly from the session remarks — not a general description. Use the student's name or a pronoun naturally; you may alternate.
+ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One or two sentences — name the specific improvement AND include a concrete detail or example from the session remarks that shows it. Must be real, not filler.]
 ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One or two sentences — a second genuine improvement from a different area, grounded in a specific observed moment or example.]
 ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One or two sentences — a third improvement with a real detail from the remarks. Only real progress — do not invent.]
 ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One or two sentences — a fourth data-backed improvement with a specific example or observed behaviour.]
@@ -3182,41 +3182,34 @@ ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [O
 ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One or two sentences — a seventh and final improvement grounded in a specific example or remark from sessions.]
 ===END===
 
-${targetsWithData.length === 0 ? "" : `===OBSERVATION SECTIONS — write ONE block for EACH target listed below===
-Produce one block per target, in this exact order, using these exact markers:
+${targetsWithData.map(r => `===OBSERVATION: ${r.name}===
+Strength: [Two sentences naming one specific thing ${firstName} does well in this target. Say what was actually observed in sessions, not a general compliment.]
+Weakness: [Two sentences naming a genuine difficulty in this target. ONLY write one if the session data directly shows it - a struggling remark, a behaviour that caused problems, or consistently low performance. If the data shows no clear weakness, write exactly: No notable areas of difficulty observed this term. NEVER invent or guess.]
+===END===`).join("\n\n")}
 
-${targetsWithData.map(r => `===OBSERVATION: ${r.name}===\n[your bullets]\n===END===`).join("\n")}
+FORMAT FOR EVERY OBSERVATION BLOCK: exactly two lines, one starting "Strength:" and one starting "Weakness:". No bullet points, no asterisks, no extra lines, no "Note:" line.
 
-The rules below apply to EVERY one of those blocks:
-Write 2 to 3 bullets for ${firstName}'s parents about this target. Format each bullet with a bold label followed by plain (not bold) content. Use these labels:
-• **Strengths:** One specific thing ${firstName} is doing well — a real skill or behaviour they show in sessions.
-• **Weaknesses:** ONLY write a weakness if the session data below directly shows a genuine difficulty — a struggling remark, a behaviour that caused problems, or consistently low performance. If the data does not show a clear weakness, write exactly: "No notable areas of difficulty observed this term." NEVER invent or guess — if it is not in the session data, it does not exist.
-
-IMPORTANT: The label MUST be wrapped in ** for bold (e.g. **Strengths:** **Weaknesses:**). The content after the colon is NOT bold. Write exactly 2 bullets per target — Strengths and Weaknesses only. Do NOT add a Note bullet.
-
-STRICT RULES — follow every one:
+RULES FOR EVERY OBSERVATION BLOCK:
+- Exactly two sentences after each label. Pick the two MOST important things; do not list everything.
 - NO numbers, percentages, or month references. Parents see those in the graph.
-- Plain English, Grade 6–8 reading level. No clinical jargon.
-- Do NOT say things like "modalities", "regulatory capacity", "situational influences", "low-demand contexts". Use real words instead — "free play", "good days and bad days", "room noise".
+- Plain English, Grade 6-8 reading level. No clinical jargon.
+- Do NOT say things like "modalities", "regulatory capacity", "situational influences", "low-demand contexts". Use real words instead: "free play", "good days and bad days", "room noise".
 - Do NOT summarise what the graph already shows. Add insight the graph cannot.
 - Warm and supportive, but completely honest. Never sugarcoat, but never sound cold.
-- ABSOLUTE: For Weaknesses, only name difficulties that are directly evidenced by remarks or low scores in the data provided. If an activity has no data at all, it does not appear here — do not invent it as a weakness. Never extrapolate from one skill to another — if data shows "identifies face", write about face identification only, not about name recognition or any other skill not in the data. If there are no genuine weaknesses to report, write that there are no notable areas of difficulty observed this term.
-- ABSOLUTE: For Strengths, only name things the student was directly observed doing in sessions. Do not infer or generalise — if the student identified one person's face, do not write that they "know their family members" or "understand names". Use only what the remarks literally say.`}
+- ABSOLUTE: For Weakness, only name difficulties directly evidenced by remarks or low scores in the data provided. If an activity has no data at all, it does not appear here. Never extrapolate from one skill to another: if the data shows "identifies face", write about face identification only, not about name recognition or any other skill not in the data.
+- ABSOLUTE: For Strength, only name things the student was directly observed doing in sessions. Do not infer or generalise: if the student identified one person's face, do not write that they "know their family members" or "understand names". Use only what the remarks literally say.
 
-${qualitativeWithData.length === 0 ? "" : `===OBSERVED SECTIONS — write ONE block for EACH area listed below===
-Produce one block per area, in this exact order, using these exact markers:
+${qualitativeWithData.map(r => `===OBSERVED: ${r.name}===
+Strength: [Two sentences about something positive noticed in this skill area - a real behaviour, moment or improvement.]
+Weakness: [Two sentences about something still developing or difficult, explained kindly with a specific example if the data provides one.]
+===END===`).join("\n\n")}
 
-${qualitativeWithData.map(r => `===OBSERVED: ${r.name}===\n[your bullets]\n===END===`).join("\n")}
-
-The rules below apply to EVERY one of those blocks:
-Write 2 to 3 bullets about the named area based on what was observed in sessions and any notes or remarks recorded.
-• **Strengths:** Something positive noticed about this skill area — a real behaviour, moment, or improvement.
-• **Weaknesses:** Something still developing or difficult — explained kindly with a specific example if possible.
-
-Same rules: plain English, no jargon, no numbers, warm tone. Labels in ** bold. Write exactly 2 bullets — Strengths and Weaknesses only. Do NOT add a Note bullet.`}
+The OBSERVED blocks follow exactly the same format and the same rules as the OBSERVATION blocks above.
 
 ===ACTION_PLAN===
 Review the full session picture for ${firstName} across all targets and all remarks this term. Identify the most important areas to work on and the most helpful strategies.
+
+ORDER BOTH LISTS BY IMPORTANCE, most important first. The first point in each list must be the single thing that matters most for ${firstName} right now, judged by how often it appears in the data, how much it affects the rest of his or her learning, and how far it is from where it should be. Do not order them by target, alphabetically, or by the order the targets appear in the data. If something is only a minor issue, leave it out rather than padding the list to reach five.
 
 Write EXACTLY 5 to 7 FOCUS AREAS — you MUST write at least 5, no fewer. Each uses this format: [2-4 word label]: [one concise sentence naming the specific difficulty or gap observed.] Do not group by target name — write each point as a standalone observation.
 
@@ -4580,12 +4573,15 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   const SECTION_H3 = `font-size:1.1rem;font-weight:700;color:#1f2937;margin:1.5rem 0 .4rem`;
 
   const obsHtml = (obs) => (obs || "").split("\n").map(line => {
-    const t = line.trim();
-    if (!t.startsWith("•")) return "";
-    const content = t.slice(1).trim();
-    if (/^\*\*Note:/i.test(content)) return "";   // suppress Note bullets
-    const html = esc("• " + content).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-    return `<p style="margin:.3rem 0 .3rem 1.4rem;line-height:1.6;text-indent:-1rem">${html}</p>`;
+    let t = line.trim();
+    if (!t) return "";
+    t = t.replace(/^•\s*/, "").replace(/\*\*/g, "").trim();
+    if (/^Note:/i.test(t)) return "";
+    const ci = t.indexOf(":");
+    const html = ci > 0
+      ? `<strong>${esc(t.slice(0, ci + 1))}</strong> ${esc(t.slice(ci + 1).trim())}`
+      : esc(t);
+    return `<p style="margin:.35rem 0;line-height:1.6">${html}</p>`;
   }).join("");
 
   // Global enrollment month: earliest index where any target has data
@@ -4842,6 +4838,26 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     return 0;
   })();
 
+  // "Strength:" / "Weakness:" on their own lines with the label in bold, rather
+  // than bullets. Older responses used the bulleted "**Strengths:**" shape, so
+  // that is still accepted and normalised.
+  function obsParas(text) {
+    const out = [];
+    (text || "").split("\n").forEach(line => {
+      let t = line.trim();
+      if (!t) return;
+      t = t.replace(/^•\s*/, "").replace(/\*\*/g, "").trim();
+      if (/^Note:/i.test(t)) return;
+      const ci = t.indexOf(":");
+      const runs = ci > 0
+        ? [new TextRun({ text: t.slice(0, ci + 1), bold: true, size: 22 }),
+           new TextRun({ text: " " + t.slice(ci + 1).trim(), size: 22 })]
+        : [new TextRun({ text: t, size: 22 })];
+      out.push(new Paragraph({ children: runs, alignment: AlignmentType.BOTH, spacing: { before: 40, after: 80, ...LS } }));
+    });
+    return out;
+  }
+
   function targetSectionParas(rows, obsKey = "observations") {
     const paras = [];
     rows.forEach((r, i) => {
@@ -4860,13 +4876,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
         children: [new ImageRun({ data: b64ToUint8(lb64), transformation: { width: 540, height: 280 }, type: "png" })],
         alignment: AlignmentType.CENTER, spacing: { after: 100 }
       }));
-      (parsed[obsKey]?.[r.name] || "").split("\n").forEach(line => {
-        const t = line.trim();
-        if (!t.startsWith("•")) return;
-        const content = t.slice(1).trim();
-        if (/^\*\*Note:/i.test(content)) return;   // suppress Note bullets
-        paras.push(bulletPara(content));
-      });
+      paras.push(...obsParas(parsed[obsKey]?.[r.name]));
     });
     return paras;
   }
@@ -5066,10 +5076,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
       paragraphs.push(new Paragraph({ children: [new TextRun({ text: `${offset + i + 1}) ${r.name} ${qualLabel}`, bold: true, size: 24 })], spacing: { before: 0, after: 80, ...LS } }));
       const obs = parsed.observed?.[r.name];
       if (obs) {
-        obs.split("\n").forEach(line => {
-          const t = line.trim();
-          if (t.startsWith("•")) paragraphs.push(bulletPara(t.slice(1).trim()));
-        });
+        paragraphs.push(...obsParas(obs));
       } else {
         paragraphs.push(mkPara(`Tracked via session notes — no percentage scores recorded this period.`, { italics: true, color: "9CA3AF" }));
       }
@@ -5107,15 +5114,72 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   }
 
   // ── Section: Appendix (portrait) ───────────────────────────
+  // Everything mastered in the reporting period, read straight from masteredOn
+  // and stated as fact. The model never writes this, so a mastery cannot be
+  // invented, missed, or attributed to the wrong target.
+  const _hyrRange = period === "H1" ? ["01", "06"] : ["07", "12"];
+  const hyrMastered = [];
+  for (const t of activeTargets) {
+    for (const pa of (t.predefinedActivities || [])) {
+      if (pa.isHeading || pa.isMaintainHeading || pa.isNote || pa.isExportNote) continue;
+      if (!pa.masteredOn) continue;
+      const [my, mm] = String(pa.masteredOn).split("-");
+      if (Number(my) !== year || mm < _hyrRange[0] || mm > _hyrRange[1]) continue;
+      const label = pa.title || pa.name;
+      if (label) hyrMastered.push({ activity: label, target: t.name, on: pa.masteredOn });
+    }
+  }
+
   const appendixParas = [];
   const appendixTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped && breakdownData[t.name]?.length);
-  if (appendixTargets.length) {
+  if (appendixTargets.length || hyrMastered.length) {
     appendixParas.push(mkPara(`Section ${nextSectionNum + 1}: Appendix`, { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
-    appendixParas.push(mkPara("Activity Breakdown Charts", { heading: HeadingLevel.HEADING_2, before: 0, after: 80, size: 26, bold: true }));
+
+    // Mastered list first, then the breakdown charts.
+    appendixParas.push(mkPara("Activities Mastered This Period", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true }));
+    if (hyrMastered.length) {
+      const mkMastHdr = (txt, dxa) => new TableCell({
+        width: { size: dxa, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER,
+        margins: { top: 100, bottom: 100, left: 150, right: 150 }, shading: { fill: "f3f4f6" },
+        children: [new Paragraph({ children: [new TextRun({ text: txt, bold: true, size: 22 })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })]
+      });
+      const mastRows = [new TableRow({ tableHeader: true, children: [
+        mkMastHdr("No.", 800), mkMastHdr("Activity", 7160), mkMastHdr("Mastered On", 1400)
+      ]})];
+      const byTarget = new Map();
+      for (const m of hyrMastered) {
+        if (!byTarget.has(m.target)) byTarget.set(m.target, []);
+        byTarget.get(m.target).push(m);
+      }
+      // Target order follows the website, the same as Section 2 and the charts.
+      const _ord = a => (_wordTargetPos[a] ?? 999);
+      for (const tName of [...byTarget.keys()].sort((a, b) => _ord(a) - _ord(b))) {
+        const items = byTarget.get(tName).sort((a, b) => a.on.localeCompare(b.on));
+        mastRows.push(new TableRow({ children: [new TableCell({
+          columnSpan: 3, width: { size: 9360, type: WidthType.DXA },
+          margins: { top: 90, bottom: 90, left: 150, right: 150 }, shading: { fill: "eff6ff" },
+          children: [new Paragraph({ children: [new TextRun({ text: tName, bold: true, size: 21, color: "1e40af" })], spacing: { before: 40, after: 40 } })]
+        })]}));
+        items.forEach((m, i) => mastRows.push(new TableRow({ children: [
+          mkCell(`${i + 1})`, { dxa: 800, align: AlignmentType.CENTER, size: 20 }),
+          mkCell(m.activity, { dxa: 7160 }),
+          mkCell(fmtPeriodDate(m.on), { dxa: 1400, align: AlignmentType.CENTER, size: 20 })
+        ]})));
+      }
+      appendixParas.push(new Table({ width: { size: 9360, type: WidthType.DXA }, rows: mastRows }));
+    } else {
+      appendixParas.push(mkPara("No activities were mastered during this period.", { italics: true, color: "6b7280", after: 120 }));
+    }
+  }
+  if (appendixTargets.length) {
+    appendixParas.push(mkPara("Activity Breakdown Charts", { heading: HeadingLevel.HEADING_2, before: 400, after: 80, size: 26, bold: true, pageBreak: true }));
     const rangeLabel = `${firstMonthName.slice(0, 3)} - ${halfEndName.slice(0, 3)} ${year}`;
     const sec2NumberMap = new Map();
-    chartTrendRows.forEach((r, i) => sec2NumberMap.set(r.name, i + 1));
-    categorized.qualitative.forEach((r, i) => sec2NumberMap.set(r.name, chartTrendRows.length + i + 1));
+    // Numbered and ordered exactly as Section 2 is, which follows the target
+    // order set on the website. chartTrendRows is sorted by score change, so
+    // using it here made the appendix run in a different order to Section 2.
+    sectionTrendRows.forEach((r, i) => sec2NumberMap.set(r.name, i + 1));
+    categorized.qualitative.forEach((r, i) => sec2NumberMap.set(r.name, sectionTrendRows.length + i + 1));
     appendixTargets.sort((a, b) => (sec2NumberMap.get(a.name) ?? 999) - (sec2NumberMap.get(b.name) ?? 999));
     let firstChart = true;
     for (const target of appendixTargets) {
