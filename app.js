@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1892";
+const APP_VERSION = "1893";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -2799,13 +2799,18 @@ function aiCostUsd(usage) {
 }
 
 const aiMonthKey = () => todayDateStr().slice(0, 7);
-const fmtUsd = v => "$" + (v < 0.01 && v > 0 ? v.toFixed(4) : v.toFixed(2));
+// Anthropic bills in USD; this is shown in ringgit for convenience. The rate is
+// a fixed figure and WILL drift - update it here when it matters. It affects
+// display only, never what is stored, so correcting it re-labels past totals
+// correctly too.
+const USD_TO_MYR = 4.50;
+const fmtMyr = v => "MYR " + (v * USD_TO_MYR).toFixed(2);
 
 /** Records one report's cost, then refreshes the line under the Generate button. */
 async function aiTrackCost(usage, kind) {
   const usd = aiCostUsd(usage);
   const inTok = (usage?.input_tokens || 0) + (usage?.cache_creation_input_tokens || 0) + (usage?.cache_read_input_tokens || 0);
-  console.log(`[AI cost] ${kind}: ${fmtUsd(usd)} (${inTok.toLocaleString()} in / ${(usage?.output_tokens || 0).toLocaleString()} out, ${AI_MODEL})`);
+  console.log(`[AI cost] ${kind}: $${usd.toFixed(4)} USD = ${fmtMyr(usd)} (${inTok.toLocaleString()} in / ${(usage?.output_tokens || 0).toLocaleString()} out, ${AI_MODEL})`);
   try {
     await recordAiCost(aiMonthKey(), usd, kind);
   } catch (err) {
@@ -2822,14 +2827,12 @@ async function renderAiCostLine(lastUsd = null, usage = null) {
   try {
     const { totalUsd, reportCount } = await getAiCostTotal(aiMonthKey());
     if (reportCount > 0) {
-      const monthName = ["January","February","March","April","May","June","July","August","September","October","November","December"][Number(aiMonthKey().slice(5, 7)) - 1];
-      totalTxt = `${monthName} total: ${fmtUsd(totalUsd)} over ${reportCount} report${reportCount === 1 ? "" : "s"}`;
+      totalTxt = `Total spent so far: ${fmtMyr(totalUsd)} over ${reportCount} report${reportCount === 1 ? "" : "s"}`;
     }
   } catch (_) {}
-  const lastTxt = lastUsd === null ? "" :
-    `Last report: ${fmtUsd(lastUsd)} (${((usage?.input_tokens || 0)).toLocaleString()} in / ${(usage?.output_tokens || 0).toLocaleString()} out)`;
+  const lastTxt = lastUsd === null ? "" : `Cost of this report: ${fmtMyr(lastUsd)}`;
   const parts = [lastTxt, totalTxt].filter(Boolean);
-  el.textContent = parts.join("  ·  ");
+  el.innerHTML = parts.map(t => `<div>${escHtml(t)}</div>`).join("");
   el.style.display = parts.length ? "" : "none";
 }
 
@@ -2930,7 +2933,7 @@ function renderHalfYearReportsSection() {
         </div>
         <div id="hyr-progress-label" style="font-size:.82rem;color:var(--text-muted);margin-top:.45rem;text-align:center"></div>
       </div>
-      <div id="hyr-cost-line" style="display:none;font-size:.78rem;color:var(--text-muted);text-align:center;margin-top:.1rem"></div>
+      <div id="hyr-cost-line" style="display:none;font-size:.78rem;color:var(--text-main);text-align:right;margin-top:.1rem;line-height:1.5"></div>
       <div id="hyr-activity-filter" class="hyr-excl-pulse" style="display:none;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:1rem 1.1rem">
         <div style="font-size:.875rem;font-weight:600;color:#374151;margin-bottom:.8rem">Select the activities you want to <span style="text-decoration:underline;font-weight:800">EXCLUDE</span> from the Appendix:</div>
         <div id="hyr-act-filter-list" style="display:flex;flex-direction:column;gap:1.1rem"></div>
