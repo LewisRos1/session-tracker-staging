@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1866";
+const APP_VERSION = "1867";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -5298,10 +5298,11 @@ Provide ONLY the following sections using EXACTLY these markers. No extra text o
 
 Write each point as TWO sentences. The first states what was observed, starting with the subject. The second states what it shows, starting with a phrase such as "This shows", "This reflects", "This demonstrates" or "This highlights". Never join them with a dash and never write "this matters because".
 
-Right: "He apologised to a peer after accidentally stepping on his foot, with minimal prompting. This reflects his use of polite language to repair social situations and maintain positive relationships with classmates."
-Wrong: "Apologised to a peer after accidentally stepping on his foot, without needing much prompting - this matters because it shows he is using polite words."
+ABSOLUTE: NEVER write a date. Not "On 9 July", not "on the 24th", not any day or date at all. The session data below carries dates so you can find the right moments, but a parent does not need to know which day it happened. Say how often instead, using wording such as "during one session this month", "in most sessions", or "on two occasions this month".
 
-Where it is relevant, say how often within the first sentence, using wording such as "during one session this month", "in most sessions" or "on two occasions this month". Do NOT use dates. Do NOT repeat anything already listed under MASTERED THIS MONTH above. Only real things from the data, never invent one to fill a slot.]
+Right: "He apologised to a peer after accidentally stepping on his foot, with minimal prompting. This reflects his use of polite language to repair social situations and maintain positive relationships with classmates."
+Wrong, fragment joined by a dash: "Apologised to a peer after accidentally stepping on his foot, without needing much prompting - this matters because it shows he is using polite words."
+Wrong, opens with a date: "On 20 July, Hayden apologised to a peer after accidentally stepping on his foot." Do NOT repeat anything already listed under MASTERED THIS MONTH above. Only real things from the data, never invent one to fill a slot.]
 - [highlight - why it matters]
 - [highlight - why it matters]
 - [highlight - why it matters]
