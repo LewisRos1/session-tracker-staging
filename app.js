@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1862";
+const APP_VERSION = "1863";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -2777,7 +2777,11 @@ GLOBAL RULES (apply to every section):
 - Be honest and sympathetic. Do NOT say positive things that are not supported by the data — false reassurance misleads parents and damages trust. Be kind in how you say things, not in what you choose to leave out.
 - NEVER use the em dash symbol (—) anywhere in the report. Use a comma, a full stop, or rewrite the sentence instead.
 - CRITICAL: A remark of "No Event" means the student did NOT perform or exhibit that behaviour or activity in that session. For negative/problem behaviours (e.g. snatching food, hitting, interrupting), "No Event" is a POSITIVE outcome — the bad behaviour simply did not occur. For skill or learning activities, "No Event" means the skill was not observed or demonstrated that session — treat it as neutral, not a failure. Do NOT treat "No Event" negatively in either case.
-- CRITICAL: A remark of "IP", "In Progress", or an activity with NO remark AND NO score, means there was not enough time to do that activity in that session. This tells you nothing about the student's ability or progress. Do NOT comment on it, do NOT treat it as a missed attempt, and do NOT use it as evidence of difficulty or strength. Ignore these entries entirely when forming your observations.
+- PROGRAM STATUS — these four words have fixed meanings in this service. They appear as an activity status and sometimes as the remark text itself. Use these meanings exactly; never infer a meaning from the word alone:
+  • In Progress (also written "IP"): the program is not currently implemented in this session due to scheduling priorities assigned to other active programs. It says NOTHING about the student's ability or progress. Do NOT comment on it, do NOT treat it as a missed attempt, and do NOT use it as evidence of difficulty or strength. Ignore these entries entirely when forming your observations. An activity with NO remark AND NO score means the same thing and is ignored the same way.
+  • Acquisition: the program is currently being taught to the learner.
+  • Maintain (also written "Maintained"): the program continues to be reviewed over time to ensure the skill is retained, based on the behaviour analyst's discretion. A run of "Maintain" remarks means the skill is HOLDING — it is evidence of a retained skill, not evidence that nothing is happening, that progress has stalled, or that the activity was skipped. Never describe a maintained activity as a lack of progress.
+  • Mastered: the learner has met the required criteria and successfully completed the program.
 - CRITICAL: ABSENT SESSIONS — Before analysing any session, determine whether the student was absent. A session is absent if: (1) every single activity across every target has no data, no remarks, and no score; OR (2) any activity remark contains the words "absent", "not present", "did not attend", or "no show" (case-insensitive match). Absent sessions must be completely excluded from all analysis — do not count them, do not average them, do not draw any conclusions from the empty activities, and do not mention absences anywhere in the report. The student was simply not there. Treat absent sessions as if they never happened.
 - CRITICAL: If an activity does not appear in the data below, it was never tested this period. The student's ability is completely unknown. NEVER mention it, NEVER describe it as a weakness or difficulty, NEVER say things like "has not yet been observed doing X" or "we do not yet know how they manage X". Simply do not write about it at all. No data = silence.
 - CRITICAL: Write ONLY what the session remarks directly and explicitly state. Do NOT extrapolate or infer related skills. "Identifies a face" is NOT the same as "knows a name." "Follows a one-step instruction" is NOT the same as "follows two-step instructions." "Points to an object" is NOT the same as "can name it." Stay word-for-word within what was actually recorded — never assume a student can or cannot do something that was not directly observed.
