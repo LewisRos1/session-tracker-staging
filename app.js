@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1863";
+const APP_VERSION = "1864";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3246,7 +3246,7 @@ RECOMMENDATIONS:
     await new Promise(r => setTimeout(r, 1000));
     setProgress(20, "Processing data…");
     await new Promise(r => setTimeout(r, 1000));
-    setProgress(35, "Sending to AI (Approx. ~15 seconds)…");
+    setProgress(35, "Sending to AI (Approx. ~30 seconds)…");
     await new Promise(r => setTimeout(r, 500));
 
     // Switch button to Cancel
@@ -5333,7 +5333,7 @@ ${(aiData[t.name] || []).join("\n")}`;
     await new Promise(r => setTimeout(r, 800));
     setProgress(25, "Processing data…");
     await new Promise(r => setTimeout(r, 800));
-    setProgress(38, "Sending to AI (Approx. ~15 seconds)…");
+    setProgress(38, "Sending to AI (Approx. ~30 seconds)…");
     await new Promise(r => setTimeout(r, 400));
 
     inCancelMode = true;
@@ -14482,13 +14482,21 @@ function buildGroupTargetViewTable(target, data, attendees) {
     // accidental damage and must still render rather than vanish. Sub-activities
     // (parentActivity set) stay excluded — they can't stand on their own.
     // Anything data-less was already deleted by the sweep above.
-    Object.entries(data.activities || {})
+    // Rendered under an "Extra" heading, matching the individual View screen.
+    // Anything landing here is either a session-only activity someone added by
+    // hand, or a record whose config entry has gone missing - the heading makes
+    // the second case visible instead of it blending into the numbered list.
+    const grpExtraActs = Object.entries(data.activities || {})
       .filter(([actId, a]) => a.targetName === target.name && !matchedIds.has(actId) && !a.parentActivity)
-      .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
-      .forEach(([actId, act]) => {
-        no++;
-        rows += viewGroupActivityRows(no, act.activityName, actId, data, target, attendees, false);
+      .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0));
+    if (grpExtraActs.length > 0) {
+      rows += `<tr class="view-heading-row"><td colspan="6" contenteditable="false">Extra</td></tr>`;
+      let grpExtraNo = 0;
+      grpExtraActs.forEach(([actId, act]) => {
+        grpExtraNo++;
+        rows += viewGroupActivityRows(grpExtraNo, act.activityName, actId, data, target, attendees, false);
       });
+    }
   } else {
     let no = 0;
     Object.entries(data.activities || {})
