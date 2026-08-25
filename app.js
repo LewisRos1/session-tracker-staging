@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1873";
+const APP_VERSION = "1874";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -5318,7 +5318,7 @@ ABSOLUTE: NEVER say WHEN or HOW OFTEN anything happened.
 Right: "Hayden apologised to a peer after accidentally stepping on his foot, with minimal prompting. This reflects his use of polite language to repair social situations and maintain positive relationships with classmates."
 Wrong, opens with a date: "On 20 July, Hayden apologised to a peer after accidentally stepping on his foot."
 Wrong, opens with a frequency: "During one session this month, Hayden apologised to a peer after accidentally stepping on his foot."
-Wrong, fragment joined by a dash: "Apologised to a peer after accidentally stepping on his foot, without needing much prompting - this matters because it shows he is using polite words." Do NOT repeat anything already listed under MASTERED THIS MONTH above. Only real things from the data, never invent one to fill a slot.]
+Wrong, fragment joined by a dash: "Apologised to a peer after accidentally stepping on his foot, without needing much prompting - this matters because it shows he is using polite words." Do NOT repeat anything already listed under ACTIVITIES MASTERED THIS MONTH below. Only real things from the data, never invent one to fill a slot.]
 - [highlight - why it matters]
 - [highlight - why it matters]
 - [highlight - why it matters]
@@ -5350,17 +5350,7 @@ NO numbers and NO percentages anywhere - describe the change in words. One idea 
   : `Write exactly this sentence and nothing else: "There is not enough earlier data yet to compare this month against, and the next few reports will start to show the bigger picture."`}]
 ===END===
 
-===FOCUS_NEXT===
-[Write 2 to 3 points naming what will be worked on next month, phrased as what is being built towards rather than as a list of problems. Each is one or two complete sentences.
-
-Write them from the team's point of view, but VARY how each one opens. Do NOT begin every point with "We will" - three points all starting that way reads as a template. Rotate the shape: "Continued support will be provided to...", "Focus will also be placed on...", "Support will continue in developing...", "Another area of focus is...". At most ONE point may begin with "We will". Never start with "Next we are working towards".
-
-Where useful, say what it builds on, e.g. "This builds on his existing ability to follow instructions." Base them on genuine difficulties in the data, never invent one to fill a slot.]
-- [focus]
-- [focus]
-===END===
-
-MASTERED THIS MONTH (already listed in the report as fact - do not repeat these in HIGHLIGHTS):
+ACTIVITIES MASTERED THIS MONTH (already listed in the report as fact - do not repeat these in HIGHLIGHTS):
 ${masteredThisMonth.length ? masteredThisMonth.map(m => `  - ${m.activity} (under target: ${m.target})`).join("\n") : "  (none this month)"}
 
 SESSION DATA BY TARGET:
@@ -5682,7 +5672,7 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
 }
 
 function monthlyParseAiResponse(text) {
-  const out = { highlights: [], comparison: "", focusNext: [] };
+  const out = { highlights: [], comparison: "" };
 
   // Stop a section at ===END=== OR at the next ===MARKER===, whichever comes
   // first. The model sometimes omits an ===END===, and a regex that only looked
@@ -5709,12 +5699,7 @@ function monthlyParseAiResponse(text) {
 
   out.highlights = bullets(section("HIGHLIGHTS"));
   out.comparison = section("COMPARISON");
-  out.focusNext  = bullets(section("FOCUS_NEXT"));
 
-  // If a section still leaked, a "working towards" line has no business being a
-  // highlight - drop those rather than print them twice.
-  const focusSet = new Set(out.focusNext);
-  out.highlights = out.highlights.filter(h => !focusSet.has(h) && !/^next we (are|will be) working towards/i.test(h));
   return out;
 }
 
@@ -6119,13 +6104,6 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   if (_cmpParas.length) _cmpParas.forEach(t => summaryParas.push(mkBody(t)));
   else summaryParas.push(mkBody("—"));
 
-  summaryParas.push(mkSectionHead("What we're working towards"));
-  if ((parsed.focusNext || []).length) {
-    parsed.focusNext.forEach(f => summaryParas.push(mkNumbered(f, "mr-focus")));
-  } else {
-    summaryParas.push(mkPara("\u2014", { italics: true, color: "9ca3af" }));
-  }
-
   // Qualitative targets and this month's scores are collected here for the
   // appendix chart; page 1 shows no numbers at all.
   const qualitativeNames = [];
@@ -6170,7 +6148,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     }));
   }
 
-  summaryParas.push(mkSectionHead("Mastered this month"));
+  summaryParas.push(mkSectionHead("Activities mastered this month"));
   if (masteredThisMonth.length) {
     // Grouped by target, with the target as a tinted band spanning the row, so a
     // target name isn't repeated down a column. Numbering restarts inside each
@@ -6219,7 +6197,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   ];
 
   const doc = new Document({
-    numbering: { config: ["mr-highlights", "mr-focus"].map(reference => ({
+    numbering: { config: ["mr-highlights"].map(reference => ({
       reference,
       levels: [{ level: 0, format: LevelFormat.DECIMAL, text: "%1)", alignment: AlignmentType.START,
         style: { paragraph: { indent: { left: 720, hanging: 360 } } } }]
