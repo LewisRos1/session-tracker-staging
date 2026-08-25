@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1897";
+const APP_VERSION = "1898";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3184,6 +3184,9 @@ async function hyrGenerate() {
     if (text === "Done!") btn.textContent = text;
   };
 
+  // Drop the previous report's cost as soon as a new one starts, or it reads as
+  // the cost of the report currently running. The running total stays.
+  renderAiCostLine();
   btn.disabled = true; progress.style.display = "";
   setProgress(5, "");
 
@@ -5411,6 +5414,9 @@ async function monthlyGenerate() {
     if (text === "Done!") btn.textContent = text;
   };
 
+  // Drop the previous report's cost as soon as a new one starts, or it reads as
+  // the cost of the report currently running. The running total stays.
+  renderAiCostLine();
   btn.disabled = true; progress.style.display = "";
   setProgress(5, "");
   try {
