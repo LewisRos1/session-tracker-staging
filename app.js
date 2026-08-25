@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1876";
+const APP_VERSION = "1877";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -5292,7 +5292,7 @@ async function monthlyGenerate() {
     // The heading no longer names the months. The prose names the period itself
     // ("the April to June period"), so putting it in both was repetition.
     const comparisonHeading = comparisonAvailable
-      ? "Progress over the past three months"
+      ? "Progress over the past 3 months"
       : "Progress so far";
 
     const aiPrompt = `${HYR_DEFAULT_PROMPT}
