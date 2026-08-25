@@ -3142,6 +3142,21 @@ function getAllActivitiesForTarget(session, target) {
     extraActivities.push({ ...act, activityName: `${extraNum}) ${extraLabel}`, activityDisplayDetails: extraDetails });
   }
 
+  // Drop section headings with nothing under them. A heading created in August
+  // has no active activities in a March session, so it would otherwise print as
+  // a bare band with empty space beneath it. Only the inline rows are considered
+  // here; the Mastered and Discontinued blocks below carry their own separators.
+  for (let i = result.length - 1; i >= 0; i--) {
+    if (!result[i].isHeading) continue;
+    let hasContent = false;
+    for (let j = i + 1; j < result.length; j++) {
+      if (result[j].isHeading) break;
+      hasContent = true;
+      break;
+    }
+    if (!hasContent) result.splice(i, 1);
+  }
+
   if (masteredActivities.length > 0) {
     result.push({ isMasteredSeparator: true, activityName: "— Mastered —" });
     result.push(...masteredActivities);
