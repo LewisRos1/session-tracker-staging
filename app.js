@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1875";
+const APP_VERSION = "1876";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6098,7 +6098,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   summaryParas.push(new Paragraph({
     children: [new TextRun({
       text: `Monthly Progress Report — ${monthName} ${year} — ${sessionCount} session${sessionCount === 1 ? "" : "s"}`,
-      size: 22, color: "6b7280", font: TNR })],
+      size: 22, font: TNR })],
     alignment: AlignmentType.CENTER, spacing: { before: 0, after: 320, ...LS }
   }));
 
