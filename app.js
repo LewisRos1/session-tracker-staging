@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1890";
+const APP_VERSION = "1891";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3244,14 +3244,26 @@ Write exactly 5 sentences summing up ${firstName}'s overall progress this term i
 ===END===
 
 ===KEY_INSIGHTS===
-Based on all session data and observations, write EXACTLY 7 Key Improvement rows — no more, no fewer. NEVER quote a session remark word for word and NEVER use quotation marks around anything taken from the data. Rewrite what was recorded in your own words as a normal sentence. Write "he wrote the numbers 1 to 100 without a mistake", not: he wrote numbers 1 to 100 "in one shot without mistakes". A parent should not be able to tell which words came from the therapist's notes. Do NOT quote a date either. Each row must include a specific observed detail, example, or moment drawn directly from the session remarks — not a general description. Use the student's name or a pronoun naturally; you may alternate.
-ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One or two sentences — name the specific improvement AND include a concrete detail or example from the session remarks that shows it. Must be real, not filler.]
-ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One or two sentences — a second genuine improvement from a different area, grounded in a specific observed moment or example.]
-ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One or two sentences — a third improvement with a real detail from the remarks. Only real progress — do not invent.]
-ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One or two sentences — a fourth data-backed improvement with a specific example or observed behaviour.]
-ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One or two sentences — a fifth improvement from a different area, with a concrete detail from the session data.]
-ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One or two sentences — a sixth improvement with a specific observed moment. Must be real, from a different area.]
-ROW: Key Improvement | [2-4 word label — write it directly, no ** markers]: [One or two sentences — a seventh and final improvement grounded in a specific example or remark from sessions.]
+Based on all session data and observations, write EXACTLY 7 Key Improvement rows, no more and no fewer.
+
+Each row is a LABEL followed by TWO sentences. The first sentence says what ${firstName} actually did, drawn from a specific observed moment in the session remarks, not a general description. The second sentence says why it matters for him or her in ordinary life. A row that only reports what happened has done half the job.
+
+Right: "Number Accuracy: Hayden wrote all the numbers from 1 to 100 correctly in a single sitting, without needing corrections. This shows his number formation is now secure enough to use in written work without support."
+Wrong, no significance: "Number Accuracy: Hayden wrote all the numbers from 1 to 100 correctly in a single sitting without needing any corrections, showing strong number formation skills."
+
+VARY how the second sentence opens. Do NOT cycle through "This shows", "This reflects", "This demonstrates", "This highlights" as a set - across seven rows AT MOST TWO may begin with "This". Other ways in: "indicating that...", "suggesting that...", "a sign that...", "supporting his ability to...", or state the significance directly with no label at all.
+
+NEVER quote a session remark word for word and NEVER use quotation marks around anything taken from the data. Rewrite what was recorded in your own words. Write "he wrote the numbers 1 to 100 without a mistake", not: he wrote numbers 1 to 100 "in one shot without mistakes". A parent should not be able to tell which words came from the therapist's notes. Do NOT quote a date. Use the student's name or a pronoun naturally; you may alternate.
+
+Each row must come from a DIFFERENT area of the student's work. Only real progress, never invent one to fill a row.
+
+ROW: Key Improvement | [2-4 word label, written directly with no ** markers]: [What he did. Why it matters.]
+ROW: Key Improvement | [2-4 word label]: [What he did. Why it matters.]
+ROW: Key Improvement | [2-4 word label]: [What he did. Why it matters.]
+ROW: Key Improvement | [2-4 word label]: [What he did. Why it matters.]
+ROW: Key Improvement | [2-4 word label]: [What he did. Why it matters.]
+ROW: Key Improvement | [2-4 word label]: [What he did. Why it matters.]
+ROW: Key Improvement | [2-4 word label]: [What he did. Why it matters.]
 ===END===
 
 ${targetsWithData.map(r => `===OBSERVATION: ${r.name}===
@@ -4735,7 +4747,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   }
   if (parsed.biggestWins?.length) {
     const fmtKI = s => { const c = s.replace(/\*\*/g, ""); const i = c.indexOf(': '); return i > 0 ? `<strong>${esc(c.slice(0,i))}</strong>: ${esc(c.slice(i+2))}` : esc(c); };
-    h += `<p style="font-weight:700;font-size:1.05rem;margin:1.5rem 0 .5rem">Key Improvements</p>`;
+    h += `<p style="font-weight:700;font-size:1.05rem;margin:1.5rem 0 .5rem">Highlights across ${esc(monthRange)} ${year}</p>`;
     h += `<ol style="margin:0;padding-left:2.5rem;line-height:1.8;font-size:11pt;text-align:justify">${parsed.biggestWins.map(s => `<li style="margin-bottom:.4rem">${fmtKI(s)}</li>`).join("")}</ol>`;
   }
 
@@ -5119,7 +5131,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   }
   if (wAllNames.length) paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 200, after: 0 } }));
 
-  paragraphs.push(mkPara("Key Improvements", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true, keepNext: true, pageBreak: true }));
+  paragraphs.push(mkPara(`Highlights across ${firstMonthName.slice(0,3)} ${year} - ${halfEndName.slice(0,3)} ${year}`, { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true, keepNext: true, pageBreak: true }));
   if (parsed.biggestWins?.length) {
     parsed.biggestWins.forEach((s, i) => {
       const c = s.replace(/\*\*/g, "");
