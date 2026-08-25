@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1877";
+const APP_VERSION = "1878";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -5272,9 +5272,6 @@ async function monthlyGenerate() {
     // the parent knows what the comparison is against, and drop the section when
     // there isn't enough history to say anything honest.
     const _cmpLabels = (threeMonthData[activeTargets[0]?.name] || {}).labels || [];
-    const comparisonLabel = _cmpLabels.length >= 2
-      ? `${_cmpLabels[0]}-${_cmpLabels[_cmpLabels.length - 1]}`
-      : "the earlier months";
     // Spelled-out month range, used as ONE fixed name for the baseline period.
     // An earlier version said "the past 3 months (April to June)" everywhere,
     // which the model then repeated in full each time and made the paragraph
@@ -5291,9 +5288,9 @@ async function monthlyGenerate() {
     // parent can see exactly what the comparison is against.
     // The heading no longer names the months. The prose names the period itself
     // ("the April to June period"), so putting it in both was repetition.
-    const comparisonHeading = comparisonAvailable
-      ? "Progress over the past 3 months"
-      : "Progress so far";
+    // Same heading either way, so the report has the same shape for every
+    // student. What changes is the paragraph underneath.
+    const comparisonHeading = "Progress over the past 3 months";
 
     const aiPrompt = `${HYR_DEFAULT_PROMPT}
 ${excludedList ? `\nEXCLUDED ACTIVITIES — ABSOLUTE RULE: The following activities have been deliberately excluded from this report. Do NOT mention, reference, or draw conclusions about them anywhere:\n${excludedList}\n` : ""}
@@ -5346,7 +5343,7 @@ If performance both varied AND improved, say so explicitly rather than leaving t
 Do NOT describe a score as simply "low" or "high" with nothing to compare it to - a parent has no way to judge that. Write "below the consistency we would expect" or "not yet consistent" instead.
 
 NO numbers and NO percentages anywhere - describe the change in words. One idea per sentence. Do not chain a whole behaviour sequence into one sentence: split the trigger and the response from what it means for communication.`
-  : `Write exactly this sentence and nothing else: "There is not enough earlier data yet to compare this month against, and the next few reports will start to show the bigger picture."`}]
+  : `Write exactly this and nothing else: "We are still in the early stages of collecting data, so comparisons are limited for now. Over the next few reports, a clearer pattern of progress will develop."`}]
 ===END===
 
 ===STILL_WORKING===
