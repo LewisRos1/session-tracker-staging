@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1867";
+const APP_VERSION = "1868";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6026,9 +6026,13 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   // Word's own numbered list rather than a hand-written "1)" run. Writing the
   // number as text meant it inherited the run's bold and needed a manual hanging
   // indent, which never lines up the way Word's list formatting does.
-  const mkNumbered = text => new Paragraph({
-    numbering: { reference: "mr-num", level: 0 },
+  // Each list gets its own numbering reference. Sharing one made Word treat the
+  // two lists as a single sequence, so "What we're working towards" carried on
+  // from 6) instead of restarting at 1).
+  const mkNumbered = (text, ref) => new Paragraph({
+    numbering: { reference: ref, level: 0 },
     children: [new TextRun({ text, size: 22 })],
+    alignment: AlignmentType.BOTH,
     spacing: { before: 70, after: 70, ...LS }
   });
   // An empty paragraph before each heading, so sections are separated by a real
@@ -6064,7 +6068,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
 
   summaryParas.push(mkSectionHead("Highlights this month"));
   if ((parsed.highlights || []).length) {
-    parsed.highlights.forEach(h => summaryParas.push(mkNumbered(h)));
+    parsed.highlights.forEach(h => summaryParas.push(mkNumbered(h, "mr-highlights")));
   } else {
     summaryParas.push(mkPara("No sessions were recorded this month.", { italics: true, color: "9ca3af", after: 120 }));
   }
@@ -6074,7 +6078,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
 
   summaryParas.push(mkSectionHead("What we're working towards"));
   if ((parsed.focusNext || []).length) {
-    parsed.focusNext.forEach(f => summaryParas.push(mkNumbered(f)));
+    parsed.focusNext.forEach(f => summaryParas.push(mkNumbered(f, "mr-focus")));
   } else {
     summaryParas.push(mkPara("\u2014", { italics: true, color: "9ca3af" }));
   }
@@ -6172,11 +6176,11 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   ];
 
   const doc = new Document({
-    numbering: { config: [{
-      reference: "mr-num",
+    numbering: { config: ["mr-highlights", "mr-focus"].map(reference => ({
+      reference,
       levels: [{ level: 0, format: LevelFormat.DECIMAL, text: "%1)", alignment: AlignmentType.START,
         style: { paragraph: { indent: { left: 720, hanging: 360 } } } }]
-    }]},
+    })) },
     sections: docSections
   });
 
