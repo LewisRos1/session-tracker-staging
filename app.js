@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1887";
+const APP_VERSION = "1888";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -19712,8 +19712,14 @@ function renderTargetManageContent(student, target) {
         const pa = discontinuedActs[ci];
         if (!pa) return;
         const date = pa.discontinuedOn || new Date().toISOString().split("T")[0];
+        // isCompleted is a legacy flag and setting it here hid the activity
+        // entirely: the Start Session inactive filter excludes isCompleted, and
+        // a mastered activity is not active either, so it appeared in neither
+        // the Mastered nor the Discontinued section. masteredOn alone marks
+        // mastery, which is what the main Master action does.
         delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped;
-        pa.masteredOn = date; pa.isCompleted = true;
+        delete pa.isCompleted; delete pa.inactiveReason;
+        pa.masteredOn = date;
       }
       await saveTarget();
       renderTargetManageContent(student, target);
@@ -21932,8 +21938,14 @@ function renderTemplateManageContent(template) {
         const pa = discontinuedActs[ci];
         if (!pa) return;
         const date = pa.discontinuedOn || new Date().toISOString().split("T")[0];
+        // isCompleted is a legacy flag and setting it here hid the activity
+        // entirely: the Start Session inactive filter excludes isCompleted, and
+        // a mastered activity is not active either, so it appeared in neither
+        // the Mastered nor the Discontinued section. masteredOn alone marks
+        // mastery, which is what the main Master action does.
         delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped;
-        pa.masteredOn = date; pa.isCompleted = true;
+        delete pa.isCompleted; delete pa.inactiveReason;
+        pa.masteredOn = date;
       }
       await saveTemplateFn();
       renderTemplateManageContent(template);
