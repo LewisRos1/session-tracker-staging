@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1895";
+const APP_VERSION = "1896";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3281,14 +3281,17 @@ ROW: Key Improvement | [2-4 word label]: [What he did. What it means for him in 
 ===END===
 
 ${targetsWithData.map(r => `===OBSERVATION: ${r.name}===
-Strength: [One or two sentences naming one specific thing ${firstName} does well in this target. Say what was actually observed in sessions, not a general compliment.]
-Weakness: [One or two sentences naming a genuine difficulty in this target. ONLY write one if the session data directly shows it - a struggling remark, a behaviour that caused problems, or consistently low performance. If the data shows no clear weakness, write exactly: No notable areas of difficulty observed this term. NEVER invent or guess.]
+What the graph shows: [One or two sentences explaining the SHAPE of this target's line over the term. The parent can already see the line; tell them what is behind it. Say where it started, what changed, and why, using the monthly averages and the session remarks below. If it rose and then levelled off, say what drove the rise and what changed afterwards. If it wobbled, say what the good months had in common. If it held steady, say so plainly rather than inventing movement.]
+Strength: [Two sentences. The first names one specific thing ${firstName} does well in this target, as actually observed in sessions rather than a general compliment. The second says what that lets him or her do in ordinary life, outside the session room, the same way the Highlights section does.]
+Weakness: [One or two sentences naming a genuine difficulty in this target, and what tends to bring it on - the situation, the time of day, the kind of task. ONLY write one if the session data directly shows it: a struggling remark, a behaviour that caused problems, or consistently low performance. If the data shows no clear weakness, write exactly: No notable areas of difficulty observed this term. NEVER invent or guess.]
 ===END===`).join("\n\n")}
 
-FORMAT FOR EVERY OBSERVATION BLOCK: exactly two lines, one starting "Strength:" and one starting "Weakness:". No bullet points, no asterisks, no extra lines, no "Note:" line.
+FORMAT FOR EVERY OBSERVATION BLOCK: exactly three lines, starting "What the graph shows:", "Strength:" and "Weakness:", in that order. No bullet points, no asterisks, no extra lines, no "Note:" line.
 
 RULES FOR EVERY OBSERVATION BLOCK:
-- ONE or TWO sentences after each label, whichever the point genuinely needs. One clear sentence is better than the same point stretched across two. Only write a second sentence if it adds something the first does not. Never pad to reach two, and never list everything - pick what matters most.
+- Each line answers a DIFFERENT question and must not repeat the others. "What the graph shows" is about movement over the term, "Strength" is about a specific ability and what it is worth, "Weakness" is about a difficulty and when it appears.
+- One or two sentences per line, whichever it genuinely needs, except Strength which is always two: the observation and what it means. One clear sentence beats the same point stretched across two. Never pad, and never list everything - pick what matters most.
+- NEVER quote numbers or percentages, including in "What the graph shows". Describe the movement in words: "climbed through the first three months, then settled", not "rose from 56% to 80%".
 - NO numbers, percentages, or month references. Parents see those in the graph.
 - Plain English, Grade 6-8 reading level. No clinical jargon.
 - Do NOT say things like "modalities", "regulatory capacity", "situational influences", "low-demand contexts". Use real words instead: "free play", "good days and bad days", "room noise".
@@ -3298,11 +3301,11 @@ RULES FOR EVERY OBSERVATION BLOCK:
 - ABSOLUTE: For Strength, only name things the student was directly observed doing in sessions. Do not infer or generalise: if the student identified one person's face, do not write that they "know their family members" or "understand names". Use only what the remarks literally say.
 
 ${qualitativeWithData.map(r => `===OBSERVED: ${r.name}===
-Strength: [One or two sentences about something positive noticed in this skill area - a real behaviour, moment or improvement.]
-Weakness: [One or two sentences about something still developing or difficult, explained kindly with a specific example if the data provides one.]
+Strength: [Two sentences. The first names something positive noticed in this skill area, a real behaviour or moment. The second says what it lets ${firstName} do in ordinary life.]
+Weakness: [One or two sentences about something still developing or difficult, and what tends to bring it on, explained kindly with a specific example if the data provides one.]
 ===END===`).join("\n\n")}
 
-The OBSERVED blocks follow exactly the same format and the same rules as the OBSERVATION blocks above.
+The OBSERVED blocks follow the same rules as the OBSERVATION blocks above, except that they have NO graph and therefore only two lines: "Strength:" and "Weakness:".
 
 ===ACTION_PLAN===
 Review the full session picture for ${firstName} across all targets and all remarks this term. Identify the most important areas to work on and the most helpful strategies.
