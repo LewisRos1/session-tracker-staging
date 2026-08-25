@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1864";
+const APP_VERSION = "1865";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8879,6 +8879,11 @@ function renderInactiveStatusSection({ label, color, pas, orphanGroups, allPas, 
   const dateText = pa => {
     if (pa.masteredOn)     return `<span style="color:#059669;font-weight:600">${fmtPeriodDate(pa.masteredOn)}</span>`;
     if (pa.discontinuedOn) return `<span style="color:#dc2626;font-weight:600">${fmtPeriodDate(pa.discontinuedOn)}</span>`;
+    // Inactive Activities have neither date - that is what puts them in that
+    // bucket. Show the active-period boundary that makes them inactive instead
+    // of an empty dash, so the column says why rather than nothing.
+    if (pa.activeTo)   return `<span style="color:#6b7280">Until ${fmtPeriodDate(pa.activeTo)}</span>`;
+    if (pa.activeFrom) return `<span style="color:#6b7280">From ${fmtPeriodDate(pa.activeFrom)}</span>`;
     return `<span style="color:#d1d5db">—</span>`;
   };
   const nameOf = pa => paDisplayHtml(pa, true) || `<em style="color:#9ca3af;font-size:.85rem">Untitled</em>`;
