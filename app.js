@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1889";
+const APP_VERSION = "1890";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3353,6 +3353,11 @@ RECOMMENDATIONS:
     }
 
     const data = await resp.json();
+    // Record the cost the moment a response comes back, BEFORE anything that
+    // can throw. Anthropic bills for a response it generated even if the app
+    // then fails to read it, so tracking after the parse under-reported spend
+    // on exactly the failures worth knowing about.
+    aiTrackCost(data.usage, "halfYear");
     // Take every text block, not content[0]. Sonnet 5 thinks by default, so the
     // first block is a thinking block and content[0].text is undefined - which is
     // what "Empty response from Claude" was really reporting.
@@ -3365,7 +3370,6 @@ RECOMMENDATIONS:
         : `Empty response from Claude (stop_reason: ${data.stop_reason || "unknown"}).`);
     }
 
-    aiTrackCost(data.usage, "halfYear");
     const parsed = hyrParseAiResponse(reportText);
 
     setProgress(100, "Done!");
@@ -5573,6 +5577,11 @@ ${(aiData[t.name] || []).join("\n")}`;
       throw new Error(`${err.error?.message || "Request failed"} (HTTP ${resp.status}${err.error?.type ? ", " + err.error.type : ""})`);
     }
     const data = await resp.json();
+    // Record the cost the moment a response comes back, BEFORE anything that
+    // can throw. Anthropic bills for a response it generated even if the app
+    // then fails to read it, so tracking after the parse under-reported spend
+    // on exactly the failures worth knowing about.
+    aiTrackCost(data.usage, "monthly");
     // Take every text block, not content[0]. Sonnet 5 thinks by default, so the
     // first block is a thinking block and content[0].text is undefined - which is
     // what "Empty response from Claude" was really reporting.
@@ -5585,7 +5594,6 @@ ${(aiData[t.name] || []).join("\n")}`;
         : `Empty response from Claude (stop_reason: ${data.stop_reason || "unknown"}).`);
     }
 
-    aiTrackCost(data.usage, "monthly");
     const parsed = monthlyParseAiResponse(reportText);
     setProgress(100, "Done!");
     await new Promise(r => setTimeout(r, 400));
