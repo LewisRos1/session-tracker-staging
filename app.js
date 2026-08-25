@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1853";
+const APP_VERSION = "1854";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3230,7 +3230,7 @@ RECOMMENDATIONS:
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
+        model: "claude-sonnet-5",
         max_tokens: 8192,
         system: "You are a professional therapy report writer. Follow the requested format exactly.",
         messages: [{ role: "user", content: aiPrompt }]
@@ -5258,7 +5258,7 @@ ${isFocus ? `===FOCUS: ${t.name}===
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
+        model: "claude-sonnet-5",
         max_tokens: 8192,
         system: "You are a professional therapy report writer. Follow the requested format exactly.",
         messages: [{ role: "user", content: aiPrompt }]
