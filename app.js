@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1854";
+const APP_VERSION = "1855";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -5230,25 +5230,36 @@ You are writing a PARENT-FRIENDLY monthly progress report. Use plain English onl
 
 Provide ONLY the following sections using EXACTLY these markers. No extra text outside markers.
 
-${activeTargets.map(t => {
-  const td = threeMonthData[t.name] || {};
-  const md = miniData[t.name] || {};
-  const isFocus = md.trend !== "up";
-  return `TARGET: ${t.name}
-• Past 3 months (${(td.labels||[]).join(", ")}): ${trendLabel(td.trend)}
-• This month (${md.lastMonthLabel}→${md.thisMonthLabel}): ${trendLabel(md.trend)}
-Session data: ${(aiData[t.name] || []).join(" | ")}
+===MONTH_SUMMARY===
+[Write 3 to 4 sentences describing how the month went overall for ${firstName}. Warm, honest, plain English. Say what improved and what was hardest. No numbers, no percentages. Do not list targets one by one - write it the way a parent would want to hear it.]
+===END===
 
-Now write your response for this target using EXACTLY these markers:
-===SUMMARY: ${t.name}===
-[Write EXACTLY ONE short sentence, max 15 words. Add meaning the parent cannot see from the arrows. Do NOT restate the trend — say WHY or what it means for the child. If the two trends differ (e.g. stable overall but declined this month), explain what changed or what drove the shift. Honest, warm, plain English. No jargon, no percentages, no trend words like "improved" or "declined".]
+===HIGHLIGHTS===
+[Write 3 to 5 bullets. Each is one specific thing ${firstName} actually did this month, taken from the session remarks - a real moment, not a general description. "Wrote his name without a model to copy from" is right; "showed progress in fine motor skills" is wrong. Where it matters, say how often, using words like "for the first time this month", "in most sessions", or "twice this month". Do NOT use dates. Only real things from the data - never invent one to fill a slot.]
+- [highlight]
+- [highlight]
+- [highlight]
 ===END===
-${isFocus ? `===FOCUS: ${t.name}===
-[Write EXACTLY ONE sentence about the single biggest struggle. Simplest everyday words, as if explaining to a parent on the phone. Short, honest, kind. No jargon.]
+
+===WHAT WE SAW - write ONE block for EACH target listed below===
+Produce one block per target, in this exact order, using these exact markers:
+
+${activeTargets.map(t => `===SAW: ${t.name}===\n[one sentence]\n===END===`).join("\n")}
+
+For every one of those blocks: write EXACTLY ONE sentence, maximum 25 words, saying what was actually seen for that target this month. Be specific - name the thing that went well or the thing that was hard. Plain English, no jargon, no percentages, no numbers. If a target has no data this month, write exactly: "No sessions recorded for this target this month."
+
+===FOCUS_NEXT===
+[Write 2 to 3 bullets naming what will be worked on next month, drawn across the whole child rather than one per target. Each is one short sentence in plain English. Base them on genuine difficulties in the data - never invent one to fill a slot.]
+- [focus]
+- [focus]
 ===END===
-===REC: ${t.name}===
-[Write EXACTLY ONE short practical recommendation — something specific parents or teachers can try. Plain English, no jargon.]
-===END===` : ""}`;
+
+SESSION DATA BY TARGET:
+${activeTargets.map(t => {
+  const md = miniData[t.name] || {};
+  return `TARGET: ${t.name}
+This month (${md.lastMonthLabel} to ${md.thisMonthLabel}): ${trendLabel(md.trend)}
+${(aiData[t.name] || []).join("\n")}`;
 }).join("\n\n")}`;
 
     console.log(`[AI monthly prompt] ${aiPrompt.length.toLocaleString()} chars `
@@ -5544,25 +5555,26 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
 }
 
 function monthlyParseAiResponse(text) {
-  const out = { summaries: {}, focusAreas: {}, focusRecs: {} };
-  const sumRe = /===SUMMARY:\s*(.+?)===\s*([\s\S]*?)\s*===END===/g;
-  const focRe = /===FOCUS:\s*(.+?)===\s*([\s\S]*?)\s*===END===/g;
-  const recRe = /===REC:\s*(.+?)===\s*([\s\S]*?)\s*===END===/g;
-  let m;
-  while ((m = sumRe.exec(text)) !== null) {
-    const content = m[2].trim();
-    const bullets = content.split("\n").map(l => l.trim()).filter(l => l.startsWith("•") || l.startsWith("-")).map(l => l.replace(/^[•\-]\s*/, "").trim()).filter(Boolean);
-    out.summaries[m[1].trim()] = bullets.length ? bullets : content.split("\n").map(l => l.trim()).filter(Boolean);
-  }
-  while ((m = focRe.exec(text)) !== null) {
-    const tName = m[1].trim(), content = m[2].trim();
-    const sentence = content.split("\n").map(l => l.trim().replace(/^[•\-\d.)\s]+/, "").trim()).filter(Boolean)[0] || "";
-    out.focusAreas[tName] = sentence ? [sentence.charAt(0).toUpperCase() + sentence.slice(1)] : [];
-  }
-  while ((m = recRe.exec(text)) !== null) {
-    const tName = m[1].trim(), content = m[2].trim();
-    const sentence = content.split("\n").map(l => l.trim().replace(/^[•\-\d.)\s]+/, "").trim()).filter(Boolean)[0] || "";
-    out.focusRecs[tName] = sentence ? sentence.charAt(0).toUpperCase() + sentence.slice(1) : "";
+  const out = { monthSummary: "", highlights: [], saw: {}, focusNext: [] };
+  const bullets = block => block.split("\n").map(l => l.trim())
+    .filter(l => l.startsWith("•") || l.startsWith("-"))
+    .map(l => l.replace(/^[•\-]\s*/, "").trim())
+    .filter(Boolean);
+
+  const one = re => { const m = re.exec(text); return m ? m[1].trim() : ""; };
+  out.monthSummary = one(/===MONTH_SUMMARY===\s*([\s\S]*?)\s*===END===/);
+
+  const hi = one(/===HIGHLIGHTS===\s*([\s\S]*?)\s*===END===/);
+  out.highlights = hi ? bullets(hi) : [];
+
+  const fn = one(/===FOCUS_NEXT===\s*([\s\S]*?)\s*===END===/);
+  out.focusNext = fn ? bullets(fn) : [];
+
+  // One "what we saw" sentence per target. Take the first non-empty line so a
+  // stray bullet marker or a wrapped second line can't leak into the cell.
+  for (const m of text.matchAll(/===SAW:\s*(.+?)===\s*([\s\S]*?)\s*===END===/g)) {
+    const sentence = m[2].split("\n").map(l => l.trim().replace(/^[•\-]\s*/, "").trim()).filter(Boolean)[0] || "";
+    if (sentence) out.saw[m[1].trim()] = sentence.charAt(0).toUpperCase() + sentence.slice(1);
   }
   return out;
 }
@@ -5676,6 +5688,58 @@ function monthlyDrawMiniBarChart(targetName, lastLabel, lastAvg, thisLabel, this
     ctx.fillStyle = "#374151"; ctx.font = "10px sans-serif"; ctx.textAlign = "center";
     ctx.fillText(bar.label, x + barW / 2, PAD.top + cH + 14);
   });
+
+  return { base64: canvas.toDataURL("image/png").split(",")[1], height: H };
+}
+
+// Appendix chart: this month's score per target, highest first, as horizontal
+// bars with the value written on each. Horizontal because target names are long
+// sentences - vertical bars would need them rotated or truncated. Qualitative
+// targets have no score and are listed under the chart instead of shown as
+// zero-length bars, which would read as "scored nothing".
+function monthlyDrawScoreBarChart(rows) {
+  if (!rows.length) return null;
+  const SCALE = 2;
+  const ROW_H = 30, PAD_T = 34, PAD_B = 34, PAD_L = 300, PAD_R = 60;
+  const W = 900, H = PAD_T + rows.length * ROW_H + PAD_B;
+  const canvas = document.createElement("canvas");
+  canvas.width = W * SCALE; canvas.height = H * SCALE;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(SCALE, SCALE);
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
+
+  const plotW = W - PAD_L - PAD_R;
+  const barH = 16;
+
+  // Gridlines every 25%
+  ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
+  ctx.fillStyle = "#9ca3af"; ctx.font = "11px Arial"; ctx.textAlign = "center";
+  for (let p = 0; p <= 100; p += 25) {
+    const x = PAD_L + (plotW * p / 100);
+    ctx.beginPath(); ctx.moveTo(x, PAD_T - 10); ctx.lineTo(x, H - PAD_B + 4); ctx.stroke();
+    ctx.fillText(`${p}%`, x, H - PAD_B + 18);
+  }
+
+  rows.forEach((r, i) => {
+    const y = PAD_T + i * ROW_H;
+    const cy = y + ROW_H / 2 - barH / 2;
+
+    ctx.fillStyle = "#374151"; ctx.font = "12px Arial"; ctx.textAlign = "right";
+    let label = r.name;
+    while (ctx.measureText(label).width > PAD_L - 20 && label.length > 4) label = label.slice(0, -2);
+    if (label !== r.name) label = label.slice(0, -1) + "\u2026";
+    ctx.fillText(label, PAD_L - 12, y + ROW_H / 2 + 4);
+
+    const w = Math.max(2, plotW * Math.max(0, Math.min(100, r.score)) / 100);
+    ctx.fillStyle = r.score >= 80 ? "#10b981" : r.score >= 50 ? "#3b82f6" : "#f59e0b";
+    ctx.fillRect(PAD_L, cy, w, barH);
+
+    ctx.fillStyle = "#111827"; ctx.font = "bold 12px Arial"; ctx.textAlign = "left";
+    ctx.fillText(`${Math.round(r.score)}%`, PAD_L + w + 8, cy + barH - 3);
+  });
+
+  ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(PAD_L, PAD_T - 10); ctx.lineTo(PAD_L, H - PAD_B + 4); ctx.stroke();
 
   return { base64: canvas.toDataURL("image/png").split(",")[1], height: H };
 }
@@ -5935,21 +5999,43 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   paragraphs.push(mkCoverLabel("Company Details:"));
   ["Tel:", "Email:", "Website:", "Address:"].forEach(l => paragraphs.push(mkCompanyLine(l)));
 
-  // ── Progress Summary (landscape) ──
+  // ── Page 1: the parent-facing report (portrait) ──
+  // Deliberately selective rather than exhaustive. The old layout printed a
+  // Past-3-Months column, a Score column and a per-target Focus Areas column for
+  // every target; with most targets steady those columns repeated the same two
+  // words down the page, which reads as filler. Scores now live in the appendix
+  // chart, and Focus is one short list for the whole child.
   const HDR = "f3f4f6";
-  // Landscape table: Target=1800 | Past3M=1260 | ThisMonth=1260 | Score=720 | Remark=4457 | FocusAreas=4457 (total 13954)
   const summaryParas = [];
-  summaryParas.push(mkPara("Progress Summary", { heading: HeadingLevel.HEADING_1, before: 560, after: 200, size: 32, bold: true }));
-  summaryParas.push(mkPara(`Here is a snapshot of ${firstName}'s progress in ${monthName} ${year}.`, { after: 200 }));
 
-  const summaryHdrRow = new TableRow({ tableHeader: true, children: [
-    mkHdrCell("Target",        "",                           1800),
-    mkHdrCell("Past 3 Months", `(${threeMonthPeriodLabel})`, 1260),
-    mkHdrCell("This Month",    `(${oneMonthPeriodLabel})`,   1260),
-    mkHdrCell("Score",         "(this month)",               720),
-    mkHdrCell("Remark",        "",                           4457),
-    mkHdrCell("Focus Areas",   "",                           4457),
-  ]});
+  const mkBullet = text => new Paragraph({
+    children: [new TextRun({ text, size: 22 })],
+    bullet: { level: 0 },
+    spacing: { before: 40, after: 40, ...LS }
+  });
+
+  summaryParas.push(mkPara(`${student.name} \u2014 ${monthName} ${year}`, { heading: HeadingLevel.HEADING_1, before: 240, after: 60, size: 32, bold: true }));
+  summaryParas.push(mkPara(`${sessionCount} session${sessionCount === 1 ? "" : "s"} this month`, { after: 240, size: 20, color: "6b7280" }));
+
+  if (parsed.monthSummary) {
+    summaryParas.push(mkPara("How the month went", { heading: HeadingLevel.HEADING_2, before: 160, after: 100, size: 26, bold: true, keepNext: true }));
+    summaryParas.push(new Paragraph({
+      children: [new TextRun({ text: parsed.monthSummary, size: 22 })],
+      alignment: AlignmentType.BOTH, spacing: { before: 0, after: 220, ...LS }
+    }));
+  }
+
+  if ((parsed.highlights || []).length) {
+    summaryParas.push(mkPara("Highlights this month", { heading: HeadingLevel.HEADING_2, before: 160, after: 100, size: 26, bold: true, keepNext: true }));
+    parsed.highlights.forEach(h => summaryParas.push(mkBullet(h)));
+    summaryParas.push(mkPara("", { after: 160 }));
+  }
+
+  // Targets table: Target | Direction | What we saw. Portrait width is 9360 dxa.
+  summaryParas.push(mkPara("Targets this month", { heading: HeadingLevel.HEADING_2, before: 160, after: 120, size: 26, bold: true, keepNext: true }));
+
+  const qualitativeNames = [];
+  const scoreRows = [];
 
   const sortedForSummary = [...activeTargets].sort((a, b) => {
     const aScore = (miniData[a.name] || {}).thisMonthAvg ?? -1;
@@ -5957,130 +6043,90 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     return bScore - aScore;
   });
 
-  let anyInsufficientPast3M = false;
+  const targetRows = [new TableRow({ tableHeader: true, children: [
+    mkHdrCell("Target", "", 3200),
+    mkHdrCell("Direction", "", 1500),
+    mkHdrCell("What we saw", "", 4660)
+  ]})];
 
-  const summaryDataRows = sortedForSummary.map(target => {
+  for (const target of sortedForSummary) {
     const tName = target.name;
     const td = threeMonthData[tName] || {};
     const md = miniData[tName] || {};
     const hasLineData = (td.avgs || []).some(v => v !== null && v !== undefined);
     const hasMiniData = md.thisMonthAvg != null || md.lastMonthAvg != null;
     const isQualitative = !hasLineData && !hasMiniData;
-    const past3MonthCount = (td.avgs || []).filter(v => v !== null && v !== undefined).length;
-    const insufficientPast3M = !isQualitative && past3MonthCount < 2;
-    if (insufficientPast3M) anyInsufficientPast3M = true;
-    const raw = parsed.summaries?.[tName];
-    const sentence = Array.isArray(raw) ? (raw[0] || "") : (raw || "");
-    const scoreText = (!isQualitative && md.thisMonthAvg != null) ? `${Math.round(md.thisMonthAvg)}%` : "—";
-    const tDisplayName = isQualitative ? `${tName} (Qualitative)` : tName;
-    const remarkKids = sentence
-      ? [new Paragraph({ children: [new TextRun({ text: sentence, size: 20 })], alignment: AlignmentType.BOTH, spacing: { before: 80, after: 80 } })]
-      : [new Paragraph({ children: [new TextRun({ text: "—", size: 20, italics: true })], spacing: { before: 80, after: 80 } })];
-    const focusText = (parsed.focusAreas?.[tName] || [])[0] || "";
-    const focusKids = focusText
-      ? [new Paragraph({ children: [new TextRun({ text: focusText, size: 20 })], alignment: AlignmentType.BOTH, spacing: { before: 80, after: 80 } })]
-      : [new Paragraph({ children: [new TextRun({ text: "—", size: 20, italics: true })], spacing: { before: 80, after: 80 } })];
-    return new TableRow({ children: [
-      mkCell(tDisplayName, { dxa: 1800, align: AlignmentType.CENTER }),
-      (isQualitative || insufficientPast3M) ? mkCell("—", { dxa: 1260, align: AlignmentType.CENTER }) : mkTrendCell(td.trend || "stable", 1260),
-      isQualitative ? mkCell("—", { dxa: 1260, align: AlignmentType.CENTER }) : mkTrendCell(md.trend || "stable", 1260),
-      mkCell(scoreText, { dxa: 720, align: AlignmentType.CENTER }),
-      new TableCell({ width: { size: 4457, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: remarkKids }),
-      new TableCell({ width: { size: 4457, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, margins: { top: 100, bottom: 100, left: 150, right: 150 }, children: focusKids })
-    ]});
-  });
-  summaryParas.push(new Table({ width: { size: 13954, type: WidthType.DXA }, rows: [summaryHdrRow, ...summaryDataRows] }));
-  if (anyInsufficientPast3M) {
-    summaryParas.push(new Paragraph({ children: [new TextRun({ text: "— Insufficient historical data: fewer than 2 months of data recorded prior to this reporting month.", size: 18, color: "6b7280", italics: true })], spacing: { before: 140, after: 0 } }));
-  }
 
-  // ── Appendix: side-by-side charts per target (portrait) ──
-  const appendixParas = [];
-  appendixParas.push(mkPara("Appendix: Target Charts", { heading: HeadingLevel.HEADING_1, before: 560, after: 200, size: 32, bold: true, pageBreak: true }));
+    if (isQualitative) qualitativeNames.push(tName);
+    else if (md.thisMonthAvg != null) scoreRows.push({ name: tName, score: md.thisMonthAvg });
 
-  const tblBR = { style: "single", size: 4, color: "e5e7eb" };
-  function mkHdrChart(mainText, subText) {
-    return new TableCell({
-      width: { size: 4680, type: WidthType.DXA },
-      margins: { top: 100, bottom: 100, left: 120, right: 120 },
-      shading: { fill: "f3f4f6" },
-      borders: { top: tblBR, bottom: tblBR, left: tblBR, right: tblBR },
-      children: [new Paragraph({ children: [new TextRun({ text: mainText, bold: true, size: 22 }), new TextRun({ break: 1, text: subText, size: 18, color: "6b7280" })], alignment: AlignmentType.CENTER, spacing: { before: 60, after: 60 } })]
-    });
-  }
+    // Target names are shown exactly as they are named in the app, so the report
+    // matches the Excel and Word exports. Qualitative ones carry an asterisk that
+    // the footnote under the appendix chart explains.
+    const displayName = isQualitative ? `${tName} *` : tName;
+    const sentence = parsed.saw?.[tName] || "";
 
-  const appendixRows = [];
-  appendixRows.push(new TableRow({ tableHeader: true, children: [
-    mkHdrChart("Past 3 Months", `(${threeMonthPeriodLabel})`),
-    mkHdrChart("This Month",    `(${oneMonthPeriodLabel})`)
-  ]}));
-
-  let appendixIdx = 1;
-  for (const target of activeTargets) {
-    const tName = target.name;
-    const td = threeMonthData[tName] || {};
-    const md = miniData[tName] || {};
-
-    // Skip qualitative targets — no numeric data in any period
-    const hasLineData = (td.avgs || []).some(v => v !== null && v !== undefined);
-    const hasMiniData = md.thisMonthAvg != null || md.lastMonthAvg != null;
-    if (!hasLineData && !hasMiniData) continue;
-
-    const lineB64 = monthlyDrawTargetLineChart(tName, td.labels || [], td.avgs || [], year);
-    // "This Month" as a 2-point line chart (same style as 3-month chart)
-    const miniB64  = monthlyDrawTargetLineChart(tName,
-      [md.lastMonthLabel, md.thisMonthLabel],
-      [md.lastMonthAvg ?? null, md.thisMonthAvg ?? null],
-      year);
-
-    // Target name row — spans both columns
-    appendixRows.push(new TableRow({ children: [new TableCell({
-      columnSpan: 2,
-      width: { size: 9360, type: WidthType.DXA },
-      margins: { top: 100, bottom: 100, left: 160, right: 160 },
-      shading: { fill: "eff6ff" },
-      borders: { top: tblBR, bottom: tblBR, left: tblBR, right: tblBR },
-      children: [new Paragraph({ children: [new TextRun({ text: `${appendixIdx++}) ${tName}`, bold: true, size: 24 })], spacing: { before: 60, after: 60 } })]
-    })]})
-  );
-
-    // Chart row
-    const noDataPara = txt => [new Paragraph({ children: [new TextRun({ text: txt, italics: true, size: 20, color: "9ca3af" })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })];
-    appendixRows.push(new TableRow({ children: [
+    targetRows.push(new TableRow({ children: [
+      mkCell(displayName, { dxa: 3200 }),
+      isQualitative
+        ? mkCell("\u2014", { dxa: 1500, align: AlignmentType.CENTER, color: "9ca3af" })
+        : mkTrendCell(md.trend || "stable", 1500),
       new TableCell({
-        width: { size: 4680, type: WidthType.DXA },
-        margins: { top: 80, bottom: 80, left: 60, right: 60 },
-        borders: { top: tblBR, bottom: tblBR, left: tblBR, right: tblBR },
-        children: lineB64
-          ? [new Paragraph({ children: [new ImageRun({ data: b64ToUint8(lineB64), transformation: { width: 220, height: Math.round(220 * 200 / 230) }, type: "png" })], alignment: AlignmentType.CENTER, spacing: { before: 40, after: 40 } })]
-          : noDataPara("No data for past 3 months")
-      }),
-      new TableCell({
-        width: { size: 4680, type: WidthType.DXA },
-        margins: { top: 80, bottom: 80, left: 60, right: 60 },
-        borders: { top: tblBR, bottom: tblBR, left: tblBR, right: tblBR },
-        children: miniB64
-          ? [new Paragraph({ children: [new ImageRun({ data: b64ToUint8(miniB64), transformation: { width: 220, height: Math.round(220 * 200 / 230) }, type: "png" })], alignment: AlignmentType.CENTER, spacing: { before: 40, after: 40 } })]
-          : noDataPara("No data this month")
+        width: { size: 4660, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER,
+        margins: { top: 100, bottom: 100, left: 150, right: 150 },
+        children: [new Paragraph({
+          children: [new TextRun({ text: sentence || "\u2014", size: 20, italics: !sentence })],
+          alignment: AlignmentType.BOTH, spacing: { before: 80, after: 80 }
+        })]
       })
     ]}));
   }
+  summaryParas.push(new Table({ width: { size: 9360, type: WidthType.DXA }, rows: targetRows }));
 
-  appendixParas.push(new Table({ width: { size: 9360, type: WidthType.DXA }, rows: appendixRows }));
+  if ((parsed.focusNext || []).length) {
+    summaryParas.push(mkPara("Focus for next month", { heading: HeadingLevel.HEADING_2, before: 280, after: 100, size: 26, bold: true, keepNext: true }));
+    parsed.focusNext.forEach(f => summaryParas.push(mkBullet(f)));
+  }
 
+  // ── Page 2: appendix — this month's scores as one chart ──
+  const appendixParas = [];
+  appendixParas.push(mkPara("Appendix: Scores this month", { heading: HeadingLevel.HEADING_1, before: 240, after: 160, size: 32, bold: true, pageBreak: true }));
+
+  scoreRows.sort((a, b) => b.score - a.score);
+  const barChart = scoreRows.length ? monthlyDrawScoreBarChart(scoreRows) : null;
+
+  if (barChart) {
+    const dispW = 620;
+    appendixParas.push(new Paragraph({
+      children: [new ImageRun({ data: b64ToUint8(barChart.base64),
+        transformation: { width: dispW, height: Math.round(dispW * barChart.height / 900) }, type: "png" })],
+      alignment: AlignmentType.CENTER, spacing: { before: 80, after: 160 }
+    }));
+  } else {
+    appendixParas.push(mkPara("No scored sessions recorded this month.", { italics: true, color: "9ca3af", after: 160 }));
+  }
+
+  if (qualitativeNames.length) {
+    appendixParas.push(new Paragraph({
+      children: [new TextRun({ text: "* Qualitative targets \u2014 progress is described rather than scored, so they do not appear on the chart: ", size: 18, color: "6b7280", italics: true }),
+                 new TextRun({ text: qualitativeNames.join(", "), size: 18, color: "6b7280", italics: true })],
+      alignment: AlignmentType.BOTH, spacing: { before: 120, after: 0 }
+    }));
+  }
   // ── Assemble sections + doc ──
   const pageFooter = Footer ? new Footer({ children: [new Paragraph({ tabStops: [{ type: "center", position: 4750 },{ type: "right", position: 9500 }], children: [new TextRun({ text: "\t" }), new TextRun({ text: "ZORA Behavioural Intervention", size: 22, color: "555555" }), new TextRun({ text: "\t" }), new TextRun({ children: [PageNumber.CURRENT], size: 22, color: "555555" })], spacing: { before: 60, after: 0 } })] }) : undefined;
   const pageHeader = (Header && logoData) ? new Header({ children: [new Paragraph({ children: [new ImageRun({ data: logoData, transformation: { width: 180, height: 54 }, type: "png" })], alignment: AlignmentType.RIGHT, spacing: { before: 0, after: 0 } })] }) : undefined;
   const footers = pageFooter ? { default: pageFooter } : undefined;
   const headers = pageHeader ? { default: pageHeader } : undefined;
 
-  const landscapeProps = { type: SectionType?.NEXT_PAGE ?? "nextPage", page: { size: { orientation: PageOrientation?.LANDSCAPE ?? "landscape" } } };
+  // Page 1 is portrait now — three columns fit comfortably, and it reads as a
+  // letter to a parent rather than a spreadsheet.
   const portraitProps  = { type: SectionType?.NEXT_PAGE ?? "nextPage", page: { size: { orientation: PageOrientation?.PORTRAIT ?? "portrait" } } };
 
   const docSections = [
-    { properties: {},              footers, headers, children: paragraphs   },  // cover (portrait)
-    { properties: landscapeProps,  footers, headers, children: summaryParas },  // progress summary (landscape)
-    { properties: portraitProps,   footers, headers, children: appendixParas }  // appendix (portrait)
+    { properties: {},              footers, headers, children: paragraphs   },  // cover
+    { properties: portraitProps,   footers, headers, children: summaryParas },  // the report
+    { properties: portraitProps,   footers, headers, children: appendixParas }  // appendix chart
   ];
 
   const doc = new Document({ sections: docSections });
