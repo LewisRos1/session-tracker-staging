@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1874";
+const APP_VERSION = "1875";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -5328,7 +5328,7 @@ Wrong, fragment joined by a dash: "Apologised to a peer after accidentally stepp
 
 ===COMPARISON===
 [${comparisonAvailable
-  ? `Write THREE short paragraphs, separated by a blank line.
+  ? `Write TWO short paragraphs, separated by a blank line.
 
 TIME REFERENCES - use ONE naming system throughout so the reader never has to work out which period you mean:
   • Call the earlier period "the ${comparisonLabelFull} period", and call it nothing else. Never "the past 3 months", never a bare month name on its own, never a mixture.
@@ -5337,10 +5337,9 @@ TIME REFERENCES - use ONE naming system throughout so the reader never has to wo
 
 Each paragraph does ONE job and nothing else:
 Paragraph 1 - the earlier pattern. How ${firstName} was over the ${comparisonLabelFull} period.
-Paragraph 2 - current progress. What improved in the most recent month.
-Paragraph 3 - what still needs work. Be honest; if something held steady rather than improved, say so plainly.
+Paragraph 2 - current progress. What improved in the most recent month. Be honest; if something held steady rather than improved, say so plainly rather than dressing it up.
 
-Do not carry a job into the wrong paragraph. Paragraph 1 does not mention recent progress, and paragraph 2 does not raise difficulties.
+Do not carry a job into the wrong paragraph. Paragraph 1 does not mention recent progress. NEITHER paragraph raises difficulties or areas of weakness - those belong in the STILL_WORKING section below and must not appear here as well.
 
 If performance both varied AND improved, say so explicitly rather than leaving the reader to reconcile it: "Although his scores varied from month to month, the overall direction was upward."
 
@@ -5348,6 +5347,18 @@ Do NOT describe a score as simply "low" or "high" with nothing to compare it to 
 
 NO numbers and NO percentages anywhere - describe the change in words. One idea per sentence. Do not chain a whole behaviour sequence into one sentence: split the trigger and the response from what it means for communication.`
   : `Write exactly this sentence and nothing else: "There is not enough earlier data yet to compare this month against, and the next few reports will start to show the bigger picture."`}]
+===END===
+
+===STILL_WORKING===
+[Write 2 to 3 points naming what ${firstName} still finds difficult, based only on genuine difficulties visible in the session data.
+
+Each point names the difficulty AND what tends to bring it on, in one or two sentences. "Sudden changes to his routine remain difficult for him. When a plan is altered without warning he may raise his voice or refuse an instruction before he is able to settle." Say what happens and when, and stop there.
+
+Do NOT suggest strategies, next steps, or what anyone will do about it. This section describes, it does not plan. No "we will", no "support will be provided", no recommendations of any kind.
+
+Vary how each point opens rather than starting them all the same way. Never invent a difficulty to fill a slot - if the data shows only one, write only one.]
+- [difficulty and what brings it on]
+- [difficulty and what brings it on]
 ===END===
 
 ACTIVITIES MASTERED THIS MONTH (already listed in the report as fact - do not repeat these in HIGHLIGHTS):
@@ -5672,7 +5683,7 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
 }
 
 function monthlyParseAiResponse(text) {
-  const out = { highlights: [], comparison: "" };
+  const out = { highlights: [], comparison: "", stillWorking: [] };
 
   // Stop a section at ===END=== OR at the next ===MARKER===, whichever comes
   // first. The model sometimes omits an ===END===, and a regex that only looked
@@ -5699,6 +5710,7 @@ function monthlyParseAiResponse(text) {
 
   out.highlights = bullets(section("HIGHLIGHTS"));
   out.comparison = section("COMPARISON");
+  out.stillWorking = bullets(section("STILL_WORKING"));
 
   return out;
 }
@@ -6104,6 +6116,15 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   if (_cmpParas.length) _cmpParas.forEach(t => summaryParas.push(mkBody(t)));
   else summaryParas.push(mkBody("—"));
 
+  // Difficulties get their own section rather than sitting at the end of a
+  // paragraph headed "Progress". The prompt forbids them appearing in both.
+  summaryParas.push(mkSectionHead("What we're still working on"));
+  if ((parsed.stillWorking || []).length) {
+    parsed.stillWorking.forEach(w => summaryParas.push(mkNumbered(w, "mr-still")));
+  } else {
+    summaryParas.push(mkPara("No particular areas of difficulty stood out this month.", { italics: true, color: "6b7280", after: 120 }));
+  }
+
   // Qualitative targets and this month's scores are collected here for the
   // appendix chart; page 1 shows no numbers at all.
   const qualitativeNames = [];
@@ -6197,7 +6218,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   ];
 
   const doc = new Document({
-    numbering: { config: ["mr-highlights"].map(reference => ({
+    numbering: { config: ["mr-highlights", "mr-still"].map(reference => ({
       reference,
       levels: [{ level: 0, format: LevelFormat.DECIMAL, text: "%1)", alignment: AlignmentType.START,
         style: { paragraph: { indent: { left: 720, hanging: 360 } } } }]
