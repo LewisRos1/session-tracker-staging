@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1894";
+const APP_VERSION = "1895";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3247,26 +3247,37 @@ Write exactly 5 sentences summing up ${firstName}'s overall progress this term i
 ===END===
 
 ===KEY_INSIGHTS===
-Based on all session data and observations, write EXACTLY 7 Key Improvement rows, no more and no fewer.
+Write EXACTLY 7 points, no more and no fewer. Each is one specific thing ${firstName} actually did this term, taken from the session remarks, a real moment rather than a general description. Each point comes from a DIFFERENT area of the student's work.
 
-Each row is a LABEL followed by TWO sentences. The first sentence says what ${firstName} actually did, drawn from a specific observed moment in the session remarks, not a general description. The second sentence says why it matters for him or her in ordinary life. A row that only reports what happened has done half the job.
+Write each point as a short LABEL, then TWO sentences. The first sentence states what was observed, starting with the subject. The second says what it means for ${firstName} in ordinary life, outside the session room. Never join them with a dash and never write "this matters because".
 
-Right: "Number Accuracy: Hayden wrote all the numbers from 1 to 100 correctly in a single sitting, without needing corrections. This shows his number formation is now secure enough to use in written work without support."
-Wrong, no significance: "Number Accuracy: Hayden wrote all the numbers from 1 to 100 correctly in a single sitting without needing any corrections, showing strong number formation skills."
+The second sentence is the one that gives the point its value. Say what the achievement lets him or her DO, or what it says about them as a person growing up. "This reflects his growing confidence in initiating friendly interactions with other children" is right, because a parent learns something about their child. "His number formation is now solid enough to support longer maths tasks" is weaker, because it only describes the mechanics of the task.
 
-VARY how the second sentence opens. Do NOT cycle through "This shows", "This reflects", "This demonstrates", "This highlights" as a set - across seven rows AT MOST TWO may begin with "This". Other ways in: "indicating that...", "suggesting that...", "a sign that...", "supporting his ability to...", or state the significance directly with no label at all.
+VARY how the second sentence opens. Do NOT cycle through "This shows", "This reflects", "This demonstrates", "This highlights" as a set - across seven points AT MOST TWO may begin with "This". Other ways in: "indicating that...", "suggesting that...", "a sign that...", "supporting his ability to...", or state the significance directly with no label at all.
 
-NEVER quote a session remark word for word and NEVER use quotation marks around anything taken from the data. Rewrite what was recorded in your own words. Write "he wrote the numbers 1 to 100 without a mistake", not: he wrote numbers 1 to 100 "in one shot without mistakes". A parent should not be able to tell which words came from the therapist's notes. Do NOT quote a date. Use the student's name or a pronoun naturally; you may alternate.
+ABSOLUTE: NEVER say WHEN or HOW OFTEN anything happened.
+  • No dates: not "In June", not "by the end of the term", not any month or date.
+  • No frequency: not "on several occasions", not "in most sessions", not "across nearly every session". Nothing of that kind.
+  • The dates in the session data are there so you can find the right moments, not to be reported back.
 
-Each row must come from a DIFFERENT area of the student's work. Only real progress, never invent one to fill a row.
+Write about MOMENTS, not statuses. Do NOT write points of the form "he reached mastery in several topics" or "his compliance was rated as maintained" - those describe record-keeping, not the child, and the activities mastered this term are already listed elsewhere in the report. Describe the thing he actually did that led to it.
 
-ROW: Key Improvement | [2-4 word label, written directly with no ** markers]: [What he did. Why it matters.]
-ROW: Key Improvement | [2-4 word label]: [What he did. Why it matters.]
-ROW: Key Improvement | [2-4 word label]: [What he did. Why it matters.]
-ROW: Key Improvement | [2-4 word label]: [What he did. Why it matters.]
-ROW: Key Improvement | [2-4 word label]: [What he did. Why it matters.]
-ROW: Key Improvement | [2-4 word label]: [What he did. Why it matters.]
-ROW: Key Improvement | [2-4 word label]: [What he did. Why it matters.]
+NEVER quote a session remark word for word and NEVER use quotation marks around anything taken from the data. Rewrite what was recorded in your own words. Write "he wrote the numbers 1 to 100 without a mistake", not: he wrote numbers 1 to 100 "in one shot without mistakes". A parent should not be able to tell which words came from the therapist's notes. Use the student's name or a pronoun naturally; you may alternate.
+
+Right: "Apology Skill: Hayden apologised to a peer after accidentally stepping on his foot, with minimal prompting. This reflects his use of polite language to repair social situations and maintain positive relationships with classmates."
+Wrong, a status rather than a moment: "Science Mastery: Hayden reached mastery this term in several science topics, including animal homes and life cycles."
+Wrong, significance is only about the task: "Number Accuracy: Hayden wrote the numbers from 1 to 100 without a mistake. Being able to do this independently means his number formation is now solid enough to support longer maths tasks."
+Wrong, opens with a date: "Day and Date Writing: By the end of the term, Hayden was writing the day and date on his own."
+
+Only real things from the data, never invent one to fill a row.
+
+ROW: Key Improvement | [2-4 word label, written directly with no ** markers]: [What he did. What it means for him in ordinary life.]
+ROW: Key Improvement | [2-4 word label]: [What he did. What it means for him in ordinary life.]
+ROW: Key Improvement | [2-4 word label]: [What he did. What it means for him in ordinary life.]
+ROW: Key Improvement | [2-4 word label]: [What he did. What it means for him in ordinary life.]
+ROW: Key Improvement | [2-4 word label]: [What he did. What it means for him in ordinary life.]
+ROW: Key Improvement | [2-4 word label]: [What he did. What it means for him in ordinary life.]
+ROW: Key Improvement | [2-4 word label]: [What he did. What it means for him in ordinary life.]
 ===END===
 
 ${targetsWithData.map(r => `===OBSERVATION: ${r.name}===
@@ -4750,7 +4761,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
   }
   if (parsed.biggestWins?.length) {
     const fmtKI = s => { const c = s.replace(/\*\*/g, ""); const i = c.indexOf(': '); return i > 0 ? `<strong>${esc(c.slice(0,i))}</strong>: ${esc(c.slice(i+2))}` : esc(c); };
-    h += `<p style="font-weight:700;font-size:1.05rem;margin:1.5rem 0 .5rem">Highlights across ${esc(monthRange)} ${year}</p>`;
+    h += `<p style="font-weight:700;font-size:1.05rem;margin:1.5rem 0 .5rem">Highlights across this term</p>`;
     h += `<ol style="margin:0;padding-left:2.5rem;line-height:1.8;font-size:11pt;text-align:justify">${parsed.biggestWins.map(s => `<li style="margin-bottom:.4rem">${fmtKI(s)}</li>`).join("")}</ol>`;
   }
 
@@ -5134,7 +5145,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   }
   if (wAllNames.length) paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 200, after: 0 } }));
 
-  paragraphs.push(mkPara(`Highlights across ${firstMonthName.slice(0,3)} ${year} - ${halfEndName.slice(0,3)} ${year}`, { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true, keepNext: true, pageBreak: true }));
+  paragraphs.push(mkPara("Highlights across this term", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true, keepNext: true, pageBreak: true }));
   if (parsed.biggestWins?.length) {
     parsed.biggestWins.forEach((s, i) => {
       const c = s.replace(/\*\*/g, "");
