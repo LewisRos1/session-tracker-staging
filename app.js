@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1856";
+const APP_VERSION = "1857";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -5715,51 +5715,101 @@ function monthlyDrawMiniBarChart(targetName, lastLabel, lastAvg, thisLabel, this
 // sentences - vertical bars would need them rotated or truncated. Qualitative
 // targets have no score and are listed under the chart instead of shown as
 // zero-length bars, which would read as "scored nothing".
+// Appendix chart: this month's score per target, highest first, as horizontal
+// bars with the value written on each. Horizontal because target names are long
+// sentences - vertical bars would need them rotated or truncated. Qualitative
+// targets have no score and are listed under the chart instead of shown as
+// zero-length bars, which would read as "scored nothing".
+//
+// The canvas is deliberately narrow (820px) relative to the 620px it is placed
+// at in the Word file. A wider canvas scales down further and shrinks the text
+// with it, which is what made the first version unreadable in print.
 function monthlyDrawScoreBarChart(rows) {
   if (!rows.length) return null;
   const SCALE = 2;
-  const ROW_H = 30, PAD_T = 34, PAD_B = 34, PAD_L = 300, PAD_R = 60;
-  const W = 900, H = PAD_T + rows.length * ROW_H + PAD_B;
+  const W = 820, PAD_L = 370, PAD_R = 74;
+  const HDR_H = 34, PAD_T = 12, PAD_B = 40;
+  const plotW = W - PAD_L - PAD_R;
+
+  const measure = document.createElement("canvas").getContext("2d");
+  measure.font = "15px Arial";
+  // Names wrap to at most two lines; anything longer is cut with an ellipsis so
+  // one very long target can't stretch the whole chart.
+  const wrap = name => {
+    const words = String(name).split(/\s+/);
+    const maxW = PAD_L - 24;
+    const out = [];
+    let line = "";
+    for (const w of words) {
+      const test = line ? `${line} ${w}` : w;
+      if (measure.measureText(test).width <= maxW) { line = test; continue; }
+      if (line) out.push(line);
+      line = w;
+      if (out.length === 2) break;
+    }
+    if (out.length < 2 && line) out.push(line);
+    if (out.length === 2 && measure.measureText(out[1]).width > maxW) {
+      let t = out[1];
+      while (t.length > 4 && measure.measureText(t + "\u2026").width > maxW) t = t.slice(0, -1);
+      out[1] = t + "\u2026";
+    }
+    return out.length ? out : [String(name)];
+  };
+
+  const wrapped = rows.map(r => ({ ...r, lines: wrap(r.name) }));
+  const rowH = wrapped.some(r => r.lines.length > 1) ? 44 : 34;
+  const H = HDR_H + PAD_T + wrapped.length * rowH + PAD_B;
+
   const canvas = document.createElement("canvas");
   canvas.width = W * SCALE; canvas.height = H * SCALE;
   const ctx = canvas.getContext("2d");
   ctx.scale(SCALE, SCALE);
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
 
-  const plotW = W - PAD_L - PAD_R;
-  const barH = 16;
+  // Column headings
+  ctx.fillStyle = "#f3f4f6"; ctx.fillRect(0, 0, W, HDR_H);
+  ctx.fillStyle = "#374151"; ctx.font = "bold 16px Arial";
+  ctx.textAlign = "right"; ctx.fillText("Target", PAD_L - 14, HDR_H - 11);
+  ctx.textAlign = "center"; ctx.fillText("Score", PAD_L + plotW / 2, HDR_H - 11);
+  ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, HDR_H + 0.5); ctx.lineTo(W, HDR_H + 0.5); ctx.stroke();
+
+  const top = HDR_H + PAD_T;
+  const barH = 18;
 
   // Gridlines every 25%
-  ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
-  ctx.fillStyle = "#9ca3af"; ctx.font = "11px Arial"; ctx.textAlign = "center";
+  ctx.strokeStyle = "#e5e7eb";
+  ctx.fillStyle = "#9ca3af"; ctx.font = "13px Arial"; ctx.textAlign = "center";
   for (let p = 0; p <= 100; p += 25) {
     const x = PAD_L + (plotW * p / 100);
-    ctx.beginPath(); ctx.moveTo(x, PAD_T - 10); ctx.lineTo(x, H - PAD_B + 4); ctx.stroke();
-    ctx.fillText(`${p}%`, x, H - PAD_B + 18);
+    ctx.beginPath(); ctx.moveTo(x, top - 4); ctx.lineTo(x, top + wrapped.length * rowH + 4); ctx.stroke();
+    ctx.fillText(`${p}%`, x, top + wrapped.length * rowH + 24);
   }
 
-  rows.forEach((r, i) => {
-    const y = PAD_T + i * ROW_H;
-    const cy = y + ROW_H / 2 - barH / 2;
+  wrapped.forEach((r, i) => {
+    const y = top + i * rowH;
+    const mid = y + rowH / 2;
 
-    ctx.fillStyle = "#374151"; ctx.font = "12px Arial"; ctx.textAlign = "right";
-    let label = r.name;
-    while (ctx.measureText(label).width > PAD_L - 20 && label.length > 4) label = label.slice(0, -2);
-    if (label !== r.name) label = label.slice(0, -1) + "\u2026";
-    ctx.fillText(label, PAD_L - 12, y + ROW_H / 2 + 4);
+    ctx.fillStyle = "#374151"; ctx.font = "15px Arial"; ctx.textAlign = "right";
+    if (r.lines.length === 1) {
+      ctx.fillText(r.lines[0], PAD_L - 14, mid + 5);
+    } else {
+      ctx.fillText(r.lines[0], PAD_L - 14, mid - 3);
+      ctx.fillText(r.lines[1], PAD_L - 14, mid + 15);
+    }
 
     const w = Math.max(2, plotW * Math.max(0, Math.min(100, r.score)) / 100);
     ctx.fillStyle = r.score >= 80 ? "#10b981" : r.score >= 50 ? "#3b82f6" : "#f59e0b";
-    ctx.fillRect(PAD_L, cy, w, barH);
+    ctx.fillRect(PAD_L, mid - barH / 2, w, barH);
 
-    ctx.fillStyle = "#111827"; ctx.font = "bold 12px Arial"; ctx.textAlign = "left";
-    ctx.fillText(`${Math.round(r.score)}%`, PAD_L + w + 8, cy + barH - 3);
+    ctx.fillStyle = "#111827"; ctx.font = "bold 16px Arial"; ctx.textAlign = "left";
+    ctx.fillText(`${Math.round(r.score)}%`, PAD_L + w + 10, mid + 6);
   });
 
   ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(PAD_L, PAD_T - 10); ctx.lineTo(PAD_L, H - PAD_B + 4); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(PAD_L, top - 4); ctx.lineTo(PAD_L, top + wrapped.length * rowH + 4); ctx.stroke();
 
-  return { base64: canvas.toDataURL("image/png").split(",")[1], height: H };
+  return { base64: canvas.toDataURL("image/png").split(",")[1], height: H, width: W };
 }
 
 function monthlyDrawTargetLineChart(targetName, labels, values, year) {
@@ -6117,7 +6167,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     const dispW = 620;
     appendixParas.push(new Paragraph({
       children: [new ImageRun({ data: b64ToUint8(barChart.base64),
-        transformation: { width: dispW, height: Math.round(dispW * barChart.height / 900) }, type: "png" })],
+        transformation: { width: dispW, height: Math.round(dispW * barChart.height / barChart.width) }, type: "png" })],
       alignment: AlignmentType.CENTER, spacing: { before: 80, after: 160 }
     }));
   } else {
