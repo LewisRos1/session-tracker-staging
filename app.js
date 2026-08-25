@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1901";
+const APP_VERSION = "1902";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6376,9 +6376,9 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   // direction is good. Scoring is already inverted for problem behaviours, so
   // "higher is better" holds for every target and is safe to state plainly.
   summaryParas.push(mkPara(
-    `The chart below summarises ${firstName}'s progress across different targets for this month. `
-    + `A score of 100% indicates strong performance on a target, while 0% indicates limited `
-    + `progress or no improvement.`,
+    `This chart summarises ${firstName}'s progress across different targets for this month. `
+    + `Higher scores (e.g. 100%) indicate stronger performance on each target, while lower `
+    + `scores (e.g. 0%) reflect weaker performance or limited progress.`,
     { align: AlignmentType.BOTH, after: 140 }));
 
   scoreRows.sort((a, b) => b.score - a.score);
