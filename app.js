@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1872";
+const APP_VERSION = "1873";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3281,7 +3281,10 @@ RECOMMENDATIONS:
 
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
-      throw new Error(err.error?.message || `API error ${resp.status}`);
+      // Include the status and error type. A bare message like "Request not
+      // allowed" gives no clue whether it came from the relay or from Anthropic.
+      console.error("AI request failed:", resp.status, err);
+      throw new Error(`${err.error?.message || "Request failed"} (HTTP ${resp.status}${err.error?.type ? ", " + err.error.type : ""})`);
     }
 
     const data = await resp.json();
@@ -5408,7 +5411,10 @@ ${(aiData[t.name] || []).join("\n")}`;
 
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
-      throw new Error(err.error?.message || `API error ${resp.status}`);
+      // Include the status and error type. A bare message like "Request not
+      // allowed" gives no clue whether it came from the relay or from Anthropic.
+      console.error("AI request failed:", resp.status, err);
+      throw new Error(`${err.error?.message || "Request failed"} (HTTP ${resp.status}${err.error?.type ? ", " + err.error.type : ""})`);
     }
     const data = await resp.json();
     // Take every text block, not content[0]. Sonnet 5 thinks by default, so the
