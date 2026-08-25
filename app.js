@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1860";
+const APP_VERSION = "1861";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -8885,28 +8885,55 @@ function renderInactiveStatusSection({ label, color, pas, orphanGroups, allPas, 
     p.parentActivity === (pa.title || pa.name) && !p.isCompleted && !p.isArchived && !p.isStopped);
   const subRows = subs => subs.map((sub, si) => row(sub, `${String.fromCharCode(97 + si)})`, true)).join('');
 
-  let itemNum = 0;
-  const topRows = pas.map(pa => {
-    if (pa.isHeading || pa.isMaintainHeading || pa.isNote || pa.isExportNote) return '';
-    itemNum++;
-    const subs = subsOf(pa);
-    // A parent with subs carries no date of its own — see the note above.
-    return subs.length === 0
-      ? row(pa, `${itemNum})`, false)
-      : `<tr>
-          <td style="${_numCell}">${itemNum})</td>
-          <td style="${_nameCell}">${nameOf(pa)}</td>
-          <td style="${_dateCell}"><span style="color:#d1d5db">—</span></td>
-        </tr>${subRows(subs)}`;
-  }).filter(Boolean).join('');
+  // Group the rows under the section heading each activity sits beneath, the way
+  // the Start Session list itself does. A heading with nothing under it in this
+  // status group is not printed, and numbering restarts inside each section -
+  // matching how activities are numbered on the entry screen.
+  const headingOf = new Map();
+  {
+    let current = null;
+    for (const pa of allPas) {
+      if (pa.isHeading || pa.isMaintainHeading) { current = pa.title || pa.name || ""; continue; }
+      headingOf.set(pa, current);
+    }
+  }
+
+  const sectionBand = title => `<tr><td colspan="3" style="${_cellBase};background:#eef2ff;font-size:.82rem;font-weight:700;color:#3730a3">${escHtml(title)}</td></tr>`;
+
+  // Keep the order the activities appear in, but break into runs by heading.
+  const renderable = pas.filter(pa => !(pa.isHeading || pa.isMaintainHeading || pa.isNote || pa.isExportNote));
+  const groups = [];
+  for (const pa of renderable) {
+    const h = headingOf.get(pa) ?? null;
+    if (!groups.length || groups[groups.length - 1].heading !== h) groups.push({ heading: h, items: [] });
+    groups[groups.length - 1].items.push(pa);
+  }
+
+  const topRows = groups.map(g => {
+    let n = 0;
+    const body = g.items.map(pa => {
+      n++;
+      const subs = subsOf(pa);
+      // A parent with subs carries no date of its own — see the note above.
+      return subs.length === 0
+        ? row(pa, `${n})`, false)
+        : `<tr>
+            <td style="${_numCell}">${n})</td>
+            <td style="${_nameCell}">${nameOf(pa)}</td>
+            <td style="${_dateCell}"><span style="color:#d1d5db">—</span></td>
+          </tr>${subRows(subs)}`;
+    }).join('');
+    return (g.heading ? sectionBand(g.heading) : '') + body;
+  }).join('');
 
   // Sub-activities whose parent is still active: the parent heads the group for
   // context only, so it gets no number and no date.
+  let orphanNum = 0;
   const orphanRows = orphanGroups.map(({ parentPa, parentKey, subs }) => {
-    itemNum++;
+    orphanNum++;
     const parentName = parentPa ? (paDisplayHtml(parentPa, true) || escHtml(parentKey)) : escHtml(parentKey);
     return `<tr>
-        <td style="${_numCell}">${itemNum})</td>
+        <td style="${_numCell}">${orphanNum})</td>
         <td style="${_nameCell}">${parentName}</td>
         <td style="${_dateCell}"><span style="color:#d1d5db">—</span></td>
       </tr>${subRows(subs)}`;
