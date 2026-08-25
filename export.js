@@ -2946,14 +2946,23 @@ function getAllActivitiesForTarget(session, target) {
     return pa.title ? sessionActs.find(a => a.activityName === pa.title && a.isPredefined && !a.configId && !usedIds.has(a.id)) : null;
   };
 
+  // An activity that was already mastered or discontinued by this session's date
+  // is NOT skipped here - it needs to reach the "Mastered" / "Discontinued"
+  // blocks further down. Everything else inactive on the date is skipped.
+  // Strict > to match isActivityActive: on the status date itself the activity
+  // is still active and renders inline, exactly as the Start Session screen does.
+  const _reachedStatus = pa =>
+    (pa.masteredOn && session.date > pa.masteredOn) ||
+    (pa.discontinuedOn && session.date > pa.discontinuedOn);
+
   for (const pa of (target.predefinedActivities || [])) {
-    if (!isActivityActive(pa, session.date)) continue;
+    if (!isActivityActive(pa, session.date) && !_reachedStatus(pa)) continue;
     if (pa.isCompleted || pa.isArchived || pa.isStopped) continue;
     if (pa.parentActivity) {
       const parentExists = (target.predefinedActivities || []).some(
         p => !p.parentActivity && (p.title || p.name) === pa.parentActivity
           && isActivityActive(p, session.date)
-          && !p.isCompleted && !p.isArchived && !p.isStopped && !p.masteredOn && !p.discontinuedOn
+          && !p.isCompleted && !p.isArchived && !p.isStopped
       );
       if (!parentExists) continue;
     }
@@ -3007,8 +3016,13 @@ function getAllActivitiesForTarget(session, target) {
       continue;
     }
 
-    // Mastered / discontinued → defer to bottom with x) prefix, don't consume a number
-    if (pa.masteredOn) {
+    // Mastered / discontinued -> deferred to the bottom with an x) prefix, and
+    // they do not consume a number. Entered only once the session date has
+    // REACHED the status date: before that the activity was still being worked
+    // on, so it belongs inline under its section heading like any other. This
+    // mirrors the Start Session screen, where the collapsed Mastered and
+    // Discontinued sections are date-aware in the same way.
+    if (pa.masteredOn && session.date > pa.masteredOn) {
       const _sAct = claimAct(pa);
       const _paKey = pa.title || pa.name;
       const _name = `x) (Mastered on ${fmtDate(pa.masteredOn)}) ${_paKey}`;
@@ -3019,7 +3033,7 @@ function getAllActivitiesForTarget(session, target) {
       else { masteredActivities.push({ id: null, activityName: _name, isPredefined: true, empty: true, ..._extra }); }
       continue;
     }
-    if (pa.discontinuedOn) {
+    if (pa.discontinuedOn && session.date > pa.discontinuedOn) {
       const _sAct = claimAct(pa);
       const _paKey = pa.title || pa.name;
       const _name = `x) (Discontinued on ${fmtDate(pa.discontinuedOn)}) ${_paKey}`;
