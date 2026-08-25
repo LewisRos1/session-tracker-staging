@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1861";
+const APP_VERSION = "1862";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3468,19 +3468,27 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
         if (pa.id) paKeyToConfigId[key] = pa.id;
         actNames.add(key);
         actDisplayNames[key] = key;
-        // Status carries its date — "why did the average drop in May" is often
-        // answered by an activity having been mastered or dropped that month.
-        if (pa.maintained) paKeyToStatus[key] = pa.maintainedAt
-          ? `maintained since ${fmtPeriodDate(pa.maintainedAt)}` : "maintained";
+        // Status and lifecycle dates. "Why did the average drop in May" is often
+        // answered by an activity having been started, mastered or dropped that
+        // month, so the model gets every date it could reason from.
+        const _startedOn = pa.createdOn || pa.activeFrom || null;
+        const _startLbl = _startedOn ? `started ${fmtPeriodDate(_startedOn)}` : "";
+        const _join = (...bits) => bits.filter(Boolean).join(", ");
+        if (pa.maintained) paKeyToStatus[key] = _join(_startLbl,
+          pa.maintainedAt ? `maintained since ${fmtPeriodDate(pa.maintainedAt)}` : "maintained");
+        else if (_startLbl) paKeyToStatus[key] = _startLbl;
         if (pa.title && pa.name && pa.title !== pa.name) {
           if (!paKeyToAliases[key]) paKeyToAliases[key] = [];
           paKeyToAliases[key].push(pa.name);
           hyrLegacyToKey[pa.name] = key;
         }
       } else {
-        paKeyToStatus[key] = pa.masteredOn
-          ? `mastered on ${fmtPeriodDate(pa.masteredOn)}`
-          : pa.discontinuedOn ? `discontinued on ${fmtPeriodDate(pa.discontinuedOn)}` : "discontinued";
+        const _startedOn2 = pa.createdOn || pa.activeFrom || null;
+        paKeyToStatus[key] = [
+          _startedOn2 ? `started ${fmtPeriodDate(_startedOn2)}` : "",
+          pa.masteredOn ? `mastered on ${fmtPeriodDate(pa.masteredOn)}`
+            : pa.discontinuedOn ? `discontinued on ${fmtPeriodDate(pa.discontinuedOn)}` : "discontinued"
+        ].filter(Boolean).join(", ");
       }
     }
     // Consolidate any legacy names added from session data into the canonical key
@@ -5475,17 +5483,23 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
       if (_mActive) {
         if (pa.id) paKeyToConfigId[key] = pa.id;
         actNames.add(key); actDisplayNames[key] = key;
-        if (pa.maintained) paKeyToStatusM[key] = pa.maintainedAt
-          ? `maintained since ${fmtPeriodDate(pa.maintainedAt)}` : "maintained";
+        const _mStart = pa.createdOn || pa.activeFrom || null;
+        const _mStartLbl = _mStart ? `started ${fmtPeriodDate(_mStart)}` : "";
+        if (pa.maintained) paKeyToStatusM[key] = [_mStartLbl,
+          pa.maintainedAt ? `maintained since ${fmtPeriodDate(pa.maintainedAt)}` : "maintained"].filter(Boolean).join(", ");
+        else if (_mStartLbl) paKeyToStatusM[key] = _mStartLbl;
         if (pa.title && pa.name && pa.title !== pa.name) {
           if (!paKeyToAliases[key]) paKeyToAliases[key] = [];
           paKeyToAliases[key].push(pa.name);
           legacyToKey[pa.name] = key;
         }
       } else {
-        paKeyToStatusM[key] = pa.masteredOn
-          ? `mastered on ${fmtPeriodDate(pa.masteredOn)}`
-          : pa.discontinuedOn ? `discontinued on ${fmtPeriodDate(pa.discontinuedOn)}` : "discontinued";
+        const _mStart2 = pa.createdOn || pa.activeFrom || null;
+        paKeyToStatusM[key] = [
+          _mStart2 ? `started ${fmtPeriodDate(_mStart2)}` : "",
+          pa.masteredOn ? `mastered on ${fmtPeriodDate(pa.masteredOn)}`
+            : pa.discontinuedOn ? `discontinued on ${fmtPeriodDate(pa.discontinuedOn)}` : "discontinued"
+        ].filter(Boolean).join(", ");
       }
     }
     for (const sess of thisMonthSessions) {
@@ -5977,37 +5991,6 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     if (r.ok) logoData = new Uint8Array(await r.arrayBuffer());
   } catch (_) {}
 
-  // ── Cover page ──
-  // Lighter than the half-year cover on purpose. A monthly update is a short,
-  // frequent document, so it drops the empty Program field and the company
-  // contact block, which belong on the formal half-year report. The session
-  // count is deliberately absent: it reads as an invoice rather than progress.
-  const CPL = { line: 276, lineRule: "auto" };
-  paragraphs.push(new Paragraph({
-    children: logoData ? [new ImageRun({ data: logoData, transformation: { width: 454, height: 135 }, type: "png" })] : [],
-    alignment: AlignmentType.CENTER, spacing: { before: 1200, after: 720, ...CPL }
-  }));
-  paragraphs.push(new Paragraph({
-    children: [new TextRun({ text: "Monthly Progress Report", bold: true, size: 64, font: TNR })],
-    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 120, ...CPL }
-  }));
-  paragraphs.push(new Paragraph({
-    children: [new TextRun({ text: `${monthName} ${year}`, size: 44, font: TNR, color: "3b5f8a" })],
-    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 960, ...CPL }
-  }));
-  paragraphs.push(new Paragraph({
-    children: [new TextRun({ text: student.name, bold: true, size: 40, font: TNR })],
-    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 60, ...CPL }
-  }));
-  paragraphs.push(new Paragraph({
-    children: [new TextRun({ text: sessionType === "group" ? "Group Sessions" : "Individual Sessions", size: 26, font: TNR, color: "6b7280" })],
-    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 960, ...CPL }
-  }));
-  paragraphs.push(new Paragraph({
-    children: [new TextRun({ text: `Report date: ${reportDate}`, size: 24, font: TNR, color: "6b7280" })],
-    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, ...CPL }
-  }));
-
   // ── Page 1: the parent-facing report (portrait) ──
   // Deliberately selective. An earlier version printed a row per target with
   // Past 3 Months, Score and Focus Areas columns; with most targets steady those
@@ -6016,10 +5999,12 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   // parent actually has: what did my child do, is it moving, what happens next.
   const summaryParas = [];
 
-  const mkBullet = text => new Paragraph({
-    children: [new TextRun({ text, size: 22 })],
-    bullet: { level: 0 },
-    spacing: { before: 60, after: 60, ...LS }
+  // Numbered "1)" rather than a bullet glyph, matching how activities are
+  // numbered everywhere else in the app.
+  const mkNumbered = (text, n) => new Paragraph({
+    children: [new TextRun({ text: `${n}) `, size: 22, bold: true }), new TextRun({ text, size: 22 })],
+    indent: { left: 400, hanging: 400 },
+    spacing: { before: 70, after: 70, ...LS }
   });
   const mkSectionHead = text => mkPara(text, { heading: HeadingLevel.HEADING_2, before: 260, after: 120, size: 26, bold: true, keepNext: true });
   const mkBody = text => new Paragraph({
@@ -6028,13 +6013,81 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   });
 
 
-  // Highlights first, because it is always populated — a report that can open
-  // with "nothing was mastered this month" opens badly.
+  // No cover page: a monthly update is a short document and a full title page
+  // made it read like the half-year report. A compact header line does the job.
+  if (logoData) {
+    summaryParas.push(new Paragraph({
+      children: [new ImageRun({ data: logoData, transformation: { width: 300, height: 89 }, type: "png" })],
+      alignment: AlignmentType.CENTER, spacing: { before: 0, after: 240, ...LS }
+    }));
+  }
+  summaryParas.push(new Paragraph({
+    children: [new TextRun({ text: student.name, bold: true, size: 36, font: TNR })],
+    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 40, ...LS }
+  }));
+  summaryParas.push(new Paragraph({
+    children: [new TextRun({
+      text: `Monthly Progress Report  ·  ${monthName} ${year}  ·  ${sessionCount} session${sessionCount === 1 ? "" : "s"}`,
+      size: 22, color: "6b7280", font: TNR })],
+    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 320, ...LS }
+  }));
+
   summaryParas.push(mkSectionHead("Highlights this month"));
   if ((parsed.highlights || []).length) {
-    parsed.highlights.forEach(h => summaryParas.push(mkBullet(h)));
+    parsed.highlights.forEach((h, i) => summaryParas.push(mkNumbered(h, i + 1)));
   } else {
     summaryParas.push(mkPara("No sessions were recorded this month.", { italics: true, color: "9ca3af", after: 120 }));
+  }
+
+  summaryParas.push(mkSectionHead(comparisonHeading));
+  summaryParas.push(mkBody(parsed.comparison || "\u2014"));
+
+  summaryParas.push(mkSectionHead("What we're working towards"));
+  if ((parsed.focusNext || []).length) {
+    parsed.focusNext.forEach((f, i) => summaryParas.push(mkNumbered(f, i + 1)));
+  } else {
+    summaryParas.push(mkPara("\u2014", { italics: true, color: "9ca3af" }));
+  }
+
+  // Qualitative targets and this month's scores are collected here for the
+  // appendix chart; page 1 shows no numbers at all.
+  const qualitativeNames = [];
+  const scoreRows = [];
+  for (const target of activeTargets) {
+    const tName = target.name;
+    const td = threeMonthData[tName] || {};
+    const md = miniData[tName] || {};
+    const hasLineData = (td.avgs || []).some(v => v !== null && v !== undefined);
+    const hasMiniData = md.thisMonthAvg != null || md.lastMonthAvg != null;
+    if (!hasLineData && !hasMiniData) qualitativeNames.push(tName);
+    else if (md.thisMonthAvg != null) scoreRows.push({ name: tName, score: md.thisMonthAvg });
+  }
+  // ── Score summary, then what was mastered ──
+  // No "Appendix" framing: the chart and the mastered list are part of the report
+  // a parent reads, not back matter. They flow on from the prose rather than
+  // starting a forced new page.
+  summaryParas.push(mkSectionHead("Score Summary"));
+
+  scoreRows.sort((a, b) => b.score - a.score);
+  const barChart = scoreRows.length ? monthlyDrawScoreBarChart(scoreRows) : null;
+
+  if (barChart) {
+    const dispW = 620;
+    summaryParas.push(new Paragraph({
+      children: [new ImageRun({ data: b64ToUint8(barChart.base64),
+        transformation: { width: dispW, height: Math.round(dispW * barChart.height / barChart.width) }, type: "png" })],
+      alignment: AlignmentType.CENTER, spacing: { before: 80, after: 140 }
+    }));
+  } else {
+    summaryParas.push(mkPara("No scored sessions recorded this month.", { italics: true, color: "9ca3af", after: 140 }));
+  }
+
+  if (qualitativeNames.length) {
+    summaryParas.push(new Paragraph({
+      children: [new TextRun({ text: "* Qualitative targets \u2014 progress is described rather than scored, so they do not appear on the chart: ", size: 18, color: "6b7280", italics: true }),
+                 new TextRun({ text: qualitativeNames.join(", "), size: 18, color: "6b7280", italics: true })],
+      alignment: AlignmentType.BOTH, spacing: { before: 100, after: 0 }
+    }));
   }
 
   summaryParas.push(mkSectionHead("Mastered this month"));
@@ -6070,54 +6123,6 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     summaryParas.push(mkPara("No activities were mastered this month.", { italics: true, color: "6b7280", after: 120 }));
   }
 
-  summaryParas.push(mkSectionHead(comparisonHeading));
-  summaryParas.push(mkBody(parsed.comparison || "\u2014"));
-
-  summaryParas.push(mkSectionHead("What we're working towards"));
-  if ((parsed.focusNext || []).length) {
-    parsed.focusNext.forEach(f => summaryParas.push(mkBullet(f)));
-  } else {
-    summaryParas.push(mkPara("\u2014", { italics: true, color: "9ca3af" }));
-  }
-
-  // Qualitative targets and this month's scores are collected here for the
-  // appendix chart; page 1 shows no numbers at all.
-  const qualitativeNames = [];
-  const scoreRows = [];
-  for (const target of activeTargets) {
-    const tName = target.name;
-    const td = threeMonthData[tName] || {};
-    const md = miniData[tName] || {};
-    const hasLineData = (td.avgs || []).some(v => v !== null && v !== undefined);
-    const hasMiniData = md.thisMonthAvg != null || md.lastMonthAvg != null;
-    if (!hasLineData && !hasMiniData) qualitativeNames.push(tName);
-    else if (md.thisMonthAvg != null) scoreRows.push({ name: tName, score: md.thisMonthAvg });
-  }
-  // ── Page 2: appendix — this month's scores as one chart ──
-  const appendixParas = [];
-  appendixParas.push(mkPara("Appendix: Scores this month", { heading: HeadingLevel.HEADING_1, before: 240, after: 160, size: 32, bold: true, pageBreak: true }));
-
-  scoreRows.sort((a, b) => b.score - a.score);
-  const barChart = scoreRows.length ? monthlyDrawScoreBarChart(scoreRows) : null;
-
-  if (barChart) {
-    const dispW = 620;
-    appendixParas.push(new Paragraph({
-      children: [new ImageRun({ data: b64ToUint8(barChart.base64),
-        transformation: { width: dispW, height: Math.round(dispW * barChart.height / barChart.width) }, type: "png" })],
-      alignment: AlignmentType.CENTER, spacing: { before: 80, after: 160 }
-    }));
-  } else {
-    appendixParas.push(mkPara("No scored sessions recorded this month.", { italics: true, color: "9ca3af", after: 160 }));
-  }
-
-  if (qualitativeNames.length) {
-    appendixParas.push(new Paragraph({
-      children: [new TextRun({ text: "* Qualitative targets \u2014 progress is described rather than scored, so they do not appear on the chart: ", size: 18, color: "6b7280", italics: true }),
-                 new TextRun({ text: qualitativeNames.join(", "), size: 18, color: "6b7280", italics: true })],
-      alignment: AlignmentType.BOTH, spacing: { before: 120, after: 0 }
-    }));
-  }
   // ── Assemble sections + doc ──
   const pageFooter = Footer ? new Footer({ children: [new Paragraph({ tabStops: [{ type: "center", position: 4750 },{ type: "right", position: 9500 }], children: [new TextRun({ text: "\t" }), new TextRun({ text: "ZORA Behavioural Intervention", size: 22, color: "555555" }), new TextRun({ text: "\t" }), new TextRun({ children: [PageNumber.CURRENT], size: 22, color: "555555" })], spacing: { before: 60, after: 0 } })] }) : undefined;
   const pageHeader = (Header && logoData) ? new Header({ children: [new Paragraph({ children: [new ImageRun({ data: logoData, transformation: { width: 180, height: 54 }, type: "png" })], alignment: AlignmentType.RIGHT, spacing: { before: 0, after: 0 } })] }) : undefined;
@@ -6128,10 +6133,9 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   // letter to a parent rather than a spreadsheet.
   const portraitProps  = { type: SectionType?.NEXT_PAGE ?? "nextPage", page: { size: { orientation: PageOrientation?.PORTRAIT ?? "portrait" } } };
 
+  // One flowing section - no cover page and no appendix.
   const docSections = [
-    { properties: {},              footers, headers, children: paragraphs   },  // cover
-    { properties: portraitProps,   footers, headers, children: summaryParas },  // the report
-    { properties: portraitProps,   footers, headers, children: appendixParas }  // appendix chart
+    { properties: portraitProps, footers, headers, children: summaryParas }
   ];
 
   const doc = new Document({ sections: docSections });
