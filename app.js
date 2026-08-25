@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1859";
+const APP_VERSION = "1860";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -5272,7 +5272,9 @@ You are writing a PARENT-FRIENDLY monthly progress report. Use plain English onl
 Provide ONLY the following sections using EXACTLY these markers. No extra text outside markers.
 
 ===HIGHLIGHTS===
-[Write 3 to 5 bullets. Each is one specific thing ${firstName} actually did this month, taken from the session remarks - a real moment, not a general description. Then add why it matters in ordinary life, after a dash. Example of the right shape: "Wrote his name without a model to copy from - which means he can start his worksheets at school without waiting for help." Where it matters, say how often, using words like "for the first time this month", "in most sessions", or "twice this month". Do NOT use dates. Do NOT repeat anything already listed under MASTERED THIS MONTH above. Only real things from the data - never invent one to fill a slot.]
+[Write EXACTLY 5 bullets - no more, no fewer. Each is one specific thing ${firstName} actually did this month, taken from the session remarks - a real moment, not a general description. Then add why it matters in ordinary life, after a dash. Example of the right shape: "Wrote his name without a model to copy from - which means he can start his worksheets at school without waiting for help." Where it matters, say how often, using words like "for the first time this month", "in most sessions", or "twice this month". Do NOT use dates. Do NOT repeat anything already listed under MASTERED THIS MONTH above. Only real things from the data - never invent one to fill a slot.]
+- [highlight - why it matters]
+- [highlight - why it matters]
 - [highlight - why it matters]
 - [highlight - why it matters]
 - [highlight - why it matters]
@@ -5604,19 +5606,38 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
 
 function monthlyParseAiResponse(text) {
   const out = { highlights: [], comparison: "", focusNext: [] };
+
+  // Stop a section at ===END=== OR at the next ===MARKER===, whichever comes
+  // first. The model sometimes omits an ===END===, and a regex that only looked
+  // for ===END=== then ran on into the following section - which is how
+  // FOCUS_NEXT items ended up inside both Highlights and the comparison text.
+  const section = name => {
+    const tag = `===${name}===`;
+    const i = text.indexOf(tag);
+    if (i < 0) return "";
+    const rest = text.slice(i + tag.length);
+    const endIdx = rest.indexOf("===END===");
+    const nextIdx = rest.search(/={3}[A-Z_]/);
+    let cut = rest.length;
+    if (endIdx >= 0) cut = Math.min(cut, endIdx);
+    if (nextIdx >= 0) cut = Math.min(cut, nextIdx);
+    // Belt and braces: drop any marker that still slipped through.
+    return rest.slice(0, cut).replace(/={3}[A-Z_]+={3}/g, "").trim();
+  };
+
   const bullets = block => block.split(String.fromCharCode(10)).map(l => l.trim())
     .filter(l => l.startsWith("•") || l.startsWith("-"))
     .map(l => l.replace(/^[•-]\s*/, "").trim())
     .filter(Boolean);
-  const one = re => { const m = re.exec(text); return m ? m[1].trim() : ""; };
 
-  const hi = one(/===HIGHLIGHTS===\s*([\s\S]*?)\s*===END===/);
-  out.highlights = hi ? bullets(hi) : [];
+  out.highlights = bullets(section("HIGHLIGHTS"));
+  out.comparison = section("COMPARISON");
+  out.focusNext  = bullets(section("FOCUS_NEXT"));
 
-  out.comparison = one(/===COMPARISON===\s*([\s\S]*?)\s*===END===/);
-
-  const fn = one(/===FOCUS_NEXT===\s*([\s\S]*?)\s*===END===/);
-  out.focusNext = fn ? bullets(fn) : [];
+  // If a section still leaked, a "working towards" line has no business being a
+  // highlight - drop those rather than print them twice.
+  const focusSet = new Set(out.focusNext);
+  out.highlights = out.highlights.filter(h => !focusSet.has(h) && !/^next we (are|will be) working towards/i.test(h));
   return out;
 }
 
