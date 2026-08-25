@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1898";
+const APP_VERSION = "1899";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -2836,6 +2836,81 @@ async function renderAiCostLine(lastUsd = null, usage = null) {
   el.style.display = parts.length ? "" : "none";
 }
 
+/**
+ * One AI request, read as a stream.
+ *
+ * The relay Worker forwards the response body untouched, so with stream:true
+ * the first bytes arrive in well under a second and keep arriving until the
+ * model finishes. That is what stops Cloudflare cutting the connection at
+ * ~100s, which was the HTTP 524 that long reports intermittently failed with.
+ * A non-streaming request looks idle for the whole generation, so a report
+ * that took longer than 100s could never succeed however many times it was run.
+ *
+ * Returns the same shape the old non-streaming call produced:
+ * { text, usage, stop_reason }, assembled from the events.
+ */
+async function aiRequest(aiPrompt, signal) {
+  const resp = await fetch("https://session-tracker-ai.wang-loys22.workers.dev", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      model: AI_MODEL,
+      max_tokens: 16000,
+      stream: true,
+      system: "You are a professional therapy report writer. Follow the requested format exactly.",
+      messages: [{ role: "user", content: aiPrompt }]
+    }),
+    signal
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    // Include the status and error type. A bare message like "Request not
+    // allowed" gives no clue whether it came from the relay or from Anthropic.
+    console.error("AI request failed:", resp.status, err);
+    throw new Error(`${err.error?.message || "Request failed"} (HTTP ${resp.status}${err.error?.type ? ", " + err.error.type : ""})`);
+  }
+
+  const usage = {};
+  let stopReason = null, text = "", inTextBlock = false, buf = "";
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    // SSE frames are separated by a blank line. Anything after the last blank
+    // line is a partial frame, so it stays in buf until the rest arrives.
+    const frames = buf.split("\n\n");
+    buf = frames.pop();
+    for (const frame of frames) {
+      const line = frame.split("\n").find(l => l.startsWith("data:"));
+      if (!line) continue;
+      let ev;
+      try { ev = JSON.parse(line.slice(5).trim()); } catch (_) { continue; }
+      if (ev.type === "message_start") {
+        Object.assign(usage, ev.message?.usage || {});
+      } else if (ev.type === "content_block_start") {
+        // Sonnet 5 thinks by default, so the first block is a thinking block.
+        // Only text blocks belong in the report.
+        inTextBlock = ev.content_block?.type === "text";
+      } else if (ev.type === "content_block_delta") {
+        if (inTextBlock && ev.delta?.type === "text_delta") text += ev.delta.text;
+      } else if (ev.type === "content_block_stop") {
+        inTextBlock = false;
+      } else if (ev.type === "message_delta") {
+        Object.assign(usage, ev.usage || {});   // final output_tokens arrives here
+        if (ev.delta?.stop_reason) stopReason = ev.delta.stop_reason;
+      } else if (ev.type === "error") {
+        throw new Error(ev.error?.message || "AI stream error");
+      }
+    }
+  }
+
+  return { text: text.trim(), usage, stop_reason: stopReason };
+}
+
 const HYR_DEFAULT_PROMPT = `You are writing a half-year progress report for parents. Keep everything warm, honest, and easy to read.
 
 GLOBAL RULES (apply to every section):
@@ -3336,17 +3411,7 @@ RECOMMENDATIONS:
     console.log(`[AI half-year prompt] ${aiPrompt.length.toLocaleString()} chars `
       + `(~${Math.round(aiPrompt.length / 4).toLocaleString()} tokens) — ${student.name}, ${aiReportingPeriod}`);
     _hyrAbortController = new AbortController();
-    const fetchPromise = fetch("https://session-tracker-ai.wang-loys22.workers.dev", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        model: "claude-sonnet-5",
-        max_tokens: 16000,
-        system: "You are a professional therapy report writer. Follow the requested format exactly.",
-        messages: [{ role: "user", content: aiPrompt }]
-      }),
-      signal: _hyrAbortController.signal
-    });
+    const fetchPromise = aiRequest(aiPrompt, _hyrAbortController.signal);
 
     // Fake phases run while fetch is already in flight
     await new Promise(r => setTimeout(r, 1000));
@@ -3361,8 +3426,8 @@ RECOMMENDATIONS:
     btn.textContent = "✕ Cancel";
     btn.style.cssText += ";background:#fee2e2;color:#dc2626;border-color:#ef4444";
 
-    // Await fetch (has been running for ~2.5s already)
-    const resp = await fetchPromise;
+    // Await the request (has been running for ~2.5s already)
+    const data = await fetchPromise;
 
     // Fetch done — restore button for remaining steps
     _hyrAbortController = null;
@@ -3376,26 +3441,13 @@ RECOMMENDATIONS:
     setProgress(85, "Writing report…");
     await new Promise(r => setTimeout(r, 700));
 
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
-      // Include the status and error type. A bare message like "Request not
-      // allowed" gives no clue whether it came from the relay or from Anthropic.
-      console.error("AI request failed:", resp.status, err);
-      throw new Error(`${err.error?.message || "Request failed"} (HTTP ${resp.status}${err.error?.type ? ", " + err.error.type : ""})`);
-    }
-
-    const data = await resp.json();
     // Record the cost the moment a response comes back, BEFORE anything that
     // can throw. Anthropic bills for a response it generated even if the app
     // then fails to read it, so tracking after the parse under-reported spend
     // on exactly the failures worth knowing about.
     aiTrackCost(data.usage, "halfYear");
-    // Take every text block, not content[0]. Sonnet 5 thinks by default, so the
-    // first block is a thinking block and content[0].text is undefined - which is
-    // what "Empty response from Claude" was really reporting.
-    const reportText = (data.content || [])
-      .filter(b => b && b.type === "text" && b.text)
-      .map(b => b.text).join("\n").trim();
+    // aiRequest already joined every text block and dropped the thinking blocks.
+    const reportText = data.text;
     if (!reportText) {
       throw new Error(data.stop_reason === "max_tokens"
         ? "The response hit the token limit before finishing. Try again, or tell Claude Code to raise max_tokens."
@@ -5569,17 +5621,7 @@ ${(aiData[t.name] || []).join("\n")}`;
     console.log(`[AI monthly prompt] ${aiPrompt.length.toLocaleString()} chars `
       + `(~${Math.round(aiPrompt.length / 4).toLocaleString()} tokens) — ${student.name}, ${monthName} ${year}`);
     _hyrAbortController = new AbortController();
-    const fetchPromise = fetch("https://session-tracker-ai.wang-loys22.workers.dev", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        model: "claude-sonnet-5",
-        max_tokens: 16000,
-        system: "You are a professional therapy report writer. Follow the requested format exactly.",
-        messages: [{ role: "user", content: aiPrompt }]
-      }),
-      signal: _hyrAbortController.signal
-    });
+    const fetchPromise = aiRequest(aiPrompt, _hyrAbortController.signal);
 
     await new Promise(r => setTimeout(r, 800));
     setProgress(25, "Processing data…");
@@ -5592,7 +5634,7 @@ ${(aiData[t.name] || []).join("\n")}`;
     btn.textContent = "✕ Cancel";
     btn.style.cssText += ";background:#fee2e2;color:#dc2626;border-color:#ef4444";
 
-    const resp = await fetchPromise;
+    const data = await fetchPromise;
     _hyrAbortController = null;
     inCancelMode = false;
     btn.disabled = true;
@@ -5604,25 +5646,13 @@ ${(aiData[t.name] || []).join("\n")}`;
     setProgress(86, "Writing report…");
     await new Promise(r => setTimeout(r, 600));
 
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
-      // Include the status and error type. A bare message like "Request not
-      // allowed" gives no clue whether it came from the relay or from Anthropic.
-      console.error("AI request failed:", resp.status, err);
-      throw new Error(`${err.error?.message || "Request failed"} (HTTP ${resp.status}${err.error?.type ? ", " + err.error.type : ""})`);
-    }
-    const data = await resp.json();
     // Record the cost the moment a response comes back, BEFORE anything that
     // can throw. Anthropic bills for a response it generated even if the app
     // then fails to read it, so tracking after the parse under-reported spend
     // on exactly the failures worth knowing about.
     aiTrackCost(data.usage, "monthly");
-    // Take every text block, not content[0]. Sonnet 5 thinks by default, so the
-    // first block is a thinking block and content[0].text is undefined - which is
-    // what "Empty response from Claude" was really reporting.
-    const reportText = (data.content || [])
-      .filter(b => b && b.type === "text" && b.text)
-      .map(b => b.text).join("\n").trim();
+    // aiRequest already joined every text block and dropped the thinking blocks.
+    const reportText = data.text;
     if (!reportText) {
       throw new Error(data.stop_reason === "max_tokens"
         ? "The response hit the token limit before finishing. Try again, or tell Claude Code to raise max_tokens."
