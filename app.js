@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1881";
+const APP_VERSION = "1882";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -19483,6 +19483,14 @@ function renderTargetManageContent(student, target) {
             sub.masteredOn = pickedDate;
           });
         } else {
+          // Clear the mastered state as well. Without this an activity switched
+          // from mastered to discontinued kept masteredOn, and the status
+          // sections check mastered first, so it stayed under Mastered
+          // Activities however many times the page was refreshed. The
+          // sub-activity branch below already did this; the parent did not.
+          const paWasMaintained = !!pa.maintained;
+          delete pa.masteredOn; delete pa.isCompleted; delete pa.inactiveReason;
+          if (!paWasMaintained) { delete pa.maintained; delete pa.activityColor; delete pa.maintainedAt; }
           pa.discontinuedOn = pickedDate;
           _cascadeToActiveSubs(sub => {
             const subWasMaintained = !!sub.maintained;
