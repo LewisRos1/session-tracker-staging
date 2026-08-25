@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1858";
+const APP_VERSION = "1859";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -5249,7 +5249,7 @@ async function monthlyGenerate() {
     // there isn't enough history to say anything honest.
     const _cmpLabels = (threeMonthData[activeTargets[0]?.name] || {}).labels || [];
     const comparisonLabel = _cmpLabels.length >= 2
-      ? `${_cmpLabels[0]} to ${_cmpLabels[_cmpLabels.length - 1]}`
+      ? `${_cmpLabels[0]}-${_cmpLabels[_cmpLabels.length - 1]}`
       : "the earlier months";
     const comparisonAvailable = activeTargets.some(t => {
       const avgs = (threeMonthData[t.name] || {}).avgs || [];
@@ -5258,8 +5258,8 @@ async function monthlyGenerate() {
     // Name the months in the heading rather than saying "a few months ago", so a
     // parent can see exactly what the comparison is against.
     const comparisonHeading = comparisonAvailable
-      ? `Compared with ${comparisonLabel}`
-      : "Compared with earlier months";
+      ? `Compared to the past 3 months (${comparisonLabel})`
+      : "Compared to the earlier months";
 
     const aiPrompt = `${HYR_DEFAULT_PROMPT}
 ${excludedList ? `\nEXCLUDED ACTIVITIES — ABSOLUTE RULE: The following activities have been deliberately excluded from this report. Do NOT mention, reference, or draw conclusions about them anywhere:\n${excludedList}\n` : ""}
@@ -5957,25 +5957,35 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   } catch (_) {}
 
   // ── Cover page ──
+  // Lighter than the half-year cover on purpose. A monthly update is a short,
+  // frequent document, so it drops the empty Program field and the company
+  // contact block, which belong on the formal half-year report. The session
+  // count is deliberately absent: it reads as an invoice rather than progress.
   const CPL = { line: 276, lineRule: "auto" };
   paragraphs.push(new Paragraph({
     children: logoData ? [new ImageRun({ data: logoData, transformation: { width: 454, height: 135 }, type: "png" })] : [],
-    alignment: AlignmentType.CENTER, spacing: { before: 480, after: 560, ...CPL }
+    alignment: AlignmentType.CENTER, spacing: { before: 1200, after: 720, ...CPL }
   }));
-  paragraphs.push(new Paragraph({ children: [new TextRun({ text: "Monthly Progress Report", bold: true, size: 72, font: TNR })], alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, ...CPL } }));
-  paragraphs.push(new Paragraph({ children: [new TextRun({ text: `${sessionType === "group" ? "Group" : "Individual"} Session (${monthName} ${year})`, bold: true, size: 36, font: TNR })], alignment: AlignmentType.CENTER, spacing: { before: 0, after: 640, ...CPL } }));
-  const mkCoverLabel  = t => new Paragraph({ children: [new TextRun({ text: t, bold: true, size: 36, font: TNR })], alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, ...CPL } });
-  const mkCoverShaded = (v, sz = 32) => new Paragraph({ shading: { type: "clear", fill: "D9D9D9", color: "auto" }, children: [new TextRun({ text: v, size: sz, font: TNR })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 160, ...CPL }, indent: { left: 120, right: 120 } });
-  const mkCoverSpacer = () => new Paragraph({ children: [], spacing: { before: 0, after: 480, ...CPL } });
-  const mkCompanyLine = l => new Paragraph({ children: [new TextRun({ text: `${l} `, bold: true, size: 28, font: TNR }), new TextRun({ text: "[insert text]", size: 28, font: TNR })], alignment: AlignmentType.CENTER, spacing: { before: 40, after: 40, ...CPL } });
-  paragraphs.push(mkCoverLabel("Student Name:")); paragraphs.push(mkCoverShaded(student.name));
-  paragraphs.push(mkCoverSpacer());
-  paragraphs.push(mkCoverLabel("Program:")); paragraphs.push(mkCoverShaded("​", 32));
-  paragraphs.push(mkCoverSpacer());
-  paragraphs.push(mkCoverLabel("Date of Report:")); paragraphs.push(mkCoverShaded(reportDate));
-  paragraphs.push(mkCoverSpacer());
-  paragraphs.push(mkCoverLabel("Company Details:"));
-  ["Tel:", "Email:", "Website:", "Address:"].forEach(l => paragraphs.push(mkCompanyLine(l)));
+  paragraphs.push(new Paragraph({
+    children: [new TextRun({ text: "Monthly Progress Report", bold: true, size: 64, font: TNR })],
+    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 120, ...CPL }
+  }));
+  paragraphs.push(new Paragraph({
+    children: [new TextRun({ text: `${monthName} ${year}`, size: 44, font: TNR, color: "3b5f8a" })],
+    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 960, ...CPL }
+  }));
+  paragraphs.push(new Paragraph({
+    children: [new TextRun({ text: student.name, bold: true, size: 40, font: TNR })],
+    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 60, ...CPL }
+  }));
+  paragraphs.push(new Paragraph({
+    children: [new TextRun({ text: sessionType === "group" ? "Group Sessions" : "Individual Sessions", size: 26, font: TNR, color: "6b7280" })],
+    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 960, ...CPL }
+  }));
+  paragraphs.push(new Paragraph({
+    children: [new TextRun({ text: `Report date: ${reportDate}`, size: 24, font: TNR, color: "6b7280" })],
+    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, ...CPL }
+  }));
 
   // ── Page 1: the parent-facing report (portrait) ──
   // Deliberately selective. An earlier version printed a row per target with
@@ -5996,8 +6006,6 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     alignment: AlignmentType.BOTH, spacing: { before: 0, after: 160, ...LS }
   });
 
-  summaryParas.push(mkPara(`${student.name} \u2014 ${monthName} ${year}`, { heading: HeadingLevel.HEADING_1, before: 240, after: 60, size: 32, bold: true }));
-  summaryParas.push(mkPara(`${sessionCount} session${sessionCount === 1 ? "" : "s"} this month`, { after: 200, size: 20, color: "6b7280" }));
 
   // Highlights first, because it is always populated — a report that can open
   // with "nothing was mastered this month" opens badly.
@@ -6010,11 +6018,33 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
 
   summaryParas.push(mkSectionHead("Mastered this month"));
   if (masteredThisMonth.length) {
-    masteredThisMonth.forEach(m => summaryParas.push(new Paragraph({
-      children: [new TextRun({ text: m.activity, size: 22, bold: true }),
-                 new TextRun({ text: `  \u2014  ${m.target}`, size: 20, color: "6b7280" })],
-      bullet: { level: 0 }, spacing: { before: 60, after: 60, ...LS }
-    })));
+    // Grouped by target, with the target as a tinted band spanning the row, so a
+    // target name isn't repeated down a column. Numbering restarts inside each
+    // band, matching how the app lists mastered activities per target.
+    const mastRows = [new TableRow({ tableHeader: true, children: [
+      mkHdrCell("No.", "", 800),
+      mkHdrCell("Activity", "", 7160),
+      mkHdrCell("Mastered On", "", 1400)
+    ]})];
+    const byTarget = new Map();
+    for (const m of masteredThisMonth) {
+      if (!byTarget.has(m.target)) byTarget.set(m.target, []);
+      byTarget.get(m.target).push(m);
+    }
+    for (const [tName, items] of byTarget) {
+      mastRows.push(new TableRow({ children: [new TableCell({
+        columnSpan: 3, width: { size: 9360, type: WidthType.DXA },
+        margins: { top: 90, bottom: 90, left: 150, right: 150 },
+        shading: { fill: "eff6ff" },
+        children: [new Paragraph({ children: [new TextRun({ text: tName, bold: true, size: 21, color: "1e40af" })], spacing: { before: 40, after: 40 } })]
+      })]}));
+      items.forEach((m, i) => mastRows.push(new TableRow({ children: [
+        mkCell(`${i + 1})`, { dxa: 800, align: AlignmentType.CENTER, size: 20 }),
+        mkCell(m.activity, { dxa: 7160 }),
+        mkCell(fmtPeriodDate(m.on), { dxa: 1400, align: AlignmentType.CENTER, size: 20 })
+      ]})));
+    }
+    summaryParas.push(new Table({ width: { size: 9360, type: WidthType.DXA }, rows: mastRows }));
   } else {
     summaryParas.push(mkPara("No activities were mastered this month.", { italics: true, color: "6b7280", after: 120 }));
   }
