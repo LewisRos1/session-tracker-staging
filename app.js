@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1865";
+const APP_VERSION = "1866";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -2787,6 +2787,10 @@ GLOBAL RULES (apply to every section):
 - CRITICAL: Write ONLY what the session remarks directly and explicitly state. Do NOT extrapolate or infer related skills. "Identifies a face" is NOT the same as "knows a name." "Follows a one-step instruction" is NOT the same as "follows two-step instructions." "Points to an object" is NOT the same as "can name it." Stay word-for-word within what was actually recorded — never assume a student can or cannot do something that was not directly observed.
 - CRITICAL: Some activities track NEGATIVE or PROBLEM BEHAVIOURS (e.g. snatching food, interrupting others, hitting, distracting behaviour). For these activities, scoring is INVERTED — a HIGH score (e.g. 3 out of 3) means the student did NOT exhibit the bad behaviour and showed good self-control, while a LOW score (e.g. 0) means the bad behaviour DID occur. Always interpret scores for problem/negative behaviour activities with this in mind: high = good, low = the behaviour occurred.
 - READABILITY: Write every section to a Flesch Reading Ease score of 60 to 70. Use short sentences and a natural tone. ABA terms that parents need to know (e.g. "self-regulation", "prompt", "generalisation") are allowed, but always explain them in plain words in the same sentence if they appear.
+- SENTENCE STRUCTURE: Write complete sentences, never fragments. Start each point with the subject, e.g. "He greeted a new friend..." or "Hayden explained...", not with a bare verb like "Greeted a new friend...".
+  • When a point states something observed AND what it means, write it as TWO sentences. The first says what happened. The second says what it shows, and begins with a phrase such as "This shows...", "This reflects...", "This demonstrates...", or "This highlights...".
+  • NEVER join an observation to its meaning with a dash or a hyphen, and never use the phrase "this matters because".
+  • Do not stack clauses. If a sentence carries more than two commas, split it into two sentences.
 - WRITING STYLE: Write like a professional therapist's report — warm but precise. Follow these rules on every sentence:
   • Verb choices: use "demonstrates" not "shows"; "requires support" or "would benefit from support" not "needs help"; "is able to" not "can"; "experiences difficulty" not "has difficulty"; "initiates" not "starts"; "attends to" not "pays attention to"; "request" not "ask for things".
   • Soften negatives: describe challenging behaviours as "may display physical behaviours such as..." rather than naming them bluntly. Use "when faced with frustration" or "when expectations are not met" instead of "when he/she cannot get what he/she wants".
@@ -5263,6 +5267,12 @@ async function monthlyGenerate() {
     const comparisonLabel = _cmpLabels.length >= 2
       ? `${_cmpLabels[0]}-${_cmpLabels[_cmpLabels.length - 1]}`
       : "the earlier months";
+    // Spelled-out version for the prose. "the past 3 months (April to June)"
+    // lands better for a parent than bare month names.
+    const _fullOf = ab => FULL_MONTHS[["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].indexOf(ab)] || ab;
+    const comparisonLabelFull = _cmpLabels.length >= 2
+      ? `the past 3 months (${_fullOf(_cmpLabels[0])} to ${_fullOf(_cmpLabels[_cmpLabels.length - 1])})`
+      : "the earlier months";
     const comparisonAvailable = activeTargets.some(t => {
       const avgs = (threeMonthData[t.name] || {}).avgs || [];
       return avgs.filter(v => v !== null && v !== undefined).length >= 2;
@@ -5279,12 +5289,19 @@ Student: ${student.name}
 ${student.note ? `Student Program Note: ${student.note}\n` : ""}Reporting Month: ${monthName} ${year}
 Number of sessions this month: ${sessionCount}
 
-You are writing a PARENT-FRIENDLY monthly progress report. Use plain English only — no clinical jargon, no percentages in the text, no technical terms. Warm but honest tone.
+You are writing a monthly progress report for this student's parents. Follow the GLOBAL RULES above on every sentence, including the writing style and sentence structure rules. No percentages or numbers anywhere in the text. Warm but honest.
 
 Provide ONLY the following sections using EXACTLY these markers. No extra text outside markers.
 
 ===HIGHLIGHTS===
-[Write EXACTLY 5 bullets - no more, no fewer. Each is one specific thing ${firstName} actually did this month, taken from the session remarks - a real moment, not a general description. Then add why it matters in ordinary life, after a dash. Example of the right shape: "Wrote his name without a model to copy from - which means he can start his worksheets at school without waiting for help." Where it matters, say how often, using words like "for the first time this month", "in most sessions", or "twice this month". Do NOT use dates. Do NOT repeat anything already listed under MASTERED THIS MONTH above. Only real things from the data - never invent one to fill a slot.]
+[Write EXACTLY 5 points, no more and no fewer. Each is one specific thing ${firstName} actually did this month, taken from the session remarks, a real moment rather than a general description.
+
+Write each point as TWO sentences. The first states what was observed, starting with the subject. The second states what it shows, starting with a phrase such as "This shows", "This reflects", "This demonstrates" or "This highlights". Never join them with a dash and never write "this matters because".
+
+Right: "He apologised to a peer after accidentally stepping on his foot, with minimal prompting. This reflects his use of polite language to repair social situations and maintain positive relationships with classmates."
+Wrong: "Apologised to a peer after accidentally stepping on his foot, without needing much prompting - this matters because it shows he is using polite words."
+
+Where it is relevant, say how often within the first sentence, using wording such as "during one session this month", "in most sessions" or "on two occasions this month". Do NOT use dates. Do NOT repeat anything already listed under MASTERED THIS MONTH above. Only real things from the data, never invent one to fill a slot.]
 - [highlight - why it matters]
 - [highlight - why it matters]
 - [highlight - why it matters]
@@ -5294,12 +5311,14 @@ Provide ONLY the following sections using EXACTLY these markers. No extra text o
 
 ===COMPARISON===
 [${comparisonAvailable
-  ? `Write 2 to 3 sentences comparing where ${firstName} is now with where he or she was over ${comparisonLabel}. Say plainly whether things are moving forward, holding steady, or slipping, and name what specifically changed. Base it on the monthly averages and the remarks in the session data below. NO numbers and NO percentages - describe the change in words. Be honest: if it has been steady rather than improving, say so warmly but do not dress it up as progress.`
+  ? `Write 2 to 3 sentences comparing where ${firstName} is now with where he or she was over ${comparisonLabelFull}. Say plainly whether things are moving forward, holding steady, or slipping, and name what specifically changed. Base it on the monthly averages and the remarks in the session data below. NO numbers and NO percentages - describe the change in words. Be honest: if it has been steady rather than improving, say so warmly but do not dress it up as progress.
+
+Whenever you refer to that earlier period, write it as "${comparisonLabelFull}" rather than naming the months on their own. Write "Over the past 3 months (April to June) his mood varied", never "Over April to June his mood varied". Naming the window each time makes it clear to a parent what is being compared.`
   : `Write exactly this sentence and nothing else: "There is not enough earlier data yet to compare this month against - the next few reports will start to show the bigger picture."`}]
 ===END===
 
 ===FOCUS_NEXT===
-[Write 2 to 3 bullets naming what will be worked on next month, phrased as what you are building towards rather than as a list of problems. "Next we are working towards him managing a change of plan without support" is right; "struggles with transitions" is wrong. Each is one short sentence in plain English. Base them on genuine difficulties in the data - never invent one to fill a slot.]
+[Write 2 to 3 points naming what will be worked on next month, phrased as what is being built towards rather than as a list of problems. Each is one or two complete sentences. Vary how each one opens rather than starting every point with the same words. Base them on genuine difficulties in the data, never invent one to fill a slot.]
 - [focus]
 - [focus]
 ===END===
@@ -6003,14 +6022,20 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   // parent actually has: what did my child do, is it moving, what happens next.
   const summaryParas = [];
 
-  // Numbered "1)" rather than a bullet glyph, matching how activities are
-  // numbered everywhere else in the app.
-  const mkNumbered = (text, n) => new Paragraph({
-    children: [new TextRun({ text: `${n}) `, size: 22, bold: true }), new TextRun({ text, size: 22 })],
-    indent: { left: 400, hanging: 400 },
+  // Word's own numbered list rather than a hand-written "1)" run. Writing the
+  // number as text meant it inherited the run's bold and needed a manual hanging
+  // indent, which never lines up the way Word's list formatting does.
+  const mkNumbered = text => new Paragraph({
+    numbering: { reference: "mr-num", level: 0 },
+    children: [new TextRun({ text, size: 22 })],
     spacing: { before: 70, after: 70, ...LS }
   });
-  const mkSectionHead = text => mkPara(text, { heading: HeadingLevel.HEADING_2, before: 260, after: 120, size: 26, bold: true, keepNext: true });
+  // An empty paragraph before each heading, so sections are separated by a real
+  // blank line rather than relying on paragraph spacing alone.
+  const mkSectionHead = text => {
+    summaryParas.push(new Paragraph({ children: [], spacing: { before: 0, after: 0, ...LS } }));
+    return mkPara(text, { heading: HeadingLevel.HEADING_2, before: 120, after: 120, size: 26, bold: true, keepNext: true });
+  };
   const mkBody = text => new Paragraph({
     children: [new TextRun({ text, size: 22 })],
     alignment: AlignmentType.BOTH, spacing: { before: 0, after: 160, ...LS }
@@ -6031,14 +6056,14 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   }));
   summaryParas.push(new Paragraph({
     children: [new TextRun({
-      text: `Monthly Progress Report  ·  ${monthName} ${year}  ·  ${sessionCount} session${sessionCount === 1 ? "" : "s"}`,
+      text: `Monthly Progress Report — ${monthName} ${year} — ${sessionCount} session${sessionCount === 1 ? "" : "s"}`,
       size: 22, color: "6b7280", font: TNR })],
     alignment: AlignmentType.CENTER, spacing: { before: 0, after: 320, ...LS }
   }));
 
   summaryParas.push(mkSectionHead("Highlights this month"));
   if ((parsed.highlights || []).length) {
-    parsed.highlights.forEach((h, i) => summaryParas.push(mkNumbered(h, i + 1)));
+    parsed.highlights.forEach(h => summaryParas.push(mkNumbered(h)));
   } else {
     summaryParas.push(mkPara("No sessions were recorded this month.", { italics: true, color: "9ca3af", after: 120 }));
   }
@@ -6048,7 +6073,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
 
   summaryParas.push(mkSectionHead("What we're working towards"));
   if ((parsed.focusNext || []).length) {
-    parsed.focusNext.forEach((f, i) => summaryParas.push(mkNumbered(f, i + 1)));
+    parsed.focusNext.forEach(f => summaryParas.push(mkNumbered(f)));
   } else {
     summaryParas.push(mkPara("\u2014", { italics: true, color: "9ca3af" }));
   }
@@ -6070,7 +6095,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   // No "Appendix" framing: the chart and the mastered list are part of the report
   // a parent reads, not back matter. They flow on from the prose rather than
   // starting a forced new page.
-  summaryParas.push(mkSectionHead("Score Summary"));
+  summaryParas.push(mkSectionHead(`Score Summary (${monthName} ${year})`));
 
   scoreRows.sort((a, b) => b.score - a.score);
   const barChart = scoreRows.length ? monthlyDrawScoreBarChart(scoreRows) : null;
@@ -6088,8 +6113,11 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
 
   if (qualitativeNames.length) {
     summaryParas.push(new Paragraph({
-      children: [new TextRun({ text: "* Qualitative targets \u2014 progress is described rather than scored, so they do not appear on the chart: ", size: 18, color: "6b7280", italics: true }),
-                 new TextRun({ text: qualitativeNames.join(", "), size: 18, color: "6b7280", italics: true })],
+      children: [new TextRun({
+        text: `Some targets, such as ${qualitativeNames.length > 1
+          ? qualitativeNames.slice(0, -1).join(", ") + " and " + qualitativeNames[qualitativeNames.length - 1]
+          : qualitativeNames[0]}, are tracked through observations rather than scores, so they are not displayed in the chart.`,
+        size: 18, color: "6b7280", italics: true })],
       alignment: AlignmentType.BOTH, spacing: { before: 100, after: 0 }
     }));
   }
@@ -6142,7 +6170,14 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     { properties: portraitProps, footers, headers, children: summaryParas }
   ];
 
-  const doc = new Document({ sections: docSections });
+  const doc = new Document({
+    numbering: { config: [{
+      reference: "mr-num",
+      levels: [{ level: 0, format: LevelFormat.DECIMAL, text: "%1)", alignment: AlignmentType.START,
+        style: { paragraph: { indent: { left: 720, hanging: 360 } } } }]
+    }]},
+    sections: docSections
+  });
 
   const blob = await Packer.toBlob(doc);
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
