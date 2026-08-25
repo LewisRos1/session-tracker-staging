@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1884";
+const APP_VERSION = "1885";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -2777,10 +2777,11 @@ GLOBAL RULES (apply to every section):
 - Be honest and sympathetic. Do NOT say positive things that are not supported by the data — false reassurance misleads parents and damages trust. Be kind in how you say things, not in what you choose to leave out.
 - NEVER use the em dash symbol (—) anywhere in the report. Use a comma, a full stop, or rewrite the sentence instead.
 - CRITICAL: A remark of "No Event" means the student did NOT perform or exhibit that behaviour or activity in that session. For negative/problem behaviours (e.g. snatching food, hitting, interrupting), "No Event" is a POSITIVE outcome — the bad behaviour simply did not occur. For skill or learning activities, "No Event" means the skill was not observed or demonstrated that session — treat it as neutral, not a failure. Do NOT treat "No Event" negatively in either case.
+- CRITICAL: NEVER say that an activity was discontinued, stopped, dropped, retired, or removed. Discontinuing is internal housekeeping that hides an activity from the website; it says nothing about the student and must never appear in a report. The work recorded against such an activity is still real: use its remarks, trials and selections normally, and simply never comment on its status.
 - CRITICAL: AN ACTIVITY'S STATE DEPENDS ON THE DATE. Each activity carries its dates, e.g. "[started 25 Feb 2026, mastered on 20 Aug 2026]". Those dates define two phases:
   • From the start date up to the mastery date, the student was STILL WORKING ON IT.
   • From the mastery date onwards, it is MASTERED.
-  Work out which phase the activity was in DURING the reporting period named above, and describe that phase. The same applies to a discontinued date.
+  Work out which phase the activity was in DURING the reporting period named above, and describe that phase.
   Never write that something was "mastered this term" unless the mastery date itself falls inside the reporting period. An activity started in February and mastered in August was still being worked on for the whole of a January to June report, so describe it as in progress, not as completed.
 - PROGRAM STATUS — these four words have fixed meanings in this service. They appear as an activity status and sometimes as the remark text itself. Use these meanings exactly; never infer a meaning from the word alone:
   • In Progress (also written "IP"): the program is not currently implemented in this session due to scheduling priorities assigned to other active programs. It says NOTHING about the student's ability or progress. Do NOT comment on it, do NOT treat it as a missed attempt, and do NOT use it as evidence of difficulty or strength. Ignore these entries entirely when forming your observations. An activity with NO remark AND NO score means the same thing and is ignored the same way.
@@ -3497,11 +3498,14 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
           hyrLegacyToKey[pa.name] = key;
         }
       } else {
+        // Discontinued is an internal housekeeping state - it means "stop showing
+        // this on the website", not that the work stopped mattering. Its data is
+        // still sent, but the status itself is withheld so it cannot be narrated
+        // to a parent.
         const _startedOn2 = pa.createdOn || pa.activeFrom || null;
         paKeyToStatus[key] = [
           _startedOn2 ? `started ${fmtPeriodDate(_startedOn2)}` : "",
-          pa.masteredOn ? `mastered on ${fmtPeriodDate(pa.masteredOn)}`
-            : pa.discontinuedOn ? `discontinued on ${fmtPeriodDate(pa.discontinuedOn)}` : "discontinued"
+          pa.masteredOn ? `mastered on ${fmtPeriodDate(pa.masteredOn)}` : ""
         ].filter(Boolean).join(", ");
       }
     }
@@ -5131,7 +5135,8 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
       const [my, mm] = String(pa.masteredOn).split("-");
       if (Number(my) !== year || mm < _hyrRange[0] || mm > _hyrRange[1]) continue;
       const label = pa.title || pa.name;
-      if (label) hyrMastered.push({ activity: label, target: t.name, on: pa.masteredOn });
+      const detail = pa.title ? (pa.name || "") : "";
+      if (label) hyrMastered.push({ activity: label, detail, target: t.name, on: pa.masteredOn });
     }
   }
 
@@ -5141,7 +5146,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     appendixParas.push(mkPara(`Section ${nextSectionNum + 1}: Appendix`, { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
 
     // Mastered list first, then the breakdown charts.
-    appendixParas.push(mkPara("Activities Mastered This Period", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true }));
+    appendixParas.push(mkPara(`Activities Mastered This Period (${firstMonthName.slice(0,3)} ${year} - ${halfEndName.slice(0,3)} ${year})`, { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true }));
     if (hyrMastered.length) {
       const mkMastHdr = (txt, dxa) => new TableCell({
         width: { size: dxa, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER,
@@ -5172,7 +5177,15 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
             margins: { top: 100, bottom: 100, left: 150, right: 150 },
             children: [new Paragraph({ children: [new TextRun({ text: tName, size: 20 })], spacing: { before: 80, after: 80 } })]
           }));
-          cells.push(mkCell(m.activity, { dxa: 4900 }));
+          cells.push(new TableCell({
+            width: { size: 4900, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER,
+            margins: { top: 100, bottom: 100, left: 150, right: 150 },
+            children: [new Paragraph({
+              children: [new TextRun({ text: m.activity, size: 22 })].concat(
+                m.detail ? [new TextRun({ break: 1, text: m.detail, size: 20, color: "374151" })] : []),
+              spacing: { before: 80, after: 80 }
+            })]
+          }));
           cells.push(mkCell(fmtPeriodDate(m.on), { dxa: 1400, align: AlignmentType.CENTER, size: 20 }));
           mastRows.push(new TableRow({ children: cells }));
         });
@@ -5337,8 +5350,11 @@ async function monthlyGenerate() {
       for (const pa of (t.predefinedActivities || [])) {
         if (pa.isHeading || pa.isMaintainHeading || pa.isNote || pa.isExportNote) continue;
         if (!pa.masteredOn || !String(pa.masteredOn).startsWith(_mmPrefix)) continue;
+        // Title and details, the way the app shows them. An activity called
+        // "Comment" tells a parent nothing without its details underneath.
         const label = pa.title || pa.name;
-        if (label) masteredThisMonth.push({ activity: label, target: t.name, on: pa.masteredOn });
+        const detail = pa.title ? (pa.name || "") : "";
+        if (label) masteredThisMonth.push({ activity: label, detail, target: t.name, on: pa.masteredOn });
       }
     }
 
@@ -5630,11 +5646,11 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
           legacyToKey[pa.name] = key;
         }
       } else {
+        // See hyrCollectData: the discontinued status is withheld deliberately.
         const _mStart2 = pa.createdOn || pa.activeFrom || null;
         paKeyToStatusM[key] = [
           _mStart2 ? `started ${fmtPeriodDate(_mStart2)}` : "",
-          pa.masteredOn ? `mastered on ${fmtPeriodDate(pa.masteredOn)}`
-            : pa.discontinuedOn ? `discontinued on ${fmtPeriodDate(pa.discontinuedOn)}` : "discontinued"
+          pa.masteredOn ? `mastered on ${fmtPeriodDate(pa.masteredOn)}` : ""
         ].filter(Boolean).join(", ");
       }
     }
@@ -6276,7 +6292,15 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
           margins: { top: 100, bottom: 100, left: 150, right: 150 },
           children: [new Paragraph({ children: [new TextRun({ text: tName, size: 20 })], spacing: { before: 80, after: 80 } })]
         }));
-        cells.push(mkCell(m.activity, { dxa: 4900 }));
+        cells.push(new TableCell({
+          width: { size: 4900, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER,
+          margins: { top: 100, bottom: 100, left: 150, right: 150 },
+          children: [new Paragraph({
+            children: [new TextRun({ text: m.activity, size: 22 })].concat(
+              m.detail ? [new TextRun({ break: 1, text: m.detail, size: 20, color: "374151" })] : []),
+            spacing: { before: 80, after: 80 }
+          })]
+        }));
         cells.push(mkCell(fmtPeriodDate(m.on), { dxa: 1400, align: AlignmentType.CENTER, size: 20 }));
         mastRows.push(new TableRow({ children: cells }));
       });
