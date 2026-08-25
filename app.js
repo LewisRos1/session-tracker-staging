@@ -176,7 +176,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1851";
+const APP_VERSION = "1852";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3389,6 +3389,8 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
     if (!tData) continue;
 
     lines.push(`=== TARGET: ${tName} ===`);
+    // Raw trial values are meaningless without the scale they were scored on.
+    lines.push(`Each trial is scored out of ${target.maxPoints || 3}.`);
 
     // Monthly averages
     const chartLabels = [];
@@ -3445,14 +3447,19 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
         if (pa.id) paKeyToConfigId[key] = pa.id;
         actNames.add(key);
         actDisplayNames[key] = key;
-        if (pa.maintained) paKeyToStatus[key] = "maintained";
+        // Status carries its date — "why did the average drop in May" is often
+        // answered by an activity having been mastered or dropped that month.
+        if (pa.maintained) paKeyToStatus[key] = pa.maintainedAt
+          ? `maintained since ${fmtPeriodDate(pa.maintainedAt)}` : "maintained";
         if (pa.title && pa.name && pa.title !== pa.name) {
           if (!paKeyToAliases[key]) paKeyToAliases[key] = [];
           paKeyToAliases[key].push(pa.name);
           hyrLegacyToKey[pa.name] = key;
         }
       } else {
-        paKeyToStatus[key] = pa.masteredOn ? "mastered" : "discontinued";
+        paKeyToStatus[key] = pa.masteredOn
+          ? `mastered on ${fmtPeriodDate(pa.masteredOn)}`
+          : pa.discontinuedOn ? `discontinued on ${fmtPeriodDate(pa.discontinuedOn)}` : "discontinued";
       }
     }
     // Consolidate any legacy names added from session data into the canonical key
@@ -3498,8 +3505,11 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
                       || (r.selectedOptions || []).length > 0);
           const _isManual = paKeyToManualScore[actName] || false;
           for (const rem of remarks) {
-            const trials = (rem.trials || []).filter(t => t !== -1);
-            if (rem.optionScore !== undefined) trials.push(rem.optionScore);
+            // rawTrials = what was actually tallied that session. optionScore is
+            // folded in for the average only — it's a selection, not a trial, and
+            // its label is already in the remark text.
+            const rawTrials = (rem.trials || []).filter(t => t !== -1);
+            const trials = rem.optionScore !== undefined ? [...rawTrials, rem.optionScore] : rawTrials;
             let avg;
             if (_isManual) {
               const _pct = parseManualScore(hyrStripHtml(rem.text || "").trim());
@@ -3510,7 +3520,7 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
             const _hText = hyrStripHtml(rem.text || "");
             const _hNote = hyrStripHtml(rem.masteryNote || "").trim();
             const _hCombined = _hText && _hNote ? `${_hText} / ${_hNote}` : _hText || _hNote;
-            allRemarks.push({ date: sess.date, text: _hCombined, avg });
+            allRemarks.push({ date: sess.date, text: _hCombined, avg, trials: rawTrials });
           }
         }
         allRemarks.sort((a, b) => a.date.localeCompare(b.date));
@@ -3566,6 +3576,19 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
         if (overallAvg !== null) actLine += ` (overall avg ${overallAvg}%)`;
         lines.push(actLine);
 
+        // Per-month averages for this activity, gaps included. Without these the
+        // model can see a target dip but not which activity moved, and can't tell
+        // a real decline from an activity that simply stopped being worked on.
+        const _actMonthly = [];
+        for (let m = startMonth; m <= endMonth; m++) {
+          const mLabel = shortMonths[m - 1];
+          const scores = actMonthlyAvgs[mLabel];
+          _actMonthly.push(scores && scores.length
+            ? `${mLabel} ${Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)}%`
+            : `${mLabel} no data`);
+        }
+        lines.push(`    Monthly: ${_actMonthly.join(", ")}`);
+
         for (const rem of allRemarks) {
           const [, _rm, _rd] = rem.date.split("-").map(Number);
           const _dateLabel = `${_rd} ${shortMonths[_rm - 1]}`;
@@ -3574,6 +3597,8 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
           // detail the report is meant to be grounded in.
           if (rem.text) parts.push(`"${rem.text.trim()}"`);
           if (rem.avg !== null) parts.push(`[${rem.avg}%]`);
+          // Raw trials: 1,3,2 and 2,2,2 average the same but mean different things.
+          if (rem.trials && rem.trials.length) parts.push(`trials ${rem.trials.join(", ")}`);
           if (parts.length > 0) lines.push(`    - ${_dateLabel}: ${parts.join(" ")}`);
         }
       }
@@ -5347,6 +5372,7 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
 
     // AI data: per-target context lines
     const lines = [];
+    lines.push(`Each trial is scored out of ${target.maxPoints || 3}.`);
     lines.push(`Past 3 months (${tLabels.join(", ")}): ${tAvgs.map(v => v !== null ? v + "%" : "no data").join(", ")}`);
     lines.push(`Last month (${lastMonthLabel}): ${lastMonthAvg !== null ? lastMonthAvg + "%" : "no data"}`);
     lines.push(`This month (${thisMonthLabel}): ${thisMonthAvg !== null ? thisMonthAvg + "%" : "no data"}`);
@@ -5361,14 +5387,17 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
       if (_mActive) {
         if (pa.id) paKeyToConfigId[key] = pa.id;
         actNames.add(key); actDisplayNames[key] = key;
-        if (pa.maintained) paKeyToStatusM[key] = "maintained";
+        if (pa.maintained) paKeyToStatusM[key] = pa.maintainedAt
+          ? `maintained since ${fmtPeriodDate(pa.maintainedAt)}` : "maintained";
         if (pa.title && pa.name && pa.title !== pa.name) {
           if (!paKeyToAliases[key]) paKeyToAliases[key] = [];
           paKeyToAliases[key].push(pa.name);
           legacyToKey[pa.name] = key;
         }
       } else {
-        paKeyToStatusM[key] = pa.masteredOn ? "mastered" : "discontinued";
+        paKeyToStatusM[key] = pa.masteredOn
+          ? `mastered on ${fmtPeriodDate(pa.masteredOn)}`
+          : pa.discontinuedOn ? `discontinued on ${fmtPeriodDate(pa.discontinuedOn)}` : "discontinued";
       }
     }
     for (const sess of thisMonthSessions) {
@@ -5397,8 +5426,8 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
         const _mIsManual = paKeyToManualScoreM[actName] || false;
         for (const rem of Object.values(filteredSess.remarks || {})) {
           if (rem.activityId !== sId) continue;
-          const trials = (rem.trials || []).filter(t => t !== -1);
-          if (rem.optionScore !== undefined) trials.push(rem.optionScore);
+          const rawTrials = (rem.trials || []).filter(t => t !== -1);
+          const trials = rem.optionScore !== undefined ? [...rawTrials, rem.optionScore] : rawTrials;
           let avg;
           if (_mIsManual) {
             const _pct = parseManualScore(hyrStripHtml(rem.text || "").trim());
@@ -5412,7 +5441,7 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
           // Option selections count as content even with no typed remark — see the
           // matching filter in hyrCollectData.
           if (_mCombined || avg !== null || rem.optionScore !== undefined || (rem.selectedOptions || []).length > 0)
-            allRemarks.push({ date: sess.date, text: _mCombined, avg });
+            allRemarks.push({ date: sess.date, text: _mCombined, avg, trials: rawTrials });
         }
       }
       allRemarks.sort((a,b) => a.date.localeCompare(b.date));
@@ -5420,6 +5449,41 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
       const avgLine = scored.length ? ` (avg ${Math.round(scored.reduce((a,b)=>a+b.avg,0)/scored.length)}%)` : "";
       const _mStatusLabel = paKeyToStatusM[actName];
       lines.push(`  • ${actDisplayNames[actName]||actName}${_mStatusLabel ? ` [${_mStatusLabel}]` : ""}${avgLine}`);
+
+      // This activity's average for each of the 3 prior months plus this one, so a
+      // month-on-month shift in the target can be traced to the activity that moved.
+      const _mWindow = [];
+      for (let off = 3; off >= 0; off--) {
+        let wm = month - off, wy = year;
+        if (wm <= 0) { wm += 12; wy--; }
+        const wSess = allSessions.filter(s => { const [sy,sm] = s.date.split("-").map(Number); return sy === wy && sm === wm; });
+        const wScores = [];
+        for (const sess of wSess) {
+          const fs = _filterGroupSess(sess);
+          const entry = Object.entries(fs.activities || {}).find(
+            ([,a]) => (a.activityName === actName || aliases.includes(a.activityName) || (configId && a.configId === configId)) &&
+                      (a.targetName === tName || a.target === tName));
+          if (!entry) continue;
+          const [wKey, wAct] = entry;
+          const wId = wAct.id || wKey;
+          for (const r of Object.values(fs.remarks || {})) {
+            if (r.activityId !== wId) continue;
+            const wt = (r.trials || []).filter(t => t !== -1);
+            if (r.optionScore !== undefined) wt.push(r.optionScore);
+            if (paKeyToManualScoreM[actName]) {
+              const p = parseManualScore(hyrStripHtml(r.text || "").trim());
+              if (p !== null) wScores.push(Math.round(p));
+            } else if (wt.length) {
+              wScores.push(Math.round(wt.reduce((a,b)=>a+b,0)/(wt.length*(target.maxPoints||3))*100));
+            }
+          }
+        }
+        _mWindow.push(wScores.length
+          ? `${ABBRS[wm-1]} ${Math.round(wScores.reduce((a,b)=>a+b,0)/wScores.length)}%`
+          : `${ABBRS[wm-1]} no data`);
+      }
+      lines.push(`    Monthly: ${_mWindow.join(", ")}`);
+
       for (const rem of allRemarks) {
         const [, _mm, _md] = rem.date.split("-").map(Number);
         const _mDateLabel = `${_md} ${ABBRS[_mm - 1]}`;
@@ -5427,6 +5491,7 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
         // Full remark text — see the matching note in hyrCollectData.
         if (rem.text) _mParts.push(`"${rem.text.trim()}"`);
         if (rem.avg !== null) _mParts.push(`[${rem.avg}%]`);
+        if (rem.trials && rem.trials.length) _mParts.push(`trials ${rem.trials.join(", ")}`);
         if (_mParts.length > 0) lines.push(`    - ${_mDateLabel}: ${_mParts.join(" ")}`);
       }
     }
