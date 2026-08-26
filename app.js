@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1917";
+const APP_VERSION = "1918";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -5724,6 +5724,19 @@ SENTENCE 2 MUST SHOW PROGRESS, AND GIVE THE PARENT HOPE. It says the child is mo
   WRONG: "This suggests ${PRON.subj} remains highly motivated by physical, sensory activities." Enjoying something is NOT progress, and it was already true before this month.
   WRONG: "This shows ${PRON.subj} labelled the animals correctly." That only repeats sentence 1.
   If all a moment shows is that ${PRON.subj} liked something, it is NOT a highlight. Choose a different moment, or write one point fewer.
+
+WRITE IN PLAIN, EVERYDAY LANGUAGE. A parent should understand every sentence at normal reading speed, without stopping to work out what it means.
+  • Put the plain meaning FIRST and the professional term in brackets AFTER it, never the other way round. By the time the parent reaches the term they already understand it, so it reads as confirmation instead of homework.
+    RIGHT: "This shows ${PRON.subj} is learning to recognise more of the animals ${PRON.subj} sees around ${PRON.obj} (receptive vocabulary)."
+    WRONG: "This reflects developing receptive vocabulary for identifying familiar animal pictures."
+    RIGHT: "This shows ${PRON.subj} can spot small differences between pictures (visual discrimination), allowing ${PRON.obj} to learn harder topics later."
+    WRONG: "This supports ${PRON.poss} visual discrimination skills, an important building block for more complex learning tasks."
+  • Not every point needs a bracketed term. Add one only where a genuine professional term applies. Never reach for one just to sound clinical.
+  • STIFF WRITING IS THE BIGGER PROBLEM, not just technical words. Ordinary ideas written in a clinical register are just as tiring to read.
+    WRONG: "Reducing avoidance behaviour indicates a growing willingness to participate in less preferred activities."
+    RIGHT: "This shows ${PRON.subj} is becoming more willing to try tasks ${PRON.subj} does not enjoy, instead of backing away from them."
+    Write "things ${PRON.subj} does not like", not "less preferred activities". Write "backing away", not "displaying avoidance behaviour". Write "helps ${PRON.obj} learn harder topics later", not "supports more complex learning tasks".
+  • Test every sentence: would a parent say it out loud to a friend? "Harder learning" is not a phrase anyone uses. "Learn harder topics later" is. If it would sound odd spoken aloud, rewrite it.
 
 DO NOT START EVERY POINT THE SAME WAY. Two or three points may begin with ${firstName}'s name; the rest must not. Vary it naturally rather than forcing an odd construction: a point may simply begin with "${PRON.subj === "she" ? "She" : "He"}", or with the thing ${PRON.subj} did.
 
