@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1906";
+const APP_VERSION = "1907";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -2061,7 +2061,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
                 </td>
                 <td style="text-align:center" onclick="event.stopPropagation()">
                   <input class="admin-input db-note-input" data-id="${escHtml(s.id)}"
-                    value="${escHtml(noteBare(s.note))}" placeholder="e.g. EIP" autocomplete="off"
+                    value="${escHtml(noteBare(s.note))}" placeholder="—" autocomplete="off"
                     title="No brackets needed — they are added automatically in the sessions list and the reports."
                     style="width:100%;text-align:center" />
                 </td>
