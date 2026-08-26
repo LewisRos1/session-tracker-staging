@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1915";
+const APP_VERSION = "1916";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -5706,37 +5706,39 @@ You are writing a monthly progress report for this student's parents. Follow the
 Provide ONLY the following sections using EXACTLY these markers. No extra text outside markers.
 
 ===HIGHLIGHTS===
-[Write 5 points. FIVE IS STRONGLY PREFERRED and should be your answer in almost every month. Drop to 4, or at the very lowest 3, ONLY when the session data genuinely does not hold five real moments worth reporting. Never pad the list with something vague, repeated, or invented to reach five, and never stop at 3 when a fourth or fifth real moment is sitting in the data. Fewer than 3 is not allowed. Each is one specific thing ${firstName} actually did this month, taken from the session remarks, a real moment rather than a general description.
+[Each point is ONE specific thing ${firstName} did, taken from the session remarks.
 
-Write each point as TWO sentences, and keep this shape in every single point.
-  • Sentence 1 is the CLEAR IDEA: what ${firstName} actually did, concretely.
-  • Sentence 2 is WHY IT MATTERS: what that ability lets ${PRON.obj} do, or what it says about how ${PRON.subj} is developing. Start it with a phrase such as "This shows", "This reflects", "This demonstrates" or "This highlights", or with the skill itself as the subject.
-  • CRITICAL: sentence 2 must add VALUE, never a relabel of sentence 1. "This reflects developing expressive and receptive vocabulary for identifying familiar animal pictures" is right, because a parent learns what the moment was worth. "This shows he labelled the animals correctly" is wrong, because it only repeats what sentence 1 already said.
-  • CRITICAL: they must be TWO SEPARATE SENTENCES with a full stop between them. NEVER fold the second into the first as a trailing clause. Banned joiners: ", indicating that", ", suggesting that", ", a sign that", ", which shows", ", showing that", ", pointing to". Every one of these turns the point into a single run-on sentence and destroys the shape.
-  • WRONG, one run-on sentence: "Movement activities such as swinging and scootering were completed with high accuracy and clear enjoyment, indicating that ${firstName} engages well with physical activities."
-  • RIGHT, the same content in two sentences: "${firstName} swung, jumped and scootered with accuracy and obvious enjoyment. This shows ${PRON.subj} engages readily with physical, sensory activities that match ${PRON.poss} interests."
-  • Never join the two with a dash and never write "this matters because".
+HOW MANY: aim for 5. Quality decides, not the count. A point that does not show real progress is worse than no point at all, so write 4, or at the lowest 3, rather than include a weak one. Never invent or pad. Fewer than 3 is not allowed.
 
-VARY HOW THE POINTS OPEN. Five points in a row all beginning with the same name is dull to read and makes the section feel like a list of records rather than a description of a child.
-  • AT MOST 2 of the points may begin with ${firstName}'s name. This is a hard limit, not a preference.
-  • Open the others another way. Make the skill or the task the subject, as in "Putting on ${PRON.poss} shoes took no physical prompting at all." Or set the scene first, as in "Asked to label pictures of animals, ${PRON.subj} named tigers and cows correctly." Or simply start with the pronoun "${PRON.subj}".
-  • Never use the same opening pattern twice in a row.
-  • This does NOT relax the rule below. Whatever the opening, it must never be a date, a frequency, or any other time reference.
+EVERY POINT IS TWO SENTENCES:
+  1. What ${PRON.subj} did. Plain, direct, natural English.
+  2. Why it matters: what ${PRON.subj} can now do, or what this lets ${PRON.obj} do in ordinary life outside the session room.
 
-ABSOLUTE: NEVER say WHEN or HOW OFTEN anything happened.
-  • No dates: not "On 9 July", not "on the 24th", not any day or date.
-  • No frequency: not "During one session this month", not "in most sessions", not "twice this month", not "on two occasions", not "this month", not "throughout the month", not "across sessions", not "across many trials", not "on several occasions". Nothing of that kind.
-  • Every point goes straight into what happened. The dates in the session data are there so you can find the right moments, not to be reported back.
+WRITE NATURAL ENGLISH. Read each sentence in your head before writing it.
+  • Ordinary sentence openings. RIGHT: "When asked to label pictures of tigers and cows, ${firstName} correctly identified them." WRONG: "Asked to label pictures of tigers and cows, ${firstName} identified them." Dropping the opening word is not how people write.
+  • Active voice, always. RIGHT: "${firstName} swung, jumped and scootered with accuracy and obvious enjoyment." WRONG: "Swinging, jumping and scootering were completed with high accuracy."
 
-Right: "Hayden apologised to a peer after accidentally stepping on his foot, with minimal prompting. This reflects his use of polite language to repair social situations and maintain positive relationships with classmates."
-Wrong, opens with a date: "On 20 July, Hayden apologised to a peer after accidentally stepping on his foot."
-Wrong, opens with a frequency: "During one session this month, Hayden apologised to a peer after accidentally stepping on his foot."
-Wrong, fragment joined by a dash: "Apologised to a peer after accidentally stepping on his foot, without needing much prompting - this matters because it shows he is using polite words." Do NOT repeat anything already listed under ACTIVITIES MASTERED THIS MONTH below. Only real things from the data, never invent one to fill a slot.]
-- [highlight - why it matters]
-- [highlight - why it matters]
-- [highlight - why it matters]
-- [highlight - why it matters, unless the month genuinely has no fourth real moment]
-- [highlight - why it matters, unless the month genuinely has no fifth real moment]
+SENTENCE 2 MUST SHOW PROGRESS, AND GIVE THE PARENT HOPE. It says the child is moving forward in ${PRON.poss} life.
+  RIGHT: "This reflects developing expressive and receptive vocabulary for identifying familiar animal pictures."
+  RIGHT: "This shows growing independence in a daily self-help skill."
+  WRONG: "This suggests ${PRON.subj} remains highly motivated by physical, sensory activities." Enjoying something is NOT progress, and it was already true before this month.
+  WRONG: "This shows ${PRON.subj} labelled the animals correctly." That only repeats sentence 1.
+  If all a moment shows is that ${PRON.subj} liked something, it is NOT a highlight. Choose a different moment, or write one point fewer.
+
+DO NOT START EVERY POINT THE SAME WAY. Two or three points may begin with ${firstName}'s name; the rest must not. Vary it naturally rather than forcing an odd construction: a point may simply begin with "${PRON.subj === "she" ? "She" : "He"}", or with the thing ${PRON.subj} did.
+
+NEVER COUNT OCCASIONS ACROSS THE MONTH. No dates, and none of "this month", "throughout the month", "across sessions", "on several occasions", "in most sessions". Describing what happened WITHIN one occasion is fine and welcome: "completing several trials correctly in a row" is good writing, not a frequency.
+
+THE TWO SENTENCES ARE SEPARATE, with a full stop between them. Never fold the second into the first with ", indicating that", ", suggesting that", ", a sign that", ", which shows", ", showing that", ", pointing to", or a dash. Never write "this matters because".
+
+Do NOT repeat anything listed under ACTIVITIES MASTERED THIS MONTH below.
+
+FULL EXAMPLE OF A GOOD POINT: "${firstName} put on ${PRON.poss} shoes independently, without needing physical prompting. Independently completing a dressing task such as putting on shoes is a sign of growing self-help skills."]
+- [what he did - why it matters]
+- [what he did - why it matters]
+- [what he did - why it matters]
+- [only if it shows real progress]
+- [only if it shows real progress]
 ===END===
 
 ===COMPARISON===
