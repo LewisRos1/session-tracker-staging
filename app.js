@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1914";
+const APP_VERSION = "1915";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -5708,7 +5708,14 @@ Provide ONLY the following sections using EXACTLY these markers. No extra text o
 ===HIGHLIGHTS===
 [Write 5 points. FIVE IS STRONGLY PREFERRED and should be your answer in almost every month. Drop to 4, or at the very lowest 3, ONLY when the session data genuinely does not hold five real moments worth reporting. Never pad the list with something vague, repeated, or invented to reach five, and never stop at 3 when a fourth or fifth real moment is sitting in the data. Fewer than 3 is not allowed. Each is one specific thing ${firstName} actually did this month, taken from the session remarks, a real moment rather than a general description.
 
-Write each point as TWO sentences. The first states what was observed. The second states what it shows, starting with a phrase such as "This shows", "This reflects", "This demonstrates" or "This highlights". Never join them with a dash and never write "this matters because".
+Write each point as TWO sentences, and keep this shape in every single point.
+  • Sentence 1 is the CLEAR IDEA: what ${firstName} actually did, concretely.
+  • Sentence 2 is WHY IT MATTERS: what that ability lets ${PRON.obj} do, or what it says about how ${PRON.subj} is developing. Start it with a phrase such as "This shows", "This reflects", "This demonstrates" or "This highlights", or with the skill itself as the subject.
+  • CRITICAL: sentence 2 must add VALUE, never a relabel of sentence 1. "This reflects developing expressive and receptive vocabulary for identifying familiar animal pictures" is right, because a parent learns what the moment was worth. "This shows he labelled the animals correctly" is wrong, because it only repeats what sentence 1 already said.
+  • CRITICAL: they must be TWO SEPARATE SENTENCES with a full stop between them. NEVER fold the second into the first as a trailing clause. Banned joiners: ", indicating that", ", suggesting that", ", a sign that", ", which shows", ", showing that", ", pointing to". Every one of these turns the point into a single run-on sentence and destroys the shape.
+  • WRONG, one run-on sentence: "Movement activities such as swinging and scootering were completed with high accuracy and clear enjoyment, indicating that ${firstName} engages well with physical activities."
+  • RIGHT, the same content in two sentences: "${firstName} swung, jumped and scootered with accuracy and obvious enjoyment. This shows ${PRON.subj} engages readily with physical, sensory activities that match ${PRON.poss} interests."
+  • Never join the two with a dash and never write "this matters because".
 
 VARY HOW THE POINTS OPEN. Five points in a row all beginning with the same name is dull to read and makes the section feel like a list of records rather than a description of a child.
   • AT MOST 2 of the points may begin with ${firstName}'s name. This is a hard limit, not a preference.
@@ -5718,7 +5725,7 @@ VARY HOW THE POINTS OPEN. Five points in a row all beginning with the same name 
 
 ABSOLUTE: NEVER say WHEN or HOW OFTEN anything happened.
   • No dates: not "On 9 July", not "on the 24th", not any day or date.
-  • No frequency: not "During one session this month", not "in most sessions", not "twice this month", not "on two occasions". Nothing of that kind.
+  • No frequency: not "During one session this month", not "in most sessions", not "twice this month", not "on two occasions", not "this month", not "throughout the month", not "across sessions", not "across many trials", not "on several occasions". Nothing of that kind.
   • Every point goes straight into what happened. The dates in the session data are there so you can find the right moments, not to be reported back.
 
 Right: "Hayden apologised to a peer after accidentally stepping on his foot, with minimal prompting. This reflects his use of polite language to repair social situations and maintain positive relationships with classmates."
@@ -5758,7 +5765,15 @@ NO numbers and NO percentages anywhere - describe the change in words. One idea 
 ===STILL_WORKING===
 [Write EXACTLY 2 or 3 points naming what ${firstName} still finds difficult, based only on genuine difficulties visible in the session data. Two is the minimum and is REQUIRED. Never write only one.
 
-Each point names the difficulty AND what tends to bring it on, in one or two sentences. "Sudden changes to his routine remain difficult for him. When a plan is altered without warning he may raise his voice or refuse an instruction before he is able to settle." Say what happens and when, and stop there.
+STRUCTURE OF EVERY POINT:
+  • Sentence 1 names the difficulty AND shows what it looks like in practice, using a real behaviour from the remarks. "Remains difficult for him" on its own gives a parent nothing they can picture.
+  • Sentence 2 adds WHEN it happens: the trigger, the kind of task, the time of day, or where the data shows it, how it eventually settles.
+  • CRITICAL: sentence 2 must add something NEW. Never use it to restate the difficulty in different words. If the data does not tell you the trigger or how it resolves, write the point as ONE sentence instead of padding it with a second.
+
+Right, sentence 2 gives the trigger and how it resolves: "${firstName} experiences difficulty engaging with certain table-based or learning tasks, often displaying avoidance behaviours such as retreating to the foam pit or crying when an instructor approaches. This tends to occur at the start of tasks ${PRON.subj} finds less appealing, before ${PRON.subj} can be gently encouraged to participate."
+Right, sentence 2 names what sets it off: "Recovering from distress within a short time remains inconsistent for ${PRON.obj}. When ${PRON.subj} becomes upset, such as after being prompted to complete an activity ${PRON.subj} dislikes, ${PRON.subj} sometimes requires the arrival of a family member before ${PRON.subj} is able to settle."
+Right, ONE sentence because there was nothing further to add: "Self-help tasks such as washing ${PRON.poss} hands and taking off or putting on ${PRON.poss} pants and diaper remain difficult for ${PRON.obj}, and ${PRON.subj} requires physical prompting for most attempts at these tasks."
+WRONG, sentence 2 only repeats sentence 1 in other words: "Self-help dressing tasks, such as washing hands and taking off or putting on pants and diaper, remain difficult for ${PRON.obj}. ${PRON.subj === "she" ? "She" : "He"} typically requires full physical prompting to complete each step of these routines." That should have been written as the single sentence above.
 
 Do NOT suggest strategies, next steps, or what anyone will do about it. This section describes, it does not plan. No "we will", no "support will be provided", no recommendations of any kind.
 
