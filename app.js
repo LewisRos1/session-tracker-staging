@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1909";
+const APP_VERSION = "1910";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3046,6 +3046,7 @@ function renderHalfYearReportsSection() {
         <span style="${labelStyle}">Session Type</span>
         <select id="hyr-session-type-select" class="admin-input" style="flex:1;min-width:0;background:#fff;font-family:inherit;font-size:1rem"></select>
       </div>
+      <div id="hyr-session-counts" style="display:none;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:.85rem 1.1rem"></div>
       <div id="hyr-row-type" style="display:none;gap:.75rem;align-items:center">
         <span style="${labelStyle}">Report Type</span>
         <select id="hyr-type-select" class="admin-input" style="flex:1;min-width:0;background:#fff;font-family:inherit;font-size:1rem">
@@ -3062,7 +3063,6 @@ function renderHalfYearReportsSection() {
           Generate Report
         </button>
       </div>
-      <div id="hyr-session-counts" style="display:none;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:.85rem 1.1rem"></div>
       <div id="hyr-progress" style="display:none">
         <div style="background:#e5e7eb;border-radius:99px;height:6px;overflow:hidden">
           <div id="hyr-progress-bar" style="height:100%;background:var(--primary);width:0%;transition:width .5s ease"></div>
