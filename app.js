@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1910";
+const APP_VERSION = "1911";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3097,7 +3097,9 @@ function renderHalfYearReportsSection() {
     const SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     const now = new Date();
     const buckets = [];
-    for (let i = 11; i >= 0; i--) {
+    // Newest month first: the recent months are the ones a report is usually
+    // about, so they should not be buried at the bottom of the list.
+    for (let i = 0; i <= 11; i++) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       buckets.push({
         key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
