@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1907";
+const APP_VERSION = "1908";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -2025,7 +2025,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
           <colgroup>
             <col style="width:42px">
             <col style="width:15%">
-            <col style="width:170px">
+            <col style="width:190px">
             <col style="width:10%">
             <col style="width:190px">
             <col style="width:120px">
@@ -2035,7 +2035,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
             <tr>
               <th>No.</th>
               <th>Full Name</th>
-              <th>Gender</th>
+              <th style="white-space:normal">Gender (For pronoun purposes in AI Reports)</th>
               <th style="white-space:normal">Short Name (Used in AI Reports)</th>
               <th>Note</th>
               <th style="white-space:normal">Report Type</th>
