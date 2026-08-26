@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1918";
+const APP_VERSION = "1919";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -5724,6 +5724,12 @@ SENTENCE 2 MUST SHOW PROGRESS, AND GIVE THE PARENT HOPE. It says the child is mo
   WRONG: "This suggests ${PRON.subj} remains highly motivated by physical, sensory activities." Enjoying something is NOT progress, and it was already true before this month.
   WRONG: "This shows ${PRON.subj} labelled the animals correctly." That only repeats sentence 1.
   If all a moment shows is that ${PRON.subj} liked something, it is NOT a highlight. Choose a different moment, or write one point fewer.
+
+NEVER DEFINE AN ACHIEVEMENT BY WHAT ${firstName} CANNOT DO. Sentence 2 says what ${PRON.subj} GAINED. It must never point, even gently and even accurately, at a skill ${PRON.subj} lacks. A parent reads this section for hope, and one clause reminding them of a limitation undoes the whole point. Difficulties have their own section later in the report; they do not belong here.
+  WRONG: "Using a picture card to make requests gives ${PRON.obj} a way to communicate ${PRON.poss} wants without needing spoken words." The parent hears "my child cannot speak".
+  RIGHT: "Using a picture card to make requests gives ${PRON.obj} a clear way to tell people what ${PRON.subj} wants."
+  Banned in sentence 2: "without needing [skill]", "instead of [skill]", "despite not yet [skill]", "even though ${PRON.subj} cannot [skill]", "as an alternative to [skill]", "compensates for", "makes up for".
+  This is NOT a ban on the word "without". "Put on ${PRON.poss} shoes without any physical help" is RIGHT, because being able to do something unaided IS the achievement. The rule is about naming a skill ${PRON.subj} does not have in order to explain one ${PRON.subj} does.
 
 WRITE IN PLAIN, EVERYDAY LANGUAGE. A parent should understand every sentence at normal reading speed, without stopping to work out what it means.
   • Put the plain meaning FIRST and the professional term in brackets AFTER it, never the other way round. By the time the parent reaches the term they already understand it, so it reads as confirmation instead of homework.
