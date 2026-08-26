@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1908";
+const APP_VERSION = "1909";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3062,6 +3062,7 @@ function renderHalfYearReportsSection() {
           Generate Report
         </button>
       </div>
+      <div id="hyr-session-counts" style="display:none;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:.85rem 1.1rem"></div>
       <div id="hyr-progress" style="display:none">
         <div style="background:#e5e7eb;border-radius:99px;height:6px;overflow:hidden">
           <div id="hyr-progress-bar" style="height:100%;background:var(--primary);width:0%;transition:width .5s ease"></div>
@@ -3082,11 +3083,66 @@ function renderHalfYearReportsSection() {
   let _hyrIndivSessions = [];
   let _hyrGroupSessions = [];
 
+  // Sessions per month for the last 12 months. A report is only as good as the
+  // data behind it, so this says up front how much there actually is: a month
+  // with one session cannot produce much, and it is better to know that before
+  // generating than to wonder why the result reads thin.
+  const renderHyrSessionCounts = () => {
+    const el = $("hyr-session-counts");
+    if (!el) return;
+    if (!_hyrSessions || !_hyrSessions.length) {
+      el.style.display = "none"; el.innerHTML = ""; return;
+    }
+
+    const SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const now = new Date();
+    const buckets = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      buckets.push({
+        key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+        label: `${SHORT[d.getMonth()]} ${d.getFullYear()}`,
+        n: 0
+      });
+    }
+    const byKey = new Map(buckets.map(b => [b.key, b]));
+    for (const s of _hyrSessions) {
+      const b = byKey.get((s.date || "").slice(0, 7));
+      if (b) b.n++;
+    }
+    // Bars are scaled against the busiest month rather than a fixed maximum, so
+    // the comparison stays readable whether a student does 3 or 20 a month.
+    const max = Math.max(1, ...buckets.map(b => b.n));
+    const total = buckets.reduce((a, b) => a + b.n, 0);
+
+    const rows = buckets.map(b => {
+      const low = b.n > 0 && b.n <= 2;
+      const bar = b.n === 0 ? ""
+        : `<div style="height:100%;width:${Math.max(4, Math.round(b.n / max * 100))}%;background:${low ? "#f59e0b" : "var(--primary)"};border-radius:99px"></div>`;
+      return `<div style="display:flex;align-items:center;gap:.55rem;font-size:.8rem">
+          <span style="width:76px;flex-shrink:0;color:#6b7280">${b.label}</span>
+          <div style="flex:1;min-width:40px;height:9px;background:#eceef1;border-radius:99px;overflow:hidden">${bar}</div>
+          <span style="width:20px;text-align:right;font-weight:600;color:${b.n ? "#111827" : "#c8cbd0"}">${b.n}</span>
+          <span style="width:30px;font-size:.7rem;font-weight:600;color:#b45309">${low ? "Low" : ""}</span>
+        </div>`;
+    }).join("");
+
+    el.innerHTML = `
+      <div style="font-size:.875rem;font-weight:600;color:#374151;margin-bottom:.65rem">
+        No. of sessions recorded
+        <span style="font-weight:400;color:#6b7280">(last 12 months)</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:.3rem">${rows}</div>
+      <div style="font-size:.75rem;color:#6b7280;margin-top:.65rem">${total} session${total === 1 ? "" : "s"} in total</div>`;
+    el.style.display = "";
+  };
+
   const resetBelowStudent = () => {
     $("hyr-row-session-type").style.display = "none";
     $("hyr-type-select").value = "";
     $("hyr-row-type").style.display  = "none";
     $("hyr-row-period").style.display = "none";
+    $("hyr-session-counts").style.display = "none";
     $("hyr-activity-filter").style.display = "none";
   };
 
@@ -3140,6 +3196,9 @@ function renderHalfYearReportsSection() {
       // silent
     } finally {
       loading.style.display = "none";
+      // Only set when the student had one session type; with both, it waits
+      // for the choice below, since the counts differ per type.
+      renderHyrSessionCounts();
     }
   });
 
@@ -3148,6 +3207,8 @@ function renderHalfYearReportsSection() {
     resetBelowSessionType();
     if (sessType === "individual") { _hyrSessions = _hyrIndivSessions; $("hyr-row-type").style.display = "flex"; }
     else if (sessType === "group") { _hyrSessions = _hyrGroupSessions; $("hyr-row-type").style.display = "flex"; }
+    else _hyrSessions = null;
+    renderHyrSessionCounts();
   });
 
   $("hyr-type-select").addEventListener("change", e => {
@@ -5643,12 +5704,12 @@ You are writing a monthly progress report for this student's parents. Follow the
 Provide ONLY the following sections using EXACTLY these markers. No extra text outside markers.
 
 ===HIGHLIGHTS===
-[Write EXACTLY 5 points, no more and no fewer. Each is one specific thing ${firstName} actually did this month, taken from the session remarks, a real moment rather than a general description.
+[Write 5 points. FIVE IS STRONGLY PREFERRED and should be your answer in almost every month. Drop to 4, or at the very lowest 3, ONLY when the session data genuinely does not hold five real moments worth reporting. Never pad the list with something vague, repeated, or invented to reach five, and never stop at 3 when a fourth or fifth real moment is sitting in the data. Fewer than 3 is not allowed. Each is one specific thing ${firstName} actually did this month, taken from the session remarks, a real moment rather than a general description.
 
 Write each point as TWO sentences. The first states what was observed. The second states what it shows, starting with a phrase such as "This shows", "This reflects", "This demonstrates" or "This highlights". Never join them with a dash and never write "this matters because".
 
 VARY HOW THE POINTS OPEN. Five points in a row all beginning with the same name is dull to read and makes the section feel like a list of records rather than a description of a child.
-  • AT MOST 2 of the 5 points may begin with ${firstName}'s name. This is a hard limit, not a preference.
+  • AT MOST 2 of the points may begin with ${firstName}'s name. This is a hard limit, not a preference.
   • Open the others another way. Make the skill or the task the subject, as in "Putting on ${PRON.poss} shoes took no physical prompting at all." Or set the scene first, as in "Asked to label pictures of animals, ${PRON.subj} named tigers and cows correctly." Or simply start with the pronoun "${PRON.subj}".
   • Never use the same opening pattern twice in a row.
   • This does NOT relax the rule below. Whatever the opening, it must never be a date, a frequency, or any other time reference.
@@ -5665,8 +5726,8 @@ Wrong, fragment joined by a dash: "Apologised to a peer after accidentally stepp
 - [highlight - why it matters]
 - [highlight - why it matters]
 - [highlight - why it matters]
-- [highlight - why it matters]
-- [highlight - why it matters]
+- [highlight - why it matters, unless the month genuinely has no fourth real moment]
+- [highlight - why it matters, unless the month genuinely has no fifth real moment]
 ===END===
 
 ===COMPARISON===
