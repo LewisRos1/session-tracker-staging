@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1921";
+const APP_VERSION = "1922";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3467,15 +3467,35 @@ Write EXACTLY 7 points, no more and no fewer. Each is ONE specific thing ${first
 EVERY POINT IS A SHORT LABEL, THEN TWO SENTENCES:
   Label: 2-4 words, written directly with no ** markers.
   1. What ${PRON.subj} did. Plain, direct, natural English.
-  2. Why it matters: what ${PRON.subj} can now do, or what this lets ${PRON.obj} do in ordinary life outside the session room.
+  2. What has CHANGED IN ${firstName}: the ability ${PRON.subj} now has, or is beginning to have.
+
+SENTENCE 2 NAMES A CHANGE IN THE CHILD, NOT A PLACE THE SKILL MIGHT BE HANDY. This is the whole difference between a line that lands as true and one that sounds invented.
+  RIGHT: "This means ${PRON.subj} is beginning to manage strong feelings on ${PRON.poss} own, a skill that will help ${PRON.obj} cope during stressful moments outside of sessions."
+  RIGHT: "Suggesting that ${PRON.poss} attention to detail and number sense are strong enough to support more advanced maths work."
+  RIGHT: "A sign that this daily task has become automatic for ${PRON.obj}, leaving more of ${PRON.poss} attention free for harder parts of ${PRON.poss} work."
+  WRONG: "Completing a long task like this on ${PRON.poss} own gives ${PRON.obj} real confidence for tackling demanding schoolwork." Nothing recorded says anything about ${PRON.poss} confidence or ${PRON.poss} schoolwork. It is a guess dressed up as a finding.
+  WRONG: "Managing a longer book independently shows growing confidence in reading that ${PRON.subj} can carry into story time at home." Story time at home was invented.
+  WRONG: "Being able to organise information like this in ${PRON.poss} head helps ${PRON.obj} follow along with calendars and everyday routines." Calendars were invented.
+
+  • Name the CAPABILITY or the CHANGE: what ${PRON.subj} can now do, what ${PRON.subj} is beginning to do, what has become automatic, what ${PRON.subj} is starting to notice or willing to try.
+  • Extend to a consequence ONLY when it follows directly from that capability, the way "leaving more of ${PRON.poss} attention free for harder parts of ${PRON.poss} work" follows from a task becoming automatic.
+  • Do NOT invent a scene. Naming a setting is fine when the skill plainly belongs there, as dressing plainly belongs at home. Inventing a specific activity the data never mentions, story time, calendars, conversations, is not.
+  • A sharp contrast often makes the point land: "a growing love of reading rather than simply following instructions", "learning to repair a difficult moment with words rather than letting it end badly", "not just following rules about being kind". Use one wherever it is true.
 
 WRITE NATURAL ENGLISH. Read each sentence in your head before writing it.
   • Ordinary sentence openings. RIGHT: "When asked to label pictures of tigers and cows, ${firstName} correctly identified them." WRONG: "Asked to label pictures of tigers and cows, ${firstName} identified them." Dropping the opening word is not how people write.
   • Active voice, always. RIGHT: "${firstName} swung, jumped and scootered with accuracy and obvious enjoyment." WRONG: "Swinging, jumping and scootering were completed with high accuracy."
 
-THE TWO SENTENCES ARE SEPARATE, with a full stop between them. Never fold the second into the first with ", indicating that", ", suggesting that", ", a sign that", ", which shows", ", showing that", ", pointing to", or a dash. Never write "this matters because".
+THE TWO SENTENCES ARE SEPARATE, with a full stop between them, never joined by a comma or a dash into one long sentence.
+  WRONG, comma-joined into a run-on: "${firstName} offered to help a friend who seemed stuck, indicating that ${PRON.subj} is starting to notice when others need support."
+  RIGHT, the same words as a second sentence: "${firstName} offered to help a friend who seemed stuck. Indicating that ${PRON.subj} is starting to notice when others need support and is willing to offer it, a real building block for friendship."
+  So "Indicating that...", "Suggesting that...", "A sign that..." are GOOD ways to begin sentence 2. They are only wrong when hung off sentence 1 with a comma. Never write "this matters because".
 
-VARY HOW SENTENCE 2 OPENS. Do NOT cycle through "This shows", "This reflects", "This demonstrates", "This highlights" as a set. Across seven points AT MOST TWO may begin with "This". Other ways in: make the skill itself the subject ("Copying actions this reliably helps ${PRON.obj} learn by watching others."), or state the significance directly.
+VARY HOW SENTENCE 2 OPENS ACROSS THE SEVEN POINTS. Seven points that all open the same way read like a form, however good each one is on its own.
+  • Rotate freely among these: "This shows...", "This means...", "This reflects...", "This points to...", "Suggesting that...", "Indicating that...", "A sign that...".
+  • "This" may begin up to FOUR of the seven, but never with the same following word twice. At least TWO points must open some other way.
+  • BANNED: opening sentence 2 by re-describing what ${PRON.subj} did. "Completing a long task like this on ${PRON.poss} own gives ${PRON.obj} confidence" wastes half the sentence repeating sentence 1. Go straight to what it means: "Suggesting that ${PRON.poss} attention to detail and number sense are strong enough to support more advanced maths work."
+  • Above all, do NOT use the same grammatical shape seven times running. If every point begins with an "-ing" phrase, the section has become a template and must be rewritten.
 
 SENTENCE 2 MUST SHOW PROGRESS, AND GIVE THE PARENT HOPE. It says the child is moving forward in ${PRON.poss} life.
   RIGHT: "This reflects ${PRON.poss} growing confidence in starting friendly conversations with other children."
@@ -5738,7 +5758,20 @@ HOW MANY: aim for 5. Quality decides, not the count. A point that does not show 
 
 EVERY POINT IS TWO SENTENCES:
   1. What ${PRON.subj} did. Plain, direct, natural English.
-  2. Why it matters: what ${PRON.subj} can now do, or what this lets ${PRON.obj} do in ordinary life outside the session room.
+  2. What has CHANGED IN ${firstName}: the ability ${PRON.subj} now has, or is beginning to have.
+
+SENTENCE 2 NAMES A CHANGE IN THE CHILD, NOT A PLACE THE SKILL MIGHT BE HANDY. This is the whole difference between a line that lands as true and one that sounds invented.
+  RIGHT: "This means ${PRON.subj} is beginning to manage strong feelings on ${PRON.poss} own, a skill that will help ${PRON.obj} cope during stressful moments outside of sessions."
+  RIGHT: "Suggesting that ${PRON.poss} attention to detail and number sense are strong enough to support more advanced maths work."
+  RIGHT: "A sign that this daily task has become automatic for ${PRON.obj}, leaving more of ${PRON.poss} attention free for harder parts of ${PRON.poss} work."
+  WRONG: "Completing a long task like this on ${PRON.poss} own gives ${PRON.obj} real confidence for tackling demanding schoolwork." Nothing recorded says anything about ${PRON.poss} confidence or ${PRON.poss} schoolwork. It is a guess dressed up as a finding.
+  WRONG: "Managing a longer book independently shows growing confidence in reading that ${PRON.subj} can carry into story time at home." Story time at home was invented.
+  WRONG: "Being able to organise information like this in ${PRON.poss} head helps ${PRON.obj} follow along with calendars and everyday routines." Calendars were invented.
+
+  • Name the CAPABILITY or the CHANGE: what ${PRON.subj} can now do, what ${PRON.subj} is beginning to do, what has become automatic, what ${PRON.subj} is starting to notice or willing to try.
+  • Extend to a consequence ONLY when it follows directly from that capability, the way "leaving more of ${PRON.poss} attention free for harder parts of ${PRON.poss} work" follows from a task becoming automatic.
+  • Do NOT invent a scene. Naming a setting is fine when the skill plainly belongs there, as dressing plainly belongs at home. Inventing a specific activity the data never mentions, story time, calendars, conversations, is not.
+  • A sharp contrast often makes the point land: "a growing love of reading rather than simply following instructions", "learning to repair a difficult moment with words rather than letting it end badly", "not just following rules about being kind". Use one wherever it is true.
 
 WRITE NATURAL ENGLISH. Read each sentence in your head before writing it.
   • Ordinary sentence openings. RIGHT: "When asked to label pictures of tigers and cows, ${firstName} correctly identified them." WRONG: "Asked to label pictures of tigers and cows, ${firstName} identified them." Dropping the opening word is not how people write.
