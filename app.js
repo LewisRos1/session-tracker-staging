@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1911";
+const APP_VERSION = "1912";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6124,12 +6124,15 @@ function monthlyParseAiResponse(text) {
 function monthlyDrawScoreBarChart(rows) {
   if (!rows.length) return null;
   const SCALE = 2;
-  const W = 820, PAD_L = 370, PAD_R = 74;
-  const HDR_H = 34, PAD_T = 12, PAD_B = 40;
+  const W = 820, PAD_L = 370, PAD_R = 88;
+  // Canvas is 820 wide but placed in the document at 620, so a 19px face here
+  // lands at roughly 11pt on the page, matching the body text around it.
+  const FONT_PX = 19;
+  const HDR_H = 40, PAD_T = 12, PAD_B = 48, LEG_H = 42;
   const plotW = W - PAD_L - PAD_R;
 
   const measure = document.createElement("canvas").getContext("2d");
-  measure.font = "15px Arial";
+  measure.font = `${FONT_PX}px Arial`;
   // Names wrap to at most two lines; anything longer is cut with an ellipsis so
   // one very long target can't stretch the whole chart.
   const wrap = name => {
@@ -6154,8 +6157,8 @@ function monthlyDrawScoreBarChart(rows) {
   };
 
   const wrapped = rows.map(r => ({ ...r, lines: wrap(r.name) }));
-  const rowH = wrapped.some(r => r.lines.length > 1) ? 44 : 34;
-  const H = HDR_H + PAD_T + wrapped.length * rowH + PAD_B;
+  const rowH = wrapped.some(r => r.lines.length > 1) ? 54 : 40;
+  const H = HDR_H + PAD_T + wrapped.length * rowH + PAD_B + LEG_H;
 
   const canvas = document.createElement("canvas");
   canvas.width = W * SCALE; canvas.height = H * SCALE;
@@ -6165,46 +6168,68 @@ function monthlyDrawScoreBarChart(rows) {
 
   // Column headings
   ctx.fillStyle = "#f3f4f6"; ctx.fillRect(0, 0, W, HDR_H);
-  ctx.fillStyle = "#374151"; ctx.font = "bold 16px Arial";
-  ctx.textAlign = "right"; ctx.fillText("Target", PAD_L - 14, HDR_H - 11);
-  ctx.textAlign = "center"; ctx.fillText("Score", PAD_L + plotW / 2, HDR_H - 11);
+  ctx.fillStyle = "#374151"; ctx.font = `bold ${FONT_PX}px Arial`;
+  ctx.textAlign = "right"; ctx.fillText("Target", PAD_L - 14, HDR_H - 13);
+  ctx.textAlign = "center"; ctx.fillText("Score", PAD_L + plotW / 2, HDR_H - 13);
   ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(0, HDR_H + 0.5); ctx.lineTo(W, HDR_H + 0.5); ctx.stroke();
 
   const top = HDR_H + PAD_T;
-  const barH = 18;
+  const barH = 20;
 
   // Gridlines every 25%
   ctx.strokeStyle = "#e5e7eb";
-  ctx.fillStyle = "#9ca3af"; ctx.font = "13px Arial"; ctx.textAlign = "center";
+  ctx.fillStyle = "#6b7280"; ctx.font = `${FONT_PX}px Arial`; ctx.textAlign = "center";
   for (let p = 0; p <= 100; p += 25) {
     const x = PAD_L + (plotW * p / 100);
     ctx.beginPath(); ctx.moveTo(x, top - 4); ctx.lineTo(x, top + wrapped.length * rowH + 4); ctx.stroke();
-    ctx.fillText(`${p}%`, x, top + wrapped.length * rowH + 24);
+    ctx.fillText(`${p}%`, x, top + wrapped.length * rowH + 28);
   }
 
   wrapped.forEach((r, i) => {
     const y = top + i * rowH;
     const mid = y + rowH / 2;
 
-    ctx.fillStyle = "#374151"; ctx.font = "15px Arial"; ctx.textAlign = "right";
+    ctx.fillStyle = "#374151"; ctx.font = `${FONT_PX}px Arial`; ctx.textAlign = "right";
     if (r.lines.length === 1) {
-      ctx.fillText(r.lines[0], PAD_L - 14, mid + 5);
+      ctx.fillText(r.lines[0], PAD_L - 14, mid + 7);
     } else {
-      ctx.fillText(r.lines[0], PAD_L - 14, mid - 3);
-      ctx.fillText(r.lines[1], PAD_L - 14, mid + 15);
+      ctx.fillText(r.lines[0], PAD_L - 14, mid - 4);
+      ctx.fillText(r.lines[1], PAD_L - 14, mid + 18);
     }
 
     const w = Math.max(2, plotW * Math.max(0, Math.min(100, r.score)) / 100);
     ctx.fillStyle = r.score >= 80 ? "#10b981" : r.score >= 50 ? "#3b82f6" : "#f59e0b";
     ctx.fillRect(PAD_L, mid - barH / 2, w, barH);
 
-    ctx.fillStyle = "#111827"; ctx.font = "bold 16px Arial"; ctx.textAlign = "left";
-    ctx.fillText(`${Math.round(r.score)}%`, PAD_L + w + 10, mid + 6);
+    ctx.fillStyle = "#111827"; ctx.font = `bold ${FONT_PX}px Arial`; ctx.textAlign = "left";
+    ctx.fillText(`${Math.round(r.score)}%`, PAD_L + w + 10, mid + 7);
   });
 
   ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(PAD_L, top - 4); ctx.lineTo(PAD_L, top + wrapped.length * rowH + 4); ctx.stroke();
+
+  // Legend along the bottom. The bar colour encodes a band, and without this a
+  // parent sees green and blue bars with no way to know what separates them.
+  const legend = [
+    { c: "#10b981", t: "80% and above" },
+    { c: "#3b82f6", t: "50% to 79%" },
+    { c: "#f59e0b", t: "Below 50%" }
+  ];
+  ctx.font = `${FONT_PX}px Arial`;
+  ctx.textAlign = "left";
+  const SW = 16, SW_GAP = 9, ITEM_GAP = 34;
+  const itemW = legend.map(l => SW + SW_GAP + ctx.measureText(l.t).width);
+  const legendW = itemW.reduce((a, b) => a + b, 0) + ITEM_GAP * (legend.length - 1);
+  let lx = (W - legendW) / 2;
+  const ly = H - LEG_H + 26;
+  legend.forEach((l, i) => {
+    ctx.fillStyle = l.c;
+    ctx.fillRect(lx, ly - 13, SW, SW);
+    ctx.fillStyle = "#374151";
+    ctx.fillText(l.t, lx + SW + SW_GAP, ly);
+    lx += itemW[i] + ITEM_GAP;
+  });
 
   return { base64: canvas.toDataURL("image/png").split(",")[1], height: H, width: W };
 }
