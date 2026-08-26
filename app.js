@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1905";
+const APP_VERSION = "1906";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -1972,6 +1972,23 @@ function openStudentRegistryScreen(opts = {}) {
 // (state.students) — the per-student session-number lookups are genuinely
 // slow (2 Firestore queries each), so those fill in afterwards per-cell
 // instead of blocking the whole screen behind a "Loading…" spinner.
+// The note is stored WITHOUT brackets and bracketed at display time, so the
+// brackets can never go missing because someone forgot to type them. Older
+// notes were typed with brackets already, so strip any wrapping pair first
+// rather than migrating the data or ending up with "((EIP))".
+function noteBare(note) {
+  return (note || "").trim().replace(/^\(([\s\S]*)\)$/, "$1").trim();
+}
+function noteLabel(note) {
+  const t = noteBare(note);
+  return t ? `(${t})` : "";
+}
+/** "Caden Tan (School Readiness)", or just the name when there is no note. */
+function studentLabel(s) {
+  const l = noteLabel(s.note);
+  return l ? `${s.name} ${l}` : s.name;
+}
+
 // Gender drives the pronouns in the AI reports, so it is a fixed set rather
 // than free text: a typo would silently put the wrong pronouns in a document
 // that goes to a parent. Clicking cycles male → female → unset.
@@ -1979,7 +1996,9 @@ const GENDER_CYCLE = { "": "male", male: "female", female: "" };
 const GENDER_STYLE = {
   male:   { label: "Male",   bg: "#dbeafe", fg: "#1d4ed8", bd: "#93c5fd" },
   female: { label: "Female", bg: "#fce7f3", fg: "#be185d", bd: "#f9a8d4" },
-  "":     { label: "—",      bg: "#f3f4f6", fg: "#9ca3af", bd: "#d1d5db" }
+  // Unset says what to do rather than showing a dash: a report cannot be
+  // generated until this is filled in, so it should not look optional.
+  "":     { label: "Click to set gender", bg: "#fef3c7", fg: "#b45309", bd: "#fcd34d" }
 };
 
 function genderPillHtml(s) {
@@ -2006,7 +2025,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
           <colgroup>
             <col style="width:42px">
             <col style="width:15%">
-            <col style="width:100px">
+            <col style="width:170px">
             <col style="width:10%">
             <col style="width:190px">
             <col style="width:120px">
@@ -2042,7 +2061,8 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
                 </td>
                 <td style="text-align:center" onclick="event.stopPropagation()">
                   <input class="admin-input db-note-input" data-id="${escHtml(s.id)}"
-                    value="${escHtml(s.note || '')}" placeholder="—" autocomplete="off"
+                    value="${escHtml(noteBare(s.note))}" placeholder="e.g. EIP" autocomplete="off"
+                    title="No brackets needed — they are added automatically in the sessions list and the reports."
                     style="width:100%;text-align:center" />
                 </td>
                 <td style="text-align:center" onclick="event.stopPropagation()">
@@ -2098,7 +2118,10 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
       const id = input.dataset.id;
       const s = state.students.find(x => x.id === id);
       if (!s) return;
-      const note = input.value.trim();
+      // Stored without brackets; every display site adds them. Typing them
+      // anyway is harmless, they are just stripped back off here.
+      const note = noteBare(input.value);
+      input.value = note;
       if (note === (s.note || "")) return;
       s.note = note;
       await setStudentNote(id, note);
@@ -2700,7 +2723,7 @@ function renderStudentList(container, students, query = "") {
   container.innerHTML = `<div class="roster-list">` +
     filtered.map(s => `
       <button class="roster-item" data-id="${s.id}">
-        <span class="roster-item-name">${escHtml(s.name)}${s.note ? ` <span style="opacity:.6">${escHtml(s.note)}</span>` : ""}</span>
+        <span class="roster-item-name">${escHtml(s.name)}${noteLabel(s.note) ? ` <span style="opacity:.6">${escHtml(noteLabel(s.note))}</span>` : ""}</span>
       </button>
     `).join("") +
     `</div>`;
@@ -3015,7 +3038,7 @@ function renderHalfYearReportsSection() {
         <span style="${labelStyle}">Student</span>
         <select id="hyr-student-select" class="admin-input" style="flex:1;min-width:0;background:#fff;font-family:inherit;font-size:1rem">
           <option value="">— Select —</option>
-          ${students.map(s => `<option value="${escHtml(s.id)}">${escHtml(s.name) + (s.note ? ' ' + escHtml(s.note) : '')}</option>`).join("")}
+          ${students.map(s => `<option value="${escHtml(s.id)}">${escHtml(studentLabel(s))}</option>`).join("")}
         </select>
         <span id="hyr-period-loading" style="font-size:.85rem;color:var(--text-muted);white-space:nowrap;display:none">Checking…</span>
       </div>
@@ -3363,7 +3386,7 @@ async function hyrGenerate() {
     const aiPrompt = `${HYR_DEFAULT_PROMPT}
 ${excludedList ? `\nEXCLUDED ACTIVITIES — ABSOLUTE RULE: The following activities have been deliberately excluded from this report by the author. They are NOT present in the session data below. Do NOT mention, reference, discuss, or draw any conclusions about them anywhere in the report — not in the executive summary, not in key insights, not in any target or observation section. Treat them as if they do not exist:\n${excludedList}\n` : ""}
 Student: ${student.name}
-${student.note ? `Student Program Note: ${student.note}\n` : ""}PRONOUNS: Refer to ${firstName} as "${PRON.subj}", "${PRON.obj}" and "${PRON.poss}" throughout. Never use the opposite pronouns, and never write "he or she", "him or her", "his or her", "they" or "their" about the student.
+${noteBare(student.note) ? `Student Program Note: ${noteBare(student.note)}\n` : ""}PRONOUNS: Refer to ${firstName} as "${PRON.subj}", "${PRON.obj}" and "${PRON.poss}" throughout. Never use the opposite pronouns, and never write "he or she", "him or her", "his or her", "they" or "their" about the student.
 Reporting Period: ${aiReportingPeriod}
 
 SESSION DATA:
@@ -5152,7 +5175,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
 
   paragraphs.push(mkCoverLabelPara("Student Name:"));
   // Note (e.g. "(EIP)") sits beside the name, as it does everywhere else.
-  paragraphs.push(mkCoverShaded(student.name + (student.note ? " " + student.note : "")));
+  paragraphs.push(mkCoverShaded(studentLabel(student)));
   paragraphs.push(mkCoverSpacer());
   paragraphs.push(mkCoverLabelPara("Program:"));
   paragraphs.push(mkCoverShaded("", 32));
@@ -5611,7 +5634,7 @@ async function monthlyGenerate() {
     const aiPrompt = `${HYR_DEFAULT_PROMPT}
 ${excludedList ? `\nEXCLUDED ACTIVITIES — ABSOLUTE RULE: The following activities have been deliberately excluded from this report. Do NOT mention, reference, or draw conclusions about them anywhere:\n${excludedList}\n` : ""}
 Student: ${student.name}
-${student.note ? `Student Program Note: ${student.note}\n` : ""}PRONOUNS: Refer to ${firstName} as "${PRON.subj}", "${PRON.obj}" and "${PRON.poss}" throughout. Never use the opposite pronouns, and never write "he or she", "him or her", "his or her", "they" or "their" about the student.
+${noteBare(student.note) ? `Student Program Note: ${noteBare(student.note)}\n` : ""}PRONOUNS: Refer to ${firstName} as "${PRON.subj}", "${PRON.obj}" and "${PRON.poss}" throughout. Never use the opposite pronouns, and never write "he or she", "him or her", "his or her", "they" or "their" about the student.
 Reporting Month: ${monthName} ${year}
 Number of sessions this month: ${sessionCount}
 
@@ -6400,7 +6423,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   summaryParas.push(new Paragraph({
     // Note (e.g. "(EIP)") sits beside the name, matching how the student is
     // labelled everywhere else in the app. Omitted entirely when there is none.
-    children: [new TextRun({ text: student.name + (student.note ? " " + student.note : ""),
+    children: [new TextRun({ text: studentLabel(student),
       bold: true, size: 36, font: TNR })],
     alignment: AlignmentType.CENTER, spacing: { before: 0, after: 40, ...LS }
   }));
@@ -6909,7 +6932,7 @@ function openManageActivityScreen(student) {
   _maIsGroup = false;
   _maSelectedTargetIdx = 0;
   const sub = $("manage-activity-subtitle");
-  if (sub) sub.textContent = student.name + (student.note ? ' ' + student.note : '');
+  if (sub) sub.textContent = studentLabel(student);
   showScreen("screen-manage-activity");
   $("btn-manage-activity-back").onclick = showHome;
   // Hide the old header button — the button is now inline next to the dropdown
@@ -7069,7 +7092,7 @@ function showStudentChoice(student) {
   // Pre-fetch sessions as soon as the picker opens so the tick marks are
   // ready by the time the user navigates to "Pick A Date".
   const sessionsFetch = getRecentSessionsForStudent(student.id);
-  $("session-picker-title").textContent = student.name + (student.note ? ' ' + student.note : '');
+  $("session-picker-title").textContent = studentLabel(student);
   $("session-picker-list").innerHTML = `
     <div class="choice-list">
       <button class="choice-btn choice-today">
@@ -7131,7 +7154,7 @@ function showStudentChoice(student) {
 
 
     const renderDateStep = () => {
-      $("session-picker-title").textContent = student.name + (student.note ? ' ' + student.note : '');
+      $("session-picker-title").textContent = studentLabel(student);
       $("session-picker-list").innerHTML = `
         <div class="session-date-step">
           <p class="session-date-prompt">What date is this session for?</p>
@@ -7230,7 +7253,7 @@ function showStudentChoice(student) {
 
 // Page 1: month grid
 async function showSessionPicker(student) {
-  $("session-picker-title").textContent = student.name + (student.note ? ' ' + student.note : '');
+  $("session-picker-title").textContent = studentLabel(student);
   $("session-picker-list").innerHTML =
     `<div class="session-picker-loading">Loading sessions…</div>`;
   $("session-picker-modal").classList.remove("hidden");
@@ -7274,7 +7297,7 @@ async function showSessionPicker(student) {
 }
 
 function renderMonthGrid(student, byMonth, today, sessions) {
-  $("session-picker-title").textContent = student.name + (student.note ? ' ' + student.note : '');
+  $("session-picker-title").textContent = studentLabel(student);
 
   let html = `<div class="month-grid">
     <button class="month-grid-btn month-grid-btn-pickdate" data-action="pick-date">
@@ -7574,7 +7597,7 @@ function showGroupExportStudentPicker(group, mode) {
 // ─── GO TO ANOTHER SESSION ───────────────────────────────────
 // Opens session-picker starting at the current session's month.
 async function showGoToAnotherSession(student) {
-  $("session-picker-title").textContent = student.name + (student.note ? ' ' + student.note : '');
+  $("session-picker-title").textContent = studentLabel(student);
   $("session-picker-list").innerHTML = `<div class="session-picker-loading">Loading sessions…</div>`;
   $("session-picker-modal").classList.remove("hidden");
 
@@ -7622,7 +7645,7 @@ async function showGoToAnotherSession(student) {
 }
 
 function renderGoToMonthGrid(student, byMonth, today) {
-  $("session-picker-title").textContent = student.name + (student.note ? ' ' + student.note : '');
+  $("session-picker-title").textContent = studentLabel(student);
   let html = `<div class="month-grid">`;
   for (const month of byMonth.keys()) {
     const [name, year] = month.split(" ");
@@ -7670,7 +7693,7 @@ function renderGoToSessionsForMonth(student, month, monthSessions, byMonth, toda
 // jumps into live entry instead of View/Edit (openSession instead of
 // openSessionView) when a session is picked.
 async function showGoToAnotherSessionForEntry(student) {
-  $("session-picker-title").textContent = student.name + (student.note ? ' ' + student.note : '');
+  $("session-picker-title").textContent = studentLabel(student);
   $("session-picker-list").innerHTML = `<div class="session-picker-loading">Loading sessions…</div>`;
   $("session-picker-modal").classList.remove("hidden");
 
@@ -7717,7 +7740,7 @@ async function showGoToAnotherSessionForEntry(student) {
 }
 
 function renderGoToMonthGridEntry(student, byMonth, today, sessions) {
-  $("session-picker-title").textContent = student.name + (student.note ? ' ' + student.note : '');
+  $("session-picker-title").textContent = studentLabel(student);
   let html = `<div class="month-grid">
     <button class="month-grid-btn month-grid-btn-pickdate" data-action="pick-date">
       <span class="mgb-pickdate-label">Pick A Date</span>
@@ -8027,7 +8050,7 @@ async function openSession(student, existingSessionId = null, dateStr = null, pa
   _selectedSectionIdx      = 0;
 
   showScreen("screen-session");
-  $("session-student-name").textContent = student.name + (student.note ? ' ' + student.note : '');
+  $("session-student-name").textContent = studentLabel(student);
   $("session-meta").textContent = "";
   $("target-content").innerHTML = `<div class="loading">Loading…</div>`;
   $("target-select").innerHTML  = `<option value="">— loading —</option>`;
@@ -11204,7 +11227,7 @@ async function openSessionView(student, sessionId) {
   state.viewActionsInFlight = 0;
 
   showScreen("screen-session-view");
-  $("view-student-name").textContent = student.name + (student.note ? ' ' + student.note : '');
+  $("view-student-name").textContent = studentLabel(student);
   $("view-session-meta").textContent = "";
   $("session-view-body").innerHTML = `<div class="loading">Loading…</div>`;
   _viewChkConfirmRole = null; clearTimeout(_viewChkConfirmTimer);
@@ -17327,7 +17350,7 @@ function wireStudentNameSection(student) {
 
 function renderStudentManageContent(student) {
   _pendingActsCleanup = null;
-  $("manage-modal-title").textContent = student.name + (student.note ? ' ' + student.note : '');
+  $("manage-modal-title").textContent = studentLabel(student);
   const isAssessment = student.type === "assessment";
 
   const html = `
