@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1904";
+const APP_VERSION = "1905";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -1972,6 +1972,23 @@ function openStudentRegistryScreen(opts = {}) {
 // (state.students) — the per-student session-number lookups are genuinely
 // slow (2 Firestore queries each), so those fill in afterwards per-cell
 // instead of blocking the whole screen behind a "Loading…" spinner.
+// Gender drives the pronouns in the AI reports, so it is a fixed set rather
+// than free text: a typo would silently put the wrong pronouns in a document
+// that goes to a parent. Clicking cycles male → female → unset.
+const GENDER_CYCLE = { "": "male", male: "female", female: "" };
+const GENDER_STYLE = {
+  male:   { label: "Male",   bg: "#dbeafe", fg: "#1d4ed8", bd: "#93c5fd" },
+  female: { label: "Female", bg: "#fce7f3", fg: "#be185d", bd: "#f9a8d4" },
+  "":     { label: "—",      bg: "#f3f4f6", fg: "#9ca3af", bd: "#d1d5db" }
+};
+
+function genderPillHtml(s) {
+  const g = GENDER_STYLE[s.gender] ? s.gender : "";
+  const st = GENDER_STYLE[g];
+  return `<button class="db-gender-pill" data-id="${escHtml(s.id)}" title="Click to change"
+    style="padding:.28rem .7rem;border-radius:999px;border:1px solid ${st.bd};background:${st.bg};color:${st.fg};font-size:.78rem;font-weight:600;cursor:pointer;white-space:nowrap;min-width:64px">${st.label}</button>`;
+}
+
 async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
   const body = $("student-registry-body");
   if (!body) return;
@@ -1989,6 +2006,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
           <colgroup>
             <col style="width:42px">
             <col style="width:15%">
+            <col style="width:100px">
             <col style="width:10%">
             <col style="width:190px">
             <col style="width:120px">
@@ -1998,6 +2016,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
             <tr>
               <th>No.</th>
               <th>Full Name</th>
+              <th>Gender</th>
               <th style="white-space:normal">Short Name (Used in AI Reports)</th>
               <th>Note</th>
               <th style="white-space:normal">Report Type</th>
@@ -2012,6 +2031,9 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
                   <input class="admin-input db-fullname-input" data-id="${escHtml(s.id)}"
                     value="${escHtml(s.name || '')}" autocomplete="off"
                     style="width:100%;text-align:center" />
+                </td>
+                <td style="text-align:center" onclick="event.stopPropagation()">
+                  ${genderPillHtml(s)}
                 </td>
                 <td style="text-align:center" onclick="event.stopPropagation()">
                   <input class="admin-input db-shortname-input" data-id="${escHtml(s.id)}"
@@ -2081,6 +2103,21 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
       s.note = note;
       await setStudentNote(id, note);
       renderExistingStudentButtons();
+    });
+  });
+
+  $("student-registry-body").querySelectorAll(".db-gender-pill").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const s = state.students.find(x => x.id === btn.dataset.id);
+      if (!s) return;
+      const next = GENDER_CYCLE[GENDER_STYLE[s.gender] ? s.gender : ""];
+      s.gender = next;
+      const st = GENDER_STYLE[next];
+      btn.textContent      = st.label;
+      btn.style.background = st.bg;
+      btn.style.color      = st.fg;
+      btn.style.borderColor = st.bd;
+      await saveStudent(s);
     });
   });
 
@@ -3259,6 +3296,15 @@ async function hyrGenerate() {
     if (text === "Done!") btn.textContent = text;
   };
 
+  // The report's pronouns come from the student's gender, so it cannot be
+  // written correctly without one. Stopping here beats sending a parent a
+  // document that calls their child by the wrong pronoun.
+  if (!student.gender || !GENDER_STYLE[student.gender]) {
+    alert(`${student.name} has no gender set, so the report cannot pick the right pronouns.\n\n`
+      + `Open Student Database, click the Gender pill next to ${student.name}, then generate the report again.`);
+    return;
+  }
+
   // Drop the previous report's cost as soon as a new one starts, or it reads as
   // the cost of the report currently running. The running total stays.
   renderAiCostLine();
@@ -3278,6 +3324,10 @@ async function hyrGenerate() {
     // Build prompt synchronously — then start fetch immediately so it runs in parallel with fake phases
     const periodLabel = period === "H1" ? `January–June ${year}` : `July–December ${year}`;
     const firstName   = student.preferredName || student.name.split(" ")[0];
+    // Gender is required before generating, so the pronouns are always known.
+    const PRON = student.gender === "female"
+      ? { subj: "she", obj: "her", poss: "her" }
+      : { subj: "he", obj: "him", poss: "his" };
     // Actual data start month (may differ from term start if student enrolled mid-term)
     const _hyrMonthAbbrs = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     const _hyrMonthFull  = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -3313,7 +3363,8 @@ async function hyrGenerate() {
     const aiPrompt = `${HYR_DEFAULT_PROMPT}
 ${excludedList ? `\nEXCLUDED ACTIVITIES — ABSOLUTE RULE: The following activities have been deliberately excluded from this report by the author. They are NOT present in the session data below. Do NOT mention, reference, discuss, or draw any conclusions about them anywhere in the report — not in the executive summary, not in key insights, not in any target or observation section. Treat them as if they do not exist:\n${excludedList}\n` : ""}
 Student: ${student.name}
-${student.note ? `Student Program Note: ${student.note}\n` : ""}Reporting Period: ${aiReportingPeriod}
+${student.note ? `Student Program Note: ${student.note}\n` : ""}PRONOUNS: Refer to ${firstName} as "${PRON.subj}", "${PRON.obj}" and "${PRON.poss}" throughout. Never use the opposite pronouns, and never write "he or she", "him or her", "his or her", "they" or "their" about the student.
+Reporting Period: ${aiReportingPeriod}
 
 SESSION DATA:
 ${dataText}
@@ -3329,7 +3380,7 @@ Write EXACTLY 7 points, no more and no fewer. Each is one specific thing ${first
 
 Write each point as a short LABEL, then TWO sentences. The first sentence states what was observed, starting with the subject. The second says what it means for ${firstName} in ordinary life, outside the session room. Never join them with a dash and never write "this matters because".
 
-The second sentence is the one that gives the point its value. Say what the achievement lets him or her DO, or what it says about them as a person growing up. "This reflects his growing confidence in initiating friendly interactions with other children" is right, because a parent learns something about their child. "His number formation is now solid enough to support longer maths tasks" is weaker, because it only describes the mechanics of the task.
+The second sentence is the one that gives the point its value. Say what the achievement lets ${PRON.obj} DO, or what it says about them as a person growing up. "This reflects his growing confidence in initiating friendly interactions with other children" is right, because a parent learns something about their child. "His number formation is now solid enough to support longer maths tasks" is weaker, because it only describes the mechanics of the task.
 
 VARY how the second sentence opens. Do NOT cycle through "This shows", "This reflects", "This demonstrates", "This highlights" as a set - across seven points AT MOST TWO may begin with "This". Other ways in: "indicating that...", "suggesting that...", "a sign that...", "supporting his ability to...", or state the significance directly with no label at all.
 
@@ -3359,7 +3410,7 @@ ROW: Key Improvement | [2-4 word label]: [What he did. What it means for him in 
 ===END===
 
 ${targetsWithData.map(r => `===OBSERVATION: ${r.name}===
-Strength: [Two sentences. The first names one specific thing ${firstName} does well in this target, as actually observed in sessions rather than a general compliment. The second says what that lets him or her do in ordinary life, outside the session room, the same way the Highlights section does.]
+Strength: [Two sentences. The first names one specific thing ${firstName} does well in this target, as actually observed in sessions rather than a general compliment. The second says what that lets ${PRON.obj} do in ordinary life, outside the session room, the same way the Highlights section does.]
 Weakness: [One or two sentences naming a genuine difficulty in this target, and what tends to bring it on - the situation, the time of day, the kind of task. ONLY write one if the session data directly shows it: a struggling remark, a behaviour that caused problems, or consistently low performance. If the data shows no clear weakness, write exactly: No notable areas of difficulty observed this term. NEVER invent or guess.]
 ===END===`).join("\n\n")}
 
@@ -3387,7 +3438,7 @@ The OBSERVED blocks follow the same rules and the same two-line format as the OB
 ===ACTION_PLAN===
 Review the full session picture for ${firstName} across all targets and all remarks this term. Identify the most important areas to work on and the most helpful strategies.
 
-ORDER BOTH LISTS BY IMPORTANCE, most important first. The first point in each list must be the single thing that matters most for ${firstName} right now, judged by how often it appears in the data, how much it affects the rest of his or her learning, and how far it is from where it should be. Do not order them by target, alphabetically, or by the order the targets appear in the data. If something is only a minor issue, leave it out rather than padding the list to reach five.
+ORDER BOTH LISTS BY IMPORTANCE, most important first. The first point in each list must be the single thing that matters most for ${firstName} right now, judged by how often it appears in the data, how much it affects the rest of ${PRON.poss} learning, and how far it is from where it should be. Do not order them by target, alphabetically, or by the order the targets appear in the data. If something is only a minor issue, leave it out rather than padding the list to reach five.
 
 Write EXACTLY 5 to 7 FOCUS AREAS — you MUST write at least 5, no fewer. Each uses this format: [2-4 word label]: [one concise sentence naming the specific difficulty or gap observed.] Do not group by target name — write each point as a standalone observation.
 
@@ -5100,7 +5151,8 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   });
 
   paragraphs.push(mkCoverLabelPara("Student Name:"));
-  paragraphs.push(mkCoverShaded(student.name));
+  // Note (e.g. "(EIP)") sits beside the name, as it does everywhere else.
+  paragraphs.push(mkCoverShaded(student.name + (student.note ? " " + student.note : "")));
   paragraphs.push(mkCoverSpacer());
   paragraphs.push(mkCoverLabelPara("Program:"));
   paragraphs.push(mkCoverShaded("", 32));
@@ -5469,6 +5521,15 @@ async function monthlyGenerate() {
     if (text === "Done!") btn.textContent = text;
   };
 
+  // The report's pronouns come from the student's gender, so it cannot be
+  // written correctly without one. Stopping here beats sending a parent a
+  // document that calls their child by the wrong pronoun.
+  if (!student.gender || !GENDER_STYLE[student.gender]) {
+    alert(`${student.name} has no gender set, so the report cannot pick the right pronouns.\n\n`
+      + `Open Student Database, click the Gender pill next to ${student.name}, then generate the report again.`);
+    return;
+  }
+
   // Drop the previous report's cost as soon as a new one starts, or it reads as
   // the cost of the report currently running. The running total stays.
   renderAiCostLine();
@@ -5489,6 +5550,9 @@ async function monthlyGenerate() {
     const FULL_MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
     const monthName = FULL_MONTHS[month - 1];
     const firstName = student.preferredName || student.name.split(" ")[0];
+    const PRON = student.gender === "female"
+      ? { subj: "she", obj: "her", poss: "her" }
+      : { subj: "he", obj: "him", poss: "his" };
     const _mGrpTargets = sessionType === "group" ? getGroupEffectiveTargets(studentId) : null;
     const effectiveStudent = _mGrpTargets ? { ...student, targets: _mGrpTargets } : student;
     const collected = monthlyCollectData(effectiveStudent, year, month, allSessions, excludedActivities, sessionType);
@@ -5547,7 +5611,8 @@ async function monthlyGenerate() {
     const aiPrompt = `${HYR_DEFAULT_PROMPT}
 ${excludedList ? `\nEXCLUDED ACTIVITIES — ABSOLUTE RULE: The following activities have been deliberately excluded from this report. Do NOT mention, reference, or draw conclusions about them anywhere:\n${excludedList}\n` : ""}
 Student: ${student.name}
-${student.note ? `Student Program Note: ${student.note}\n` : ""}Reporting Month: ${monthName} ${year}
+${student.note ? `Student Program Note: ${student.note}\n` : ""}PRONOUNS: Refer to ${firstName} as "${PRON.subj}", "${PRON.obj}" and "${PRON.poss}" throughout. Never use the opposite pronouns, and never write "he or she", "him or her", "his or her", "they" or "their" about the student.
+Reporting Month: ${monthName} ${year}
 Number of sessions this month: ${sessionCount}
 
 You are writing a monthly progress report for this student's parents. Follow the GLOBAL RULES above on every sentence, including the writing style and sentence structure rules. No percentages or numbers anywhere in the text. Warm but honest.
@@ -5557,12 +5622,18 @@ Provide ONLY the following sections using EXACTLY these markers. No extra text o
 ===HIGHLIGHTS===
 [Write EXACTLY 5 points, no more and no fewer. Each is one specific thing ${firstName} actually did this month, taken from the session remarks, a real moment rather than a general description.
 
-Write each point as TWO sentences. The first states what was observed, starting with the subject. The second states what it shows, starting with a phrase such as "This shows", "This reflects", "This demonstrates" or "This highlights". Never join them with a dash and never write "this matters because".
+Write each point as TWO sentences. The first states what was observed. The second states what it shows, starting with a phrase such as "This shows", "This reflects", "This demonstrates" or "This highlights". Never join them with a dash and never write "this matters because".
+
+VARY HOW THE POINTS OPEN. Five points in a row all beginning with the same name is dull to read and makes the section feel like a list of records rather than a description of a child.
+  • AT MOST 2 of the 5 points may begin with ${firstName}'s name. This is a hard limit, not a preference.
+  • Open the others another way. Make the skill or the task the subject, as in "Putting on ${PRON.poss} shoes took no physical prompting at all." Or set the scene first, as in "Asked to label pictures of animals, ${PRON.subj} named tigers and cows correctly." Or simply start with the pronoun "${PRON.subj}".
+  • Never use the same opening pattern twice in a row.
+  • This does NOT relax the rule below. Whatever the opening, it must never be a date, a frequency, or any other time reference.
 
 ABSOLUTE: NEVER say WHEN or HOW OFTEN anything happened.
   • No dates: not "On 9 July", not "on the 24th", not any day or date.
   • No frequency: not "During one session this month", not "in most sessions", not "twice this month", not "on two occasions". Nothing of that kind.
-  • Every point begins with the subject and goes straight into what happened. The dates in the session data are there so you can find the right moments, not to be reported back.
+  • Every point goes straight into what happened. The dates in the session data are there so you can find the right moments, not to be reported back.
 
 Right: "Hayden apologised to a peer after accidentally stepping on his foot, with minimal prompting. This reflects his use of polite language to repair social situations and maintain positive relationships with classmates."
 Wrong, opens with a date: "On 20 July, Hayden apologised to a peer after accidentally stepping on his foot."
@@ -6327,7 +6398,10 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     }));
   }
   summaryParas.push(new Paragraph({
-    children: [new TextRun({ text: student.name, bold: true, size: 36, font: TNR })],
+    // Note (e.g. "(EIP)") sits beside the name, matching how the student is
+    // labelled everywhere else in the app. Omitted entirely when there is none.
+    children: [new TextRun({ text: student.name + (student.note ? " " + student.note : ""),
+      bold: true, size: 36, font: TNR })],
     alignment: AlignmentType.CENTER, spacing: { before: 0, after: 40, ...LS }
   }));
   summaryParas.push(new Paragraph({
