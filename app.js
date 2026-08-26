@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1920";
+const APP_VERSION = "1921";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3462,29 +3462,55 @@ Write exactly 5 sentences summing up ${firstName}'s overall progress this term i
 ===END===
 
 ===KEY_INSIGHTS===
-Write EXACTLY 7 points, no more and no fewer. Each is one specific thing ${firstName} actually did this term, taken from the session remarks, a real moment rather than a general description. Each point comes from a DIFFERENT area of the student's work.
+Write EXACTLY 7 points, no more and no fewer. Each is ONE specific thing ${firstName} did this term, taken from the session remarks, a real moment rather than a general description. Each point comes from a DIFFERENT area of the student's work. Only real things from the data, never invent one to fill a row.
 
-Write each point as a short LABEL, then TWO sentences. The first sentence states what was observed, starting with the subject. The second says what it means for ${firstName} in ordinary life, outside the session room. Never join them with a dash and never write "this matters because".
+EVERY POINT IS A SHORT LABEL, THEN TWO SENTENCES:
+  Label: 2-4 words, written directly with no ** markers.
+  1. What ${PRON.subj} did. Plain, direct, natural English.
+  2. Why it matters: what ${PRON.subj} can now do, or what this lets ${PRON.obj} do in ordinary life outside the session room.
 
-The second sentence is the one that gives the point its value. Say what the achievement lets ${PRON.obj} DO, or what it says about them as a person growing up. "This reflects his growing confidence in initiating friendly interactions with other children" is right, because a parent learns something about their child. "His number formation is now solid enough to support longer maths tasks" is weaker, because it only describes the mechanics of the task.
+WRITE NATURAL ENGLISH. Read each sentence in your head before writing it.
+  • Ordinary sentence openings. RIGHT: "When asked to label pictures of tigers and cows, ${firstName} correctly identified them." WRONG: "Asked to label pictures of tigers and cows, ${firstName} identified them." Dropping the opening word is not how people write.
+  • Active voice, always. RIGHT: "${firstName} swung, jumped and scootered with accuracy and obvious enjoyment." WRONG: "Swinging, jumping and scootering were completed with high accuracy."
 
-VARY how the second sentence opens. Do NOT cycle through "This shows", "This reflects", "This demonstrates", "This highlights" as a set - across seven points AT MOST TWO may begin with "This". Other ways in: "indicating that...", "suggesting that...", "a sign that...", "supporting his ability to...", or state the significance directly with no label at all.
+THE TWO SENTENCES ARE SEPARATE, with a full stop between them. Never fold the second into the first with ", indicating that", ", suggesting that", ", a sign that", ", which shows", ", showing that", ", pointing to", or a dash. Never write "this matters because".
 
-ABSOLUTE: NEVER say WHEN or HOW OFTEN anything happened.
-  • No dates: not "In June", not "by the end of the term", not any month or date.
-  • No frequency: not "on several occasions", not "in most sessions", not "across nearly every session". Nothing of that kind.
-  • The dates in the session data are there so you can find the right moments, not to be reported back.
+VARY HOW SENTENCE 2 OPENS. Do NOT cycle through "This shows", "This reflects", "This demonstrates", "This highlights" as a set. Across seven points AT MOST TWO may begin with "This". Other ways in: make the skill itself the subject ("Copying actions this reliably helps ${PRON.obj} learn by watching others."), or state the significance directly.
 
-Write about MOMENTS, not statuses. Do NOT write points of the form "he reached mastery in several topics" or "his compliance was rated as maintained" - those describe record-keeping, not the child, and the activities mastered this term are already listed elsewhere in the report. Describe the thing he actually did that led to it.
+SENTENCE 2 MUST SHOW PROGRESS, AND GIVE THE PARENT HOPE. It says the child is moving forward in ${PRON.poss} life.
+  RIGHT: "This reflects ${PRON.poss} growing confidence in starting friendly conversations with other children."
+  WRONG: "This suggests ${PRON.subj} remains highly motivated by physical, sensory activities." Enjoying something is NOT progress, and it was already true before the term started.
+  WRONG: "${PRON.poss} number formation is now solid enough to support longer maths tasks." That is only about the mechanics of the task, not about the child.
+  If all a moment shows is that ${PRON.subj} liked something, it is NOT a key improvement. Choose a different moment.
 
-NEVER quote a session remark word for word and NEVER use quotation marks around anything taken from the data. Rewrite what was recorded in your own words. Write "he wrote the numbers 1 to 100 without a mistake", not: he wrote numbers 1 to 100 "in one shot without mistakes". A parent should not be able to tell which words came from the therapist's notes. Use the student's name or a pronoun naturally; you may alternate.
+NEVER DEFINE AN ACHIEVEMENT BY WHAT ${firstName} CANNOT DO. Sentence 2 says what ${PRON.subj} GAINED. It must never point, even gently and even accurately, at a skill ${PRON.subj} lacks. A parent reads this section for hope, and one clause reminding them of a limitation undoes the whole point.
+  WRONG: "Using a picture card to make requests gives ${PRON.obj} a way to communicate ${PRON.poss} wants without needing spoken words." The parent hears "my child cannot speak".
+  RIGHT: "Using a picture card to make requests gives ${PRON.obj} a clear way to tell people what ${PRON.subj} wants."
+  Banned in sentence 2: "without needing [skill]", "instead of [skill]", "despite not yet [skill]", "even though ${PRON.subj} cannot [skill]", "as an alternative to [skill]", "compensates for", "makes up for".
+  This is NOT a ban on the word "without". "Put on ${PRON.poss} shoes without any physical help" is RIGHT, because being able to do something unaided IS the achievement.
 
-Right: "Apology Skill: Hayden apologised to a peer after accidentally stepping on his foot, with minimal prompting. This reflects his use of polite language to repair social situations and maintain positive relationships with classmates."
-Wrong, a status rather than a moment: "Science Mastery: Hayden reached mastery this term in several science topics, including animal homes and life cycles."
-Wrong, significance is only about the task: "Number Accuracy: Hayden wrote the numbers from 1 to 100 without a mistake. Being able to do this independently means his number formation is now solid enough to support longer maths tasks."
-Wrong, opens with a date: "Day and Date Writing: By the end of the term, Hayden was writing the day and date on his own."
+WRITE IN PLAIN, EVERYDAY LANGUAGE. A parent should understand every sentence at normal reading speed, without stopping to work out what it means.
+  • Put the plain meaning FIRST and the professional term in brackets AFTER it, never the other way round.
+    RIGHT: "This shows ${PRON.subj} can spot small differences between pictures (visual discrimination), allowing ${PRON.obj} to learn harder topics later."
+    WRONG: "This supports ${PRON.poss} visual discrimination skills, an important building block for more complex learning tasks."
+  • Not every point needs a bracketed term. Add one only where a genuine professional term applies.
+  • STIFF WRITING IS THE BIGGER PROBLEM, not just technical words. Write "things ${PRON.subj} does not like", not "less preferred activities". Write "backing away", not "displaying avoidance behaviour".
+  • Test every sentence: would a parent say it out loud to a friend? If it would sound odd spoken aloud, rewrite it.
 
-Only real things from the data, never invent one to fill a row.
+BE HONEST ABOUT HOW OFTEN. A flat statement like "${firstName} put on and took off ${PRON.poss} shoes without any physical help" reads to a parent as "${PRON.subj} can do this now, every time". If it happened once, that is false hope, and they will find out at home. Match the strength of the claim to what the data shows:
+  • Observed ONCE: say so, and write it as a beginning rather than a caveat. "For the first time, ${firstName} put on ${PRON.poss} shoes without any physical help." Managing something ${PRON.subj} has never managed before is genuinely good news. Say it warmly.
+  • Observed A FEW times: "${firstName} has started putting on ${PRON.poss} shoes without help, managing it on several occasions."
+  • Observed in MOST or ALL attempts: "${firstName} now consistently puts on ${PRON.poss} shoes without help."
+  Never claim more than the data supports. Equally, never hedge something that genuinely was consistent, since that robs ${PRON.obj} of real progress.
+  Weave the frequency into the sentence, NEVER open a point with it, and do not anchor it to the term. Write "for the first time", never "for the first time this term".
+
+ABSOLUTE, NEVER WRITE A DATE. Not "In June", not "by the end of the term", not any day, date or month name anywhere in any point. The dates in the session data are there so you can find the right moments, never to be repeated back to the parent. A point that names a date is WRONG even if everything else about it is perfect.
+
+WRITE ABOUT MOMENTS, NOT STATUSES. Do NOT write points of the form "${PRON.subj} reached mastery in several topics" or "${PRON.poss} compliance was rated as maintained". Those describe record-keeping, not the child, and the activities mastered this term are already listed elsewhere in the report. Describe the thing ${PRON.subj} actually did that led to it.
+
+NEVER quote a session remark word for word and NEVER use quotation marks around anything taken from the data. Rewrite what was recorded in your own words. Write "${PRON.subj} wrote the numbers 1 to 100 without a mistake", not: ${PRON.subj} wrote numbers 1 to 100 "in one shot without mistakes". A parent should not be able to tell which words came from the therapist's notes.
+
+FULL EXAMPLE OF A GOOD POINT: "Apology Skill: ${firstName} apologised to a peer after accidentally stepping on ${PRON.poss} foot, with minimal prompting. This reflects ${PRON.poss} use of polite language to repair a situation and stay on good terms with other children."
 
 ROW: Key Improvement | [2-4 word label, written directly with no ** markers]: [What he did. What it means for him in ordinary life.]
 ROW: Key Improvement | [2-4 word label]: [What he did. What it means for him in ordinary life.]
