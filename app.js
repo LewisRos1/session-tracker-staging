@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1913";
+const APP_VERSION = "1914";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6125,9 +6125,9 @@ function monthlyDrawScoreBarChart(rows) {
   if (!rows.length) return null;
   const SCALE = 2;
   const W = 820, PAD_L = 370, PAD_R = 88;
-  // Canvas is 820 wide but placed in the document at 620, so a 19px face here
-  // lands at roughly 11pt on the page, matching the body text around it.
-  const FONT_PX = 19;
+  // Canvas is 820 wide but placed in the document at 620, so everything drawn
+  // here shrinks to about 76% on the page. 17px sits just under the body text.
+  const FONT_PX = 17;
   const HDR_H = 40, PAD_T = 12, PAD_B = 48, LEG_H = 42;
   const plotW = W - PAD_L - PAD_R;
 
@@ -6199,7 +6199,7 @@ function monthlyDrawScoreBarChart(rows) {
     }
 
     const w = Math.max(2, plotW * Math.max(0, Math.min(100, r.score)) / 100);
-    ctx.fillStyle = r.score >= 80 ? "#10b981" : r.score >= 50 ? "#3b82f6" : "#f59e0b";
+    ctx.fillStyle = r.score >= 80 ? "#16a34a" : r.score >= 50 ? "#eab308" : "#dc2626";
     ctx.fillRect(PAD_L, mid - barH / 2, w, barH);
 
     ctx.fillStyle = "#111827"; ctx.font = `bold ${FONT_PX}px Arial`; ctx.textAlign = "left";
@@ -6212,9 +6212,9 @@ function monthlyDrawScoreBarChart(rows) {
   // Legend along the bottom. The bar colour encodes a band, and without this a
   // parent sees green and blue bars with no way to know what separates them.
   const legend = [
-    { c: "#10b981", t: "80% and above" },
-    { c: "#3b82f6", t: "50% to 79%" },
-    { c: "#f59e0b", t: "Below 50%" }
+    { c: "#16a34a", t: "80% and above" },
+    { c: "#eab308", t: "50% to 79%" },
+    { c: "#dc2626", t: "Below 50%" }
   ];
   ctx.font = `${FONT_PX}px Arial`;
   ctx.textAlign = "left";
