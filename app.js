@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1919";
+const APP_VERSION = "1920";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -5748,7 +5748,16 @@ DO NOT START EVERY POINT THE SAME WAY. Two or three points may begin with ${firs
 
 ABSOLUTE, NEVER WRITE A DATE. Not "on 31 July", not "On 24 July", not "in July", not "by the end of the month", not any day, date or month name anywhere in any point. The dates in the session data are there so you can find the right moments, never to be repeated back to the parent. A point that names a date is WRONG even if everything else about it is perfect.
 
-NEVER COUNT OCCASIONS ACROSS THE MONTH: none of "this month", "throughout the month", "across sessions", "on several occasions", "in most sessions". Describing what happened WITHIN one occasion is fine and welcome: "completing several trials correctly in a row" is good writing, not a frequency.
+BE HONEST ABOUT HOW OFTEN. This matters more than it sounds. A flat statement like "${firstName} put on and took off ${PRON.poss} shoes without any physical help" reads to a parent as "${PRON.subj} can do this now, every time". If it happened once, that is false hope, and they will find out at home. Match the strength of the claim to what the data actually shows:
+  • Observed ONCE: say so, and write it as a beginning rather than a caveat. "For the first time, ${firstName} put on ${PRON.poss} shoes without any physical help." Managing something ${PRON.subj} has never managed before is genuinely good news. Say it warmly.
+  • Observed A FEW times: "${firstName} has started putting on ${PRON.poss} shoes without help, managing it on several occasions."
+  • Observed in MOST or ALL attempts: "${firstName} now consistently puts on ${PRON.poss} shoes without help."
+  Never claim more than the data supports. Equally, never hedge something that genuinely was consistent, since that robs ${PRON.obj} of real progress.
+
+HOW TO WORD THE FREQUENCY:
+  • Weave it into the sentence. NEVER open a point with it. WRONG: "During one session this month, ${firstName} put on ${PRON.poss} shoes." RIGHT: "For the first time, ${firstName} put on ${PRON.poss} shoes without any physical help."
+  • Do not anchor it to the reporting period. Write "for the first time", never "for the first time this month". The whole section is about this month already.
+  • Describing what happened WITHIN one occasion is also welcome: "completing several trials correctly in a row" is good writing.
 
 THE TWO SENTENCES ARE SEPARATE, with a full stop between them. Never fold the second into the first with ", indicating that", ", suggesting that", ", a sign that", ", which shows", ", showing that", ", pointing to", or a dash. Never write "this matters because".
 
