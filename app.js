@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1903";
+const APP_VERSION = "1904";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -5599,15 +5599,18 @@ NO numbers and NO percentages anywhere - describe the change in words. One idea 
 ===END===
 
 ===STILL_WORKING===
-[Write 2 to 3 points naming what ${firstName} still finds difficult, based only on genuine difficulties visible in the session data.
+[Write EXACTLY 2 or 3 points naming what ${firstName} still finds difficult, based only on genuine difficulties visible in the session data. Two is the minimum and is REQUIRED. Never write only one.
 
 Each point names the difficulty AND what tends to bring it on, in one or two sentences. "Sudden changes to his routine remain difficult for him. When a plan is altered without warning he may raise his voice or refuse an instruction before he is able to settle." Say what happens and when, and stop there.
 
 Do NOT suggest strategies, next steps, or what anyone will do about it. This section describes, it does not plan. No "we will", no "support will be provided", no recommendations of any kind.
 
-Vary how each point opens rather than starting them all the same way. Never invent a difficulty to fill a slot - if the data shows only one, write only one.]
+Vary how each point opens rather than starting them all the same way.
+
+If the most obvious difficulty is the only large one, do NOT invent a second. Search the rest of the session data for a smaller but real one instead: a skill that needed more prompting than the others, a task type that took longer to settle into, a situation that came up more than once. A milder genuine difficulty is always the right answer; a fabricated one never is.]
 - [difficulty and what brings it on]
 - [difficulty and what brings it on]
+- [difficulty and what brings it on, only if a third genuine one exists]
 ===END===
 
 ACTIVITIES MASTERED THIS MONTH (already listed in the report as fact - do not repeat these in HIGHLIGHTS):
