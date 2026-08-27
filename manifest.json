@@ -5,7 +5,7 @@
   "start_url": "/session-tracker/",
   "scope": "/session-tracker/",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "any",
   "background_color": "#6366f1",
   "theme_color": "#6366f1",
   "categories": ["medical", "productivity"],
