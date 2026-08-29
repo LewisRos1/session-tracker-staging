@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1934";
+const APP_VERSION = "1935";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -5837,12 +5837,14 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   // target. Archived and stopped targets stay out, as everywhere else.
   const hyrMastered = [];
   for (const t of activeTargets) {
+    let curHeading = null;   // the section heading each activity sits beneath
     for (const pa of (t.predefinedActivities || [])) {
-      if (pa.isHeading || pa.isMaintainHeading || pa.isNote || pa.isExportNote) continue;
+      if (pa.isHeading || pa.isMaintainHeading) { curHeading = (pa.title || pa.name || "").trim() || null; continue; }
+      if (pa.isNote || pa.isExportNote) continue;
       if (!pa.masteredOn) continue;
       const label = pa.title || pa.name;
       const detail = pa.title ? (pa.name || "") : "";
-      if (label) hyrMastered.push({ activity: label, detail, target: t.name, on: pa.masteredOn });
+      if (label) hyrMastered.push({ activity: label, detail, target: t.name, on: pa.masteredOn, heading: curHeading });
     }
   }
 
@@ -5872,23 +5874,55 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
       let hyrMastNo = 0;
       const _ord = a => (_wordTargetPos[a] ?? 999);
       for (const tName of [...byTarget.keys()].sort((a, b) => _ord(a) - _ord(b))) {
-        const items = byTarget.get(tName).sort((a, b) => a.on.localeCompare(b.on));
+        // Section headings become a shaded band inside the Activity column, so
+        // the merged Target cell keeps spanning the whole group. Heading order
+        // follows the config, since hyrMastered was collected in that order,
+        // and activities are date-sorted inside each heading.
+        const byHeading = new Map();
+        for (const m of byTarget.get(tName)) {
+          const h = m.heading || null;
+          if (!byHeading.has(h)) byHeading.set(h, []);
+          byHeading.get(h).push(m);
+        }
+        const rowsFor = [];
+        for (const [h, list] of byHeading) {
+          if (h) rowsFor.push({ heading: h });
+          list.sort((a, b) => a.on.localeCompare(b.on)).forEach(m => rowsFor.push({ m }));
+        }
         // See the monthly builder: Target is a merged column, not a band.
-        items.forEach((m, i) => {
-          hyrMastNo++;
-          const cells = [mkCell(`${hyrMastNo})`, { dxa: 700, align: AlignmentType.CENTER, size: 20 })];
+        rowsFor.forEach((d, i) => {
+          const cells = [];
+          if (d.heading) {
+            cells.push(mkCell("", { dxa: 700, align: AlignmentType.CENTER, size: 20 }));
+          } else {
+            hyrMastNo++;
+            cells.push(mkCell(`${hyrMastNo})`, { dxa: 700, align: AlignmentType.CENTER, size: 20 }));
+          }
           if (i === 0) cells.push(new TableCell({
-            rowSpan: items.length, width: { size: 2360, type: WidthType.DXA },
+            rowSpan: rowsFor.length, width: { size: 2360, type: WidthType.DXA },
             verticalAlign: VerticalAlign.CENTER,
             margins: { top: 100, bottom: 100, left: 150, right: 150 },
             children: [new Paragraph({ children: [new TextRun({ text: tName, size: 20 })], spacing: { before: 80, after: 80 } })]
           }));
+          if (d.heading) {
+            // Deeper grey than the repeating header row, so a band is never
+            // mistaken for a header after a page break.
+            cells.push(new TableCell({
+              columnSpan: 2, width: { size: 6300, type: WidthType.DXA },
+              verticalAlign: VerticalAlign.CENTER, shading: { fill: "e5e7eb" },
+              margins: { top: 80, bottom: 80, left: 150, right: 150 },
+              children: [new Paragraph({ children: [new TextRun({ text: d.heading, bold: true, size: 20 })], spacing: { before: 60, after: 60 } })]
+            }));
+            mastRows.push(new TableRow({ children: cells }));
+            return;
+          }
+          const m = d.m;
           cells.push(new TableCell({
             width: { size: 4900, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER,
             margins: { top: 100, bottom: 100, left: 150, right: 150 },
             children: [new Paragraph({
               children: [new TextRun({ text: m.activity, size: 22 })].concat(
-                m.detail ? [new TextRun({ break: 1, text: m.detail, size: 20, color: "374151" })] : []),
+                m.detail ? wordDetailRuns(m.detail) : []),
               spacing: { before: 80, after: 80 }
             })]
           }));
@@ -6068,14 +6102,16 @@ async function monthlyGenerate() {
     const _mmPrefix = `${year}-${String(month).padStart(2, "0")}-`;
     const masteredThisMonth = [];
     for (const t of activeTargets) {
+      let curHeading = null;   // the section heading each activity sits beneath
       for (const pa of (t.predefinedActivities || [])) {
-        if (pa.isHeading || pa.isMaintainHeading || pa.isNote || pa.isExportNote) continue;
+        if (pa.isHeading || pa.isMaintainHeading) { curHeading = (pa.title || pa.name || "").trim() || null; continue; }
+        if (pa.isNote || pa.isExportNote) continue;
         if (!pa.masteredOn || !String(pa.masteredOn).startsWith(_mmPrefix)) continue;
         // Title and details, the way the app shows them. An activity called
         // "Comment" tells a parent nothing without its details underneath.
         const label = pa.title || pa.name;
         const detail = pa.title ? (pa.name || "") : "";
-        if (label) masteredThisMonth.push({ activity: label, detail, target: t.name, on: pa.masteredOn });
+        if (label) masteredThisMonth.push({ activity: label, detail, target: t.name, on: pa.masteredOn, heading: curHeading });
       }
     }
 
@@ -7090,24 +7126,56 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     // Numbering runs straight down the table rather than restarting per target,
     // so the last number is the total mastered this month.
     let mastNo = 0;
-    for (const [tName, items] of byTarget) {
-      items.forEach((m, i) => {
-        mastNo++;
-        const cells = [mkCell(`${mastNo})`, { dxa: 700, align: AlignmentType.CENTER, size: 20 })];
+    for (const [tName, allItems] of byTarget) {
+      // Section headings become a shaded band inside the Activity column so the
+      // merged Target cell still spans the whole group — see the half-year
+      // builder, which does the same.
+      const byHeading = new Map();
+      for (const m of allItems) {
+        const h = m.heading || null;
+        if (!byHeading.has(h)) byHeading.set(h, []);
+        byHeading.get(h).push(m);
+      }
+      const rowsFor = [];
+      for (const [h, list] of byHeading) {
+        if (h) rowsFor.push({ heading: h });
+        list.forEach(m => rowsFor.push({ m }));
+      }
+      rowsFor.forEach((d, i) => {
+        const cells = [];
+        if (d.heading) {
+          cells.push(mkCell("", { dxa: 700, align: AlignmentType.CENTER, size: 20 }));
+        } else {
+          mastNo++;
+          cells.push(mkCell(`${mastNo})`, { dxa: 700, align: AlignmentType.CENTER, size: 20 }));
+        }
         // Only the first row of a group carries the Target cell; rowSpan merges
         // it down over the rest, and later rows simply omit that column.
         if (i === 0) cells.push(new TableCell({
-          rowSpan: items.length, width: { size: 2360, type: WidthType.DXA },
+          rowSpan: rowsFor.length, width: { size: 2360, type: WidthType.DXA },
           verticalAlign: VerticalAlign.CENTER,
           margins: { top: 100, bottom: 100, left: 150, right: 150 },
           children: [new Paragraph({ children: [new TextRun({ text: tName, size: 20 })], spacing: { before: 80, after: 80 } })]
         }));
+        if (d.heading) {
+          // Deeper grey than the repeating header row, so a band is never
+          // mistaken for a header after a page break.
+          cells.push(new TableCell({
+            columnSpan: 2, width: { size: 6300, type: WidthType.DXA },
+            verticalAlign: VerticalAlign.CENTER, shading: { fill: "e5e7eb" },
+            margins: { top: 80, bottom: 80, left: 150, right: 150 },
+            children: [new Paragraph({ children: [new TextRun({ text: d.heading, bold: true, size: 20 })], spacing: { before: 60, after: 60 } })]
+          }));
+          mastRows.push(new TableRow({ children: cells }));
+          return;
+        }
+        const m = d.m;
         cells.push(new TableCell({
           width: { size: 4900, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER,
           margins: { top: 100, bottom: 100, left: 150, right: 150 },
           children: [new Paragraph({
             children: [new TextRun({ text: m.activity, size: 22 })].concat(
-              m.detail ? [new TextRun({ break: 1, text: m.detail, size: 20, color: "374151" })] : []),
+              m.detail ? wordDetailRuns(m.detail) : []),
             spacing: { before: 80, after: 80 }
           })]
         }));
@@ -10189,6 +10257,38 @@ function formatActivityMarkup(text) {
     .replace(/^\. /gm, "• ")
     .replace(/\*(.+?)\*/g, "<b>$1</b>")
     .replace(/_(.+?)_/g, "<u>$1</u>");
+}
+
+/**
+ * Activity details as Word runs, laid out the way the website shows them.
+ * A detail field holds several lines separated by newlines, and Word ignores
+ * newlines inside a single TextRun, so every bullet used to collapse onto one
+ * line. Each line becomes its own run with a break, ". " becomes a bullet, and
+ * the *bold* / _underline_ markers are turned into real formatting, matching
+ * formatActivityMarkup on screen.
+ */
+function wordDetailRuns(text, size = 20, color = "374151") {
+  const { TextRun } = window.docx;
+  const runs = [];
+  String(text || "").split(/\r?\n/).forEach(line => {
+    const t = line.replace(/^\. /, "• ");
+    let idx = 0, m, firstOnLine = true;
+    const push = (txt, opts = {}) => {
+      if (!txt) return;
+      runs.push(new TextRun({ text: txt, size, color, ...(firstOnLine ? { break: 1 } : {}), ...opts }));
+      firstOnLine = false;
+    };
+    const re = /(\*[^*]+\*|_[^_]+_)/g;
+    while ((m = re.exec(t)) !== null) {
+      if (m.index > idx) push(t.slice(idx, m.index));
+      if (m[0].startsWith("*")) push(m[0].slice(1, -1), { bold: true });
+      else push(m[0].slice(1, -1), { underline: { type: "single" } });
+      idx = m.index + m[0].length;
+    }
+    if (idx < t.length) push(t.slice(idx));
+    if (firstOnLine) push(" ");   // a blank line still needs its break
+  });
+  return runs;
 }
 
 // Returns the display name for a predefined activity: pa.title if set, else pa.name.
