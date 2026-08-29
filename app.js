@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1936";
+const APP_VERSION = "1937";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -5893,7 +5893,11 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
         rowsFor.forEach((d, i) => {
           const cells = [];
           if (d.heading) {
-            cells.push(mkCell("", { dxa: 700, align: AlignmentType.CENTER, size: 20 }));
+            cells.push(new TableCell({
+              width: { size: 700, type: WidthType.DXA }, shading: { fill: "e5e7eb" },
+              margins: { top: 80, bottom: 80, left: 150, right: 150 },
+              children: [new Paragraph({ children: [new TextRun({ text: "", size: 20 })], alignment: AlignmentType.CENTER })]
+            }));
           } else {
             hyrMastNo++;
             cells.push(mkCell(`${hyrMastNo})`, { dxa: 700, align: AlignmentType.CENTER, size: 20 }));
@@ -7144,7 +7148,11 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
       rowsFor.forEach((d, i) => {
         const cells = [];
         if (d.heading) {
-          cells.push(mkCell("", { dxa: 700, align: AlignmentType.CENTER, size: 20 }));
+          cells.push(new TableCell({
+              width: { size: 700, type: WidthType.DXA }, shading: { fill: "e5e7eb" },
+              margins: { top: 80, bottom: 80, left: 150, right: 150 },
+              children: [new Paragraph({ children: [new TextRun({ text: "", size: 20 })], alignment: AlignmentType.CENTER })]
+            }));
         } else {
           mastNo++;
           cells.push(mkCell(`${mastNo})`, { dxa: 700, align: AlignmentType.CENTER, size: 20 }));
