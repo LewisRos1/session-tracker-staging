@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1929";
+const APP_VERSION = "1930";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -20964,11 +20964,39 @@ function renderTargetManageContent(student, target) {
         }
         // Switching to Manual Score — set flag and re-render so type detection updates
         if (type === "manual_score") {
+          // Coming from Remark Only, the prose lives in rem.text — which for a
+          // manual-score activity means the SCORE. Park it in the note field so
+          // it stays visible in the remark box, the same way the Multiple
+          // Choice and Checkbox conversions below already do.
+          const _msWasRemarkOnly = (oldType === "" || oldType === "no_trials");
+          const _msName  = acts[idx].name;
+          const _msTitle = acts[idx].title;
+          const _msCfgId = acts[idx].id;
           acts[idx].manualScore = true;
           delete acts[idx].fixedRemark; acts[idx].sentenceStarter = null; acts[idx].noteSentenceStarter = null; acts[idx].remarkPresetId = null;
           acts[idx].inlineOptions = null; acts[idx].optionsMulti = false; acts[idx].remarkHasNote = false;
           target.predefinedActivities = acts;
           await saveTarget();
+          if (_msWasRemarkOnly) {
+            getSessionsCached().then(async sessions => {
+              for (const sess of sessions) {
+                const matchActIds = Object.entries(sess.activities || {})
+                  .filter(([, a]) => (_msCfgId && a.configId === _msCfgId)
+                    || (_msName && a.activityName === _msName)
+                    || (_msTitle && a.activityName === _msTitle))
+                  .map(([id]) => id);
+                const changes = {};
+                for (const [remId, rem] of Object.entries(sess.remarks || {})) {
+                  if (!matchActIds.includes(rem.activityId)) continue;
+                  const txt = (rem.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+                  // Never overwrite a note that already exists.
+                  if (!txt || (rem.masteryNote || "").trim()) continue;
+                  changes[remId] = { text: "", masteryNote: txt };
+                }
+                if (Object.keys(changes).length > 0) await migrateRemarksToNote(sess.id, changes);
+              }
+            }).catch(err => console.error("remark→note migration (manual score) failed:", err));
+          }
           const sp = $("manage-modal-body").scrollTop;
           renderTargetManageContent(student, target);
           $("manage-modal-body").scrollTop = sp;
@@ -21041,11 +21069,18 @@ function renderTargetManageContent(student, target) {
         else if (optsVis) { optsContainer.querySelector(".mn-opt-item")?.focus(); }
         if (wasRemarkOnly) {
           const actName2  = acts[idx].name;
+          const actTitle2 = acts[idx].title;
           const actCfgId2 = acts[idx].id;
-          getAllSessionsForStudent(student.id).then(async sessions => {
+          // getSessionsCached, not getAllSessionsForStudent: a group target's
+          // sessions live elsewhere and were being missed entirely. Title is
+          // matched as well as name, since an activity with a title and no
+          // details stores the TITLE as the record's activityName.
+          getSessionsCached().then(async sessions => {
             for (const sess of sessions) {
               const matchActIds = Object.entries(sess.activities || {})
-                .filter(([, a]) => a.configId === actCfgId2 || a.activityName === actName2)
+                .filter(([, a]) => (actCfgId2 && a.configId === actCfgId2)
+                  || (actName2 && a.activityName === actName2)
+                  || (actTitle2 && a.activityName === actTitle2))
                 .map(([id]) => id);
               const changes = {};
               for (const [remId, rem] of Object.entries(sess.remarks || {})) {
