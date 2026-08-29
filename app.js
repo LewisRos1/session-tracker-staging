@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1926";
+const APP_VERSION = "1927";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -285,6 +285,91 @@ window.debugDuplicates = async function(studentName, targetName) {
   window.__dupCheck = { student: studentName, target: targetName, config: cfgRows, byCfg, clashes, perSession };
   console.log("Full data on window.__dupCheck");
   console.log('For every record of one activity: debugActivityRecords("' + studentName + '", "' + targetName + '", "<configId>")');
+};
+
+// 1e) Move session records from one config activity to another. DRY RUN by
+//     default; pass true as the last argument to write. Refuses any session
+//     that already holds a record for the destination, since repointing there
+//     would create a real duplicate inside one session.
+//     debugRepoint("Kayden Koh", "Learning", "amt73xzqm73w53", "amqknhgnoek9u")
+//     debugRepoint("Kayden Koh", "Learning", "amt73xzqm73w53", "amqknhgnoek9u", true)
+window.debugRepoint = async function(studentName, targetName, fromCfg, toCfg, apply = false) {
+  const students = await loadStudentsConfig();
+  const student = students.find(s => s.name === studentName);
+  if (!student) { console.error("Student not found:", studentName); return; }
+  const target = (student.targets || []).find(t => t.name === targetName);
+  if (!target) { console.error("Target not found:", targetName); return; }
+  const acts = target.predefinedActivities || [];
+  if (!acts.some(a => a.id === toCfg)) { console.error("Destination configId is not in this target:", toCfg); return; }
+
+  const sessions = await getAllSessionsForStudent(student.id);
+  const plan = [], conflicts = [];
+  sessions.forEach(s => {
+    const mine = [], theirs = [];
+    Object.entries(s.activities || {}).forEach(([recId, a]) => {
+      if (a.targetName !== targetName) return;
+      if (a.configId === fromCfg) mine.push([recId, a]);
+      else if (a.configId === toCfg) theirs.push(recId);
+    });
+    if (!mine.length) return;
+    if (theirs.length) { conflicts.push({ date: s.date, session: s.sessionNumber || s.id, movingRecords: mine.length, alreadyThere: theirs.length }); return; }
+    mine.forEach(([recId, a]) => plan.push({
+      sessionId: s.id, date: s.date, session: s.sessionNumber || s.id, recId,
+      activityName: a.activityName || "", parentActivity: a.parentActivity || null,
+      remarks: Object.values(s.remarks || {}).filter(r => r.activityId === recId).length
+    }));
+  });
+
+  console.log(`${apply ? "APPLYING" : "DRY RUN"} — repoint ${fromCfg} → ${toCfg}`);
+  console.log(`${plan.length} record(s) to move across ${new Set(plan.map(p => p.date)).size} session(s)`);
+  console.table(plan);
+  if (conflicts.length) {
+    console.warn(`${conflicts.length} session(s) SKIPPED — they already hold a record for the destination:`);
+    console.table(conflicts);
+  }
+  if (!apply) { console.log("Nothing written. Re-run with true as the last argument to apply."); return; }
+
+  let done = 0;
+  for (const p of plan) {
+    await adoptOrphanActivity(p.sessionId, p.recId, p.parentActivity, toCfg);
+    done++;
+  }
+  console.log(`Done — ${done} record(s) repointed.`);
+};
+
+// 1f) Remove a config activity entry WITHOUT touching session data. Refuses
+//     while any record still points at it, so it can only be used after
+//     debugRepoint has emptied it. DRY RUN by default.
+//     debugDropConfigEntry("Kayden Koh", "Learning", "amt73xzqm73w53", true)
+window.debugDropConfigEntry = async function(studentName, targetName, configId, apply = false) {
+  const students = await loadStudentsConfig();
+  const student = students.find(s => s.name === studentName);
+  if (!student) { console.error("Student not found:", studentName); return; }
+  const target = (student.targets || []).find(t => t.name === targetName);
+  if (!target) { console.error("Target not found:", targetName); return; }
+  const acts = target.predefinedActivities || [];
+  const idx = acts.findIndex(a => a.id === configId);
+  if (idx < 0) { console.error("configId not in this target:", configId); return; }
+
+  const sessions = await getAllSessionsForStudent(student.id);
+  let still = 0;
+  sessions.forEach(s => Object.values(s.activities || {}).forEach(a => {
+    if (a.targetName === targetName && a.configId === configId) still++;
+  }));
+  if (still > 0) {
+    console.error(`REFUSED — ${still} session record(s) still point at ${configId}. Run debugRepoint first.`);
+    return;
+  }
+  const entry = acts[idx];
+  console.log(`${apply ? "APPLYING" : "DRY RUN"} — remove config entry ${configId} = "${entry.title || entry.name || "(blank)"}"`);
+  console.log("No session records reference it, so no session data is touched.");
+  if (!apply) { console.log("Nothing written. Re-run with true as the last argument to apply."); return; }
+
+  acts.splice(idx, 1);
+  acts.forEach((a, i) => a.order = i);
+  target.predefinedActivities = acts;
+  await saveStudent(student);
+  console.log(`Done — entry removed, ${acts.length} activities remain.`);
 };
 
 // 1d) READ-ONLY. Every session record whose activityName matches, regardless of
