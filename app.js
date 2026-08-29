@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1931";
+const APP_VERSION = "1932";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -9891,7 +9891,7 @@ function renderInactiveStatusSection({ label, color, pas, orphanGroups, allPas, 
 
   const row = (pa, marker, isSub) => `<tr>
       <td style="${isSub ? _subNumCell : _numCell}">${marker}</td>
-      <td style="${_nameCell}${isSub ? ';padding-left:1.5rem' : ''}">${nameOf(pa)}</td>
+      <td style="${_nameCell}">${nameOf(pa)}</td>
       <td style="${_dateCell}">${dateText(pa)}</td>
     </tr>`;
 
@@ -9914,6 +9914,10 @@ function renderInactiveStatusSection({ label, color, pas, orphanGroups, allPas, 
 
   const sectionBand = title => `<tr><td colspan="3" style="${_cellBase};background:#eef2ff;font-size:.82rem;font-weight:700;color:#3730a3">${escHtml(title)}</td></tr>`;
 
+  // Numbering runs straight through the whole list, section headings included:
+  // a heading groups the rows visually, it does not restart the count.
+  let topNum = 0;
+
   // Keep the order the activities appear in, but break into runs by heading.
   const renderable = pas.filter(pa => !(pa.isHeading || pa.isMaintainHeading || pa.isNote || pa.isExportNote));
   const groups = [];
@@ -9924,15 +9928,14 @@ function renderInactiveStatusSection({ label, color, pas, orphanGroups, allPas, 
   }
 
   const topRows = groups.map(g => {
-    let n = 0;
     const body = g.items.map(pa => {
-      n++;
+      topNum++;
       const subs = subsOf(pa);
       // A parent with subs carries no date of its own — see the note above.
       return subs.length === 0
-        ? row(pa, `${n})`, false)
+        ? row(pa, `${topNum})`, false)
         : `<tr>
-            <td style="${_numCell}">${n})</td>
+            <td style="${_numCell}">${topNum})</td>
             <td style="${_nameCell}">${nameOf(pa)}</td>
             <td style="${_dateCell}"><span style="color:#d1d5db">—</span></td>
           </tr>${subRows(subs)}`;
@@ -9942,7 +9945,7 @@ function renderInactiveStatusSection({ label, color, pas, orphanGroups, allPas, 
 
   // Sub-activities whose parent is still active: the parent heads the group for
   // context only, so it gets no number and no date.
-  let orphanNum = 0;
+  let orphanNum = topNum;   // same table, so the count carries on rather than restarting
   const orphanRows = orphanGroups.map(({ parentPa, parentKey, subs }) => {
     orphanNum++;
     const parentName = parentPa ? (paDisplayHtml(parentPa, true) || escHtml(parentKey)) : escHtml(parentKey);
