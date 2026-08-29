@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1923";
+const APP_VERSION = "1924";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -198,6 +198,84 @@ window.debugScanTarget = async function(studentName, targetName) {
     });
   });
   console.table(counts);
+};
+
+// 1b) READ-ONLY. Diagnose suspected duplicate activities under one target.
+//     Shows every config entry with its id, both name fields, type and dates,
+//     then how many session records point at each one and where they sit. Two
+//     entries holding the same remark text in the same session is the signature
+//     of a duplicate; an entry with records but no config is a stranded record.
+//     Writes nothing. Full data left on window.__dupCheck.
+//     debugDuplicates("Kayden Koh", "Learning")
+window.debugDuplicates = async function(studentName, targetName) {
+  const students = await loadStudentsConfig();
+  const student = students.find(s => s.name === studentName);
+  if (!student) { console.error("Student not found:", studentName); return; }
+  const target = (student.targets || []).find(t => t.name === targetName);
+  if (!target) { console.error("Target not found:", targetName); return; }
+
+  const acts = target.predefinedActivities || [];
+  const cfgRows = acts.map((a, i) => ({
+    idx: i + 1,
+    id: a.id || "(no id)",
+    title: a.title || "",
+    name: a.name || "",
+    type: a.type || a.activityType || "",
+    created: a.createdOn || a.created || "",
+    masteredOn: a.masteredOn || "",
+    discontinuedOn: a.discontinuedOn || "",
+    order: a.order === undefined ? "" : a.order,
+    isHeading: !!a.isHeading
+  }));
+  console.log(`CONFIG — ${acts.length} entries for ${studentName} / ${targetName}`);
+  console.table(cfgRows);
+
+  const sessions = await getAllSessionsForStudent(student.id);
+  const byCfg = {};      // configId -> { count, first, last, names:Set, samples:[] }
+  const perSession = {}; // sessionDate -> [ {cfgId, name, text} ]
+  sessions.forEach(s => {
+    Object.entries(s.activities || {}).forEach(([recId, a]) => {
+      if (a.targetName !== targetName) return;
+      const cid = a.configId || "(none)";
+      const b = byCfg[cid] || (byCfg[cid] = { count: 0, first: null, last: null, names: new Set(), samples: [] });
+      b.count++;
+      if (!b.first || s.date < b.first) b.first = s.date;
+      if (!b.last || s.date > b.last) b.last = s.date;
+      b.names.add(a.activityName || "(no name)");
+      const txt = Object.values(a.remarks || {}).map(r => (r.text || r.masteryNote || "")).filter(Boolean).join(" | ");
+      if (txt && b.samples.length < 3) b.samples.push(`${s.date}: ${txt.slice(0, 60)}`);
+      (perSession[s.date] || (perSession[s.date] = [])).push({ cfgId: cid, name: a.activityName || "", text: txt.slice(0, 60) });
+    });
+  });
+
+  const cfgIds = new Set(acts.map(a => a.id).filter(Boolean));
+  console.log(`RECORDS — across ${sessions.length} sessions`);
+  console.table(Object.entries(byCfg).map(([cid, b]) => ({
+    configId: cid,
+    inConfig: cid === "(none)" ? "NO configId" : (cfgIds.has(cid) ? "yes" : "STRANDED"),
+    records: b.count,
+    first: b.first,
+    last: b.last,
+    namesUsed: [...b.names].join(" || ").slice(0, 80),
+    sample: b.samples[0] || ""
+  })));
+
+  // Sessions where two different records carry identical remark text: the
+  // clearest sign that one activity was duplicated rather than renamed.
+  const clashes = [];
+  Object.entries(perSession).forEach(([date, rows]) => {
+    const seen = {};
+    rows.forEach(r => {
+      if (!r.text) return;
+      if (seen[r.text]) clashes.push({ date, text: r.text, a: seen[r.text].name, aId: seen[r.text].cfgId, b: r.name, bId: r.cfgId });
+      else seen[r.text] = r;
+    });
+  });
+  console.log(`DUPLICATE REMARK TEXT in the same session — ${clashes.length} found`);
+  if (clashes.length) console.table(clashes.slice(0, 40));
+
+  window.__dupCheck = { student: studentName, target: targetName, config: cfgRows, byCfg, clashes };
+  console.log("Full data on window.__dupCheck");
 };
 
 // 2) Show config dates for all activities in a target — reveals hidden activeTo/activeFrom:
