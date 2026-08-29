@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1935";
+const APP_VERSION = "1936";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10267,7 +10267,7 @@ function formatActivityMarkup(text) {
  * the *bold* / _underline_ markers are turned into real formatting, matching
  * formatActivityMarkup on screen.
  */
-function wordDetailRuns(text, size = 20, color = "374151") {
+function wordDetailRuns(text, size = 22, color = "374151") {
   const { TextRun } = window.docx;
   const runs = [];
   String(text || "").split(/\r?\n/).forEach(line => {
