@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1928";
+const APP_VERSION = "1929";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -335,6 +335,76 @@ window.debugRepoint = async function(studentName, targetName, fromCfg, toCfg, ap
     done++;
   }
   console.log(`Done — ${done} record(s) repointed.`);
+};
+
+// 1h) Repair activities converted to Multiple Choice / Checkboxes BEFORE the
+//     conversion migration existed. For such an activity, rem.text means "which
+//     option was chosen" and free prose belongs in rem.masteryNote, so old prose
+//     left in rem.text renders as a grey "Old data:" line with an empty remark
+//     box. This moves that prose into the note field where it belongs.
+//     Only touches remarks whose text is NOT one of the options AND whose note
+//     is empty, so a real selection is never destroyed and no note is
+//     overwritten. Omit configId to sweep every option-based activity in the
+//     target. DRY RUN by default.
+//     debugFixOldData("Kayden Koh", "Learning")
+//     debugFixOldData("Kayden Koh", "Learning", null, true)
+window.debugFixOldData = async function(studentName, targetName, configId = null, apply = false) {
+  const students = await loadStudentsConfig();
+  const student = students.find(s => s.name === studentName);
+  if (!student) { console.error("Student not found:", studentName); return; }
+  const target = (student.targets || []).find(t => t.name === targetName);
+  if (!target) { console.error("Target not found:", targetName); return; }
+
+  const acts = (target.predefinedActivities || []).filter(a =>
+    !a.isHeading && !a.isNote && !a.isExportNote && parseOpts(a.inlineOptions).length > 0
+    && (!configId || a.id === configId));
+  if (!acts.length) { console.log("No option-based activities matched."); return; }
+
+  const sessions = await getAllSessionsForStudent(student.id);
+  const plan = [];   // { sessionId, date, remId, activity, from }
+  for (const pa of acts) {
+    const opts = parseOpts(pa.inlineOptions);
+    sessions.forEach(s => {
+      const recIds = Object.entries(s.activities || {})
+        .filter(([, a]) => a.targetName === targetName
+          && (a.configId === pa.id || (pa.name && a.activityName === pa.name) || (pa.title && a.activityName === pa.title)))
+        .map(([id]) => id);
+      if (!recIds.length) return;
+      Object.entries(s.remarks || {}).forEach(([remId, r]) => {
+        if (!recIds.includes(r.activityId)) return;
+        const txt = (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+        if (!txt) return;
+        if (opts.includes(txt)) return;              // a real selection, leave alone
+        if ((r.masteryNote || "").trim()) return;    // never overwrite an existing note
+        plan.push({ sessionId: s.id, date: s.date, session: s.sessionNumber || s.id, remId,
+                    activity: pa.title || pa.name || "(untitled)", from: txt.slice(0, 70) });
+      });
+    });
+  }
+
+  console.log(`${apply ? "APPLYING" : "DRY RUN"} — move prose out of rem.text into rem.masteryNote`);
+  console.log(`${plan.length} remark(s) across ${new Set(plan.map(p => p.date)).size} session(s), ${acts.length} activity(ies)`);
+  console.table(plan.slice(0, 60));
+  if (plan.length > 60) console.log(`…and ${plan.length - 60} more`);
+  if (!apply) { console.log("Nothing written. Re-run with true as the last argument to apply."); return; }
+
+  const bySession = {};
+  plan.forEach(p => {
+    (bySession[p.sessionId] || (bySession[p.sessionId] = {}))[p.remId] = { text: "", masteryNote: p.from };
+  });
+  // Re-read the untruncated text rather than the 70-char preview used for display.
+  for (const s of sessions) {
+    if (!bySession[s.id]) continue;
+    const changes = {};
+    for (const remId of Object.keys(bySession[s.id])) {
+      const r = (s.remarks || {})[remId];
+      if (!r) continue;
+      const txt = (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+      changes[remId] = { text: "", masteryNote: txt };
+    }
+    if (Object.keys(changes).length) await migrateRemarksToNote(s.id, changes);
+  }
+  console.log(`Done — ${plan.length} remark(s) moved.`);
 };
 
 // 1g) Merge two records for the same target inside ONE session: every remark
