@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1932";
+const APP_VERSION = "1933";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -9946,10 +9946,17 @@ function renderInactiveStatusSection({ label, color, pas, orphanGroups, allPas, 
   // Sub-activities whose parent is still active: the parent heads the group for
   // context only, so it gets no number and no date.
   let orphanNum = topNum;   // same table, so the count carries on rather than restarting
+  // These rows sit in the same table as the ones above, so they need the same
+  // section bands. Carry the last heading forward so a band is not repeated
+  // when the orphan groups continue under the heading the list ended on.
+  let prevHeading = groups.length ? groups[groups.length - 1].heading : null;
   const orphanRows = orphanGroups.map(({ parentPa, parentKey, subs }) => {
     orphanNum++;
+    const h = (parentPa ? headingOf.get(parentPa) : null) ?? null;
+    const band = h !== prevHeading && h ? sectionBand(h) : '';
+    prevHeading = h;
     const parentName = parentPa ? (paDisplayHtml(parentPa, true) || escHtml(parentKey)) : escHtml(parentKey);
-    return `<tr>
+    return `${band}<tr>
         <td style="${_numCell}">${orphanNum})</td>
         <td style="${_nameCell}">${parentName}</td>
         <td style="${_dateCell}"><span style="color:#d1d5db">—</span></td>
