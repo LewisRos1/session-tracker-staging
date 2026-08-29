@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1933";
+const APP_VERSION = "1934";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -5830,17 +5830,16 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   }
 
   // ── Section: Appendix (portrait) ───────────────────────────
-  // Everything mastered in the reporting period, read straight from masteredOn
-  // and stated as fact. The model never writes this, so a mastery cannot be
-  // invented, missed, or attributed to the wrong target.
-  const _hyrRange = period === "H1" ? ["01", "06"] : ["07", "12"];
+  // EVERY activity the student has ever mastered, not only those mastered
+  // inside the reporting period, and including any mastered after it ended.
+  // Read straight from masteredOn and stated as fact: the model never writes
+  // this, so a mastery cannot be invented, missed, or put under the wrong
+  // target. Archived and stopped targets stay out, as everywhere else.
   const hyrMastered = [];
   for (const t of activeTargets) {
     for (const pa of (t.predefinedActivities || [])) {
       if (pa.isHeading || pa.isMaintainHeading || pa.isNote || pa.isExportNote) continue;
       if (!pa.masteredOn) continue;
-      const [my, mm] = String(pa.masteredOn).split("-");
-      if (Number(my) !== year || mm < _hyrRange[0] || mm > _hyrRange[1]) continue;
       const label = pa.title || pa.name;
       const detail = pa.title ? (pa.name || "") : "";
       if (label) hyrMastered.push({ activity: label, detail, target: t.name, on: pa.masteredOn });
@@ -5853,7 +5852,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     appendixParas.push(mkPara(`Section ${nextSectionNum + 1}: Appendix`, { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
 
     // Mastered list first, then the breakdown charts.
-    appendixParas.push(mkPara(`Activities Mastered This Period (${firstMonthName.slice(0,3)} ${year} - ${halfEndName.slice(0,3)} ${year})`, { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true }));
+    appendixParas.push(mkPara("Complete List of Mastered Activities", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true }));
     if (hyrMastered.length) {
       const mkMastHdr = (txt, dxa) => new TableCell({
         width: { size: dxa, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER,
