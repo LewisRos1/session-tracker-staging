@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1924";
+const APP_VERSION = "1925";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -242,7 +242,14 @@ window.debugDuplicates = async function(studentName, targetName) {
       if (!b.first || s.date < b.first) b.first = s.date;
       if (!b.last || s.date > b.last) b.last = s.date;
       b.names.add(a.activityName || "(no name)");
-      const txt = Object.values(a.remarks || {}).map(r => (r.text || r.masteryNote || "")).filter(Boolean).join(" | ");
+      // Remarks live in a flat map on the SESSION, keyed by remark id, each
+      // carrying activityId. They are not nested under the activity.
+      const rems = Object.values(s.remarks || {}).filter(r => r.activityId === recId);
+      const txt = rems.map(r => {
+        const t = plainTextForEdit(r.text || r.masteryNote || "").trim();
+        const tr = (r.trials || []).filter(v => v !== null && v !== -1);
+        return t || (tr.length ? `[trials ${tr.join(",")}]` : "");
+      }).filter(Boolean).join(" | ");
       if (txt && b.samples.length < 3) b.samples.push(`${s.date}: ${txt.slice(0, 60)}`);
       (perSession[s.date] || (perSession[s.date] = [])).push({ cfgId: cid, name: a.activityName || "", text: txt.slice(0, 60) });
     });
@@ -274,8 +281,42 @@ window.debugDuplicates = async function(studentName, targetName) {
   console.log(`DUPLICATE REMARK TEXT in the same session — ${clashes.length} found`);
   if (clashes.length) console.table(clashes.slice(0, 40));
 
-  window.__dupCheck = { student: studentName, target: targetName, config: cfgRows, byCfg, clashes };
+  window.__dupCheck = { student: studentName, target: targetName, config: cfgRows, byCfg, clashes, perSession };
   console.log("Full data on window.__dupCheck");
+  console.log('For every record of one activity: debugActivityRecords("' + studentName + '", "' + targetName + '", "<configId>")');
+};
+
+// 1c) READ-ONLY. Every session record for ONE activity, with its remark text,
+//     so a suspected duplicate can be compared against the original before
+//     anything is deleted. Writes nothing.
+//     debugActivityRecords("Kayden Koh", "Learning", "amt73xzqm73w53")
+window.debugActivityRecords = async function(studentName, targetName, configId) {
+  const students = await loadStudentsConfig();
+  const student = students.find(s => s.name === studentName);
+  if (!student) { console.error("Student not found:", studentName); return; }
+  const sessions = await getAllSessionsForStudent(student.id);
+  const rows = [];
+  sessions.forEach(s => {
+    Object.entries(s.activities || {}).forEach(([recId, a]) => {
+      if (a.targetName !== targetName) return;
+      if ((a.configId || "(none)") !== configId) return;
+      Object.values(s.remarks || {}).filter(r => r.activityId === recId).forEach(r => {
+        const tr = (r.trials || []).filter(v => v !== null && v !== -1);
+        rows.push({
+          date: s.date,
+          session: s.sessionNumber || s.id,
+          activityName: a.activityName || "",
+          text: plainTextForEdit(r.text || "").slice(0, 90),
+          masteryNote: plainTextForEdit(r.masteryNote || "").slice(0, 60),
+          trials: tr.join(","),
+          optionScore: r.optionScore === undefined ? "" : r.optionScore
+        });
+      });
+    });
+  });
+  rows.sort((a, b) => (a.date < b.date ? -1 : 1));
+  console.log(`${rows.length} remark rows for configId ${configId}`);
+  console.table(rows);
 };
 
 // 2) Show config dates for all activities in a target — reveals hidden activeTo/activeFrom:
