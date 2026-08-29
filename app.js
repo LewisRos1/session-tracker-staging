@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1925";
+const APP_VERSION = "1926";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -263,7 +263,8 @@ window.debugDuplicates = async function(studentName, targetName) {
     records: b.count,
     first: b.first,
     last: b.last,
-    namesUsed: [...b.names].join(" || ").slice(0, 80),
+    distinctNames: b.names.size,
+    namesUsed: [...b.names].join(" || "),
     sample: b.samples[0] || ""
   })));
 
@@ -284,6 +285,42 @@ window.debugDuplicates = async function(studentName, targetName) {
   window.__dupCheck = { student: studentName, target: targetName, config: cfgRows, byCfg, clashes, perSession };
   console.log("Full data on window.__dupCheck");
   console.log('For every record of one activity: debugActivityRecords("' + studentName + '", "' + targetName + '", "<configId>")');
+};
+
+// 1d) READ-ONLY. Every session record whose activityName matches, regardless of
+//     configId. This is the honest answer to "which sessions hold data for this
+//     activity", because records that lost their configId are invisible to a
+//     configId lookup but still show on screen, matched by name.
+//     debugRecordsByName("Kayden Koh", "Learning", "b) 2 Animals instructions")
+window.debugRecordsByName = async function(studentName, targetName, activityName) {
+  const students = await loadStudentsConfig();
+  const student = students.find(s => s.name === studentName);
+  if (!student) { console.error("Student not found:", studentName); return; }
+  const sessions = await getAllSessionsForStudent(student.id);
+  const rows = [];
+  sessions.forEach(s => {
+    Object.entries(s.activities || {}).forEach(([recId, a]) => {
+      if (a.targetName !== targetName) return;
+      if ((a.activityName || "") !== activityName) return;
+      const rems = Object.values(s.remarks || {}).filter(r => r.activityId === recId);
+      if (!rems.length) rows.push({ date: s.date, session: s.sessionNumber || s.id, configId: a.configId || "(none)", text: "(no remarks)", trials: "" });
+      rems.forEach(r => {
+        const tr = (r.trials || []).filter(v => v !== null && v !== -1);
+        rows.push({
+          date: s.date,
+          session: s.sessionNumber || s.id,
+          configId: a.configId || "(none)",
+          text: plainTextForEdit(r.text || r.masteryNote || "").slice(0, 90),
+          trials: tr.join(",")
+        });
+      });
+    });
+  });
+  rows.sort((a, b) => (a.date < b.date ? -1 : 1));
+  const dates = [...new Set(rows.map(r => r.date))];
+  console.log(`${rows.length} remark rows across ${dates.length} sessions for name "${activityName}"`);
+  console.log("configIds seen:", [...new Set(rows.map(r => r.configId))].join(", "));
+  console.table(rows);
 };
 
 // 1c) READ-ONLY. Every session record for ONE activity, with its remark text,
