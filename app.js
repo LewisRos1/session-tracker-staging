@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1927";
+const APP_VERSION = "1928";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -335,6 +335,45 @@ window.debugRepoint = async function(studentName, targetName, fromCfg, toCfg, ap
     done++;
   }
   console.log(`Done — ${done} record(s) repointed.`);
+};
+
+// 1g) Merge two records for the same target inside ONE session: every remark
+//     on the dropped record moves to the kept one, then the emptied record is
+//     removed. Nothing is deleted, only re-pointed. DRY RUN by default.
+//     debugMergeInSession("Kayden Koh", "Learning", "2026-06-18", "amqknhgnoek9u", "amt73xzqm73w53")
+window.debugMergeInSession = async function(studentName, targetName, sessionDate, keepCfg, dropCfg, apply = false) {
+  const students = await loadStudentsConfig();
+  const student = students.find(s => s.name === studentName);
+  if (!student) { console.error("Student not found:", studentName); return; }
+  const sessions = (await getAllSessionsForStudent(student.id)).filter(s => s.date === sessionDate);
+  if (!sessions.length) { console.error("No session on", sessionDate); return; }
+
+  for (const s of sessions) {
+    const keep = [], drop = [];
+    Object.entries(s.activities || {}).forEach(([recId, a]) => {
+      if (a.targetName !== targetName) return;
+      if (a.configId === keepCfg) keep.push([recId, a]);
+      else if (a.configId === dropCfg) drop.push([recId, a]);
+    });
+    if (!keep.length || !drop.length) {
+      console.log(`Session ${s.sessionNumber || s.id} (${s.date}): nothing to merge (keep=${keep.length}, drop=${drop.length})`);
+      continue;
+    }
+    if (keep.length > 1) { console.error(`Session ${s.sessionNumber || s.id}: ${keep.length} records for the KEEP side, too ambiguous. Stopping.`); return; }
+    const rows = [];
+    [...keep, ...drop].forEach(([recId, a]) => {
+      Object.values(s.remarks || {}).filter(r => r.activityId === recId).forEach(r => {
+        const tr = (r.trials || []).filter(v => v !== null && v !== -1);
+        rows.push({ side: a.configId === keepCfg ? "KEEP" : "DROP", recId, name: a.activityName || "", text: plainTextForEdit(r.text || "").slice(0, 70), trials: tr.join(",") });
+      });
+    });
+    console.log(`${apply ? "APPLYING" : "DRY RUN"} — session ${s.sessionNumber || s.id} (${s.date}): moving ${drop.length} record(s) onto ${keep[0][0]}`);
+    console.table(rows);
+    if (!apply) continue;
+    for (const [dropId] of drop) await mergeDuplicateActivity(s.id, keep[0][0], dropId);
+    console.log("Merged.");
+  }
+  if (!apply) console.log("Nothing written. Re-run with true as the last argument to apply.");
 };
 
 // 1f) Remove a config activity entry WITHOUT touching session data. Refuses
