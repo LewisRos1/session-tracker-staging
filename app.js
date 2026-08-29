@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1930";
+const APP_VERSION = "1931";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -361,7 +361,7 @@ window.debugFixOldData = async function(studentName, targetName, configId = null
   if (!acts.length) { console.log("No option-based activities matched."); return; }
 
   const sessions = await getAllSessionsForStudent(student.id);
-  const plan = [];   // { sessionId, date, remId, activity, from }
+  const plan = [], conflicts = [];
   for (const pa of acts) {
     const opts = parseOpts(pa.inlineOptions);
     sessions.forEach(s => {
@@ -372,12 +372,20 @@ window.debugFixOldData = async function(studentName, targetName, configId = null
       if (!recIds.length) return;
       Object.entries(s.remarks || {}).forEach(([remId, r]) => {
         if (!recIds.includes(r.activityId)) return;
-        const txt = (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+        const clean = v => (v || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+        const txt  = clean(r.text);
+        const note = clean(r.masteryNote);
         if (!txt) return;
         if (opts.includes(txt)) return;              // a real selection, leave alone
-        if ((r.masteryNote || "").trim()) return;    // never overwrite an existing note
+        // A note that says something DIFFERENT is real content: never touch it,
+        // list it so it can be looked at by hand. A note that says the SAME
+        // thing means the text is a leftover duplicate and can just be cleared.
+        if (note && note !== txt) { conflicts.push({ date: s.date, session: s.sessionNumber || s.id, remId,
+                    activity: pa.title || pa.name || "(untitled)", text: txt.slice(0, 50), note: note.slice(0, 50) }); return; }
         plan.push({ sessionId: s.id, date: s.date, session: s.sessionNumber || s.id, remId,
-                    activity: pa.title || pa.name || "(untitled)", from: txt.slice(0, 70) });
+                    activity: pa.title || pa.name || "(untitled)",
+                    action: note ? "clear duplicate text" : "move into note",
+                    from: txt.slice(0, 70) });
       });
     });
   }
@@ -386,6 +394,10 @@ window.debugFixOldData = async function(studentName, targetName, configId = null
   console.log(`${plan.length} remark(s) across ${new Set(plan.map(p => p.date)).size} session(s), ${acts.length} activity(ies)`);
   console.table(plan.slice(0, 60));
   if (plan.length > 60) console.log(`…and ${plan.length - 60} more`);
+  if (conflicts.length) {
+    console.warn(`${conflicts.length} SKIPPED — the note says something different from the text, so both are real. Left untouched:`);
+    console.table(conflicts.slice(0, 40));
+  }
   if (!apply) { console.log("Nothing written. Re-run with true as the last argument to apply."); return; }
 
   const bySession = {};
@@ -400,7 +412,10 @@ window.debugFixOldData = async function(studentName, targetName, configId = null
       const r = (s.remarks || {})[remId];
       if (!r) continue;
       const txt = (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
-      changes[remId] = { text: "", masteryNote: txt };
+      // Where a note already holds the same words, keep the note exactly as it
+      // is (it may carry formatting) and simply drop the duplicate text.
+      const keepNote = (r.masteryNote || "").trim() ? r.masteryNote : txt;
+      changes[remId] = { text: "", masteryNote: keepNote };
     }
     if (Object.keys(changes).length) await migrateRemarksToNote(s.id, changes);
   }
