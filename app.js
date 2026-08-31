@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1947";
+const APP_VERSION = "1948";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6175,37 +6175,44 @@ function assessmentCollect(student, sessions, excludedActivities) {
   return { days, rows, scored, unscored, text: lines.join("\n") };
 }
 
-/** Wrap a target name to at most two lines for an x-axis label. */
-function assessWrapLabel(ctx, name, maxW) {
-  const words = String(name || "").split(/\s+/);
-  const out = [];
-  let line = "";
-  for (const w of words) {
-    const test = line ? `${line} ${w}` : w;
-    if (ctx.measureText(test).width <= maxW) { line = test; continue; }
-    if (line) out.push(line);
-    line = w;
-    if (out.length === 2) break;
-  }
-  if (out.length < 2 && line) out.push(line);
-  if (out.length === 2 && ctx.measureText(out[1]).width > maxW) {
-    let t = out[1];
-    while (t.length > 3 && ctx.measureText(t + "…").width > maxW) t = t.slice(0, -1);
-    out[1] = t + "…";
-  }
-  return out.length ? out : [String(name || "")];
+// Target names are drawn at 45 degrees. Angled text needs almost no
+// horizontal room, so each target's column stays narrow and the whole canvas
+// stays close to the 600px it is placed at in Word — which is what actually
+// decides how big the text lands on the page.
+const ASSESS_LABEL_MAX = 170;
+const ASSESS_LABEL_DROP = Math.round(ASSESS_LABEL_MAX * 0.7071) + 14;
+
+/** Trim a target name to the angled-label budget, with an ellipsis if needed. */
+function assessTrimLabel(ctx, name) {
+  let t = String(name || "");
+  if (ctx.measureText(t).width <= ASSESS_LABEL_MAX) return t;
+  while (t.length > 3 && ctx.measureText(t + "…").width > ASSESS_LABEL_MAX) t = t.slice(0, -1);
+  return t + "…";
+}
+
+/** Draw one 45-degree x-axis label, ending at the tick it belongs to. */
+function assessDrawAngledLabel(ctx, name, cx, y) {
+  ctx.save();
+  ctx.translate(cx, y);
+  ctx.rotate(-Math.PI / 4);
+  ctx.textAlign = "right";
+  ctx.fillText(assessTrimLabel(ctx, name), 0, 0);
+  ctx.restore();
 }
 
 /** Grouped bars, one group per target and one bar per assessment day. */
 function assessmentDrawDayChart(scored, days, title) {
   if (!scored.length || !days.length) return null;
-  const SCALE = 2, PLOT_H = 250;
-  const PAD = { top: 54, right: 26, bottom: 104, left: 58 };
-  const barW = days.length <= 2 ? 22 : days.length === 3 ? 17 : 13;
-  const gap  = 5;
+  const SCALE = 2, PLOT_H = 300;
+  const F_TITLE = 26, F_AXIS = 22, F_LABEL = 20, F_VALUE = 16, F_LEGEND = 20;
+  // Left padding only has to clear the rotated "Score", since there are no
+  // tick labels — which is what keeps the axis title tight against the plot.
+  const PAD = { top: 62, right: 30, bottom: ASSESS_LABEL_DROP + 78, left: 36 };
+  const barW = days.length <= 2 ? 26 : days.length === 3 ? 19 : 14;
+  const gap  = 7;
   const inner = days.length * barW + (days.length - 1) * gap;
-  const slot = Math.max(78, inner + 40);
-  const W = Math.max(640, PAD.left + PAD.right + slot * scored.length);
+  const slot = Math.max(76, inner + 18);
+  const W = Math.max(560, PAD.left + PAD.right + slot * scored.length);
   const H = PAD.top + PLOT_H + PAD.bottom;
 
   const canvas = document.createElement("canvas");
@@ -6214,11 +6221,10 @@ function assessmentDrawDayChart(scored, days, title) {
   ctx.scale(SCALE, SCALE);
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
 
-  ctx.font = "bold 15px Arial"; ctx.fillStyle = "#111827"; ctx.textAlign = "center";
-  ctx.fillText(title, W / 2, 28);
+  ctx.font = `bold ${F_TITLE}px Arial`; ctx.fillStyle = "#111827"; ctx.textAlign = "center";
+  ctx.fillText(title, W / 2, 36);
 
   const base = PAD.top + PLOT_H;
-  // Gridlines without tick labels: the value sits on top of each bar already.
   ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
   for (let p = 0; p <= 100; p += 25) {
     const y = base - (PLOT_H * p / 100);
@@ -6236,34 +6242,32 @@ function assessmentDrawDayChart(scored, days, title) {
         const h = Math.max(2, PLOT_H * v / 100);
         ctx.fillStyle = ASSESS_DAY_COLORS[di % ASSESS_DAY_COLORS.length];
         ctx.fillRect(x, base - h, barW, h);
-        ctx.fillStyle = "#111827"; ctx.font = "bold 11px Arial"; ctx.textAlign = "center";
-        ctx.fillText(`${v}%`, x + barW / 2, base - h - 5);
+        ctx.fillStyle = "#111827"; ctx.font = `bold ${F_VALUE}px Arial`; ctx.textAlign = "center";
+        ctx.fillText(`${v}%`, x + barW / 2, base - h - 6);
       }
       x += barW + gap;
     });
-    ctx.font = "11px Arial"; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
-    assessWrapLabel(ctx, r.target, slot - 6).forEach((ln, li) => ctx.fillText(ln, cx, base + 18 + li * 13));
+    ctx.font = `${F_LABEL}px Arial`; ctx.fillStyle = "#374151";
+    assessDrawAngledLabel(ctx, r.target, cx, base + 16);
   });
 
-  // Axis titles
   ctx.save();
-  ctx.translate(18, PAD.top + PLOT_H / 2); ctx.rotate(-Math.PI / 2);
-  ctx.font = "bold 12px Arial"; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
+  ctx.translate(16, PAD.top + PLOT_H / 2); ctx.rotate(-Math.PI / 2);
+  ctx.font = `bold ${F_AXIS}px Arial`; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
   ctx.fillText("Score", 0, 0);
   ctx.restore();
-  ctx.font = "bold 12px Arial"; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
-  ctx.fillText("Target", W / 2, H - 34);
+  ctx.font = `bold ${F_AXIS}px Arial`; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
+  ctx.fillText("Target", W / 2, base + ASSESS_LABEL_DROP + 30);
 
-  // Legend, one entry per assessment day
-  ctx.font = "11px Arial";
-  const BOX = 11, G = 6, SP = 20;
+  ctx.font = `${F_LEGEND}px Arial`;
+  const BOX = 18, G = 8, SP = 26;
   const widths = days.map(d => BOX + G + ctx.measureText(d.label).width);
   const total = widths.reduce((a, b) => a + b, 0) + SP * (days.length - 1);
   let lx = (W - total) / 2;
-  const ly = H - 12;
+  const ly = base + ASSESS_LABEL_DROP + 64;
   days.forEach((d, di) => {
     ctx.fillStyle = ASSESS_DAY_COLORS[di % ASSESS_DAY_COLORS.length];
-    ctx.fillRect(lx, ly - BOX + 2, BOX, BOX);
+    ctx.fillRect(lx, ly - BOX + 3, BOX, BOX);
     ctx.fillStyle = "#374151"; ctx.textAlign = "left";
     ctx.fillText(d.label, lx + BOX + G, ly);
     lx += widths[di] + SP;
@@ -6275,12 +6279,12 @@ function assessmentDrawDayChart(scored, days, title) {
 /** One bar per target: the mean of that target's daily averages. */
 function assessmentDrawAvgChart(scored, title) {
   if (!scored.length) return null;
-  const SCALE = 2, PLOT_H = 250;
-  const PAD = { top: 54, right: 26, bottom: 78, left: 58 };
-  const slot = Math.max(78, 60);
+  const SCALE = 2, PLOT_H = 300;
+  const F_TITLE = 26, F_AXIS = 22, F_LABEL = 20, F_VALUE = 20;
+  const PAD = { top: 62, right: 30, bottom: ASSESS_LABEL_DROP + 44, left: 36 };
+  const slot = 76, barW = 34;
   const W = Math.max(560, PAD.left + PAD.right + slot * scored.length);
   const H = PAD.top + PLOT_H + PAD.bottom;
-  const barW = 34;
 
   const canvas = document.createElement("canvas");
   canvas.width = W * SCALE; canvas.height = H * SCALE;
@@ -6288,8 +6292,8 @@ function assessmentDrawAvgChart(scored, title) {
   ctx.scale(SCALE, SCALE);
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
 
-  ctx.font = "bold 15px Arial"; ctx.fillStyle = "#111827"; ctx.textAlign = "center";
-  ctx.fillText(title, W / 2, 28);
+  ctx.font = `bold ${F_TITLE}px Arial`; ctx.fillStyle = "#111827"; ctx.textAlign = "center";
+  ctx.fillText(title, W / 2, 36);
 
   const base = PAD.top + PLOT_H;
   ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
@@ -6305,19 +6309,19 @@ function assessmentDrawAvgChart(scored, title) {
     const h = Math.max(2, PLOT_H * r.avg / 100);
     ctx.fillStyle = ASSESS_AVG_COLOR;
     ctx.fillRect(cx - barW / 2, base - h, barW, h);
-    ctx.fillStyle = "#111827"; ctx.font = "bold 11px Arial"; ctx.textAlign = "center";
-    ctx.fillText(`${r.avg}%`, cx, base - h - 5);
-    ctx.font = "11px Arial"; ctx.fillStyle = "#374151";
-    assessWrapLabel(ctx, r.target, slot - 6).forEach((ln, li) => ctx.fillText(ln, cx, base + 18 + li * 13));
+    ctx.fillStyle = "#111827"; ctx.font = `bold ${F_VALUE}px Arial`; ctx.textAlign = "center";
+    ctx.fillText(`${r.avg}%`, cx, base - h - 6);
+    ctx.font = `${F_LABEL}px Arial`; ctx.fillStyle = "#374151";
+    assessDrawAngledLabel(ctx, r.target, cx, base + 16);
   });
 
   ctx.save();
-  ctx.translate(18, PAD.top + PLOT_H / 2); ctx.rotate(-Math.PI / 2);
-  ctx.font = "bold 12px Arial"; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
+  ctx.translate(16, PAD.top + PLOT_H / 2); ctx.rotate(-Math.PI / 2);
+  ctx.font = `bold ${F_AXIS}px Arial`; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
   ctx.fillText("Score", 0, 0);
   ctx.restore();
-  ctx.font = "bold 12px Arial"; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
-  ctx.fillText("Target", W / 2, H - 14);
+  ctx.font = `bold ${F_AXIS}px Arial`; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
+  ctx.fillText("Target", W / 2, base + ASSESS_LABEL_DROP + 30);
 
   return { base64: canvas.toDataURL("image/png").split(",")[1], width: W, height: H };
 }
@@ -6603,7 +6607,10 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
     if ((kind === "h" || kind === "sh") && (prevKind === "b" || prevKind === "p")) blankLine();
     if (kind === "p")  paragraphs.push(mkPara(text, { align: AlignmentType.BOTH, after: 160 }));
     if (kind === "h")  paragraphs.push(mkPara(text, { bold: true, before: 0, after: 100, size: 24 }));
-    if (kind === "sh") paragraphs.push(mkPara(text, { bold: true, before: 0, after: 60 }));
+    if (kind === "sh") paragraphs.push(new Paragraph({
+      children: [new TextRun({ text, underline: { type: "single" }, size: 22 })],
+      spacing: { before: 0, after: 60, ...LS }
+    }));
     if (kind === "b")  paragraphs.push(new Paragraph({
       numbering: { reference: "assess-bullets", level: 0 },
       children: [new TextRun({ text, size: 22 })],
