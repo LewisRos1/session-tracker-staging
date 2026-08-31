@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1952";
+const APP_VERSION = "1953";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -5658,7 +5658,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
       const _wValues = r.values.slice(_wordGlobalFirstIdx);
       const lb64 = hyrDrawLineChart(r.name, _wLabels, _wValues, period, year, r.tStart, r.tEnd, r.delta, r.direction);
       if (lb64) paras.push(new Paragraph({
-        children: [new ImageRun({ data: b64ToUint8(lb64), transformation: { width: 540, height: 280 }, type: "png" })],
+        children: [new ImageRun({ data: b64ToUint8(lb64), transformation: { width: 540, height: 280 }, type: "png", outline: REPORT_CHART_BORDER })],
         alignment: AlignmentType.CENTER, spacing: { after: 100 }
       }));
       paras.push(...obsParas(parsed[obsKey]?.[r.name]));
@@ -5798,7 +5798,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     const ovDocW = 600;
     const ovH = Math.round(ovDocW * ovResult.height / ovNativeW);
     paragraphs.push(new Paragraph({
-      children: [new ImageRun({ data: b64ToUint8(ovResult.base64), transformation: { width: ovDocW, height: ovH }, type: "png" })],
+      children: [new ImageRun({ data: b64ToUint8(ovResult.base64), transformation: { width: ovDocW, height: ovH }, type: "png", outline: REPORT_CHART_BORDER })],
       alignment: AlignmentType.CENTER, spacing: { after: 60 }
     }));
   }
@@ -6035,7 +6035,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
           appendixParas.push(mkPara(headingTitle, { heading: HeadingLevel.HEADING_2, before: firstChart ? 120 : 0, after: 100, size: 24, bold: true, pageBreak: !firstChart }));
           firstChart = false;
           appendixParas.push(new Paragraph({
-            children: [new ImageRun({ data: b64ToUint8(abResult.base64), transformation: { width: 600, height: abH }, type: "png" })],
+            children: [new ImageRun({ data: b64ToUint8(abResult.base64), transformation: { width: 600, height: abH }, type: "png", outline: REPORT_CHART_BORDER })],
             alignment: AlignmentType.CENTER, spacing: { after: 240 }
           }));
         }
@@ -6182,6 +6182,11 @@ function assessmentCollect(student, sessions, excludedActivities) {
 // horizontal room, so each target's column stays narrow and the whole canvas
 // stays close to the 600px it is placed at in Word — which is what actually
 // decides how big the text lands on the page.
+// A 3/4 pt picture border on every chart image in every report, matching what
+// Picture Format > Picture Border > Weight > 3/4 pt produces by hand. Word
+// measures a:ln in EMUs and 1pt is 12700 EMU, so 3/4 pt is 9525.
+const REPORT_CHART_BORDER = { type: "solidFill", solidFillType: "rgb", value: "000000", width: 9525 };
+
 // Both charts are placed in the document at this width, so a canvas that is
 // W px wide is scaled by 600/W before it reaches the page.
 const ASSESS_DISP_W = 600;
@@ -6656,7 +6661,7 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
     const dispW = 600;
     paragraphs.push(new Paragraph({
       children: [new ImageRun({ data: b64ToUint8(chart.base64),
-        transformation: { width: dispW, height: Math.round(dispW * chart.height / chart.width) }, type: "png" })],
+        transformation: { width: dispW, height: Math.round(dispW * chart.height / chart.width) }, type: "png", outline: REPORT_CHART_BORDER })],
       alignment: AlignmentType.CENTER, spacing: { before: 80, after: 200 }
     }));
   }
@@ -7858,7 +7863,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     const dispW = 620;
     summaryParas.push(new Paragraph({
       children: [new ImageRun({ data: b64ToUint8(barChart.base64),
-        transformation: { width: dispW, height: Math.round(dispW * barChart.height / barChart.width) }, type: "png" })],
+        transformation: { width: dispW, height: Math.round(dispW * barChart.height / barChart.width) }, type: "png", outline: REPORT_CHART_BORDER })],
       alignment: AlignmentType.CENTER, spacing: { before: 80, after: 140 }
     }));
   } else {
