@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1939";
+const APP_VERSION = "1940";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -2542,10 +2542,15 @@ function startAddStudentRow() {
   const nextNo = tbody.querySelectorAll("tr").length + 1;
   const tr = document.createElement("tr");
   tr.id = "new-student-row";
+  // The row mirrors the columns it sits under, so what is typed lands where it
+  // will be read back. Gender uses the same pill as the rest of the column.
+  let newGender = "";
   tr.innerHTML = `
     <td style="padding:.5rem .3rem;text-align:center">${nextNo}</td>
-    <td style="padding:.3rem"><input class="admin-input" id="new-student-first" placeholder="First name" style="width:100%;text-align:center" /></td>
-    <td style="padding:.3rem"><input class="admin-input" id="new-student-last" placeholder="Last name" style="width:100%;text-align:center" /></td>
+    <td style="padding:.3rem"><input class="admin-input" id="new-student-name" placeholder="Full name" style="width:100%;text-align:center" /></td>
+    <td style="padding:.3rem;text-align:center">${genderPillHtml({ id: "new-student", gender: "" }).replace('class="db-gender-pill"', 'class="db-gender-pill" id="new-student-gender"')}</td>
+    <td style="padding:.3rem"><input class="admin-input" id="new-student-short" placeholder="Short name" style="width:100%;text-align:center" /></td>
+    <td style="padding:.3rem"><input class="admin-input" id="new-student-note" placeholder="—" title="No brackets needed — they are added automatically." style="width:100%;text-align:center" /></td>
     <td colspan="2" style="padding:.3rem;display:flex;gap:.4rem">
       <button class="btn-primary-sm" id="btn-save-new-student">Save</button>
       <button class="btn-adm-edit" id="btn-cancel-new-student">Cancel</button>
@@ -2553,23 +2558,48 @@ function startAddStudentRow() {
   tbody.appendChild(tr);
   tr.scrollIntoView({ block: "center" });
 
-  const firstInput = $("new-student-first");
-  const lastInput  = $("new-student-last");
-  firstInput.focus();
-  firstInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); lastInput.focus(); } });
-  lastInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $("btn-save-new-student").click(); } });
+  const nameInput  = $("new-student-name");
+  const shortInput = $("new-student-short");
+  const noteInput  = $("new-student-note");
+  const genderBtn  = $("new-student-gender");
+  nameInput.focus();
+  nameInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); shortInput.focus(); } });
+  shortInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); noteInput.focus(); } });
+  noteInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $("btn-save-new-student").click(); } });
+
+  genderBtn.addEventListener("click", () => {
+    newGender = GENDER_CYCLE[GENDER_STYLE[newGender] ? newGender : ""];
+    const st = GENDER_STYLE[newGender];
+    genderBtn.textContent = st.label;
+    genderBtn.style.background = st.bg;
+    genderBtn.style.color = st.fg;
+    genderBtn.style.borderColor = st.bd;
+  });
 
   $("btn-save-new-student").addEventListener("click", async () => {
-    const firstName = firstInput.value.trim();
-    const lastName  = lastInput.value.trim();
-    if (!firstName || !lastName) {
-      alert("Please enter both a first name and a last name.");
+    const fullName = nameInput.value.trim().replace(/\s+/g, " ");
+    const shortName = shortInput.value.trim();
+    const missing = [];
+    if (!fullName)  missing.push("Full Name");
+    if (!newGender) missing.push("Gender");
+    if (!shortName) missing.push("Short Name");
+    if (missing.length) {
+      alert(`Please fill in: ${missing.join(", ")}.\n\nOnly the Note may be left blank.`);
+      (!fullName ? nameInput : !shortName ? shortInput : genderBtn).focus();
       return;
     }
+    // firstName/lastName are kept because older records carry them; the first
+    // word is the given name and whatever follows is the rest.
+    const parts = fullName.split(" ");
+    const firstName = parts[0];
+    const lastName  = parts.slice(1).join(" ");
     const s = {
       id: cfgId("s"),
-      name: `${firstName} ${lastName}`,
+      name: fullName,
       firstName, lastName,
+      preferredName: shortName,
+      gender: newGender,
+      note: noteBare(noteInput.value),
       type: "unassigned",
       order: state.students.length,
       targets: []
@@ -9813,10 +9843,15 @@ function calcDaysAverage(target, visited = new Set()) {
 function renderTargetContent() {
   if (!state.sessionData) return;
   updateSessionHeader();
+  // Both early returns below have to clear the average. They used to leave it
+  // alone, so a student with no targets at all showed the previous student's
+  // percentage — a number with nothing behind it.
+  const _clearAvg = () => { const el = $("days-average-value"); if (el) el.textContent = "—"; };
   if (!state.selectedTargetName) {
     const mb = $("btn-manage-targets");
     if (mb) mb.classList.add("hidden");
     $("target-type-chip")?.classList.add("hidden");
+    _clearAvg();
     $("target-content").innerHTML =
       `<p class="empty-hint" contenteditable="false" style="padding:2rem;text-align:center">
         No targets added yet. Use the dropdown above to add one.
@@ -9828,6 +9863,7 @@ function renderTargetContent() {
   if (!target) {
     if (manageBtn) manageBtn.classList.add("hidden");
     $("target-type-chip")?.classList.add("hidden");
+    _clearAvg();
     return;
   }
 
@@ -18514,8 +18550,10 @@ function showDupFromCurrentStudent(student) {
 }
 
 function showDupFromOtherStudent_pickStudent(student, otherStudents) {
-  const existing   = otherStudents.filter(s => s.type !== "assessment").sort((a, b) => a.name.localeCompare(b.name));
-  const assessment = otherStudents.filter(s => s.type === "assessment").sort((a, b) => a.name.localeCompare(b.name));
+  // One flat list: the separate Assessment Students group went with the home
+  // section it mirrored. Assessment students now sit under Individual Sessions
+  // with an "(Assessment)" note, which the label below shows.
+  const existing = otherStudents.slice().sort((a, b) => a.name.localeCompare(b.name));
 
   function buildList(list) {
     if (list.length === 0) return `<div style="color:var(--text-muted);font-size:.85rem;padding:.25rem .5rem">None</div>`;
@@ -18523,19 +18561,17 @@ function showDupFromOtherStudent_pickStudent(student, otherStudents) {
       <label class="admin-list-item" style="cursor:pointer;gap:.75rem">
         <input type="radio" name="other-student" class="other-student-radio" data-student-id="${escHtml(s.id)}"
           style="width:18px;height:18px;flex-shrink:0;cursor:pointer" />
-        <span class="admin-item-name">${escHtml(s.name)}</span>
+        <span class="admin-item-name">${escHtml(studentLabel(s))}</span>
       </label>`).join("");
   }
 
   function render(filter) {
     const q = filter.toLowerCase();
-    const filteredExisting   = existing.filter(s => s.name.toLowerCase().includes(q));
-    const filteredAssessment = assessment.filter(s => s.name.toLowerCase().includes(q));
+    // Search the note too, so typing "assessment" finds the right record when
+    // two students share a name.
+    const filteredExisting = existing.filter(s => studentLabel(s).toLowerCase().includes(q));
     $("dup-student-list").innerHTML = `
-      <div class="admin-section-title" style="margin:.5rem 0 .25rem">Existing Students</div>
-      <div class="admin-list" style="margin-bottom:1rem">${buildList(filteredExisting)}</div>
-      <div class="admin-section-title" style="margin:.5rem 0 .25rem">Assessment Students</div>
-      <div class="admin-list">${buildList(filteredAssessment)}</div>`;
+      <div class="admin-list">${buildList(filteredExisting)}</div>`;
   }
 
   $("manage-modal-body").innerHTML = `
