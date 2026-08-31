@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1942";
+const APP_VERSION = "1943";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6659,6 +6659,21 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
     children: [new TextRun({ text: t, size: 22, color: "6b7280" })],
     alignment: AlignmentType.BOTH, spacing: { before: 40, after: 40, ...LS }
   })));
+
+  // Company stamp, closing the report. Same image, size and alignment as the
+  // single-session Word export, so the two documents sign off identically.
+  let stampData = null;
+  try {
+    const sr = await fetch("Daisy Word Doc Stamp.png", { cache: "no-cache" });
+    if (sr.ok) stampData = new Uint8Array(await sr.arrayBuffer());
+  } catch (_) {}
+  if (stampData) {
+    paragraphs.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
+    paragraphs.push(new Paragraph({
+      alignment: AlignmentType.LEFT,
+      children: [new ImageRun({ type: "png", data: stampData, transformation: { width: 312, height: 197 } })]
+    }));
+  }
 
   const pageFooter = Footer ? new Footer({ children: [new Paragraph({
     tabStops: [{ type: "center", position: 4750 }, { type: "right", position: 9500 }],
