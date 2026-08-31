@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1945";
+const APP_VERSION = "1946";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6091,7 +6091,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   const blob = await Packer.toBlob(doc);
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `${student.name} - ${period} Report - ${reportDate}.docx`;
+  a.download = `${student.name} - ${period} ${year} Report - ${reportDate}.docx`;
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -6714,7 +6714,16 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
   const blob = await Packer.toBlob(doc);
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `${student.name} - Assessment Report - ${reportDate}.docx`;
+  // The month the assessment itself began, not the export month — so the file
+  // still says when the work happened if it is re-exported months later.
+  const SHORT_M = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const firstDay = collected.days[0];
+  let assessPeriod = "";
+  if (firstDay) {
+    const [fy, fm] = String(firstDay.date).split("-").map(Number);
+    if (fy && fm) assessPeriod = `${SHORT_M[fm - 1]} ${fy} `;
+  }
+  a.download = `${student.name} - ${assessPeriod}Assessment Report - ${reportDate}.docx`;
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -7912,7 +7921,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
 
   const blob = await Packer.toBlob(doc);
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
-  a.download = `${student.name} - ${monthName} Report - ${reportDate}.docx`; a.click();
+  a.download = `${student.name} - ${monthName} ${year} Report - ${reportDate}.docx`; a.click();
   URL.revokeObjectURL(a.href);
 }
 
