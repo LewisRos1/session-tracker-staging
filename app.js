@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1950";
+const APP_VERSION = "1951";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3380,24 +3380,24 @@ async function aiRequest(aiPrompt, signal) {
 const HYR_DEFAULT_PROMPT = `You are writing a half-year progress report for parents. Keep everything warm, honest, and easy to read.
 
 GLOBAL RULES (apply to every section):
-- Be honest and sympathetic. Do NOT say positive things that are not supported by the data — false reassurance misleads parents and damages trust. Be kind in how you say things, not in what you choose to leave out.
+- Be honest and sympathetic. Do NOT say positive things that are not supported by the data, because false reassurance misleads parents and damages trust. Be kind in how you say things, not in what you choose to leave out.
 - NEVER use the em dash symbol (—) anywhere in the report. Use a comma, a full stop, or rewrite the sentence instead.
-- CRITICAL: A remark of "No Event" means the student did NOT perform or exhibit that behaviour or activity in that session. For negative/problem behaviours (e.g. snatching food, hitting, interrupting), "No Event" is a POSITIVE outcome — the bad behaviour simply did not occur. For skill or learning activities, "No Event" means the skill was not observed or demonstrated that session — treat it as neutral, not a failure. Do NOT treat "No Event" negatively in either case.
+- CRITICAL: A remark of "No Event" means the student did NOT perform or exhibit that behaviour or activity in that session. For negative/problem behaviours (e.g. snatching food, hitting, interrupting), "No Event" is a POSITIVE outcome: the bad behaviour simply did not occur. For skill or learning activities, "No Event" means the skill was not observed or demonstrated that session, so treat it as neutral, not a failure. Do NOT treat "No Event" negatively in either case.
 - CRITICAL: NEVER say that an activity was discontinued, stopped, dropped, retired, or removed. Discontinuing is internal housekeeping that hides an activity from the website; it says nothing about the student and must never appear in a report. The work recorded against such an activity is still real: use its remarks, trials and selections normally, and simply never comment on its status.
 - CRITICAL: AN ACTIVITY'S STATE DEPENDS ON THE DATE. Each activity carries its dates, e.g. "[started 25 Feb 2026, mastered on 20 Aug 2026]". Those dates define two phases:
   • From the start date up to the mastery date, the student was STILL WORKING ON IT.
   • From the mastery date onwards, it is MASTERED.
   Work out which phase the activity was in DURING the reporting period named above, and describe that phase.
   Never write that something was "mastered this term" unless the mastery date itself falls inside the reporting period. An activity started in February and mastered in August was still being worked on for the whole of a January to June report, so describe it as in progress, not as completed.
-- PROGRAM STATUS — these four words have fixed meanings in this service. They appear as an activity status and sometimes as the remark text itself. Use these meanings exactly; never infer a meaning from the word alone:
+- PROGRAM STATUS: these four words have fixed meanings in this service. They appear as an activity status and sometimes as the remark text itself. Use these meanings exactly; never infer a meaning from the word alone:
   • In Progress (also written "IP"): the program is not currently implemented in this session due to scheduling priorities assigned to other active programs. It says NOTHING about the student's ability or progress. Do NOT comment on it, do NOT treat it as a missed attempt, and do NOT use it as evidence of difficulty or strength. Ignore these entries entirely when forming your observations. An activity with NO remark AND NO score means the same thing and is ignored the same way.
   • Acquisition: the program is currently being taught to the learner.
-  • Maintain (also written "Maintained"): the program continues to be reviewed over time to ensure the skill is retained, based on the behaviour analyst's discretion. A run of "Maintain" remarks means the skill is HOLDING — it is evidence of a retained skill, not evidence that nothing is happening, that progress has stalled, or that the activity was skipped. Never describe a maintained activity as a lack of progress.
+  • Maintain (also written "Maintained"): the program continues to be reviewed over time to ensure the skill is retained, based on the behaviour analyst's discretion. A run of "Maintain" remarks means the skill is HOLDING. It is evidence of a retained skill, not evidence that nothing is happening, that progress has stalled, or that the activity was skipped. Never describe a maintained activity as a lack of progress.
   • Mastered: the learner has met the required criteria and successfully completed the program.
-- CRITICAL: ABSENT SESSIONS — Before analysing any session, determine whether the student was absent. A session is absent if: (1) every single activity across every target has no data, no remarks, and no score; OR (2) any activity remark contains the words "absent", "not present", "did not attend", or "no show" (case-insensitive match). Absent sessions must be completely excluded from all analysis — do not count them, do not average them, do not draw any conclusions from the empty activities, and do not mention absences anywhere in the report. The student was simply not there. Treat absent sessions as if they never happened.
+- CRITICAL: ABSENT SESSIONS. Before analysing any session, determine whether the student was absent. A session is absent if: (1) every single activity across every target has no data, no remarks, and no score; OR (2) any activity remark contains the words "absent", "not present", "did not attend", or "no show" (case-insensitive match). Absent sessions must be completely excluded from all analysis: do not count them, do not average them, do not draw any conclusions from the empty activities, and do not mention absences anywhere in the report. The student was simply not there. Treat absent sessions as if they never happened.
 - CRITICAL: If an activity does not appear in the data below, it was never tested this period. The student's ability is completely unknown. NEVER mention it, NEVER describe it as a weakness or difficulty, NEVER say things like "has not yet been observed doing X" or "we do not yet know how they manage X". Simply do not write about it at all. No data = silence.
-- CRITICAL: Write ONLY what the session remarks directly and explicitly state. Do NOT extrapolate or infer related skills. "Identifies a face" is NOT the same as "knows a name." "Follows a one-step instruction" is NOT the same as "follows two-step instructions." "Points to an object" is NOT the same as "can name it." Stay word-for-word within what was actually recorded — never assume a student can or cannot do something that was not directly observed.
-- CRITICAL: Some activities track NEGATIVE or PROBLEM BEHAVIOURS (e.g. snatching food, interrupting others, hitting, distracting behaviour). For these activities, scoring is INVERTED — a HIGH score (e.g. 3 out of 3) means the student did NOT exhibit the bad behaviour and showed good self-control, while a LOW score (e.g. 0) means the bad behaviour DID occur. Always interpret scores for problem/negative behaviour activities with this in mind: high = good, low = the behaviour occurred.
+- CRITICAL: Write ONLY what the session remarks directly and explicitly state. Do NOT extrapolate or infer related skills. "Identifies a face" is NOT the same as "knows a name." "Follows a one-step instruction" is NOT the same as "follows two-step instructions." "Points to an object" is NOT the same as "can name it." Stay word-for-word within what was actually recorded. Never assume a student can or cannot do something that was not directly observed.
+- CRITICAL: Some activities track NEGATIVE or PROBLEM BEHAVIOURS (e.g. snatching food, interrupting others, hitting, distracting behaviour). For these activities, scoring is INVERTED: a HIGH score (e.g. 3 out of 3) means the student did NOT exhibit the bad behaviour and showed good self-control, while a LOW score (e.g. 0) means the bad behaviour DID occur. Always interpret scores for problem/negative behaviour activities with this in mind: high = good, low = the behaviour occurred.
 - READABILITY: Write every section to a Flesch Reading Ease score of 60 to 70. Use short sentences and a natural tone. ABA terms that parents need to know (e.g. "self-regulation", "prompt", "generalisation") are allowed, but always explain them in plain words in the same sentence if they appear.
 - SENTENCE STRUCTURE: Write complete sentences, never fragments.
   • ONE IDEA PER SENTENCE. If a sentence describes more than two actions, split it. "After initially refusing to correct his worksheet, Hayden used his regulation board to request a break and returned to a calm state to finish the task" stacks four actions; write it as two sentences instead.
@@ -3408,12 +3408,12 @@ GLOBAL RULES (apply to every section):
   • VARY how that second sentence opens. Do NOT cycle through "This shows", "This reflects", "This demonstrates", "This highlights" as a set - that reads as a template. Across a list of five points, AT MOST TWO may begin with "This". Other ways in: "indicating that...", "suggesting that...", "a sign that...", "supporting his ability to...", or simply state the significance directly with no label at all. Read your points back: if they all open the same way, rewrite them.
   • NEVER join an observation to its meaning with a dash or a hyphen, and never use the phrase "this matters because".
   • Do not stack clauses. If a sentence carries more than two commas, split it into two sentences.
-- WRITING STYLE: Write like a professional therapist's report — warm but precise. Follow these rules on every sentence:
+- WRITING STYLE: Write like a professional therapist's report, warm but precise. Follow these rules on every sentence:
   • Verb choices: use "demonstrates" not "shows"; "requires support" or "would benefit from support" not "needs help"; "is able to" not "can"; "experiences difficulty" not "has difficulty"; "initiates" not "starts"; "attends to" not "pays attention to"; "request" not "ask for things".
   • Soften negatives: describe challenging behaviours as "may display physical behaviours such as..." rather than naming them bluntly. Use "when faced with frustration" or "when expectations are not met" instead of "when he/she cannot get what he/she wants".
-  • Frame limitations with "remains": write "remains limited", "remains inconsistent", "remains emerging" — not "is still small", "does not consistently", "is still developing".
+  • Frame limitations with "remains": write "remains limited", "remains inconsistent", "remains emerging", not "is still small", "does not consistently", "is still developing".
   • Examples: always use "such as" not "like".
-  • Skills not yet present: write "has not yet developed", "not yet consistently", "emerging" — never "cannot yet" or blunt deficit statements.
+  • Skills not yet present: write "has not yet developed", "not yet consistently", "emerging", never "cannot yet" or blunt deficit statements.
   • Areas needing work: write "would benefit from support in developing..." not "needs to learn...".
   • Use clinical terms where appropriate: "expressive and receptive vocabulary", "emotional responses", "transitions" (not "when plans change"), "sensory experiences" (not "sensations"), "dressing tasks" (not "pants and socks"), "verbal communication" (not "speaking"), "distress" or "frustration" (not "upset").
   • British spelling throughout: "behaviours", "recognised", "generalisation", "practise" (verb).`;
@@ -3882,7 +3882,7 @@ async function hyrGenerate() {
       : null;
 
     const aiPrompt = `${HYR_DEFAULT_PROMPT}
-${excludedList ? `\nEXCLUDED ACTIVITIES — ABSOLUTE RULE: The following activities have been deliberately excluded from this report by the author. They are NOT present in the session data below. Do NOT mention, reference, discuss, or draw any conclusions about them anywhere in the report — not in the executive summary, not in key insights, not in any target or observation section. Treat them as if they do not exist:\n${excludedList}\n` : ""}
+${excludedList ? `\nEXCLUDED ACTIVITIES, ABSOLUTE RULE: The following activities have been deliberately excluded from this report by the author. They are NOT present in the session data below. Do NOT mention, reference, discuss, or draw any conclusions about them anywhere in the report: not in the executive summary, not in key insights, not in any target or observation section. Treat them as if they do not exist:\n${excludedList}\n` : ""}
 Student: ${student.name}
 ${noteBare(student.note) ? `Student Program Note: ${noteBare(student.note)}\n` : ""}PRONOUNS: Refer to ${firstName} as "${PRON.subj}", "${PRON.obj}" and "${PRON.poss}" throughout. Never use the opposite pronouns, and never write "he or she", "him or her", "his or her", "they" or "their" about the student.
 Reporting Period: ${aiReportingPeriod}
@@ -4007,9 +4007,9 @@ Review the full session picture for ${firstName} across all targets and all rema
 
 ORDER BOTH LISTS BY IMPORTANCE, most important first. The first point in each list must be the single thing that matters most for ${firstName} right now, judged by how often it appears in the data, how much it affects the rest of ${PRON.poss} learning, and how far it is from where it should be. Do not order them by target, alphabetically, or by the order the targets appear in the data. If something is only a minor issue, leave it out rather than padding the list to reach five.
 
-Write EXACTLY 5 to 7 FOCUS AREAS — you MUST write at least 5, no fewer. Each uses this format: [2-4 word label]: [one concise sentence naming the specific difficulty or gap observed.] Do not group by target name — write each point as a standalone observation.
+Write EXACTLY 5 to 7 FOCUS AREAS. You MUST write at least 5, no fewer. Each uses this format: [2-4 word label]: [one concise sentence naming the specific difficulty or gap observed.] Do not group by target name: write each point as a standalone observation.
 
-Then write EXACTLY 5 to 7 RECOMMENDATIONS — you MUST write at least 5, no fewer. Each uses this format: [2-4 word label]: [one clear actionable sentence.] They do not need to pair with the focus areas above.
+Then write EXACTLY 5 to 7 RECOMMENDATIONS. You MUST write at least 5, no fewer. Each uses this format: [2-4 word label]: [one clear actionable sentence.] They do not need to pair with the focus areas above.
 
 Format EXACTLY as:
 FOCUS_AREAS:
@@ -6444,7 +6444,7 @@ async function assessmentGenerate() {
     const nDays = collected.days.length;
 
     const aiPrompt = `${HYR_DEFAULT_PROMPT}
-${excludedList ? `\nEXCLUDED ACTIVITIES — ABSOLUTE RULE: The following activities have been deliberately excluded from this report. Do NOT mention, reference, analyse, or draw conclusions about them anywhere:\n${excludedList}\n` : ""}
+${excludedList ? `\nEXCLUDED ACTIVITIES, ABSOLUTE RULE: The following activities have been deliberately excluded from this report. Do NOT mention, reference, analyse, or draw conclusions about them anywhere:\n${excludedList}\n` : ""}
 Student: ${student.name}
 ${noteBare(student.note) ? `Student Program Note: ${noteBare(student.note)}\n` : ""}PRONOUNS: Refer to ${firstName} as "${PRON.subj}", "${PRON.obj}" and "${PRON.poss}" throughout. Never use the opposite pronouns, and never write "he or she", "him or her", "his or her", "they" or "their" about the student.
 Assessment days: ${nDays} (${collected.days.map(d => d.label).join(", ")})
@@ -6459,12 +6459,13 @@ ABSOLUTE, THIS IS A BASELINE:
 
 Follow the GLOBAL RULES above on every sentence, including plain everyday language, the ban on inventing a scene, and never defining an ability by what ${firstName} cannot do.
 
-ABSOLUTE, EXPLAIN EVERY PROFESSIONAL TERM. This report is read by parents with no training in this field. The MOMENT you use a term someone outside the profession would not know, put its plain meaning in brackets straight after it. No exceptions, and never assume a term is common knowledge because it is common in your field.
-  Right: "He demonstrated limit setting (staying within the boundaries he was given) by playing boldly with the sand without spreading it around."
-  Right: "This shows an emerging ability to use self-regulation (managing his own feelings) to recover his mood."
-  Wrong: "He demonstrated limit setting by playing boldly with the sand." A parent does not know what limit setting is.
-  Terms that ALWAYS need a bracket include, and are not limited to: limit setting, joint attention, self-regulation, receptive language, expressive language, visual discrimination, generalisation, prompting, prompt fading, shared attention, reciprocal interaction, symbolic play, co-regulation, sensory seeking, sensory processing.
-  Keep the bracket short: a few plain words, not a definition. If you cannot explain it in plain words, do not use the term at all — describe what ${PRON.subj} actually did instead.
+ABSOLUTE, PLAIN MEANING FIRST AND THE PROFESSIONAL TERM AFTER IT IN BRACKETS. This report is read by parents with no training in this field. Putting the meaning first means they already understand the idea by the time they reach the term, so it reads as confirmation instead of homework. Never the other way round.
+  Right: "He stayed within the boundaries he was given (limit setting), playing boldly with the sand without spreading it around."
+  Right: "This shows he can manage his own feelings (self-regulation) well enough to recover his mood."
+  Wrong, term first with no explanation: "He demonstrated limit setting by playing boldly with the sand." A parent does not know what limit setting is.
+  Wrong, term first with the meaning behind it: "He demonstrated limit setting (staying within the boundaries) by playing boldly with the sand." The parent still meets the unknown term first and has to stop.
+  Terms that ALWAYS need this treatment include, and are not limited to: limit setting, joint attention, self-regulation, receptive language, expressive language, visual discrimination, generalisation, prompting, prompt fading, shared attention, reciprocal interaction, symbolic play, co-regulation, sensory seeking, sensory processing.
+  Keep the bracket to the term itself, not a definition. If you cannot say the idea in plain words, do not use the term at all: describe what ${PRON.subj} actually did instead.
 
 Provide ONLY the following sections using EXACTLY these markers. No extra text outside markers.
 
@@ -6918,7 +6919,7 @@ async function monthlyGenerate() {
     const comparisonHeading = "Progress over the past 3 months";
 
     const aiPrompt = `${HYR_DEFAULT_PROMPT}
-${excludedList ? `\nEXCLUDED ACTIVITIES — ABSOLUTE RULE: The following activities have been deliberately excluded from this report. Do NOT mention, reference, or draw conclusions about them anywhere:\n${excludedList}\n` : ""}
+${excludedList ? `\nEXCLUDED ACTIVITIES, ABSOLUTE RULE: The following activities have been deliberately excluded from this report. Do NOT mention, reference, or draw conclusions about them anywhere:\n${excludedList}\n` : ""}
 Student: ${student.name}
 ${noteBare(student.note) ? `Student Program Note: ${noteBare(student.note)}\n` : ""}PRONOUNS: Refer to ${firstName} as "${PRON.subj}", "${PRON.obj}" and "${PRON.poss}" throughout. Never use the opposite pronouns, and never write "he or she", "him or her", "his or her", "they" or "their" about the student.
 Reporting Month: ${monthName} ${year}
@@ -8095,7 +8096,7 @@ async function hyrOpenSettings() {
 }
 
 async function hyrShowPromptEditor() {
-  const dynamicBlock = `\n[DYNAMIC — injected at report generation time when activities are excluded from the appendix]\n\nEXCLUDED ACTIVITIES — ABSOLUTE RULE: The following activities have been deliberately excluded from this report by the author. They are NOT present in the session data below. Do NOT mention, reference, discuss, or draw any conclusions about them anywhere in the report — not in the executive summary, not in key insights, not in any target or observation section. Treat them as if they do not exist:\n  - [Activity Name] (under target: [Target Name])\n  - [Activity Name] (under target: [Target Name])\n  ...\n\n[END OF DYNAMIC SECTION]\n`;
+  const dynamicBlock = `\n[DYNAMIC — injected at report generation time when activities are excluded from the appendix]\n\nEXCLUDED ACTIVITIES, ABSOLUTE RULE: The following activities have been deliberately excluded from this report by the author. They are NOT present in the session data below. Do NOT mention, reference, discuss, or draw any conclusions about them anywhere in the report — not in the executive summary, not in key insights, not in any target or observation section. Treat them as if they do not exist:\n  - [Activity Name] (under target: [Target Name])\n  - [Activity Name] (under target: [Target Name])\n  ...\n\n[END OF DYNAMIC SECTION]\n`;
   $("manage-modal-title").textContent = "Prompt for AI Report";
   $("manage-modal-body").innerHTML = `
     <div style="padding:.75rem 1rem;display:flex;flex-direction:column;gap:1rem">
