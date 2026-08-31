@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1944";
+const APP_VERSION = "1945";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6091,7 +6091,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   const blob = await Packer.toBlob(doc);
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `${student.name} Half Year Report ${period} ${year}.docx`;
+  a.download = `${student.name} - ${period} Report - ${reportDate}.docx`;
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -6714,7 +6714,7 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
   const blob = await Packer.toBlob(doc);
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `${student.name} Assessment Report ${reportDate}.docx`;
+  a.download = `${student.name} - Assessment Report - ${reportDate}.docx`;
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -7912,7 +7912,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
 
   const blob = await Packer.toBlob(doc);
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
-  a.download = `${student.name} - ${monthName} ${year} - Monthly Report.docx`; a.click();
+  a.download = `${student.name} - ${monthName} Report - ${reportDate}.docx`; a.click();
   URL.revokeObjectURL(a.href);
 }
 
