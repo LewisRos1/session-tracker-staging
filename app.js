@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1949";
+const APP_VERSION = "1950";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6182,7 +6182,7 @@ function assessmentCollect(student, sessions, excludedActivities) {
 // horizontal room, so each target's column stays narrow and the whole canvas
 // stays close to the 600px it is placed at in Word — which is what actually
 // decides how big the text lands on the page.
-const ASSESS_LABEL_MAX = 170;
+const ASSESS_LABEL_MAX = 88;
 const ASSESS_LABEL_DROP = Math.round(ASSESS_LABEL_MAX * 0.7071) + 14;
 
 /** Trim a target name to the angled-label budget, with an ellipsis if needed. */
@@ -6207,10 +6207,10 @@ function assessDrawAngledLabel(ctx, name, cx, y) {
 function assessmentDrawDayChart(scored, days, title) {
   if (!scored.length || !days.length) return null;
   const SCALE = 2, PLOT_H = 300;
-  const F_TITLE = 26, F_AXIS = 22, F_LABEL = 20, F_VALUE = 16, F_LEGEND = 20;
+  const F_TITLE = 13, F_AXIS = 11, F_LABEL = 10, F_VALUE = 8, F_LEGEND = 10;
   // Left padding only has to clear the rotated "Score", since there are no
   // tick labels — which is what keeps the axis title tight against the plot.
-  const PAD = { top: 62, right: 30, bottom: ASSESS_LABEL_DROP + 78, left: 36 };
+  const PAD = { top: 62, right: 30, bottom: ASSESS_LABEL_DROP + 78, left: 52 };
   const barW = days.length <= 2 ? 26 : days.length === 3 ? 19 : 14;
   const gap  = 7;
   const inner = days.length * barW + (days.length - 1) * gap;
@@ -6283,8 +6283,8 @@ function assessmentDrawDayChart(scored, days, title) {
 function assessmentDrawAvgChart(scored, title) {
   if (!scored.length) return null;
   const SCALE = 2, PLOT_H = 300;
-  const F_TITLE = 26, F_AXIS = 22, F_LABEL = 20, F_VALUE = 20;
-  const PAD = { top: 62, right: 30, bottom: ASSESS_LABEL_DROP + 44, left: 36 };
+  const F_TITLE = 13, F_AXIS = 11, F_LABEL = 10, F_VALUE = 10;
+  const PAD = { top: 62, right: 30, bottom: ASSESS_LABEL_DROP + 44, left: 52 };
   const slot = 76, barW = 34;
   const W = Math.max(560, PAD.left + PAD.right + slot * scored.length);
   const H = PAD.top + PLOT_H + PAD.bottom;
@@ -6355,14 +6355,15 @@ const ASSESS_FRAMEWORK = [
   ["sh", "FEDC 6: Emotional Thinking and Logic"],
   ["b", "Making connections between ideas through seeking opinions, discussion, and debate while expanding pretend play."],
   ["h", "B. Learning Capacity"],
-  ["b", "Attending"], ["b", "Eye contact"], ["b", "Wait"], ["b", "Transition"],
+  ["sh", "Attending"],
+  ["b", "Eye contact"], ["b", "Wait"], ["b", "Transition"],
   ["b", "Joint attention"], ["b", "Follow a point"], ["b", "Follow eye gaze"],
   ["p", "These attending skills were observed during indoor play activities. Transitions were noted between preferred activities and structured table tasks within the indoor environment."],
-  ["h", "School Readiness Skills"],
-  ["sh", "Expressive Language"],
+  ["sh", "School Readiness Skills"],
+  ["n", "1) Expressive Language"],
   ["b", "Sequence"], ["b", "Preposition"], ["b", "Cause and Effect"],
   ["b", "Using 'Wh' questions: where, what, when, why of a topic"], ["b", "Pronouns"],
-  ["sh", "Receptive Language"],
+  ["n", "2) Receptive Language"],
   ["b", "Following two-step instructions"], ["b", "Mathematics concepts"]
 ];
 
@@ -6458,6 +6459,13 @@ ABSOLUTE, THIS IS A BASELINE:
 
 Follow the GLOBAL RULES above on every sentence, including plain everyday language, the ban on inventing a scene, and never defining an ability by what ${firstName} cannot do.
 
+ABSOLUTE, EXPLAIN EVERY PROFESSIONAL TERM. This report is read by parents with no training in this field. The MOMENT you use a term someone outside the profession would not know, put its plain meaning in brackets straight after it. No exceptions, and never assume a term is common knowledge because it is common in your field.
+  Right: "He demonstrated limit setting (staying within the boundaries he was given) by playing boldly with the sand without spreading it around."
+  Right: "This shows an emerging ability to use self-regulation (managing his own feelings) to recover his mood."
+  Wrong: "He demonstrated limit setting by playing boldly with the sand." A parent does not know what limit setting is.
+  Terms that ALWAYS need a bracket include, and are not limited to: limit setting, joint attention, self-regulation, receptive language, expressive language, visual discrimination, generalisation, prompting, prompt fading, shared attention, reciprocal interaction, symbolic play, co-regulation, sensory seeking, sensory processing.
+  Keep the bracket short: a few plain words, not a definition. If you cannot explain it in plain words, do not use the term at all — describe what ${PRON.subj} actually did instead.
+
 Provide ONLY the following sections using EXACTLY these markers. No extra text outside markers.
 
 ${collected.rows.map(r => `===TARGET: ${r.target}===
@@ -6474,11 +6482,22 @@ RULES FOR EVERY TARGET BLOCK:
 - Do not repeat the same observation across two different targets.
 
 ===RECOMMENDATIONS===
-[Write 4 to 6 recommendations for ${firstName}'s program, drawn from what this assessment actually showed. Each is one clear, actionable sentence a therapist could act on. Order them most important first. Plain everyday language. Never invent a difficulty to justify a recommendation.]
-- [recommendation]
-- [recommendation]
-- [recommendation]
-- [recommendation]
+[Write EXACTLY 6 recommendations, no more and no fewer, drawn from what this assessment actually showed.
+
+EACH ONE IS TWO SENTENCES IN THIS ORDER:
+  1. The DIFFICULTY. Name the specific thing ${firstName} found hard, taken from the session remarks. Start with what was seen, not with what to do.
+  2. The RECOMMENDATION that answers that exact difficulty. One clear, actionable sentence.
+
+Right: "${firstName} relied on gestures rather than words to show what he wanted during imaginary play. Give him repeated chances to pair a word with each gesture during play he already enjoys, so the word carries the meaning instead of the gesture."
+Wrong, recommendation with no difficulty behind it: "Provide continued opportunities to practise using words alongside gestures."
+
+Order them most important first, judged by how much the difficulty affects the rest of ${PRON.poss} learning. Never invent a difficulty to justify a recommendation: every one must trace to something actually recorded. Plain everyday language throughout.]
+1. [difficulty. recommendation]
+2. [difficulty. recommendation]
+3. [difficulty. recommendation]
+4. [difficulty. recommendation]
+5. [difficulty. recommendation]
+6. [difficulty. recommendation]
 ===END===
 
 ASSESSMENT DATA:
@@ -6607,9 +6626,15 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
   let prevKind = null;
   const blankLine = () => paragraphs.push(new Paragraph({ children: [], spacing: { before: 0, after: 0, ...LS } }));
   for (const [kind, text] of ASSESS_FRAMEWORK) {
-    if ((kind === "h" || kind === "sh") && (prevKind === "b" || prevKind === "p")) blankLine();
+    // Anything that follows a run of bullets gets a blank line, and a heading
+    // following a paragraph does too. A heading straight after another heading
+    // gets none, since those belong together.
+    const isHead = kind === "h" || kind === "sh" || kind === "n";
+    if (prevKind === "b" && (isHead || kind === "p")) blankLine();
+    else if (prevKind === "p" && isHead) blankLine();
     if (kind === "p")  paragraphs.push(mkPara(text, { align: AlignmentType.BOTH, after: 160 }));
     if (kind === "h")  paragraphs.push(mkPara(text, { bold: true, before: 0, after: 100, size: 24 }));
+    if (kind === "n")  paragraphs.push(mkPara(text, { before: 0, after: 60 }));
     if (kind === "sh") paragraphs.push(new Paragraph({
       children: [new TextRun({ text, underline: { type: "single" }, size: 22 })],
       spacing: { before: 0, after: 60, ...LS }
@@ -6655,15 +6680,18 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
   collected.rows.forEach((r, i) => {
     // Average sits beside the target name rather than on a line of its own,
     // so each target block opens with one heading instead of two.
+    // A real blank line between targets, not just paragraph spacing.
+    if (i > 0) paragraphs.push(new Paragraph({ children: [], spacing: { before: 0, after: 0, ...LS } }));
     paragraphs.push(new Paragraph({
       children: [
         new TextRun({ text: r.target, bold: true, size: 26 }),
+        // One space, not two: the double space is what Word underlines as an error.
         new TextRun({
-          text: r.avg === null ? "  (Observation only)" : `  (Average: ${r.avg}%)`,
+          text: r.avg === null ? " (Observation only)" : ` (Average: ${r.avg}%)`,
           size: 22, color: "374151"
         })
       ],
-      spacing: { before: i === 0 ? 0 : 280, after: 80, ...LS }
+      spacing: { before: 0, after: 80, ...LS }
     }));
     const block = parsed.targets[r.target] || { strengths: [], weaknesses: [] };
     const listOf = arr => arr.length ? arr : ["None noted during this assessment."];
@@ -6686,7 +6714,7 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
   const recs = parsed.recommendations.length ? parsed.recommendations
     : ["No recommendations were generated. Please review the assessment data."];
   recs.forEach(t => paragraphs.push(new Paragraph({
-    numbering: { reference: "assess-bullets", level: 0 },
+    numbering: { reference: "assess-numbers", level: 0 },
     children: [new TextRun({ text: t, size: 22, color: "6b7280" })],
     alignment: AlignmentType.BOTH, spacing: { before: 40, after: 40, ...LS }
   })));
@@ -6737,11 +6765,18 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
     // draws an empty marker: the indent appears but no bullet. "•" is
     // Word's own round bullet, and because this is a real numbered list,
     // pressing Enter in Word continues it onto the next bullet.
-    numbering: { config: [{
-      reference: "assess-bullets",
-      levels: [{ level: 0, format: LevelFormat?.BULLET ?? "bullet", text: "•", alignment: AlignmentType.LEFT,
-        style: { paragraph: { indent: { left: 720, hanging: 360 } }, run: { size: 22 } } }]
-    }] },
+    numbering: { config: [
+      {
+        reference: "assess-bullets",
+        levels: [{ level: 0, format: LevelFormat?.BULLET ?? "bullet", text: "•", alignment: AlignmentType.LEFT,
+          style: { paragraph: { indent: { left: 720, hanging: 360 } }, run: { size: 22 } } }]
+      },
+      {
+        reference: "assess-numbers",
+        levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT,
+          style: { paragraph: { indent: { left: 720, hanging: 360 } }, run: { size: 22 } } }]
+      }
+    ] },
     sections: [{
       properties: { type: SectionType?.NEXT_PAGE ?? "nextPage" },
       headers: pageHeader ? { default: pageHeader } : undefined,
