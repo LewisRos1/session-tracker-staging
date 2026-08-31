@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1940";
+const APP_VERSION = "1941";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -2350,7 +2350,6 @@ function studentLabel(s) {
 // Gender drives the pronouns in the AI reports, so it is a fixed set rather
 // than free text: a typo would silently put the wrong pronouns in a document
 // that goes to a parent. Clicking cycles male → female → unset.
-const GENDER_CYCLE = { "": "male", male: "female", female: "" };
 const GENDER_STYLE = {
   male:   { label: "Male",   bg: "#dbeafe", fg: "#1d4ed8", bd: "#93c5fd" },
   female: { label: "Female", bg: "#fce7f3", fg: "#be185d", bd: "#f9a8d4" },
@@ -2359,11 +2358,17 @@ const GENDER_STYLE = {
   "":     { label: "Click to set gender", bg: "#fef3c7", fg: "#b45309", bd: "#fcd34d" }
 };
 
-function genderPillHtml(s) {
+// A dropdown rather than a pill: a select is obviously changeable, where a
+// pill reads as a status badge and gives no hint that clicking does anything.
+// Unset keeps the amber colouring, since a report cannot be generated without it.
+function genderSelectHtml(s) {
   const g = GENDER_STYLE[s.gender] ? s.gender : "";
   const st = GENDER_STYLE[g];
-  return `<button class="db-gender-pill" data-id="${escHtml(s.id)}" title="Click to change"
-    style="padding:.28rem .7rem;border-radius:999px;border:1px solid ${st.bd};background:${st.bg};color:${st.fg};font-size:.78rem;font-weight:600;cursor:pointer;white-space:nowrap;min-width:64px">${st.label}</button>`;
+  const opt = (val, text) => `<option value="${val}"${g === val ? " selected" : ""}>${text}</option>`;
+  return `<select class="db-gender-select admin-input" data-id="${escHtml(s.id)}"
+    style="width:100%;text-align:center;font-size:.82rem;font-weight:600;cursor:pointer;background:${st.bg};color:${st.fg};border-color:${st.bd}">
+    ${opt("", "Select gender…")}${opt("male", "Male")}${opt("female", "Female")}
+  </select>`;
 }
 
 async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
@@ -2376,7 +2381,6 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
     <div style="padding:1rem">
       <div style="display:flex;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap">
         <button class="export-btn" id="btn-add-student-row">+ Add New Student</button>
-        <button class="export-btn" id="btn-delete-student-row" style="color:#dc2626">Delete Student</button>
       </div>
       <div class="view-table-wrapper">
         <table class="view-table">
@@ -2388,6 +2392,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
             <col style="width:190px">
             <col style="width:120px">
             <col style="width:160px">
+            <col style="width:48px">
           </colgroup>
           <thead>
             <tr>
@@ -2398,6 +2403,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
               <th>Note</th>
               <th style="white-space:normal">Report Type</th>
               <th style="white-space:normal">Latest Individual Session Recorded</th>
+              <th></th>
             </tr>
           </thead>
           <tbody id="student-registry-tbody">
@@ -2410,7 +2416,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
                     style="width:100%;text-align:center" />
                 </td>
                 <td style="text-align:center" onclick="event.stopPropagation()">
-                  ${genderPillHtml(s)}
+                  ${genderSelectHtml(s)}
                 </td>
                 <td style="text-align:center" onclick="event.stopPropagation()">
                   <input class="admin-input db-shortname-input" data-id="${escHtml(s.id)}"
@@ -2424,9 +2430,13 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
                     style="width:100%;text-align:center" />
                 </td>
                 <td style="text-align:center" onclick="event.stopPropagation()">
-                  ${(() => { const m = s.exportDuration === "monthly"; return `<button class="db-export-dur-pill" data-id="${escHtml(s.id)}" style="padding:.28rem .7rem;border-radius:999px;border:1px solid ${m ? '#d1d5db' : '#93c5fd'};background:${m ? '#f3f4f6' : '#dbeafe'};color:${m ? '#6b7280' : '#1d4ed8'};font-size:.78rem;font-weight:600;cursor:pointer;white-space:nowrap">${m ? 'Monthly' : 'Every Session'}</button>`; })()}
+                  ${(() => { const m = s.exportDuration === "monthly"; return `<select class="db-export-dur-select admin-input" data-id="${escHtml(s.id)}" style="width:100%;text-align:center;font-size:.82rem;font-weight:600;cursor:pointer;background:${m ? "#f3f4f6" : "#dbeafe"};color:${m ? "#6b7280" : "#1d4ed8"};border-color:${m ? "#d1d5db" : "#93c5fd"}"><option value="monthly"${m ? " selected" : ""}>Monthly</option><option value="every_session"${m ? "" : " selected"}>Every Session</option></select>`; })()}
                 </td>
                 <td class="reg-indiv-num" data-id="${escHtml(s.id)}" style="text-align:center">…</td>
+                <td style="text-align:center" onclick="event.stopPropagation()">
+                  <button class="db-del-student" data-id="${escHtml(s.id)}" title="Delete this student"
+                    style="background:none;border:none;cursor:pointer;font-size:1rem;line-height:1;padding:.3rem;color:#dc2626">🗑</button>
+                </td>
               </tr>`).join("")}
           </tbody>
         </table>
@@ -2487,38 +2497,68 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
     });
   });
 
-  $("student-registry-body").querySelectorAll(".db-gender-pill").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const s = state.students.find(x => x.id === btn.dataset.id);
+  $("student-registry-body").querySelectorAll(".db-gender-select").forEach(sel => {
+    sel.addEventListener("change", async () => {
+      const s = state.students.find(x => x.id === sel.dataset.id);
       if (!s) return;
-      const next = GENDER_CYCLE[GENDER_STYLE[s.gender] ? s.gender : ""];
-      s.gender = next;
-      const st = GENDER_STYLE[next];
-      btn.textContent      = st.label;
-      btn.style.background = st.bg;
-      btn.style.color      = st.fg;
-      btn.style.borderColor = st.bd;
+      s.gender = GENDER_STYLE[sel.value] ? sel.value : "";
+      const st = GENDER_STYLE[s.gender];
+      sel.style.background  = st.bg;
+      sel.style.color       = st.fg;
+      sel.style.borderColor = st.bd;
       await saveStudent(s);
     });
   });
 
-  $("student-registry-body").querySelectorAll(".db-export-dur-pill").forEach(btn => {
-    btn.addEventListener("click", async () => {
+  $("student-registry-body").querySelectorAll(".db-export-dur-select").forEach(sel => {
+    sel.addEventListener("change", async () => {
+      const s = state.students.find(x => x.id === sel.dataset.id);
+      if (!s) return;
+      s.exportDuration = sel.value;
+      const m = sel.value === "monthly";
+      sel.style.background  = m ? "#f3f4f6" : "#dbeafe";
+      sel.style.color       = m ? "#6b7280" : "#1d4ed8";
+      sel.style.borderColor = m ? "#d1d5db" : "#93c5fd";
+      await saveStudent(s);
+    });
+  });
+
+  // Deleting a student is unrecoverable from inside the app, so it asks three
+  // separate times: the password, then a confirmation showing how much history
+  // is attached, then the student's full name typed out. The session count is
+  // the point of the middle step — "delete Leven Chua" reads very differently
+  // once you can see 367 sessions sitting behind it.
+  $("student-registry-body").querySelectorAll(".db-del-student").forEach(btn => {
+    btn.addEventListener("click", () => {
       const s = state.students.find(x => x.id === btn.dataset.id);
       if (!s) return;
-      const newDur = s.exportDuration === "monthly" ? "every_session" : "monthly";
-      s.exportDuration = newDur;
-      const m = newDur === "monthly";
-      btn.textContent = m ? "Monthly" : "Every Session";
-      btn.style.background   = m ? "#f3f4f6" : "#dbeafe";
-      btn.style.color        = m ? "#6b7280" : "#1d4ed8";
-      btn.style.borderColor  = m ? "#d1d5db" : "#93c5fd";
-      await saveStudent(s);
+      requirePassword(async () => {
+        let sessions = [];
+        try { sessions = await getAllSessionsForStudent(s.id); } catch (_) {}
+        const latest = [...sessions]
+          .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+          .slice(0, 5)
+          .map(x => `   • ${fmtPeriodDate(x.date)}${x.sessionNumber ? ` (Session ${x.sessionNumber})` : ""}`)
+          .join("\n");
+        const summary = `Delete "${studentLabel(s)}"?\n\n`
+          + `${sessions.length} individual session${sessions.length === 1 ? "" : "s"} recorded.`
+          + (latest ? `\n\nMost recent:\n${latest}` : "")
+          + `\n\nThe student is removed from every list in the app. This cannot be undone here.`;
+        if (!confirm(summary)) return;
+        const typed = prompt(`To confirm, type the student's full name exactly:\n\n${s.name}`);
+        if (typed === null) return;
+        if (typed.trim() !== s.name) {
+          alert("That name did not match. Nothing was deleted.");
+          return;
+        }
+        state.students = state.students.filter(x => x.id !== s.id);
+        await deleteStudentConfig(s.id);
+        renderStudentRegistryBody();
+      }, EXPORT_MSG);
     });
   });
 
   $("btn-add-student-row").addEventListener("click", startAddStudentRow);
-  $("btn-delete-student-row").addEventListener("click", promptDeleteStudentFromRegistry);
 
   if (highlightAdd) {
     const btn = $("btn-add-student-row");
@@ -2548,7 +2588,7 @@ function startAddStudentRow() {
   tr.innerHTML = `
     <td style="padding:.5rem .3rem;text-align:center">${nextNo}</td>
     <td style="padding:.3rem"><input class="admin-input" id="new-student-name" placeholder="Full name" style="width:100%;text-align:center" /></td>
-    <td style="padding:.3rem;text-align:center">${genderPillHtml({ id: "new-student", gender: "" }).replace('class="db-gender-pill"', 'class="db-gender-pill" id="new-student-gender"')}</td>
+    <td style="padding:.3rem;text-align:center">${genderSelectHtml({ id: "new-student", gender: "" }).replace('class="db-gender-select admin-input"', 'class="db-gender-select admin-input" id="new-student-gender"')}</td>
     <td style="padding:.3rem"><input class="admin-input" id="new-student-short" placeholder="Short name" style="width:100%;text-align:center" /></td>
     <td style="padding:.3rem"><input class="admin-input" id="new-student-note" placeholder="—" title="No brackets needed — they are added automatically." style="width:100%;text-align:center" /></td>
     <td colspan="2" style="padding:.3rem;display:flex;gap:.4rem">
@@ -2567,10 +2607,9 @@ function startAddStudentRow() {
   shortInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); noteInput.focus(); } });
   noteInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $("btn-save-new-student").click(); } });
 
-  genderBtn.addEventListener("click", () => {
-    newGender = GENDER_CYCLE[GENDER_STYLE[newGender] ? newGender : ""];
+  genderBtn.addEventListener("change", () => {
+    newGender = GENDER_STYLE[genderBtn.value] ? genderBtn.value : "";
     const st = GENDER_STYLE[newGender];
-    genderBtn.textContent = st.label;
     genderBtn.style.background = st.bg;
     genderBtn.style.color = st.fg;
     genderBtn.style.borderColor = st.bd;
@@ -2610,27 +2649,6 @@ function startAddStudentRow() {
   });
 
   $("btn-cancel-new-student").addEventListener("click", renderStudentRegistryBody);
-}
-
-async function promptDeleteStudentFromRegistry() {
-  if (state.students.length === 0) { alert("No students to delete."); return; }
-  const sorted = [...state.students].sort((a, b) => a.name.localeCompare(b.name));
-  const choice = prompt(
-    "Type the No. of the student to delete:\n" +
-    sorted.map((s, i) => `${i + 1}. ${s.name}`).join("\n")
-  );
-  if (choice === null) return;
-  const idx = Number(choice) - 1;
-  if (!Number.isInteger(idx) || idx < 0 || idx >= sorted.length) {
-    alert("Invalid number.");
-    return;
-  }
-  const student = sorted[idx];
-  const typed = prompt(`Type DELETE to permanently delete "${student.name}". Session data is kept in Firebase, but the student will be removed from all lists.`);
-  if (typed !== "DELETE") return;
-  state.students = state.students.filter(s => s.id !== student.id);
-  await deleteStudentConfig(student.id);
-  renderStudentRegistryBody();
 }
 
 // Dice's coefficient over character bigrams — a cheap, dependency-free way
@@ -18655,71 +18673,23 @@ function showDupFromOtherStudent_pickTarget(student, sourceStudent) {
 
 // ── Student management content ────────────────────────────────
 
-function renderStudentNameDisplay(student) {
-  return `<div style="display:flex;gap:.6rem;align-items:center">
-    <div class="admin-input" style="flex:1;color:var(--text-muted);cursor:default">${escHtml(student.name)}</div>
-    <button class="btn-primary-sm" id="btn-mn-rename">Change Student's Name</button>
-  </div>`;
-}
-
 // "Change Student's Name" swaps the read-only name display for the old
 // First Name/Last Name editor in place (same popup, no navigation) — with
 // persistent labels instead of placeholder text (which disappears once you
 // type) and no Save button, since each field autosaves on blur instead.
-function wireStudentNameSection(student) {
-  $("btn-mn-rename")?.addEventListener("click", () => {
-    $("manage-modal").classList.add("hidden");
-    openStudentRegistryScreen();
-    setTimeout(() => {
-      const input = document.querySelector(`.db-fullname-input[data-id="${student.id}"]`);
-      if (input) { input.focus(); input.select(); }
-    }, 100);
-  });
-}
-
 function renderStudentManageContent(student) {
   _pendingActsCleanup = null;
   $("manage-modal-title").textContent = studentLabel(student);
-  const isAssessment = student.type === "assessment";
-
-  const html = `
-    <div class="admin-section" style="margin-bottom:1.5rem">
-      <label class="admin-label">Full Name</label>
-      <div id="mn-s-name-section">${renderStudentNameDisplay(student)}</div>
-    </div>
+  // This popup renumbers sessions and nothing else. Renaming happens in the
+  // Full Name column of the table itself, and deleting has its own button on
+  // each row, so both were removed from here rather than duplicated.
+  $("manage-modal-body").innerHTML = `
     <div class="admin-section">
       <div id="mn-s-session-number-area">Loading…</div>
-    </div>
-    ${isAssessment ? `
-    <div class="admin-section">
-      <button class="btn-adm-edit" id="btn-mn-move-to-existing"
-        style="width:100%;padding:.75rem;justify-content:center;display:flex">
-        Move to Existing Students
-      </button>
-    </div>` : ""}
-    <div style="margin-top:1.5rem;padding-bottom:.5rem">
-      <button class="btn-adm-danger" id="btn-mn-del-student">Delete Student</button>
     </div>`;
-
-  $("manage-modal-body").innerHTML = html;
-  wireStudentNameSection(student);
 
   renderSessionNumberSection(student);
 
-  $("btn-mn-move-to-existing")?.addEventListener("click", async () => {
-    if (!confirm(`Move "${student.name}" to Existing Students?`)) return;
-    student.type = "existing";
-    await saveStudent(student);
-    closeManageModal();
-  });
-
-  $("btn-mn-del-student").addEventListener("click", async () => {
-    const typed = prompt(`Type DELETE to permanently delete "${student.name}". Session data is kept in Firebase, but the student will be removed from all lists.`);
-    if (typed !== "DELETE") return;
-    await deleteStudentConfig(student.id);
-    state.students = state.students.filter(s => s.id !== student.id);
-    closeManageModal();
-  });
 }
 
 // Lets the boss correct a veteran student's lifetime session count (e.g. they
