@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1953";
+const APP_VERSION = "1954";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6367,6 +6367,44 @@ function assessmentDrawAvgChart(scored, title) {
 
   return { base64: canvas.toDataURL("image/png").split(",")[1], width: W, height: H };
 }
+
+/** The fixed framework text. Identical for every child, so it lives here. */
+const ASSESS_FRAMEWORK = [
+  ["p", "This assessment is facilitated using the Functional Emotional Capacity (FEDC) assessment to establish the six levels of Developmental Functional Emotional Capacity, as well as Learning Capacity, to set the baseline for the social-emotional skills and communication program."],
+  ["h", "A. Functional Emotional Capacity (FEDC)"],
+  ["sh", "FEDC 1: Shared Attention & Regulation"],
+  ["b", "This child's capacity to show interest in various toys and sensory objects in the environment and with the instructor."],
+  ["b", "The ability to stay calm when engaging in the environment."],
+  ["b", "The ability to recover from distress within 20 min."],
+  ["sh", "FEDC 2: Engagement and Relating"],
+  ["b", "The child's ability to respond to the engagement of the adult."],
+  ["b", "The child's participation in play and other reactions during various activities."],
+  ["b", "The child displays emotions in various events."],
+  ["sh", "FEDC 3: Becoming a Two-Way Intentional Communicator"],
+  ["b", "The communication between the child and others."],
+  ["b", "The child's initiation to interact with others in the environment."],
+  ["b", "The demonstration of various emotions: closeness, pleasure, excitement, assertive curiosity, protest, anger and fear."],
+  ["sh", "FEDC 4: Purposeful Communication"],
+  ["b", "Complex communication and shared problem-solving by combining gestures, words and emotions."],
+  ["sh", "FEDC 5: Using Symbols and Creating Emotional Ideas and Elaboration"],
+  ["b", "Creating emotional ideas through imagination and play."],
+  ["b", "Express ideas derived from intent and combine with reality-based actions."],
+  ["b", "Elaborate on ideas in verbal and imaginary play sequences."],
+  ["b", "Pretend to assume different roles and predict how others feel or act in certain situations."],
+  ["sh", "FEDC 6: Emotional Thinking and Logic"],
+  ["b", "Making connections between ideas through seeking opinions, discussion, and debate while expanding pretend play."],
+  ["h", "B. Learning Capacity"],
+  ["sh", "Attending"],
+  ["b", "Eye contact"], ["b", "Wait"], ["b", "Transition"],
+  ["b", "Joint attention"], ["b", "Follow a point"], ["b", "Follow eye gaze"],
+  ["p", "These attending skills were observed during indoor play activities. Transitions were noted between preferred activities and structured table tasks within the indoor environment."],
+  ["sh", "School Readiness Skills"],
+  ["n", "1) Expressive Language"],
+  ["b", "Sequence"], ["b", "Preposition"], ["b", "Cause and Effect"],
+  ["b", "Using 'Wh' questions: where, what, when, why of a topic"], ["b", "Pronouns"],
+  ["n", "2) Receptive Language"],
+  ["b", "Following two-step instructions"], ["b", "Mathematics concepts"]
+];
 
 /** Pulls the per-target strengths/weaknesses and the recommendations out. */
 function assessmentParseAiResponse(text) {
