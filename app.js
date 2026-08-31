@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1941";
+const APP_VERSION = "1942";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -2408,7 +2408,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
           </thead>
           <tbody id="student-registry-tbody">
             ${sorted.map((s, i) => `
-              <tr class="registry-row" data-id="${escHtml(s.id)}" style="cursor:pointer">
+              <tr class="registry-row" data-id="${escHtml(s.id)}">
                 <td style="text-align:center">${i + 1}</td>
                 <td style="text-align:center" onclick="event.stopPropagation()">
                   <input class="admin-input db-fullname-input" data-id="${escHtml(s.id)}"
@@ -2432,7 +2432,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
                 <td style="text-align:center" onclick="event.stopPropagation()">
                   ${(() => { const m = s.exportDuration === "monthly"; return `<select class="db-export-dur-select admin-input" data-id="${escHtml(s.id)}" style="width:100%;text-align:center;font-size:.82rem;font-weight:600;cursor:pointer;background:${m ? "#f3f4f6" : "#dbeafe"};color:${m ? "#6b7280" : "#1d4ed8"};border-color:${m ? "#d1d5db" : "#93c5fd"}"><option value="monthly"${m ? " selected" : ""}>Monthly</option><option value="every_session"${m ? "" : " selected"}>Every Session</option></select>`; })()}
                 </td>
-                <td class="reg-indiv-num" data-id="${escHtml(s.id)}" style="text-align:center">…</td>
+                <td class="reg-indiv-num" data-id="${escHtml(s.id)}" title="Click to renumber this student's sessions" style="text-align:center;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px">…</td>
                 <td style="text-align:center" onclick="event.stopPropagation()">
                   <button class="db-del-student" data-id="${escHtml(s.id)}" title="Delete this student"
                     style="background:none;border:none;cursor:pointer;font-size:1rem;line-height:1;padding:.3rem;color:#dc2626">🗑</button>
@@ -2444,9 +2444,12 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
       ${sorted.length === 0 ? `<p class="empty-hint" style="padding:1rem">No students registered yet.</p>` : ""}
     </div>`;
 
-  $("student-registry-body").querySelectorAll(".registry-row").forEach(row => {
-    row.addEventListener("click", () => {
-      const s = state.students.find(x => x.id === row.dataset.id);
+  // Only the session number opens the renumbering popup. Clicking anywhere else
+  // on the row used to open it, which is how a popup about session numbers
+  // ended up feeling like the place to edit a student.
+  $("student-registry-body").querySelectorAll(".reg-indiv-num").forEach(cell => {
+    cell.addEventListener("click", () => {
+      const s = state.students.find(x => x.id === cell.dataset.id);
       if (s) openManageModal(s);
     });
   });
