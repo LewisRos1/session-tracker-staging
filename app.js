@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1956";
+const APP_VERSION = "1957";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6249,8 +6249,11 @@ function assessmentDrawDayChart(scored, days, title) {
   // band of top padding, or a 100% bar's label is drawn over the title.
   const measure = document.createElement("canvas").getContext("2d");
   measure.font = `bold ${F_BODY}px Arial`;
-  const stagger = days.length > 1 && measure.measureText("100%").width > (barW + gap);
-  const lift = stagger ? F_BODY + 4 : 0;
+  // A label is centred on its bar, so two neighbours clear each other only if
+  // the widest label plus breathing room fits inside barW + gap. Measuring
+  // without that margin let a 38px label sit in a 33px pitch and touch.
+  const stagger = days.length > 1 && measure.measureText("100%").width + 8 > (barW + gap);
+  const lift = stagger ? F_BODY + 6 : 0;
 
   const PAD = {
     top: Math.round(F_TITLE * 1.8 + F_BODY + lift + 18),
