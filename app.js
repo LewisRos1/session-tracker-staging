@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1955";
+const APP_VERSION = "1956";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6227,7 +6227,7 @@ function assessDrawAngledLabel(ctx, name, cx, y, maxW) {
 /** Grouped bars, one group per target and one bar per assessment day. */
 function assessmentDrawDayChart(scored, days, title) {
   if (!scored.length || !days.length) return null;
-  const SCALE = 2, PLOT_H = 300;
+  const SCALE = 2;
   const barW = days.length <= 2 ? 26 : days.length === 3 ? 19 : 14;
   const gap  = 7;
   const inner = days.length * barW + (days.length - 1) * gap;
@@ -6258,6 +6258,10 @@ function assessmentDrawDayChart(scored, days, title) {
     bottom: drop + Math.round(F_BODY * 4.4),
     left: padL
   };
+  // Both charts are placed at a fixed 6.25in x 4.4in so the two fit on one
+  // page. The canvas is built to that same ratio, so nothing is squashed when
+  // Word scales it: the plot area takes whatever height is left over.
+  const PLOT_H = Math.max(140, Math.round(W * (4.4 / 6.25)) - PAD.top - PAD.bottom);
   const H = PAD.top + PLOT_H + PAD.bottom;
 
   const canvas = document.createElement("canvas");
@@ -6324,7 +6328,7 @@ function assessmentDrawDayChart(scored, days, title) {
 /** One bar per target: the mean of that target's daily averages. */
 function assessmentDrawAvgChart(scored, title) {
   if (!scored.length) return null;
-  const SCALE = 2, PLOT_H = 300;
+  const SCALE = 2;
   const slot = 76, barW = 34;
 
   let padL = 52;
@@ -6344,6 +6348,10 @@ function assessmentDrawAvgChart(scored, title) {
     bottom: drop + Math.round(F_BODY * 2.4),
     left: padL
   };
+  // Both charts are placed at a fixed 6.25in x 4.4in so the two fit on one
+  // page. The canvas is built to that same ratio, so nothing is squashed when
+  // Word scales it: the plot area takes whatever height is left over.
+  const PLOT_H = Math.max(140, Math.round(W * (4.4 / 6.25)) - PAD.top - PAD.bottom);
   const H = PAD.top + PLOT_H + PAD.bottom;
 
   const canvas = document.createElement("canvas");
@@ -6712,12 +6720,13 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
     `${student.name} (${nDays}-Day Assessment)`);
   const avgChart = assessmentDrawAvgChart(collected.scored,
     `${student.name} (Average of ${nDays} Day${nDays === 1 ? "" : "s"})`);
+  // 6.25in x 4.4in each, at 96dpi, so both fit on the one page. The canvases
+  // are drawn to this exact ratio, so fixing both dimensions distorts nothing.
   for (const chart of [dayChart, avgChart]) {
     if (!chart) continue;
-    const dispW = 600;
     paragraphs.push(new Paragraph({
       children: [new ImageRun({ data: b64ToUint8(chart.base64),
-        transformation: { width: dispW, height: Math.round(dispW * chart.height / chart.width) }, type: "png", outline: REPORT_CHART_BORDER })],
+        transformation: { width: 600, height: 422 }, type: "png", outline: REPORT_CHART_BORDER })],
       alignment: AlignmentType.CENTER, spacing: { before: 80, after: 200 }
     }));
   }
