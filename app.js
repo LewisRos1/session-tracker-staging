@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1946";
+const APP_VERSION = "1947";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6594,19 +6594,28 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
     ],
     alignment: AlignmentType.BOTH, spacing: { before: 0, after: 160, ...LS }
   }));
+  // A real blank line before each heading that follows body text, so the FEDC
+  // levels and the lettered sections are visibly separated. A heading that
+  // directly follows another heading gets none, since they belong together.
+  let prevKind = null;
+  const blankLine = () => paragraphs.push(new Paragraph({ children: [], spacing: { before: 0, after: 0, ...LS } }));
   for (const [kind, text] of ASSESS_FRAMEWORK) {
+    if ((kind === "h" || kind === "sh") && (prevKind === "b" || prevKind === "p")) blankLine();
     if (kind === "p")  paragraphs.push(mkPara(text, { align: AlignmentType.BOTH, after: 160 }));
-    if (kind === "h")  paragraphs.push(mkPara(text, { bold: true, before: 160, after: 100, size: 24 }));
-    if (kind === "sh") paragraphs.push(mkPara(text, { bold: true, before: 120, after: 60 }));
+    if (kind === "h")  paragraphs.push(mkPara(text, { bold: true, before: 0, after: 100, size: 24 }));
+    if (kind === "sh") paragraphs.push(mkPara(text, { bold: true, before: 0, after: 60 }));
     if (kind === "b")  paragraphs.push(new Paragraph({
       numbering: { reference: "assess-bullets", level: 0 },
       children: [new TextRun({ text, size: 22 })],
       alignment: AlignmentType.BOTH, spacing: { before: 20, after: 20, ...LS }
     }));
+    prevKind = kind;
   }
 
   // ── Assessment Results: the two charts ──
-  paragraphs.push(mkPara("Assessment Results", { heading: HeadingLevel.HEADING_2, before: 320, after: 140, size: 26, bold: true }));
+  // Its own page: the charts are tall, so left to flow it lands at the foot of
+  // the framework page with the graphs pushed onto the next one anyway.
+  paragraphs.push(mkPara("Assessment Results", { heading: HeadingLevel.HEADING_2, before: 0, after: 140, size: 26, bold: true, pageBreak: true }));
   const dayChart = assessmentDrawDayChart(collected.scored, collected.days,
     `${student.name} (${nDays}-Day Assessment)`);
   const avgChart = assessmentDrawAvgChart(collected.scored,
@@ -6634,12 +6643,18 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
   // ── Page 3: Section 2, one block per target in website order ──
   paragraphs.push(mkPara("Section 2: Assessment Details", { heading: HeadingLevel.HEADING_1, before: 0, after: 200, pageBreak: true, size: 32, bold: true }));
   collected.rows.forEach((r, i) => {
-    paragraphs.push(mkPara(r.target, { bold: true, size: 26, before: i === 0 ? 0 : 280, after: 60 }));
-    paragraphs.push(mkPara(
-      r.avg === null
-        ? `Tracked through observations rather than scores across the ${nDays} assessment day${nDays === 1 ? "" : "s"}.`
-        : `Average score across the ${nDays} assessment day${nDays === 1 ? "" : "s"}: ${r.avg}%`,
-      { color: "374151", after: 100 }));
+    // Average sits beside the target name rather than on a line of its own,
+    // so each target block opens with one heading instead of two.
+    paragraphs.push(new Paragraph({
+      children: [
+        new TextRun({ text: r.target, bold: true, size: 26 }),
+        new TextRun({
+          text: r.avg === null ? "  (Observation only)" : `  (Average: ${r.avg}%)`,
+          size: 22, color: "374151"
+        })
+      ],
+      spacing: { before: i === 0 ? 0 : 280, after: 80, ...LS }
+    }));
     const block = parsed.targets[r.target] || { strengths: [], weaknesses: [] };
     const listOf = arr => arr.length ? arr : ["None noted during this assessment."];
     paragraphs.push(mkPara("Strengths:", { bold: true, after: 40 }));
@@ -6666,6 +6681,18 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
     alignment: AlignmentType.BOTH, spacing: { before: 40, after: 40, ...LS }
   })));
 
+  // Enrichment programme note, sitting between the recommendations and the
+  // stamp with a blank line either side.
+  paragraphs.push(new Paragraph({ children: [], spacing: { before: 0, after: 0, ...LS } }));
+  paragraphs.push(mkPara(
+    "ZORA offers an enrichment program for students who are beginning to learn social thinking, "
+    + "executive functioning, and oral language skills. This program provides opportunities for them "
+    + "to apply these skills in small playgroups, where they can practise and further develop them "
+    + "together. Through guided interaction, students build their social and communication abilities "
+    + "to support better integration into the wider community.",
+    { align: AlignmentType.BOTH, after: 0 }));
+  paragraphs.push(new Paragraph({ children: [], spacing: { before: 0, after: 0, ...LS } }));
+
   // Company stamp, closing the report. Same image, size and alignment as the
   // single-session Word export, so the two documents sign off identically.
   let stampData = null;
@@ -6674,7 +6701,6 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
     if (sr.ok) stampData = new Uint8Array(await sr.arrayBuffer());
   } catch (_) {}
   if (stampData) {
-    paragraphs.push(new Paragraph({ children: [], spacing: { before: 280, after: 0 } }));
     paragraphs.push(new Paragraph({
       alignment: AlignmentType.LEFT,
       children: [new ImageRun({ type: "png", data: stampData, transformation: { width: 312, height: 197 } })]
@@ -6697,11 +6723,14 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
   })] }) : undefined;
 
   const doc = new Document({
+    // text must carry an actual glyph. It was "" with a Wingdings run, which
+    // draws an empty marker: the indent appears but no bullet. "•" is
+    // Word's own round bullet, and because this is a real numbered list,
+    // pressing Enter in Word continues it onto the next bullet.
     numbering: { config: [{
       reference: "assess-bullets",
-      levels: [{ level: 0, format: LevelFormat?.BULLET ?? "bullet", text: "", alignment: AlignmentType.LEFT,
-        style: { paragraph: { indent: { left: 720, hanging: 360 } },
-                 run: { fonts: { ascii: "Wingdings", hAnsi: "Wingdings", hint: "default" }, size: 22 } } }]
+      levels: [{ level: 0, format: LevelFormat?.BULLET ?? "bullet", text: "•", alignment: AlignmentType.LEFT,
+        style: { paragraph: { indent: { left: 720, hanging: 360 } }, run: { size: 22 } } }]
     }] },
     sections: [{
       properties: { type: SectionType?.NEXT_PAGE ?? "nextPage" },
