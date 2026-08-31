@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1954";
+const APP_VERSION = "1955";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6200,6 +6200,12 @@ const ASSESS_DISP_W = 600;
  */
 const assessFontPx = (pt, W) => Math.max(8, Math.round(pt * W / (ASSESS_DISP_W * 0.75)));
 
+// 15% under the document body size. At a full 11pt a "100%" label is wider
+// than the pitch between two bars, so labels on neighbouring bars cannot help
+// but overlap; a little under that they fit side by side.
+const ASSESS_BODY_PT  = 11 * 0.85;
+const ASSESS_TITLE_PT = 16 * 0.85;
+
 /** Trim a target name to the angled-label budget, with an ellipsis if needed. */
 function assessTrimLabel(ctx, name, maxW) {
   let t = String(name || "");
@@ -6231,15 +6237,27 @@ function assessmentDrawDayChart(scored, days, title) {
   // provisional left padding, then again once the label budget is known.
   let padL = 52;
   let W = Math.max(560, padL + 30 + slot * scored.length);
-  let F_BODY = assessFontPx(11, W);
+  let F_BODY = assessFontPx(ASSESS_BODY_PT, W);
   const labelMax = Math.round(F_BODY * 8.5);
   const drop = Math.round(labelMax * 0.7071) + 14;
   padL = Math.max(52, Math.round(24 + labelMax * 0.7071 - slot / 2));
   W = Math.max(560, padL + 30 + slot * scored.length);
-  F_BODY = assessFontPx(11, W);
-  const F_TITLE = assessFontPx(16, W);
+  F_BODY = assessFontPx(ASSESS_BODY_PT, W);
+  const F_TITLE = assessFontPx(ASSESS_TITLE_PT, W);
 
-  const PAD = { top: Math.round(F_TITLE * 2.4), right: 30, bottom: drop + Math.round(F_BODY * 4.4), left: padL };
+  // Decide the stagger before sizing the canvas. A lifted label needs its own
+  // band of top padding, or a 100% bar's label is drawn over the title.
+  const measure = document.createElement("canvas").getContext("2d");
+  measure.font = `bold ${F_BODY}px Arial`;
+  const stagger = days.length > 1 && measure.measureText("100%").width > (barW + gap);
+  const lift = stagger ? F_BODY + 4 : 0;
+
+  const PAD = {
+    top: Math.round(F_TITLE * 1.8 + F_BODY + lift + 18),
+    right: 30,
+    bottom: drop + Math.round(F_BODY * 4.4),
+    left: padL
+  };
   const H = PAD.top + PLOT_H + PAD.bottom;
 
   const canvas = document.createElement("canvas");
@@ -6260,11 +6278,6 @@ function assessmentDrawDayChart(scored, days, title) {
   ctx.strokeStyle = "#9ca3af";
   ctx.beginPath(); ctx.moveTo(PAD.left, base + 0.5); ctx.lineTo(W - PAD.right, base + 0.5); ctx.stroke();
 
-  // At 11pt two "100%" labels can be wider than the pair of bars they sit on.
-  // Where that happens, lift every second one so they cannot collide.
-  ctx.font = `bold ${F_BODY}px Arial`;
-  const stagger = days.length > 1 && ctx.measureText("100%").width > (barW + gap);
-
   scored.forEach((r, i) => {
     const cx = PAD.left + slot * i + slot / 2;
     let x = cx - inner / 2;
@@ -6275,8 +6288,7 @@ function assessmentDrawDayChart(scored, days, title) {
         ctx.fillStyle = ASSESS_DAY_COLORS[di % ASSESS_DAY_COLORS.length];
         ctx.fillRect(x, base - h, barW, h);
         ctx.fillStyle = "#111827"; ctx.font = `bold ${F_BODY}px Arial`; ctx.textAlign = "center";
-        const lift = (stagger && di % 2 === 1) ? F_BODY + 4 : 0;
-        ctx.fillText(`${v}%`, x + barW / 2, base - h - 6 - lift);
+        ctx.fillText(`${v}%`, x + barW / 2, base - h - 6 - ((stagger && di % 2 === 1) ? lift : 0));
       }
       x += barW + gap;
     });
@@ -6317,15 +6329,21 @@ function assessmentDrawAvgChart(scored, title) {
 
   let padL = 52;
   let W = Math.max(560, padL + 30 + slot * scored.length);
-  let F_BODY = assessFontPx(11, W);
+  let F_BODY = assessFontPx(ASSESS_BODY_PT, W);
   const labelMax = Math.round(F_BODY * 8.5);
   const drop = Math.round(labelMax * 0.7071) + 14;
   padL = Math.max(52, Math.round(24 + labelMax * 0.7071 - slot / 2));
   W = Math.max(560, padL + 30 + slot * scored.length);
-  F_BODY = assessFontPx(11, W);
-  const F_TITLE = assessFontPx(16, W);
+  F_BODY = assessFontPx(ASSESS_BODY_PT, W);
+  const F_TITLE = assessFontPx(ASSESS_TITLE_PT, W);
 
-  const PAD = { top: Math.round(F_TITLE * 2.4), right: 30, bottom: drop + Math.round(F_BODY * 2.4), left: padL };
+  // Room for a 100% bar's label between the plot and the title.
+  const PAD = {
+    top: Math.round(F_TITLE * 1.8 + F_BODY + 18),
+    right: 30,
+    bottom: drop + Math.round(F_BODY * 2.4),
+    left: padL
+  };
   const H = PAD.top + PLOT_H + PAD.bottom;
 
   const canvas = document.createElement("canvas");
