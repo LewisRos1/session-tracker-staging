@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1943";
+const APP_VERSION = "1944";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3626,13 +3626,19 @@ function renderHalfYearReportsSection() {
     resetBelowType();
     if (!type || !_hyrSessions) return;
     // Half-year and monthly need a period; an assessment is simply every
-    // session the student has, so that row keeps only the Generate button.
-    const _periodVisible = type !== "assessment";
-    $("hyr-period-label").style.display = _periodVisible ? "" : "none";
-    periodSel.style.display = _periodVisible ? "" : "none";
+    // session the student has. The Generate button normally lives in the
+    // period row, so for an assessment it moves up beside Report Type rather
+    // than sitting alone on a line with nothing else on it.
+    const genBtn = $("hyr-btn-generate");
+    if (type !== "assessment") {
+      $("hyr-period-label").style.display = "";
+      periodSel.style.display = "";
+      if (genBtn && genBtn.parentElement !== $("hyr-row-period")) $("hyr-row-period").appendChild(genBtn);
+    }
 
     if (type === "assessment") {
-      $("hyr-row-period").style.display = "flex";
+      $("hyr-row-period").style.display = "none";
+      if (genBtn) $("hyr-row-type").appendChild(genBtn);
       const _aSessType = $("hyr-session-type-select")?.value || "individual";
       const _aGrpTargets = _aSessType === "group" ? getGroupEffectiveTargets(studentIdForFilter()) : null;
       const _aStudent = state.students.find(s => s.id === studentIdForFilter());
