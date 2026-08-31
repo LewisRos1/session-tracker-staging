@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1948";
+const APP_VERSION = "1949";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3243,16 +3243,19 @@ function renderExportButtons() {
 // a stale rate here reports a confident wrong number, which is worse than
 // showing none. Rates: https://claude.com/pricing
 const AI_MODEL = "claude-sonnet-5";
+// Sonnet 5's published rate, checked 2026-09-01. This used to carry an
+// "intro pricing ends 2026-08-31" assumption that was simply wrong: the rate
+// did not rise, so from 1 Sep the app was quoting 3.00/15.00 and overstating
+// every report by half. One rate, no expiry guessing — correct it here if
+// Anthropic actually changes it. https://claude.com/pricing
 const AI_RATES = {
-  intro:    { until: "2026-08-31", inPerM: 2.00, outPerM: 10.00 },
-  standard: {                      inPerM: 3.00, outPerM: 15.00 }
+  standard: { inPerM: 2.00, outPerM: 10.00 }
 };
 
 /** Cost in USD for one response, from the usage block the API returns. */
 function aiCostUsd(usage) {
   if (!usage) return 0;
-  const today = todayDateStr();
-  const r = today <= AI_RATES.intro.until ? AI_RATES.intro : AI_RATES.standard;
+  const r = AI_RATES.standard;
   // Cache reads and writes are billed differently, but nothing here uses
   // caching yet; counted as plain input so the figure can't silently miss spend.
   const inTok = (usage.input_tokens || 0)
