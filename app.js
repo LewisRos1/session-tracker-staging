@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1938";
+const APP_VERSION = "1939";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -803,7 +803,6 @@ const state = {
   templates:          [],
   remarkPresets:      [],
   searchExisting:     "",
-  searchAssessment:   "",
   currentStudent:     null,
   currentSessionId:   null,
   sessionData:        null,
@@ -1603,13 +1602,12 @@ async function showHome() {
   const verEl = document.getElementById("app-version");
   if (verEl) verEl.textContent = versionLineText();
   // Clear section searches when returning home
-  state.searchExisting = ""; state.searchAssessment = "";
+  state.searchExisting = "";
   state.searchGroup = "";
-  [$("search-existing"), $("search-assessment"), $("search-group")]
+  [$("search-existing"), $("search-group")]
     .forEach(el => { if (el) el.value = ""; });
   renderExistingStudentButtons();
   renderGroupButtons();
-  renderAssessmentStudentButtons();
   renderExportButtons();
   renderHalfYearReportsSection();
   renderStudentDatabaseButton();
@@ -1897,7 +1895,6 @@ $("btn-logout")?.addEventListener("click", () => {
 // ── Add student / group from home screen ──────────────────────
 
 $("btn-add-existing-student").addEventListener("click", () => showRegisteredStudentPicker("existing"));
-$("btn-add-assessment-student").addEventListener("click", () => showRegisteredStudentPicker("assessment"));
 $("btn-add-group").addEventListener("click", addNewGroup);
 $("search-existing").addEventListener("input", e => {
   state.searchExisting = e.target.value;
@@ -1906,10 +1903,6 @@ $("search-existing").addEventListener("input", e => {
 $("search-group").addEventListener("input", e => {
   state.searchGroup = e.target.value;
   renderGroupButtons();
-});
-$("search-assessment").addEventListener("input", e => {
-  state.searchAssessment = e.target.value;
-  renderAssessmentStudentButtons();
 });
 
 function renderStudentDatabaseButton() {
@@ -3065,8 +3058,7 @@ async function assignStudentToBucket(student, targetType) {
   student.type = targetType;
   await saveStudent(student);
   closeSessionPicker();
-  if (targetType === "existing") renderExistingStudentButtons();
-  else renderAssessmentStudentButtons();
+  renderExistingStudentButtons();
 }
 
 
@@ -3151,11 +3143,6 @@ function renderGroupButtons() {
       if (group) showGroupChoice(group);
     });
   });
-}
-
-function renderAssessmentStudentButtons() {
-  const students = state.students.filter(s => s.type === "assessment");
-  renderStudentList($("assessment-student-buttons"), students, state.searchAssessment);
 }
 
 
@@ -3418,6 +3405,7 @@ function renderHalfYearReportsSection() {
           <option value="">— Select —</option>
           <option value="halfyear">Half Year</option>
           <option value="monthly">Monthly</option>
+          <option value="assessment">Assessment</option>
         </select>
       </div>
       <div id="hyr-row-period" style="display:none;gap:.75rem;align-items:center">
@@ -3436,7 +3424,8 @@ function renderHalfYearReportsSection() {
       </div>
       <div id="hyr-cost-line" style="display:none;font-size:.78rem;color:var(--text-main);text-align:right;margin-top:.1rem;line-height:1.5"></div>
       <div id="hyr-activity-filter" class="hyr-excl-pulse" style="display:none;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:1rem 1.1rem">
-        <div style="font-size:.875rem;font-weight:600;color:#374151;margin-bottom:.8rem">Select the activities you want to <span style="text-decoration:underline;font-weight:800">EXCLUDE</span> from the Appendix:</div>
+        <div style="font-size:.875rem;font-weight:600;color:#374151;margin-bottom:.25rem">Select the activities you want to <span style="text-decoration:underline;font-weight:800">EXCLUDE</span> from this report:</div>
+        <div style="font-size:.78rem;color:#6b7280;margin-bottom:.8rem;font-weight:400">Excluded activities are left out of the appendix, and the AI is told to ignore them completely — it will not mention, analyse, or draw conclusions from them.</div>
         <div id="hyr-act-filter-list" style="display:flex;flex-direction:column;gap:1.1rem"></div>
       </div>
     </div>`;
@@ -3578,11 +3567,31 @@ function renderHalfYearReportsSection() {
     renderHyrSessionCounts();
   });
 
+  const studentIdForFilter = () => $("hyr-student-select")?.value || "";
+
   $("hyr-type-select").addEventListener("change", e => {
     const type = e.target.value;
     const periodSel = $("hyr-period-select");
     resetBelowType();
     if (!type || !_hyrSessions) return;
+    // Half-year and monthly need a period; an assessment is simply every
+    // session the student has, so that row keeps only the Generate button.
+    const _periodVisible = type !== "assessment";
+    $("hyr-period-label").style.display = _periodVisible ? "" : "none";
+    periodSel.style.display = _periodVisible ? "" : "none";
+
+    if (type === "assessment") {
+      $("hyr-row-period").style.display = "flex";
+      const _aSessType = $("hyr-session-type-select")?.value || "individual";
+      const _aGrpTargets = _aSessType === "group" ? getGroupEffectiveTargets(studentIdForFilter()) : null;
+      const _aStudent = state.students.find(s => s.id === studentIdForFilter());
+      if (_aStudent) {
+        hyrPopulateActivityFilter(_aGrpTargets ? { ..._aStudent, targets: _aGrpTargets } : _aStudent,
+          _aStudent.id, "assessment");
+        $("hyr-activity-filter").style.display = "";
+      }
+      return;
+    }
 
     if (type === "halfyear") {
       $("hyr-period-label").textContent = "Semester";
@@ -3643,6 +3652,7 @@ function renderHalfYearReportsSection() {
 
   $("hyr-btn-generate").addEventListener("click", () => {
     const type = $("hyr-type-select").value;
+    if (type === "assessment") { requirePassword(assessmentGenerate, EXPORT_MSG); return; }
     if (type === "monthly") { requirePassword(monthlyGenerate, EXPORT_MSG); return; }
     requirePassword(hyrGenerate, EXPORT_MSG);
   });
@@ -6025,6 +6035,614 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = `${student.name} Half Year Report ${period} ${year}.docx`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ============================================================
+// ASSESSMENT REPORT GENERATION
+// A new student is assessed over 2-4 days. Unlike the monthly and half-year
+// reports there is no progress to describe: this is a baseline, so everything
+// here states what was observed and never what is improving.
+// ============================================================
+
+// One colour per assessment day, up to four, all clearly distinct.
+const ASSESS_DAY_COLORS = ["#f59e0b", "#2563eb", "#10b981", "#7c3aed"];
+const ASSESS_AVG_COLOR  = "#0f766e";
+
+/**
+ * Per-target daily averages plus the remark evidence the model reasons from.
+ * calcDailyAverage is the same function the Excel export uses, so the numbers
+ * here match the spreadsheet rather than drifting from it.
+ */
+function assessmentCollect(student, sessions, excludedActivities) {
+  const targets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
+  const days = [...sessions]
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+    .map(s => ({ date: s.date, label: fmtPeriodDate(s.date), sess: s }));
+
+  const rows = [], unscored = [], lines = [];
+  for (const t of targets) {
+    const avgs = days.map(d => {
+      const v = calcDailyAverage(d.sess, t, targets);
+      return (v === null || v === undefined) ? null : Math.round(v);
+    });
+    const got = avgs.filter(v => v !== null);
+    const avg = got.length ? Math.round(got.reduce((a, b) => a + b, 0) / got.length) : null;
+
+    // The exclusion tickboxes are keyed by an activity's display name
+    // (title || name), but a session record stores name || title. Resolve both,
+    // plus the configId, or an activity with both fields would never match.
+    const exNames = new Set(), exIds = new Set();
+    for (const pa of (t.predefinedActivities || [])) {
+      const key = pa.title || pa.name;
+      if (!key || !excludedActivities.has(`${t.name}|${key}`)) continue;
+      if (pa.name)  exNames.add(pa.name);
+      if (pa.title) exNames.add(pa.title);
+      if (pa.id)    exIds.add(pa.id);
+    }
+
+    const ev = [];
+    days.forEach((d, di) => {
+      Object.entries(d.sess.activities || {}).forEach(([recId, a]) => {
+        if (a.targetName !== t.name) return;
+        const actName = a.activityName || "";
+        if (exNames.has(actName) || (a.configId && exIds.has(a.configId))) return;
+        Object.values(d.sess.remarks || {}).filter(r => r.activityId === recId).forEach(r => {
+          const txt  = plainTextForEdit(r.text || "").trim();
+          const note = plainTextForEdit(r.masteryNote || "").trim();
+          const tr   = (r.trials || []).filter(v => v !== null && v !== -1);
+          const said = [txt, note].filter(Boolean).join(" — ");
+          if (!said && !tr.length) return;
+          ev.push(`  Day ${di + 1} (${d.label}) | ${actName}: ${said || "(no remark)"}${tr.length ? ` [trials ${tr.join(", ")}]` : ""}`);
+        });
+      });
+    });
+
+    if (avg === null) unscored.push(t.name);
+    rows.push({ target: t.name, avgs, avg, hasScore: avg !== null });
+
+    lines.push(`=== TARGET: ${t.name} ===`);
+    lines.push(`Each trial is scored out of ${t.maxPoints || 3}.`);
+    lines.push(avg === null
+      ? "This target is observation-only and carries no numeric score."
+      : `Average across the assessment: ${avg}%${days.map((d, i) => avgs[i] === null ? "" : `\n  ${d.label}: ${avgs[i]}%`).join("")}`);
+    lines.push(ev.length ? "What was recorded:" : "Nothing was recorded for this target.");
+    lines.push(...ev);
+    lines.push("");
+  }
+
+  // Both charts run lowest average first, and the day chart follows the same
+  // order as the average chart so the two can be read together.
+  const scored = rows.filter(r => r.hasScore).slice().sort((a, b) => a.avg - b.avg);
+  return { days, rows, scored, unscored, text: lines.join("\n") };
+}
+
+/** Wrap a target name to at most two lines for an x-axis label. */
+function assessWrapLabel(ctx, name, maxW) {
+  const words = String(name || "").split(/\s+/);
+  const out = [];
+  let line = "";
+  for (const w of words) {
+    const test = line ? `${line} ${w}` : w;
+    if (ctx.measureText(test).width <= maxW) { line = test; continue; }
+    if (line) out.push(line);
+    line = w;
+    if (out.length === 2) break;
+  }
+  if (out.length < 2 && line) out.push(line);
+  if (out.length === 2 && ctx.measureText(out[1]).width > maxW) {
+    let t = out[1];
+    while (t.length > 3 && ctx.measureText(t + "…").width > maxW) t = t.slice(0, -1);
+    out[1] = t + "…";
+  }
+  return out.length ? out : [String(name || "")];
+}
+
+/** Grouped bars, one group per target and one bar per assessment day. */
+function assessmentDrawDayChart(scored, days, title) {
+  if (!scored.length || !days.length) return null;
+  const SCALE = 2, PLOT_H = 250;
+  const PAD = { top: 54, right: 26, bottom: 104, left: 58 };
+  const barW = days.length <= 2 ? 22 : days.length === 3 ? 17 : 13;
+  const gap  = 5;
+  const inner = days.length * barW + (days.length - 1) * gap;
+  const slot = Math.max(78, inner + 40);
+  const W = Math.max(640, PAD.left + PAD.right + slot * scored.length);
+  const H = PAD.top + PLOT_H + PAD.bottom;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W * SCALE; canvas.height = H * SCALE;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(SCALE, SCALE);
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
+
+  ctx.font = "bold 15px Arial"; ctx.fillStyle = "#111827"; ctx.textAlign = "center";
+  ctx.fillText(title, W / 2, 28);
+
+  const base = PAD.top + PLOT_H;
+  // Gridlines without tick labels: the value sits on top of each bar already.
+  ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
+  for (let p = 0; p <= 100; p += 25) {
+    const y = base - (PLOT_H * p / 100);
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
+  }
+  ctx.strokeStyle = "#9ca3af";
+  ctx.beginPath(); ctx.moveTo(PAD.left, base + 0.5); ctx.lineTo(W - PAD.right, base + 0.5); ctx.stroke();
+
+  scored.forEach((r, i) => {
+    const cx = PAD.left + slot * i + slot / 2;
+    let x = cx - inner / 2;
+    days.forEach((d, di) => {
+      const v = r.avgs[di];
+      if (v !== null && v !== undefined) {
+        const h = Math.max(2, PLOT_H * v / 100);
+        ctx.fillStyle = ASSESS_DAY_COLORS[di % ASSESS_DAY_COLORS.length];
+        ctx.fillRect(x, base - h, barW, h);
+        ctx.fillStyle = "#111827"; ctx.font = "bold 11px Arial"; ctx.textAlign = "center";
+        ctx.fillText(`${v}%`, x + barW / 2, base - h - 5);
+      }
+      x += barW + gap;
+    });
+    ctx.font = "11px Arial"; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
+    assessWrapLabel(ctx, r.target, slot - 6).forEach((ln, li) => ctx.fillText(ln, cx, base + 18 + li * 13));
+  });
+
+  // Axis titles
+  ctx.save();
+  ctx.translate(18, PAD.top + PLOT_H / 2); ctx.rotate(-Math.PI / 2);
+  ctx.font = "bold 12px Arial"; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
+  ctx.fillText("Score", 0, 0);
+  ctx.restore();
+  ctx.font = "bold 12px Arial"; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
+  ctx.fillText("Target", W / 2, H - 34);
+
+  // Legend, one entry per assessment day
+  ctx.font = "11px Arial";
+  const BOX = 11, G = 6, SP = 20;
+  const widths = days.map(d => BOX + G + ctx.measureText(d.label).width);
+  const total = widths.reduce((a, b) => a + b, 0) + SP * (days.length - 1);
+  let lx = (W - total) / 2;
+  const ly = H - 12;
+  days.forEach((d, di) => {
+    ctx.fillStyle = ASSESS_DAY_COLORS[di % ASSESS_DAY_COLORS.length];
+    ctx.fillRect(lx, ly - BOX + 2, BOX, BOX);
+    ctx.fillStyle = "#374151"; ctx.textAlign = "left";
+    ctx.fillText(d.label, lx + BOX + G, ly);
+    lx += widths[di] + SP;
+  });
+
+  return { base64: canvas.toDataURL("image/png").split(",")[1], width: W, height: H };
+}
+
+/** One bar per target: the mean of that target's daily averages. */
+function assessmentDrawAvgChart(scored, title) {
+  if (!scored.length) return null;
+  const SCALE = 2, PLOT_H = 250;
+  const PAD = { top: 54, right: 26, bottom: 78, left: 58 };
+  const slot = Math.max(78, 60);
+  const W = Math.max(560, PAD.left + PAD.right + slot * scored.length);
+  const H = PAD.top + PLOT_H + PAD.bottom;
+  const barW = 34;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W * SCALE; canvas.height = H * SCALE;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(SCALE, SCALE);
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
+
+  ctx.font = "bold 15px Arial"; ctx.fillStyle = "#111827"; ctx.textAlign = "center";
+  ctx.fillText(title, W / 2, 28);
+
+  const base = PAD.top + PLOT_H;
+  ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
+  for (let p = 0; p <= 100; p += 25) {
+    const y = base - (PLOT_H * p / 100);
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
+  }
+  ctx.strokeStyle = "#9ca3af";
+  ctx.beginPath(); ctx.moveTo(PAD.left, base + 0.5); ctx.lineTo(W - PAD.right, base + 0.5); ctx.stroke();
+
+  scored.forEach((r, i) => {
+    const cx = PAD.left + slot * i + slot / 2;
+    const h = Math.max(2, PLOT_H * r.avg / 100);
+    ctx.fillStyle = ASSESS_AVG_COLOR;
+    ctx.fillRect(cx - barW / 2, base - h, barW, h);
+    ctx.fillStyle = "#111827"; ctx.font = "bold 11px Arial"; ctx.textAlign = "center";
+    ctx.fillText(`${r.avg}%`, cx, base - h - 5);
+    ctx.font = "11px Arial"; ctx.fillStyle = "#374151";
+    assessWrapLabel(ctx, r.target, slot - 6).forEach((ln, li) => ctx.fillText(ln, cx, base + 18 + li * 13));
+  });
+
+  ctx.save();
+  ctx.translate(18, PAD.top + PLOT_H / 2); ctx.rotate(-Math.PI / 2);
+  ctx.font = "bold 12px Arial"; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
+  ctx.fillText("Score", 0, 0);
+  ctx.restore();
+  ctx.font = "bold 12px Arial"; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
+  ctx.fillText("Target", W / 2, H - 14);
+
+  return { base64: canvas.toDataURL("image/png").split(",")[1], width: W, height: H };
+}
+
+/** The fixed framework text. Identical for every child, so it lives here. */
+const ASSESS_FRAMEWORK = [
+  ["p", "This assessment is facilitated using the Functional Emotional Capacity (FEDC) assessment to establish the six levels of Developmental Functional Emotional Capacity, as well as Learning Capacity, to set the baseline for the social-emotional skills and communication program."],
+  ["h", "A. Functional Emotional Capacity (FEDC)"],
+  ["sh", "FEDC 1: Shared Attention & Regulation"],
+  ["b", "This child's capacity to show interest in various toys and sensory objects in the environment and with the instructor."],
+  ["b", "The ability to stay calm when engaging in the environment."],
+  ["b", "The ability to recover from distress within 20 min."],
+  ["sh", "FEDC 2: Engagement and Relating"],
+  ["b", "The child's ability to respond to the engagement of the adult."],
+  ["b", "The child's participation in play and other reactions during various activities."],
+  ["b", "The child displays emotions in various events."],
+  ["sh", "FEDC 3: Becoming a Two-Way Intentional Communicator"],
+  ["b", "The communication between the child and others."],
+  ["b", "The child's initiation to interact with others in the environment."],
+  ["b", "The demonstration of various emotions: closeness, pleasure, excitement, assertive curiosity, protest, anger and fear."],
+  ["sh", "FEDC 4: Purposeful Communication"],
+  ["b", "Complex communication and shared problem-solving by combining gestures, words and emotions."],
+  ["sh", "FEDC 5: Using Symbols and Creating Emotional Ideas and Elaboration"],
+  ["b", "Creating emotional ideas through imagination and play."],
+  ["b", "Express ideas derived from intent and combine with reality-based actions."],
+  ["b", "Elaborate on ideas in verbal and imaginary play sequences."],
+  ["b", "Pretend to assume different roles and predict how others feel or act in certain situations."],
+  ["sh", "FEDC 6: Emotional Thinking and Logic"],
+  ["b", "Making connections between ideas through seeking opinions, discussion, and debate while expanding pretend play."],
+  ["h", "B. Learning Capacity"],
+  ["b", "Attending"], ["b", "Eye contact"], ["b", "Wait"], ["b", "Transition"],
+  ["b", "Joint attention"], ["b", "Follow a point"], ["b", "Follow eye gaze"],
+  ["p", "These attending skills were observed during indoor play activities. Transitions were noted between preferred activities and structured table tasks within the indoor environment."],
+  ["h", "School Readiness Skills"],
+  ["sh", "Expressive Language"],
+  ["b", "Sequence"], ["b", "Preposition"], ["b", "Cause and Effect"],
+  ["b", "Using 'Wh' questions: where, what, when, why of a topic"], ["b", "Pronouns"],
+  ["sh", "Receptive Language"],
+  ["b", "Following two-step instructions"], ["b", "Mathematics concepts"]
+];
+
+/** Pulls the per-target strengths/weaknesses and the recommendations out. */
+function assessmentParseAiResponse(text) {
+  const out = { targets: {}, recommendations: [] };
+  for (const m of text.matchAll(/===TARGET:\s*([^=]+?)===\s*([\s\S]*?)\s*===END===/g)) {
+    const name = m[1].trim();
+    const body = m[2];
+    const grab = label => {
+      const re = new RegExp(`${label}\\s*:?\\s*\\n([\\s\\S]*?)(?=\\n\\s*(?:Strengths|Weaknesses)\\b|$)`, "i");
+      const hit = body.match(re);
+      if (!hit) return [];
+      return hit[1].split("\n").map(l => l.trim().replace(/^[-•*]\s*/, "").trim()).filter(Boolean);
+    };
+    out.targets[name] = { strengths: grab("Strengths"), weaknesses: grab("Weaknesses") };
+  }
+  const rec = text.match(/===RECOMMENDATIONS===\s*([\s\S]*?)\s*===END===/);
+  if (rec) {
+    out.recommendations = rec[1].split("\n")
+      .map(l => l.trim().replace(/^[-•*]\s*/, "").replace(/^\d+[.)]\s*/, "").trim())
+      .filter(Boolean);
+  }
+  return out;
+}
+
+async function assessmentGenerate() {
+  const studentId = $("hyr-student-select")?.value;
+  if (!studentId) { alert("Please select a student first."); return; }
+  const student = state.students.find(s => s.id === studentId);
+  if (!student) return;
+
+  const btn = $("hyr-btn-generate");
+  const progress = $("hyr-progress");
+  const bar   = $("hyr-progress-bar");
+  const label = $("hyr-progress-label");
+  let inCancelMode = false;
+  const setProgress = (pct, text) => {
+    bar.style.width = pct + "%";
+    label.textContent = text;
+    if (text === "Done!") btn.textContent = text;
+  };
+
+  // Same rule as the other reports: the wording uses the child's pronouns, so
+  // it cannot be written correctly without the Gender column set.
+  if (!student.gender || !GENDER_STYLE[student.gender]) {
+    alert(`${student.name} has no gender set, so the report cannot pick the right pronouns.\n\n`
+      + `Open Student Database, click the Gender pill next to ${student.name}, then generate the report again.`);
+    return;
+  }
+
+  renderAiCostLine();
+  btn.disabled = true; progress.style.display = "";
+  setProgress(5, "");
+
+  try {
+    const excludedActivities = new Set();
+    document.querySelectorAll(".hyr-act-cb[data-excluded='true']").forEach(b => {
+      excludedActivities.add(`${b.dataset.target}|${b.dataset.activity}`);
+    });
+
+    const sessionType = $("hyr-session-type-select")?.value || "individual";
+    const sessions = sessionType === "group"
+      ? await getAllGroupSessionsForStudent(studentId)
+      : await getAllSessionsForStudent(studentId);
+    if (!sessions.length) { alert("This student has no sessions recorded."); return; }
+    setProgress(15, "Processing data…");
+
+    const _grpTargets = sessionType === "group" ? getGroupEffectiveTargets(studentId) : null;
+    const effectiveStudent = _grpTargets ? { ...student, targets: _grpTargets } : student;
+    const collected = assessmentCollect(effectiveStudent, sessions, excludedActivities);
+    const firstName = student.preferredName || student.name.split(" ")[0];
+    const PRON = student.gender === "female"
+      ? { subj: "she", obj: "her", poss: "her" }
+      : { subj: "he", obj: "him", poss: "his" };
+
+    const excludedList = [...excludedActivities].map(k => `- ${k.split("|")[1]} (${k.split("|")[0]})`).join("\n");
+    const nDays = collected.days.length;
+
+    const aiPrompt = `${HYR_DEFAULT_PROMPT}
+${excludedList ? `\nEXCLUDED ACTIVITIES — ABSOLUTE RULE: The following activities have been deliberately excluded from this report. Do NOT mention, reference, analyse, or draw conclusions about them anywhere:\n${excludedList}\n` : ""}
+Student: ${student.name}
+${noteBare(student.note) ? `Student Program Note: ${noteBare(student.note)}\n` : ""}PRONOUNS: Refer to ${firstName} as "${PRON.subj}", "${PRON.obj}" and "${PRON.poss}" throughout. Never use the opposite pronouns, and never write "he or she", "him or her", "his or her", "they" or "their" about the student.
+Assessment days: ${nDays} (${collected.days.map(d => d.label).join(", ")})
+
+You are writing the findings of an INITIAL ASSESSMENT. This is the first time anyone has worked with ${firstName}. There is no history, no progress and no improvement to describe, because there is nothing to compare against. Everything you write states what was OBSERVED across these ${nDays} days.
+
+ABSOLUTE, THIS IS A BASELINE:
+- NEVER write that ${PRON.subj} is "improving", "progressing", "developing", "growing", "beginning to" or "starting to". Those claim a change over time that ${nDays} days cannot show.
+- NEVER compare one day to another, and never say a skill got better or worse.
+- Write in the present tense about what ${PRON.subj} can and cannot currently do.
+- Do NOT write a date anywhere.
+
+Follow the GLOBAL RULES above on every sentence, including plain everyday language, the ban on inventing a scene, and never defining an ability by what ${firstName} cannot do.
+
+Provide ONLY the following sections using EXACTLY these markers. No extra text outside markers.
+
+${collected.rows.map(r => `===TARGET: ${r.target}===
+Strengths:
+- [One or two things ${firstName} did well in this target, each taken from what was actually recorded. If nothing in the data shows a strength, write exactly: None noted during this assessment.]
+Weaknesses:
+- [One or two genuine difficulties seen in this target, each taken from what was actually recorded. If nothing in the data shows a difficulty, write exactly: None noted during this assessment.]
+===END===`).join("\n\n")}
+
+RULES FOR EVERY TARGET BLOCK:
+- One or two bullets each, never more. One strong bullet beats two thin ones.
+- Each bullet is a complete sentence naming something specific and observable, not a general compliment or a label.
+- NEVER invent. If a target has no recorded remarks, both lists are "None noted during this assessment."
+- Do not repeat the same observation across two different targets.
+
+===RECOMMENDATIONS===
+[Write 4 to 6 recommendations for ${firstName}'s program, drawn from what this assessment actually showed. Each is one clear, actionable sentence a therapist could act on. Order them most important first. Plain everyday language. Never invent a difficulty to justify a recommendation.]
+- [recommendation]
+- [recommendation]
+- [recommendation]
+- [recommendation]
+===END===
+
+ASSESSMENT DATA:
+${collected.text}`;
+
+    console.log(`[AI assessment prompt] ${aiPrompt.length.toLocaleString()} chars `
+      + `(~${Math.round(aiPrompt.length / 4).toLocaleString()} tokens) — ${student.name}, ${nDays} days`);
+    _hyrAbortController = new AbortController();
+    const fetchPromise = aiRequest(aiPrompt, _hyrAbortController.signal);
+
+    await new Promise(r => setTimeout(r, 800));
+    setProgress(30, "Sending to AI (Approx. ~1 min)…");
+    inCancelMode = true;
+    btn.disabled = false;
+    btn.textContent = "✕ Cancel";
+    btn.style.cssText += ";background:#fee2e2;color:#dc2626;border-color:#ef4444";
+
+    const data = await fetchPromise;
+    _hyrAbortController = null;
+    inCancelMode = false;
+    btn.disabled = true;
+    btn.textContent = "Generate Report";
+    btn.style.background = ""; btn.style.color = ""; btn.style.borderColor = "";
+
+    setProgress(72, "AI response received…");
+    aiTrackCost(data.usage, "assessment");
+    const reportText = data.text;
+    if (!reportText) {
+      throw new Error(data.stop_reason === "max_tokens"
+        ? "The response hit the token limit before finishing. Try again, or tell Claude Code to raise max_tokens."
+        : `Empty response from Claude (stop_reason: ${data.stop_reason || "unknown"}).`);
+    }
+
+    const parsed = assessmentParseAiResponse(reportText);
+    setProgress(88, "Writing report…");
+    await assessmentDownloadWord(effectiveStudent, student, collected, parsed, PRON);
+    setProgress(100, "Done!");
+    await new Promise(r => setTimeout(r, 400));
+
+  } catch (err) {
+    if (err.name !== "AbortError") alert("Failed to generate assessment report:\n" + err.message);
+  } finally {
+    _hyrAbortController = null;
+    btn.disabled = false; btn.textContent = "Generate Report";
+    btn.style.background = ""; btn.style.color = ""; btn.style.borderColor = "";
+    progress.style.display = "none"; bar.style.width = "0%";
+  }
+}
+
+async function assessmentDownloadWord(effectiveStudent, student, collected, parsed, PRON) {
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun, LevelFormat,
+          Table, TableRow, TableCell, WidthType, SectionType, Header, Footer, PageNumber } = window.docx;
+
+  const LS = { line: 276, lineRule: "auto" };
+  const reportDate = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  const nDays = collected.days.length;
+
+  let logoData = null;
+  try {
+    const r = await fetch("ZORA Logo for AI Report.png", { cache: "no-cache" });
+    if (r.ok) logoData = new Uint8Array(await r.arrayBuffer());
+  } catch (_) {}
+  const b64ToUint8 = b64 => {
+    const bin = atob(b64); const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return arr;
+  };
+  const mkPara = (text, opts = {}) => new Paragraph({
+    children: [new TextRun({ text, bold: opts.bold, italics: opts.italics, size: opts.size || 22, color: opts.color })],
+    heading: opts.heading,
+    alignment: opts.align || AlignmentType.LEFT,
+    spacing: { before: opts.before || 0, after: opts.after === undefined ? 140 : opts.after, ...LS },
+    pageBreakBefore: opts.pageBreak || false
+  });
+
+  const paragraphs = [];
+
+  // ── Page 1: cover placeholder, filled in by hand ──
+  paragraphs.push(new Paragraph({
+    children: [new TextRun({ text: "[Insert Cover Page]", bold: true, size: 32 })],
+    alignment: AlignmentType.CENTER, spacing: { before: 3600, after: 0, ...LS }
+  }));
+
+  // ── Page 2: Section 1 ──
+  paragraphs.push(mkPara("Section 1: Overview", { heading: HeadingLevel.HEADING_1, before: 0, after: 200, pageBreak: true, size: 32, bold: true }));
+  paragraphs.push(mkPara("Student Details", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true }));
+
+  const mkDetailRow = (labelText, value) => new TableRow({ children: [
+    new TableCell({
+      width: { size: 30, type: WidthType.PERCENTAGE },
+      margins: { top: 60, bottom: 60, left: 120, right: 120 },
+      children: [new Paragraph({ children: [new TextRun({ text: labelText, bold: true, size: 22 })], spacing: { before: 40, after: 40 } })]
+    }),
+    new TableCell({
+      width: { size: 70, type: WidthType.PERCENTAGE },
+      margins: { top: 60, bottom: 60, left: 120, right: 120 },
+      children: [new Paragraph({ children: [new TextRun({ text: value, size: 22 })], spacing: { before: 40, after: 40 } })]
+    })
+  ]});
+  paragraphs.push(new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [
+      mkDetailRow("Name:", student.name),
+      mkDetailRow("Date of Birth:", ""),
+      mkDetailRow("Age:", ""),
+      mkDetailRow("Assessment Dates:", collected.days.map(d => d.label).join(", ")),
+      mkDetailRow("Total Assessment Hours:", ""),
+      mkDetailRow("Date of Report:", reportDate)
+    ]
+  }));
+  paragraphs.push(new Paragraph({ children: [], spacing: { before: 200, after: 0 } }));
+
+  // ── Assessment Framework ──
+  paragraphs.push(mkPara("Assessment Framework", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true }));
+  const Cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+  paragraphs.push(new Paragraph({
+    children: [
+      new TextRun({ text: `Dr Khoo Chai Soon has referred ${student.name} for therapy. ${Cap(PRON.subj)} has a diagnosis of `, size: 22 }),
+      new TextRun({ text: "[Please Enter Diagnosis]", size: 22, bold: true, highlight: "red" })
+    ],
+    alignment: AlignmentType.BOTH, spacing: { before: 0, after: 160, ...LS }
+  }));
+  for (const [kind, text] of ASSESS_FRAMEWORK) {
+    if (kind === "p")  paragraphs.push(mkPara(text, { align: AlignmentType.BOTH, after: 160 }));
+    if (kind === "h")  paragraphs.push(mkPara(text, { bold: true, before: 160, after: 100, size: 24 }));
+    if (kind === "sh") paragraphs.push(mkPara(text, { bold: true, before: 120, after: 60 }));
+    if (kind === "b")  paragraphs.push(new Paragraph({
+      numbering: { reference: "assess-bullets", level: 0 },
+      children: [new TextRun({ text, size: 22 })],
+      alignment: AlignmentType.BOTH, spacing: { before: 20, after: 20, ...LS }
+    }));
+  }
+
+  // ── Assessment Results: the two charts ──
+  paragraphs.push(mkPara("Assessment Results", { heading: HeadingLevel.HEADING_2, before: 320, after: 140, size: 26, bold: true }));
+  const dayChart = assessmentDrawDayChart(collected.scored, collected.days,
+    `${student.name} (${nDays}-Day Assessment)`);
+  const avgChart = assessmentDrawAvgChart(collected.scored,
+    `${student.name} (Average of ${nDays} Day${nDays === 1 ? "" : "s"})`);
+  for (const chart of [dayChart, avgChart]) {
+    if (!chart) continue;
+    const dispW = 600;
+    paragraphs.push(new Paragraph({
+      children: [new ImageRun({ data: b64ToUint8(chart.base64),
+        transformation: { width: dispW, height: Math.round(dispW * chart.height / chart.width) }, type: "png" })],
+      alignment: AlignmentType.CENTER, spacing: { before: 80, after: 200 }
+    }));
+  }
+  if (!dayChart) {
+    paragraphs.push(mkPara("No scored targets were recorded during this assessment.", { italics: true, color: "6b7280" }));
+  }
+  if (collected.unscored.length) {
+    paragraphs.push(mkPara(
+      `Some targets, such as ${collected.unscored.length > 1
+        ? collected.unscored.slice(0, -1).join(", ") + " and " + collected.unscored[collected.unscored.length - 1]
+        : collected.unscored[0]}, are tracked through observations rather than scores, so they are not displayed in the charts.`,
+      { size: 22, color: "6b7280", italics: true, align: AlignmentType.BOTH, after: 0 }));
+  }
+
+  // ── Page 3: Section 2, one block per target in website order ──
+  paragraphs.push(mkPara("Section 2: Assessment Details", { heading: HeadingLevel.HEADING_1, before: 0, after: 200, pageBreak: true, size: 32, bold: true }));
+  collected.rows.forEach((r, i) => {
+    paragraphs.push(mkPara(r.target, { bold: true, size: 26, before: i === 0 ? 0 : 280, after: 60 }));
+    paragraphs.push(mkPara(
+      r.avg === null
+        ? `Tracked through observations rather than scores across the ${nDays} assessment day${nDays === 1 ? "" : "s"}.`
+        : `Average score across the ${nDays} assessment day${nDays === 1 ? "" : "s"}: ${r.avg}%`,
+      { color: "374151", after: 100 }));
+    const block = parsed.targets[r.target] || { strengths: [], weaknesses: [] };
+    const listOf = arr => arr.length ? arr : ["None noted during this assessment."];
+    paragraphs.push(mkPara("Strengths:", { bold: true, after: 40 }));
+    listOf(block.strengths).forEach(s => paragraphs.push(new Paragraph({
+      numbering: { reference: "assess-bullets", level: 0 },
+      children: [new TextRun({ text: s, size: 22 })],
+      alignment: AlignmentType.BOTH, spacing: { before: 20, after: 20, ...LS }
+    })));
+    paragraphs.push(mkPara("Weaknesses:", { bold: true, before: 80, after: 40 }));
+    listOf(block.weaknesses).forEach(s => paragraphs.push(new Paragraph({
+      numbering: { reference: "assess-bullets", level: 0 },
+      children: [new TextRun({ text: s, size: 22 })],
+      alignment: AlignmentType.BOTH, spacing: { before: 20, after: 20, ...LS }
+    })));
+  });
+
+  // ── Page 4: Section 3 ──
+  paragraphs.push(mkPara("Section 3: Recommendations", { heading: HeadingLevel.HEADING_1, before: 0, after: 200, pageBreak: true, size: 32, bold: true }));
+  const recs = parsed.recommendations.length ? parsed.recommendations
+    : ["No recommendations were generated. Please review the assessment data."];
+  recs.forEach(t => paragraphs.push(new Paragraph({
+    numbering: { reference: "assess-bullets", level: 0 },
+    children: [new TextRun({ text: t, size: 22, color: "6b7280" })],
+    alignment: AlignmentType.BOTH, spacing: { before: 40, after: 40, ...LS }
+  })));
+
+  const pageFooter = Footer ? new Footer({ children: [new Paragraph({
+    tabStops: [{ type: "center", position: 4750 }, { type: "right", position: 9500 }],
+    children: [
+      new TextRun({ text: "\t" }),
+      new TextRun({ text: "ZORA Behavioural Intervention", size: 22, color: "555555" }),
+      new TextRun({ text: "\t" }),
+      new TextRun({ children: [PageNumber.CURRENT], size: 22, color: "555555" })
+    ],
+    spacing: { before: 60, after: 0 }
+  })] }) : undefined;
+  const pageHeader = (Header && logoData) ? new Header({ children: [new Paragraph({
+    children: [new ImageRun({ data: logoData, transformation: { width: 180, height: 54 }, type: "png" })],
+    alignment: AlignmentType.RIGHT, spacing: { before: 0, after: 0 }
+  })] }) : undefined;
+
+  const doc = new Document({
+    numbering: { config: [{
+      reference: "assess-bullets",
+      levels: [{ level: 0, format: LevelFormat?.BULLET ?? "bullet", text: "", alignment: AlignmentType.LEFT,
+        style: { paragraph: { indent: { left: 720, hanging: 360 } },
+                 run: { fonts: { ascii: "Wingdings", hAnsi: "Wingdings", hint: "default" }, size: 22 } } }]
+    }] },
+    sections: [{
+      properties: { type: SectionType?.NEXT_PAGE ?? "nextPage" },
+      headers: pageHeader ? { default: pageHeader } : undefined,
+      footers: pageFooter ? { default: pageFooter } : undefined,
+      children: paragraphs
+    }]
+  });
+
+  const blob = await Packer.toBlob(doc);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `${student.name} Assessment Report ${reportDate}.docx`;
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -17595,7 +18213,6 @@ async function closeManageModal() {
   }
   // Always refresh all home screen sections
   renderExistingStudentButtons();
-  renderAssessmentStudentButtons();
   renderExportButtons();
   renderHalfYearReportsSection();
   renderGroupButtons();
