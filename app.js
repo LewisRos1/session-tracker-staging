@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1951";
+const APP_VERSION = "1952";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3945,8 +3945,8 @@ NEVER DEFINE AN ACHIEVEMENT BY WHAT ${firstName} CANNOT DO. Sentence 2 says what
   This is NOT a ban on the word "without". "Put on ${PRON.poss} shoes without any physical help" is RIGHT, because being able to do something unaided IS the achievement.
 
 WRITE IN PLAIN, EVERYDAY LANGUAGE. A parent should understand every sentence at normal reading speed, without stopping to work out what it means.
-  • Put the plain meaning FIRST and the professional term in brackets AFTER it, never the other way round.
-    RIGHT: "This shows ${PRON.subj} can spot small differences between pictures (visual discrimination), allowing ${PRON.obj} to learn harder topics later."
+  • Put the professional term FIRST and its plain meaning in brackets straight after it, so the parent is never left with a word they cannot decode.
+    RIGHT: "This shows ${PRON.poss} visual discrimination (spotting small differences between pictures) is strong enough to carry ${PRON.obj} into harder topics later."
     WRONG: "This supports ${PRON.poss} visual discrimination skills, an important building block for more complex learning tasks."
   • Not every point needs a bracketed term. Add one only where a genuine professional term applies.
   • STIFF WRITING IS THE BIGGER PROBLEM, not just technical words. Write "things ${PRON.subj} does not like", not "less preferred activities". Write "backing away", not "displaying avoidance behaviour".
@@ -6182,24 +6182,34 @@ function assessmentCollect(student, sessions, excludedActivities) {
 // horizontal room, so each target's column stays narrow and the whole canvas
 // stays close to the 600px it is placed at in Word — which is what actually
 // decides how big the text lands on the page.
-const ASSESS_LABEL_MAX = 88;
-const ASSESS_LABEL_DROP = Math.round(ASSESS_LABEL_MAX * 0.7071) + 14;
+// Both charts are placed in the document at this width, so a canvas that is
+// W px wide is scaled by 600/W before it reaches the page.
+const ASSESS_DISP_W = 600;
+
+/**
+ * The canvas font size that renders at a given POINT size in the document.
+ * A canvas pixel lands on the page at 0.75pt once the image is scaled to
+ * ASSESS_DISP_W, so this has to be derived from W rather than fixed: the same
+ * pixel value prints at a different size on every chart, because W grows with
+ * the number of targets. That is why fixed sizes kept coming out wrong.
+ */
+const assessFontPx = (pt, W) => Math.max(8, Math.round(pt * W / (ASSESS_DISP_W * 0.75)));
 
 /** Trim a target name to the angled-label budget, with an ellipsis if needed. */
-function assessTrimLabel(ctx, name) {
+function assessTrimLabel(ctx, name, maxW) {
   let t = String(name || "");
-  if (ctx.measureText(t).width <= ASSESS_LABEL_MAX) return t;
-  while (t.length > 3 && ctx.measureText(t + "…").width > ASSESS_LABEL_MAX) t = t.slice(0, -1);
+  if (ctx.measureText(t).width <= maxW) return t;
+  while (t.length > 3 && ctx.measureText(t + "…").width > maxW) t = t.slice(0, -1);
   return t + "…";
 }
 
 /** Draw one 45-degree x-axis label, ending at the tick it belongs to. */
-function assessDrawAngledLabel(ctx, name, cx, y) {
+function assessDrawAngledLabel(ctx, name, cx, y, maxW) {
   ctx.save();
   ctx.translate(cx, y);
   ctx.rotate(-Math.PI / 4);
   ctx.textAlign = "right";
-  ctx.fillText(assessTrimLabel(ctx, name), 0, 0);
+  ctx.fillText(assessTrimLabel(ctx, name, maxW), 0, 0);
   ctx.restore();
 }
 
@@ -6207,15 +6217,24 @@ function assessDrawAngledLabel(ctx, name, cx, y) {
 function assessmentDrawDayChart(scored, days, title) {
   if (!scored.length || !days.length) return null;
   const SCALE = 2, PLOT_H = 300;
-  const F_TITLE = 13, F_AXIS = 11, F_LABEL = 10, F_VALUE = 8, F_LEGEND = 10;
-  // Left padding only has to clear the rotated "Score", since there are no
-  // tick labels — which is what keeps the axis title tight against the plot.
-  const PAD = { top: 62, right: 30, bottom: ASSESS_LABEL_DROP + 78, left: 52 };
   const barW = days.length <= 2 ? 26 : days.length === 3 ? 19 : 14;
   const gap  = 7;
   const inner = days.length * barW + (days.length - 1) * gap;
   const slot = Math.max(76, inner + 18);
-  const W = Math.max(560, PAD.left + PAD.right + slot * scored.length);
+
+  // Width first, because every font size is derived from it. One pass at a
+  // provisional left padding, then again once the label budget is known.
+  let padL = 52;
+  let W = Math.max(560, padL + 30 + slot * scored.length);
+  let F_BODY = assessFontPx(11, W);
+  const labelMax = Math.round(F_BODY * 8.5);
+  const drop = Math.round(labelMax * 0.7071) + 14;
+  padL = Math.max(52, Math.round(24 + labelMax * 0.7071 - slot / 2));
+  W = Math.max(560, padL + 30 + slot * scored.length);
+  F_BODY = assessFontPx(11, W);
+  const F_TITLE = assessFontPx(16, W);
+
+  const PAD = { top: Math.round(F_TITLE * 2.4), right: 30, bottom: drop + Math.round(F_BODY * 4.4), left: padL };
   const H = PAD.top + PLOT_H + PAD.bottom;
 
   const canvas = document.createElement("canvas");
@@ -6225,7 +6244,7 @@ function assessmentDrawDayChart(scored, days, title) {
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
 
   ctx.font = `bold ${F_TITLE}px Arial`; ctx.fillStyle = "#111827"; ctx.textAlign = "center";
-  ctx.fillText(title, W / 2, 36);
+  ctx.fillText(title, W / 2, Math.round(F_TITLE * 1.5));
 
   const base = PAD.top + PLOT_H;
   ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
@@ -6236,6 +6255,11 @@ function assessmentDrawDayChart(scored, days, title) {
   ctx.strokeStyle = "#9ca3af";
   ctx.beginPath(); ctx.moveTo(PAD.left, base + 0.5); ctx.lineTo(W - PAD.right, base + 0.5); ctx.stroke();
 
+  // At 11pt two "100%" labels can be wider than the pair of bars they sit on.
+  // Where that happens, lift every second one so they cannot collide.
+  ctx.font = `bold ${F_BODY}px Arial`;
+  const stagger = days.length > 1 && ctx.measureText("100%").width > (barW + gap);
+
   scored.forEach((r, i) => {
     const cx = PAD.left + slot * i + slot / 2;
     let x = cx - inner / 2;
@@ -6245,29 +6269,30 @@ function assessmentDrawDayChart(scored, days, title) {
         const h = Math.max(2, PLOT_H * v / 100);
         ctx.fillStyle = ASSESS_DAY_COLORS[di % ASSESS_DAY_COLORS.length];
         ctx.fillRect(x, base - h, barW, h);
-        ctx.fillStyle = "#111827"; ctx.font = `bold ${F_VALUE}px Arial`; ctx.textAlign = "center";
-        ctx.fillText(`${v}%`, x + barW / 2, base - h - 6);
+        ctx.fillStyle = "#111827"; ctx.font = `bold ${F_BODY}px Arial`; ctx.textAlign = "center";
+        const lift = (stagger && di % 2 === 1) ? F_BODY + 4 : 0;
+        ctx.fillText(`${v}%`, x + barW / 2, base - h - 6 - lift);
       }
       x += barW + gap;
     });
-    ctx.font = `${F_LABEL}px Arial`; ctx.fillStyle = "#374151";
-    assessDrawAngledLabel(ctx, r.target, cx, base + 16);
+    ctx.font = `${F_BODY}px Arial`; ctx.fillStyle = "#374151";
+    assessDrawAngledLabel(ctx, r.target, cx, base + 16, labelMax);
   });
 
   ctx.save();
-  ctx.translate(16, PAD.top + PLOT_H / 2); ctx.rotate(-Math.PI / 2);
-  ctx.font = `bold ${F_AXIS}px Arial`; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
+  ctx.translate(Math.round(F_BODY), PAD.top + PLOT_H / 2); ctx.rotate(-Math.PI / 2);
+  ctx.font = `bold ${F_BODY}px Arial`; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
   ctx.fillText("Score", 0, 0);
   ctx.restore();
-  ctx.font = `bold ${F_AXIS}px Arial`; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
-  ctx.fillText("Target", W / 2, base + ASSESS_LABEL_DROP + 30);
+  ctx.font = `bold ${F_BODY}px Arial`; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
+  ctx.fillText("Target", W / 2, base + drop + Math.round(F_BODY * 1.6));
 
-  ctx.font = `${F_LEGEND}px Arial`;
-  const BOX = 18, G = 8, SP = 26;
+  ctx.font = `${F_BODY}px Arial`;
+  const BOX = F_BODY, G = Math.round(F_BODY * 0.5), SP = Math.round(F_BODY * 1.4);
   const widths = days.map(d => BOX + G + ctx.measureText(d.label).width);
   const total = widths.reduce((a, b) => a + b, 0) + SP * (days.length - 1);
   let lx = (W - total) / 2;
-  const ly = base + ASSESS_LABEL_DROP + 64;
+  const ly = base + drop + Math.round(F_BODY * 3.4);
   days.forEach((d, di) => {
     ctx.fillStyle = ASSESS_DAY_COLORS[di % ASSESS_DAY_COLORS.length];
     ctx.fillRect(lx, ly - BOX + 3, BOX, BOX);
@@ -6283,10 +6308,19 @@ function assessmentDrawDayChart(scored, days, title) {
 function assessmentDrawAvgChart(scored, title) {
   if (!scored.length) return null;
   const SCALE = 2, PLOT_H = 300;
-  const F_TITLE = 13, F_AXIS = 11, F_LABEL = 10, F_VALUE = 10;
-  const PAD = { top: 62, right: 30, bottom: ASSESS_LABEL_DROP + 44, left: 52 };
   const slot = 76, barW = 34;
-  const W = Math.max(560, PAD.left + PAD.right + slot * scored.length);
+
+  let padL = 52;
+  let W = Math.max(560, padL + 30 + slot * scored.length);
+  let F_BODY = assessFontPx(11, W);
+  const labelMax = Math.round(F_BODY * 8.5);
+  const drop = Math.round(labelMax * 0.7071) + 14;
+  padL = Math.max(52, Math.round(24 + labelMax * 0.7071 - slot / 2));
+  W = Math.max(560, padL + 30 + slot * scored.length);
+  F_BODY = assessFontPx(11, W);
+  const F_TITLE = assessFontPx(16, W);
+
+  const PAD = { top: Math.round(F_TITLE * 2.4), right: 30, bottom: drop + Math.round(F_BODY * 2.4), left: padL };
   const H = PAD.top + PLOT_H + PAD.bottom;
 
   const canvas = document.createElement("canvas");
@@ -6296,7 +6330,7 @@ function assessmentDrawAvgChart(scored, title) {
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
 
   ctx.font = `bold ${F_TITLE}px Arial`; ctx.fillStyle = "#111827"; ctx.textAlign = "center";
-  ctx.fillText(title, W / 2, 36);
+  ctx.fillText(title, W / 2, Math.round(F_TITLE * 1.5));
 
   const base = PAD.top + PLOT_H;
   ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
@@ -6312,60 +6346,22 @@ function assessmentDrawAvgChart(scored, title) {
     const h = Math.max(2, PLOT_H * r.avg / 100);
     ctx.fillStyle = ASSESS_AVG_COLOR;
     ctx.fillRect(cx - barW / 2, base - h, barW, h);
-    ctx.fillStyle = "#111827"; ctx.font = `bold ${F_VALUE}px Arial`; ctx.textAlign = "center";
+    ctx.fillStyle = "#111827"; ctx.font = `bold ${F_BODY}px Arial`; ctx.textAlign = "center";
     ctx.fillText(`${r.avg}%`, cx, base - h - 6);
-    ctx.font = `${F_LABEL}px Arial`; ctx.fillStyle = "#374151";
-    assessDrawAngledLabel(ctx, r.target, cx, base + 16);
+    ctx.font = `${F_BODY}px Arial`; ctx.fillStyle = "#374151";
+    assessDrawAngledLabel(ctx, r.target, cx, base + 16, labelMax);
   });
 
   ctx.save();
-  ctx.translate(16, PAD.top + PLOT_H / 2); ctx.rotate(-Math.PI / 2);
-  ctx.font = `bold ${F_AXIS}px Arial`; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
+  ctx.translate(Math.round(F_BODY), PAD.top + PLOT_H / 2); ctx.rotate(-Math.PI / 2);
+  ctx.font = `bold ${F_BODY}px Arial`; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
   ctx.fillText("Score", 0, 0);
   ctx.restore();
-  ctx.font = `bold ${F_AXIS}px Arial`; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
-  ctx.fillText("Target", W / 2, base + ASSESS_LABEL_DROP + 30);
+  ctx.font = `bold ${F_BODY}px Arial`; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
+  ctx.fillText("Target", W / 2, base + drop + Math.round(F_BODY * 1.6));
 
   return { base64: canvas.toDataURL("image/png").split(",")[1], width: W, height: H };
 }
-
-/** The fixed framework text. Identical for every child, so it lives here. */
-const ASSESS_FRAMEWORK = [
-  ["p", "This assessment is facilitated using the Functional Emotional Capacity (FEDC) assessment to establish the six levels of Developmental Functional Emotional Capacity, as well as Learning Capacity, to set the baseline for the social-emotional skills and communication program."],
-  ["h", "A. Functional Emotional Capacity (FEDC)"],
-  ["sh", "FEDC 1: Shared Attention & Regulation"],
-  ["b", "This child's capacity to show interest in various toys and sensory objects in the environment and with the instructor."],
-  ["b", "The ability to stay calm when engaging in the environment."],
-  ["b", "The ability to recover from distress within 20 min."],
-  ["sh", "FEDC 2: Engagement and Relating"],
-  ["b", "The child's ability to respond to the engagement of the adult."],
-  ["b", "The child's participation in play and other reactions during various activities."],
-  ["b", "The child displays emotions in various events."],
-  ["sh", "FEDC 3: Becoming a Two-Way Intentional Communicator"],
-  ["b", "The communication between the child and others."],
-  ["b", "The child's initiation to interact with others in the environment."],
-  ["b", "The demonstration of various emotions: closeness, pleasure, excitement, assertive curiosity, protest, anger and fear."],
-  ["sh", "FEDC 4: Purposeful Communication"],
-  ["b", "Complex communication and shared problem-solving by combining gestures, words and emotions."],
-  ["sh", "FEDC 5: Using Symbols and Creating Emotional Ideas and Elaboration"],
-  ["b", "Creating emotional ideas through imagination and play."],
-  ["b", "Express ideas derived from intent and combine with reality-based actions."],
-  ["b", "Elaborate on ideas in verbal and imaginary play sequences."],
-  ["b", "Pretend to assume different roles and predict how others feel or act in certain situations."],
-  ["sh", "FEDC 6: Emotional Thinking and Logic"],
-  ["b", "Making connections between ideas through seeking opinions, discussion, and debate while expanding pretend play."],
-  ["h", "B. Learning Capacity"],
-  ["sh", "Attending"],
-  ["b", "Eye contact"], ["b", "Wait"], ["b", "Transition"],
-  ["b", "Joint attention"], ["b", "Follow a point"], ["b", "Follow eye gaze"],
-  ["p", "These attending skills were observed during indoor play activities. Transitions were noted between preferred activities and structured table tasks within the indoor environment."],
-  ["sh", "School Readiness Skills"],
-  ["n", "1) Expressive Language"],
-  ["b", "Sequence"], ["b", "Preposition"], ["b", "Cause and Effect"],
-  ["b", "Using 'Wh' questions: where, what, when, why of a topic"], ["b", "Pronouns"],
-  ["n", "2) Receptive Language"],
-  ["b", "Following two-step instructions"], ["b", "Mathematics concepts"]
-];
 
 /** Pulls the per-target strengths/weaknesses and the recommendations out. */
 function assessmentParseAiResponse(text) {
@@ -6459,13 +6455,12 @@ ABSOLUTE, THIS IS A BASELINE:
 
 Follow the GLOBAL RULES above on every sentence, including plain everyday language, the ban on inventing a scene, and never defining an ability by what ${firstName} cannot do.
 
-ABSOLUTE, PLAIN MEANING FIRST AND THE PROFESSIONAL TERM AFTER IT IN BRACKETS. This report is read by parents with no training in this field. Putting the meaning first means they already understand the idea by the time they reach the term, so it reads as confirmation instead of homework. Never the other way round.
-  Right: "He stayed within the boundaries he was given (limit setting), playing boldly with the sand without spreading it around."
-  Right: "This shows he can manage his own feelings (self-regulation) well enough to recover his mood."
-  Wrong, term first with no explanation: "He demonstrated limit setting by playing boldly with the sand." A parent does not know what limit setting is.
-  Wrong, term first with the meaning behind it: "He demonstrated limit setting (staying within the boundaries) by playing boldly with the sand." The parent still meets the unknown term first and has to stop.
-  Terms that ALWAYS need this treatment include, and are not limited to: limit setting, joint attention, self-regulation, receptive language, expressive language, visual discrimination, generalisation, prompting, prompt fading, shared attention, reciprocal interaction, symbolic play, co-regulation, sensory seeking, sensory processing.
-  Keep the bracket to the term itself, not a definition. If you cannot say the idea in plain words, do not use the term at all: describe what ${PRON.subj} actually did instead.
+ABSOLUTE, EVERY PROFESSIONAL TERM CARRIES ITS PLAIN MEANING IN BRACKETS STRAIGHT AFTER IT. This report is read by parents with no training in this field. The moment you use a word someone outside the profession would not know, put what it means in brackets immediately after it. No exceptions, and never assume a term is common knowledge because it is common in your field.
+  Right: "He demonstrated limit setting (staying within the boundaries he was given) by playing boldly with the sand without spreading it around."
+  Right: "This shows an emerging ability to use self-regulation (managing his own feelings) to recover his mood."
+  Wrong: "He demonstrated limit setting by playing boldly with the sand." A parent does not know what limit setting is.
+  Terms that ALWAYS need a bracket include, and are not limited to: limit setting, joint attention, self-regulation, receptive language, expressive language, visual discrimination, generalisation, prompting, prompt fading, shared attention, reciprocal interaction, symbolic play, co-regulation, sensory seeking, sensory processing.
+  Keep the bracket short, a few plain words rather than a definition. If you cannot explain it in plain words, do not use the term at all: describe what ${PRON.subj} actually did instead.
 
 Provide ONLY the following sections using EXACTLY these markers. No extra text outside markers.
 
@@ -6969,10 +6964,10 @@ NEVER DEFINE AN ACHIEVEMENT BY WHAT ${firstName} CANNOT DO. Sentence 2 says what
   This is NOT a ban on the word "without". "Put on ${PRON.poss} shoes without any physical help" is RIGHT, because being able to do something unaided IS the achievement. The rule is about naming a skill ${PRON.subj} does not have in order to explain one ${PRON.subj} does.
 
 WRITE IN PLAIN, EVERYDAY LANGUAGE. A parent should understand every sentence at normal reading speed, without stopping to work out what it means.
-  • Put the plain meaning FIRST and the professional term in brackets AFTER it, never the other way round. By the time the parent reaches the term they already understand it, so it reads as confirmation instead of homework.
-    RIGHT: "This shows ${PRON.subj} is learning to recognise more of the animals ${PRON.subj} sees around ${PRON.obj} (receptive vocabulary)."
-    WRONG: "This reflects developing receptive vocabulary for identifying familiar animal pictures."
-    RIGHT: "This shows ${PRON.subj} can spot small differences between pictures (visual discrimination), allowing ${PRON.obj} to learn harder topics later."
+  • Put the professional term FIRST and its plain meaning in brackets straight after it, so the parent is never left with a word they cannot decode.
+    RIGHT: "This shows ${PRON.subj} is building receptive vocabulary (recognising more of the animals ${PRON.subj} sees around ${PRON.obj})."
+    WRONG: "This reflects developing receptive vocabulary for identifying familiar animal pictures." The term is left standing with nothing to explain it.
+    RIGHT: "This shows ${PRON.poss} visual discrimination (spotting small differences between pictures) is strong enough to carry ${PRON.obj} into harder topics later."
     WRONG: "This supports ${PRON.poss} visual discrimination skills, an important building block for more complex learning tasks."
   • Not every point needs a bracketed term. Add one only where a genuine professional term applies. Never reach for one just to sound clinical.
   • STIFF WRITING IS THE BIGGER PROBLEM, not just technical words. Ordinary ideas written in a clinical register are just as tiring to read.
