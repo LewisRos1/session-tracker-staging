@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1957";
+const APP_VERSION = "1958";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -16760,7 +16760,6 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
             <td class="vcol-score" contenteditable="false">&nbsp;</td>
           </tr>`;
           firstRowOverall = false;
-          firstInRound = false;
           continue;
         }
         // opts.length > 0 — show inline select/multi UI directly
@@ -16814,7 +16813,6 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
           <td class="vcol-score" contenteditable="false">&nbsp;</td>
         </tr>`;
         firstRowOverall = false;
-        firstInRound = false;
         continue;
       }
 
