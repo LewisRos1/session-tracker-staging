@@ -108,7 +108,7 @@ import {
 import {
   exportStudentData, exportAllStudents, exportGroupMemberData,
   exportStudentSingleSessionWord, exportGroupMemberSingleSessionWord,
-  renderActivityBreakdownChart, calcDailyAverage
+  renderActivityBreakdownChart, calcDailyAverage, scoresPct
 } from "./export.js";
 
 // ── SW update detection — must run at parse time, before DOMContentLoaded,
@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1970";
+const APP_VERSION = "1971";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -4546,7 +4546,8 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
               const _pct = parseManualScore(hyrStripHtml(rem.text || "").trim());
               avg = _pct !== null ? Math.round(_pct) : null;
             } else {
-              avg = trials.length > 0 ? Math.round(trials.reduce((a, b) => a + b, 0) / (trials.length * (target.maxPoints || 3)) * 100) : null;
+              const _p = scoresPct(trials, target.maxPoints);
+              avg = _p === null ? null : Math.round(_p);
             }
             const _hText = hyrStripHtml(rem.text || "");
             const _hNote = hyrStripHtml(rem.masteryNote || "").trim();
@@ -4683,7 +4684,9 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
           const trials = (rem.trials || []).filter(t => t !== -1);
           if (rem.optionScore !== undefined) trials.push(rem.optionScore);
           if (!trials.length) continue;
-          const avg = Math.round(trials.reduce((a, b) => a + b, 0) / (trials.length * (target.maxPoints || 3)) * 100);
+          const _pA = scoresPct(trials, target.maxPoints);
+          if (_pA === null) continue;
+          const avg = Math.round(_pA);
           const [, m] = sess.date.split("-").map(Number);
           const mLabel = shortMonths[m - 1];
           if (!monthly[mLabel]) monthly[mLabel] = [];
@@ -7680,7 +7683,8 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
             const _pct = parseManualScore(hyrStripHtml(rem.text || "").trim());
             avg = _pct !== null ? Math.round(_pct) : null;
           } else {
-            avg = trials.length ? Math.round(trials.reduce((a,b)=>a+b,0)/(trials.length*(target.maxPoints||3))*100) : null;
+            const _pM = scoresPct(trials, target.maxPoints);
+            avg = _pM === null ? null : Math.round(_pM);
           }
           const text = hyrStripHtml(rem.text || "");
           const _mNote = hyrStripHtml(rem.masteryNote || "").trim();
@@ -7721,7 +7725,8 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
               const p = parseManualScore(hyrStripHtml(r.text || "").trim());
               if (p !== null) wScores.push(Math.round(p));
             } else if (wt.length) {
-              wScores.push(Math.round(wt.reduce((a,b)=>a+b,0)/(wt.length*(target.maxPoints||3))*100));
+              const _pW = scoresPct(wt, target.maxPoints);
+              if (_pW !== null) wScores.push(Math.round(_pW));
             }
           }
         }
@@ -10374,7 +10379,8 @@ function calcDaysAverage(target, visited = new Set()) {
       const trials = (rem.trials || []).filter(t => t !== -1);
       const allScores = rem.optionScore !== undefined ? [...trials, rem.optionScore] : trials;
       if (allScores.length === 0) continue;
-      avgs.push(allScores.reduce((a, b) => a + b, 0) / (allScores.length * maxPts) * 100);
+      const _pS = scoresPct(allScores, maxPts);
+      if (_pS !== null) avgs.push(_pS);
     }
   }
   return avgs.length > 0 ? Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length) : null;
@@ -14801,7 +14807,7 @@ function calcViewTrialSummary(trials, maxPts, optionScore = undefined) {
   if (optionScore !== undefined) validTrials.push(optionScore);
   const total       = validTrials.reduce((a, b) => a + b, 0);
   const scorePct    = validTrials.length > 0
-    ? Math.round(total / (validTrials.length * maxPts) * 100) + "%" : "";
+    ? Math.round(scoresPct(validTrials, maxPts)) + "%" : "";
   return { validTrials, total, scorePct };
 }
 
@@ -15029,7 +15035,8 @@ function calcViewDayAvg(data, target, visited = new Set()) {
         const trials = (rem.trials || []).filter(t => t !== -1);
         const allScores = rem.optionScore !== undefined ? [...trials, rem.optionScore] : trials;
         if (!allScores.length) return;
-        avgs.push(allScores.reduce((a, b) => a + b, 0) / (allScores.length * (target.maxPoints || 3)) * 100);
+        const _pV = scoresPct(allScores, target.maxPoints);
+        if (_pV !== null) avgs.push(_pV);
       });
     });
   return avgs.length ? Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length) : null;
@@ -20025,13 +20032,6 @@ function renderTargetManageContent(student, target) {
       <label class="admin-label">Target Name</label>
       <input class="admin-input" id="mn-t-name" value="${escHtml(target.name)}" />
     </div>
-    <div class="admin-section admin-row">
-      <label class="admin-label">Max Points</label>
-      <div class="admin-pts-group">
-        <button class="admin-pts-btn ${target.maxPoints !== 4 ? "active" : ""}" data-pts="3">3</button>
-        <button class="admin-pts-btn ${target.maxPoints === 4 ? "active" : ""}" data-pts="4">4</button>
-      </div>
-    </div>
     ${_groupForTargetEdit ? `
     <div class="admin-section">
       <div class="admin-label-row">
@@ -20757,21 +20757,6 @@ function renderTargetManageContent(student, target) {
   });
   $("mn-t-name").addEventListener("keydown", e => {
     if (e.key === "Enter") { e.preventDefault(); $("mn-t-name").blur(); }
-  });
-
-  // [data-pts] keeps this to the real Max Points buttons. Other controls have
-  // reused .admin-pts-btn for its styling and been caught here before,
-  // setting maxPoints to NaN.
-  $("manage-modal-body").querySelectorAll(".admin-pts-btn[data-pts]").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const newPts = Number(btn.dataset.pts);
-      if (newPts === target.maxPoints) return;
-      if (!confirm(`Change max points to ${newPts}? This will affect how scores are calculated for this target.`)) return;
-      target.maxPoints = newPts;
-      $("manage-modal-body").querySelectorAll(".admin-pts-btn[data-pts]").forEach(b =>
-        b.classList.toggle("active", b.dataset.pts === btn.dataset.pts));
-      await saveTarget();
-    });
   });
 
 
@@ -23000,13 +22985,6 @@ function renderTemplateManageContent(template) {
       <label class="admin-label">Template Name</label>
       <input class="admin-input" id="mn-t-name" value="${escHtml(template.name)}" />
     </div>
-    <div class="admin-section admin-row">
-      <label class="admin-label">Max Points</label>
-      <div class="admin-pts-group">
-        <button class="admin-pts-btn ${(template.maxPoints || 3) !== 4 ? "active" : ""}" data-pts="3">3</button>
-        <button class="admin-pts-btn ${(template.maxPoints || 3) === 4 ? "active" : ""}" data-pts="4">4</button>
-      </div>
-    </div>
 
     <div class="admin-section-title">Activities & Notes</div>
     <div class="admin-list" id="mn-act-list">`;
@@ -23540,19 +23518,6 @@ function renderTemplateManageContent(template) {
     if (e.key === "Enter") { e.preventDefault(); $("mn-t-name").blur(); }
   });
 
-  // [data-pts] keeps this to the real Max Points buttons. Other controls have
-  // reused .admin-pts-btn for its styling and been caught here before,
-  // setting maxPoints to NaN.
-  $("manage-modal-body").querySelectorAll(".admin-pts-btn[data-pts]").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const newPts = Number(btn.dataset.pts);
-      if (newPts === (template.maxPoints || 3)) return;
-      template.maxPoints = newPts;
-      $("manage-modal-body").querySelectorAll(".admin-pts-btn[data-pts]").forEach(b =>
-        b.classList.toggle("active", b.dataset.pts === btn.dataset.pts));
-      await saveTemplateFn();
-    });
-  });
 
 
   acts.forEach((a, idx) => {
@@ -25955,7 +25920,8 @@ function calcGroupStudentDaysAverage(target, data, studentName, visited = new Se
       const trials = (r.trials || []).filter(t => t !== -1);
       const allScores = r.optionScore !== undefined ? [...trials, r.optionScore] : trials;
       if (allScores.length === 0) continue;
-      avgs.push(allScores.reduce((a, b) => a + b, 0) / (allScores.length * maxPts) * 100);
+      const _pS = scoresPct(allScores, maxPts);
+      if (_pS !== null) avgs.push(_pS);
     }
   }
   return avgs.length > 0 ? Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length) : null;

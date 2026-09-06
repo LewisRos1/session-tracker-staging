@@ -1167,7 +1167,8 @@ function addActivityBreakdownHalfSheets(wb, allTargets, sessions) {
           for (const rem of getRemarksForActivity(sess, actId)) {
             const scores = allScores(rem);
             if (scores.length === 0) continue;
-            const pct = scores.reduce((a, b) => a + b, 0) / (scores.length * mp) * 100;
+            const pct = scoresPct(scores, mp);
+            if (pct === null) continue;
             if (!monthBuckets[sess.month]) monthBuckets[sess.month] = [];
             monthBuckets[sess.month].push(pct);
           }
@@ -1361,7 +1362,8 @@ function addActivityScoreSheet(wb, allTargets, sessions) {
         for (const rem of getRemarksForActivity(sess, actId)) {
           const s = allScores(rem);
           if (s.length === 0) continue;
-          remScores.push(s.reduce((a, b) => a + b, 0) / (s.length * mp) * 100);
+          const _sPct = scoresPct(s, mp);
+          if (_sPct !== null) remScores.push(_sPct);
         }
         if (remScores.length === 0) continue;
 
@@ -3226,12 +3228,47 @@ function allScores(rem) {
   return valid;
 }
 
-function calcRemarkAvg(trials, maxPoints) {
-  if (!trials || trials.length === 0) return null;
-  const valid = trials.filter(t => t !== -1);
-  if (valid.length === 0) return null;
+// ─── TRIAL SCORING ───────────────────────────────────────────
+// A trial is scored 0-3, and the scale is deliberately NOT proportional: only a
+// 3 means the child managed it unaided, so it is worth double a 2 rather than
+// one notch above it. Everything in the app that turns trials into a percentage
+// goes through here; the formula used to be written out in nine separate places
+// and that is exactly how two of them would eventually disagree.
+//
+//   0 mark  ->   0%      2 marks ->  50%
+//   1 mark  ->  25%      3 marks -> 100%
+//
+// Option-based activities can award half a point, so values in between are
+// interpolated: 1.5 sits halfway between 25% and 50%, giving 37.5%.
+const TRIAL_PCT_3 = [0, 25, 50, 100];
+
+export function trialPct(score, maxPoints = 3) {
   const mp = maxPoints || 3;
-  return valid.reduce((a, b) => a + b, 0) / (valid.length * mp) * 100;
+  const s = Number(score);
+  if (!Number.isFinite(s)) return null;
+  // Anything not on the 3-point scale keeps the old straight proportion. No
+  // target uses that today, but a session recorded years ago carries its own
+  // maxPoints in its snapshot and must not be silently rescored.
+  if (mp !== 3) return Math.max(0, Math.min(100, (s / mp) * 100));
+  const c = Math.max(0, Math.min(3, s));
+  const lo = Math.floor(c);
+  if (lo === c) return TRIAL_PCT_3[lo];
+  return TRIAL_PCT_3[lo] + (TRIAL_PCT_3[lo + 1] - TRIAL_PCT_3[lo]) * (c - lo);
+}
+
+/** Mean percentage across a list of trial scores. -1 means "not attempted". */
+export function scoresPct(scores, maxPoints = 3) {
+  if (!scores || scores.length === 0) return null;
+  const pcts = scores
+    .filter(t => t !== -1 && t !== null && t !== undefined)
+    .map(t => trialPct(t, maxPoints))
+    .filter(p => p !== null);
+  if (pcts.length === 0) return null;
+  return pcts.reduce((a, b) => a + b, 0) / pcts.length;
+}
+
+function calcRemarkAvg(trials, maxPoints) {
+  return scoresPct(trials, maxPoints);
 }
 
 // visited guards against a circular mapping chain recursing forever — direct
