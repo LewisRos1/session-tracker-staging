@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1966";
+const APP_VERSION = "1967";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -7251,7 +7251,6 @@ async function monthlyGenerate() {
     const { threeMonthData, miniData, aiData, sessionCount, threeMonthPeriodLabel, oneMonthPeriodLabel } = collected;
 
     const activeTargets = (effectiveStudent.targets || []).filter(t => !t.isArchived && !t.isStopped);
-    const focusTargets = activeTargets.filter(t => miniData[t.name]?.trend !== "up");
     const excludedList = excludedActivities.size > 0
       ? [...excludedActivities].map(k => { const [t, a] = k.split("|"); return `  - ${a} (under target: ${t})`; }).join("\n")
       : null;
@@ -8091,7 +8090,6 @@ function monthlyDrawMiniVerticalBar(lastLabel, lastAvg, thisLabel, thisAvg) {
 async function monthlyDownloadWord(student, year, month, monthName, sessionCount, threeMonthData, miniData, parsed, masteredThisMonth, comparisonHeading, sessionType = "individual") {
   const firstName = student.preferredName || student.name.split(" ")[0];
   const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
-  const focusTargets = activeTargets.filter(t => miniData[t.name]?.trend !== "up");
   const reportDate = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun, LevelFormat,
