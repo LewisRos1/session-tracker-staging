@@ -1725,7 +1725,8 @@ input.field-input::placeholder {
    happens to be open, which is why those rules carry !important. */
 .mn-act-compact-title {
   display: block;
-  font-size: .9rem;
+  font-size: .93rem;   /* matches .admin-input, so the header reads at the same
+                          size as the title typed into the box below it */
   font-weight: 600;
   color: #374151;
   padding: .05rem 0;

@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1969";
+const APP_VERSION = "1970";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -11500,7 +11500,7 @@ function paDisplayName(pa) {
 
 // Returns the HTML to display a predefined activity's title (with checkbox-style
 // bold/underline from pa.isBold/pa.isUnderline) and optional details below.
-function paDisplayHtml(pa, showPlaceholder = false) {
+function paDisplayHtml(pa, showPlaceholder = false, titleOnly = false) {
   // pa.title → first line only (empty = nothing shown on line 1, or placeholder on session screen).
   // pa.name  → always the details/second line when non-empty.
   const titleText = (pa.title || "").trim();
@@ -11515,7 +11515,10 @@ function paDisplayHtml(pa, showPlaceholder = false) {
   } else if (showPlaceholder) {
     html = `<span style="font-style:italic;color:#9ca3af;font-size:.85rem">&lt;Please give this activity a title in Edit Target&gt;</span>`;
   }
-  const detailsText = (pa.name || "").trim();
+  // Edit Target's collapsed header wants the title alone: the details are right
+  // there in the card once it is opened, and repeating them made the header two
+  // lines deep for every activity in the list.
+  const detailsText = titleOnly ? "" : (pa.name || "").trim();
   if (detailsText && detailsText !== titleText) {
     html += `<span style="display:block;margin-top:.1rem;font-weight:400;text-decoration:none">${formatActivityMarkup(detailsText)}</span>`;
   }
@@ -19817,7 +19820,7 @@ function mnInitActivityCollapse(bodyEl, acts) {
     col.style.cssText = "flex:1;min-width:0;display:flex;flex-direction:column;gap:.3rem";
     const title = document.createElement("div");
     title.className = "mn-act-compact-title";
-    title.innerHTML = a ? formatActivityMarkup(a.title || a.name || "") : "";
+    title.innerHTML = a ? paDisplayHtml(a, false, true) : "";
     body.parentElement.insertBefore(col, body);
     col.appendChild(title);
     col.appendChild(body);
@@ -20239,7 +20242,7 @@ function renderTargetManageContent(student, target) {
           <div style="flex:1;min-width:0;display:flex;gap:.5rem;align-items:flex-start">
             <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;min-width:1.6rem;padding-top:.2rem">${manageActNo})</span>
             <div style="flex:1;min-width:0">
-              <div class="mn-act-compact-title">${paDisplayHtml(a, true)}</div>
+              <div class="mn-act-compact-title">${paDisplayHtml(a, false, true)}</div>
               ${subActs.length ? `<div class="mn-sub-compact-list" data-parent-key="${escHtml(_paKey || "")}">${subActs.map((sub, si) =>
                 `<div class="mn-sub-compact" data-idx="${acts.indexOf(sub)}"><span class="drag-handle" style="font-size:.95rem">⠿</span>${String.fromCharCode(97 + si)}) ${formatActivityMarkup(sub.title || sub.name || "")}</div>`
               ).join("")}</div>` : ""}
@@ -20289,7 +20292,7 @@ function renderTargetManageContent(student, target) {
           <div style="flex:1;min-width:0;display:flex;gap:.5rem;align-items:flex-start">
             <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;min-width:1.6rem;padding-top:.2rem">${manageActNo})</span>
             <div style="flex:1;min-width:0">
-              <div class="mn-act-compact-title">${paDisplayHtml(a, true)}</div>
+              <div class="mn-act-compact-title">${paDisplayHtml(a, false, true)}</div>
               <div class="mn-act-body" style="display:flex;flex-direction:column;gap:.55rem">
               <div style="display:flex;gap:.6rem;align-items:flex-start">
                 <div style="flex-shrink:0">
@@ -23104,7 +23107,7 @@ function renderTemplateManageContent(template) {
       html += `<div class="admin-list-item" data-idx="${idx}"${actItemStyle}>
         <span class="drag-handle">⠿</span>
         <div style="flex:1;min-width:0">
-          <div class="mn-act-compact-title">${paDisplayHtml(a, true)}</div>
+          <div class="mn-act-compact-title">${paDisplayHtml(a, false, true)}</div>
           <div class="mn-act-body" style="display:flex;flex-direction:column;gap:.3rem">
           <div style="display:flex;align-items:center;gap:.4rem">
             <span style="font-size:.8rem;font-weight:700;color:#6b7280;white-space:nowrap">Start Date:</span>
