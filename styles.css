@@ -1719,8 +1719,7 @@ input.field-input::placeholder {
   border-radius: var(--radius-sm);
 }
 /* Edit Target activities open COLLAPSED and expand one at a time. The title row
-   is the toggle and stays visible either way, so it reads as the card's header;
-   .mn-collapse-btn beside the kebab does the same job from the other end.
+   is the toggle and stays visible either way, so it reads as the card's header.
    .is-reordering forces the compact look for the duration of a drag, whatever
    happens to be open, which is why those rules carry !important. */
 .mn-act-compact-title {
@@ -1739,32 +1738,39 @@ input.field-input::placeholder {
 .mn-act-compact-title:hover { color: #4338ca; }
 .mn-act-body { display: none !important; }
 .mn-sub-compact-list { display: block; }
-.mn-collapse-btn {
-  display: none;
-  align-self: flex-start;
-  background: #f3f4f6;
-  border: none;
-  border-radius: .3rem;
-  cursor: pointer;
-  color: #6b7280;
-  font-size: .8rem;
-  line-height: 1;
-  padding: 0 .35rem;
-  min-width: 26px;
-  height: 26px;
-  flex-shrink: 0;
+
+/* The header row is lifted out of the card's inner column so it spans the full
+   width; the card's own padding moves onto the row and the body. The divider
+   lives on the body's top edge, which means it appears exactly when the card is
+   open and needs no separate rule. */
+.admin-list-item.mn-act-card {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
 }
-.mn-collapse-btn:hover { background: #e5e7eb; color: #374151; }
+.mn-act-head {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .7rem .75rem;
+}
+.mn-act-head > .mn-act-compact-title { flex: 1; min-width: 0; }
+.mn-act-card > .mn-act-body {
+  border-top: 1px solid var(--border);
+  padding: .75rem;
+}
+.mn-act-card > .mn-sub-compact-list { padding: 0 .75rem .6rem; }
+.mn-inact-card .mn-act-body { border-top: 1px solid var(--border); padding-top: .5rem; }
 
 .is-expanded > .mn-act-body,
 .is-expanded .mn-act-body { display: flex !important; }
 .is-expanded .mn-sub-compact-list { display: none; }
-.is-expanded .mn-collapse-btn { display: block; }
 
 .is-reordering .mn-act-compact-title { display: block !important; }
 .is-reordering .mn-act-body { display: none !important; }
 .is-reordering .mn-sub-compact-list { display: block !important; }
-.is-reordering .mn-collapse-btn { display: none !important; }
+ 
 .mn-sub-compact {
   font-size: .84rem;
   color: #0369a1;
