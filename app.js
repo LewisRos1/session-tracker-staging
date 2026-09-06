@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1967";
+const APP_VERSION = "1968";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -5087,28 +5087,28 @@ function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd
   // Trendline endpoint value labels — use pre-computed values if available
   const dispStart = tStart ?? tStartVal;
   const dispEnd   = tEnd   ?? tEndVal;
-  // Collision-aware placement. Both labels sit on the same x, so a clash is
-  // purely vertical: the data value is drawn just above its dot and the trend
-  // value just below the trendline's end, and the two bands meet whenever the
-  // trendline passes a little above the dot. The old rule compared the VALUES,
-  // which missed that entirely and drew the grey number straight through the
-  // black one, so nothing but the data value could be read.
-  const DATA_FS = 14, TREND_FS = 13, ASC = 0.8, DESC = 0.25;
-  const plotBottom = PAD.top + cH;
-  const safeTrendY = (tY, dY) => {
-    const dataTop = dY - 9 - DATA_FS * ASC, dataBot = dY - 9 + DATA_FS * DESC;
-    const clashes = y => (y - TREND_FS * ASC) < dataBot + 3 && (y + TREND_FS * DESC) > dataTop - 3;
-    const below = tY + TREND_FS;                 // preferred: under the trendline end
-    if (!clashes(below)) return below;
-    const underDot = dY + 9 + TREND_FS;          // next best: under the data dot
-    if (!clashes(underDot) && underDot + TREND_FS * DESC < plotBottom) return underDot;
-    return dataTop - 4;                          // last resort: stacked above the data value
-  };
-  const tYS = toY(trendAt(xs[0]));
-  const tYE = toY(trendAt(xs[xs.length - 1]));
-  ctx.fillStyle = "#6b7280"; ctx.font = TREND_FS + "px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(dispStart + "%", toX(xs[0]),             safeTrendY(tYS, toY(pts[0].v)));
-  ctx.fillText(dispEnd   + "%", toX(xs[xs.length - 1]), safeTrendY(tYE, toY(pts[pts.length - 1].v)));
+  // Both numbers describe the same month, so they are stacked on the dot they
+  // belong to rather than one of them sitting out on the trendline: the higher
+  // value goes above the dot, the lower value below it, and a tie puts the
+  // actual score on top. Reading down the pair therefore always reads high then
+  // low, whichever of the two happens to be the trend.
+  const LBL_ABOVE = 10, LBL_BELOW = 20, MONTH_LBL_Y = PAD.top + cH + 16;
+  const dataLabelY = new Map();   // point index -> baseline for the black value
+  const trendLabels = [];
+  const _ends = [{ xi: xs[0], p: pts[0], tv: dispStart }];
+  if (xs.length > 1) _ends.push({ xi: xs[xs.length - 1], p: pts[pts.length - 1], tv: dispEnd });
+  _ends.forEach(({ xi, p, tv }) => {
+    const dotY = toY(p.v);
+    const trendOnTop = tv > p.v;
+    let topY = dotY - LBL_ABOVE, botY = dotY + LBL_BELOW;
+    // A dot on the baseline has no room underneath it: the month name is there.
+    // Stack both above instead, keeping the higher value on top.
+    if (botY + 3 > MONTH_LBL_Y - 6) { botY = topY; topY = botY - 15; }
+    dataLabelY.set(xi, trendOnTop ? botY : topY);
+    trendLabels.push({ x: toX(xi), text: tv + "%", y: trendOnTop ? topY : botY });
+  });
+  ctx.fillStyle = "#6b7280"; ctx.font = "13px sans-serif"; ctx.textAlign = "center";
+  trendLabels.forEach(l => ctx.fillText(l.text, l.x, l.y));
 
   // Trend annotation subtitle — use pre-computed delta/direction if available
   const dispDelta = delta ?? Math.round(tStartVal !== tEndVal ? tEndVal - tStartVal : ys[ys.length-1] - ys[0]);
@@ -5127,13 +5127,13 @@ function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd
     if (!_lineStarted) { ctx.moveTo(x, y); _lineStarted = true; } else ctx.lineTo(x, y);
   });
   ctx.stroke();
-
-  // Data point dots + value labels above (only non-null)
+  // Data point dots + value labels (only non-null). The two endpoints also carry
+  // a trend value, so their placement was decided together above.
   pts.forEach(p => {
     const x = toX(p.i), y = toY(p.v);
     ctx.fillStyle = "#4472c4"; ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = "#1f2937"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "center";
-    ctx.fillText(p.v + "%", x, y - 9);
+    ctx.fillText(p.v + "%", x, dataLabelY.has(p.i) ? dataLabelY.get(p.i) : y - 9);
   });
 
   // Month labels on X-axis — all months including empty positions
