@@ -181,7 +181,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1980";
+const APP_VERSION = "1981";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -4409,7 +4409,7 @@ async function hyrGenerate() {
 
     const _grpTargets = sessionType === "group" ? getGroupEffectiveTargets(studentId) : null;
     const effectiveStudent = _grpTargets ? { ...student, targets: _grpTargets } : student;
-    const { text: dataText, chartData, breakdownData, trendRows, categorized } = await hyrCollectData(effectiveStudent, period, year, excludedActivities, sessionType);
+    const { text: dataText, chartData, breakdownData, trendRows, categorized, evidence } = await hyrCollectData(effectiveStudent, period, year, excludedActivities, sessionType);
 
     // Build prompt synchronously — then start fetch immediately so it runs in parallel with fake phases
     const _gR = hyrRangeOf(period, year);
@@ -4560,8 +4560,9 @@ FORMAT FOR EVERY OBSERVATION BLOCK: exactly two lines, starting "Strength:" and 
 RULES FOR EVERY OBSERVATION BLOCK:
 - Each line answers a DIFFERENT question and must not repeat the other. "Strength" is about a specific ability and what it is worth, "Weakness" is about a difficulty and when it appears.
 - One or two sentences per line, whichever it genuinely needs, except Strength which is always two: the observation and what it means. One clear sentence beats the same point stretched across two. Never pad, and never list everything - pick what matters most.
-- NEVER quote numbers or percentages anywhere in these blocks.
-- NO numbers, percentages, or month references. Parents see those in the graph.
+- NEVER quote a score or a percentage anywhere in these blocks.
+- NO percentages and no score numbers. Parents see those in the graph. The ONE exception is a figure the record itself states, such as a length of time written into a remark: that may be given in the Weakness line, exactly as recorded.
+- TIME ANCHOR IN THE WEAKNESS LINE. Work out WHEN the difficulty actually happened before writing it. If the events sit in the opening weeks of the period and the later sessions are clear, the sentence MUST say so in plain words, and this is the one place a stretch of time may be named: "early in the term", "in the first few weeks", "not seen since April". A difficulty that is genuinely still current needs no anchor and must not be given one. Never write a day or a full date in either case.
 - Plain English, Grade 6-8 reading level. No clinical jargon.
 - Do NOT say things like "modalities", "regulatory capacity", "situational influences", "low-demand contexts". Use real words instead: "free play", "good days and bad days", "room noise".
 - Do NOT summarise what the graph already shows. Add insight the graph cannot.
@@ -4594,7 +4595,9 @@ RECOMMENDATIONS:
 1. [label]: [recommendation sentence]
 2. [label]: [recommendation sentence]
 ...
-===END===`;
+===END===
+
+${evidencePromptBlock(["Weakness", "Focus Area", "Recommendation"], "the target's name for a Weakness, or the point's own short label for a Focus Area or Recommendation", "Weakness | Self-Regulation | 1 Mar, 8 Mar, 15 Mar")}`;
 
     // Start fetch immediately — fake phases will play while it runs in background
     // Prompt size, so we can see what we are actually sending before deciding
@@ -4658,7 +4661,8 @@ RECOMMENDATIONS:
     setProgress(100, "Done!");
     await new Promise(r => setTimeout(r, 400));
 
-    await hyrDownloadWord(effectiveStudent, period, year, trendRows, categorized, parsed, breakdownData, chartData, sessionType);
+    const evidenceRows = parseEvidenceBlock(reportText);
+    await hyrDownloadWord(effectiveStudent, period, year, trendRows, categorized, parsed, breakdownData, chartData, sessionType, evidenceRows, evidence);
 
   } catch (err) {
     // No alert: it would steal focus mid-typing, which is the interruption
@@ -4779,6 +4783,151 @@ function exportStampDate(d = new Date()) {
   return `${d.getDate()} ${HYR_SHORT_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 const HYR_FULL_MONTHS  = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+// ─── EVIDENCE PAGE ───────────────────────────────────────────
+// A negative statement in a report is the one that gets challenged, and there
+// was no way to tell from the document which session it came from: the prompt
+// keeps dates out of the parent-facing text on purpose. So the model is asked
+// to name the sessions behind every Weakness, Focus Area and Recommendation,
+// and those citations are printed on a final page marked for deletion.
+//
+// The citations are CHECKED rather than trusted. A model can name a date that
+// holds nothing, and an unverifiable citation is worse than none: it looks like
+// proof. Anything that does not line up with the data is flagged in red.
+
+/** "1 Mar", "1 Mar 2026" and "1 March" all key to "1 mar". A report spans at
+ *  most twelve months, so a day-and-month key cannot collide. */
+function evidenceDateKey(d) {
+  if (!d) return null;
+  const iso = String(d).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return `${Number(iso[3])} ${HYR_SHORT_MONTHS[Number(iso[2]) - 1].toLowerCase()}`;
+  const m = String(d).trim().match(/(\d{1,2})\s*([A-Za-z]{3})/);
+  return m ? `${Number(m[1])} ${m[2].toLowerCase()}` : null;
+}
+
+/** Rows of "Kind | Label | dates" from the model's ===EVIDENCE=== block. */
+function parseEvidenceBlock(text) {
+  const m = String(text || "").match(/===EVIDENCE===\s*([\s\S]*?)\s*===END===/);
+  if (!m) return [];
+  const rows = [];
+  for (const line of m[1].split("\n")) {
+    const parts = line.split("|").map(s => s.trim());
+    if (parts.length < 3 || !parts[0] || !parts[1]) continue;
+    if (/^kind$/i.test(parts[0])) continue;   // a header row, if the model adds one
+    rows.push({
+      kind: parts[0].replace(/^[-•*]\s*/, "").trim(),
+      label: parts[1],
+      dates: parts.slice(2).join(" ").split(/[,;]/).map(s => s.trim()).filter(Boolean)
+    });
+  }
+  return rows;
+}
+
+/**
+ * Checks each cited date against the data. `evidence.sessionDates` is every
+ * session in the period; `evidence.byTarget` is the days each target actually
+ * holds something, which is what catches a date borrowed from another target.
+ */
+function verifyEvidenceRow(row, evidence) {
+  const out = [];
+  const targetDates = evidence?.byTarget?.[row.label] || null;
+  for (const d of row.dates) {
+    const key = evidenceDateKey(d);
+    if (!key) { out.push({ text: d, ok: false, why: "not a date" }); continue; }
+    if (!evidence?.sessionDates?.has(key)) {
+      out.push({ text: d, ok: false, why: "no session on this date" });
+    } else if (targetDates && targetDates.size && !targetDates.has(key)) {
+      out.push({ text: d, ok: false, why: "no data for this target that day" });
+    } else {
+      out.push({ text: d, ok: true, why: "" });
+    }
+  }
+  return out;
+}
+
+/** The block appended to every prompt. Identical wording across the reports, so
+ *  the same parser and the same checks work on all of them. */
+function evidencePromptBlock(kinds, labelHint, example) {
+  return `===EVIDENCE===
+For EVERY negative point you wrote above, give the sessions it came from, one per line, in exactly this shape:
+
+Kind | Label | dates
+
+  Kind    one of: ${kinds.join(", ")}
+  Label   ${labelHint}
+  dates   the session dates you actually used, written exactly as they appear in the session data, separated by commas
+
+Example: ${example}
+
+RULES:
+- One line per point. Every point listed above needs a line, unless it says there were no notable areas of difficulty.
+- List ONLY the dates that genuinely carry the evidence. Never pad the list to look thorough.
+- NEVER invent or guess a date. Every date is checked against the session records afterwards, and one that does not hold up is marked as an error in the document.
+- Where the point is about one target, the dates must come from THAT target's data. Do not borrow a date from another target.
+- This block is read by the therapist and removed before the report reaches a parent, so plain accuracy matters here, not tone.
+===END===`;
+}
+
+/**
+ * The final page. Word paragraphs, built from whatever the report's own helpers
+ * pass in, so each report keeps its own styling.
+ */
+function evidencePageParas(rows, evidence, mk) {
+  const { Paragraph, TextRun, HeadingLevel, AlignmentType } = window.docx;
+  const paras = [];
+  paras.push(mk.head("Evidence (Internal Use Only)"));
+  paras.push(new Paragraph({
+    children: [new TextRun({
+      text: "DELETE THIS PAGE BEFORE SENDING. It records the sessions behind each point above so they can be checked, and is not written for a parent.",
+      bold: true, size: 22, highlight: "yellow"
+    })],
+    spacing: { before: 0, after: 240 }
+  }));
+
+  if (!rows.length) {
+    paras.push(new Paragraph({
+      children: [new TextRun({ text: "No evidence was returned for this report. Nothing above can be traced to a session from this document.", size: 22, italics: true, color: "B91C1C" })],
+      spacing: { before: 0, after: 120 }
+    }));
+    return paras;
+  }
+
+  let bad = 0;
+  for (const row of rows) {
+    const checked = verifyEvidenceRow(row, evidence);
+    bad += checked.filter(c => !c.ok).length;
+    paras.push(new Paragraph({
+      children: [new TextRun({ text: `${row.kind}: ${row.label}`, bold: true, size: 22 })],
+      spacing: { before: 160, after: 40 }
+    }));
+    if (!checked.length) {
+      paras.push(new Paragraph({
+        children: [new TextRun({ text: "No sessions given.", size: 22, italics: true, color: "B91C1C" })],
+        spacing: { before: 0, after: 40 }
+      }));
+      continue;
+    }
+    const runs = [];
+    checked.forEach((c, i) => {
+      if (i > 0) runs.push(new TextRun({ text: ", ", size: 22 }));
+      runs.push(c.ok
+        ? new TextRun({ text: c.text, size: 22 })
+        : new TextRun({ text: `${c.text} (${c.why})`, size: 22, bold: true, color: "B91C1C" }));
+    });
+    paras.push(new Paragraph({ children: runs, spacing: { before: 0, after: 40 } }));
+  }
+
+  paras.push(new Paragraph({
+    children: [new TextRun({
+      text: bad === 0
+        ? "Every session named above was found in the records."
+        : `${bad} session${bad === 1 ? " does" : "s do"} not match the records and ${bad === 1 ? "is" : "are"} marked in red. Check the point ${bad === 1 ? "it belongs" : "they belong"} to before sending.`,
+      size: 22, italics: true, color: bad === 0 ? "6B7280" : "B91C1C"
+    })],
+    spacing: { before: 240, after: 0 }
+  }));
+  return paras;
+}
 
 /**
  * One shape for both kinds of report. "H1"/"H2" with a year yield exactly the
@@ -5054,10 +5203,13 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
           }
         }
         allRemarks.sort((a, b) => a.date.localeCompare(b.date));
-        const _tf = targetFacts[tName] || (targetFacts[tName] = { hasRemarks: false, hasTrials: false });
+        const _tf = targetFacts[tName] || (targetFacts[tName] = { hasRemarks: false, hasTrials: false, dates: new Set() });
         for (const _r of allRemarks) {
           if ((_r.text || "").trim()) _tf.hasRemarks = true;
           if ((_r.trials || []).length) _tf.hasTrials = true;
+          // Which days this target actually holds something, so a date the model
+          // cites as its evidence can be checked rather than taken on trust.
+          _tf.dates.add(evidenceDateKey(_r.date));
         }
 
         // Per-month averages for activity breakdown chart
@@ -5286,7 +5438,13 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
     quantitativeNoData: new Set(trendRows.filter(r => r.noData && quantitativeTargetNames.has(r.name)).map(r => r.name)),
   };
 
-  return { text: lines.join("\n"), chartData, breakdownData, trendRows, categorized };
+  // Every session date in range, plus the dates each target holds data on, so the
+  // internal evidence page can check what the model says it drew on.
+  const evidence = {
+    sessionDates: new Set(sessions.map(s => evidenceDateKey(s.date)).filter(Boolean)),
+    byTarget: Object.fromEntries(Object.entries(targetFacts).map(([n, f]) => [n, f.dates || new Set()]))
+  };
+  return { text: lines.join("\n"), chartData, breakdownData, trendRows, categorized, evidence };
 }
 
 function hyrLinearTrend(values) {
@@ -6290,7 +6448,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
 }
 
 
-async function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData, chartData, sessionType = "individual") {
+async function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData, chartData, sessionType = "individual", evidenceRows = [], evidence = null) {
   const firstName   = student.preferredName || student.name.split(" ")[0];
   const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
   const n = activeTargets.length;
@@ -6856,6 +7014,12 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   const docSections = [{ properties: {}, footers, headers, children: paragraphs }];
   if (actionPlanParas.length) docSections.push({ properties: portraitProps, footers, headers, children: actionPlanParas });
   if (appendixParas.length) docSections.push({ properties: portraitProps, footers, headers, children: appendixParas });
+  // Last page, and its own section so it starts on a fresh one: it is meant to
+  // be deleted whole before the report is sent.
+  const evidenceParas = evidencePageParas(evidenceRows, evidence, {
+    head: t => mkPara(t, { heading: HeadingLevel.HEADING_1, before: 0, after: 160, size: 32, bold: true })
+  });
+  if (evidenceParas.length) docSections.push({ properties: portraitProps, footers, headers, children: evidenceParas });
 
   const doc = new Document({
     numbering: { config: [
@@ -6901,6 +7065,7 @@ function assessmentCollect(student, sessions, excludedActivities) {
     .map(s => ({ date: s.date, label: fmtPeriodDate(s.date), sess: s }));
 
   const rows = [], unscored = [], lines = [];
+  const aEvidence = {};
   for (const t of targets) {
     const avgs = days.map(d => {
       const v = calcDailyAverage(d.sess, t, targets);
@@ -6940,6 +7105,12 @@ function assessmentCollect(student, sessions, excludedActivities) {
       });
     });
 
+    // Which assessment days this target holds something, for the evidence page.
+    aEvidence[t.name] = new Set(days.filter((d, di) =>
+      Object.entries(d.sess.activities || {}).some(([recId, a]) =>
+        (a.targetName === t.name || a.target === t.name) &&
+        Object.values(d.sess.remarks || {}).some(r => r.activityId === recId))
+    ).map(d => evidenceDateKey(d.date)));
     if (avg === null) unscored.push(t.name);
     rows.push({ target: t.name, avgs, avg, hasScore: avg !== null });
 
@@ -6956,7 +7127,11 @@ function assessmentCollect(student, sessions, excludedActivities) {
   // Both charts run lowest average first, and the day chart follows the same
   // order as the average chart so the two can be read together.
   const scored = rows.filter(r => r.hasScore).slice().sort((a, b) => a.avg - b.avg);
-  return { days, rows, scored, unscored, text: lines.join("\n") };
+  const evidence = {
+    sessionDates: new Set(days.map(d => evidenceDateKey(d.date)).filter(Boolean)),
+    byTarget: aEvidence
+  };
+  return { days, rows, scored, unscored, evidence, text: lines.join("\n") };
 }
 
 // Target names are drawn at 45 degrees. Angled text needs almost no
@@ -7357,7 +7532,9 @@ Order them most important first, judged by how much the difficulty affects the r
 ===END===
 
 ASSESSMENT DATA:
-${collected.text}`;
+${collected.text}
+
+${evidencePromptBlock(["Weakness", "Recommendation"], "the target's name for a Weakness, or the point's own short label for a Recommendation", "Weakness | Self-Regulation | 12 Aug 2026, 13 Aug 2026")}`;
 
     console.log(`[AI assessment prompt] ${aiPrompt.length.toLocaleString()} chars `
       + `(~${Math.round(aiPrompt.length / 4).toLocaleString()} tokens) — ${student.name}, ${nDays} days`);
@@ -7393,7 +7570,8 @@ ${collected.text}`;
     const _assessMissing = collected.rows.filter(r => !hyrPickObs(parsed.targets, r.target)).map(r => r.target);
     if (_assessMissing.length) console.warn("[Assessment report] no write-up returned for:", _assessMissing);
     setProgress(88, "Writing report…");
-    await assessmentDownloadWord(effectiveStudent, student, collected, parsed, PRON);
+    const evidenceRows = parseEvidenceBlock(reportText);
+    await assessmentDownloadWord(effectiveStudent, student, collected, parsed, PRON, evidenceRows);
     setProgress(100, "Done!");
     await new Promise(r => setTimeout(r, 400));
 
@@ -7414,7 +7592,7 @@ ${collected.text}`;
   }
 }
 
-async function assessmentDownloadWord(effectiveStudent, student, collected, parsed, PRON) {
+async function assessmentDownloadWord(effectiveStudent, student, collected, parsed, PRON, evidenceRows = []) {
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun, LevelFormat,
           Table, TableRow, TableCell, WidthType, SectionType, Header, Footer, PageNumber } = window.docx;
 
@@ -7661,6 +7839,14 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
       headers: pageHeader ? { default: pageHeader } : undefined,
       footers: pageFooter ? { default: pageFooter } : undefined,
       children: paragraphs
+    }, {
+      // Last page, its own section, meant to be deleted whole before sending.
+      properties: { type: SectionType?.NEXT_PAGE ?? "nextPage" },
+      headers: pageHeader ? { default: pageHeader } : undefined,
+      footers: pageFooter ? { default: pageFooter } : undefined,
+      children: evidencePageParas(evidenceRows, collected.evidence, {
+        head: t => mkPara(t, { heading: HeadingLevel.HEADING_1, before: 0, after: 200, size: 32, bold: true })
+      })
     }]
   });
 
@@ -7749,7 +7935,7 @@ async function monthlyGenerate() {
     const _mGrpTargets = sessionType === "group" ? getGroupEffectiveTargets(studentId) : null;
     const effectiveStudent = _mGrpTargets ? { ...student, targets: _mGrpTargets } : student;
     const collected = monthlyCollectData(effectiveStudent, year, month, allSessions, excludedActivities, sessionType);
-    const { threeMonthData, miniData, aiData, sessionCount, threeMonthPeriodLabel, oneMonthPeriodLabel } = collected;
+    const { threeMonthData, miniData, aiData, sessionCount, threeMonthPeriodLabel, oneMonthPeriodLabel, evidence } = collected;
 
     const activeTargets = (effectiveStudent.targets || []).filter(t => !t.isArchived && !t.isStopped);
     const excludedList = excludedActivities.size > 0
@@ -7956,7 +8142,9 @@ ${activeTargets.map(t => {
   return `TARGET: ${t.name}
 This month (${md.lastMonthLabel} to ${md.thisMonthLabel}): ${_mTrendLine}
 ${(aiData[t.name] || []).join("\n")}`;
-}).join("\n\n")}`;
+}).join("\n\n")}
+
+${evidencePromptBlock(["Still Working On"], "the point's own short label", "Still Working On | Settling after upset | 4 Jul, 12 Jul")}`;
 
     console.log(`[AI monthly prompt] ${aiPrompt.length.toLocaleString()} chars `
       + `(~${Math.round(aiPrompt.length / 4).toLocaleString()} tokens) — ${student.name}, ${monthName} ${year}`);
@@ -8009,7 +8197,8 @@ ${(aiData[t.name] || []).join("\n")}`;
     setProgress(100, "Done!");
     await new Promise(r => setTimeout(r, 400));
 
-    await monthlyDownloadWord(effectiveStudent, year, month, monthName, sessionCount, threeMonthData, miniData, parsed, masteredThisMonth, comparisonHeading, sessionType);
+    const evidenceRows = parseEvidenceBlock(reportText);
+    await monthlyDownloadWord(effectiveStudent, year, month, monthName, sessionCount, threeMonthData, miniData, parsed, masteredThisMonth, comparisonHeading, sessionType, evidenceRows, evidence);
   } catch (err) {
     if (err.name !== "AbortError") aiJobEnd("fail", `Monthly report failed: ${err.message}`);
     else aiJobEnd("cancelled");
@@ -8078,6 +8267,8 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
   const oneMonthPeriodLabel = `${lastMonthLabel}→${thisMonthLabel}`;
 
   const miniData = {}, threeMonthData = {}, aiData = {};
+  // Which days each target holds a remark, for the internal evidence page.
+  const mEvidence = {};
 
   for (const target of activeTargets) {
     const tName = target.name;
@@ -8194,6 +8385,8 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
         }
       }
       allRemarks.sort((a,b) => a.date.localeCompare(b.date));
+      if (!mEvidence[tName]) mEvidence[tName] = new Set();
+      for (const _r of allRemarks) mEvidence[tName].add(evidenceDateKey(_r.date));
       const scored = allRemarks.filter(r => r.avg !== null);
       const avgLine = scored.length ? ` (avg ${Math.round(scored.reduce((a,b)=>a+b.avg,0)/scored.length)}%)` : "";
       const _mStatusLabel = paKeyToStatusM[actName];
@@ -8263,7 +8456,11 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
     aiData[tName] = lines;
   }
 
-  return { threeMonthData, miniData, aiData, sessionCount, thisMonthLabel, lastMonthLabel, threeMonthPeriodLabel, oneMonthPeriodLabel };
+  const evidence = {
+    sessionDates: new Set(thisMonthSessions.map(s => evidenceDateKey(s.date)).filter(Boolean)),
+    byTarget: mEvidence
+  };
+  return { threeMonthData, miniData, aiData, sessionCount, thisMonthLabel, lastMonthLabel, threeMonthPeriodLabel, oneMonthPeriodLabel, evidence };
 }
 
 function monthlyParseAiResponse(text) {
@@ -8590,7 +8787,7 @@ function monthlyDrawMiniVerticalBar(lastLabel, lastAvg, thisLabel, thisAvg) {
   return { base64: canvas.toDataURL("image/png").split(",")[1], height: H, width: W };
 }
 
-async function monthlyDownloadWord(student, year, month, monthName, sessionCount, threeMonthData, miniData, parsed, masteredThisMonth, comparisonHeading, sessionType = "individual") {
+async function monthlyDownloadWord(student, year, month, monthName, sessionCount, threeMonthData, miniData, parsed, masteredThisMonth, comparisonHeading, sessionType = "individual", evidenceRows = [], evidence = null) {
   const firstName = student.preferredName || student.name.split(" ")[0];
   const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
 
@@ -8900,6 +9097,11 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   const docSections = [
     { properties: portraitProps, footers, headers, children: summaryParas }
   ];
+  // Last page, its own section, meant to be deleted whole before sending.
+  const evidenceParas = evidencePageParas(evidenceRows, evidence, {
+    head: t => mkPara(t, { heading: HeadingLevel.HEADING_1, before: 0, after: 160, size: 30, bold: true })
+  });
+  if (evidenceParas.length) docSections.push({ properties: portraitProps, footers, headers, children: evidenceParas });
 
   const doc = new Document({
     numbering: { config: ["mr-highlights", "mr-still"].map(reference => ({
