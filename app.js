@@ -181,7 +181,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1977";
+const APP_VERSION = "1978";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -497,6 +497,108 @@ window.debugDropConfigEntry = async function(studentName, targetName, configId, 
   target.predefinedActivities = acts;
   await saveStudent(student);
   console.log(`Done — entry removed, ${acts.length} activities remain.`);
+};
+
+// 1x) READ-ONLY. Free-text search across every remark a student has, so a claim
+//     made in an AI report can be traced back to the session that produced it.
+//     The prompt forbids the model quoting a remark word for word, so search a
+//     distinctive WORD rather than the report's phrasing: "hour", "toilet",
+//     "transition". Case-insensitive, searches the remark and its note.
+//     Writes nothing. Full rows left on window.__remarkHits.
+//       debugFindRemark("Caden Tan", "hour")
+//       debugFindRemark("Caden Tan", "recover", "2026-03", "2026-07")
+window.debugFindRemark = async function(studentName, needle, fromYm = null, toYm = null) {
+  const students = await loadStudentsConfig();
+  const student = students.find(s => s.name === studentName);
+  if (!student) {
+    console.error("Student not found:", studentName,
+      "\nNames on file:", students.map(s => s.name));
+    return;
+  }
+  const sessions = (await getAllSessionsForStudent(student.id))
+    .filter(s => {
+      const ym = String(s.date).slice(0, 7);
+      return (!fromYm || ym >= fromYm) && (!toYm || ym <= toYm);
+    })
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+  const q = String(needle || "").toLowerCase();
+  const hits = [];
+  for (const sess of sessions) {
+    const actById = {};
+    for (const [k, a] of Object.entries(sess.activities || {})) actById[a.id || k] = a;
+    for (const rem of Object.values(sess.remarks || {})) {
+      const text = hyrStripHtml(rem.text || "").trim();
+      const note = hyrStripHtml(rem.masteryNote || "").trim();
+      if (!`${text} ${note}`.toLowerCase().includes(q)) continue;
+      const act = actById[rem.activityId] || {};
+      hits.push({
+        date: fmtPeriodDate(sess.date),
+        session: sess.sessionNumber ?? "?",
+        target: act.targetName || act.target || "(unknown)",
+        activity: act.activityTitle || act.activityName || "(unknown)",
+        remark: text || "(no remark text)",
+        note: note || "",
+        trials: (rem.trials || []).filter(t => t !== -1).join(", ")
+      });
+    }
+  }
+  const span = fromYm || toYm ? ` between ${fromYm || "the start"} and ${toYm || "now"}` : "";
+  console.log(`${hits.length} remark(s) mentioning "${needle}" for ${studentName}${span}`
+    + ` — searched ${sessions.length} session(s)`);
+  if (hits.length) console.table(hits);
+  else console.log("Nothing found. Try a shorter or different word: the report never quotes a remark directly.");
+  window.__remarkHits = hits;
+  return hits;
+};
+
+// 1y) READ-ONLY. Every remark in a date range, oldest first, for reading a whole
+//     period rather than hunting one word. Same shape as debugFindRemark.
+//       debugAllRemarks("Caden Tan", "2026-03", "2026-07")
+//       debugAllRemarks("Caden Tan", "2026-03", "2026-07", "Self-Regulation")
+window.debugAllRemarks = async function(studentName, fromYm = null, toYm = null, targetName = null) {
+  const students = await loadStudentsConfig();
+  const student = students.find(s => s.name === studentName);
+  if (!student) {
+    console.error("Student not found:", studentName,
+      "\nNames on file:", students.map(s => s.name));
+    return;
+  }
+  const sessions = (await getAllSessionsForStudent(student.id))
+    .filter(s => {
+      const ym = String(s.date).slice(0, 7);
+      return (!fromYm || ym >= fromYm) && (!toYm || ym <= toYm);
+    })
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+  const rows = [];
+  for (const sess of sessions) {
+    const actById = {};
+    for (const [k, a] of Object.entries(sess.activities || {})) actById[a.id || k] = a;
+    for (const rem of Object.values(sess.remarks || {})) {
+      const act = actById[rem.activityId] || {};
+      const tName = act.targetName || act.target || "(unknown)";
+      if (targetName && tName !== targetName) continue;
+      const text = hyrStripHtml(rem.text || "").trim();
+      const note = hyrStripHtml(rem.masteryNote || "").trim();
+      if (!text && !note && !(rem.trials || []).length) continue;
+      rows.push({
+        date: fmtPeriodDate(sess.date),
+        session: sess.sessionNumber ?? "?",
+        target: tName,
+        activity: act.activityTitle || act.activityName || "(unknown)",
+        remark: text || "",
+        note: note || "",
+        trials: (rem.trials || []).filter(t => t !== -1).join(", ")
+      });
+    }
+  }
+  console.log(`${rows.length} remark(s) for ${studentName}`
+    + (targetName ? ` under "${targetName}"` : "")
+    + ` across ${sessions.length} session(s)`);
+  console.table(rows);
+  window.__remarkHits = rows;
+  return rows;
 };
 
 // 1d) READ-ONLY. Every session record whose activityName matches, regardless of
