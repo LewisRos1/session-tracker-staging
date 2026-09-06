@@ -181,7 +181,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1976";
+const APP_VERSION = "1977";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -4469,6 +4469,14 @@ function aiJobEnd(state, text) {
 }
 
 const HYR_SHORT_MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+// "6 Sep 2026", for the "Generated On" stamp in every report's file name. Built
+// by hand rather than from toLocaleDateString: en-GB renders September as
+// "Sept", so the browser's short month is not the three letters wanted here.
+// The documents' own "Date of Report" line keeps the long form.
+function exportStampDate(d = new Date()) {
+  return `${d.getDate()} ${HYR_SHORT_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
 const HYR_FULL_MONTHS  = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
 /**
@@ -6563,8 +6571,8 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   // period is a range object for a custom report, so it cannot be interpolated
   // directly: that is what produced "[object Object]" in the file name.
   a.download = R.isCustom
-    ? `${student.name} - ${R.startShort} ${R.startY} to ${R.endShort} ${R.endY} - Custom Months Report - ${reportDate}.docx`
-    : `${student.name} - ${period} ${year} Report - ${reportDate}.docx`;
+    ? `${student.name} - ${R.startShort} ${R.startY} to ${R.endShort} ${R.endY} - Custom Months Report - Generated On ${exportStampDate()}.docx`
+    : `${student.name} - ${period} ${year} Report - Generated On ${exportStampDate()}.docx`;
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -7367,7 +7375,7 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
     const [fy, fm] = String(firstDay.date).split("-").map(Number);
     if (fy && fm) assessPeriod = `${SHORT_M[fm - 1]} ${fy} `;
   }
-  a.download = `${student.name} - ${assessPeriod}Assessment Report - ${reportDate}.docx`;
+  a.download = `${student.name} - ${assessPeriod}Assessment Report - Generated On ${exportStampDate()}.docx`;
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -8284,7 +8292,6 @@ function monthlyDrawMiniVerticalBar(lastLabel, lastAvg, thisLabel, thisAvg) {
 async function monthlyDownloadWord(student, year, month, monthName, sessionCount, threeMonthData, miniData, parsed, masteredThisMonth, comparisonHeading, sessionType = "individual") {
   const firstName = student.preferredName || student.name.split(" ")[0];
   const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
-  const reportDate = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun, LevelFormat,
           Table, TableRow, TableCell, WidthType, PageOrientation, SectionType, Header, Footer, PageNumber, VerticalAlign } = window.docx;
@@ -8604,7 +8611,9 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
 
   const blob = await Packer.toBlob(doc);
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
-  a.download = `${student.name} - ${monthName} ${year} Report - ${reportDate}.docx`; a.click();
+  // Short month in the file name, full month inside the document.
+  a.download = `${student.name} - ${HYR_SHORT_MONTHS[month - 1]} ${year} Report - Generated On ${exportStampDate()}.docx`;
+  a.click();
   URL.revokeObjectURL(a.href);
 }
 
