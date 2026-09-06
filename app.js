@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1963";
+const APP_VERSION = "1964";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -4156,6 +4156,14 @@ RECOMMENDATIONS:
     }
 
     const parsed = hyrParseAiResponse(reportText);
+    // A block the model quietly skipped leaves a target with nothing written
+    // under it, which reads to the parent as though nothing was recorded. There
+    // is no way to see that from the finished document, so name it here.
+    const _missingObs = [
+      ...targetsWithData.filter(r => !hyrPickObs(parsed.observations, r.name)).map(r => r.name),
+      ...qualitativeWithData.filter(r => !hyrPickObs(parsed.observed, r.name)).map(r => r.name)
+    ];
+    if (_missingObs.length) console.warn("[AI report] no write-up returned for:", _missingObs);
 
     setProgress(100, "Done!");
     await new Promise(r => setTimeout(r, 400));
@@ -4389,6 +4397,11 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
   const lines = [];
   const chartData = {};
   const breakdownData = {};
+  // What the DATA actually holds per target, so Section 2 can say honestly
+  // whether a target had remarks, trials, both or neither. It used to infer
+  // that from whether the AI happened to write a paragraph, which meant a
+  // target full of session notes was labelled "No Remarks were recorded".
+  const targetFacts = {};
 
   for (const target of targets) {
     const tName = target.name;
@@ -4542,6 +4555,11 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
           }
         }
         allRemarks.sort((a, b) => a.date.localeCompare(b.date));
+        const _tf = targetFacts[tName] || (targetFacts[tName] = { hasRemarks: false, hasTrials: false });
+        for (const _r of allRemarks) {
+          if ((_r.text || "").trim()) _tf.hasRemarks = true;
+          if ((_r.trials || []).length) _tf.hasTrials = true;
+        }
 
         // Per-month averages for activity breakdown chart
         const actMonthlyAvgs = {};
@@ -4734,21 +4752,22 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
 
   // Compute trendlines and categorize every target
   const trendRows = [];
+  const _facts = n => targetFacts[n] || { hasRemarks: false, hasTrials: false };
   for (const target of targets) {
     const cd = chartData[target.name];
     if (!cd) {
-      trendRows.push({ name: target.name, noData: true, delta: -Infinity, labels: [], values: [] });
+      trendRows.push({ name: target.name, noData: true, delta: -Infinity, labels: [], values: [], ..._facts(target.name) });
       continue;
     }
     const nonNull = cd.values.filter(v => v !== null && v !== undefined);
     if (nonNull.length === 0) {
-      trendRows.push({ name: target.name, noData: true, delta: -Infinity, labels: cd.labels, values: cd.values });
+      trendRows.push({ name: target.name, noData: true, delta: -Infinity, labels: cd.labels, values: cd.values, ..._facts(target.name) });
       continue;
     }
     const { tStart, tEnd } = hyrLinearTrend(nonNull);
     const delta = tEnd - tStart;
     const direction = Math.abs(delta) <= 8 ? "Stable" : delta > 0 ? "Improving" : "Declining";
-    trendRows.push({ name: target.name, tStart, tEnd, delta, direction, labels: cd.labels, values: cd.values, noData: false });
+    trendRows.push({ name: target.name, tStart, tEnd, delta, direction, labels: cd.labels, values: cd.values, noData: false, ..._facts(target.name) });
   }
   trendRows.sort((a, b) => (b.delta ?? -Infinity) - (a.delta ?? -Infinity));
 
@@ -5034,7 +5053,7 @@ function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd
     ? `${allPts[0].label} ${_lcFirst.y} - ${_lcR.endShort} ${_lcR.endY}`
     : _lcR.shortLabel;
   ctx.fillStyle = "#1f2937"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(`${(targetName || "").trim()} (${rangeLabel} ${year})`, W / 2, 24);
+  ctx.fillText(`${(targetName || "").trim()} (${rangeLabel})`, W / 2, 24);
 
   // Fixed 0–100 Y range; Y-axis labels hidden (data point labels carry the values)
   const toY = v => PAD.top + cH * (1 - v / 100);
@@ -5068,14 +5087,28 @@ function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd
   // Trendline endpoint value labels — use pre-computed values if available
   const dispStart = tStart ?? tStartVal;
   const dispEnd   = tEnd   ?? tEndVal;
-  // Collision-aware placement: if trend is within 10pts of the actual data value,
-  // push the label below both dots to avoid overlapping the data label above the dot.
-  const safeTrendY = (tY, dY, tV, dV) => Math.abs(tV - dV) <= 10 ? Math.max(dY, tY) + 20 : tY + 13;
+  // Collision-aware placement. Both labels sit on the same x, so a clash is
+  // purely vertical: the data value is drawn just above its dot and the trend
+  // value just below the trendline's end, and the two bands meet whenever the
+  // trendline passes a little above the dot. The old rule compared the VALUES,
+  // which missed that entirely and drew the grey number straight through the
+  // black one, so nothing but the data value could be read.
+  const DATA_FS = 14, TREND_FS = 13, ASC = 0.8, DESC = 0.25;
+  const plotBottom = PAD.top + cH;
+  const safeTrendY = (tY, dY) => {
+    const dataTop = dY - 9 - DATA_FS * ASC, dataBot = dY - 9 + DATA_FS * DESC;
+    const clashes = y => (y - TREND_FS * ASC) < dataBot + 3 && (y + TREND_FS * DESC) > dataTop - 3;
+    const below = tY + TREND_FS;                 // preferred: under the trendline end
+    if (!clashes(below)) return below;
+    const underDot = dY + 9 + TREND_FS;          // next best: under the data dot
+    if (!clashes(underDot) && underDot + TREND_FS * DESC < plotBottom) return underDot;
+    return dataTop - 4;                          // last resort: stacked above the data value
+  };
   const tYS = toY(trendAt(xs[0]));
   const tYE = toY(trendAt(xs[xs.length - 1]));
-  ctx.fillStyle = "#6b7280"; ctx.font = "13px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(dispStart + "%", toX(xs[0]),             safeTrendY(tYS, toY(pts[0].v),             dispStart, pts[0].v));
-  ctx.fillText(dispEnd   + "%", toX(xs[xs.length - 1]), safeTrendY(tYE, toY(pts[pts.length - 1].v), dispEnd,   pts[pts.length - 1].v));
+  ctx.fillStyle = "#6b7280"; ctx.font = TREND_FS + "px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText(dispStart + "%", toX(xs[0]),             safeTrendY(tYS, toY(pts[0].v)));
+  ctx.fillText(dispEnd   + "%", toX(xs[xs.length - 1]), safeTrendY(tYE, toY(pts[pts.length - 1].v)));
 
   // Trend annotation subtitle — use pre-computed delta/direction if available
   const dispDelta = delta ?? Math.round(tStartVal !== tEndVal ? tEndVal - tStartVal : ys[ys.length-1] - ys[0]);
@@ -5486,6 +5519,21 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
   return { base64: canvas.toDataURL("image/png").split(",")[1], height: H };
 }
 
+/**
+ * Finds a target's block in the AI's reply. The model echoes the target name
+ * back, and a stray space or a difference in case was enough to lose the whole
+ * paragraph silently, leaving the section looking as if no data existed.
+ */
+function hyrPickObs(map, name) {
+  if (!map || !name) return undefined;
+  if (map[name]) return map[name];
+  const want = String(name).trim().toLowerCase().replace(/\s+/g, " ");
+  for (const [k, v] of Object.entries(map)) {
+    if (String(k).trim().toLowerCase().replace(/\s+/g, " ") === want) return v;
+  }
+  return undefined;
+}
+
 function hyrParseAiResponse(text) {
   const out = { executiveSummary: "", biggestWins: [], keyFocusAreas: [], keyFocusStrategies: [], observations: {}, observed: {}, actionPlanRows: [], focusAreas: [], recommendations: [] };
   const exec = text.match(/===EXECUTIVE_SUMMARY===\s*([\s\S]*?)\s*===END===/);
@@ -5588,7 +5636,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
     return `<div style="margin-top:2rem">
       <p style="font-weight:700;font-size:1rem;margin:0 0 .15rem">${ROMAN[i] || i + 1}. ${esc(r.name.trim())}</p>
       ${chartImg}
-      ${obsHtml(parsed.observations[r.name])}
+      ${obsHtml(hyrPickObs(parsed.observations, r.name))}
     </div>`;
   };
 
@@ -5670,7 +5718,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
     h += `<hr style="margin:2rem 0">`;
     h += `<h2 style="${SECTION_H2}">Section 4: Observed Skills</h2>`;
     categorized.qualitative.forEach((r, i) => {
-      const hasObs = !!parsed.observed[r.name];
+      const hasObs = !!hyrPickObs(parsed.observed, r.name);
       const isQnoData = categorized.quantitativeNoData.has(r.name);
       const badgeText = isQnoData && !hasObs ? "(No Trials or Remarks were recorded this Period)"
         : isQnoData && hasObs ? "(No Trials were recorded this Period; Remarks only)"
@@ -5679,7 +5727,7 @@ function hyrBuildPreviewHtml(student, period, year, trendRows, categorized, pars
       const badge = ` <span style='font-weight:400;font-size:.8rem;color:#6b7280'>${badgeText}</span>`;
       h += `<div style="margin-top:2rem">
         <p style="font-weight:700;font-size:1rem;margin:0 0 .35rem">${ROMAN[i] || i + 1}. ${esc(r.name)}${badge}</p>
-        ${hasObs ? obsHtml(parsed.observed[r.name]) : `<p style="color:#9ca3af;font-style:italic">${isQnoData ? "No scores recorded this period — see session notes." : "Tracked via session notes — no percentage scores recorded this period."}</p>`}
+        ${hasObs ? obsHtml(hyrPickObs(parsed.observed, r.name)) : `<p style="color:#9ca3af;font-style:italic">${isQnoData ? "No scores recorded this term; see session notes." : "Tracked through session notes only, with no percentage scores recorded this term."}</p>`}
       </div>`;
     });
   }
@@ -5875,7 +5923,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
         children: [new ImageRun({ data: b64ToUint8(lb64), transformation: { width: 540, height: 280 }, type: "png", outline: REPORT_CHART_BORDER })],
         alignment: AlignmentType.CENTER, spacing: { after: 100 }
       }));
-      paras.push(...obsParas(parsed[obsKey]?.[r.name]));
+      paras.push(...obsParas(hyrPickObs(parsed[obsKey], r.name)));
     });
     return paras;
   }
@@ -6075,18 +6123,22 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     const offset = sectionTrendRows.length;
     categorized.qualitative.forEach((r, i) => {
       paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 280, after: 0 } }));
-      const _isQND = categorized.quantitativeNoData.has(r.name);
-      const _hasObs = !!parsed.observed?.[r.name];
-      const qualLabel = _isQND && !_hasObs ? "(No Trials or Remarks were recorded this Period)"
-        : _isQND && _hasObs ? "(No Trials were recorded this Period; Remarks only)"
-        : !_isQND && !_hasObs ? "(No Remarks were recorded this Period; Trials only)"
+      // Read straight from the session data. This label used to be decided by
+      // whether the AI had written a paragraph, so a target with a term's worth
+      // of session notes was announced as having no remarks at all.
+      const qualLabel = !r.hasRemarks && !r.hasTrials ? "(No Trials or Remarks were recorded this Period)"
+        : r.hasRemarks && !r.hasTrials ? "(No Trials were recorded this Period; Remarks only)"
+        : !r.hasRemarks && r.hasTrials ? "(No Remarks were recorded this Period; Trials only)"
         : "(Qualitative)";
       paragraphs.push(new Paragraph({ children: [new TextRun({ text: `${offset + i + 1}) ${r.name} ${qualLabel}`, bold: true, size: 24 })], spacing: { before: 0, after: 80, ...LS } }));
-      const obs = parsed.observed?.[r.name];
+      const obs = hyrPickObs(parsed.observed, r.name);
       if (obs) {
         paragraphs.push(...obsParas(obs));
       } else {
-        paragraphs.push(mkPara(`Tracked via session notes — no percentage scores recorded this period.`, { italics: true, color: "9CA3AF" }));
+        paragraphs.push(mkPara(r.hasRemarks
+          ? `Tracked through session notes only, with no percentage scores recorded this term.`
+          : `No percentage scores were recorded for this target this term.`,
+          { italics: true, color: "9CA3AF" }));
       }
     });
   }
