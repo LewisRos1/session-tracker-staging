@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1960";
+const APP_VERSION = "1961";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -4196,15 +4196,18 @@ function hyrMakeRange(startY, startM, endY, endM, isCustom) {
     if (++m > 12) { m = 1; y++; }
   }
   const first = months[0], last = months[months.length - 1];
-  const sameYear = startY === endY;
+  // Every label names the year at BOTH ends. "Mar - Jul 2026" leaves the
+  // reader to assume the first month shares the year printed after the second,
+  // which is exactly the assumption a cross-year range breaks.
   return {
     isCustom: !!isCustom, months, count: months.length,
     startY, startM, endY, endM,
     firstKey: first.key, lastKey: last.key,
     startFull: first.full, endFull: last.full,
-    spanLabel:  sameYear ? `${first.full}–${last.full} ${endY}`        : `${first.full} ${startY}–${last.full} ${endY}`,
-    wordsLabel: sameYear ? `${first.full} to ${last.full} ${endY}`     : `${first.full} ${startY} to ${last.full} ${endY}`,
-    shortLabel: sameYear ? `${first.short} - ${last.short} ${endY}`    : `${first.short} ${startY} - ${last.short} ${endY}`
+    startShort: first.short, endShort: last.short,
+    spanLabel:  `${first.full} ${startY}–${last.full} ${endY}`,
+    wordsLabel: `${first.full} ${startY} to ${last.full} ${endY}`,
+    shortLabel: `${first.short} ${startY} - ${last.short} ${endY}`
   };
 }
 
@@ -4928,8 +4931,15 @@ function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd
   const pts    = allPts.filter(p => p.v !== null && p.v !== undefined);
   if (pts.length === 0) return null;
 
-  const halfEnd = period === "H1" ? "Jun" : "Dec";
-  const rangeLabel = allPts.length > 0 ? `${allPts[0].label} - ${halfEnd}` : halfEnd;
+  // The end month came from the period string, so a custom range ending in
+  // July was labelled December. Both ends now come from the range, with years.
+  const _lcR = hyrRangeOf(period, year);
+  // The first plotted month is not always the range's first month, so take its
+  // year from the range by position rather than assuming the range start year.
+  const _lcFirst = _lcR.months[allPts[0]?.i ?? 0] || _lcR.months[0];
+  const rangeLabel = allPts.length > 0
+    ? `${allPts[0].label} ${_lcFirst.y} - ${_lcR.endShort} ${_lcR.endY}`
+    : _lcR.shortLabel;
   ctx.fillStyle = "#1f2937"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center";
   ctx.fillText(`${(targetName || "").trim()} (${rangeLabel} ${year})`, W / 2, 24);
 
@@ -5661,9 +5671,10 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     }
   }
   const firstMonthName = FULL_MONTH_NAMES[_firstLabel] || R.startFull;
-  const _sameYear = R.startY === R.endY;
-  const monthRangeFull = _sameYear ? ` to  ` : `  to  `;
-  const periodLabel    = _sameYear ? `– ` : ` – `;
+  // Both ends always carry their year, so a reader never has to infer which
+  // year the first month belongs to.
+  const monthRangeFull = `${firstMonthName} ${R.startY} to ${R.endFull} ${R.endY}`;
+  const periodLabel    = `${firstMonthName} ${R.startY}–${R.endFull} ${R.endY}`;
   const fullTermLabel  = R.spanLabel;
   const enrolledLate   = !R.isCustom && firstMonthName !== R.startFull;
   const nextMonthRange = period === "H1" ? "July to December" : "January to June";
@@ -5907,7 +5918,8 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   const _wordTargetPos = {};
   (student.targets || []).forEach((t, i) => { _wordTargetPos[t.name] = i; });
   const sectionTrendRows = [...trendRows.filter(r => !r.noData)].sort((a, b) => ((_wordTargetPos[a.name] ?? 999) - (_wordTargetPos[b.name] ?? 999)));
-  const ovTitle = `${student.name} (${monthRangeFull} Progress)`;
+  // Short form on a chart, long form in prose, both naming each year.
+  const ovTitle = `${student.name} (${firstMonthName.slice(0, 3)} ${R.startY} - ${R.endShort} ${R.endY} Progress)`;
   const ovDrawFn = hyrDrawOverviewChartC;
   const ovNativeW = 700;
   const ovResult = ovDrawFn(chartTrendRows, ovTitle);
@@ -6128,9 +6140,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   }
   if (appendixTargets.length) {
     appendixParas.push(mkPara("Activity Breakdown Charts", { heading: HeadingLevel.HEADING_2, before: 400, after: 80, size: 26, bold: true, pageBreak: true }));
-    const rangeLabel = R.startY === R.endY
-      ? `${firstMonthName.slice(0, 3)} - ${R.endFull.slice(0, 3)} ${R.endY}`
-      : `${firstMonthName.slice(0, 3)} ${R.startY} - ${R.endFull.slice(0, 3)} ${R.endY}`;
+    const rangeLabel = `${firstMonthName.slice(0, 3)} ${R.startY} - ${R.endShort} ${R.endY}`;
     const sec2NumberMap = new Map();
     // Numbered and ordered exactly as Section 2 is, which follows the target
     // order set on the website. chartTrendRows is sorted by score change, so
@@ -6213,7 +6223,11 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   const blob = await Packer.toBlob(doc);
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `${student.name} - ${period} ${year} Report - ${reportDate}.docx`;
+  // period is a range object for a custom report, so it cannot be interpolated
+  // directly: that is what produced "[object Object]" in the file name.
+  a.download = R.isCustom
+    ? `${student.name} - ${R.startShort} ${R.startY} to ${R.endShort} ${R.endY} - Custom Months Report - ${reportDate}.docx`
+    : `${student.name} - ${period} ${year} Report - ${reportDate}.docx`;
   a.click();
   URL.revokeObjectURL(a.href);
 }
