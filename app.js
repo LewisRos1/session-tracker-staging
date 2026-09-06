@@ -111,7 +111,7 @@ import {
   exportStudentData, exportAllStudents, exportGroupMemberData,
   exportStudentSingleSessionWord, exportGroupMemberSingleSessionWord,
   renderActivityBreakdownChart, calcDailyAverage, scoresPct,
-  setTrialScale, getTrialScale, TRIAL_PCT_DEFAULT
+  setTrialScale, getTrialScale
 } from "./export.js";
 
 // ── SW update detection — must run at parse time, before DOMContentLoaded,
@@ -181,7 +181,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1973";
+const APP_VERSION = "1974";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -788,10 +788,7 @@ function renderScoreSettingsBody() {
     <div class="score-settings-wrap">
       <div class="score-card">
         <h3 class="score-card-title">Trial scores</h3>
-        <p class="score-card-note">
-          What one trial is worth. Every score in the app is the average of its
-          trials, so 3, 2, 2 works out as (${draft[3]} + ${draft[2]} + ${draft[2]}) &divide; (100 &times; 3).
-        </p>
+        <p class="score-card-note">Assign scores to the trials:</p>
         <table class="score-table">
           <thead>
             <tr><th style="width:9rem">Trial</th><th>Score (%)</th></tr>
@@ -812,18 +809,12 @@ function renderScoreSettingsBody() {
         ${dirty && !errs.length ? `<div class="score-dirty-note">Not applied yet. The website is still using ${live.join(" / ")}.</div>` : ""}
         <div class="score-actions">
           <button class="btn-primary-sm" id="btn-score-apply" ${errs.length || !dirty ? "disabled" : ""}>Apply new score settings to website</button>
-          <button class="score-btn-plain" id="btn-score-reset">Reset to 0 / 25 / 50 / 100</button>
         </div>
         <div id="score-apply-msg" class="score-apply-msg"></div>
       </div>
 
       <div class="score-card">
         <h3 class="score-card-title">Try it out</h3>
-        <p class="score-card-note">
-          Add trials and see what they come to. This uses the numbers typed above,
-          not the ones the website is currently using, so you can see the effect
-          of a change before applying it.
-        </p>
         <div class="score-test-trials">
           ${_scoreTestTrials.map((t, i) => `
             <div class="score-trial">
@@ -865,10 +856,6 @@ function renderScoreSettingsBody() {
   });
   $("btn-score-add-trial")?.addEventListener("click", () => {
     _scoreTestTrials.push(3);
-    renderScoreSettingsBody();
-  });
-  $("btn-score-reset")?.addEventListener("click", () => {
-    _scoreDraft = [...TRIAL_PCT_DEFAULT];
     renderScoreSettingsBody();
   });
   $("btn-score-apply")?.addEventListener("click", applyScoreSettings);

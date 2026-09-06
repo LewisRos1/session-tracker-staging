@@ -3980,7 +3980,7 @@ button.wf-pill:hover { filter: brightness(.93); }
 .score-apply-msg.is-ok   { color: #15803d; }
 .score-apply-msg.is-fail { color: #b91c1c; }
 
-.score-test-trials { display: flex; flex-direction: column; gap: .4rem; margin-bottom: .7rem; }
+.score-test-trials { display: flex; flex-direction: column; gap: .4rem; margin: .7rem 0; }
 .score-trial { display: flex; align-items: center; gap: .6rem; }
 .score-trial-no {
   font-size: .82rem;
