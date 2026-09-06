@@ -181,14 +181,28 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1978";
+const APP_VERSION = "1979";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
 //    debugScanTarget("Hayden Chan", "Math")
 window.debugScanTarget = async function(studentName, targetName) {
   const students = await loadStudentsConfig();
-  const student = students.find(s => s.name === studentName);
+  // Three records can share the name "Caden Tan", separated only by their note,
+  // so an exact-name lookup would silently pick whichever came back first and
+  // search the wrong child's sessions. Accept "Caden Tan (School Readiness)"
+  // too, and refuse to guess when a bare name is ambiguous.
+  const _label = s => `${s.name}${noteBare(s.note) ? ` (${noteBare(s.note)})` : ""}`;
+  let student = students.find(s => _label(s) === studentName);
+  if (!student) {
+    const byName = students.filter(s => s.name === studentName);
+    if (byName.length === 1) student = byName[0];
+    else if (byName.length > 1) {
+      console.error(`More than one student is called "${studentName}". Pass the full label instead:`,
+        byName.map(_label));
+      return;
+    }
+  }
   if (!student) { console.error("Student not found:", studentName); return; }
   const sessions = await getAllSessionsForStudent(student.id);
   console.log(`Scanning ${sessions.length} sessions for ${studentName} / ${targetName}...`);
@@ -212,7 +226,21 @@ window.debugScanTarget = async function(studentName, targetName) {
 //     debugDuplicates("Kayden Koh", "Learning")
 window.debugDuplicates = async function(studentName, targetName) {
   const students = await loadStudentsConfig();
-  const student = students.find(s => s.name === studentName);
+  // Three records can share the name "Caden Tan", separated only by their note,
+  // so an exact-name lookup would silently pick whichever came back first and
+  // search the wrong child's sessions. Accept "Caden Tan (School Readiness)"
+  // too, and refuse to guess when a bare name is ambiguous.
+  const _label = s => `${s.name}${noteBare(s.note) ? ` (${noteBare(s.note)})` : ""}`;
+  let student = students.find(s => _label(s) === studentName);
+  if (!student) {
+    const byName = students.filter(s => s.name === studentName);
+    if (byName.length === 1) student = byName[0];
+    else if (byName.length > 1) {
+      console.error(`More than one student is called "${studentName}". Pass the full label instead:`,
+        byName.map(_label));
+      return;
+    }
+  }
   if (!student) { console.error("Student not found:", studentName); return; }
   const target = (student.targets || []).find(t => t.name === targetName);
   if (!target) { console.error("Target not found:", targetName); return; }
@@ -298,7 +326,21 @@ window.debugDuplicates = async function(studentName, targetName) {
 //     debugRepoint("Kayden Koh", "Learning", "amt73xzqm73w53", "amqknhgnoek9u", true)
 window.debugRepoint = async function(studentName, targetName, fromCfg, toCfg, apply = false) {
   const students = await loadStudentsConfig();
-  const student = students.find(s => s.name === studentName);
+  // A name is not unique: three records can share "Caden Tan", separated only by
+  // their note. A bare-name lookup picks whichever came back first, which on a
+  // WRITE tool means repairing the wrong child's data. Accept the full label
+  // "Caden Tan (School Readiness)", and refuse to guess when a name is shared.
+  const _label = s => `${s.name}${noteBare(s.note) ? ` (${noteBare(s.note)})` : ""}`;
+  let student = students.find(s => _label(s) === studentName);
+  if (!student) {
+    const _byName = students.filter(s => s.name === studentName);
+    if (_byName.length === 1) student = _byName[0];
+    else if (_byName.length > 1) {
+      console.error(`More than one student is called "${studentName}". Pass the full label instead:`,
+        _byName.map(_label));
+      return;
+    }
+  }
   if (!student) { console.error("Student not found:", studentName); return; }
   const target = (student.targets || []).find(t => t.name === targetName);
   if (!target) { console.error("Target not found:", targetName); return; }
@@ -353,7 +395,21 @@ window.debugRepoint = async function(studentName, targetName, fromCfg, toCfg, ap
 //     debugFixOldData("Kayden Koh", "Learning", null, true)
 window.debugFixOldData = async function(studentName, targetName, configId = null, apply = false) {
   const students = await loadStudentsConfig();
-  const student = students.find(s => s.name === studentName);
+  // A name is not unique: three records can share "Caden Tan", separated only by
+  // their note. A bare-name lookup picks whichever came back first, which on a
+  // WRITE tool means repairing the wrong child's data. Accept the full label
+  // "Caden Tan (School Readiness)", and refuse to guess when a name is shared.
+  const _label = s => `${s.name}${noteBare(s.note) ? ` (${noteBare(s.note)})` : ""}`;
+  let student = students.find(s => _label(s) === studentName);
+  if (!student) {
+    const _byName = students.filter(s => s.name === studentName);
+    if (_byName.length === 1) student = _byName[0];
+    else if (_byName.length > 1) {
+      console.error(`More than one student is called "${studentName}". Pass the full label instead:`,
+        _byName.map(_label));
+      return;
+    }
+  }
   if (!student) { console.error("Student not found:", studentName); return; }
   const target = (student.targets || []).find(t => t.name === targetName);
   if (!target) { console.error("Target not found:", targetName); return; }
@@ -431,7 +487,21 @@ window.debugFixOldData = async function(studentName, targetName, configId = null
 //     debugMergeInSession("Kayden Koh", "Learning", "2026-06-18", "amqknhgnoek9u", "amt73xzqm73w53")
 window.debugMergeInSession = async function(studentName, targetName, sessionDate, keepCfg, dropCfg, apply = false) {
   const students = await loadStudentsConfig();
-  const student = students.find(s => s.name === studentName);
+  // A name is not unique: three records can share "Caden Tan", separated only by
+  // their note. A bare-name lookup picks whichever came back first, which on a
+  // WRITE tool means repairing the wrong child's data. Accept the full label
+  // "Caden Tan (School Readiness)", and refuse to guess when a name is shared.
+  const _label = s => `${s.name}${noteBare(s.note) ? ` (${noteBare(s.note)})` : ""}`;
+  let student = students.find(s => _label(s) === studentName);
+  if (!student) {
+    const _byName = students.filter(s => s.name === studentName);
+    if (_byName.length === 1) student = _byName[0];
+    else if (_byName.length > 1) {
+      console.error(`More than one student is called "${studentName}". Pass the full label instead:`,
+        _byName.map(_label));
+      return;
+    }
+  }
   if (!student) { console.error("Student not found:", studentName); return; }
   const sessions = (await getAllSessionsForStudent(student.id)).filter(s => s.date === sessionDate);
   if (!sessions.length) { console.error("No session on", sessionDate); return; }
@@ -470,7 +540,21 @@ window.debugMergeInSession = async function(studentName, targetName, sessionDate
 //     debugDropConfigEntry("Kayden Koh", "Learning", "amt73xzqm73w53", true)
 window.debugDropConfigEntry = async function(studentName, targetName, configId, apply = false) {
   const students = await loadStudentsConfig();
-  const student = students.find(s => s.name === studentName);
+  // A name is not unique: three records can share "Caden Tan", separated only by
+  // their note. A bare-name lookup picks whichever came back first, which on a
+  // WRITE tool means repairing the wrong child's data. Accept the full label
+  // "Caden Tan (School Readiness)", and refuse to guess when a name is shared.
+  const _label = s => `${s.name}${noteBare(s.note) ? ` (${noteBare(s.note)})` : ""}`;
+  let student = students.find(s => _label(s) === studentName);
+  if (!student) {
+    const _byName = students.filter(s => s.name === studentName);
+    if (_byName.length === 1) student = _byName[0];
+    else if (_byName.length > 1) {
+      console.error(`More than one student is called "${studentName}". Pass the full label instead:`,
+        _byName.map(_label));
+      return;
+    }
+  }
   if (!student) { console.error("Student not found:", studentName); return; }
   const target = (student.targets || []).find(t => t.name === targetName);
   if (!target) { console.error("Target not found:", targetName); return; }
@@ -509,7 +593,21 @@ window.debugDropConfigEntry = async function(studentName, targetName, configId, 
 //       debugFindRemark("Caden Tan", "recover", "2026-03", "2026-07")
 window.debugFindRemark = async function(studentName, needle, fromYm = null, toYm = null) {
   const students = await loadStudentsConfig();
-  const student = students.find(s => s.name === studentName);
+  // A name is not unique: three records can share "Caden Tan", separated only by
+  // their note. A bare-name lookup picks whichever came back first, which on a
+  // WRITE tool means repairing the wrong child's data. Accept the full label
+  // "Caden Tan (School Readiness)", and refuse to guess when a name is shared.
+  const _label = s => `${s.name}${noteBare(s.note) ? ` (${noteBare(s.note)})` : ""}`;
+  let student = students.find(s => _label(s) === studentName);
+  if (!student) {
+    const _byName = students.filter(s => s.name === studentName);
+    if (_byName.length === 1) student = _byName[0];
+    else if (_byName.length > 1) {
+      console.error(`More than one student is called "${studentName}". Pass the full label instead:`,
+        _byName.map(_label));
+      return;
+    }
+  }
   if (!student) {
     console.error("Student not found:", studentName,
       "\nNames on file:", students.map(s => s.name));
@@ -558,7 +656,21 @@ window.debugFindRemark = async function(studentName, needle, fromYm = null, toYm
 //       debugAllRemarks("Caden Tan", "2026-03", "2026-07", "Self-Regulation")
 window.debugAllRemarks = async function(studentName, fromYm = null, toYm = null, targetName = null) {
   const students = await loadStudentsConfig();
-  const student = students.find(s => s.name === studentName);
+  // A name is not unique: three records can share "Caden Tan", separated only by
+  // their note. A bare-name lookup picks whichever came back first, which on a
+  // WRITE tool means repairing the wrong child's data. Accept the full label
+  // "Caden Tan (School Readiness)", and refuse to guess when a name is shared.
+  const _label = s => `${s.name}${noteBare(s.note) ? ` (${noteBare(s.note)})` : ""}`;
+  let student = students.find(s => _label(s) === studentName);
+  if (!student) {
+    const _byName = students.filter(s => s.name === studentName);
+    if (_byName.length === 1) student = _byName[0];
+    else if (_byName.length > 1) {
+      console.error(`More than one student is called "${studentName}". Pass the full label instead:`,
+        _byName.map(_label));
+      return;
+    }
+  }
   if (!student) {
     console.error("Student not found:", studentName,
       "\nNames on file:", students.map(s => s.name));
@@ -608,7 +720,21 @@ window.debugAllRemarks = async function(studentName, fromYm = null, toYm = null,
 //     debugRecordsByName("Kayden Koh", "Learning", "b) 2 Animals instructions")
 window.debugRecordsByName = async function(studentName, targetName, activityName) {
   const students = await loadStudentsConfig();
-  const student = students.find(s => s.name === studentName);
+  // A name is not unique: three records can share "Caden Tan", separated only by
+  // their note. A bare-name lookup picks whichever came back first, which on a
+  // WRITE tool means repairing the wrong child's data. Accept the full label
+  // "Caden Tan (School Readiness)", and refuse to guess when a name is shared.
+  const _label = s => `${s.name}${noteBare(s.note) ? ` (${noteBare(s.note)})` : ""}`;
+  let student = students.find(s => _label(s) === studentName);
+  if (!student) {
+    const _byName = students.filter(s => s.name === studentName);
+    if (_byName.length === 1) student = _byName[0];
+    else if (_byName.length > 1) {
+      console.error(`More than one student is called "${studentName}". Pass the full label instead:`,
+        _byName.map(_label));
+      return;
+    }
+  }
   if (!student) { console.error("Student not found:", studentName); return; }
   const sessions = await getAllSessionsForStudent(student.id);
   const rows = [];
@@ -643,7 +769,21 @@ window.debugRecordsByName = async function(studentName, targetName, activityName
 //     debugActivityRecords("Kayden Koh", "Learning", "amt73xzqm73w53")
 window.debugActivityRecords = async function(studentName, targetName, configId) {
   const students = await loadStudentsConfig();
-  const student = students.find(s => s.name === studentName);
+  // A name is not unique: three records can share "Caden Tan", separated only by
+  // their note. A bare-name lookup picks whichever came back first, which on a
+  // WRITE tool means repairing the wrong child's data. Accept the full label
+  // "Caden Tan (School Readiness)", and refuse to guess when a name is shared.
+  const _label = s => `${s.name}${noteBare(s.note) ? ` (${noteBare(s.note)})` : ""}`;
+  let student = students.find(s => _label(s) === studentName);
+  if (!student) {
+    const _byName = students.filter(s => s.name === studentName);
+    if (_byName.length === 1) student = _byName[0];
+    else if (_byName.length > 1) {
+      console.error(`More than one student is called "${studentName}". Pass the full label instead:`,
+        _byName.map(_label));
+      return;
+    }
+  }
   if (!student) { console.error("Student not found:", studentName); return; }
   const sessions = await getAllSessionsForStudent(student.id);
   const rows = [];
@@ -674,7 +814,21 @@ window.debugActivityRecords = async function(studentName, targetName, configId) 
 //    debugTargetConfig("Hayden Chan", "Math")
 window.debugTargetConfig = async function(studentName, targetName) {
   const students = await loadStudentsConfig();
-  const student = students.find(s => s.name === studentName);
+  // A name is not unique: three records can share "Caden Tan", separated only by
+  // their note. A bare-name lookup picks whichever came back first, which on a
+  // WRITE tool means repairing the wrong child's data. Accept the full label
+  // "Caden Tan (School Readiness)", and refuse to guess when a name is shared.
+  const _label = s => `${s.name}${noteBare(s.note) ? ` (${noteBare(s.note)})` : ""}`;
+  let student = students.find(s => _label(s) === studentName);
+  if (!student) {
+    const _byName = students.filter(s => s.name === studentName);
+    if (_byName.length === 1) student = _byName[0];
+    else if (_byName.length > 1) {
+      console.error(`More than one student is called "${studentName}". Pass the full label instead:`,
+        _byName.map(_label));
+      return;
+    }
+  }
   if (!student) { console.error("Student not found:", studentName); return; }
   const target = (student.targets || []).find(t => t.name === targetName);
   if (!target) { console.error("Target not found:", targetName); return; }
@@ -700,7 +854,21 @@ window.debugTargetConfig = async function(studentName, targetName) {
 //     debugRecoveryPlan("Hayden Chan", "Math")
 window.debugRecoveryPlan = async function(studentName, targetName) {
   const students = await loadStudentsConfig();
-  const student = students.find(s => s.name === studentName);
+  // A name is not unique: three records can share "Caden Tan", separated only by
+  // their note. A bare-name lookup picks whichever came back first, which on a
+  // WRITE tool means repairing the wrong child's data. Accept the full label
+  // "Caden Tan (School Readiness)", and refuse to guess when a name is shared.
+  const _label = s => `${s.name}${noteBare(s.note) ? ` (${noteBare(s.note)})` : ""}`;
+  let student = students.find(s => _label(s) === studentName);
+  if (!student) {
+    const _byName = students.filter(s => s.name === studentName);
+    if (_byName.length === 1) student = _byName[0];
+    else if (_byName.length > 1) {
+      console.error(`More than one student is called "${studentName}". Pass the full label instead:`,
+        _byName.map(_label));
+      return;
+    }
+  }
   if (!student) { console.error("Student not found:", studentName); return; }
   const target = (student.targets || []).find(t => t.name === targetName);
   if (!target) { console.error("Target not found:", targetName); return; }
@@ -764,7 +932,21 @@ window.debugRecoveryPlan = async function(studentName, targetName) {
 //    debugClearActivePeriod("Hayden Chan", "Math")
 window.debugClearActivePeriod = async function(studentName, targetName) {
   const students = await loadStudentsConfig();
-  const student = students.find(s => s.name === studentName);
+  // A name is not unique: three records can share "Caden Tan", separated only by
+  // their note. A bare-name lookup picks whichever came back first, which on a
+  // WRITE tool means repairing the wrong child's data. Accept the full label
+  // "Caden Tan (School Readiness)", and refuse to guess when a name is shared.
+  const _label = s => `${s.name}${noteBare(s.note) ? ` (${noteBare(s.note)})` : ""}`;
+  let student = students.find(s => _label(s) === studentName);
+  if (!student) {
+    const _byName = students.filter(s => s.name === studentName);
+    if (_byName.length === 1) student = _byName[0];
+    else if (_byName.length > 1) {
+      console.error(`More than one student is called "${studentName}". Pass the full label instead:`,
+        _byName.map(_label));
+      return;
+    }
+  }
   if (!student) { console.error("Student not found:", studentName); return; }
   const target = (student.targets || []).find(t => t.name === targetName);
   if (!target) { console.error("Target not found:", targetName); return; }
@@ -782,7 +964,21 @@ window.debugClearActivePeriod = async function(studentName, targetName) {
 //    debugDeleteCheck("Hayden Chan", "Math", "Writing/Spelling Numbers in Letters")
 window.debugDeleteCheck = async function(studentName, targetName, activityName) {
   const students = await loadStudentsConfig();
-  const student = students.find(s => s.name === studentName);
+  // A name is not unique: three records can share "Caden Tan", separated only by
+  // their note. A bare-name lookup picks whichever came back first, which on a
+  // WRITE tool means repairing the wrong child's data. Accept the full label
+  // "Caden Tan (School Readiness)", and refuse to guess when a name is shared.
+  const _label = s => `${s.name}${noteBare(s.note) ? ` (${noteBare(s.note)})` : ""}`;
+  let student = students.find(s => _label(s) === studentName);
+  if (!student) {
+    const _byName = students.filter(s => s.name === studentName);
+    if (_byName.length === 1) student = _byName[0];
+    else if (_byName.length > 1) {
+      console.error(`More than one student is called "${studentName}". Pass the full label instead:`,
+        _byName.map(_label));
+      return;
+    }
+  }
   if (!student) { console.error("Student not found:", studentName); return; }
   const sessions = await getAllSessionsForStudent(student.id);
   console.log(`Found ${sessions.length} sessions for ${studentName}`);
