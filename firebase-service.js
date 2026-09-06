@@ -1152,6 +1152,20 @@ export async function saveHalfYearReportConfig(data) {
   await setDoc(doc(db, "config", "halfYearReport"), data, { merge: true });
 }
 
+// ─── SCORING CONFIG ──────────────────────────────────────────
+// What each trial mark is worth as a percentage. One document for the whole
+// site: the scale has to be the same everywhere or two staff members reading
+// the same session would see different scores.
+
+export async function loadScoringConfig() {
+  const snap = await getDoc(doc(db, "config", "scoring"));
+  return snap.exists() ? snap.data() : {};
+}
+
+export async function saveScoringConfig(data) {
+  await setDoc(doc(db, "config", "scoring"), data, { merge: true });
+}
+
 // ─── REMARK PRESETS ──────────────────────────────────────────
 
 export async function loadRemarkPresets() {

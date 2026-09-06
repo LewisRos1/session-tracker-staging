@@ -3882,3 +3882,156 @@ button.wf-pill:hover { filter: brightness(.93); }
   font-size: .95rem; cursor: pointer; padding: 0 0 0 .2rem; flex-shrink: 0;
 }
 #ai-report-pill .ai-pill-x:hover { color: #fff; }
+
+/* ── Score Settings page ───────────────────────────────────────
+   Two cards: the scale itself, and a sandbox that works off the unsaved
+   values so the effect of a change can be seen before it reaches anyone. */
+.score-settings-wrap {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.score-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1.1rem 1.15rem 1.25rem;
+}
+.score-card-title {
+  margin: 0 0 .35rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.score-card-note {
+  margin: 0 0 .9rem;
+  font-size: .84rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+.score-table { width: 100%; border-collapse: collapse; }
+.score-table th {
+  text-align: left;
+  font-size: .78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  color: var(--text-muted);
+  padding: 0 0 .4rem;
+  border-bottom: 1px solid var(--border);
+}
+.score-table td { padding: .45rem 0; border-bottom: 1px solid #f1f3f5; }
+.score-mark { font-size: .93rem; font-weight: 600; color: var(--text); }
+.score-input {
+  width: 5.5rem;
+  padding: .4rem .55rem;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: .93rem;
+  font-family: var(--font);
+  color: var(--text);
+  text-align: right;
+  outline: none;
+}
+.score-input:focus { border-color: var(--primary); }
+.score-pct-sign { margin-left: .4rem; font-size: .88rem; color: var(--text-muted); }
+
+.score-errors {
+  margin-top: .8rem;
+  padding: .6rem .75rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-sm);
+  font-size: .82rem;
+  line-height: 1.6;
+  color: #b91c1c;
+}
+.score-dirty-note {
+  margin-top: .8rem;
+  font-size: .82rem;
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: var(--radius-sm);
+  padding: .55rem .75rem;
+}
+.score-actions {
+  margin-top: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .6rem;
+}
+.score-btn-plain {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: .45rem .8rem;
+  font-size: .84rem;
+  font-family: var(--font);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.score-btn-plain:hover { background: #f8f9fa; color: var(--text); }
+.score-apply-msg { margin-top: .7rem; font-size: .83rem; line-height: 1.5; }
+.score-apply-msg.is-ok   { color: #15803d; }
+.score-apply-msg.is-fail { color: #b91c1c; }
+
+.score-test-trials { display: flex; flex-direction: column; gap: .4rem; margin-bottom: .7rem; }
+.score-trial { display: flex; align-items: center; gap: .6rem; }
+.score-trial-no {
+  font-size: .82rem;
+  color: var(--text-muted);
+  min-width: 3.6rem;
+  flex-shrink: 0;
+}
+.score-trial-btns { display: flex; gap: .25rem; }
+.score-mark-btn {
+  min-width: 2.1rem;
+  padding: .3rem 0;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  font-size: .88rem;
+  font-family: var(--font);
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.score-mark-btn:hover { background: #f8f9fa; }
+.score-mark-btn.active {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.score-trial-del {
+  background: none;
+  border: none;
+  color: #cbd5e1;
+  font-size: .85rem;
+  cursor: pointer;
+  padding: .2rem .3rem;
+}
+.score-trial-del:hover { color: #dc2626; }
+
+.score-working {
+  margin-top: .3rem;
+  padding: .75rem .9rem;
+  background: #f8f9fa;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: .9rem;
+  line-height: 1.75;
+  color: var(--text);
+}
+.score-working-line { font-variant-numeric: tabular-nums; }
+.score-working-result {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
+}
+.score-working-empty { color: var(--text-muted); font-style: italic; font-size: .84rem; }

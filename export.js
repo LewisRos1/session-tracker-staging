@@ -3235,12 +3235,32 @@ function allScores(rem) {
 // goes through here; the formula used to be written out in nine separate places
 // and that is exactly how two of them would eventually disagree.
 //
+// The four values are editable from the Score Settings page and stored site-wide
+// in Firestore, so this holds the defaults only. Nothing persists a percentage:
+// sessions store raw marks, so a changed scale takes effect everywhere at once.
+//
 //   0 mark  ->   0%      2 marks ->  50%
 //   1 mark  ->  25%      3 marks -> 100%
 //
 // Option-based activities can award half a point, so values in between are
 // interpolated: 1.5 sits halfway between 25% and 50%, giving 37.5%.
-const TRIAL_PCT_3 = [0, 25, 50, 100];
+// The four values are editable from the Score Settings page and stored site-wide
+// in Firestore, so what follows is only the default. Nothing ever persists a
+// percentage: sessions store raw marks, so a changed scale takes effect
+// everywhere the moment it is applied, historical sessions included.
+export const TRIAL_PCT_DEFAULT = [0, 25, 50, 100];
+let TRIAL_PCT_3 = [...TRIAL_PCT_DEFAULT];
+
+/** Replaces the live scale. Bad input is refused rather than applied, so a
+ *  broken config document cannot take the whole app's scoring down with it. */
+export function setTrialScale(vals) {
+  if (!Array.isArray(vals) || vals.length !== 4) return false;
+  const nums = vals.map(Number);
+  if (nums.some(n => !Number.isFinite(n))) return false;
+  TRIAL_PCT_3 = nums;
+  return true;
+}
+export function getTrialScale() { return [...TRIAL_PCT_3]; }
 
 export function trialPct(score, maxPoints = 3) {
   const mp = maxPoints || 3;

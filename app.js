@@ -102,13 +102,16 @@ import {
   getAllGroupSessionsForStudent,
   changeSessionNumber,
   loadHalfYearReportConfig,
+  loadScoringConfig,
+  saveScoringConfig,
   saveHalfYearReportConfig,
   getStudentById
 } from "./firebase-service.js";
 import {
   exportStudentData, exportAllStudents, exportGroupMemberData,
   exportStudentSingleSessionWord, exportGroupMemberSingleSessionWord,
-  renderActivityBreakdownChart, calcDailyAverage, scoresPct
+  renderActivityBreakdownChart, calcDailyAverage, scoresPct,
+  setTrialScale, getTrialScale, TRIAL_PCT_DEFAULT
 } from "./export.js";
 
 // ── SW update detection — must run at parse time, before DOMContentLoaded,
@@ -178,7 +181,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1971";
+const APP_VERSION = "1972";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -739,6 +742,190 @@ function showInstructorPickerStep(onConfirm, preSelected = [], onBack = null, da
     const participants = [...$("session-picker-list").querySelectorAll(".inst-check:checked")].map(c => c.value);
     onConfirm(participants);
   });
+}
+
+
+// ─── SCORE SETTINGS SCREEN ───────────────────────────────────
+// What each trial mark is worth. One scale for the whole site, stored in
+// Firestore, because two staff reading the same session must not see different
+// scores. Nothing anywhere persists a percentage: sessions hold raw marks and
+// every average is derived, so applying a change rescores the entire history
+// the moment it lands, live sessions and old reports alike.
+let _scoreDraft = null;           // the four values being edited
+let _scoreTestTrials = [3, 2, 2]; // the tester's trials, seeded with the worked example
+
+function scoreScaleErrors(vals) {
+  const errs = [];
+  vals.forEach((v, i) => {
+    if (!Number.isFinite(v)) errs.push(`${i} marks: not a number.`);
+    else if (v < 0 || v > 100) errs.push(`${i} marks: must be between 0 and 100.`);
+  });
+  for (let i = 1; i < vals.length; i++) {
+    if (Number.isFinite(vals[i]) && Number.isFinite(vals[i - 1]) && vals[i] < vals[i - 1]) {
+      errs.push(`${i} marks cannot be worth less than ${i - 1} marks.`);
+    }
+  }
+  return errs;
+}
+
+function openScoreSettingsScreen() {
+  _scoreDraft = getTrialScale();
+  showScreen("screen-score-settings");
+  renderScoreSettingsBody();
+  const backBtn = $("btn-score-settings-back");
+  if (backBtn) backBtn.onclick = showHome;
+}
+
+function renderScoreSettingsBody() {
+  const body = $("score-settings-body");
+  if (!body) return;
+  const live = getTrialScale();
+  const draft = _scoreDraft;
+  const dirty = draft.some((v, i) => v !== live[i]);
+  const errs = scoreScaleErrors(draft);
+
+  body.innerHTML = `
+    <div class="score-settings-wrap">
+      <div class="score-card">
+        <h3 class="score-card-title">Trial scores</h3>
+        <p class="score-card-note">
+          What one trial is worth. Every score in the app is the average of its
+          trials, so 3, 2, 2 works out as (${draft[3]} + ${draft[2]} + ${draft[2]}) &divide; (100 &times; 3).
+        </p>
+        <table class="score-table">
+          <thead>
+            <tr><th style="width:9rem">Trial</th><th>Score (%)</th></tr>
+          </thead>
+          <tbody>
+            ${draft.map((v, i) => `
+              <tr>
+                <td class="score-mark">${i} ${i === 1 ? "mark" : "marks"}</td>
+                <td>
+                  <input type="number" class="score-input" data-mark="${i}"
+                    min="0" max="100" step="0.5" value="${Number.isFinite(v) ? v : ""}" />
+                  <span class="score-pct-sign">%</span>
+                </td>
+              </tr>`).join("")}
+          </tbody>
+        </table>
+        ${errs.length ? `<div class="score-errors">${errs.map(e => `<div>&bull; ${escHtml(e)}</div>`).join("")}</div>` : ""}
+        ${dirty && !errs.length ? `<div class="score-dirty-note">Not applied yet. The website is still using ${live.join(" / ")}.</div>` : ""}
+        <div class="score-actions">
+          <button class="btn-primary-sm" id="btn-score-apply" ${errs.length || !dirty ? "disabled" : ""}>Apply new score settings to website</button>
+          <button class="score-btn-plain" id="btn-score-reset">Reset to 0 / 25 / 50 / 100</button>
+        </div>
+        <div id="score-apply-msg" class="score-apply-msg"></div>
+      </div>
+
+      <div class="score-card">
+        <h3 class="score-card-title">Try it out</h3>
+        <p class="score-card-note">
+          Add trials and see what they come to. This uses the numbers typed above,
+          not the ones the website is currently using, so you can see the effect
+          of a change before applying it.
+        </p>
+        <div class="score-test-trials">
+          ${_scoreTestTrials.map((t, i) => `
+            <div class="score-trial">
+              <span class="score-trial-no">Trial ${i + 1}</span>
+              <div class="score-trial-btns">
+                ${[0, 1, 2, 3].map(m =>
+                  `<button class="score-mark-btn ${t === m ? "active" : ""}" data-trial="${i}" data-mark="${m}">${m}</button>`
+                ).join("")}
+              </div>
+              <button class="score-trial-del" data-trial="${i}" title="Remove this trial">&#10005;</button>
+            </div>`).join("")}
+        </div>
+        <button class="score-btn-plain" id="btn-score-add-trial">+ Trial</button>
+        ${renderScoreTestWorking()}
+      </div>
+    </div>`;
+
+  body.querySelectorAll(".score-input").forEach(inp => {
+    inp.addEventListener("input", () => {
+      const mark = inp.dataset.mark;
+      _scoreDraft[Number(mark)] = inp.value === "" ? NaN : Number(inp.value);
+      renderScoreSettingsBody();
+      // Re-rendering replaces the box being typed into, so put the cursor back.
+      const again = $("score-settings-body")?.querySelector(`.score-input[data-mark="${mark}"]`);
+      if (again) { again.focus(); again.setSelectionRange(again.value.length, again.value.length); }
+    });
+  });
+  body.querySelectorAll(".score-mark-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      _scoreTestTrials[Number(btn.dataset.trial)] = Number(btn.dataset.mark);
+      renderScoreSettingsBody();
+    });
+  });
+  body.querySelectorAll(".score-trial-del").forEach(btn => {
+    btn.addEventListener("click", () => {
+      _scoreTestTrials.splice(Number(btn.dataset.trial), 1);
+      renderScoreSettingsBody();
+    });
+  });
+  $("btn-score-add-trial")?.addEventListener("click", () => {
+    _scoreTestTrials.push(3);
+    renderScoreSettingsBody();
+  });
+  $("btn-score-reset")?.addEventListener("click", () => {
+    _scoreDraft = [...TRIAL_PCT_DEFAULT];
+    renderScoreSettingsBody();
+  });
+  $("btn-score-apply")?.addEventListener("click", applyScoreSettings);
+}
+
+/** The tester works off the DRAFT, so the effect of a change can be seen before
+ *  it is applied to everyone. */
+function renderScoreTestWorking() {
+  const draft = _scoreDraft;
+  if (!_scoreTestTrials.length) {
+    return `<div class="score-working score-working-empty">Add a trial to see the working.</div>`;
+  }
+  if (scoreScaleErrors(draft).length) {
+    return `<div class="score-working score-working-empty">Fix the values above to see the working.</div>`;
+  }
+  const pcts = _scoreTestTrials.map(t => draft[t]);
+  const sum = pcts.reduce((a, b) => a + b, 0);
+  const n = _scoreTestTrials.length;
+  return `
+    <div class="score-working">
+      <div class="score-working-line">${_scoreTestTrials.join(", ")}</div>
+      <div class="score-working-line">= (${pcts.join(" + ")}) &divide; (100 &times; ${n})</div>
+      <div class="score-working-line">= ${sum} &divide; ${100 * n}</div>
+      <div class="score-working-result">= ${Math.round(sum / n)}%</div>
+    </div>`;
+}
+
+async function applyScoreSettings() {
+  const btn = $("btn-score-apply");
+  const msg = $("score-apply-msg");
+  if (scoreScaleErrors(_scoreDraft).length) return;
+  if (!confirm(
+    `Apply ${_scoreDraft.join(" / ")} to the whole website?\n\n`
+    + `Every score is worked out from this scale, so this changes past sessions `
+    + `and past reports as well as new ones. A report generated after this will `
+    + `not match a copy already sent out.`
+  )) return;
+
+  if (btn) { btn.disabled = true; btn.textContent = "Applying…"; }
+  if (msg) { msg.textContent = ""; msg.className = "score-apply-msg"; }
+  try {
+    await saveScoringConfig({ trialPercents: _scoreDraft, updatedAt: new Date().toISOString() });
+    setTrialScale(_scoreDraft);
+    renderScoreSettingsBody();
+    const done = $("score-apply-msg");
+    if (done) {
+      done.className = "score-apply-msg is-ok";
+      done.textContent = "Applied. Every score on this device has already changed; "
+        + "other devices pick it up the next time they reload.";
+    }
+  } catch (err) {
+    if (btn) { btn.disabled = false; btn.textContent = "Apply new score settings to website"; }
+    if (msg) {
+      msg.className = "score-apply-msg is-fail";
+      msg.textContent = `Could not save: ${err.message}. Nothing was changed.`;
+    }
+  }
 }
 
 // ─── PASSWORD GATE ────────────────────────────────────────────
@@ -1413,14 +1600,24 @@ async function migrateGrayActivitiesToMaintained() {
 
 // Student/template/group/remark-preset config — only fetchable once signed in.
 async function loadAppData() {
-  // These 4 reads are independent of each other — fire them all at once
+  // These reads are independent of each other — fire them all at once
   // instead of one-after-another, or their wait times just add up.
-  const [studentsR, templatesR, groupsR, presetsR] = await Promise.allSettled([
+  const [studentsR, templatesR, groupsR, presetsR, scoringR] = await Promise.allSettled([
     loadStudentsConfig(),
     loadTemplates(),
     loadGroups(),
-    loadRemarkPresets()
+    loadRemarkPresets(),
+    loadScoringConfig()
   ]);
+
+  // The trial scale has to be in place before anything works out an average.
+  // A failed read leaves the built-in 0/25/50/100 standing rather than blocking
+  // the app, and setTrialScale refuses anything malformed.
+  if (scoringR.status === "fulfilled" && scoringR.value?.trialPercents) {
+    if (!setTrialScale(scoringR.value.trialPercents)) {
+      console.warn("[Score Settings] stored scale is malformed, using the default:", scoringR.value.trialPercents);
+    }
+  }
 
   // Student config (seeds from INITIAL_STUDENTS if empty)
   if (studentsR.status === "fulfilled") {
@@ -1910,9 +2107,14 @@ function renderStudentDatabaseButton() {
   if (!container) return;
   container.innerHTML = `<div class="info-btn-row">
     <button class="export-btn export-btn-all" id="btn-open-student-registry" style="margin-bottom:0">Student Database</button>
+    <button class="export-btn" id="btn-open-score-settings">Score Settings</button>
     <button class="export-btn" id="btn-open-ai-report">AI Report Generator</button>
   </div>`;
   $("btn-open-student-registry").addEventListener("click", () => openStudentRegistryScreen());
+  // Behind the same password as Edit Target: the scale it sets decides every
+  // score in the app, so it is not something to wander into.
+  $("btn-open-score-settings").addEventListener("click", () =>
+    requirePassword(() => openScoreSettingsScreen(), "Enter password to open Score Settings"));
   $("btn-open-ai-report").addEventListener("click", () => showScreen("screen-ai-report"));
 }
 
