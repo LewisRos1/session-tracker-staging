@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1964";
+const APP_VERSION = "1965";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6885,6 +6885,10 @@ ${collected.text}`;
     }
 
     const parsed = assessmentParseAiResponse(reportText);
+    // A target the model skipped prints a red placeholder in the document, but
+    // name it here too so the cause is visible while the report is running.
+    const _assessMissing = collected.rows.filter(r => !hyrPickObs(parsed.targets, r.target)).map(r => r.target);
+    if (_assessMissing.length) console.warn("[Assessment report] no write-up returned for:", _assessMissing);
     setProgress(88, "Writing report…");
     await assessmentDownloadWord(effectiveStudent, student, collected, parsed, PRON);
     setProgress(100, "Done!");
@@ -7054,20 +7058,31 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
       ],
       spacing: { before: 0, after: 80, ...LS }
     }));
-    const block = parsed.targets[r.target] || { strengths: [], weaknesses: [] };
-    const listOf = arr => arr.length ? arr : ["None noted during this assessment."];
+    // Matched loosely: the model echoes the target name back, and a stray space
+    // or a change of case used to lose the whole block. A MISSING block is not
+    // the same as an empty one. "None noted" is a real finding about the child
+    // and must never be printed just because the write-up went astray.
+    const block = hyrPickObs(parsed.targets, r.target);
+    const listOf = arr => block ? (arr.length ? arr : ["None noted during this assessment."]) : null;
+    const bullets = (arr, refName) => {
+      const items = listOf(arr);
+      if (!items) {
+        paragraphs.push(new Paragraph({
+          children: [new TextRun({ text: `[Not generated for this target. Please write this in manually.]`, size: 22, bold: true, highlight: "red" })],
+          alignment: AlignmentType.BOTH, spacing: { before: 20, after: 20, ...LS }
+        }));
+        return;
+      }
+      items.forEach(s => paragraphs.push(new Paragraph({
+        numbering: { reference: refName, level: 0 },
+        children: [new TextRun({ text: s, size: 22 })],
+        alignment: AlignmentType.BOTH, spacing: { before: 20, after: 20, ...LS }
+      })));
+    };
     paragraphs.push(mkPara("Strengths:", { bold: true, after: 40 }));
-    listOf(block.strengths).forEach(s => paragraphs.push(new Paragraph({
-      numbering: { reference: "assess-bullets", level: 0 },
-      children: [new TextRun({ text: s, size: 22 })],
-      alignment: AlignmentType.BOTH, spacing: { before: 20, after: 20, ...LS }
-    })));
+    bullets(block?.strengths || [], "assess-bullets");
     paragraphs.push(mkPara("Weaknesses:", { bold: true, before: 80, after: 40 }));
-    listOf(block.weaknesses).forEach(s => paragraphs.push(new Paragraph({
-      numbering: { reference: "assess-bullets", level: 0 },
-      children: [new TextRun({ text: s, size: 22 })],
-      alignment: AlignmentType.BOTH, spacing: { before: 20, after: 20, ...LS }
-    })));
+    bullets(block?.weaknesses || [], "assess-bullets");
   });
 
   // ── Page 4: Section 3 ──
@@ -7474,6 +7489,12 @@ ${(aiData[t.name] || []).join("\n")}`;
     }
 
     const parsed = monthlyParseAiResponse(reportText);
+    const _mrMissing = [
+      (parsed.highlights || []).length ? null : "Highlights",
+      (parsed.comparison || "").trim() ? null : "Comparison",
+      (parsed.stillWorking || []).length ? null : "What we're still working on"
+    ].filter(Boolean);
+    if (_mrMissing.length) console.warn("[Monthly report] section came back empty:", _mrMissing);
     setProgress(100, "Done!");
     await new Promise(r => setTimeout(r, 400));
 
@@ -8076,7 +8097,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
 
   function mkPara(text, opts = {}) {
     return new Paragraph({
-      children: [new TextRun({ text, bold: opts.bold, italics: opts.italics, size: opts.size || 22, color: opts.color })],
+      children: [new TextRun({ text, bold: opts.bold, italics: opts.italics, size: opts.size || 22, color: opts.color, highlight: opts.highlight })],
       heading: opts.heading, alignment: opts.align || AlignmentType.LEFT,
       spacing: { before: opts.before || 0, after: opts.after || 140, ...LS },
       pageBreakBefore: opts.pageBreak || false, keepNext: opts.keepNext || false
@@ -8180,11 +8201,21 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     alignment: AlignmentType.CENTER, spacing: { before: 0, after: 320, ...LS }
   }));
 
+  // Each of these fallbacks used to state something about the CHILD whenever the
+  // model's reply came back empty: no sessions, no difficulties. Those are real
+  // claims and were never true, since the section only ran because sessions
+  // exist and the prompt requires the bullets. A missing reply is flagged in red
+  // instead, so it cannot be handed to a parent unnoticed.
+  const mkMissing = what => mkPara(`[${what} was not generated. Please write this in manually.]`,
+    { bold: true, highlight: "red", after: 120 });
+
   summaryParas.push(mkSectionHead("Highlights this month"));
   if ((parsed.highlights || []).length) {
     parsed.highlights.forEach(h => summaryParas.push(mkNumbered(h, "mr-highlights")));
-  } else {
+  } else if (!sessionCount) {
     summaryParas.push(mkPara("No sessions were recorded this month.", { italics: true, color: "9ca3af", after: 120 }));
+  } else {
+    summaryParas.push(mkMissing("This section"));
   }
 
   summaryParas.push(mkSectionHead(comparisonHeading));
@@ -8192,7 +8223,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   // time frames is exactly what made this section hard to read.
   const _cmpParas = (parsed.comparison || "").split(/\r?\n+/).map(t => t.trim()).filter(Boolean);
   if (_cmpParas.length) _cmpParas.forEach(t => summaryParas.push(mkBody(t)));
-  else summaryParas.push(mkBody("—"));
+  else summaryParas.push(mkMissing("This section"));
 
   // Difficulties get their own section rather than sitting at the end of a
   // paragraph headed "Progress". The prompt forbids them appearing in both.
@@ -8200,7 +8231,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   if ((parsed.stillWorking || []).length) {
     parsed.stillWorking.forEach(w => summaryParas.push(mkNumbered(w, "mr-still")));
   } else {
-    summaryParas.push(mkPara("No particular areas of difficulty stood out this month.", { italics: true, color: "6b7280", after: 120 }));
+    summaryParas.push(mkMissing("This section"));
   }
 
   // Qualitative targets and this month's scores are collected here for the
