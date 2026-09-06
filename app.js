@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1962";
+const APP_VERSION = "1963";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3890,7 +3890,7 @@ async function hyrGenerate() {
     if (bar) bar.style.width = pct + "%";
     if (label) label.textContent = text;
     if (text === "Done!" && btn) btn.textContent = text;
-    if (text) aiJobProgress(text.replace(/…$/, "") + (pct < 100 ? ` (${pct}%)` : ""));
+    aiJobProgress(pct);
   };
 
   // The report's pronouns come from the student's gender, so it cannot be
@@ -4169,7 +4169,7 @@ RECOMMENDATIONS:
     else aiJobEnd("cancelled");
   } finally {
     // aiJobEnd clears the job, so this only fires when the catch did not run.
-    if (_aiJob) aiJobEnd("done", "Report downloaded");
+    if (_aiJob) aiJobEnd("done");
     _aiJob = null;
     _hyrAbortController = null;
     if (btn) {
@@ -4217,7 +4217,7 @@ function aiPillEl() {
   if (el) return el;
   el = document.createElement("div");
   el.id = "ai-report-pill";
-  el.innerHTML = `<span class="ai-pill-spin"></span><span class="ai-pill-text"></span>`
+  el.innerHTML = `<span class="ai-pill-ring"><span class="ai-pill-pct">0%</span></span><span class="ai-pill-text"></span>`
     + `<button class="ai-pill-x" title="Cancel">✕</button>`;
   el.querySelector(".ai-pill-x").addEventListener("click", () => {
     if (_aiJob) _aiJob.abort();
@@ -4226,11 +4226,17 @@ function aiPillEl() {
   document.body.appendChild(el);
   return el;
 }
-function aiPillShow(text, cls) {
+function aiPillShow(text, cls, pct) {
   const el = aiPillEl();
   el.classList.toggle("is-done", cls === "done");
   el.classList.toggle("is-fail", cls === "fail");
   el.querySelector(".ai-pill-text").textContent = text;
+  if (typeof pct === "number") {
+    const ring = el.querySelector(".ai-pill-ring");
+    const p = Math.max(0, Math.min(100, Math.round(pct)));
+    ring.style.setProperty("--pct", p + "%");
+    ring.querySelector(".ai-pill-pct").textContent = p + "%";
+  }
   el.querySelector(".ai-pill-x").title = cls ? "Dismiss" : "Cancel";
   el.style.display = "flex";
 }
@@ -4246,14 +4252,14 @@ function aiJobStart(label, abort) {
     return false;
   }
   _aiJob = { label, abort };
-  aiPillShow("Generating " + label + "… you can leave this page");
+  aiPillShow("Generating Report…", null, 0);
   return true;
 }
-function aiJobProgress(text) { if (_aiJob) aiPillShow(text); }
+function aiJobProgress(pct) { if (_aiJob) aiPillShow("Generating Report…", null, pct); }
 function aiJobEnd(state, text) {
   _aiJob = null;
   if (state === "done") {
-    aiPillShow(text || "Report downloaded", "done");
+    aiPillShow(text || "Done!", "done");
     setTimeout(() => {
       const el = document.getElementById("ai-report-pill");
       if (el && el.classList.contains("is-done")) aiPillHide();
@@ -6696,7 +6702,7 @@ async function assessmentGenerate() {
     if (bar) bar.style.width = pct + "%";
     if (label) label.textContent = text;
     if (text === "Done!" && btn) btn.textContent = text;
-    if (text) aiJobProgress(text.replace(/…$/, "") + (pct < 100 ? ` (${pct}%)` : ""));
+    aiJobProgress(pct);
   };
 
   // Same rule as the other reports: the wording uses the child's pronouns, so
@@ -6837,7 +6843,7 @@ ${collected.text}`;
     else aiJobEnd("cancelled");
   } finally {
     // aiJobEnd clears the job, so this only fires when the catch did not run.
-    if (_aiJob) aiJobEnd("done", "Report downloaded");
+    if (_aiJob) aiJobEnd("done");
     _aiJob = null;
     _hyrAbortController = null;
     if (btn) {
@@ -7132,7 +7138,7 @@ async function monthlyGenerate() {
     if (bar) bar.style.width = pct + "%";
     if (label) label.textContent = text;
     if (text === "Done!" && btn) btn.textContent = text;
-    if (text) aiJobProgress(text.replace(/…$/, "") + (pct < 100 ? ` (${pct}%)` : ""));
+    aiJobProgress(pct);
   };
 
   // The report's pronouns come from the student's gender, so it cannot be
@@ -7425,7 +7431,7 @@ ${(aiData[t.name] || []).join("\n")}`;
     else aiJobEnd("cancelled");
   } finally {
     // aiJobEnd clears the job, so this only fires when the catch did not run.
-    if (_aiJob) aiJobEnd("done", "Report downloaded");
+    if (_aiJob) aiJobEnd("done");
     _aiJob = null;
     _hyrAbortController = null;
     if (btn) {

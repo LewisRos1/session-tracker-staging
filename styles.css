@@ -3846,20 +3846,31 @@ button.wf-pill:hover { filter: brightness(.93); }
   font-size: .85rem; font-weight: 600; line-height: 1.3;
   box-shadow: 0 8px 28px rgba(0,0,0,.28);
   max-width: min(92vw, 460px);
+  --pill-bg: #111827;
 }
-#ai-report-pill.is-done { background: #15803d; }
-#ai-report-pill.is-fail { background: #b91c1c; }
-#ai-report-pill .ai-pill-spin {
-  width: 15px; height: 15px; flex-shrink: 0; border-radius: 50%;
-  border: 2px solid rgba(255,255,255,.35); border-top-color: #fff;
-  animation: ai-pill-spin .8s linear infinite;
+#ai-report-pill.is-done { background: #15803d; --pill-bg: #15803d; }
+#ai-report-pill.is-fail { background: #b91c1c; --pill-bg: #b91c1c; }
+/* Determinate ring: fills clockwise to the percentage, with the number in the
+   middle. The inner disc uses --pill-bg so it stays invisible on every state. */
+#ai-report-pill .ai-pill-ring {
+  position: relative; width: 34px; height: 34px; flex-shrink: 0;
+  border-radius: 50%;
+  background: conic-gradient(#fff 0 var(--pct, 0%), rgba(255,255,255,.25) var(--pct, 0%) 100%);
+  display: flex; align-items: center; justify-content: center;
 }
-#ai-report-pill.is-done .ai-pill-spin,
-#ai-report-pill.is-fail .ai-pill-spin { display: none; }
+#ai-report-pill .ai-pill-ring::before {
+  content: ""; position: absolute; inset: 4px;
+  border-radius: 50%; background: var(--pill-bg);
+}
+#ai-report-pill .ai-pill-pct {
+  position: relative; font-size: .6rem; font-weight: 700;
+  letter-spacing: -.02em; color: #fff;
+}
+#ai-report-pill.is-done .ai-pill-ring,
+#ai-report-pill.is-fail .ai-pill-ring { display: none; }
 #ai-report-pill .ai-pill-text { flex: 1; min-width: 0; }
 #ai-report-pill .ai-pill-x {
   background: none; border: none; color: rgba(255,255,255,.8);
   font-size: .95rem; cursor: pointer; padding: 0 0 0 .2rem; flex-shrink: 0;
 }
 #ai-report-pill .ai-pill-x:hover { color: #fff; }
-@keyframes ai-pill-spin { to { transform: rotate(360deg); } }
