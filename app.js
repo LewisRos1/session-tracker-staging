@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1958";
+const APP_VERSION = "1959";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3457,7 +3457,8 @@ function renderHalfYearReportsSection() {
         <span style="${labelStyle}">Report Type</span>
         <select id="hyr-type-select" class="admin-input" style="flex:1;min-width:0;background:#fff;font-family:inherit;font-size:1rem">
           <option value="">— Select —</option>
-          <option value="halfyear">Half Year</option>
+          <option value="halfyear">Half Year (Jan to Jun / Jul to Dec)</option>
+          <option value="custom">Choose Custom Months (Uses Half Year Report Format)</option>
           <option value="monthly">Monthly</option>
           <option value="assessment">Assessment</option>
         </select>
@@ -3465,6 +3466,8 @@ function renderHalfYearReportsSection() {
       <div id="hyr-row-period" style="display:none;gap:.75rem;align-items:center">
         <span id="hyr-period-label" style="${labelStyle}">Semester</span>
         <select id="hyr-period-select" class="admin-input" style="flex:1;min-width:0;background:#fff;font-family:inherit;font-size:1rem"></select>
+        <span id="hyr-period-to" style="display:none;font-size:.9rem;font-weight:600;color:#374151;flex-shrink:0">to</span>
+        <select id="hyr-period-select-2" class="admin-input" style="display:none;flex:1;min-width:0;background:#fff;font-family:inherit;font-size:1rem"></select>
         <button id="hyr-btn-generate" class="btn-add-section"
           style="font-size:.9rem;padding:.45rem 1.1rem;min-height:38px;white-space:nowrap;flex-shrink:0">
           Generate Report
@@ -3639,6 +3642,41 @@ function renderHalfYearReportsSection() {
       if (genBtn && genBtn.parentElement !== $("hyr-row-period")) $("hyr-row-period").appendChild(genBtn);
     }
 
+    // Custom months: two dropdowns covering every month from the student's
+    // first session to their last, gaps included, since a quiet month inside a
+    // range is normal and the report already copes with an empty one.
+    const toLabel = $("hyr-period-to"), sel2 = $("hyr-period-select-2");
+    if (type !== "custom") {
+      if (toLabel) toLabel.style.display = "none";
+      if (sel2) sel2.style.display = "none";
+    }
+    if (type === "custom") {
+      $("hyr-period-label").textContent = "Months";
+      const keys = [...new Set(_hyrSessions.map(s => String(s.date).slice(0, 7)))].sort();
+      if (!keys.length) {
+        periodSel.innerHTML = `<option value="">No sessions found</option>`;
+        $("hyr-row-period").style.display = "flex"; return;
+      }
+      const [fy, fm] = keys[0].split("-").map(Number);
+      const [ly, lm] = keys[keys.length - 1].split("-").map(Number);
+      const opts = hyrMakeRange(fy, fm, ly, lm, true).months
+        .map(mo => `<option value="${mo.key}">${mo.full} ${mo.y}</option>`).join("");
+      periodSel.innerHTML = opts;
+      sel2.innerHTML = opts;
+      periodSel.selectedIndex = 0;
+      sel2.selectedIndex = sel2.options.length - 1;
+      toLabel.style.display = "";
+      sel2.style.display = "";
+      $("hyr-row-period").style.display = "flex";
+      const _cStudent = state.students.find(s => s.id === studentIdForFilter());
+      if (_cStudent) {
+        const _cGrp = ($("hyr-session-type-select")?.value === "group") ? getGroupEffectiveTargets(_cStudent.id) : null;
+        hyrPopulateActivityFilter(_cGrp ? { ..._cStudent, targets: _cGrp } : _cStudent, _cStudent.id, "custom");
+        $("hyr-activity-filter").style.display = "";
+      }
+      return;
+    }
+
     if (type === "assessment") {
       $("hyr-row-period").style.display = "none";
       if (genBtn) $("hyr-row-type").appendChild(genBtn);
@@ -3706,7 +3744,10 @@ function renderHalfYearReportsSection() {
     if (!student) return;
     const _pSessType = $("hyr-session-type-select")?.value || "individual";
     const _pGrpTargets = _pSessType === "group" ? getGroupEffectiveTargets(studentId) : null;
-    hyrPopulateActivityFilter(_pGrpTargets ? { ...student, targets: _pGrpTargets } : student, studentId, e.target.value);
+    // Custom keeps one exclusion list rather than a separate one per start
+    // month, or changing the range would silently forget what was ticked.
+    const _pKey = $("hyr-type-select")?.value === "custom" ? "custom" : e.target.value;
+    hyrPopulateActivityFilter(_pGrpTargets ? { ...student, targets: _pGrpTargets } : student, studentId, _pKey);
     actFilter.style.display = "";
   });
 
@@ -3801,8 +3842,28 @@ async function hyrGenerate() {
   if (!studentId) { alert("Please select a student first."); return; }
   if (!periodVal) { alert("Please select a semester first."); return; }
 
-  const [yearStr, period] = periodVal.split("-");
-  const year = parseInt(yearStr) || new Date().getFullYear();
+  // A custom range becomes the same object the half-year path builds from its
+  // period string, so everything downstream is unaware of the difference.
+  let period, year;
+  if ($("hyr-type-select")?.value === "custom") {
+    const fromKey = periodVal;
+    const toKey   = $("hyr-period-select-2")?.value;
+    if (!toKey) { alert("Please choose both a start month and an end month."); return; }
+    if (fromKey > toKey) { alert("The start month must come before the end month."); return; }
+    const [sy, sm] = fromKey.split("-").map(Number);
+    const [ey, em] = toKey.split("-").map(Number);
+    const months = (ey - sy) * 12 + (em - sm) + 1;
+    if (months > 12) {
+      alert(`That range covers ${months} months.\n\nThe maximum for Choose Custom Months is 12 months.`);
+      return;
+    }
+    period = hyrMakeRange(sy, sm, ey, em, true);
+    year = sy;
+  } else {
+    const [yearStr, p] = periodVal.split("-");
+    period = p;
+    year = parseInt(yearStr) || new Date().getFullYear();
+  }
   const student = state.students.find(s => s.id === studentId);
   if (!student) return;
 
@@ -3843,7 +3904,8 @@ async function hyrGenerate() {
     const { text: dataText, chartData, breakdownData, trendRows, categorized } = await hyrCollectData(effectiveStudent, period, year, excludedActivities, sessionType);
 
     // Build prompt synchronously — then start fetch immediately so it runs in parallel with fake phases
-    const periodLabel = period === "H1" ? `January–June ${year}` : `July–December ${year}`;
+    const _gR = hyrRangeOf(period, year);
+    const periodLabel = _gR.spanLabel;
     const firstName   = student.preferredName || student.name.split(" ")[0];
     // Gender is required before generating, so the pronouns are always known.
     const PRON = student.gender === "female"
@@ -3852,16 +3914,20 @@ async function hyrGenerate() {
     // Actual data start month (may differ from term start if student enrolled mid-term)
     const _hyrMonthAbbrs = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     const _hyrMonthFull  = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-    const _hyrTermStart  = period === "H1" ? "January" : "July";
-    const _hyrTermEnd    = period === "H1" ? "June" : "December";
+    const _hyrTermStart  = _gR.startFull;
+    const _hyrTermEnd    = _gR.endFull;
     let _hyrFirstLabel = null;
-    for (let _i = 0; _i < 6 && !_hyrFirstLabel; _i++) {
-      for (const _r of trendRows) { if (_r.labels?.[_i]) { _hyrFirstLabel = _r.labels[_i]; break; } }
+    // Only a half-year report backs its start date off to the first month with
+    // data; a custom range was chosen deliberately and keeps what was picked.
+    if (!_gR.isCustom) {
+      for (let _i = 0; _i < _gR.count && !_hyrFirstLabel; _i++) {
+        for (const _r of trendRows) { if (_r.labels?.[_i]) { _hyrFirstLabel = _r.labels[_i]; break; } }
+      }
     }
     const _hyrFirstMonth = (_hyrMonthAbbrs.indexOf(_hyrFirstLabel) >= 0 ? _hyrMonthFull[_hyrMonthAbbrs.indexOf(_hyrFirstLabel)] : null) || _hyrTermStart;
-    const _hyrEnrolledLate = _hyrFirstMonth !== _hyrTermStart;
+    const _hyrEnrolledLate = !_gR.isCustom && _hyrFirstMonth !== _hyrTermStart;
     const aiReportingPeriod = _hyrEnrolledLate
-      ? `${_hyrFirstMonth}–${_hyrTermEnd} ${year} (student joined in ${_hyrFirstMonth}; full term is ${periodLabel})`
+      ? `${_hyrFirstMonth}–${_hyrTermEnd} ${_gR.endY} (student joined in ${_hyrFirstMonth}; full term is ${periodLabel})`
       : periodLabel;
     const targetsWithData = trendRows.filter(r => !r.noData);
 
@@ -4112,16 +4178,53 @@ function getGroupEffectiveTargets(studentId) {
   return targets.length > 0 ? targets : null;
 }
 
+const HYR_SHORT_MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const HYR_FULL_MONTHS  = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+/**
+ * One shape for both kinds of report. "H1"/"H2" with a year yield exactly the
+ * six months they always did; a custom range carries its own ends and may
+ * cross a year boundary, which is why months are keyed "YYYY-MM" rather than
+ * by month number inside a single year.
+ */
+function hyrMakeRange(startY, startM, endY, endM, isCustom) {
+  const months = [];
+  let y = startY, m = startM;
+  while (y < endY || (y === endY && m <= endM)) {
+    months.push({ y, m, key: `${y}-${String(m).padStart(2, "0")}`,
+                  short: HYR_SHORT_MONTHS[m - 1], full: HYR_FULL_MONTHS[m - 1] });
+    if (++m > 12) { m = 1; y++; }
+  }
+  const first = months[0], last = months[months.length - 1];
+  const sameYear = startY === endY;
+  return {
+    isCustom: !!isCustom, months, count: months.length,
+    startY, startM, endY, endM,
+    firstKey: first.key, lastKey: last.key,
+    startFull: first.full, endFull: last.full,
+    spanLabel:  sameYear ? `${first.full}–${last.full} ${endY}`        : `${first.full} ${startY}–${last.full} ${endY}`,
+    wordsLabel: sameYear ? `${first.full} to ${last.full} ${endY}`     : `${first.full} ${startY} to ${last.full} ${endY}`,
+    shortLabel: sameYear ? `${first.short} - ${last.short} ${endY}`    : `${first.short} ${startY} - ${last.short} ${endY}`
+  };
+}
+
+/** Accepts either a half-year period string or an already-built custom range. */
+function hyrRangeOf(period, year) {
+  if (period && typeof period === "object") return period;
+  const [sm, em] = period === "H1" ? [1, 6] : [7, 12];
+  return hyrMakeRange(year, sm, year, em, false);
+}
+
 async function hyrCollectData(student, period, year, excludedActivities = new Set(), sessionType = "individual") {
-  const [startMonth, endMonth] = period === "H1" ? [1, 6] : [7, 12];
-  const shortMonths = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const HYR_R = hyrRangeOf(period, year);
+  const shortMonths = HYR_SHORT_MONTHS;
 
   const allSessions = sessionType === "group"
     ? await getAllGroupSessionsForStudent(student.id)
     : await getAllSessionsForStudent(student.id);
   const sessions = allSessions.filter(s => {
-    const [y, m] = s.date.split("-").map(Number);
-    return y === year && m >= startMonth && m <= endMonth;
+    const ym = String(s.date).slice(0, 7);
+    return ym >= HYR_R.firstKey && ym <= HYR_R.lastKey;
   });
 
   // For group sessions, filter each session's remarks down to just this student's
@@ -4159,7 +4262,7 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
 
   if (sessions.length === 0) {
     return {
-      text: `No sessions recorded for this student in ${period} ${year}.`,
+      text: `No sessions recorded for this student in ${HYR_R.spanLabel}.`,
       chartData: {}, breakdownData: {}, trendRows: [],
       categorized: { mostImproved: [], strengths: [], qualitative: [], needsSupport: [], emerging: [] }
     };
@@ -4204,8 +4307,8 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
     const chartLabels = [];
     const chartValues = [];
     const monthlyAvgs = [];
-    for (let m = startMonth; m <= endMonth; m++) {
-      const mLabel = shortMonths[m - 1];
+    for (const _mo of HYR_R.months) {
+      const m = _mo.m, mLabel = _mo.short;
       chartLabels.push(mLabel);
       const mSessions = tData[mLabel] || [];
       if (mSessions.length === 0) { monthlyAvgs.push(`${mLabel}: no data`); chartValues.push(null); continue; }
@@ -4354,8 +4457,8 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
           actMonthlyAvgs[mLabel].push(rem.avg);
         }
         const actDataMonths = [];
-        for (let m = startMonth; m <= endMonth; m++) {
-          const mLabel = shortMonths[m - 1];
+        for (const _mo of HYR_R.months) {
+          const m = _mo.m, mLabel = _mo.short;
           const scores = actMonthlyAvgs[mLabel];
           if (!scores || scores.length === 0) continue;
           actDataMonths.push({ label: mLabel, avg: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) });
@@ -4399,8 +4502,8 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
         // model can see a target dip but not which activity moved, and can't tell
         // a real decline from an activity that simply stopped being worked on.
         const _actMonthly = [];
-        for (let m = startMonth; m <= endMonth; m++) {
-          const mLabel = shortMonths[m - 1];
+        for (const _mo of HYR_R.months) {
+          const m = _mo.m, mLabel = _mo.short;
           const scores = actMonthlyAvgs[mLabel];
           _actMonthly.push(scores && scores.length
             ? `${mLabel} ${Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)}%`
@@ -4474,8 +4577,8 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
         }
       }
       const dataMonths = [];
-      for (let m = startMonth; m <= endMonth; m++) {
-        const mLabel = shortMonths[m - 1];
+      for (const _mo of HYR_R.months) {
+        const m = _mo.m, mLabel = _mo.short;
         const scores = monthly[mLabel];
         if (!scores?.length) continue;
         dataMonths.push({ label: mLabel, avg: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) });
@@ -5541,21 +5644,28 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   const n = activeTargets.length;
   const tNames = activeTargets.map(t => t.name);
   const targetList = n <= 1 ? (tNames[0] || "") : tNames.slice(0, -1).join(", ") + " and " + tNames[n - 1];
-  const halfText   = period === "H1" ? "first" : "second";
+  const R = hyrRangeOf(period, year);
+  const halfText   = R.startM === 1 ? "first" : "second";
   const FULL_MONTH_NAMES = { Jan:"January",Feb:"February",Mar:"March",Apr:"April",May:"May",Jun:"June",Jul:"July",Aug:"August",Sep:"September",Oct:"October",Nov:"November",Dec:"December" };
-  const halfEndName = period === "H1" ? "June" : "December";
-  const halfStartDefault = period === "H1" ? "January" : "July";
+  const halfEndName = R.endFull;
+  const halfStartDefault = R.startFull;
+  // A half-year report starts its labels at the first month that actually has
+  // data, so a child who joined in March is not described as a January start.
+  // A custom range was chosen deliberately, so its own start month stands.
   let _firstLabel = null;
-  for (let i = 0; i < 6 && !_firstLabel; i++) {
-    for (const row of trendRows) {
-      if (row.labels?.[i] && row.values?.[i] !== null && row.values?.[i] !== undefined) { _firstLabel = row.labels[i]; break; }
+  if (!R.isCustom) {
+    for (let i = 0; i < R.count && !_firstLabel; i++) {
+      for (const row of trendRows) {
+        if (row.labels?.[i] && row.values?.[i] !== null && row.values?.[i] !== undefined) { _firstLabel = row.labels[i]; break; }
+      }
     }
   }
-  const firstMonthName = FULL_MONTH_NAMES[_firstLabel] || halfStartDefault;
-  const monthRange = `${firstMonthName} to ${halfEndName}`;
-  const periodLabel    = `${firstMonthName}–${halfEndName} ${year}`;
-  const fullTermLabel  = `${halfStartDefault}–${halfEndName} ${year}`;
-  const enrolledLate   = firstMonthName !== halfStartDefault;
+  const firstMonthName = FULL_MONTH_NAMES[_firstLabel] || R.startFull;
+  const _sameYear = R.startY === R.endY;
+  const monthRangeFull = _sameYear ? ` to  ` : `  to  `;
+  const periodLabel    = _sameYear ? `– ` : ` – `;
+  const fullTermLabel  = R.spanLabel;
+  const enrolledLate   = !R.isCustom && firstMonthName !== R.startFull;
   const nextMonthRange = period === "H1" ? "July to December" : "January to June";
   const nextTermYear   = period === "H1" ? year : year + 1;
   const ROMAN = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"];
@@ -5686,8 +5796,13 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
       : [],
     alignment: AlignmentType.CENTER, spacing: { before: 480, after: 560, ...CPL }
   }));
+  // The only thing a custom range changes on the page: a half-year report is
+  // always six months and can name itself, whereas a chosen range has to say
+  // how many months it covers.
   paragraphs.push(new Paragraph({
-    children: [new TextRun({ text: "Half-Year Progress Report", bold: true, size: 72, font: TNR })],
+    children: [new TextRun({
+      text: R.isCustom ? `${R.count} Month${R.count === 1 ? "" : "s"} Progress Report` : "Half-Year Progress Report",
+      bold: true, size: 72, font: TNR })],
     alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, ...CPL }
   }));
   paragraphs.push(new Paragraph({
@@ -5753,7 +5868,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
       mkDetailRow("Name:", student.name),
       mkDetailRow("Date of Birth:", ""),
       mkDetailRow("Age:", ""),
-      mkDetailRow("Tracking Period:", `${monthRange} ${year}`),
+      mkDetailRow("Tracking Period:", monthRangeFull),
       mkDetailRow("Date of Report:", reportDate)
     ]
   }));
@@ -5770,8 +5885,10 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     return name;
   });
   const wordIntroLine1 = enrolledLate
-    ? `Although the term runs from ${halfStartDefault} to ${halfEndName} ${year}, ${firstName} joined us in ${firstMonthName} ${year}. This report covers their progress from ${firstMonthName} to ${halfEndName} ${year} in ${n} key therapy target${n !== 1 ? "s" : ""}:`
-    : `This report documents ${firstName}'s progress across the ${halfText} half of ${year} (${monthRange}) in ${n} key therapy target${n !== 1 ? "s" : ""}:`;
+    ? `Although the term runs from ${R.startFull} to ${R.endFull} ${R.endY}, ${firstName} joined us in ${firstMonthName} ${R.endY}. This report covers their progress from ${monthRangeFull} in ${n} key therapy target${n !== 1 ? "s" : ""}:`
+    : R.isCustom
+      ? `This report documents ${firstName}'s progress from ${monthRangeFull} in ${n} key therapy target${n !== 1 ? "s" : ""}:`
+      : `This report documents ${firstName}'s progress across the ${halfText} half of ${R.endY} (${monthRangeFull}) in ${n} key therapy target${n !== 1 ? "s" : ""}:`;
   paragraphs.push(mkPara(wordIntroLine1, { after: 80, align: AlignmentType.JUSTIFIED }));
   expandedNames.forEach((name, i) => {
     paragraphs.push(new Paragraph({
@@ -5790,7 +5907,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   const _wordTargetPos = {};
   (student.targets || []).forEach((t, i) => { _wordTargetPos[t.name] = i; });
   const sectionTrendRows = [...trendRows.filter(r => !r.noData)].sort((a, b) => ((_wordTargetPos[a.name] ?? 999) - (_wordTargetPos[b.name] ?? 999)));
-  const ovTitle = `${student.name} (${monthRange} ${year} Progress)`;
+  const ovTitle = `${student.name} (${monthRangeFull} Progress)`;
   const ovDrawFn = hyrDrawOverviewChartC;
   const ovNativeW = 700;
   const ovResult = ovDrawFn(chartTrendRows, ovTitle);
@@ -5841,7 +5958,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   // ── Section 2: Target Progress ──────────────────────────────
   paragraphs.push(mkPara("Section 2: Target Review", { heading: HeadingLevel.HEADING_1, before: 560, after: 160, pageBreak: true, size: 32, bold: true }));
   paragraphs.push(mkPara(
-    `This section provides a detailed look at each of ${firstName}'s therapy targets for ${monthRange} ${year}.`,
+    `This section provides a detailed look at each of ${firstName}'s therapy targets for ${monthRangeFull}.`,
     { after: 280, align: AlignmentType.JUSTIFIED }
   ));
   paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 0, after: 280 } }));
@@ -6011,7 +6128,9 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   }
   if (appendixTargets.length) {
     appendixParas.push(mkPara("Activity Breakdown Charts", { heading: HeadingLevel.HEADING_2, before: 400, after: 80, size: 26, bold: true, pageBreak: true }));
-    const rangeLabel = `${firstMonthName.slice(0, 3)} - ${halfEndName.slice(0, 3)} ${year}`;
+    const rangeLabel = R.startY === R.endY
+      ? `${firstMonthName.slice(0, 3)} - ${R.endFull.slice(0, 3)} ${R.endY}`
+      : `${firstMonthName.slice(0, 3)} ${R.startY} - ${R.endFull.slice(0, 3)} ${R.endY}`;
     const sec2NumberMap = new Map();
     // Numbered and ordered exactly as Section 2 is, which follows the target
     // order set on the website. chartTrendRows is sorted by score change, so
