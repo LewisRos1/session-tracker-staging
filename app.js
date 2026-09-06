@@ -181,7 +181,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1972";
+const APP_VERSION = "1973";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -2107,8 +2107,8 @@ function renderStudentDatabaseButton() {
   if (!container) return;
   container.innerHTML = `<div class="info-btn-row">
     <button class="export-btn export-btn-all" id="btn-open-student-registry" style="margin-bottom:0">Student Database</button>
-    <button class="export-btn" id="btn-open-score-settings">Score Settings</button>
     <button class="export-btn" id="btn-open-ai-report">AI Report Generator</button>
+    <button class="export-btn" id="btn-open-score-settings">Score Settings</button>
   </div>`;
   $("btn-open-student-registry").addEventListener("click", () => openStudentRegistryScreen());
   // Behind the same password as Edit Target: the scale it sets decides every
