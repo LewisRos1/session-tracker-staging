@@ -3834,3 +3834,32 @@ button.wf-pill:hover { filter: brightness(.93); }
 .btn-excel-export-ready:disabled,
 .btn-ai-h1-ready:disabled { opacity: .5; cursor: not-allowed; }
 
+
+/* ── Background AI report indicator ────────────────────────────
+   Fixed to the viewport, not to the AI Report section, because going
+   home rebuilds that section's HTML and would destroy it mid-run. */
+#ai-report-pill {
+  position: fixed; right: 1rem; bottom: 1rem; z-index: 9999;
+  display: none; align-items: center; gap: .65rem;
+  padding: .6rem .95rem; border-radius: 999px;
+  background: #111827; color: #fff;
+  font-size: .85rem; font-weight: 600; line-height: 1.3;
+  box-shadow: 0 8px 28px rgba(0,0,0,.28);
+  max-width: min(92vw, 460px);
+}
+#ai-report-pill.is-done { background: #15803d; }
+#ai-report-pill.is-fail { background: #b91c1c; }
+#ai-report-pill .ai-pill-spin {
+  width: 15px; height: 15px; flex-shrink: 0; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.35); border-top-color: #fff;
+  animation: ai-pill-spin .8s linear infinite;
+}
+#ai-report-pill.is-done .ai-pill-spin,
+#ai-report-pill.is-fail .ai-pill-spin { display: none; }
+#ai-report-pill .ai-pill-text { flex: 1; min-width: 0; }
+#ai-report-pill .ai-pill-x {
+  background: none; border: none; color: rgba(255,255,255,.8);
+  font-size: .95rem; cursor: pointer; padding: 0 0 0 .2rem; flex-shrink: 0;
+}
+#ai-report-pill .ai-pill-x:hover { color: #fff; }
+@keyframes ai-pill-spin { to { transform: rotate(360deg); } }

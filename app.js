@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1961";
+const APP_VERSION = "1962";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3490,6 +3490,16 @@ function renderHalfYearReportsSection() {
   // Show this month's running total straight away, before any report is made.
   renderAiCostLine();
 
+  // Coming back mid-generation, the freshly built button would otherwise read
+  // "Generate Report" and look idle while a job is still running.
+  if (_aiJob) {
+    const _rb = $("hyr-btn-generate");
+    if (_rb) {
+      _rb.textContent = "✕ Cancel";
+      _rb.style.cssText += ";background:#fee2e2;color:#dc2626;border-color:#ef4444";
+    }
+  }
+
   let _hyrSessions = null;
   let _hyrIndivSessions = [];
   let _hyrGroupSessions = [];
@@ -3752,6 +3762,12 @@ function renderHalfYearReportsSection() {
   });
 
   $("hyr-btn-generate").addEventListener("click", () => {
+    // While a job runs this button is the Cancel. Coming back to a rebuilt
+    // page it looks like Generate again, so ask before throwing the work away.
+    if (_aiJob) {
+      if (confirm(`A ${_aiJob.label} is still generating.\n\nCancel it?`)) _aiJob.abort();
+      return;
+    }
     const type = $("hyr-type-select").value;
     if (type === "assessment") { requirePassword(assessmentGenerate, EXPORT_MSG); return; }
     if (type === "monthly") { requirePassword(monthlyGenerate, EXPORT_MSG); return; }
@@ -3830,11 +3846,6 @@ function hyrPopulateActivityFilter(student, studentId, periodVal) {
 let _hyrAbortController = null;
 
 async function hyrGenerate() {
-  // If already generating, this click cancels
-  if (_hyrAbortController) {
-    _hyrAbortController.abort();
-    return;
-  }
 
   const studentId   = $("hyr-student-select")?.value;
   const periodVal   = $("hyr-period-select")?.value;
@@ -3872,10 +3883,14 @@ async function hyrGenerate() {
   const bar      = $("hyr-progress-bar");
   const label    = $("hyr-progress-label");
   let inCancelMode = false;
+  // Null-safe: going home rebuilds the AI Report section, so these nodes can
+  // be detached by the time a later step reports in. The pill is the copy the
+  // user actually sees once they have navigated away.
   const setProgress = (pct, text) => {
-    bar.style.width = pct + "%";
-    label.textContent = text;
-    if (text === "Done!") btn.textContent = text;
+    if (bar) bar.style.width = pct + "%";
+    if (label) label.textContent = text;
+    if (text === "Done!" && btn) btn.textContent = text;
+    if (text) aiJobProgress(text.replace(/…$/, "") + (pct < 100 ? ` (${pct}%)` : ""));
   };
 
   // The report's pronouns come from the student's gender, so it cannot be
@@ -3890,7 +3905,10 @@ async function hyrGenerate() {
   // Drop the previous report's cost as soon as a new one starts, or it reads as
   // the cost of the report currently running. The running total stays.
   renderAiCostLine();
-  btn.disabled = true; progress.style.display = "";
+  const AI_JOB_LABEL = period && typeof period === "object" ? "custom months report" : "half-year report";
+  if (!aiJobStart(AI_JOB_LABEL, () => _hyrAbortController?.abort())) return;
+  if (btn) btn.disabled = true;
+  if (progress) progress.style.display = "";
   setProgress(5, "");
 
   try {
@@ -4145,16 +4163,24 @@ RECOMMENDATIONS:
     await hyrDownloadWord(effectiveStudent, period, year, trendRows, categorized, parsed, breakdownData, chartData, sessionType);
 
   } catch (err) {
-    if (err.name !== "AbortError") alert("Failed to generate report:\n" + err.message);
+    // No alert: it would steal focus mid-typing, which is the interruption
+    // background generation exists to avoid. The pill carries the message.
+    if (err.name !== "AbortError") aiJobEnd("fail", `Report failed: ${err.message}`);
+    else aiJobEnd("cancelled");
   } finally {
+    // aiJobEnd clears the job, so this only fires when the catch did not run.
+    if (_aiJob) aiJobEnd("done", "Report downloaded");
+    _aiJob = null;
     _hyrAbortController = null;
-    btn.disabled = false;
-    btn.textContent = "Generate Report";
-    btn.style.background = "";
-    btn.style.color = "";
-    btn.style.borderColor = "";
-    progress.style.display = "none";
-    bar.style.width = "0%";
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Generate Report";
+      btn.style.background = "";
+      btn.style.color = "";
+      btn.style.borderColor = "";
+    }
+    if (progress) progress.style.display = "none";
+    if (bar) bar.style.width = "0%";
   }
 }
 
@@ -4176,6 +4202,67 @@ function getGroupEffectiveTargets(studentId) {
     }
   }
   return targets.length > 0 ? targets : null;
+}
+
+// ── Background report generation ──────────────────────────────
+// A report takes about a minute, and the user should not have to sit on the
+// AI Report screen watching it. The job carries on wherever they navigate,
+// reporting into a pill fixed to the viewport: the AI Report section's own
+// progress bar cannot be used for this, because going home rebuilds that
+// section's HTML and would destroy it mid-run.
+let _aiJob = null;
+
+function aiPillEl() {
+  let el = document.getElementById("ai-report-pill");
+  if (el) return el;
+  el = document.createElement("div");
+  el.id = "ai-report-pill";
+  el.innerHTML = `<span class="ai-pill-spin"></span><span class="ai-pill-text"></span>`
+    + `<button class="ai-pill-x" title="Cancel">✕</button>`;
+  el.querySelector(".ai-pill-x").addEventListener("click", () => {
+    if (_aiJob) _aiJob.abort();
+    else aiPillHide();
+  });
+  document.body.appendChild(el);
+  return el;
+}
+function aiPillShow(text, cls) {
+  const el = aiPillEl();
+  el.classList.toggle("is-done", cls === "done");
+  el.classList.toggle("is-fail", cls === "fail");
+  el.querySelector(".ai-pill-text").textContent = text;
+  el.querySelector(".ai-pill-x").title = cls ? "Dismiss" : "Cancel";
+  el.style.display = "flex";
+}
+function aiPillHide() {
+  const el = document.getElementById("ai-report-pill");
+  if (el) el.style.display = "none";
+}
+
+/** Refuses a second job, so two reports cannot bill and download at once. */
+function aiJobStart(label, abort) {
+  if (_aiJob) {
+    alert(`A ${_aiJob.label} is already being generated.\n\nPlease wait for it to finish before starting another.`);
+    return false;
+  }
+  _aiJob = { label, abort };
+  aiPillShow("Generating " + label + "… you can leave this page");
+  return true;
+}
+function aiJobProgress(text) { if (_aiJob) aiPillShow(text); }
+function aiJobEnd(state, text) {
+  _aiJob = null;
+  if (state === "done") {
+    aiPillShow(text || "Report downloaded", "done");
+    setTimeout(() => {
+      const el = document.getElementById("ai-report-pill");
+      if (el && el.classList.contains("is-done")) aiPillHide();
+    }, 6000);
+  } else if (state === "fail") {
+    aiPillShow(text || "Report failed", "fail");   // stays until dismissed
+  } else {
+    aiPillHide();
+  }
 }
 
 const HYR_SHORT_MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -6602,10 +6689,14 @@ async function assessmentGenerate() {
   const bar   = $("hyr-progress-bar");
   const label = $("hyr-progress-label");
   let inCancelMode = false;
+  // Null-safe: going home rebuilds the AI Report section, so these nodes can
+  // be detached by the time a later step reports in. The pill is the copy the
+  // user actually sees once they have navigated away.
   const setProgress = (pct, text) => {
-    bar.style.width = pct + "%";
-    label.textContent = text;
-    if (text === "Done!") btn.textContent = text;
+    if (bar) bar.style.width = pct + "%";
+    if (label) label.textContent = text;
+    if (text === "Done!" && btn) btn.textContent = text;
+    if (text) aiJobProgress(text.replace(/…$/, "") + (pct < 100 ? ` (${pct}%)` : ""));
   };
 
   // Same rule as the other reports: the wording uses the child's pronouns, so
@@ -6617,7 +6708,10 @@ async function assessmentGenerate() {
   }
 
   renderAiCostLine();
-  btn.disabled = true; progress.style.display = "";
+  const AI_JOB_LABEL = "assessment report";
+  if (!aiJobStart(AI_JOB_LABEL, () => _hyrAbortController?.abort())) return;
+  if (btn) btn.disabled = true;
+  if (progress) progress.style.display = "";
   setProgress(5, "");
 
   try {
@@ -6739,12 +6833,19 @@ ${collected.text}`;
     await new Promise(r => setTimeout(r, 400));
 
   } catch (err) {
-    if (err.name !== "AbortError") alert("Failed to generate assessment report:\n" + err.message);
+    if (err.name !== "AbortError") aiJobEnd("fail", `Assessment report failed: ${err.message}`);
+    else aiJobEnd("cancelled");
   } finally {
+    // aiJobEnd clears the job, so this only fires when the catch did not run.
+    if (_aiJob) aiJobEnd("done", "Report downloaded");
+    _aiJob = null;
     _hyrAbortController = null;
-    btn.disabled = false; btn.textContent = "Generate Report";
-    btn.style.background = ""; btn.style.color = ""; btn.style.borderColor = "";
-    progress.style.display = "none"; bar.style.width = "0%";
+    if (btn) {
+      btn.disabled = false; btn.textContent = "Generate Report";
+      btn.style.background = ""; btn.style.color = ""; btn.style.borderColor = "";
+    }
+    if (progress) progress.style.display = "none";
+    if (bar) bar.style.width = "0%";
   }
 }
 
@@ -7024,10 +7125,14 @@ async function monthlyGenerate() {
   const bar = $("hyr-progress-bar");
   const label = $("hyr-progress-label");
   let inCancelMode = false;
+  // Null-safe: going home rebuilds the AI Report section, so these nodes can
+  // be detached by the time a later step reports in. The pill is the copy the
+  // user actually sees once they have navigated away.
   const setProgress = (pct, text) => {
-    bar.style.width = pct + "%";
-    label.textContent = text;
-    if (text === "Done!") btn.textContent = text;
+    if (bar) bar.style.width = pct + "%";
+    if (label) label.textContent = text;
+    if (text === "Done!" && btn) btn.textContent = text;
+    if (text) aiJobProgress(text.replace(/…$/, "") + (pct < 100 ? ` (${pct}%)` : ""));
   };
 
   // The report's pronouns come from the student's gender, so it cannot be
@@ -7042,7 +7147,10 @@ async function monthlyGenerate() {
   // Drop the previous report's cost as soon as a new one starts, or it reads as
   // the cost of the report currently running. The running total stays.
   renderAiCostLine();
-  btn.disabled = true; progress.style.display = "";
+  const AI_JOB_LABEL = "monthly report";
+  if (!aiJobStart(AI_JOB_LABEL, () => _hyrAbortController?.abort())) return;
+  if (btn) btn.disabled = true;
+  if (progress) progress.style.display = "";
   setProgress(5, "");
   try {
     const excludedActivities = new Set();
@@ -7313,12 +7421,19 @@ ${(aiData[t.name] || []).join("\n")}`;
 
     await monthlyDownloadWord(effectiveStudent, year, month, monthName, sessionCount, threeMonthData, miniData, parsed, masteredThisMonth, comparisonHeading, sessionType);
   } catch (err) {
-    if (err.name !== "AbortError") alert("Failed to generate monthly report:\n" + err.message);
+    if (err.name !== "AbortError") aiJobEnd("fail", `Monthly report failed: ${err.message}`);
+    else aiJobEnd("cancelled");
   } finally {
+    // aiJobEnd clears the job, so this only fires when the catch did not run.
+    if (_aiJob) aiJobEnd("done", "Report downloaded");
+    _aiJob = null;
     _hyrAbortController = null;
-    btn.disabled = false; btn.textContent = "Generate Report";
-    btn.style.background = ""; btn.style.color = ""; btn.style.borderColor = "";
-    progress.style.display = "none"; bar.style.width = "0%";
+    if (btn) {
+      btn.disabled = false; btn.textContent = "Generate Report";
+      btn.style.background = ""; btn.style.color = ""; btn.style.borderColor = "";
+    }
+    if (progress) progress.style.display = "none";
+    if (bar) bar.style.width = "0%";
   }
 }
 
