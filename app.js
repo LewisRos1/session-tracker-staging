@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1959";
+const APP_VERSION = "1960";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3458,7 +3458,7 @@ function renderHalfYearReportsSection() {
         <select id="hyr-type-select" class="admin-input" style="flex:1;min-width:0;background:#fff;font-family:inherit;font-size:1rem">
           <option value="">— Select —</option>
           <option value="halfyear">Half Year (Jan to Jun / Jul to Dec)</option>
-          <option value="custom">Choose Custom Months (Uses Half Year Report Format)</option>
+          <option value="custom">Custom Months (Uses Half Year Report Format)</option>
           <option value="monthly">Monthly</option>
           <option value="assessment">Assessment</option>
         </select>
@@ -3854,7 +3854,7 @@ async function hyrGenerate() {
     const [ey, em] = toKey.split("-").map(Number);
     const months = (ey - sy) * 12 + (em - sm) + 1;
     if (months > 12) {
-      alert(`That range covers ${months} months.\n\nThe maximum for Choose Custom Months is 12 months.`);
+      alert(`That range covers ${months} months.\n\nThe maximum for Custom Months is 12 months.`);
       return;
     }
     period = hyrMakeRange(sy, sm, ey, em, true);
