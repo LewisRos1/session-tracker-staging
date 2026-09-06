@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1965";
+const APP_VERSION = "1966";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6423,14 +6423,16 @@ function assessmentCollect(student, sessions, excludedActivities) {
     const ev = [];
     days.forEach((d, di) => {
       Object.entries(d.sess.activities || {}).forEach(([recId, a]) => {
-        if (a.targetName !== t.name) return;
+        // Older records store the target under `target`, not `targetName`. Matching
+        // only the new field silently dropped every remark on those sessions.
+        if (a.targetName !== t.name && a.target !== t.name) return;
         const actName = a.activityName || "";
         if (exNames.has(actName) || (a.configId && exIds.has(a.configId))) return;
         Object.values(d.sess.remarks || {}).filter(r => r.activityId === recId).forEach(r => {
           const txt  = plainTextForEdit(r.text || "").trim();
           const note = plainTextForEdit(r.masteryNote || "").trim();
           const tr   = (r.trials || []).filter(v => v !== null && v !== -1);
-          const said = [txt, note].filter(Boolean).join(" — ");
+          const said = [txt, note].filter(Boolean).join(" / ");
           if (!said && !tr.length) return;
           ev.push(`  Day ${di + 1} (${d.label}) | ${actName}: ${said || "(no remark)"}${tr.length ? ` [trials ${tr.join(", ")}]` : ""}`);
         });
@@ -7442,8 +7444,17 @@ ${masteredThisMonth.length ? masteredThisMonth.map(m => `  - ${m.activity} (unde
 SESSION DATA BY TARGET:
 ${activeTargets.map(t => {
   const md = miniData[t.name] || {};
+  // A target tracked only through remarks has no scores to compare, and the
+  // trend was forced to "stable" in that case. Handing the model "Stable" for a
+  // target that was never scored invites it to report steady progress that no
+  // number supports, so say plainly that there is nothing to compare.
+  const _mTrendLine = (md.thisMonthAvg == null && md.lastMonthAvg == null)
+    ? "No percentage scores recorded. This target is tracked through session notes, which are listed below and must still be written about."
+    : (md.thisMonthAvg == null || md.lastMonthAvg == null)
+      ? "No trend available, only one of these two months has a score."
+      : trendLabel(md.trend);
   return `TARGET: ${t.name}
-This month (${md.lastMonthLabel} to ${md.thisMonthLabel}): ${trendLabel(md.trend)}
+This month (${md.lastMonthLabel} to ${md.thisMonthLabel}): ${_mTrendLine}
 ${(aiData[t.name] || []).join("\n")}`;
 }).join("\n\n")}`;
 
