@@ -1718,53 +1718,60 @@ input.field-input::placeholder {
   border: 2px dashed var(--primary);
   border-radius: var(--radius-sm);
 }
-
-/* Two ways into the same compact layout: .mn-collapsed-view is held on by the
-   toggle, .is-reordering is applied for the duration of a drag. Every rule below
-   lists both so a drag looks exactly like Collapsed View being switched on —
-   title-only activity rows, sub-activity titles beneath their parent, and the
-   Mastered/Discontinued groups shown as compact rows rather than full cards. */
+/* Edit Target activities open COLLAPSED and expand one at a time. The title row
+   is the toggle and stays visible either way, so it reads as the card's header;
+   .mn-collapse-btn beside the kebab does the same job from the other end.
+   .is-reordering forces the compact look for the duration of a drag, whatever
+   happens to be open, which is why those rules carry !important. */
 .mn-act-compact-title {
-  display: none;
+  display: block;
   font-size: .9rem;
   font-weight: 600;
   color: #374151;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   padding: .05rem 0;
+  cursor: pointer;
+  /* Wrap rather than clip. A long title used to run past the card and sit on
+     top of the kebab, which is unreachable once that happens. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
-.mn-sub-compact-list   { display: none; }
-.mn-inact-compact-body { display: none; }
+.mn-act-compact-title:hover { color: #4338ca; }
+.mn-act-body { display: none !important; }
+.mn-sub-compact-list { display: block; }
+.mn-collapse-btn {
+  display: none;
+  align-self: flex-start;
+  background: #f3f4f6;
+  border: none;
+  border-radius: .3rem;
+  cursor: pointer;
+  color: #6b7280;
+  font-size: .8rem;
+  line-height: 1;
+  padding: 0 .35rem;
+  min-width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+}
+.mn-collapse-btn:hover { background: #e5e7eb; color: #374151; }
 
-.is-reordering .mn-act-compact-title,
-.mn-collapsed-view .mn-act-compact-title { display: block; }
+.is-expanded > .mn-act-body,
+.is-expanded .mn-act-body { display: flex !important; }
+.is-expanded .mn-sub-compact-list { display: none; }
+.is-expanded .mn-collapse-btn { display: block; }
 
-.is-reordering .mn-act-body,
-.mn-collapsed-view .mn-act-body { display: none !important; }
-
-/* Sub-activities live inside .mn-act-body, so their titles are shown from a
-   separate list that takes its place. */
-.is-reordering .mn-sub-compact-list,
-.mn-collapsed-view .mn-sub-compact-list { display: block; }
-
-/* The group headers stay visible either way, so the counts are there and you can
-   see which section you're dropping into; opening one shows title-only rows
-   instead of the full editable cards. */
-.is-reordering .mn-inact-body,
-.mn-collapsed-view .mn-inact-body { display: none !important; }
-
-.is-reordering .mn-inact-compact-body,
-.mn-collapsed-view .mn-inact-compact-body { display: block; }
+.is-reordering .mn-act-compact-title { display: block !important; }
+.is-reordering .mn-act-body { display: none !important; }
+.is-reordering .mn-sub-compact-list { display: block !important; }
+.is-reordering .mn-collapse-btn { display: none !important; }
 .mn-sub-compact {
   font-size: .84rem;
   color: #0369a1;
   padding: .1rem 0 .1rem .9rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: .4rem;
 }
 

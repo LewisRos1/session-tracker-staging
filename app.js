@@ -178,7 +178,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1968";
+const APP_VERSION = "1969";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -18380,7 +18380,7 @@ async function handleActStartPickerChange() {
 // ── Open / close ──────────────────────────────────────────────
 
 function openManageModal(student, targetOrNull, templateOrNull = null, remarkPresetOrNull = null, scrollToPaId = null) {
-  _mnCollapsedView = false;   // always opens expanded — see the declaration
+  _mnExpandedActs = new Set();   // every activity opens collapsed
   $("manage-modal").classList.remove("hidden");
   if (remarkPresetOrNull) {
     renderRemarkPresetManageContent(remarkPresetOrNull);
@@ -19673,12 +19673,6 @@ function mnStatusKebabHtml(a, idx, isParent = false) {
          (!isParent ? btn('maintain','🆗 Maintain Activity',';color:#0369a1') : '');
 }
 
-// Collapsed view in Edit Target — title-only rows, no detail fields and no
-// mastered/discontinued groups, while drag handles and ⋮ menus stay live.
-// Deliberately NOT persisted: it resets to off every time the editor is opened
-// (see openManageModal / openGroupManageModal), so nobody is surprised by a
-// half-empty-looking screen they don't remember switching on.
-let _mnCollapsedView = false;
 
 // ─── EDIT TARGET: SECTION SEGMENTS ───────────────────────────
 // Every activity belongs to the section heading that precedes it in the array;
@@ -19789,6 +19783,96 @@ function mnReorderActs(acts, newOrder) {
   return result;
 }
 
+
+// ── Per-activity expand / collapse in Edit Target ─────────────
+// Every activity opens collapsed: a target with twenty activities was otherwise
+// a wall of forms you had to scroll past to reach the one you wanted. Clicking a
+// title expands that card alone, and the others are left exactly as they were.
+// Expansion is remembered across the re-render that follows a save, keyed by the
+// activity's own id so adding or deleting a card cannot shift the state onto its
+// neighbour.
+let _mnExpandedActs = new Set();
+
+const mnActExpandKey = (a, idx) => (a && a.id) ? `id:${a.id}` : `ix:${idx}`;
+
+/**
+ * Turns every activity card in the modal into its own expander, active and
+ * inactive alike. Mastered and discontinued cards are the same thing as an
+ * active card minus the drag handle, so they are given the same title row and
+ * the same body wrapper here rather than the title-only list they used to get.
+ */
+function mnInitActivityCollapse(bodyEl, acts) {
+  const list = bodyEl.querySelector("#mn-act-list");
+  if (!list) return;
+
+  bodyEl.querySelectorAll(".mn-inact-card").forEach(card => {
+    if (card.querySelector(".mn-act-compact-title")) return;
+    const body = card.querySelector(":scope > div[style*='flex:1']");
+    if (!body) return;
+    const gi = Number(card.dataset.globalIdx);
+    const a = Number.isFinite(gi) ? acts[gi] : null;
+    // The body keeps its own layout styles, so it is wrapped in a plain column
+    // that holds the title above it.
+    const col = document.createElement("div");
+    col.style.cssText = "flex:1;min-width:0;display:flex;flex-direction:column;gap:.3rem";
+    const title = document.createElement("div");
+    title.className = "mn-act-compact-title";
+    title.innerHTML = a ? formatActivityMarkup(a.title || a.name || "") : "";
+    body.parentElement.insertBefore(col, body);
+    col.appendChild(title);
+    col.appendChild(body);
+    body.classList.add("mn-act-body");
+    body.style.flex = "1";
+  });
+
+  const cards = [
+    ...list.querySelectorAll(":scope > .admin-list-item"),
+    ...bodyEl.querySelectorAll(".mn-inact-card")
+  ].filter(c => c.querySelector(".mn-act-compact-title") && c.querySelector(".mn-act-body"));
+
+  cards.forEach(card => {
+    // The kebab is the only fixed landmark both card types share. Its wrapper
+    // becomes a flex row so the collapse button can sit beside it.
+    const kebab = card.querySelector(".mn-kebab-btn, .btn-mn-inactive-kebab");
+    if (kebab && !card.querySelector(".mn-collapse-btn")) {
+      const wrap = kebab.parentElement;
+      wrap.style.display = "flex";
+      wrap.style.alignItems = "flex-start";
+      wrap.style.gap = ".25rem";
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "mn-collapse-btn";
+      btn.title = "Collapse this activity";
+      btn.textContent = "▲";
+      wrap.insertBefore(btn, kebab);
+    }
+
+    const gi = Number(card.dataset.globalIdx ?? card.dataset.idx);
+    const key = mnActExpandKey(Number.isFinite(gi) ? acts[gi] : null, gi);
+    card.dataset.expandKey = key;
+    card.classList.toggle("is-expanded", _mnExpandedActs.has(key));
+
+    const setOpen = on => {
+      card.classList.toggle("is-expanded", on);
+      if (on) _mnExpandedActs.add(key); else _mnExpandedActs.delete(key);
+      // Textareas measured while hidden come back 0px tall.
+      if (on) card.querySelectorAll("textarea").forEach(autoResizeTextarea);
+    };
+
+    // An activity with no title yet would collapse to an empty strip with
+    // nothing to click, so it keeps a placeholder to grab hold of.
+    const titleEl = card.querySelector(".mn-act-compact-title");
+    if (!titleEl.textContent.trim()) {
+      titleEl.innerHTML = `<span style="color:#9ca3af;font-style:italic;font-weight:500">(Untitled activity)</span>`;
+    }
+    titleEl.addEventListener("click", () =>
+      setOpen(!card.classList.contains("is-expanded")));
+    card.querySelector(".mn-collapse-btn")?.addEventListener("click", e => {
+      e.stopPropagation();
+      setOpen(false);
+    });
+  });
+}
 // Moves every card built into the hidden #mn-inactive-source into a collapsed
 // group under the heading it belongs to, then removes the staging container.
 // Runs after innerHTML but before listeners are attached, so the handlers bound
@@ -19823,39 +19907,16 @@ function mnRegroupInactiveCards(bodyEl, acts) {
             `<span class="mn-inact-arrow" style="font-size:.7rem">▶</span>` +
             `<span>${m.emoji} ${m.label} (<span class="mn-inact-count">0</span>)</span>` +
           `</button>` +
-          // Two bodies, one shown at a time by CSS: the full editable cards in
-          // normal view, and title-only rows in collapsed view. Building the
-          // compact rows here avoids touching the card markup at all.
+          // One body only. Mastered and discontinued cards now collapse and
+          // expand individually like the active ones, so the separate
+          // title-only list that used to sit beside them is gone.
           `<div class="mn-inact-panel" style="display:none">` +
             `<div class="mn-inact-body"></div>` +
-            `<div class="mn-inact-compact-body"></div>` +
           `</div>`;
         holder.appendChild(group);
       }
       group.querySelector(".mn-inact-body").appendChild(card);
 
-      // Matching compact row: number top-level entries, letter their subs.
-      const pa = acts[gi];
-      if (pa) {
-        const compact = group.querySelector(".mn-inact-compact-body");
-        const isSub = !!pa.parentActivity;
-        if (isSub) {
-          group.dataset.subSeq = String(Number(group.dataset.subSeq || 0) + 1);
-        } else {
-          group.dataset.topSeq = String(Number(group.dataset.topSeq || 0) + 1);
-          group.dataset.subSeq = "0";
-        }
-        const marker = isSub
-          ? `${String.fromCharCode(96 + Number(group.dataset.subSeq))})`
-          : `${group.dataset.topSeq})`;
-        const row = document.createElement("div");
-        row.className = "mn-inact-compact-row";
-        row.style.cssText = `display:flex;align-items:center;gap:.4rem;padding:.12rem 0;${isSub ? "padding-left:1.5rem;" : ""}font-size:.84rem`;
-        row.innerHTML =
-          `<span style="font-weight:700;color:${isSub ? "#0369a1" : "#6b7280"};flex-shrink:0;min-width:1.3rem">${marker}</span>` +
-          `<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${formatActivityMarkup(pa.title || pa.name || "")}</span>`;
-        compact.appendChild(row);
-      }
 
       group.querySelector(".mn-inact-count").textContent =
         String(group.querySelectorAll(".mn-inact-body > .mn-inact-card").length);
@@ -19966,13 +20027,6 @@ function renderTargetManageContent(student, target) {
       <div class="admin-pts-group">
         <button class="admin-pts-btn ${target.maxPoints !== 4 ? "active" : ""}" data-pts="3">3</button>
         <button class="admin-pts-btn ${target.maxPoints === 4 ? "active" : ""}" data-pts="4">4</button>
-      </div>
-    </div>
-    <div class="admin-section admin-row">
-      <label class="admin-label">Collapsed View</label>
-      <div class="admin-pts-group">
-        <button class="admin-pts-btn mn-collapse-toggle-btn ${_mnCollapsedView ? "" : "active"}" data-collapsed="0">Off</button>
-        <button class="admin-pts-btn mn-collapse-toggle-btn ${_mnCollapsedView ? "active" : ""}" data-collapsed="1">On</button>
       </div>
     </div>
     ${_groupForTargetEdit ? `
@@ -20182,7 +20236,7 @@ function renderTargetManageContent(student, target) {
         }
         html += `<div class="admin-list-item" data-idx="${idx}"${actItemStyle}>
           <span class="drag-handle">⠿</span>
-          <div style="flex:1;display:flex;gap:.5rem;align-items:flex-start">
+          <div style="flex:1;min-width:0;display:flex;gap:.5rem;align-items:flex-start">
             <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;min-width:1.6rem;padding-top:.2rem">${manageActNo})</span>
             <div style="flex:1;min-width:0">
               <div class="mn-act-compact-title">${paDisplayHtml(a, true)}</div>
@@ -20232,7 +20286,7 @@ function renderTargetManageContent(student, target) {
         const maintainedRow = "";
         html += `<div class="admin-list-item" data-idx="${idx}"${actItemStyle}>
           <span class="drag-handle">⠿</span>
-          <div style="flex:1;display:flex;gap:.5rem;align-items:flex-start">
+          <div style="flex:1;min-width:0;display:flex;gap:.5rem;align-items:flex-start">
             <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;min-width:1.6rem;padding-top:.2rem">${manageActNo})</span>
             <div style="flex:1;min-width:0">
               <div class="mn-act-compact-title">${paDisplayHtml(a, true)}</div>
@@ -20643,7 +20697,7 @@ function renderTargetManageContent(student, target) {
   // Relocate the mastered/discontinued cards under their headings before any
   // listener is bound, so every handler below finds them in their final home.
   mnRegroupInactiveCards($("manage-modal-body"), acts);
-  $("mn-act-list")?.classList.toggle("mn-collapsed-view", _mnCollapsedView);
+  mnInitActivityCollapse($("manage-modal-body"), acts);
   $("manage-modal-body").querySelectorAll(".admin-list-item textarea").forEach(autoResizeTextarea);
 
   _pendingActsCleanup = { acts, save: saveTarget };
@@ -20702,9 +20756,9 @@ function renderTargetManageContent(student, target) {
     if (e.key === "Enter") { e.preventDefault(); $("mn-t-name").blur(); }
   });
 
-  // [data-pts] scopes this to the real Max Points buttons — the Collapsed View
-  // toggle reuses .admin-pts-btn for its styling and would otherwise be caught
-  // here, setting maxPoints to NaN.
+  // [data-pts] keeps this to the real Max Points buttons. Other controls have
+  // reused .admin-pts-btn for its styling and been caught here before,
+  // setting maxPoints to NaN.
   $("manage-modal-body").querySelectorAll(".admin-pts-btn[data-pts]").forEach(btn => {
     btn.addEventListener("click", async () => {
       const newPts = Number(btn.dataset.pts);
@@ -20717,16 +20771,6 @@ function renderTargetManageContent(student, target) {
     });
   });
 
-  $("manage-modal-body").querySelectorAll(".mn-collapse-toggle-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const on = btn.dataset.collapsed === "1";
-      if (on === _mnCollapsedView) return;
-      _mnCollapsedView = on;
-      $("manage-modal-body").querySelectorAll(".mn-collapse-toggle-btn").forEach(b =>
-        b.classList.toggle("active", (b.dataset.collapsed === "1") === on));
-      $("mn-act-list")?.classList.toggle("mn-collapsed-view", on);
-    });
-  });
 
   $("manage-modal-body").querySelectorAll(".mn-grouplayout-btn").forEach(btn => {
     btn.addEventListener("click", async () => {
@@ -21927,7 +21971,11 @@ function renderTargetManageContent(student, target) {
   $("btn-mn-add-act").addEventListener("click", () => {
     const btn = $("btn-mn-add-act"); if (btn) btn.disabled = true;
     const _newActDate = _groupForTargetEdit ? (state.groupSessionData?.date || todayDateStr()) : (state.sessionData?.date || todayDateStr());
-    acts.push({ id: cfgId("a"), name: "", order: acts.length, createdOn: todayDateStr(), activeFrom: _newActDate });
+    // Opened straight away: a brand new activity has nothing to read and every
+    // field still to fill in.
+    const _newAct = { id: cfgId("a"), name: "", order: acts.length, createdOn: todayDateStr(), activeFrom: _newActDate };
+    _mnExpandedActs.add(mnActExpandKey(_newAct, acts.length));
+    acts.push(_newAct);
     target.predefinedActivities = acts;
     renderTargetManageContent(student, target);
     saveTarget().catch(() => {});
@@ -22956,13 +23004,6 @@ function renderTemplateManageContent(template) {
         <button class="admin-pts-btn ${(template.maxPoints || 3) === 4 ? "active" : ""}" data-pts="4">4</button>
       </div>
     </div>
-    <div class="admin-section admin-row">
-      <label class="admin-label">Collapsed View</label>
-      <div class="admin-pts-group">
-        <button class="admin-pts-btn mn-collapse-toggle-btn ${_mnCollapsedView ? "" : "active"}" data-collapsed="0">Off</button>
-        <button class="admin-pts-btn mn-collapse-toggle-btn ${_mnCollapsedView ? "active" : ""}" data-collapsed="1">On</button>
-      </div>
-    </div>
 
     <div class="admin-section-title">Activities & Notes</div>
     <div class="admin-list" id="mn-act-list">`;
@@ -23455,7 +23496,7 @@ function renderTemplateManageContent(template) {
   $("manage-modal-body").innerHTML = html;
   // See renderTargetManageContent — relocate before listeners are bound.
   mnRegroupInactiveCards($("manage-modal-body"), acts);
-  $("mn-act-list")?.classList.toggle("mn-collapsed-view", _mnCollapsedView);
+  mnInitActivityCollapse($("manage-modal-body"), acts);
   $("manage-modal-body").querySelectorAll(".admin-list-item textarea").forEach(autoResizeTextarea);
 
   const saveTemplateFn = async () => {
@@ -23496,9 +23537,9 @@ function renderTemplateManageContent(template) {
     if (e.key === "Enter") { e.preventDefault(); $("mn-t-name").blur(); }
   });
 
-  // [data-pts] scopes this to the real Max Points buttons — the Collapsed View
-  // toggle reuses .admin-pts-btn for its styling and would otherwise be caught
-  // here, setting maxPoints to NaN.
+  // [data-pts] keeps this to the real Max Points buttons. Other controls have
+  // reused .admin-pts-btn for its styling and been caught here before,
+  // setting maxPoints to NaN.
   $("manage-modal-body").querySelectorAll(".admin-pts-btn[data-pts]").forEach(btn => {
     btn.addEventListener("click", async () => {
       const newPts = Number(btn.dataset.pts);
@@ -23510,16 +23551,6 @@ function renderTemplateManageContent(template) {
     });
   });
 
-  $("manage-modal-body").querySelectorAll(".mn-collapse-toggle-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const on = btn.dataset.collapsed === "1";
-      if (on === _mnCollapsedView) return;
-      _mnCollapsedView = on;
-      $("manage-modal-body").querySelectorAll(".mn-collapse-toggle-btn").forEach(b =>
-        b.classList.toggle("active", (b.dataset.collapsed === "1") === on));
-      $("mn-act-list")?.classList.toggle("mn-collapsed-view", on);
-    });
-  });
 
   acts.forEach((a, idx) => {
     const input = $(`mn-act-name-${idx}`);
@@ -23654,7 +23685,9 @@ function renderTemplateManageContent(template) {
 
   $("btn-mn-add-act").addEventListener("click", () => {
     const btn = $("btn-mn-add-act"); if (btn) btn.disabled = true;
-    acts.push({ id: cfgId("a"), name: "", order: acts.length, createdOn: todayDateStr() });
+    const _newAct = { id: cfgId("a"), name: "", order: acts.length, createdOn: todayDateStr() };
+    _mnExpandedActs.add(mnActExpandKey(_newAct, acts.length));
+    acts.push(_newAct);
     template.predefinedActivities = acts;
     renderTemplateManageContent(template);
     saveTemplateFn().catch(() => {});
@@ -26498,7 +26531,7 @@ function renderGroupSessionsForMonth(group, month, monthSessions, byMonth, sessi
 
 // ── Group manage modal ───────────────────────────────────────
 function openGroupManageModal(group, target = null, scrollToPaId = null) {
-  _mnCollapsedView = false;   // always opens expanded — see the declaration
+  _mnExpandedActs = new Set();   // every activity opens collapsed
   $("manage-modal").classList.remove("hidden");
   if (target) {
     _groupForTargetEdit = group;
