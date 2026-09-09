@@ -19,13 +19,23 @@
   <link rel="stylesheet" href="styles.css" />
 
   <!-- ExcelJS (Excel export with bold support) -->
-  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"
+          integrity="sha384-Pqp51FUN2/qzfxZxBCtF0stpc9ONI6MYZpVqmo8m20SoaQCzf+arZvACkLkirlPz"
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <!-- JSZip (ZIP export for Export All) -->
-  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"
+          integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG"
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <!-- Chart.js (chart images for Excel export) -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"
+          integrity="sha384-NrKB+u6Ts6AtkIhwPixiKTzgSKNblyhlk0Sohlgar9UHUBzai/sgnNNWWd291xqt"
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <!-- docx (Word export — must be UMD build, not ESM) -->
-  <script src="https://cdn.jsdelivr.net/npm/docx@8/build/index.umd.min.js"></script>
+  <!-- Pinned to an exact version: docx@8 floats to the newest 8.x, and an SRI hash
+       on a floating URL breaks the app the day a new 8.x is published. -->
+  <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.min.js"
+          integrity="sha384-FycsogZbaX8lWofCovAsu/4Zn+hNlGu29U1sGJnT30r7WWPzA4071wlpUKFPCw/m"
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body>
 

@@ -1,0 +1,83 @@
+rules_version = '2';
+
+// ============================================================
+// FIRESTORE SECURITY RULES
+//
+// Paste this into Firebase Console -> Firestore Database -> Rules, for BOTH the
+// staging and the live project, then press Publish. Keep this file in the repo
+// as the source of truth: rules that live only in the console cannot be
+// reviewed, diffed, or restored.
+//
+// WHAT THIS FIXES
+// The previous rules were:
+//     match /{document=**} { allow read, write: if request.auth != null; }
+// which grants every signed-in client full read and write over the entire
+// database, including collections the app never touches. The app signs in with
+// ONE shared account whose e-mail, password prefix and PIN are all readable in
+// the JavaScript the site serves to every visitor, so "signed in" is not a
+// meaningful barrier on its own.
+//
+// WHAT THIS DOES NOT FIX
+// These rules cannot tell one member of staff from another, because they all
+// share one account. Anyone who can sign in can still read every client's
+// records. Closing that needs either per-user accounts or Firebase App Check
+// (App Check is the smaller change: it rejects requests that do not come from
+// the real app, so stolen credentials alone stop being enough). Until one of
+// those is in place, treat this file as damage limitation rather than a fix.
+// ============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // ── Session records ──────────────────────────────────────
+    // The bulk of the client data. Deletes are allowed because the app removes
+    // empty and Maintain-only sessions itself.
+    match /sessions/{sessionId} {
+      allow read, delete: if signedIn();
+      allow create, update: if signedIn()
+        && request.resource.data.keys().hasAny(['date', 'studentId', 'groupId'])
+        && (!('date' in request.resource.data) || request.resource.data.date is string)
+        && (!('remarks' in request.resource.data) || request.resource.data.remarks is map)
+        && (!('activities' in request.resource.data) || request.resource.data.activities is map);
+    }
+
+    // ── Student and group configuration ──────────────────────
+    // Split by operation rather than testing request.method: on a delete there
+    // is no request.resource to inspect at all.
+    match /students/{studentId} {
+      allow read, delete: if signedIn();
+      allow create, update: if signedIn() && request.resource.data.name is string;
+    }
+
+    match /groups/{groupId} {
+      allow read, delete: if signedIn();
+      allow create, update: if signedIn() && request.resource.data.name is string;
+    }
+
+    // ── App-wide settings ────────────────────────────────────
+    // Two documents only: the half-year report prompt, and the trial score
+    // scale. Naming them stops anything else being written into this space.
+    match /config/{docId} {
+      allow read: if signedIn();
+      allow write: if signedIn() && docId in ['halfYearReport', 'scoring'];
+    }
+
+    // ── Supporting collections ───────────────────────────────
+    match /remarkPresets/{presetId} { allow read, write: if signedIn(); }
+    match /templates/{templateId}   { allow read, write: if signedIn(); }
+    match /trash/{trashId}          { allow read, write: if signedIn(); }
+    match /aiUsage/{usageId}        { allow read, write: if signedIn(); }
+
+    // ── Everything else ──────────────────────────────────────
+    // Denied. The old catch-all let a client create collections the app has
+    // never heard of, which is free storage for anyone holding the credentials
+    // and gives an attacker somewhere to stage data.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
