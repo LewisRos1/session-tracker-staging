@@ -32,9 +32,52 @@ import {
   signOut,
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import {
+  initializeAppCheck,
+  ReCaptchaV3Provider
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app-check.js";
 import { FIREBASE_CONFIG } from "./config.js";
 
 const app = initializeApp(FIREBASE_CONFIG);
+
+// ─── APP CHECK ───────────────────────────────────────────────
+// Everything below is protected by ONE shared account whose e-mail, password
+// prefix and PIN are all readable in the JavaScript this site serves to every
+// visitor. A browser has to read them for the app to work, so they cannot be
+// hidden, which means "signed in" proves nothing about who is asking.
+//
+// App Check closes that. Every Firestore request carries a token proving it came
+// from THIS app on a registered domain, and Firebase rejects anything else once
+// enforcement is on. Stolen credentials stop being enough on their own.
+//
+// Set up per project, since staging and live have separate keys:
+//   1. Firebase Console -> App Check -> Apps -> register the web app with
+//      reCAPTCHA v3, and copy the site key.
+//   2. Add it to THAT project's config.js:  appCheckSiteKey: "6Lxxxxxx..."
+//   3. Watch App Check -> Firestore for a day. It reports verified against
+//      unverified requests. Only when unverified reaches nothing, press Enforce.
+//      Enforcing early locks the real app out along with everyone else.
+//
+// With no key set this is skipped entirely and the app behaves exactly as it
+// does today, so deploying this cannot take anything offline by itself.
+if (FIREBASE_CONFIG.appCheckSiteKey) {
+  // localhost is not a registered reCAPTCHA domain. This makes the SDK print a
+  // debug token to the console once; register it under App Check -> Manage debug
+  // tokens, or local development cannot reach Firestore after enforcement.
+  if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
+    self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+  }
+  try {
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(FIREBASE_CONFIG.appCheckSiteKey),
+      isTokenAutoRefreshEnabled: true
+    });
+  } catch (err) {
+    // Never block the app on this. With enforcement off a failure is harmless,
+    // and with it on the Firestore errors say plainly what happened.
+    console.error("[App Check] could not start:", err);
+  }
+}
 
 // Enable offline persistence with multi-tab support so opening a second tab
 // doesn't fall back to memory cache and lose offline writes.
