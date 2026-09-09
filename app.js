@@ -181,7 +181,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1986";
+const APP_VERSION = "1987";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -9743,7 +9743,13 @@ function showStudentChoice(student) {
                 const rOpt = r.optionScore !== undefined && r.optionScore !== null;
                 const rSel = (r.selectedOptions || []).length > 0;
                 const rScore = r.score !== undefined && r.score !== null && r.score !== "";
-                if (rText === "Maintain" && !rTrials && !rOpt && !rSel && !rScore && !rNote) return false;
+                // "Maintain" is auto-filled for a maintained activity every session: into
+                // text for a Notes-Only activity, into masteryNote for a structured one.
+                // Only the text case was checked, so a maintained activity with trials or a
+                // score put its auto-fill in the note, counted as real data, and left a tick
+                // on the calendar for a day nobody worked. Both fields now count as auto-fill.
+                if (((rText === "Maintain" && !rNote) || (rNote === "Maintain" && !rText))
+                    && !rTrials && !rOpt && !rSel && !rScore) return false;
                 return rText.length > 0 || rNote.length > 0 || rTrials || rOpt || rSel || rScore;
               });
             };
@@ -25411,7 +25417,13 @@ function showGroupChoice(group) {
                 const rOpt = r.optionScore !== undefined && r.optionScore !== null;
                 const rSel = (r.selectedOptions || []).length > 0;
                 const rScore = r.score !== undefined && r.score !== null && r.score !== "";
-                if (rText === "Maintain" && !rTrials && !rOpt && !rSel && !rScore && !rNote) return false;
+                // "Maintain" is auto-filled for a maintained activity every session: into
+                // text for a Notes-Only activity, into masteryNote for a structured one.
+                // Only the text case was checked, so a maintained activity with trials or a
+                // score put its auto-fill in the note, counted as real data, and left a tick
+                // on the calendar for a day nobody worked. Both fields now count as auto-fill.
+                if (((rText === "Maintain" && !rNote) || (rNote === "Maintain" && !rText))
+                    && !rTrials && !rOpt && !rSel && !rScore) return false;
                 return rText.length > 0 || rNote.length > 0 || rTrials || rOpt || rSel || rScore;
               });
             };
