@@ -181,7 +181,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1988";
+const APP_VERSION = "1989";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -21765,19 +21765,22 @@ function renderTargetManageContent(student, target) {
   // Sub-activities reorder within their own parent, in both the expanded blocks
   // and the collapsed compact rows.
   $("manage-modal-body").querySelectorAll(".mn-sub-list, .mn-sub-compact-list").forEach(list => {
-    initDragSort(list, async (newOrder, movedIdx, anchorTop) => {
-      const moved = movedIdx != null ? acts[movedIdx] : null;
+    initDragSort(list, async (newOrder) => {
       const result = mnReorderSubs(acts, list.dataset.parentKey || "", newOrder);
       if (!result) { renderTargetManageContent(student, target); return; }
       target.predefinedActivities = result;
+      // Reordering a sub only rearranges rows INSIDE its parent, so nothing above
+      // changes height and holding the scroll position is enough to keep the view
+      // still. The old code anchored the PARENT row to where the SUB had been
+      // dropped, which shifted the whole list, and blinked a row the user never
+      // moved.
+      const keepScroll = $("manage-modal-body")?.scrollTop ?? 0;
       await saveTarget();
       renderTargetManageContent(student, target);
-      // A sub lives inside its parent's row, so anchor on the parent to hold the
-      // view still — the sub itself isn't a direct child of #mn-act-list.
-      const parentIdx = moved
-        ? result.findIndex(a => !a.parentActivity && (a._linkKey || a.title || a.name) === moved.parentActivity)
-        : -1;
-      mnScrollToMovedRow(parentIdx, anchorTop);
+      requestAnimationFrame(() => {
+        const b = $("manage-modal-body");
+        if (b) b.scrollTop = keepScroll;
+      });
     });
   });
 
