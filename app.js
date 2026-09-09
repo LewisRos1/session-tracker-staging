@@ -200,7 +200,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1993";
+const APP_VERSION = "1994";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -20786,7 +20786,7 @@ document.addEventListener("keydown", e => {
 function mnRowChip(kind) {
   const el = document.createElement("span");
   el.className = "mn-row-chip mn-row-chip--" + kind;
-  el.textContent = { section: "Section", activity: "Activity", sub: "Sub-activity", note: "Note" }[kind] || kind;
+  el.textContent = { section: "Section Heading", activity: "Activity", sub: "Sub-activity", note: "Note" }[kind] || kind;
   return el;
 }
 
