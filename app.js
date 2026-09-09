@@ -200,7 +200,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2009";
+const APP_VERSION = "2010";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -4659,6 +4659,9 @@ FORMAT FOR EVERY OBSERVATION BLOCK: exactly two lines, starting "Strength:" and 
 RETURN ONE BLOCK FOR EVERY TARGET, WITH NO EXCEPTIONS. ${targetsWithData.length} OBSERVATION block${targetsWithData.length === 1 ? "" : "s"} and ${qualitativeWithData.length} OBSERVED block${qualitativeWithData.length === 1 ? "" : "s"} are required, ${targetsWithData.length + qualitativeWithData.length} in total. Copy each target's name into its header EXACTLY as it is written above, character for character, including hyphens, capitals and any bracketed words: the report is assembled by matching that name, and a name written back differently loses the whole write-up. Never skip a target, never merge two targets into one block, and never write a block for a target that is not listed. Close EVERY block with ===END=== on its own line. Before you finish, count your blocks against the list above.
 
 RULES FOR EVERY OBSERVATION BLOCK:
+- BEFORE WRITING A WEAKNESS, ASK WHAT A PARENT WOULD DO WITH IT. This is the first test and the one that matters most. A line that only reports which way a number moved is useless to them: they cannot picture it and they cannot help with it. Every Weakness must leave the reader knowing WHAT ${firstName} did, and where the data says so, WHY. If all you have is that scores went up or down, you do not have a weakness worth writing: go and find the behaviour behind those scores in the remarks, or write about something else the data actually describes.
+  USELESS TO A PARENT, numbers moving and nothing else: "Hayden's accuracy drops when he is asked to write longer sentences or facts about new topics, scoring as low as 33-38% on some sentence-writing tasks in May. This eased afterwards, and by June he was scoring 100% on most sentence-writing tasks again."
+  USEFUL, the behaviour behind the numbers, where the remarks support it: "Hayden writes short sentences confidently, but longer ones about a topic he has not met before take him much more time and support. In May he needed several reminders to finish these, and by June he was completing them with far less help."
 - Each line answers a DIFFERENT question and must not repeat the other. "Strength" is about a specific ability and what it is worth, "Weakness" is about a difficulty and when it appears.
 - Strength is always two sentences: the observation and what it means. Weakness is one or two, whichever it genuinely needs, and a third is allowed only under the rule below. One clear sentence beats the SAME point stretched across two, but two different ideas always need two sentences. Never pad, and never list everything - pick what matters most.
 - PLAIN ENGLISH HERE, NOT REPORT LANGUAGE. The WRITING STYLE word list in the GLOBAL RULES above does NOT apply inside a Strength or Weakness line. Write these two lines the way you would say them out loud to a parent at the door. Do NOT write "spontaneous requesting", "preferred activities", "remains less consistent", "experiences difficulty", "demonstrates", "attends to", "modalities" or "would benefit from support in developing". Write "asking for things himself", "the activities he likes", "still not steady", "finds it hard", "does", "watches", "needs help with". "Upset" is the right word here even though the global list prefers "distress".
