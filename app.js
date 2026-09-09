@@ -200,7 +200,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2004";
+const APP_VERSION = "2005";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3831,8 +3831,8 @@ async function renderAiCostLine(lastUsd = null, usage = null) {
 // debugLastAiReport() show them. Memory only, cleared on reload.
 const _aiReplies = [];
 
-function aiStashReply(kind, label, text, stopReason) {
-  _aiReplies.unshift({ kind, label, at: new Date().toISOString(), text, stopReason });
+function aiStashReply(kind, label, text, stopReason, timing) {
+  _aiReplies.unshift({ kind, label, at: new Date().toISOString(), text, stopReason, timing });
   _aiReplies.length = Math.min(_aiReplies.length, 3);
 }
 
@@ -3846,6 +3846,13 @@ window.debugLastAiReport = function(n = 0) {
   console.log(`stop_reason: ${r.stopReason === null || r.stopReason === undefined
     ? "NONE — the stream ended early, so this reply is incomplete"
     : r.stopReason}`);
+  if (r.timing) {
+    const t = r.timing;
+    console.log(`stream: ran ${(t.durationMs / 1000).toFixed(1)}s, `
+      + `first byte at ${t.firstByteMs === null ? "never" : (t.firstByteMs / 1000).toFixed(1) + "s"}, `
+      + `last byte at ${t.lastByteMs === null ? "never" : (t.lastByteMs / 1000).toFixed(1) + "s"}, `
+      + `${t.events} events, last event "${t.lastEvent || "none"}"`);
+  }
   console.log("Blocks the model returned:");
   for (const m of r.text.matchAll(/===(OBSERVATION|OBSERVED):\s*([^=\n]+?)\s*===/g)) {
     console.log(`  ${m[1]}: ${JSON.stringify(m[2])}`);
@@ -3885,9 +3892,18 @@ async function aiRequest(aiPrompt, signal, meta = {}) {
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();
 
+  // When a stream dies, WHERE it died is what names the culprit. A cut at a
+  // consistent number of seconds is an infrastructure timeout; a cut at a
+  // random point is a flaky connection; no bytes at all is the relay. None of
+  // that can be told apart from the text alone, so the timing is recorded here.
+  const t0 = Date.now();
+  const timing = { events: 0, lastEvent: null, firstByteMs: null, lastByteMs: null, durationMs: 0 };
+
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
+    if (timing.firstByteMs === null) timing.firstByteMs = Date.now() - t0;
+    timing.lastByteMs = Date.now() - t0;
     buf += decoder.decode(value, { stream: true });
     // SSE frames are separated by a blank line. Anything after the last blank
     // line is a partial frame, so it stays in buf until the rest arrives.
@@ -3898,6 +3914,8 @@ async function aiRequest(aiPrompt, signal, meta = {}) {
       if (!line) continue;
       let ev;
       try { ev = JSON.parse(line.slice(5).trim()); } catch (_) { continue; }
+      timing.events++;
+      timing.lastEvent = ev.type || null;
       if (ev.type === "message_start") {
         Object.assign(usage, ev.message?.usage || {});
       } else if (ev.type === "content_block_start") {
@@ -3917,9 +3935,11 @@ async function aiRequest(aiPrompt, signal, meta = {}) {
     }
   }
 
+  timing.durationMs = Date.now() - t0;
+
   // Every reply is kept, finished or not, so a broken report can be looked at
   // afterwards rather than guessed about.
-  aiStashReply(meta.kind || "report", meta.label || "", text.trim(), stopReason);
+  aiStashReply(meta.kind || "report", meta.label || "", text.trim(), stopReason, timing);
 
   // Anthropic always sends a stop_reason before it closes the stream. Arriving
   // here without one means the connection died partway through and this is a
@@ -4746,10 +4766,11 @@ ${evidencePromptBlock(["Weakness", "Focus Area", "Recommendation"], "the target'
     aiTrackCost(data.usage, "halfYear");
     // aiRequest already joined every text block and dropped the thinking blocks.
     const reportText = data.text;
+    if (data.stop_reason === "max_tokens") {
+      throw new Error("Generation failed. The reply hit the token limit before it finished, so part of the report is missing. Nothing was downloaded. Please generate again, or tell Claude Code to raise max_tokens.");
+    }
     if (!reportText) {
-      throw new Error(data.stop_reason === "max_tokens"
-        ? "The response hit the token limit before finishing. Try again, or tell Claude Code to raise max_tokens."
-        : `Empty response from Claude (stop_reason: ${data.stop_reason || "unknown"}).`);
+      throw new Error(`Generation failed. Claude returned nothing (stop_reason: ${data.stop_reason || "unknown"}). Nothing was downloaded. Please generate again.`);
     }
 
     const parsed = hyrParseAiResponse(reportText);
@@ -4760,15 +4781,13 @@ ${evidencePromptBlock(["Weakness", "Focus Area", "Recommendation"], "the target'
       ...targetsWithData.filter(r => !hyrPickObs(parsed.observations, r.name)).map(r => r.name),
       ...qualitativeWithData.filter(r => !hyrPickObs(parsed.observed, r.name)).map(r => r.name)
     ];
+    // A target with a chart and nothing under it is a broken report, and handing
+    // it over as a finished document only means finding out on a read-through.
+    // Nothing is downloaded: the run has to be repeated either way.
     if (_missingObs.length) {
       console.warn("[AI report] no write-up returned for:", _missingObs);
       console.warn("[AI report] run debugLastAiReport() to see what the model actually sent back.");
-      // Those targets print with a chart and nothing underneath. The document
-      // gives no sign anything is missing, so say it here rather than leaving
-      // it to be noticed on a read-through.
-      _aiDoneNote = _missingObs.length === 1
-        ? `Done, but ${_missingObs[0]} has no write-up. Run debugLastAiReport() in the console.`
-        : `Done, but ${_missingObs.length} targets have no write-up: ${_missingObs.join(", ")}. Run debugLastAiReport() in the console.`;
+      throw new Error(`Generation failed. ${_missingObs.length === 1 ? "One target" : _missingObs.length + " targets"} came back with no write-up (${_missingObs.join(", ")}). Nothing was downloaded. Please generate again.`);
     }
 
     setProgress(100, "Done!");
@@ -4845,7 +4864,6 @@ function aiPillShow(text, cls, pct) {
   const el = aiPillEl();
   el.classList.toggle("is-done", cls === "done");
   el.classList.toggle("is-fail", cls === "fail");
-  el.classList.toggle("is-warn", cls === "warn");
   el.querySelector(".ai-pill-text").textContent = text;
   if (typeof pct === "number") {
     const ring = el.querySelector(".ai-pill-ring");
@@ -4868,25 +4886,13 @@ function aiJobStart(label, abort) {
     return false;
   }
   _aiJob = { label, abort };
-  _aiDoneNote = "";          // a note from the previous run must not carry over
   aiPillShow("Generating Report…", null, 0);
   return true;
 }
 function aiJobProgress(pct) { if (_aiJob) aiPillShow("Generating Report…", null, pct); }
-// Set when the report finished but something in it needs saying. The pill
-// message is chosen in the finally block, which has no way of knowing what the
-// try block found, so it is left here instead.
-let _aiDoneNote = "";
-
 function aiJobEnd(state, text) {
   _aiJob = null;
   if (state === "done") {
-    const note = _aiDoneNote;
-    _aiDoneNote = "";
-    // A green "Done!" that clears itself after six seconds is the wrong way to
-    // say part of the report is blank, so a note gets its own colour and stays
-    // until it is dismissed.
-    if (note) return aiPillShow(note, "warn");
     aiPillShow(text || "Done!", "done");
     setTimeout(() => {
       const el = document.getElementById("ai-report-pill");
@@ -7698,17 +7704,21 @@ ${evidencePromptBlock(["Weakness", "Recommendation"], "the target's name for a W
     setProgress(72, "AI response received…");
     aiTrackCost(data.usage, "assessment");
     const reportText = data.text;
+    if (data.stop_reason === "max_tokens") {
+      throw new Error("Generation failed. The reply hit the token limit before it finished, so part of the report is missing. Nothing was downloaded. Please generate again, or tell Claude Code to raise max_tokens.");
+    }
     if (!reportText) {
-      throw new Error(data.stop_reason === "max_tokens"
-        ? "The response hit the token limit before finishing. Try again, or tell Claude Code to raise max_tokens."
-        : `Empty response from Claude (stop_reason: ${data.stop_reason || "unknown"}).`);
+      throw new Error(`Generation failed. Claude returned nothing (stop_reason: ${data.stop_reason || "unknown"}). Nothing was downloaded. Please generate again.`);
     }
 
     const parsed = assessmentParseAiResponse(reportText);
     // A target the model skipped prints a red placeholder in the document, but
     // name it here too so the cause is visible while the report is running.
     const _assessMissing = collected.rows.filter(r => !hyrPickObs(parsed.targets, r.target)).map(r => r.target);
-    if (_assessMissing.length) console.warn("[Assessment report] no write-up returned for:", _assessMissing);
+    if (_assessMissing.length) {
+      console.warn("[Assessment report] no write-up returned for:", _assessMissing);
+      throw new Error(`Generation failed. ${_assessMissing.length === 1 ? "One target" : _assessMissing.length + " targets"} came back with no write-up (${_assessMissing.join(", ")}). Nothing was downloaded. Please generate again.`);
+    }
     setProgress(88, "Writing report…");
     const evidenceRows = parseEvidenceBlock(reportText);
     await assessmentDownloadWord(effectiveStudent, student, collected, parsed, PRON, evidenceRows);
@@ -8322,10 +8332,11 @@ ${evidencePromptBlock(["Still Working On"], "the point's own short label", "Stil
     aiTrackCost(data.usage, "monthly");
     // aiRequest already joined every text block and dropped the thinking blocks.
     const reportText = data.text;
+    if (data.stop_reason === "max_tokens") {
+      throw new Error("Generation failed. The reply hit the token limit before it finished, so part of the report is missing. Nothing was downloaded. Please generate again, or tell Claude Code to raise max_tokens.");
+    }
     if (!reportText) {
-      throw new Error(data.stop_reason === "max_tokens"
-        ? "The response hit the token limit before finishing. Try again, or tell Claude Code to raise max_tokens."
-        : `Empty response from Claude (stop_reason: ${data.stop_reason || "unknown"}).`);
+      throw new Error(`Generation failed. Claude returned nothing (stop_reason: ${data.stop_reason || "unknown"}). Nothing was downloaded. Please generate again.`);
     }
 
     const parsed = monthlyParseAiResponse(reportText);
