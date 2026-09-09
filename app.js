@@ -181,7 +181,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1984";
+const APP_VERSION = "1985";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -20635,14 +20635,37 @@ function mnDetachPanel(discardNode = false) {
   open.home.insertBefore(open.body, open.next && open.next.isConnected ? open.next : null);
 }
 
+/**
+ * An activity that was never filled in is thrown away rather than saved. A row
+ * with no title and no details helps nobody, and it used to reach the Start
+ * Session screen as "<Please give this activity a title in Edit Target>".
+ * A parent that still has sub-activities under it is kept whatever its own
+ * fields say, or the children would be orphaned.
+ */
+function mnDropEmptyPanelAct(host, key) {
+  if (!host || !key) return false;
+  const i = host.acts.findIndex(a => a && a.id === key);
+  if (i < 0) return false;
+  const a = host.acts[i];
+  if (!isEmptyActItem(a)) return false;
+  const ownName = (a.title || a.name || "").trim();
+  if (ownName && host.acts.some(s => s !== a && (s.parentActivity || "").trim() === ownName)) return false;
+  host.acts.splice(i, 1);
+  host.acts.forEach((x, n) => { x.order = n; });
+  host.target.predefinedActivities = host.acts;
+  return true;
+}
+
 /** Save and Close: lift the hold, write once, run any held renames, rebuild. */
 async function mnPanelSave() {
   if (!_mnPanelOpen) return;
   const host = _mnPanelHost;
-  const dirty = mnPanelIsDirty();
+  const key = _mnPanelOpen.key;
+  let dirty = mnPanelIsDirty();
   const wanted = _mnPanelSaveWanted;
   const renames = _mnPanelRenameQueue;
   mnDetachPanel();
+  if (mnDropEmptyPanelAct(host, key)) dirty = true;
   _mnPanelHold = false;
   _mnPanelSaveWanted = false;
   _mnPanelRenameQueue = [];
@@ -20662,6 +20685,7 @@ function mnPanelDiscard() {
       !confirm("Discard your changes to this activity?\n\nEverything you have just typed here will be thrown away.")) return;
   const host = _mnPanelHost;
   const snap = _mnPanelSnapshot;
+  const key = _mnPanelOpen.key;
   mnDetachPanel(true);
   _mnPanelHold = false;
   _mnPanelSaveWanted = false;
@@ -20676,6 +20700,9 @@ function mnPanelDiscard() {
       host.target.predefinedActivities = host.acts;
     } catch (err) { console.error("Could not restore the activity list:", err); }
   }
+  // The snapshot was taken after "+ Add Activity" pushed the blank row, so a
+  // discard restores it. It was never real, so it goes.
+  if (mnDropEmptyPanelAct(host, key)) host?.flushSave().catch(() => {});
   host?.rerender();
 }
 
