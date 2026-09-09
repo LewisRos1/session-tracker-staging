@@ -121,6 +121,25 @@ if ("serviceWorker" in navigator) {
   let _reloadQueued = false;
   function _doUpdateReload() {
     if (_reloadQueued) return;
+    // _reloadQueued only guards ONE page load, and this reloads the page, so it
+    // cannot stop a loop: reload, disagree about the version again, reload. That
+    // happens when a deploy is still propagating and app.js and sw.js are served
+    // from different edges, which a run of quick version bumps makes likely.
+    // Count reloads across loads and give up rather than spin.
+    try {
+      const now = Date.now();
+      const hist = JSON.parse(sessionStorage.getItem("swReloadHistory") || "[]")
+        .filter(t => now - t < 60000);
+      hist.push(now);
+      sessionStorage.setItem("swReloadHistory", JSON.stringify(hist));
+      if (hist.length > 3) {
+        sessionStorage.removeItem("swReloadHistory");
+        console.error("[SW] update reload loop detected after " + hist.length
+          + " reloads in under a minute. Staying on version " + APP_VERSION
+          + " instead of reloading again. Refresh by hand once the deploy has settled.");
+        return;
+      }
+    } catch { /* sessionStorage unavailable: fall through and reload as before */ }
     _reloadQueued = true;
     sessionStorage.setItem("justUpdated", "1");
     document.querySelectorAll(".screen").forEach(s => s.classList.toggle("hidden", s.id !== "screen-loading"));
@@ -181,7 +200,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1991";
+const APP_VERSION = "1992";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
