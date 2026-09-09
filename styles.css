@@ -1800,16 +1800,7 @@ input.field-input::placeholder {
   color: var(--text);
   overflow-wrap: anywhere;
 }
-.mn-act-panel-x {
-  background: none;
-  border: none;
-  font-size: 1rem;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: .1rem .3rem;
-  flex-shrink: 0;
-}
-.mn-act-panel-x:hover { color: var(--text); }
+
 .mn-act-panel-body {
   padding: 1rem;
   overflow-y: auto;
@@ -1820,7 +1811,23 @@ input.field-input::placeholder {
   padding: .75rem 1rem;
   border-top: 1px solid var(--border);
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: .45rem;
 }
+.mn-act-panel-discard {
+  width: 100%;
+  padding: .55rem 1rem;
+  border: 1px solid #fca5a5;
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: #dc2626;
+  font-family: var(--font);
+  font-size: .88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.mn-act-panel-discard:hover { background: #fef2f2; }
 .mn-act-panel-save {
   width: 100%;
   padding: .7rem 1rem;
@@ -1844,19 +1851,20 @@ input.field-input::placeholder {
    same panel. */
 
 .mn-sub-compact {
-  font-size: .87rem;
-  color: #0369a1;
-  margin: .25rem 0 .25rem 1.5rem;
-  padding: .45rem .6rem;
+  font-size: .93rem;
+  font-weight: 600;
+  color: #0c4a6e;
+  margin: .3rem 0 .3rem 1.75rem;
+  padding: .6rem .7rem;
   background: #f0f9ff;
   border: 1px solid #bae6fd;
   border-left: 3px solid #60a5fa;
-  border-radius: .35rem;
+  border-radius: .4rem;
   overflow-wrap: anywhere;
   word-break: break-word;
   display: flex;
   align-items: center;
-  gap: .45rem;
+  gap: .5rem;
   cursor: pointer;
 }
 .mn-sub-compact:hover { background: #e0f2fe; }
