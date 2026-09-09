@@ -200,7 +200,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2010";
+const APP_VERSION = "2011";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -4651,7 +4651,7 @@ ROW: Key Improvement | [2-4 word label]: [What he did. What it means for him in 
 
 ${targetsWithData.map(r => `===OBSERVATION: ${r.name}===
 Strength: [Two sentences. The first names one specific thing ${firstName} does well in this target, as actually observed in sessions rather than a general compliment. The second says what that lets ${PRON.obj} do in ordinary life, outside the session room, the same way the Highlights section does.]
-Weakness: [One or two sentences naming a genuine difficulty in this target, and what tends to bring it on - the situation, the time of day, the kind of task. ONLY write one if the session data directly shows it: a struggling remark, a behaviour that caused problems, or consistently low performance. If the data shows no clear weakness, write exactly: No notable areas of difficulty were observed in this period. NEVER invent or guess. Always leave the reader knowing where the difficulty stands NOW, not only when it was worst.]
+Weakness: [One or two sentences naming a genuine difficulty in this target, and what tends to bring it on - the situation, the time of day, the kind of task. ONLY write one if the session data directly shows it: a struggling remark, a behaviour that caused problems, or consistently low performance. If the data shows no clear weakness, write exactly: No notable areas of difficulty were observed in this period. NEVER invent or guess. Always leave the reader knowing where the difficulty stands NOW, not only when it was worst.${r.lastDataMonth ? ` If this difficulty ran right through without changing, anchor it to ${r.lastDataMonth}, which is the last month this target has anything recorded against it.` : ""}]
 ===END===`).join("\n\n")}
 
 FORMAT FOR EVERY OBSERVATION BLOCK: exactly two lines, starting "Strength:" and "Weakness:", in that order. No bullet points, no asterisks, no extra lines, no "Note:" line, and NEVER a line describing the graph or the shape of the line.
@@ -4670,17 +4670,19 @@ RULES FOR EVERY OBSERVATION BLOCK:
 - NO PERCENTAGES AND NO SCORE NUMBERS, IN EITHER LINE. A figure you would quote here comes from ONE activity, while the graph printed directly above is a monthly average across the whole target, so the two never agree. A parent reading "25% in May" under a graph showing 95% for May is simply confused, and has no way to tell which number is wrong. Say it in words instead: "he drew them accurately in January and March, but on one occasion in May he managed very few", "he named fewer than half of them correctly", "this happened in most sessions". The ONE exception is a length of time the record itself states, such as "unsettled on and off for 45 minutes": no graph shows that, so nothing contradicts it.
 - ALWAYS SAY WHERE IT STANDS NOW. A Weakness must leave the reader knowing what the difficulty looks like TODAY, not only when it was at its worst. If it eased, say what it looks like now and roughly when that changed. If it is still there, say so plainly. Naming only the early part and stopping is half an answer and is WRONG, however true that half is.
   RIGHT, both halves: "Caden's assertive curiosity, meaning his willingness to explore and try new things rather than just watch, was lower in March. From April onwards, it became far more consistent."
-  RIGHT, still current and says so without naming a month: "Caden still tends to wait for an adult to ask whether he wants a snack or water rather than requesting these on his own."
+  RIGHT, still current and anchored: "Up till June, Caden was still waiting for an adult to ask whether he wants a snack or water rather than requesting these on his own."
   WRONG, the present is left unsaid: "Caden required calming support during a few sessions early in the term when he appeared dysregulated." A parent reads that and asks what he is like now.
-- NAME A MONTH ONLY WHEN SOMETHING CHANGED. A month earns its place by marking WHEN a difficulty began, eased, or got worse. If the difficulty has been the same from the first month to the last, name NO month at all: "still" already tells the parent it is happening now. A month bolted onto the end of an unchanged difficulty makes the line heavy to read, and the same month repeated under target after target is worse still.
-  WRONG, unchanged throughout but stamped with a month anyway: "...and this was still evident in July." / "...and this was still the case in his most recent sessions in July." / "...he continued to need reminders about orientation in his most recent sessions in July." / "...though it can still happen on mornings when he appears tired or distracted, as seen in July."
-  RIGHT, unchanged throughout, so no month anywhere: "Caden still relies mostly on the instructor to start an interaction rather than beginning it himself, especially for activities he likes less. This means his independent initiation remains an area to keep building on."
-  When it DID change, the months carry real information and belong there - see the example below.
+- EVERY WEAKNESS IS ANCHORED TO A MONTH. If the difficulty CHANGED, name the months that mark the change ("In March... From April onwards, ..."). If it did NOT change, anchor it to the last month this target has anything recorded against it, which is given to you in that target's Weakness instruction above. A parent needs to know how current the statement is, and "still" on its own does not tell them.
+  NEVER "today", "currently", "at present", "these days" or "his most recent sessions". A report can be opened months after the last session it covers, and a difficulty last seen in June must not be written as though it were happening the day it is read. Today is not a date the data knows anything about.
+  VARY THE WORDING. This anchor appears under every unchanged difficulty in the report, and the same five words repeated down the page reads like a form letter. "Up till June, he still...", "As late as June, he was still...", "This was still happening in June", "Through to June, he continued to...". Pick whatever fits the sentence you are writing.
+  WRONG, no anchor at all, so the reader cannot tell how current it is: "Hayden often becomes upset when asked to write longer pieces or redo corrections. He still needs support to calm down in these moments."
+  WRONG, anchored to a day the data knows nothing about: "...and this is still the case today."
+  RIGHT, anchored to the last month with data: "Up till June, Hayden was still becoming upset when asked to write longer pieces or redo corrections, which led to crying, noise-making or refusing to continue."
 - NEVER WRITE THE WORD "TERM" IN THESE LINES. "Early in the term", "later in the term", "right through the term" and "his last few sessions of the term" all say the same vague thing, and the word repeated under target after target makes the whole report heavy to read. Name the months instead when something changed, and say nothing at all about time when it did not.
   WRONG: "Caden's regulation was lowest in the earliest sessions of the term, but this eased noticeably after March."
   RIGHT, the change pinned to months: "In March, Caden's regulation was at its lowest and he needed calming support such as gentle pressure to settle. From April onwards, this eased and he now settles far more easily."
   RIGHT, also good where the change was gradual: "By the later months, these moments were shorter and usually linked to one clear reason."
-  RIGHT, nothing changed, so no time phrase at all: "Caden still tends to wait for an adult to ask whether he wants a snack or water rather than requesting these on his own."
+  RIGHT, nothing changed, so the anchor is the last month with data: "As late as June, Caden was still waiting for an adult to ask whether he wants a snack or water rather than requesting these on his own."
 - UP TO FOUR SHORT SENTENCES, AND LET THE COMMAS DECIDE. Two is the usual shape and four is the ceiling. The test is mechanical: ANY sentence carrying more than two commas must be broken into two. Extra sentences exist to LIFT detail out of a crowded one, never to add a new idea, and never to pad towards four. A parent must understand each sentence on a single read: if they would have to go back to the start of it, it has failed, however accurate it is. Do not weld separate facts together with "though", "a pattern that", or "and he has needed".
   TOO MANY COMMAS: "Caden still needs help calming down within 15 minutes when something upsets him, and this has not changed much across the year. When it happens now, it is usually because he has to wait, do something he does not enjoy, or go to the toilet, and he settles once he is spoken to calmly or given a choice."
   RIGHT, the same facts broken up: "Caden continues to need support to calm within around 15 minutes when upset. This pattern has remained fairly consistent across the year. When it happens, it is usually triggered by waiting, a task he does not enjoy, or being asked to use the toilet. He settles when spoken to calmly or offered a choice."
@@ -4700,10 +4702,10 @@ RULES FOR EVERY OBSERVATION BLOCK:
   RIGHT, May then June: "In May, Hayden said he did not feel he needed the reward at all, and by June his motivation for the token system was mostly low."
 - NEVER WRITE "BRIEF" OR "BRIEFLY" ABOUT HOW LONG SOMETHING LASTS. Write "it lasts only a short time".
 - WRITE "REASON", NOT "CAUSE". "usually linked to a clear reason", not "tied to a clear cause". It is how people actually speak.
-- DO NOT ADD A SENTENCE WHOSE ONLY JOB IS TO SAY IT IS STILL HAPPENING. "This is still true today" adds nothing when the sentence already said "still", and there is no earlier state being compared against. The word "still" on its own satisfies the "say where it stands now" rule above. Where the extra sentence carries nothing but context, put that context in brackets on the end of the first sentence instead.
+- DO NOT ADD A SENTENCE WHOSE ONLY JOB IS TO SAY IT IS STILL HAPPENING. "This is still true today" adds nothing: the month anchor at the front of the first sentence has already said how current the difficulty is, and there is no earlier state being compared against. Where the extra sentence carries nothing but context, put that context in brackets on the end of the first sentence instead.
   WRONG, the second sentence is filler: "Caden still mostly waits for the instructor to start playing before joining in, rather than beginning an interaction himself, especially for activities he is less keen on. This is still true today, particularly during table-based or quieter tasks."
-  RIGHT, the context moves into brackets: "Caden still mostly waits for the instructor to start playing before joining in, rather than beginning an interaction himself, especially for activities he is less keen on (e.g. during table-based or quieter tasks)."
-  A second sentence IS worth writing when it adds WHERE or WHEN the difficulty shows up: "Caden still waits for an adult to ask "do you want a snack?" or "are you thirsty?" instead of asking for food and drink on his own. This happens most often at snack times and drink breaks, and it is something he still needs support with today."
+  RIGHT, the context moves into brackets and the anchor is a month, not "today": "Through to June, Caden was still mostly waiting for the instructor to start playing before joining in, rather than beginning an interaction himself, especially for activities he is less keen on (e.g. during table-based or quieter tasks)."
+  A second sentence IS worth writing when it adds WHERE or WHEN the difficulty shows up: "Up till June, Caden was still waiting for an adult to ask "do you want a snack?" or "are you thirsty?" instead of asking for food and drink on his own. This happens most often at snack times and drink breaks."
 - DO NOT PILE UP NEGATIVE WORDS. "harder... less often... less familiar... less than half" inside one sentence reads far heavier than the facts actually are. Where there is a positive side, say it once, then give the difficulty.
 - GENERAL POINT FIRST, THEN THE EXAMPLE. Never swing between a general statement, one specific session, a figure and a contrast inside a single sentence: the reader loses the point entirely. One sentence for what is generally true, the next for the specific session that shows it.
   WRONG, four thoughts in one breath: "Caden finds it harder to name people he sees less often, such as other children or staff, compared with close family. This was clearest in one session where he named several less familiar names correctly less than half the time, though he continues to do well with people he knows best."
@@ -4722,7 +4724,7 @@ RULES FOR EVERY OBSERVATION BLOCK:
 
 ${qualitativeWithData.map(r => `===OBSERVED: ${r.name}===
 Strength: [Two sentences. The first names something positive noticed in this skill area, a real behaviour or moment. The second says what it lets ${firstName} do in ordinary life.]
-Weakness: [One or two sentences about something still developing or difficult, and what tends to bring it on, explained kindly with a specific example if the data provides one.]
+Weakness: [One or two sentences about something still developing or difficult, and what tends to bring it on, explained kindly with a specific example if the data provides one.${r.lastDataMonth ? ` If it ran right through without changing, anchor it to ${r.lastDataMonth}, the last month this target has anything recorded against it.` : ""}]
 ===END===`).join("\n\n")}
 
 The OBSERVED blocks follow the same rules and the same two-line format as the OBSERVATION blocks above. They simply have no graph beside them.
@@ -5366,6 +5368,14 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
         for (const _r of allRemarks) {
           if ((_r.text || "").trim()) _tf.hasRemarks = true;
           if ((_r.trials || []).length) _tf.hasTrials = true;
+          // How current a Weakness can honestly claim to be. A difficulty that
+          // never changed has to be anchored to the last month this target has
+          // anything written or scored against it, NOT to today: a report opened
+          // in September would otherwise imply sessions that never happened.
+          // Empty placeholder remarks are skipped, since nothing was recorded.
+          if ((_r.text || "").trim() || (_r.trials || []).length) {
+            if (!_tf.lastDataDate || _r.date > _tf.lastDataDate) _tf.lastDataDate = _r.date;
+          }
           // Which days this target actually holds something, so a date the model
           // cites as its evidence can be checked rather than taken on trust.
           _tf.dates.add(evidenceDateKey(_r.date));
@@ -5560,6 +5570,15 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
     }
 
     lines.push("");
+  }
+
+  for (const _f of Object.values(targetFacts)) {
+    if (!_f.lastDataDate) continue;
+    const [_ly, _lm] = _f.lastDataDate.split("-").map(Number);
+    // The year is only worth printing when the period straddles two of them.
+    _f.lastDataMonth = HYR_R.months.some(_mo => _mo.y !== _ly)
+      ? `${HYR_FULL_MONTHS[_lm - 1]} ${_ly}`
+      : HYR_FULL_MONTHS[_lm - 1];
   }
 
   // Compute trendlines and categorize every target
