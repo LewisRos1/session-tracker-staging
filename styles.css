@@ -4160,40 +4160,13 @@ button.wf-pill:hover { filter: brightness(.93); }
 .mn-row-chip--sub      { background: #dbeafe; color: #1d4ed8; border: 1px solid #93c5fd; }
 .mn-row-chip--note     { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
 
-/* ── Sections as containers in Edit Target ─────────────────────
-   A section reads as one block so it is obvious which heading a mastered or
-   discontinued list belongs to. The rows stay DIRECT children of #mn-act-list,
-   because the drag sorter finds a row by walking the list's children, so the
-   container is a rail drawn on each row and stretched to bridge the .5rem gap
-   between them rather than a wrapper element. */
-#mn-act-list > [data-sec-head] {
-  border-left: 4px solid var(--primary);
-}
+/* ── Sections in Edit Target ───────────────────────────────────
+   Everything under a heading is simply indented. Hierarchy comes from position
+   alone: a rail or a border cannot be drawn cleanly here because the list puts a
+   .5rem flex gap between every row, which breaks any vertical line into segments
+   and looks choppy. The SECTION chip already says which row is the heading. The
+   rows also have to stay DIRECT children of #mn-act-list, because the drag
+   sorter finds the row a handle belongs to by walking the list's children. */
 #mn-act-list > [data-sec-member] {
-  position: relative;
-  margin-left: 1.15rem;
-}
-#mn-act-list > [data-sec-member]::before {
-  content: "";
-  position: absolute;
-  left: -.9rem;
-  top: -.5rem;      /* bridges the list's row gap, so the rail reads as one line */
-  bottom: -.5rem;
-  width: 3px;
-  border-radius: 2px;
-  background: var(--primary);
-  opacity: .3;
-}
-/* The last row closes the bracket instead of running on into the next section. */
-#mn-act-list > [data-sec-last]::before { bottom: 0; }
-#mn-act-list > [data-sec-last]::after {
-  content: "";
-  position: absolute;
-  left: -.9rem;
-  bottom: 0;
-  width: .75rem;
-  height: 3px;
-  border-radius: 2px;
-  background: var(--primary);
-  opacity: .3;
+  margin-left: 1.5rem;
 }
