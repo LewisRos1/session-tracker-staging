@@ -17,7 +17,7 @@ const ALLOWED_ORIGINS = new Set([
 ]);
 
 const ALLOWED_MODELS = new Set(["claude-sonnet-5"]);
-const MAX_TOKENS_CAP = 16000;
+const MAX_TOKENS_CAP = 32000;
 const MAX_BODY_BYTES = 300000;   // a real half-year prompt is far below this
 
 export default {

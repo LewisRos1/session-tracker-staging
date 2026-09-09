@@ -200,7 +200,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2005";
+const APP_VERSION = "2006";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3871,7 +3871,12 @@ async function aiRequest(aiPrompt, signal, meta = {}) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       model: AI_MODEL,
-      max_tokens: 16000,
+      // Sonnet 5 thinks before it writes, and the thinking counts against this
+      // same budget. A half-year report is only about 3,000 tokens of actual
+      // text, so 16,000 was never tight on the writing: it ran out during the
+      // reasoning and cut the reply mid-report. Headroom costs nothing unless
+      // it is used, since billing is on tokens produced, not on the ceiling.
+      max_tokens: 32000,
       stream: true,
       system: "You are a professional therapy report writer. Follow the requested format exactly.",
       messages: [{ role: "user", content: aiPrompt }]
@@ -4767,7 +4772,7 @@ ${evidencePromptBlock(["Weakness", "Focus Area", "Recommendation"], "the target'
     // aiRequest already joined every text block and dropped the thinking blocks.
     const reportText = data.text;
     if (data.stop_reason === "max_tokens") {
-      throw new Error("Generation failed. The reply hit the token limit before it finished, so part of the report is missing. Nothing was downloaded. Please generate again, or tell Claude Code to raise max_tokens.");
+      throw new Error(`Generation failed. The reply hit the token limit (${(data.usage?.output_tokens || 0).toLocaleString()} tokens produced) before it finished, so part of the report is missing. Nothing was downloaded. Please generate again.`);
     }
     if (!reportText) {
       throw new Error(`Generation failed. Claude returned nothing (stop_reason: ${data.stop_reason || "unknown"}). Nothing was downloaded. Please generate again.`);
@@ -7705,7 +7710,7 @@ ${evidencePromptBlock(["Weakness", "Recommendation"], "the target's name for a W
     aiTrackCost(data.usage, "assessment");
     const reportText = data.text;
     if (data.stop_reason === "max_tokens") {
-      throw new Error("Generation failed. The reply hit the token limit before it finished, so part of the report is missing. Nothing was downloaded. Please generate again, or tell Claude Code to raise max_tokens.");
+      throw new Error(`Generation failed. The reply hit the token limit (${(data.usage?.output_tokens || 0).toLocaleString()} tokens produced) before it finished, so part of the report is missing. Nothing was downloaded. Please generate again.`);
     }
     if (!reportText) {
       throw new Error(`Generation failed. Claude returned nothing (stop_reason: ${data.stop_reason || "unknown"}). Nothing was downloaded. Please generate again.`);
@@ -8333,7 +8338,7 @@ ${evidencePromptBlock(["Still Working On"], "the point's own short label", "Stil
     // aiRequest already joined every text block and dropped the thinking blocks.
     const reportText = data.text;
     if (data.stop_reason === "max_tokens") {
-      throw new Error("Generation failed. The reply hit the token limit before it finished, so part of the report is missing. Nothing was downloaded. Please generate again, or tell Claude Code to raise max_tokens.");
+      throw new Error(`Generation failed. The reply hit the token limit (${(data.usage?.output_tokens || 0).toLocaleString()} tokens produced) before it finished, so part of the report is missing. Nothing was downloaded. Please generate again.`);
     }
     if (!reportText) {
       throw new Error(`Generation failed. Claude returned nothing (stop_reason: ${data.stop_reason || "unknown"}). Nothing was downloaded. Please generate again.`);
