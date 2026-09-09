@@ -181,7 +181,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1987";
+const APP_VERSION = "1988";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -11197,6 +11197,17 @@ function groupPasBySections(target, dateStr, ignoreDate = false) {
 // Returns true if a predefined activity has any written data in the current individual session.
 function paIsWritten(pa, target, parentName = null) {
   if ((pa.fixedRemark !== undefined || pa.isMaintain) && !pa.maintained) return false;
+  // A maintained activity shows "Maintain" in its remark box from the moment the
+  // screen opens, but that is a default typed into the textarea, not a saved
+  // remark. Two maintained activities therefore ticked differently depending on
+  // whether one had been saved on some earlier visit. The box has something in
+  // it either way, so both count as written. This is display only: whether the
+  // SESSION counts is decided separately, and a Maintain-only session still does
+  // not count (see the date picker's hasData).
+  if (pa.maintained) {
+    const _d = state.sessionData?.date || todayDateStr();
+    if (_d >= (pa.maintainedAt || "2026-08-21")) return true;
+  }
   const actData = findActivityByName(target.name, pa.title || pa.name, parentName, pa.id);
   if (!actData) return false;
   const stripH = t => (t || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
@@ -20751,6 +20762,15 @@ document.addEventListener("keydown", e => {
   if (mnPanelIsDirty()) mnBlinkPanelSave(); else mnPanelSave();
 });
 
+/** SECTION / ACTIVITY / SUB-ACTIVITY / NOTE, the same labelling the Start
+ *  Session screen uses, so a section heading cannot be mistaken for an activity. */
+function mnRowChip(kind) {
+  const el = document.createElement("span");
+  el.className = "mn-row-chip mn-row-chip--" + kind;
+  el.textContent = { section: "Section", activity: "Activity", sub: "Sub-activity", note: "Note" }[kind] || kind;
+  return el;
+}
+
 /**
  * Wires every row in Edit Target to open its own panel: activities,
  * sub-activities, section headings, notes, and the mastered and discontinued
@@ -20860,6 +20880,14 @@ function mnInitActivityCollapse(bodyEl, acts) {
       }
     }
 
+    const kind = act && (act.isHeading || act.isMaintainHeading) ? "section"
+               : act && (act.isNote || act.isExportNote) ? "note" : "activity";
+    const head = card.querySelector(":scope > .mn-act-head");
+    if (!card.querySelector(".mn-row-chip")) {
+      if (head) head.insertBefore(mnRowChip(kind), titleEl);
+      else titleEl.insertBefore(mnRowChip(kind), titleEl.firstChild);   // mastered / discontinued cards
+    }
+
     const body = card.querySelector(":scope > .mn-act-body") || card.querySelector(".mn-act-body");
     titleEl.addEventListener("click", () =>
       mnOpenActPanel(card, body, titleEl.innerHTML, card.dataset.panelKey));
@@ -20875,6 +20903,10 @@ function mnInitActivityCollapse(bodyEl, acts) {
     const subBody = item ? [...item.children].find(c => c.querySelector && c.querySelector(".mn-act-title-input, .mn-sub-act-body")) : null;
     if (!item || !subBody) return;
     row.classList.add("mn-sub-clickable");
+    if (!row.querySelector(".mn-row-chip")) {
+      const handle = row.querySelector(".drag-handle");
+      row.insertBefore(mnRowChip("sub"), handle ? handle.nextSibling : row.firstChild);
+    }
     row.addEventListener("click", e => {
       if (e.target.closest(".drag-handle")) return;   // grabbing to reorder
       const shown = escHtml(nameOf(sub)) ||

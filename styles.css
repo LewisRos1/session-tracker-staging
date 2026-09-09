@@ -4140,3 +4140,22 @@ button.wf-pill:hover { filter: brightness(.93); }
   font-variant-numeric: tabular-nums;
 }
 .score-working-empty { color: var(--text-muted); font-style: italic; font-size: .84rem; }
+
+/* Row-type chips in Edit Target. Borrowed from the Start Session screen, which
+   already labels ACTIVITY and SUBACTIVITY: a section heading was the same shape
+   and colour as an activity, so it was easy to read one as the other. */
+.mn-row-chip {
+  flex-shrink: 0;
+  font-size: .65rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  padding: .18rem .42rem;
+  border-radius: .3rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+.mn-row-chip--section  { background: #4338ca; color: #fff; }
+.mn-row-chip--activity { background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; }
+.mn-row-chip--sub      { background: #dbeafe; color: #1d4ed8; border: 1px solid #93c5fd; }
+.mn-row-chip--note     { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
