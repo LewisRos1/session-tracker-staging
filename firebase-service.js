@@ -34,7 +34,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {
   initializeAppCheck,
-  ReCaptchaV3Provider
+  ReCaptchaEnterpriseProvider
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app-check.js";
 import { FIREBASE_CONFIG } from "./config.js";
 
@@ -51,8 +51,11 @@ const app = initializeApp(FIREBASE_CONFIG);
 // enforcement is on. Stolen credentials stop being enough on their own.
 //
 // Set up per project, since staging and live have separate keys:
-//   1. Firebase Console -> App Check -> Apps -> register the web app with
-//      reCAPTCHA v3, and copy the site key.
+//   1. Google Cloud Console -> Security -> reCAPTCHA Enterprise -> Create key,
+//      type Website, score-based, domains lewisros1.github.io and localhost.
+//      Then Firebase Console -> App Check -> register the app with reCAPTCHA
+//      Enterprise and give it that same key ID. Plain reCAPTCHA v3 is
+//      deprecated for App Check and the console refuses to recommend it.
 //   2. Add it to THAT project's config.js:  appCheckSiteKey: "6Lxxxxxx..."
 //   3. Watch App Check -> Firestore for a day. It reports verified against
 //      unverified requests. Only when unverified reaches nothing, press Enforce.
@@ -69,7 +72,7 @@ if (FIREBASE_CONFIG.appCheckSiteKey) {
   }
   try {
     initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider(FIREBASE_CONFIG.appCheckSiteKey),
+      provider: new ReCaptchaEnterpriseProvider(FIREBASE_CONFIG.appCheckSiteKey),
       isTokenAutoRefreshEnabled: true
     });
   } catch (err) {
