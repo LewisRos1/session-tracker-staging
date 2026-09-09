@@ -3963,6 +3963,14 @@ button.wf-pill:hover { filter: brightness(.93); }
 }
 #ai-report-pill.is-done { background: #15803d; --pill-bg: #15803d; }
 #ai-report-pill.is-fail { background: #b91c1c; --pill-bg: #b91c1c; }
+/* A report that finished but came out incomplete. Not a failure, not a clean
+   success, and the message is a sentence rather than a word, so it drops the
+   fully rounded ends and keeps its own colour. */
+#ai-report-pill.is-warn {
+  background: #b45309; --pill-bg: #b45309;
+  border-radius: 14px; align-items: flex-start;
+}
+#ai-report-pill.is-warn .ai-pill-ring { display: none; }
 /* Determinate ring: fills clockwise to the percentage, with the number in the
    middle. The inner disc uses --pill-bg so it stays invisible on every state. */
 #ai-report-pill .ai-pill-ring {

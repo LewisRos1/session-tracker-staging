@@ -200,7 +200,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2001";
+const APP_VERSION = "2002";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3824,6 +3824,37 @@ async function renderAiCostLine(lastUsd = null, usage = null) {
  * Returns the same shape the old non-streaming call produced:
  * { text, usage, stop_reason }, assembled from the events.
  */
+// The Strength and Weakness sentences exist nowhere in the database: the model
+// writes them, and if it skips a block the app has nothing to fall back on and
+// the section comes out blank. Nothing about the finished document says which
+// of the possible causes it was, so keep the raw replies and let
+// debugLastAiReport() show them. Memory only, cleared on reload.
+const _aiReplies = [];
+
+function aiStashReply(kind, label, text) {
+  _aiReplies.unshift({ kind, label, at: new Date().toISOString(), text });
+  _aiReplies.length = Math.min(_aiReplies.length, 3);
+}
+
+/** debugLastAiReport()  or  debugLastAiReport(1) for the one before it. */
+window.debugLastAiReport = function(n = 0) {
+  const r = _aiReplies[n];
+  if (!r) return console.log(_aiReplies.length
+    ? `Only ${_aiReplies.length} reply/replies kept this session.`
+    : "No AI report has been generated since this page was loaded.");
+  console.log(`${r.kind} — ${r.label} — ${r.at} — ${r.text.length.toLocaleString()} chars`);
+  console.log("Blocks the model returned:");
+  for (const m of r.text.matchAll(/===(OBSERVATION|OBSERVED):\s*([^=\n]+?)\s*===/g)) {
+    console.log(`  ${m[1]}: ${JSON.stringify(m[2])}`);
+  }
+  const ends = (r.text.match(/===END===/g) || []).length;
+  const heads = (r.text.match(/===[A-Z_]+(?::|===)/g) || []).length;
+  console.log(`${heads} opening markers, ${ends} ===END=== markers`);
+  console.log("Full reply below. Right-click it and Copy if you want to send it on.");
+  console.log(r.text);
+  return r.text;
+};
+
 async function aiRequest(aiPrompt, signal) {
   const resp = await fetch("https://session-tracker-ai.wang-loys22.workers.dev", {
     method: "POST",
@@ -3909,6 +3940,7 @@ GLOBAL RULES (apply to every section):
 - CRITICAL: Write ONLY what the session remarks directly and explicitly state. Do NOT extrapolate or infer related skills. "Identifies a face" is NOT the same as "knows a name." "Follows a one-step instruction" is NOT the same as "follows two-step instructions." "Points to an object" is NOT the same as "can name it." Stay word-for-word within what was actually recorded. Never assume a student can or cannot do something that was not directly observed.
 - CRITICAL: NEVER restate a number, a duration or a count as anything other than what the record says, and never drop the words that qualify it. "45 min" is 45 minutes: it is not "close to an hour", not "almost an hour", and not "a long stretch of time". "45 min on and off" is not 45 minutes of continuous distress, and the "on and off" must survive into whatever you write. If a figure cannot be stated exactly, leave it out rather than round it.
 - CRITICAL: NEVER let a vague word do the work of a fact. "Settled", "settling", "resolved", "stabilised", "improved", "progressed" and "developed" name no behaviour, and a parent reading one is left asking what settled, or what improved. Write the thing itself instead: "he now calms within a few minutes when reminded", not "this settled"; "he now asks for a snack without being prompted", not "this improved".
+- CRITICAL: NEVER write "episode" or "episodes". A child having a hard time is not a television programme, and the word tells a parent nothing about what actually happened. Name the thing itself: "he was unsettled on and off for about 45 minutes", "these times are shorter now", "it happens when he has to wait his turn". This is an absolute ban, in every section of every report.
 - CRITICAL: COUNT BEFORE YOU GENERALISE. "Sometimes", "often", "at times", "on harder days", "tends to", "has needed" and "can take" all claim a PATTERN, and a pattern needs more than one recorded instance behind it. Something recorded once is written as once. If the one instance sits at the very start of the period, say so plainly rather than implying it is still happening. Check how many separate sessions record a thing before you reach for any of those words.
 - CRITICAL: Some activities track NEGATIVE or PROBLEM BEHAVIOURS (e.g. snatching food, interrupting others, hitting, distracting behaviour). For these activities, scoring is INVERTED: a HIGH score (e.g. 3 out of 3) means the student did NOT exhibit the bad behaviour and showed good self-control, while a LOW score (e.g. 0) means the bad behaviour DID occur. Always interpret scores for problem/negative behaviour activities with this in mind: high = good, low = the behaviour occurred.
 - READABILITY: Write every section to a Flesch Reading Ease score of 60 to 70. Use short sentences and a natural tone. ABA terms that parents need to know (e.g. "self-regulation", "prompt", "generalisation") are allowed, but always explain them in plain words in the same sentence if they appear.
@@ -4580,6 +4612,8 @@ Weakness: [One or two sentences naming a genuine difficulty in this target, and 
 
 FORMAT FOR EVERY OBSERVATION BLOCK: exactly two lines, starting "Strength:" and "Weakness:", in that order. No bullet points, no asterisks, no extra lines, no "Note:" line, and NEVER a line describing the graph or the shape of the line.
 
+RETURN ONE BLOCK FOR EVERY TARGET, WITH NO EXCEPTIONS. ${targetsWithData.length} OBSERVATION block${targetsWithData.length === 1 ? "" : "s"} and ${qualitativeWithData.length} OBSERVED block${qualitativeWithData.length === 1 ? "" : "s"} are required, ${targetsWithData.length + qualitativeWithData.length} in total. Copy each target's name into its header EXACTLY as it is written above, character for character, including hyphens, capitals and any bracketed words: the report is assembled by matching that name, and a name written back differently loses the whole write-up. Never skip a target, never merge two targets into one block, and never write a block for a target that is not listed. Close EVERY block with ===END=== on its own line. Before you finish, count your blocks against the list above.
+
 RULES FOR EVERY OBSERVATION BLOCK:
 - Each line answers a DIFFERENT question and must not repeat the other. "Strength" is about a specific ability and what it is worth, "Weakness" is about a difficulty and when it appears.
 - One or two sentences per line, whichever it genuinely needs, except Strength which is always two: the observation and what it means. One clear sentence beats the SAME point stretched across two, but two different ideas always need two sentences. Never pad, and never list everything - pick what matters most.
@@ -4587,14 +4621,18 @@ RULES FOR EVERY OBSERVATION BLOCK:
 - NO percentages and no score numbers. Parents see those in the graph. The ONE exception is a figure the record itself states, such as a length of time written into a remark: that may be given in the Weakness line, exactly as recorded.
 - ALWAYS SAY WHERE IT STANDS NOW. A Weakness must leave the reader knowing what the difficulty looks like TODAY, not only when it was at its worst. If it eased, say what it looks like now and roughly when that changed. If it is still there, say so plainly. Naming only the early part and stopping is half an answer and is WRONG, however true that half is.
   RIGHT, both halves: "Caden's assertive curiosity, meaning his willingness to explore and try new things rather than just watch, was lower early in the term but became far more consistent from April onward."
-  RIGHT, still current and says so: "Caden still tends to wait for an adult to ask whether he wants a snack, water or help before asking himself. This has continued through most sessions, including the most recent ones."
+  RIGHT, still current and says so without naming a month: "Caden still tends to wait for an adult to ask whether he wants a snack or water rather than requesting these on his own."
   WRONG, the present is left unsaid: "Caden required calming support during a few sessions early in the term when he appeared dysregulated." A parent reads that and asks what he is like now.
-- ONE IDEA PER SENTENCE, AND USE THE SECOND SENTENCE. Where there is a difficulty AND how it changed, or two different difficulties, write TWO sentences. Never chain them into one long sentence with "though", "a pattern that", "rather than", or "and he has needed". A sentence a parent has to read twice has failed, however accurate it is.
-  WRONG, three ideas welded together: "Recovering from distress within twenty minutes was hardest early in the term, taking as long as forty-five minutes on and off on one occasion in March, though this settled into brief, specific episodes tied to particular triggers like waiting or toileting later on."
-  RIGHT, the same facts split: "Early in the term Caden took a long time to recover once he was upset, and on one occasion in March this went on for 45 min on and off. Since April the upsets have been short, and they happen mainly when he has to wait his turn or is asked to use the toilet."
+- NAME A MONTH ONLY WHEN SOMETHING CHANGED. A month earns its place by marking WHEN a difficulty began, eased, or got worse. If the difficulty has been the same from the start of the term to the end, name NO month at all: "still" already tells the parent it is happening now. A month bolted onto the end of an unchanged difficulty makes the line heavy to read, and the same month repeated under target after target is worse still.
+  WRONG, unchanged all term but stamped with a month anyway: "...and this was still evident in July." / "...and this was still the case in his most recent sessions in July." / "...he continued to need reminders about orientation in his most recent sessions in July." / "...though it can still happen on mornings when he appears tired or distracted, as seen in July."
+  RIGHT, unchanged all term, so no month anywhere: "Caden still relies mostly on the instructor to start an interaction rather than beginning it himself, especially for activities he likes less. This means his independent initiation remains an area to keep building on."
+  When it DID change, the months carry real information and belong there - see the two-sentence example below.
+- TWO SENTENCES AT MOST, AND KEEP EACH ONE SIMPLE. One sentence where one says it. Two where the difficulty changed during the term, or where there are genuinely two different difficulties. NEVER three. A parent must understand each sentence on a single read: if they would have to go back to the start of it, the sentence has failed, however accurate it is. Do not weld three separate facts together with "though", "a pattern that", or "and he has needed".
+  WRONG, three ideas welded together: "Recovering from distress within twenty minutes was hardest early in the term, taking as long as forty-five minutes on and off on one occasion in March, though this settled into brief, specific difficulties tied to particular triggers like waiting or toileting later on."
+  RIGHT, the same facts, one sentence for then and one for now: "Early in the term, Caden took a long time to calm down after becoming upset, including one time in March when he was unsettled on and off for about 45 minutes. Since then, he has improved and now settles more quickly, usually in situations like waiting for his turn or being asked to use the toilet, as seen in June and July."
   WRONG, two unrelated facts in one sentence: "On one occasion Caden was slower to respond to instructions and seemed more spaced out than usual, and he had more difficulty identifying newer, less familiar friends compared with well-known family members."
   RIGHT, split: "On one occasion Caden was slower to respond to instructions and seemed more spaced out than usual. He also finds it harder to name newer friends than family members he knows well."
-- Write a figure the way the record writes it: "45 min", not "forty-five minutes".
+- Write a length of time with the number as a figure and the unit as a full word: "45 minutes", not "45 min" and not "forty-five minutes".
 - Plain English, Grade 6-8 reading level. No clinical jargon.
 - Do NOT say things like "modalities", "regulatory capacity", "situational influences", "low-demand contexts". Use real words instead: "free play", "good days and bad days", "room noise".
 - Do NOT summarise what the graph already shows. Add insight the graph cannot.
@@ -4674,6 +4712,7 @@ ${evidencePromptBlock(["Weakness", "Focus Area", "Recommendation"], "the target'
     aiTrackCost(data.usage, "halfYear");
     // aiRequest already joined every text block and dropped the thinking blocks.
     const reportText = data.text;
+    aiStashReply("half-year", `${student.name}, ${aiReportingPeriod}`, reportText || "");
     if (!reportText) {
       throw new Error(data.stop_reason === "max_tokens"
         ? "The response hit the token limit before finishing. Try again, or tell Claude Code to raise max_tokens."
@@ -4688,7 +4727,16 @@ ${evidencePromptBlock(["Weakness", "Focus Area", "Recommendation"], "the target'
       ...targetsWithData.filter(r => !hyrPickObs(parsed.observations, r.name)).map(r => r.name),
       ...qualitativeWithData.filter(r => !hyrPickObs(parsed.observed, r.name)).map(r => r.name)
     ];
-    if (_missingObs.length) console.warn("[AI report] no write-up returned for:", _missingObs);
+    if (_missingObs.length) {
+      console.warn("[AI report] no write-up returned for:", _missingObs);
+      console.warn("[AI report] run debugLastAiReport() to see what the model actually sent back.");
+      // Those targets print with a chart and nothing underneath. The document
+      // gives no sign anything is missing, so say it here rather than leaving
+      // it to be noticed on a read-through.
+      _aiDoneNote = _missingObs.length === 1
+        ? `Done, but ${_missingObs[0]} has no write-up. Run debugLastAiReport() in the console.`
+        : `Done, but ${_missingObs.length} targets have no write-up: ${_missingObs.join(", ")}. Run debugLastAiReport() in the console.`;
+    }
 
     setProgress(100, "Done!");
     await new Promise(r => setTimeout(r, 400));
@@ -4764,6 +4812,7 @@ function aiPillShow(text, cls, pct) {
   const el = aiPillEl();
   el.classList.toggle("is-done", cls === "done");
   el.classList.toggle("is-fail", cls === "fail");
+  el.classList.toggle("is-warn", cls === "warn");
   el.querySelector(".ai-pill-text").textContent = text;
   if (typeof pct === "number") {
     const ring = el.querySelector(".ai-pill-ring");
@@ -4786,13 +4835,25 @@ function aiJobStart(label, abort) {
     return false;
   }
   _aiJob = { label, abort };
+  _aiDoneNote = "";          // a note from the previous run must not carry over
   aiPillShow("Generating Report…", null, 0);
   return true;
 }
 function aiJobProgress(pct) { if (_aiJob) aiPillShow("Generating Report…", null, pct); }
+// Set when the report finished but something in it needs saying. The pill
+// message is chosen in the finally block, which has no way of knowing what the
+// try block found, so it is left here instead.
+let _aiDoneNote = "";
+
 function aiJobEnd(state, text) {
   _aiJob = null;
   if (state === "done") {
+    const note = _aiDoneNote;
+    _aiDoneNote = "";
+    // A green "Done!" that clears itself after six seconds is the wrong way to
+    // say part of the report is blank, so a note gets its own colour and stays
+    // until it is dismissed.
+    if (note) return aiPillShow(note, "warn");
     aiPillShow(text || "Done!", "done");
     setTimeout(() => {
       const el = document.getElementById("ai-report-pill");
@@ -6215,12 +6276,21 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
  * back, and a stray space or a difference in case was enough to lose the whole
  * paragraph silently, leaving the section looking as if no data existed.
  */
+// The model writes each target's name back as the block header, and it does not
+// always copy it character for character: "Self Regulation" for "Self-Regulation"
+// is enough to lose a whole write-up, and the finished document gives no hint
+// that anything is missing. Match on letters and digits only so punctuation,
+// hyphens, spacing and case cannot break the link.
+function hyrObsKey(name) {
+  return String(name).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
 function hyrPickObs(map, name) {
   if (!map || !name) return undefined;
   if (map[name]) return map[name];
-  const want = String(name).trim().toLowerCase().replace(/\s+/g, " ");
+  const want = hyrObsKey(name);
   for (const [k, v] of Object.entries(map)) {
-    if (String(k).trim().toLowerCase().replace(/\s+/g, " ") === want) return v;
+    if (hyrObsKey(k) === want) return v;
   }
   return undefined;
 }
@@ -6244,11 +6314,15 @@ function hyrParseAiResponse(text) {
       }
     }
   }
-  for (const m of text.matchAll(/===OBSERVATION:\s*([^=]+?)===\s*([\s\S]*?)\s*===END===/g)) {
-    out.observations[m[1].trim()] = m[2].trim();
+  // Stop at the next marker as well as at ===END===. When the model forgets one
+  // closing marker the old pattern ran on to the FOLLOWING block's ===END===,
+  // which fed one target its neighbour's text and dropped that neighbour
+  // entirely - a blank section in the document with nothing to explain it.
+  for (const m of text.matchAll(/===OBSERVATION:\s*([^=\n]+?)\s*===\s*([\s\S]*?)\s*(?====END===|===OBSERVATION:|===OBSERVED:|===ACTION_PLAN|===EVIDENCE|$)/g)) {
+    if (m[2].trim()) out.observations[m[1].trim()] = m[2].trim();
   }
-  for (const m of text.matchAll(/===OBSERVED:\s*([^=]+?)===\s*([\s\S]*?)\s*===END===/g)) {
-    out.observed[m[1].trim()] = m[2].trim();
+  for (const m of text.matchAll(/===OBSERVED:\s*([^=\n]+?)\s*===\s*([\s\S]*?)\s*(?====END===|===OBSERVATION:|===OBSERVED:|===ACTION_PLAN|===EVIDENCE|$)/g)) {
+    if (m[2].trim()) out.observed[m[1].trim()] = m[2].trim();
   }
   const plan = text.match(/===ACTION_PLAN===\s*([\s\S]*?)\s*===END===/);
   if (plan) {
@@ -7590,6 +7664,7 @@ ${evidencePromptBlock(["Weakness", "Recommendation"], "the target's name for a W
     setProgress(72, "AI response received…");
     aiTrackCost(data.usage, "assessment");
     const reportText = data.text;
+    aiStashReply("assessment", `${student.name}, ${nDays} days`, reportText || "");
     if (!reportText) {
       throw new Error(data.stop_reason === "max_tokens"
         ? "The response hit the token limit before finishing. Try again, or tell Claude Code to raise max_tokens."
@@ -8213,6 +8288,7 @@ ${evidencePromptBlock(["Still Working On"], "the point's own short label", "Stil
     aiTrackCost(data.usage, "monthly");
     // aiRequest already joined every text block and dropped the thinking blocks.
     const reportText = data.text;
+    aiStashReply("monthly", `${student.name}, ${monthName} ${year}`, reportText || "");
     if (!reportText) {
       throw new Error(data.stop_reason === "max_tokens"
         ? "The response hit the token limit before finishing. Try again, or tell Claude Code to raise max_tokens."
