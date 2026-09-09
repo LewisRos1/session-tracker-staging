@@ -181,7 +181,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1989";
+const APP_VERSION = "1990";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -20914,6 +20914,27 @@ function mnInitActivityCollapse(bodyEl, acts) {
       mnOpenActPanel(item, subBody, `<span class="mn-act-title-text">${shown}</span>`, keyOf(sub));
     });
   });
+
+  // Draw each section as a container. The rows have to stay DIRECT children of
+  // #mn-act-list because the drag sorter finds a row by walking the list's
+  // children, so this marks the run belonging to each heading and lets CSS draw
+  // a rail down the side rather than wrapping them in an element.
+  let secOpen = false, run = [];
+  const closeRun = () => { if (run.length) run[run.length - 1].dataset.secLast = "1"; run = []; };
+  [...list.children].forEach(row => {
+    if (row.classList.contains("mn-heading-item")) {
+      closeRun();
+      row.dataset.secHead = "1";
+      secOpen = true;
+      return;
+    }
+    if (!secOpen) return;
+    // An empty holder has no height and would leave a gap in the rail.
+    if (row.classList.contains("mn-seg-groups") && !row.firstElementChild) return;
+    row.dataset.secMember = "1";
+    run.push(row);
+  });
+  closeRun();
 
   // A newly added activity, or one whose panel was interrupted by a rebuild,
   // opens straight back up.
