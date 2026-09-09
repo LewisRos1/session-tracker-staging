@@ -181,7 +181,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1982";
+const APP_VERSION = "1983";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -19110,7 +19110,7 @@ async function handleActStartPickerChange() {
 // ── Open / close ──────────────────────────────────────────────
 
 function openManageModal(student, targetOrNull, templateOrNull = null, remarkPresetOrNull = null, scrollToPaId = null) {
-  _mnExpandedActs = new Set();   // every activity opens collapsed
+  mnCloseActPanel(true);   // never inherit a panel from the last target
   $("manage-modal").classList.remove("hidden");
   if (remarkPresetOrNull) {
     renderRemarkPresetManageContent(remarkPresetOrNull);
@@ -20514,41 +20514,126 @@ function mnReorderActs(acts, newOrder) {
 }
 
 
-// ── Per-activity expand / collapse in Edit Target ─────────────
-// Every activity opens collapsed: a target with twenty activities was otherwise
-// a wall of forms you had to scroll past to reach the one you wanted. Clicking a
-// title expands that card alone, and the others are left exactly as they were.
-// Expansion is remembered across the re-render that follows a save, keyed by the
-// activity's own id so adding or deleting a card cannot shift the state onto its
-// neighbour.
-let _mnExpandedActs = new Set();
+// ─── EDIT TARGET: ONE ACTIVITY AT A TIME ─────────────────────
+// The list shows one row per activity and nothing else. Clicking a row opens
+// that activity's fields in a floating panel, so a target with twenty
+// activities is a list of twenty lines rather than a page of forms to scroll
+// past.
+//
+// The panel BORROWS the card's existing fields rather than rendering its own
+// copy: the node is moved into the panel and moved back on close. Every handler
+// in the modal is bound by class after the HTML is inserted, so a node that
+// moves keeps working, and fields go on saving on blur exactly as they did.
+// Rebuilding the fields inside the panel would have meant duplicating several
+// hundred lines of markup and every listener attached to it.
+let _mnPanelOpen = null;   // { body, home, next, card }
+let _mnPanelOpenAfterRender = null;   // an activity id to open once the list is rebuilt
 
-const mnActExpandKey = (a, idx) => (a && a.id) ? `id:${a.id}` : `ix:${idx}`;
+function mnActPanelEl() {
+  let el = document.getElementById("mn-act-panel-overlay");
+  if (el) return el;
+  el = document.createElement("div");
+  el.id = "mn-act-panel-overlay";
+  el.innerHTML =
+    `<div class="mn-act-panel" role="dialog" aria-modal="true">` +
+      `<div class="mn-act-panel-head">` +
+        `<span class="mn-act-panel-title"></span>` +
+        `<button class="mn-act-panel-x" type="button" title="Save and close">&#10005;</button>` +
+      `</div>` +
+      `<div class="mn-act-panel-body"></div>` +
+      `<div class="mn-act-panel-foot">` +
+        `<button class="mn-act-panel-save" type="button">Save and Close</button>` +
+      `</div>` +
+    `</div>`;
+  // Clicking the dimmed area does NOT close the panel. Fields save on blur, so
+  // nothing would be lost, but a window that vanishes when you miss it leaves
+  // you unsure whether the edit took. Point at the button instead.
+  el.addEventListener("click", e => { if (e.target === el) mnBlinkPanelSave(); });
+  el.querySelector(".mn-act-panel-x").addEventListener("click", () => mnCloseActPanel());
+  el.querySelector(".mn-act-panel-save").addEventListener("click", () => mnCloseActPanel());
+  document.body.appendChild(el);
+  return el;
+}
+
+/** `body` is the card's own field container, moved in as-is. */
+function mnOpenActPanel(card, body, titleHtml) {
+  if (!body) return;
+  if (_mnPanelOpen) mnCloseActPanel();
+  const el = mnActPanelEl();
+  const slot = el.querySelector(".mn-act-panel-body");
+  el.querySelector(".mn-act-panel-title").innerHTML = titleHtml || "";
+  // Remember exactly where it came from, so it goes back in the same place even
+  // if siblings shifted while it was away.
+  _mnPanelOpen = { body, home: body.parentElement, next: body.nextSibling, card };
+  slot.appendChild(body);
+  body.classList.add("mn-act-panel-open");
+  el.style.display = "flex";
+  // A textarea measured while its container was hidden comes back 0px tall.
+  requestAnimationFrame(() => {
+    slot.querySelectorAll("textarea").forEach(autoResizeTextarea);
+    slot.scrollTop = 0;
+  });
+}
 
 /**
- * Turns every activity card in the modal into its own expander, active and
- * inactive alike. Mastered and discontinued cards are the same thing as an
- * active card minus the drag handle, so they are given the same title row and
- * the same body wrapper here rather than the title-only list they used to get.
+ * Closes the panel and puts the fields back. `discard` is for the case where the
+ * whole modal is being re-rendered underneath: the card is about to be replaced,
+ * so there is nowhere to put anything back.
+ */
+function mnCloseActPanel(discard = false) {
+  const el = document.getElementById("mn-act-panel-overlay");
+  if (el) el.style.display = "none";
+  const open = _mnPanelOpen;
+  _mnPanelOpen = null;
+  if (!open) return;
+  // Blur first. Fields save on blur, and closing while one still has focus
+  // would drop whatever was typed into it.
+  if (document.activeElement && open.body.contains(document.activeElement)) {
+    document.activeElement.blur();
+  }
+  open.body.classList.remove("mn-act-panel-open");
+  if (discard || !open.home || !open.home.isConnected) return;
+  open.home.insertBefore(open.body, open.next && open.next.isConnected ? open.next : null);
+}
+
+/** Draws the eye to Save and Close when someone clicks off the panel. */
+function mnBlinkPanelSave() {
+  const btn = document.querySelector("#mn-act-panel-overlay .mn-act-panel-save");
+  if (!btn) return;
+  btn.classList.remove("is-blinking");
+  void btn.offsetWidth;              // restart the animation on a repeat click
+  btn.classList.add("is-blinking");
+  setTimeout(() => btn.classList.remove("is-blinking"), 1400);
+}
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && _mnPanelOpen) { e.preventDefault(); mnCloseActPanel(); }
+});
+
+/**
+ * Wires every row in Edit Target to open its own panel: activities,
+ * sub-activities, section headings, notes, and the mastered and discontinued
+ * cards. Each kind stores its fields differently, so each is given the same two
+ * things here, a title row to click and one container holding everything else.
  */
 function mnInitActivityCollapse(bodyEl, acts) {
   const list = bodyEl.querySelector("#mn-act-list");
   if (!list) return;
+  const nameOf = a => (a && (a.title || a.name || "").trim()) || "";
 
+  // ── Mastered / discontinued cards: wrap their fields and add a title row ──
   bodyEl.querySelectorAll(".mn-inact-card").forEach(card => {
     if (card.querySelector(".mn-act-compact-title")) return;
     const body = card.querySelector(":scope > div[style*='flex:1']");
     if (!body) return;
     const gi = Number(card.dataset.globalIdx);
     const a = Number.isFinite(gi) ? acts[gi] : null;
-    // The body keeps its own layout styles, so it is wrapped in a plain column
-    // that holds the title above it.
     const col = document.createElement("div");
     col.style.cssText = "flex:1;min-width:0;display:flex;flex-direction:column;gap:.3rem";
     const title = document.createElement("div");
     title.className = "mn-act-compact-title";
-    // The mastered / discontinued / maintained tag now leads the title, the way
-    // the Start Session screen shows it, instead of sitting off on the right.
+    // The mastered / discontinued / maintained tag leads the title, the way the
+    // Start Session screen shows it.
     title.innerHTML = a ? inactiveReasonBadge(a) + `<span class="mn-act-title-text">${paPlainTitle(a)}</span>` : `<span class="mn-act-title-text"></span>`;
     body.parentElement.insertBefore(col, body);
     col.appendChild(title);
@@ -20557,31 +20642,53 @@ function mnInitActivityCollapse(bodyEl, acts) {
     body.style.flex = "1";
   });
 
+  // ── Headings and notes: their editor IS the row, so it is wrapped into a body
+  //    and a read-only title put in its place. ──
+  list.querySelectorAll(":scope > .admin-list-item").forEach(card => {
+    if (card.querySelector(".mn-act-compact-title")) return;
+    const idx = Number(card.dataset.idx);
+    const a = acts[idx];
+    if (!a || !(a.isHeading || a.isMaintainHeading || a.isNote || a.isExportNote)) return;
+    const handle = card.querySelector(":scope > .drag-handle");
+    const kebabWrap = card.querySelector(":scope > div > .mn-heading-color-btn, :scope > div > .mn-note-kebab-btn, :scope > div > .btn-adm-del")?.parentElement;
+    const pieces = [...card.children].filter(c => c !== handle && c !== kebabWrap);
+    if (!pieces.length) return;
+    const body = document.createElement("div");
+    body.className = "mn-act-body";
+    body.style.cssText = "display:flex;flex-direction:column;gap:.55rem";
+    pieces.forEach(p => body.appendChild(p));
+    const isNote = !!(a.isNote || a.isExportNote);
+    const text = isNote ? stripNoteHtml(a.text || "") : (a.name || "");
+    const title = document.createElement("div");
+    title.className = "mn-act-compact-title" + (isNote ? " mn-note-title" : " mn-heading-title");
+    title.innerHTML = `<span class="mn-act-title-text">${escHtml(text.trim())}</span>`;
+    const head = document.createElement("div");
+    head.className = "mn-act-head";
+    if (handle) head.appendChild(handle);
+    head.appendChild(title);
+    if (kebabWrap) head.appendChild(kebabWrap);
+    card.appendChild(head);
+    card.appendChild(body);
+    card.classList.add("mn-act-card");
+  });
+
+  // ── Activities: lift the title onto a header row spanning the whole card ──
   const cards = [
     ...list.querySelectorAll(":scope > .admin-list-item"),
     ...bodyEl.querySelectorAll(".mn-inact-card")
   ].filter(c => c.querySelector(".mn-act-compact-title") && c.querySelector(".mn-act-body"));
-  cards.forEach(card => {
-    const gi = Number(card.dataset.globalIdx ?? card.dataset.idx);
-    const key = mnActExpandKey(Number.isFinite(gi) ? acts[gi] : null, gi);
-    card.dataset.expandKey = key;
-    card.classList.toggle("is-expanded", _mnExpandedActs.has(key));
 
+  cards.forEach(card => {
     const titleEl = card.querySelector(".mn-act-compact-title");
-    // An activity with no title yet would collapse to an empty strip with
-    // nothing to click, so it keeps a placeholder to grab hold of. The check is
-    // on the title text alone: a mastered or maintained tag sits in the same
-    // element and would otherwise make an untitled activity look named.
+    // A row with nothing written in it yet would be an empty strip with nothing
+    // to click, so it keeps a placeholder. The check is on the title text alone:
+    // a mastered or maintained tag sits in the same element.
     const titleTextEl = titleEl.querySelector(".mn-act-title-text") || titleEl;
     if (!titleTextEl.textContent.trim()) {
-      titleTextEl.innerHTML = `<span style="color:#9ca3af;font-style:italic;font-weight:500">(Untitled activity)</span>`;
+      const what = card.classList.contains("mn-heading-title") ? "section heading" : "activity";
+      titleTextEl.innerHTML = `<span style="color:#9ca3af;font-style:italic;font-weight:500">(Untitled ${what})</span>`;
     }
 
-    // Lift the title onto a header row of its own, spanning the whole card, so
-    // the divider under it runs edge to edge instead of starting after the drag
-    // handle. Done here rather than in the markup for the same reason
-    // mnRegroupInactiveCards relocates its cards: it leaves several hundred
-    // lines of card HTML, and every handler bound to it, completely untouched.
     if (card.classList.contains("admin-list-item") && !card.querySelector(":scope > .mn-act-head")) {
       const body       = card.querySelector(":scope .mn-act-body");
       const column     = titleEl.parentElement;                 // holds title + body
@@ -20605,16 +20712,38 @@ function mnInitActivityCollapse(bodyEl, acts) {
       }
     }
 
-    const setOpen = on => {
-      card.classList.toggle("is-expanded", on);
-      if (on) _mnExpandedActs.add(key); else _mnExpandedActs.delete(key);
-      // Textareas measured while hidden come back 0px tall.
-      if (on) card.querySelectorAll("textarea").forEach(autoResizeTextarea);
-    };
-
+    const body = card.querySelector(":scope > .mn-act-body") || card.querySelector(".mn-act-body");
     titleEl.addEventListener("click", () =>
-      setOpen(!card.classList.contains("is-expanded")));
+      mnOpenActPanel(card, body, titleEl.innerHTML));
   });
+
+  // ── Sub-activities: the indented rows under a parent open their own panel ──
+  list.querySelectorAll(".mn-sub-compact").forEach(row => {
+    const subIdx = Number(row.dataset.idx);
+    const sub = acts[subIdx];
+    // The full sub-activity card lives inside the parent's body, which is hidden.
+    // Moving its fields out of a hidden container makes them visible again.
+    const item = list.querySelector(`.mn-sub-item[data-idx="${subIdx}"]`);
+    const subBody = item ? [...item.children].find(c => c.querySelector && c.querySelector(".mn-act-title-input, .mn-sub-act-body")) : null;
+    if (!item || !subBody) return;
+    row.classList.add("mn-sub-clickable");
+    row.addEventListener("click", e => {
+      if (e.target.closest(".drag-handle")) return;   // grabbing to reorder
+      mnOpenActPanel(item, subBody,
+        `<span class="mn-act-title-text">${escHtml(nameOf(sub)) || "(Untitled sub-activity)"}</span>`);
+    });
+  });
+
+  // A newly added activity opens straight into its panel: there is nothing to
+  // read on the row and every field is still blank.
+  if (_mnPanelOpenAfterRender) {
+    const wantIdx = acts.findIndex(a => a && a.id === _mnPanelOpenAfterRender);
+    _mnPanelOpenAfterRender = null;
+    const card = wantIdx >= 0 ? list.querySelector(`.admin-list-item[data-idx="${wantIdx}"]`) : null;
+    const titleEl = card?.querySelector(".mn-act-compact-title");
+    const body = card?.querySelector(".mn-act-body");
+    if (card && body) mnOpenActPanel(card, body, titleEl ? titleEl.innerHTML : "");
+  }
 }
 // Moves every card built into the hidden #mn-inactive-source into a collapsed
 // group under the heading it belongs to, then removes the staging container.
@@ -21411,6 +21540,9 @@ function renderTargetManageContent(student, target) {
       ${_groupForTargetEdit ? `<button class="btn-adm-danger" id="btn-mn-del-target">Delete This Target</button>` : ''}
     </div>`;
 
+  // A re-render replaces the very card the panel borrowed its fields from, so
+  // close it first and let the queue below decide whether to open it again.
+  mnCloseActPanel(true);
   $("manage-modal-body").innerHTML = html;
   // Relocate the mastered/discontinued cards under their headings before any
   // listener is bound, so every handler below finds them in their final home.
@@ -22677,7 +22809,7 @@ function renderTargetManageContent(student, target) {
     // Opened straight away: a brand new activity has nothing to read and every
     // field still to fill in.
     const _newAct = { id: cfgId("a"), name: "", order: acts.length, createdOn: todayDateStr(), activeFrom: _newActDate };
-    _mnExpandedActs.add(mnActExpandKey(_newAct, acts.length));
+    _mnPanelOpenAfterRender = _newAct.id;
     acts.push(_newAct);
     target.predefinedActivities = acts;
     renderTargetManageContent(student, target);
@@ -24171,6 +24303,9 @@ function renderTemplateManageContent(template) {
       <button class="btn-adm-danger" id="btn-mn-del-template">Delete Template</button>
     </div>`;
 
+  // A re-render replaces the very card the panel borrowed its fields from, so
+  // close it first and let the queue below decide whether to open it again.
+  mnCloseActPanel(true);
   $("manage-modal-body").innerHTML = html;
   // See renderTargetManageContent — relocate before listeners are bound.
   mnRegroupInactiveCards($("manage-modal-body"), acts);
@@ -24351,7 +24486,7 @@ function renderTemplateManageContent(template) {
   $("btn-mn-add-act").addEventListener("click", () => {
     const btn = $("btn-mn-add-act"); if (btn) btn.disabled = true;
     const _newAct = { id: cfgId("a"), name: "", order: acts.length, createdOn: todayDateStr() };
-    _mnExpandedActs.add(mnActExpandKey(_newAct, acts.length));
+    _mnPanelOpenAfterRender = _newAct.id;
     acts.push(_newAct);
     template.predefinedActivities = acts;
     renderTemplateManageContent(template);
@@ -27197,7 +27332,7 @@ function renderGroupSessionsForMonth(group, month, monthSessions, byMonth, sessi
 
 // ── Group manage modal ───────────────────────────────────────
 function openGroupManageModal(group, target = null, scrollToPaId = null) {
-  _mnExpandedActs = new Set();   // every activity opens collapsed
+  mnCloseActPanel(true);   // never inherit a panel from the last target
   $("manage-modal").classList.remove("hidden");
   if (target) {
     _groupForTargetEdit = group;
