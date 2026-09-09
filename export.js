@@ -2018,7 +2018,6 @@ function wordTargetRows(target, session, allTargets) {
       continue;
     }
 
-    const mappedScore = act.isMapped ? resolveExportMappedScore(act, session, allTargets) : null;
 
     let first = true;
     for (const rem of remarks) {
@@ -2026,7 +2025,6 @@ function wordTargetRows(target, session, allTargets) {
       const text        = stripRemarkHtml(rem.text);
       const masteryNote = stripRemarkHtml(rem.masteryNote || "");
       const remarkAvg   = act.noTrials    ? null
-                        : act.isMapped    ? mappedScore
                         : act.manualScore ? parseManualScore(text)
                         : calcRemarkAvg(validTrials, target.maxPoints);
       rows.push({
@@ -2880,7 +2878,6 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, mastere
         continue;
       }
 
-      const mappedScore = act.isMapped ? resolveExportMappedScore(act, session, allTargets) : null;
 
       let firstRemark = true;
       for (const rem of remarks) {
@@ -2888,7 +2885,6 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, mastere
         if (act.isGreen) greenRows.add(rows.length);
         const validTrials = allScores(rem);
         const remarkAvg   = act.noTrials ? null
-                          : act.isMapped ? mappedScore
                           : calcRemarkAvg(validTrials, target.maxPoints);
         const masteryNote = stripRemarkHtml(rem.masteryNote || "");
         const r = blankRow();
@@ -3114,13 +3110,11 @@ function getAllActivitiesForTarget(session, target) {
     const _isMaintainedForSession = !!pa.maintained && (session.date >= (pa.maintainedAt || "2026-08-21"));
     if (sessionAct) {
       usedIds.add(sessionAct.id);
-      result.push(pa.isMapped
-        ? { ...sessionAct, activityName: numberedName, isMapped: true, mappedTargetId: pa.mappedTargetId || null, ...colorProps, isMaintained: _isMaintainedForSession, ...paExtraProps }
-        : { ...sessionAct, activityName: numberedName, ...colorProps, ...manualScoreProp, ...noTrialsProp, isMaintained: _isMaintainedForSession, ...paExtraProps });
+      result.push({ ...sessionAct, activityName: numberedName, ...colorProps, ...manualScoreProp, ...noTrialsProp, isMaintained: _isMaintainedForSession, ...paExtraProps });
     } else {
       result.push({
         id: null, activityName: numberedName, isPredefined: true, empty: true,
-        isMapped: pa.isMapped || false, mappedTargetId: pa.mappedTargetId || null, ...colorProps, ...manualScoreProp, ...noTrialsProp, isMaintained: _isMaintainedForSession, ...paExtraProps
+        ...colorProps, ...manualScoreProp, ...noTrialsProp, isMaintained: _isMaintainedForSession, ...paExtraProps
       });
     }
   }
@@ -3306,12 +3300,6 @@ export function calcDailyAverage(session, target, allTargets = [], visited = new
     if (act.isHeading || act.isNote || act.isExportNote || act.empty || act.isMasteredSeparator || act.isStoppedSeparator || act.isMaintainSeparator || act.isMaintain || act.isMaintainHeading) continue;
     // "Remark Only (No Trials)" never contributes to the daily average.
     if (act.noTrials) continue;
-    if (act.isMapped) {
-      if (getRemarksForActivity(session, act.id).length === 0) continue;
-      const a = resolveExportMappedScore(act, session, allTargets, visited);
-      if (a !== null) avgs.push(a);
-      continue;
-    }
     for (const rem of getRemarksForActivity(session, act.id)) {
       if (act.manualScore) {
         const pct = parseManualScore(stripRemarkHtml(rem.text || "").trim());
@@ -3326,13 +3314,6 @@ export function calcDailyAverage(session, target, allTargets = [], visited = new
   return avgs.length > 0 ? avg(avgs) : null;
 }
 
-// Resolves a mapped-score activity's value for export — see calcDaysAverage's
-// live-entry counterpart (app.js) for the same idea.
-function resolveExportMappedScore(act, session, allTargets, visited) {
-  const mappedTarget = act.mappedTargetId ? allTargets.find(t => t.id === act.mappedTargetId) : null;
-  if (!mappedTarget) return null;
-  return calcDailyAverage(session, mappedTarget, allTargets, visited);
-}
 
 function avg(arr) { return arr.reduce((a, b) => a + b, 0) / arr.length; }
 

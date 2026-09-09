@@ -200,7 +200,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2000";
+const APP_VERSION = "2001";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -10780,9 +10780,6 @@ async function openSession(student, existingSessionId = null, dateStr = null, pa
       // session (not just on open), so this check isn't gated to firstLoad.
       // Same render-immediately approach: don't wait for the write's snapshot.
       try {
-        await autoFillMappedRemarks(student, sessionId);
-      } catch (err) { console.error("autoFillMappedRemarks failed:", err); }
-      try {
         await autoFillMaintainedRemarks(student, sessionId, state.selectedTargetName);
         // Don't return early — render now and let the Firestore write from
         // the fill trigger its own snapshot update rather than blocking here.
@@ -11012,12 +11009,11 @@ function populateTargetDropdown(targets) {
     try { renderTargetContent(); } catch(e) { console.error("renderTargetContent (sync) failed:", e); }
     // Also run auto-fills on target switch: the Firestore snapshot listener
     // only fires when session data changes, but switching targets alone doesn't
-    // cause a write, so newly-added structured/mapped activities would otherwise
+    // cause a write, so newly-added structured activities would otherwise
     // never auto-fill until a write happened.
     (async () => {
       try {
         await autoFillStructuredRemarks(state.currentStudent, state.currentSessionId);
-        await autoFillMappedRemarks(state.currentStudent, state.currentSessionId);
         await autoFillMaintainedRemarks(state.currentStudent, state.currentSessionId, state.selectedTargetName);
       } catch (e) { console.error("auto-fill error on target switch:", e); }
       try { renderTargetContent(); } catch(e) { console.error("renderTargetContent (post-fill) failed:", e); }
@@ -11064,19 +11060,6 @@ $("btn-back").addEventListener("click", leaveSession);
 // TARGET CONTENT RENDERING
 // ============================================================
 
-// Resolves a mapped-score activity's live display: the label naming its
-// mapped target, and that target's current day average (null if unmapped,
-// the mapped target was deleted, or it has no data yet today).
-function resolveMappedScoreDisplay(pa, visited) {
-  const mappedTarget = pa.mappedTargetId
-    ? getEffectiveTargets().find(t => t.id === pa.mappedTargetId)
-    : null;
-  if (!mappedTarget) return { label: "Score (Not Mapped Yet)", pct: null };
-  return {
-    label: `Score (Mapped to ${mappedTarget.name}'s Average)`,
-    pct: calcDaysAverage(mappedTarget, visited)
-  };
-}
 
 // visited guards against a circular mapping chain (A maps to B, B maps back
 // to A) recursing forever — direct self-mapping is already blocked in the
@@ -11099,14 +11082,6 @@ function calcDaysAverage(target, visited = new Set()) {
     if ((target.predefinedActivities || []).some(p => p.noTrials &&
         (p.name === act.activityName || (p.title && p.title === act.activityName) ||
          (act.configId && p.id === act.configId)))) continue;
-    const pa = (target.predefinedActivities || []).find(p => p.isMapped &&
-        (p.name === act.activityName || (act.configId && p.id === act.configId)));
-    if (pa) {
-      if (getRemarksForActivity(act.id).length === 0) continue;
-      const mappedPct = resolveMappedScoreDisplay(pa, visited).pct;
-      if (mappedPct !== null) avgs.push(mappedPct);
-      continue;
-    }
     const manualPa = (target.predefinedActivities || []).find(p => p.manualScore &&
         (p.name === act.activityName || (act.configId && p.id === act.configId)));
     for (const rem of getRemarksForActivity(act.id)) {
@@ -11505,7 +11480,7 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
           </div>`;
         } else {
         for (const rem of subRemarks) {
-          html += renderRemarkFields(rem, target, getActivityInlineOptions(sub), sub.sentenceStarter || null, sub.optionsMulti || false, null, sub.remarkHasNote || false, false, sub.optionScores || null, !!(sub.manualScore || sub.remarkHasNote || sub.inlineOptions || sub.remarkPresetId), sub.noteSentenceStarter || null);
+          html += renderRemarkFields(rem, target, getActivityInlineOptions(sub), sub.sentenceStarter || null, sub.optionsMulti || false, sub.remarkHasNote || false, false, sub.optionScores || null, !!(sub.manualScore || sub.remarkHasNote || sub.inlineOptions || sub.remarkPresetId), sub.noteSentenceStarter || null);
         }
         if (subPending) {
           html += renderPendingRemarkFields(sub.name, subActId, sub.name, idx, target);
@@ -11541,7 +11516,6 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
     const actId      = actData ? actData.id : null;
     const remarks    = actId ? getRemarksForActivity(actId) : [];
     const isPending  = state.pendingNewRemark?.pendingKey === pendingKey;
-    const mappedInfo = pa.isMapped ? resolveMappedScoreDisplay(pa) : null;
 
     const isGrayActivity  = pa.activityColor === "gray" || pa.isMaintainLive || pa.maintained;
     const isGreenActivity = pa.activityColor === "green";
@@ -11604,7 +11578,7 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
           const sid = state.currentSessionId;
           if (sid) migrateRemarksToNote(sid, { [rem.id]: { text: rescued, masteryNote: "" } }).catch(() => {});
         }
-        html += renderRemarkFields(rem, target, getActivityInlineOptions(pa), pa.sentenceStarter || null, pa.optionsMulti || false, mappedInfo, pa.remarkHasNote || false, pa.manualScore || false, pa.optionScores || null, !!(pa.manualScore || pa.remarkHasNote || pa.inlineOptions || pa.remarkPresetId), pa.noteSentenceStarter || null, pa.noTrials || false);
+        html += renderRemarkFields(rem, target, getActivityInlineOptions(pa), pa.sentenceStarter || null, pa.optionsMulti || false, pa.remarkHasNote || false, pa.manualScore || false, pa.optionScores || null, !!(pa.manualScore || pa.remarkHasNote || pa.inlineOptions || pa.remarkPresetId), pa.noteSentenceStarter || null, pa.noTrials || false);
       }
       if (isPending) {
         html += renderPendingRemarkFields(pendingKey, actId, pa.name, idx, target);
@@ -11628,18 +11602,16 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
           data-act-id="${actId || ""}"
           data-pa-name="${escHtml(pa.name || pa.title)}"
           data-pa-order="${idx}"
-          data-is-mapped="${pa.isMapped ? "1" : ""}"
           data-is-maintained="${_showMaintDefault ? "1" : ""}"
           data-cfg-id="${escHtml(pa.id || "")}"
           data-target="${escHtml(target.name)}">+ Add ${addLabel}</button>`;
       } else {
-        const addLabel = pa.isMapped ? "Score" : pa.manualScore ? "Remark &amp; Score" : pa.noTrials ? "Remark" : "Remark &amp; Trials";
+        const addLabel = pa.manualScore ? "Remark &amp; Score" : pa.noTrials ? "Remark" : "Remark &amp; Trials";
         html += `<button class="btn-add-remark" contenteditable="false"
           data-pending-key="${escHtml(pendingKey)}"
           data-act-id="${actId || ""}"
           data-pa-name="${escHtml(pa.name || pa.title)}"
           data-pa-order="${idx}"
-          data-is-mapped="${pa.isMapped ? "1" : ""}"
           data-cfg-id="${escHtml(pa.id || "")}"
           data-target="${escHtml(target.name)}">+ Add ${addLabel}</button>`;
       }
@@ -12439,7 +12411,7 @@ function toggleBulletSelection(el) {
 
 // ─── REMARK FIELDS ───────────────────────────────────────────
 
-function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false, manualScore = false, optionScores = null, noteCapable = false, noteSentenceStarter = null, noTrials = false) {
+function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, remarkHasNote = false, manualScore = false, optionScores = null, noteCapable = false, noteSentenceStarter = null, noTrials = false) {
   const opts = parseOpts(inlineOptions);
 
   // Sync optionScore with current config whenever the target is re-rendered.
@@ -12514,11 +12486,6 @@ function renderRemarkFields(rem, target, inlineOptions = null, sentenceStarter =
           <button class="btn-primary-sm btn-trial-not-required" disabled
             style="background:#e5e7eb;color:#9ca3af;border-color:#e5e7eb;cursor:default;box-shadow:none">+ Trial (Not Required)</button>
         </div>
-      </div>`
-    : mappedInfo
-    ? `<div class="entry-field" contenteditable="false">
-        <span class="field-label">${escHtml(mappedInfo.label)}</span>
-        <span class="field-value-fixed">${mappedInfo.pct !== null ? mappedInfo.pct + "%" : "—"}</span>
       </div>`
     : `<div class="entry-field" contenteditable="false">
         <span class="field-label">Trials</span>
@@ -13000,14 +12967,6 @@ function attachTargetListeners(target) {
         const paOrder = Number(btn.dataset.paOrder) || 0;
         let   actId   = btn.dataset.actId  || null;
         state.pendingNewActivity = null;
-        // Mapped activities use autoFillMappedRemarks instead of the normal
-        // path to avoid a race: addActivity's Firestore snapshot can re-enter
-        // autoFillMappedRemarks before this handler adds the remark, creating
-        // a duplicate. autoFillMappedRemarks's in-flight guard prevents that.
-        if (btn.dataset.isMapped === "1") {
-          await autoFillMappedRemarks(state.currentStudent, state.currentSessionId);
-          return; // Firestore write will trigger snapshot → re-render
-        }
         // The activity is created LOCALLY first and only then written. Awaiting
         // the Firestore round trip before rendering left the button doing
         // nothing for as long as the write took; a snapshot landing in the
@@ -13071,12 +13030,11 @@ function attachTargetListeners(target) {
         alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
       } finally {
         // The normal path renders, which replaces this button, so leaving it
-        // disabled there is harmless. Every path that returned WITHOUT rendering
-        // left the button dead for good: the mapped branch waits on a Firestore
-        // snapshot that never arrives when autoFillMappedRemarks finds nothing to
-        // write, and from then on every click hit the disabled check at the top
-        // and did nothing at all. If the button is still in the document then
-        // nothing replaced it, so it has to be usable again.
+        // disabled there is harmless. A path that returns WITHOUT rendering
+        // would leave the button dead for good: nothing replaces it, so every
+        // later click hits the disabled check at the top and does nothing at
+        // all. If the button is still in the document then nothing replaced it,
+        // so it has to be usable again.
         if (btn.isConnected) btn.disabled = false;
       }
     });
@@ -13397,8 +13355,8 @@ function isAutoOpenRemarkType(pa) {
 // Auto-create an empty remark for every "pick from options" activity on
 // session open, unconditionally — the point is just to skip the extra click,
 // there's no "previous value" to wait for first.
-// Same in-flight guard as autoFillMappedRemarks below (structuredRemarkAutoFillInFlight,
-// keyed the same way) — without it, a duplicate activity could be created
+// An in-flight guard (structuredRemarkAutoFillInFlight, keyed by session and
+// activity) — without it, a duplicate activity could be created
 // here too if firstLoad re-entered before a prior addActivity+addRemark
 // pair finished, the exact shape mergeDuplicateActivity (firebase-service.js)
 // exists to clean up. This only protects re-entrancy within one open tab —
@@ -13514,21 +13472,6 @@ async function autoFillStructuredRemarks(student, sessionId) {
   return toFill.length;
 }
 
-// Auto-create an empty remark for a mapped-score activity as soon as its
-// mapped target gains a computable average — otherwise the row stays
-// collapsed (no remark of its own) even after the target it pulls from has
-// real data. Unlike autoFillStructuredRemarks this runs on every snapshot,
-// not just first load: the trigger ("the other target now has data") can
-// become true at any point while this session stays open, not only when
-// it's opened.
-// Creating a mapped-score activity's first remark is two separate Firestore
-// writes (addActivity, then addRemark) — each one's own snapshot can re-enter
-// these auto-fill functions before the second write lands, racing into a
-// duplicate remark for the same activity (or, for group sessions, the same
-// attendee). Shared by all four autoFill*MappedRemarks functions below so a
-// re-entrant call for the same key skips instead of double-adding.
-const mappedRemarkAutoFillInFlight = new Set();
-
 // The session screen finds an activity's session record by (pa.name || pa.title)
 // — details first — plus pa.id as configId, and every other creation path stores
 // it that way. The mapped/maintained auto-fills below used to create it under
@@ -13558,63 +13501,9 @@ function relinkAutoFillActivity(sessionId, data, actId, pa) {
   updateActivityName(sessionId, actId, wantName).catch(() => {});
 }
 
-async function autoFillMappedRemarks(student, sessionId) {
-  const data = state.sessionData;
-
-  const toFill = [];
-  for (const target of (student.targets || [])) {
-    for (const pa of (target.predefinedActivities || [])) {
-      if (pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || pa.isMaintainHeading) continue;
-      if (!pa.isMapped) continue;
-      const allMatches = Object.entries(data.activities || {})
-        .filter(([, a]) => a.targetName === target.name &&
-                           (a.activityName === pa.name || (pa.title && a.activityName === pa.title) || (pa.id && a.configId === pa.id)));
-      const canonical = allMatches.find(([, a]) => pa.id && a.configId === pa.id) || allMatches[0] || null;
-      for (const [dupeActId] of allMatches.filter(([aid]) => aid !== canonical?.[0] && !data.activities[aid]?.configId)) {
-        const dupeRemIds = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === dupeActId).map(([rid]) => rid);
-        deleteActivity(sessionId, dupeActId, dupeRemIds);
-      }
-      let actId = canonical?.[0] || null;
-      // Heal records written by older title-first auto-fills before deciding
-      // there's nothing to do — otherwise an invisible record with a remark on
-      // it keeps this activity stuck showing "+ Add Score" forever.
-      if (actId) relinkAutoFillActivity(sessionId, data, actId, pa);
-      if (actId && Object.values(data.remarks || {}).some(r => r.activityId === actId)) continue;
-      const key = `${sessionId}:${target.name}:${pa.name}`;
-      if (mappedRemarkAutoFillInFlight.has(key)) continue;
-      mappedRemarkAutoFillInFlight.add(key);
-      toFill.push({ target, pa, actId, key });
-    }
-  }
-  if (toFill.length === 0) return 0;
-
-  await Promise.all(toFill.map(async item => {
-    if (!item.actId) {
-      try {
-        // Name/configId must match what the renderer looks up with —
-        // see relinkAutoFillActivity above.
-        item.actId = await addActivity(sessionId, item.target.name, item.pa.name || item.pa.title, item.pa.order ?? 0, true, undefined, null, item.pa.id || null);
-      } catch (err) {
-        mappedRemarkAutoFillInFlight.delete(item.key);
-        item.actId = null;
-      }
-    }
-  }));
-
-  await Promise.all(toFill.map(async item => {
-    if (!item.actId) return;
-    try {
-      await addRemark(sessionId, item.actId, "");
-    } finally {
-      mappedRemarkAutoFillInFlight.delete(item.key);
-    }
-  }));
-
-  return toFill.length;
-}
 
 // Auto-create a "Maintain" remark for every maintained activity in the session.
-// Mirrors autoFillMappedRemarks — runs on first load and target switch only.
+// Runs on first load and target switch only.
 const maintainedRemarkAutoFillInFlight = new Set();
 
 // Shared fill executor: creates the activity (if missing) then the remark.
@@ -13713,11 +13602,6 @@ async function autoFillMaintainedRemarks(student, sessionId, selectedTargetName 
 // quietly dropped from its trials array.
 async function cleanupEmptyEntries(sessionId, data, targetName, target = null, isLeaving = false) {
   if (!sessionId || !data) return;
-  // Mapped-score activities are designed to have no remark of their own until
-  // their mapped target gains an average (see autoFillMappedRemarks) — an
-  // empty one isn't stale data, it's the activity waiting to auto-fill. Treat
-  // them as exempt so this cleanup never races that auto-fill and deletes it.
-  const mappedNames   = new Set((target?.predefinedActivities || []).filter(pa => pa.isMapped).map(pa => pa.name));
   // Maintained non-Notes-Only activities always keep their auto-created placeholder
   // remark so the proper UI (checkboxes/MC/manual score) stays visible on revisit.
   const maintainedStructuredNames = new Set(
@@ -13734,7 +13618,7 @@ async function cleanupEmptyEntries(sessionId, data, targetName, target = null, i
     ? new Set()
     : new Set((target?.predefinedActivities || []).filter(pa => isAutoOpenRemarkType(pa)).map(pa => pa.title || pa.name));
   const acts = Object.entries(data.activities || {})
-    .filter(([, a]) => a.targetName === targetName && !mappedNames.has(a.activityName) &&
+    .filter(([, a]) => a.targetName === targetName &&
       // Always process maintained-structured activities so extra empty remarks get cleaned up,
       // even during target-switch when autoOpenNames would normally skip them.
       (!autoOpenNames.has(a.activityName) || maintainedStructuredNames.has(a.activityName)));
@@ -13965,10 +13849,6 @@ async function openSessionView(student, sessionId) {
       state.viewSessionData = data;
       window._lastViewData = data; // debug: persists after navigation
       window._lastViewStudent = student;
-      try {
-        const filled = await autoFillViewMappedRemarks(student, sessionId, data);
-        if (filled > 0) return;
-      } catch (err) { console.error("autoFillViewMappedRemarks failed:", err); }
       try {
         const maintainedFilled = await autoFillViewMaintainedRemarks(student, sessionId, data);
         if (maintainedFilled > 0) return;
@@ -15212,7 +15092,7 @@ function buildTargetViewTable(target, data) {
           <td class="vcol-rem" contenteditable="false" style="color:#374151;cursor:pointer;white-space:pre-wrap"
             onclick="alert('This is a Fixed Remark — the text is set in Edit Target and cannot be changed here.')"
             title="Fixed Remark — click for info">${formatActivityMarkup(fixedText) || "<span style='color:#9ca3af;font-style:italic'>No remark set</span>"}</td>
-          <td class="vcol-trials" contenteditable="false"><span class="view-mapped-label" style="color:#9ca3af;font-style:italic">Fixed Remark</span></td>
+          <td class="vcol-trials" contenteditable="false"><span class="view-fixed-remark-label" style="color:#9ca3af;font-style:italic">Fixed Remark</span></td>
           <td class="vcol-total" contenteditable="false">&nbsp;</td>
           <td class="vcol-score" contenteditable="false">&nbsp;</td>
         </tr>`;
@@ -15445,7 +15325,6 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
   const sentenceStarter = paEntry?.sentenceStarter || null;
   const multiSelect     = paEntry?.optionsMulti || false;
   const remarkHasNote   = paEntry ? !!(paEntry.remarkHasNote || inlineOptions || paEntry.manualScore) : false;
-  const mappedInfo      = paEntry?.isMapped ? resolveViewMappedScoreDisplay(paEntry, data) : null;
   const isGrayAct       = isPredefined && (_maintained || paEntry?.activityColor === "gray" || paEntry?.isMaintainLive);
   const isGreenAct      = isPredefined && paEntry?.activityColor === "green";
   const rowClass        = isGrayAct ? "view-gray-row" : isGreenAct ? "view-green-row" : "";
@@ -15488,21 +15367,15 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
            data-parent-activity="${escHtml(paConfig?.parentActivity || "")}"
            data-config-id="${escHtml(paConfig?.id || "")}"
            placeholder="${_maintained && data.date >= (_maintainedAt || "2026-01-01") ? "" : "Remark…"}">${_maintained && data.date >= (_maintainedAt || "2026-01-01") ? "Maintain" : ""}</textarea>`;
-      const addTrialBtn = mappedInfo
-        ? ""
-        : `<button class="view-add-trial-new" data-act-id="${escHtml(actId || "")}"
+      const addTrialBtn = `<button class="view-add-trial-new" data-act-id="${escHtml(actId || "")}"
         data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
         data-is-predefined="${isPredefined}"
         data-parent-activity="${escHtml(paConfig?.parentActivity || "")}"
         data-config-id="${escHtml(paConfig?.id || "")}">+</button>`;
       const emptyTrialsContent = paConfig?.noTrials
         ? `<span class="view-trials-disabled" style="color:#9ca3af;font-style:italic">Trials are not required for this activity</span>`
-        : mappedInfo
-        ? `<span class="view-mapped-label">${escHtml(mappedInfo.label)}</span>`
         : (addTrialBtn || "&nbsp;");
-      const emptyScoreContent = mappedInfo
-        ? (mappedInfo.pct !== null ? mappedInfo.pct + "%" : "—")
-        : "&nbsp;";
+      const emptyScoreContent = "&nbsp;";
       return `<tr${rowClass ? ` class="${rowClass}"` : ""}>
         <td class="vcol-no" contenteditable="false">${no}</td>
         <td class="vcol-act" contenteditable="false">${actCell}</td>
@@ -15570,8 +15443,6 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
     }
     const emptyTrialBtn = paConfig?.noTrials
       ? `<span class="view-trials-disabled" style="color:#9ca3af;font-style:italic">Trials are not required for this activity</span>`
-      : mappedInfo
-      ? `<span class="view-mapped-label">${escHtml(mappedInfo.label)}</span>`
       : `<button class="view-add-trial-new" data-act-id="${escHtml(actId || "")}"
           data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
           data-is-predefined="${isPredefined}"
@@ -15583,13 +15454,13 @@ function viewActivityRows(no, actName, actId, data, target, isPredefined = true,
       <td class="vcol-rem" contenteditable="false">${emptyRemCell}</td>
       <td class="vcol-trials" contenteditable="false">${emptyTrialBtn}</td>
       <td class="vcol-total" contenteditable="false">&nbsp;</td>
-      <td class="vcol-score" contenteditable="false">${mappedInfo ? (mappedInfo.pct !== null ? mappedInfo.pct + "%" : "—") : "&nbsp;"}</td>
+      <td class="vcol-score" contenteditable="false">&nbsp;</td>
     </tr>`;
   }
   return remarks.map((rem, ri) => viewRemarkRow(
     ri === 0 ? no : null,
     ri === 0 ? actCell : null,
-    rem, target, inlineOptions, sentenceStarter, multiSelect, mappedInfo, remarkHasNote, rowClass,
+    rem, target, inlineOptions, sentenceStarter, multiSelect, remarkHasNote, rowClass,
     paEntry?.optionScores || null, paEntry?.manualScore || false, paEntry?.noTrials || false
   )).join("");
 }
@@ -15623,7 +15494,7 @@ function buildTrialCellsHtml(rem, maxPts) {
     `<button class="view-add-trial" data-rem-id="${escHtml(rem.id)}">+</button>`;
 }
 
-function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false, rowClass = "", optionScores = null, manualScore = false, noTrials = false) {
+function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, remarkHasNote = false, rowClass = "", optionScores = null, manualScore = false, noTrials = false) {
   const _sv = t => (t || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
   const _remEmpty = !_sv(rem.text) && !_sv(rem.masteryNote) && !(rem.trials || []).some(t => t >= 0) && rem.optionScore === undefined;
   const delBtn = _remEmpty ? "" : `<button class="view-rem-del" data-rem-id="${escHtml(rem.id)}" title="Delete remark">×</button>`;
@@ -15664,13 +15535,9 @@ function viewRemarkRow(no, actName, rem, target, inlineOptions = null, sentenceS
 
   const maxPts = target.maxPoints || 3;
   const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts, rem.optionScore);
-  const trialCells = mappedInfo
-    ? `<span class="view-mapped-label">${escHtml(mappedInfo.label)}</span>`
-    : `<div class="trial-cells">${buildTrialCellsHtml(rem, maxPts)}</div>`;
-  const totalCell = mappedInfo ? "&nbsp;" : (validTrials.length > 0 ? total : "&nbsp;");
-  const scoreDisplay = mappedInfo
-    ? (mappedInfo.pct !== null ? mappedInfo.pct + "%" : "—")
-    : scorePct;
+  const trialCells = `<div class="trial-cells">${buildTrialCellsHtml(rem, maxPts)}</div>`;
+  const totalCell = validTrials.length > 0 ? total : "&nbsp;";
+  const scoreDisplay = scorePct;
 
   const opts = parseOpts(inlineOptions);
 
@@ -15784,42 +15651,14 @@ function viewGetRemarks(data, actId) {
 // calcDaysAverage's comment (this is the View-screen counterpart, working off
 // a passed-in `data` snapshot instead of the live session's global state, so
 // it doubles as both the individual and group View/Edit Past Sessions calc).
-// Group sessions fold in each attendee's own per-attendee mapped score
-// separately (one push per attendee with a remark on the activity) rather
-// than a single blended number, per the boss's "per-attendee" decision —
-// detected via data.attendees, same signal already used elsewhere for group
-// session data.
 function calcViewDayAvg(data, target, visited = new Set()) {
   if (visited.has(target.id)) return null;
   visited.add(target.id);
 
-  const attendees = data.attendees || state.viewGroup?.students || null;
   const avgs = [];
   Object.entries(data.activities || {})
     .filter(([, a]) => a.targetName === target.name)
     .forEach(([actId, act]) => {
-      const pa = (target.predefinedActivities || []).find(p => p.isMapped &&
-          (p.name === act.activityName || (act.configId && p.id === act.configId)));
-      if (pa) {
-        const mappedTarget = pa.mappedTargetId
-          ? (state.viewGroup?.targets || state.viewStudent?.targets || []).find(t => t.id === pa.mappedTargetId)
-          : null;
-        if (!mappedTarget) return;
-        if (attendees) {
-          attendees.forEach(studentName => {
-            const hasRemark = Object.values(data.remarks || {})
-              .some(r => r.activityId === actId && r.studentName === studentName);
-            if (!hasRemark) return;
-            const pct = calcGroupStudentDaysAverage(mappedTarget, data, studentName, visited);
-            if (pct !== null) avgs.push(pct);
-          });
-        } else {
-          if (viewGetRemarks(data, actId).length === 0) return;
-          const pct = calcViewDayAvg(data, mappedTarget, visited);
-          if (pct !== null) avgs.push(pct);
-        }
-        return;
-      }
       const manualPa = (target.predefinedActivities || []).find(p => p.manualScore &&
           (p.name === act.activityName || (act.configId && p.id === act.configId)));
       viewGetRemarks(data, actId).forEach(rem => {
@@ -15838,45 +15677,7 @@ function calcViewDayAvg(data, target, visited = new Set()) {
   return avgs.length ? Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length) : null;
 }
 
-// Resolves a mapped-score activity's display on the individual View/Edit Past
-// Sessions screen — see resolveMappedScoreDisplay (live-entry counterpart).
-function resolveViewMappedScoreDisplay(pa, data, visited) {
-  const mappedTarget = pa.mappedTargetId
-    ? getViewEffectiveTargets().find(t => t.id === pa.mappedTargetId)
-    : null;
-  if (!mappedTarget) return { label: "Score (Not Mapped Yet)", pct: null };
-  return {
-    label: `Score (Mapped to ${mappedTarget.name}'s Average)`,
-    pct: calcViewDayAvg(data, mappedTarget, visited)
-  };
-}
 
-// View/Edit Past Sessions counterpart of autoFillMappedRemarks (live-entry
-// session) — same trigger (mapped target gained a computable average), but
-// runs on every snapshot here since this screen has no "first load" gate and
-// the mapped-to target's data could change at any time while it's open.
-async function autoFillViewMappedRemarks(student, sessionId, data) {
-  let count = 0;
-  for (const target of (student.targets || [])) {
-    for (const pa of (target.predefinedActivities || [])) {
-      if (pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || pa.isMaintainHeading) continue;
-      if (!pa.isMapped) continue;
-
-      const allMatchesV = Object.entries(data.activities || {})
-        .filter(([, a]) => a.targetName === target.name &&
-                           (a.activityName === pa.name || (pa.title && a.activityName === pa.title) || (pa.id && a.configId === pa.id)));
-      const canonicalV = allMatchesV.find(([, a]) => pa.id && a.configId === pa.id) || allMatchesV[0] || null;
-      for (const [dupeActId] of allMatchesV.filter(([aid]) => aid !== canonicalV?.[0] && !data.activities[aid]?.configId)) {
-        const dupeRemIds = Object.entries(data.remarks || {}).filter(([, r]) => r.activityId === dupeActId).map(([rid]) => rid);
-        deleteActivity(sessionId, dupeActId, dupeRemIds);
-      }
-      // No longer create empty remarks — the view screen now renders the mapped
-      // score even when no remark exists, so the empty-remark creation step is
-      // unnecessary and was the source of the 5-second delay + paste-disappears bug.
-    }
-  }
-  return count;
-}
 
 // View/Edit Past Sessions counterpart of autoFillMaintainedRemarks.
 // No hasRealData guard: maintained activities always show "Maintain" regardless
@@ -15935,7 +15736,7 @@ async function autoFillViewStructuredRemarks(student, sessionId, data) {
       if (!isAutoOpenRemarkType(pa)) continue;
       if (!pa.maintained && !hasRealData) continue;
       const _viewIsNotesOnly = !getActivityInlineOptions(pa) && !pa.optionsMulti && !pa.manualScore;
-      if ((pa.maintained && _viewIsNotesOnly) || pa.isMapped) continue;
+      if (pa.maintained && _viewIsNotesOnly) continue;
       if (!isActivityActive(pa, sessionDate)) continue;
       const paConfigId = pa.id || null;
       const paParent = pa.parentActivity || null;
@@ -16025,56 +15826,7 @@ async function autoFillViewStructuredRemarks(student, sessionId, data) {
   return count;
 }
 
-// Resolves a mapped-score activity's display for one attendee on the group
-// View/Edit Past Sessions screen — see resolveGroupMappedScoreDisplay
-// (live-entry counterpart). Per-attendee throughout, per the boss's decision.
-function resolveViewGroupMappedScoreDisplay(pa, data, studentName, visited) {
-  const mappedTarget = pa.mappedTargetId
-    ? getViewGroupEffectiveTargets().find(t => t.id === pa.mappedTargetId)
-    : null;
-  if (!mappedTarget) return { label: "Score (Not Mapped Yet)", pct: null };
-  return {
-    label: `Score (Mapped to ${mappedTarget.name}'s Average)`,
-    pct: calcGroupStudentDaysAverage(mappedTarget, data, studentName, visited)
-  };
-}
 
-// Group View/Edit Past Sessions counterpart of autoFillMappedRemarks — unlike
-// the live group entry version, this screen renders every target at once (no
-// per-target lazy loading), so it checks all of them on every snapshot, same
-// as the individual View screen's autoFillViewMappedRemarks.
-async function autoFillViewGroupMappedRemarks(group, sessionId, data) {
-  const attendees = data.attendees || (group.students || []).filter(Boolean);
-  let count = 0;
-  for (const target of (group.targets || [])) {
-    for (const pa of (target.predefinedActivities || [])) {
-      if (pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || pa.isMaintainHeading) continue;
-      if (!pa.isMapped) continue;
-      const existingAct = Object.entries(data.activities || {})
-        .find(([, a]) => a.targetName === target.name && (a.activityName === pa.name || (pa.title && a.activityName === pa.title)));
-      let actId = existingAct?.[0] || null;
-
-      for (const studentName of attendees) {
-        const hasRemark = actId && Object.values(data.remarks || {})
-          .some(r => r.activityId === actId && r.studentName === studentName);
-        if (hasRemark) continue;
-        const key = `${sessionId}:${target.name}:${pa.name}:${studentName}`;
-        if (mappedRemarkAutoFillInFlight.has(key)) continue;
-        mappedRemarkAutoFillInFlight.add(key);
-        try {
-          if (!actId) {
-            actId = await addActivity(sessionId, target.name, pa.name, pa.order ?? 0, true);
-          }
-          await addGroupRemark(sessionId, actId, studentName, "");
-          count++;
-        } finally {
-          mappedRemarkAutoFillInFlight.delete(key);
-        }
-      }
-    }
-  }
-  return count;
-}
 
 // Group View/Edit Past Sessions counterpart of autoFillViewMaintainedRemarks.
 // Creates "Maintain" remark per attendee for maintained Notes-Only activities
@@ -16136,7 +15888,7 @@ async function autoFillViewGroupStructuredRemarks(group, sessionId, data) {
       if (!isAutoOpenRemarkType(pa)) continue;
       if (!pa.maintained && !hasRealData) continue;
       const _vgIsNotesOnly = !getActivityInlineOptions(pa) && !pa.optionsMulti && !pa.manualScore;
-      if ((pa.maintained && _vgIsNotesOnly) || pa.isMapped) continue;
+      if (pa.maintained && _vgIsNotesOnly) continue;
       const existingAct = Object.entries(data.activities || {})
         .find(([, a]) => a.targetName === target.name &&
           (a.activityName === pa.name || (pa.title && a.activityName === pa.title) || (pa.id && a.configId === pa.id)));
@@ -17247,10 +16999,6 @@ async function openGroupSessionView(group, sessionId) {
     state.fbViewGroupUnsubscribe = listenToSession(sessionId, async data => {
       state.viewGroupSessionData = data;
       try {
-        const filled = await autoFillViewGroupMappedRemarks(group, sessionId, data);
-        if (filled > 0) return; // the write triggers another snapshot, which renders
-      } catch (err) { console.error("autoFillViewGroupMappedRemarks failed:", err); }
-      try {
         const maintainedFilled = await autoFillViewGroupMaintainedRemarks(group, sessionId, data);
         if (maintainedFilled > 0) return;
       } catch (err) { console.error("autoFillViewGroupMaintainedRemarks failed:", err); }
@@ -17709,49 +17457,6 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
           data-target-name="${escHtml(target.name)}" title="Delete activity">×</button>
        </div>`;
 
-  // Mapped-score activities have no trials/combine-remarks concept — bypass
-  // the rounds/combine machinery entirely and list every attendee's own
-  // remark + their own per-attendee mapped score (see renderGroupActivityCard's
-  // live-entry counterpart for the same per-attendee bypass).
-  if (paEntry?.isMapped) {
-    const mappedInlineOptions   = getActivityInlineOptions(paEntry);
-    const mappedSentenceStarter = paEntry.sentenceStarter || null;
-    const mappedMultiSelect     = paEntry.optionsMulti || false;
-    const mappedHasNote         = paEntry.remarkHasNote || false;
-    let firstRow = true;
-    return attendees.map(studentName => {
-      const remarks = actId
-        ? Object.entries(data.remarks || {})
-            .filter(([, r]) => r.activityId === actId && r.studentName === studentName)
-            .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
-            .map(([id, r]) => ({ id, ...r }))
-        : [];
-      const noVal  = firstRow ? no : null;
-      const actVal = firstRow ? actCell : null;
-      firstRow = false;
-      if (remarks.length === 0) {
-        return `<tr>
-          <td class="vcol-no" contenteditable="false">${noVal !== null ? noVal : ""}</td>
-          <td class="vcol-act" contenteditable="false">${actVal !== null ? actVal : ""}</td>
-          <td class="vcol-student" contenteditable="false">${groupAttendeeLabel(studentName)}</td>
-          <td class="vcol-rem" contenteditable="false">
-            <button class="btn-view-group-add-remark-mapped-pending" data-act-id="${escHtml(actId || "")}"
-              data-act-name="${escHtml(actName)}" data-target-name="${escHtml(target.name)}"
-              data-student="${escHtml(studentName)}">+ Add Remark</button>
-          </td>
-          <td class="vcol-trials" contenteditable="false">&nbsp;</td>
-          <td class="vcol-total" contenteditable="false">&nbsp;</td>
-          <td class="vcol-score" contenteditable="false">&nbsp;</td>
-        </tr>`;
-      }
-      const mappedInfo = resolveViewGroupMappedScoreDisplay(paEntry, data, studentName);
-      return remarks.map((rem, ri) => viewGroupRemarkRow(
-        ri === 0 ? noVal : null, ri === 0 ? actVal : null, studentName, rem, target,
-        mappedInlineOptions, mappedSentenceStarter, mappedMultiSelect, null, mappedInfo, mappedHasNote, "", paEntry?.optionScores || null
-      )).join("");
-    }).join("");
-  }
-
   // Per-round toggles are built inside the round loop below
 
   const inlineOptions   = paEntry ? getActivityInlineOptions(paEntry) : null;
@@ -17970,7 +17675,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
 
       html += viewGroupRemarkRow(
         noVal, actVal, entry.studentName, entry, target,
-        inlineOptions, sentenceStarter, multiSelect, null, remarkHasNote, rowClass, paEntry?.optionScores || null, paEntry?.manualScore || false, paEntry?.noTrials || false
+        inlineOptions, sentenceStarter, multiSelect, remarkHasNote, rowClass, paEntry?.optionScores || null, paEntry?.manualScore || false, paEntry?.noTrials || false
       );
       firstRowOverall = false;
     }
@@ -17978,7 +17683,7 @@ function viewGroupActivityRows(no, actName, actId, data, target, attendees, isPr
   return html;
 }
 
-function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, mappedInfo = null, remarkHasNote = false, rowClass = "", optionScores = null, manualScore = false, noTrials = false) {
+function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, remarkHasNote = false, rowClass = "", optionScores = null, manualScore = false, noTrials = false) {
   const _sv2 = t => (t || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
   const _remEmpty2 = !_sv2(rem.text) && !_sv2(rem.masteryNote) && !(rem.trials || []).some(t => t >= 0) && rem.optionScore === undefined;
   const delBtn2 = _remEmpty2 ? "" : `<button class="view-rem-del" data-rem-id="${escHtml(rem.id)}" title="Delete remark">×</button>`;
@@ -18018,13 +17723,9 @@ function viewGroupRemarkRow(no, actName, studentName, rem, target, inlineOptions
   }
   const maxPts = target.maxPoints || 3;
   const { validTrials, total, scorePct } = calcViewTrialSummary(rem.trials, maxPts, rem.optionScore);
-  const trialCells = mappedInfo
-    ? `<span class="view-mapped-label">${escHtml(mappedInfo.label)}</span>`
-    : `<div class="trial-cells">${buildTrialCellsHtml(rem, maxPts)}</div>`;
-  const totalCell = mappedInfo ? "&nbsp;" : (validTrials.length > 0 ? total : "&nbsp;");
-  const scoreDisplay = mappedInfo
-    ? (mappedInfo.pct !== null ? mappedInfo.pct + "%" : "—")
-    : scorePct;
+  const trialCells = `<div class="trial-cells">${buildTrialCellsHtml(rem, maxPts)}</div>`;
+  const totalCell = validTrials.length > 0 ? total : "&nbsp;";
+  const scoreDisplay = scorePct;
 
   let remarkTd = "";
   {
@@ -18411,46 +18112,6 @@ function attachGroupViewListeners() {
         renderGroupSessionView();
         alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
       });
-    });
-  });
-
-  // "+ Add Remark" for a mapped-score activity, one attendee at a time — unlike
-  // the plain pending button above, the activity may not exist yet at all
-  // (mapped activities skip the bulk "add for everyone" button), so this
-  // creates it on demand, same as ensureGroupActivityAndRemark's live-entry
-  // counterpart — also optimistic now, for the same reason as the buttons above.
-  body.querySelectorAll(".btn-view-group-add-remark-mapped-pending").forEach(btn => {
-    btn.addEventListener("click", () => {
-      if (btn.disabled) return;
-      btn.disabled = true;
-      const data       = state.viewGroupSessionData;
-      const targetName = btn.dataset.targetName;
-      const actName    = btn.dataset.actName;
-      const studentName = btn.dataset.student;
-      data.activities = data.activities || {};
-      data.remarks    = data.remarks || {};
-      let actId = btn.dataset.actId || Object.entries(data.activities)
-        .find(([, a]) => a.targetName === targetName && a.activityName === actName)?.[0] || null;
-      const isNewAct = !actId;
-      const actOrder = Date.now();
-      if (isNewAct) {
-        actId = generateId("a");
-        data.activities[actId] = { targetName, activityName: actName, order: actOrder, isPredefined: true };
-      }
-      const remId = generateId("r");
-      data.remarks[remId] = { activityId: actId, studentName, text: "", trials: [], order: actOrder };
-      renderGroupSessionView();
-      (async () => {
-        try {
-          if (isNewAct) await addActivity(sid(), targetName, actName, actOrder, true, actId);
-          await addGroupRemark(sid(), actId, studentName, "", remId);
-        } catch (err) {
-          if (isNewAct) delete data.activities[actId];
-          delete data.remarks[remId];
-          renderGroupSessionView();
-          alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
-        }
-      })();
     });
   });
 
@@ -19547,14 +19208,13 @@ async function closeManageModal() {
   if (state.currentStudent) {
     populateTargetDropdown(state.currentStudent.targets);
     if (state.currentSessionId) {
-      // Run both auto-fills so newly-added Select One / Tickbox / mapped-score
-      // activities get their remarks immediately — no Firestore snapshot will
+      // Run both auto-fills so newly-added Select One / Tickbox activities
+      // get their remarks immediately — no Firestore snapshot will
       // arrive on its own since saving the target config doesn't write to the
       // session doc.
       (async () => {
         try {
           await autoFillStructuredRemarks(state.currentStudent, state.currentSessionId);
-          await autoFillMappedRemarks(state.currentStudent, state.currentSessionId);
           await autoFillMaintainedRemarks(state.currentStudent, state.currentSessionId, state.selectedTargetName);
         } catch (e) { console.error("auto-fill error after Edit Target:", e); }
         renderTargetContent();
@@ -19567,24 +19227,18 @@ async function closeManageModal() {
     if (state.groupSessionId && state.groupSessionData && state.selectedGroupTargetName) {
       autoFillGroupSession(
         state.currentGroup, state.groupSessionId, state.groupSessionData,
-        state.selectedGroupTargetName, state.groupAttendees
+        state.selectedGroupTargetName
       ).then(filled => {
         if (filled > 0) return;
-        return autoFillGroupMappedRemarks(
+        return autoFillGroupStructuredRemarks(
           state.currentGroup, state.groupSessionId, state.groupSessionData,
           state.selectedGroupTargetName, state.groupAttendees
-        ).then(mappedFilled => {
-          if (mappedFilled > 0) return;
-          return autoFillGroupStructuredRemarks(
+        ).then(structuredFilled => {
+          if (structuredFilled > 0) return;
+          return autoFillGroupMaintainedRemarks(
             state.currentGroup, state.groupSessionId, state.groupSessionData,
             state.selectedGroupTargetName, state.groupAttendees
-          ).then(structuredFilled => {
-            if (structuredFilled > 0) return;
-            return autoFillGroupMaintainedRemarks(
-              state.currentGroup, state.groupSessionId, state.groupSessionData,
-              state.selectedGroupTargetName, state.groupAttendees
-            ).then(mFilled => { if (mFilled === 0) renderGroupTargetContent(); });
-          });
+          ).then(mFilled => { if (mFilled === 0) renderGroupTargetContent(); });
         });
       }).catch(() => renderGroupTargetContent());
     } else if (state.groupSessionId) {
@@ -20370,10 +20024,8 @@ function parseManualScore(val) {
   return null;
 }
 
-// Shared by the normal-activity and mapped-score-activity rows in
-// renderTargetManageContent — both let the boss configure how the Remark
-// field is captured (free text / preset options / sentence starter),
-// independently of where the Score comes from.
+// Used by the activity rows in renderTargetManageContent to configure how the
+// Remark field is captured (free text / preset options / sentence starter).
 function buildRemarkTypeControls(a, idx, maxPts = 3) {
   // noTrials is checked first: it's "Remark Only" plus a no-trials flag, so it
   // carries none of the other type markers and would otherwise fall through to "".
@@ -25640,10 +25292,8 @@ async function openGroupSession(group, dateStr, attendees, participants = null) 
         try { renderGroupTargetContent(); } catch (e) { console.error("renderGroupTargetContent (init) failed:", e); }
         if (state.selectedGroupTargetName) {
           try {
-            const filled = await autoFillGroupSession(group, sid, data, state.selectedGroupTargetName, attendees);
+            const filled = await autoFillGroupSession(group, sid, data, state.selectedGroupTargetName);
             if (filled > 0) return;
-            const mappedFilled = await autoFillGroupMappedRemarks(group, sid, data, state.selectedGroupTargetName, attendees);
-            if (mappedFilled > 0) return;
             const structuredFilled = await autoFillGroupStructuredRemarks(group, sid, data, state.selectedGroupTargetName, attendees);
             if (structuredFilled > 0) return;
           } catch (err) { console.error("Group session auto-fill failed:", err); }
@@ -25771,14 +25421,9 @@ function populateGroupTargetDropdown(targets) {
       try {
         const filled = await autoFillGroupSession(
           state.currentGroup, state.groupSessionId, data,
-          state.selectedGroupTargetName, state.groupAttendees
+          state.selectedGroupTargetName
         );
         if (filled > 0) return;
-        const mappedFilled = await autoFillGroupMappedRemarks(
-          state.currentGroup, state.groupSessionId, data,
-          state.selectedGroupTargetName, state.groupAttendees
-        );
-        if (mappedFilled > 0) return;
         const structuredFilled = await autoFillGroupStructuredRemarks(
           state.currentGroup, state.groupSessionId, data,
           state.selectedGroupTargetName, state.groupAttendees
@@ -25795,7 +25440,7 @@ function populateGroupTargetDropdown(targets) {
 }
 
 // ── Auto-fill activity + remark stubs for predefined activities ──
-async function autoFillGroupSession(group, sessionId, data, targetName, attendees) {
+async function autoFillGroupSession(group, sessionId, data, targetName) {
   const target = group.targets.find(t => t.name === targetName);
   if (!target) return 0;
   let created = 0;
@@ -25812,40 +25457,6 @@ async function autoFillGroupSession(group, sessionId, data, targetName, attendee
   return created;
 }
 
-// Group-entry counterpart of autoFillMappedRemarks — only checks the
-// currently selected target (group activity stubs are filled in lazily per
-// selected target too, via autoFillGroupSession above, not for every target
-// up front), per attendee. Call only after confirming autoFillGroupSession
-// didn't just create a brand-new stub for this target — that write triggers
-// its own snapshot, which gets a fresh look at this on the next pass.
-async function autoFillGroupMappedRemarks(group, sessionId, data, targetName, attendees) {
-  const target = group.targets.find(t => t.name === targetName);
-  if (!target) return 0;
-  let count = 0;
-  for (const pa of (target.predefinedActivities || [])) {
-    if (pa.isCompleted || pa.isArchived) continue;
-    if (!pa.isMapped) continue;
-    const existingAct = Object.entries(data.activities || {})
-      .find(([, a]) => a.targetName === targetName && a.activityName === pa.name);
-    const actId = existingAct?.[0];
-    if (!actId) continue;
-    for (const studentName of attendees) {
-      const hasRemark = Object.values(data.remarks || {})
-        .some(r => r.activityId === actId && r.studentName === studentName);
-      if (hasRemark) continue;
-      const key = `${sessionId}:${targetName}:${pa.name}:${studentName}`;
-      if (mappedRemarkAutoFillInFlight.has(key)) continue;
-      mappedRemarkAutoFillInFlight.add(key);
-      try {
-        await addGroupRemark(sessionId, actId, studentName, "");
-        count++;
-      } finally {
-        mappedRemarkAutoFillInFlight.delete(key);
-      }
-    }
-  }
-  return count;
-}
 
 // Group-entry counterpart of autoFillMaintainedRemarks.
 async function autoFillGroupMaintainedRemarks(group, sessionId, attendees) {
@@ -25910,7 +25521,6 @@ async function autoFillGroupStructuredRemarks(group, sessionId, data, targetName
     if (!isAutoOpenRemarkType(pa)) continue;
     const _gsIsNotesOnly = !getActivityInlineOptions(pa) && !pa.optionsMulti && !pa.manualScore;
     if (pa.maintained && _gsIsNotesOnly) continue; // Notes-Only maintained handled by autoFillGroupMaintainedRemarks
-    if (pa.isMapped) continue;
     const existingAct = Object.entries(data.activities || {})
       .find(([, a]) => a.targetName === targetName && (a.activityName === pa.name || (pa.title && a.activityName === pa.title) || (pa.id && a.configId === pa.id)));
     const actId = existingAct?.[0];
@@ -26221,7 +25831,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
             ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:#22c55e;color:#fff;font-size:.6rem;font-weight:900;margin-right:.3rem;flex-shrink:0">✓</span>`
             : `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;border:2px solid #d1d5db;margin-right:.3rem;flex-shrink:0"></span>`)
           : "";
-        const subCard  = renderGroupActivityCard(sub.title || sub.name, subActId, target, data, attendees, null, null, sub, true, sub.parentActivity, sub.id, _grpFilterPaSet, 0, true);
+        const subCard  = renderGroupActivityCard(sub.title || sub.name, subActId, target, data, attendees, null, sub, true, sub.parentActivity, sub.id, _grpFilterPaSet, 0, true);
         const subRadius = isLast ? '0 0 var(--radius) var(--radius)' : '0';
         const _subCreatedDate = sub.activeFrom || sub.createdOn;
         groupHtml += `<div style="border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);border-top:1px solid var(--border);border-radius:${subRadius};overflow:hidden">
@@ -26245,7 +25855,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
       || null;
     if (actId && pa.id && !data.activities[actId]?.configId) data.activities[actId].configId = pa.id;
     grpActNum++;
-    items.push(renderGroupActivityCard(pa.title || pa.name, actId, target, data, attendees, pa.actNote, pa.isMapped ? pa : null, pa, true, null, pa.id, _grpFilterPaSet, grpActNum));
+    items.push(renderGroupActivityCard(pa.title || pa.name, actId, target, data, attendees, pa.actNote, pa, true, null, pa.id, _grpFilterPaSet, grpActNum));
   }
 
   if (_grpFilterPaSet && !_footerOnly) return items; // sidebar mode: manual/inactive sections handled by sidebar wrapper
@@ -26257,7 +25867,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
     .filter(([actId, a]) => a.targetName === target.name && (!a.isPredefined || _grpStranded(actId, a)))
     .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
     .forEach(([actId, act]) => {
-      items.push(renderGroupActivityCard(act.activityName, actId, target, data, attendees, null, null, null, false, null, null, _grpFilterPaSet));
+      items.push(renderGroupActivityCard(act.activityName, actId, target, data, attendees, null, null, false, null, null, _grpFilterPaSet));
     });
 
   // Only show in the inactive section if the activity is actually inactive on this session's date
@@ -26530,7 +26140,7 @@ function renderGroupStudentBlock(studentName, target, data, grpStudentDate = nul
   if (activityEntries.length === 0) return '';
 
   const cards = activityEntries.map(({ actId, actName, actNote, pa, actNum }) =>
-    renderGroupStudentActivityCard(studentName, actName, actId, target, data, actNote, pa?.isMapped ? pa : null, !!pa?.maintained, pa || null, actNum || 0)).join("");
+    renderGroupStudentActivityCard(studentName, actName, actId, target, data, actNote, !!pa?.maintained, pa || null, actNum || 0)).join("");
 
   return `<div class="group-by-student-block" data-student="${escHtml(studentName)}">
     <div class="activity-group-heading" contenteditable="false">${liveGroupAttendeeLabel(studentName)}</div>
@@ -26538,7 +26148,7 @@ function renderGroupStudentBlock(studentName, target, data, grpStudentDate = nul
   </div>`;
 }
 
-function renderGroupStudentActivityCard(studentName, actName, actId, target, data, actNote = null, mappedPa = null, isMaintained = false, pa = null, actNum = 0) {
+function renderGroupStudentActivityCard(studentName, actName, actId, target, data, actNote = null, isMaintained = false, pa = null, actNum = 0) {
   const remarksForThisStudent = actId
     ? Object.entries(data.remarks || {})
         .filter(([, r]) => r.activityId === actId && r.studentName === studentName)
@@ -26575,10 +26185,9 @@ function renderGroupStudentActivityCard(studentName, actName, actId, target, dat
     </div>
     ${noteRow}`;
 
-  const mappedInfo = mappedPa ? resolveGroupMappedScoreDisplay(mappedPa, target, data, studentName) : null;
 
   for (const [remId, rem] of remarksForThisStudent) {
-    html += renderGroupStudentRowCompact(remId, rem, target, mappedInfo, pa?.noTrials || false);
+    html += renderGroupStudentRowCompact(remId, rem, target, pa?.noTrials || false);
   }
 
   // Only show "Maintain" default on/after the maintained date, and only for Notes Only activities
@@ -26602,10 +26211,10 @@ function renderGroupStudentActivityCard(studentName, actName, actId, target, dat
           data-student="${escHtml(studentName)}"
           data-act-id="${escHtml(actId || "")}"
           data-act-name="${escHtml(actName)}"
-          data-target="${escHtml(target.name)}">+ Add Remark${(mappedPa || pa?.noTrials) ? "" : " &amp; Trials"}</button>`
+          data-target="${escHtml(target.name)}">+ Add Remark${pa?.noTrials ? "" : " &amp; Trials"}</button>`
       : `<button class="btn-add-remark btn-group-add-remark-student-more" contenteditable="false"
           data-act-id="${escHtml(actId || "")}"
-          data-student="${escHtml(studentName)}">+ Add Remark${(mappedPa || pa?.noTrials) ? "" : " &amp; Trials"}</button>`;
+          data-student="${escHtml(studentName)}">+ Add Remark${pa?.noTrials ? "" : " &amp; Trials"}</button>`;
   }
 
   html += `</div>`;
@@ -26625,7 +26234,7 @@ function firstNameOf(name) {
   return (name || "").trim().split(/\s+/)[0] || name;
 }
 
-function renderGroupStudentRowCompact(remId, rem, target, mappedInfo = null, noTrials = false) {
+function renderGroupStudentRowCompact(remId, rem, target, noTrials = false) {
   const trials = rem.trials || [];
   const regularBadges = trials.map((t, i) =>
     `<span class="trial-badge">${t === -1 ? "—" : t}<button class="btn-trial-delete btn-group-trial-del" data-rem-id="${remId}" data-idx="${i}">×</button></span>`
@@ -26643,11 +26252,6 @@ function renderGroupStudentRowCompact(remId, rem, target, mappedInfo = null, noT
           <button class="btn-primary-sm btn-trial-not-required" disabled
             style="background:#e5e7eb;color:#9ca3af;border-color:#e5e7eb;cursor:default;box-shadow:none">+ Trial (Not Required)</button>
         </div>
-      </div>`
-    : mappedInfo
-    ? `<div class="entry-field" contenteditable="false">
-        <span class="field-label">${escHtml(mappedInfo.label)}</span>
-        <span class="field-value-fixed">${mappedInfo.pct !== null ? mappedInfo.pct + "%" : "—"}</span>
       </div>`
     : `<div class="entry-field" contenteditable="false">
         <span class="field-label">Trials</span>
@@ -26670,7 +26274,7 @@ function renderGroupStudentRowCompact(remId, rem, target, mappedInfo = null, noT
     ${trailingField}`;
 }
 
-function renderGroupActivityCard(actName, actId, target, data, attendees, actNote = null, mappedPa = null, paEntry = null, isPredefined = false, parentActivity = null, configId = null, filterPaSet = null, actNum = 0, suppressHeader = false) {
+function renderGroupActivityCard(actName, actId, target, data, attendees, actNote = null, paEntry = null, isPredefined = false, parentActivity = null, configId = null, filterPaSet = null, actNum = 0, suppressHeader = false) {
   // Free-text activities (no preset options, no sentence starter) get a
   // ready-to-type empty box for a pending attendee instead of a "+ Add
   // Remark & Trials" button once the card is already expanded (see
@@ -26698,35 +26302,6 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
   const _outerOpen = suppressHeader
     ? `<div style="padding:.5rem .85rem" data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">`
     : `<div class="entry-block entry-block-predefined"${_grpCardGrayStyle} data-act-name="${escHtml(actName)}" data-act-id="${escHtml(actId || "")}">`;
-
-  // Mapped-score activities have no trials/combine-remarks concept at all —
-  // bypass the rounds/combine machinery below entirely and just list every
-  // attendee's own remark + their own per-attendee mapped score.
-  if (mappedPa) {
-    const rows = attendees.map(studentName => {
-      const remarks = actId
-        ? Object.entries(data.remarks || {})
-            .filter(([, r]) => r.activityId === actId && r.studentName === studentName)
-            .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
-        : [];
-      if (remarks.length === 0) return renderGroupStudentPendingRow(studentName, actId, actName, target, true);
-      const mappedInfo = resolveGroupMappedScoreDisplay(mappedPa, target, data, studentName);
-      return remarks.map(([remId, rem]) => renderGroupStudentRow(
-        studentName, remId, rem, target, mappedInfo, inlineOptions, sentenceStarter, multiSelect, remarkHasNote, paEntry?.optionScores || null, noteCapableGrp, paEntry?.noteSentenceStarter || null, paEntry?.noTrials || false
-      )).join("");
-    }).join("");
-    return `${_outerOpen}
-      ${suppressHeader ? "" : `<div class="entry-field" contenteditable="false">
-        <span class="field-label">Activity</span>
-        <span class="field-value-fixed">${actNum ? `<span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>` : ""}${paEntry ? paDisplayHtml(paEntry, true) : formatActivityMarkup(actName)}</span>
-        ${(paEntry?.activeFrom || paEntry?.createdOn) ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(paEntry.activeFrom || paEntry.createdOn)}</span>` : ""}
-        ${paEntry?.id ? `<button class="btn-icon btn-grp-edit-pencil" contenteditable="false" data-pa-id="${escHtml(paEntry.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
-      </div>`}
-      ${noteRow}
-      ${suppressHeader ? "" : `<div class="entry-divider" contenteditable="false"></div>`}
-      ${rows}
-    </div>`;
-  }
 
   // Check if any attendee already has a remark for this activity
   const anyExpanded = actId && Object.values(data.remarks || {})
@@ -26797,7 +26372,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
     const bodyHtml = attendees.map(studentName => {
       const entry = byStudent[studentName]?.[i] || null;
       if (entry) return renderGroupStudentRow(
-        studentName, entry[0], entry[1], target, null, inlineOptions, sentenceStarter, multiSelect, remarkHasNote, paEntry?.optionScores || null, noteCapableGrp, paEntry?.noteSentenceStarter || null, paEntry?.noTrials || false
+        studentName, entry[0], entry[1], target, inlineOptions, sentenceStarter, multiSelect, remarkHasNote, paEntry?.optionScores || null, noteCapableGrp, paEntry?.noteSentenceStarter || null, paEntry?.noTrials || false
       );
       return isFreeText
         ? renderGroupStudentEmptyRow(studentName, actId, actName, target, isPredefined)
@@ -26838,7 +26413,7 @@ function renderGroupActivityCard(actName, actId, target, data, attendees, actNot
 // just with .group-remark-input instead of .remark-text-input for the
 // free-text fallback box, since this row is one attendee's slice of a
 // shared-activity card instead of a single student's own remark field.
-function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = null, inlineOptions = null, sentenceStarter = null, multiSelect = false, remarkHasNote = false, optionScores = null, noteCapable = false, noteSentenceStarter = null, noTrials = false) {
+function renderGroupStudentRow(studentName, remId, rem, target, inlineOptions = null, sentenceStarter = null, multiSelect = false, remarkHasNote = false, optionScores = null, noteCapable = false, noteSentenceStarter = null, noTrials = false) {
   const trials = rem.trials || [];
   const regularBadges = trials.map((t, i) =>
     `<span class="trial-badge">${t === -1 ? "—" : t}<button class="btn-trial-delete btn-group-trial-del" data-rem-id="${remId}" data-idx="${i}">×</button></span>`
@@ -26858,11 +26433,6 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
           <button class="btn-primary-sm btn-trial-not-required" disabled
             style="background:#e5e7eb;color:#9ca3af;border-color:#e5e7eb;cursor:default;box-shadow:none">+ Trial (Not Required)</button>
         </div>
-      </div>`
-    : mappedInfo
-    ? `<div class="entry-field" contenteditable="false">
-        <span class="field-label">${escHtml(mappedInfo.label)}</span>
-        <span class="field-value-fixed">${mappedInfo.pct !== null ? mappedInfo.pct + "%" : "—"}</span>
       </div>`
     : `<div class="entry-field" contenteditable="false">
         <span class="field-label">Trials</span>
@@ -26959,7 +26529,7 @@ function renderGroupStudentRow(studentName, remId, rem, target, mappedInfo = nul
   </div>`;
 }
 
-function renderGroupStudentPendingRow(studentName, actId, actName, target, mapped = false) {
+function renderGroupStudentPendingRow(studentName, actId, actName, target) {
   return `<div class="group-student-section group-student-pending" contenteditable="false"
     data-student="${escHtml(studentName)}"
     data-act-id="${escHtml(actId || "")}"
@@ -26971,7 +26541,7 @@ function renderGroupStudentPendingRow(studentName, actId, actName, target, mappe
         data-student="${escHtml(studentName)}"
         data-act-id="${escHtml(actId || "")}"
         data-act-name="${escHtml(actName)}"
-        data-target="${escHtml(target.name)}">+ Add Remark${mapped ? "" : " &amp; Trials"}</button>
+        data-target="${escHtml(target.name)}">+ Add Remark &amp; Trials</button>
     </div>
   </div>`;
 }
@@ -27019,17 +26589,9 @@ function calcGroupStudentDaysAverage(target, data, studentName, visited = new Se
   const actsForTarget = Object.entries(data.activities || {})
     .filter(([, a]) => a.targetName === target.name);
 
-  for (const [actId, act] of actsForTarget) {
+  for (const [actId] of actsForTarget) {
     const remarksForStudent = Object.values(data.remarks || {})
       .filter(r => r.activityId === actId && r.studentName === studentName);
-    const pa = (target.predefinedActivities || []).find(p => p.isMapped &&
-        (p.name === act.activityName || (act.configId && p.id === act.configId)));
-    if (pa) {
-      if (remarksForStudent.length === 0) continue;
-      const mappedPct = resolveGroupMappedScoreDisplay(pa, target, data, studentName, visited).pct;
-      if (mappedPct !== null) avgs.push(mappedPct);
-      continue;
-    }
     for (const r of remarksForStudent) {
       const trials = (r.trials || []).filter(t => t !== -1);
       const allScores = r.optionScore !== undefined ? [...trials, r.optionScore] : trials;
@@ -27041,18 +26603,6 @@ function calcGroupStudentDaysAverage(target, data, studentName, visited = new Se
   return avgs.length > 0 ? Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length) : null;
 }
 
-// Resolves a mapped-score activity's live display for one attendee — see
-// calcDaysAverage's individual-session counterpart, resolveMappedScoreDisplay.
-function resolveGroupMappedScoreDisplay(pa, target, data, studentName, visited) {
-  const mappedTarget = pa.mappedTargetId
-    ? (state.currentGroup?.targets || []).find(t => t.id === pa.mappedTargetId)
-    : null;
-  if (!mappedTarget) return { label: "Score (Not Mapped Yet)", pct: null };
-  return {
-    label: `Score (Mapped to ${mappedTarget.name}'s Average)`,
-    pct: calcGroupStudentDaysAverage(mappedTarget, data, studentName, visited)
-  };
-}
 
 function updateGroupAvgChips(target, data) {
   const container = $("group-avg-chips");
