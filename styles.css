@@ -4168,5 +4168,5 @@ button.wf-pill:hover { filter: brightness(.93); }
    rows also have to stay DIRECT children of #mn-act-list, because the drag
    sorter finds the row a handle belongs to by walking the list's children. */
 #mn-act-list > [data-sec-member] {
-  margin-left: 1.5rem;
+  margin-left: 2.75rem;
 }
