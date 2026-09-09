@@ -200,7 +200,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2003";
+const APP_VERSION = "2004";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3831,8 +3831,8 @@ async function renderAiCostLine(lastUsd = null, usage = null) {
 // debugLastAiReport() show them. Memory only, cleared on reload.
 const _aiReplies = [];
 
-function aiStashReply(kind, label, text) {
-  _aiReplies.unshift({ kind, label, at: new Date().toISOString(), text });
+function aiStashReply(kind, label, text, stopReason) {
+  _aiReplies.unshift({ kind, label, at: new Date().toISOString(), text, stopReason });
   _aiReplies.length = Math.min(_aiReplies.length, 3);
 }
 
@@ -3843,6 +3843,9 @@ window.debugLastAiReport = function(n = 0) {
     ? `Only ${_aiReplies.length} reply/replies kept this session.`
     : "No AI report has been generated since this page was loaded.");
   console.log(`${r.kind} — ${r.label} — ${r.at} — ${r.text.length.toLocaleString()} chars`);
+  console.log(`stop_reason: ${r.stopReason === null || r.stopReason === undefined
+    ? "NONE — the stream ended early, so this reply is incomplete"
+    : r.stopReason}`);
   console.log("Blocks the model returned:");
   for (const m of r.text.matchAll(/===(OBSERVATION|OBSERVED):\s*([^=\n]+?)\s*===/g)) {
     console.log(`  ${m[1]}: ${JSON.stringify(m[2])}`);
@@ -3855,7 +3858,7 @@ window.debugLastAiReport = function(n = 0) {
   return r.text;
 };
 
-async function aiRequest(aiPrompt, signal) {
+async function aiRequest(aiPrompt, signal, meta = {}) {
   const resp = await fetch("https://session-tracker-ai.wang-loys22.workers.dev", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -3912,6 +3915,22 @@ async function aiRequest(aiPrompt, signal) {
         throw new Error(ev.error?.message || "AI stream error");
       }
     }
+  }
+
+  // Every reply is kept, finished or not, so a broken report can be looked at
+  // afterwards rather than guessed about.
+  aiStashReply(meta.kind || "report", meta.label || "", text.trim(), stopReason);
+
+  // Anthropic always sends a stop_reason before it closes the stream. Arriving
+  // here without one means the connection died partway through and this is a
+  // fragment, not a reply. It used to be handed on as though it were finished:
+  // one dropped connection produced a full document with an executive summary
+  // cut off mid-sentence and every target section blank, and nothing anywhere
+  // said why. Anthropic still bills for what it generated, so the cost is
+  // recorded before this gives up.
+  if (stopReason === null) {
+    aiTrackCost(usage, meta.kind || "unknown");
+    throw new Error(`The connection dropped partway through Claude's reply, after ${text.length.toLocaleString()} characters. No report was written. Press Generate Report and try again.`);
   }
 
   return { text: text.trim(), usage, stop_reason: stopReason };
@@ -4689,7 +4708,8 @@ ${evidencePromptBlock(["Weakness", "Focus Area", "Recommendation"], "the target'
     console.log(`[AI half-year prompt] ${aiPrompt.length.toLocaleString()} chars `
       + `(~${Math.round(aiPrompt.length / 4).toLocaleString()} tokens) — ${student.name}, ${aiReportingPeriod}`);
     _hyrAbortController = new AbortController();
-    const fetchPromise = aiRequest(aiPrompt, _hyrAbortController.signal);
+    const fetchPromise = aiRequest(aiPrompt, _hyrAbortController.signal,
+      { kind: "halfYear", label: `${student.name}, ${aiReportingPeriod}` });
 
     // Fake phases run while fetch is already in flight
     await new Promise(r => setTimeout(r, 1000));
@@ -4726,7 +4746,6 @@ ${evidencePromptBlock(["Weakness", "Focus Area", "Recommendation"], "the target'
     aiTrackCost(data.usage, "halfYear");
     // aiRequest already joined every text block and dropped the thinking blocks.
     const reportText = data.text;
-    aiStashReply("half-year", `${student.name}, ${aiReportingPeriod}`, reportText || "");
     if (!reportText) {
       throw new Error(data.stop_reason === "max_tokens"
         ? "The response hit the token limit before finishing. Try again, or tell Claude Code to raise max_tokens."
@@ -7659,7 +7678,8 @@ ${evidencePromptBlock(["Weakness", "Recommendation"], "the target's name for a W
     console.log(`[AI assessment prompt] ${aiPrompt.length.toLocaleString()} chars `
       + `(~${Math.round(aiPrompt.length / 4).toLocaleString()} tokens) — ${student.name}, ${nDays} days`);
     _hyrAbortController = new AbortController();
-    const fetchPromise = aiRequest(aiPrompt, _hyrAbortController.signal);
+    const fetchPromise = aiRequest(aiPrompt, _hyrAbortController.signal,
+      { kind: "assessment", label: `${student.name}, ${nDays} days` });
 
     await new Promise(r => setTimeout(r, 800));
     setProgress(30, "Sending to AI (Approx. ~1 min)…");
@@ -7678,7 +7698,6 @@ ${evidencePromptBlock(["Weakness", "Recommendation"], "the target's name for a W
     setProgress(72, "AI response received…");
     aiTrackCost(data.usage, "assessment");
     const reportText = data.text;
-    aiStashReply("assessment", `${student.name}, ${nDays} days`, reportText || "");
     if (!reportText) {
       throw new Error(data.stop_reason === "max_tokens"
         ? "The response hit the token limit before finishing. Try again, or tell Claude Code to raise max_tokens."
@@ -8270,7 +8289,8 @@ ${evidencePromptBlock(["Still Working On"], "the point's own short label", "Stil
     console.log(`[AI monthly prompt] ${aiPrompt.length.toLocaleString()} chars `
       + `(~${Math.round(aiPrompt.length / 4).toLocaleString()} tokens) — ${student.name}, ${monthName} ${year}`);
     _hyrAbortController = new AbortController();
-    const fetchPromise = aiRequest(aiPrompt, _hyrAbortController.signal);
+    const fetchPromise = aiRequest(aiPrompt, _hyrAbortController.signal,
+      { kind: "monthly", label: `${student.name}, ${monthName} ${year}` });
 
     await new Promise(r => setTimeout(r, 800));
     setProgress(25, "Processing data…");
@@ -8302,7 +8322,6 @@ ${evidencePromptBlock(["Still Working On"], "the point's own short label", "Stil
     aiTrackCost(data.usage, "monthly");
     // aiRequest already joined every text block and dropped the thinking blocks.
     const reportText = data.text;
-    aiStashReply("monthly", `${student.name}, ${monthName} ${year}`, reportText || "");
     if (!reportText) {
       throw new Error(data.stop_reason === "max_tokens"
         ? "The response hit the token limit before finishing. Try again, or tell Claude Code to raise max_tokens."
