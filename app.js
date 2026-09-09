@@ -181,7 +181,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1985";
+const APP_VERSION = "1986";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -20547,7 +20547,10 @@ function mnActPanelEl() {
   el.id = "mn-act-panel-overlay";
   el.innerHTML =
     `<div class="mn-act-panel" role="dialog" aria-modal="true">` +
-      `<div class="mn-act-panel-head"><span class="mn-act-panel-title"></span></div>` +
+      `<div class="mn-act-panel-head">` +
+        `<span class="mn-act-panel-title"></span>` +
+        `<button class="mn-act-panel-x" type="button" title="Close">&#10005;</button>` +
+      `</div>` +
       `<div class="mn-act-panel-body"></div>` +
       `<div class="mn-act-panel-foot">` +
         `<button class="mn-act-panel-save" type="button">Save and Close</button>` +
@@ -20558,6 +20561,11 @@ function mnActPanelEl() {
   // Otherwise it points at the button rather than throwing the edit away.
   el.addEventListener("click", e => {
     if (e.target !== el) return;
+    if (mnPanelIsDirty()) mnBlinkPanelSave(); else mnPanelSave();
+  });
+  // The X behaves exactly like clicking off the panel: it can close when there
+  // is nothing to lose, and points at Save and Close when there is.
+  el.querySelector(".mn-act-panel-x").addEventListener("click", () => {
     if (mnPanelIsDirty()) mnBlinkPanelSave(); else mnPanelSave();
   });
   el.querySelector(".mn-act-panel-save").addEventListener("click", () => mnPanelSave());
