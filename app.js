@@ -200,7 +200,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1999";
+const APP_VERSION = "2000";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -13008,7 +13008,35 @@ function attachTargetListeners(target) {
           await autoFillMappedRemarks(state.currentStudent, state.currentSessionId);
           return; // Firestore write will trigger snapshot → re-render
         }
-        if (paName) actId = await ensureFedcActivity(target.name, paName, paOrder, btn.dataset.paParent || null, btn.dataset.cfgId || null);
+        // The activity is created LOCALLY first and only then written. Awaiting
+        // the Firestore round trip before rendering left the button doing
+        // nothing for as long as the write took; a snapshot landing in the
+        // meantime re-rendered a fresh, enabled button, so a second click while
+        // waiting produced a second remark. Nothing is awaited before the render
+        // now, so there is nothing to click twice.
+        if (paName) {
+          const existing = findActivityByName(target.name, paName, btn.dataset.paParent || null, btn.dataset.cfgId || null);
+          if (existing) {
+            actId = existing.id;
+            if (btn.dataset.cfgId && !existing.configId) {
+              if (state.sessionData?.activities?.[existing.id]) state.sessionData.activities[existing.id].configId = btn.dataset.cfgId;
+              adoptOrphanActivity(state.currentSessionId, existing.id, existing.parentActivity || null, btn.dataset.cfgId).catch(() => {});
+            }
+          } else {
+            actId = generateId("a");
+            const actData = { targetName: target.name, activityName: paName, order: paOrder, isPredefined: true };
+            if (btn.dataset.paParent) actData.parentActivity = btn.dataset.paParent;
+            if (btn.dataset.cfgId)     actData.configId      = btn.dataset.cfgId;
+            state.sessionData.activities = state.sessionData.activities || {};
+            state.sessionData.activities[actId] = actData;
+            addActivity(state.currentSessionId, target.name, paName, paOrder, true, actId,
+                        btn.dataset.paParent || null, btn.dataset.cfgId || null).catch(err => {
+              delete state.sessionData.activities?.[actId];
+              renderTargetContent();
+              alert("Couldn't add activity, check your connection and try again.\n\n" + err.message);
+            });
+          }
+        }
         if (!actId) { btn.disabled = false; return; }
         // Maintained placeholder: ensure "Maintain" remark exists before adding the
         // empty one. Autofill may have already written it during the ensureFedcActivity
