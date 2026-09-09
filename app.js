@@ -200,7 +200,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "1998";
+const APP_VERSION = "1999";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -13041,6 +13041,15 @@ function attachTargetListeners(target) {
       } catch (err) {
         btn.disabled = false;
         alert("Couldn't add remark — check your connection and try again.\n\n" + err.message);
+      } finally {
+        // The normal path renders, which replaces this button, so leaving it
+        // disabled there is harmless. Every path that returned WITHOUT rendering
+        // left the button dead for good: the mapped branch waits on a Firestore
+        // snapshot that never arrives when autoFillMappedRemarks finds nothing to
+        // write, and from then on every click hit the disabled check at the top
+        // and did nothing at all. If the button is still in the document then
+        // nothing replaced it, so it has to be usable again.
+        if (btn.isConnected) btn.disabled = false;
       }
     });
   });
