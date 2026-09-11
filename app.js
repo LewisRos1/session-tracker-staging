@@ -201,7 +201,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2022";
+const APP_VERSION = "2023";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -4593,22 +4593,24 @@ Write exactly 5 sentences summing up ${firstName}'s overall progress this term i
 ===KEY_INSIGHTS===
 Write EXACTLY 7 points, no more and no fewer. Each is ONE specific thing ${firstName} did this term, taken from the session remarks, a real moment rather than a general description. Each point comes from a DIFFERENT area of the student's work. Only real things from the data, never invent one to fill a row.
 
-EVERY POINT IS A SHORT LABEL, THEN TWO SENTENCES:
+EVERY POINT IS A SHORT LABEL, THEN TWO SENTENCES, OR THREE FOR A THEN-AND-NOW POINT:
   Label: 2-4 words, written directly with no ** markers.
   1. What ${PRON.subj} did. Plain, direct, natural English.
   2. What has CHANGED IN ${firstName}: the ability ${PRON.subj} now has, or is beginning to have.
+
+THE LAST SENTENCE IS ALWAYS THE ONE THAT SAYS WHAT IT MEANS, and every rule below about "sentence 2" means that sentence. In an ordinary point it is the second. In a then-and-now point it is the THIRD, after the then and the now. A point that stops without it is unfinished: the parent has been told what happened and never told why it matters.
 
 EVERYDAY LANGUAGE IN THIS SECTION TOO. The WRITING STYLE word list in the GLOBAL RULES above does NOT apply to these points. Write them the way a teacher speaks to a parent at the door. "An earlier upset" is not a thing anyone says out loud, and neither is "a marked change from earlier in the year".
 
 SENTENCE 1 IS SHORT. It names ONE thing ${PRON.subj} did and stops. A reader has to be able to hold it in their head after reading it once, and a sentence that stacks the action, the trigger, a comparison and a duration on top of each other cannot be held at all.
 
-WHERE THE POINT IS AN IMPROVEMENT, WRITE IT AS THEN AND NOW, WITH A MONTH ON EACH. Do not squeeze the comparison into one sentence, and do not gesture at the past with "an earlier upset". MONTHS BELONG IN THIS SECTION: unlike the Weakness lines under each chart, these points exist to show progress, and the months are what show it. For a then-and-now point the two sentences are the then and the now, and no third sentence is needed.
+WHERE THE POINT IS AN IMPROVEMENT, WRITE IT AS THEN AND NOW, WITH A MONTH ON EACH. Do not squeeze the comparison into one sentence, and do not gesture at the past with "an earlier upset". MONTHS BELONG IN THIS SECTION: unlike the Weakness lines under each chart, these points exist to show progress, and the months are what show it. A then-and-now point has THREE sentences: the then, the now, and then what it means, which is never dropped.
   WRONG, one crammed sentence with a vague back-reference: "Caden calmed down within a few minutes after being helped to join a group game he had been waiting for, unlike an earlier upset that lasted 45 minutes on and off."
   WRONG, the same fault dressed differently: "Caden now calms down after being offered a choice or a short wait when something upsets him, a marked change from earlier in the year when a similar upset lasted 45 minutes on and off with no response to comforting."
-  RIGHT, then and now, a month on each: "In March, Caden took 45 minutes to calm down after getting upset. In July, he only needed a few minutes, after being helped to join a group game."
+  RIGHT, then, now, and what it means: "In March, Caden was upset on and off for 45 minutes and did not respond to any attempts to comfort him. In July, he was able to tell the instructor he did not like a song, and he calmed down as soon as it was changed. This means he is learning to settle himself with just a little support instead of needing a long time to recover."
   NEVER a vague back-reference: "an earlier upset", "a previous occasion", "before", "at the start", "earlier in the year". Name the month.
 
-SENTENCE 2 NAMES A CHANGE IN THE CHILD, NOT A PLACE THE SKILL MIGHT BE HANDY. This is the whole difference between a line that lands as true and one that sounds invented. It does not apply to a then-and-now point, where sentence 2 is the "now" and the change is already plain from the two months.
+SENTENCE 2 NAMES A CHANGE IN THE CHILD, NOT A PLACE THE SKILL MIGHT BE HANDY. This is the whole difference between a line that lands as true and one that sounds invented. In a then-and-now point this is the third sentence, and it is required there exactly as it is everywhere else.
   RIGHT: "This means ${PRON.subj} is beginning to manage strong feelings on ${PRON.poss} own, a skill that will help ${PRON.obj} cope during stressful moments outside of sessions."
   RIGHT: "Suggesting that ${PRON.poss} attention to detail and number sense are strong enough to support more advanced maths work."
   RIGHT: "A sign that this daily task has become automatic for ${PRON.obj}, leaving more of ${PRON.poss} attention free for harder parts of ${PRON.poss} work."
