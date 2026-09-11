@@ -201,7 +201,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2016";
+const APP_VERSION = "2017";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -4591,10 +4591,6 @@ Write exactly 5 sentences summing up ${firstName}'s overall progress this term i
 ===KEY_INSIGHTS===
 Write EXACTLY 7 points, no more and no fewer. Each is ONE specific thing ${firstName} did this term, taken from the session remarks, a real moment rather than a general description. Each point comes from a DIFFERENT area of the student's work. Only real things from the data, never invent one to fill a row.
 
-DIFFICULTIES THAT HAVE GONE AWAY BELONG HERE, AND THEY COME FIRST. The Weakness line under each chart now carries only what ${firstName} STILL needs help with, so a difficulty that used to be real and no longer is has nowhere else in the report to go. Fill these 7 points with those first, then use the remaining slots as described above. How confidently you write one depends entirely on what the data holds:
-  - THE REMARKS SHOW THE BETTER STATE: say it plainly, as a change in ${firstName}. "He now settles within a few minutes when he becomes upset, where in March this once took 45 minutes on and off."
-  - THE BEHAVIOUR SIMPLY STOPPED APPEARING, with nothing positive recorded: say that and only that. "Whining at arrival no longer shows up in his sessions." That is a fact about the records, not about ${firstName}, and you must NOT upgrade it into a claim about what ${PRON.subj} can now do.
-
 EVERY POINT IS A SHORT LABEL, THEN TWO SENTENCES:
   Label: 2-4 words, written directly with no ** markers.
   1. What ${PRON.subj} did. Plain, direct, natural English.
@@ -4694,7 +4690,7 @@ RULES FOR EVERY OBSERVATION BLOCK:
   RIGHT, the same meaning in ordinary words: "He is good at asking for the physical activities he likes, but not yet for everyday things like food and drink."
 - NO PERCENTAGES AND NO SCORE NUMBERS, IN EITHER LINE. A figure you would quote here comes from ONE activity, while the graph printed directly above is a monthly average across the whole target, so the two never agree and a parent reading "25% in May" under a graph showing 95% for May has no way to tell which to believe. Say it in words: "he named fewer than half of them correctly", "on one occasion in May he managed very few", "this happened in most sessions". The ONE exception is a length of time the record itself states, written with the number as a figure and the unit as a full word: "45 minutes", never "45 min" and never "forty-five minutes". No graph shows a duration, so nothing contradicts it.
 - A WEAKNESS IS WHAT ${firstName} STILL NEEDS HELP WITH. Not a history of the period. Of the difficulties the data shows for this target, write about the one appearing in the MOST SESSIONS, not the most dramatic one and not the most recent one. Say how often it happens in plain words: "in most sessions", "about half the time", "only occasionally", "rarely".
-  A difficulty that has STOPPED does not belong here at all. Leave it out of this line: the Key Improvements section above picks it up as progress, which is where good news belongs.
+  A difficulty that has STOPPED does not belong here at all: this line is for what is still a problem, so leave it out.
   ONE BACKWARD GLANCE, and only where the difficulty is still happening AND has clearly shrunk. One clause, never a sequence of months.
     ALLOWED: "Caden still needs support to calm down when upset, though this now takes a few minutes rather than the 45 minutes seen in March."
     NOT ALLOWED, that is a timeline again: "In March this took 45 minutes, by April it was 20 minutes, and by June a few minutes."
@@ -4942,11 +4938,10 @@ function aiJobEnd(state, text) {
   _aiJob = null;
   aiTimerStop();
   if (state === "done") {
+    // Stays until the X is clicked or the next report starts. It carries the
+    // final elapsed time, which is worth reading, and a notice that clears
+    // itself after six seconds is one you can miss entirely by looking away.
     aiPillShow(text || "Done!", "done");
-    setTimeout(() => {
-      const el = document.getElementById("ai-report-pill");
-      if (el && el.classList.contains("is-done")) aiPillHide();
-    }, 6000);
   } else if (state === "fail") {
     aiPillShow(text || "Report failed", "fail");   // stays until dismissed
   } else {
