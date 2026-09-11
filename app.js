@@ -201,7 +201,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2018";
+const APP_VERSION = "2019";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3996,7 +3996,7 @@ GLOBAL RULES (apply to every section):
 - CRITICAL: If an activity does not appear in the data below, it was never tested this period. The student's ability is completely unknown. NEVER mention it, NEVER describe it as a weakness or difficulty, NEVER say things like "has not yet been observed doing X" or "we do not yet know how they manage X". Simply do not write about it at all. No data = silence.
 - CRITICAL: Write ONLY what the session remarks directly and explicitly state. Do NOT extrapolate or infer related skills. "Identifies a face" is NOT the same as "knows a name." "Follows a one-step instruction" is NOT the same as "follows two-step instructions." "Points to an object" is NOT the same as "can name it." Stay word-for-word within what was actually recorded. Never assume a student can or cannot do something that was not directly observed.
 - CRITICAL: NEVER restate a number, a duration or a count as anything other than what the record says, and never drop the words that qualify it. "45 min" is 45 minutes: it is not "close to an hour", not "almost an hour", and not "a long stretch of time". "45 min on and off" is not 45 minutes of continuous distress, and the "on and off" must survive into whatever you write. If a figure cannot be stated exactly, leave it out rather than round it.
-- CRITICAL: NEVER let a vague word do the work of a fact. "Settled", "settling", "resolved", "stabilised", "improved", "progressed" and "developed" name no behaviour, and a parent reading one is left asking what settled, or what improved. "Drops", "declines", "dips", "falls" and "decreases" are the same failure pointing the other way: they report which direction a number moved and say nothing whatever about the child. Write the thing itself instead: "he now calms within a few minutes when reminded", not "this settled"; "he now asks for a snack without being prompted", not "this improved".
+- CRITICAL: NEVER let a vague word do the work of a fact. "Settled", "settling", "resolved", "stabilised", "improved", "progressed" and "developed" name no behaviour, and a parent reading one is left asking what settled, or what improved. "Drops", "declines", "dips", "falls" and "decreases" are the same failure pointing the other way: they report which direction a number moved and say nothing whatever about the child. A vague QUANTITY fails the same test: "a short wait", "a little while", "some time", "a few goes" leave the reader asking how long or how many. Write what the record states, or leave it out. Write the thing itself instead: "he now calms within a few minutes when reminded", not "this settled"; "he now asks for a snack without being prompted", not "this improved".
 - CRITICAL: NEVER write "episode" or "episodes". A child having a hard time is not a television programme, and the word tells a parent nothing about what actually happened. Name the thing itself: "he was unsettled on and off for about 45 minutes", "these times are shorter now", "it happens when he has to wait his turn". This is an absolute ban, in every section of every report.
 - CRITICAL: COUNT BEFORE YOU GENERALISE. "Sometimes", "often", "at times", "on harder days", "tends to", "has needed" and "can take" all claim a PATTERN, and a pattern needs more than one recorded instance behind it. Something recorded once is written as once. If the one instance sits at the very start of the period, say so plainly rather than implying it is still happening. Check how many separate sessions record a thing before you reach for any of those words.
 - CRITICAL: Some activities track NEGATIVE or PROBLEM BEHAVIOURS (e.g. snatching food, interrupting others, hitting, distracting behaviour). For these activities, scoring is INVERTED: a HIGH score (e.g. 3 out of 3) means the student did NOT exhibit the bad behaviour and showed good self-control, while a LOW score (e.g. 0) means the bad behaviour DID occur. Always interpret scores for problem/negative behaviour activities with this in mind: high = good, low = the behaviour occurred.
@@ -4595,6 +4595,10 @@ EVERY POINT IS A SHORT LABEL, THEN TWO SENTENCES:
   Label: 2-4 words, written directly with no ** markers.
   1. What ${PRON.subj} did. Plain, direct, natural English.
   2. What has CHANGED IN ${firstName}: the ability ${PRON.subj} now has, or is beginning to have.
+
+SENTENCE 1 IS SHORT. It names ONE thing ${PRON.subj} did and stops. A reader has to be able to hold it in their head after reading it once, and a sentence that stacks the action, the trigger, a comparison and a duration on top of each other cannot be held at all. Where a comparison with how it used to be belongs, it is a SHORT trailing clause, not a second half of the sentence.
+  TOO MUCH IN ONE SENTENCE, nothing sticks: "Caden now calms down after being offered a choice or a short wait when something upsets him, a marked change from earlier in the year when a similar upset lasted 45 minutes on and off with no response to comforting."
+  RIGHT, one action, one short comparison: "Caden now calms down when he is offered a choice, where in March one upset lasted 45 minutes on and off."
 
 SENTENCE 2 NAMES A CHANGE IN THE CHILD, NOT A PLACE THE SKILL MIGHT BE HANDY. This is the whole difference between a line that lands as true and one that sounds invented.
   RIGHT: "This means ${PRON.subj} is beginning to manage strong feelings on ${PRON.poss} own, a skill that will help ${PRON.obj} cope during stressful moments outside of sessions."
