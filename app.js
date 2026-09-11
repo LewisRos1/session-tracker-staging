@@ -200,7 +200,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2014";
+const APP_VERSION = "2015";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -4584,6 +4584,10 @@ Write exactly 5 sentences summing up ${firstName}'s overall progress this term i
 ===KEY_INSIGHTS===
 Write EXACTLY 7 points, no more and no fewer. Each is ONE specific thing ${firstName} did this term, taken from the session remarks, a real moment rather than a general description. Each point comes from a DIFFERENT area of the student's work. Only real things from the data, never invent one to fill a row.
 
+DIFFICULTIES THAT HAVE GONE AWAY BELONG HERE, AND THEY COME FIRST. The Weakness line under each chart now carries only what ${firstName} STILL needs help with, so a difficulty that used to be real and no longer is has nowhere else in the report to go. Fill these 7 points with those first, then use the remaining slots as described above. How confidently you write one depends entirely on what the data holds:
+  - THE REMARKS SHOW THE BETTER STATE: say it plainly, as a change in ${firstName}. "He now settles within a few minutes when he becomes upset, where in March this once took 45 minutes on and off."
+  - THE BEHAVIOUR SIMPLY STOPPED APPEARING, with nothing positive recorded: say that and only that. "Whining at arrival no longer shows up in his sessions." That is a fact about the records, not about ${firstName}, and you must NOT upgrade it into a claim about what ${PRON.subj} can now do.
+
 EVERY POINT IS A SHORT LABEL, THEN TWO SENTENCES:
   Label: 2-4 words, written directly with no ** markers.
   1. What ${PRON.subj} did. Plain, direct, natural English.
@@ -4663,7 +4667,7 @@ ROW: Key Improvement | [2-4 word label]: [What he did. What it means for him in 
 
 ${targetsWithData.map(r => `===OBSERVATION: ${r.name}===
 Strength: [Two sentences. The first names one specific thing ${firstName} does well in this target, as actually observed in sessions rather than a general compliment. The second says what that lets ${PRON.obj} do in ordinary life, outside the session room, the same way the Highlights section does.]
-Weakness: [One or two sentences naming a genuine difficulty in this target, and what tends to bring it on - the situation, the time of day, the kind of task. ONLY write one if the session data directly shows it: a struggling remark, a behaviour that caused problems, or consistently low performance. If the data shows no clear weakness, write exactly: No notable areas of difficulty were observed in this period. NEVER invent or guess. Always leave the reader knowing where the difficulty stands NOW, not only when it was worst. THIS TARGET'S DATA RUNS FROM ${r.firstDataMonth || "the first month"} TO ${r.lastDataMonth || "the last month"}. If the difficulty changed, start at ${r.firstDataMonth || "the first month"} and work forwards. If it ran right through without changing, anchor it to ${r.lastDataMonth || "the last month"}.]
+Weakness: [One or two sentences naming a genuine difficulty in this target, and what tends to bring it on - the situation, the time of day, the kind of task. ONLY write one if the session data directly shows it: a struggling remark, a behaviour that caused problems, or consistently low performance. If the data shows no clear weakness, write exactly: No notable areas of difficulty were observed in this period. NEVER invent or guess.${r.dataStopsEarly ? ` THIS TARGET'S DATA STOPS IN ${r.lastDataMonth}, before the end of the reporting period: say when the difficulty last showed and that the target has not been worked on since.` : ` This target has data right up to the end of the reporting period, so do NOT name a month.`}]
 ===END===`).join("\n\n")}
 
 FORMAT FOR EVERY OBSERVATION BLOCK: exactly two lines, starting "Strength:" and "Weakness:", in that order. No bullet points, no asterisks, no extra lines, no "Note:" line, and NEVER a line describing the graph or the shape of the line.
@@ -4682,24 +4686,19 @@ RULES FOR EVERY OBSERVATION BLOCK:
   TOO DENSE, a parent has to stop and work it out: "This suggests his spontaneous requesting works well for preferred physical activities but remains less consistent for everyday needs like eating and drinking."
   RIGHT, the same meaning in ordinary words: "He is good at asking for the physical activities he likes, but not yet for everyday things like food and drink."
 - NO PERCENTAGES AND NO SCORE NUMBERS, IN EITHER LINE. A figure you would quote here comes from ONE activity, while the graph printed directly above is a monthly average across the whole target, so the two never agree and a parent reading "25% in May" under a graph showing 95% for May has no way to tell which to believe. Say it in words: "he named fewer than half of them correctly", "on one occasion in May he managed very few", "this happened in most sessions". The ONE exception is a length of time the record itself states, written with the number as a figure and the unit as a full word: "45 minutes", never "45 min" and never "forty-five minutes". No graph shows a duration, so nothing contradicts it.
-- TIME, AND HOW TO WRITE IT. Every Weakness is anchored in time, and the anchor is always a month.
-  - If the difficulty CHANGED, name the months that mark the change: "In March... From April onwards, ...".
-  - If it did NOT change, anchor it to the last month this target has anything recorded against it, which is given to you in that target's own Weakness instruction above.
-  - START AT THE BEGINNING. Where the difficulty changed, begin at the earliest month this target has data, given to you in that target's own Weakness instruction above, and work forwards from there. A reader who sees the chart start in March and the text start in June assumes March was ignored, and the earliest months are where the story starts. If the difficulty genuinely was not there at the start, SAY SO in as many words rather than skipping those months. NEVER invent an early difficulty to fill the gap.
-  - ALWAYS SAY WHERE IT STANDS NOW. Naming only the early part and stopping is half an answer and is WRONG, however true that half is.
-  - Months run in CHRONOLOGICAL ORDER, earliest first, whatever order you happened to find the evidence in. A sentence that jumps backwards makes the reader re-order it before it means anything.
-  - Put a comma after an opening time phrase, and around one dropped into the middle: "From April onwards, this became far less frequent"; "now, whenever it happens again, it lasts only a short time".
-  - VARY THE WORDING. The anchor appears under every unchanged difficulty in the report, and one repeated form reads like a form letter: "Up till June, he still...", "As late as June, he was still...", "This was still happening in June", "Through to June, he continued to...".
-  - BANNED, all of them: "today", "currently", "at present", "these days", "his most recent sessions", because a report can be opened months after the last session it covers; the word "term" in any form, including "early in the term", "later in the term", "right through the term", "his last few sessions of the term"; and "afterward", "afterwards", "later on", "subsequently", "over time". "Since then" is allowed ONLY when the sentence immediately before it named the month.
-  WRONG: "Hayden's regulation was lowest in the earliest sessions of the term, but this eased noticeably after March." / "Hayden's motivation was mostly low in June, and in May he said he did not feel he needed the reward at all." / "...and this is still the case today."
-  RIGHT, it changed, so the months mark the change: "In March, Caden's regulation was at its lowest and he needed calming support such as gentle pressure to settle. From April onwards, this eased and he now settles far more easily."
-  RIGHT, it did not change, so the anchor is the last month with data: "Up till June, Hayden was still becoming upset when asked to write longer pieces or redo corrections, which led to crying, noise-making or refusing to continue."
-  WRONG, the chart starts in March but the text starts in June, so the first half looks ignored: "In mid-to-late June, Caden sometimes needed his name repeated several times before he responded, especially in new places. This happened again in early July, but from mid-July onward he was responding promptly in every session."
-  RIGHT, the earliest months accounted for without inventing a problem: "Caden responded to his name reliably in March and April. From mid-June he sometimes needed it repeated several times, especially in new places or when he seemed distracted. From mid-July he was responding promptly again."
+- A WEAKNESS IS WHAT ${firstName} STILL NEEDS HELP WITH. Not a history of the period. Of the difficulties the data shows for this target, write about the one appearing in the MOST SESSIONS, not the most dramatic one and not the most recent one. Say how often it happens in plain words: "in most sessions", "about half the time", "only occasionally", "rarely".
+  A difficulty that has STOPPED does not belong here at all. Leave it out of this line: the Key Improvements section above picks it up as progress, which is where good news belongs.
+  ONE BACKWARD GLANCE, and only where the difficulty is still happening AND has clearly shrunk. One clause, never a sequence of months.
+    ALLOWED: "Caden still needs support to calm down when upset, though this now takes a few minutes rather than the 45 minutes seen in March."
+    NOT ALLOWED, that is a timeline again: "In March this took 45 minutes, by April it was 20 minutes, and by June a few minutes."
+- DO NOT NAME A MONTH, unless that target's own Weakness instruction above tells you its data stops early. The chart heading directly above your line already states the reporting period, and everything in a Weakness is current by definition, so a month under every target is repetition the reader does not need. Where the instruction DOES say the data stops early, say when the difficulty last showed and that the target has not been worked on since: that is a fact about the records. NEVER claim it has stopped happening, which the records cannot show once sessions stopped.
+  RIGHT, target ran to the end of the period: "Caden still waits for an adult to offer a snack rather than asking himself, in most sessions."
+  RIGHT, target stopped early: "This last showed in April, and the target has not been worked on since."
+  BANNED, all of them: "today", "currently", "at present", "these days", "his most recent sessions", because a report can be opened months after the last session it covers; the word "term" in any form; and "afterward", "afterwards", "later on", "subsequently", "over time".
 - NEVER A DAY-LEVEL DATE, IN EITHER LINE. Write "in July", never "on 12 July" or "on 19 and 26 July". A parent does not need the day, and a sentence carrying three of them is far harder to read. Months, and words like "early", "mid" or "late" in front of a month, are as precise as these two lines ever get.
   WRONG: "In July, it dipped again on some days: he needed reminders to stay seated on 12 July and tended to run off unannounced, and he whined when a task felt too hard on 19 and 26 July."
   RIGHT: "In July, he needed reminders to stay seated and sometimes ran off unannounced. He also whined when a task felt too hard."
-- NEVER WRITE "BRIEF" OR "BRIEFLY" ABOUT HOW LONG SOMETHING LASTS: write "it lasts only a short time". And write "reason", not "cause": "usually linked to a clear reason" is how people actually speak.
+- SMALL MECHANICS. Never "brief" or "briefly" for how long something lasts: write "it lasts only a short time". Write "reason", not "cause": "usually linked to a clear reason" is how people actually speak. And put a comma after an opening phrase, and around one dropped into the middle: "In July, he needed reminders to stay seated"; "now, whenever it happens, it lasts only a short time".
 - GENERAL POINT FIRST, THEN THE EXAMPLE, AND DO NOT PILE UP NEGATIVE WORDS. Never swing between a general statement, one specific session, a figure and a contrast inside a single sentence: the reader loses the point entirely. One sentence for what is generally true, the next for the specific session that shows it. "harder... less often... less familiar... less than half" inside one sentence also reads far heavier than the facts actually are, so where there is a positive side, say it once, then give the difficulty.
   WRONG, four thoughts in one breath: "Caden finds it harder to name people he sees less often, such as other children or staff, compared with close family. This was clearest in one session where he named several less familiar names correctly less than half the time, though he continues to do well with people he knows best."
   RIGHT, general first, then the session: "Caden is more accurate when naming close family members than less familiar people such as peers or staff. In one session, he named fewer than half of the less familiar people correctly, but he does well with the people he knows best."
@@ -4714,7 +4713,7 @@ RULES FOR EVERY OBSERVATION BLOCK:
 
 ${qualitativeWithData.map(r => `===OBSERVED: ${r.name}===
 Strength: [Two sentences. The first names something positive noticed in this skill area, a real behaviour or moment. The second says what it lets ${firstName} do in ordinary life.]
-Weakness: [One or two sentences about something still developing or difficult, and what tends to bring it on, explained kindly with a specific example if the data provides one. THIS TARGET'S DATA RUNS FROM ${r.firstDataMonth || "the first month"} TO ${r.lastDataMonth || "the last month"}. If it changed, start at ${r.firstDataMonth || "the first month"}. If it ran right through without changing, anchor it to ${r.lastDataMonth || "the last month"}.]
+Weakness: [One or two sentences about something still developing or difficult, and what tends to bring it on, explained kindly with a specific example if the data provides one.${r.dataStopsEarly ? ` THIS TARGET'S DATA STOPS IN ${r.lastDataMonth}, before the end of the reporting period: say when the difficulty last showed and that the target has not been worked on since.` : ` This target has data right up to the end of the reporting period, so do NOT name a month.`}]
 ===END===`).join("\n\n")}
 
 The OBSERVED blocks follow the same rules and the same two-line format as the OBSERVATION blocks above. They simply have no graph beside them.
@@ -5237,11 +5236,7 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
           // in September would otherwise imply sessions that never happened.
           // Empty placeholder remarks are skipped, since nothing was recorded.
           if ((_r.text || "").trim() || (_r.trials || []).length) {
-            if (!_tf.lastDataDate  || _r.date > _tf.lastDataDate)  _tf.lastDataDate  = _r.date;
-            // The earliest month matters as much as the latest: a write-up that
-            // opens in June under a chart starting in March reads as though the
-            // first half of the period was ignored.
-            if (!_tf.firstDataDate || _r.date < _tf.firstDataDate) _tf.firstDataDate = _r.date;
+            if (!_tf.lastDataDate || _r.date > _tf.lastDataDate) _tf.lastDataDate = _r.date;
           }
         }
 
@@ -5444,8 +5439,13 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
       : HYR_FULL_MONTHS[_m - 1];
   };
   for (const _f of Object.values(targetFacts)) {
-    if (_f.lastDataDate)  _f.lastDataMonth  = _monthNameOf(_f.lastDataDate);
-    if (_f.firstDataDate) _f.firstDataMonth = _monthNameOf(_f.firstDataDate);
+    if (!_f.lastDataDate) continue;
+    _f.lastDataMonth = _monthNameOf(_f.lastDataDate);
+    // A Weakness names no month when the target ran to the end of the period:
+    // the chart heading above it already gives the range, and "still" carries
+    // the rest. It only needs a month when the data stops EARLY, where silence
+    // would imply the difficulty was seen more recently than it was.
+    _f.dataStopsEarly = _f.lastDataDate.slice(0, 7) < HYR_R.lastKey;
   }
 
   // Compute trendlines and categorize every target
