@@ -200,7 +200,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2011";
+const APP_VERSION = "2012";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -1832,6 +1832,9 @@ function hasLoggedInToday() {
 function markLoggedInToday() {
   localStorage.setItem(LAST_LOGIN_DATE_KEY, getTodayString());
 }
+function clearLoggedInToday() {
+  localStorage.removeItem(LAST_LOGIN_DATE_KEY);
+}
 
 // Maps studentId → Map(targetName → baseline activity count).
 // Populated once from the fresh Firestore load in loadAppData().
@@ -2060,6 +2063,15 @@ function initPin() {
       checking = false;
       keypad.classList.remove("checking");
     } catch (err) {
+      // The day was marked BEFORE the attempt (see above), so a failed attempt
+      // has to take it back. Leaving it set is what produced "it says the PIN
+      // is wrong and then logs me in anyway": hasLoggedInToday() was now true,
+      // so the next auth-state change onAuthChange saw was accepted instead of
+      // being signed out as a stale session from a previous day.
+      clearLoggedInToday();
+      // Nothing was ever written about WHY a sign-in failed, so a wrong PIN and
+      // a dropped connection looked identical from the outside.
+      console.warn("[PIN] sign-in failed:", err?.code || "(no code)", err?.message || err);
       shake();
       errMsg.classList.remove("hidden");
       statusMsg.classList.add("hidden");
@@ -4880,7 +4892,8 @@ function aiPillEl() {
   if (el) return el;
   el = document.createElement("div");
   el.id = "ai-report-pill";
-  el.innerHTML = `<span class="ai-pill-ring"><span class="ai-pill-pct">0%</span></span><span class="ai-pill-text"></span>`
+  el.innerHTML = `<span class="ai-pill-ring"><span class="ai-pill-pct">0%</span></span>`
+    + `<span class="ai-pill-text"></span><span class="ai-pill-time"></span>`
     + `<button class="ai-pill-x" title="Cancel">✕</button>`;
   el.querySelector(".ai-pill-x").addEventListener("click", () => {
     if (_aiJob) _aiJob.abort();
@@ -4889,6 +4902,30 @@ function aiPillEl() {
   document.body.appendChild(el);
   return el;
 }
+let _aiTimerId = null, _aiStartedAt = 0;
+
+function aiFmtElapsed(ms) {
+  const total = Math.floor(ms / 1000);
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
+
+function aiTimerStart() {
+  aiTimerStop();
+  _aiStartedAt = Date.now();
+  const paint = () => {
+    const el = document.querySelector("#ai-report-pill .ai-pill-time");
+    if (el) el.textContent = aiFmtElapsed(Date.now() - _aiStartedAt);
+  };
+  paint();
+  _aiTimerId = setInterval(paint, 1000);
+}
+
+/** Stops the clock but leaves the final time on screen, which is the useful part. */
+function aiTimerStop() {
+  if (_aiTimerId) clearInterval(_aiTimerId);
+  _aiTimerId = null;
+}
+
 function aiPillShow(text, cls, pct) {
   const el = aiPillEl();
   el.classList.toggle("is-done", cls === "done");
@@ -4916,11 +4953,13 @@ function aiJobStart(label, abort) {
   }
   _aiJob = { label, abort };
   aiPillShow("Generating Report…", null, 0);
+  aiTimerStart();
   return true;
 }
 function aiJobProgress(pct) { if (_aiJob) aiPillShow("Generating Report…", null, pct); }
 function aiJobEnd(state, text) {
   _aiJob = null;
+  aiTimerStop();
   if (state === "done") {
     aiPillShow(text || "Done!", "done");
     setTimeout(() => {

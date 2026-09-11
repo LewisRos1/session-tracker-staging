@@ -3985,6 +3985,12 @@ button.wf-pill:hover { filter: brightness(.93); }
 #ai-report-pill.is-done .ai-pill-ring,
 #ai-report-pill.is-fail .ai-pill-ring { display: none; }
 #ai-report-pill .ai-pill-text { flex: 1; min-width: 0; }
+/* Tabular figures so the clock does not jiggle the text beside it every second. */
+#ai-report-pill .ai-pill-time {
+  flex-shrink: 0; font-variant-numeric: tabular-nums;
+  font-size: .8rem; font-weight: 700; opacity: .75;
+}
+#ai-report-pill .ai-pill-time:empty { display: none; }
 #ai-report-pill .ai-pill-x {
   background: none; border: none; color: rgba(255,255,255,.8);
   font-size: .95rem; cursor: pointer; padding: 0 0 0 .2rem; flex-shrink: 0;
