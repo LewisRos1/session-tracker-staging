@@ -201,7 +201,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2024";
+const APP_VERSION = "2025";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6794,7 +6794,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   paragraphs.push(mkPara(`The therapy team has prepared this report to give you a clear overview of ${firstName}'s development and the areas that need continued attention.`, { before: 120, after: 280, align: AlignmentType.JUSTIFIED }));
 
   paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 0, after: 280 } }));
-  paragraphs.push(mkPara("Overall Progress", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true, pageBreak: true }));
+  paragraphs.push(mkPara("Overall Progress (Arranged Starting From Most Improved)", { heading: HeadingLevel.HEADING_2, before: 0, after: 120, size: 26, bold: true, pageBreak: true }));
   const chartTrendRows = [...trendRows.filter(r => !r.noData)].sort((a, b) => b.delta - a.delta);
   const _wordTargetPos = {};
   (student.targets || []).forEach((t, i) => { _wordTargetPos[t.name] = i; });
