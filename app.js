@@ -201,7 +201,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2019";
+const APP_VERSION = "2020";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -4513,8 +4513,10 @@ async function hyrGenerate() {
   // Drop the previous report's cost as soon as a new one starts, or it reads as
   // the cost of the report currently running. The running total stays.
   renderAiCostLine();
-  const AI_JOB_LABEL = period && typeof period === "object" ? "custom months report" : "half-year report";
-  if (!aiJobStart(AI_JOB_LABEL, () => _hyrAbortController?.abort())) return;
+  const _isCustom = period && typeof period === "object";
+  const AI_JOB_LABEL = _isCustom ? "custom months report" : "half-year report";
+  if (!aiJobStart(AI_JOB_LABEL, () => _hyrAbortController?.abort(),
+      aiDoneText(student, _isCustom ? "Custom Months Report" : "Half Year Report"))) return;
   if (btn) btn.disabled = true;
   if (progress) progress.style.display = "";
   setProgress(5, "");
@@ -4930,26 +4932,35 @@ function aiPillHide() {
   if (el) el.style.display = "none";
 }
 
+/** The name a finished pill shows: "Caden (Custom Months Report)". */
+function aiDoneText(student, reportType) {
+  const short = student?.preferredName || String(student?.name || "").split(" ")[0] || "Report";
+  return `${short} (${reportType})`;
+}
+
 /** Refuses a second job, so two reports cannot bill and download at once. */
-function aiJobStart(label, abort) {
+function aiJobStart(label, abort, doneText) {
   if (_aiJob) {
     alert(`A ${_aiJob.label} is already being generated.\n\nPlease wait for it to finish before starting another.`);
     return false;
   }
-  _aiJob = { label, abort };
+  _aiJob = { label, abort, doneText };
   aiPillShow("Generating Report…", null, 0);
   aiTimerStart();
   return true;
 }
 function aiJobProgress(pct) { if (_aiJob) aiPillShow("Generating Report…", null, pct); }
 function aiJobEnd(state, text) {
+  // "Done!" says nothing once the pill stays put: two reports in a row leave
+  // the same word on screen. Captured before the job is cleared.
+  const doneText = _aiJob?.doneText;
   _aiJob = null;
   aiTimerStop();
   if (state === "done") {
     // Stays until the X is clicked or the next report starts. It carries the
     // final elapsed time, which is worth reading, and a notice that clears
     // itself after six seconds is one you can miss entirely by looking away.
-    aiPillShow(text || "Done!", "done");
+    aiPillShow(text || doneText || "Done!", "done");
   } else if (state === "fail") {
     aiPillShow(text || "Report failed", "fail");   // stays until dismissed
   } else {
@@ -7489,7 +7500,8 @@ async function assessmentGenerate() {
 
   renderAiCostLine();
   const AI_JOB_LABEL = "assessment report";
-  if (!aiJobStart(AI_JOB_LABEL, () => _hyrAbortController?.abort())) return;
+  if (!aiJobStart(AI_JOB_LABEL, () => _hyrAbortController?.abort(),
+      aiDoneText(student, "Assessment Report"))) return;
   if (btn) btn.disabled = true;
   if (progress) progress.style.display = "";
   setProgress(5, "");
@@ -7950,7 +7962,8 @@ async function monthlyGenerate() {
   // the cost of the report currently running. The running total stays.
   renderAiCostLine();
   const AI_JOB_LABEL = "monthly report";
-  if (!aiJobStart(AI_JOB_LABEL, () => _hyrAbortController?.abort())) return;
+  if (!aiJobStart(AI_JOB_LABEL, () => _hyrAbortController?.abort(),
+      aiDoneText(student, "Monthly Report"))) return;
   if (btn) btn.disabled = true;
   if (progress) progress.style.display = "";
   setProgress(5, "");
