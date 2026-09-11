@@ -1818,7 +1818,25 @@ input.field-input::placeholder {
   overflow-y: auto;
   flex: 1;
   min-height: 0;
+  /* This panel is taller than it looks and the fields below the fold are easy
+     to miss, so its scrollbar is deliberately louder than the app's 10px grey
+     default: wider, and the same green as the finished-report pill so it reads
+     as "there is more here" rather than as chrome. Scoped to this panel only. */
+  scrollbar-color: #15803d #e5e7eb;   /* Firefox: thumb, then track */
 }
+.mn-act-panel-body::-webkit-scrollbar { width: 16px; }
+.mn-act-panel-body::-webkit-scrollbar-track {
+  background: #e5e7eb;
+  border-radius: 8px;
+}
+.mn-act-panel-body::-webkit-scrollbar-thumb {
+  background: #15803d;
+  border-radius: 8px;
+  /* Inset the thumb slightly so the track stays visible either side of it. */
+  border: 3px solid #e5e7eb;
+  cursor: default;
+}
+.mn-act-panel-body::-webkit-scrollbar-thumb:hover { background: #166534; }
 .mn-act-panel-foot {
   padding: .75rem 1rem;
   border-top: 1px solid var(--border);
