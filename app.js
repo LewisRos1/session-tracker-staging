@@ -201,7 +201,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2020";
+const APP_VERSION = "2021";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -4932,10 +4932,10 @@ function aiPillHide() {
   if (el) el.style.display = "none";
 }
 
-/** The name a finished pill shows: "Caden (Custom Months Report)". */
+/** The name a finished pill shows: "Done! → Caden (Custom Months Report)". */
 function aiDoneText(student, reportType) {
   const short = student?.preferredName || String(student?.name || "").split(" ")[0] || "Report";
-  return `${short} (${reportType})`;
+  return `Done! → ${short} (${reportType})`;
 }
 
 /** Refuses a second job, so two reports cannot bill and download at once. */
