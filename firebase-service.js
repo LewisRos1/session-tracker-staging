@@ -208,11 +208,49 @@ export async function getOrCreateTodaySession(studentId, targets = []) {
 // live on every render, which would mean re-scanning a student's entire
 // history just to open a session.
 
+/**
+ * Does this session hold anything a person actually recorded?
+ *
+ * Opening a date creates the session document immediately, so backing out
+ * without typing leaves an empty one behind. Those are cleaned up, but only
+ * when the Start Session date picker is next opened for that student, so
+ * between those two moments the document is real and anything counting
+ * documents counts a session that never happened. Every screen that asks
+ * "how many sessions" has to ask this instead.
+ *
+ * `targetNames`, when given, restricts the answer to remarks under targets the
+ * student still has - what the calendar wants, since a tick should not appear
+ * for a day whose only data sits under a deleted target.
+ */
+export function sessionHasRealData(sess, targetNames = null) {
+  const strip = t => String(t || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
+  if (Object.values(sess.fedcComments || {}).some(c => strip(c).length > 0)) return true;
+  return Object.values(sess.remarks || {}).some(r => {
+    if (targetNames) {
+      const act = (sess.activities || {})[r.activityId];
+      if (!act || !targetNames.has(act.targetName)) return false;
+    }
+    const text   = strip(r.text);
+    const note   = strip(r.masteryNote);
+    const trials = (r.trials || []).some(t => t !== null && t !== -1);
+    const opt    = r.optionScore !== undefined && r.optionScore !== null;
+    const sel    = (r.selectedOptions || []).length > 0;
+    const score  = r.score !== undefined && r.score !== null && r.score !== "";
+    // "Maintain" is auto-filled for a maintained activity every session, into
+    // text for a Notes-Only activity and into masteryNote for a structured one.
+    // On its own it is the app writing, not a person, so it is not data.
+    if (((text === "Maintain" && !note) || (note === "Maintain" && !text))
+        && !trials && !opt && !sel && !score) return false;
+    return text.length > 0 || note.length > 0 || trials || opt || sel || score;
+  });
+}
+
 /** All of one student's individual sessions, unsorted. */
 export async function getIndividualSessionsForStudent(studentId) {
   const snap = await getDocs(query(collection(db, "sessions"), where("studentId", "==", studentId)));
   return snap.docs.map(d => ({
-    id: d.id, date: d.data().date, kind: "individual", number: d.data().sessionNumber
+    id: d.id, date: d.data().date, kind: "individual", number: d.data().sessionNumber,
+    hasData: sessionHasRealData(d.data())
   }));
 }
 
@@ -220,7 +258,8 @@ export async function getIndividualSessionsForStudent(studentId) {
 export async function getGroupSessionsForStudent(studentId) {
   const snap = await getDocs(query(collection(db, "sessions"), where("attendeeIds", "array-contains", studentId)));
   return snap.docs.map(d => ({
-    id: d.id, date: d.data().date, kind: "group", number: (d.data().attendeePersonalSessionNumbers || {})[studentId]
+    id: d.id, date: d.data().date, kind: "group", number: (d.data().attendeePersonalSessionNumbers || {})[studentId],
+    hasData: sessionHasRealData(d.data())
   }));
 }
 

@@ -96,6 +96,7 @@ import {
   onAuthChange,
   generateId,
   getIndividualSessionsForStudent,
+  sessionHasRealData,
   getGroupSessionsForStudent,
   getAllSessionsForStudent,
   getAllSessionsForGroup,
@@ -200,7 +201,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2015";
+const APP_VERSION = "2016";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -4192,10 +4193,16 @@ function renderHalfYearReportsSection() {
     if (!studentId) return;
     loading.style.display = "";
     try {
-      [_hyrIndivSessions, _hyrGroupSessions] = await Promise.all([
+      // Only sessions somebody actually recorded something in. Opening a date
+      // and backing out leaves an empty document behind, and it survives until
+      // the Start Session date picker is next opened for this student, so
+      // counting documents put a phantom session under a month nobody worked.
+      const [_allIndiv, _allGroup] = await Promise.all([
         getIndividualSessionsForStudent(studentId).catch(() => []),
         getGroupSessionsForStudent(studentId).catch(() => [])
       ]);
+      _hyrIndivSessions = _allIndiv.filter(s => s.hasData);
+      _hyrGroupSessions = _allGroup.filter(s => s.hasData);
       const hasIndiv = _hyrIndivSessions.length > 0;
       const hasGroup = _hyrGroupSessions.length > 0;
       const sel = $("hyr-session-type-select");
@@ -9735,28 +9742,7 @@ function showStudentChoice(student) {
         sessionsFetch
           .then(sessions => {
             const curTgtNames = new Set((student.targets || []).map(t => t.name));
-            const stripE = s => (s || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/ /g, " ").trim();
-            const hasData = s => {
-              if (Object.values(s.fedcComments || {}).some(c => stripE(c).length > 0)) return true;
-              return Object.values(s.remarks || {}).some(r => {
-                const act = (s.activities || {})[r.activityId];
-                if (!act || !curTgtNames.has(act.targetName)) return false;
-                const rText = stripE(r.text);
-                const rNote = stripE(r.masteryNote);
-                const rTrials = (r.trials || []).some(t => t !== null && t !== -1);
-                const rOpt = r.optionScore !== undefined && r.optionScore !== null;
-                const rSel = (r.selectedOptions || []).length > 0;
-                const rScore = r.score !== undefined && r.score !== null && r.score !== "";
-                // "Maintain" is auto-filled for a maintained activity every session: into
-                // text for a Notes-Only activity, into masteryNote for a structured one.
-                // Only the text case was checked, so a maintained activity with trials or a
-                // score put its auto-fill in the note, counted as real data, and left a tick
-                // on the calendar for a day nobody worked. Both fields now count as auto-fill.
-                if (((rText === "Maintain" && !rNote) || (rNote === "Maintain" && !rText))
-                    && !rTrials && !rOpt && !rSel && !rScore) return false;
-                return rText.length > 0 || rNote.length > 0 || rTrials || rOpt || rSel || rScore;
-              });
-            };
+            const hasData = s => sessionHasRealData(s, curTgtNames);
             const empties = sessions.filter(s => !hasData(s));
             empties.forEach(s => deleteSession(s.id).catch(() => {}));
             if (empties.length > 0) resequenceIndividualSessions(student.id).catch(() => {});
