@@ -201,7 +201,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2021";
+const APP_VERSION = "2022";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -4598,11 +4598,17 @@ EVERY POINT IS A SHORT LABEL, THEN TWO SENTENCES:
   1. What ${PRON.subj} did. Plain, direct, natural English.
   2. What has CHANGED IN ${firstName}: the ability ${PRON.subj} now has, or is beginning to have.
 
-SENTENCE 1 IS SHORT. It names ONE thing ${PRON.subj} did and stops. A reader has to be able to hold it in their head after reading it once, and a sentence that stacks the action, the trigger, a comparison and a duration on top of each other cannot be held at all. Where a comparison with how it used to be belongs, it is a SHORT trailing clause, not a second half of the sentence.
-  TOO MUCH IN ONE SENTENCE, nothing sticks: "Caden now calms down after being offered a choice or a short wait when something upsets him, a marked change from earlier in the year when a similar upset lasted 45 minutes on and off with no response to comforting."
-  RIGHT, one action, one short comparison: "Caden now calms down when he is offered a choice, where in March one upset lasted 45 minutes on and off."
+EVERYDAY LANGUAGE IN THIS SECTION TOO. The WRITING STYLE word list in the GLOBAL RULES above does NOT apply to these points. Write them the way a teacher speaks to a parent at the door. "An earlier upset" is not a thing anyone says out loud, and neither is "a marked change from earlier in the year".
 
-SENTENCE 2 NAMES A CHANGE IN THE CHILD, NOT A PLACE THE SKILL MIGHT BE HANDY. This is the whole difference between a line that lands as true and one that sounds invented.
+SENTENCE 1 IS SHORT. It names ONE thing ${PRON.subj} did and stops. A reader has to be able to hold it in their head after reading it once, and a sentence that stacks the action, the trigger, a comparison and a duration on top of each other cannot be held at all.
+
+WHERE THE POINT IS AN IMPROVEMENT, WRITE IT AS THEN AND NOW, WITH A MONTH ON EACH. Do not squeeze the comparison into one sentence, and do not gesture at the past with "an earlier upset". MONTHS BELONG IN THIS SECTION: unlike the Weakness lines under each chart, these points exist to show progress, and the months are what show it. For a then-and-now point the two sentences are the then and the now, and no third sentence is needed.
+  WRONG, one crammed sentence with a vague back-reference: "Caden calmed down within a few minutes after being helped to join a group game he had been waiting for, unlike an earlier upset that lasted 45 minutes on and off."
+  WRONG, the same fault dressed differently: "Caden now calms down after being offered a choice or a short wait when something upsets him, a marked change from earlier in the year when a similar upset lasted 45 minutes on and off with no response to comforting."
+  RIGHT, then and now, a month on each: "In March, Caden took 45 minutes to calm down after getting upset. In July, he only needed a few minutes, after being helped to join a group game."
+  NEVER a vague back-reference: "an earlier upset", "a previous occasion", "before", "at the start", "earlier in the year". Name the month.
+
+SENTENCE 2 NAMES A CHANGE IN THE CHILD, NOT A PLACE THE SKILL MIGHT BE HANDY. This is the whole difference between a line that lands as true and one that sounds invented. It does not apply to a then-and-now point, where sentence 2 is the "now" and the change is already plain from the two months.
   RIGHT: "This means ${PRON.subj} is beginning to manage strong feelings on ${PRON.poss} own, a skill that will help ${PRON.obj} cope during stressful moments outside of sessions."
   RIGHT: "Suggesting that ${PRON.poss} attention to detail and number sense are strong enough to support more advanced maths work."
   RIGHT: "A sign that this daily task has become automatic for ${PRON.obj}, leaving more of ${PRON.poss} attention free for harder parts of ${PRON.poss} work."
