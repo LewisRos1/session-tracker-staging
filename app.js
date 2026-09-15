@@ -201,7 +201,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2028";
+const APP_VERSION = "2029";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -7321,6 +7321,8 @@ ${collected.text}
 }
 
 async function assessmentDownloadWord(effectiveStudent, student, collected, parsed, PRON) {
+  // Same short name the prompt uses, so the document and the writing agree.
+  const firstName = student.preferredName || student.name.split(" ")[0];
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun, LevelFormat,
           Table, TableRow, TableCell, WidthType, SectionType, Header, Footer, PageNumber } = window.docx;
 
@@ -14071,6 +14073,10 @@ async function handleCheckedByClick(e, isGroup) {
   const setTimer     = fn  => { const t = setTimeout(fn, 4000); if (isGroup) _grpChkConfirmTimer = t; else _viewChkConfirmTimer = t; };
   const rerender     = ()  => isGroup ? renderGroupSessionView() : renderSessionView();
   const getSid       = ()  => isGroup ? state.viewGroupSessionId  : state.viewSessionId;
+  // Used by the phase-3 "tasks remain" message below. It was reaching for a
+  // helper of the same name defined inside a different function, so that
+  // message threw a ReferenceError instead of appearing.
+  const instName     = id  => (INSTRUCTORS.find(i => i.id === id) || { name: id }).name;
   const getData      = ()  => isGroup ? state.viewGroupSessionData : state.viewSessionData;
   const getSubjectMeta = () => {
     const data = getData();
