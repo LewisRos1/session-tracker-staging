@@ -201,7 +201,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2032";
+const APP_VERSION = "2033";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6925,7 +6925,11 @@ function assessmentDrawDayChart(scored, days, title) {
   // canvas width, the width comes from the slot, and the left padding comes
   // from the angled label length, which comes from the font size. Settled by
   // running the same pass until the gap stops growing.
-  let gap = 7, padL = 52, inner = 0, slot = 0, W = 0, F_BODY = 0, labelMax = 0, drop = 0;
+  // Zero: the two bars of a target sit flush against each other, so a target
+  // reads as one block and the 28px between targets does all the separating.
+  // The solver below only lifts this off zero if the values would collide,
+  // which dropping the "%" from them is what prevents.
+  let gap = 0, padL = 52, inner = 0, slot = 0, W = 0, F_BODY = 0, labelMax = 0, drop = 0;
   const layout = () => {
     inner = days.length * barW + (days.length - 1) * gap;
     // The space BETWEEN targets has to read as clearly larger than the space
@@ -6967,7 +6971,7 @@ function assessmentDrawDayChart(scored, days, title) {
   // can take a few rounds to settle. The width limit below is the real guard.
   for (let pass = 0; pass < 6 && !fitted; pass++) {
     measure.font = `bold ${F_BODY}px Arial`;
-    const need = Math.ceil(measure.measureText("100%").width + 8) - barW;
+    const need = Math.ceil(measure.measureText("100").width + 4) - barW;
     if (need <= gap) { fitted = true; break; }
     gap = need;
     layout();
@@ -6989,7 +6993,7 @@ function assessmentDrawDayChart(scored, days, title) {
   // day count that cannot be made to fit still needs the labels separated
   // rather than overlapping.
   measure.font = `bold ${F_BODY}px Arial`;
-  const stagger = days.length > 1 && measure.measureText("100%").width + 8 > (barW + gap);
+  const stagger = days.length > 1 && measure.measureText("100").width + 4 > (barW + gap);
   const lift = stagger ? F_BODY + 6 : 0;
 
   const PAD = {
@@ -7032,7 +7036,7 @@ function assessmentDrawDayChart(scored, days, title) {
         ctx.fillStyle = ASSESS_DAY_COLORS[di % ASSESS_DAY_COLORS.length];
         ctx.fillRect(x, base - h, barW, h);
         ctx.fillStyle = "#111827"; ctx.font = `bold ${F_BODY}px Arial`; ctx.textAlign = "center";
-        ctx.fillText(`${v}%`, x + barW / 2, base - h - 6 - ((stagger && di % 2 === 1) ? lift : 0));
+        ctx.fillText(`${v}`, x + barW / 2, base - h - 6 - ((stagger && di % 2 === 1) ? lift : 0));
       }
       x += barW + gap;
     });
@@ -7043,7 +7047,7 @@ function assessmentDrawDayChart(scored, days, title) {
   ctx.save();
   ctx.translate(Math.max(Math.round(F_BODY), PAD.left - Math.round(F_BODY * 1.5)), PAD.top + PLOT_H / 2); ctx.rotate(-Math.PI / 2);
   ctx.font = `bold ${F_BODY}px Arial`; ctx.fillStyle = "#111827"; ctx.textAlign = "center";
-  ctx.fillText("Score", 0, 0);
+  ctx.fillText("Score (%)", 0, 0);
   ctx.restore();
   ctx.font = `bold ${F_BODY}px Arial`; ctx.fillStyle = "#111827"; ctx.textAlign = "center";
   ctx.fillText("Target", W / 2, base + drop + Math.round(F_BODY * 0.9));
@@ -7118,7 +7122,7 @@ function assessmentDrawAvgChart(scored, title) {
     ctx.fillStyle = ASSESS_AVG_COLOR;
     ctx.fillRect(cx - barW / 2, base - h, barW, h);
     ctx.fillStyle = "#111827"; ctx.font = `bold ${F_BODY}px Arial`; ctx.textAlign = "center";
-    ctx.fillText(`${r.avg}%`, cx, base - h - 6);
+    ctx.fillText(`${r.avg}`, cx, base - h - 6);
     ctx.font = `${F_BODY}px Arial`; ctx.fillStyle = "#374151";
     assessDrawAngledLabel(ctx, r.target, cx, base + 16, labelMax);
   });
@@ -7126,7 +7130,7 @@ function assessmentDrawAvgChart(scored, title) {
   ctx.save();
   ctx.translate(Math.max(Math.round(F_BODY), PAD.left - Math.round(F_BODY * 1.5)), PAD.top + PLOT_H / 2); ctx.rotate(-Math.PI / 2);
   ctx.font = `bold ${F_BODY}px Arial`; ctx.fillStyle = "#111827"; ctx.textAlign = "center";
-  ctx.fillText("Score", 0, 0);
+  ctx.fillText("Score (%)", 0, 0);
   ctx.restore();
   ctx.font = `bold ${F_BODY}px Arial`; ctx.fillStyle = "#111827"; ctx.textAlign = "center";
   ctx.fillText("Target", W / 2, base + drop + Math.round(F_BODY * 0.9));
