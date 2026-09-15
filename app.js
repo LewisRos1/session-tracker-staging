@@ -201,7 +201,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2031";
+const APP_VERSION = "2032";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6928,7 +6928,16 @@ function assessmentDrawDayChart(scored, days, title) {
   let gap = 7, padL = 52, inner = 0, slot = 0, W = 0, F_BODY = 0, labelMax = 0, drop = 0;
   const layout = () => {
     inner = days.length * barW + (days.length - 1) * gap;
-    slot  = Math.max(76, inner + 18);
+    // The space BETWEEN targets has to read as clearly larger than the space
+    // between the two bars WITHIN one target, or the pairs stop looking like
+    // pairs and the whole row runs together. At 18 against a 13 gap they were
+    // near enough identical. The average chart, which nobody has complained
+    // about, sits at 42 between 34-wide bars, so this is the same proportion.
+    // A FIXED amount, deliberately not derived from `gap`. Tying the two
+    // together made widening the gap widen the group padding, which widened
+    // the canvas, which enlarged the font and asked for more gap again: the
+    // solver below then could not converge on the commonest chart of all.
+    slot  = Math.max(76, inner + 28);
     W     = Math.max(560, padL + 30 + slot * scored.length);
     F_BODY = assessFontPx(ASSESS_BODY_PT, W);
     labelMax = Math.round(F_BODY * 8.5);
@@ -6953,7 +6962,10 @@ function assessmentDrawDayChart(scored, days, title) {
   layout();
   const W_LIMIT = Math.round(W * 1.25);
   let fitted = days.length < 2;
-  for (let pass = 0; pass < 3 && !fitted; pass++) {
+  // Six passes, not three. The label width is measured in the browser rather
+  // than predicted here, and the font size steps in whole pixels, so the gap
+  // can take a few rounds to settle. The width limit below is the real guard.
+  for (let pass = 0; pass < 6 && !fitted; pass++) {
     measure.font = `bold ${F_BODY}px Arial`;
     const need = Math.ceil(measure.measureText("100%").width + 8) - barW;
     if (need <= gap) { fitted = true; break; }
@@ -7030,10 +7042,10 @@ function assessmentDrawDayChart(scored, days, title) {
 
   ctx.save();
   ctx.translate(Math.max(Math.round(F_BODY), PAD.left - Math.round(F_BODY * 1.5)), PAD.top + PLOT_H / 2); ctx.rotate(-Math.PI / 2);
-  ctx.font = `bold ${F_BODY}px Arial`; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
+  ctx.font = `bold ${F_BODY}px Arial`; ctx.fillStyle = "#111827"; ctx.textAlign = "center";
   ctx.fillText("Score", 0, 0);
   ctx.restore();
-  ctx.font = `bold ${F_BODY}px Arial`; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
+  ctx.font = `bold ${F_BODY}px Arial`; ctx.fillStyle = "#111827"; ctx.textAlign = "center";
   ctx.fillText("Target", W / 2, base + drop + Math.round(F_BODY * 0.9));
 
   ctx.font = `${F_BODY}px Arial`;
@@ -7113,10 +7125,10 @@ function assessmentDrawAvgChart(scored, title) {
 
   ctx.save();
   ctx.translate(Math.max(Math.round(F_BODY), PAD.left - Math.round(F_BODY * 1.5)), PAD.top + PLOT_H / 2); ctx.rotate(-Math.PI / 2);
-  ctx.font = `bold ${F_BODY}px Arial`; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
+  ctx.font = `bold ${F_BODY}px Arial`; ctx.fillStyle = "#111827"; ctx.textAlign = "center";
   ctx.fillText("Score", 0, 0);
   ctx.restore();
-  ctx.font = `bold ${F_BODY}px Arial`; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
+  ctx.font = `bold ${F_BODY}px Arial`; ctx.fillStyle = "#111827"; ctx.textAlign = "center";
   ctx.fillText("Target", W / 2, base + drop + Math.round(F_BODY * 0.9));
 
   return { base64: canvas.toDataURL("image/png").split(",")[1], width: W, height: H };
@@ -7492,7 +7504,9 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
     `${student.name} (Average of ${nDays} Day${nDays === 1 ? "" : "s"})`);
   // 6.25in x 4.4in each, at 96dpi, so both fit on the one page. The canvases
   // are drawn to this exact ratio, so fixing both dimensions distorts nothing.
-  for (const chart of [dayChart, avgChart]) {
+  // Average first: it is the summary, and the per-day chart is the detail
+  // behind it.
+  for (const chart of [avgChart, dayChart]) {
     if (!chart) continue;
     paragraphs.push(new Paragraph({
       children: [new ImageRun({ data: b64ToUint8(chart.base64),
