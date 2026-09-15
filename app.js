@@ -201,7 +201,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2027";
+const APP_VERSION = "2028";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6157,19 +6157,30 @@ function hyrParseAiResponse(text) {
   for (const m of text.matchAll(/===OBSERVED:\s*([^=\n]+?)\s*===\s*([\s\S]*?)\s*(?====END===|===OBSERVATION:|===OBSERVED:|===ACTION_PLAN|===EVIDENCE|$)/g)) {
     if (m[2].trim()) out.observed[m[1].trim()] = m[2].trim();
   }
-  const plan = text.match(/===ACTION_PLAN===\s*([\s\S]*?)\s*===END===/);
-  if (plan) {
-    let section = null;
-    for (const line of plan[1].split("\n")) {
-      const t = line.trim();
-      if (t.startsWith("FOCUS_AREAS:")) { section = "focus"; continue; }
-      if (t.startsWith("RECOMMENDATIONS:")) { section = "rec"; continue; }
-      const numbered = t.match(/^(\d+)\.\s+(.+)/);
-      if (numbered) {
-        if (section === "focus") out.focusAreas.push(numbered[2].trim());
-        else if (section === "rec") out.recommendations.push(numbered[2].trim());
-      }
-    }
+  const plan = parseActionPlan(text);
+  out.focusAreas = plan.focusAreas;
+  out.recommendations = plan.recommendations;
+  return out;
+}
+
+/**
+ * The ===ACTION_PLAN=== block, shared by the half-year, Custom Months and
+ * assessment reports. One definition so the three cannot drift: they print the
+ * same two lists under the same heading and differ only in what the data says.
+ */
+function parseActionPlan(text) {
+  const out = { focusAreas: [], recommendations: [] };
+  const plan = String(text || "").match(/===ACTION_PLAN===\s*([\s\S]*?)\s*===END===/);
+  if (!plan) return out;
+  let section = null;
+  for (const line of plan[1].split("\n")) {
+    const t = line.trim();
+    if (t.startsWith("FOCUS_AREAS:")) { section = "focus"; continue; }
+    if (t.startsWith("RECOMMENDATIONS:")) { section = "rec"; continue; }
+    const numbered = t.match(/^(\d+)\.\s+(.+)/);
+    if (!numbered) continue;
+    if (section === "focus") out.focusAreas.push(numbered[2].trim());
+    else if (section === "rec") out.recommendations.push(numbered[2].trim());
   }
   return out;
 }
@@ -7101,7 +7112,7 @@ const ASSESS_FRAMEWORK = [
 
 /** Pulls the per-target strengths/weaknesses and the recommendations out. */
 function assessmentParseAiResponse(text) {
-  const out = { targets: {}, recommendations: [] };
+  const out = { targets: {}, focusAreas: [], recommendations: [] };
   for (const m of text.matchAll(/===TARGET:\s*([^=]+?)===\s*([\s\S]*?)\s*===END===/g)) {
     const name = m[1].trim();
     const body = m[2];
@@ -7113,12 +7124,9 @@ function assessmentParseAiResponse(text) {
     };
     out.targets[name] = { strengths: grab("Strengths"), weaknesses: grab("Weaknesses") };
   }
-  const rec = text.match(/===RECOMMENDATIONS===\s*([\s\S]*?)\s*===END===/);
-  if (rec) {
-    out.recommendations = rec[1].split("\n")
-      .map(l => l.trim().replace(/^[-•*]\s*/, "").replace(/^\d+[.)]\s*/, "").trim())
-      .filter(Boolean);
-  }
+  const plan = parseActionPlan(text);
+  out.focusAreas = plan.focusAreas;
+  out.recommendations = plan.recommendations;
   return out;
 }
 
@@ -7221,23 +7229,30 @@ RULES FOR EVERY TARGET BLOCK:
 - NEVER invent. If a target has no recorded remarks, both lists are "None noted during this assessment."
 - Do not repeat the same observation across two different targets.
 
-===RECOMMENDATIONS===
-[Write EXACTLY 6 recommendations, no more and no fewer, drawn from what this assessment actually showed.
+===ACTION_PLAN===
+Review everything this assessment recorded for ${firstName}, across every target. Identify the most important areas to work on and the most helpful strategies.
 
-EACH ONE IS TWO SENTENCES IN THIS ORDER:
-  1. The DIFFICULTY. Name the specific thing ${firstName} found hard, taken from the session remarks. Start with what was seen, not with what to do.
-  2. The RECOMMENDATION that answers that exact difficulty. One clear, actionable sentence.
+ORDER BOTH LISTS BY IMPORTANCE, most important first. The first point in each list is the single thing that matters most for ${firstName}, judged by how often it appears in the assessment and how much it affects the rest of ${PRON.poss} learning. Do not order them by target, alphabetically, or by the order the targets appear in the data.
 
-Right: "${firstName} relied on gestures rather than words to show what he wanted during imaginary play. Give him repeated chances to pair a word with each gesture during play he already enjoys, so the word carries the meaning instead of the gesture."
-Wrong, recommendation with no difficulty behind it: "Provide continued opportunities to practise using words alongside gestures."
+Write 4 to 7 FOCUS AREAS, never fewer than 4. Each uses this format: [2-4 word label]: [one concise sentence naming a specific difficulty or gap this assessment showed.] Do not group by target name: write each point as a standalone observation.
 
-Order them most important first, judged by how much the difficulty affects the rest of ${PRON.poss} learning. Never invent a difficulty to justify a recommendation: every one must trace to something actually recorded. Plain everyday language throughout.]
-1. [difficulty. recommendation]
-2. [difficulty. recommendation]
-3. [difficulty. recommendation]
-4. [difficulty. recommendation]
-5. [difficulty. recommendation]
-6. [difficulty. recommendation]
+Then write 4 to 7 RECOMMENDATIONS, never fewer than 4. Each uses this format: [2-4 word label]: [one clear actionable sentence.] They do not need to pair with the focus areas above.
+
+An assessment covers only a few days, so there is genuinely less to draw on than in a term report. NEVER invent a difficulty and NEVER pad a list to reach a number: every focus area must trace to something actually recorded. Four real points beat seven with three invented.
+
+This is a baseline assessment, not a progress report. Describe what was seen, never whether it improved.
+
+Plain everyday language throughout.
+
+Format EXACTLY as:
+FOCUS_AREAS:
+1. [label]: [focus area sentence]
+2. [label]: [focus area sentence]
+...
+RECOMMENDATIONS:
+1. [label]: [recommendation sentence]
+2. [label]: [recommendation sentence]
+...
 ===END===
 
 ASSESSMENT DATA:
@@ -7480,14 +7495,37 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
   });
 
   // ── Page 4: Section 3 ──
-  paragraphs.push(mkPara("Section 3: Recommendations", { heading: HeadingLevel.HEADING_1, before: 0, after: 200, pageBreak: true, size: 32, bold: true }));
-  const recs = parsed.recommendations.length ? parsed.recommendations
+  paragraphs.push(mkPara("Section 3: Focus Areas & Recommendations", { heading: HeadingLevel.HEADING_1, before: 0, after: 160, pageBreak: true, size: 32, bold: true }));
+  paragraphs.push(new Paragraph({
+    children: [new TextRun({ text: `This section outlines the key areas requiring the most attention, and practical recommendations to support ${firstName}'s development going forward.`, size: 22 })],
+    spacing: { before: 0, after: 200, ...LS }
+  }));
+
+  // Same two lists, same order and same styling as the half-year and Custom
+  // Months reports: the label in bold, the recommendations in grey. Each list
+  // has its own numbering reference so both start at 1.
+  const apList = (items, ref, grey) => items.forEach((pt, i) => {
+    const c = pt.replace(/\*\*/g, "");
+    const ci = c.indexOf(": ");
+    const tint = grey ? { color: "6b7280" } : {};
+    const runs = ci > 0
+      ? [new TextRun({ text: c.slice(0, ci), bold: true, size: 22, ...tint }),
+         new TextRun({ text: ": " + c.slice(ci + 2), size: 22, ...tint })]
+      : [new TextRun({ text: c, size: 22, ...tint })];
+    paragraphs.push(new Paragraph({
+      numbering: { reference: ref, level: 0 }, children: runs,
+      alignment: AlignmentType.BOTH, spacing: { before: i === 0 ? 0 : 60, after: 60, ...LS }
+    }));
+  });
+
+  if (parsed.focusAreas?.length) {
+    paragraphs.push(mkPara("Focus Areas", { heading: HeadingLevel.HEADING_2, before: 360, after: 100, size: 26, bold: true }));
+    apList(parsed.focusAreas, "assess-focus", false);
+  }
+  const recs = parsed.recommendations?.length ? parsed.recommendations
     : ["No recommendations were generated. Please review the assessment data."];
-  recs.forEach(t => paragraphs.push(new Paragraph({
-    numbering: { reference: "assess-numbers", level: 0 },
-    children: [new TextRun({ text: t, size: 22, color: "6b7280" })],
-    alignment: AlignmentType.BOTH, spacing: { before: 40, after: 40, ...LS }
-  })));
+  paragraphs.push(mkPara("Recommendations", { heading: HeadingLevel.HEADING_2, before: 480, after: 100, size: 26, bold: true }));
+  apList(recs, "assess-rec", true);
 
   // Enrichment programme note, sitting between the recommendations and the
   // stamp with a blank line either side.
@@ -7545,7 +7583,12 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
         reference: "assess-numbers",
         levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT,
           style: { paragraph: { indent: { left: 720, hanging: 360 } }, run: { size: 22 } } }]
-      }
+      },
+      ...["assess-focus", "assess-rec"].map(reference => ({
+        reference,
+        levels: [{ level: 0, format: LevelFormat?.DECIMAL ?? "decimal", text: "%1.", alignment: AlignmentType.LEFT,
+          style: { paragraph: { indent: { left: 720, hanging: 360 } }, run: { size: 22 } } }]
+      }))
     ] },
     sections: [{
       properties: { type: SectionType?.NEXT_PAGE ?? "nextPage" },
