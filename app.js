@@ -201,7 +201,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2029";
+const APP_VERSION = "2030";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6185,6 +6185,21 @@ function parseActionPlan(text) {
   return out;
 }
 
+/**
+ * A Student Details value, or a green prompt where the app cannot know it.
+ * Date of birth, age and assessment hours are filled in by hand after the
+ * document is generated, and an empty cell is easy to hand to a parent without
+ * noticing. Green because it means "type here": red is kept for the separate
+ * case of the AI failing to produce a section, which is a fault, not a task.
+ */
+function mkDetailValueRun(value) {
+  const { TextRun } = window.docx;
+  const t = String(value == null ? "" : value).trim();
+  return t
+    ? new TextRun({ text: t, size: 22 })
+    : new TextRun({ text: "[Please Enter Text]", bold: true, size: 22, highlight: "green" });
+}
+
 async function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData, chartData, sessionType = "individual") {
   const firstName   = student.preferredName || student.name.split(" ")[0];
   const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
@@ -6407,7 +6422,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     new TableCell({
       width: { size: 70, type: WidthType.PERCENTAGE },
       margins: { top: 60, bottom: 60, left: 120, right: 120 },
-      children: [new Paragraph({ run: { size: 22 }, children: [new TextRun({ text: value, size: 22 })], spacing: { before: 40, after: 40 } })]
+      children: [new Paragraph({ run: { size: 22 }, children: [mkDetailValueRun(value)], spacing: { before: 40, after: 40 } })]
     })
   ]});
   paragraphs.push(new Table({
@@ -7369,7 +7384,7 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
     new TableCell({
       width: { size: 70, type: WidthType.PERCENTAGE },
       margins: { top: 60, bottom: 60, left: 120, right: 120 },
-      children: [new Paragraph({ children: [new TextRun({ text: value, size: 22 })], spacing: { before: 40, after: 40 } })]
+      children: [new Paragraph({ children: [mkDetailValueRun(value)], spacing: { before: 40, after: 40 } })]
     })
   ]});
   paragraphs.push(new Table({
@@ -7391,7 +7406,7 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
   paragraphs.push(new Paragraph({
     children: [
       new TextRun({ text: `Dr Khoo Chai Soon has referred ${student.name} for therapy. ${Cap(PRON.subj)} has a diagnosis of `, size: 22 }),
-      new TextRun({ text: "[Please Enter Diagnosis]", size: 22, bold: true, highlight: "red" })
+      new TextRun({ text: "[Please Enter Diagnosis]", size: 22, bold: true, highlight: "green" })
     ],
     alignment: AlignmentType.BOTH, spacing: { before: 0, after: 160, ...LS }
   }));
