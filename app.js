@@ -201,7 +201,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2030";
+const APP_VERSION = "2031";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6919,36 +6919,71 @@ function assessmentDrawDayChart(scored, days, title) {
   if (!scored.length || !days.length) return null;
   const SCALE = 2;
   const barW = days.length <= 2 ? 26 : days.length === 3 ? 19 : 14;
-  const gap  = 7;
-  const inner = days.length * barW + (days.length - 1) * gap;
-  const slot = Math.max(76, inner + 18);
+  const measure = document.createElement("canvas").getContext("2d");
 
-  // Width first, because every font size is derived from it. One pass at a
-  // provisional left padding, then again once the label budget is known.
-  let padL = 52;
-  let W = Math.max(560, padL + 30 + slot * scored.length);
-  let F_BODY = assessFontPx(ASSESS_BODY_PT, W);
-  const labelMax = Math.round(F_BODY * 8.5);
-  const drop = Math.round(labelMax * 0.7071) + 14;
-  padL = Math.max(52, Math.round(24 + labelMax * 0.7071 - slot / 2));
-  W = Math.max(560, padL + 30 + slot * scored.length);
-  F_BODY = assessFontPx(ASSESS_BODY_PT, W);
+  // Every one of these depends on the other two: the font size comes from the
+  // canvas width, the width comes from the slot, and the left padding comes
+  // from the angled label length, which comes from the font size. Settled by
+  // running the same pass until the gap stops growing.
+  let gap = 7, padL = 52, inner = 0, slot = 0, W = 0, F_BODY = 0, labelMax = 0, drop = 0;
+  const layout = () => {
+    inner = days.length * barW + (days.length - 1) * gap;
+    slot  = Math.max(76, inner + 18);
+    W     = Math.max(560, padL + 30 + slot * scored.length);
+    F_BODY = assessFontPx(ASSESS_BODY_PT, W);
+    labelMax = Math.round(F_BODY * 8.5);
+    drop = Math.round(labelMax * 0.7071) + 14;
+    padL = Math.max(52, Math.round(24 + labelMax * 0.7071 - slot / 2));
+  };
+
+  // WIDEN THE BARS APART UNTIL THE VALUES FIT SIDE BY SIDE. A label is centred
+  // on its bar, so two neighbours clear each other only when the widest label
+  // plus breathing room fits inside barW + gap. Left to fail, every second
+  // label was lifted a line higher to dodge its neighbour, which put a short
+  // bar's value floating well above the bar it belonged to.
+  //
+  // ONLY WHERE IT SETTLES CHEAPLY. Each unit added to the gap widens the
+  // canvas by (days - 1) x targets, which enlarges the font, which widens the
+  // label, which asks for more gap. On two days that converges in one step and
+  // costs about 5% of width. On four it runs away: a 4-day, 8-target chart
+  // reaches 16,000px and still does not fit. Where it does not settle, the
+  // compact layout with staggered labels IS the right answer, so the gap goes
+  // back to where it started.
+  const GAP_BASE = gap, PADL_BASE = padL;
+  layout();
+  const W_LIMIT = Math.round(W * 1.25);
+  let fitted = days.length < 2;
+  for (let pass = 0; pass < 3 && !fitted; pass++) {
+    measure.font = `bold ${F_BODY}px Arial`;
+    const need = Math.ceil(measure.measureText("100%").width + 8) - barW;
+    if (need <= gap) { fitted = true; break; }
+    gap = need;
+    layout();
+    if (W > W_LIMIT) break;
+  }
+  if (fitted) {
+    layout();
+  } else {
+    // Put it back exactly as it was before the attempt, including the padding,
+    // and run the same two passes the chart has always run. Settling the
+    // padding further would leave a chart that cannot fit its labels rendering
+    // ~8% wider than before, which is a change nobody asked for.
+    gap = GAP_BASE; padL = PADL_BASE;
+    layout(); layout();
+  }
   const F_TITLE = assessFontPx(ASSESS_TITLE_PT, W);
 
-  // Decide the stagger before sizing the canvas. A lifted label needs its own
-  // band of top padding, or a 100% bar's label is drawn over the title.
-  const measure = document.createElement("canvas").getContext("2d");
+  // Kept as a backstop only. With the gap solved above this is false, but a
+  // day count that cannot be made to fit still needs the labels separated
+  // rather than overlapping.
   measure.font = `bold ${F_BODY}px Arial`;
-  // A label is centred on its bar, so two neighbours clear each other only if
-  // the widest label plus breathing room fits inside barW + gap. Measuring
-  // without that margin let a 38px label sit in a 33px pitch and touch.
   const stagger = days.length > 1 && measure.measureText("100%").width + 8 > (barW + gap);
   const lift = stagger ? F_BODY + 6 : 0;
 
   const PAD = {
     top: Math.round(F_TITLE * 1.8 + F_BODY + lift + 18),
     right: 30,
-    bottom: drop + Math.round(F_BODY * 4.4),
+    bottom: drop + Math.round(F_BODY * 3.7),
     left: padL
   };
   // Both charts are placed at a fixed 6.25in x 4.4in so the two fit on one
@@ -6994,19 +7029,19 @@ function assessmentDrawDayChart(scored, days, title) {
   });
 
   ctx.save();
-  ctx.translate(Math.round(F_BODY), PAD.top + PLOT_H / 2); ctx.rotate(-Math.PI / 2);
+  ctx.translate(Math.max(Math.round(F_BODY), PAD.left - Math.round(F_BODY * 1.5)), PAD.top + PLOT_H / 2); ctx.rotate(-Math.PI / 2);
   ctx.font = `bold ${F_BODY}px Arial`; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
   ctx.fillText("Score", 0, 0);
   ctx.restore();
   ctx.font = `bold ${F_BODY}px Arial`; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
-  ctx.fillText("Target", W / 2, base + drop + Math.round(F_BODY * 1.6));
+  ctx.fillText("Target", W / 2, base + drop + Math.round(F_BODY * 0.9));
 
   ctx.font = `${F_BODY}px Arial`;
   const BOX = F_BODY, G = Math.round(F_BODY * 0.5), SP = Math.round(F_BODY * 1.4);
   const widths = days.map(d => BOX + G + ctx.measureText(d.label).width);
   const total = widths.reduce((a, b) => a + b, 0) + SP * (days.length - 1);
   let lx = (W - total) / 2;
-  const ly = base + drop + Math.round(F_BODY * 3.4);
+  const ly = base + drop + Math.round(F_BODY * 2.7);
   days.forEach((d, di) => {
     ctx.fillStyle = ASSESS_DAY_COLORS[di % ASSESS_DAY_COLORS.length];
     ctx.fillRect(lx, ly - BOX + 3, BOX, BOX);
@@ -7038,7 +7073,7 @@ function assessmentDrawAvgChart(scored, title) {
   const PAD = {
     top: Math.round(F_TITLE * 1.8 + F_BODY + 18),
     right: 30,
-    bottom: drop + Math.round(F_BODY * 2.4),
+    bottom: drop + Math.round(F_BODY * 1.7),
     left: padL
   };
   // Both charts are placed at a fixed 6.25in x 4.4in so the two fit on one
@@ -7077,12 +7112,12 @@ function assessmentDrawAvgChart(scored, title) {
   });
 
   ctx.save();
-  ctx.translate(Math.round(F_BODY), PAD.top + PLOT_H / 2); ctx.rotate(-Math.PI / 2);
+  ctx.translate(Math.max(Math.round(F_BODY), PAD.left - Math.round(F_BODY * 1.5)), PAD.top + PLOT_H / 2); ctx.rotate(-Math.PI / 2);
   ctx.font = `bold ${F_BODY}px Arial`; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
   ctx.fillText("Score", 0, 0);
   ctx.restore();
   ctx.font = `bold ${F_BODY}px Arial`; ctx.fillStyle = "#374151"; ctx.textAlign = "center";
-  ctx.fillText("Target", W / 2, base + drop + Math.round(F_BODY * 1.6));
+  ctx.fillText("Target", W / 2, base + drop + Math.round(F_BODY * 0.9));
 
   return { base64: canvas.toDataURL("image/png").split(",")[1], width: W, height: H };
 }
@@ -7440,7 +7475,17 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
   // ── Assessment Results: the two charts ──
   // Its own page: the charts are tall, so left to flow it lands at the foot of
   // the framework page with the graphs pushed onto the next one anyway.
-  paragraphs.push(mkPara("Assessment Results", { heading: HeadingLevel.HEADING_2, before: 0, after: 140, size: 26, bold: true, pageBreak: true }));
+  // The trailing note is styled like the "(Average: 99%)" beside each target in
+  // Section 2: same size and grey, against the heading's own blue.
+  paragraphs.push(new Paragraph({
+    heading: HeadingLevel.HEADING_2,
+    children: [
+      new TextRun({ text: "Assessment Results", bold: true, size: 26 }),
+      new TextRun({ text: " (Arranged from lowest to highest performance)", size: 22, color: "374151" })
+    ],
+    spacing: { before: 0, after: 140, ...LS },
+    pageBreakBefore: true
+  }));
   const dayChart = assessmentDrawDayChart(collected.scored, collected.days,
     `${student.name} (${nDays}-Day Assessment)`);
   const avgChart = assessmentDrawAvgChart(collected.scored,
@@ -7494,7 +7539,7 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
       const items = listOf(arr);
       if (!items) {
         paragraphs.push(new Paragraph({
-          children: [new TextRun({ text: `[Not generated for this target. Please write this in manually.]`, size: 22, bold: true, highlight: "red" })],
+          children: [new TextRun({ text: `[Generation Error (Contact Lewis) -> Not generated for this target. Please write this in manually.]`, size: 22, bold: true, highlight: "red" })],
           alignment: AlignmentType.BOTH, spacing: { before: 20, after: 20, ...LS }
         }));
         return;
@@ -8673,7 +8718,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   // claims and were never true, since the section only ran because sessions
   // exist and the prompt requires the bullets. A missing reply is flagged in red
   // instead, so it cannot be handed to a parent unnoticed.
-  const mkMissing = what => mkPara(`[${what} was not generated. Please write this in manually.]`,
+  const mkMissing = what => mkPara(`[Generation Error (Contact Lewis) -> ${what} was not generated. Please write this in manually.]`,
     { bold: true, highlight: "red", after: 120 });
 
   summaryParas.push(mkSectionHead("Highlights this month"));
