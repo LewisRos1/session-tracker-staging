@@ -201,7 +201,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2033";
+const APP_VERSION = "2034";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3898,10 +3898,34 @@ async function aiRequest(aiPrompt, signal, meta = {}) {
   });
 
   if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    // Include the status and error type. A bare message like "Request not
-    // allowed" gives no clue whether it came from the relay or from Anthropic.
-    console.error("AI request failed:", resp.status, err);
+    // WHO REFUSED IT? Three different things can answer this call and they need
+    // three different fixes, so the answer is worked out here rather than left
+    // to a message that reads the same either way.
+    //
+    // Our own relay answers {"error":{"message":...}} with no "type", and its
+    // only 403 says "Origin not allowed". Anthropic's refusals arrive with
+    // their own type, and cannot be specific to one person: the upstream call
+    // is made from Cloudflare with one shared key, so it is byte-identical
+    // whoever pressed the button. Anything else is Cloudflare's edge deciding
+    // from the caller's IP and browser BEFORE the Worker runs, which is the
+    // only one of the three that can fail on one computer and pass on another.
+    const raw = await resp.text().catch(() => "");
+    let err = {};
+    try { err = JSON.parse(raw); } catch (_) {}
+    const hdr = n => resp.headers.get(n) || "";
+    const mitigated = hdr("cf-mitigated");
+    const ours = /Origin not allowed|Method not allowed|Model not allowed|Request too large|Invalid JSON/.test(raw);
+    console.error("AI request failed:", resp.status, {
+      from: ours ? "our relay" : mitigated ? "Cloudflare edge" : err.error?.type ? "Anthropic" : "unknown",
+      body: raw.slice(0, 400),
+      "cf-mitigated": mitigated,
+      "cf-ray": hdr("cf-ray"),
+      server: hdr("server"),
+      "content-type": hdr("content-type")
+    });
+    if (!ours && (mitigated || resp.status === 403)) {
+      throw new Error(`Blocked before the request reached the report service (HTTP ${resp.status}${mitigated ? ", " + mitigated : ""}). Cloudflare decides this from the network and the browser, not from the report, which is why the same report can fail on one computer and work on another. Try a different network or another browser, and send Lewis the red line in the console (F12).`);
+    }
     throw new Error(`${err.error?.message || "Request failed"} (HTTP ${resp.status}${err.error?.type ? ", " + err.error.type : ""})`);
   }
 
