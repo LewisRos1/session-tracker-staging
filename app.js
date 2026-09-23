@@ -201,7 +201,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2034";
+const APP_VERSION = "2035";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3915,14 +3915,19 @@ async function aiRequest(aiPrompt, signal, meta = {}) {
     const hdr = n => resp.headers.get(n) || "";
     const mitigated = hdr("cf-mitigated");
     const ours = /Origin not allowed|Method not allowed|Model not allowed|Request too large|Invalid JSON/.test(raw);
-    console.error("AI request failed:", resp.status, {
-      from: ours ? "our relay" : mitigated ? "Cloudflare edge" : err.error?.type ? "Anthropic" : "unknown",
-      body: raw.slice(0, 400),
-      "cf-mitigated": mitigated,
-      "cf-ray": hdr("cf-ray"),
-      server: hdr("server"),
-      "content-type": hdr("content-type")
-    });
+    // Logged as one string, not an object. An object prints collapsed, and a
+    // collapsed object copies out of the console as the word "Object", so the
+    // one thing worth sending is the one thing that does not travel.
+    console.error(
+      "AI request failed: " + resp.status
+      + "\n  from:         " + (ours ? "our relay" : mitigated ? "Cloudflare edge" : err.error?.type ? "Anthropic" : "unknown")
+      + "\n  cf-mitigated: " + (mitigated || "(none)")
+      + "\n  cf-ray:       " + (hdr("cf-ray") || "(none)")
+      + "\n  server:       " + (hdr("server") || "(none)")
+      + "\n  content-type: " + (hdr("content-type") || "(none)")
+      + "\n  body:         " + (raw.slice(0, 400) || "(empty)")
+    );
+
     if (!ours && (mitigated || resp.status === 403)) {
       throw new Error(`Blocked before the request reached the report service (HTTP ${resp.status}${mitigated ? ", " + mitigated : ""}). Cloudflare decides this from the network and the browser, not from the report, which is why the same report can fail on one computer and work on another. Try a different network or another browser, and send Lewis the red line in the console (F12).`);
     }
