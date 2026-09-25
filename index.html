@@ -18,24 +18,26 @@
 
   <link rel="stylesheet" href="styles.css" />
 
-  <!-- ExcelJS (Excel export with bold support) -->
-  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"
-          integrity="sha384-Pqp51FUN2/qzfxZxBCtF0stpc9ONI6MYZpVqmo8m20SoaQCzf+arZvACkLkirlPz"
-          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <!-- JSZip (ZIP export for Export All) -->
-  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"
-          integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG"
-          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <!-- Chart.js (chart images for Excel export) -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"
-          integrity="sha384-NrKB+u6Ts6AtkIhwPixiKTzgSKNblyhlk0Sohlgar9UHUBzai/sgnNNWWd291xqt"
-          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <!-- docx (Word export — must be UMD build, not ESM) -->
-  <!-- Pinned to an exact version: docx@8 floats to the newest 8.x, and an SRI hash
-       on a floating URL breaks the app the day a new 8.x is published. -->
-  <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.min.js"
-          integrity="sha384-FycsogZbaX8lWofCovAsu/4Zn+hNlGu29U1sGJnT30r7WWPzA4071wlpUKFPCw/m"
-          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <!-- Libraries are served from this site, not from a CDN.
+       They used to load from cdn.jsdelivr.net with subresource integrity
+       hashes. Security software that scans encrypted traffic (Bitdefender's
+       Encrypted Web Scan, and corporate filters generally) decrypts and
+       re-serves the response, which changes the bytes, which makes the
+       integrity check refuse the file. Word export and the AI reports then
+       die with "the docx library didn't load" and no way to fix it from the
+       app. Both features are doing their job; they just cannot both work.
+
+       Served from here there is no third party in the path, and no hash to
+       fail: exactly the trust model app.js already has. Each file below was
+       downloaded from jsdelivr and verified byte-for-byte against the SHA-384
+       hash that used to sit on these tags, so this is the same code that has
+       always been running, just from a different address.
+
+       To update one: download the new version, then update it in BOTH repos. -->
+  <script src="vendor/exceljs.min.js"></script>
+  <script src="vendor/jszip.min.js"></script>
+  <script src="vendor/chart.umd.min.js"></script>
+  <script src="vendor/docx.umd.min.js"></script>
 </head>
 <body>
 

@@ -2346,15 +2346,13 @@ function downloadBlob(blob, filename) {
 /**
  * The docx global, fetching the library if it is not already there.
  *
- * It is loaded as a plain <script> in the head, so one CDN hiccup at page load
- * left Word export dead for the rest of the session with nothing to do about
- * it but reload the page. This re-injects the SAME pinned URL with the SAME
- * integrity hash, so a transient failure costs one retry rather than the whole
- * session, and a tampered file is still refused. Concurrent callers share one
- * attempt rather than racing to add several script tags.
+ * It is loaded as a plain <script> in the head, so if that one request fails
+ * there is no second attempt and Word export stays dead for the rest of the
+ * session. This re-injects it, so a failure costs one retry rather than the
+ * whole session. Concurrent callers share one attempt rather than racing to
+ * add several script tags.
  */
-const DOCX_SRC = "https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.min.js";
-const DOCX_SRI = "sha384-FycsogZbaX8lWofCovAsu/4Zn+hNlGu29U1sGJnT30r7WWPzA4071wlpUKFPCw/m";
+const DOCX_SRC = "vendor/docx.umd.min.js";
 let _docxLoading = null;
 
 export function ensureDocx() {
@@ -2363,9 +2361,6 @@ export function ensureDocx() {
     _docxLoading = new Promise(resolve => {
       const el = document.createElement("script");
       el.src = DOCX_SRC;
-      el.integrity = DOCX_SRI;
-      el.crossOrigin = "anonymous";
-      el.referrerPolicy = "no-referrer";
       el.onload  = () => resolve(window.docx || null);
       el.onerror = () => resolve(null);
       document.head.appendChild(el);
