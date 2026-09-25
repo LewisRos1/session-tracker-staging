@@ -193,9 +193,25 @@ const STYLE_NOTE = {
 // Converts *bold* / _underline_ markers in an activity name to ExcelJS richText.
 // Returns a plain string when no markup is present, { richText: [...] } otherwise.
 // An optional plain-text suffix (e.g. " (Mastered ✓)") is appended at the end.
-function buildExcelActivityCell(text, suffix) {
+/**
+ * Drops the *bold* and _underline_ markers, keeping the words.
+ *
+ * Titles are no longer formatted by hand: an activity is bolded and underlined
+ * when it has Activity Details and not otherwise, so a leftover marker from the
+ * old title toolbar would put bold on a title the rule says should be plain.
+ * The markers still work everywhere else, which is why they are only stripped
+ * on the way into a title.
+ */
+function stripTitleMarkers(text) {
+  return String(text || "")
+    .replace(/\*(.+?)\*/g, "$1")
+    .replace(/_(.+?)_/g, "$1");
+}
+
+function buildExcelActivityCell(text, suffix, titleHasDetails = false) {
   // Mirrors the website's ". " → "• " display substitution (see bulletifyActivityText).
-  const lines = parseInlineMarkup(bulletifyActivityText(text || ""));
+  const prepared = titleHasDetails ? stripTitleMarkers(text) : text;
+  const lines = parseInlineMarkup(bulletifyActivityText(prepared || ""));
   const richText = [];
   let hasFormatting = false;
   lines.forEach((lineRuns, lineIdx) => {
@@ -203,6 +219,7 @@ function buildExcelActivityCell(text, suffix) {
     for (const run of lineRuns) {
       if (!run.text) continue;
       const entry = { text: run.text };
+      if (titleHasDetails) { run.bold = true; run.underline = true; }
       if (run.bold || run.underline) {
         entry.font = {};
         if (run.bold)      entry.font.bold      = true;
@@ -220,8 +237,8 @@ function buildExcelActivityCell(text, suffix) {
   return { richText };
 }
 
-function richTextActivityWithNote(activityName, note) {
-  const actCell = buildExcelActivityCell(activityName);
+function richTextActivityWithNote(activityName, note, titleHasDetails = false) {
+  const actCell = buildExcelActivityCell(activityName, undefined, titleHasDetails);
   const noteRun = { text: `\nRemark: ${note}`, font: STYLE_NOTE.font };
   if (typeof actCell === "string") return { richText: [{ text: actCell }, noteRun] };
   return { richText: [...actCell.richText, noteRun] };
@@ -1823,15 +1840,21 @@ function parseInlineMarkupLine(line) {
   return runs;
 }
 
-// Builds actLines for the Word activity cell: handles checkbox-style bold/underline
-// on the title, and appends a details line below if activityDisplayDetails is set.
+// Builds actLines for the Word activity cell, and appends a details line below
+// if activityDisplayDetails is set.
+//
+// An activity title is bold and underlined exactly when it has Activity Details
+// under it, which is what makes the title read as a heading for the lines that
+// follow. A title with nothing under it is not introducing anything, so it stays
+// plain. This used to be set by hand per activity (isBold/isUnderline, ticked on
+// the Templates screen and synced down), which is why titles with no details
+// could end up bold and titles with details plain.
 function buildActLines(act, label) {
-  const titleBold = act.activityTitleBold || act.activityIsBold || false;
-  const titleUnderline = act.activityTitleUnderline || act.activityIsUnderline || false;
+  const titleHasDetails = !!act.activityDisplayDetails;
   // bulletifyActivityText mirrors the website's ". " → "• " display substitution.
-  const labelText = bulletifyActivityText(label);
-  const titleLines = (titleBold || titleUnderline)
-    ? labelText.split("\n").map(line => [{ text: line, bold: titleBold, underline: titleUnderline }])
+  const labelText = bulletifyActivityText(titleHasDetails ? stripTitleMarkers(label) : label);
+  const titleLines = titleHasDetails
+    ? labelText.split("\n").map(line => [{ text: line, bold: true, underline: true }])
     : parseInlineMarkup(labelText);
   const details = act.activityDisplayDetails;
   if (details) return [...titleLines, ...parseInlineMarkup(bulletifyActivityText(details))];
@@ -2853,7 +2876,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, mastere
       if (act.noRemark) {
         if (act.isGray) grayRows.add(rows.length);
         if (act.isGreen) greenRows.add(rows.length);
-        const actCell = appendActivityDetails(buildExcelActivityCell(act.activityName), act.activityDisplayDetails);
+        const actCell = appendActivityDetails(buildExcelActivityCell(act.activityName, undefined, !!act.activityDisplayDetails), act.activityDisplayDetails);
         const noRmkRemarks = getRemarksForActivity(session, act.id).filter(hasRemarkContent);
         if (noRmkRemarks.length === 0) {
           const r = blankRow(); r[1] = actCell; rows.push(r);
@@ -2879,7 +2902,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, mastere
       // Sub-activity: indented lettered label
       if (act.isSubActivity) {
         const subLabel = `    ${act.subLabel}) ${act.activityName}`;
-        const subCell  = appendActivityDetails(buildExcelActivityCell(subLabel), act.activityDisplayDetails);
+        const subCell  = appendActivityDetails(buildExcelActivityCell(subLabel, undefined, !!act.activityDisplayDetails), act.activityDisplayDetails);
         if (act.isGray) grayRows.add(rows.length);
         if (act.isGreen) greenRows.add(rows.length);
         if (act.empty) {
@@ -2915,16 +2938,17 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, mastere
       )?.actNote;
       let activityCell;
       if (actNoteText && actNoteText.trim()) {
-        const base = richTextActivityWithNote(act.activityName, stripActivityMarkup(actNoteText.trim()));
+        const base = richTextActivityWithNote(act.activityName, stripActivityMarkup(actNoteText.trim()), !!act.activityDisplayDetails);
         activityCell = act.isMastered
           ? { richText: [...base.richText, { text: " (Mastered ✓)", font: { italic: true, color: { argb: "FF6B7280" } } }] }
           : act.isArchived
           ? { richText: [...base.richText, { text: " (Archived)", font: { italic: true, color: { argb: "FF9CA3AF" } } }] }
           : base;
       } else {
-        activityCell = act.isMastered ? buildExcelActivityCell(act.activityName, " (Mastered ✓)")
-          : act.isArchived ? buildExcelActivityCell(act.activityName, " (Archived)")
-          : buildExcelActivityCell(act.activityName);
+        const _td = !!act.activityDisplayDetails;
+        activityCell = act.isMastered ? buildExcelActivityCell(act.activityName, " (Mastered ✓)", _td)
+          : act.isArchived ? buildExcelActivityCell(act.activityName, " (Archived)", _td)
+          : buildExcelActivityCell(act.activityName, undefined, _td);
       }
       activityCell = appendActivityDetails(activityCell, act.activityDisplayDetails);
 
