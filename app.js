@@ -201,7 +201,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2040";
+const APP_VERSION = "2041";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -21756,31 +21756,12 @@ function renderTargetManageContent(student, target) {
       const pa = acts[idx];
       if (!pa) return;
       $("manage-modal-body").querySelectorAll(".mn-kebab-menu").forEach(m => m.style.display = "none");
-      if (action === "color_white") {
-        delete pa.activityColor; delete pa.isMaintainLive;
-        await saveTarget(); renderTargetManageContent(student, target); if (state.sessionData) renderTargetContent();
-      } else if (action === "color_gray") {
-        pa.activityColor = "gray"; delete pa.isMaintainLive;
-        await saveTarget(); renderTargetManageContent(student, target); if (state.sessionData) renderTargetContent();
-      } else if (action === "color_blue") {
-        pa.activityColor = "blue"; delete pa.isMaintainLive;
-        await saveTarget(); renderTargetManageContent(student, target); if (state.sessionData) renderTargetContent();
-      } else if (action === "color_red") {
-        if (pa.isNote) pa.activityColor = "red"; else delete pa.activityColor;
-        delete pa.isMaintainLive;
-        await saveTarget(); renderTargetManageContent(student, target); if (state.sessionData) renderTargetContent();
-      } else if (action === "master") {
-        pa.isCompleted = true;
-        delete pa.isArchived;
-        await saveTarget();
-        renderTargetManageContent(student, target);
-      } else if (action === "stop") {
-        pa.isStopped = true;
-        delete pa.isArchived;
-        delete pa.isCompleted;
-        await saveTarget();
-        renderTargetManageContent(student, target);
-      } else if (action === "delete") {
+      // This menu only ever offers Delete. The colour options are built and
+      // handled elsewhere (they send "blue" and "gray", not "color_blue"), and
+      // mastering and discontinuing moved to mnSubStatusKebabHtml, which always
+      // asks for a date. The branches for color_white/gray/blue/red, master and
+      // stop were left behind by that move and nothing could reach them.
+      if (action === "delete") {
         if (pa.isNote || pa.isExportNote) {
           if (!confirm(`Delete this note?`)) return;
           const actIdx = acts.indexOf(pa);

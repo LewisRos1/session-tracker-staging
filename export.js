@@ -2959,10 +2959,14 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, mastere
  *               worked on then. After that date it does not appear at all: the
  *               Start Session screen stops offering it, so no later session
  *               touched it. No heading, no "(Mastered on ...)" label.
- *   WITHOUT it  the original behaviour: inline until the status date, then
- *               under a "Mastered" or "Discontinued" heading after it. Kept for
- *               the Excel export and for calcDailyAverage, which reads this
- *               same list to work out scores.
+ *   WITHOUT it  once an activity has a mastered or discontinued date it goes
+ *               under that heading in EVERY session, whether the session came
+ *               before or after the date, with the date shown on the row. The
+ *               Excel export wants one predictable place to look for it rather
+ *               than having it move between inline and the section depending on
+ *               which session you are reading. Sections are ordered oldest date
+ *               first. calcDailyAverage reads this same list to work out scores,
+ *               so it does not care which bucket a row landed in.
  */
 function getAllActivitiesForTarget(session, target, opts = {}) {
   const sessionActs = Object.entries(session.activities || {})
@@ -3067,38 +3071,52 @@ function getAllActivitiesForTarget(session, target, opts = {}) {
     }
 
     // Mastered / discontinued -> deferred to the bottom with an x) prefix, and
-    // they do not consume a number. Entered only once the session date has
-    // REACHED the status date: before that the activity was still being worked
-    // on, so it belongs inline under its section heading like any other. This
-    // mirrors the Start Session screen, where the collapsed Mastered and
-    // Discontinued sections are date-aware in the same way.
+    // they do not consume a number. For the Word note (noStatusSections) this is
+    // date-aware: still inline up to and including the status date, gone after
+    // it, matching the Start Session screen. Everywhere else the date only
+    // decides the ordering, not whether the row appears.
+    //
+    // The props below are computed up here because the Mastered and Discontinued
+    // rows need them too, not just the inline ones. A row that sits inline before
+    // its status date and under a heading after it has to look and score the same
+    // either way: isGray/isGreen are the row fill, isMaintained writes "Maintain"
+    // into the score cell, and calcDailyAverage reads noTrials and manualScore, so
+    // a "Remark Only (No Trials)" activity that lost the flag on its way into a
+    // section would start counting towards the score it is meant to sit out of.
+    const _manualScoreProp = pa.manualScore ? { manualScore: true } : {};
+    const _noTrialsProp    = pa.noTrials    ? { noTrials: true }    : {};
+    const _colorProps      = (pa.activityColor === "gray" || pa.isMaintainLive) ? { isGray: true }
+                           : pa.activityColor === "green" ? { isGreen: true } : {};
+    const _isMaintainedForSession = !!pa.maintained && (session.date >= (pa.maintainedAt || "2026-08-21"));
+    const _statusProps = { ..._colorProps, ..._manualScoreProp, ..._noTrialsProp, isMaintained: _isMaintainedForSession };
+
     if (pa.masteredOn) {
       const _afterM = session.date > pa.masteredOn;
       if (opts.noStatusSections) { if (_afterM) continue; }
-      else if (_afterM) {
+      else {
       const _sAct = claimAct(pa);
       const _paKey = pa.title || pa.name;
       const _name = `x) (Mastered on ${fmtDate(pa.masteredOn)}) ${_paKey}`;
       const _subs = (target.predefinedActivities || []).filter(p => p.parentActivity === _paKey);
       const _subText = _subs.length > 0 ? _subs.map((p, i) => `${String.fromCharCode(97 + i)}. ${p.title || p.name}`).join("\n") : null;
       const _extra = { activityDisplayDetails: _subText || (pa.title ? (pa.name || null) : null), activityTitleBold: !!pa.isBold, activityTitleUnderline: !!pa.isUnderline };
-      if (_sAct) { usedIds.add(_sAct.id); masteredActivities.push({ ..._sAct, activityName: _name, ..._extra }); }
-      else { masteredActivities.push({ id: null, activityName: _name, isPredefined: true, empty: true, ..._extra }); }
+      if (_sAct) { usedIds.add(_sAct.id); masteredActivities.push({ ..._sAct, activityName: _name, _sortDate: pa.masteredOn, ..._extra, ..._statusProps }); }
+      else { masteredActivities.push({ id: null, activityName: _name, isPredefined: true, empty: true, _sortDate: pa.masteredOn, ..._extra, ..._statusProps }); }
       continue;
       }
     }
     if (pa.discontinuedOn) {
       const _afterD = session.date > pa.discontinuedOn;
       if (opts.noStatusSections) { if (_afterD) continue; }
-      else if (_afterD) {
+      else {
       const _sAct = claimAct(pa);
       const _paKey = pa.title || pa.name;
       const _name = `x) (Discontinued on ${fmtDate(pa.discontinuedOn)}) ${_paKey}`;
       const _subs = (target.predefinedActivities || []).filter(p => p.parentActivity === _paKey);
       const _subText = _subs.length > 0 ? _subs.map((p, i) => `${String.fromCharCode(97 + i)}. ${p.title || p.name}`).join("\n") : null;
       const _extra = { activityDisplayDetails: _subText || (pa.title ? (pa.name || null) : null), activityTitleBold: !!pa.isBold, activityTitleUnderline: !!pa.isUnderline };
-      if (_sAct) { usedIds.add(_sAct.id); discontinuedActivities.push({ ..._sAct, activityName: _name, ..._extra }); }
-      else { discontinuedActivities.push({ id: null, activityName: _name, isPredefined: true, empty: true, ..._extra }); }
+      if (_sAct) { usedIds.add(_sAct.id); discontinuedActivities.push({ ..._sAct, activityName: _name, _sortDate: pa.discontinuedOn, ..._extra, ..._statusProps }); }
+      else { discontinuedActivities.push({ id: null, activityName: _name, isPredefined: true, empty: true, _sortDate: pa.discontinuedOn, ..._extra, ..._statusProps }); }
       continue;
       }
     }
@@ -3137,9 +3155,9 @@ function getAllActivitiesForTarget(session, target, opts = {}) {
       const sessionAct = claimAct(pa);
       if (sessionAct) {
         usedIds.add(sessionAct.id);
-        masteredActivities.push({ ...sessionAct, activityName: numberedName, isMastered: true, ...paExtraProps });
+        masteredActivities.push({ ...sessionAct, activityName: numberedName, isMastered: true, ...paExtraProps, ..._statusProps });
       } else {
-        masteredActivities.push({ id: null, activityName: numberedName, isPredefined: true, empty: true, isMastered: true, ...paExtraProps });
+        masteredActivities.push({ id: null, activityName: numberedName, isPredefined: true, empty: true, isMastered: true, ...paExtraProps, ..._statusProps });
       }
       continue;
     }
@@ -3148,20 +3166,16 @@ function getAllActivitiesForTarget(session, target, opts = {}) {
       const sessionAct = claimAct(pa);
       if (sessionAct) {
         usedIds.add(sessionAct.id);
-        stoppedActivities.push({ ...sessionAct, activityName: numberedName, isStopped: true, ...paExtraProps });
+        stoppedActivities.push({ ...sessionAct, activityName: numberedName, isStopped: true, ...paExtraProps, ..._statusProps });
       } else {
-        stoppedActivities.push({ id: null, activityName: numberedName, isPredefined: true, empty: true, isStopped: true, ...paExtraProps });
+        stoppedActivities.push({ id: null, activityName: numberedName, isPredefined: true, empty: true, isStopped: true, ...paExtraProps, ..._statusProps });
       }
       continue;
     }
     const sessionAct = claimAct(pa);
-    const colorProps = (pa.activityColor === "gray" || pa.isMaintainLive) ? { isGray: true }
-                     : pa.activityColor === "green" ? { isGreen: true } : {};
-    const manualScoreProp = pa.manualScore ? { manualScore: true } : {};
-    // "Remark Only (No Trials)" — carried through so the score column and the
-    // daily average both ignore it no matter what is still stored on it.
-    const noTrialsProp = pa.noTrials ? { noTrials: true } : {};
-    const _isMaintainedForSession = !!pa.maintained && (session.date >= (pa.maintainedAt || "2026-08-21"));
+    const colorProps      = _colorProps;
+    const manualScoreProp = _manualScoreProp;
+    const noTrialsProp    = _noTrialsProp;
     if (sessionAct) {
       usedIds.add(sessionAct.id);
       result.push({ ...sessionAct, activityName: numberedName, ...colorProps, ...manualScoreProp, ...noTrialsProp, isMaintained: _isMaintainedForSession, ...paExtraProps });
@@ -3217,6 +3231,14 @@ function getAllActivitiesForTarget(session, target, opts = {}) {
     }
     if (!hasContent) result.splice(i, 1);
   }
+
+  // Oldest first within each section, so a reader can follow when things were
+  // mastered or dropped. Rows with no date (marked without one, before the
+  // date picker existed) sort to the end.
+  const _byStatusDate = (a, b) => String(a._sortDate || "9999-99-99").localeCompare(String(b._sortDate || "9999-99-99"));
+  masteredActivities.sort(_byStatusDate);
+  discontinuedActivities.sort(_byStatusDate);
+  stoppedActivities.sort(_byStatusDate);
 
   if (masteredActivities.length > 0) {
     result.push({ isMasteredSeparator: true, activityName: "— Mastered —" });
