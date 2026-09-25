@@ -1863,7 +1863,7 @@ function wordHeadingHasContent(activities, i) {
 
 function wordTargetRows(target, session, allTargets) {
   const rows = [];
-  const activities = getAllActivitiesForTarget(session, target, { masteredByDate: true });
+  const activities = getAllActivitiesForTarget(session, target, { noStatusSections: true });
 
   for (let ai = 0; ai < activities.length; ai++) {
     const act = activities[ai];
@@ -2950,18 +2950,19 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, mastere
  * custom (non-predefined) activities appended at the end.
  */
 /**
- * `opts.masteredByDate` changes where a mastered or discontinued activity
- * goes, and is passed only by the Word session note.
+ * `opts.noStatusSections` is passed only by the Word session note, which has no
+ * Mastered or Discontinued sections at all.
  *
- *   WITH it     under the heading for every session UP TO AND INCLUDING the
- *               status date, and absent entirely after it. Once an activity is
- *               mastered it stops being offered on the Start Session screen,
- *               so a later session never worked on it and its note should not
- *               list it.
- *   WITHOUT it  the original behaviour, which is the reverse: inline until the
- *               status date, under the heading after it. Kept for the Excel
- *               export and for calcDailyAverage, which reads this same list to
- *               work out scores.
+ *   WITH it     an activity that has been mastered or discontinued appears
+ *               INLINE, in its ordinary numbered place, for every session up to
+ *               and including its status date, because it was still being
+ *               worked on then. After that date it does not appear at all: the
+ *               Start Session screen stops offering it, so no later session
+ *               touched it. No heading, no "(Mastered on ...)" label.
+ *   WITHOUT it  the original behaviour: inline until the status date, then
+ *               under a "Mastered" or "Discontinued" heading after it. Kept for
+ *               the Excel export and for calcDailyAverage, which reads this
+ *               same list to work out scores.
  */
 function getAllActivitiesForTarget(session, target, opts = {}) {
   const sessionActs = Object.entries(session.activities || {})
@@ -3073,8 +3074,8 @@ function getAllActivitiesForTarget(session, target, opts = {}) {
     // Discontinued sections are date-aware in the same way.
     if (pa.masteredOn) {
       const _afterM = session.date > pa.masteredOn;
-      if (opts.masteredByDate && _afterM) continue;
-      if (opts.masteredByDate || _afterM) {
+      if (opts.noStatusSections) { if (_afterM) continue; }
+      else if (_afterM) {
       const _sAct = claimAct(pa);
       const _paKey = pa.title || pa.name;
       const _name = `x) (Mastered on ${fmtDate(pa.masteredOn)}) ${_paKey}`;
@@ -3088,8 +3089,8 @@ function getAllActivitiesForTarget(session, target, opts = {}) {
     }
     if (pa.discontinuedOn) {
       const _afterD = session.date > pa.discontinuedOn;
-      if (opts.masteredByDate && _afterD) continue;
-      if (opts.masteredByDate || _afterD) {
+      if (opts.noStatusSections) { if (_afterD) continue; }
+      else if (_afterD) {
       const _sAct = claimAct(pa);
       const _paKey = pa.title || pa.name;
       const _name = `x) (Discontinued on ${fmtDate(pa.discontinuedOn)}) ${_paKey}`;
@@ -3129,6 +3130,10 @@ function getAllActivitiesForTarget(session, target, opts = {}) {
       continue;
     }
     if (pa.isCompleted) {
+      // No date on these: the kebab menu can mark an activity mastered without
+      // picking one. Nothing to compare a session date against, so the Word
+      // note leaves them out entirely rather than inventing a section for them.
+      if (opts.noStatusSections) continue;
       const sessionAct = claimAct(pa);
       if (sessionAct) {
         usedIds.add(sessionAct.id);
@@ -3139,6 +3144,7 @@ function getAllActivitiesForTarget(session, target, opts = {}) {
       continue;
     }
     if (pa.isArchived || pa.isStopped) {
+      if (opts.noStatusSections) continue;
       const sessionAct = claimAct(pa);
       if (sessionAct) {
         usedIds.add(sessionAct.id);
