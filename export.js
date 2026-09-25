@@ -2745,6 +2745,9 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, mastere
         continue;
       }
 
+      // Both of these are the note boxes from the Start Session screen, so they
+      // carry that screen's own label, "Note:". An actNote attached to a single
+      // activity is a different thing and still prints as "Remark:".
       if (act.isNote) {
         noteRows.add(rows.length);
         const noteText = stripActivityMarkup((act.activityName || "")
@@ -2754,7 +2757,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, mastere
           .replace(/<[^>]*>/g, "")
           .replace(/\n{3,}/g, "\n\n")
           .trim());
-        const r = blankRow(); r[1] = `Remark: ${noteText}`; rows.push(r);
+        const r = blankRow(); r[1] = `Note: ${noteText}`; rows.push(r);
         continue;
       }
 
@@ -2767,7 +2770,7 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, mastere
           .replace(/<[^>]*>/g, "")
           .replace(/\n{3,}/g, "\n\n")
           .trim());
-        const r = blankRow(); r[1] = `Remark: ${noteText}`; rows.push(r);
+        const r = blankRow(); r[1] = `Note: ${noteText}`; rows.push(r);
         continue;
       }
 
