@@ -1863,7 +1863,7 @@ function wordHeadingHasContent(activities, i) {
 
 function wordTargetRows(target, session, allTargets) {
   const rows = [];
-  const activities = getAllActivitiesForTarget(session, target);
+  const activities = getAllActivitiesForTarget(session, target, { masteredByDate: true });
 
   for (let ai = 0; ai < activities.length; ai++) {
     const act = activities[ai];
@@ -2949,7 +2949,21 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, mastere
  * with { empty: true } for predefined items with no session data, plus any
  * custom (non-predefined) activities appended at the end.
  */
-function getAllActivitiesForTarget(session, target) {
+/**
+ * `opts.masteredByDate` changes where a mastered or discontinued activity
+ * goes, and is passed only by the Word session note.
+ *
+ *   WITH it     under the heading for every session UP TO AND INCLUDING the
+ *               status date, and absent entirely after it. Once an activity is
+ *               mastered it stops being offered on the Start Session screen,
+ *               so a later session never worked on it and its note should not
+ *               list it.
+ *   WITHOUT it  the original behaviour, which is the reverse: inline until the
+ *               status date, under the heading after it. Kept for the Excel
+ *               export and for calcDailyAverage, which reads this same list to
+ *               work out scores.
+ */
+function getAllActivitiesForTarget(session, target, opts = {}) {
   const sessionActs = Object.entries(session.activities || {})
     .filter(([, a]) => a.targetName === target.name)
     .sort(([, a], [, b]) => (a.order || 0) - (b.order || 0))
@@ -3057,7 +3071,10 @@ function getAllActivitiesForTarget(session, target) {
     // on, so it belongs inline under its section heading like any other. This
     // mirrors the Start Session screen, where the collapsed Mastered and
     // Discontinued sections are date-aware in the same way.
-    if (pa.masteredOn && session.date > pa.masteredOn) {
+    if (pa.masteredOn) {
+      const _afterM = session.date > pa.masteredOn;
+      if (opts.masteredByDate && _afterM) continue;
+      if (opts.masteredByDate || _afterM) {
       const _sAct = claimAct(pa);
       const _paKey = pa.title || pa.name;
       const _name = `x) (Mastered on ${fmtDate(pa.masteredOn)}) ${_paKey}`;
@@ -3067,8 +3084,12 @@ function getAllActivitiesForTarget(session, target) {
       if (_sAct) { usedIds.add(_sAct.id); masteredActivities.push({ ..._sAct, activityName: _name, ..._extra }); }
       else { masteredActivities.push({ id: null, activityName: _name, isPredefined: true, empty: true, ..._extra }); }
       continue;
+      }
     }
-    if (pa.discontinuedOn && session.date > pa.discontinuedOn) {
+    if (pa.discontinuedOn) {
+      const _afterD = session.date > pa.discontinuedOn;
+      if (opts.masteredByDate && _afterD) continue;
+      if (opts.masteredByDate || _afterD) {
       const _sAct = claimAct(pa);
       const _paKey = pa.title || pa.name;
       const _name = `x) (Discontinued on ${fmtDate(pa.discontinuedOn)}) ${_paKey}`;
@@ -3078,6 +3099,7 @@ function getAllActivitiesForTarget(session, target) {
       if (_sAct) { usedIds.add(_sAct.id); discontinuedActivities.push({ ..._sAct, activityName: _name, ..._extra }); }
       else { discontinuedActivities.push({ id: null, activityName: _name, isPredefined: true, empty: true, ..._extra }); }
       continue;
+      }
     }
 
     // All remaining paths are real activities — assign sequential number
