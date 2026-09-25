@@ -202,7 +202,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2047";
+const APP_VERSION = "2048";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -20182,6 +20182,20 @@ function mnPanelIsDirty() {
   } catch { return true; }   // uncomparable means assume changed, never lose work
 }
 
+/**
+ * The row's heading without the note preview.
+ *
+ * The preview exists to tell the rows apart in the list. Inside the panel the
+ * details are in the box right below, so repeating their opening words in the
+ * heading would say the same thing twice.
+ */
+function mnPanelTitleHtml(titleEl) {
+  if (!titleEl) return "";
+  const clone = titleEl.cloneNode(true);
+  clone.querySelectorAll(".mn-act-note-preview").forEach(n => n.remove());
+  return clone.innerHTML;
+}
+
 /** `body` is the card's own field container, moved in as-is. */
 function mnOpenActPanel(card, body, titleHtml, key) {
   if (!body || !_mnPanelHost) return;
@@ -20404,14 +20418,19 @@ function mnInitActivityCollapse(bodyEl, acts) {
     body.style.cssText = "display:flex;flex-direction:column;gap:.55rem";
     pieces.forEach(p => body.appendChild(p));
     const isNote = !!(a.isNote || a.isExportNote);
-    // Collapsed, a note shows its title, the same way an activity shows its own.
-    // A note with details but no title falls back to the details so the row is
-    // not a blank strip with no way to tell what it is.
+    // Collapsed, a note shows its title, the same way an activity shows its own,
+    // with the opening of its details underneath so the row says what the note
+    // is actually about. A note with details but no title shows those details on
+    // the title line instead, rather than being a blank strip.
     const _noteNp = isNote ? noteParts(a) : null;
     const text = isNote ? (_noteNp.title || _noteNp.details || "") : (a.name || "");
+    const _notePreview = isNote && _noteNp.title ? _noteNp.details : "";
     const title = document.createElement("div");
     title.className = "mn-act-compact-title";
-    title.innerHTML = `<span class="mn-act-title-text">${escHtml(truncateWords(text))}</span>`;
+    title.innerHTML = `<span class="mn-act-title-text">${escHtml(truncateWords(text))}</span>`
+      + (_notePreview.trim()
+          ? `<span class="mn-act-note-preview">${escHtml(truncateWords(_notePreview))}</span>`
+          : "");
     const head = document.createElement("div");
     head.className = "mn-act-head";
     if (handle) head.appendChild(handle);
@@ -20478,7 +20497,7 @@ function mnInitActivityCollapse(bodyEl, acts) {
 
     const body = card.querySelector(":scope > .mn-act-body") || card.querySelector(".mn-act-body");
     titleEl.addEventListener("click", () =>
-      mnOpenActPanel(card, body, titleEl.innerHTML, card.dataset.panelKey));
+      mnOpenActPanel(card, body, mnPanelTitleHtml(titleEl), card.dataset.panelKey));
   });
 
   // ── Sub-activities: the indented rows under a parent open their own panel ──
@@ -20532,7 +20551,7 @@ function mnInitActivityCollapse(bodyEl, acts) {
     const card = [...list.querySelectorAll("[data-panel-key]")].find(c => c.dataset.panelKey === want);
     const titleEl = card?.querySelector(".mn-act-compact-title");
     const body = card?.querySelector(".mn-act-body");
-    if (card && body) mnOpenActPanel(card, body, titleEl ? titleEl.innerHTML : "", want);
+    if (card && body) mnOpenActPanel(card, body, mnPanelTitleHtml(titleEl), want);
   }
 }
 // Moves every card built into the hidden #mn-inactive-source into a collapsed

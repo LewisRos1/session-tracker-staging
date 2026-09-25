@@ -1736,6 +1736,20 @@ input.field-input::placeholder {
   word-break: break-word;
 }
 .mn-act-compact-title:hover { color: #4338ca; }
+/* The second line of a collapsed note row: the opening of its details, so two
+   notes under the same heading are still tellable apart at a glance. Lighter
+   and italic so it reads as a preview of the note rather than part of its
+   title. */
+.mn-act-note-preview {
+  display: block;
+  margin-top: .1rem;
+  font-size: .86rem;
+  font-style: italic;
+  font-weight: 400;
+  color: #6b7280;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 /* The fields never show in the list. They are moved into the floating panel when
    a row is clicked, and moved back when it closes. */
 .mn-act-body { display: none !important; }
