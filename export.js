@@ -194,26 +194,6 @@ const STYLE_NOTE = {
 // Returns a plain string when no markup is present, { richText: [...] } otherwise.
 // An optional plain-text suffix (e.g. " (Mastered ✓)") is appended at the end.
 /**
- * Drops the *bold* and _underline_ markers, keeping the words.
- *
- * Titles are no longer formatted by hand: an activity is bolded and underlined
- * when it has Activity Details and not otherwise, so a leftover marker from the
- * old title toolbar would put bold on a title the rule says should be plain.
- * The markers still work everywhere else, which is why they are only stripped
- * on the way into a title.
- */
-/**
- * Pulls "2) Plants (Mastered on 1 Jan 2026)" apart into the number, the title
- * and the status label.
- *
- * Only the middle piece is bold and underlined. The number and the status are
- * not part of what the activity is called, so they stay plain, the way it would
- * be written by hand. Covers the "x) " used by the Mastered and Discontinued
- * sections and the "a) " used by sub-activities as well.
- */
-const STATUS_SUFFIX_RE = /\s*\((?:Maintained|Mastered|Discontinued) on [^)]*\)\s*$/;
-
-/**
  * A note as a plain string, whatever tags the editor left in it.
  */
 export function noteToPlain(text) {
@@ -262,16 +242,30 @@ export function noteParts(pa) {
   return splitNoteText(pa?.text || "");
 }
 
+/**
+ * Splits "2) Plants (Mastered on 1 Jan 2026)" into the number that starts the
+ * row and everything else.
+ *
+ * Only the number stays plain. The status label rides with the title and is
+ * bold and underlined along with it, so the whole heading reads as one piece
+ * with the number sitting outside it, the way it would be written by hand.
+ * Covers the "x) " used by the Mastered and Discontinued sections and the
+ * "a) " used by sub-activities as well.
+ */
 function splitActivityLabel(label) {
-  let rest = String(label || "");
-  let prefix = "", suffix = "";
-  const m = /^(\s*(?:\d+|x|[a-z])\)\s*)([\s\S]*)$/.exec(rest);
-  if (m) { prefix = m[1]; rest = m[2]; }
-  const sm = STATUS_SUFFIX_RE.exec(rest);
-  if (sm) { suffix = sm[0]; rest = rest.slice(0, sm.index); }
-  return { prefix, title: rest, suffix };
+  const m = /^(\s*(?:\d+|x|[a-z])\)\s*)([\s\S]*)$/.exec(String(label || ""));
+  return m ? { prefix: m[1], title: m[2] } : { prefix: "", title: String(label || "") };
 }
 
+/**
+ * Drops the *bold* and _underline_ markers, keeping the words.
+ *
+ * Titles are no longer formatted by hand: an activity is bolded and underlined
+ * when it has Activity Details and not otherwise, so a leftover marker from the
+ * old title toolbar would put bold on a title the rule says should be plain.
+ * The markers still work everywhere else, which is why they are only stripped
+ * on the way into a title.
+ */
 function stripTitleMarkers(text) {
   return String(text || "")
     .replace(/\*(.+?)\*/g, "$1")
@@ -283,8 +277,8 @@ function buildExcelActivityCell(text, suffix, titleHasDetails = false) {
   const prepared = titleHasDetails ? stripTitleMarkers(text) : text;
   // The number that starts the row is not part of the title, so it is peeled
   // off before the formatting goes on and put back as a plain run.
-  const { prefix: numPrefix, title: titleOnly, suffix: statusSuffix } =
-    titleHasDetails ? splitActivityLabel(prepared) : { prefix: "", title: prepared, suffix: "" };
+  const { prefix: numPrefix, title: titleOnly } =
+    titleHasDetails ? splitActivityLabel(prepared) : { prefix: "", title: prepared };
   const lines = parseInlineMarkup(bulletifyActivityText(titleOnly || ""));
   const richText = [];
   let hasFormatting = false;
@@ -304,7 +298,6 @@ function buildExcelActivityCell(text, suffix, titleHasDetails = false) {
       richText.push(entry);
     }
   });
-  if (statusSuffix) richText.push({ text: statusSuffix });
   if (suffix) {
     if (richText.length > 0) richText[richText.length - 1].text += suffix;
     else richText.push({ text: suffix });
@@ -1950,15 +1943,10 @@ function buildActLines(act, label) {
   const labelText = bulletifyActivityText(titleHasDetails ? stripTitleMarkers(label) : label);
   let titleLines;
   if (titleHasDetails) {
-    const { prefix, title, suffix } = splitActivityLabel(labelText);
-    const lines = title.split("\n");
-    titleLines = lines.map((line, i) => {
-      const runs = [];
-      if (i === 0 && prefix) runs.push({ text: prefix });
-      runs.push({ text: line, bold: true, underline: true });
-      if (i === lines.length - 1 && suffix) runs.push({ text: suffix });
-      return runs;
-    });
+    const { prefix, title } = splitActivityLabel(labelText);
+    titleLines = title.split("\n").map((line, i) => (i === 0 && prefix)
+      ? [{ text: prefix }, { text: line, bold: true, underline: true }]
+      : [{ text: line, bold: true, underline: true }]);
   } else {
     titleLines = parseInlineMarkup(labelText);
   }
