@@ -111,7 +111,7 @@ import {
 import {
   exportStudentData, exportAllStudents, exportGroupMemberData,
   exportStudentSingleSessionWord, exportGroupMemberSingleSessionWord,
-  renderActivityBreakdownChart, calcDailyAverage, scoresPct,
+  renderActivityBreakdownChart, calcDailyAverage, scoresPct, ensureDocx,
   setTrialScale, getTrialScale
 } from "./export.js";
 
@@ -201,7 +201,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2036";
+const APP_VERSION = "2037";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -6230,6 +6230,9 @@ function mkDetailValueRun(value) {
 }
 
 async function hyrDownloadWord(student, period, year, trendRows, categorized, parsed, breakdownData, chartData, sessionType = "individual") {
+  // Re-fetch the library if the page-load script never landed, rather than
+  // failing on the destructure below with "cannot read Document of undefined".
+  if (!(await ensureDocx())) throw new Error("The Word library did not load, so the document could not be built. Check your connection and try again.");
   const firstName   = student.preferredName || student.name.split(" ")[0];
   const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
   const n = activeTargets.length;
@@ -7416,6 +7419,9 @@ ${collected.text}
 }
 
 async function assessmentDownloadWord(effectiveStudent, student, collected, parsed, PRON) {
+  // Re-fetch the library if the page-load script never landed, rather than
+  // failing on the destructure below with "cannot read Document of undefined".
+  if (!(await ensureDocx())) throw new Error("The Word library did not load, so the document could not be built. Check your connection and try again.");
   // Same short name the prompt uses, so the document and the writing agree.
   const firstName = student.preferredName || student.name.split(" ")[0];
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun, LevelFormat,
@@ -8639,6 +8645,9 @@ function monthlyDrawMiniVerticalBar(lastLabel, lastAvg, thisLabel, thisAvg) {
 }
 
 async function monthlyDownloadWord(student, year, month, monthName, sessionCount, threeMonthData, miniData, parsed, masteredThisMonth, comparisonHeading, sessionType = "individual") {
+  // Re-fetch the library if the page-load script never landed, rather than
+  // failing on the destructure below with "cannot read Document of undefined".
+  if (!(await ensureDocx())) throw new Error("The Word library did not load, so the document could not be built. Check your connection and try again.");
   const firstName = student.preferredName || student.name.split(" ")[0];
   const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
 

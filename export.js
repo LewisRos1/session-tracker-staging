@@ -2343,9 +2343,40 @@ function downloadBlob(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
+/**
+ * The docx global, fetching the library if it is not already there.
+ *
+ * It is loaded as a plain <script> in the head, so one CDN hiccup at page load
+ * left Word export dead for the rest of the session with nothing to do about
+ * it but reload the page. This re-injects the SAME pinned URL with the SAME
+ * integrity hash, so a transient failure costs one retry rather than the whole
+ * session, and a tampered file is still refused. Concurrent callers share one
+ * attempt rather than racing to add several script tags.
+ */
+const DOCX_SRC = "https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.min.js";
+const DOCX_SRI = "sha384-FycsogZbaX8lWofCovAsu/4Zn+hNlGu29U1sGJnT30r7WWPzA4071wlpUKFPCw/m";
+let _docxLoading = null;
+
+export function ensureDocx() {
+  if (window.docx) return Promise.resolve(window.docx);
+  if (!_docxLoading) {
+    _docxLoading = new Promise(resolve => {
+      const el = document.createElement("script");
+      el.src = DOCX_SRC;
+      el.integrity = DOCX_SRI;
+      el.crossOrigin = "anonymous";
+      el.referrerPolicy = "no-referrer";
+      el.onload  = () => resolve(window.docx || null);
+      el.onerror = () => resolve(null);
+      document.head.appendChild(el);
+    }).then(v => { _docxLoading = null; return v; });
+  }
+  return _docxLoading;
+}
+
 export async function exportStudentSingleSessionWord(student, session) {
   if (!student || !session) return;
-  if (typeof docx === "undefined") {
+  if (!(await ensureDocx())) {
     alert("Word export isn't available right now (the docx library didn't load) — check your internet connection and try again.");
     return;
   }
@@ -2369,7 +2400,7 @@ export async function exportStudentSingleSessionWord(student, session) {
 
 export async function exportGroupMemberSingleSessionWord(studentName, groups, session) {
   if (!studentName || !groups?.length || !session) return;
-  if (typeof docx === "undefined") {
+  if (!(await ensureDocx())) {
     alert("Word export isn't available right now (the docx library didn't load) — check your internet connection and try again.");
     return;
   }
