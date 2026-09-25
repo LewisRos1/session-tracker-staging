@@ -1743,7 +1743,9 @@ input.field-input::placeholder {
 .mn-act-note-preview {
   display: block;
   margin-top: .1rem;
-  font-size: .86rem;
+  font-size: .93rem;   /* same as .mn-act-compact-title, so the preview sits
+                          level with the title instead of looking like a
+                          footnote under it */
   font-style: italic;
   font-weight: 400;
   color: #6b7280;

@@ -202,7 +202,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2048";
+const APP_VERSION = "2049";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -11100,7 +11100,8 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
     // Note item — render inline in order, styled like a section heading
     if (pa.isNote || pa.isExportNote) {
       if (_filterPaSet && !_filterPaSet.has(pa)) return;
-      if (pa.text) {
+      const _noteNp = noteParts(pa);
+      if (_noteNp.title || _noteNp.details) {
         const noteTag = pa.isExportNote
           ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.25rem">📄 Included in Word export</div>`
           : `<div style="font-size:.82rem;color:#9a3412;margin-bottom:.25rem">🔒 This note is for ZORA's use only. Excluded from Word report</div>`;
@@ -11522,7 +11523,18 @@ function renderFedcTargetWithSidebar(target, allPas, subActsByParent, sessionDat
   const pct = totalActs > 0 ? Math.round(totalWritten / totalActs * 100) : 0;
 
   // Hide sections whose activities are all invisible (before start date / mastered / discontinued)
-  const _visData = sections.map((s, i) => ({ s, st: sectionStats[i] })).filter(({ st }) => st.total > 0);
+  // A section is kept when it still has something to show. Notes are deliberately
+  // left out of the activity count (they are not work to be filled in), so a
+  // section whose only content is a note counted as zero and was dropped along
+  // with the note inside it. A note sitting above the first heading falls into the
+  // implicit "General" section, which is exactly that case, so target-level notes
+  // never reached the session screen at all.
+  const _sectionHasNote = sec => (sec.pas || []).some(pa => {
+    if (!pa.isNote && !pa.isExportNote) return false;
+    const np = noteParts(pa);
+    return !!(np.title || np.details);
+  });
+  const _visData = sections.map((s, i) => ({ s, st: sectionStats[i] })).filter(({ s, st }) => st.total > 0 || _sectionHasNote(s));
   if (_visData.length === 0) return renderFedcTarget(target, new Set());
   if (_selectedSectionIdx >= _visData.length) _selectedSectionIdx = 0;
 
@@ -25535,7 +25547,8 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
     if (pa.parentActivity) continue;
     if (pa.isNote || pa.isExportNote) {
       if (_grpFilterPaSet && !_grpFilterPaSet.has(pa)) continue;
-      if (pa.text) {
+      const _grpNoteNp = noteParts(pa);
+      if (_grpNoteNp.title || _grpNoteNp.details) {
         const noteTag = pa.isExportNote
           ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.25rem">📄 Included in Word export</div>`
           : `<div style="font-size:.82rem;color:#9a3412;margin-bottom:.25rem">🔒 This note is for ZORA's use only. Excluded from Word report</div>`;
@@ -25812,7 +25825,18 @@ function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByPa
   const pct = totalActs > 0 ? Math.round(totalWritten / totalActs * 100) : 0;
 
   // Hide sections whose activities are all invisible (mastered / discontinued / stopped)
-  const _grpVisData = sections.map((s, i) => ({ s, st: sectionStats[i] })).filter(({ st }) => st.total > 0);
+  // A section is kept when it still has something to show. Notes are deliberately
+  // left out of the activity count (they are not work to be filled in), so a
+  // section whose only content is a note counted as zero and was dropped along
+  // with the note inside it. A note sitting above the first heading falls into the
+  // implicit "General" section, which is exactly that case, so target-level notes
+  // never reached the session screen at all.
+  const _sectionHasNote = sec => (sec.pas || []).some(pa => {
+    if (!pa.isNote && !pa.isExportNote) return false;
+    const np = noteParts(pa);
+    return !!(np.title || np.details);
+  });
+  const _grpVisData = sections.map((s, i) => ({ s, st: sectionStats[i] })).filter(({ s, st }) => st.total > 0 || _sectionHasNote(s));
   if (_grpVisData.length === 0) {
     return layout === "byStudent"
       ? buildGroupItemsByStudent(target, data, attendees, new Set())
