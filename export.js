@@ -202,6 +202,72 @@ const STYLE_NOTE = {
  * The markers still work everywhere else, which is why they are only stripped
  * on the way into a title.
  */
+/**
+ * Pulls "2) Plants (Mastered on 1 Jan 2026)" apart into the number, the title
+ * and the status label.
+ *
+ * Only the middle piece is bold and underlined. The number and the status are
+ * not part of what the activity is called, so they stay plain, the way it would
+ * be written by hand. Covers the "x) " used by the Mastered and Discontinued
+ * sections and the "a) " used by sub-activities as well.
+ */
+const STATUS_SUFFIX_RE = /\s*\((?:Maintained|Mastered|Discontinued) on [^)]*\)\s*$/;
+
+/**
+ * A note as a plain string, whatever tags the editor left in it.
+ */
+export function noteToPlain(text) {
+  return String(text || "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/div>/gi, "\n").replace(/<div>/gi, "")
+    .replace(/<\/p>/gi, "\n").replace(/<p>/gi, "")
+    .replace(/<[^>]*>/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/**
+ * Splits a note written before notes had two fields.
+ *
+ * Notes used to be one box, and the way to give one a heading was to bold or
+ * underline the opening words by hand: "*_Target Behaviour Details:_* Due to
+ * his current mood...". That leading marked span is the title and the rest is
+ * the detail, so it is read that way. A note with no marked span at the front
+ * has no heading to find, so the whole thing is the title and there are no
+ * details, which is how it already reads on screen.
+ */
+export function splitNoteText(text) {
+  const t = noteToPlain(text);
+  const m = /^\s*(?:\*_([^*_]+)_\*|_\*([^*_]+)\*_|\*([^*]+)\*|_([^_]+)_)\s*/.exec(t);
+  if (m) {
+    const title = (m[1] || m[2] || m[3] || m[4] || "").trim();
+    if (title) return { title, details: t.slice(m[0].length).trim() };
+  }
+  return { title: t, details: "" };
+}
+
+/**
+ * A note's title and details, from the two fields when the note has them and
+ * from the old single box when it does not. Same shape either way, so nothing
+ * downstream has to know which kind of note it is looking at.
+ */
+export function noteParts(pa) {
+  if (pa && (pa.noteTitle !== undefined || pa.noteDetails !== undefined)) {
+    return { title: String(pa.noteTitle || ""), details: String(pa.noteDetails || "") };
+  }
+  return splitNoteText(pa?.text || "");
+}
+
+function splitActivityLabel(label) {
+  let rest = String(label || "");
+  let prefix = "", suffix = "";
+  const m = /^(\s*(?:\d+|x|[a-z])\)\s*)([\s\S]*)$/.exec(rest);
+  if (m) { prefix = m[1]; rest = m[2]; }
+  const sm = STATUS_SUFFIX_RE.exec(rest);
+  if (sm) { suffix = sm[0]; rest = rest.slice(0, sm.index); }
+  return { prefix, title: rest, suffix };
+}
+
 function stripTitleMarkers(text) {
   return String(text || "")
     .replace(/\*(.+?)\*/g, "$1")
@@ -211,9 +277,14 @@ function stripTitleMarkers(text) {
 function buildExcelActivityCell(text, suffix, titleHasDetails = false) {
   // Mirrors the website's ". " → "• " display substitution (see bulletifyActivityText).
   const prepared = titleHasDetails ? stripTitleMarkers(text) : text;
-  const lines = parseInlineMarkup(bulletifyActivityText(prepared || ""));
+  // The number that starts the row is not part of the title, so it is peeled
+  // off before the formatting goes on and put back as a plain run.
+  const { prefix: numPrefix, title: titleOnly, suffix: statusSuffix } =
+    titleHasDetails ? splitActivityLabel(prepared) : { prefix: "", title: prepared, suffix: "" };
+  const lines = parseInlineMarkup(bulletifyActivityText(titleOnly || ""));
   const richText = [];
   let hasFormatting = false;
+  if (numPrefix) richText.push({ text: numPrefix });
   lines.forEach((lineRuns, lineIdx) => {
     if (lineIdx > 0 && richText.length > 0) richText[richText.length - 1].text += "\n";
     for (const run of lineRuns) {
@@ -229,11 +300,31 @@ function buildExcelActivityCell(text, suffix, titleHasDetails = false) {
       richText.push(entry);
     }
   });
+  if (statusSuffix) richText.push({ text: statusSuffix });
   if (suffix) {
     if (richText.length > 0) richText[richText.length - 1].text += suffix;
     else richText.push({ text: suffix });
   }
   if (!hasFormatting) return richText.map(r => r.text).join("");
+  return { richText };
+}
+
+/**
+ * The "Note:" cell for a session note, with the note's title bold and
+ * underlined when it has detail under it, matching the Word export and the
+ * website. Built as rich text rather than a plain string because only part of
+ * the cell is formatted.
+ */
+function buildExcelNoteCell(act) {
+  const title   = stripActivityMarkup(noteToPlain(act.activityName || ""));
+  const details = stripActivityMarkup(noteToPlain(act.noteDetails || ""));
+  const richText = [{ text: "Note: ", font: { bold: true } }];
+  if (title) {
+    richText.push(details
+      ? { text: title, font: { bold: true, underline: true } }
+      : { text: title });
+  }
+  if (details) richText.push({ text: (title ? "\n" : "") + bulletifyActivityText(details) });
   return { richText };
 }
 
@@ -1853,9 +1944,20 @@ function buildActLines(act, label) {
   const titleHasDetails = !!act.activityDisplayDetails;
   // bulletifyActivityText mirrors the website's ". " → "• " display substitution.
   const labelText = bulletifyActivityText(titleHasDetails ? stripTitleMarkers(label) : label);
-  const titleLines = titleHasDetails
-    ? labelText.split("\n").map(line => [{ text: line, bold: true, underline: true }])
-    : parseInlineMarkup(labelText);
+  let titleLines;
+  if (titleHasDetails) {
+    const { prefix, title, suffix } = splitActivityLabel(labelText);
+    const lines = title.split("\n");
+    titleLines = lines.map((line, i) => {
+      const runs = [];
+      if (i === 0 && prefix) runs.push({ text: prefix });
+      runs.push({ text: line, bold: true, underline: true });
+      if (i === lines.length - 1 && suffix) runs.push({ text: suffix });
+      return runs;
+    });
+  } else {
+    titleLines = parseInlineMarkup(labelText);
+  }
   const details = act.activityDisplayDetails;
   if (details) return [...titleLines, ...parseInlineMarkup(bulletifyActivityText(details))];
   return titleLines;
@@ -1929,7 +2031,7 @@ function wordTargetRows(target, session, allTargets) {
     if (act.isNote) continue;
 
     if (act.isExportNote) {
-      rows.push({ merge: true, isExportNote: true, text: act.activityName || "" });
+      rows.push({ merge: true, isExportNote: true, text: act.activityName || "", noteDetails: act.noteDetails || "" });
       continue;
     }
 
@@ -2216,11 +2318,17 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
     for (const r of targetBodyRows) {
       if (r.merge) {
         if (r.isExportNote) {
-          const noteLines = (r.text || "").split("\n").map(line => {
+          // Same rule as an activity: the title is bold and underlined when it
+          // has detail under it, and plain when it is the whole note.
+          const noteHasDetails = !!(r.noteDetails || "").trim();
+          const titleLines = (r.text || "").split("\n").map(line =>
+            noteHasDetails ? [{ text: line, bold: true, underline: true }] : parseInlineMarkupLine(line));
+          const detailLines = (r.noteDetails || "").split("\n").filter((l, i, arr) => l !== "" || i < arr.length - 1).map(line => {
             const isBullet = /^\s*•\s?/.test(line);
             const cleanLine = isBullet ? "• " + line.replace(/^\s*•\s?/, "") : line;
             return parseInlineMarkupLine(cleanLine);
           });
+          const noteLines = noteHasDetails ? [...titleLines, ...detailLines] : titleLines;
           if (noteLines.length === 0) noteLines.push([{ text: "" }]);
           // Labelled "Note:" to match what the Start Session screen calls this
           // box. It is the yellow NOTE marked "Included in Word export", not a
@@ -2806,29 +2914,9 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, mastere
       // Both of these are the note boxes from the Start Session screen, so they
       // carry that screen's own label, "Note:". An actNote attached to a single
       // activity is a different thing and still prints as "Remark:".
-      if (act.isNote) {
+      if (act.isNote || act.isExportNote) {
         noteRows.add(rows.length);
-        const noteText = stripActivityMarkup((act.activityName || "")
-          .replace(/<br\s*\/?>/gi, "\n")
-          .replace(/<\/div>/gi, "\n").replace(/<div>/gi, "")
-          .replace(/<\/p>/gi, "\n").replace(/<p>/gi, "")
-          .replace(/<[^>]*>/g, "")
-          .replace(/\n{3,}/g, "\n\n")
-          .trim());
-        const r = blankRow(); r[1] = `Note: ${noteText}`; rows.push(r);
-        continue;
-      }
-
-      if (act.isExportNote) {
-        noteRows.add(rows.length);
-        const noteText = stripActivityMarkup((act.activityName || "")
-          .replace(/<br\s*\/?>/gi, "\n")
-          .replace(/<\/div>/gi, "\n").replace(/<div>/gi, "")
-          .replace(/<\/p>/gi, "\n").replace(/<p>/gi, "")
-          .replace(/<[^>]*>/g, "")
-          .replace(/\n{3,}/g, "\n\n")
-          .trim());
-        const r = blankRow(); r[1] = `Note: ${noteText}`; rows.push(r);
+        const r = blankRow(); r[1] = buildExcelNoteCell(act); rows.push(r);
         continue;
       }
 
@@ -3096,11 +3184,13 @@ function getAllActivitiesForTarget(session, target, opts = {}) {
     }
     if (!pa.name && !pa.title && !pa.isNote && !pa.isExportNote && !pa.isHeading && !pa.isMaintainHeading) continue;
     if (pa.isNote) {
-      result.push({ isNote: true, activityName: pa.text || "" });
+      const _np = noteParts(pa);
+      result.push({ isNote: true, activityName: _np.title, noteDetails: _np.details });
       continue;
     }
     if (pa.isExportNote) {
-      result.push({ isExportNote: true, activityName: pa.text || "" });
+      const _np = noteParts(pa);
+      result.push({ isExportNote: true, activityName: _np.title, noteDetails: _np.details });
       continue;
     }
     if (!pa.name && !pa.title) continue;
@@ -3126,14 +3216,14 @@ function getAllActivitiesForTarget(session, target, opts = {}) {
       subLabelCounters[pa.parentActivity] = si + 1;
       const subLabel = String.fromCharCode(97 + si);
       const parentPa = (target.predefinedActivities || []).find(p => !p.parentActivity && (p.title || p.name) === pa.parentActivity);
-      const subStatusPrefix = pa.discontinuedOn ? `(Discontinued on ${fmtDate(pa.discontinuedOn)}) `
-        : pa.masteredOn ? `(Mastered on ${fmtDate(pa.masteredOn)}) `
-        : pa.maintained ? `(Maintained on ${fmtDate(pa.maintainedAt || "2026-08-21")}) `
-        : parentPa?.discontinuedOn ? `(Discontinued on ${fmtDate(parentPa.discontinuedOn)}) `
-        : parentPa?.masteredOn ? `(Mastered on ${fmtDate(parentPa.masteredOn)}) `
-        : parentPa?.maintained ? `(Maintained on ${fmtDate(parentPa.maintainedAt || "2026-08-21")}) `
+      const subStatusSuffix = pa.discontinuedOn ? ` (Discontinued on ${fmtDate(pa.discontinuedOn)})`
+        : pa.masteredOn ? ` (Mastered on ${fmtDate(pa.masteredOn)})`
+        : pa.maintained ? ` (Maintained on ${fmtDate(pa.maintainedAt || "2026-08-21")})`
+        : parentPa?.discontinuedOn ? ` (Discontinued on ${fmtDate(parentPa.discontinuedOn)})`
+        : parentPa?.masteredOn ? ` (Mastered on ${fmtDate(parentPa.masteredOn)})`
+        : parentPa?.maintained ? ` (Maintained on ${fmtDate(parentPa.maintainedAt || "2026-08-21")})`
         : '';
-      const subActName = subStatusPrefix + (pa.title || pa.name);
+      const subActName = (pa.title || pa.name) + subStatusSuffix;
       const sessionAct = claimAct(pa);
       if (sessionAct) {
         usedIds.add(sessionAct.id);
@@ -3170,7 +3260,7 @@ function getAllActivitiesForTarget(session, target, opts = {}) {
       else {
       const _sAct = claimAct(pa);
       const _paKey = pa.title || pa.name;
-      const _name = `x) (Mastered on ${fmtDate(pa.masteredOn)}) ${_paKey}`;
+      const _name = `x) ${_paKey} (Mastered on ${fmtDate(pa.masteredOn)})`;
       const _subs = (target.predefinedActivities || []).filter(p => p.parentActivity === _paKey);
       const _subText = _subs.length > 0 ? _subs.map((p, i) => `${String.fromCharCode(97 + i)}. ${p.title || p.name}`).join("\n") : null;
       const _extra = { activityDisplayDetails: _subText || (pa.title ? (pa.name || null) : null), activityTitleBold: !!pa.isBold, activityTitleUnderline: !!pa.isUnderline };
@@ -3185,7 +3275,7 @@ function getAllActivitiesForTarget(session, target, opts = {}) {
       else {
       const _sAct = claimAct(pa);
       const _paKey = pa.title || pa.name;
-      const _name = `x) (Discontinued on ${fmtDate(pa.discontinuedOn)}) ${_paKey}`;
+      const _name = `x) ${_paKey} (Discontinued on ${fmtDate(pa.discontinuedOn)})`;
       const _subs = (target.predefinedActivities || []).filter(p => p.parentActivity === _paKey);
       const _subText = _subs.length > 0 ? _subs.map((p, i) => `${String.fromCharCode(97 + i)}. ${p.title || p.name}`).join("\n") : null;
       const _extra = { activityDisplayDetails: _subText || (pa.title ? (pa.name || null) : null), activityTitleBold: !!pa.isBold, activityTitleUnderline: !!pa.isUnderline };
@@ -3197,9 +3287,11 @@ function getAllActivitiesForTarget(session, target, opts = {}) {
 
     // All remaining paths are real activities — assign sequential number
     exportActNum++;
-    const _exportStatusPrefix = pa.maintained ? `(Maintained on ${fmtDate(pa.maintainedAt || "2026-08-21")}) ` : '';
+    // After the title, not before it: the label says something about the
+    // activity, it is not part of what the activity is called.
+    const _exportStatusSuffix = pa.maintained ? ` (Maintained on ${fmtDate(pa.maintainedAt || "2026-08-21")})` : '';
     const _paDisplayBase = pa.title || pa.name;
-    const numberedName = `${exportActNum}) ${_exportStatusPrefix}${_paDisplayBase}`;
+    const numberedName = `${exportActNum}) ${_paDisplayBase}${_exportStatusSuffix}`;
     const paExtraProps = { activityDisplayDetails: pa.title ? (pa.name || null) : null, activityTitleBold: !!pa.isBold, activityTitleUnderline: !!pa.isUnderline };
 
     // Parent activity (noRemark) — numbered title; session data at parent level is still shown

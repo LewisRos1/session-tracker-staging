@@ -112,6 +112,7 @@ import {
   exportStudentData, exportAllStudents, exportGroupMemberData,
   exportStudentSingleSessionWord, exportGroupMemberSingleSessionWord,
   renderActivityBreakdownChart, calcDailyAverage, scoresPct, ensureDocx,
+  noteParts,
   setTrialScale, getTrialScale
 } from "./export.js";
 
@@ -201,7 +202,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2045";
+const APP_VERSION = "2046";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -11106,7 +11107,7 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
         html += `<div class="entry-block" contenteditable="false" style="border-left:4px solid #f59e0b;">
           <div class="entry-field">
             <span class="field-label" style="color:#b45309">Note</span>
-            <div style="flex:1;font-size:.93rem;font-weight:600">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
+            <div style="flex:1;font-size:.93rem;font-weight:600">${noteTag}<div style="white-space:pre-wrap">${noteBodyHtml(pa)}</div></div>
           </div>
         </div>`;
       }
@@ -14867,7 +14868,7 @@ function buildTargetViewTable(target, data) {
       }
       if (pa.isNote || pa.isExportNote) {
         if (_pendingViewHeading) { rows += _pendingViewHeading; _pendingViewHeading = null; }
-        rows += `<tr class="view-note-row"><td colspan="6" contenteditable="false">${noteToHtml(pa.text)}</td></tr>`;
+        rows += `<tr class="view-note-row"><td colspan="6" contenteditable="false">${noteBodyHtml(pa)}</td></tr>`;
         continue;
       }
       if (_pendingViewHeading) { rows += _pendingViewHeading; _pendingViewHeading = null; }
@@ -17035,7 +17036,7 @@ function buildGroupTargetViewTable(target, data, attendees) {
       }
       if (pa.isNote || pa.isExportNote) {
         if (_pendingGrpViewHeading) { rows += _pendingGrpViewHeading; _pendingGrpViewHeading = null; }
-        rows += `<tr class="view-note-row"><td colspan="7" contenteditable="false">${noteToHtml(pa.text)}</td></tr>`;
+        rows += `<tr class="view-note-row"><td colspan="7" contenteditable="false">${noteBodyHtml(pa)}</td></tr>`;
         continue;
       }
       if (_pendingGrpViewHeading) { rows += _pendingGrpViewHeading; _pendingGrpViewHeading = null; }
@@ -19795,6 +19796,28 @@ function autoResizeTextarea(el) {
 
 // Converts stored note text to safe display HTML.
 // Accepts both legacy *bold* markdown and new HTML from contenteditable.
+/**
+ * A note as it should read: its title, then its details under it.
+ *
+ * The title is bold and underlined when there are details beneath it and plain
+ * when the title is the whole note, which is the same rule activity titles
+ * follow. Notes written before they had two fields are split on the fly by
+ * noteParts, so an old note looks the same here as a new one.
+ */
+function noteBodyHtml(pa) {
+  const { title, details } = noteParts(pa);
+  let html = "";
+  if (title) {
+    html += details
+      ? `<span style="font-weight:700;text-decoration:underline">${noteToHtml(title)}</span>`
+      : noteToHtml(title);
+  }
+  if (details) {
+    html += `<span style="display:block;font-weight:400;text-decoration:none">${noteToHtml(details)}</span>`;
+  }
+  return html;
+}
+
 function noteToHtml(text) {
   if (!text) return "";
   if (/<[a-z]/i.test(text)) return text;
@@ -20366,7 +20389,11 @@ function mnInitActivityCollapse(bodyEl, acts) {
     body.style.cssText = "display:flex;flex-direction:column;gap:.55rem";
     pieces.forEach(p => body.appendChild(p));
     const isNote = !!(a.isNote || a.isExportNote);
-    const text = isNote ? stripNoteHtml(a.text || "") : (a.name || "");
+    // Collapsed, a note shows its title, the same way an activity shows its own.
+    // A note with details but no title falls back to the details so the row is
+    // not a blank strip with no way to tell what it is.
+    const _noteNp = isNote ? noteParts(a) : null;
+    const text = isNote ? (_noteNp.title || _noteNp.details || "") : (a.name || "");
     const title = document.createElement("div");
     title.className = "mn-act-compact-title";
     title.innerHTML = `<span class="mn-act-title-text">${escHtml(text.trim())}</span>`;
@@ -20728,12 +20755,21 @@ function renderTargetManageContent(student, target) {
               <option value="export"${a.isExportNote ? ' selected' : ''}>📄 Include in Word export</option>
             </select>
           </div>
-          <div style="display:flex;align-items:flex-start;gap:.3rem">
-            ${formatButtonsHtml(`mn-act-name-${idx}`)}
-            <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
-              rows="1" placeholder="Enter Note"
-              style="flex:1;overflow-y:hidden;resize:none">${escHtml(stripNoteHtml(a.text || ""))}</textarea>
+          ${(() => { const _np = noteParts(a); return `
+          <div>
+            <div style="font-size:.85rem;font-weight:700;color:#78350f;margin-bottom:.2rem">Note Title</div>
+            <input type="text" class="admin-input mn-note-title-input" id="mn-note-title-${idx}" data-idx="${idx}"
+              placeholder="Enter Note Title Here" value="${escHtml(_np.title)}" style="width:100%;box-sizing:border-box;display:block" />
           </div>
+          <div>
+            <div style="font-size:.85rem;font-weight:700;color:#78350f;margin-bottom:.2rem">Note Details</div>
+            <div style="display:flex;align-items:flex-start;gap:.3rem">
+              ${formatButtonsHtml(`mn-note-details-${idx}`)}
+              <textarea class="admin-input mn-note-details-input" id="mn-note-details-${idx}" data-idx="${idx}"
+                rows="1" placeholder="Enter Note Details Here (Optional)"
+                style="flex:1;overflow-y:hidden;resize:none">${escHtml(bulletifyForEditing(_np.details))}</textarea>
+            </div>
+          </div>`; })()}
         </div>
         <div style="position:relative">
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Note options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
@@ -21348,18 +21384,31 @@ function renderTargetManageContent(student, target) {
   });
 
   acts.forEach((a, idx) => {
-    const input = $(`mn-act-name-${idx}`);
-    if ((a.isNote || a.isExportNote) && input) {
-      const resize = () => { input.style.height = "auto"; input.style.height = input.scrollHeight + "px"; };
+    // A note is a title plus optional details, the same shape as an activity.
+    // a.text is kept in step as the plain reading of the two, so anything that
+    // still wants the note as one string keeps working.
+    const noteTitleEl   = $(`mn-note-title-${idx}`);
+    const noteDetailsEl = $(`mn-note-details-${idx}`);
+    if ((a.isNote || a.isExportNote) && (noteTitleEl || noteDetailsEl)) {
+      const resize = () => {
+        if (!noteDetailsEl) return;
+        noteDetailsEl.style.height = "auto";
+        noteDetailsEl.style.height = noteDetailsEl.scrollHeight + "px";
+      };
       resize();
       let noteTimer;
-      input.addEventListener("input", () => {
-        resize();
-        a.text = input.value;           // keep in-memory state in sync immediately
+      const syncNote = () => {
+        a.noteTitle   = noteTitleEl ? noteTitleEl.value : (a.noteTitle || "");
+        a.noteDetails = noteDetailsEl ? noteDetailsEl.value : (a.noteDetails || "");
+        a.text = a.noteDetails.trim() ? `${a.noteTitle}\n${a.noteDetails}` : a.noteTitle;
         clearTimeout(noteTimer);
         noteTimer = setTimeout(async () => { await saveTarget(); }, 800);
-      });
+      };
+      noteTitleEl?.addEventListener("input", syncNote);
+      noteDetailsEl?.addEventListener("input", () => { resize(); syncNote(); });
     }
+
+    const input = $(`mn-act-name-${idx}`);
     input?.addEventListener("blur", async () => {
       let oldName = null;
       if (a.isNote || a.isExportNote) {
@@ -23580,12 +23629,21 @@ function renderTemplateManageContent(template) {
               <option value="export"${a.isExportNote ? ' selected' : ''}>📄 Include in Word export</option>
             </select>
           </div>
-          <div style="display:flex;align-items:flex-start;gap:.3rem">
-            ${formatButtonsHtml(`mn-act-name-${idx}`)}
-            <textarea class="admin-input mn-act-name-input" id="mn-act-name-${idx}" data-idx="${idx}"
-              rows="1" placeholder="Enter Note"
-              style="flex:1;overflow-y:hidden;resize:none">${escHtml(stripNoteHtml(a.text || ""))}</textarea>
+          ${(() => { const _np = noteParts(a); return `
+          <div>
+            <div style="font-size:.85rem;font-weight:700;color:#78350f;margin-bottom:.2rem">Note Title</div>
+            <input type="text" class="admin-input mn-note-title-input" id="mn-note-title-${idx}" data-idx="${idx}"
+              placeholder="Enter Note Title Here" value="${escHtml(_np.title)}" style="width:100%;box-sizing:border-box;display:block" />
           </div>
+          <div>
+            <div style="font-size:.85rem;font-weight:700;color:#78350f;margin-bottom:.2rem">Note Details</div>
+            <div style="display:flex;align-items:flex-start;gap:.3rem">
+              ${formatButtonsHtml(`mn-note-details-${idx}`)}
+              <textarea class="admin-input mn-note-details-input" id="mn-note-details-${idx}" data-idx="${idx}"
+                rows="1" placeholder="Enter Note Details Here (Optional)"
+                style="flex:1;overflow-y:hidden;resize:none">${escHtml(bulletifyForEditing(_np.details))}</textarea>
+            </div>
+          </div>`; })()}
         </div>
         <div style="position:relative">
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Note options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
@@ -24016,18 +24074,31 @@ function renderTemplateManageContent(template) {
 
 
   acts.forEach((a, idx) => {
-    const input = $(`mn-act-name-${idx}`);
-    if (a.isNote && input) {
-      const resize = () => { input.style.height = "auto"; input.style.height = input.scrollHeight + "px"; };
+    // A note is a title plus optional details, the same shape as an activity.
+    // a.text is kept in step as the plain reading of the two, so anything that
+    // still wants the note as one string keeps working.
+    const noteTitleEl   = $(`mn-note-title-${idx}`);
+    const noteDetailsEl = $(`mn-note-details-${idx}`);
+    if ((a.isNote || a.isExportNote) && (noteTitleEl || noteDetailsEl)) {
+      const resize = () => {
+        if (!noteDetailsEl) return;
+        noteDetailsEl.style.height = "auto";
+        noteDetailsEl.style.height = noteDetailsEl.scrollHeight + "px";
+      };
       resize();
       let noteTimer;
-      input.addEventListener("input", () => {
-        resize();
-        a.text = input.value;           // keep in-memory state in sync immediately
+      const syncNote = () => {
+        a.noteTitle   = noteTitleEl ? noteTitleEl.value : (a.noteTitle || "");
+        a.noteDetails = noteDetailsEl ? noteDetailsEl.value : (a.noteDetails || "");
+        a.text = a.noteDetails.trim() ? `${a.noteTitle}\n${a.noteDetails}` : a.noteTitle;
         clearTimeout(noteTimer);
         noteTimer = setTimeout(async () => { await saveTemplateFn(); }, 800);
-      });
+      };
+      noteTitleEl?.addEventListener("input", syncNote);
+      noteDetailsEl?.addEventListener("input", () => { resize(); syncNote(); });
     }
+
+    const input = $(`mn-act-name-${idx}`);
     input?.addEventListener("blur", async () => {
       if (a.isNote) {
         const v = input.value;
@@ -25441,7 +25512,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
         items.push(`<div class="entry-block" contenteditable="false" style="background:#fffbeb;border-left:4px solid #f59e0b;">
           <div class="entry-field">
             <span class="field-label" style="color:#b45309">Note</span>
-            <div style="flex:1;color:#92400e;font-size:.93rem;font-weight:600">${noteTag}<div style="white-space:pre-wrap">${noteToHtml(pa.text)}</div></div>
+            <div style="flex:1;color:#92400e;font-size:.93rem;font-weight:600">${noteTag}<div style="white-space:pre-wrap">${noteBodyHtml(pa)}</div></div>
           </div>
         </div>`);
       }
