@@ -202,7 +202,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2050";
+const APP_VERSION = "2051";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -1694,6 +1694,45 @@ function initHomeSidenav() {
   }, { passive: true });
 }
 
+/**
+ * Remembers that a <select> menu is open, so nothing re-renders underneath it.
+ *
+ * An open native menu is an operating system window. It fires no events while
+ * it is up, and the page can lose focus the moment it opens, so
+ * document.activeElement is not a dependable test for "the menu is showing".
+ * Any re-render while it is open destroys the menu, which is what made picking
+ * a target take two goes: the list appeared, a Firestore snapshot landed a
+ * moment later, the screen redrew and the list vanished.
+ *
+ * The flag used to clear itself after 800ms, which is shorter than it takes to
+ * read a list and move the mouse down it, so the guard was gone before the user
+ * had chosen. It is now cleared only when the menu is genuinely finished with:
+ * a choice was made, a key dismissed it, or the next click landed somewhere
+ * else on the page. The timeout that remains is a backstop against a flag that
+ * somehow never clears, not a guess at how long someone takes to decide.
+ *
+ * blur is deliberately NOT used to clear it. On some platforms opening the menu
+ * blurs the select, which would clear the flag at the exact moment it is needed.
+ */
+function trackSelectOpen(sel, flag) {
+  if (!sel) return;
+  const timerKey = flag + "Timer";
+  const close = () => { state[flag] = false; clearTimeout(state[timerKey]); };
+  const open = () => {
+    state[flag] = true;
+    clearTimeout(state[timerKey]);
+    state[timerKey] = setTimeout(() => { state[flag] = false; }, 30000);
+  };
+  // touchstart as well as pointerdown: on iOS pointerdown may not fire for a
+  // <select>, and touchstart reliably beats focusout there.
+  ["pointerdown", "touchstart"].forEach(ev => sel.addEventListener(ev, open, { passive: true }));
+  sel.addEventListener("change", close);
+  sel.addEventListener("keydown", e => {
+    if (e.key === "Escape" || e.key === "Enter" || e.key === "Tab") close();
+  });
+  document.addEventListener("pointerdown", e => { if (e.target !== sel) close(); }, { passive: true, capture: true });
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
 
   // Register SW immediately — don't wait for Firebase so updates are never blocked.
@@ -1715,15 +1754,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }, 5000);
   }
 
-  // On iOS, relatedTarget is always null and pointerdown may not fire for <select>.
-  // Use both pointerdown and touchstart (touchstart fires reliably before focusout on iOS).
-  ["pointerdown", "touchstart"].forEach(evtName => {
-    $("target-select").addEventListener(evtName, () => {
-      state._targetSelDown = true;
-      clearTimeout(state._targetSelTimer);
-      state._targetSelTimer = setTimeout(() => { state._targetSelDown = false; }, 800);
-    }, { passive: true });
-  });
+  trackSelectOpen($("target-select"), "_targetSelDown");
+  trackSelectOpen($("group-target-select"), "_grpTargetSelDown");
 
   document.addEventListener("focusout", (e) => {
     if (e.relatedTarget === $("target-select") || state._targetSelDown) return;
@@ -10442,7 +10474,7 @@ async function openSession(student, existingSessionId = null, dateStr = null, pa
   }
   state.entryRemarkSaver = setupEntryRemarkSaving($("target-content"), () => state.currentSessionId, () => {
     if (!state.renderPending || state.entryActionsInFlight > 0) return;
-    if (document.activeElement === $("target-select")) return;
+    if (document.activeElement === $("target-select") || state._targetSelDown) return;
     const _tc = $("target-content"), _ae = document.activeElement;
     if (_tc?.contains(_ae) && (_ae?.tagName === "TEXTAREA" || _ae?.tagName === "INPUT")) return;
     state.renderPending = false;
@@ -10600,7 +10632,7 @@ async function openSession(student, existingSessionId = null, dateStr = null, pa
       // wasn't registering when clicked soon after typing elsewhere).
       const isEntryBusy = () => {
         const ae = document.activeElement;
-        if (ae === $("target-select")) return true;
+        if (ae === $("target-select") || state._targetSelDown) return true;
         if (state.entryActionsInFlight > 0) return true;
         if (ae?.classList.contains("pending-activity-name-input")) return true;
         // Any text field inside target-content means the user is actively typing.
@@ -10740,14 +10772,19 @@ function sortTargetsByOrder(targets) {
 function populateTargetDropdown(targets) {
   const sel = $("target-select");
   const sorted = sortTargetsByOrder(targets).filter(t => !t.discontinuedOn);
-  const placeholder = sorted.length === 0
-    ? `<option value="" disabled selected>— no targets yet —</option>` : "";
-  sel.innerHTML = placeholder +
-    sorted.map(t =>
-      `<option value="${escHtml(t.name)}">${escHtml(t.name)}</option>`
-    ).join("") + `<option value="__add_target__">+ Add Target…</option>`;
+  // Rewriting the options closes an open menu, so the list is left alone while
+  // the user is reading it. Everything below still runs: skipping the whole
+  // function here would leave the Edit Instructors button unwired.
+  if (!state._targetSelDown) {
+    const placeholder = sorted.length === 0
+      ? `<option value="" disabled selected>— no targets yet —</option>` : "";
+    sel.innerHTML = placeholder +
+      sorted.map(t =>
+        `<option value="${escHtml(t.name)}">${escHtml(t.name)}</option>`
+      ).join("") + `<option value="__add_target__">+ Add Target…</option>`;
 
-  sel.value = state.selectedTargetName || sorted[0]?.name || "";
+    sel.value = state.selectedTargetName || sorted[0]?.name || "";
+  }
 
   const editInstBtn2 = $("btn-entry-edit-instructors");
   if (editInstBtn2) {
@@ -25073,7 +25110,7 @@ async function openGroupSession(group, dateStr, attendees, participants = null) 
   }
   state.entryGroupRemarkSaver = setupEntryRemarkSaving($("group-target-content"), () => state.groupSessionId, () => {
     if (!state.groupRenderPending || state.entryGroupActionsInFlight > 0) return;
-    if (document.activeElement === $("group-target-select")) return;
+    if (document.activeElement === $("group-target-select") || state._grpTargetSelDown) return;
     state.groupRenderPending = false;
     renderGroupTargetContent();
   });
@@ -25143,7 +25180,7 @@ async function openGroupSession(group, dateStr, attendees, participants = null) 
       // a focused box never needs to defer a render here.
       const isGroupEntryBusy = () => {
         const ae = document.activeElement;
-        if (ae === $("group-target-select")) return true;
+        if (ae === $("group-target-select") || state._grpTargetSelDown) return true;
         if (state.entryGroupActionsInFlight > 0) return true;
         const gc = $("group-target-content");
         if (gc?.contains(ae) && (ae?.tagName === "TEXTAREA" || ae?.tagName === "INPUT")) return true;
@@ -25177,13 +25214,18 @@ function populateGroupTargetDropdown(targets) {
   const sel = $("group-target-select");
   if (!sel) return;
   const sorted = sortTargetsByOrder(targets).filter(t => !t.discontinuedOn);
-  const placeholder = sorted.length === 0
-    ? `<option value="" disabled selected>— no targets yet —</option>` : "";
-  sel.innerHTML = placeholder +
-    sorted.map(t =>
-      `<option value="${escHtml(t.name)}"${t.name === state.selectedGroupTargetName ? " selected" : ""}>${escHtml(t.name)}</option>`
-    ).join("") +
-    `<option value="__add_target__">+ Add Target…</option>`;
+  // Rewriting the options closes an open menu, so the list is left alone while
+  // the user is reading it. Everything below still runs: skipping the whole
+  // function here would leave the Edit Target button unwired.
+  if (!state._grpTargetSelDown) {
+    const placeholder = sorted.length === 0
+      ? `<option value="" disabled selected>— no targets yet —</option>` : "";
+    sel.innerHTML = placeholder +
+      sorted.map(t =>
+        `<option value="${escHtml(t.name)}"${t.name === state.selectedGroupTargetName ? " selected" : ""}>${escHtml(t.name)}</option>`
+      ).join("") +
+      `<option value="__add_target__">+ Add Target…</option>`;
+  }
 
   const manageBtn = $("btn-group-manage-targets");
   if (manageBtn) {
