@@ -232,9 +232,13 @@ export function noteToPlain(text) {
  * Notes used to be one box, and the way to give one a heading was to bold or
  * underline the opening words by hand: "*_Target Behaviour Details:_* Due to
  * his current mood...". That leading marked span is the title and the rest is
- * the detail, so it is read that way. A note with no marked span at the front
- * has no heading to find, so the whole thing is the title and there are no
- * details, which is how it already reads on screen.
+ * the detail, so it is read that way.
+ *
+ * A note with no marked span has no heading, so it becomes DETAILS with no
+ * title rather than one paragraph-long title. Calling a whole instruction a
+ * title made the Edit Target rows and the editing panel as tall as the note,
+ * and put a paragraph in a box labelled Title. With no title there is nothing
+ * to bold, so it prints exactly as it always has.
  */
 export function splitNoteText(text) {
   const t = noteToPlain(text);
@@ -243,7 +247,7 @@ export function splitNoteText(text) {
     const title = (m[1] || m[2] || m[3] || m[4] || "").trim();
     if (title) return { title, details: t.slice(m[0].length).trim() };
   }
-  return { title: t, details: "" };
+  return { title: "", details: t };
 }
 
 /**

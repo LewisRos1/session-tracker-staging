@@ -202,7 +202,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2046";
+const APP_VERSION = "2047";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -12057,6 +12057,20 @@ function stripTitleMarkers(text) {
   return String(text || "").replace(/\*(.+?)\*/g, "$1").replace(/_(.+?)_/g, "$1");
 }
 
+/**
+ * A collapsed row shows the first words and then an ellipsis.
+ *
+ * The row and the editing panel's heading both read from this. A note can run
+ * to a full paragraph, and printing all of it made a single row taller than the
+ * rest of the list and repeated the whole note above the box already holding
+ * it. The full text is still one click away in the field itself.
+ */
+function truncateWords(text, limit = 10) {
+  const t = String(text || "").trim();
+  const words = t.split(/\s+/);
+  return words.length <= limit ? t : words.slice(0, limit).join(" ") + "…";
+}
+
 function paPlainTitle(pa) {
   const t = (pa?.title || "").trim();
   return escHtml(t.replace(/\*(.+?)\*/g, "$1").replace(/_(.+?)_/g, "$1"));
@@ -20200,13 +20214,14 @@ function mnOpenActPanel(card, body, titleHtml, key) {
 function mnWirePanelLiveTitle(slot) {
   const head = document.querySelector("#mn-act-panel-overlay .mn-act-panel-title .mn-act-title-text");
   const rowText = _mnPanelOpen?.card?.querySelector(".mn-act-compact-title .mn-act-title-text");
-  const field = slot.querySelector(".mn-act-title-input, .mn-heading-input, .mn-act-name-input");
+  const field = slot.querySelector(".mn-act-title-input, .mn-heading-input, .mn-act-name-input, .mn-note-title-input");
   if (!field) return;
+  const isNoteField = field.classList.contains("mn-note-title-input");
   const paint = () => {
-    const raw = (field.value || "").trim();
+    const raw = truncateWords(stripTitleMarkers(field.value || ""));
     const shown = raw
-      ? escHtml(raw.replace(/\*(.+?)\*/g, "$1").replace(/_(.+?)_/g, "$1"))
-      : `<span style="color:#9ca3af;font-style:italic;font-weight:500">(Untitled activity)</span>`;
+      ? escHtml(raw)
+      : `<span style="color:#9ca3af;font-style:italic;font-weight:500">(Untitled ${isNoteField ? "note" : "activity"})</span>`;
     if (head) head.innerHTML = shown;
     if (rowText) rowText.innerHTML = shown;
   };
@@ -20365,7 +20380,7 @@ function mnInitActivityCollapse(bodyEl, acts) {
     title.className = "mn-act-compact-title";
     // The mastered / discontinued / maintained tag leads the title, the way the
     // Start Session screen shows it.
-    title.innerHTML = a ? inactiveReasonBadge(a) + `<span class="mn-act-title-text">${paPlainTitle(a)}</span>` : `<span class="mn-act-title-text"></span>`;
+    title.innerHTML = a ? inactiveReasonBadge(a) + `<span class="mn-act-title-text">${escHtml(truncateWords(stripTitleMarkers(a.title || "")))}</span>` : `<span class="mn-act-title-text"></span>`;
     body.parentElement.insertBefore(col, body);
     col.appendChild(title);
     col.appendChild(body);
@@ -20396,7 +20411,7 @@ function mnInitActivityCollapse(bodyEl, acts) {
     const text = isNote ? (_noteNp.title || _noteNp.details || "") : (a.name || "");
     const title = document.createElement("div");
     title.className = "mn-act-compact-title";
-    title.innerHTML = `<span class="mn-act-title-text">${escHtml(text.trim())}</span>`;
+    title.innerHTML = `<span class="mn-act-title-text">${escHtml(truncateWords(text))}</span>`;
     const head = document.createElement("div");
     head.className = "mn-act-head";
     if (handle) head.appendChild(handle);
@@ -20758,8 +20773,9 @@ function renderTargetManageContent(student, target) {
           ${(() => { const _np = noteParts(a); return `
           <div>
             <div style="font-size:.85rem;font-weight:700;color:#78350f;margin-bottom:.2rem">Note Title</div>
-            <input type="text" class="admin-input mn-note-title-input" id="mn-note-title-${idx}" data-idx="${idx}"
-              placeholder="Enter Note Title Here" value="${escHtml(_np.title)}" style="width:100%;box-sizing:border-box;display:block" />
+            <textarea class="admin-input mn-note-title-input" id="mn-note-title-${idx}" data-idx="${idx}"
+              rows="1" placeholder="Enter Note Title Here (Optional)"
+              style="width:100%;box-sizing:border-box;display:block;overflow-y:hidden;resize:none">${escHtml(_np.title)}</textarea>
           </div>
           <div>
             <div style="font-size:.85rem;font-weight:700;color:#78350f;margin-bottom:.2rem">Note Details</div>
@@ -21390,11 +21406,8 @@ function renderTargetManageContent(student, target) {
     const noteTitleEl   = $(`mn-note-title-${idx}`);
     const noteDetailsEl = $(`mn-note-details-${idx}`);
     if ((a.isNote || a.isExportNote) && (noteTitleEl || noteDetailsEl)) {
-      const resize = () => {
-        if (!noteDetailsEl) return;
-        noteDetailsEl.style.height = "auto";
-        noteDetailsEl.style.height = noteDetailsEl.scrollHeight + "px";
-      };
+      const grow = el => { if (el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } };
+      const resize = () => { grow(noteTitleEl); grow(noteDetailsEl); };
       resize();
       let noteTimer;
       const syncNote = () => {
@@ -21404,7 +21417,7 @@ function renderTargetManageContent(student, target) {
         clearTimeout(noteTimer);
         noteTimer = setTimeout(async () => { await saveTarget(); }, 800);
       };
-      noteTitleEl?.addEventListener("input", syncNote);
+      noteTitleEl?.addEventListener("input", () => { grow(noteTitleEl); syncNote(); });
       noteDetailsEl?.addEventListener("input", () => { resize(); syncNote(); });
     }
 
@@ -23632,8 +23645,9 @@ function renderTemplateManageContent(template) {
           ${(() => { const _np = noteParts(a); return `
           <div>
             <div style="font-size:.85rem;font-weight:700;color:#78350f;margin-bottom:.2rem">Note Title</div>
-            <input type="text" class="admin-input mn-note-title-input" id="mn-note-title-${idx}" data-idx="${idx}"
-              placeholder="Enter Note Title Here" value="${escHtml(_np.title)}" style="width:100%;box-sizing:border-box;display:block" />
+            <textarea class="admin-input mn-note-title-input" id="mn-note-title-${idx}" data-idx="${idx}"
+              rows="1" placeholder="Enter Note Title Here (Optional)"
+              style="width:100%;box-sizing:border-box;display:block;overflow-y:hidden;resize:none">${escHtml(_np.title)}</textarea>
           </div>
           <div>
             <div style="font-size:.85rem;font-weight:700;color:#78350f;margin-bottom:.2rem">Note Details</div>
@@ -24080,11 +24094,8 @@ function renderTemplateManageContent(template) {
     const noteTitleEl   = $(`mn-note-title-${idx}`);
     const noteDetailsEl = $(`mn-note-details-${idx}`);
     if ((a.isNote || a.isExportNote) && (noteTitleEl || noteDetailsEl)) {
-      const resize = () => {
-        if (!noteDetailsEl) return;
-        noteDetailsEl.style.height = "auto";
-        noteDetailsEl.style.height = noteDetailsEl.scrollHeight + "px";
-      };
+      const grow = el => { if (el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } };
+      const resize = () => { grow(noteTitleEl); grow(noteDetailsEl); };
       resize();
       let noteTimer;
       const syncNote = () => {
@@ -24094,7 +24105,7 @@ function renderTemplateManageContent(template) {
         clearTimeout(noteTimer);
         noteTimer = setTimeout(async () => { await saveTemplateFn(); }, 800);
       };
-      noteTitleEl?.addEventListener("input", syncNote);
+      noteTitleEl?.addEventListener("input", () => { grow(noteTitleEl); syncNote(); });
       noteDetailsEl?.addEventListener("input", () => { resize(); syncNote(); });
     }
 
