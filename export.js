@@ -1861,6 +1861,27 @@ function wordHeadingHasContent(activities, i) {
   return false;
 }
 
+/**
+ * What to print for a target whose table came out completely empty.
+ *
+ * Only called once the caller has established there is nothing to show at all.
+ * A target that still has a note prints the note and never reaches here, which
+ * is deliberate: the note is the content in that case, and a line saying there
+ * is nothing would contradict the paragraph sitting right above it.
+ *
+ * The wording has to match the reason. A target whose activities were all
+ * mastered or discontinued is a finished target; one that was never filled in
+ * is an empty target. Telling a parent everything was mastered on a target
+ * nobody ever set up would be a false claim, so the two are kept apart.
+ */
+function emptyTargetNotice(target) {
+  const realActs = (target.predefinedActivities || []).filter(pa =>
+    (pa.name || pa.title) && !pa.isHeading && !pa.isNote && !pa.isExportNote && !pa.isMaintainHeading);
+  const anyRetired = realActs.some(pa =>
+    pa.masteredOn || pa.discontinuedOn || pa.isCompleted || pa.isArchived || pa.isStopped);
+  return anyRetired ? "All activities mastered/discontinued" : "No activities added";
+}
+
 function wordTargetRows(target, session, allTargets) {
   const rows = [];
   const activities = getAllActivitiesForTarget(session, target, { noStatusSections: true });
@@ -2155,7 +2176,21 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
       })
     ];
 
-    for (const r of wordTargetRows(target, session, allTargets)) {
+    const targetBodyRows = wordTargetRows(target, session, allTargets);
+
+    // Nothing but the header row means the table would print as a bare band of
+    // column titles with empty space under it, which reads as a broken export
+    // rather than as a target with nothing on it.
+    if (targetBodyRows.length === 0) {
+      tableRows.push(new TableRow({
+        children: [cell(emptyTargetNotice(target), {
+          italics: true, color: "6B7280", colSpan: 3,
+          align: AlignmentType.CENTER, width: WORD_COL_TOTAL
+        })]
+      }));
+    }
+
+    for (const r of targetBodyRows) {
       if (r.merge) {
         if (r.isExportNote) {
           const noteLines = (r.text || "").split("\n").map(line => {
@@ -2938,6 +2973,14 @@ function appendSessionRows(rows, sessionDateBlocks, activityHeadingRows, mastere
       const commentText = (session.fedcComments || {})[sanitizeKey(target.name)] || "";
       if (commentText) { const r = blankRow(); r[1] = "Comment"; r[2] = commentText; rows.push(r); }
     }
+
+  // Same reasoning as the Word export, plus a concrete bug: a session that
+  // pushed no rows ends up with endRow one BELOW startRow, so the merge is
+  // skipped and the date and average get written onto the next session's first
+  // row instead, overwriting it. One row keeps every block at least one tall.
+  if (rows.length === startRow) {
+    const r = blankRow(); r[1] = emptyTargetNotice(target); rows.push(r);
+  }
 
   const daily = calcDailyAverage(session, target, allTargets);
   sessionDateBlocks.push({
