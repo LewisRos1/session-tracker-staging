@@ -202,7 +202,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2056";
+const APP_VERSION = "2057";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -2446,6 +2446,15 @@ $("btn-logout")?.addEventListener("click", () => {
 
 $("btn-add-existing-student").addEventListener("click", () => showRegisteredStudentPicker("existing"));
 $("btn-add-group").addEventListener("click", addNewGroup);
+$("btn-archived-existing")?.addEventListener("click", () => {
+  state.showArchivedExisting = !state.showArchivedExisting;
+  renderExistingStudentButtons();
+});
+$("btn-archived-group")?.addEventListener("click", () => {
+  state.showArchivedGroup = !state.showArchivedGroup;
+  renderGroupButtons();
+});
+
 $("search-existing").addEventListener("input", e => {
   state.searchExisting = e.target.value;
   renderExistingStudentButtons();
@@ -3670,23 +3679,40 @@ async function assignStudentToBucket(student, targetType) {
 
 // ── Render helpers ────────────────────────────────────────────
 
-function renderStudentList(container, students, query = "") {
+/**
+ * `showArchived` swaps the list over to the archived entries instead of the
+ * active ones.
+ *
+ * Archiving only takes someone off this list. Everything else about them is
+ * untouched: reports, exports, backups, the Student Database and group rosters
+ * all still have them, and opening them from here works exactly as before.
+ *
+ * A search reaches archived entries either way, tagged so it is obvious why
+ * they were not in the list. Typing a name you know exists and being told "No
+ * matches" reads as though the person had been deleted.
+ */
+function renderStudentList(container, students, query = "", showArchived = false) {
   if (!container) return;
   const q = query.toLowerCase();
-  const filtered = students
-    .filter(s => !q || s.name.toLowerCase().includes(q))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const matches = s => !q || s.name.toLowerCase().includes(q);
+  const pool = showArchived
+    ? students.filter(s => s.archived)
+    : students.filter(s => !s.archived || q);
+  const filtered = pool.filter(matches).sort((a, b) => a.name.localeCompare(b.name));
 
   if (filtered.length === 0) {
     container.innerHTML = q
       ? `<p class="empty-hint">No matches.</p>`
-      : `<p class="empty-hint">None yet.</p>`;
+      : showArchived
+        ? `<p class="empty-hint">Nothing archived.</p>`
+        : `<p class="empty-hint">None yet.</p>`;
     return;
   }
   container.innerHTML = `<div class="roster-list">` +
     filtered.map(s => `
       <button class="roster-item" data-id="${s.id}">
         <span class="roster-item-name">${escHtml(s.name)}${noteLabel(s.note) ? ` <span style="opacity:.6">${escHtml(noteLabel(s.note))}</span>` : ""}</span>
+        ${s.archived && !showArchived ? `<span class="roster-archived-tag">Archived</span>` : ""}
       </button>
     `).join("") +
     `</div>`;
@@ -3711,7 +3737,32 @@ function renderExistingStudentButtons() {
   const students = state.students.filter(s =>
     s.type !== "assessment" && s.type !== "unassigned" && !groupNames.has(s.name)
   );
-  renderStudentList($("existing-student-buttons"), students, state.searchExisting);
+  renderStudentList($("existing-student-buttons"), students, state.searchExisting, !!state.showArchivedExisting);
+  syncArchivedToggle("existing", students.filter(s => s.archived).length);
+}
+
+/**
+ * Shows, hides and labels a section's Archived button.
+ *
+ * The button is not drawn at all until something has been archived: an
+ * "Archived (0)" control that does nothing is just noise in the header. If the
+ * last entry is un-archived while its list is open, the view falls back to the
+ * active list rather than sitting on an empty page with no way out.
+ */
+function syncArchivedToggle(which, count) {
+  const btn = $(`btn-archived-${which}`);
+  const num = $(`archived-count-${which}`);
+  if (!btn || !num) return;
+  const stateKey = which === "existing" ? "showArchivedExisting" : "showArchivedGroup";
+  if (count === 0 && state[stateKey]) {
+    state[stateKey] = false;
+    which === "existing" ? renderExistingStudentButtons() : renderGroupButtons();
+    return;
+  }
+  num.textContent = String(count);
+  btn.classList.toggle("hidden", count === 0);
+  btn.classList.toggle("is-on", !!state[stateKey]);
+  btn.setAttribute("aria-pressed", state[stateKey] ? "true" : "false");
 }
 
 function addNewGroup() {
@@ -3731,17 +3782,23 @@ function renderGroupButtons() {
   const container = $("group-buttons");
   if (!container) return;
   const q = state.searchGroup.toLowerCase();
-  const filtered = state.groups
-    .filter(g => !q || g.name.toLowerCase().includes(q))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const showArchived = !!state.showArchivedGroup;
+  const matches = g => !q || g.name.toLowerCase().includes(q);
+  const pool = showArchived
+    ? state.groups.filter(g => g.archived)
+    : state.groups.filter(g => !g.archived || q);
+  const filtered = pool.filter(matches).sort((a, b) => a.name.localeCompare(b.name));
+  syncArchivedToggle("group", state.groups.filter(g => g.archived).length);
   if (filtered.length === 0) {
     container.innerHTML = q
       ? `<p class="empty-hint">No matches.</p>`
-      : `<p class="empty-hint">None yet.</p>`;
+      : showArchived
+        ? `<p class="empty-hint">Nothing archived.</p>`
+        : `<p class="empty-hint">None yet.</p>`;
     return;
   }
   container.innerHTML = `<div class="roster-list">` +
-    filtered.map(g => `<button class="roster-item" data-id="${g.id}"><span class="roster-item-name">${escHtml(g.name)}</span></button>`).join("") +
+    filtered.map(g => `<button class="roster-item" data-id="${g.id}"><span class="roster-item-name">${escHtml(g.name)}</span>${g.archived && !showArchived ? `<span class="roster-archived-tag">Archived</span>` : ""}</button>`).join("") +
     `</div>`;
   container.querySelectorAll(".roster-item").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -9540,8 +9597,25 @@ function showStudentChoice(student) {
           <div class="choice-label">Export to Word (Daily Session Note)</div>
         </div>
       </button>
+      <button class="choice-btn choice-archive">
+        <span class="choice-icon">${student.archived ? "📤" : "🗄️"}</span>
+        <div class="choice-text">
+          <div class="choice-label">${student.archived ? "Unarchive" : "Archive"}</div>
+        </div>
+      </button>
     </div>`;
   $("session-picker-modal").classList.remove("hidden");
+
+  // Archiving only takes someone off the home list. Their sessions, targets,
+  // reports, exports and backups are all untouched, which is why this needs no
+  // warning: it is a tidying-up, not a deletion.
+  $("session-picker-list").querySelector(".choice-archive").addEventListener("click", async () => {
+    student.archived = !student.archived;
+    if (!student.archived) delete student.archived;
+    closeSessionPicker();
+    await saveStudent(student).catch(() => {});
+    renderExistingStudentButtons();
+  });
 
   $("session-picker-list").querySelector(".choice-export-excel").addEventListener("click", () => {
     requirePassword(() => showExportTrialsChoice(student.name, includeTrials => exportStudentData(student, includeTrials)), EXPORT_MSG);
@@ -25076,8 +25150,22 @@ function showGroupChoice(group) {
         <span class="choice-icon">📝</span>
         <div class="choice-text"><div class="choice-label">Export to Word (Daily Session Note)</div></div>
       </button>
+      <button class="choice-btn choice-archive">
+        <span class="choice-icon">${group.archived ? "📤" : "🗄️"}</span>
+        <div class="choice-text"><div class="choice-label">${group.archived ? "Unarchive" : "Archive"}</div></div>
+      </button>
     </div>`;
   $("session-picker-modal").classList.remove("hidden");
+
+  // See the note on the individual version: this hides the group from the home
+  // list and changes nothing else about it.
+  $("session-picker-list").querySelector(".choice-archive").addEventListener("click", async () => {
+    group.archived = !group.archived;
+    if (!group.archived) delete group.archived;
+    closeSessionPicker();
+    await saveGroup(group).catch(() => {});
+    renderGroupButtons();
+  });
 
   $("session-picker-list").querySelector(".choice-export-excel").addEventListener("click", () => {
     showGroupExportStudentPicker(group, "excel");

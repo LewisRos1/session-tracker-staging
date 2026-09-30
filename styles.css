@@ -4239,6 +4239,56 @@ button.wf-pill:hover { filter: brightness(.93); }
 .mn-row-chip--activity { background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; }
 .mn-row-chip--parent   { background: #ede9fe; color: #6d28d9; border: 1px solid #c4b5fd; }
 
+/* ── Archived students and groups ───────────────────────────────
+   Archiving takes someone off the home list and does nothing else to them, so
+   the way back has to be obvious. The button sits beside its section's search
+   box and is only drawn once something has been archived. Pressed, it fills in,
+   because the list underneath is showing something other than the usual. */
+.btn-archived-toggle {
+  flex-shrink: 0;
+  /* The search box carries margin-left:auto to push the right-hand controls
+     over. This button sits in front of it, so it takes that job on and the
+     search drops its own, otherwise the free space would be split between the
+     two and leave a gap between them. */
+  margin-left: auto;
+  margin-right: .5rem;
+  padding: .4rem .8rem;
+  border: 1px solid #c7d2fe;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: .85rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-archived-toggle:hover { background: #e0e7ff; }
+/* There is no global .hidden in this stylesheet: every control that uses it
+   declares its own rule. */
+.btn-archived-toggle.hidden { display: none; }
+.btn-archived-toggle:not(.hidden) + .section-search { margin-left: 0; }
+.btn-archived-toggle.is-on {
+  background: #4338ca;
+  border-color: #4338ca;
+  color: #fff;
+}
+
+/* On a name found by searching outside the archive, saying why it was not in
+   the list to begin with. */
+.roster-archived-tag {
+  margin-left: .5rem;
+  padding: .1rem .4rem;
+  border: 1px solid #c7d2fe;
+  border-radius: .3rem;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 /* ── Mastered / Discontinued groups in Edit Target ──────────────
    These lists sit INSIDE the active list, under the section heading their
    activities belong to. Expanded, their cards ran straight on from the active
@@ -4248,56 +4298,50 @@ button.wf-pill:hover { filter: brightness(.93); }
    Collapsed it stays a plain toggle row: one line of text needs no frame.
    Expanded it becomes a bordered card in its own status colour, with the
    heading as a filled title bar, so a row's status is never in question. */
-.mn-inact-group { margin: .35rem 0 .15rem; }
+/* Always a card, open or shut. Collapsed it used to be a bare arrow and a line
+   of text, which floated between the section heading above it and the activity
+   below with nothing tying it to either. As a card it reads as a thing sitting
+   under that heading, and opening it just fills the card in. */
+.mn-inact-group {
+  margin: .45rem 0 .5rem;
+  border-radius: .5rem;
+  overflow: hidden;
+}
+.mn-inact-group[data-kind="mastered"]     { border: 2px solid #6ee7b7; background: #f0fdf9; }
+.mn-inact-group[data-kind="discontinued"] { border: 2px solid #fca5a5; background: #fff5f5; }
 
+/* The heading is the card's title bar. */
 .mn-inact-toggle {
   display: flex;
   align-items: center;
   gap: .45rem;
   width: 100%;
-  padding: .25rem 0;
-  background: none;
+  padding: .5rem .7rem;
   border: none;
   cursor: pointer;
   font-size: .83rem;
   font-weight: 700;
   text-align: left;
 }
-.mn-inact-group[data-kind="mastered"]     > .mn-inact-toggle { color: #059669; }
-.mn-inact-group[data-kind="discontinued"] > .mn-inact-toggle { color: #dc2626; }
-
-.mn-inact-group.mn-inact-open {
-  margin: .55rem 0 .65rem;
-  border-radius: .5rem;
-  overflow: hidden;
+.mn-inact-group[data-kind="mastered"] > .mn-inact-toggle {
+  color: #059669;
+  background: #d1fae5;
 }
-.mn-inact-group.mn-inact-open[data-kind="mastered"] {
-  border: 2px solid #6ee7b7;
-  background: #f0fdf9;
-}
-.mn-inact-group.mn-inact-open[data-kind="discontinued"] {
-  border: 2px solid #fca5a5;
-  background: #fff5f5;
+.mn-inact-group[data-kind="discontinued"] > .mn-inact-toggle {
+  color: #dc2626;
+  background: #fee2e2;
 }
 
-/* The heading becomes the card's title bar, and stays put while a long list
-   scrolls past it, so the status is still on screen at the bottom of seven
-   mastered activities. */
+/* Open, the bar keeps its place while a long list scrolls past it, so the
+   status is still on screen at the bottom of seven mastered activities. */
 .mn-inact-group.mn-inact-open > .mn-inact-toggle {
   position: sticky;
   top: 0;
   z-index: 3;
-  padding: .5rem .7rem;
   border-bottom: 1px solid;
 }
-.mn-inact-group.mn-inact-open[data-kind="mastered"] > .mn-inact-toggle {
-  background: #d1fae5;
-  border-bottom-color: #6ee7b7;
-}
-.mn-inact-group.mn-inact-open[data-kind="discontinued"] > .mn-inact-toggle {
-  background: #fee2e2;
-  border-bottom-color: #fca5a5;
-}
+.mn-inact-group.mn-inact-open[data-kind="mastered"]     > .mn-inact-toggle { border-bottom-color: #6ee7b7; }
+.mn-inact-group.mn-inact-open[data-kind="discontinued"] > .mn-inact-toggle { border-bottom-color: #fca5a5; }
 .mn-inact-group.mn-inact-open > .mn-inact-panel { padding: .5rem .55rem .15rem; }
 .mn-row-chip--sub      { background: #dbeafe; color: #1d4ed8; border: 1px solid #93c5fd; }
 .mn-row-chip--note     { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
