@@ -202,7 +202,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2053";
+const APP_VERSION = "2054";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -11209,7 +11209,24 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
 
     // Parent activity with sub-activities — render as a connected visual group
     const children = subActsByParent.get(pa.title || pa.name) || [];
-    { const _pk2 = pa.title || pa.name; if (_pk2 && children.length === 0 && allPas.some(p => p.parentActivity === _pk2 && !p.isCompleted && !p.isArchived && !p.isStopped)) { actNum--; return; } } // parent with all subs now inactive
+    // A parent whose sub-activities have all been mastered or discontinued. It
+    // keeps its number and its place, with nothing to fill in and a line saying
+    // why, so this screen and Edit Target agree about what exists. It used to
+    // vanish from here while still showing there.
+    if (children.length === 0) {
+      const _ep = emptyParentInfo(pa, allPas);
+      if (_ep) {
+        html += `<div class="entry-block" contenteditable="false" style="border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);box-shadow:var(--shadow)">
+          <div class="entry-field" contenteditable="false">
+            <span class="field-label">Activity</span>
+            <span class="field-value-fixed"><span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${paDisplayHtml(pa, true)}</span>
+            ${pa.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(pa.activeFrom)}</span>` : ""}
+          </div>
+          <div class="empty-parent-note" contenteditable="false">${escHtml(EMPTY_PARENT_NOTE)}</div>
+        </div>`;
+        return;
+      }
+    }
     if (children.length > 0) {
       const isGrayP  = pa.activityColor === "gray" || pa.isMaintainLive || pa.maintained;
       const isGreenP = pa.activityColor === "green";
@@ -12121,6 +12138,40 @@ function truncateWords(text, limit = 10) {
   const words = t.split(/\s+/);
   return words.length <= limit ? t : words.slice(0, limit).join(" ") + "…";
 }
+
+/**
+ * A parent activity that has run out of sub-activities, or null.
+ *
+ * A parent is a name that groups sub-activities. It holds no score and no
+ * remark of its own, so once every sub under it has been mastered or
+ * discontinued there is nothing left to record against it. That does not make
+ * the parent itself finished: more sub-activities can be added to it, which is
+ * why it is not retired automatically.
+ *
+ * Both screens show it, labelled, rather than one showing it and the other
+ * hiding it. The session screen used to drop it silently, so an activity that
+ * was plainly there in Edit Target simply did not exist when you went to fill
+ * the session in.
+ *
+ * `lastDate` is the day the last sub left, which is what "hide" uses so nobody
+ * has to invent a date for a bag that is already empty.
+ */
+function emptyParentInfo(a, acts) {
+  if (!a || a.parentActivity || a.isHeading || a.isMaintainHeading || a.isNote || a.isExportNote || a.isMaintain) return null;
+  if (a.masteredOn || a.discontinuedOn || a.isCompleted || a.isArchived || a.isStopped) return null;
+  const key = a._linkKey || a.title || a.name;
+  if (!key) return null;
+  const mine = (acts || []).filter(p => p.parentActivity === key);
+  if (mine.length === 0) return null;
+  const retired = p => p.isCompleted || p.isArchived || p.isStopped || p.masteredOn || p.discontinuedOn;
+  if (mine.some(p => !retired(p))) return null;
+  const dates = mine.map(p => p.masteredOn || p.discontinuedOn).filter(Boolean).sort();
+  return { lastDate: dates.length ? dates[dates.length - 1] : null, count: mine.length };
+}
+
+const EMPTY_PARENT_NOTE =
+  "All sub-activities under this parent activity have been mastered or discontinued. " +
+  "You can hide this parent activity, or add more sub-activities to it.";
 
 function paPlainTitle(pa) {
   const t = (pa?.title || "").trim();
@@ -20911,6 +20962,7 @@ function renderTargetManageContent(student, target) {
       const _paKey = a._linkKey || a.title || a.name;
       const subActs = _paKey ? acts.filter(a2 => a2.parentActivity === _paKey && !a2.isCompleted && !a2.isArchived && !a2.isStopped && !a2.masteredOn && !a2.discontinuedOn) : [];
       const hasSubActs = subActs.length > 0;
+      const _emptyParent = hasSubActs ? null : emptyParentInfo(a, acts);
       const isGray = a.activityColor === "gray" || a.isMaintainLive;
       const isGreen = a.activityColor === "green";
       const actBaseBg   = isGray ? 'background:#f3f4f6;border:1px solid #d1d5db' : isGreen ? 'background:#e2efda;border:1px solid #a9d18e' : null;
@@ -21038,6 +21090,9 @@ function renderTargetManageContent(student, target) {
             <span style="font-size:.8rem;font-weight:700;color:#6b7280;flex-shrink:0;min-width:1.6rem;padding-top:.2rem">${manageActNo})</span>
             <div style="flex:1;min-width:0">
               <div class="mn-act-compact-title">${inactiveReasonBadge(a)}<span class="mn-act-title-text">${paPlainTitle(a)}</span></div>
+              ${_emptyParent ? `<div class="mn-empty-parent-note">${escHtml(EMPTY_PARENT_NOTE)}
+                <button class="mn-hide-empty-parent" data-idx="${idx}" type="button">Hide this parent activity</button>
+              </div>` : ""}
               <div class="mn-act-body" style="display:flex;flex-direction:column;gap:.55rem">
               <div style="display:flex;gap:.6rem;align-items:flex-start">
                 <div style="flex-shrink:0">
@@ -22463,26 +22518,34 @@ function renderTargetManageContent(student, target) {
     });
   });
 
+  // Hiding an empty parent marks it mastered on the day its last sub-activity
+  // left, so nobody has to pick a date for a bag that is already empty. It is
+  // an ordinary mastered activity underneath, which is why the Mastered list,
+  // the exports and the reports need to know nothing about any of this.
+  $("manage-modal-body").querySelectorAll(".mn-hide-empty-parent").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const idx = Number(btn.dataset.idx);
+      const a = acts[idx];
+      if (!a) return;
+      const info = emptyParentInfo(a, acts);
+      a.masteredOn = info?.lastDate || todayDateStr();
+      delete a.isCompleted; delete a.isArchived; delete a.isStopped;
+      await saveTarget();
+      renderTargetManageContent(student, target);
+    });
+  });
+
   $("manage-modal-body").querySelectorAll(".btn-mn-restore").forEach(btn => {
     btn.addEventListener("click", async () => {
       const ci = Number(btn.dataset.completedIdx);
       const type = btn.dataset.inactiveType;
       const pa = type === "mastered" ? masteredActs[ci] : discontinuedActs[ci];
       if (!pa) return;
-      if (!pa.parentActivity) {
-        const paKey = pa._linkKey || pa.title || pa.name;
-        if (paKey) {
-          const affectedSubs = acts.filter(a => a.parentActivity === paKey && (type === "mastered" ? !!a.masteredOn : !!a.discontinuedOn));
-          if (affectedSubs.length > 0) {
-            const ok = await showAutoDateConfirm({ message: `Restoring this activity to active will also restore all its sub-activities. To restore only a specific sub-activity, use the sub-activity's kebab menu in the Mastered/Discontinued section.`, confirmLabel: "Restore All ↩" });
-            if (!ok) return;
-            affectedSubs.forEach(sub => {
-              if (type === "mastered") { delete sub.masteredOn; delete sub.isCompleted; }
-              else { delete sub.discontinuedOn; delete sub.isArchived; delete sub.isStopped; }
-            });
-          }
-        }
-      }
+      // A parent comes back on its own. Its sub-activities were mastered or
+      // discontinued one at a time and each was a decision; undoing all of them
+      // because the parent returned would throw those away in a single click.
+      // The parent reappears as an empty parent, which says so on its card, and
+      // any sub is restored from its own menu.
       if (type === "mastered") { delete pa.masteredOn; delete pa.isCompleted; }
       else { delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped; }
       await saveTarget();

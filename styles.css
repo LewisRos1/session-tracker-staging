@@ -1736,6 +1736,43 @@ input.field-input::placeholder {
   word-break: break-word;
 }
 .mn-act-compact-title:hover { color: #4338ca; }
+
+/* A parent activity with no sub-activities left under it. Amber rather than
+   grey on purpose: grey already means "maintained" on the session screen, and
+   an emptied parent is a different thing entirely. The same note appears on
+   both screens so neither can look like it is missing an activity the other
+   one has. */
+.mn-empty-parent-note,
+.empty-parent-note {
+  margin-top: .35rem;
+  padding: .45rem .6rem;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: .4rem;
+  font-size: .82rem;
+  font-weight: 500;
+  line-height: 1.45;
+  color: #9a3412;
+}
+.mn-empty-parent-note {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  flex-wrap: wrap;
+}
+.mn-hide-empty-parent {
+  flex-shrink: 0;
+  padding: .3rem .7rem;
+  border: 1px solid #fdba74;
+  border-radius: .35rem;
+  background: #ffedd5;
+  color: #9a3412;
+  font-size: .8rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.mn-hide-empty-parent:hover { background: #fed7aa; }
 /* The second line of a collapsed note row: the opening of its details, so two
    notes under the same heading are still tellable apart at a glance. Lighter
    and italic so it reads as a preview of the note rather than part of its
