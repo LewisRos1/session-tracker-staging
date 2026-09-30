@@ -202,7 +202,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2058";
+const APP_VERSION = "2059";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3742,28 +3742,28 @@ function renderExistingStudentButtons() {
 }
 
 /**
- * Keeps a section's Archived button labelled and in step with its list.
+ * Paints a section's Archived button: the count, and whether it is switched on.
  *
- * The button is always there, including at (0). Hiding it until something had
- * been archived meant the one place that explains where archived people went
- * only appeared once you had already worked it out.
+ * Painting only. It used to also notice an empty archive, flip the view back to
+ * the active list and re-render from in here, which broke the button it was
+ * meant to be keeping in step. The group list calls this halfway through
+ * building itself, so that inner render was immediately overwritten by the
+ * outer one still finishing with the archived (empty) list, leaving the screen
+ * saying "Nothing archived" while the state said otherwise, and the switched-on
+ * class cleared before it was ever applied. Clicking again just repeated it.
  *
- * If the last entry is un-archived while its list is open, the view falls back
- * to the active list rather than sitting on an empty page.
+ * There is no automatic fallback now. The button is always on screen, so
+ * clicking it again is the way back, which is what anyone would expect from a
+ * control that stays put.
  */
 function syncArchivedToggle(which, count) {
   const btn = $(`btn-archived-${which}`);
   const num = $(`archived-count-${which}`);
   if (!btn || !num) return;
-  const stateKey = which === "existing" ? "showArchivedExisting" : "showArchivedGroup";
-  if (count === 0 && state[stateKey]) {
-    state[stateKey] = false;
-    which === "existing" ? renderExistingStudentButtons() : renderGroupButtons();
-    return;
-  }
+  const on = which === "existing" ? !!state.showArchivedExisting : !!state.showArchivedGroup;
   num.textContent = String(count);
-  btn.classList.toggle("is-on", !!state[stateKey]);
-  btn.setAttribute("aria-pressed", state[stateKey] ? "true" : "false");
+  btn.classList.toggle("is-on", on);
+  btn.setAttribute("aria-pressed", on ? "true" : "false");
 }
 
 function addNewGroup() {
@@ -9599,7 +9599,7 @@ function showStudentChoice(student) {
         </div>
       </button>
       <button class="choice-btn choice-archive">
-        <span class="choice-icon">${student.archived ? "📤" : "🗄️"}</span>
+        <span class="choice-icon">${student.archived ? "📤" : "📥"}</span>
         <div class="choice-text">
           <div class="choice-label">${student.archived ? "Unarchive" : "Archive"}</div>
         </div>
@@ -25152,7 +25152,7 @@ function showGroupChoice(group) {
         <div class="choice-text"><div class="choice-label">Export to Word (Daily Session Note)</div></div>
       </button>
       <button class="choice-btn choice-archive">
-        <span class="choice-icon">${group.archived ? "📤" : "🗄️"}</span>
+        <span class="choice-icon">${group.archived ? "📤" : "📥"}</span>
         <div class="choice-text"><div class="choice-label">${group.archived ? "Unarchive" : "Archive"}</div></div>
       </button>
     </div>`;
