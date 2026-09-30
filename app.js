@@ -202,7 +202,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2059";
+const APP_VERSION = "2060";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -11229,6 +11229,10 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
 
     // Heading rows — blue, gray, or green based on headingColor property
     if (pa.isHeading || pa.isMaintainHeading) {
+      // Numbering restarts under each section heading. Reset before the sidebar
+      // check below so both layouts agree: one section per render already
+      // starts from zero, and the all-sections layout now does the same.
+      actNum = 0;
       if (_filterPaSet) return; // sidebar mode: section name shown in sidebar, not inline
       const isGray  = pa.headingColor === "gray" || pa.isMaintainHeading;
       const isGreen = pa.headingColor === "green";
@@ -11856,8 +11860,7 @@ function renderInactiveStatusSection({ label, color, pas, orphanGroups, allPas, 
 
   const sectionBand = title => `<tr><td colspan="3" style="${_cellBase};background:#eef2ff;font-size:.82rem;font-weight:700;color:#3730a3">${escHtml(title)}</td></tr>`;
 
-  // Numbering runs straight through the whole list, section headings included:
-  // a heading groups the rows visually, it does not restart the count.
+  // Numbering restarts under each section heading, the same as everywhere else.
   let topNum = 0;
 
   // Keep the order the activities appear in, but break into runs by heading.
@@ -11870,6 +11873,7 @@ function renderInactiveStatusSection({ label, color, pas, orphanGroups, allPas, 
   }
 
   const topRows = groups.map(g => {
+    topNum = 0;
     const body = g.items.map(pa => {
       topNum++;
       const subs = subsOf(pa);
@@ -20958,6 +20962,7 @@ function renderTargetManageContent(student, target) {
     // list, which made whichever heading happened to be last reappear with the new
     // activity under it.
     if (a.isHeading || a.isMaintainHeading) {
+      manageActNo = 0;   // numbering restarts under each section heading
       const isGray = a.headingColor === "gray" || a.isMaintainHeading;
       const isGreen = a.headingColor === "green";
       const hdgBg = isGray ? "#9ca3af" : isGreen ? "#a9d18e" : null;
