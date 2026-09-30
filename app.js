@@ -202,7 +202,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2068";
+const APP_VERSION = "2069";
 
 // Debug helpers — call from F12 console
 // 0) Find who has an activity, when you remember the name but not the student:
@@ -20829,6 +20829,41 @@ function mnInitActivityCollapse(bodyEl, acts) {
 // group under the heading it belongs to, then removes the staging container.
 // Runs after innerHTML but before listeners are attached, so the handlers bound
 // afterwards find the cards wherever they ended up.
+/**
+ * Puts a parent and the sub-activities under it inside one card.
+ *
+ * In the active list a parent's card physically contains its sub-activities, so
+ * it is obvious at a glance which subs belong to it. In the Mastered and
+ * Discontinued lists they were flat siblings: a parent, then some subs, then
+ * the next parent, with nothing but order to say where one ended.
+ *
+ * They are built in that order, so the wrapping is done here once the cards
+ * have been moved into their groups: take a row that is not a sub-activity,
+ * gather the sub-activity cards that immediately follow it, and put them all in
+ * a family. A row with no subs after it is left alone.
+ */
+function mnWrapInactiveFamilies(bodyEl) {
+  bodyEl.querySelectorAll(".mn-inact-body").forEach(body => {
+    const kids = [...body.children];
+    let i = 0;
+    while (i < kids.length) {
+      const head = kids[i];
+      if (head.classList.contains("mn-inact-card--sub")) { i++; continue; }
+      const subs = [];
+      let j = i + 1;
+      while (j < kids.length && kids[j].classList.contains("mn-inact-card--sub")) { subs.push(kids[j]); j++; }
+      if (subs.length > 0) {
+        const fam = document.createElement("div");
+        fam.className = "mn-inact-family";
+        body.insertBefore(fam, head);
+        fam.appendChild(head);
+        subs.forEach(sc => fam.appendChild(sc));
+      }
+      i = j;
+    }
+  });
+}
+
 function mnRegroupInactiveCards(bodyEl, acts) {
   const src = bodyEl.querySelector("#mn-inactive-source");
   if (!src) return;
@@ -20878,10 +20913,11 @@ function mnRegroupInactiveCards(bodyEl, acts) {
 
 
       group.querySelector(".mn-inact-count").textContent =
-        String(group.querySelectorAll(".mn-inact-body > .mn-inact-card").length);
+        String(group.querySelectorAll(".mn-inact-body .mn-inact-card").length);
     }
   }
   src.remove();
+  mnWrapInactiveFamilies(bodyEl);
   bodyEl.querySelectorAll(".mn-inact-toggle").forEach(btn => {
     btn.addEventListener("click", () => {
       const panel = btn.nextElementSibling;

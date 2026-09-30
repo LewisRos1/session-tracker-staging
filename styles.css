@@ -4380,6 +4380,37 @@ button.wf-pill:hover { filter: brightness(.93); }
   padding-left: .25rem;
   margin-bottom: .25rem;
 }
+
+/* A retired parent and its sub-activities, in one card. The wrapper is the card
+   now, so the parent row inside it stops being one: two nested cards read as
+   two separate things, which is the opposite of the point. The sub-activities
+   keep their own card and their status rail, indented, the way the active list
+   shows them. */
+.mn-inact-family {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  padding: .5rem;
+  margin-bottom: .45rem;
+}
+.mn-inact-group[data-kind="mastered"]     .mn-inact-family { border-left: 3px solid #059669; }
+.mn-inact-group[data-kind="discontinued"] .mn-inact-family { border-left: 3px solid #dc2626; }
+
+.mn-inact-family > .mn-inact-card:not(.mn-inact-card--sub) {
+  border: none;
+  box-shadow: none;
+  padding: .15rem .25rem .35rem;
+}
+.mn-inact-family > .mn-inact-card--sub {
+  margin-left: 1.25rem;
+  margin-right: 0;
+}
+/* The blue strip naming a parent that is still active. Inside the card it is a
+   title bar, so it loses the gap that separated it when it stood alone. */
+.mn-inact-family > .mn-inact-hdr {
+  margin-bottom: .45rem !important;
+}
 .mn-row-chip--sub      { background: #dbeafe; color: #1d4ed8; border: 1px solid #93c5fd; }
 .mn-row-chip--note     { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
 
