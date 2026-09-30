@@ -202,7 +202,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2054";
+const APP_VERSION = "2055";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -12171,7 +12171,8 @@ function emptyParentInfo(a, acts) {
 
 const EMPTY_PARENT_NOTE =
   "All sub-activities under this parent activity have been mastered or discontinued. " +
-  "You can hide this parent activity, or add more sub-activities to it.";
+  "You can hide this parent activity if you don't wish to see it here, " +
+  "or add more sub-activities to it under \u201cEdit Target\u201d.";
 
 function paPlainTitle(pa) {
   const t = (pa?.title || "").trim();
@@ -20467,7 +20468,7 @@ document.addEventListener("keydown", e => {
 function mnRowChip(kind) {
   const el = document.createElement("span");
   el.className = "mn-row-chip mn-row-chip--" + kind;
-  el.textContent = { section: "Section Heading", activity: "Activity", sub: "Sub-activity", note: "Note" }[kind] || kind;
+  el.textContent = { section: "Section Heading", activity: "Activity", parent: "Parent Activity", sub: "Sub-activity", note: "Note" }[kind] || kind;
   return el;
 }
 
@@ -20589,8 +20590,15 @@ function mnInitActivityCollapse(bodyEl, acts) {
       }
     }
 
+    // A row that owns sub-activities says so. It behaves differently from an
+    // ordinary activity — no score, no remark, only the subs beneath it — and
+    // that stays true once the last sub has been retired, which is exactly when
+    // it would otherwise be mistaken for a plain activity sitting on its own.
+    const _chipKey = act && !act.parentActivity ? (act._linkKey || act.title || act.name) : null;
+    const _isParentRow = !!_chipKey && acts.some(p => p.parentActivity === _chipKey);
     const kind = act && (act.isHeading || act.isMaintainHeading) ? "section"
-               : act && (act.isNote || act.isExportNote) ? "note" : "activity";
+               : act && (act.isNote || act.isExportNote) ? "note"
+               : _isParentRow ? "parent" : "activity";
     const head = card.querySelector(":scope > .mn-act-head");
     if (!card.querySelector(".mn-row-chip")) {
       if (head) head.insertBefore(mnRowChip(kind), titleEl);
@@ -21130,8 +21138,15 @@ function renderTargetManageContent(student, target) {
           <div style="position:relative;align-self:flex-start">
             <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Activity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
             <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:310px;overflow:hidden">
-              ${mnStatusKebabHtml(a, idx, false)}
-              <button class="mn-km-move-to-parent" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151;white-space:nowrap">↪️ Make this activity into a Sub-activity</button>
+              ${_emptyParent
+                // An emptied parent cannot be mastered, discontinued or
+                // maintained: those describe work, and it holds none of its own.
+                // Nor can it become a sub-activity, since it still owns the subs
+                // that were retired under it. What is left is to put it away, to
+                // refill it, or to remove it.
+                ? `<button class="mn-hide-empty-parent" data-idx="${idx}" type="button" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#9a3412">🙈 Hide Parent Activity</button>`
+                : `${mnStatusKebabHtml(a, idx, false)}
+              <button class="mn-km-move-to-parent" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151;white-space:nowrap">↪️ Make this activity into a Sub-activity</button>`}
               <button class="mn-km-add-sub" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">➕ Add sub-activity</button>
               <div style="display:flex;align-items:stretch">
                 <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>

@@ -4237,6 +4237,7 @@ button.wf-pill:hover { filter: brightness(.93); }
 }
 .mn-row-chip--section  { background: #4338ca; color: #fff; }
 .mn-row-chip--activity { background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; }
+.mn-row-chip--parent   { background: #ede9fe; color: #6d28d9; border: 1px solid #c4b5fd; }
 .mn-row-chip--sub      { background: #dbeafe; color: #1d4ed8; border: 1px solid #93c5fd; }
 .mn-row-chip--note     { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
 
