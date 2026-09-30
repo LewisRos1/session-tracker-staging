@@ -4406,11 +4406,21 @@ button.wf-pill:hover { filter: brightness(.93); }
   margin-left: 1.25rem;
   margin-right: 0;
 }
-/* The blue strip naming a parent that is still active. Inside the card it is a
-   title bar, so it loses the gap that separated it when it stood alone. */
+/* The strip naming a parent that is still active. Inside the card it is a title
+   bar, so it loses the gap that separated it when it stood alone. */
 .mn-inact-family > .mn-inact-hdr {
   margin-bottom: .45rem !important;
 }
+
+/* Its rail takes the colour of the list it is in, not the blue that means
+   "active" elsewhere. The parent itself is still active, but the rows under it
+   are the mastered or discontinued ones this list is about, and a blue rail
+   down the side of a green card read as a third thing entirely.
+   The border is set here rather than inline because an inline shorthand would
+   win over any rule trying to recolour one side of it. */
+.mn-inact-hdr { border: 1px solid #bae6fd; }
+.mn-inact-group[data-kind="mastered"]     .mn-inact-hdr { border-left: 3px solid #059669; }
+.mn-inact-group[data-kind="discontinued"] .mn-inact-hdr { border-left: 3px solid #dc2626; }
 .mn-row-chip--sub      { background: #dbeafe; color: #1d4ed8; border: 1px solid #93c5fd; }
 .mn-row-chip--note     { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
 
