@@ -4238,6 +4238,67 @@ button.wf-pill:hover { filter: brightness(.93); }
 .mn-row-chip--section  { background: #4338ca; color: #fff; }
 .mn-row-chip--activity { background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; }
 .mn-row-chip--parent   { background: #ede9fe; color: #6d28d9; border: 1px solid #c4b5fd; }
+
+/* ── Mastered / Discontinued groups in Edit Target ──────────────
+   These lists sit INSIDE the active list, under the section heading their
+   activities belong to. Expanded, their cards ran straight on from the active
+   rows above with nothing in between, so seven mastered activities read as
+   seven more things still to do.
+
+   Collapsed it stays a plain toggle row: one line of text needs no frame.
+   Expanded it becomes a bordered card in its own status colour, with the
+   heading as a filled title bar, so a row's status is never in question. */
+.mn-inact-group { margin: .35rem 0 .15rem; }
+
+.mn-inact-toggle {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  width: 100%;
+  padding: .25rem 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: .83rem;
+  font-weight: 700;
+  text-align: left;
+}
+.mn-inact-group[data-kind="mastered"]     > .mn-inact-toggle { color: #059669; }
+.mn-inact-group[data-kind="discontinued"] > .mn-inact-toggle { color: #dc2626; }
+
+.mn-inact-group.mn-inact-open {
+  margin: .55rem 0 .65rem;
+  border-radius: .5rem;
+  overflow: hidden;
+}
+.mn-inact-group.mn-inact-open[data-kind="mastered"] {
+  border: 2px solid #6ee7b7;
+  background: #f0fdf9;
+}
+.mn-inact-group.mn-inact-open[data-kind="discontinued"] {
+  border: 2px solid #fca5a5;
+  background: #fff5f5;
+}
+
+/* The heading becomes the card's title bar, and stays put while a long list
+   scrolls past it, so the status is still on screen at the bottom of seven
+   mastered activities. */
+.mn-inact-group.mn-inact-open > .mn-inact-toggle {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  padding: .5rem .7rem;
+  border-bottom: 1px solid;
+}
+.mn-inact-group.mn-inact-open[data-kind="mastered"] > .mn-inact-toggle {
+  background: #d1fae5;
+  border-bottom-color: #6ee7b7;
+}
+.mn-inact-group.mn-inact-open[data-kind="discontinued"] > .mn-inact-toggle {
+  background: #fee2e2;
+  border-bottom-color: #fca5a5;
+}
+.mn-inact-group.mn-inact-open > .mn-inact-panel { padding: .5rem .55rem .15rem; }
 .mn-row-chip--sub      { background: #dbeafe; color: #1d4ed8; border: 1px solid #93c5fd; }
 .mn-row-chip--note     { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
 

@@ -202,7 +202,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2055";
+const APP_VERSION = "2056";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -20686,9 +20686,11 @@ function mnRegroupInactiveCards(bodyEl, acts) {
   const src = bodyEl.querySelector("#mn-inactive-source");
   if (!src) return;
   const segOf = mnSegmentOf(acts);
+  // No colour here: the group's colours are in styles.css, keyed off data-kind,
+  // so the collapsed row, the card border and its title bar cannot drift apart.
   const meta = {
-    mastered:     { label: "List of Mastered Activities",     emoji: "⭐", color: "#059669" },
-    discontinued: { label: "List of Discontinued Activities", emoji: "🚩", color: "#dc2626" }
+    mastered:     { label: "List of Mastered Activities",     emoji: "⭐" },
+    discontinued: { label: "List of Discontinued Activities", emoji: "🚩" }
   };
   for (const kind of ["mastered", "discontinued"]) {
     const panel = src.querySelector(`#mn-${kind}-section`);
@@ -20707,9 +20709,11 @@ function mnRegroupInactiveCards(bodyEl, acts) {
         group = document.createElement("div");
         group.className = "mn-inact-group";
         group.dataset.kind = kind;
-        group.style.cssText = "margin:.35rem 0 .15rem";
+        // The look lives in styles.css. It used to be set inline here, which
+        // no rule could override, so the expanded card could not restyle its
+        // own heading.
         group.innerHTML =
-          `<button class="mn-inact-toggle" style="display:flex;align-items:center;gap:.45rem;background:none;border:none;cursor:pointer;width:100%;padding:.25rem 0;font-size:.83rem;font-weight:700;color:${m.color};text-align:left">` +
+          `<button class="mn-inact-toggle">` +
             // Label and count share one span: the button is a flex row with a gap,
             // so leaving them as loose text nodes rendered as "Mastered ( 3 )".
             `<span class="mn-inact-arrow" style="font-size:.7rem">▶</span>` +
@@ -20738,6 +20742,9 @@ function mnRegroupInactiveCards(bodyEl, acts) {
       if (!panel) return;
       const open = panel.style.display !== "none";
       panel.style.display = open ? "none" : "block";
+      // Expanded, the group becomes a bordered card so its rows cannot be read
+      // as a continuation of the active list above it.
+      btn.parentElement?.classList.toggle("mn-inact-open", !open);
       if (arrow) arrow.textContent = open ? "▶" : "▼";
       if (!open) panel.querySelectorAll(".mn-act-details-input,.mn-inactive-name-input").forEach(autoResizeTextarea);
     });
