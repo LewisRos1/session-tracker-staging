@@ -202,7 +202,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2066";
+const APP_VERSION = "2067";
 
 // Debug helpers — call from F12 console
 // 0) Find who has an activity, when you remember the name but not the student:
@@ -21366,7 +21366,7 @@ function renderTargetManageContent(student, target) {
             <span style="font-size:.72rem;color:#9ca3af;white-space:nowrap">${_mnCreatedLabel}</span>
           </div>
           <div style="position:relative">
-            <button class="btn-mn-inactive-kebab" data-completed-idx="${ci}" data-inactive-type="mastered" style="font-size:1.2rem;font-weight:900;min-width:28px;height:28px;border:none;background:#f3f4f6;cursor:pointer;padding:0 5px;border-radius:.3rem;line-height:1">⋮</button>
+            <button class="btn-mn-inactive-kebab" data-completed-idx="${ci}" data-inactive-type="mastered" style="font-size:1.2rem;font-weight:900;min-width:28px;height:28px;border:none;background:none;cursor:pointer;padding:0 5px;border-radius:.3rem;line-height:1">⋮</button>
             <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
               <button class="btn-mn-change-date" data-completed-idx="${ci}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Mastered Date</button>
               <button class="btn-mn-restore" data-completed-idx="${ci}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active Activity</button>
@@ -21402,7 +21402,7 @@ function renderTargetManageContent(student, target) {
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.25rem;flex-shrink:0;padding-top:.3rem">
             <div style="position:relative">
-              <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="mastered" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#a7f3d0;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#059669">⋮</button>
+              <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="mastered" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:none;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#059669">⋮</button>
               <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
                 <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Mastered Date</button>
                 <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
@@ -21449,7 +21449,7 @@ function renderTargetManageContent(student, target) {
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.25rem;flex-shrink:0;padding-top:.3rem">
               <div style="position:relative">
-                <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="mastered" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#a7f3d0;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#059669">⋮</button>
+                <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="mastered" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:none;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#059669">⋮</button>
                 <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
                   <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Mastered Date</button>
                   <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
@@ -21507,7 +21507,7 @@ function renderTargetManageContent(student, target) {
             <span style="font-size:.72rem;color:#9ca3af;white-space:nowrap">${_mnCreatedLabel2}</span>
           </div>
           <div style="position:relative">
-            <button class="btn-mn-inactive-kebab" data-completed-idx="${ci}" data-inactive-type="discontinued" style="font-size:1.2rem;font-weight:900;min-width:28px;height:28px;border:none;background:#f3f4f6;cursor:pointer;padding:0 5px;border-radius:.3rem;line-height:1">⋮</button>
+            <button class="btn-mn-inactive-kebab" data-completed-idx="${ci}" data-inactive-type="discontinued" style="font-size:1.2rem;font-weight:900;min-width:28px;height:28px;border:none;background:none;cursor:pointer;padding:0 5px;border-radius:.3rem;line-height:1">⋮</button>
             <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
               <button class="btn-mn-change-date" data-completed-idx="${ci}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Discontinued Date</button>
               <button class="btn-mn-restore" data-completed-idx="${ci}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active Activity</button>
@@ -21543,7 +21543,7 @@ function renderTargetManageContent(student, target) {
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.25rem;flex-shrink:0;padding-top:.3rem">
             <div style="position:relative">
-              <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#fca5a5;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#dc2626">⋮</button>
+              <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:none;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#dc2626">⋮</button>
               <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
                 <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Discontinued Date</button>
                 <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
@@ -21590,7 +21590,7 @@ function renderTargetManageContent(student, target) {
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.25rem;flex-shrink:0;padding-top:.3rem">
               <div style="position:relative">
-                <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#fca5a5;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#dc2626">⋮</button>
+                <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:none;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#dc2626">⋮</button>
                 <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
                   <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Discontinued Date</button>
                   <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
@@ -24117,7 +24117,7 @@ function renderTemplateManageContent(template) {
             <span style="font-size:.72rem;color:#9ca3af;white-space:nowrap">${_mnCreatedLabel}</span>
           </div>
           <div style="position:relative">
-            <button class="btn-mn-inactive-kebab" data-completed-idx="${ci}" data-inactive-type="mastered" style="font-size:1.2rem;font-weight:900;min-width:28px;height:28px;border:none;background:#f3f4f6;cursor:pointer;padding:0 5px;border-radius:.3rem;line-height:1">⋮</button>
+            <button class="btn-mn-inactive-kebab" data-completed-idx="${ci}" data-inactive-type="mastered" style="font-size:1.2rem;font-weight:900;min-width:28px;height:28px;border:none;background:none;cursor:pointer;padding:0 5px;border-radius:.3rem;line-height:1">⋮</button>
             <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
               <button class="btn-mn-change-date" data-completed-idx="${ci}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Mastered Date</button>
               <button class="btn-mn-restore" data-completed-idx="${ci}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active Activity</button>
@@ -24153,7 +24153,7 @@ function renderTemplateManageContent(template) {
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.25rem;flex-shrink:0;padding-top:.3rem">
             <div style="position:relative">
-              <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="mastered" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#a7f3d0;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#059669">⋮</button>
+              <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="mastered" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:none;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#059669">⋮</button>
               <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
                 <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Mastered Date</button>
                 <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
@@ -24200,7 +24200,7 @@ function renderTemplateManageContent(template) {
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.25rem;flex-shrink:0;padding-top:.3rem">
               <div style="position:relative">
-                <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="mastered" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#a7f3d0;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#059669">⋮</button>
+                <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="mastered" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:none;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#059669">⋮</button>
                 <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
                   <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Mastered Date</button>
                   <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="mastered" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
@@ -24258,7 +24258,7 @@ function renderTemplateManageContent(template) {
             <span style="font-size:.72rem;color:#9ca3af;white-space:nowrap">${_mnCreatedLabel2}</span>
           </div>
           <div style="position:relative">
-            <button class="btn-mn-inactive-kebab" data-completed-idx="${ci}" data-inactive-type="discontinued" style="font-size:1.2rem;font-weight:900;min-width:28px;height:28px;border:none;background:#f3f4f6;cursor:pointer;padding:0 5px;border-radius:.3rem;line-height:1">⋮</button>
+            <button class="btn-mn-inactive-kebab" data-completed-idx="${ci}" data-inactive-type="discontinued" style="font-size:1.2rem;font-weight:900;min-width:28px;height:28px;border:none;background:none;cursor:pointer;padding:0 5px;border-radius:.3rem;line-height:1">⋮</button>
             <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
               <button class="btn-mn-change-date" data-completed-idx="${ci}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Discontinued Date</button>
               <button class="btn-mn-restore" data-completed-idx="${ci}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active Activity</button>
@@ -24294,7 +24294,7 @@ function renderTemplateManageContent(template) {
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.25rem;flex-shrink:0;padding-top:.3rem">
             <div style="position:relative">
-              <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#fca5a5;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#dc2626">⋮</button>
+              <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:none;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#dc2626">⋮</button>
               <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
                 <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Discontinued Date</button>
                 <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>
@@ -24341,7 +24341,7 @@ function renderTemplateManageContent(template) {
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.25rem;flex-shrink:0;padding-top:.3rem">
               <div style="position:relative">
-                <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:#fca5a5;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#dc2626">⋮</button>
+                <button class="btn-mn-inactive-kebab" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="font-size:1rem;font-weight:900;min-width:22px;height:22px;border:none;background:none;cursor:pointer;padding:0 4px;border-radius:.25rem;line-height:1;color:#dc2626">⋮</button>
                 <div class="mn-inactive-km" style="display:none;position:absolute;right:0;top:100%;z-index:200;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:210px;overflow:hidden">
                   <button class="btn-mn-change-date" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">📅 Change Discontinued Date</button>
                   <button class="btn-mn-restore" data-completed-idx="${subCi}" data-inactive-type="discontinued" style="width:100%;padding:.5rem .85rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#1d4ed8">↩ Restore to Active</button>

@@ -4306,8 +4306,14 @@ button.wf-pill:hover { filter: brightness(.93); }
 .mn-inact-group {
   margin: .45rem 0 .5rem;
   border-radius: .5rem;
-  overflow: hidden;
+  /* Deliberately NOT overflow:hidden. That was rounding the title bar's corners
+     against the card, but a row's kebab menu is positioned inside this card, so
+     it was being clipped away to nothing the moment it opened. The title bar
+     rounds its own corners instead, two pixels tighter to sit inside the
+     border. */
 }
+.mn-inact-group > .mn-inact-toggle { border-radius: calc(.5rem - 2px) calc(.5rem - 2px) 0 0; }
+.mn-inact-group:not(.mn-inact-open) > .mn-inact-toggle { border-radius: calc(.5rem - 2px); }
 .mn-inact-group[data-kind="mastered"]     { border: 2px solid #6ee7b7; background: #f0fdf9; }
 .mn-inact-group[data-kind="discontinued"] { border: 2px solid #fca5a5; background: #fff5f5; }
 
