@@ -1760,7 +1760,11 @@ input.field-input::placeholder {
   gap: .6rem;
   flex-wrap: wrap;
 }
-.mn-hide-empty-parent {
+/* Scoped to the note. The same button also sits in the activity's kebab menu,
+   where it has to read like every other item in that menu rather than like a
+   pill: the menu supplies its own padding and background inline, but the bold
+   from here leaked through and made it the only heavy row in the list. */
+.mn-empty-parent-note .mn-hide-empty-parent {
   flex-shrink: 0;
   padding: .3rem .7rem;
   border: 1px solid #fdba74;
@@ -1772,7 +1776,7 @@ input.field-input::placeholder {
   cursor: pointer;
   white-space: nowrap;
 }
-.mn-hide-empty-parent:hover { background: #fed7aa; }
+.mn-empty-parent-note .mn-hide-empty-parent:hover { background: #fed7aa; }
 /* The second line of a collapsed note row: the opening of its details, so two
    notes under the same heading are still tellable apart at a glance. Lighter
    and italic so it reads as a preview of the note rather than part of its
