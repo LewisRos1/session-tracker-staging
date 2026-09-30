@@ -202,9 +202,72 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2064";
+const APP_VERSION = "2065";
 
 // Debug helpers — call from F12 console
+// 0) Find who has an activity, when you remember the name but not the student:
+//    debugFindActivity("Is Toilet Trained")
+//
+//    Matches any part of the name, ignoring case and the *bold* / _underline_
+//    markers a title may carry. Searches every student and every group, their
+//    targets, and activities, parent activities, sub-activities and notes.
+//    Reads only. Full rows are left on window.__findHits.
+window.debugFindActivity = async function(text) {
+  const needle = String(text || "").trim().toLowerCase();
+  if (!needle) { console.warn('Give me something to look for, e.g. debugFindActivity("Is Toilet Trained")'); return; }
+  const plain = t => String(t || "").replace(/\*(.+?)\*/g, "$1").replace(/_(.+?)_/g, "$1").trim();
+
+  const [students, groups] = await Promise.all([loadStudentsConfig(), loadGroups()]);
+  const hits = [];
+
+  const scan = (ownerKind, ownerName, targets) => {
+    for (const t of (targets || [])) {
+      for (const pa of (t.predefinedActivities || [])) {
+        const title = plain(pa.title);
+        const detail = plain(pa.name);
+        const noteText = plain(pa.noteTitle || pa.text);
+        const hay = [title, detail, noteText].filter(Boolean).join(" \u2502 ").toLowerCase();
+        if (!hay.includes(needle)) continue;
+
+        const kind = (pa.isHeading || pa.isMaintainHeading) ? "Section heading"
+                   : (pa.isNote || pa.isExportNote) ? "Note"
+                   : pa.parentActivity ? "Sub-activity"
+                   : (t.predefinedActivities || []).some(p => p.parentActivity === (pa.title || pa.name)) ? "Parent activity"
+                   : "Activity";
+        const status = pa.masteredOn ? `Mastered ${pa.masteredOn}`
+                     : pa.discontinuedOn ? `Discontinued ${pa.discontinuedOn}`
+                     : pa.isCompleted ? "Mastered (no date)"
+                     : (pa.isArchived || pa.isStopped) ? "Discontinued (no date)"
+                     : pa.maintained ? `Maintained ${pa.maintainedAt || ""}`.trim()
+                     : "Active";
+        hits.push({
+          Who: `${ownerName}${ownerKind === "group" ? " (group)" : ""}`,
+          Target: t.name,
+          Kind: kind,
+          Name: title || detail || noteText,
+          Under: pa.parentActivity || "",
+          Status: status,
+          Since: pa.activeFrom || "",
+          _pa: pa
+        });
+      }
+    }
+  };
+
+  for (const st of students) scan("student", st.name + (st.note ? ` (${st.note})` : ""), st.targets);
+  for (const g of groups)    scan("group", g.name, g.targets);
+
+  window.__findHits = hits;
+  if (hits.length === 0) {
+    console.log(`No activity matching "${text}" on this site. Check the spelling, or try a shorter piece of it.`);
+    return hits;
+  }
+  console.log(`${hits.length} match${hits.length === 1 ? "" : "es"} for "${text}":`);
+  console.table(hits.map(({ _pa, ...row }) => row));
+  console.log("Full records on window.__findHits");
+  return hits;
+};
+
 // 1) List all stored activity names under a target:
 //    debugScanTarget("Hayden Chan", "Math")
 window.debugScanTarget = async function(studentName, targetName) {
