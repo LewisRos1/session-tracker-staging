@@ -202,7 +202,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2061";
+const APP_VERSION = "2062";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -22228,7 +22228,16 @@ function renderTargetManageContent(student, target) {
       act.noRemark = true;
       const subId = cfgId("a");
       const paKey = act._linkKey || act.title || act.name;
-      const newSub = { id: subId, title: "", name: "", parentActivity: paKey, order: 0, activeFrom: act.activeFrom || null, createdOn: todayDateStr() };
+      // Starts the day it is created, like every other new activity, not on the
+      // parent's start date. A parent shows the earliest of its sub-activities'
+      // dates, so inheriting it dated a brand-new sub back to whenever the first
+      // one began: it then appeared, unfilled, in every session since.
+      // The session's own date rather than today, so a sub added while writing up
+      // an earlier session belongs to that session.
+      const _newSubDate = _groupForTargetEdit
+        ? (state.groupSessionData?.date || todayDateStr())
+        : (state.sessionData?.date || todayDateStr());
+      const newSub = { id: subId, title: "", name: "", parentActivity: paKey, order: 0, activeFrom: _newSubDate, createdOn: todayDateStr() };
       acts.splice(idx + 1, 0, newSub);
       acts.forEach((a2, i) => a2.order = i);
       target.predefinedActivities = acts;
