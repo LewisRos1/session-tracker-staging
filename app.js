@@ -202,7 +202,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2067";
+const APP_VERSION = "2068";
 
 // Debug helpers — call from F12 console
 // 0) Find who has an activity, when you remember the name but not the student:
@@ -21341,7 +21341,7 @@ function renderTargetManageContent(student, target) {
       const globalIdx = acts.indexOf(a);
       const _mnCreatedLabel = a.activeFrom ? `Created ${fmtPeriodDate(a.activeFrom)}` : 'Created';
       const myMastSubs = _mastSubs.filter(s => s.parentActivity === (a.title || a.name));
-      html += `<div class="mn-inact-card" data-global-idx="${globalIdx}" style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:${myMastSubs.length ? '.1rem' : '.35rem'}">
+      html += `<div class="mn-inact-card" data-global-idx="${globalIdx}" style="margin-bottom:${myMastSubs.length ? '.1rem' : '.35rem'}">
         <div style="flex:1;display:flex;flex-direction:column;gap:.4rem">
           <div>
             <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Title</div>
@@ -21379,7 +21379,7 @@ function renderTargetManageContent(student, target) {
       myMastSubs.forEach((sub, si) => {
         const subCi = masteredActs.indexOf(sub);
         const subGlobalIdx = acts.indexOf(sub);
-        html += `<div class="mn-inact-card" data-global-idx="${subGlobalIdx}" style="display:flex;align-items:flex-start;gap:.4rem;background:#ecfdf5;border:1px solid #a7f3d0;border-left:3px solid #059669;border-radius:.35rem;margin-bottom:.1rem;margin-left:3rem;padding:.35rem .5rem .35rem 0">
+        html += `<div class="mn-inact-card mn-inact-card--sub" data-global-idx="${subGlobalIdx}">
           <span style="font-size:.8rem;color:#059669;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
           <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
             <div>
@@ -21426,7 +21426,7 @@ function renderTargetManageContent(student, target) {
         subs.forEach((sub, si) => {
           const subCi = masteredActs.indexOf(sub);
           const subGlobalIdx = acts.indexOf(sub);
-          html += `<div class="mn-inact-card" data-global-idx="${subGlobalIdx}" style="display:flex;align-items:flex-start;gap:.4rem;background:#ecfdf5;border:1px solid #a7f3d0;border-left:3px solid #059669;border-radius:.35rem;margin-bottom:.1rem;margin-left:3rem;padding:.35rem .5rem .35rem 0">
+          html += `<div class="mn-inact-card mn-inact-card--sub" data-global-idx="${subGlobalIdx}">
             <span style="font-size:.8rem;color:#059669;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
             <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
               <div>
@@ -21482,7 +21482,7 @@ function renderTargetManageContent(student, target) {
       const globalIdx = acts.indexOf(a);
       const _mnCreatedLabel2 = a.activeFrom ? `Created ${fmtPeriodDate(a.activeFrom)}` : 'Created';
       const myDiscSubs = _discSubs.filter(s => s.parentActivity === (a.title || a.name));
-      html += `<div class="mn-inact-card" data-global-idx="${globalIdx}" style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:${myDiscSubs.length ? '.1rem' : '.35rem'}">
+      html += `<div class="mn-inact-card" data-global-idx="${globalIdx}" style="margin-bottom:${myDiscSubs.length ? '.1rem' : '.35rem'}">
         <div style="flex:1;display:flex;flex-direction:column;gap:.4rem">
           <div>
             <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Title</div>
@@ -21567,7 +21567,7 @@ function renderTargetManageContent(student, target) {
         subs.forEach((sub, si) => {
           const subCi = discontinuedActs.indexOf(sub);
           const subGlobalIdx = acts.indexOf(sub);
-          html += `<div class="mn-inact-card" data-global-idx="${subGlobalIdx}" style="display:flex;align-items:flex-start;gap:.4rem;background:#fff5f5;border:1px solid #fca5a5;border-left:3px solid #dc2626;border-radius:.35rem;margin-bottom:.1rem;margin-left:3rem;padding:.35rem .5rem .35rem 0">
+          html += `<div class="mn-inact-card mn-inact-card--sub" data-global-idx="${subGlobalIdx}">
             <span style="font-size:.8rem;color:#dc2626;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
             <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
               <div>
@@ -24092,7 +24092,7 @@ function renderTemplateManageContent(template) {
       const globalIdx = acts.indexOf(a);
       const _mnCreatedLabel = a.activeFrom ? `Created ${fmtPeriodDate(a.activeFrom)}` : 'Created';
       const myMastSubs = _mastSubs.filter(s => s.parentActivity === (a.title || a.name));
-      html += `<div class="mn-inact-card" data-global-idx="${globalIdx}" style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#d1fae5;border:1px solid #6ee7b7;border-radius:.4rem;margin-bottom:${myMastSubs.length ? '.1rem' : '.35rem'}">
+      html += `<div class="mn-inact-card" data-global-idx="${globalIdx}" style="margin-bottom:${myMastSubs.length ? '.1rem' : '.35rem'}">
         <div style="flex:1;display:flex;flex-direction:column;gap:.4rem">
           <div>
             <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Title</div>
@@ -24130,7 +24130,7 @@ function renderTemplateManageContent(template) {
       myMastSubs.forEach((sub, si) => {
         const subCi = masteredActs.indexOf(sub);
         const subGlobalIdx = acts.indexOf(sub);
-        html += `<div class="mn-inact-card" data-global-idx="${subGlobalIdx}" style="display:flex;align-items:flex-start;gap:.4rem;background:#ecfdf5;border:1px solid #a7f3d0;border-left:3px solid #059669;border-radius:.35rem;margin-bottom:.1rem;margin-left:3rem;padding:.35rem .5rem .35rem 0">
+        html += `<div class="mn-inact-card mn-inact-card--sub" data-global-idx="${subGlobalIdx}">
           <span style="font-size:.8rem;color:#059669;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
           <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
             <div>
@@ -24177,7 +24177,7 @@ function renderTemplateManageContent(template) {
         subs.forEach((sub, si) => {
           const subCi = masteredActs.indexOf(sub);
           const subGlobalIdx = acts.indexOf(sub);
-          html += `<div class="mn-inact-card" data-global-idx="${subGlobalIdx}" style="display:flex;align-items:flex-start;gap:.4rem;background:#ecfdf5;border:1px solid #a7f3d0;border-left:3px solid #059669;border-radius:.35rem;margin-bottom:.1rem;margin-left:3rem;padding:.35rem .5rem .35rem 0">
+          html += `<div class="mn-inact-card mn-inact-card--sub" data-global-idx="${subGlobalIdx}">
             <span style="font-size:.8rem;color:#059669;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
             <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
               <div>
@@ -24233,7 +24233,7 @@ function renderTemplateManageContent(template) {
       const globalIdx = acts.indexOf(a);
       const _mnCreatedLabel2 = a.activeFrom ? `Created ${fmtPeriodDate(a.activeFrom)}` : 'Created';
       const myDiscSubs = _discSubs.filter(s => s.parentActivity === (a.title || a.name));
-      html += `<div class="mn-inact-card" data-global-idx="${globalIdx}" style="display:flex;align-items:flex-start;gap:.5rem;padding:.45rem .5rem;background:#fafafa;border:1px solid #e5e7eb;border-radius:.4rem;margin-bottom:${myDiscSubs.length ? '.1rem' : '.35rem'}">
+      html += `<div class="mn-inact-card" data-global-idx="${globalIdx}" style="margin-bottom:${myDiscSubs.length ? '.1rem' : '.35rem'}">
         <div style="flex:1;display:flex;flex-direction:column;gap:.4rem">
           <div>
             <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Title</div>
@@ -24318,7 +24318,7 @@ function renderTemplateManageContent(template) {
         subs.forEach((sub, si) => {
           const subCi = discontinuedActs.indexOf(sub);
           const subGlobalIdx = acts.indexOf(sub);
-          html += `<div class="mn-inact-card" data-global-idx="${subGlobalIdx}" style="display:flex;align-items:flex-start;gap:.4rem;background:#fff5f5;border:1px solid #fca5a5;border-left:3px solid #dc2626;border-radius:.35rem;margin-bottom:.1rem;margin-left:3rem;padding:.35rem .5rem .35rem 0">
+          html += `<div class="mn-inact-card mn-inact-card--sub" data-global-idx="${subGlobalIdx}">
             <span style="font-size:.8rem;color:#dc2626;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
             <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
               <div>

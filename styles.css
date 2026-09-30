@@ -4350,6 +4350,36 @@ button.wf-pill:hover { filter: brightness(.93); }
 .mn-inact-group.mn-inact-open[data-kind="mastered"]     > .mn-inact-toggle { border-bottom-color: #6ee7b7; }
 .mn-inact-group.mn-inact-open[data-kind="discontinued"] > .mn-inact-toggle { border-bottom-color: #fca5a5; }
 .mn-inact-group.mn-inact-open > .mn-inact-panel { padding: .5rem .55rem .15rem; }
+
+/* A retired activity is still an activity, so its card is built like an active
+   one: same padding, same corner, same shadow. It used to be flatter, tighter
+   and tinted, which left the discontinued ones as a near-white block on a pink
+   card with a border you had to hunt for.
+
+   White, with the status carried by a coloured left rail and by the date chip
+   on the row. The group's own tint sits behind them, so tinting the rows too
+   left nothing for the eye to separate. */
+.mn-inact-card {
+  display: flex;
+  align-items: flex-start;
+  gap: .5rem;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: .75rem;
+  box-shadow: var(--shadow);
+  margin-bottom: .35rem;
+}
+.mn-inact-group[data-kind="mastered"]     .mn-inact-card { border-left: 3px solid #059669; }
+.mn-inact-group[data-kind="discontinued"] .mn-inact-card { border-left: 3px solid #dc2626; }
+
+/* Sub-activities are indented under the parent named above them. The left
+   padding is trimmed because the a) b) c) marker brings its own. */
+.mn-inact-card--sub {
+  margin-left: 2.25rem;
+  padding-left: .25rem;
+  margin-bottom: .25rem;
+}
 .mn-row-chip--sub      { background: #dbeafe; color: #1d4ed8; border: 1px solid #93c5fd; }
 .mn-row-chip--note     { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
 
