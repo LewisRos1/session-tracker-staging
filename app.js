@@ -202,7 +202,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2065";
+const APP_VERSION = "2066";
 
 // Debug helpers — call from F12 console
 // 0) Find who has an activity, when you remember the name but not the student:
@@ -20735,10 +20735,16 @@ function mnInitActivityCollapse(bodyEl, acts) {
     // ordinary activity — no score, no remark, only the subs beneath it — and
     // that stays true once the last sub has been retired, which is exactly when
     // it would otherwise be mistaken for a plain activity sitting on its own.
+    // A sub-activity only reaches this loop once it has been mastered or
+    // discontinued: while active it is a row inside its parent's card and is
+    // labelled there. In the Mastered and Discontinued lists it stands on its
+    // own, so without this it was the one place a sub-activity was called a
+    // plain activity, right where its parent is named on the line above.
     const _chipKey = act && !act.parentActivity ? (act._linkKey || act.title || act.name) : null;
     const _isParentRow = !!_chipKey && acts.some(p => p.parentActivity === _chipKey);
     const kind = act && (act.isHeading || act.isMaintainHeading) ? "section"
                : act && (act.isNote || act.isExportNote) ? "note"
+               : act && act.parentActivity ? "sub"
                : _isParentRow ? "parent" : "activity";
     const head = card.querySelector(":scope > .mn-act-head");
     if (!card.querySelector(".mn-row-chip")) {
@@ -21416,7 +21422,7 @@ function renderTargetManageContent(student, target) {
         const _omParent = acts.find(a => (a.title || a.name) === pk && !a.parentActivity);
         const _omParentTitle = _omParent ? (paDisplayHtml(_omParent, true) || escHtml(pk)) : escHtml(pk);
         const _omParentCreated = _omParent?.activeFrom ? `<span style="font-size:.71rem;color:#9ca3af;margin-left:.4rem">Created ${fmtPeriodDate(_omParent.activeFrom)}</span>` : '';
-        html += `<div class="mn-inact-hdr" data-global-idx="${_omParent ? acts.indexOf(_omParent) : -1}" style="display:flex;align-items:center;gap:.5rem;background:#f0f9ff;border:1px solid #bae6fd;border-left:3px solid #60a5fa;border-radius:.35rem;margin-bottom:.35rem;padding:.45rem .75rem"><span style="font-size:.85rem;font-weight:700;color:#1e40af;flex:1;min-width:0">${_omParentTitle}</span><span style="font-size:.71rem;background:#dbeafe;color:#1d4ed8;font-weight:600;padding:.05rem .4rem;border-radius:.3rem;border:1px solid #93c5fd;white-space:nowrap;flex-shrink:0">Still Active</span>${_omParentCreated}</div>`;
+        html += `<div class="mn-inact-hdr" data-global-idx="${_omParent ? acts.indexOf(_omParent) : -1}" style="display:flex;align-items:center;gap:.5rem;background:#f0f9ff;border:1px solid #bae6fd;border-left:3px solid #60a5fa;border-radius:.35rem;margin-bottom:.35rem;padding:.45rem .75rem"><span class="mn-row-chip mn-row-chip--parent">Parent Activity</span><span style="font-size:.85rem;font-weight:700;color:#1e40af;flex:1;min-width:0">${_omParentTitle}</span><span style="font-size:.71rem;background:#dbeafe;color:#1d4ed8;font-weight:600;padding:.05rem .4rem;border-radius:.3rem;border:1px solid #93c5fd;white-space:nowrap;flex-shrink:0">Still Active</span>${_omParentCreated}</div>`;
         subs.forEach((sub, si) => {
           const subCi = masteredActs.indexOf(sub);
           const subGlobalIdx = acts.indexOf(sub);
@@ -21557,7 +21563,7 @@ function renderTargetManageContent(student, target) {
         const _odParent = acts.find(a => (a.title || a.name) === pk && !a.parentActivity);
         const _odParentTitle = _odParent ? (paDisplayHtml(_odParent, true) || escHtml(pk)) : escHtml(pk);
         const _odParentCreated = _odParent?.activeFrom ? `<span style="font-size:.71rem;color:#9ca3af;margin-left:.4rem">Created ${fmtPeriodDate(_odParent.activeFrom)}</span>` : '';
-        html += `<div class="mn-inact-hdr" data-global-idx="${_odParent ? acts.indexOf(_odParent) : -1}" style="display:flex;align-items:center;gap:.5rem;background:#f0f9ff;border:1px solid #bae6fd;border-left:3px solid #60a5fa;border-radius:.35rem;margin-bottom:.35rem;padding:.45rem .75rem"><span style="font-size:.85rem;font-weight:700;color:#1e40af;flex:1;min-width:0">${_odParentTitle}</span><span style="font-size:.71rem;background:#dbeafe;color:#1d4ed8;font-weight:600;padding:.05rem .4rem;border-radius:.3rem;border:1px solid #93c5fd;white-space:nowrap;flex-shrink:0">Still Active</span>${_odParentCreated}</div>`;
+        html += `<div class="mn-inact-hdr" data-global-idx="${_odParent ? acts.indexOf(_odParent) : -1}" style="display:flex;align-items:center;gap:.5rem;background:#f0f9ff;border:1px solid #bae6fd;border-left:3px solid #60a5fa;border-radius:.35rem;margin-bottom:.35rem;padding:.45rem .75rem"><span class="mn-row-chip mn-row-chip--parent">Parent Activity</span><span style="font-size:.85rem;font-weight:700;color:#1e40af;flex:1;min-width:0">${_odParentTitle}</span><span style="font-size:.71rem;background:#dbeafe;color:#1d4ed8;font-weight:600;padding:.05rem .4rem;border-radius:.3rem;border:1px solid #93c5fd;white-space:nowrap;flex-shrink:0">Still Active</span>${_odParentCreated}</div>`;
         subs.forEach((sub, si) => {
           const subCi = discontinuedActs.indexOf(sub);
           const subGlobalIdx = acts.indexOf(sub);
@@ -24167,7 +24173,7 @@ function renderTemplateManageContent(template) {
         const _omParent = acts.find(a => (a.title || a.name) === pk && !a.parentActivity);
         const _omParentTitle = _omParent ? (paDisplayHtml(_omParent, true) || escHtml(pk)) : escHtml(pk);
         const _omParentCreated = _omParent?.activeFrom ? `<span style="font-size:.71rem;color:#9ca3af;margin-left:.4rem">Created ${fmtPeriodDate(_omParent.activeFrom)}</span>` : '';
-        html += `<div class="mn-inact-hdr" data-global-idx="${_omParent ? acts.indexOf(_omParent) : -1}" style="display:flex;align-items:center;gap:.5rem;background:#f0f9ff;border:1px solid #bae6fd;border-left:3px solid #60a5fa;border-radius:.35rem;margin-bottom:.35rem;padding:.45rem .75rem"><span style="font-size:.85rem;font-weight:700;color:#1e40af;flex:1;min-width:0">${_omParentTitle}</span><span style="font-size:.71rem;background:#dbeafe;color:#1d4ed8;font-weight:600;padding:.05rem .4rem;border-radius:.3rem;border:1px solid #93c5fd;white-space:nowrap;flex-shrink:0">Still Active</span>${_omParentCreated}</div>`;
+        html += `<div class="mn-inact-hdr" data-global-idx="${_omParent ? acts.indexOf(_omParent) : -1}" style="display:flex;align-items:center;gap:.5rem;background:#f0f9ff;border:1px solid #bae6fd;border-left:3px solid #60a5fa;border-radius:.35rem;margin-bottom:.35rem;padding:.45rem .75rem"><span class="mn-row-chip mn-row-chip--parent">Parent Activity</span><span style="font-size:.85rem;font-weight:700;color:#1e40af;flex:1;min-width:0">${_omParentTitle}</span><span style="font-size:.71rem;background:#dbeafe;color:#1d4ed8;font-weight:600;padding:.05rem .4rem;border-radius:.3rem;border:1px solid #93c5fd;white-space:nowrap;flex-shrink:0">Still Active</span>${_omParentCreated}</div>`;
         subs.forEach((sub, si) => {
           const subCi = masteredActs.indexOf(sub);
           const subGlobalIdx = acts.indexOf(sub);
@@ -24308,7 +24314,7 @@ function renderTemplateManageContent(template) {
         const _odParent = acts.find(a => (a.title || a.name) === pk && !a.parentActivity);
         const _odParentTitle = _odParent ? (paDisplayHtml(_odParent, true) || escHtml(pk)) : escHtml(pk);
         const _odParentCreated = _odParent?.activeFrom ? `<span style="font-size:.71rem;color:#9ca3af;margin-left:.4rem">Created ${fmtPeriodDate(_odParent.activeFrom)}</span>` : '';
-        html += `<div class="mn-inact-hdr" data-global-idx="${_odParent ? acts.indexOf(_odParent) : -1}" style="display:flex;align-items:center;gap:.5rem;background:#f0f9ff;border:1px solid #bae6fd;border-left:3px solid #60a5fa;border-radius:.35rem;margin-bottom:.35rem;padding:.45rem .75rem"><span style="font-size:.85rem;font-weight:700;color:#1e40af;flex:1;min-width:0">${_odParentTitle}</span><span style="font-size:.71rem;background:#dbeafe;color:#1d4ed8;font-weight:600;padding:.05rem .4rem;border-radius:.3rem;border:1px solid #93c5fd;white-space:nowrap;flex-shrink:0">Still Active</span>${_odParentCreated}</div>`;
+        html += `<div class="mn-inact-hdr" data-global-idx="${_odParent ? acts.indexOf(_odParent) : -1}" style="display:flex;align-items:center;gap:.5rem;background:#f0f9ff;border:1px solid #bae6fd;border-left:3px solid #60a5fa;border-radius:.35rem;margin-bottom:.35rem;padding:.45rem .75rem"><span class="mn-row-chip mn-row-chip--parent">Parent Activity</span><span style="font-size:.85rem;font-weight:700;color:#1e40af;flex:1;min-width:0">${_odParentTitle}</span><span style="font-size:.71rem;background:#dbeafe;color:#1d4ed8;font-weight:600;padding:.05rem .4rem;border-radius:.3rem;border:1px solid #93c5fd;white-space:nowrap;flex-shrink:0">Still Active</span>${_odParentCreated}</div>`;
         subs.forEach((sub, si) => {
           const subCi = discontinuedActs.indexOf(sub);
           const subGlobalIdx = acts.indexOf(sub);
