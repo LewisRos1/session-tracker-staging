@@ -202,7 +202,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2051";
+const APP_VERSION = "2052";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -20563,8 +20563,22 @@ function mnInitActivityCollapse(bodyEl, acts) {
       const handle = row.querySelector(".drag-handle");
       row.insertBefore(mnRowChip("sub"), handle ? handle.nextSibling : row.firstChild);
     }
+    // The ⋮ belongs on the row, level with the parent activity's own ⋮ above
+    // it, rather than inside the card you have to open first. The element is
+    // MOVED, not copied: a second menu would need its own handlers and would
+    // have to be kept in step with this one forever. Its offsets were set to
+    // line it up with the Activity Title field inside the card, so they are
+    // cleared here and it is pushed to the far right of the row instead.
+    const subKebab = item.querySelector(".mn-sub-kebab-wrap");
+    if (subKebab && !row.contains(subKebab)) {
+      subKebab.style.marginTop = "0";
+      subKebab.style.alignSelf = "center";
+      subKebab.style.marginLeft = "auto";
+      row.appendChild(subKebab);
+    }
     row.addEventListener("click", e => {
       if (e.target.closest(".drag-handle")) return;   // grabbing to reorder
+      if (e.target.closest(".mn-sub-kebab-wrap")) return;   // using the menu, not opening the card
       const shown = escHtml(nameOf(sub)) ||
         `<span style="color:#9ca3af;font-style:italic;font-weight:500">(Untitled sub-activity)</span>`;
       mnOpenActPanel(item, subBody, `<span class="mn-act-title-text">${shown}</span>`, keyOf(sub));
@@ -20926,7 +20940,7 @@ function renderTargetManageContent(student, target) {
                         placeholder="Enter Activity Title Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
                     </div>
                   </div>
-                  <div style="position:relative;align-self:flex-start;flex-shrink:0;margin-top:1.6rem">
+                  <div class="mn-sub-kebab-wrap" style="position:relative;align-self:flex-start;flex-shrink:0;margin-top:1.6rem">
                     <button class="btn-adm-del mn-sub-kebab-btn" data-idx="${subIdx}" title="Subactivity options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
                     <div class="mn-sub-kebab-menu" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:240px;overflow:hidden">
                       ${mnSubStatusKebabHtml(sub, subIdx)}
