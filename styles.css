@@ -4263,10 +4263,7 @@ button.wf-pill:hover { filter: brightness(.93); }
   white-space: nowrap;
 }
 .btn-archived-toggle:hover { background: #e0e7ff; }
-/* There is no global .hidden in this stylesheet: every control that uses it
-   declares its own rule. */
-.btn-archived-toggle.hidden { display: none; }
-.btn-archived-toggle:not(.hidden) + .section-search { margin-left: 0; }
+.btn-archived-toggle + .section-search { margin-left: 0; }
 .btn-archived-toggle.is-on {
   background: #4338ca;
   border-color: #4338ca;

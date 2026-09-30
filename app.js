@@ -202,7 +202,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2057";
+const APP_VERSION = "2058";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -3742,12 +3742,14 @@ function renderExistingStudentButtons() {
 }
 
 /**
- * Shows, hides and labels a section's Archived button.
+ * Keeps a section's Archived button labelled and in step with its list.
  *
- * The button is not drawn at all until something has been archived: an
- * "Archived (0)" control that does nothing is just noise in the header. If the
- * last entry is un-archived while its list is open, the view falls back to the
- * active list rather than sitting on an empty page with no way out.
+ * The button is always there, including at (0). Hiding it until something had
+ * been archived meant the one place that explains where archived people went
+ * only appeared once you had already worked it out.
+ *
+ * If the last entry is un-archived while its list is open, the view falls back
+ * to the active list rather than sitting on an empty page.
  */
 function syncArchivedToggle(which, count) {
   const btn = $(`btn-archived-${which}`);
@@ -3760,7 +3762,6 @@ function syncArchivedToggle(which, count) {
     return;
   }
   num.textContent = String(count);
-  btn.classList.toggle("hidden", count === 0);
   btn.classList.toggle("is-on", !!state[stateKey]);
   btn.setAttribute("aria-pressed", state[stateKey] ? "true" : "false");
 }
