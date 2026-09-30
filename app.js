@@ -202,7 +202,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2063";
+const APP_VERSION = "2064";
 
 // Debug helpers — call from F12 console
 // 1) List all stored activity names under a target:
@@ -11229,10 +11229,6 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
 
     // Heading rows — blue, gray, or green based on headingColor property
     if (pa.isHeading || pa.isMaintainHeading) {
-      // Numbering restarts under each section heading. Reset before the sidebar
-      // check below so both layouts agree: one section per render already
-      // starts from zero, and the all-sections layout now does the same.
-      actNum = 0;
       if (_filterPaSet) return; // sidebar mode: section name shown in sidebar, not inline
       const isGray  = pa.headingColor === "gray" || pa.isMaintainHeading;
       const isGreen = pa.headingColor === "green";
@@ -11245,9 +11241,12 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
     }
 
     if (pa.isCompleted || pa.isArchived || pa.isStopped) return;
-    if (_filterPaSet && !_filterPaSet.has(pa)) return;
 
+    // Numbered before the section filter, not after it. Numbering runs straight
+    // through a target, and this screen draws one section at a time from the
+    // full list: counting only what it draws restarted every section at 1.
     actNum++;
+    if (_filterPaSet && !_filterPaSet.has(pa)) return;
     const writtenDot = _filterPaSet
       ? (paIsWritten(pa, target)
         ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:#22c55e;color:#fff;font-size:.6rem;font-weight:900;margin-right:.3rem;flex-shrink:0;align-self:flex-start;margin-top:.35rem">✓</span>`
@@ -11860,7 +11859,8 @@ function renderInactiveStatusSection({ label, color, pas, orphanGroups, allPas, 
 
   const sectionBand = title => `<tr><td colspan="3" style="${_cellBase};background:#eef2ff;font-size:.82rem;font-weight:700;color:#3730a3">${escHtml(title)}</td></tr>`;
 
-  // Numbering restarts under each section heading, the same as everywhere else.
+  // Numbering runs straight through the whole list, section headings included:
+  // a heading groups the rows visually, it does not restart the count.
   let topNum = 0;
 
   // Keep the order the activities appear in, but break into runs by heading.
@@ -11873,7 +11873,6 @@ function renderInactiveStatusSection({ label, color, pas, orphanGroups, allPas, 
   }
 
   const topRows = groups.map(g => {
-    topNum = 0;
     const body = g.items.map(pa => {
       topNum++;
       const subs = subsOf(pa);
@@ -20962,7 +20961,6 @@ function renderTargetManageContent(student, target) {
     // list, which made whichever heading happened to be last reappear with the new
     // activity under it.
     if (a.isHeading || a.isMaintainHeading) {
-      manageActNo = 0;   // numbering restarts under each section heading
       const isGray = a.headingColor === "gray" || a.isMaintainHeading;
       const isGreen = a.headingColor === "green";
       const hdgBg = isGray ? "#9ca3af" : isGreen ? "#a9d18e" : null;
@@ -25793,6 +25791,33 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
     }
   }
 
+  /**
+   * The number each activity carries, worked out over the whole target.
+   *
+   * This screen draws one section at a time out of the full list, so a counter
+   * that only advanced on the rows it drew started again at 1 in every section
+   * and the same number turned up several times down one target. The number is
+   * a property of where an activity sits in its target, so it is settled here,
+   * once, and the section filter below only decides what gets drawn.
+   *
+   * Mirrors the skips in the loop: sub-activities are lettered under their
+   * parent, headings and notes are not activities, retired ones are gone, and a
+   * parent whose sub-activities have all been retired is not drawn at all.
+   */
+  const grpNumOf = new Map();
+  {
+    let n = 0;
+    for (const pa of allPas) {
+      if (pa.parentActivity) continue;
+      if (pa.isNote || pa.isExportNote || pa.isHeading) continue;
+      if (pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || pa.isMaintainHeading) continue;
+      const k = pa.title || pa.name;
+      const hasAnySubs = k && allPas.some(p => p.parentActivity === k && !p.isCompleted && !p.isArchived && !p.isStopped);
+      if (hasAnySubs && (grpSubsByParent.get(k) || []).length === 0) continue;
+      grpNumOf.set(pa, ++n);
+    }
+  }
+
   let grpActNum = 0;
   for (const pa of allPas) {
     if (_footerOnly) continue; // predefined activities rendered in sections already; skip in footer
@@ -25829,7 +25854,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
     const _grpHasAnySubs = _grpPaKey && allPas.some(p => p.parentActivity === _grpPaKey && !p.isCompleted && !p.isArchived && !p.isStopped);
     if (_grpHasAnySubs && children.length === 0) continue; // parent with all subs now inactive
     if (children.length > 0) {
-      grpActNum++;
+      grpActNum = grpNumOf.get(pa) || 0;
       const grpIsGrayP = pa.activityColor === "gray" || pa.isMaintainLive || pa.maintained;
       const grpIsGreenP = pa.activityColor === "green";
       const grpPBorder = grpIsGreenP ? 'border:1px solid #a9d18e;border-left:4px solid #70ad47;background:#e2efda;'
@@ -25941,7 +25966,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
       || grpAllActs.find(([, a]) => a.targetName === target.name && a.activityName === (pa.title || pa.name) && !a.parentActivity && !a.configId)?.[0]
       || null;
     if (actId && pa.id && !data.activities[actId]?.configId) data.activities[actId].configId = pa.id;
-    grpActNum++;
+    grpActNum = grpNumOf.get(pa) || 0;
     items.push(renderGroupActivityCard(pa.title || pa.name, actId, target, data, attendees, pa.actNote, pa, true, null, pa.id, _grpFilterPaSet, grpActNum));
   }
 
@@ -26212,8 +26237,12 @@ function renderGroupStudentBlock(studentName, target, data, grpStudentDate = nul
   let byStudentActNum = 0;
   for (const pa of (target.predefinedActivities || [])) {
     // Group sessions: don't filter by activeFrom date — activities apply to all sessions
-    if (_filterPaSet && !_filterPaSet.has(pa)) continue;
     if (pa.isNote || pa.isExportNote || pa.isHeading || pa.isMaintainHeading || pa.isCompleted || pa.isArchived || pa.isStopped || pa.isMaintain || (!pa.name && !pa.title)) continue;
+    // Numbered before the section filter: this screen draws one section at a
+    // time from the full list, so counting only what it draws restarted the
+    // numbering in every section.
+    if (!pa.parentActivity) byStudentActNum++;
+    if (_filterPaSet && !_filterPaSet.has(pa)) continue;
     const actId = Object.entries(data.activities || {})
       .find(([, a]) => {
         if (a.targetName !== target.name) return false;
@@ -26222,7 +26251,6 @@ function renderGroupStudentBlock(studentName, target, data, grpStudentDate = nul
         if (pa.name && a.activityName === pa.name) return true;
         return false;
       })?.[0] || null;
-    if (!pa.parentActivity) byStudentActNum++;
     activityEntries.push({ actId, actName: pa.title || pa.name, actNote: pa.actNote, pa, actNum: pa.parentActivity ? 0 : byStudentActNum });
   }
   if (!_filterPaSet) {

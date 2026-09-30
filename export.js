@@ -3186,21 +3186,17 @@ function getAllActivitiesForTarget(session, target, opts = {}) {
       continue;
     }
     if (!pa.name && !pa.title) continue;
-    // Numbering restarts under each section heading, matching both screens.
     if (pa.isHeading && !pa.headingColor && !pa.isMaintainHeading) {
-      exportActNum = 0;
       result.push({ isHeading: true, activityName: pa.title || pa.name });
       continue;
     }
     // Gray headings — inline in their natural position
     if ((pa.isHeading && pa.headingColor === "gray") || pa.isMaintainHeading) {
-      exportActNum = 0;
       result.push({ isMaintainHeading: true, activityName: pa.title || pa.name, isGray: true });
       continue;
     }
     // Green headings — inline in their natural position
     if (pa.isHeading && pa.headingColor === "green") {
-      exportActNum = 0;
       result.push({ isGreenHeading: true, activityName: pa.title || pa.name });
       continue;
     }
