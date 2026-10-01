@@ -202,7 +202,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2070";
+const APP_VERSION = "2071";
 
 // Debug helpers — call from F12 console
 // 0) Find who has an activity, when you remember the name but not the student:
@@ -11469,6 +11469,7 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
             ${subWrittenDot}<span style="flex-shrink:0;align-self:flex-start;margin-top:.45rem;display:inline-block;background:#dbeafe;color:#1e40af;border-radius:.4rem;padding:.12rem .5rem;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Subactivity</span>
             <span class="field-value-fixed"><span style="color:#1e40af;font-weight:700;margin-right:.25rem">${subLabel})</span>${inactiveReasonBadge(sub)}${paDisplayHtml(sub)}</span>
             ${sub.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start;margin-top:.45rem">Created: ${fmtPeriodDate(sub.activeFrom)}</span>` : ""}
+            ${sub.id ? `<button class="btn-icon btn-edit-activity-pencil" contenteditable="false" data-pa-id="${escHtml(sub.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
           </div>`;
         const _subNoOpts = (sub.remarkHasNote || sub.optionsMulti) && parseOpts(getActivityInlineOptions(sub)).length === 0;
         if (_subNoOpts) {
@@ -18977,7 +18978,11 @@ function openManageModal(student, targetOrNull, templateOrNull = null, remarkPre
           const idx = acts.findIndex(a => a.id === scrollToPaId);
           if (idx < 0) return;
           const modalBody = $("manage-modal-body");
-          const el = modalBody?.querySelector(`.admin-list-item[data-idx="${idx}"]`);
+          // A sub-activity is not an .admin-list-item: it is a .mn-sub-compact row
+          // inside its parent\'s card. Looking only for the former meant a pencil on
+          // a sub-activity opened Edit Target and then did nothing, leaving you to
+          // hunt for the row yourself.
+          const el = modalBody?.querySelector(`.admin-list-item[data-idx="${idx}"], .mn-sub-compact[data-idx="${idx}"]`);
           if (!el || !modalBody) return;
           modalBody.scrollTop = el.offsetTop - 120;
           el.classList.add("activity-cfg-blink");
@@ -27406,7 +27411,11 @@ function openGroupManageModal(group, target = null, scrollToPaId = null) {
         const idx = acts.findIndex(a => a.id === scrollToPaId);
         if (idx < 0) return;
         const modalBody = $("manage-modal-body");
-        const el = modalBody?.querySelector(`.admin-list-item[data-idx="${idx}"]`);
+        // A sub-activity is not an .admin-list-item: it is a .mn-sub-compact row
+        // inside its parent\'s card. Looking only for the former meant a pencil on
+        // a sub-activity opened Edit Target and then did nothing, leaving you to
+        // hunt for the row yourself.
+        const el = modalBody?.querySelector(`.admin-list-item[data-idx="${idx}"], .mn-sub-compact[data-idx="${idx}"]`);
         if (!el || !modalBody) return;
         modalBody.scrollTop = el.offsetTop - 120;
         el.classList.add("activity-cfg-blink");
