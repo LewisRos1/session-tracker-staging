@@ -709,12 +709,18 @@ html, body {
   color: #fff;
   font-weight: 700;
 }
-/* Today. An inset shadow rather than a border so the cell does not change size
-   and shift the grid, and it layers over whatever background the day already
-   has: plain, hovered, taken, or selected. */
-.date-picker-day-today {
-  box-shadow: inset 0 0 0 2px var(--primary);
-  font-weight: 800;
+/* Today: a darker grey fill. Every other cell is the same pale grey, so a
+   deeper shade of it is enough to pick today out without adding a second
+   colour. The ring and the bold number are gone; the ring competed with the
+   purple of the selected day, and the bold was shouting.
+   :not(...current) so that today being the SELECTED day still shows as the
+   purple block, and hover is restated because this rule would otherwise sit
+   on top of it. */
+.date-picker-day-today:not(.date-picker-day-current) {
+  background: #d8dbe0;
+}
+.date-picker-day-today:not(.date-picker-day-current):hover {
+  background: var(--primary-light);
 }
 .date-picker-day-future { color: #bbb; cursor: default; }
 .date-picker-day-taken  { cursor: default; }
