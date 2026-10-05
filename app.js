@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2096";
+const APP_VERSION = "2097";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -1527,6 +1527,36 @@ async function applyScoreSettings() {
  * sessions behind it, are separate and still shown to whoever is allowed
  * through here.
  */
+/**
+ * Shows a lock on top of the floating activity panel, if that panel is open.
+ *
+ * The Edit Target modal sits at z-index 1000 and the panel at 1200, so a lock
+ * written into the modal while the panel is up gets painted BEHIND it: you can
+ * make out the grey of it around the edges, but the thing telling you why
+ * nothing happened is the one thing you cannot read. Writing into the modal
+ * also wipes the Edit Target content that is sitting there waiting for the
+ * panel to close.
+ *
+ * Returns false when the panel is not open, which leaves every lock outside the
+ * panel on the modal it has always used.
+ */
+function showLockOverPanel(bodyHtml) {
+  const panelEl = document.getElementById("mn-act-panel-overlay");
+  if (!panelEl || panelEl.style.display === "none") return false;
+  document.querySelectorAll("[data-lock-overlay]").forEach(el => el.remove());
+  const overlay = document.createElement("div");
+  overlay.dataset.lockOverlay = "1";
+  overlay.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding-top:2rem;z-index:300;border-radius:.75rem;overflow-y:auto";
+  overlay.innerHTML = `<div style="background:#fff;padding:1.5rem 1.25rem;border-radius:.75rem;width:min(320px,92%);box-shadow:0 4px 24px rgba(0,0,0,.25);display:flex;flex-direction:column;align-items:center;gap:.9rem;margin-bottom:1rem">
+      <div style="font-size:2rem;line-height:1">🔒</div>
+      <div style="font-size:.9rem;color:#111;text-align:center;line-height:1.55">${bodyHtml}</div>
+      <button class="btn-primary-sm" data-lock-ok style="padding:.5rem 1.75rem">OK</button>
+    </div>`;
+  panelEl.appendChild(overlay);
+  overlay.querySelector("[data-lock-ok]").addEventListener("click", () => overlay.remove());
+  return true;
+}
+
 function requirePassword(onSuccess, message = "") {
   if (canUseStaffTools()) { onSuccess(); return; }
 
@@ -1535,6 +1565,9 @@ function requirePassword(onSuccess, message = "") {
   // it. The old-session lock keeps its reason because that one is about the
   // session, not about the person reading it.
   const isOldSession = message === EXPIRED_MSG;
+  if (showLockOverPanel(isOldSession
+        ? `Locked. This session is more than 7 days old.`
+        : `Locked.`)) return;
   $("manage-modal-title").textContent = isOldSession ? "Older Session" : "Locked";
   $("manage-modal-body").innerHTML = `
     <div style="padding:2rem 1.25rem;display:flex;flex-direction:column;align-items:center;gap:.9rem">
@@ -23388,17 +23421,17 @@ function renderTargetManageContent(student, target) {
       // waits on a scan for an answer that was never going to be yes.
       if (!isOwner()) {
         sel.value = oldType;
-        $("manage-modal-title").textContent = "Not Available";
-        $("manage-modal-body").innerHTML = `
-          <div style="padding:2rem 1.25rem;display:flex;flex-direction:column;align-items:center;gap:.9rem">
-            <div style="font-size:2rem;line-height:1">🔒</div>
-            <div style="font-size:.9rem;color:var(--text);text-align:center;max-width:300px;line-height:1.55">
-              Changing an activity's type can delete scores already recorded against it, so only Lewis can do it.
-            </div>
-            <button class="btn-primary-sm" id="type-deny-ok" style="padding:.5rem 1.75rem">OK</button>
-          </div>`;
-        $("manage-modal").classList.remove("hidden");
-        $("type-deny-ok").addEventListener("click", () => $("manage-modal").classList.add("hidden"));
+        if (!showLockOverPanel(`Locked.`)) {
+          $("manage-modal-title").textContent = "Locked";
+          $("manage-modal-body").innerHTML = `
+            <div style="padding:2rem 1.25rem;display:flex;flex-direction:column;align-items:center;gap:.9rem">
+              <div style="font-size:2rem;line-height:1">🔒</div>
+              <div style="font-size:.9rem;color:var(--text);text-align:center;max-width:300px;line-height:1.55">Locked.</div>
+              <button class="btn-primary-sm" id="type-deny-ok" style="padding:.5rem 1.75rem">OK</button>
+            </div>`;
+          $("manage-modal").classList.remove("hidden");
+          $("type-deny-ok").addEventListener("click", () => $("manage-modal").classList.add("hidden"));
+        }
         return;
       }
 
