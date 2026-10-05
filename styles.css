@@ -217,6 +217,10 @@ html, body {
   pointer-events: none;
   transition: top .13s ease, font-size .13s ease, transform .13s ease;
 }
+/* Autofill counts as filled. Chrome fills the value without the field ever
+   being typed in, and without this the label sat on top of the dots it was
+   supposed to be labelling. */
+.float-field input:-webkit-autofill + label,
 .float-field input:focus + label,
 .float-field input:not(:placeholder-shown) + label {
   top: .34rem;
@@ -229,6 +233,19 @@ html, body {
   padding-top: 1.15rem !important;
   padding-bottom: .4rem !important;
   text-align: left !important;
+}
+
+/* Chrome paints an autofilled field its own blue, which does not belong to this
+   design and made the box look broken next to the one beside it. The colour
+   cannot be set directly, but an inset shadow covers it, and the text colour
+   has its own property. */
+.float-field input:-webkit-autofill,
+.float-field input:-webkit-autofill:hover,
+.float-field input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--input-bg, #f8fafc) inset;
+  -webkit-text-fill-color: var(--text);
+  caret-color: var(--text);
+  transition: background-color 9999s ease-out;
 }
 
 .login-pw .admin-input {
