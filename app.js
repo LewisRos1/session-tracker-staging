@@ -202,7 +202,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2074";
+const APP_VERSION = "2075";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -20653,10 +20653,26 @@ async function mnPanelSave() {
   if (!_mnPanelOpen) return;
   const host = _mnPanelHost;
   const key = _mnPanelOpen.key;
-  let dirty = mnPanelIsDirty();
+  const snapshot = _mnPanelSnapshot;
+
+  // Detach FIRST, then ask what changed.
+  //
+  // Several fields only record what you typed in their blur handler, and
+  // detaching is what blurs them. Asking "has anything changed?" before that
+  // ran meant the panel still looked untouched, so dirty came back false, the
+  // write was skipped, and the edit was dropped. Pressing Save and Close a
+  // second time worked only because the blur had happened by then. The same
+  // ordering decided whether an option edit reached Firestore at all.
+  mnDetachPanel();
+
+  let dirty;
+  // Not mnPanelIsDirty(): that returns false once the panel is detached. The
+  // snapshot captured on open is compared directly instead, and anything that
+  // cannot be compared counts as changed, so work is never thrown away.
+  try { dirty = !!host && !!snapshot && JSON.stringify(host.acts) !== snapshot; }
+  catch { dirty = true; }
   const wanted = _mnPanelSaveWanted;
   const renames = _mnPanelRenameQueue;
-  mnDetachPanel();
   if (mnDropEmptyPanelAct(host, key)) dirty = true;
   _mnPanelHold = false;
   _mnPanelSaveWanted = false;
