@@ -106,6 +106,20 @@ export function signInWithPin(pin) {
   return signInWithEmailAndPassword(auth, AUTH_EMAIL, PIN_PASSWORD_PREFIX + pin);
 }
 
+/**
+ * Sign in as one named member of staff.
+ *
+ * The shared account above cannot tell one person from another: its address and
+ * password prefix are both in this file, which every visitor downloads, so the
+ * only secret was a four digit PIN. Each person now has their own account, and
+ * what they type is a real password that is written down nowhere the browser
+ * can see. The address is built from the name they picked, so nobody has to
+ * type an e-mail on a tablet.
+ */
+export function signInAs(email, password) {
+  return signInWithEmailAndPassword(auth, email, password);
+}
+
 export function signOutUser() {
   return signOut(auth);
 }

@@ -191,6 +191,52 @@ html, body {
 
 .pin-error.hidden { display: none; }
 
+/* ── Sign in: pick a name, then a password ─────────────────────
+   Replaces the shared PIN pad. The names are large targets because this is
+   used on a tablet, and the password field is an ordinary one so a password
+   manager can fill it. */
+.login-names {
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
+  width: min(280px, 80vw);
+  margin: .5rem auto 0;
+}
+.login-name {
+  padding: .85rem 1rem;
+  border: 1.5px solid rgba(255,255,255,.35);
+  border-radius: .6rem;
+  background: rgba(255,255,255,.1);
+  color: #fff;
+  font-size: 1.02rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.login-name:hover { background: rgba(255,255,255,.2); }
+.login-pw {
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
+  align-items: center;
+  width: min(280px, 80vw);
+  margin: .5rem auto 0;
+}
+.login-pw .admin-input {
+  width: 100%;
+  text-align: center;
+  font-size: 1rem;
+}
+.login-pw .btn-primary-sm { width: 100%; padding: .6rem; }
+.login-back {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,.75);
+  font-size: .85rem;
+  cursor: pointer;
+  padding: .2rem;
+}
+.login-back:hover { color: #fff; }
+
 .pin-status {
   color: var(--text-muted);
   font-size: .9rem;

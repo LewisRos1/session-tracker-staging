@@ -92,6 +92,7 @@ import {
   getSessionsWithParticipant,
   getAllSessions,
   signInWithPin,
+  signInAs,
   signOutUser,
   onAuthChange,
   generateId,
@@ -202,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2082";
+const APP_VERSION = "2083";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -1251,6 +1252,48 @@ window.debugDeleteCheck = async function(studentName, targetName, activityName) 
   });
 };
 // The three instructors — id keys match Firestore checks fields (p1_*, p3_*)
+/**
+ * Who can sign in, and what each of them is allowed to do.
+ *
+ * Keyed by e-mail rather than by Firebase user id, because an id exists only
+ * once the account has been created and differs between the staging and live
+ * projects, while the address is the same in both. An address is a username,
+ * not a secret, so there is no harm in it being here.
+ *
+ * Three tiers:
+ *   assistant  the daily work: sessions, remarks, trials, scores. Targets are
+ *              readable but not editable, and nothing leaves the system.
+ *   teacher    everything the 0823 password used to stand in front of, with no
+ *              prompt, because the account already says who they are.
+ *   owner      that, plus changing an activity's type and the debug tools.
+ */
+const USERS = [
+  { id: "daisy", name: "Ms. Daisy", email: "daisy@session-tracker.app",    role: "teacher"   },
+  { id: "nigel", name: "Nigel",     email: "nigel@session-tracker.app",    role: "teacher"   },
+  { id: "ray",   name: "Rayhanah",  email: "rayhanah@session-tracker.app", role: "assistant" },
+  { id: "lewis", name: "Lewis",     email: "lewis@session-tracker.app",    role: "owner"     },
+];
+
+/** The signed-in person, or null when the account is not one of the four. */
+function currentUser() {
+  const email = (state.authEmail || "").toLowerCase();
+  return USERS.find(u => u.email.toLowerCase() === email) || null;
+}
+
+/**
+ * Anything not in the list above is the old shared login, and is treated as an
+ * assistant: the safe end of the scale. That keeps the old account usable as a
+ * way back in without handing it the run of the place.
+ */
+function currentRole() {
+  return currentUser()?.role || "assistant";
+}
+
+const isOwner   = () => currentRole() === "owner";
+const isTeacher = () => currentRole() === "teacher";
+/** Everything the 0823 password used to gate. */
+const canUseStaffTools = () => isOwner() || isTeacher();
+
 const INSTRUCTORS = [
   { id: "daisy", name: "Ms. Daisy", isMain: true  },
   { id: "nigel", name: "Nigel",     isMain: false },
@@ -1459,32 +1502,43 @@ async function applyScoreSettings() {
 
 // ─── PASSWORD GATE ────────────────────────────────────────────
 // Single shared password for exports and old-session access.
-function requirePassword(onSuccess, message = "Enter password to continue") {
-  $("manage-modal-title").textContent = "Password Required";
+/**
+ * Runs an action that only a main teacher or the owner may run.
+ *
+ * It used to ask for the 0823 password. The account now says who you are, so
+ * there is nothing to type: a teacher or the owner goes straight through, and
+ * an assistant is told plainly that it is not theirs to do. Every call site
+ * keeps the same shape, which is why the name stays.
+ *
+ * This is a signpost, not the lock. The lock is in the Firestore rules, where
+ * it cannot be stepped around from the browser console.
+ *
+ * Note what this does NOT decide: whether an action is a good idea. Warnings
+ * about consequences, like changing the type of an activity that already has
+ * sessions behind it, are separate and still shown to whoever is allowed
+ * through here.
+ */
+function requirePassword(onSuccess, message = "") {
+  if (canUseStaffTools()) { onSuccess(); return; }
+
+  const isOldSession = message === EXPIRED_MSG;
+  const who = currentUser()?.name || "This account";
+  $("manage-modal-title").textContent = isOldSession ? "Older Session" : "Not Available";
   $("manage-modal-body").innerHTML = `
-    <div style="padding:2rem 1rem;display:flex;flex-direction:column;align-items:center;gap:.75rem">
-      <div style="font-size:.85rem;color:var(--text-muted);text-align:center;max-width:260px;line-height:1.5">${message}</div>
-      <input id="req-pw-input" type="text" class="admin-input"
-        style="width:200px;text-align:center;font-size:1rem;-webkit-text-security:disc"
-        placeholder="Enter password" autocomplete="off">
-      <div id="req-pw-err" style="font-size:.8rem;color:#dc2626;display:none">Incorrect password</div>
-      <button class="btn-primary-sm" id="req-pw-btn" style="padding:.5rem 1.5rem">Continue</button>
+    <div style="padding:2rem 1.25rem;display:flex;flex-direction:column;align-items:center;gap:.9rem">
+      <div style="font-size:2rem;line-height:1">🔒</div>
+      <div style="font-size:.9rem;color:var(--text);text-align:center;max-width:300px;line-height:1.55">
+        ${isOldSession
+          ? `This session is more than 7 days old. Only a main teacher can open one this far back.`
+          : `This is only available to a main teacher.`}
+      </div>
+      <div style="font-size:.8rem;color:var(--text-muted);text-align:center;max-width:300px;line-height:1.5">
+        Signed in as <strong>${escHtml(who)}</strong>. Ask Ms. Daisy or Nigel if you need this.
+      </div>
+      <button class="btn-primary-sm" id="req-deny-ok" style="padding:.5rem 1.75rem">OK</button>
     </div>`;
   $("manage-modal").classList.remove("hidden");
-  const pwInput = $("req-pw-input");
-  pwInput.value = "";
-  setTimeout(() => pwInput.focus(), 50);
-  const check = () => {
-    if (pwInput.value !== "0823") {
-      $("req-pw-err").style.display = "";
-      pwInput.value = "";
-      return;
-    }
-    $("manage-modal").classList.add("hidden");
-    onSuccess();
-  };
-  $("req-pw-btn").addEventListener("click", check);
-  pwInput.addEventListener("keydown", e => { if (e.key === "Enter") check(); });
+  $("req-deny-ok").addEventListener("click", () => $("manage-modal").classList.add("hidden"));
 }
 
 const LEGAL_WARNING = `<strong>Client data is confidential</strong> and must only be accessed, used, or shared for authorised purposes. Unauthorised <strong>downloading of client data</strong> without permission for personal use is <strong>strictly prohibited</strong>.<br><br>Any violation of this policy constitutes a serious breach of privacy law. Violators may be <strong>reported to the relevant authorities</strong> and may be subject to civil and criminal liability.`;
@@ -2055,6 +2109,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   // user = null and fall into the PIN branch below.
   onAuthChange(async user => {
     authResolved = true;
+    // Which of the four signed in. Every permission in the app reads from
+    // this, so it is set before anything else looks at it.
+    state.authEmail = user?.email || null;
     if (user && !hasLoggedInToday()) {
       await signOutUser();
       return;
@@ -2259,111 +2316,101 @@ checkVersionFromServer();
 // PIN SCREEN
 // ============================================================
 
+/**
+ * Pick who you are, then type your password.
+ *
+ * Replaces the shared PIN pad. The address is built from the name, so nobody
+ * types an e-mail, and the password is never derived from anything published
+ * in this file the way the old PIN was.
+ */
 function initPin() {
   showScreen("screen-pin");
   const vEl = $("pin-version");
   if (vEl) vEl.textContent = versionLineText();
-  const errMsg = $("pin-error");
-  const statusMsg = $("pin-status");
-  const dotsEl = $("pin-dots");
-  const keypad = $("pin-keypad");
-  const pinLen = CONFIG.PIN_LENGTH;
-  let value = "";
+  const mount = $("login-mount");
+  if (!mount) return;
+
+  let picked = null;
   let checking = false;
 
-  // A previous successful login leaves statusMsg's "hidden" class removed
-  // (only the error path explicitly re-hides it — success just navigates
-  // away from this whole screen). Reset both on every fresh entry so
-  // "Logging in…" can't still be showing before anything's been typed.
-  errMsg.classList.add("hidden");
-  statusMsg.classList.add("hidden");
+  const render = () => {
+    mount.innerHTML = picked ? passwordStepHtml() : namesStepHtml();
+    picked ? wirePasswordStep() : wireNamesStep();
+  };
 
-  dotsEl.innerHTML = Array.from({ length: pinLen }, () =>
-    '<span class="pin-dot"></span>'
-  ).join("");
-  const dots = dotsEl.querySelectorAll(".pin-dot");
+  const namesStepHtml = () => `
+    <p class="pin-subtitle">Who are you?</p>
+    <div class="login-names">
+      ${USERS.map(u => `<button class="login-name" data-email="${escHtml(u.email)}">${escHtml(u.name)}</button>`).join("")}
+    </div>
+    <button class="login-back" id="login-old-pin" style="margin-top:.9rem">Use the old staff PIN</button>`;
 
-  function renderDots() {
-    dots.forEach((d, i) => d.classList.toggle("filled", i < value.length));
-  }
+  const passwordStepHtml = () => `
+    <p class="pin-subtitle">${escHtml(picked.name)}</p>
+    <div class="login-pw">
+      <input id="login-pw-input" type="password" class="admin-input" placeholder="Password"
+        autocomplete="current-password" autocapitalize="off" spellcheck="false">
+      <div id="login-err" class="pin-error hidden">Incorrect password. Try again.</div>
+      <div id="login-status" class="pin-status hidden">Signing in…</div>
+      <button class="btn-primary-sm" id="login-go">Sign In</button>
+      <button class="login-back" id="login-back">← Not you?</button>
+    </div>`;
 
-  function shake() {
-    dotsEl.classList.remove("shake");
-    void dotsEl.offsetWidth;
-    dotsEl.classList.add("shake");
-  }
+  const wireNamesStep = () => {
+    mount.querySelectorAll(".login-name").forEach(btn => {
+      btn.addEventListener("click", () => {
+        picked = USERS.find(u => u.email === btn.dataset.email) || null;
+        render();
+        setTimeout(() => $("login-pw-input")?.focus(), 50);
+      });
+    });
+    // The way back in. The four accounts above have to be created by hand in
+    // the Firebase console, and until they exist nobody could sign in at all,
+    // which would lock the app shut rather than restrict it. The old shared
+    // account still works and is treated as an assistant, so it opens the door
+    // without handing over the run of the place. Remove this once the accounts
+    // are in place and proven.
+    $("login-old-pin")?.addEventListener("click", async () => {
+      const pin = prompt("Old staff PIN:");
+      if (!pin) return;
+      try {
+        await signInWithPin(pin.trim());
+        markLoggedInToday();
+      } catch (_) {
+        alert("That PIN was not accepted.");
+      }
+    });
+  };
 
-  async function submit() {
-    if (checking) return;
-    checking = true;
-    keypad.classList.add("checking");
-    errMsg.classList.add("hidden");
-    statusMsg.classList.remove("hidden");
-    try {
-      // Marked *before* signing in, not after — onAuthChange's listener can
-      // fire as soon as Firebase's internal state updates, which can race
-      // ahead of this async function's own continuation after the await.
-      // If hasLoggedInToday() were still false at that moment, onAuthChange
-      // would immediately sign this brand-new login back out again (it
-      // looks identical to a stale persisted session from a previous day),
-      // leaving "Logging in…" stuck forever since the screen never moves on
-      // to home OR back to a fresh PIN entry.
-      markLoggedInToday();
-      await signInWithPin(value);
-      // Success: onAuthChange (registered once in DOMContentLoaded) picks up
-      // the new signed-in user, loads data, and shows home from there. Leave
-      // "Logging in…" up the whole time — loading that data after sign-in
-      // can itself take a few seconds, and showScreen() will hide this
-      // entire PIN screen (status message included) once home appears, so
-      // there's no gap where nothing is showing.
-      document.removeEventListener("keydown", onKeyDown);
-      checking = false;
-      keypad.classList.remove("checking");
-    } catch (err) {
-      // The day was marked BEFORE the attempt (see above), so a failed attempt
-      // has to take it back. Leaving it set is what produced "it says the PIN
-      // is wrong and then logs me in anyway": hasLoggedInToday() was now true,
-      // so the next auth-state change onAuthChange saw was accepted instead of
-      // being signed out as a stale session from a previous day.
-      clearLoggedInToday();
-      // Nothing was ever written about WHY a sign-in failed, so a wrong PIN and
-      // a dropped connection looked identical from the outside.
-      console.warn("[PIN] sign-in failed:", err?.code || "(no code)", err?.message || err);
-      shake();
-      errMsg.classList.remove("hidden");
-      statusMsg.classList.add("hidden");
-      value = "";
-      renderDots();
-      checking = false;
-      keypad.classList.remove("checking");
-    }
-  }
+  const wirePasswordStep = () => {
+    const inp = $("login-pw-input");
+    const err = $("login-err");
+    const status = $("login-status");
+    $("login-back").addEventListener("click", () => { picked = null; render(); });
 
-  function pressKey(key) {
-    if (key === "back") {
-      value = value.slice(0, -1);
-      errMsg.classList.add("hidden");
-      renderDots();
-      return;
-    }
-    if (value.length >= pinLen) return;
-    value += key;
-    renderDots();
-    if (value.length === pinLen) setTimeout(submit, 120);
-  }
+    const submit = async () => {
+      if (checking || !inp.value) return;
+      checking = true;
+      err.classList.add("hidden");
+      status.classList.remove("hidden");
+      try {
+        await signInAs(picked.email, inp.value);
+        markLoggedInToday();
+        // onAuthChange takes it from here and loads the app.
+      } catch (_) {
+        status.classList.add("hidden");
+        err.classList.remove("hidden");
+        inp.value = "";
+        inp.focus();
+      } finally {
+        checking = false;
+      }
+    };
+    $("login-go").addEventListener("click", submit);
+    inp.addEventListener("keydown", e => { if (e.key === "Enter") submit(); });
+  };
 
-  keypad.addEventListener("click", e => {
-    const btn = e.target.closest(".pin-key");
-    if (!btn || btn.disabled) return;
-    pressKey(btn.dataset.key);
-  });
-
-  function onKeyDown(e) {
-    if (e.key >= "0" && e.key <= "9") pressKey(e.key);
-    else if (e.key === "Backspace") pressKey("back");
-    else if (e.key === "Enter" && value.length === pinLen) submit();
-  }
-  document.addEventListener("keydown", onKeyDown);
+  render();
 }
 
 // ============================================================
@@ -9343,29 +9390,8 @@ async function monthlyDownloadExcel(student, year, month, monthName, overviewDat
 }
 
 async function hyrOpenSettings() {
-  $("manage-modal-title").textContent = "Prompt for AI Report";
-  $("manage-modal-body").innerHTML = `
-    <div style="padding:2rem 1rem;display:flex;flex-direction:column;align-items:center;gap:.75rem">
-      <div style="font-size:.9rem;color:var(--text-muted)">Enter password to continue</div>
-      <input id="hyr-settings-pw" type="text" class="admin-input"
-        style="width:200px;text-align:center;font-size:1rem;-webkit-text-security:disc"
-        placeholder="Enter password" autocomplete="off">
-      <div id="hyr-settings-pw-err" style="font-size:.8rem;color:#dc2626;display:none">Incorrect password</div>
-    </div>`;
-  $("manage-modal").classList.remove("hidden");
-
-  const pwInput = $("hyr-settings-pw");
-  pwInput.value = "";
-  setTimeout(() => { pwInput.value = ""; pwInput.focus(); }, 50);
-  pwInput.addEventListener("keydown", async e => {
-    if (e.key !== "Enter") return;
-    if (pwInput.value !== "0823") {
-      $("hyr-settings-pw-err").style.display = "";
-      pwInput.value = "";
-      return;
-    }
-    await hyrShowPromptEditor();
-  });
+  // Was its own password box asking for 0823. The account answers that now.
+  requirePassword(() => hyrShowPromptEditor(), EXPORT_MSG);
 }
 
 async function hyrShowPromptEditor() {
@@ -9906,31 +9932,8 @@ function showStudentChoice(student) {
   });
   $("session-picker-list").querySelector(".choice-manage-activity").addEventListener("click", () => {
     closeSessionPicker();
-    $("manage-modal-title").textContent = "Manage Targets";
-    $("manage-modal-body").innerHTML = `
-      <div style="padding:2rem 1rem;display:flex;flex-direction:column;align-items:center;gap:.75rem">
-        <div style="font-size:.9rem;color:var(--text-muted)">Enter password to continue</div>
-        <input id="ma-gate-pw" type="text" class="admin-input"
-          style="width:200px;text-align:center;font-size:1rem;-webkit-text-security:disc"
-          placeholder="Enter password" autocomplete="off">
-        <div id="ma-gate-pw-err" style="font-size:.8rem;color:#dc2626;display:none">Incorrect password</div>
-        <button class="btn-primary-sm" id="ma-gate-pw-btn" style="padding:.5rem 1.5rem">Continue</button>
-      </div>`;
-    $("manage-modal").classList.remove("hidden");
-    const pwInput = $("ma-gate-pw");
-    pwInput.value = "";
-    setTimeout(() => { pwInput.value = ""; pwInput.focus(); }, 50);
-    const checkPw = () => {
-      if (pwInput.value !== "0823") {
-        $("ma-gate-pw-err").style.display = "";
-        pwInput.value = "";
-        return;
-      }
-      $("manage-modal").classList.add("hidden");
-      openManageActivityScreen(student);
-    };
-    pwInput.addEventListener("keydown", e => { if (e.key === "Enter") checkPw(); });
-    $("ma-gate-pw-btn").addEventListener("click", checkPw);
+    // Was its own password box. Same gate as everywhere else now.
+    requirePassword(() => openManageActivityScreen(student), EXPORT_MSG);
   });
 }
 
@@ -19097,25 +19100,10 @@ function openManageModal(student, targetOrNull, templateOrNull = null, remarkPre
   } else if (templateOrNull) {
     renderTemplateManageContent(templateOrNull);
   } else if (targetOrNull) {
-    // Password gate before revealing Edit Target
-    $("manage-modal-title").textContent = "Edit Target";
-    $("manage-modal-body").innerHTML = `
-      <div style="padding:2rem 1rem;display:flex;flex-direction:column;align-items:center;gap:.75rem">
-        <div style="font-size:.9rem;color:var(--text-muted)">Enter password to continue</div>
-        <input id="edit-target-pw" type="text" class="admin-input"
-          style="width:200px;text-align:center;font-size:1rem;-webkit-text-security:disc"
-          placeholder="Enter password" autocomplete="off">
-        <div id="edit-target-pw-err" style="font-size:.8rem;color:#dc2626;display:none">Incorrect password</div>
-      </div>`;
-    const pwInput = $("edit-target-pw");
-    pwInput.value = "";
-    setTimeout(() => { pwInput.value = ""; pwInput.focus(); }, 50);
-    const checkPw = () => {
-      if (pwInput.value !== "0823") {
-        $("edit-target-pw-err").style.display = "";
-        pwInput.value = "";
-        return;
-      }
+    // Was a password box in front of Edit Target. The account answers it now.
+    // An assistant is turned away here for the moment; read-only Edit Target
+    // is the next piece of work, and half of it would be worse than none.
+    requirePassword(() => {
       renderTargetManageContent(student, targetOrNull);
       if (scrollToPaId) {
         requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -19134,8 +19122,7 @@ function openManageModal(student, targetOrNull, templateOrNull = null, remarkPre
           el.addEventListener("animationend", () => el.classList.remove("activity-cfg-blink"), { once: true });
         }));
       }
-    };
-    pwInput.addEventListener("keydown", e => { if (e.key === "Enter") checkPw(); });
+    }, EXPORT_MSG);
   } else {
     renderStudentManageContent(student);
   }
@@ -23355,6 +23342,25 @@ function renderTargetManageContent(student, target) {
       // all came back null, the first style assignment threw, and the handler died
       // half way, so picking Multiple Choice changed the dropdown and never
       // revealed the options editor underneath it.
+      // Changing an activity's type can delete recorded scores, so it is the
+      // owner's alone. Checked here, before the sessions are read, so nobody
+      // waits on a scan for an answer that was never going to be yes.
+      if (!isOwner()) {
+        sel.value = oldType;
+        $("manage-modal-title").textContent = "Not Available";
+        $("manage-modal-body").innerHTML = `
+          <div style="padding:2rem 1.25rem;display:flex;flex-direction:column;align-items:center;gap:.9rem">
+            <div style="font-size:2rem;line-height:1">🔒</div>
+            <div style="font-size:.9rem;color:var(--text);text-align:center;max-width:300px;line-height:1.55">
+              Changing an activity's type can delete scores already recorded against it, so only Lewis can do it.
+            </div>
+            <button class="btn-primary-sm" id="type-deny-ok" style="padding:.5rem 1.75rem">OK</button>
+          </div>`;
+        $("manage-modal").classList.remove("hidden");
+        $("type-deny-ok").addEventListener("click", () => $("manage-modal").classList.add("hidden"));
+        return;
+      }
+
       const body = document;
       const starterWrap      = body.querySelector(`.mn-act-starter-wrap[data-idx="${idx}"]`);
       const starterLabel     = body.querySelector(`.mn-act-starter-wrap[data-idx="${idx}"] .mn-act-starter-label`);
@@ -23647,10 +23653,7 @@ function renderTargetManageContent(student, target) {
         <p style="font-size:.82rem;margin:0 0 .25rem;color:#374151;font-weight:600">Sessions with data:</p>
         <ul style="font-size:.82rem;color:#374151;margin:0 0 .75rem;padding-left:1.2rem;line-height:1.8">${sessionDateHtml}</ul>
         ${type === "no_trials" && hasScoringData ? `<p style="font-size:.83rem;margin:0 0 .75rem;color:#dc2626;font-weight:700;line-height:1.5">WARNING: All past trial scores, multiple choice and checkbox selections for this activity will be permanently deleted. Only remarks you have written will be kept.</p>` : ``}
-        <p style="font-size:.84rem;margin:0 0 .35rem;color:#374151;font-weight:600">To change the activity type, please enter special password (only Lewis knows)</p>
-        <input id="act-type-pw" type="text" autocomplete="off" value=""
-          style="width:100%;box-sizing:border-box;padding:.45rem .6rem;border:2px solid #d1d5db;border-radius:.4rem;font-size:1.1rem;text-align:center;outline:none;margin-bottom:.3rem;-webkit-text-security:disc" placeholder="Enter password">
-        <div id="act-type-pw-err" style="color:#dc2626;font-size:.82rem;margin-bottom:.5rem;min-height:1.1em"></div>
+        <p style="font-size:.84rem;margin:0 0 .6rem;color:#374151;font-weight:600">Change the type anyway?</p>
         <div style="display:flex;gap:.5rem">
           <button id="act-type-pw-cancel" style="flex:1;padding:.45rem;border:1px solid #d1d5db;border-radius:.4rem;background:#f9fafb;cursor:pointer;font-size:.85rem">Cancel</button>
           <button id="act-type-pw-ok" style="flex:1;padding:.45rem;border:none;border-radius:.4rem;background:var(--primary);color:#fff;cursor:pointer;font-size:.85rem">Confirm</button>
@@ -23671,26 +23674,18 @@ function renderTargetManageContent(student, target) {
       // The panel is already position:fixed; only the modal sheet needs one.
       if (mount !== panelEl) mount.style.position = "relative";
       mount.appendChild(overlay);
-      const pwInp = overlay.querySelector("#act-type-pw");
-      const pwErr = overlay.querySelector("#act-type-pw-err");
-      pwInp.focus();
+      // No password here any more: only the owner reaches this point at all.
+      // The warning stays, because it is about what the change COSTS, which is
+      // worth seeing however senior you are.
       overlay.querySelector("#act-type-pw-cancel").addEventListener("click", () => {
         overlay.remove();
         sel.value = oldType;
       });
-      const tryConfirm = async () => {
-        if (pwInp.value !== "8888") {
-          pwErr.textContent = "Incorrect password.";
-          pwInp.value = "";
-          pwInp.focus();
-          return;
-        }
+      overlay.querySelector("#act-type-pw-ok").addEventListener("click", async () => {
         overlay.remove();
-        sel.value = type;   // the password was right, so the change is real now
+        sel.value = type;   // confirmed, so the change is real now
         await doChange();
-      };
-      overlay.querySelector("#act-type-pw-ok").addEventListener("click", tryConfirm);
-      pwInp.addEventListener("keydown", e => { if (e.key === "Enter") tryConfirm(); });
+      });
     });
   });
 
