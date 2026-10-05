@@ -202,7 +202,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2080";
+const APP_VERSION = "2081";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -2627,7 +2627,9 @@ $("btn-logout")?.addEventListener("click", () => {
 
 // ── Add student / group from home screen ──────────────────────
 
-$("btn-add-existing-student").addEventListener("click", () => showRegisteredStudentPicker("existing"));
+// Individual Sessions has no Add button: registering a student in the Student
+// Database is what puts them there. Two steps meant a student could exist and
+// still be missing from the list, with nothing on screen explaining the gap.
 $("btn-add-group").addEventListener("click", addNewGroup);
 $("btn-archived-existing")?.addEventListener("click", () => {
   state.showArchivedExisting = !state.showArchivedExisting;
@@ -3435,7 +3437,7 @@ function startAddStudentRow() {
       preferredName: shortName,
       gender: newGender,
       note: noteBare(noteInput.value),
-      type: "unassigned",
+      type: "existing",
       order: state.students.length,
       targets: []
     };
@@ -3837,74 +3839,10 @@ function renderDataIntegrityReport() {
   });
 }
 
-// Choosing a student here adds them to Individual Sessions or Assessments.
-// One flat list, no separate "transfer" entry — an Assessment student
-// shows up right alongside everyone else in the Individual Sessions
-// picker, and clicking them just asks a one-line confirm tailored to what's
-// actually happening ("Move X from Assessment...?") instead of a special
-// menu item or a guard error sending the boss elsewhere. Doesn't create a
-// new person directly — "Register a New Student" sends the boss to the
-// Student Database page instead, which is the one place new students get
-// created (see openStudentRegistryScreen).
-function showRegisteredStudentPicker(targetType) {
-  $("session-picker-title").textContent =
-    targetType === "assessment" ? "Add to Assessments" : "Add to Individual Sessions";
-
-  const renderList = () => {
-    // Leave out students already in this exact bucket, and — since
-    // Individual Sessions and Assessment are mutually exclusive — also
-    // leave Individual Sessions students out of the Assessment picker.
-    const candidates = state.students
-      .filter(s => s.type !== targetType)
-      .filter(s => !(targetType === "assessment" && s.type === "existing"))
-      .sort((a, b) => a.name.localeCompare(b.name));
-
-    $("session-picker-list").innerHTML = `
-      <div class="choice-list">
-        <button class="choice-btn choice-register-new">
-          <span class="choice-icon">➕</span>
-          <div class="choice-text"><div class="choice-label">Register a New Student</div></div>
-        </button>
-        ${candidates.map(s => `
-          <button class="choice-btn reg-student-pick" data-id="${escHtml(s.id)}">
-            <div class="choice-text"><div class="choice-label">${escHtml(s.name)}</div></div>
-          </button>`).join("")}
-      </div>
-      ${candidates.length === 0 ? `<p class="empty-hint" style="padding:1rem">All registered students have already been added.</p>` : ""}`;
-
-    $("session-picker-list").querySelector(".choice-register-new").addEventListener("click", () => {
-      closeSessionPicker();
-      openStudentRegistryScreen({ highlightAdd: true });
-    });
-    $("session-picker-list").querySelectorAll(".reg-student-pick").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        const s = state.students.find(x => x.id === btn.dataset.id);
-        if (s) await assignStudentToBucket(s, targetType);
-      });
-    });
-  };
-
-  renderList();
-  $("session-picker-modal").classList.remove("hidden");
-}
-
-async function assignStudentToBucket(student, targetType) {
-  if (student.type === targetType) {
-    alert(`"${student.name}" is already in ${targetType === "existing" ? "Individual Sessions" : "Assessments"}.`);
-    return;
-  }
-  if (student.type === "assessment" && targetType === "existing") {
-    if (!confirm(`Move "${student.name}" from Assessment to Individual Sessions?`)) return;
-  } else if (student.type === "existing" && targetType === "assessment") {
-    alert(`"${student.name}" is already in Individual Sessions.`);
-    return;
-  }
-  student.type = targetType;
-  await saveStudent(student);
-  closeSessionPicker();
-  renderExistingStudentButtons();
-}
-
+// The "add a registered student to Individual Sessions" picker and the
+// bucket it assigned to were removed with the + Add button above that list.
+// Registering a student in the Student Database is what puts them there now,
+// so there is no second step to offer and no bucket to move them between.
 
 // ── Render helpers ────────────────────────────────────────────
 
@@ -3954,18 +3892,19 @@ function renderStudentList(container, students, query = "", showArchived = false
 }
 
 function renderExistingStudentButtons() {
-  // Pre-registry records have no type field at all (undefined) and should
-  // keep defaulting to "existing" for backward compatibility — only the new
-  // explicit "unassigned" (set when a student is registered via the Student
-  // Database page or a group roster picker) opts out of that default, so a
-  // freshly-registered student doesn't show here until she actually +Adds
-  // them via showRegisteredStudentPicker.
-  // Also exclude any student whose name matches a group name — safeguard
-  // against accidentally created student records with group names.
-  const groupNames = new Set((state.groups || []).map(g => g.name));
-  const students = state.students.filter(s =>
-    s.type !== "assessment" && s.type !== "unassigned" && !groupNames.has(s.name)
-  );
+  // Everyone in the Student Database, with nothing filtered out.
+  //
+  // There used to be three exclusions, and together they meant the database and
+  // this list could disagree with no way to tell why. "unassigned" marked a
+  // student registered but never added here, which is now impossible since
+  // registering IS adding. "assessment" is a dead bucket from when assessments
+  // had their own section; they sit here with an "(Assessment)" note instead.
+  // The third hid any student whose name matched a group's, which happens when
+  // a group has a single member, since a group is named after its members
+  // joined by " & ". Hiding a record is worse than showing two things with the
+  // same name: the record is still in the database either way, and only one of
+  // those states can be acted on.
+  const students = state.students.slice();
   renderStudentList($("existing-student-buttons"), students, state.searchExisting, !!state.showArchivedExisting);
   syncArchivedToggle("existing", students.filter(s => s.archived).length);
 }
