@@ -202,7 +202,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2078";
+const APP_VERSION = "2079";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -23646,7 +23646,7 @@ function renderTargetManageContent(student, target) {
       }
 
       // Has past data — show password overlay
-      $("manage-modal").querySelectorAll("[data-type-change-overlay]").forEach(el => el.remove());
+      document.querySelectorAll("[data-type-change-overlay]").forEach(el => el.remove());
       const overlay = document.createElement("div");
       overlay.dataset.typeChangeOverlay = "1";
       overlay.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding-top:1.25rem;z-index:200;border-radius:.75rem;overflow-y:auto";
@@ -23669,9 +23669,21 @@ function renderTargetManageContent(student, target) {
           <button id="act-type-pw-ok" style="flex:1;padding:.45rem;border:none;border-radius:.4rem;background:var(--primary);color:#fff;cursor:pointer;font-size:.85rem">Confirm</button>
         </div>
       </div>`;
-      const modalSheet = $("manage-modal").querySelector(".modal-sheet");
-      modalSheet.style.position = "relative";
-      modalSheet.appendChild(overlay);
+      // Mounted on whatever is actually in front.
+      //
+      // The Edit Target modal sits at z-index 1000 and the floating activity
+      // panel at 1200, so an overlay put inside the modal while the panel was
+      // open was painted behind it. The gate fired the moment the dropdown
+      // changed, exactly as intended, and there was no way to see it: it only
+      // appeared once Save and Close took the panel away, which read as the
+      // warning arriving far too late.
+      const panelEl = document.getElementById("mn-act-panel-overlay");
+      const mount = (panelEl && panelEl.style.display !== "none")
+        ? panelEl
+        : $("manage-modal").querySelector(".modal-sheet");
+      // The panel is already position:fixed; only the modal sheet needs one.
+      if (mount !== panelEl) mount.style.position = "relative";
+      mount.appendChild(overlay);
       const pwInp = overlay.querySelector("#act-type-pw");
       const pwErr = overlay.querySelector("#act-type-pw-err");
       pwInp.focus();
