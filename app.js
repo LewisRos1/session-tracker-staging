@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2084";
+const APP_VERSION = "2085";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -2026,15 +2026,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupStickyNote();
   $("btn-ai-report-back").addEventListener("click", showHome);
 
-  // If there's no today-login record in localStorage, Firebase auth can't possibly
-  // auto-sign-in (either first load or site data was cleared). Skip the Firebase
-  // wait entirely and go straight to PIN — no loading screen hang.
+  // Nothing stored means Firebase has no session to restore either, so go
+  // straight to the sign-in screen rather than hang on the loading screen
+  // waiting for an answer that was always going to be empty.
   let authResolved = false;
-  if (!hasLoggedInToday()) {
+  if (!hasSignedInBefore()) {
     initPin();
     authResolved = true; // prevent the timeout below from calling initPin a second time
   } else {
-    // Logged in today — wait for Firebase to confirm, but give up after 5 s.
+    // Signed in before — wait for Firebase to restore it, giving up after 5 s.
     setTimeout(() => {
       if (!authResolved) initPin();
     }, 5000);
@@ -2121,10 +2121,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Which of the four signed in. Every permission in the app reads from
     // this, so it is set before anything else looks at it.
     state.authEmail = user?.email || null;
-    if (user && !hasLoggedInToday()) {
-      await signOutUser();
-      return;
-    }
     if (!user) {
       if (state.reviewQueueUnsubscribe) { state.reviewQueueUnsubscribe(); state.reviewQueueUnsubscribe = null; }
       await waitForUpdatingScreenMinimum();
@@ -2148,14 +2144,28 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 });
 
+/**
+ * Whether anyone has ever signed in on this device.
+ *
+ * Not whether they signed in TODAY. A sign-in used to be thrown away at
+ * midnight, so the first person in each morning was asked for the password
+ * again whether or not they had ever signed out. Signing in now lasts until
+ * someone signs out, the way it does everywhere else.
+ *
+ * The flag is only a shortcut at startup: with nothing stored, Firebase cannot
+ * have a session to restore either, so the sign-in screen is shown at once
+ * instead of waiting on a round trip that was always going to come back empty.
+ * The old key is reused and anything stored under it counts, so a device that
+ * had the date written under it is not asked to sign in again.
+ */
 const LAST_LOGIN_DATE_KEY = "lastLoginDate";
-function hasLoggedInToday() {
-  return localStorage.getItem(LAST_LOGIN_DATE_KEY) === getTodayString();
+function hasSignedInBefore() {
+  return !!localStorage.getItem(LAST_LOGIN_DATE_KEY);
 }
-function markLoggedInToday() {
-  localStorage.setItem(LAST_LOGIN_DATE_KEY, getTodayString());
+function markSignedIn() {
+  localStorage.setItem(LAST_LOGIN_DATE_KEY, "1");
 }
-function clearLoggedInToday() {
+function clearSignedIn() {
   localStorage.removeItem(LAST_LOGIN_DATE_KEY);
 }
 
@@ -2350,10 +2360,16 @@ function initPin() {
   mount.innerHTML = `
     <p class="pin-subtitle">Sign in</p>
     <div class="login-pw">
-      <input id="login-user" type="text" class="admin-input" placeholder="Username"
-        autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false">
-      <input id="login-pw-input" type="password" class="admin-input" placeholder="Password"
-        autocomplete="current-password" autocapitalize="off" spellcheck="false">
+      <div class="float-field">
+        <input id="login-user" type="text" class="admin-input" placeholder=" "
+          autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <label for="login-user">Username</label>
+      </div>
+      <div class="float-field">
+        <input id="login-pw-input" type="password" class="admin-input" placeholder=" "
+          autocomplete="current-password" autocapitalize="off" spellcheck="false">
+        <label for="login-pw-input">Password</label>
+      </div>
       <div id="login-err" class="pin-error hidden">Wrong username or password.</div>
       <div id="login-status" class="pin-status hidden">Signing in…</div>
       <button class="btn-primary-sm" id="login-go">Sign In</button>
@@ -2374,7 +2390,7 @@ function initPin() {
     status.classList.remove("hidden");
     try {
       await signInAs(emailForUsername(username), pwInp.value);
-      markLoggedInToday();
+      markSignedIn();
       // onAuthChange takes it from here and loads the app.
     } catch (_) {
       // One message for both, on purpose: saying which half was wrong tells
@@ -2402,7 +2418,7 @@ function initPin() {
     if (!pin) return;
     try {
       await signInWithPin(pin.trim());
-      markLoggedInToday();
+      markSignedIn();
     } catch (_) {
       alert("That PIN was not accepted.");
     }
@@ -2707,6 +2723,9 @@ async function migrateAwayFromMappedScoreType() {
 }
 
 $("btn-logout")?.addEventListener("click", () => {
+  // Clear the shortcut too, or the next load waits on Firebase for a session
+  // that was deliberately ended.
+  clearSignedIn();
   signOutUser();
 });
 

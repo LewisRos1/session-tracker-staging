@@ -202,6 +202,35 @@ html, body {
   width: min(280px, 80vw);
   margin: .5rem auto 0;
 }
+/* The label rides up out of the way instead of disappearing, so you can still
+   see which field you are in once there is something in it. The placeholder is
+   a single space on purpose: :placeholder-shown is what tells an empty field
+   from a filled one, and it only holds while a placeholder exists. */
+.float-field { position: relative; width: 100%; }
+.float-field label {
+  position: absolute;
+  left: .85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: .95rem;
+  pointer-events: none;
+  transition: top .13s ease, font-size .13s ease, transform .13s ease;
+}
+.float-field input:focus + label,
+.float-field input:not(:placeholder-shown) + label {
+  top: .34rem;
+  transform: none;
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+}
+.float-field input {
+  padding-top: 1.15rem !important;
+  padding-bottom: .4rem !important;
+  text-align: left !important;
+}
+
 .login-pw .admin-input {
   width: 100%;
   text-align: center;
