@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2090";
+const APP_VERSION = "2091";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -10104,6 +10104,10 @@ function renderPickDateCalendar(student, sessions, byMonth, today, displayDate, 
     const isFut   = ds > today;
     const isTaken = sessionIdByDate.has(ds);
     let cls = "date-picker-day";
+    // A ring, not a fill: the selected day is already a solid block, and a
+    // second filled day would read as a second selection. The ring also
+    // survives today BEING the selected day, which a fill could not.
+    if (ds === today) cls += " date-picker-day-today";
     if (isFut)   cls += " date-picker-day-future";
     if (isTaken) cls += " date-picker-day-taken";
     const dotCls = isTaken ? "date-taken-dot" : "day-dot-spacer";
@@ -10546,6 +10550,10 @@ function renderStartSessionCalendar(student, today, displayDate, takenDates = ne
     const isFut   = ds > today;
     const isTaken = takenDates.has(ds);
     let cls = "date-picker-day";
+    // A ring, not a fill: the selected day is already a solid block, and a
+    // second filled day would read as a second selection. The ring also
+    // survives today BEING the selected day, which a fill could not.
+    if (ds === today) cls += " date-picker-day-today";
     if (isFut)   cls += " date-picker-day-future";
     if (isTaken) cls += " date-picker-day-taken";
     const dotCls = isTaken ? "date-taken-dot" : "day-dot-spacer";
@@ -10614,6 +10622,10 @@ function renderGroupStartSessionCalendar(group, today, displayDate, takenDates =
     const isFut   = ds > today;
     const isTaken = takenDates.has(ds);
     let cls = "date-picker-day";
+    // A ring, not a fill: the selected day is already a solid block, and a
+    // second filled day would read as a second selection. The ring also
+    // survives today BEING the selected day, which a fill could not.
+    if (ds === today) cls += " date-picker-day-today";
     if (isFut)   cls += " date-picker-day-future";
     if (isTaken) cls += " date-picker-day-taken";
     const dotCls = isTaken ? "date-taken-dot" : "day-dot-spacer";
@@ -10685,6 +10697,10 @@ function renderDatePickerCalendar(displayDate, takenDates, today, currentDate) {
     const isTaken = takenDates.has(ds);
     const dis    = isFut || isTaken;
     let cls = "date-picker-day";
+    // A ring, not a fill: the selected day is already a solid block, and a
+    // second filled day would read as a second selection. The ring also
+    // survives today BEING the selected day, which a fill could not.
+    if (ds === today) cls += " date-picker-day-today";
     if (isCur)   cls += " date-picker-day-current";
     if (isFut)   cls += " date-picker-day-future";
     if (isTaken) cls += " date-picker-day-taken";
@@ -18783,6 +18799,10 @@ function renderGroupDatePickerCalendar(displayDate, takenDates, today, currentDa
     const isTaken = takenDates.has(ds);
     const dis     = isFut || isTaken;
     let cls = "date-picker-day";
+    // A ring, not a fill: the selected day is already a solid block, and a
+    // second filled day would read as a second selection. The ring also
+    // survives today BEING the selected day, which a fill could not.
+    if (ds === today) cls += " date-picker-day-today";
     if (isCur)   cls += " date-picker-day-current";
     if (isFut)   cls += " date-picker-day-future";
     if (isTaken) cls += " date-picker-day-taken";
@@ -27576,6 +27596,10 @@ function renderGroupPickDateCalendar(group, sessions, byMonth, displayDate) {
     const isFut   = ds > today;
     const isTaken = sessionIdByDate.has(ds);
     let cls = "date-picker-day";
+    // A ring, not a fill: the selected day is already a solid block, and a
+    // second filled day would read as a second selection. The ring also
+    // survives today BEING the selected day, which a fill could not.
+    if (ds === today) cls += " date-picker-day-today";
     if (isFut)   cls += " date-picker-day-future";
     if (isTaken) cls += " date-picker-day-taken";
     const dotCls = isTaken ? "date-taken-dot" : "day-dot-spacer";

@@ -709,6 +709,13 @@ html, body {
   color: #fff;
   font-weight: 700;
 }
+/* Today. An inset shadow rather than a border so the cell does not change size
+   and shift the grid, and it layers over whatever background the day already
+   has: plain, hovered, taken, or selected. */
+.date-picker-day-today {
+  box-shadow: inset 0 0 0 2px var(--primary);
+  font-weight: 800;
+}
 .date-picker-day-future { color: #bbb; cursor: default; }
 .date-picker-day-taken  { cursor: default; }
 .date-taken-dot, .day-dot-spacer {
