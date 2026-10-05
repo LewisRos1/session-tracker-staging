@@ -1793,7 +1793,35 @@ function exportedOnSuffix(now) {
 
 // Filename format: "{Name} - Yearly Summary (Exported On {D Mon YYYY}, {HH.MM})"
 function formatExportFilename(name, now) {
-  return `${name} - Yearly Summary (${exportedOnSuffix(now)}).xlsx`;
+  return `${safePathSegment(name)} - Yearly Summary (${exportedOnSuffix(now)}).xlsx`;
+}
+
+/**
+ * One piece of a path inside the zip, with nothing in it that would split or
+ * break the path.
+ *
+ * A slash would silently create a folder, so a group called "Mon/Wed" would
+ * scatter its members into a folder nobody asked for. The rest are characters
+ * Windows refuses in a file name, which makes the whole zip awkward to extract.
+ */
+function safePathSegment(text) {
+  return String(text || "")
+    .replace(/[\\/:*?"<>|]/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/^\.+|\.+$/g, "")
+    .trim() || "Unnamed";
+}
+
+/**
+ * The name a workbook is filed under: the student's name and their note.
+ *
+ * Without the note, two students whose names match wrote to the same path in
+ * the zip and the second quietly replaced the first. "Caden Tan" and "Caden Tan
+ * (School Readiness)" went in as one file, and nothing said so.
+ */
+function exportEntityFilename(entity, now) {
+  const note = String(entity?.note || "").replace(/^\(|\)$/g, "").trim();
+  return formatExportFilename(note ? `${entity.name} (${note})` : entity.name, now);
 }
 
 export async function exportStudentData(student, includeTrials = false) {
@@ -2625,32 +2653,41 @@ export async function exportAllStudents(students, groups = [], includeTrials = f
   const now = new Date();
   let exported = 0;
 
+  // The zip mirrors the home screen: Individual Sessions and Group Sessions,
+  // each with the active entries at the top and an Archived folder beneath.
+  // Archiving is about where something is filed, not whether it is kept, so an
+  // archived student or group is still exported in full.
   for (const student of students) {
     const sessions = await getAllSessionsForStudent(student.id);
-    if (sessions.length > 0) {
-      const buffer = await buildStudentWorkbook(student, sessions, includeTrials);
-      zip.file(`Individual Sessions/${formatExportFilename(student.name, now)}`, buffer);
-      exported++;
-    }
+    if (sessions.length === 0) continue;
+    const buffer = await buildStudentWorkbook(student, sessions, includeTrials);
+    const folder = student.archived ? "Individual Sessions/Archived" : "Individual Sessions";
+    zip.file(`${folder}/${exportEntityFilename(student, now)}`, buffer);
+    exported++;
+  }
 
-    // A student can be linked into a group under a free-typed name that
-    // doesn't exactly match their registered name — same lookup the
-    // single-group "Export" button next to a group attendee already uses
-    // (see exportGroupMemberData), just generalized across every group they
-    // appear in instead of one.
-    const studentGroups = groups.filter(g => Object.values(g.studentLinks || {}).includes(student.id));
-    if (studentGroups.length > 0) {
-      const groupName = Object.entries(studentGroups[0].studentLinks || {}).find(([, id]) => id === student.id)?.[0];
-      let groupSessions = [];
-      for (const group of studentGroups) {
-        groupSessions.push(...await getAllSessionsForGroup(group.id));
-      }
-      if (groupName && groupSessions.length > 0) {
-        const allTargets = unionTargetsByName(studentGroups);
-        const buffer = await buildGroupMemberWorkbook(groupName, allTargets, groupSessions, includeTrials);
-        zip.file(`Group Sessions/${formatExportFilename(student.name, now)}`, buffer);
-        exported++;
-      }
+  // One folder per group, holding a workbook for each of its members, the way
+  // the Group Sessions list reads on screen. Each file covers that group alone:
+  // a student in two groups gets a file in each rather than one workbook with
+  // both groups blended together, which could not be told apart afterwards.
+  for (const group of groups) {
+    const links = Object.entries(group.studentLinks || {});
+    if (links.length === 0) continue;
+    const groupSessions = await getAllSessionsForGroup(group.id);
+    if (groupSessions.length === 0) continue;
+    const allTargets = unionTargetsByName([group]);
+    const base = group.archived
+      ? `Group Sessions/Archived/${safePathSegment(group.name)}`
+      : `Group Sessions/${safePathSegment(group.name)}`;
+    for (const [linkName, studentId] of links) {
+      if (!linkName) continue;
+      // The roster name is what the sessions were recorded under, which is not
+      // always the student's registered name. The file is named after the
+      // student record when there is one, so it matches the rest of the zip.
+      const student = students.find(st => st.id === studentId);
+      const buffer = await buildGroupMemberWorkbook(linkName, allTargets, groupSessions, includeTrials);
+      zip.file(`${base}/${student ? exportEntityFilename(student, now) : formatExportFilename(linkName, now)}`, buffer);
+      exported++;
     }
   }
 

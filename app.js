@@ -202,7 +202,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2075";
+const APP_VERSION = "2076";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -3089,6 +3089,26 @@ function noteLabel(note) {
   return t ? `(${t})` : "";
 }
 /** "Caden Tan (School Readiness)", or just the name when there is no note. */
+/**
+ * Another student already registered under this exact name and note, or null.
+ *
+ * The note is what tells two records with the same name apart, on screen and in
+ * the exported file names, so two records sharing both cannot be told apart at
+ * all: whichever is reached first wins, and in the Excel backup one silently
+ * overwrites the other. `exceptId` is the record being edited, which must not
+ * count as a clash with itself.
+ */
+function findDuplicateStudent(name, note, exceptId = null) {
+  const n = String(name || "").trim().toLowerCase().replace(/\s+/g, " ");
+  const t = noteBare(note).trim().toLowerCase();
+  if (!n) return null;
+  return (state.students || []).find(s =>
+    s.id !== exceptId &&
+    String(s.name || "").trim().toLowerCase().replace(/\s+/g, " ") === n &&
+    noteBare(s.note).trim().toLowerCase() === t
+  ) || null;
+}
+
 function studentLabel(s) {
   const l = noteLabel(s.note);
   return l ? `${s.name} ${l}` : s.name;
@@ -3209,6 +3229,15 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
       if (!s) return;
       const newName = input.value.trim();
       if (!newName || newName === s.name) return;
+      const clash = findDuplicateStudent(newName, s.note, s.id);
+      if (clash) {
+        alert(`There is already a student called "${studentLabel(clash)}".\n\n`
+          + `Two records with the same full name AND the same note cannot be told apart, `
+          + `in the app or in the exported files. Give one of them a note that says which is which.`);
+        input.value = s.name;
+        input.focus();
+        return;
+      }
       const parts = newName.split(/\s+/);
       const oldName = s.name;
       s.firstName = parts[0];
@@ -3241,6 +3270,15 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
       const note = noteBare(input.value);
       input.value = note;
       if (note === (s.note || "")) return;
+      const clash = findDuplicateStudent(s.name, note, s.id);
+      if (clash) {
+        alert(`There is already a student called "${studentLabel(clash)}".\n\n`
+          + `Two records with the same full name AND the same note cannot be told apart, `
+          + `in the app or in the exported files. Pick a different note.`);
+        input.value = s.note || "";
+        input.focus();
+        return;
+      }
       s.note = note;
       await setStudentNote(id, note);
       renderExistingStudentButtons();
@@ -3375,6 +3413,14 @@ function startAddStudentRow() {
     if (missing.length) {
       alert(`Please fill in: ${missing.join(", ")}.\n\nOnly the Note may be left blank.`);
       (!fullName ? nameInput : !shortName ? shortInput : genderBtn).focus();
+      return;
+    }
+    const clash = findDuplicateStudent(fullName, noteInput.value, null);
+    if (clash) {
+      alert(`There is already a student called "${studentLabel(clash)}".\n\n`
+        + `Two records with the same full name AND the same note cannot be told apart, `
+        + `in the app or in the exported files. Add a note that says which is which.`);
+      noteInput.focus();
       return;
     }
     // firstName/lastName are kept because older records carry them; the first
