@@ -717,10 +717,19 @@ html, body {
    purple block, and hover is restated because this rule would otherwise sit
    on top of it. */
 .date-picker-day-today:not(.date-picker-day-current) {
-  background: #d8dbe0;
+  background: #6b7280;
+  color: #fff;
+}
+/* The tick is purple on the pale cells, which would go muddy on this one. */
+.date-picker-day-today:not(.date-picker-day-current) .date-taken-dot {
+  color: #fff;
 }
 .date-picker-day-today:not(.date-picker-day-current):hover {
   background: var(--primary-light);
+  color: var(--text-main);
+}
+.date-picker-day-today:not(.date-picker-day-current):hover .date-taken-dot {
+  color: var(--primary);
 }
 .date-picker-day-future { color: #bbb; cursor: default; }
 .date-picker-day-taken  { cursor: default; }
