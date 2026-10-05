@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2088";
+const APP_VERSION = "2089";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -2366,8 +2366,8 @@ function initPin() {
         <label for="login-user">Username</label>
       </div>
       <div class="float-field">
-        <input id="login-pw-input" type="text" class="admin-input login-secret" placeholder=" "
-          autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <input id="login-pw-input" type="password" class="admin-input" placeholder=" "
+          autocomplete="current-password" autocapitalize="off" spellcheck="false">
         <label for="login-pw-input">Password</label>
       </div>
       <div id="login-err" class="pin-error hidden">Wrong username or password.</div>

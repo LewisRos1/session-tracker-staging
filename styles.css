@@ -206,20 +206,6 @@ html, body {
    see which field you are in once there is something in it. The placeholder is
    a single space on purpose: :placeholder-shown is what tells an empty field
    from a filled one, and it only holds while a placeholder exists. */
-/* Masked with CSS rather than type="password", which is what the rest of this
-   app already does for its password boxes.
-   A real password field makes the browser offer everything it has saved for
-   this site the moment it is focused, and autocomplete cannot turn that off:
-   Chrome and Safari override the site on purpose. As an ordinary text box there
-   is nothing for them to offer. autocomplete="off" is honoured on a normal
-   field, so the typed value does not reach form history either.
-   The trade: a browser without -webkit-text-security shows the password in
-   plain sight. Chrome, Edge, Safari and Firefox 119+ all have it. */
-.login-secret {
-  -webkit-text-security: disc;
-  text-security: disc;
-}
-
 .float-field { position: relative; width: 100%; }
 .float-field label {
   position: absolute;
