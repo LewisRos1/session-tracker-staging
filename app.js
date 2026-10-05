@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2098";
+const APP_VERSION = "2099";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -14310,6 +14310,95 @@ let _focusNewRow            = false;
 let _phase3Error            = null; // error string shown in Phase 3 node, auto-clears
 const _textareaDebounce     = new Map();
 
+/**
+ * The signed-in person as an INSTRUCTORS id, or null when they have no place
+ * in the workflow.
+ *
+ * null is deliberately permissive and means "do not apply the rule": it covers
+ * Lewis, who owns no pills and is allowed everything, and it covers the old
+ * shared PIN, which cannot tell who is using it. Were null treated as "nobody",
+ * the whole workflow would lock itself shut for everyone still signing in with
+ * the PIN, which is everyone until the four accounts exist.
+ */
+function workflowActorId() {
+  const u = currentUser();
+  if (!u || u.role === "owner") return null;
+  return INSTRUCTORS.some(i => i.id === u.id) ? u.id : null;
+}
+
+/** Whose pill this is. Phases 2 and 4 are Ms. Daisy checking someone else's
+ *  work, so they belong to her, not to the person named in the label. */
+function pillOwnerId(role) {
+  if (role.startsWith("p2_check_") || role.startsWith("p4_check_")) return "daisy";
+  if (role === "p4_nigel") return "nigel";
+  if (role.startsWith("p1_") || role.startsWith("p3_")) return role.slice(3);
+  return null;
+}
+
+/** You may tick your own pills and nobody else's. */
+function canTickPill(role) {
+  const me = workflowActorId();
+  if (me === null) return true;
+  const owner = pillOwnerId(role);
+  return owner === null || owner === me;
+}
+
+/** A corrections list is the instructor's and Ms. Daisy's: she writes the
+ *  corrections, they tick them off. Everyone else gets it read-only.
+ *
+ *  A null instId is the single shared list older sessions have, from before
+ *  the lists were split per instructor. It belongs to nobody in particular, so
+ *  locking it to Ms. Daisy would make every old session read-only for the
+ *  person who actually has to act on it. */
+function canEditCorrectionsFor(instId) {
+  const me = workflowActorId();
+  return me === null || !instId || me === "daisy" || me === instId;
+}
+
+const instructorName = id => (INSTRUCTORS.find(i => i.id === id) || { name: id }).name;
+
+/**
+ * A brief message that does not move anything on the screen.
+ *
+ * The phases are a row of cards whose heights are already uneven; putting the
+ * refusal inside the card it came from would reflow the row every time someone
+ * tapped the wrong pill.
+ */
+let _wfToastTimer = null;
+function showWorkflowToast(msg) {
+  let el = document.getElementById("wf-toast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "wf-toast";
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.classList.remove("hidden");
+  // Restart the fade rather than letting an earlier one close this one early.
+  void el.offsetWidth;
+  el.classList.add("wf-toast--in");
+  clearTimeout(_wfToastTimer);
+  _wfToastTimer = setTimeout(() => {
+    el.classList.remove("wf-toast--in");
+    setTimeout(() => el.classList.add("hidden"), 220);
+  }, 2600);
+}
+
+/**
+ * The three statuses as people say them, rather than as they are stored.
+ *
+ * "", "fixed" and "rejected" are what Firestore holds and are not changed
+ * here: renaming the stored values would strand every correction already
+ * written. Only the words on screen change, and a blank circle is now a
+ * labelled choice, because an empty cell said nothing about whether anyone had
+ * looked at the row.
+ */
+const CORRECTION_STATUSES = [
+  { value: "",         label: "Undone",      cls: "snote-status--empty"    },
+  { value: "fixed",    label: "Corrected",   cls: "snote-status--fixed"    },
+  { value: "rejected", label: "Still Wrong", cls: "snote-status--rejected" },
+];
+
 // Returns null | "fixed" | "rejected" for a correction entry.
 function getCmtStatus(c) {
   if (c.fixStatus) return c.fixStatus;  // new field ("fixed" | "rejected")
@@ -14591,13 +14680,10 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     p3State = ws.allP3Done ? "done" : (anyUnlocked ? "corrections" : "locked");
     p3Body  = ws.p3Ids.map(mkPill3).join("");
   }
-  const hasRejections = !ws.daisyOnly && ws.p3Ids.some(id =>
-    ws.commentsFor(id).some(([, c]) => getCmtStatus(c) === "rejected"));
   const p3Node = `<div class="wf-node wf-node--${p3State}">
     <div class="wf-node-label">Phase 3: Revision</div>
     <div class="wf-node-body">${p3Body}</div>
     ${_phase3Error ? `<div class="wf-error-msg">${escHtml(_phase3Error)}</div>` : ""}
-    ${hasRejections ? `<div class="wf-p3-hint">✗ Crosses indicate that Ms. Daisy has reviewed the work and errors are still present.</div>` : ""}
   </div>`;
 
   // ── Phase 4: Check #2 — per instructor, unlocks after their Phase 3 ──
@@ -14630,9 +14716,6 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     const anyUnlocked4 = ws.p3Ids.some(id => ws.p3Done(id) || ws.noCorr(id));
     p4State = ws.allP4Done ? "done" : (anyUnlocked4 ? "p2-active" : "locked");
     p4Body  = ws.p3Ids.map(mkPill4).join("");
-    if (!ws.allP4Done) {
-      p4Body += `<div class="wf-p4-hint">If their work still contains errors, go to their list of corrections and click any incorrect ticks (✓) to change them into crosses (✗). Add an extra note if needed.</div>`;
-    }
   }
   const p4Node = `<div class="wf-node wf-node--${p4State}">
     <div class="wf-node-label">Phase 4: Check #2</div>
@@ -14798,6 +14881,14 @@ async function handleCheckedByClick(e, isGroup) {
   // ── Phase-pill click → confirm flow ─────────────────────────
   const pillBtn = e.target.closest(".wf-pill[data-role]");
   if (pillBtn) {
+    // Every pill click funnels through here, so one check covers all five
+    // phases. Refused before the confirm step, not after, so nobody is asked
+    // "Sure?" about something they were never going to be allowed to do.
+    if (!canTickPill(pillBtn.dataset.role)) {
+      const owner = pillOwnerId(pillBtn.dataset.role);
+      showWorkflowToast(`Locked. Only ${instructorName(owner)} can tick this.`);
+      return true;
+    }
     clearTimer();
     setConfirm(pillBtn.dataset.role);
     rerender();
@@ -14808,6 +14899,15 @@ async function handleCheckedByClick(e, isGroup) {
   // ── Confirm button ───────────────────────────────────────────
   const yesBtn = e.target.closest(".chk-btn-yes");
   if (yesBtn) {
+    // Checked again here, not only on the pill: a confirm box left open while
+    // somebody else signs in would otherwise still act on the old person's
+    // behalf.
+    if (!canTickPill(yesBtn.dataset.role)) {
+      clearTimer(); setConfirm(null); rerender();
+      const owner = pillOwnerId(yesBtn.dataset.role);
+      showWorkflowToast(`Locked. Only ${instructorName(owner)} can tick this.`);
+      return true;
+    }
     clearTimer(); setConfirm(null); rerender(); // remove confirm UI immediately — no lag
     const sid  = getSid();
     const data = getData();
@@ -14978,21 +15078,35 @@ function renderStickyNoteContent(data, isGroup) {
   const caretPos     = focusedCmtId ? activeEl.selectionEnd : null;
   const liveText     = focusedCmtId ? activeEl.value : null;
 
+  // Someone else's list opens, but nothing in it can be changed. Seeing what a
+  // colleague was asked to fix is useful; editing it is not theirs to do.
+  const canEdit = canEditCorrectionsFor(_stickyNoteInstructorId);
+  const roBanner = document.getElementById("sticky-note-readonly");
+  if (roBanner) {
+    const owner = _stickyNoteInstructorId ? instructorName(_stickyNoteInstructorId) : "";
+    roBanner.textContent = owner
+      ? `Read-only. Only Ms. Daisy and ${owner} can change this list.`
+      : `Read-only.`;
+    roBanner.classList.toggle("hidden", canEdit);
+  }
+  const addBtn = document.getElementById("sticky-note-add-row-btn");
+  if (addBtn) addBtn.classList.toggle("hidden", !canEdit);
+
   if (visible.length === 0) {
     tbody.innerHTML = "";
   } else {
     tbody.innerHTML = visible.map(([id, c], i) => {
       const text = (focusedCmtId === id && liveText !== null) ? liveText : (c.text || "");
-      const st = getCmtStatus(c);
-      const [stIcon, stCls] = st === "fixed" ? ["✓", "snote-status--fixed"]
-        : st === "rejected" ? ["✗", "snote-status--rejected"]
-        : ["", "snote-status--empty"];
+      const st = getCmtStatus(c) || "";
+      const stCls = (CORRECTION_STATUSES.find(o => o.value === st) || CORRECTION_STATUSES[0]).cls;
       const rowCls = st === "fixed" ? " snote-row--done" : st === "rejected" ? " snote-row--rejected" : "";
+      const opts = CORRECTION_STATUSES.map(o =>
+        `<option value="${o.value}"${o.value === st ? " selected" : ""}>${escHtml(o.label)}</option>`).join("");
       return `<tr class="snote-row${rowCls}">
         <td class="snote-no">${i + 1}</td>
-        <td class="snote-text"><textarea class="snote-textarea" data-cmt-id="${id}" rows="1" placeholder="Type here…">${escHtml(text)}</textarea></td>
-        <td class="snote-tick"><button class="snote-status-btn ${stCls}" data-cmt-id="${id}" title="Click to change status">${stIcon}</button></td>
-        <td class="snote-del"><button class="snote-del-btn" data-cmt-id="${id}" title="Delete row">🗑</button></td>
+        <td class="snote-text"><textarea class="snote-textarea" data-cmt-id="${id}" rows="1" placeholder="Type here…"${canEdit ? "" : " readonly"}>${escHtml(text)}</textarea></td>
+        <td class="snote-tick"><select class="snote-status-sel ${stCls}" data-cmt-id="${id}"${canEdit ? "" : " disabled"}>${opts}</select></td>
+        <td class="snote-del">${canEdit ? `<button class="snote-del-btn" data-cmt-id="${id}" title="Delete row">🗑</button>` : ""}</td>
       </tr>`;
     }).join("");
 
@@ -15171,6 +15285,7 @@ function setupStickyNote() {
     if (e.target.id === "sticky-note-add-row-btn") {
       const { sid, data } = getCtx();
       if (!sid) return;
+      if (!canEditCorrectionsFor(_stickyNoteInstructorId)) return;
       _focusNewRow = true;
       try {
         await addReviewComment(sid, "", _stickyNoteInstructorId);
@@ -15192,40 +15307,12 @@ function setupStickyNote() {
       return;
     }
 
-    // 3-state status button: empty → fixed (✓) → rejected (✗) → empty
-    const statusBtn = e.target.closest(".snote-status-btn");
-    if (statusBtn) {
-      const { sid, data } = getCtx();
-      if (!sid) return;
-      const cmtId = statusBtn.dataset.cmtId;
-      const cmt   = (data?.reviewComments || {})[cmtId];
-      if (!cmt) return;
-      const current = getCmtStatus(cmt);
-      const next = current === null ? "fixed" : current === "fixed" ? "rejected" : null;
-      try {
-        await setCommentStatus(sid, cmtId, next);
-        // Leaving "fixed" state → reset this instructor's Phase 3 & 4
-        if (next !== "fixed") {
-          const instId = cmt.forInstructor || _stickyNoteInstructorId;
-          const ws2 = getWorkflowState(data);
-          const affected = instId ? [instId] : ws2.p3Ids;
-          const checks = { ...(data?.checks || {}) };
-          let changed = false;
-          affected.forEach(id => {
-            if (checks[`p3_${id}`]) { delete checks[`p3_${id}`]; changed = true; }
-            if (checks[`p4_check_${id}`]) { delete checks[`p4_check_${id}`]; changed = true; }
-          });
-          if (changed) { delete checks["p4_nigel"]; await updateSessionChecks(sid, checks).catch(() => {}); }
-        }
-      } catch (err) { console.error("setCommentStatus:", err); }
-      return;
-    }
-
     // Delete row
     const delBtn = e.target.closest(".snote-del-btn");
     if (delBtn) {
       const { sid } = getCtx();
       if (!sid) return;
+      if (!canEditCorrectionsFor(_stickyNoteInstructorId)) return;
       if (!confirm("Delete this row? This cannot be undone.")) return;
       const cmtId = delBtn.dataset.cmtId;
       try { await deleteReviewComment(sid, cmtId); }
@@ -15234,12 +15321,48 @@ function setupStickyNote() {
     }
   });
 
+  // ── Status dropdown ──────────────────────────────────────────
+  // A "change" listener, not a click. The old button cycled
+  // blank → ✓ → ✗ → blank, so marking a row Still Wrong meant clicking twice
+  // and passing through Corrected on the way, which told the workflow the row
+  // was done and bounced Phases 3 and 4 for no reason. Picking a value states
+  // it once.
+  note.addEventListener("change", async e => {
+    const sel = e.target.closest(".snote-status-sel");
+    if (!sel) return;
+    const { sid, data } = getCtx();
+    if (!sid) return;
+    if (!canEditCorrectionsFor(_stickyNoteInstructorId)) return;
+    const cmtId = sel.dataset.cmtId;
+    const cmt   = (data?.reviewComments || {})[cmtId];
+    if (!cmt) return;
+    const next = sel.value || null;   // "" is stored as null, exactly as before
+    try {
+      await setCommentStatus(sid, cmtId, next);
+      // Anything other than Corrected means this instructor is not finished,
+      // so Phases 3 and 4 go back to pending.
+      if (next !== "fixed") {
+        const instId = cmt.forInstructor || _stickyNoteInstructorId;
+        const ws2 = getWorkflowState(data);
+        const affected = instId ? [instId] : ws2.p3Ids;
+        const checks = { ...(data?.checks || {}) };
+        let changed = false;
+        affected.forEach(id => {
+          if (checks[`p3_${id}`]) { delete checks[`p3_${id}`]; changed = true; }
+          if (checks[`p4_check_${id}`]) { delete checks[`p4_check_${id}`]; changed = true; }
+        });
+        if (changed) { delete checks["p4_nigel"]; await updateSessionChecks(sid, checks).catch(() => {}); }
+      }
+    } catch (err) { console.error("setCommentStatus:", err); }
+  });
+
   // ── Textarea auto-save (debounced, per-row) ──────────────────
   note.addEventListener("input", e => {
     const ta = e.target.closest(".snote-textarea");
     if (!ta) return;
     const cmtId = ta.dataset.cmtId;
     if (!cmtId) return;
+    if (!canEditCorrectionsFor(_stickyNoteInstructorId)) return;
     // Auto-grow
     ta.style.height = "auto";
     ta.style.height = ta.scrollHeight + "px";
