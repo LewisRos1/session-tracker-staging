@@ -202,7 +202,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2079";
+const APP_VERSION = "2080";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -23645,7 +23645,15 @@ function renderTargetManageContent(student, target) {
         return;
       }
 
-      // Has past data — show password overlay
+      // Has past data — show password overlay.
+      //
+      // Put the dropdown back to the type the activity actually still has while
+      // the gate is up. Leaving it on the new choice said the change had gone
+      // through when it had not, and anyone who closed the gate without the
+      // password was left looking at a type the activity was never given. The
+      // chosen type is held in `type`, captured before any of this, so the
+      // dropdown is only a display here and doChange applies the real value.
+      sel.value = oldType;
       document.querySelectorAll("[data-type-change-overlay]").forEach(el => el.remove());
       const overlay = document.createElement("div");
       overlay.dataset.typeChangeOverlay = "1";
@@ -23699,6 +23707,7 @@ function renderTargetManageContent(student, target) {
           return;
         }
         overlay.remove();
+        sel.value = type;   // the password was right, so the change is real now
         await doChange();
       };
       overlay.querySelector("#act-type-pw-ok").addEventListener("click", tryConfirm);
