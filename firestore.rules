@@ -72,6 +72,15 @@ service cloud.firestore {
     match /trash/{trashId}          { allow read, write: if signedIn(); }
     match /aiUsage/{usageId}        { allow read, write: if signedIn(); }
 
+    // Who is online. One document per person, named after their account, and
+    // writable only by that account: nobody can post a heartbeat as somebody
+    // else. Readable by everyone signed in, because the point is seeing who
+    // else is here.
+    match /presence/{userId} {
+      allow read:  if signedIn();
+      allow write: if signedIn() && request.auth.uid == userId;
+    }
+
     // ── Everything else ──────────────────────────────────────
     // Denied. The old catch-all let a client create collections the app has
     // never heard of, which is free storage for anyone holding the credentials

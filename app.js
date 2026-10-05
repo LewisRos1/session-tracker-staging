@@ -89,6 +89,9 @@ import {
   setCommentStatus,
   updateCommentAssignment,
   listenToReviewQueue,
+  markPresence,
+  clearPresence,
+  listenToPresence,
   getSessionsWithParticipant,
   getAllSessions,
   signInWithPin,
@@ -203,7 +206,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2099";
+const APP_VERSION = "2100";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -2156,6 +2159,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     state.authEmail = user?.email || null;
     if (!user) {
       if (state.reviewQueueUnsubscribe) { state.reviewQueueUnsubscribe(); state.reviewQueueUnsubscribe = null; }
+      stopPresence();
       await waitForUpdatingScreenMinimum();
       initPin();
       return;
@@ -2172,6 +2176,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         renderTodoHomeSection();
       }
     });
+    startPresence();
     showHome();
     cleanupExpiredTrash();
   });
@@ -2479,6 +2484,7 @@ async function showHome() {
   renderHalfYearReportsSection();
   renderStudentDatabaseButton();
   renderTodoHomeSection();
+  renderHeaderUser();
   runOneOffRepairs();
 }
 
@@ -2759,6 +2765,11 @@ $("btn-logout")?.addEventListener("click", () => {
   // Clear the shortcut too, or the next load waits on Firebase for a session
   // that was deliberately ended.
   clearSignedIn();
+  // Signing out is the one departure we are told about, so take the chance to
+  // leave the list properly instead of fading out of it over the next
+  // two and a half minutes.
+  stopPresence();
+  clearPresence().catch(() => {});
   signOutUser();
 });
 
@@ -14343,19 +14354,75 @@ function canTickPill(role) {
   return owner === null || owner === me;
 }
 
-/** A corrections list is the instructor's and Ms. Daisy's: she writes the
- *  corrections, they tick them off. Everyone else gets it read-only.
- *
- *  A null instId is the single shared list older sessions have, from before
- *  the lists were split per instructor. It belongs to nobody in particular, so
- *  locking it to Ms. Daisy would make every old session read-only for the
- *  person who actually has to act on it. */
-function canEditCorrectionsFor(instId) {
-  const me = workflowActorId();
-  return me === null || !instId || me === "daisy" || me === instId;
+const instructorName = id => (INSTRUCTORS.find(i => i.id === id) || { name: id }).name;
+
+// ─── WHO IS HERE ─────────────────────────────────────────────
+// Nobody gets to say goodbye reliably: a closed lid, a flat battery or a lost
+// signal all leave in silence, and an unload handler fires too late to be
+// trusted on mobile. So presence is a heartbeat, and "online" means "wrote
+// recently". The window is generous compared to the beat, so one missed write
+// on a slow connection does not blink someone out of the list and back in.
+const PRESENCE_BEAT_MS   = 45 * 1000;
+const PRESENCE_WINDOW_MS = 150 * 1000;
+let _presenceTimer = null;
+let _presenceUnsub = null;
+let _presenceList  = [];
+
+function _presenceBeat() {
+  const u = currentUser();
+  if (u) markPresence(u.id, u.name).catch(() => {});
+}
+function _presenceOnVisible() { if (!document.hidden) _presenceBeat(); }
+
+function startPresence() {
+  stopPresence();
+  // The shared PIN cannot say who is using it, so it is not announced. It can
+  // still SEE who else is here, which is the useful half.
+  if (currentUser()) {
+    _presenceBeat();
+    _presenceTimer = setInterval(_presenceBeat, PRESENCE_BEAT_MS);
+    document.addEventListener("visibilitychange", _presenceOnVisible);
+  }
+  _presenceUnsub = listenToPresence(list => {
+    _presenceList = list;
+    renderHeaderUser();
+  });
 }
 
-const instructorName = id => (INSTRUCTORS.find(i => i.id === id) || { name: id }).name;
+function stopPresence() {
+  if (_presenceTimer) { clearInterval(_presenceTimer); _presenceTimer = null; }
+  if (_presenceUnsub) { _presenceUnsub(); _presenceUnsub = null; }
+  document.removeEventListener("visibilitychange", _presenceOnVisible);
+  _presenceList = [];
+}
+
+/** "Ms. Daisy" -> "D". The last word is the name; a title is not. */
+const presenceInitial = name => {
+  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+  return (parts[parts.length - 1] || "?").charAt(0).toUpperCase();
+};
+
+function renderHeaderUser() {
+  const el = $("header-user");
+  if (!el) return;
+  const me  = currentUser();
+  const now = Date.now();
+  const others = _presenceList
+    .filter(pp => pp.at > 0 && now - pp.at < PRESENCE_WINDOW_MS && pp.key !== (me?.id || ""))
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+
+  // "Staff" because the shared PIN genuinely does not know. Saying a name here
+  // would be a guess, and this line's whole job is to be the one place you can
+  // check who the app thinks you are.
+  const meName = me ? me.name : "Staff";
+  el.innerHTML = `
+    <span class="hu-me" title="You are signed in as ${escHtml(meName)}">
+      <span class="hu-dot"></span>${escHtml(meName)}
+    </span>
+    ${others.length ? `<span class="hu-others" title="Also here now: ${escHtml(others.map(o => o.name).join(", "))}">
+      ${others.map(o => `<span class="hu-av">${escHtml(presenceInitial(o.name))}</span>`).join("")}
+    </span>` : ""}`;
+}
 
 /**
  * A brief message that does not move anything on the screen.
@@ -14753,12 +14820,19 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
       ? `<button class="wf-note-btn" data-action="open-note" data-inst-id="">📝 List of Corrections</button>`
       : noteIds.map(id => {
           const idComments = ws.commentsFor(id);
-          const cnt  = idComments.length;
           const name = instName(id);
-          const allFixed  = cnt > 0 && idComments.every(([, c]) => getCmtStatus(c) === "fixed");
-          const colorCls  = cnt === 0 ? "" : allFixed ? " wf-note-btn--green" : " wf-note-btn--red";
+          // What is still to do, not how many rows exist. The old count never
+          // moved as rows were worked through, so a list of five said "(5)"
+          // whether four were done or none were.
+          //
+          // Undone and Still Wrong both count as outstanding; only Corrected
+          // clears a row. An empty list and a fully corrected one both mean
+          // there is nothing left, so both get the party popper.
+          const left = idComments.filter(([, c]) => getCmtStatus(c) !== "fixed").length;
+          const colorCls = left === 0 ? " wf-note-btn--green" : " wf-note-btn--red";
+          const tally = left === 0 ? "🎉" : `${left} left`;
           return `<button class="wf-note-btn${colorCls}" data-action="open-note" data-inst-id="${escHtml(id)}">
-            📝 List of Corrections – ${escHtml(name)}${cnt > 0 ? ` (${cnt})` : ""}
+            📝 List of Corrections – ${escHtml(name)} (${tally})
           </button>`;
         }).join("")}
   </div>`;
@@ -15078,20 +15152,6 @@ function renderStickyNoteContent(data, isGroup) {
   const caretPos     = focusedCmtId ? activeEl.selectionEnd : null;
   const liveText     = focusedCmtId ? activeEl.value : null;
 
-  // Someone else's list opens, but nothing in it can be changed. Seeing what a
-  // colleague was asked to fix is useful; editing it is not theirs to do.
-  const canEdit = canEditCorrectionsFor(_stickyNoteInstructorId);
-  const roBanner = document.getElementById("sticky-note-readonly");
-  if (roBanner) {
-    const owner = _stickyNoteInstructorId ? instructorName(_stickyNoteInstructorId) : "";
-    roBanner.textContent = owner
-      ? `Read-only. Only Ms. Daisy and ${owner} can change this list.`
-      : `Read-only.`;
-    roBanner.classList.toggle("hidden", canEdit);
-  }
-  const addBtn = document.getElementById("sticky-note-add-row-btn");
-  if (addBtn) addBtn.classList.toggle("hidden", !canEdit);
-
   if (visible.length === 0) {
     tbody.innerHTML = "";
   } else {
@@ -15104,9 +15164,9 @@ function renderStickyNoteContent(data, isGroup) {
         `<option value="${o.value}"${o.value === st ? " selected" : ""}>${escHtml(o.label)}</option>`).join("");
       return `<tr class="snote-row${rowCls}">
         <td class="snote-no">${i + 1}</td>
-        <td class="snote-text"><textarea class="snote-textarea" data-cmt-id="${id}" rows="1" placeholder="Type here…"${canEdit ? "" : " readonly"}>${escHtml(text)}</textarea></td>
-        <td class="snote-tick"><select class="snote-status-sel ${stCls}" data-cmt-id="${id}"${canEdit ? "" : " disabled"}>${opts}</select></td>
-        <td class="snote-del">${canEdit ? `<button class="snote-del-btn" data-cmt-id="${id}" title="Delete row">🗑</button>` : ""}</td>
+        <td class="snote-text"><textarea class="snote-textarea" data-cmt-id="${id}" rows="1" placeholder="Type here…">${escHtml(text)}</textarea></td>
+        <td class="snote-tick"><select class="snote-status-sel ${stCls}" data-cmt-id="${id}">${opts}</select></td>
+        <td class="snote-del"><button class="snote-del-btn" data-cmt-id="${id}" title="Delete row">🗑</button></td>
       </tr>`;
     }).join("");
 
@@ -15285,7 +15345,6 @@ function setupStickyNote() {
     if (e.target.id === "sticky-note-add-row-btn") {
       const { sid, data } = getCtx();
       if (!sid) return;
-      if (!canEditCorrectionsFor(_stickyNoteInstructorId)) return;
       _focusNewRow = true;
       try {
         await addReviewComment(sid, "", _stickyNoteInstructorId);
@@ -15312,7 +15371,6 @@ function setupStickyNote() {
     if (delBtn) {
       const { sid } = getCtx();
       if (!sid) return;
-      if (!canEditCorrectionsFor(_stickyNoteInstructorId)) return;
       if (!confirm("Delete this row? This cannot be undone.")) return;
       const cmtId = delBtn.dataset.cmtId;
       try { await deleteReviewComment(sid, cmtId); }
@@ -15332,7 +15390,6 @@ function setupStickyNote() {
     if (!sel) return;
     const { sid, data } = getCtx();
     if (!sid) return;
-    if (!canEditCorrectionsFor(_stickyNoteInstructorId)) return;
     const cmtId = sel.dataset.cmtId;
     const cmt   = (data?.reviewComments || {})[cmtId];
     if (!cmt) return;
@@ -15362,7 +15419,6 @@ function setupStickyNote() {
     if (!ta) return;
     const cmtId = ta.dataset.cmtId;
     if (!cmtId) return;
-    if (!canEditCorrectionsFor(_stickyNoteInstructorId)) return;
     // Auto-grow
     ta.style.height = "auto";
     ta.style.height = ta.scrollHeight + "px";

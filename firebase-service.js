@@ -516,6 +516,53 @@ export async function getAllSessions() {
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
+// ─── PRESENCE ────────────────────────────────────────────────
+// One document per signed-in person, rewritten on a heartbeat. There is no
+// "goodbye" write to rely on: a closed laptop, a dead battery or a lost
+// connection all leave without saying so. Whoever is reading decides who counts
+// as here, by how recently the heartbeat landed.
+//
+// The timestamp is the SERVER's, so a person whose own clock is wrong does not
+// drop out of the list or sit in it forever.
+
+/**
+ * Say "still here". Called on a timer while the app is open.
+ *
+ * The document is named after the Firebase account id, not after our own
+ * "daisy"/"nigel" ids, so the rule can be `uid == documentId` and nobody can
+ * post a heartbeat under somebody else's name. The friendly id travels inside
+ * the document as `key`, which is what the app matches on.
+ */
+export async function markPresence(key, name) {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
+  await setDoc(doc(db, "presence", uid), {
+    key:  key || "",
+    name: name || key || "",
+    at:   serverTimestamp(),
+  }, { merge: true });
+}
+
+/** Stop being listed, for the one case we DO get told about: signing out. */
+export async function clearPresence() {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
+  await deleteDoc(doc(db, "presence", uid)).catch(() => {});
+}
+
+/** Everyone's heartbeat, live. Callers decide which are recent enough. */
+export function listenToPresence(callback) {
+  return onSnapshot(collection(db, "presence"),
+    snap => callback(snap.docs.map(d => {
+      const v = d.data() || {};
+      // Pending writes report null until the server fills them in, which would
+      // otherwise read as "last seen in 1970" for a moment.
+      const at = v.at?.toMillis ? v.at.toMillis() : 0;
+      return { uid: d.id, key: v.key || "", name: v.name || d.id, at };
+    })),
+    () => {});
+}
+
 /** Real-time listener for sessions awaiting Daisy's review or Ray's corrections. */
 export function listenToReviewQueue(callback) {
   const q = query(collection(db, "sessions"),
