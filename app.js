@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2101";
+const APP_VERSION = "2102";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -14764,13 +14764,12 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
           // whether four were done or none were.
           //
           // Undone and Still Wrong both count as outstanding; only Corrected
-          // clears a row. An empty list and a fully corrected one both mean
-          // there is nothing left, so both get the party popper.
+          // clears a row. An empty list and a fully corrected one both read
+          // "0 left"; the green says which kind of nothing it is.
           const left = idComments.filter(([, c]) => getCmtStatus(c) !== "fixed").length;
           const colorCls = left === 0 ? " wf-note-btn--green" : " wf-note-btn--red";
-          const tally = left === 0 ? "🎉" : `${left} left`;
           return `<button class="wf-note-btn${colorCls}" data-action="open-note" data-inst-id="${escHtml(id)}">
-            📝 List of Corrections – ${escHtml(name)} (${tally})
+            📝 List of Corrections – ${escHtml(name)} (${left} left)
           </button>`;
         }).join("")}
   </div>`;
