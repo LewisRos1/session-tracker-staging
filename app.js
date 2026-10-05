@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2097";
+const APP_VERSION = "2098";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -23416,25 +23416,6 @@ function renderTargetManageContent(student, target) {
       // all came back null, the first style assignment threw, and the handler died
       // half way, so picking Multiple Choice changed the dropdown and never
       // revealed the options editor underneath it.
-      // Changing an activity's type can delete recorded scores, so it is the
-      // owner's alone. Checked here, before the sessions are read, so nobody
-      // waits on a scan for an answer that was never going to be yes.
-      if (!isOwner()) {
-        sel.value = oldType;
-        if (!showLockOverPanel(`Locked.`)) {
-          $("manage-modal-title").textContent = "Locked";
-          $("manage-modal-body").innerHTML = `
-            <div style="padding:2rem 1.25rem;display:flex;flex-direction:column;align-items:center;gap:.9rem">
-              <div style="font-size:2rem;line-height:1">🔒</div>
-              <div style="font-size:.9rem;color:var(--text);text-align:center;max-width:300px;line-height:1.55">Locked.</div>
-              <button class="btn-primary-sm" id="type-deny-ok" style="padding:.5rem 1.75rem">OK</button>
-            </div>`;
-          $("manage-modal").classList.remove("hidden");
-          $("type-deny-ok").addEventListener("click", () => $("manage-modal").classList.add("hidden"));
-        }
-        return;
-      }
-
       const body = document;
       const starterWrap      = body.querySelector(`.mn-act-starter-wrap[data-idx="${idx}"]`);
       const starterLabel     = body.querySelector(`.mn-act-starter-wrap[data-idx="${idx}"] .mn-act-starter-label`);
@@ -23704,8 +23685,33 @@ function renderTargetManageContent(student, target) {
         return;
       }
 
-      // Has past data — show password overlay.
-      //
+      // Has past data. An activity with nothing recorded against it can be
+      // retyped by anyone who got into Edit Target at all: there is nothing to
+      // lose, and asking would be asking about damage that cannot happen. Past
+      // data is what makes the change destructive, and that one is the owner's
+      // alone. This is also why the check sits HERE and not at the top of the
+      // handler, where it blocked every teacher whether or not the activity
+      // had ever been used.
+      if (!isOwner()) {
+        sel.value = oldType;
+        // A reason, unlike the other locks: this one is read by the two main
+        // teachers, who can do everything else on this screen, so "Locked." on
+        // its own would look like a fault rather than a decision.
+        const lockMsg = `Locked. Only Lewis can perform this action.`;
+        if (!showLockOverPanel(lockMsg)) {
+          $("manage-modal-title").textContent = "Locked";
+          $("manage-modal-body").innerHTML = `
+            <div style="padding:2rem 1.25rem;display:flex;flex-direction:column;align-items:center;gap:.9rem">
+              <div style="font-size:2rem;line-height:1">🔒</div>
+              <div style="font-size:.9rem;color:var(--text);text-align:center;max-width:300px;line-height:1.55">${lockMsg}</div>
+              <button class="btn-primary-sm" id="type-deny-ok" style="padding:.5rem 1.75rem">OK</button>
+            </div>`;
+          $("manage-modal").classList.remove("hidden");
+          $("type-deny-ok").addEventListener("click", () => $("manage-modal").classList.add("hidden"));
+        }
+        return;
+      }
+
       // Put the dropdown back to the type the activity actually still has while
       // the gate is up. Leaving it on the new choice said the change had gone
       // through when it had not, and anyone who closed the gate without the
