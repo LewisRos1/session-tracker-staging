@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2083";
+const APP_VERSION = "2084";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -1267,12 +1267,21 @@ window.debugDeleteCheck = async function(studentName, targetName, activityName) 
  *              prompt, because the account already says who they are.
  *   owner      that, plus changing an activity's type and the debug tools.
  */
+/**
+ * Firebase only signs in with something e-mail shaped, so each account is
+ * created in the console as <username>@session-tracker.app. The address is an
+ * implementation detail: it is never shown and never typed. Someone signing in
+ * types "daisy", and this is appended.
+ */
+const LOGIN_DOMAIN = "@session-tracker.app";
+const emailForUsername = u => String(u || "").trim().toLowerCase() + LOGIN_DOMAIN;
+
 const USERS = [
-  { id: "daisy", name: "Ms. Daisy", email: "daisy@session-tracker.app",    role: "teacher"   },
-  { id: "nigel", name: "Nigel",     email: "nigel@session-tracker.app",    role: "teacher"   },
-  { id: "ray",   name: "Rayhanah",  email: "rayhanah@session-tracker.app", role: "assistant" },
-  { id: "lewis", name: "Lewis",     email: "lewis@session-tracker.app",    role: "owner"     },
-];
+  { id: "daisy", username: "daisy",    name: "Ms. Daisy", role: "teacher"   },
+  { id: "nigel", username: "nigel",    name: "Nigel",     role: "teacher"   },
+  { id: "ray",   username: "rayhanah", name: "Rayhanah",  role: "assistant" },
+  { id: "lewis", username: "lewis",    name: "Lewis",     role: "owner"     },
+].map(u => ({ ...u, email: u.username + LOGIN_DOMAIN }));
 
 /** The signed-in person, or null when the account is not one of the four. */
 function currentUser() {
@@ -2323,6 +2332,13 @@ checkVersionFromServer();
  * types an e-mail, and the password is never derived from anything published
  * in this file the way the old PIN was.
  */
+/**
+ * Username and password.
+ *
+ * Replaces the shared PIN pad. Nothing here says who has an account, and the
+ * password is not derived from anything published in the served code the way
+ * the old PIN was. The e-mail Firebase needs is built from the username.
+ */
 function initPin() {
   showScreen("screen-pin");
   const vEl = $("pin-version");
@@ -2330,87 +2346,69 @@ function initPin() {
   const mount = $("login-mount");
   if (!mount) return;
 
-  let picked = null;
   let checking = false;
-
-  const render = () => {
-    mount.innerHTML = picked ? passwordStepHtml() : namesStepHtml();
-    picked ? wirePasswordStep() : wireNamesStep();
-  };
-
-  const namesStepHtml = () => `
-    <p class="pin-subtitle">Who are you?</p>
-    <div class="login-names">
-      ${USERS.map(u => `<button class="login-name" data-email="${escHtml(u.email)}">${escHtml(u.name)}</button>`).join("")}
-    </div>
-    <button class="login-back" id="login-old-pin" style="margin-top:.9rem">Use the old staff PIN</button>`;
-
-  const passwordStepHtml = () => `
-    <p class="pin-subtitle">${escHtml(picked.name)}</p>
+  mount.innerHTML = `
+    <p class="pin-subtitle">Sign in</p>
     <div class="login-pw">
+      <input id="login-user" type="text" class="admin-input" placeholder="Username"
+        autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false">
       <input id="login-pw-input" type="password" class="admin-input" placeholder="Password"
         autocomplete="current-password" autocapitalize="off" spellcheck="false">
-      <div id="login-err" class="pin-error hidden">Incorrect password. Try again.</div>
+      <div id="login-err" class="pin-error hidden">Wrong username or password.</div>
       <div id="login-status" class="pin-status hidden">Signing in…</div>
       <button class="btn-primary-sm" id="login-go">Sign In</button>
-      <button class="login-back" id="login-back">← Not you?</button>
+      <button class="login-back" id="login-old-pin">Use the old staff PIN</button>
     </div>`;
 
-  const wireNamesStep = () => {
-    mount.querySelectorAll(".login-name").forEach(btn => {
-      btn.addEventListener("click", () => {
-        picked = USERS.find(u => u.email === btn.dataset.email) || null;
-        render();
-        setTimeout(() => $("login-pw-input")?.focus(), 50);
-      });
-    });
-    // The way back in. The four accounts above have to be created by hand in
-    // the Firebase console, and until they exist nobody could sign in at all,
-    // which would lock the app shut rather than restrict it. The old shared
-    // account still works and is treated as an assistant, so it opens the door
-    // without handing over the run of the place. Remove this once the accounts
-    // are in place and proven.
-    $("login-old-pin")?.addEventListener("click", async () => {
-      const pin = prompt("Old staff PIN:");
-      if (!pin) return;
-      try {
-        await signInWithPin(pin.trim());
-        markLoggedInToday();
-      } catch (_) {
-        alert("That PIN was not accepted.");
-      }
-    });
+  const userInp = $("login-user");
+  const pwInp   = $("login-pw-input");
+  const err     = $("login-err");
+  const status  = $("login-status");
+
+  const submit = async () => {
+    if (checking) return;
+    const username = userInp.value.trim();
+    if (!username || !pwInp.value) return;
+    checking = true;
+    err.classList.add("hidden");
+    status.classList.remove("hidden");
+    try {
+      await signInAs(emailForUsername(username), pwInp.value);
+      markLoggedInToday();
+      // onAuthChange takes it from here and loads the app.
+    } catch (_) {
+      // One message for both, on purpose: saying which half was wrong tells
+      // someone guessing that a username exists.
+      status.classList.add("hidden");
+      err.classList.remove("hidden");
+      pwInp.value = "";
+      pwInp.focus();
+    } finally {
+      checking = false;
+    }
   };
 
-  const wirePasswordStep = () => {
-    const inp = $("login-pw-input");
-    const err = $("login-err");
-    const status = $("login-status");
-    $("login-back").addEventListener("click", () => { picked = null; render(); });
+  $("login-go").addEventListener("click", submit);
+  [userInp, pwInp].forEach(el =>
+    el.addEventListener("keydown", e => { if (e.key === "Enter") submit(); }));
 
-    const submit = async () => {
-      if (checking || !inp.value) return;
-      checking = true;
-      err.classList.add("hidden");
-      status.classList.remove("hidden");
-      try {
-        await signInAs(picked.email, inp.value);
-        markLoggedInToday();
-        // onAuthChange takes it from here and loads the app.
-      } catch (_) {
-        status.classList.add("hidden");
-        err.classList.remove("hidden");
-        inp.value = "";
-        inp.focus();
-      } finally {
-        checking = false;
-      }
-    };
-    $("login-go").addEventListener("click", submit);
-    inp.addEventListener("keydown", e => { if (e.key === "Enter") submit(); });
-  };
+  // The way back in. The four accounts have to be created by hand in the
+  // Firebase console, and until they exist nobody could sign in at all, which
+  // would lock the app shut rather than restrict it. The old shared account
+  // still works and is treated as an assistant. Remove this once the accounts
+  // are in place and proven.
+  $("login-old-pin").addEventListener("click", async () => {
+    const pin = prompt("Old staff PIN:");
+    if (!pin) return;
+    try {
+      await signInWithPin(pin.trim());
+      markLoggedInToday();
+    } catch (_) {
+      alert("That PIN was not accepted.");
+    }
+  });
 
-  render();
+  setTimeout(() => userInp.focus(), 50);
 }
 
 // ============================================================
