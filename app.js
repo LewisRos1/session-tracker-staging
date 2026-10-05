@@ -202,12 +202,14 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2073";
+const APP_VERSION = "2074";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
-//     debugRecoverOptions("Hayden Chan", "Math")            // report only
+//     debugRecoverOptions()                                 // scan EVERY student
+//     debugRecoverOptions("Hayden Chan", "Math")            // one target
 //     debugRecoverOptions("Hayden Chan", "Math", true)      // write them back
+//     debugRecoverOptions(null, null, true)                 // write them all back
 //
 //     Saving an activity while its panel was open read the option list from the
 //     wrong place, found nothing, and saved "no options" over the real ones.
@@ -215,8 +217,31 @@ const APP_VERSION = "2073";
 //     and archivedOptions. Past sessions hold the texts actually chosen, in
 //     rem.text. This gathers all three, shows what each activity can be rebuilt
 //     from, and only writes when told to.
-window.debugRecoverOptions = async function(studentName, targetName, apply = false) {
+window.debugRecoverOptions = async function(studentName = null, targetName = null, apply = false) {
   const students = await loadStudentsConfig();
+
+  // No student named: sweep everyone. The bug fired on any activity whose
+  // options were edited with the panel open, so the damage is not confined to
+  // the target it was first noticed in.
+  if (!studentName) {
+    const all = [];
+    for (const st of students) {
+      for (const t of (st.targets || [])) {
+        const found = await window.debugRecoverOptions(
+          st.note ? `${st.name} (${st.note})` : st.name, t.name, apply, true);
+        for (const r of (found || [])) all.push({ Student: st.name, Target: t.name, ...r });
+      }
+    }
+    window.__optRecovery = all;
+    if (all.length === 0) { console.log("No activity anywhere has lost its options."); return all; }
+    console.log(`${all.length} activit${all.length === 1 ? "y" : "ies"} with no options left, across every student:`);
+    console.table(all.map(({ _pa, _rebuilt, ...r }) => r));
+    const fixable = all.filter(r => r._rebuilt.length > 0);
+    console.log(`${fixable.length} of ${all.length} can be rebuilt.` +
+      (apply ? "" : " Nothing written. Run debugRecoverOptions(null, null, true) to write them back."));
+    return all;
+  }
+
   const matches = students.filter(st => st.name === studentName
     || `${st.name} (${st.note || ""})` === studentName);
   if (matches.length === 0) { console.warn(`No student called "${studentName}".`); return; }
@@ -230,10 +255,15 @@ window.debugRecoverOptions = async function(studentName, targetName, apply = fal
     console.warn(`No target called "${targetName}". This student has:`, (student.targets || []).map(t => t.name));
     return;
   }
+  const quiet = arguments[3] === true;   // called from the sweep above
 
   // Everything ever typed into a remark for each activity of this target.
   const seen = new Map();   // activity name -> Set of remark texts
-  const sessions = await getAllSessionsForStudent(student.id);
+  // Cached per student: the sweep calls this once per TARGET, so without it a
+  // student with six targets would be read out of Firestore six times over.
+  window.__optRecSessions = window.__optRecSessions || {};
+  const sessions = window.__optRecSessions[student.id]
+    || (window.__optRecSessions[student.id] = await getAllSessionsForStudent(student.id));
   for (const sess of sessions) {
     const acts = sess.activities || {}, rems = sess.remarks || {};
     for (const [rid, r] of Object.entries(rems)) {
@@ -273,21 +303,25 @@ window.debugRecoverOptions = async function(studentName, targetName, apply = fal
     });
   }
 
-  window.__optRecovery = rows;
-  if (rows.length === 0) { console.log("No activity in this target has lost its options."); return rows; }
-  console.log(`${rows.length} activit${rows.length === 1 ? "y" : "ies"} with no options left:`);
-  console.table(rows.map(({ _pa, _rebuilt, ...r }) => r));
+  if (!quiet) {
+    window.__optRecovery = rows;
+    if (rows.length === 0) { console.log("No activity in this target has lost its options."); return rows; }
+    console.log(`${rows.length} activit${rows.length === 1 ? "y" : "ies"} with no options left:`);
+    console.table(rows.map(({ _pa, _rebuilt, ...r }) => r));
+  }
 
   const fixable = rows.filter(r => r._rebuilt.length > 0);
   if (!apply) {
-    console.log(`Nothing written. ${fixable.length} of ${rows.length} can be rebuilt.`);
-    console.log(`Check the table, then run the same call with , true to write them back.`);
+    if (!quiet) {
+      console.log(`Nothing written. ${fixable.length} of ${rows.length} can be rebuilt.`);
+      console.log(`Check the table, then run the same call with , true to write them back.`);
+    }
     return rows;
   }
-  if (fixable.length === 0) { console.log("Nothing to write."); return rows; }
+  if (fixable.length === 0) return rows;
   for (const r of fixable) r._pa.inlineOptions = r._rebuilt.join("\x1F");
   await saveStudent(student);
-  console.log(`Restored options on ${fixable.length} activit${fixable.length === 1 ? "y" : "ies"}. Reopen the target to see them.`);
+  if (!quiet) console.log(`Restored options on ${fixable.length} activit${fixable.length === 1 ? "y" : "ies"}. Reopen the target to see them.`);
   return rows;
 };
 
