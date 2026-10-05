@@ -339,7 +339,6 @@ html, body {
 .hu-me {
   display: inline-flex;
   align-items: center;
-  gap: .4rem;
   background: rgba(255,255,255,.15);
   border: 1.5px solid rgba(255,255,255,.4);
   border-radius: var(--radius-sm);
@@ -349,36 +348,8 @@ html, body {
   color: #fff;
   white-space: nowrap;
 }
-/* Green against the purple header reads as "live" without a word for it. */
-.hu-dot {
-  width: .5rem; height: .5rem;
-  border-radius: 50%;
-  background: #4ade80;
-  box-shadow: 0 0 0 2px rgba(74,222,128,.35);
-  flex-shrink: 0;
-}
-.hu-others { display: inline-flex; align-items: center; }
-/* Overlapped circles, so four people take about the room of two. */
-.hu-av {
-  width: 1.5rem; height: 1.5rem;
-  border-radius: 50%;
-  background: #fff;
-  color: var(--primary);
-  font-size: .72rem;
-  font-weight: 800;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid var(--primary);
-  margin-left: -.35rem;
-  cursor: default;
-}
-.hu-av:first-child { margin-left: 0; }
-
 @media (max-width: 560px) {
-  /* The name alone, no initials: the header has one line and the version, the
-     name and the button already fill it. */
-  .hu-others { display: none; }
+  /* The header is one line, and the version and the button are already on it. */
   .hu-me { max-width: 7.5rem; overflow: hidden; text-overflow: ellipsis; }
 }
 

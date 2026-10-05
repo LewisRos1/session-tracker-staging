@@ -89,9 +89,6 @@ import {
   setCommentStatus,
   updateCommentAssignment,
   listenToReviewQueue,
-  markPresence,
-  clearPresence,
-  listenToPresence,
   getSessionsWithParticipant,
   getAllSessions,
   signInWithPin,
@@ -206,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2100";
+const APP_VERSION = "2101";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -2159,7 +2156,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     state.authEmail = user?.email || null;
     if (!user) {
       if (state.reviewQueueUnsubscribe) { state.reviewQueueUnsubscribe(); state.reviewQueueUnsubscribe = null; }
-      stopPresence();
       await waitForUpdatingScreenMinimum();
       initPin();
       return;
@@ -2176,7 +2172,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         renderTodoHomeSection();
       }
     });
-    startPresence();
     showHome();
     cleanupExpiredTrash();
   });
@@ -2765,11 +2760,6 @@ $("btn-logout")?.addEventListener("click", () => {
   // Clear the shortcut too, or the next load waits on Firebase for a session
   // that was deliberately ended.
   clearSignedIn();
-  // Signing out is the one departure we are told about, so take the chance to
-  // leave the list properly instead of fading out of it over the next
-  // two and a half minutes.
-  stopPresence();
-  clearPresence().catch(() => {});
   signOutUser();
 });
 
@@ -14356,72 +14346,20 @@ function canTickPill(role) {
 
 const instructorName = id => (INSTRUCTORS.find(i => i.id === id) || { name: id }).name;
 
-// ─── WHO IS HERE ─────────────────────────────────────────────
-// Nobody gets to say goodbye reliably: a closed lid, a flat battery or a lost
-// signal all leave in silence, and an unload handler fires too late to be
-// trusted on mobile. So presence is a heartbeat, and "online" means "wrote
-// recently". The window is generous compared to the beat, so one missed write
-// on a slow connection does not blink someone out of the list and back in.
-const PRESENCE_BEAT_MS   = 45 * 1000;
-const PRESENCE_WINDOW_MS = 150 * 1000;
-let _presenceTimer = null;
-let _presenceUnsub = null;
-let _presenceList  = [];
-
-function _presenceBeat() {
-  const u = currentUser();
-  if (u) markPresence(u.id, u.name).catch(() => {});
-}
-function _presenceOnVisible() { if (!document.hidden) _presenceBeat(); }
-
-function startPresence() {
-  stopPresence();
-  // The shared PIN cannot say who is using it, so it is not announced. It can
-  // still SEE who else is here, which is the useful half.
-  if (currentUser()) {
-    _presenceBeat();
-    _presenceTimer = setInterval(_presenceBeat, PRESENCE_BEAT_MS);
-    document.addEventListener("visibilitychange", _presenceOnVisible);
-  }
-  _presenceUnsub = listenToPresence(list => {
-    _presenceList = list;
-    renderHeaderUser();
-  });
-}
-
-function stopPresence() {
-  if (_presenceTimer) { clearInterval(_presenceTimer); _presenceTimer = null; }
-  if (_presenceUnsub) { _presenceUnsub(); _presenceUnsub = null; }
-  document.removeEventListener("visibilitychange", _presenceOnVisible);
-  _presenceList = [];
-}
-
-/** "Ms. Daisy" -> "D". The last word is the name; a title is not. */
-const presenceInitial = name => {
-  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
-  return (parts[parts.length - 1] || "?").charAt(0).toUpperCase();
-};
-
+/**
+ * Names the account in the header.
+ *
+ * "Staff" when the old shared PIN is in use, because it genuinely cannot say
+ * who is holding it. Putting a name there would be a guess, and the whole job
+ * of this line is to be the one place you can check who the app thinks you
+ * are.
+ */
 function renderHeaderUser() {
   const el = $("header-user");
   if (!el) return;
-  const me  = currentUser();
-  const now = Date.now();
-  const others = _presenceList
-    .filter(pp => pp.at > 0 && now - pp.at < PRESENCE_WINDOW_MS && pp.key !== (me?.id || ""))
-    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
-
-  // "Staff" because the shared PIN genuinely does not know. Saying a name here
-  // would be a guess, and this line's whole job is to be the one place you can
-  // check who the app thinks you are.
+  const me = currentUser();
   const meName = me ? me.name : "Staff";
-  el.innerHTML = `
-    <span class="hu-me" title="You are signed in as ${escHtml(meName)}">
-      <span class="hu-dot"></span>${escHtml(meName)}
-    </span>
-    ${others.length ? `<span class="hu-others" title="Also here now: ${escHtml(others.map(o => o.name).join(", "))}">
-      ${others.map(o => `<span class="hu-av">${escHtml(presenceInitial(o.name))}</span>`).join("")}
-    </span>` : ""}`;
+  el.innerHTML = `<span class="hu-me" title="Signed in as ${escHtml(meName)}">${escHtml(meName)}</span>`;
 }
 
 /**
