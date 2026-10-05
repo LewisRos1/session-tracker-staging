@@ -394,6 +394,37 @@ function getAllTargets(student) {
   return student.targets || [];
 }
 
+/**
+ * A worksheet name Excel will accept, for a name a person chose.
+ *
+ * Excel refuses * ? : \ / [ ] in a sheet name, caps it at 31 characters, and
+ * will not take two sheets with the same name. Target names are typed by hand,
+ * so all three can happen. One target called "Behaviour Intervention: Target"
+ * failed the entire backup, for every student at once, with an error that named
+ * a punctuation mark and not the target it came from.
+ *
+ * Forbidden characters become spaces rather than being dropped, so two targets
+ * that differ only there do not collapse onto the same name. If the name is
+ * taken anyway, including by one of the fixed sheets, a counter goes on the end
+ * inside the 31-character limit.
+ */
+function safeSheetName(wb, raw) {
+  let name = String(raw || "")
+    .replace(/[*?:\\/\[\]]/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/^'+|'+$/g, "")
+    .trim();
+  if (!name) name = "Sheet";
+  name = name.slice(0, 31);
+  if (!wb.getWorksheet(name)) return name;
+  for (let i = 2; i < 500; i++) {
+    const tail = ` (${i})`;
+    const candidate = name.slice(0, 31 - tail.length).trim() + tail;
+    if (!wb.getWorksheet(candidate)) return candidate;
+  }
+  return name.slice(0, 27) + " ~" + Math.floor(Math.random() * 90 + 10);
+}
+
 function exportTargetDisplayName(t) {
   return t.discontinuedOn ? "(Disc.) " + t.name : t.name;
 }
@@ -1532,7 +1563,7 @@ function addIndividualTargetSheets(wb, allTargets, sessions, studentName, includ
   for (const target of allTargets) {
     const { rows, monthHeaderRows, colHeaderRows, activityHeadingRows, masteredSepRows, discontinuedSepRows, extraSepRows, noteRows, sessionDateBlocks, spacerRows, grayRows, greenRows } =
       buildTargetSheet(target, sessions, allTargets, includeTrials);
-    const ws = wb.addWorksheet(exportTargetDisplayName(target).slice(0, 31));
+    const ws = wb.addWorksheet(safeSheetName(wb, exportTargetDisplayName(target)));
     rows.forEach(row => ws.addRow(row));
 
     // Col widths: Date | Activity | Remark | [Trials |] Score | Avg Score
