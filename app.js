@@ -202,7 +202,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2077";
+const APP_VERSION = "2078";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -23371,7 +23371,12 @@ function renderTargetManageContent(student, target) {
         : pa.fixedRemark !== undefined ? "fixed_remark"
         : "";
 
-      const body = $("manage-modal-body");
+      // document, not #manage-modal-body: opening an activity moves its fields
+      // into the floating panel, which hangs off <body>. Scoped to the modal these
+      // all came back null, the first style assignment threw, and the handler died
+      // half way, so picking Multiple Choice changed the dropdown and never
+      // revealed the options editor underneath it.
+      const body = document;
       const starterWrap      = body.querySelector(`.mn-act-starter-wrap[data-idx="${idx}"]`);
       const starterLabel     = body.querySelector(`.mn-act-starter-wrap[data-idx="${idx}"] .mn-act-starter-label`);
       const starterInput     = body.querySelector(`.mn-act-starter-text[data-idx="${idx}"]`);
@@ -23385,6 +23390,7 @@ function renderTargetManageContent(student, target) {
         // keeps counting toward the target average or exports.
         if (type === "no_trials") {
           const actName2  = acts[idx].name;
+          const actTitle2 = acts[idx].title || "";
           const actCfgId2 = acts[idx].id;
           acts[idx].noTrials = true;
           delete acts[idx].manualScore; delete acts[idx].fixedRemark;
@@ -23396,7 +23402,9 @@ function renderTargetManageContent(student, target) {
           getSessionsCached().then(async sessions => {
             for (const sess of sessions) {
               const matchActIds = Object.entries(sess.activities || {})
-                .filter(([, a]) => (actCfgId2 && a.configId === actCfgId2) || a.activityName === actName2)
+                .filter(([, a]) => (actCfgId2 && a.configId === actCfgId2)
+                  || (!a.configId && ((actName2 && a.activityName === actName2)
+                                   || (actTitle2 && a.activityName === actTitle2))))
                 .map(([id]) => id);
               const changes = {};
               for (const [remId, rem] of Object.entries(sess.remarks || {})) {
@@ -23484,6 +23492,7 @@ function renderTargetManageContent(student, target) {
         // Switching away from Manual Score
         if (acts[idx].manualScore) {
           const actName2  = acts[idx].name;
+          const actTitle2 = acts[idx].title || "";
           const actCfgId2 = acts[idx].id;
           delete acts[idx].manualScore;
           acts[idx].sentenceStarter = null; acts[idx].noteSentenceStarter = null; acts[idx].remarkPresetId = null;
@@ -23494,7 +23503,9 @@ function renderTargetManageContent(student, target) {
           getAllSessionsForStudent(student.id).then(async sessions => {
             for (const sess of sessions) {
               const matchActIds = Object.entries(sess.activities || {})
-                .filter(([, a]) => a.configId === actCfgId2 || a.activityName === actName2)
+                .filter(([, a]) => (actCfgId2 && a.configId === actCfgId2)
+                  || (!a.configId && ((actName2 && a.activityName === actName2)
+                                   || (actTitle2 && a.activityName === actTitle2))))
                 .map(([id]) => id);
               const changes = {};
               for (const [remId, rem] of Object.entries(sess.remarks || {})) {
@@ -23565,11 +23576,14 @@ function renderTargetManageContent(student, target) {
         // Reverse migration: switching back TO Notes Only — move masteryNote back into text
         if (type === "" && !usesOpts) {
           const actName2  = acts[idx].name;
+          const actTitle2 = acts[idx].title || "";
           const actCfgId2 = acts[idx].id;
           getAllSessionsForStudent(student.id).then(async sessions => {
             for (const sess of sessions) {
               const matchActIds = Object.entries(sess.activities || {})
-                .filter(([, a]) => a.configId === actCfgId2 || a.activityName === actName2)
+                .filter(([, a]) => (actCfgId2 && a.configId === actCfgId2)
+                  || (!a.configId && ((actName2 && a.activityName === actName2)
+                                   || (actTitle2 && a.activityName === actTitle2))))
                 .map(([id]) => id);
               const changes = {};
               for (const [remId, rem] of Object.entries(sess.remarks || {})) {
@@ -23585,7 +23599,17 @@ function renderTargetManageContent(student, target) {
 
       // Check past session data before allowing the type change
       const actCfgId = pa.id || null;
-      const actName  = pa.name || pa.title || "";
+      // Both halves of the identity, and the name fallback only applies to
+      // records carrying no configId of their own.
+      //
+      // pa.name is the DETAILS field and pa.title is the title, so the old
+      // `pa.name || pa.title` matched past sessions against the detail text. An
+      // activity created minutes earlier, with "asdf" typed into its details,
+      // matched a real activity called "asdf" and was declared to have months
+      // of history behind it. Claiming a record that already belongs to another
+      // activity is the same mistake claimAct is written to avoid.
+      const actTitle = pa.title || "";
+      const actName  = pa.name  || "";
       let sessionsWithData = [];
       // Tracked separately from sessionsWithData: the red "this will be deleted"
       // warning must only appear when there is actually scoring data to delete,
@@ -23595,7 +23619,9 @@ function renderTargetManageContent(student, target) {
         const allSess = await getSessionsCached();
         for (const sess of allSess) {
           const matchActIds = Object.entries(sess.activities || {})
-            .filter(([, a]) => (actCfgId && a.configId === actCfgId) || (actName && a.activityName === actName))
+            .filter(([, a]) => (actCfgId && a.configId === actCfgId)
+              || (!a.configId && ((actName && a.activityName === actName)
+                               || (actTitle && a.activityName === actTitle))))
             .map(([id]) => id);
           const matchRems = matchActIds.length === 0 ? [] : Object.values(sess.remarks || {})
             .filter(rem => matchActIds.includes(rem.activityId));
@@ -24818,7 +24844,12 @@ function renderTemplateManageContent(template) {
   $("manage-modal-body").querySelectorAll(".mn-act-preset").forEach(sel => {
     sel.addEventListener("change", async () => {
       const idx = Number(sel.dataset.idx);
-      const body = $("manage-modal-body");
+      // document, not #manage-modal-body: opening an activity moves its fields
+      // into the floating panel, which hangs off <body>. Scoped to the modal these
+      // all came back null, the first style assignment threw, and the handler died
+      // half way, so picking Multiple Choice changed the dropdown and never
+      // revealed the options editor underneath it.
+      const body = document;
       const starterWrap     = body.querySelector(`.mn-act-starter-wrap[data-idx="${idx}"]`);
       const starterLabel    = body.querySelector(`.mn-act-starter-wrap[data-idx="${idx}"] .mn-act-starter-label`);
       const starterInput    = body.querySelector(`.mn-act-starter-text[data-idx="${idx}"]`);
