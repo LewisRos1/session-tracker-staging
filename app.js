@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2092";
+const APP_VERSION = "2093";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -1538,6 +1538,7 @@ function requirePassword(onSuccess, message = "") {
   $("manage-modal-title").textContent = isOldSession ? "Older Session" : "Locked";
   $("manage-modal-body").innerHTML = `
     <div style="padding:2rem 1.25rem;display:flex;flex-direction:column;align-items:center;gap:.9rem">
+      <div style="font-size:2rem;line-height:1">🔒</div>
       <div style="font-size:.95rem;color:var(--text);text-align:center;max-width:300px;line-height:1.55">
         ${isOldSession
           ? `Locked. This session is more than 7 days old.`
