@@ -724,12 +724,11 @@ html, body {
 .date-picker-day-today:not(.date-picker-day-current) .date-taken-dot {
   color: #fff;
 }
+/* Hovering darkens it further. The shared hover is a pale purple, which made
+   today the one cell in the grid that got LIGHTER under the cursor, and the
+   text had to flip back to dark with it. */
 .date-picker-day-today:not(.date-picker-day-current):hover {
-  background: var(--primary-light);
-  color: var(--text-main);
-}
-.date-picker-day-today:not(.date-picker-day-current):hover .date-taken-dot {
-  color: var(--primary);
+  background: #4b5563;
 }
 .date-picker-day-future { color: #bbb; cursor: default; }
 .date-picker-day-taken  { cursor: default; }
