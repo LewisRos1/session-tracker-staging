@@ -202,7 +202,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2081";
+const APP_VERSION = "2082";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -225,12 +225,27 @@ window.debugRecoverOptions = async function(studentName = null, targetName = nul
   // the target it was first noticed in.
   if (!studentName) {
     const all = [];
+    const skipped = [];
     for (const st of students) {
       for (const t of (st.targets || [])) {
-        const found = await window.debugRecoverOptions(
-          st.note ? `${st.name} (${st.note})` : st.name, t.name, apply, true);
-        for (const r of (found || [])) all.push({ Student: st.name, Target: t.name, ...r });
+        // By id, not by name. Passing a name back into this function made it
+        // look the student up again, and a name matches every record that
+        // shares it — so four sets of same-named students reported themselves
+        // as ambiguous and were skipped entirely. The sweep then announced that
+        // nothing anywhere had lost its options, having never looked at them.
+        let found;
+        try {
+          found = await window.debugRecoverOptions(st, t.name, apply, true);
+        } catch (err) {
+          skipped.push(`${studentLabel(st)} / ${t.name}: ${err?.message || err}`);
+          continue;
+        }
+        for (const r of (found || [])) all.push({ Student: studentLabel(st), Target: t.name, ...r });
       }
+    }
+    if (skipped.length) {
+      console.warn(`${skipped.length} target${skipped.length === 1 ? "" : "s"} could not be checked:`);
+      skipped.forEach(x => console.warn("  " + x));
     }
     window.__optRecovery = all;
     if (all.length === 0) { console.log("No activity anywhere has lost its options."); return all; }
@@ -242,14 +257,22 @@ window.debugRecoverOptions = async function(studentName = null, targetName = nul
     return all;
   }
 
-  const matches = students.filter(st => st.name === studentName
-    || `${st.name} (${st.note || ""})` === studentName);
-  if (matches.length === 0) { console.warn(`No student called "${studentName}".`); return; }
-  if (matches.length > 1) {
-    console.warn(`"${studentName}" is ambiguous. Use one of:`, matches.map(m => m.note ? `${m.name} (${m.note})` : m.name));
-    return;
+  // The sweep hands the record straight over; a person typing a name gets it
+  // looked up, and has to say which one when a name is shared.
+  let student;
+  if (studentName && typeof studentName === "object") {
+    student = studentName;
+  } else {
+    const matches = students.filter(st => st.name === studentName
+      || studentLabel(st) === studentName
+      || `${st.name} (${st.note || ""})` === studentName);
+    if (matches.length === 0) { console.warn(`No student called "${studentName}".`); return; }
+    if (matches.length > 1) {
+      console.warn(`"${studentName}" is ambiguous. Use one of:`, matches.map(m => studentLabel(m)));
+      return;
+    }
+    student = matches[0];
   }
-  const student = matches[0];
   const target = (student.targets || []).find(t => t.name === targetName);
   if (!target) {
     console.warn(`No target called "${targetName}". This student has:`, (student.targets || []).map(t => t.name));
@@ -278,14 +301,30 @@ window.debugRecoverOptions = async function(studentName = null, targetName = nul
 
   const rows = [];
   for (const pa of (target.predefinedActivities || [])) {
-    const usesOpts = !!(pa.optionsMulti || pa.remarkHasNote);
-    if (!usesOpts) continue;
-    const current = pa.inlineOptions ? String(pa.inlineOptions).split("\x1F").filter(Boolean) : [];
-    if (current.length > 0) continue;              // nothing lost here
+    // parseOpts, not a plain split: older data separates options with "/" and
+    // only newer data uses \x1F, so splitting one way would report an activity
+    // as empty when it is fine.
+    const current = parseOpts(pa.inlineOptions);
+    if (current.length > 0) continue;              // still has its options
 
     const name = pa.title || pa.name;
     const fromScores = Object.keys(pa.optionScores || {});
     const archived = (pa.archivedOptions || []).map(ao => ao.text).filter(Boolean);
+
+    // An activity counts as damaged if it is still SET to use options, or if it
+    // is not but has left-over scores or archived options, which only an
+    // activity that once had options can have.
+    //
+    // The second half matters: switching the type away from Multiple Choice
+    // deletes optionScores outright, so an activity that was wiped and then had
+    // its type changed keeps neither its options nor the usual evidence. Those
+    // are still worth listing, because past sessions may remember what was
+    // picked even when the config no longer does.
+    const usesOpts = !!(pa.optionsMulti || pa.remarkHasNote);
+    const hadOpts  = fromScores.length > 0 || archived.length > 0;
+    const isActivity = !pa.isHeading && !pa.isNote && !pa.isExportNote
+      && !pa.isMaintainHeading && (pa.title || pa.name);
+    if (!isActivity || (!usesOpts && !hadOpts)) continue;
     const fromSessions = [...(seen.get(name) || seen.get(pa.name) || new Set())];
     // Scores first, because their key order is the order the options were added.
     // Anything only ever seen in a session is appended after. Options that were
@@ -295,6 +334,7 @@ window.debugRecoverOptions = async function(studentName = null, targetName = nul
 
     rows.push({
       Activity: name,
+      Type: usesOpts ? (pa.optionsMulti ? "Checkboxes" : "Multiple Choice") : "changed away",
       "From scores": fromScores.join(" | ") || "—",
       "From sessions": fromSessions.join(" | ") || "—",
       Archived: archived.join(" | ") || "—",
