@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2091";
+const APP_VERSION = "2092";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -1530,17 +1530,18 @@ async function applyScoreSettings() {
 function requirePassword(onSuccess, message = "") {
   if (canUseStaffTools()) { onSuccess(); return; }
 
-  // Short on purpose. Whoever hits this already knows what they are and who to
-  // ask; the earlier version spelled both out and was longer than the thing it
-  // was refusing to do.
+  // Just "Locked." A role lock said "only a main teacher can do this", which
+  // told an assistant nothing they could act on and ranked them while it did
+  // it. The old-session lock keeps its reason because that one is about the
+  // session, not about the person reading it.
   const isOldSession = message === EXPIRED_MSG;
-  $("manage-modal-title").textContent = isOldSession ? "Older Session" : "Not Available";
+  $("manage-modal-title").textContent = isOldSession ? "Older Session" : "Locked";
   $("manage-modal-body").innerHTML = `
     <div style="padding:2rem 1.25rem;display:flex;flex-direction:column;align-items:center;gap:.9rem">
       <div style="font-size:.95rem;color:var(--text);text-align:center;max-width:300px;line-height:1.55">
         ${isOldSession
           ? `Locked. This session is more than 7 days old.`
-          : `Locked. Only a main teacher can do this.`}
+          : `Locked.`}
       </div>
       <button class="btn-primary-sm" id="req-deny-ok" style="padding:.5rem 1.75rem">OK</button>
     </div>`;
@@ -2764,7 +2765,11 @@ function renderStudentDatabaseButton() {
   // score in the app, so it is not something to wander into.
   $("btn-open-score-settings").addEventListener("click", () =>
     requirePassword(() => openScoreSettingsScreen(), "Enter password to open Score Settings"));
-  $("btn-open-ai-report").addEventListener("click", () => showScreen("screen-ai-report"));
+  // Gated on the way in rather than on Generate. The screen shows every
+  // student's name and the shape of their reports, so letting someone walk
+  // around it and only stopping them at the last step guards the wrong thing.
+  $("btn-open-ai-report").addEventListener("click", () =>
+    requirePassword(() => showScreen("screen-ai-report"), EXPORT_MSG));
 }
 
 function renderTodoHomeSection() {
