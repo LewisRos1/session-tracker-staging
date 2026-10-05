@@ -202,9 +202,95 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2072";
+const APP_VERSION = "2073";
 
 // Debug helpers — call from F12 console
+// -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
+//     debugRecoverOptions("Hayden Chan", "Math")            // report only
+//     debugRecoverOptions("Hayden Chan", "Math", true)      // write them back
+//
+//     Saving an activity while its panel was open read the option list from the
+//     wrong place, found nothing, and saved "no options" over the real ones.
+//     What it did NOT touch was optionScores, whose keys are the option texts,
+//     and archivedOptions. Past sessions hold the texts actually chosen, in
+//     rem.text. This gathers all three, shows what each activity can be rebuilt
+//     from, and only writes when told to.
+window.debugRecoverOptions = async function(studentName, targetName, apply = false) {
+  const students = await loadStudentsConfig();
+  const matches = students.filter(st => st.name === studentName
+    || `${st.name} (${st.note || ""})` === studentName);
+  if (matches.length === 0) { console.warn(`No student called "${studentName}".`); return; }
+  if (matches.length > 1) {
+    console.warn(`"${studentName}" is ambiguous. Use one of:`, matches.map(m => m.note ? `${m.name} (${m.note})` : m.name));
+    return;
+  }
+  const student = matches[0];
+  const target = (student.targets || []).find(t => t.name === targetName);
+  if (!target) {
+    console.warn(`No target called "${targetName}". This student has:`, (student.targets || []).map(t => t.name));
+    return;
+  }
+
+  // Everything ever typed into a remark for each activity of this target.
+  const seen = new Map();   // activity name -> Set of remark texts
+  const sessions = await getAllSessionsForStudent(student.id);
+  for (const sess of sessions) {
+    const acts = sess.activities || {}, rems = sess.remarks || {};
+    for (const [rid, r] of Object.entries(rems)) {
+      const a = acts[r.activityId];
+      if (!a || a.targetName !== target.name) continue;
+      const txt = String(r.text || "").replace(/<[^>]*>/g, "").trim();
+      if (!txt) continue;
+      if (!seen.has(a.activityName)) seen.set(a.activityName, new Set());
+      seen.get(a.activityName).add(txt);
+    }
+  }
+
+  const rows = [];
+  for (const pa of (target.predefinedActivities || [])) {
+    const usesOpts = !!(pa.optionsMulti || pa.remarkHasNote);
+    if (!usesOpts) continue;
+    const current = pa.inlineOptions ? String(pa.inlineOptions).split("\x1F").filter(Boolean) : [];
+    if (current.length > 0) continue;              // nothing lost here
+
+    const name = pa.title || pa.name;
+    const fromScores = Object.keys(pa.optionScores || {});
+    const archived = (pa.archivedOptions || []).map(ao => ao.text).filter(Boolean);
+    const fromSessions = [...(seen.get(name) || seen.get(pa.name) || new Set())];
+    // Scores first, because their key order is the order the options were added.
+    // Anything only ever seen in a session is appended after. Options that were
+    // deliberately removed stay removed.
+    const rebuilt = [...fromScores];
+    for (const t of fromSessions) if (!rebuilt.includes(t) && !archived.includes(t)) rebuilt.push(t);
+
+    rows.push({
+      Activity: name,
+      "From scores": fromScores.join(" | ") || "—",
+      "From sessions": fromSessions.join(" | ") || "—",
+      Archived: archived.join(" | ") || "—",
+      "Would restore": rebuilt.join(" | ") || "NOTHING FOUND",
+      _pa: pa, _rebuilt: rebuilt
+    });
+  }
+
+  window.__optRecovery = rows;
+  if (rows.length === 0) { console.log("No activity in this target has lost its options."); return rows; }
+  console.log(`${rows.length} activit${rows.length === 1 ? "y" : "ies"} with no options left:`);
+  console.table(rows.map(({ _pa, _rebuilt, ...r }) => r));
+
+  const fixable = rows.filter(r => r._rebuilt.length > 0);
+  if (!apply) {
+    console.log(`Nothing written. ${fixable.length} of ${rows.length} can be rebuilt.`);
+    console.log(`Check the table, then run the same call with , true to write them back.`);
+    return rows;
+  }
+  if (fixable.length === 0) { console.log("Nothing to write."); return rows; }
+  for (const r of fixable) r._pa.inlineOptions = r._rebuilt.join("\x1F");
+  await saveStudent(student);
+  console.log(`Restored options on ${fixable.length} activit${fixable.length === 1 ? "y" : "ies"}. Reopen the target to see them.`);
+  return rows;
+};
+
 // 0) Find who has an activity, when you remember the name but not the student:
 //    debugFindActivity("Is Toilet Trained")
 //
@@ -23634,8 +23720,17 @@ function renderTargetManageContent(student, target) {
     });
   });
 
+  // Opening an activity MOVES its fields out of #manage-modal-body and into the
+  // floating panel, which is attached to <body>. Anything that looks a field up
+  // when a button is pressed, rather than when the list was drawn, therefore has
+  // to search the whole document: the three helpers below all did it the old way
+  // and all three only ever ran while the panel was open.
+  //
+  // This one cost data. It read the options, found none because it was looking
+  // in the wrong place, and "no options" was saved over the real ones. Adding an
+  // option appeared to do nothing and Save and Close quietly emptied the list.
   const getOptsFromDom = idx =>
-    [...$("manage-modal-body").querySelectorAll(`.mn-opt-item[data-idx="${idx}"]`)]
+    [...document.querySelectorAll(`.mn-opt-item[data-idx="${idx}"]`)]
       .map(i => i.value.trim()).filter(Boolean);
 
   const renumberOpts = list => {
@@ -23649,7 +23744,7 @@ function renderTargetManageContent(student, target) {
   };
 
   const rebuildOptScores = idx => {
-    const container = $("manage-modal-body").querySelector(`.mn-opts-container[data-idx="${idx}"]`);
+    const container = document.querySelector(`.mn-opts-container[data-idx="${idx}"]`);
     if (!container) return;
     const scores = {};
     // Preserve scores for removed options so past session exports remain accurate
@@ -23666,7 +23761,7 @@ function renderTargetManageContent(student, target) {
   };
 
   const updateRemovedSection = idx => {
-    const section = $("manage-modal-body").querySelector(`.mn-removed-section[data-idx="${idx}"]`);
+    const section = document.querySelector(`.mn-removed-section[data-idx="${idx}"]`);
     if (!section) return;
     const archived = acts[idx].archivedOptions || [];
     const toggle = section.querySelector(".mn-removed-toggle");
