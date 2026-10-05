@@ -336,17 +336,17 @@ html, body {
   gap: .45rem;
   min-width: 0;
 }
+/* Plain text, no box. Given the same pill shape as Log Out beside it, the
+   name read as a second button and invited a click that does nothing. */
 .hu-me {
   display: inline-flex;
   align-items: center;
-  background: rgba(255,255,255,.15);
-  border: 1.5px solid rgba(255,255,255,.4);
-  border-radius: var(--radius-sm);
-  padding: .3rem .7rem;
-  font-size: .8rem;
-  font-weight: 700;
-  color: #fff;
+  padding: 0 .2rem;
+  font-size: .82rem;
+  font-weight: 600;
+  color: rgba(255,255,255,.85);
   white-space: nowrap;
+  cursor: default;
 }
 @media (max-width: 560px) {
   /* The header is one line, and the version and the button are already on it. */
