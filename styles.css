@@ -4641,21 +4641,34 @@ button.wf-pill:hover { filter: brightness(.93); }
   gap: .35rem;
   z-index: 2;
 }
+/* The kebab alone on the top line, pushed right so it sits where every other
+   kebab in the list sits. Everything below it is full width, so the tag and
+   both buttons share one left edge. */
 .mn-pending-top {
   display: flex;
-  align-items: center;
-  gap: .35rem;
+  justify-content: flex-end;
+  min-height: 1.6rem;
 }
-.mn-pending-top .mn-pending-tag { flex: 1; text-align: center; }
-/* The row's own kebab, moved in so it sits where every other kebab sits. */
 .mn-pending-kebab-slot { flex-shrink: 0; display: inline-flex; }
+.mn-pending-foot .mn-pending-tag {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+  margin: 0;
+}
 .mn-pending-foot .mn-pending-hint { max-width: none; white-space: normal; text-align: center; }
 
-.mn-pending-details { padding-left: 2.6rem; }
+/* Same size as the title it sits under, with a gap above so the two read as
+   two things rather than one paragraph that changed its mind. */
+.mn-pending-details {
+  padding-left: 2.6rem;
+  margin-top: .55rem;
+  font-size: inherit;
+}
 .mn-pending-details-label {
   display: block;
   font-weight: 700;
-  font-size: .78rem;
   letter-spacing: .02em;
 }
 .mn-pending-details-body { display: block; }
@@ -4922,3 +4935,7 @@ button.wf-pill:hover { filter: brightness(.93); }
   min-width: 0;
 }
 .mn-pending-card .mn-pending-details { width: 100%; box-sizing: border-box; }
+
+/* The wrapped title text: take what is left of the row and wrap inside it,
+   rather than dropping below the chip. */
+.mn-sub-title-text { flex: 1 1 0; min-width: 0; }

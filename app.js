@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2132";
+const APP_VERSION = "2133";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -14865,11 +14865,12 @@ function buildPendingFooter(item, idx, blockedHint) {
 
   const col = document.createElement("div");
   col.className = "mn-pending-foot";
+  // The kebab on its own line above, not beside the tag. Sharing a line made
+  // the tag narrower than the buttons under it, so nothing in the column lined
+  // up down its left edge.
   col.innerHTML = `
-    <div class="mn-pending-top">
-      <span class="mn-pending-tag">Waiting for approval</span>
-      <span class="mn-pending-kebab-slot"></span>
-    </div>
+    <div class="mn-pending-top"><span class="mn-pending-kebab-slot"></span></div>
+    <span class="mn-pending-tag">Waiting for approval</span>
     ${canApprove() ? `
       ${blockedHint ? `<span class="mn-pending-hint">${blockedHint}</span>` : ``}
       <button class="mn-pending-btn mn-pending-ok" data-pending-idx="${idx}"${blockedHint ? " disabled" : ""}>✓ Approve</button>
@@ -14894,6 +14895,27 @@ function adoptKebabIntoPendingFoot(host, kebabBtn) {
   wrap.style.marginLeft = "0";
   wrap.style.alignSelf = "center";
   slot.appendChild(wrap);
+}
+
+/**
+ * Wrap a row's bare title text in a span.
+ *
+ * A text node is an anonymous flex item: CSS cannot reach it, and it will not
+ * shrink below its longest word, so once the approval column took its strip of
+ * the row the title gave up and dropped to the next line instead of sitting
+ * beside the chip. Wrapped, it is an element that can be told to take the space
+ * that is left and wrap inside itself.
+ */
+function wrapRowTitleText(row) {
+  if (!row || row.querySelector(":scope > .mn-sub-title-text")) return;
+  [...row.childNodes]
+    .filter(n => n.nodeType === 3 && n.textContent.trim())
+    .forEach(n => {
+      const span = document.createElement("span");
+      span.className = "mn-sub-title-text";
+      span.textContent = n.textContent;
+      n.replaceWith(span);
+    });
 }
 
 /** Stamp an entry as somebody's proposal. */
@@ -21811,6 +21833,7 @@ function mnInitActivityCollapse(bodyEl, acts) {
         ".mn-sub-km-status-btn, .mn-km-status-btn, .mn-move-sub-act, .mn-make-standalone"
       ).forEach(el => { el.style.display = "none"; }));
 
+      wrapRowTitleText(row);
       if (!row.querySelector(".mn-pending-foot")) {
         // A sub cannot go live before the parent it hangs off: approved on its
         // own it would point at a parent that is not there yet.
