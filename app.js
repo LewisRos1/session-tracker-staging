@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2119";
+const APP_VERSION = "2120";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -11556,7 +11556,15 @@ function renderTargetContent() {
   }
 
   if (manageBtn) {
-    manageBtn.classList.toggle("hidden", target.isStructured !== true && !target.predefinedActivities?.length);
+    // Proposals are stripped out of `target` before it gets here, so a target
+    // whose only activities are still waiting looks empty -- and the one button
+    // that leads to them would hide itself. Counted from the unstripped target.
+    const rawTarget = (state.currentStudent?.targets || [])
+      .find(t => t.name === state.selectedTargetName);
+    const hasPending = pendingCountForTarget(rawTarget) > 0;
+    manageBtn.classList.toggle("hidden",
+      !hasPending && target.isStructured !== true && !target.predefinedActivities?.length);
+    if (_approvalFlashEdit && flashButtonHint(manageBtn)) _approvalFlashEdit = false;
   }
 
   $("target-type-chip")?.classList.add("hidden");
@@ -14678,6 +14686,11 @@ let _mnPendingOnly = false;
 // Set just before openSession so the screen opens on the target that is
 // waiting. Cleared as soon as it is used, so it cannot steer a later visit.
 let _approvalJumpTarget = null;
+// Arriving from an approval task leaves you on the session screen with nothing
+// obviously to do: the proposals are not shown here, by design. The one button
+// that leads to them gets the same flash the app uses elsewhere to point at a
+// control.
+let _approvalFlashEdit = false;
 
 /** Everyone carrying proposals, newest-looking first. */
 function entitiesAwaitingApproval() {
@@ -14703,6 +14716,7 @@ function entitiesAwaitingApproval() {
 async function openApprovalTask(row) {
   const t = (row.entity.targets || []).find(x => pendingCountForTarget(x) > 0);
   _approvalJumpTarget = t?.name || null;
+  _approvalFlashEdit  = true;
   try {
     if (row.isGroup) {
       const sessions = await getRecentGroupSessions(row.entity.id, 1).catch(() => []);
@@ -14716,6 +14730,7 @@ async function openApprovalTask(row) {
     }
   } catch (err) {
     _approvalJumpTarget = null;
+    _approvalFlashEdit  = false;
     console.error("openApprovalTask:", err);
   }
 }
@@ -14741,6 +14756,19 @@ function noteApproval(entity, proposerId, by) {
     by:    by || "daisy",
     at:    Date.now(),
   };
+}
+
+/**
+ * The app's standard "look here" flash: .85s, three times.
+ *
+ * Matched to the one the Student Database already uses rather than invented
+ * again, because two slightly different flashes read as two different things.
+ */
+function flashButtonHint(btn) {
+  if (!btn || btn.classList.contains("hidden")) return false;
+  btn.classList.add("btn-flash-hint");
+  setTimeout(() => btn.classList.remove("btn-flash-hint"), 3400);
+  return true;
 }
 
 /** Everything waiting to be read by one person. */
@@ -26740,6 +26768,8 @@ function populateGroupTargetDropdown(targets) {
   const manageBtn = $("btn-group-manage-targets");
   if (manageBtn) {
     manageBtn.classList.toggle("hidden", !state.selectedGroupTargetName);
+    // Same flash as the individual screen when arriving from an approval task.
+    if (_approvalFlashEdit && flashButtonHint(manageBtn)) _approvalFlashEdit = false;
     manageBtn.onclick = () => {
       const tgt = state.currentGroup?.targets.find(t => t.name === state.selectedGroupTargetName);
       if (tgt) requirePassword(() => openGroupManageModal(state.currentGroup, tgt), EXPORT_MSG);
