@@ -4570,3 +4570,83 @@ button.wf-pill:hover { filter: brightness(.93); }
 #mn-act-list > [data-sec-member] {
   margin-left: 2.75rem;
 }
+
+/* ── Waiting for approval ─────────────────────────────────── */
+/* An amber rail down the side, so a proposal is recognisable at a glance in a
+   long list without the tag having to be read. */
+.mn-pending-card {
+  box-shadow: inset 3px 0 0 #f59e0b;
+  background: #fffbeb !important;
+}
+.mn-pending-tag {
+  font-size: .68rem;
+  font-weight: 700;
+  color: #92400e;
+  background: #fde68a;
+  border: 1px solid #f59e0b;
+  border-radius: .3rem;
+  padding: .05rem .4rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: .4rem;
+}
+.mn-pending-actions {
+  display: inline-flex;
+  gap: .25rem;
+  margin-left: .35rem;
+  flex-shrink: 0;
+}
+.mn-pending-btn {
+  width: 1.55rem; height: 1.55rem;
+  border-radius: 50%;
+  border: 1.5px solid #d1d5db;
+  background: #fff;
+  cursor: pointer;
+  font-size: .9rem;
+  font-weight: 800;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.mn-pending-ok { color: #047857; border-color: #10b981; }
+.mn-pending-ok:hover:not(:disabled) { background: #d1fae5; }
+.mn-pending-no { color: #b91c1c; border-color: #ef4444; }
+.mn-pending-no:hover { background: #fee2e2; }
+.mn-pending-btn:disabled { opacity: .35; cursor: not-allowed; }
+
+.mn-pending-banner {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  flex-wrap: wrap;
+  background: #fef3c7;
+  border: 1.5px solid #f59e0b;
+  border-radius: .5rem;
+  padding: .5rem .75rem;
+  margin: 0 0 .75rem;
+}
+.mn-pending-banner-count {
+  font-size: .83rem;
+  font-weight: 700;
+  color: #92400e;
+  flex: 1;
+  min-width: 0;
+}
+.mn-pending-filter {
+  font-size: .78rem;
+  font-weight: 700;
+  padding: .28rem .7rem;
+  border-radius: .4rem;
+  border: 1.5px solid #f59e0b;
+  background: #fff;
+  color: #92400e;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.mn-pending-filter.is-on { background: #f59e0b; color: #fff; }
+
+/* display:none, not visibility: a hidden row must not keep its space, and the
+   section rail is drawn from data-sec-* on the rows that remain. */
+.mn-hidden-by-pending { display: none !important; }

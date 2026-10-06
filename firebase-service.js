@@ -963,11 +963,52 @@ export async function getStudentById(studentId) {
 }
 
 /** Save (upsert) a student config document. */
+// ─── PENDING APPROVAL ────────────────────────────────────────
+// An activity an assistant proposes is not live. It must not appear in a
+// session, an export or a report until a main teacher approves it.
+//
+// Rather than carry a flag through the 190-odd places that read
+// predefinedActivities -- where missing one would put unapproved content in
+// front of a client -- proposals are stored in a SEPARATE list,
+// target.pendingActivities. Nothing else in the app knows that list exists, so
+// invisible is the default and leaking would take deliberate effort.
+//
+// Edit Target is the one screen that wants them, so it merges the two lists
+// into one while you work, marking the merged-in entries with _pending. Every
+// write goes through saveStudent or saveGroup, which is where they are pulled
+// back apart. Two functions cover every save path in the app, including the
+// ones that call saveStudent directly.
+//
+// The split works on a COPY. The object the editor is holding is never
+// touched, so a save cannot disturb a list being edited.
+function splitPendingForWrite(entity) {
+  const targets = entity?.targets;
+  if (!Array.isArray(targets)) return entity;
+  let changed = false;
+  const out = targets.map(t => {
+    const acts = t?.predefinedActivities;
+    // _pendingMerged marks a target the editor has opened. Such a target is
+    // rebuilt even when nothing is pending any more, because approving or
+    // rejecting the last proposal has to be able to empty the list.
+    if (!t?._pendingMerged && !(Array.isArray(acts) && acts.some(a => a?._pending))) return t;
+    changed = true;
+    const live = [], pend = [];
+    (acts || []).forEach((a, i) => {
+      if (!a?._pending) { live.push(a); return; }
+      const { _pending, ...rest } = a;
+      pend.push({ ...rest, pendingAtIdx: i });
+    });
+    const { _pendingMerged, ...tRest } = t;
+    return { ...tRest, predefinedActivities: live, pendingActivities: pend };
+  });
+  return changed ? { ...entity, targets: out } : entity;
+}
+
 export async function saveStudent(student) {
   if (!student.name || !student.name.trim()) {
     throw new Error("Cannot save a student with a blank name.");
   }
-  await setDoc(doc(db, "students", student.id), student);
+  await setDoc(doc(db, "students", student.id), splitPendingForWrite(student));
 }
 
 /** Delete a student config document. */
@@ -1308,7 +1349,7 @@ export async function loadGroups() {
 }
 
 export async function saveGroup(group) {
-  await setDoc(doc(db, "groups", group.id), group);
+  await setDoc(doc(db, "groups", group.id), splitPendingForWrite(group));
 }
 
 export async function deleteGroup(groupId) {

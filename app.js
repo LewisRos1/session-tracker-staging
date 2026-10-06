@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2104";
+const APP_VERSION = "2105";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -14363,6 +14363,99 @@ function canTickPill(role) {
 
 const instructorName = id => (INSTRUCTORS.find(i => i.id === id) || { name: id }).name;
 
+// ─── PENDING APPROVAL ────────────────────────────────────────
+// What an assistant adds in Edit Target is a proposal, not a change. It lives
+// in target.pendingActivities (see splitPendingForWrite in firebase-service)
+// and stays out of sessions, exports and reports until a main teacher
+// approves it.
+//
+// The editor works on ONE list, so the two are merged on open and pulled apart
+// on save. Entries merged in carry _pending, which never reaches Firestore.
+
+/**
+ * Everything a known assistant adds here is a proposal.
+ *
+ * Deliberately NOT !canUseStaffTools(). currentRole() answers "assistant" for
+ * anyone it cannot identify, which includes the old shared PIN that everyone
+ * is still using. Treating that as an assistant would quietly turn every
+ * addition anybody made into an invisible proposal with nobody able to approve
+ * it. An unknown signer keeps working as before; only a named assistant
+ * proposes.
+ */
+const proposesOnly = () => currentUser()?.role === "assistant";
+/** Main teachers and the owner decide. */
+const canApprove = () => canUseStaffTools();
+
+/**
+ * Fold a target's proposals into its live list for editing.
+ *
+ * pendingAtIdx is where the entry sat when it was last saved. Inserting in
+ * ascending order means each index is correct as it is used, because
+ * everything before it is already back in place. An index past the end lands
+ * at the end, which is where an entry whose neighbours have since gone belongs
+ * anyway.
+ */
+function mergePendingForEdit(target) {
+  if (!target || target._pendingMerged) return target;
+  const pend = Array.isArray(target.pendingActivities) ? target.pendingActivities : [];
+  target.predefinedActivities = target.predefinedActivities || [];
+  pend
+    .slice()
+    .sort((a, b) => (a.pendingAtIdx ?? 1e9) - (b.pendingAtIdx ?? 1e9))
+    .forEach(item => {
+      const { pendingAtIdx, ...rest } = item;
+      const at = Math.min(pendingAtIdx ?? target.predefinedActivities.length,
+                          target.predefinedActivities.length);
+      target.predefinedActivities.splice(at, 0, { ...rest, _pending: true });
+    });
+  // Marks the target as opened, so a later save rebuilds pendingActivities
+  // even when the last proposal has just been approved or rejected.
+  target._pendingMerged = true;
+  return target;
+}
+
+// The filter survives the re-render that approving or rejecting triggers, so
+// working through a list does not mean switching it back on each time.
+let _mnPendingOnly = false;
+
+/** Stamp an entry as somebody's proposal. */
+function markAsProposal(item) {
+  item._pending   = true;
+  item.proposedBy = currentUser()?.id || "";
+  item.proposedAt = Date.now();
+  return item;
+}
+
+/** How many proposals a target is carrying, without opening it. */
+function pendingCountForTarget(target) {
+  if (!target) return 0;
+  if (target._pendingMerged) {
+    return (target.predefinedActivities || []).filter(a => a?._pending).length;
+  }
+  return (target.pendingActivities || []).length;
+}
+
+/** How many a whole student or group is carrying. */
+function pendingCountForEntity(entity) {
+  return (entity?.targets || []).reduce((n, t) => n + pendingCountForTarget(t), 0);
+}
+
+/**
+ * Whether this entry can be approved yet.
+ *
+ * An activity under a heading that is itself still a proposal has nowhere to
+ * sit: approving it would drop it under whatever heading happens to precede
+ * it. The heading goes first.
+ */
+function pendingBlockedByHeading(acts, idx) {
+  for (let i = idx - 1; i >= 0; i--) {
+    const a = acts[i];
+    if (!a) continue;
+    if (a.isHeading || a.isMaintainHeading) return a._pending ? a : null;
+  }
+  return null;
+}
+
 /**
  * Names the account in the header.
  *
@@ -19310,10 +19403,12 @@ function openManageModal(student, targetOrNull, templateOrNull = null, remarkPre
   } else if (templateOrNull) {
     renderTemplateManageContent(templateOrNull);
   } else if (targetOrNull) {
-    // Was a password box in front of Edit Target. The account answers it now.
-    // An assistant is turned away here for the moment; read-only Edit Target
-    // is the next piece of work, and half of it would be worse than none.
-    requirePassword(() => {
+    // Open to everyone. An assistant is not locked out: what they add here
+    // becomes a proposal rather than a change, and the rule lives inside the
+    // screen (see mergePendingForEdit and proposesOnly) rather than on the
+    // door. Locking the door was the stopgap while there was nothing on the
+    // other side of it.
+    (() => {
       renderTargetManageContent(student, targetOrNull);
       if (scrollToPaId) {
         requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -19332,7 +19427,7 @@ function openManageModal(student, targetOrNull, templateOrNull = null, remarkPre
           el.addEventListener("animationend", () => el.classList.remove("activity-cfg-blink"), { once: true });
         }));
       }
-    }, EXPORT_MSG);
+    })();
   } else {
     renderStudentManageContent(student);
   }
@@ -21115,6 +21210,34 @@ function mnInitActivityCollapse(bodyEl, acts) {
       else titleEl.insertBefore(mnRowChip(kind), titleEl.firstChild);   // mastered / discontinued cards
     }
 
+    // ── Waiting for approval ──
+    // Decorated here rather than in the row's own markup because this pass
+    // already runs over every kind of row -- activity, heading, note, mastered,
+    // discontinued -- and each builds its HTML somewhere different.
+    if (act && act._pending) {
+      card.classList.add("mn-pending-card");
+      const tagHost = card.querySelector(":scope > .mn-act-head") || titleEl;
+      if (!tagHost.querySelector(".mn-pending-tag")) {
+        const tag = document.createElement("span");
+        tag.className = "mn-pending-tag";
+        tag.textContent = "Waiting for approval";
+        tagHost.appendChild(tag);
+      }
+      if (canApprove() && !tagHost.querySelector(".mn-pending-actions")) {
+        // A heading that is itself unapproved cannot hold anything yet:
+        // approving the activity now would file it under whichever heading
+        // happens to sit above it instead.
+        const blocker = pendingBlockedByHeading(acts, gi);
+        const wrap = document.createElement("span");
+        wrap.className = "mn-pending-actions";
+        wrap.innerHTML = `
+          <button class="mn-pending-btn mn-pending-ok" data-pending-idx="${gi}"
+            ${blocker ? `disabled title="Approve the section heading above this one first."` : `title="Approve"`}>✓</button>
+          <button class="mn-pending-btn mn-pending-no" data-pending-idx="${gi}" title="Reject and delete">✗</button>`;
+        tagHost.appendChild(wrap);
+      }
+    }
+
     const body = card.querySelector(":scope > .mn-act-body") || card.querySelector(".mn-act-body");
     titleEl.addEventListener("click", () =>
       mnOpenActPanel(card, body, mnPanelTitleHtml(titleEl), card.dataset.panelKey));
@@ -21300,6 +21423,10 @@ function mnRegroupInactiveCards(bodyEl, acts) {
 function renderTargetManageContent(student, target) {
   $("manage-modal-title").textContent = target.name;
   target.predefinedActivities = normalizeActivitiesFormat(target.predefinedActivities || []);
+  // Proposals join the live list for the duration of the edit. They are pulled
+  // back out on every write by splitPendingForWrite, so nothing here can leak
+  // an unapproved entry into a session or an export.
+  mergePendingForEdit(target);
 
   // Migrate legacy notes array into the unified predefinedActivities list
   if (target.notes?.length > 0) {
@@ -23290,12 +23417,117 @@ function renderTargetManageContent(student, target) {
     });
   });
 
+  // ── Waiting for approval: the banner, the filter, and the decisions ──
+  renderPendingBanner();
+
+  function renderPendingBanner() {
+    const bodyEl = $("manage-modal-body");
+    if (!bodyEl) return;
+    bodyEl.querySelector(":scope > .mn-pending-banner")?.remove();
+    const n = acts.filter(a => a?._pending).length;
+    if (n === 0) {
+      bodyEl.classList.remove("mn-pending-only");
+      _mnPendingOnly = false;
+      return;
+    }
+    const bar = document.createElement("div");
+    bar.className = "mn-pending-banner";
+    bar.innerHTML = `
+      <span class="mn-pending-banner-count">${n} item${n === 1 ? "" : "s"} waiting for approval</span>
+      <button class="mn-pending-filter${_mnPendingOnly ? " is-on" : ""}" id="btn-mn-pending-only">
+        ${_mnPendingOnly ? "Show everything" : "Show only these"}
+      </button>`;
+    bodyEl.insertBefore(bar, bodyEl.firstChild);
+    bodyEl.classList.toggle("mn-pending-only", _mnPendingOnly);
+    applyPendingFilter();
+    $("btn-mn-pending-only").addEventListener("click", () => {
+      _mnPendingOnly = !_mnPendingOnly;
+      renderPendingBanner();
+    });
+  }
+
+  /**
+   * Hide everything already approved.
+   *
+   * A section whose rows are all hidden is hidden with them, otherwise the
+   * filtered view is a column of empty headings. The rule is deliberately
+   * "contains a pending card", so a section heading that is itself a proposal
+   * stays visible even before anything is added under it.
+   */
+  function applyPendingFilter() {
+    const bodyEl = $("manage-modal-body");
+    const list   = $("mn-act-list");
+    if (!bodyEl) return;
+    bodyEl.querySelectorAll(".mn-hidden-by-pending")
+      .forEach(el => el.classList.remove("mn-hidden-by-pending"));
+    if (!_mnPendingOnly || !list) return;
+
+    const isPending = el =>
+      el.classList.contains("mn-pending-card") || !!el.querySelector(".mn-pending-card");
+
+    // Sections are not containers here: a heading and the rows under it are
+    // siblings, marked out by data-sec-* for the rail CSS. So a heading is kept
+    // by looking forward to the next heading rather than by looking inside it.
+    const rows = [...list.children];
+    rows.forEach((row, i) => {
+      if (isPending(row)) return;
+      if (row.classList.contains("mn-heading-item")) {
+        for (let j = i + 1; j < rows.length; j++) {
+          if (rows[j].classList.contains("mn-heading-item")) break;
+          if (isPending(rows[j])) return;
+        }
+      }
+      row.classList.add("mn-hidden-by-pending");
+    });
+
+    // Mastered and discontinued are approved by definition, so the whole
+    // section goes while the filter is on.
+    bodyEl.querySelectorAll(".mn-inact-group, .mn-inact-card")
+      .forEach(el => el.classList.add("mn-hidden-by-pending"));
+  }
+
+  $("manage-modal-body").querySelectorAll(".mn-pending-ok").forEach(btn => {
+    btn.addEventListener("click", async e => {
+      e.stopPropagation();
+      const i = Number(btn.dataset.pendingIdx);
+      const a = acts[i];
+      if (!a || !a._pending) return;
+      // Approving is only ever a promotion: the entry is already sitting in
+      // the right place in the list, so nothing moves and nothing is rewritten.
+      delete a._pending;
+      delete a.proposedBy;
+      delete a.proposedAt;
+      target.predefinedActivities = acts;
+      await saveTarget().catch(() => {});
+      renderTargetManageContent(student, target);
+    });
+  });
+
+  $("manage-modal-body").querySelectorAll(".mn-pending-no").forEach(btn => {
+    btn.addEventListener("click", async e => {
+      e.stopPropagation();
+      const i = Number(btn.dataset.pendingIdx);
+      const a = acts[i];
+      if (!a || !a._pending) return;
+      const what = a.isHeading || a.isMaintainHeading ? "section heading"
+                 : a.isNote || a.isExportNote ? "note" : "activity";
+      const label = (a.name || a.title || a.text || "").trim();
+      if (!confirm(`Reject this ${what}${label ? ` ("${label.slice(0, 40)}")` : ""}? It will be deleted.`)) return;
+      acts.splice(i, 1);
+      acts.forEach((x, k) => { x.order = k; });
+      target.predefinedActivities = acts;
+      await saveTarget().catch(() => {});
+      renderTargetManageContent(student, target);
+    });
+  });
+
   $("btn-mn-add-act").addEventListener("click", () => {
     const btn = $("btn-mn-add-act"); if (btn) btn.disabled = true;
     const _newActDate = _groupForTargetEdit ? (state.groupSessionData?.date || todayDateStr()) : (state.sessionData?.date || todayDateStr());
     // Opened straight away: a brand new activity has nothing to read and every
     // field still to fill in.
     const _newAct = { id: cfgId("a"), name: "", order: acts.length, createdOn: todayDateStr(), activeFrom: _newActDate };
+    if (proposesOnly()) markAsProposal(_newAct);
     _mnPanelOpenAfterRender = _newAct.id;
     acts.push(_newAct);
     target.predefinedActivities = acts;
@@ -23305,7 +23537,9 @@ function renderTargetManageContent(student, target) {
 
   $("btn-mn-add-heading").addEventListener("click", () => {
     const btn = $("btn-mn-add-heading"); if (btn) btn.disabled = true;
-    acts.push({ id: cfgId("h"), isHeading: true, name: "", order: acts.length, activeFrom: null });
+    const _newHead = { id: cfgId("h"), isHeading: true, name: "", order: acts.length, activeFrom: null };
+    if (proposesOnly()) markAsProposal(_newHead);
+    acts.push(_newHead);
     target.predefinedActivities = acts;
     renderTargetManageContent(student, target);
     saveTarget().catch(() => {});
@@ -23313,7 +23547,9 @@ function renderTargetManageContent(student, target) {
 
   $("btn-mn-add-note").addEventListener("click", () => {
     const btn = $("btn-mn-add-note"); if (btn) btn.disabled = true;
-    acts.push({ id: cfgId("n"), isNote: true, text: "", order: acts.length, activeFrom: null });
+    const _newNote = { id: cfgId("n"), isNote: true, text: "", order: acts.length, activeFrom: null };
+    if (proposesOnly()) markAsProposal(_newNote);
+    acts.push(_newNote);
     target.predefinedActivities = acts;
     renderTargetManageContent(student, target);
     saveTarget().catch(() => {});
