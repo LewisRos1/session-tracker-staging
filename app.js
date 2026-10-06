@@ -204,7 +204,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2150";
+const APP_VERSION = "2151";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -2428,6 +2428,8 @@ function initPin() {
         <input id="login-pw-input" type="password" class="admin-input" placeholder=" "
           autocomplete="current-password" autocapitalize="off" spellcheck="false">
         <label for="login-pw-input">Password</label>
+        <button type="button" id="login-pw-eye" class="pw-eye" tabindex="-1"
+          aria-label="Hold to show password">👁</button>
       </div>
       <div id="login-err" class="pin-error hidden">Wrong username or password.</div>
       <div id="login-status" class="pin-status hidden">Signing in…</div>
@@ -2436,6 +2438,31 @@ function initPin() {
 
   const userInp = $("login-user");
   const pwInp   = $("login-pw-input");
+
+  // Held, not toggled.
+  //
+  // A toggle can be left on: someone checks their typing, signs in, and the
+  // next person to open the laptop finds the box already readable. Holding it
+  // cannot be left anywhere -- let go and it is covered again.
+  //
+  // pointerup and pointercancel are bound to the window rather than the button
+  // because the finger or the mouse is often released somewhere else entirely,
+  // and a release missed outside would leave the password on screen, which is
+  // the one thing this must not do.
+  const eye = $("login-pw-eye");
+  if (eye) {
+    const reveal = on => {
+      pwInp.type = on ? "text" : "password";
+      eye.classList.toggle("is-on", on);
+    };
+    eye.addEventListener("pointerdown", e => { e.preventDefault(); reveal(true); });
+    ["pointerup", "pointercancel", "blur"].forEach(ev =>
+      window.addEventListener(ev, () => reveal(false)));
+    // A keyboard reaches it too: held while the key is down, for the same
+    // reason.
+    eye.addEventListener("keydown", e => { if (e.key === " " || e.key === "Enter") reveal(true); });
+    eye.addEventListener("keyup", () => reveal(false));
+  }
   const err     = $("login-err");
   const status  = $("login-status");
 
