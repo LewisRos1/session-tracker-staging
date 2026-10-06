@@ -4617,35 +4617,44 @@ button.wf-pill:hover { filter: brightness(.93); }
 .mn-pending-no:hover { background: #b91c1c; }
 .mn-pending-btn:disabled { opacity: .4; cursor: not-allowed; }
 
-/* The proposal's own block, under the title row. */
+/* The tag and the two buttons, pinned as a column at the top right.
+   In the flow they ended up wherever the title happened to finish, which is
+   what made them look scattered. Absolute keeps them in one place whatever
+   length the title is, and the card is padded so the text wraps before it
+   reaches them. */
+.mn-pending-card { position: relative; }
+.mn-pending-card > * { padding-right: 11.5rem; }
 .mn-pending-foot {
-  width: 100%;
+  position: absolute;
+  top: .55rem;
+  right: .7rem;
+  width: 10.5rem;
   display: flex;
   flex-direction: column;
-  gap: .4rem;
-  padding: .1rem 2.6rem .5rem;
-  box-sizing: border-box;
+  align-items: stretch;
+  gap: .35rem;
+  padding-right: 0 !important;
+  z-index: 2;
 }
-.mn-pending-bar {
-  display: flex;
-  align-items: center;
-  gap: .5rem;
-  flex-wrap: wrap;
-}
-/* A gap before the buttons, so Approve is never the thing the thumb lands on
-   while reaching for the tag. */
-.mn-pending-actions {
-  display: inline-flex;
-  gap: .5rem;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-/* A sub-activity's row is a single flex line; this lets the block sit under it
-   rather than squeeze in beside the title. */
+.mn-pending-foot .mn-pending-tag { text-align: center; margin-left: 0; }
+.mn-pending-foot .mn-pending-hint { max-width: none; white-space: normal; text-align: center; }
+.mn-pending-details { padding-left: 2.6rem; }
 .mn-sub-compact.mn-pending-card { flex-wrap: wrap; }
-@media (max-width: 560px) {
-  .mn-pending-foot { padding-left: .9rem; padding-right: .6rem; }
-  .mn-pending-actions { margin-left: 0; }
+.mn-sub-compact.mn-pending-card .mn-pending-details { padding-left: 1.6rem; }
+
+@media (max-width: 760px) {
+  /* Not enough width for a column beside the text, so it goes back under it. */
+  .mn-pending-card > * { padding-right: .6rem; }
+  .mn-pending-foot {
+    position: static;
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: .2rem .6rem .5rem 2.6rem !important;
+    box-sizing: border-box;
+  }
+  .mn-pending-foot .mn-pending-btn { flex: 1 1 auto; }
 }
 
 .mn-pending-banner {

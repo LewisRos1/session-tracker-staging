@@ -426,7 +426,15 @@ export function listenToSession(sessionId, callback, onError) {
       // ten-second watchdog on the screen picks it up. That is the right way
       // round: better to say "this is taking a while" than to say the session
       // was deleted when the network is simply down.
-      if (!snap.metadata.fromCache) onError?.(new Error("This session no longer exists."));
+      // Not reported at all, even when the server is the one saying it.
+      //
+      // Claiming a session was deleted is a strong thing to say, and there are
+      // ways to see an empty document that have nothing to do with deletion: a
+      // session created in another browser whose write has not synced yet is
+      // the obvious one. The screen's own watchdog says "this is taking
+      // unusually long" after ten seconds, which is honest about what is known.
+      // Real failures still come through the error callback below.
+      console.warn("listenToSession: no document for", sessionId);
     },
     err => {
       console.error("listenToSession:", err);

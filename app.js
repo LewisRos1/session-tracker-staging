@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2129";
+const APP_VERSION = "2130";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -10879,27 +10879,38 @@ function renderDatePickerCalendar(displayDate, takenDates, today, currentDate) {
  * before.
  */
 function stripPendingFromTarget(t) {
-  const acts = t?.predefinedActivities;
-  if (!Array.isArray(acts) || !acts.some(a => a?._pending)) return t;
+  const acts = Array.isArray(t?.predefinedActivities) ? t.predefinedActivities : null;
+  if (!acts) return t;
+
+  // Proposals live in TWO places depending on who is looking.
+  //
+  // Stored, they sit in their own pendingActivities list. Inside Edit Target
+  // they are merged into predefinedActivities and flagged _pending. This
+  // function only knew about the second, so for every screen outside the editor
+  // -- which is all of them -- it found nothing and did nothing, and a parent
+  // whose sub-activities were all still waiting arrived looking like a parent
+  // with no children. Indistinguishable from a plain activity, so it was drawn
+  // as one, offering a remark box it can never hold.
+  const merged = acts.filter(a => a?._pending);
+  const stored = Array.isArray(t.pendingActivities) ? t.pendingActivities : [];
+  const pending = merged.concat(stored).filter(a => a && !isEmptyActItem(a));
+  if (pending.length === 0) return merged.length ? { ...t, predefinedActivities: acts.filter(a => !a?._pending) } : t;
+
   const kept = acts.filter(a => !a?._pending);
-  // A parent whose sub-activities are all still waiting would otherwise arrive
-  // here looking like a parent with no children, which is indistinguishable
-  // from a plain activity -- and a parent rendered as a plain activity offers a
-  // remark box it can never hold. The count of what was removed travels with
-  // the copy so the screen can say what is actually going on.
-  const pendingSubs = acts.filter(a => a?._pending && a.parentActivity);
-  if (pendingSubs.length) {
-    return {
-      ...t,
-      predefinedActivities: kept.map(a => {
-        if (!a || a.parentActivity) return a;
-        const key = a._linkKey || a.title || a.name;
-        const n = key ? pendingSubs.filter(x => x.parentActivity === key).length : 0;
-        return n ? { ...a, _pendingSubs: n } : a;
-      }),
-    };
-  }
-  return { ...t, predefinedActivities: kept };
+  const pendingSubs = pending.filter(a => a.parentActivity);
+  if (pendingSubs.length === 0) return { ...t, predefinedActivities: kept };
+
+  // The count of what is being held back travels with the copy, so the screen
+  // can say what is actually going on instead of guessing from an empty list.
+  return {
+    ...t,
+    predefinedActivities: kept.map(a => {
+      if (!a || a.parentActivity) return a;
+      const key = a._linkKey || a.title || a.name;
+      const n = key ? pendingSubs.filter(x => x.parentActivity === key).length : 0;
+      return n ? { ...a, _pendingSubs: n } : a;
+    }),
+  };
 }
 
 function getEffectiveTargets() {
@@ -14828,11 +14839,15 @@ function approvalNoticesFor(instId) {
  * the editor.
  */
 function buildPendingFooter(item, idx, blockedHint) {
-  const wrap = document.createElement("div");
-  wrap.className = "mn-pending-foot";
+  // Returns two nodes. The details belong with the text, down the left; the
+  // tag and the two buttons are pinned in a column at the top right, and the
+  // card is padded so the text wraps before it reaches them. Laid out in the
+  // flow they ended up wherever the title happened to finish, which is why they
+  // looked scattered.
+  const out = document.createDocumentFragment();
 
   // Shown rather than folded away: a proposal is being read in order to be
-  // judged, and the detail is the thing being judged. Not truncated for the
+  // judged, and the detail is the thing being judged. Not truncated, for the
   // same reason.
   const detail = (item.isHeading || item.isMaintainHeading) ? ""
     : (item.isNote || item.isExportNote) ? (noteParts(item).details || "")
@@ -14841,21 +14856,19 @@ function buildPendingFooter(item, idx, blockedHint) {
     const d = document.createElement("div");
     d.className = "mn-pending-details";
     d.innerHTML = formatActivityMarkup(detail);
-    wrap.appendChild(d);
+    out.appendChild(d);
   }
 
-  const bar = document.createElement("div");
-  bar.className = "mn-pending-bar";
-  bar.innerHTML = `
+  const col = document.createElement("div");
+  col.className = "mn-pending-foot";
+  col.innerHTML = `
     <span class="mn-pending-tag">Waiting for approval</span>
     ${canApprove() ? `
       ${blockedHint ? `<span class="mn-pending-hint">${blockedHint}</span>` : ``}
-      <span class="mn-pending-actions">
-        <button class="mn-pending-btn mn-pending-ok" data-pending-idx="${idx}"${blockedHint ? " disabled" : ""}>✓ Approve</button>
-        <button class="mn-pending-btn mn-pending-no" data-pending-idx="${idx}">✗ Reject &amp; Delete</button>
-      </span>` : ``}`;
-  wrap.appendChild(bar);
-  return wrap;
+      <button class="mn-pending-btn mn-pending-ok" data-pending-idx="${idx}"${blockedHint ? " disabled" : ""}>✓ Approve</button>
+      <button class="mn-pending-btn mn-pending-no" data-pending-idx="${idx}">✗ Reject &amp; Delete</button>` : ``}`;
+  out.appendChild(col);
+  return out;
 }
 
 /** Stamp an entry as somebody's proposal. */
