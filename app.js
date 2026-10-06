@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2103";
+const APP_VERSION = "2104";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -10888,7 +10888,17 @@ async function openSession(student, existingSessionId = null, dateStr = null, pa
       updateSessionParticipants(sessionId, participants).catch(() => {});
     }
 
+    // A watchdog, not a retry. Every known way this hangs is fixed above, so
+    // anything still sitting here after ten seconds is something we have not
+    // seen -- and a message that admits it beats a spinner that never stops.
+    const _loadWatchdog = setTimeout(() => {
+      if (state.currentSessionId === sessionId && state.sessionData === null) {
+        $("target-content").innerHTML = sessionLoadFailedHtml(new Error("It is taking unusually long."));
+      }
+    }, 10000);
+
     state.fbUnsubscribe = listenToSession(sessionId, async data => {
+      clearTimeout(_loadWatchdog);
       const firstLoad = state.sessionData === null;
       // Strip orphan extra activities from EVERY incoming snapshot (empty name
       // + no substantive remarks) before storing in state — prevents pre-existing
@@ -11011,11 +11021,15 @@ async function openSession(student, existingSessionId = null, dateStr = null, pa
           else { renderTargetContent(); }
         }, 0);
       }
+    }, err => {
+      clearTimeout(_loadWatchdog);
+      if (state.currentSessionId === sessionId) {
+        $("target-content").innerHTML = sessionLoadFailedHtml(err);
+      }
     });
 
   } catch (err) {
-    $("target-content").innerHTML =
-      `<div class="error-msg">Could not load session.<br>${escHtml(err.message)}</div>`;
+    $("target-content").innerHTML = sessionLoadFailedHtml(err);
   }
 }
 
@@ -14188,10 +14202,13 @@ async function openSessionView(student, sessionId) {
           }
         }, 250);
       }
+    }, err => {
+      if (state.viewSessionId === sessionId) {
+        $("session-view-body").innerHTML = sessionLoadFailedHtml(err);
+      }
     });
   } catch (err) {
-    $("session-view-body").innerHTML =
-      `<div class="error-msg">Could not load session.<br>${escHtml(err.message)}</div>`;
+    $("session-view-body").innerHTML = sessionLoadFailedHtml(err);
   }
 }
 
@@ -17451,10 +17468,13 @@ async function openGroupSessionView(group, sessionId) {
           }
         }, 250);
       }
+    }, err => {
+      if (state.viewGroupSessionId === sessionId) {
+        $("group-session-view-body").innerHTML = sessionLoadFailedHtml(err);
+      }
     });
   } catch (err) {
-    $("group-session-view-body").innerHTML =
-      `<div class="error-msg">Could not load session.<br>${escHtml(err.message)}</div>`;
+    $("group-session-view-body").innerHTML = sessionLoadFailedHtml(err);
   }
 }
 
@@ -25883,7 +25903,15 @@ async function openGroupSession(group, dateStr, attendees, participants = null) 
     state.groupSessionId = sid;
     if (participants) updateSessionParticipants(sid, participants).catch(() => {});
     let firstLoad = true;
+    // Same watchdog as the individual entry screen; see the note there.
+    const _grpLoadWatchdog = setTimeout(() => {
+      if (state.groupSessionId === sid && state.groupSessionData === null) {
+        $("group-target-content").innerHTML = sessionLoadFailedHtml(new Error("It is taking unusually long."));
+      }
+    }, 10000);
+
     state.fbGroupUnsubscribe = listenToSession(sid, async data => {
+      clearTimeout(_grpLoadWatchdog);
       state.groupSessionData = data;
       renderGroupSessionHeader(data);
       if (firstLoad) {
@@ -25929,10 +25957,17 @@ async function openGroupSession(group, dateStr, attendees, participants = null) 
         if (isGroupEntryBusy()) { state.groupRenderPending = true; }
         else { try { renderGroupTargetContent(); } catch (e) { console.error("renderGroupTargetContent (snap):", e); } }
       }, 0);
+    }, err => {
+      clearTimeout(_grpLoadWatchdog);
+      if (state.groupSessionId === sid) {
+        $("group-target-content").innerHTML = sessionLoadFailedHtml(err);
+      }
     });
   } catch (err) {
-    alert("Error opening session: " + err.message);
-    showHome();
+    // Was an alert that then threw you back to the home screen, losing the
+    // session you were trying to open. The message belongs on the screen it
+    // is about, the same as everywhere else.
+    $("group-target-content").innerHTML = sessionLoadFailedHtml(err);
   }
 }
 
@@ -28097,6 +28132,23 @@ function findActivityByName(targetName, activityName, parentActivity = null, con
 }
 
 // ─── UTILITIES ───────────────────────────────────────────────
+
+/**
+ * What a screen shows when its session never arrives.
+ *
+ * Reload rather than a cleverer retry: by the time this appears the listener
+ * has already failed or the document has gone, and re-running the same call
+ * on the same state is the least likely thing to behave differently.
+ */
+function sessionLoadFailedHtml(err) {
+  const msg = err?.message || "Something went wrong.";
+  return `<div class="error-msg" style="padding:1.5rem;text-align:center;line-height:1.6">
+    Could not load this session.<br>
+    <span style="font-size:.85rem;opacity:.8">${escHtml(msg)}</span><br>
+    <button class="btn-primary-sm" style="margin-top:.9rem;padding:.45rem 1.4rem"
+      onclick="location.reload()">Reload</button>
+  </div>`;
+}
 
 function escHtml(str) {
   return String(str ?? "")

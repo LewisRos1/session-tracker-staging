@@ -196,7 +196,9 @@ export async function getOrCreateTodaySession(studentId, targets = []) {
     fullName:            t.fullName || ""
   }));
 
-  const ref = await addDoc(collection(db, "sessions"), {
+  // Not awaited, for the reason spelled out in getOrCreateSessionForDate.
+  const ref = doc(collection(db, "sessions"));
+  setDoc(ref, {
     studentId,
     date: today,
     month,
@@ -207,7 +209,7 @@ export async function getOrCreateTodaySession(studentId, targets = []) {
     fedcComments: {},
     targetsSnapshot,
     createdAt: serverTimestamp()
-  });
+  }).catch(err => console.error("session create failed to sync:", err));
   return ref.id;
 }
 
@@ -369,24 +371,31 @@ export async function getOrCreateSessionForDate(studentId, dateStr, targets = []
     notes: t.notes || [], hasComment: t.hasComment || false, fullName: t.fullName || ""
   }));
 
-  let ref;
-  try {
-    ref = await addDoc(collection(db, "sessions"), {
-      studentId, date: dateStr, month, sessionNumber,
-      finished: false, activities: {}, remarks: {}, fedcComments: {},
-      targetsSnapshot, createdAt: serverTimestamp()
-    });
-  } catch (err) {
-    // Firebase offline-persistence can replay a stale queued write and get
-    // "Document already exists" if another tab or a prior sync already landed
-    // the doc on the server. Recover by re-fetching to return the real ID.
-    if (err.message?.includes("Document already exists")) {
-      const refetched = await getIndividualSessionsForStudent(studentId);
-      const found = refetched.find(s => s.date === dateStr);
-      if (found) return found.id;
-    }
-    throw err;
-  }
+  // The write is NOT awaited, and that is the whole point.
+  //
+  // A Firestore write promise settles only when the SERVER acknowledges it.
+  // Offline, or on a connection that drops for a moment, it simply never
+  // settles: it does not reject, it waits. Awaiting it here meant that opening
+  // a date with no session yet could sit on "Loading…" indefinitely, while
+  // opening a date that already had one was instant, because that path returns
+  // before ever reaching a write. That is exactly the "sometimes it hangs"
+  // shape people were seeing.
+  //
+  // The id is generated locally, so it is known before the write leaves the
+  // machine, and persistence applies the document to the local cache straight
+  // away. The listener that follows therefore gets its first snapshot
+  // immediately and the screen draws. Firestore syncs it when the network
+  // returns, and the queue survives a reload.
+  //
+  // The old "Document already exists" recovery went with it: that could only
+  // happen when the server picked the id, and a locally generated one is new
+  // by construction.
+  const ref = doc(collection(db, "sessions"));
+  setDoc(ref, {
+    studentId, date: dateStr, month, sessionNumber,
+    finished: false, activities: {}, remarks: {}, fedcComments: {},
+    targetsSnapshot, createdAt: serverTimestamp()
+  }).catch(err => console.error("session create failed to sync:", err));
   return ref.id;
 }
 
@@ -394,10 +403,21 @@ export async function getOrCreateSessionForDate(studentId, dateStr, targets = []
  * Real-time listener for a session document.
  * Returns unsubscribe function.
  */
-export function listenToSession(sessionId, callback) {
-  return onSnapshot(doc(db, "sessions", sessionId), snap => {
-    if (snap.exists()) callback(snap.data());
-  });
+export function listenToSession(sessionId, callback, onError) {
+  // onError matters as much as the callback. Without it, a listener that fails
+  // -- rules rejecting the read, a session deleted from another device, a
+  // malformed id -- did nothing at all: no throw, no callback, no complaint.
+  // The screen that was waiting for the first snapshot simply waited forever,
+  // and "Loading…" was the only thing anyone ever saw.
+  return onSnapshot(doc(db, "sessions", sessionId),
+    snap => {
+      if (snap.exists()) callback(snap.data());
+      else onError?.(new Error("This session no longer exists."));
+    },
+    err => {
+      console.error("listenToSession:", err);
+      onError?.(err);
+    });
 }
 
 /** Mark session as finished. */
@@ -1345,22 +1365,14 @@ export async function getOrCreateGroupSessionForDate(groupId, dateStr, targets =
     predefinedActivities: t.predefinedActivities || [],
     notes: t.notes || [], hasComment: t.hasComment || false, fullName: t.fullName || ""
   }));
-  let ref;
-  try {
-    ref = await addDoc(collection(db, "sessions"), {
-      groupId, date: dateStr, month, sessionNumber, attendees,
-      attendeeIds: linkedIds, attendeePersonalSessionNumbers,
-      finished: false, activities: {}, remarks: {}, fedcComments: {},
-      targetsSnapshot, createdAt: serverTimestamp()
-    });
-  } catch (err) {
-    if (err.message?.includes("Document already exists")) {
-      const refetchedSnap = await getDocs(query(collection(db, "sessions"), where("groupId", "==", groupId)));
-      const refetchedDoc  = refetchedSnap.docs.find(d => d.data().date === dateStr);
-      if (refetchedDoc) return refetchedDoc.id;
-    }
-    throw err;
-  }
+  // Not awaited, for the reason spelled out in getOrCreateSessionForDate.
+  const ref = doc(collection(db, "sessions"));
+  setDoc(ref, {
+    groupId, date: dateStr, month, sessionNumber, attendees,
+    attendeeIds: linkedIds, attendeePersonalSessionNumbers,
+    finished: false, activities: {}, remarks: {}, fedcComments: {},
+    targetsSnapshot, createdAt: serverTimestamp()
+  }).catch(err => console.error("group session create failed to sync:", err));
   return ref.id;
 }
 
