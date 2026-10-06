@@ -205,7 +205,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2144";
+const APP_VERSION = "2145";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -2798,10 +2798,10 @@ function renderStudentDatabaseButton() {
     <button class="export-btn" id="btn-open-ai-report">AI Report Generator</button>
     <button class="export-btn" id="btn-open-score-settings">Score Settings</button>
   </div>`;
-  // Adding, renaming, deleting and re-noting students is everything this
-  // screen does, and none of it is an assistant's to do.
-  $("btn-open-student-registry").addEventListener("click", () =>
-    requirePassword(() => openStudentRegistryScreen(), EXPORT_MSG));
+  // Open to everyone: reading the list is useful and harmless. Every control
+  // on the screen is locked instead, which is the difference between looking
+  // something up and changing it.
+  $("btn-open-student-registry").addEventListener("click", () => openStudentRegistryScreen());
   // Behind the same password as Edit Target: the scale it sets decides every
   // score in the app, so it is not something to wander into.
   $("btn-open-score-settings").addEventListener("click", () =>
@@ -3375,6 +3375,42 @@ function genderSelectHtml(s) {
   </select>`;
 }
 
+/**
+ * The Student Database, read-only for an assistant.
+ *
+ * Selects and the delete button are properly disabled, because a half-working
+ * dropdown is worse than one that plainly does nothing. Text boxes are left
+ * clickable but read-only so that clicking one can say why, and the rows and
+ * the Add button do the same. Between them, everything anyone would actually
+ * reach for explains itself.
+ */
+function applyRegistryReadOnly() {
+  if (!proposesOnly()) return;
+  const body = $("student-registry-body");
+  if (!body) return;
+
+  body.querySelectorAll("select, .db-del-student").forEach(el => {
+    el.disabled = true;
+    el.classList.add("mn-locked-field");
+  });
+  body.querySelectorAll("input, textarea").forEach(el => {
+    el.readOnly = true;
+    el.classList.add("mn-locked-field");
+  });
+  $("btn-add-student-row")?.classList.add("mn-locked-field");
+
+  if (body._regLockWired) return;
+  body._regLockWired = true;
+  // Capture, so it runs before the field's own handler rather than after it.
+  body.addEventListener("click", e => {
+    if (!proposesOnly()) return;
+    if (!e.target.closest(".mn-locked-field")) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    requirePassword(() => {}, EXPORT_MSG);
+  }, true);
+}
+
 async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
   const body = $("student-registry-body");
   if (!body) return;
@@ -3454,7 +3490,9 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
   $("student-registry-body").querySelectorAll(".reg-indiv-num").forEach(cell => {
     cell.addEventListener("click", () => {
       const s = state.students.find(x => x.id === cell.dataset.id);
-      if (s) openManageModal(s);
+      // The student's own page is where renaming, session numbering and
+      // deletion live, so it is the gate rather than the screen behind it.
+      if (s) requirePassword(() => openManageModal(s), EXPORT_MSG);
     });
   });
 
@@ -3583,7 +3621,9 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
     });
   });
 
-  $("btn-add-student-row").addEventListener("click", startAddStudentRow);
+  $("btn-add-student-row").addEventListener("click", () =>
+    requirePassword(startAddStudentRow, EXPORT_MSG));
+  applyRegistryReadOnly();
 
   if (highlightAdd) {
     const btn = $("btn-add-student-row");
@@ -4245,8 +4285,13 @@ function renderExportButtons() {
     });
   };
   wire("btn-export-all-trials", "Backup All Excel (ZIP)", true);
-  $("btn-data-integrity-check").addEventListener("click", runDataIntegrityCheck);
-  $("btn-recently-deleted").addEventListener("click", renderRecentlyDeleted);
+  // The whole "FOR LEWIS (IT) USE" row is locked. Recently Deleted can
+  // restore and permanently destroy; the integrity check writes nothing but
+  // reports on data an assistant has no business reading through.
+  $("btn-data-integrity-check").addEventListener("click", () =>
+    requirePassword(runDataIntegrityCheck, EXPORT_MSG));
+  $("btn-recently-deleted").addEventListener("click", () =>
+    requirePassword(renderRecentlyDeleted, EXPORT_MSG));
   $("btn-hyr-settings").addEventListener("click", hyrOpenSettings);
 }
 
