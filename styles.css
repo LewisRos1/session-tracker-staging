@@ -745,18 +745,15 @@ html, body {
    purple block, and hover is restated because this rule would otherwise sit
    on top of it. */
 .date-picker-day-today:not(.date-picker-day-current) {
-  background: #6b7280;
-  color: #fff;
+  /* Indigo 200: the app's own blue, two steps lighter than --primary. Grey was
+     the one colour on this screen that belonged to nothing else. */
+  background: #c7d2fe;
+  color: var(--text-main);
 }
-/* The tick is purple on the pale cells, which would go muddy on this one. */
-.date-picker-day-today:not(.date-picker-day-current) .date-taken-dot {
-  color: #fff;
-}
-/* Hovering darkens it further. The shared hover is a pale purple, which made
-   today the one cell in the grid that got LIGHTER under the cursor, and the
-   text had to flip back to dark with it. */
+/* Darker on hover, and still well clear of the solid --primary the SELECTED day
+   uses, so a hovered today is never mistaken for the day you picked. */
 .date-picker-day-today:not(.date-picker-day-current):hover {
-  background: #4b5563;
+  background: #a5b4fc;
 }
 .date-picker-day-future { color: #bbb; cursor: default; }
 .date-picker-day-taken  { cursor: default; }
