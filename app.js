@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2125";
+const APP_VERSION = "2126";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -14644,7 +14644,12 @@ const canApprove = () => {
  */
 function mergePendingForEdit(target) {
   if (!target || target._pendingMerged) return target;
-  const pend   = Array.isArray(target.pendingActivities) ? target.pendingActivities : [];
+  // Blank leftovers are dropped on the way in rather than merged back. They can
+  // only come from an editor that was closed before anything was typed, and
+  // carrying them forward is what let a target claim it had something waiting
+  // when it had nothing to show.
+  const pend   = (Array.isArray(target.pendingActivities) ? target.pendingActivities : [])
+    .filter(a => a && !isEmptyActItem(a));
   const merged = (target.predefinedActivities || []).slice();
   pend
     .slice()
@@ -14793,13 +14798,23 @@ function markAsProposal(item) {
   return item;
 }
 
-/** How many proposals a target is carrying, without opening it. */
+/**
+ * How many proposals a target is carrying, without opening it.
+ *
+ * An entry with nothing written in it is not counted. Adding an activity
+ * creates the row before anything has been typed into it, so backing out of
+ * the editor could leave a blank proposal behind -- which announced itself on
+ * the target, raised a task for Ms. Daisy, and then showed her an Edit Target
+ * with nothing in it, because an empty row is cleaned off the list on close.
+ * Counting what is actually there keeps the two in step whichever way the
+ * editor was left.
+ */
 function pendingCountForTarget(target) {
   if (!target) return 0;
-  if (target._pendingMerged) {
-    return (target.predefinedActivities || []).filter(a => a?._pending).length;
-  }
-  return (target.pendingActivities || []).length;
+  const list = target._pendingMerged
+    ? (target.predefinedActivities || []).filter(a => a?._pending)
+    : (target.pendingActivities || []);
+  return list.filter(a => a && !isEmptyActItem(a)).length;
 }
 
 /** How many a whole student or group is carrying. */
@@ -20046,8 +20061,16 @@ async function closeManageModal() {
       if (a.name && a.title && a.name.trim() === a.title.trim()) a.name = "";
     });
 
-    // Block close if any newly-created parent activity still has no title.
-    const blankParentIdx = acts.findIndex(a => a._linkKey && !(a.title || "").trim());
+    // Block close if a newly-created parent still has no title AND something
+    // real is hanging off it: those sub-activities need a name to sit under.
+    //
+    // A parent with nothing but blank sub-activities is not held back. It is a
+    // "+ Add Parent Activity" that was never filled in, and demanding a title
+    // for something about to be thrown away is asking for work to be done on
+    // rubbish. The cleanup below removes the whole family instead.
+    const blankParentIdx = acts.findIndex(a =>
+      a._linkKey && !(a.title || "").trim()
+      && acts.some(sub => sub !== a && sub.parentActivity === a._linkKey && !isEmptyActItem(sub)));
     if (blankParentIdx !== -1) {
       $("manage-modal").classList.remove("hidden");
       _groupForTargetEdit = _savedGroupForTargetEdit;
@@ -22602,7 +22625,10 @@ function renderTargetManageContent(student, target) {
   _mnPanelHost = {
     acts,
     rerender: () => renderTargetManageContent(student, target),
-    flushSave: async () => { const i = student.targets.findIndex(t => t.id === target.id); if (i >= 0) student.targets[i] = target;
+    // splitPendingTarget for the same reason saveTarget uses it: handing the
+    // editor's merged copy back would put proposals into the object the rest of
+    // the app reads.
+    flushSave: async () => { const i = student.targets.findIndex(t => t.id === target.id); if (i >= 0) student.targets[i] = splitPendingTarget(target);
       if (_groupForTargetEdit) { const gi = state.groups.findIndex(g => g.id === _groupForTargetEdit.id); if (gi >= 0) state.groups[gi] = _groupForTargetEdit; await saveGroup(_groupForTargetEdit); }
       else { const si = state.students.findIndex(s => s.id === student.id); if (si >= 0) state.students[si] = student; await saveStudent(student); } },
     student, target
