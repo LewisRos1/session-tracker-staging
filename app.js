@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2107";
+const APP_VERSION = "2108";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -11186,23 +11186,6 @@ function sortTargetsByOrder(targets) {
   return [...targets].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
 }
 
-/**
- * The count for the target on screen.
- *
- * Spelled out where there is room and reduced to a number where there is not:
- * on a phone the header already holds a label, a dropdown and two buttons, and
- * a sentence here would push the dropdown onto its own line.
- */
-function renderTargetPendingPill(target) {
-  const el = $("target-pending-pill");
-  if (!el) return;
-  const n = pendingCountForTarget(target);
-  el.classList.toggle("hidden", n === 0);
-  if (n === 0) return;
-  el.innerHTML = `<span class="tpp-long">(${n} item${n === 1 ? "" : "s"} waiting for approval)</span>`
-               + `<span class="tpp-short">(${n})</span>`;
-}
-
 function populateTargetDropdown(targets) {
   const sel = $("target-select");
   const sorted = sortTargetsByOrder(targets).filter(t => !t.discontinuedOn);
@@ -11212,19 +11195,26 @@ function populateTargetDropdown(targets) {
   if (!state._targetSelDown) {
     const placeholder = sorted.length === 0
       ? `<option value="" disabled selected>— no targets yet —</option>` : "";
-    // The count rides in the option text because a <select> cannot carry a
-    // styled badge. It is the only way to see, from the closed list, WHICH
-    // target is waiting -- which is the thing that would otherwise mean opening
-    // every one of them.
+    // The whole count sits on the option, beside the target it belongs to.
+    // That is the only place it answers the question actually being asked --
+    // WHICH target needs looking at -- so reading the open list is enough and
+    // no target has to be visited to find out.
+    //
+    // An <option> is plain text, so the short form on a narrow screen is chosen
+    // here rather than by CSS. Measured at build time: the dropdown is rebuilt
+    // on every render of the screen, so it follows a rotation soon enough.
+    const shortForm = window.innerWidth <= 760;
     sel.innerHTML = placeholder +
       sorted.map(t => {
         const n = pendingCountForTarget(t);
-        return `<option value="${escHtml(t.name)}">${escHtml(t.name)}${n ? ` (${n})` : ""}</option>`;
+        const tally = !n ? ""
+          : shortForm ? ` (${n})`
+          : ` (${n} item${n === 1 ? "" : "s"} waiting for approval)`;
+        return `<option value="${escHtml(t.name)}">${escHtml(t.name)}${tally}</option>`;
       }).join("") + `<option value="__add_target__">+ Add Target…</option>`;
 
     sel.value = state.selectedTargetName || sorted[0]?.name || "";
   }
-  renderTargetPendingPill(sorted.find(t => t.name === sel.value));
 
   const editInstBtn2 = $("btn-entry-edit-instructors");
   if (editInstBtn2) {

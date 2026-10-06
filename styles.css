@@ -4651,25 +4651,6 @@ button.wf-pill:hover { filter: brightness(.93); }
    section rail is drawn from data-sec-* on the rows that remain. */
 .mn-hidden-by-pending { display: none !important; }
 
-/* Count of proposals on the selected target. Green, because it is a prompt to
-   look rather than a warning. */
-.target-pending-pill {
-  font-size: .76rem;
-  font-weight: 700;
-  color: #065f46;
-  background: #d1fae5;
-  border: 1px solid #10b981;
-  border-radius: .35rem;
-  padding: .2rem .5rem;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-.target-pending-pill .tpp-short { display: none; }
-@media (max-width: 760px) {
-  /* The header already carries a label, a dropdown and two buttons. */
-  .target-pending-pill .tpp-long  { display: none; }
-  .target-pending-pill .tpp-short { display: inline; }
-}
 
 /* ── Approval tasks in the To Do list ─────────────────────── */
 .todo-approval-block { margin-bottom: .65rem; }
