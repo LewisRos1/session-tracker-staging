@@ -411,8 +411,22 @@ export function listenToSession(sessionId, callback, onError) {
   // and "Loading…" was the only thing anyone ever saw.
   return onSnapshot(doc(db, "sessions", sessionId),
     snap => {
-      if (snap.exists()) callback(snap.data());
-      else onError?.(new Error("This session no longer exists."));
+      if (snap.exists()) { callback(snap.data()); return; }
+      // An empty snapshot is not proof of anything until the server says so.
+      //
+      // With offline persistence on, a listener for a document this browser has
+      // never seen fires immediately with an empty snapshot marked fromCache,
+      // and only then goes to the server. Reporting that as "gone" turned the
+      // ordinary case -- a second person opening a session for the first time --
+      // into an error on their screen. The old code ignored every empty
+      // snapshot and so never had this problem; it also never reported a real
+      // deletion, which is what onError was added for.
+      //
+      // Offline, with nothing cached, nothing is reported at all and the
+      // ten-second watchdog on the screen picks it up. That is the right way
+      // round: better to say "this is taking a while" than to say the session
+      // was deleted when the network is simply down.
+      if (!snap.metadata.fromCache) onError?.(new Error("This session no longer exists."));
     },
     err => {
       console.error("listenToSession:", err);
