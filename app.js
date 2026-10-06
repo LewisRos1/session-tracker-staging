@@ -205,7 +205,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2140";
+const APP_VERSION = "2141";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -14985,6 +14985,76 @@ function watchConfigForOpenSession(isGroup) {
   });
 }
 
+/**
+ * The lock, shown over Edit Target.
+ *
+ * requirePassword writes into the modal's body, which is where the target's
+ * whole list lives -- using it here would wipe the screen the message is about.
+ * This lays an overlay over whatever is in front instead: the floating activity
+ * panel if one is open, the modal sheet otherwise.
+ */
+function showEditTargetLock(msg) {
+  const panelEl = document.getElementById("mn-act-panel-overlay");
+  const onPanel = panelEl && panelEl.style.display !== "none";
+  const host = onPanel ? panelEl : $("manage-modal")?.querySelector(".modal-sheet");
+  if (!host) return;
+  host.querySelectorAll("[data-lock-overlay]").forEach(el => el.remove());
+  if (!onPanel) host.style.position = "relative";
+  const overlay = document.createElement("div");
+  overlay.dataset.lockOverlay = "1";
+  overlay.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding-top:2rem;z-index:400;border-radius:.75rem;overflow-y:auto";
+  overlay.innerHTML = `<div style="background:#fff;padding:1.5rem 1.25rem;border-radius:.75rem;width:min(320px,92%);box-shadow:0 4px 24px rgba(0,0,0,.25);display:flex;flex-direction:column;align-items:center;gap:.9rem;margin-bottom:1rem">
+      <div style="font-size:2rem;line-height:1">🔒</div>
+      <div style="font-size:.9rem;color:#111;text-align:center;line-height:1.55">${escHtml(msg)}</div>
+      <button class="btn-primary-sm" data-lock-ok style="padding:.5rem 1.75rem">OK</button>
+    </div>`;
+  host.appendChild(overlay);
+  overlay.querySelector("[data-lock-ok]").addEventListener("click", () => overlay.remove());
+}
+
+/**
+ * Everything in a kebab that changes something already live.
+ *
+ * An assistant may propose; she may not alter what has been approved. Her own
+ * proposals are exempt -- Delete on one of those is how she withdraws it, and
+ * it is the only way she has.
+ */
+const LIVE_ONLY_MENU_ITEMS = [
+  ".mn-km-status-btn", ".mn-sub-km-status-btn",
+  ".mn-km-move-to-parent", ".mn-move-sub-act", ".mn-make-standalone",
+  ".mn-km-add-sub", ".mn-del-sub-act",
+  ".mn-hkm-color-toggle", ".mn-hkm-opt",
+  // Delete Activity shares .mn-km-opt with other entries, so it is picked out
+  // by its action rather than by a class of its own.
+  ".mn-km-opt[data-action='delete']",
+].join(", ");
+
+/**
+ * One capture listener on the modal body, which always runs before a listener
+ * on the button itself, so the real handler never starts. Registered once and
+ * fed the current list through the element, because the body survives every
+ * re-render and adding it each time would stack them up.
+ */
+function wireAssistantMenuLock(bodyEl, acts) {
+  if (!bodyEl) return;
+  bodyEl._mnActs = acts;
+  if (bodyEl._mnLockWired) return;
+  bodyEl._mnLockWired = true;
+  bodyEl.addEventListener("click", e => {
+    if (!proposesOnly()) return;
+    const btn = e.target.closest(LIVE_ONLY_MENU_ITEMS);
+    if (!btn) return;
+    const idx = Number(btn.dataset.idx);
+    const item = bodyEl._mnActs?.[idx];
+    if (item?._pending) return;   // her own proposal; Delete must still work
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    bodyEl.querySelectorAll(".mn-kebab-menu, .mn-sub-kebab-menu, .mn-inactive-km, .mn-heading-color-menu")
+      .forEach(m => { m.style.display = "none"; });
+    showEditTargetLock("Locked. Only Ms. Daisy can perform these functions.");
+  }, true);
+}
+
 /** Stamp an entry as somebody's proposal. */
 function markAsProposal(item) {
   item._pending   = true;
@@ -22824,6 +22894,7 @@ function renderTargetManageContent(student, target) {
   // listener is bound, so every handler below finds them in their final home.
   mnRegroupInactiveCards($("manage-modal-body"), acts);
   mnInitActivityCollapse($("manage-modal-body"), acts);
+  wireAssistantMenuLock($("manage-modal-body"), acts);
   $("manage-modal-body").querySelectorAll(".admin-list-item textarea").forEach(autoResizeTextarea);
 
   _pendingActsCleanup = { acts, save: saveTarget };
@@ -25806,6 +25877,7 @@ function renderTemplateManageContent(template) {
   // See renderTargetManageContent — relocate before listeners are bound.
   mnRegroupInactiveCards($("manage-modal-body"), acts);
   mnInitActivityCollapse($("manage-modal-body"), acts);
+  wireAssistantMenuLock($("manage-modal-body"), acts);
   $("manage-modal-body").querySelectorAll(".admin-list-item textarea").forEach(autoResizeTextarea);
 
   const saveTemplateFn = async () => {

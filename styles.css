@@ -4678,7 +4678,7 @@ button.wf-pill:hover { filter: brightness(.93); }
    which not every browser this runs on understands. Only when the buttons are
    actually there: with just the tag, the reserved height would be empty
    space. */
-.mn-pending-card.mn-pending-decide { min-height: 7.4rem; }
+.mn-pending-card.mn-pending-decide { min-height: 8.1rem; }
 .mn-pending-foot .mn-pending-hint { max-width: none; white-space: normal; text-align: center; }
 
 /* Same size as the title it sits under, with a gap above so the two read as
