@@ -205,7 +205,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2143";
+const APP_VERSION = "2144";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -9992,13 +9992,16 @@ function showStudentChoice(student) {
   // Archiving only takes someone off the home list. Their sessions, targets,
   // reports, exports and backups are all untouched, which is why this needs no
   // warning: it is a tidying-up, not a deletion.
-  $("session-picker-list").querySelector(".choice-archive").addEventListener("click", async () => {
-    student.archived = !student.archived;
-    if (!student.archived) delete student.archived;
-    closeSessionPicker();
-    await saveStudent(student).catch(() => {});
-    renderExistingStudentButtons();
-  });
+  // Archiving takes someone off the home list. Not destructive, but to
+  // anyone looking for them it is indistinguishable from their being gone.
+  $("session-picker-list").querySelector(".choice-archive").addEventListener("click", () =>
+    requirePassword(async () => {
+      student.archived = !student.archived;
+      if (!student.archived) delete student.archived;
+      closeSessionPicker();
+      await saveStudent(student).catch(() => {});
+      renderExistingStudentButtons();
+    }, EXPORT_MSG));
 
   $("session-picker-list").querySelector(".choice-export-excel").addEventListener("click", () => {
     requirePassword(() => showExportTrialsChoice(student.name, includeTrials => exportStudentData(student, includeTrials)), EXPORT_MSG);
@@ -21075,7 +21078,16 @@ function initDragSort(listEl, onReorder) {
   }
 
   listEl.addEventListener('pointerdown', e => {
-    if (!e.target.closest('.drag-handle')) return;
+    const handle = e.target.closest('.drag-handle');
+    if (!handle) return;
+    // Locked for this person: the class was styling only, so the drag still
+    // started and approved rows could be reordered by an assistant. Refused
+    // here, where the drag actually begins, rather than left to CSS.
+    if (handle.classList.contains('mn-locked-handle')) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     // Find the direct child of listEl that contains the handle (works for any item class)
     const item = [...listEl.children].find(child => child.contains(e.target));
     if (!item) return;
@@ -26848,13 +26860,16 @@ function showGroupChoice(group) {
 
   // See the note on the individual version: this hides the group from the home
   // list and changes nothing else about it.
-  $("session-picker-list").querySelector(".choice-archive").addEventListener("click", async () => {
-    group.archived = !group.archived;
-    if (!group.archived) delete group.archived;
-    closeSessionPicker();
-    await saveGroup(group).catch(() => {});
-    renderGroupButtons();
-  });
+  // Archiving takes someone off the home list. Not destructive, but to
+  // anyone looking for them it is indistinguishable from their being gone.
+  $("session-picker-list").querySelector(".choice-archive").addEventListener("click", () =>
+    requirePassword(async () => {
+      group.archived = !group.archived;
+      if (!group.archived) delete group.archived;
+      closeSessionPicker();
+      await saveGroup(group).catch(() => {});
+      renderGroupButtons();
+    }, EXPORT_MSG));
 
   $("session-picker-list").querySelector(".choice-export-excel").addEventListener("click", () => {
     showGroupExportStudentPicker(group, "excel");
