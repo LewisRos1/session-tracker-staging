@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2117";
+const APP_VERSION = "2118";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -22449,6 +22449,7 @@ function renderTargetManageContent(student, target) {
       <button class="btn-admin-add" id="btn-mn-add-act" style="flex:0 0 auto;width:auto">+ Add Activity</button>
       <button class="btn-admin-add" id="btn-mn-add-heading" style="flex:0 0 auto;width:auto">+ Add Section Heading</button>
       <button class="btn-admin-add" id="btn-mn-add-note" style="flex:0 0 auto;width:auto">+ Add Note</button>
+      <button class="btn-admin-add" id="btn-mn-add-parent" style="flex:0 0 auto;width:auto">+ Add Parent Activity with Sub-activities</button>
     </div>
     <div style="margin-top:2rem;padding-bottom:1.5rem">
       <button class="btn-primary-sm" id="btn-mn-done-target"
@@ -22816,6 +22817,38 @@ function renderTargetManageContent(student, target) {
     });
   });
 
+  /** Greys out "Add sub-activity" and says why, before it is pressed. */
+  async function markAddSubAvailability(menu, idx) {
+    const item = menu?.querySelector(".mn-km-add-sub");
+    const act  = acts[idx];
+    if (!item || !act || item.dataset.subChecked) return;
+    item.dataset.subChecked = "1";
+    try {
+      const sessions = await getSessionsCached();
+      const n = sessions.filter(sess => {
+        const matchIds = Object.entries(sess.activities || {}).filter(([, a2]) => {
+          if (a2.targetName !== target.name || a2.parentActivity) return false;
+          if (a2.configId && act.id && a2.configId !== act.id) return false;
+          return (act.name && a2.activityName === act.name) || (act.title && a2.activityName === act.title);
+        }).map(([id2]) => id2);
+        return matchIds.some(aid => Object.values(sess.remarks || {}).some(r =>
+          r.activityId === aid && (
+            (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
+            (r.masteryNote || "").trim().length > 0 ||
+            (r.trials || []).some(t => t !== null && t !== -1) ||
+            (r.optionScore !== undefined && r.optionScore !== null))));
+      }).length;
+      if (n === 0) return;
+      item.disabled = true;
+      item.style.opacity = ".5";
+      item.style.cursor = "not-allowed";
+      item.innerHTML = `➕ Add sub-activity`
+        + `<div style="font-size:.74rem;font-style:italic;color:#92400e;margin-top:.15rem;white-space:normal">`
+        + `Not available: this activity has data in ${n} session${n === 1 ? "" : "s"}, and a parent activity holds none of its own.`
+        + `</div>`;
+    } catch { /* leave it enabled; the click still checks properly */ }
+  }
+
   $("manage-modal-body").querySelectorAll(".mn-kebab-btn").forEach(btn => {
     btn.addEventListener("click", e => {
       e.stopPropagation();
@@ -22827,6 +22860,16 @@ function renderTargetManageContent(student, target) {
         menu.style.top    = "100%";
         menu.style.bottom = "auto";
         menu.style.display = "block";
+        // Say up front whether this activity can take sub-activities.
+        //
+        // A parent is a title for the rows beneath it and holds no score or
+        // remark of its own, so an activity that already has session data
+        // cannot become one. That was only discovered on clicking, as a
+        // refusal after the fact. Checked here instead, while the menu is
+        // opening, which is early enough to be useful and rare enough not to
+        // cost a query on every render. The click still re-checks: this is a
+        // label, not the gate.
+        markAddSubAvailability(menu, Number(idx));
         const rect = menu.getBoundingClientRect();
         if (rect.bottom > window.innerHeight - 8) {
           menu.style.top    = "auto";
@@ -23852,6 +23895,53 @@ function renderTargetManageContent(student, target) {
     acts.push(_newHead);
     target.predefinedActivities = acts;
     renderTargetManageContent(student, target);
+    saveTarget().catch(() => {});
+  });
+
+  /**
+   * A parent activity and its first sub-activity, in one go.
+   *
+   * The old route was to add an ordinary activity and then convert it through
+   * the kebab, which only worked if you had not already typed anything into it:
+   * a parent is a title for the rows beneath it and cannot hold a score or a
+   * remark of its own, so an activity with data in it cannot become one. That
+   * rule arrived as a refusal AFTER the work was done. Made this way the thing
+   * is a parent from the moment it exists and the rule never comes up.
+   *
+   * _linkKey is how a parent with no title yet is still something its
+   * sub-activities can point at. The first time a title is typed the subs are
+   * repointed to it and the key is dropped, which is the existing behaviour --
+   * this just gives a brand-new parent one from the start.
+   */
+  $("btn-mn-add-parent").addEventListener("click", () => {
+    const btn = $("btn-mn-add-parent"); if (btn) btn.disabled = true;
+    const _newDate = _groupForTargetEdit
+      ? (state.groupSessionData?.date || todayDateStr())
+      : (state.sessionData?.date || todayDateStr());
+    const linkKey = cfgId("pk");
+    const parent = {
+      id: cfgId("a"), _linkKey: linkKey, title: "", name: "",
+      noRemark: true, order: acts.length, createdOn: todayDateStr(), activeFrom: null,
+    };
+    const sub = {
+      id: cfgId("a"), title: "", name: "", parentActivity: linkKey,
+      order: acts.length + 1, createdOn: todayDateStr(), activeFrom: _newDate,
+    };
+    if (proposesOnly()) { markAsProposal(parent); markAsProposal(sub); }
+    acts.push(parent, sub);
+    acts.forEach((a2, i) => { a2.order = i; });
+    target.predefinedActivities = acts;
+    renderTargetManageContent(student, target);
+    // Straight into the parent's title. It is the one field that must be filled
+    // before the modal will close, and it is what the sub-activities hang off.
+    requestAnimationFrame(() => {
+      const input = $(`mn-act-title-${acts.length - 2}`);
+      if (input) {
+        input.focus();
+        input.classList.add("input-bg-blink");
+        input.addEventListener("animationend", () => input.classList.remove("input-bg-blink"), { once: true });
+      }
+    });
     saveTarget().catch(() => {});
   });
 
