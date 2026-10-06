@@ -4593,26 +4593,60 @@ button.wf-pill:hover { filter: brightness(.93); }
   margin-left: .35rem;
   flex-shrink: 0;
 }
+/* Solid and opposite. Two outlined buttons side by side are told apart by
+   reading them, which is exactly what does not happen when a list is being
+   worked through quickly, and one of the two deletes. */
 .mn-pending-btn {
   border-radius: .4rem;
-  border: 1.5px solid #d1d5db;
-  background: #fff;
+  border: 1.5px solid transparent;
   cursor: pointer;
-  font-size: .76rem;
+  font-size: .78rem;
   font-weight: 700;
   line-height: 1;
   display: inline-flex;
   align-items: center;
   gap: .25rem;
   justify-content: center;
-  padding: .32rem .6rem;
+  padding: .4rem .85rem;
   white-space: nowrap;
+  color: #fff;
 }
-.mn-pending-ok { color: #047857; border-color: #10b981; }
-.mn-pending-ok:hover:not(:disabled) { background: #d1fae5; }
-.mn-pending-no { color: #b91c1c; border-color: #ef4444; }
-.mn-pending-no:hover { background: #fee2e2; }
-.mn-pending-btn:disabled { opacity: .35; cursor: not-allowed; }
+.mn-pending-ok { background: #059669; border-color: #047857; }
+.mn-pending-ok:hover:not(:disabled) { background: #047857; }
+.mn-pending-no { background: #dc2626; border-color: #b91c1c; }
+.mn-pending-no:hover { background: #b91c1c; }
+.mn-pending-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* The proposal's own block, under the title row. */
+.mn-pending-foot {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+  padding: .1rem 2.6rem .5rem;
+  box-sizing: border-box;
+}
+.mn-pending-bar {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex-wrap: wrap;
+}
+/* A gap before the buttons, so Approve is never the thing the thumb lands on
+   while reaching for the tag. */
+.mn-pending-actions {
+  display: inline-flex;
+  gap: .5rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+/* A sub-activity's row is a single flex line; this lets the block sit under it
+   rather than squeeze in beside the title. */
+.mn-sub-compact.mn-pending-card { flex-wrap: wrap; }
+@media (max-width: 560px) {
+  .mn-pending-foot { padding-left: .9rem; padding-right: .6rem; }
+  .mn-pending-actions { margin-left: 0; }
+}
 
 .mn-pending-banner {
   display: flex;
@@ -4844,8 +4878,4 @@ button.wf-pill:hover { filter: brightness(.93); }
   color: #78350f;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  padding: .1rem .2rem .35rem 2.6rem;
-}
-@media (max-width: 560px) {
-  .mn-pending-details { padding-left: .9rem; }
 }

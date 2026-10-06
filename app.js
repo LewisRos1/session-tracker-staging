@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2128";
+const APP_VERSION = "2129";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -10881,7 +10881,25 @@ function renderDatePickerCalendar(displayDate, takenDates, today, currentDate) {
 function stripPendingFromTarget(t) {
   const acts = t?.predefinedActivities;
   if (!Array.isArray(acts) || !acts.some(a => a?._pending)) return t;
-  return { ...t, predefinedActivities: acts.filter(a => !a?._pending) };
+  const kept = acts.filter(a => !a?._pending);
+  // A parent whose sub-activities are all still waiting would otherwise arrive
+  // here looking like a parent with no children, which is indistinguishable
+  // from a plain activity -- and a parent rendered as a plain activity offers a
+  // remark box it can never hold. The count of what was removed travels with
+  // the copy so the screen can say what is actually going on.
+  const pendingSubs = acts.filter(a => a?._pending && a.parentActivity);
+  if (pendingSubs.length) {
+    return {
+      ...t,
+      predefinedActivities: kept.map(a => {
+        if (!a || a.parentActivity) return a;
+        const key = a._linkKey || a.title || a.name;
+        const n = key ? pendingSubs.filter(x => x.parentActivity === key).length : 0;
+        return n ? { ...a, _pendingSubs: n } : a;
+      }),
+    };
+  }
+  return { ...t, predefinedActivities: kept };
 }
 
 function getEffectiveTargets() {
@@ -11822,7 +11840,7 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
             <span class="field-value-fixed"><span style="color:#6b7280;font-weight:600;margin-right:.2rem">${actNum})</span>${paDisplayHtml(pa, true)}</span>
             ${pa.activeFrom ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(pa.activeFrom)}</span>` : ""}
           </div>
-          <div class="empty-parent-note" contenteditable="false">${escHtml(EMPTY_PARENT_NOTE)}</div>
+          <div class="empty-parent-note" contenteditable="false">${escHtml(_ep.awaitingApproval ? PARENT_PENDING_NOTE(_ep.count) : EMPTY_PARENT_NOTE)}</div>
         </div>`;
         return;
       }
@@ -12763,12 +12781,23 @@ function emptyParentInfo(a, acts) {
   const key = a._linkKey || a.title || a.name;
   if (!key) return null;
   const mine = (acts || []).filter(p => p.parentActivity === key);
-  if (mine.length === 0) return null;
+  // Sub-activities exist but none of them are approved yet. Still a parent, and
+  // still not something that can hold a remark, so it is reported here with a
+  // flag that changes only the wording.
+  if (mine.length === 0) {
+    return a._pendingSubs > 0
+      ? { lastDate: null, count: a._pendingSubs, awaitingApproval: true }
+      : null;
+  }
   const retired = p => p.isCompleted || p.isArchived || p.isStopped || p.masteredOn || p.discontinuedOn;
   if (mine.some(p => !retired(p))) return null;
   const dates = mine.map(p => p.masteredOn || p.discontinuedOn).filter(Boolean).sort();
   return { lastDate: dates.length ? dates[dates.length - 1] : null, count: mine.length };
 }
+
+const PARENT_PENDING_NOTE = n =>
+  `${n} sub-activit${n === 1 ? "y" : "ies"} under this parent activity ${n === 1 ? "is" : "are"} `
+  + `waiting for approval, so ${n === 1 ? "it is" : "they are"} not shown here yet.`;
 
 const EMPTY_PARENT_NOTE =
   "All sub-activities under this parent activity have been mastered or discontinued. " +
@@ -14788,6 +14817,45 @@ function approvalNoticesFor(instId) {
   pick(state.students, false);
   pick(state.groups, true);
   return rows.sort((a, b) => (b.notice.at || 0) - (a.notice.at || 0));
+}
+
+/**
+ * The tag, the details and the two decisions, stacked under a proposal.
+ *
+ * They used to share the title row, which left a long title and a block of
+ * details fighting over what was left of it. On their own lines the text gets
+ * the full width, and the buttons are nowhere near the title you click to open
+ * the editor.
+ */
+function buildPendingFooter(item, idx, blockedHint) {
+  const wrap = document.createElement("div");
+  wrap.className = "mn-pending-foot";
+
+  // Shown rather than folded away: a proposal is being read in order to be
+  // judged, and the detail is the thing being judged. Not truncated for the
+  // same reason.
+  const detail = (item.isHeading || item.isMaintainHeading) ? ""
+    : (item.isNote || item.isExportNote) ? (noteParts(item).details || "")
+    : (item.name || "");
+  if (detail.trim()) {
+    const d = document.createElement("div");
+    d.className = "mn-pending-details";
+    d.innerHTML = formatActivityMarkup(detail);
+    wrap.appendChild(d);
+  }
+
+  const bar = document.createElement("div");
+  bar.className = "mn-pending-bar";
+  bar.innerHTML = `
+    <span class="mn-pending-tag">Waiting for approval</span>
+    ${canApprove() ? `
+      ${blockedHint ? `<span class="mn-pending-hint">${blockedHint}</span>` : ``}
+      <span class="mn-pending-actions">
+        <button class="mn-pending-btn mn-pending-ok" data-pending-idx="${idx}"${blockedHint ? " disabled" : ""}>✓ Approve</button>
+        <button class="mn-pending-btn mn-pending-no" data-pending-idx="${idx}">✗ Reject &amp; Delete</button>
+      </span>` : ``}`;
+  wrap.appendChild(bar);
+  return wrap;
 }
 
 /** Stamp an entry as somebody's proposal. */
@@ -21639,7 +21707,6 @@ function mnInitActivityCollapse(bodyEl, acts) {
     // discontinued -- and each builds its HTML somewhere different.
     if (act && act._pending) {
       card.classList.add("mn-pending-card");
-      const tagHost = card.querySelector(":scope > .mn-act-head") || titleEl;
       // The kebab is trimmed, not taken away.
       //
       // Mastering, discontinuing and maintaining are about a live activity and
@@ -21657,56 +21724,17 @@ function mnInitActivityCollapse(bodyEl, acts) {
         .filter(el => !el.closest(".mn-sub-item") && !el.closest(".mn-sub-compact"));
       ownMenu(".mn-km-status-btn, .mn-hkm-color-toggle, .mn-hkm-color-panel, .mn-period-section")
         .forEach(el => { el.style.display = "none"; });
-      if (!tagHost.querySelector(".mn-pending-tag")) {
-        const tag = document.createElement("span");
-        tag.className = "mn-pending-tag";
-        tag.textContent = "Waiting for approval";
-        tagHost.appendChild(tag);
-      }
-      // The details, in full, on the row itself.
-      //
-      // Every other row keeps them folded away behind a click, which is right
-      // when you already know what the activity is. A proposal is the opposite
-      // case: it is being read in order to be judged, and judging it one click
-      // at a time through a floating panel is the slow way to do the only job
-      // this screen has. Not truncated either -- the detail is the thing being
-      // approved.
-      if (!card.querySelector(":scope > .mn-pending-details")) {
-        const detailText = (act.isHeading || act.isMaintainHeading) ? ""
-          : (act.isNote || act.isExportNote) ? (noteParts(act).details || "")
-          : (act.name || "");
-        if (detailText.trim()) {
-          const d = document.createElement("div");
-          d.className = "mn-pending-details";
-          d.innerHTML = formatActivityMarkup(detailText);
-          card.appendChild(d);
-        }
-      }
-
-      if (canApprove() && !tagHost.querySelector(".mn-pending-actions")) {
-        // A heading that is itself unapproved cannot hold anything yet:
-        // approving the activity now would file it under whichever heading
-        // happens to sit above it instead.
+      // A heading that is itself unapproved cannot hold anything yet:
+      // approving the activity now would file it under whichever heading
+      // happens to sit above it instead. The reason is said on the row rather
+      // than in a title attribute, which is no reason at all on a tablet.
+      if (!card.querySelector(":scope > .mn-pending-foot")) {
         const blocker = pendingBlockedByHeading(acts, gi);
-        // Worded, not symbols. A tick and a cross on a row that already
-        // carries a tag read as a status rather than as two buttons, and the
-        // cross deletes -- which is worth saying out loud before it is pressed.
-        //
-        // A greyed-out button with its reason in a title attribute is a button
-        // that looks broken: tooltips do not exist on a tablet and nobody hovers
-        // on a desktop either. The reason is said on the row.
-        const blockerName = blocker
-          ? (blocker.name || blocker.title || "").trim()
+        const bName   = blocker ? (blocker.name || blocker.title || "").trim() : "";
+        const hint = blocker
+          ? `Approve ${bName ? `“${escHtml(truncateWords(bName))}” section heading` : "the section heading above"} first`
           : "";
-        const wrap = document.createElement("span");
-        wrap.className = "mn-pending-actions";
-        wrap.innerHTML = `
-          ${blocker ? `<span class="mn-pending-hint">Approve ${
-            blockerName ? `“${escHtml(truncateWords(blockerName))}” section heading` : "the section heading above"
-          } first</span>` : ``}
-          <button class="mn-pending-btn mn-pending-ok" data-pending-idx="${gi}"${blocker ? " disabled" : ""}>✓ Approve</button>
-          <button class="mn-pending-btn mn-pending-no" data-pending-idx="${gi}">✗ Reject &amp; Delete</button>`;
-        tagHost.appendChild(wrap);
+        card.appendChild(buildPendingFooter(act, gi, hint));
       }
     }
 
@@ -21736,18 +21764,11 @@ function mnInitActivityCollapse(bodyEl, acts) {
     // proposal, and with nothing to approve it by.
     if (sub?._pending) {
       row.classList.add("mn-pending-card");
-      if (!row.querySelector(".mn-pending-tag")) {
-        const tag = document.createElement("span");
-        tag.className = "mn-pending-tag";
-        tag.textContent = "Waiting for approval";
-        tag.style.marginLeft = "auto";
-        row.appendChild(tag);
-      }
       // Status actions assume a live row; the sub's own kebab keeps the rest.
       row.querySelectorAll(".mn-km-status-btn").forEach(el => { el.style.display = "none"; });
       item.querySelectorAll(".mn-km-status-btn").forEach(el => { el.style.display = "none"; });
 
-      if (canApprove() && !row.querySelector(".mn-pending-actions")) {
+      if (!row.querySelector(".mn-pending-foot")) {
         // A sub cannot go live before the parent it hangs off: approved on its
         // own it would point at a parent that is not there yet.
         const pKey    = (sub.parentActivity || "").trim();
@@ -21755,15 +21776,10 @@ function mnInitActivityCollapse(bodyEl, acts) {
                           && ((x._linkKey || x.title || x.name) === pKey)) : null;
         const blocked = parent?._pending ? parent : null;
         const bName   = blocked ? (blocked.title || blocked.name || "").trim() : "";
-        const wrap = document.createElement("span");
-        wrap.className = "mn-pending-actions";
-        wrap.innerHTML = `
-          ${blocked ? `<span class="mn-pending-hint">Approve ${
-            bName ? `“${escHtml(truncateWords(bName))}” parent activity` : "the parent activity"
-          } first</span>` : ``}
-          <button class="mn-pending-btn mn-pending-ok" data-pending-idx="${subIdx}"${blocked ? " disabled" : ""}>✓ Approve</button>
-          <button class="mn-pending-btn mn-pending-no" data-pending-idx="${subIdx}">✗ Reject &amp; Delete</button>`;
-        row.appendChild(wrap);
+        const hint = blocked
+          ? `Approve ${bName ? `“${escHtml(truncateWords(bName))}” parent activity` : "the parent activity"} first`
+          : "";
+        row.appendChild(buildPendingFooter(sub, subIdx, hint));
       }
     }
     // The ⋮ belongs on the row, level with the parent activity's own ⋮ above
@@ -24076,11 +24092,34 @@ function renderTargetManageContent(student, target) {
       const i = Number(btn.dataset.pendingIdx);
       const a = acts[i];
       if (!a || !a._pending) return;
+
       const what = a.isHeading || a.isMaintainHeading ? "section heading"
-                 : a.isNote || a.isExportNote ? "note" : "activity";
-      const label = (a.name || a.title || a.text || "").trim();
-      if (!confirm(`Reject this ${what}${label ? ` ("${label.slice(0, 40)}")` : ""}? It will be deleted.`)) return;
-      acts.splice(i, 1);
+                 : a.isNote || a.isExportNote ? "note"
+                 : a.parentActivity ? "sub-activity"
+                 : a.noRemark ? "parent activity" : "activity";
+      const label = (a.title || a.name || a.text || "").trim();
+
+      // A parent is only a name for the rows under it, so rejecting one takes
+      // those rows with it -- there is nowhere for them to go. Said plainly,
+      // and they are listed, because "2 sub-activities" is easy to agree to
+      // without picturing which two.
+      const pKey = a.noRemark ? (a._linkKey || a.title || a.name) : null;
+      const subs = pKey ? acts.filter(x => x !== a && x.parentActivity === pKey) : [];
+      const subList = subs.length
+        ? "\n\nThese " + subs.length + " sub-activit" + (subs.length === 1 ? "y goes" : "ies go") + " with it:\n"
+          + subs.map(x => "  \u2022 " + ((x.title || x.name || "").trim() || "(untitled)")).join("\n")
+        : "";
+
+      if (!confirm(
+        `Reject this ${what}${label ? ` ("${label.slice(0, 60)}")` : ""}?`
+        + subList
+        + `\n\nIt will be deleted. This cannot be undone.`)) return;
+
+      // Highest index first, so removing one does not shift the next.
+      [...subs.map(x => acts.indexOf(x)), i]
+        .filter(k => k >= 0)
+        .sort((x, y) => y - x)
+        .forEach(k => acts.splice(k, 1));
       acts.forEach((x, k) => { x.order = k; });
       target.predefinedActivities = acts;
       await saveTarget().catch(() => {});
