@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2110";
+const APP_VERSION = "2111";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -11205,6 +11205,88 @@ function sortTargetsByOrder(targets) {
   return [...targets].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
 }
 
+/**
+ * A dropdown that can show a coloured tag beside a target.
+ *
+ * A native <option> renders as plain text -- browsers discard any markup or
+ * styling inside it -- so the count had to live in the option's text, reading
+ * like part of the target's name. This draws the list itself instead, so the
+ * count can be a tag.
+ *
+ * The <select> is kept and stays the source of truth. It is hidden, written to,
+ * and told to fire "change" exactly as a person clicking it would. Every
+ * .value read, every change listener and every "is the menu open" guard in the
+ * app therefore carries on working untouched, which is the whole reason for
+ * driving the old control rather than replacing it.
+ *
+ * busyFlag is the same flag trackSelectOpen sets for the native menu. A render
+ * arriving while the list is open would otherwise close it under the cursor --
+ * the exact fault this dropdown had for months.
+ */
+function renderTargetCombo(comboId, selectId, items, busyFlag) {
+  const combo = $(comboId), sel = $(selectId);
+  if (!combo || !sel) return;
+
+  const current = items.find(i => i.value === sel.value);
+  // Both wordings are rendered and CSS picks one. Choosing in JS would need a
+  // resize listener to stay right, and a pill that says "12 waiting" must not
+  // be shortened by trimming characters off the front of the number.
+  const tag = n => n > 0
+    ? `<span class="tc-pill"><span class="tcp-long">${n} waiting for approval</span><span class="tcp-short">${n}</span></span>`
+    : "";
+  const label = current
+    ? `<span class="tc-name">${escHtml(current.label)}</span>${tag(current.pending)}`
+    : `<span class="tc-name tc-placeholder">${escHtml(items.length ? "— select —" : "— no targets yet —")}</span>`;
+
+  combo.innerHTML = `
+    <button type="button" class="tc-btn" aria-haspopup="listbox" aria-expanded="false">
+      ${label}<span class="tc-caret" aria-hidden="true">▾</span>
+    </button>
+    <div class="tc-list" role="listbox" hidden>
+      ${items.map(i => `
+        <button type="button" class="tc-opt${i.value === sel.value ? " is-current" : ""}${i.isAdd ? " tc-opt-add" : ""}"
+          role="option" aria-selected="${i.value === sel.value}" data-value="${escHtml(i.value)}">
+          <span class="tc-name">${escHtml(i.label)}</span>${tag(i.pending)}
+        </button>`).join("")}
+    </div>`;
+
+  const btn  = combo.querySelector(".tc-btn");
+  const list = combo.querySelector(".tc-list");
+
+  const close = () => {
+    list.hidden = true;
+    btn.setAttribute("aria-expanded", "false");
+    state[busyFlag] = false;
+    document.removeEventListener("pointerdown", onOutside, true);
+    document.removeEventListener("keydown", onKey, true);
+  };
+  const onOutside = e => { if (!combo.contains(e.target)) close(); };
+  const onKey = e => { if (e.key === "Escape") { close(); btn.focus(); } };
+  const open = () => {
+    list.hidden = false;
+    btn.setAttribute("aria-expanded", "true");
+    // Held open against re-renders for the same reason the native one was.
+    state[busyFlag] = true;
+    document.addEventListener("pointerdown", onOutside, true);
+    document.addEventListener("keydown", onKey, true);
+    list.querySelector(".tc-opt.is-current")?.scrollIntoView({ block: "nearest" });
+  };
+
+  btn.addEventListener("click", () => (list.hidden ? open() : close()));
+
+  list.querySelectorAll(".tc-opt").forEach(opt => {
+    opt.addEventListener("click", () => {
+      close();
+      const v = opt.dataset.value;
+      if (v === sel.value) return;      // nothing changed, so nothing to announce
+      sel.value = v;
+      // The app listens on the select, not here. Dispatching keeps one code
+      // path for "a target was chosen", however it was chosen.
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  });
+}
+
 function populateTargetDropdown(targets) {
   const sel = $("target-select");
   const sorted = sortTargetsByOrder(targets).filter(t => !t.discontinuedOn);
@@ -11214,26 +11296,19 @@ function populateTargetDropdown(targets) {
   if (!state._targetSelDown) {
     const placeholder = sorted.length === 0
       ? `<option value="" disabled selected>— no targets yet —</option>` : "";
-    // The whole count sits on the option, beside the target it belongs to.
-    // That is the only place it answers the question actually being asked --
-    // WHICH target needs looking at -- so reading the open list is enough and
-    // no target has to be visited to find out.
-    //
-    // An <option> is plain text, so the short form on a narrow screen is chosen
-    // here rather than by CSS. Measured at build time: the dropdown is rebuilt
-    // on every render of the screen, so it follows a rotation soon enough.
-    const shortForm = window.innerWidth <= 760;
+    // The hidden select keeps plain names and no counts: it is the value the
+    // app reads, and an export that ever reached for it must get the target's
+    // real name. The count belongs to the drawn list only.
     sel.innerHTML = placeholder +
-      sorted.map(t => {
-        const n = pendingCountForTarget(t);
-        const tally = !n ? ""
-          : shortForm ? ` (${n})`
-          : ` (${n} item${n === 1 ? "" : "s"} waiting for approval)`;
-        return `<option value="${escHtml(t.name)}">${escHtml(t.name)}${tally}</option>`;
-      }).join("") + `<option value="__add_target__">+ Add Target…</option>`;
+      sorted.map(t => `<option value="${escHtml(t.name)}">${escHtml(t.name)}</option>`).join("")
+      + `<option value="__add_target__">+ Add Target…</option>`;
 
     sel.value = state.selectedTargetName || sorted[0]?.name || "";
   }
+  renderTargetCombo("target-combo", "target-select",
+    sorted.map(t => ({ value: t.name, label: t.name, pending: pendingCountForTarget(t) }))
+      .concat([{ value: "__add_target__", label: "+ Add Target…", pending: 0, isAdd: true }]),
+    "_targetSelDown");
 
   const editInstBtn2 = $("btn-entry-edit-instructors");
   if (editInstBtn2) {
@@ -26429,6 +26504,12 @@ function populateGroupTargetDropdown(targets) {
       ).join("") +
       `<option value="__add_target__">+ Add Target…</option>`;
   }
+  // Same drawn list as the individual screen, so a group target can carry its
+  // count too.
+  renderTargetCombo("group-target-combo", "group-target-select",
+    sorted.map(t => ({ value: t.name, label: t.name, pending: pendingCountForTarget(t) }))
+      .concat([{ value: "__add_target__", label: "+ Add Target…", pending: 0, isAdd: true }]),
+    "_grpTargetSelDown");
 
   const manageBtn = $("btn-group-manage-targets");
   if (manageBtn) {

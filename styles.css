@@ -4682,3 +4682,95 @@ button.wf-pill:hover { filter: brightness(.93); }
   background: #fde68a;
   color: #92400e;
 }
+
+/* ── Target dropdown, drawn rather than native ─────────────── */
+/* The <select> stays in the DOM and stays the source of truth; it is only
+   hidden. Everything that reads .value or listens for "change" is unchanged. */
+.tc-native { display: none !important; }
+
+.target-combo { position: relative; flex: 1; min-width: 0; }
+.tc-btn {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  width: 100%;
+  padding: .55rem .75rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--white);
+  min-height: var(--tap-min);
+  cursor: pointer;
+  text-align: left;
+}
+.tc-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.tc-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tc-placeholder { color: var(--text-muted); }
+.tc-caret { flex-shrink: 0; color: var(--text-muted); font-size: .9rem; }
+
+/* The reason for drawing the list at all. */
+.tc-pill {
+  flex-shrink: 0;
+  font-size: .7rem;
+  font-weight: 700;
+  padding: .12rem .45rem;
+  border-radius: 999px;
+  background: #fde68a;
+  color: #92400e;
+  border: 1px solid #f59e0b;
+  white-space: nowrap;
+}
+
+.tc-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  /* Above the session content, below the Edit Target modal at 1000. */
+  z-index: 60;
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0,0,0,.18);
+  max-height: 17rem;
+  overflow-y: auto;
+  padding: .25rem;
+}
+.tc-list[hidden] { display: none; }
+.tc-opt {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  width: 100%;
+  padding: .5rem .6rem;
+  border: none;
+  border-radius: .35rem;
+  background: none;
+  font-size: .95rem;
+  font-family: inherit;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  min-height: 2.4rem;
+}
+.tc-opt:hover { background: var(--primary-light); }
+.tc-opt.is-current { background: var(--primary); color: #fff; font-weight: 600; }
+.tc-opt.is-current .tc-pill { background: #fff; color: #92400e; border-color: #fff; }
+.tc-opt-add { color: var(--primary); font-weight: 600; border-top: 1px solid var(--border); border-radius: 0; margin-top: .25rem; }
+.tc-opt-add.is-current { color: #fff; }
+
+.tc-pill .tcp-short { display: none; }
+@media (max-width: 560px) {
+  /* Just the number: the row has a name to fit first. */
+  .tc-pill .tcp-long  { display: none; }
+  .tc-pill .tcp-short { display: inline; }
+}

@@ -156,10 +156,11 @@
     <div class="session-body">
       <div class="target-selector">
         <label for="target-select" class="target-label">Target</label>
-        <select id="target-select" class="target-dropdown"
+        <select id="target-select" class="target-dropdown tc-native"
           data-gramm="false" data-gramm_editor="false" data-enable-grammarly="false">
           <option value="">— select —</option>
         </select>
+        <div class="target-combo" id="target-combo"></div>
         <div class="target-type-chip hidden" id="target-type-chip">
           <span class="target-type-label">Type</span>
           <span class="target-type-value" id="target-type-badge"></span>
@@ -221,10 +222,11 @@
     <div class="session-body">
       <div class="target-selector" id="group-target-selector-bar">
         <label for="group-target-select" class="target-label">Target</label>
-        <select id="group-target-select" class="target-dropdown"
+        <select id="group-target-select" class="target-dropdown tc-native"
           data-gramm="false" data-gramm_editor="false" data-enable-grammarly="false">
           <option value="">— select —</option>
         </select>
+        <div class="target-combo" id="group-target-combo"></div>
         <div id="group-avg-chips" style="display:flex;gap:.4rem;align-items:center"></div>
         <button id="btn-group-edit-instructors" class="btn-manage-targets hidden">Edit Instructors</button>
         <button id="btn-group-manage-targets" class="btn-manage-targets hidden">Edit Target</button>
