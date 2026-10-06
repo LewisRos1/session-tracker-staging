@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2122";
+const APP_VERSION = "2123";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -22579,9 +22579,9 @@ function renderTargetManageContent(student, target) {
   html += `
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.25rem">
       <button class="btn-admin-add" id="btn-mn-add-act" style="flex:0 0 auto;width:auto">+ Add Activity</button>
+      <button class="btn-admin-add" id="btn-mn-add-parent" style="flex:0 0 auto;width:auto">+ Add Parent Activity with Sub-activities</button>
       <button class="btn-admin-add" id="btn-mn-add-heading" style="flex:0 0 auto;width:auto">+ Add Section Heading</button>
       <button class="btn-admin-add" id="btn-mn-add-note" style="flex:0 0 auto;width:auto">+ Add Note</button>
-      <button class="btn-admin-add" id="btn-mn-add-parent" style="flex:0 0 auto;width:auto">+ Add Parent Activity with Sub-activities</button>
     </div>
     <div style="margin-top:2rem;padding-bottom:1.5rem">
       <button class="btn-primary-sm" id="btn-mn-done-target"
