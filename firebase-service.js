@@ -984,6 +984,27 @@ export async function getStudentById(studentId) {
   return snap.exists() ? snap.data() : null;
 }
 
+/**
+ * Watch one student's config for changes made anywhere.
+ *
+ * The session document has had a live listener from the start, so a remark
+ * typed on one device appears on another at once. The CONFIG -- the targets and
+ * their activities -- was only ever fetched, so an activity approved on one
+ * device stayed invisible on another until the page was reloaded.
+ */
+export function listenToStudent(studentId, callback, onError) {
+  return onSnapshot(doc(db, "students", studentId),
+    snap => { if (snap.exists()) callback({ id: snap.id, ...snap.data() }); },
+    err => { console.error("listenToStudent:", err); onError?.(err); });
+}
+
+/** The same, for a group's config. */
+export function listenToGroup(groupId, callback, onError) {
+  return onSnapshot(doc(db, "groups", groupId),
+    snap => { if (snap.exists()) callback({ id: snap.id, ...snap.data() }); },
+    err => { console.error("listenToGroup:", err); onError?.(err); });
+}
+
 /** Save (upsert) a student config document. */
 // ─── PENDING APPROVAL ────────────────────────────────────────
 // An activity an assistant proposes is not live. It must not appear in a

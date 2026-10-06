@@ -89,6 +89,8 @@ import {
   setCommentStatus,
   updateCommentAssignment,
   listenToReviewQueue,
+  listenToStudent,
+  listenToGroup,
   getSessionsWithParticipant,
   getAllSessions,
   signInWithPin,
@@ -203,7 +205,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2133";
+const APP_VERSION = "2134";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -11032,6 +11034,12 @@ async function openSession(student, existingSessionId = null, dateStr = null, pa
       }
     }, 10000);
 
+    // Config changes made elsewhere -- an activity approved by someone on
+    // another device -- arrive while the screen is open, instead of waiting for
+    // a reload.
+    state.fbConfigUnsub?.();
+    state.fbConfigUnsub = watchConfigForOpenSession(false);
+
     state.fbUnsubscribe = listenToSession(sessionId, async data => {
       clearTimeout(_loadWatchdog);
       const firstLoad = state.sessionData === null;
@@ -11185,6 +11193,7 @@ async function leaveSession() {
   state.entryEnterKeyCleanup?.();
   state.entryEnterKeyCleanup = null;
   if (state.fbUnsubscribe) { state.fbUnsubscribe(); state.fbUnsubscribe = null; }
+  state.fbConfigUnsub?.(); state.fbConfigUnsub = null;
   const sessionId = state.currentSessionId;
   const data      = state.sessionData;
   const student   = state.currentStudent;
@@ -14916,6 +14925,47 @@ function wrapRowTitleText(row) {
       span.textContent = n.textContent;
       n.replaceWith(span);
     });
+}
+
+/**
+ * Keep the open session screen in step with config changes from elsewhere.
+ *
+ * Returns the unsubscribe. The incoming copy is merged into the SAME object the
+ * screen already holds rather than swapping it, because handlers all around the
+ * app close over that object; replacing it would leave them writing to one
+ * nobody reads.
+ *
+ * A redraw is skipped while the Edit Target modal is open or a field is being
+ * typed into. The config has already been taken on board either way -- this only
+ * decides when the screen is rebuilt, and rebuilding it under someone's cursor
+ * is how typing gets thrown away.
+ */
+function watchConfigForOpenSession(isGroup) {
+  const entity = isGroup ? state.currentGroup : state.currentStudent;
+  if (!entity?.id) return null;
+  const listen = isGroup ? listenToGroup : listenToStudent;
+  return listen(entity.id, fresh => {
+    const live = isGroup ? state.currentGroup : state.currentStudent;
+    if (!live || live.id !== fresh.id) return;
+    Object.assign(live, fresh);
+    const list = isGroup ? (state.groups || []) : (state.students || []);
+    const i = list.findIndex(x => x.id === fresh.id);
+    if (i >= 0) list[i] = live;
+
+    if (!$("manage-modal")?.classList.contains("hidden")) return;
+    const ae = document.activeElement;
+    const host = $(isGroup ? "group-target-content" : "target-content");
+    if (host?.contains(ae) && (ae?.tagName === "TEXTAREA" || ae?.tagName === "INPUT")) return;
+    try {
+      if (isGroup) {
+        populateGroupTargetDropdown(live.targets || []);
+        renderGroupTargetContent();
+      } else {
+        populateTargetDropdown(getEffectiveTargets());
+        renderTargetContent();
+      }
+    } catch (err) { console.error("config refresh:", err); }
+  });
 }
 
 /** Stamp an entry as somebody's proposal. */
@@ -26739,6 +26789,7 @@ async function openGroupSession(group, dateStr, attendees, participants = null) 
   const _prevGroup        = state.currentGroup;
   if (_prevGrpSessionId && _prevGrpData) await state.entryGroupRemarkSaver?.flush();
   if (state.fbGroupUnsubscribe) { state.fbGroupUnsubscribe(); state.fbGroupUnsubscribe = null; }
+  state.fbGroupConfigUnsub?.(); state.fbGroupConfigUnsub = null;
   state.entryGroupRemarkSaver?.cleanup();
   if (_prevGrpSessionId && _prevGrpData && _prevGroup) {
     const _allGrpTgtNames = new Set(Object.values(_prevGrpData.activities || {}).map(a => a.targetName));
@@ -26795,6 +26846,9 @@ async function openGroupSession(group, dateStr, attendees, participants = null) 
         $("group-target-content").innerHTML = sessionLoadFailedHtml(new Error("It is taking unusually long."));
       }
     }, 10000);
+
+    state.fbGroupConfigUnsub?.();
+    state.fbGroupConfigUnsub = watchConfigForOpenSession(true);
 
     state.fbGroupUnsubscribe = listenToSession(sid, async data => {
       clearTimeout(_grpLoadWatchdog);
@@ -27106,6 +27160,7 @@ async function leaveGroupSession() {
   state.entryGroupRemarkSaver?.cleanup();
   state.entryGroupRemarkSaver = null;
   if (state.fbGroupUnsubscribe) { state.fbGroupUnsubscribe(); state.fbGroupUnsubscribe = null; }
+  state.fbGroupConfigUnsub?.(); state.fbGroupConfigUnsub = null;
   const sessionId = state.groupSessionId;
   const data      = state.groupSessionData;
   const group     = state.currentGroup;
