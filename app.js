@@ -93,7 +93,6 @@ import {
   listenToGroup,
   getSessionsWithParticipant,
   getAllSessions,
-  signInWithPin,
   signInAs,
   signOutUser,
   onAuthChange,
@@ -205,7 +204,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2148";
+const APP_VERSION = "2150";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -2065,7 +2064,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // straight to the sign-in screen rather than hang on the loading screen
   // waiting for an answer that was always going to be empty.
   let authResolved = false;
-  if (!hasSignedInBefore()) {
+  if (!hasSignedInBefore() || sessionEpochStale()) {
     initPin();
     authResolved = true; // prevent the timeout below from calling initPin a second time
   } else {
@@ -2156,6 +2155,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Which of the four signed in. Every permission in the app reads from
     // this, so it is set before anything else looks at it.
     state.authEmail = user?.email || null;
+    // Marked before signing out, so a failed sign-out cannot leave this
+    // looping through the same session on every reload.
+    if (user && sessionEpochStale()) {
+      markSessionEpoch();
+      clearSignedIn();
+      await signOutUser().catch(() => {});
+      return;   // onAuthChange fires again with no user and lands on the login screen
+    }
+    markSessionEpoch();
     if (!user) {
       if (state.reviewQueueUnsubscribe) { state.reviewQueueUnsubscribe(); state.reviewQueueUnsubscribe = null; }
       await waitForUpdatingScreenMinimum();
@@ -2193,6 +2201,22 @@ document.addEventListener("DOMContentLoaded", async () => {
  * The old key is reused and anything stored under it counts, so a device that
  * had the date written under it is not asked to sign in again.
  */
+/**
+ * Signs everyone out once, the next time they load the app.
+ *
+ * A Firebase session survives a deploy, so taking the PIN screen away did not
+ * remove anybody who was already signed in on the shared staff account -- and
+ * that account cannot say who is using it, which this app reads as "trusted
+ * with everything". They had to be put back through the door.
+ *
+ * Change the string to do it again. Each browser clears itself once and
+ * remembers that it has, so it is a single sign-out and not a loop.
+ */
+const SESSION_EPOCH = "2026-10-08-named-accounts";
+const SESSION_EPOCH_KEY = "sessionEpoch";
+const sessionEpochStale = () => localStorage.getItem(SESSION_EPOCH_KEY) !== SESSION_EPOCH;
+const markSessionEpoch  = () => localStorage.setItem(SESSION_EPOCH_KEY, SESSION_EPOCH);
+
 const LAST_LOGIN_DATE_KEY = "lastLoginDate";
 function hasSignedInBefore() {
   return !!localStorage.getItem(LAST_LOGIN_DATE_KEY);
@@ -2408,7 +2432,6 @@ function initPin() {
       <div id="login-err" class="pin-error hidden">Wrong username or password.</div>
       <div id="login-status" class="pin-status hidden">Signing in…</div>
       <button class="btn-primary-sm" id="login-go">Sign In</button>
-      <button class="login-back" id="login-old-pin">Use the old staff PIN</button>
     </div>`;
 
   const userInp = $("login-user");
@@ -2442,22 +2465,6 @@ function initPin() {
   $("login-go").addEventListener("click", submit);
   [userInp, pwInp].forEach(el =>
     el.addEventListener("keydown", e => { if (e.key === "Enter") submit(); }));
-
-  // The way back in. The four accounts have to be created by hand in the
-  // Firebase console, and until they exist nobody could sign in at all, which
-  // would lock the app shut rather than restrict it. The old shared account
-  // still works and is treated as an assistant. Remove this once the accounts
-  // are in place and proven.
-  $("login-old-pin").addEventListener("click", async () => {
-    const pin = prompt("Old staff PIN:");
-    if (!pin) return;
-    try {
-      await signInWithPin(pin.trim());
-      markSignedIn();
-    } catch (_) {
-      alert("That PIN was not accepted.");
-    }
-  });
 
   setTimeout(() => userInp.focus(), 50);
 }

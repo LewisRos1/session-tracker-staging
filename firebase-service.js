@@ -89,22 +89,19 @@ const db = initializeFirestore(app, {
 });
 
 // ─── AUTH ────────────────────────────────────────────────────
-// There's one shared account for the whole team — the PIN screen is the
-// real login UI, this just turns "the PIN" into an actual server-checked
-// password instead of a value compared inside the page's own JS (which
-// anyone could read). Firebase requires passwords to be 6+ characters, so
-// the PIN gets a fixed prefix glued on before being sent — staff never see
-// or type that prefix, they still just enter the PIN on the keypad.
+// Each person signs in as themselves. There used to be one shared account for
+// the whole team, unlocked by a four digit PIN, with its address and password
+// prefix both sitting in this file -- which every visitor downloads. It could
+// not tell one person from another, so no rule about who may do what could
+// mean anything. It is gone along with the PIN screen that drove it; the
+// staff@ account can be deleted from the Firebase console once nobody is
+// signed in on it.
+//
 // browserLocalPersistence is the default for web — no setPersistence call needed.
 // Calling setPersistence after getAuth() can trigger an internal sign-out round-trip
 // to Firebase servers which hangs when local tokens are missing (e.g. after clearing site data).
 const auth = getAuth(app);
-const AUTH_EMAIL    = "staff@session-tracker.app";
-const PIN_PASSWORD_PREFIX = "str-pin-";
 
-export function signInWithPin(pin) {
-  return signInWithEmailAndPassword(auth, AUTH_EMAIL, PIN_PASSWORD_PREFIX + pin);
-}
 
 /**
  * Sign in as one named member of staff.
