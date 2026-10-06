@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2130";
+const APP_VERSION = "2131";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -12808,7 +12808,8 @@ function emptyParentInfo(a, acts) {
 
 const PARENT_PENDING_NOTE = n =>
   `${n} sub-activit${n === 1 ? "y" : "ies"} under this parent activity ${n === 1 ? "is" : "are"} `
-  + `waiting for approval, so ${n === 1 ? "it is" : "they are"} not shown here yet.`;
+  + `waiting for approval, so ${n === 1 ? "it is" : "they are"} not shown here yet. `
+  + `Go into Edit Target and approve ${n === 1 ? "it" : "them"}.`;
 
 const EMPTY_PARENT_NOTE =
   "All sub-activities under this parent activity have been mastered or discontinued. " +
