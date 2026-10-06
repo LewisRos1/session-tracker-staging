@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2124";
+const APP_VERSION = "2125";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -22184,19 +22184,15 @@ function renderTargetManageContent(student, target) {
                   <button class="mn-parent-start-date-btn" data-idx="${idx}" style="padding:.35rem .65rem;border:1.5px solid #b91c1c;border-radius:.4rem;background:#dc2626;cursor:not-allowed;font-size:.95rem;color:#ffffff;white-space:nowrap;display:block" title="Automatically set from earliest sub-activity">📅 ${_parentStartDate ? fmtPeriodDate(_parentStartDate) : 'No dates set'}</button>
                 </div>
                 <div style="flex:1">
-                  <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title</div>
+                  <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Parent Activity Title</div>
                   <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
                     <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
-                      placeholder="Enter Activity Title Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+                      placeholder="Enter Parent Activity Title Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
                   </div>
                 </div>
               </div>
               <div class="mn-sub-list" data-parent-key="${escHtml(_paKey || "")}">${subActsHtml}</div>
               ${maintainedRowSub}
-              <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
-                <button class="mn-add-sub-act-btn" data-parent-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:#f9fafb;border:1px solid #d1d5db;border-radius:.35rem;color:#374151;cursor:pointer">+ Add Sub-activity</button>
-                ${a._linkKey ? `<button class="mn-undo-convert-btn" data-idx="${idx}" style="font-size:.82rem;padding:.3rem .7rem;background:#fee2e2;border:1px solid #fca5a5;border-radius:.35rem;color:#dc2626;cursor:pointer">↩ Undo — keep as its own activity</button>` : ''}
-              </div>
               </div>
             </div>
           </div>
@@ -24110,64 +24106,6 @@ function renderTargetManageContent(student, target) {
     });
   });
 
-  $("manage-modal-body").querySelectorAll(".mn-add-sub-act-btn").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const parentIdx = Number(btn.dataset.parentIdx);
-      const parentAct = acts[parentIdx];
-      if (!parentAct) return;
-
-      // Sync parent name from textarea — user may not have blurred it yet
-      const nameInput = $("manage-modal-body").querySelector(`.mn-act-name-input[data-idx="${parentIdx}"]`);
-      if (nameInput) {
-        const typedName = nameInput.value.trim();
-        if (typedName !== parentAct.name) parentAct.name = typedName;
-      }
-      if (!(parentAct.title || parentAct.name)) {
-        alert("Please enter an activity name before adding sub-activities.");
-        nameInput?.focus();
-        return;
-      }
-
-      // Check existing subs — all must be named before adding another
-      const _parentKey = parentAct.title || parentAct.name;
-      const existingSubs = acts.filter(a2 => a2.parentActivity === _parentKey && !a2.isCompleted && !a2.isArchived && !a2.isStopped);
-      const unnamedSub = existingSubs.find(s => !s.name?.trim() && !s.title?.trim());
-      if (unnamedSub) {
-        const unnamedIdx = acts.indexOf(unnamedSub);
-        const unnamedInput = $("manage-modal-body").querySelector(`.mn-act-title-${unnamedIdx}, .mn-act-name-input[data-idx="${unnamedIdx}"]`);
-        unnamedInput?.focus();
-        alert("Please name all existing sub-activities before adding another.");
-        return;
-      }
-
-      // Warn if parent has a remark type configured — it won't apply once it has sub-activities
-      if (!existingSubs.length && (parentAct.inlineOptions || parentAct.sentenceStarter || parentAct.fixedRemark !== undefined || parentAct.manualScore)) {
-        const typeLabel = parentAct.fixedRemark !== undefined ? "Fixed Remark" : parentAct.manualScore ? "Manual Score" : "remark options";
-        if (!confirm(`"${parentAct.name}" has a ${typeLabel} configured.\n\nAdding sub-activities removes the remark field from this activity — configure the remark type on each sub-activity instead. The current options will be cleared.\n\nContinue?`)) return;
-        parentAct.sentenceStarter = null;
-        parentAct.remarkPresetId  = null;
-        parentAct.inlineOptions   = null;
-        parentAct.optionsMulti    = false;
-        parentAct.remarkHasNote   = false;
-        delete parentAct.manualScore;
-        delete parentAct.fixedRemark;
-        delete parentAct.optionScores;
-      }
-
-      parentAct.noRemark = true;
-      const siblingIdxs = acts.map((a2, i) => a2.parentActivity === _parentKey ? i : -1).filter(i => i >= 0);
-      const insertAfter = siblingIdxs.length > 0 ? Math.max(...siblingIdxs) : parentIdx;
-      const _newSubActDate = _groupForTargetEdit ? (state.groupSessionData?.date || todayDateStr()) : (state.sessionData?.date || todayDateStr());
-      acts.splice(insertAfter + 1, 0, { id: cfgId("a"), name: "", parentActivity: _parentKey, order: 0, activeFrom: _newSubActDate, createdOn: todayDateStr() });
-      acts.forEach((a2, i) => a2.order = i);
-      target.predefinedActivities = acts;
-      const sp = $("manage-modal-body").scrollTop;
-      renderTargetManageContent(student, target);
-      requestAnimationFrame(() => { const b = $("manage-modal-body"); if (b) b.scrollTop = sp; });
-      saveTarget();
-    });
-  });
-
   $("manage-modal-body").querySelectorAll(".mn-del-sub-act").forEach(btn => {
     btn.addEventListener("click", async () => {
       const idx = Number(btn.dataset.idx);
@@ -24274,25 +24212,6 @@ function renderTargetManageContent(student, target) {
         overlay.remove();
         await doDelete();
       });
-    });
-  });
-
-  $("manage-modal-body").querySelectorAll(".mn-undo-convert-btn").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const idx = Number(btn.dataset.idx);
-      const parentAct = acts[idx];
-      if (!parentAct) return;
-      // Restore all sub-activities under this parent back to top-level
-      const linkKey = parentAct._linkKey || parentAct.title || parentAct.name;
-      acts.forEach(a2 => { if (a2.parentActivity === linkKey) delete a2.parentActivity; });
-      // Remove the blank parent
-      acts.splice(idx, 1);
-      acts.forEach((a2, i) => a2.order = i);
-      target.predefinedActivities = acts;
-      await saveTarget();
-      const sp = $("manage-modal-body").scrollTop;
-      renderTargetManageContent(student, target);
-      requestAnimationFrame(() => { const b = $("manage-modal-body"); if (b) b.scrollTop = sp; });
     });
   });
 
