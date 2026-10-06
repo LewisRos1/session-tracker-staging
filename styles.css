@@ -4784,7 +4784,7 @@ button.wf-pill:hover { filter: brightness(.93); }
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 14rem;
+  max-width: 20rem;
 }
 
 /* The kind of block the panel is editing, as the same chip the row carries. */

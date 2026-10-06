@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2114";
+const APP_VERSION = "2115";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -21524,7 +21524,7 @@ function mnInitActivityCollapse(bodyEl, acts) {
         wrap.className = "mn-pending-actions";
         wrap.innerHTML = `
           ${blocker ? `<span class="mn-pending-hint">Approve ${
-            blockerName ? `“${escHtml(truncateWords(blockerName))}”` : "the section heading above"
+            blockerName ? `“${escHtml(truncateWords(blockerName))}” section heading` : "the section heading above"
           } first</span>` : ``}
           <button class="mn-pending-btn mn-pending-ok" data-pending-idx="${gi}"${blocker ? " disabled" : ""}>✓ Approve</button>
           <button class="mn-pending-btn mn-pending-no" data-pending-idx="${gi}">✗ Reject &amp; Delete</button>`;
