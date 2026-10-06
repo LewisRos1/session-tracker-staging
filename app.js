@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2112";
+const APP_VERSION = "2113";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -21499,11 +21499,20 @@ function mnInitActivityCollapse(bodyEl, acts) {
         // Worded, not symbols. A tick and a cross on a row that already
         // carries a tag read as a status rather than as two buttons, and the
         // cross deletes -- which is worth saying out loud before it is pressed.
+        //
+        // A greyed-out button with its reason in a title attribute is a button
+        // that looks broken: tooltips do not exist on a tablet and nobody hovers
+        // on a desktop either. The reason is said on the row.
+        const blockerName = blocker
+          ? (blocker.name || blocker.title || "").trim()
+          : "";
         const wrap = document.createElement("span");
         wrap.className = "mn-pending-actions";
         wrap.innerHTML = `
-          <button class="mn-pending-btn mn-pending-ok" data-pending-idx="${gi}"
-            ${blocker ? `disabled title="Approve the section heading above this one first."` : ``}>✓ Approve</button>
+          ${blocker ? `<span class="mn-pending-hint">Approve ${
+            blockerName ? `“${escHtml(truncateWords(blockerName))}”` : "the section heading above"
+          } first</span>` : ``}
+          <button class="mn-pending-btn mn-pending-ok" data-pending-idx="${gi}"${blocker ? " disabled" : ""}>✓ Approve</button>
           <button class="mn-pending-btn mn-pending-no" data-pending-idx="${gi}">✗ Reject &amp; Delete</button>`;
         tagHost.appendChild(wrap);
       }

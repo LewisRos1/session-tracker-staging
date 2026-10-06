@@ -4774,3 +4774,15 @@ button.wf-pill:hover { filter: brightness(.93); }
   .tc-pill .tcp-long  { display: none; }
   .tc-pill .tcp-short { display: inline; }
 }
+
+/* Says why Approve is unavailable, instead of leaving a dead button. */
+.mn-pending-hint {
+  font-size: .72rem;
+  font-weight: 600;
+  font-style: italic;
+  color: #92400e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 14rem;
+}
