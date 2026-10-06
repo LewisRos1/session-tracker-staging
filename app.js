@@ -205,7 +205,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2136";
+const APP_VERSION = "2137";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -14874,12 +14874,14 @@ function buildPendingFooter(item, idx, blockedHint) {
 
   const col = document.createElement("div");
   col.className = "mn-pending-foot";
-  // The kebab on its own line above, not beside the tag. Sharing a line made
-  // the tag narrower than the buttons under it, so nothing in the column lined
-  // up down its left edge.
+  // A two-column grid: the tag and the buttons share the first column, so they
+  // share a left edge and a width, and the kebab sits in the second beside the
+  // tag. On its own line above, it pushed the tag down and away from the title
+  // it belongs to; sharing a line inside one column made it narrower than the
+  // buttons underneath.
   col.innerHTML = `
-    <div class="mn-pending-top"><span class="mn-pending-kebab-slot"></span></div>
     <span class="mn-pending-tag">Waiting for approval</span>
+    <span class="mn-pending-kebab-slot"></span>
     ${canApprove() ? `
       ${blockedHint ? `<span class="mn-pending-hint">${blockedHint}</span>` : ``}
       <button class="mn-pending-btn mn-pending-ok" data-pending-idx="${idx}"${blockedHint ? " disabled" : ""}>✓ Approve</button>

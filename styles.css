@@ -4576,7 +4576,7 @@ button.wf-pill:hover { filter: brightness(.93); }
   background: #fffbeb !important;
 }
 .mn-pending-tag {
-  font-size: .68rem;
+  font-size: .78rem;
   font-weight: 700;
   color: #92400e;
   background: #fde68a;
@@ -4627,35 +4627,42 @@ button.wf-pill:hover { filter: brightness(.93); }
    individually, which is what sent the row's own layout to pieces. */
 .mn-pending-card {
   position: relative;
-  padding-right: 12rem !important;
+  padding-right: 14rem !important;
   box-sizing: border-box;
 }
+/* Two columns. The tag and both buttons live in the first, so they share a
+   left edge and a width; the kebab sits in the second, level with the tag and
+   as far right as every other kebab in the list. The top of the tag is the top
+   of the column, which is what puts it level with the title. */
 .mn-pending-foot {
   position: absolute;
-  top: .5rem;
-  right: .6rem;
-  width: 11rem;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
+  top: .55rem;
+  right: .55rem;
+  width: 13rem;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
   gap: .35rem;
   z-index: 2;
 }
+.mn-pending-foot > * { grid-column: 1; }
+.mn-pending-foot > .mn-pending-kebab-slot { grid-column: 2; grid-row: 1; }
+.admin-list-item.mn-pending-card > .mn-pending-foot { top: .8rem; }
 /* The kebab alone on the top line, pushed right so it sits where every other
    kebab in the list sits. Everything below it is full width, so the tag and
    both buttons share one left edge. */
-.mn-pending-top {
-  display: flex;
-  justify-content: flex-end;
-  min-height: 1.6rem;
-}
 .mn-pending-kebab-slot { flex-shrink: 0; display: inline-flex; }
+/* Same size and weight as the two buttons: they are three controls in one
+   column and a smaller tag read as a caption for them. */
 .mn-pending-foot .mn-pending-tag {
   display: block;
   width: 100%;
   box-sizing: border-box;
   text-align: center;
   margin: 0;
+  padding: .4rem .5rem;
+  font-size: .78rem;
+  line-height: 1;
 }
 .mn-pending-foot .mn-pending-hint { max-width: none; white-space: normal; text-align: center; }
 
