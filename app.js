@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2111";
+const APP_VERSION = "2112";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -11226,6 +11226,24 @@ function sortTargetsByOrder(targets) {
 function renderTargetCombo(comboId, selectId, items, busyFlag) {
   const combo = $(comboId), sel = $(selectId);
   if (!combo || !sel) return;
+
+  // Redraw whenever the select's value changes, from anywhere.
+  //
+  // A native <select> repaints itself when its value changes; a drawn list does
+  // not. Picking a target re-renders the screen but does NOT rebuild the
+  // dropdown -- there was never a reason to -- so the button went on naming the
+  // target you had left and the highlight stayed on it. The items are stashed
+  // on the element so this can redraw with exactly what it had, and the listener
+  // is registered once per select so repeated renders cannot stack them up.
+  combo._tcItems = items;
+  combo._tcBusy  = busyFlag;
+  if (!sel._tcBound) {
+    sel._tcBound = true;
+    sel.addEventListener("change", () => {
+      const c = $(comboId);
+      if (c?._tcItems) renderTargetCombo(comboId, selectId, c._tcItems, c._tcBusy);
+    });
+  }
 
   const current = items.find(i => i.value === sel.value);
   // Both wordings are rendered and CSS picks one. Choosing in JS would need a
