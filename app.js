@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2113";
+const APP_VERSION = "2114";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -21089,6 +21089,7 @@ function mnActPanelEl() {
   el.innerHTML =
     `<div class="mn-act-panel" role="dialog" aria-modal="true">` +
       `<div class="mn-act-panel-head">` +
+        `<span class="mn-act-panel-kind"></span>` +
         `<span class="mn-act-panel-title"></span>` +
         `<button class="mn-act-panel-x" type="button" title="Close">&#10005;</button>` +
       `</div>` +
@@ -21138,11 +21139,24 @@ function mnPanelTitleHtml(titleEl) {
 }
 
 /** `body` is the card's own field container, moved in as-is. */
-function mnOpenActPanel(card, body, titleHtml, key) {
+function mnOpenActPanel(card, body, titleHtml, key, chipHtml) {
   if (!body || !_mnPanelHost) return;
   if (_mnPanelOpen) mnPanelSave();
   const el = mnActPanelEl();
   const slot = el.querySelector(".mn-act-panel-body");
+  // The same chip the row carries, so the panel says what it is editing. Once
+  // the fields are out of the list and on their own, an activity, a note and a
+  // section heading are three boxes of text that have to be told apart by
+  // reading the field labels -- which is a moment's work every single time.
+  //
+  // Taken from the row rather than worked out again, so the two can never
+  // disagree. A sub-activity's chip lives on its compact row rather than inside
+  // the element passed here, so that caller hands one in.
+  const chip = chipHtml
+    || card?.querySelector(":scope > .mn-act-head .mn-row-chip")?.outerHTML
+    || card?.querySelector(":scope .mn-row-chip")?.outerHTML
+    || "";
+  el.querySelector(".mn-act-panel-kind").innerHTML = chip;
   el.querySelector(".mn-act-panel-title").innerHTML = titleHtml || "";
   // Snapshot the WHOLE list, not just this activity: renaming a parent rewrites
   // its sub-activities' parentActivity, so a per-activity copy could not put
@@ -21555,7 +21569,8 @@ function mnInitActivityCollapse(bodyEl, acts) {
       if (e.target.closest(".mn-sub-kebab-wrap")) return;   // using the menu, not opening the card
       const shown = escHtml(nameOf(sub)) ||
         `<span style="color:#9ca3af;font-style:italic;font-weight:500">(Untitled sub-activity)</span>`;
-      mnOpenActPanel(item, subBody, `<span class="mn-act-title-text">${shown}</span>`, keyOf(sub));
+      mnOpenActPanel(item, subBody, `<span class="mn-act-title-text">${shown}</span>`, keyOf(sub),
+        mnRowChip("sub").outerHTML);
     });
   });
 

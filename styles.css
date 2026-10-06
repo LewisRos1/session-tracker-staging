@@ -4786,3 +4786,8 @@ button.wf-pill:hover { filter: brightness(.93); }
   text-overflow: ellipsis;
   max-width: 14rem;
 }
+
+/* The kind of block the panel is editing, as the same chip the row carries. */
+.mn-act-panel-kind { flex-shrink: 0; display: inline-flex; }
+.mn-act-panel-kind:empty { display: none; }
+.mn-act-panel-kind .mn-row-chip { margin: 0; }
