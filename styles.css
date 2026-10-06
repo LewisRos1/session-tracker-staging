@@ -4791,3 +4791,50 @@ button.wf-pill:hover { filter: brightness(.93); }
 .mn-act-panel-kind { flex-shrink: 0; display: inline-flex; }
 .mn-act-panel-kind:empty { display: none; }
 .mn-act-panel-kind .mn-row-chip { margin: 0; }
+
+/* ── Approval notifications ───────────────────────────────── */
+/* Green against the approvals' amber: one is news, the other is work, and the
+   difference should be clear before either is read. */
+.todo-notice-block { margin-bottom: .65rem; }
+.todo-notice-card {
+  border: 1.5px solid #10b981;
+  border-left-width: 4px;
+  border-radius: 12px;
+  background: #ecfdf5;
+  margin-bottom: .65rem;
+  padding: .9rem 1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+.todo-notice-name {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+.todo-notice-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .6rem;
+  flex-wrap: wrap;
+  margin-top: .35rem;
+}
+.todo-notice-pill {
+  font-size: .8rem;
+  font-weight: 700;
+  padding: .15rem .55rem;
+  border-radius: 999px;
+  background: #d1fae5;
+  color: #065f46;
+}
+.todo-notice-clear {
+  font-size: .76rem;
+  font-weight: 700;
+  padding: .3rem .7rem;
+  border-radius: .4rem;
+  border: 1.5px solid #10b981;
+  background: #fff;
+  color: #065f46;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.todo-notice-clear:hover { background: #d1fae5; }

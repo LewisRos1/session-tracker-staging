@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2118";
+const APP_VERSION = "2119";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -2856,7 +2856,9 @@ async function loadTodoHomeCounts() {
       }, 0);
       // Approvals are Ms. Daisy's and belong to a student rather than a
       // session, so they are counted separately and added on.
-      const total = count + (inst.id === "daisy" ? entitiesAwaitingApproval().length : 0);
+      const total = count
+        + (inst.id === "daisy" ? entitiesAwaitingApproval().length : 0)
+        + approvalNoticesFor(inst.id).length;
       const badge = document.querySelector(`.todo-home-badge[data-id="${inst.id}"]`);
       if (badge) {
         badge.textContent = total;
@@ -3080,6 +3082,45 @@ function renderTodoTiles(results, filterInst = null) {
     </div>`;
   };
 
+  // News, not work: nothing has to be done about it, it only has to be read.
+  // Green rather than the approvals' amber, so the two are told apart before
+  // either is read.
+  const noticeHtml = (inst) => {
+    const rows = approvalNoticesFor(inst.id);
+    if (rows.length === 0) return "";
+    return `<div class="todo-notice-block">
+      ${rows.map(r => `
+        <div class="todo-notice-card" data-notice-id="${escHtml(r.entity.id)}" data-notice-group="${r.isGroup}">
+          <div class="todo-notice-name">${escHtml(r.entity.name || "Unknown")}</div>
+          <div class="todo-notice-line">
+            <span class="todo-notice-pill">${escHtml(instructorName(r.notice.by))} has approved ${r.notice.count} item${r.notice.count === 1 ? "" : "s"}</span>
+            <button class="todo-notice-clear" type="button">Clear This Notification</button>
+          </div>
+        </div>`).join("")}
+    </div>`;
+  };
+
+  const wireNoticeCards = (inst) => {
+    body.querySelectorAll(".todo-notice-clear").forEach(btn => {
+      btn.addEventListener("click", async e => {
+        e.stopPropagation();
+        const card   = btn.closest(".todo-notice-card");
+        const isGrp  = card?.dataset.noticeGroup === "true";
+        const list   = isGrp ? (state.groups || []) : (state.students || []);
+        const entity = list.find(x => x.id === card?.dataset.noticeId);
+        if (!entity) return;
+        // Removed before the write, so the card goes the moment it is pressed
+        // rather than after a round trip.
+        delete entity.approvalNotices?.[inst.id];
+        card.remove();
+        try {
+          await (isGrp ? saveGroup(entity) : saveStudent(entity));
+        } catch (err) { console.error("clear notification:", err); }
+        loadTodoHomeCounts();
+      });
+    });
+  };
+
   const wireApprovalCards = () => {
     body.querySelectorAll(".todo-approval-card").forEach(card => {
       card.addEventListener("click", () => {
@@ -3149,14 +3190,17 @@ function renderTodoTiles(results, filterInst = null) {
     };
 
     const approvals = approvalHtml(inst);
+    const notices   = noticeHtml(inst);
     body.innerHTML = `
       <div style="padding:1rem;max-width:600px;margin:0 auto">
+        ${notices}
         ${approvals}
         ${sorted.length === 0
-          ? (approvals ? "" : `<p style="color:var(--text-muted);padding:.5rem 0">All caught up! No pending tasks.</p>`)
+          ? (approvals || notices ? "" : `<p style="color:var(--text-muted);padding:.5rem 0">All caught up! No pending tasks.</p>`)
           : sorted.map(mkFlatCard).join("")}
       </div>`;
     wireApprovalCards();
+    wireNoticeCards(inst);
 
     body.querySelectorAll(".todo-flat-card").forEach(card => {
       card.addEventListener("click", () => {
@@ -3184,7 +3228,8 @@ function renderTodoTiles(results, filterInst = null) {
           // opens at all: a column showing 0 does not expand, which would hide
           // the very thing it is meant to surface.
           const approvalRows = inst.id === "daisy" ? entitiesAwaitingApproval().length : 0;
-          const hasPending = pending.length + approvalRows > 0;
+          const noticeRows   = approvalNoticesFor(inst.id).length;
+          const hasPending = pending.length + approvalRows + noticeRows > 0;
           const sorted = [...pending].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
           return `
           <div class="todo-col" style="border:1.5px solid #e5e7eb;border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.06)">
@@ -3192,11 +3237,12 @@ function renderTodoTiles(results, filterInst = null) {
               style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:.9rem 1rem;border:none;background:#f9fafb;cursor:${hasPending ? "pointer" : "default"};text-align:left">
               <div style="display:flex;align-items:center;gap:.5rem">
                 <span style="font-weight:700;font-size:.95rem;color:#1f2937">${escHtml(inst.name)}</span>
-                <span style="background:${hasPending ? '#3b82f6' : '#d1d5db'};color:${hasPending ? '#fff' : '#6b7280'};border-radius:999px;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;padding:0 5px;flex-shrink:0">${pending.length + approvalRows}</span>
+                <span style="background:${hasPending ? '#3b82f6' : '#d1d5db'};color:${hasPending ? '#fff' : '#6b7280'};border-radius:999px;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;padding:0 5px;flex-shrink:0">${pending.length + approvalRows + noticeRows}</span>
               </div>
               ${hasPending ? `<span class="todo-chevron" style="color:#6b7280;font-size:1.5rem;line-height:1;transition:transform .2s;transform:rotate(-90deg)">▾</span>` : ""}
             </button>
             <div class="todo-col-body" data-id="${inst.id}" style="display:none">
+              ${noticeHtml(inst)}
               ${approvalHtml(inst)}
               ${hasPending ? sorted.map(s => mkSessionRow(s, inst)).join("") : ""}
             </div>
@@ -3204,6 +3250,7 @@ function renderTodoTiles(results, filterInst = null) {
         }).join("")}
       </div>`;
     wireApprovalCards();
+    results.forEach(({ inst }) => wireNoticeCards(inst));
   }
 
   // Toggle collapse
@@ -14673,6 +14720,43 @@ async function openApprovalTask(row) {
   }
 }
 
+/**
+ * "Ms. Daisy has approved 3 activities."
+ *
+ * Kept on the student or group, under the id of the person who proposed the
+ * work, because that is the only person it means anything to and it is already
+ * being saved alongside the proposals themselves. One record per person per
+ * student, counting up, rather than one per activity: approving ten things in a
+ * row is one piece of news, not ten.
+ *
+ * It is cleared by the person it is for. Nothing expires it, because the point
+ * is that they see it, and they may not open the app for days.
+ */
+function noteApproval(entity, proposerId, by) {
+  if (!entity || !proposerId) return;
+  entity.approvalNotices = entity.approvalNotices || {};
+  const prev = entity.approvalNotices[proposerId];
+  entity.approvalNotices[proposerId] = {
+    count: (prev?.count || 0) + 1,
+    by:    by || "daisy",
+    at:    Date.now(),
+  };
+}
+
+/** Everything waiting to be read by one person. */
+function approvalNoticesFor(instId) {
+  const rows = [];
+  const pick = (list, isGroup) => {
+    for (const e of list || []) {
+      const n = e.approvalNotices?.[instId];
+      if (n?.count > 0) rows.push({ entity: e, isGroup, notice: n });
+    }
+  };
+  pick(state.students, false);
+  pick(state.groups, true);
+  return rows.sort((a, b) => (b.notice.at || 0) - (a.notice.at || 0));
+}
+
 /** Stamp an entry as somebody's proposal. */
 function markAsProposal(item) {
   item._pending   = true;
@@ -23847,9 +23931,14 @@ function renderTargetManageContent(student, target) {
       if (!a || !a._pending) return;
       // Approving is only ever a promotion: the entry is already sitting in
       // the right place in the list, so nothing moves and nothing is rewritten.
+      const proposer = a.proposedBy;
       delete a._pending;
       delete a.proposedBy;
       delete a.proposedAt;
+      // Told to whoever asked for it. Recorded on the entity being edited, which
+      // for a group target is the group rather than the student standing in for
+      // it here.
+      noteApproval(_groupForTargetEdit || student, proposer, currentUser()?.id);
       target.predefinedActivities = acts;
       await saveTarget().catch(() => {});
       renderTargetManageContent(student, target);
