@@ -205,7 +205,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2134";
+const APP_VERSION = "2135";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -14917,14 +14917,26 @@ function adoptKebabIntoPendingFoot(host, kebabBtn) {
  */
 function wrapRowTitleText(row) {
   if (!row || row.querySelector(":scope > .mn-sub-title-text")) return;
-  [...row.childNodes]
-    .filter(n => n.nodeType === 3 && n.textContent.trim())
-    .forEach(n => {
-      const span = document.createElement("span");
-      span.className = "mn-sub-title-text";
-      span.textContent = n.textContent;
-      n.replaceWith(span);
-    });
+  // Everything that is not furniture, gathered into ONE span.
+  //
+  // The row is built as `a) ` plus formatted markup, so the title arrives as a
+  // run of text nodes and <b>/<u> elements side by side. Wrapping each text
+  // node on its own made several flex items that each claimed a share of the
+  // row and broke across lines between words. One wrapper is one item, and it
+  // wraps inside itself like ordinary text.
+  const furniture = n => n.nodeType === 1 && (
+    n.classList.contains("drag-handle") ||
+    n.classList.contains("mn-row-chip") ||
+    n.classList.contains("mn-pending-foot") ||
+    n.classList.contains("mn-pending-details") ||
+    n.classList.contains("mn-sub-kebab-wrap"));
+  const parts = [...row.childNodes].filter(n =>
+    !furniture(n) && (n.nodeType !== 3 || n.textContent.trim()));
+  if (!parts.length) return;
+  const span = document.createElement("span");
+  span.className = "mn-sub-title-text";
+  row.insertBefore(span, parts[0]);
+  parts.forEach(n => span.appendChild(n));
 }
 
 /**

@@ -4661,10 +4661,18 @@ button.wf-pill:hover { filter: brightness(.93); }
 
 /* Same size as the title it sits under, with a gap above so the two read as
    two things rather than one paragraph that changed its mind. */
+/* Shown rather than folded away: a proposal is read in order to be judged.
+   pre-wrap so typed line breaks and bullet lines survive. Same size as the
+   title above it -- there was a second copy of this rule further down the file
+   holding it at .84rem, which is why it stayed smaller. */
 .mn-pending-details {
   padding-left: 2.6rem;
   margin-top: .55rem;
   font-size: inherit;
+  line-height: 1.5;
+  color: #78350f;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .mn-pending-details-label {
   display: block;
@@ -4912,16 +4920,6 @@ button.wf-pill:hover { filter: brightness(.93); }
   white-space: nowrap;
 }
 .todo-notice-clear:hover { background: #d1fae5; }
-
-/* A proposal's details, shown rather than folded away: it is being read to be
-   judged. pre-wrap so typed line breaks and bullet lines survive. */
-.mn-pending-details {
-  font-size: .84rem;
-  line-height: 1.5;
-  color: #78350f;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
 
 /* A sub-activity's row is one flex line by default. The details need a line of
    their own under the title rather than a slot beside it. */
