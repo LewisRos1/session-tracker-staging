@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2108";
+const APP_VERSION = "2109";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -21360,6 +21360,12 @@ function mnInitActivityCollapse(bodyEl, acts) {
     if (act && act._pending) {
       card.classList.add("mn-pending-card");
       const tagHost = card.querySelector(":scope > .mn-act-head") || titleEl;
+      // The kebab offers master, discontinue, maintain and delete. None of
+      // them mean anything for something that is not live yet, and the only
+      // two decisions that do are right beside it, so it comes off the row.
+      const keb = card.querySelector(":scope > .mn-act-head .mn-kebab-btn")
+               || card.querySelector(":scope .mn-kebab-btn");
+      if (keb?.parentElement) keb.parentElement.style.display = "none";
       if (!tagHost.querySelector(".mn-pending-tag")) {
         const tag = document.createElement("span");
         tag.className = "mn-pending-tag";
@@ -21371,12 +21377,15 @@ function mnInitActivityCollapse(bodyEl, acts) {
         // approving the activity now would file it under whichever heading
         // happens to sit above it instead.
         const blocker = pendingBlockedByHeading(acts, gi);
+        // Worded, not symbols. A tick and a cross on a row that already
+        // carries a tag read as a status rather than as two buttons, and the
+        // cross deletes -- which is worth saying out loud before it is pressed.
         const wrap = document.createElement("span");
         wrap.className = "mn-pending-actions";
         wrap.innerHTML = `
           <button class="mn-pending-btn mn-pending-ok" data-pending-idx="${gi}"
-            ${blocker ? `disabled title="Approve the section heading above this one first."` : `title="Approve"`}>✓</button>
-          <button class="mn-pending-btn mn-pending-no" data-pending-idx="${gi}" title="Reject and delete">✗</button>`;
+            ${blocker ? `disabled title="Approve the section heading above this one first."` : ``}>✓ Approve</button>
+          <button class="mn-pending-btn mn-pending-no" data-pending-idx="${gi}">✗ Reject &amp; Delete</button>`;
         tagHost.appendChild(wrap);
       }
     }

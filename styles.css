@@ -4597,18 +4597,19 @@ button.wf-pill:hover { filter: brightness(.93); }
   flex-shrink: 0;
 }
 .mn-pending-btn {
-  width: 1.55rem; height: 1.55rem;
-  border-radius: 50%;
+  border-radius: .4rem;
   border: 1.5px solid #d1d5db;
   background: #fff;
   cursor: pointer;
-  font-size: .9rem;
-  font-weight: 800;
+  font-size: .76rem;
+  font-weight: 700;
   line-height: 1;
   display: inline-flex;
   align-items: center;
+  gap: .25rem;
   justify-content: center;
-  padding: 0;
+  padding: .32rem .6rem;
+  white-space: nowrap;
 }
 .mn-pending-ok { color: #047857; border-color: #10b981; }
 .mn-pending-ok:hover:not(:disabled) { background: #d1fae5; }
