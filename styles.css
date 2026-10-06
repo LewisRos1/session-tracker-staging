@@ -4650,3 +4650,53 @@ button.wf-pill:hover { filter: brightness(.93); }
 /* display:none, not visibility: a hidden row must not keep its space, and the
    section rail is drawn from data-sec-* on the rows that remain. */
 .mn-hidden-by-pending { display: none !important; }
+
+/* Count of proposals on the selected target. Green, because it is a prompt to
+   look rather than a warning. */
+.target-pending-pill {
+  font-size: .76rem;
+  font-weight: 700;
+  color: #065f46;
+  background: #d1fae5;
+  border: 1px solid #10b981;
+  border-radius: .35rem;
+  padding: .2rem .5rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.target-pending-pill .tpp-short { display: none; }
+@media (max-width: 760px) {
+  /* The header already carries a label, a dropdown and two buttons. */
+  .target-pending-pill .tpp-long  { display: none; }
+  .target-pending-pill .tpp-short { display: inline; }
+}
+
+/* ── Approval tasks in the To Do list ─────────────────────── */
+.todo-approval-block { margin-bottom: .65rem; }
+.todo-approval-card {
+  border: 1.5px solid #f59e0b;
+  border-left-width: 4px;
+  border-radius: 12px;
+  background: #fffbeb;
+  margin-bottom: .65rem;
+  cursor: pointer;
+  padding: .9rem 1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+.todo-approval-card:hover { background: #fef3c7; }
+.todo-approval-name {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+/* On its own line under the name, so a long student name never squeezes it. */
+.todo-approval-pill {
+  display: inline-block;
+  margin-top: .3rem;
+  font-size: .8rem;
+  font-weight: 700;
+  padding: .15rem .55rem;
+  border-radius: 999px;
+  background: #fde68a;
+  color: #92400e;
+}

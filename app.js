@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2106";
+const APP_VERSION = "2107";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -2854,11 +2854,14 @@ async function loadTodoHomeCounts() {
         } catch { /* skip malformed session */ }
         return n;
       }, 0);
+      // Approvals are Ms. Daisy's and belong to a student rather than a
+      // session, so they are counted separately and added on.
+      const total = count + (inst.id === "daisy" ? entitiesAwaitingApproval().length : 0);
       const badge = document.querySelector(`.todo-home-badge[data-id="${inst.id}"]`);
       if (badge) {
-        badge.textContent = count;
-        badge.style.background = count > 0 ? "#3b82f6" : "#d1d5db";
-        badge.style.color      = count > 0 ? "#fff"    : "#6b7280";
+        badge.textContent = total;
+        badge.style.background = total > 0 ? "#3b82f6" : "#d1d5db";
+        badge.style.color      = total > 0 ? "#fff"    : "#6b7280";
       }
     } catch { /* silently skip this instructor if query fails */ }
   });
@@ -3061,6 +3064,34 @@ function renderTodoTiles(results, filterInst = null) {
     </button>`;
   };
 
+  // Approvals sit above the session tasks, and only on Ms. Daisy's list. They
+  // are not session work: a proposal belongs to a student, not to a day, so it
+  // has no date and no workflow phase and cannot be folded into the rows below.
+  const approvalHtml = (inst) => {
+    if (inst.id !== "daisy") return "";
+    const rows = entitiesAwaitingApproval();
+    if (rows.length === 0) return "";
+    return `<div class="todo-approval-block">
+      ${rows.map(r => `
+        <div class="todo-approval-card" data-approval-id="${escHtml(r.entity.id)}" data-approval-group="${r.isGroup}">
+          <div class="todo-approval-name">${escHtml(r.entity.name || "Unknown")}</div>
+          <span class="todo-approval-pill">(${r.count} item${r.count === 1 ? "" : "s"} waiting for approval)</span>
+        </div>`).join("")}
+    </div>`;
+  };
+
+  const wireApprovalCards = () => {
+    body.querySelectorAll(".todo-approval-card").forEach(card => {
+      card.addEventListener("click", () => {
+        const isGroup = card.dataset.approvalGroup === "true";
+        const list    = isGroup ? (state.groups || []) : (state.students || []);
+        const entity  = list.find(e => e.id === card.dataset.approvalId);
+        if (!entity) return;
+        openApprovalTask({ entity, isGroup, count: 0 });
+      });
+    });
+  };
+
   if (filterInst) {
     // Flat card list for a single instructor
     const { inst, pending } = results[0];
@@ -3117,12 +3148,15 @@ function renderTodoTiles(results, filterInst = null) {
       </div>`;
     };
 
+    const approvals = approvalHtml(inst);
     body.innerHTML = `
       <div style="padding:1rem;max-width:600px;margin:0 auto">
+        ${approvals}
         ${sorted.length === 0
-          ? `<p style="color:var(--text-muted);padding:.5rem 0">All caught up! No pending tasks.</p>`
+          ? (approvals ? "" : `<p style="color:var(--text-muted);padding:.5rem 0">All caught up! No pending tasks.</p>`)
           : sorted.map(mkFlatCard).join("")}
       </div>`;
+    wireApprovalCards();
 
     body.querySelectorAll(".todo-flat-card").forEach(card => {
       card.addEventListener("click", () => {
@@ -3146,7 +3180,11 @@ function renderTodoTiles(results, filterInst = null) {
     body.innerHTML = `
       <div style="padding:1rem;display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;align-items:start">
         ${results.map(({ inst, pending }) => {
-          const hasPending = pending.length > 0;
+          // Approvals count towards the badge and towards whether the column
+          // opens at all: a column showing 0 does not expand, which would hide
+          // the very thing it is meant to surface.
+          const approvalRows = inst.id === "daisy" ? entitiesAwaitingApproval().length : 0;
+          const hasPending = pending.length + approvalRows > 0;
           const sorted = [...pending].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
           return `
           <div class="todo-col" style="border:1.5px solid #e5e7eb;border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.06)">
@@ -3154,16 +3192,18 @@ function renderTodoTiles(results, filterInst = null) {
               style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:.9rem 1rem;border:none;background:#f9fafb;cursor:${hasPending ? "pointer" : "default"};text-align:left">
               <div style="display:flex;align-items:center;gap:.5rem">
                 <span style="font-weight:700;font-size:.95rem;color:#1f2937">${escHtml(inst.name)}</span>
-                <span style="background:${pending.length > 0 ? '#3b82f6' : '#d1d5db'};color:${pending.length > 0 ? '#fff' : '#6b7280'};border-radius:999px;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;padding:0 5px;flex-shrink:0">${pending.length}</span>
+                <span style="background:${hasPending ? '#3b82f6' : '#d1d5db'};color:${hasPending ? '#fff' : '#6b7280'};border-radius:999px;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;padding:0 5px;flex-shrink:0">${pending.length + approvalRows}</span>
               </div>
               ${hasPending ? `<span class="todo-chevron" style="color:#6b7280;font-size:1.5rem;line-height:1;transition:transform .2s;transform:rotate(-90deg)">▾</span>` : ""}
             </button>
             <div class="todo-col-body" data-id="${inst.id}" style="display:none">
+              ${approvalHtml(inst)}
               ${hasPending ? sorted.map(s => mkSessionRow(s, inst)).join("") : ""}
             </div>
           </div>`;
         }).join("")}
       </div>`;
+    wireApprovalCards();
   }
 
   // Toggle collapse
@@ -10960,9 +11000,15 @@ async function openSession(student, existingSessionId = null, dateStr = null, pa
           deleteOrphanActivities(sessionId, staleActIds, staleRemIds).catch(() => {});
         }
         const eff = getEffectiveTargets();
-        state.selectedTargetName = (preservedTargetName && eff.some(t => t.name === preservedTargetName))
-          ? preservedTargetName
-          : (eff[0]?.name || null);
+        // Arriving from an approval task lands on the target that is waiting,
+        // rather than on whichever target happens to be first.
+        const jump = _approvalJumpTarget && eff.some(t => t.name === _approvalJumpTarget)
+          ? _approvalJumpTarget : null;
+        _approvalJumpTarget = null;
+        state.selectedTargetName = jump
+          || ((preservedTargetName && eff.some(t => t.name === preservedTargetName))
+                ? preservedTargetName
+                : (eff[0]?.name || null));
         populateTargetDropdown(eff);
         // Auto-create an empty remark for "pick from options" activities
         // (Select one / Tick boxes / Sentence Starter + either, or + Select
@@ -11140,6 +11186,23 @@ function sortTargetsByOrder(targets) {
   return [...targets].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
 }
 
+/**
+ * The count for the target on screen.
+ *
+ * Spelled out where there is room and reduced to a number where there is not:
+ * on a phone the header already holds a label, a dropdown and two buttons, and
+ * a sentence here would push the dropdown onto its own line.
+ */
+function renderTargetPendingPill(target) {
+  const el = $("target-pending-pill");
+  if (!el) return;
+  const n = pendingCountForTarget(target);
+  el.classList.toggle("hidden", n === 0);
+  if (n === 0) return;
+  el.innerHTML = `<span class="tpp-long">(${n} item${n === 1 ? "" : "s"} waiting for approval)</span>`
+               + `<span class="tpp-short">(${n})</span>`;
+}
+
 function populateTargetDropdown(targets) {
   const sel = $("target-select");
   const sorted = sortTargetsByOrder(targets).filter(t => !t.discontinuedOn);
@@ -11149,13 +11212,19 @@ function populateTargetDropdown(targets) {
   if (!state._targetSelDown) {
     const placeholder = sorted.length === 0
       ? `<option value="" disabled selected>— no targets yet —</option>` : "";
+    // The count rides in the option text because a <select> cannot carry a
+    // styled badge. It is the only way to see, from the closed list, WHICH
+    // target is waiting -- which is the thing that would otherwise mean opening
+    // every one of them.
     sel.innerHTML = placeholder +
-      sorted.map(t =>
-        `<option value="${escHtml(t.name)}">${escHtml(t.name)}</option>`
-      ).join("") + `<option value="__add_target__">+ Add Target…</option>`;
+      sorted.map(t => {
+        const n = pendingCountForTarget(t);
+        return `<option value="${escHtml(t.name)}">${escHtml(t.name)}${n ? ` (${n})` : ""}</option>`;
+      }).join("") + `<option value="__add_target__">+ Add Target…</option>`;
 
     sel.value = state.selectedTargetName || sorted[0]?.name || "";
   }
+  renderTargetPendingPill(sorted.find(t => t.name === sel.value));
 
   const editInstBtn2 = $("btn-entry-edit-instructors");
   if (editInstBtn2) {
@@ -14401,34 +14470,106 @@ const canApprove = () => {
 /**
  * Fold a target's proposals into its live list for editing.
  *
+ * Returns a COPY, and the caller must use what comes back. The target handed
+ * in is a live reference inside state.currentStudent, and merging into it was
+ * enough to put an unapproved activity on the session screen the moment anyone
+ * opened Edit Target -- no save required. The copy keeps proposals inside the
+ * editor, where they belong.
+ *
+ * Only the target and its list are copied; the entries themselves stay shared.
+ * The editor has always written straight into those objects, and changing that
+ * here would quietly alter what an edit does.
+ *
  * pendingAtIdx is where the entry sat when it was last saved. Inserting in
  * ascending order means each index is correct as it is used, because
  * everything before it is already back in place. An index past the end lands
- * at the end, which is where an entry whose neighbours have since gone belongs
- * anyway.
+ * at the end, which is where an entry whose neighbours have since gone belongs.
  */
 function mergePendingForEdit(target) {
   if (!target || target._pendingMerged) return target;
-  const pend = Array.isArray(target.pendingActivities) ? target.pendingActivities : [];
-  target.predefinedActivities = target.predefinedActivities || [];
+  const pend   = Array.isArray(target.pendingActivities) ? target.pendingActivities : [];
+  const merged = (target.predefinedActivities || []).slice();
   pend
     .slice()
     .sort((a, b) => (a.pendingAtIdx ?? 1e9) - (b.pendingAtIdx ?? 1e9))
     .forEach(item => {
       const { pendingAtIdx, ...rest } = item;
-      const at = Math.min(pendingAtIdx ?? target.predefinedActivities.length,
-                          target.predefinedActivities.length);
-      target.predefinedActivities.splice(at, 0, { ...rest, _pending: true });
+      merged.splice(Math.min(pendingAtIdx ?? merged.length, merged.length), 0,
+                    { ...rest, _pending: true });
     });
-  // Marks the target as opened, so a later save rebuilds pendingActivities
-  // even when the last proposal has just been approved or rejected.
-  target._pendingMerged = true;
-  return target;
+  // _pendingMerged marks this as the editor's copy: it stops a re-render
+  // copying again, and tells the split below to rebuild pendingActivities even
+  // when the last proposal has just been approved or rejected.
+  return { ...target, predefinedActivities: merged, _pendingMerged: true };
+}
+
+/**
+ * The reverse: the editor's copy back to a plain target.
+ *
+ * The same shape as splitPendingForWrite in firebase-service, which guards the
+ * write. This one guards MEMORY, so what sits in state.currentStudent after a
+ * save is a target with no proposals in its live list.
+ */
+function splitPendingTarget(t) {
+  if (!t?._pendingMerged) return t;
+  const live = [], pend = [];
+  (t.predefinedActivities || []).forEach((a, i) => {
+    if (!a?._pending) { live.push(a); return; }
+    const { _pending, ...rest } = a;
+    pend.push({ ...rest, pendingAtIdx: i });
+  });
+  const { _pendingMerged, ...rest } = t;
+  return { ...rest, predefinedActivities: live, pendingActivities: pend };
 }
 
 // The filter survives the re-render that approving or rejecting triggers, so
 // working through a list does not mean switching it back on each time.
 let _mnPendingOnly = false;
+
+// Set just before openSession so the screen opens on the target that is
+// waiting. Cleared as soon as it is used, so it cannot steer a later visit.
+let _approvalJumpTarget = null;
+
+/** Everyone carrying proposals, newest-looking first. */
+function entitiesAwaitingApproval() {
+  const rows = [];
+  for (const st of state.students || []) {
+    const n = pendingCountForEntity(st);
+    if (n > 0) rows.push({ entity: st, isGroup: false, count: n });
+  }
+  for (const g of state.groups || []) {
+    const n = pendingCountForEntity(g);
+    if (n > 0) rows.push({ entity: g, isGroup: true, count: n });
+  }
+  return rows.sort((a, b) => b.count - a.count);
+}
+
+/**
+ * Open the student on the first target that is waiting.
+ *
+ * Their most recent EXISTING session, never a new one: reviewing somebody
+ * else's proposal should not quietly create a session for today that nobody
+ * ran.
+ */
+async function openApprovalTask(row) {
+  const t = (row.entity.targets || []).find(x => pendingCountForTarget(x) > 0);
+  _approvalJumpTarget = t?.name || null;
+  try {
+    if (row.isGroup) {
+      const sessions = await getRecentGroupSessions(row.entity.id, 1).catch(() => []);
+      if (!sessions.length) { alert("This group has no sessions yet, so there is nothing to open."); return; }
+      await openGroupSession(row.entity, sessions[0].date, sessions[0].attendees || []);
+    } else {
+      const sessions = await getIndividualSessionsForStudent(row.entity.id).catch(() => []);
+      if (!sessions.length) { alert("This student has no sessions yet, so there is nothing to open."); return; }
+      const latest = sessions.sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0];
+      await openSession(row.entity, latest.id, latest.date);
+    }
+  } catch (err) {
+    _approvalJumpTarget = null;
+    console.error("openApprovalTask:", err);
+  }
+}
 
 /** Stamp an entry as somebody's proposal. */
 function markAsProposal(item) {
@@ -21435,10 +21576,11 @@ function mnRegroupInactiveCards(bodyEl, acts) {
 function renderTargetManageContent(student, target) {
   $("manage-modal-title").textContent = target.name;
   target.predefinedActivities = normalizeActivitiesFormat(target.predefinedActivities || []);
-  // Proposals join the live list for the duration of the edit. They are pulled
-  // back out on every write by splitPendingForWrite, so nothing here can leak
-  // an unapproved entry into a session or an export.
-  mergePendingForEdit(target);
+  // Proposals join the live list for the duration of the edit, on a copy. The
+  // reassignment is the point: everything below, including every handler that
+  // closes over `target`, works on the editor's copy, while the object the rest
+  // of the app holds keeps its live list clean.
+  target = mergePendingForEdit(target);
 
   // Migrate legacy notes array into the unified predefinedActivities list
   if (target.notes?.length > 0) {
@@ -21455,8 +21597,11 @@ function renderTargetManageContent(student, target) {
     // Discard Changes, and a discard can only put things back if they never
     // left. Save and Close lifts the hold and writes once.
     if (_mnPanelHold) { _mnPanelSaveWanted = true; return; }
+    // The split version, not the editor's copy. Handing back the merged list
+    // would put the proposals straight into the object the session screen
+    // reads, which is the leak this whole arrangement exists to prevent.
     const i = student.targets.findIndex(t => t.id === target.id);
-    if (i >= 0) student.targets[i] = target;
+    if (i >= 0) student.targets[i] = splitPendingTarget(target);
     if (_groupForTargetEdit) {
       const gi = state.groups.findIndex(g => g.id === _groupForTargetEdit.id);
       if (gi >= 0) state.groups[gi] = _groupForTargetEdit;
@@ -26165,7 +26310,12 @@ async function openGroupSession(group, dateStr, attendees, participants = null) 
       if (firstLoad) {
         firstLoad = false;
         const stillValid = preservedGroupTargetName && group.targets.some(t => t.name === preservedGroupTargetName);
-        state.selectedGroupTargetName = stillValid ? preservedGroupTargetName : (sortTargetsByOrder(group.targets)[0]?.name || null);
+        // An approval task lands on the target that is waiting; see openSession.
+        const grpJump = _approvalJumpTarget && group.targets.some(t => t.name === _approvalJumpTarget)
+          ? _approvalJumpTarget : null;
+        _approvalJumpTarget = null;
+        state.selectedGroupTargetName = grpJump
+          || (stillValid ? preservedGroupTargetName : (sortTargetsByOrder(group.targets)[0]?.name || null));
         populateGroupTargetDropdown(group.targets);
         try { renderGroupTargetContent(); } catch (e) { console.error("renderGroupTargetContent (init) failed:", e); }
         if (state.selectedGroupTargetName) {
