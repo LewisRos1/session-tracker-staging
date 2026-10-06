@@ -4622,38 +4622,59 @@ button.wf-pill:hover { filter: brightness(.93); }
    what made them look scattered. Absolute keeps them in one place whatever
    length the title is, and the card is padded so the text wraps before it
    reaches them. */
-.mn-pending-card { position: relative; }
-.mn-pending-card > * { padding-right: 11.5rem; }
+/* The reserved strip is padding on the CARD, never on its children.
+   Padding every child pushed the chip, the title and the kebab around
+   individually, which is what sent the row's own layout to pieces. */
+.mn-pending-card {
+  position: relative;
+  padding-right: 12rem !important;
+  box-sizing: border-box;
+}
 .mn-pending-foot {
   position: absolute;
-  top: .55rem;
-  right: .7rem;
-  width: 10.5rem;
+  top: .5rem;
+  right: .6rem;
+  width: 11rem;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: .35rem;
-  padding-right: 0 !important;
   z-index: 2;
 }
-.mn-pending-foot .mn-pending-tag { text-align: center; margin-left: 0; }
+.mn-pending-top {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+}
+.mn-pending-top .mn-pending-tag { flex: 1; text-align: center; }
+/* The row's own kebab, moved in so it sits where every other kebab sits. */
+.mn-pending-kebab-slot { flex-shrink: 0; display: inline-flex; }
 .mn-pending-foot .mn-pending-hint { max-width: none; white-space: normal; text-align: center; }
+
 .mn-pending-details { padding-left: 2.6rem; }
-.mn-sub-compact.mn-pending-card { flex-wrap: wrap; }
-.mn-sub-compact.mn-pending-card .mn-pending-details { padding-left: 1.6rem; }
+.mn-pending-details-label {
+  display: block;
+  font-weight: 700;
+  font-size: .78rem;
+  letter-spacing: .02em;
+}
+.mn-pending-details-body { display: block; }
+.mn-sub-compact.mn-pending-card .mn-pending-details { padding-left: 1.7rem; }
 
 @media (max-width: 760px) {
-  /* Not enough width for a column beside the text, so it goes back under it. */
-  .mn-pending-card > * { padding-right: .6rem; }
+  /* No room for a column beside the text, so it goes back under it. */
+  .mn-pending-card { padding-right: .6rem !important; }
   .mn-pending-foot {
     position: static;
     width: 100%;
     flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
-    padding: .2rem .6rem .5rem 2.6rem !important;
+    margin-top: .35rem;
+    padding-left: 2.6rem;
     box-sizing: border-box;
   }
+  .mn-pending-top { flex: 1 1 100%; }
   .mn-pending-foot .mn-pending-btn { flex: 1 1 auto; }
 }
 
@@ -4888,3 +4909,16 @@ button.wf-pill:hover { filter: brightness(.93); }
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* A sub-activity's row is one flex line by default. The details need a line of
+   their own under the title rather than a slot beside it. */
+.mn-sub-compact.mn-pending-card {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.mn-sub-compact.mn-pending-card .mn-sub-compact-title,
+.mn-sub-compact.mn-pending-card > span:not(.drag-handle):not(.mn-row-chip) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.mn-pending-card .mn-pending-details { width: 100%; box-sizing: border-box; }

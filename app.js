@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2131";
+const APP_VERSION = "2132";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -14856,20 +14856,44 @@ function buildPendingFooter(item, idx, blockedHint) {
   if (detail.trim()) {
     const d = document.createElement("div");
     d.className = "mn-pending-details";
-    d.innerHTML = formatActivityMarkup(detail);
+    // Labelled. Dropped in under the title with nothing to introduce it, the
+    // details read as a second, unexplained line of the title.
+    d.innerHTML = `<span class="mn-pending-details-label">Details:</span>`
+      + `<span class="mn-pending-details-body">${formatActivityMarkup(detail)}</span>`;
     out.appendChild(d);
   }
 
   const col = document.createElement("div");
   col.className = "mn-pending-foot";
   col.innerHTML = `
-    <span class="mn-pending-tag">Waiting for approval</span>
+    <div class="mn-pending-top">
+      <span class="mn-pending-tag">Waiting for approval</span>
+      <span class="mn-pending-kebab-slot"></span>
+    </div>
     ${canApprove() ? `
       ${blockedHint ? `<span class="mn-pending-hint">${blockedHint}</span>` : ``}
       <button class="mn-pending-btn mn-pending-ok" data-pending-idx="${idx}"${blockedHint ? " disabled" : ""}>✓ Approve</button>
       <button class="mn-pending-btn mn-pending-no" data-pending-idx="${idx}">✗ Reject &amp; Delete</button>` : ``}`;
   out.appendChild(col);
   return out;
+}
+
+/**
+ * Move a row's own kebab into the proposal column.
+ *
+ * The column sits where a kebab normally does, so left alone the two fought
+ * over the same corner and the kebab was pushed somewhere arbitrary. Moved, not
+ * copied: a second menu would need its own handlers and would have to be kept
+ * in step with this one forever.
+ */
+function adoptKebabIntoPendingFoot(host, kebabBtn) {
+  const slot = host?.querySelector(".mn-pending-kebab-slot");
+  const wrap = kebabBtn?.parentElement;
+  if (!slot || !wrap || slot.contains(wrap)) return;
+  wrap.style.marginTop = "0";
+  wrap.style.marginLeft = "0";
+  wrap.style.alignSelf = "center";
+  slot.appendChild(wrap);
 }
 
 /** Stamp an entry as somebody's proposal. */
@@ -21749,6 +21773,7 @@ function mnInitActivityCollapse(bodyEl, acts) {
           ? `Approve ${bName ? `“${escHtml(truncateWords(bName))}” section heading` : "the section heading above"} first`
           : "";
         card.appendChild(buildPendingFooter(act, gi, hint));
+        adoptKebabIntoPendingFoot(card, ownMenu(".mn-kebab-btn, .mn-heading-color-btn")[0]);
       }
     }
 
@@ -21778,9 +21803,13 @@ function mnInitActivityCollapse(bodyEl, acts) {
     // proposal, and with nothing to approve it by.
     if (sub?._pending) {
       row.classList.add("mn-pending-card");
-      // Status actions assume a live row; the sub's own kebab keeps the rest.
-      row.querySelectorAll(".mn-km-status-btn").forEach(el => { el.style.display = "none"; });
-      item.querySelectorAll(".mn-km-status-btn").forEach(el => { el.style.display = "none"; });
+      // Everything except Delete goes. Mastering, discontinuing, maintaining,
+      // moving to another parent and making it standalone are all things you do
+      // to a sub-activity that exists; this one does not exist yet. Delete stays
+      // because it is the only way the person who proposed it can withdraw it.
+      [row, item].forEach(host => host.querySelectorAll(
+        ".mn-sub-km-status-btn, .mn-km-status-btn, .mn-move-sub-act, .mn-make-standalone"
+      ).forEach(el => { el.style.display = "none"; }));
 
       if (!row.querySelector(".mn-pending-foot")) {
         // A sub cannot go live before the parent it hangs off: approved on its
@@ -21794,6 +21823,8 @@ function mnInitActivityCollapse(bodyEl, acts) {
           ? `Approve ${bName ? `“${escHtml(truncateWords(bName))}” parent activity` : "the parent activity"} first`
           : "";
         row.appendChild(buildPendingFooter(sub, subIdx, hint));
+        adoptKebabIntoPendingFoot(row, row.querySelector(".mn-sub-kebab-btn")
+                                    || item.querySelector(".mn-sub-kebab-btn"));
       }
     }
     // The ⋮ belongs on the row, level with the parent activity's own ⋮ above
