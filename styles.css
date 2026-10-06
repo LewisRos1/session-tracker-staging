@@ -4652,18 +4652,33 @@ button.wf-pill:hover { filter: brightness(.93); }
    kebab in the list sits. Everything below it is full width, so the tag and
    both buttons share one left edge. */
 .mn-pending-kebab-slot { flex-shrink: 0; display: inline-flex; }
-/* Same size and weight as the two buttons: they are three controls in one
-   column and a smaller tag read as a caption for them. */
+/* The tag is a label, like the SUB-ACTIVITY chip opposite it, so it is set in
+   the same type as that chip rather than in the buttons'. Its box is the width
+   of the column and its top is the top of the column, which puts it level with
+   the chip across the row. */
 .mn-pending-foot .mn-pending-tag {
   display: block;
   width: 100%;
   box-sizing: border-box;
   text-align: center;
   margin: 0;
-  padding: .4rem .5rem;
-  font-size: .78rem;
+  padding: .18rem .42rem;
+  font-size: .65rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
   line-height: 1;
+  border-radius: .3rem;
 }
+
+/* Room for the column.
+   It is positioned out of the flow, so a card shorter than the column -- a
+   one-line activity, a section heading, a note -- had the buttons hanging out
+   of its bottom edge. The class is set in JS rather than matched with :has(),
+   which not every browser this runs on understands. Only when the buttons are
+   actually there: with just the tag, the reserved height would be empty
+   space. */
+.mn-pending-card.mn-pending-decide { min-height: 7.4rem; }
 .mn-pending-foot .mn-pending-hint { max-width: none; white-space: normal; text-align: center; }
 
 /* Same size as the title it sits under, with a gap above so the two read as

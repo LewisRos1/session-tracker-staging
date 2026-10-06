@@ -205,7 +205,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2139";
+const APP_VERSION = "2140";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -14873,7 +14873,10 @@ function buildPendingFooter(item, idx, blockedHint) {
   }
 
   const col = document.createElement("div");
-  col.className = "mn-pending-foot";
+  // Marked when it carries the two buttons, so the row can be told to reserve
+  // enough height for them. Without it a one-line activity was shorter than its
+  // own column and the buttons hung out of the bottom of the card.
+  col.className = "mn-pending-foot" + (canApprove() ? " mn-pending-foot--decide" : "");
   // A two-column grid: the tag and the buttons share the first column, so they
   // share a left edge and a width, and the kebab sits in the second beside the
   // tag. On its own line above, it pushed the tag down and away from the title
@@ -21859,6 +21862,7 @@ function mnInitActivityCollapse(bodyEl, acts) {
           ? `Approve ${bName ? `“${escHtml(truncateWords(bName))}” section heading` : "the section heading above"} first`
           : "";
         card.appendChild(buildPendingFooter(act, gi, hint));
+        if (canApprove()) card.classList.add("mn-pending-decide");
         adoptKebabIntoPendingFoot(card, ownMenu(".mn-kebab-btn, .mn-heading-color-btn")[0]);
       }
     }
@@ -21910,6 +21914,7 @@ function mnInitActivityCollapse(bodyEl, acts) {
           ? `Approve ${bName ? `“${escHtml(truncateWords(bName))}” parent activity` : "the parent activity"} first`
           : "";
         row.appendChild(buildPendingFooter(sub, subIdx, hint));
+        if (canApprove()) row.classList.add("mn-pending-decide");
         adoptKebabIntoPendingFoot(row, row.querySelector(".mn-sub-kebab-btn")
                                     || item.querySelector(".mn-sub-kebab-btn"));
       }
