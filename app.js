@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2127";
+const APP_VERSION = "2128";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -21728,6 +21728,43 @@ function mnInitActivityCollapse(bodyEl, acts) {
     if (!row.querySelector(".mn-row-chip")) {
       const handle = row.querySelector(".drag-handle");
       row.insertBefore(mnRowChip("sub"), handle ? handle.nextSibling : row.firstChild);
+    }
+
+    // A sub-activity is decorated here and not in the pass above, because its
+    // compact row is not one of the cards that pass walks. It was therefore the
+    // one kind of proposal carrying no tag at all: counted, invisible as a
+    // proposal, and with nothing to approve it by.
+    if (sub?._pending) {
+      row.classList.add("mn-pending-card");
+      if (!row.querySelector(".mn-pending-tag")) {
+        const tag = document.createElement("span");
+        tag.className = "mn-pending-tag";
+        tag.textContent = "Waiting for approval";
+        tag.style.marginLeft = "auto";
+        row.appendChild(tag);
+      }
+      // Status actions assume a live row; the sub's own kebab keeps the rest.
+      row.querySelectorAll(".mn-km-status-btn").forEach(el => { el.style.display = "none"; });
+      item.querySelectorAll(".mn-km-status-btn").forEach(el => { el.style.display = "none"; });
+
+      if (canApprove() && !row.querySelector(".mn-pending-actions")) {
+        // A sub cannot go live before the parent it hangs off: approved on its
+        // own it would point at a parent that is not there yet.
+        const pKey    = (sub.parentActivity || "").trim();
+        const parent  = pKey ? acts.find(x => x && !x.parentActivity
+                          && ((x._linkKey || x.title || x.name) === pKey)) : null;
+        const blocked = parent?._pending ? parent : null;
+        const bName   = blocked ? (blocked.title || blocked.name || "").trim() : "";
+        const wrap = document.createElement("span");
+        wrap.className = "mn-pending-actions";
+        wrap.innerHTML = `
+          ${blocked ? `<span class="mn-pending-hint">Approve ${
+            bName ? `“${escHtml(truncateWords(bName))}” parent activity` : "the parent activity"
+          } first</span>` : ``}
+          <button class="mn-pending-btn mn-pending-ok" data-pending-idx="${subIdx}"${blocked ? " disabled" : ""}>✓ Approve</button>
+          <button class="mn-pending-btn mn-pending-no" data-pending-idx="${subIdx}">✗ Reject &amp; Delete</button>`;
+        row.appendChild(wrap);
+      }
     }
     // The ⋮ belongs on the row, level with the parent activity's own ⋮ above
     // it, rather than inside the card you have to open first. The element is
