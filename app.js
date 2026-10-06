@@ -205,7 +205,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2146";
+const APP_VERSION = "2147";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -24453,6 +24453,18 @@ function renderTargetManageContent(student, target) {
       delete a._pending;
       delete a.proposedBy;
       delete a.proposedAt;
+
+      // It starts the day it is approved, not the day it was asked for.
+      //
+      // Proposed on the 7th and approved on the 9th, it did not exist on the
+      // 7th or the 8th: it was in nobody's session and nobody could write
+      // against it. Dating it back makes it look unfilled for days it was never
+      // part of. Today's real date, not the open session's -- the approval
+      // happens now, whatever day is being written up.
+      const approvedOn = todayDateStr();
+      if (a.createdOn !== undefined) a.createdOn = approvedOn;
+      // A section heading's activeFrom is deliberately null and stays that way.
+      if (a.activeFrom) a.activeFrom = approvedOn;
       // Told to whoever asked for it. Recorded on the entity being edited, which
       // for a group target is the group rather than the student standing in for
       // it here.
