@@ -2543,7 +2543,18 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
 async function buildSingleSessionWordBlob(entityName, sessionLabel, allTargets, session) {
   const { Document, Packer, LineRuleType } = docx;
   const stampImageBuffer = await getStampImageBuffer();
-  const { header, footer, body } = buildSessionDocxBody(entityName, sessionLabel, allTargets, session, stampImageBuffer);
+  // A target discontinued before this session happened is left out of the
+  // document entirely.
+  //
+  // Discontinuing a target hides it from the session dropdown, so no data is
+  // ever recorded against it again -- but the Word report went on printing it
+  // for every later session, as a heading with an empty table or a line saying
+  // all its activities were mastered. The day it stopped is the last day it
+  // belongs in a report; anything on or before that date still shows it,
+  // because those sessions really did include it.
+  const targetsForDate = (allTargets || []).filter(t =>
+    !t?.discontinuedOn || !session?.date || session.date <= t.discontinuedOn);
+  const { header, footer, body } = buildSessionDocxBody(entityName, sessionLabel, targetsForDate, session, stampImageBuffer);
   const doc = new Document({
     // 1.5 line spacing document-wide (360 = 1.5 * the single-spacing unit of
     // 240) — every Paragraph inherits this unless it sets its own "spacing",
