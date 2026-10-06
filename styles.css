@@ -4702,7 +4702,6 @@ button.wf-pill:hover { filter: brightness(.93); }
     padding-left: 2.6rem;
     box-sizing: border-box;
   }
-  .mn-pending-top { flex: 1 1 100%; }
   .mn-pending-foot .mn-pending-btn { flex: 1 1 auto; }
 }
 
