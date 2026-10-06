@@ -205,7 +205,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2142";
+const APP_VERSION = "2143";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -2770,7 +2770,8 @@ $("btn-logout")?.addEventListener("click", () => {
 // Individual Sessions has no Add button: registering a student in the Student
 // Database is what puts them there. Two steps meant a student could exist and
 // still be missing from the list, with nothing on screen explaining the gap.
-$("btn-add-group").addEventListener("click", addNewGroup);
+$("btn-add-group").addEventListener("click", () =>
+  requirePassword(addNewGroup, EXPORT_MSG));
 $("btn-archived-existing")?.addEventListener("click", () => {
   state.showArchivedExisting = !state.showArchivedExisting;
   renderExistingStudentButtons();
@@ -2797,7 +2798,10 @@ function renderStudentDatabaseButton() {
     <button class="export-btn" id="btn-open-ai-report">AI Report Generator</button>
     <button class="export-btn" id="btn-open-score-settings">Score Settings</button>
   </div>`;
-  $("btn-open-student-registry").addEventListener("click", () => openStudentRegistryScreen());
+  // Adding, renaming, deleting and re-noting students is everything this
+  // screen does, and none of it is an assistant's to do.
+  $("btn-open-student-registry").addEventListener("click", () =>
+    requirePassword(() => openStudentRegistryScreen(), EXPORT_MSG));
   // Behind the same password as Edit Target: the scale it sets decides every
   // score in the app, so it is not something to wander into.
   $("btn-open-score-settings").addEventListener("click", () =>
@@ -15042,6 +15046,13 @@ function wireAssistantMenuLock(bodyEl, acts) {
   bodyEl._mnLockWired = true;
   bodyEl.addEventListener("click", e => {
     if (!proposesOnly()) return;
+    const locked = e.target.closest(".mn-locked-field, .mn-locked-handle");
+    if (locked) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      showEditTargetLock("Locked.");
+      return;
+    }
     const btn = e.target.closest(LIVE_ONLY_MENU_ITEMS);
     if (!btn) return;
     const idx = Number(btn.dataset.idx);
@@ -15053,6 +15064,57 @@ function wireAssistantMenuLock(bodyEl, acts) {
       .forEach(m => { m.style.display = "none"; });
     showEditTargetLock("Locked. Only Ms. Daisy can perform these functions.");
   }, true);
+}
+
+/**
+ * Lock everything in Edit Target that is already approved.
+ *
+ * Deliberately the other way round from a list of things to disable: every
+ * field is locked, and then the ones belonging to this person's own proposals
+ * are let back in. A list of what to lock has to be kept in step with the
+ * screen forever, and the cost of forgetting one is an assistant quietly
+ * editing live work. The cost of locking one too many is a field that does not
+ * respond, which gets noticed and reported.
+ *
+ * That covers the mastered and discontinued cards too, which are approved work
+ * like any other, and the target's own name, which belongs to no row at all.
+ */
+function applyAssistantReadOnly(bodyEl, acts) {
+  if (!proposesOnly() || !bodyEl) return;
+
+  const ownIdx = el => {
+    const host = el.closest("[data-idx],[data-global-idx],[data-completed-idx],[data-discontinued-idx]");
+    if (!host) return null;
+    const d = host.dataset;
+    const raw = d.idx ?? d.globalIdx ?? d.completedIdx ?? d.discontinuedIdx;
+    return raw == null || raw === "" ? null : Number(raw);
+  };
+  const isHers = el => {
+    const i = ownIdx(el);
+    return i != null && !!acts[i]?._pending;
+  };
+
+  bodyEl.querySelectorAll("input, textarea, select").forEach(el => {
+    if (isHers(el)) return;
+    if (el.tagName === "SELECT") el.disabled = true;
+    else el.readOnly = true;
+    el.classList.add("mn-locked-field");
+  });
+
+  // Buttons that edit rather than navigate. The kebab is left alone: it opens
+  // and shows the lock, which says more than a dead button does.
+  bodyEl.querySelectorAll(
+    ".mn-opt-add, .mn-opt-remove, .mn-opt-unremove, .mn-act-start-btn, " +
+    ".mn-parent-start-date-btn, .btn-mn-del-mastered"
+  ).forEach(b => { if (!isHers(b)) b.classList.add("mn-locked-field"); });
+
+  // Reordering approved work is editing it. Her own proposals keep their
+  // handles, and can be dragged anywhere in the list -- including in among
+  // approved rows, which is the only way to say which heading one belongs
+  // under.
+  bodyEl.querySelectorAll(".drag-handle").forEach(h => {
+    if (!isHers(h)) h.classList.add("mn-locked-handle");
+  });
 }
 
 /** Stamp an entry as somebody's proposal. */
@@ -16147,9 +16209,10 @@ function renderSessionView() {
   const delBtn = $("btn-delete-session");
   if (delBtn) delBtn.classList.remove("hidden");
 
-  $("view-session-meta").querySelector(".btn-edit-session-date").addEventListener("click", () => {
-    showEditDatePicker();
-  });
+  // Moving a session to another day shifts its number and everything that
+  // reads from it.
+  $("view-session-meta").querySelector(".btn-edit-session-date").addEventListener("click", () =>
+    requirePassword(() => showEditDatePicker(), EXPORT_MSG));
 
   const gotoBtn = $("btn-goto-session");
   if (gotoBtn) {
@@ -16163,13 +16226,13 @@ function renderSessionView() {
     const newDelBtn = _delBtn.cloneNode(true); // remove old listeners
     newDelBtn.classList.remove("hidden");
     _delBtn.replaceWith(newDelBtn);
-    newDelBtn.addEventListener("click", async () => {
+    newDelBtn.addEventListener("click", () => requirePassword(async () => {
       const typed = prompt(`Delete Session ${data.sessionNumber} (${formatDate(data.date)})?\n\nThis cannot be undone. Type DELETE to confirm:`);
       if (typed !== "DELETE") return;
       const sid = state.viewSessionId;
       leaveSessionView();
       await deleteSession(sid).catch(() => {});
-    });
+    }, EXPORT_MSG));
   }
 
   const targets = getViewEffectiveTargets();
@@ -18284,9 +18347,9 @@ function renderGroupSessionView() {
   const delBtn = $("btn-group-delete-session");
   if (delBtn) delBtn.classList.remove("hidden");
 
-  $("group-view-session-meta").querySelector(".btn-edit-session-date").addEventListener("click", () => {
-    showEditGroupDatePicker();
-  });
+  // Same as the individual screen: moving a session shifts its number.
+  $("group-view-session-meta").querySelector(".btn-edit-session-date").addEventListener("click", () =>
+    requirePassword(() => showEditGroupDatePicker(), EXPORT_MSG));
 
   const gotoBtn = $("btn-group-goto-session");
   if (gotoBtn) {
@@ -18300,13 +18363,13 @@ function renderGroupSessionView() {
     const newDelBtn = _delBtn.cloneNode(true); // remove old listeners
     newDelBtn.classList.remove("hidden");
     _delBtn.replaceWith(newDelBtn);
-    newDelBtn.addEventListener("click", async () => {
+    newDelBtn.addEventListener("click", () => requirePassword(async () => {
       const typed = prompt(`Delete Session ${data.sessionNumber} of ${data.month.split(" ")[0]} (${formatDate(data.date)})?\n\nThis cannot be undone. Type DELETE to confirm:`);
       if (typed !== "DELETE") return;
       const sid = state.viewGroupSessionId;
       leaveGroupSessionView();
       await deleteSession(sid).catch(() => {});
-    });
+    }, EXPORT_MSG));
   }
 
   const attendees = data.attendees || (group.students || []).filter(Boolean);
@@ -21554,6 +21617,11 @@ function mnPanelTitleHtml(titleEl) {
   if (!titleEl) return "";
   const clone = titleEl.cloneNode(true);
   clone.querySelectorAll(".mn-act-note-preview").forEach(n => n.remove());
+  // A mastered or discontinued card carries its chip INSIDE the title, where
+  // an ordinary row keeps it alongside. Cloning the title therefore brought a
+  // chip with it, and the panel added its own on top -- two PARENT ACTIVITY
+  // labels side by side. The panel's own is the one that stays.
+  clone.querySelectorAll(".mn-row-chip").forEach(n => n.remove());
   return clone.innerHTML;
 }
 
@@ -21752,6 +21820,20 @@ document.addEventListener("keydown", e => {
 
 /** SECTION / ACTIVITY / SUB-ACTIVITY / NOTE, the same labelling the Start
  *  Session screen uses, so a section heading cannot be mistaken for an activity. */
+/**
+ * Which Mastered / Discontinued lists are open.
+ *
+ * The lists are opened by setting display on the panel, and every edit rebuilds
+ * the whole screen -- so opening one, editing a row and closing the editor
+ * collapsed it again, every time. Remembered by section and kind rather than by
+ * position, so it survives the list being reordered.
+ *
+ * Module level, not per render, because the render is exactly what wipes it.
+ */
+const _mnOpenInactGroups = new Set();
+const mnInactKey = group =>
+  (group?.closest(".mn-seg-groups")?.dataset.seg ?? "") + "|" + (group?.dataset.kind ?? "");
+
 function mnRowChip(kind) {
   const el = document.createElement("span");
   el.className = "mn-row-chip mn-row-chip--" + kind;
@@ -22138,17 +22220,30 @@ function mnRegroupInactiveCards(bodyEl, acts) {
   src.remove();
   mnWrapInactiveFamilies(bodyEl);
   bodyEl.querySelectorAll(".mn-inact-toggle").forEach(btn => {
+    const group = btn.parentElement;
+    const setOpen = (panel, arrow, open) => {
+      panel.style.display = open ? "block" : "none";
+      // Expanded, the group becomes a bordered card so its rows cannot be read
+      // as a continuation of the active list above it.
+      group?.classList.toggle("mn-inact-open", open);
+      if (arrow) arrow.textContent = open ? "\u25bc" : "\u25b6";
+      if (open) panel.querySelectorAll(".mn-act-details-input,.mn-inactive-name-input").forEach(autoResizeTextarea);
+    };
+
+    // Put back whatever was open before this render.
+    if (_mnOpenInactGroups.has(mnInactKey(group))) {
+      const panel = btn.nextElementSibling;
+      if (panel) setOpen(panel, btn.querySelector(".mn-inact-arrow"), true);
+    }
+
     btn.addEventListener("click", () => {
       const panel = btn.nextElementSibling;
       const arrow = btn.querySelector(".mn-inact-arrow");
       if (!panel) return;
-      const open = panel.style.display !== "none";
-      panel.style.display = open ? "none" : "block";
-      // Expanded, the group becomes a bordered card so its rows cannot be read
-      // as a continuation of the active list above it.
-      btn.parentElement?.classList.toggle("mn-inact-open", !open);
-      if (arrow) arrow.textContent = open ? "▶" : "▼";
-      if (!open) panel.querySelectorAll(".mn-act-details-input,.mn-inactive-name-input").forEach(autoResizeTextarea);
+      const willOpen = panel.style.display === "none" || !panel.style.display;
+      setOpen(panel, arrow, willOpen);
+      const key = mnInactKey(group);
+      if (willOpen) _mnOpenInactGroups.add(key); else _mnOpenInactGroups.delete(key);
     });
   });
 }
@@ -22342,16 +22437,16 @@ function renderTargetManageContent(student, target) {
             <div style="flex:1;min-width:0">
               <div style="font-size:.85rem;font-weight:700;color:#78350f;margin-bottom:.2rem">Note Title</div>
               <textarea class="admin-input mn-note-title-input" id="mn-note-title-${idx}" data-idx="${idx}"
-                rows="1" placeholder="Enter Note Title Here (Optional)"
+                rows="1" placeholder="Enter Text Here"
                 style="width:100%;box-sizing:border-box;display:block;overflow-y:hidden;resize:none">${escHtml(_np.title)}</textarea>
             </div>
           </div>
           <div>
-            <div style="font-size:.85rem;font-weight:700;color:#78350f;margin-bottom:.2rem">Note Details</div>
+            <div style="font-size:.85rem;font-weight:700;color:#78350f;margin-bottom:.2rem">Details</div>
             <div style="display:flex;align-items:flex-start;gap:.3rem">
               ${formatButtonsHtml(`mn-note-details-${idx}`)}
               <textarea class="admin-input mn-note-details-input" id="mn-note-details-${idx}" data-idx="${idx}"
-                rows="1" placeholder="Enter Note Details Here (Optional)"
+                rows="1" placeholder="Enter Text Here"
                 style="flex:1;overflow-y:hidden;resize:none">${escHtml(bulletifyForEditing(_np.details))}</textarea>
             </div>
           </div>`; })()}
@@ -22422,10 +22517,10 @@ function renderTargetManageContent(student, target) {
                     <button class="mn-act-start-btn" data-idx="${subIdx}" style="padding:.35rem .65rem;border:1.5px solid #d1d5db;border-radius:.4rem;background:#f0f9ff;cursor:pointer;font-size:.95rem;color:#374151;white-space:nowrap;display:block">📅 ${sub.activeFrom ? fmtPeriodDate(sub.activeFrom) : 'Set date'}</button>
                   </div>
                   <div style="flex:1">
-                    <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title</div>
+                    <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Sub-activity Title</div>
                     <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
                       <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subIdx}" data-idx="${subIdx}"
-                        placeholder="Enter Activity Title Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+                        placeholder="Enter Text Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
                     </div>
                   </div>
                   <div class="mn-sub-kebab-wrap" style="position:relative;align-self:flex-start;flex-shrink:0;margin-top:1.6rem">
@@ -22440,7 +22535,7 @@ function renderTargetManageContent(student, target) {
                 </div>
               </div>
               <div>
-                <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Details</div>
+                <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Details</div>
                 <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
                   <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
                     <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${subIdx}" title="Bold (Ctrl+B)">B</button>
@@ -22448,12 +22543,12 @@ function renderTargetManageContent(student, target) {
                     <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${subIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
                   </div>
                   <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subIdx}" data-idx="${subIdx}"
-                    rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(sub.name || ''))}</textarea>
+                    rows="2" placeholder="Enter Text Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(sub.name || ''))}</textarea>
                 </div>
               </div>
               <div class="mn-sub-act-body" data-idx="${subIdx}" style="display:flex;flex-direction:column;gap:.55rem">
                 <div>
-                  <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Type</div>
+                  <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Type</div>
                   ${subRemarkType}
                 </div>
               </div>
@@ -22488,7 +22583,7 @@ function renderTargetManageContent(student, target) {
                   <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Parent Activity Title</div>
                   <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
                     <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
-                      placeholder="Enter Parent Activity Title Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+                      placeholder="Enter Text Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
                   </div>
                 </div>
               </div>
@@ -22531,12 +22626,12 @@ function renderTargetManageContent(student, target) {
                   <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Title</div>
                   <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
                     <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${idx}" data-idx="${idx}"
-                      placeholder="Enter Activity Title Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+                      placeholder="Enter Text Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
                   </div>
                 </div>
               </div>
               <div>
-                <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Details</div>
+                <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Details</div>
                 <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
                   <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
                     <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${idx}" title="Bold (Ctrl+B)">B</button>
@@ -22544,11 +22639,11 @@ function renderTargetManageContent(student, target) {
                     <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${idx}" title="Bullet (Ctrl+Shift+L)">•</button>
                   </div>
                   <textarea class="admin-input mn-act-details-input" id="mn-act-details-${idx}" data-idx="${idx}"
-                    rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(a.name || ''))}</textarea>
+                    rows="2" placeholder="Enter Text Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(a.name || ''))}</textarea>
                 </div>
               </div>
               <div>
-                <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Activity Type</div>
+                <div style="font-size:.95rem;font-weight:700;color:#374151;margin-bottom:.28rem">Type</div>
                 ${remarkTypeSelect}
               </div>
               ${maintainedRow}
@@ -22609,20 +22704,20 @@ function renderTargetManageContent(student, target) {
       html += `<div class="mn-inact-card" data-global-idx="${globalIdx}" style="margin-bottom:${myMastSubs.length ? '.1rem' : '.35rem'}">
         <div style="flex:1;display:flex;flex-direction:column;gap:.4rem">
           <div>
-            <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Title</div>
+            <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">${acts.some(a2 => a2.parentActivity === (a.title || a.name)) ? "Parent Activity Title" : "Activity Title"}</div>
             <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
-              <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${globalIdx}" data-idx="${globalIdx}" placeholder="Enter Activity Title Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+              <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${globalIdx}" data-idx="${globalIdx}" placeholder="Enter Text Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
             </div>
           </div>
           ${acts.some(a2 => a2.parentActivity === (a.title || a.name)) ? '' : `<div>
-            <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Details</div>
+            <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Details</div>
             <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
               <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
                 <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${globalIdx}" title="Bold (Ctrl+B)">B</button>
                 <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${globalIdx}" title="Underline (Ctrl+U)">U</button>
                 <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${globalIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
               </div>
-              <textarea class="admin-input mn-act-details-input" id="mn-act-details-${globalIdx}" data-idx="${globalIdx}" rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(a.name || ''))}</textarea>
+              <textarea class="admin-input mn-act-details-input" id="mn-act-details-${globalIdx}" data-idx="${globalIdx}" rows="2" placeholder="Enter Text Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(a.name || ''))}</textarea>
             </div>
           </div>`}
         </div>
@@ -22648,20 +22743,20 @@ function renderTargetManageContent(student, target) {
           <span style="font-size:.8rem;color:#059669;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
           <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
             <div>
-              <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Title</div>
+              <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Sub-activity Title</div>
               <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
-                <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subGlobalIdx}" data-idx="${subGlobalIdx}" placeholder="Enter Activity Title Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+                <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subGlobalIdx}" data-idx="${subGlobalIdx}" placeholder="Enter Text Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
               </div>
             </div>
             <div>
-              <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Details</div>
+              <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Details</div>
               <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
                 <div style="display:flex;gap:.2rem;padding:.25rem .4rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
                   <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bold (Ctrl+B)">B</button>
                   <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Underline (Ctrl+U)">U</button>
                   <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
                 </div>
-                <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subGlobalIdx}" data-idx="${subGlobalIdx}" rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(sub.name || ''))}</textarea>
+                <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subGlobalIdx}" data-idx="${subGlobalIdx}" rows="2" placeholder="Enter Text Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(sub.name || ''))}</textarea>
               </div>
             </div>
           </div>
@@ -22695,20 +22790,20 @@ function renderTargetManageContent(student, target) {
             <span style="font-size:.8rem;color:#059669;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
             <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
               <div>
-                <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Title</div>
+                <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Sub-activity Title</div>
                 <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
-                  <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subGlobalIdx}" data-idx="${subGlobalIdx}" placeholder="Enter Activity Title Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+                  <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subGlobalIdx}" data-idx="${subGlobalIdx}" placeholder="Enter Text Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
                 </div>
               </div>
               <div>
-                <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Details</div>
+                <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Details</div>
                 <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
                   <div style="display:flex;gap:.2rem;padding:.25rem .4rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
                     <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bold (Ctrl+B)">B</button>
                     <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Underline (Ctrl+U)">U</button>
                     <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
                   </div>
-                  <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subGlobalIdx}" data-idx="${subGlobalIdx}" rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(sub.name || ''))}</textarea>
+                  <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subGlobalIdx}" data-idx="${subGlobalIdx}" rows="2" placeholder="Enter Text Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(sub.name || ''))}</textarea>
                 </div>
               </div>
             </div>
@@ -22750,20 +22845,20 @@ function renderTargetManageContent(student, target) {
       html += `<div class="mn-inact-card" data-global-idx="${globalIdx}" style="margin-bottom:${myDiscSubs.length ? '.1rem' : '.35rem'}">
         <div style="flex:1;display:flex;flex-direction:column;gap:.4rem">
           <div>
-            <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Title</div>
+            <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">${acts.some(a2 => a2.parentActivity === (a.title || a.name)) ? "Parent Activity Title" : "Activity Title"}</div>
             <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
-              <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${globalIdx}" data-idx="${globalIdx}" placeholder="Enter Activity Title Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+              <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${globalIdx}" data-idx="${globalIdx}" placeholder="Enter Text Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
             </div>
           </div>
           ${acts.some(a2 => a2.parentActivity === (a.title || a.name)) ? '' : `<div>
-            <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Details</div>
+            <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Details</div>
             <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
               <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
                 <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${globalIdx}" title="Bold (Ctrl+B)">B</button>
                 <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${globalIdx}" title="Underline (Ctrl+U)">U</button>
                 <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${globalIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
               </div>
-              <textarea class="admin-input mn-act-details-input" id="mn-act-details-${globalIdx}" data-idx="${globalIdx}" rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(a.name || ''))}</textarea>
+              <textarea class="admin-input mn-act-details-input" id="mn-act-details-${globalIdx}" data-idx="${globalIdx}" rows="2" placeholder="Enter Text Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(a.name || ''))}</textarea>
             </div>
           </div>`}
         </div>
@@ -22789,20 +22884,20 @@ function renderTargetManageContent(student, target) {
           <span style="font-size:.8rem;color:#dc2626;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
           <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
             <div>
-              <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Title</div>
+              <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Sub-activity Title</div>
               <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
-                <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subGlobalIdx}" data-idx="${subGlobalIdx}" placeholder="Enter Activity Title Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+                <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subGlobalIdx}" data-idx="${subGlobalIdx}" placeholder="Enter Text Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
               </div>
             </div>
             <div>
-              <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Details</div>
+              <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Details</div>
               <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
                 <div style="display:flex;gap:.2rem;padding:.25rem .4rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
                   <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bold (Ctrl+B)">B</button>
                   <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Underline (Ctrl+U)">U</button>
                   <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
                 </div>
-                <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subGlobalIdx}" data-idx="${subGlobalIdx}" rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(sub.name || ''))}</textarea>
+                <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subGlobalIdx}" data-idx="${subGlobalIdx}" rows="2" placeholder="Enter Text Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(sub.name || ''))}</textarea>
               </div>
             </div>
           </div>
@@ -22836,20 +22931,20 @@ function renderTargetManageContent(student, target) {
             <span style="font-size:.8rem;color:#dc2626;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
             <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
               <div>
-                <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Title</div>
+                <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Sub-activity Title</div>
                 <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
-                  <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subGlobalIdx}" data-idx="${subGlobalIdx}" placeholder="Enter Activity Title Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+                  <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subGlobalIdx}" data-idx="${subGlobalIdx}" placeholder="Enter Text Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
                 </div>
               </div>
               <div>
-                <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Details</div>
+                <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Details</div>
                 <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
                   <div style="display:flex;gap:.2rem;padding:.25rem .4rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
                     <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bold (Ctrl+B)">B</button>
                     <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Underline (Ctrl+U)">U</button>
                     <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
                   </div>
-                  <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subGlobalIdx}" data-idx="${subGlobalIdx}" rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(sub.name || ''))}</textarea>
+                  <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subGlobalIdx}" data-idx="${subGlobalIdx}" rows="2" placeholder="Enter Text Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(sub.name || ''))}</textarea>
                 </div>
               </div>
             </div>
@@ -22895,6 +22990,7 @@ function renderTargetManageContent(student, target) {
   mnRegroupInactiveCards($("manage-modal-body"), acts);
   mnInitActivityCollapse($("manage-modal-body"), acts);
   wireAssistantMenuLock($("manage-modal-body"), acts);
+  applyAssistantReadOnly($("manage-modal-body"), acts);
   $("manage-modal-body").querySelectorAll(".admin-list-item textarea").forEach(autoResizeTextarea);
 
   _pendingActsCleanup = { acts, save: saveTarget };
@@ -25478,15 +25574,15 @@ function renderTemplateManageContent(template) {
           <div>
             <div style="font-size:.85rem;font-weight:700;color:#78350f;margin-bottom:.2rem">Note Title</div>
             <textarea class="admin-input mn-note-title-input" id="mn-note-title-${idx}" data-idx="${idx}"
-              rows="1" placeholder="Enter Note Title Here (Optional)"
+              rows="1" placeholder="Enter Text Here"
               style="width:100%;box-sizing:border-box;display:block;overflow-y:hidden;resize:none">${escHtml(_np.title)}</textarea>
           </div>
           <div>
-            <div style="font-size:.85rem;font-weight:700;color:#78350f;margin-bottom:.2rem">Note Details</div>
+            <div style="font-size:.85rem;font-weight:700;color:#78350f;margin-bottom:.2rem">Details</div>
             <div style="display:flex;align-items:flex-start;gap:.3rem">
               ${formatButtonsHtml(`mn-note-details-${idx}`)}
               <textarea class="admin-input mn-note-details-input" id="mn-note-details-${idx}" data-idx="${idx}"
-                rows="1" placeholder="Enter Note Details Here (Optional)"
+                rows="1" placeholder="Enter Text Here"
                 style="flex:1;overflow-y:hidden;resize:none">${escHtml(bulletifyForEditing(_np.details))}</textarea>
             </div>
           </div>`; })()}
@@ -25594,20 +25690,20 @@ function renderTemplateManageContent(template) {
       html += `<div class="mn-inact-card" data-global-idx="${globalIdx}" style="margin-bottom:${myMastSubs.length ? '.1rem' : '.35rem'}">
         <div style="flex:1;display:flex;flex-direction:column;gap:.4rem">
           <div>
-            <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Title</div>
+            <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">${acts.some(a2 => a2.parentActivity === (a.title || a.name)) ? "Parent Activity Title" : "Activity Title"}</div>
             <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
-              <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${globalIdx}" data-idx="${globalIdx}" placeholder="Enter Activity Title Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+              <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${globalIdx}" data-idx="${globalIdx}" placeholder="Enter Text Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
             </div>
           </div>
           ${acts.some(a2 => a2.parentActivity === (a.title || a.name)) ? '' : `<div>
-            <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Details</div>
+            <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Details</div>
             <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
               <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
                 <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${globalIdx}" title="Bold (Ctrl+B)">B</button>
                 <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${globalIdx}" title="Underline (Ctrl+U)">U</button>
                 <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${globalIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
               </div>
-              <textarea class="admin-input mn-act-details-input" id="mn-act-details-${globalIdx}" data-idx="${globalIdx}" rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(a.name || ''))}</textarea>
+              <textarea class="admin-input mn-act-details-input" id="mn-act-details-${globalIdx}" data-idx="${globalIdx}" rows="2" placeholder="Enter Text Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(a.name || ''))}</textarea>
             </div>
           </div>`}
         </div>
@@ -25633,20 +25729,20 @@ function renderTemplateManageContent(template) {
           <span style="font-size:.8rem;color:#059669;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
           <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
             <div>
-              <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Title</div>
+              <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Sub-activity Title</div>
               <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
-                <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subGlobalIdx}" data-idx="${subGlobalIdx}" placeholder="Enter Activity Title Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+                <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subGlobalIdx}" data-idx="${subGlobalIdx}" placeholder="Enter Text Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
               </div>
             </div>
             <div>
-              <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Details</div>
+              <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Details</div>
               <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
                 <div style="display:flex;gap:.2rem;padding:.25rem .4rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
                   <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bold (Ctrl+B)">B</button>
                   <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Underline (Ctrl+U)">U</button>
                   <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
                 </div>
-                <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subGlobalIdx}" data-idx="${subGlobalIdx}" rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(sub.name || ''))}</textarea>
+                <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subGlobalIdx}" data-idx="${subGlobalIdx}" rows="2" placeholder="Enter Text Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(sub.name || ''))}</textarea>
               </div>
             </div>
           </div>
@@ -25680,20 +25776,20 @@ function renderTemplateManageContent(template) {
             <span style="font-size:.8rem;color:#059669;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
             <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
               <div>
-                <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Title</div>
+                <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Sub-activity Title</div>
                 <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
-                  <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subGlobalIdx}" data-idx="${subGlobalIdx}" placeholder="Enter Activity Title Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+                  <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subGlobalIdx}" data-idx="${subGlobalIdx}" placeholder="Enter Text Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
                 </div>
               </div>
               <div>
-                <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Details</div>
+                <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Details</div>
                 <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
                   <div style="display:flex;gap:.2rem;padding:.25rem .4rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
                     <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bold (Ctrl+B)">B</button>
                     <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Underline (Ctrl+U)">U</button>
                     <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
                   </div>
-                  <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subGlobalIdx}" data-idx="${subGlobalIdx}" rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(sub.name || ''))}</textarea>
+                  <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subGlobalIdx}" data-idx="${subGlobalIdx}" rows="2" placeholder="Enter Text Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(sub.name || ''))}</textarea>
                 </div>
               </div>
             </div>
@@ -25735,20 +25831,20 @@ function renderTemplateManageContent(template) {
       html += `<div class="mn-inact-card" data-global-idx="${globalIdx}" style="margin-bottom:${myDiscSubs.length ? '.1rem' : '.35rem'}">
         <div style="flex:1;display:flex;flex-direction:column;gap:.4rem">
           <div>
-            <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Title</div>
+            <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">${acts.some(a2 => a2.parentActivity === (a.title || a.name)) ? "Parent Activity Title" : "Activity Title"}</div>
             <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
-              <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${globalIdx}" data-idx="${globalIdx}" placeholder="Enter Activity Title Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+              <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${globalIdx}" data-idx="${globalIdx}" placeholder="Enter Text Here" value="${escHtml(a.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
             </div>
           </div>
           ${acts.some(a2 => a2.parentActivity === (a.title || a.name)) ? '' : `<div>
-            <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Activity Details</div>
+            <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:.2rem">Details</div>
             <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
               <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
                 <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${globalIdx}" title="Bold (Ctrl+B)">B</button>
                 <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${globalIdx}" title="Underline (Ctrl+U)">U</button>
                 <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${globalIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
               </div>
-              <textarea class="admin-input mn-act-details-input" id="mn-act-details-${globalIdx}" data-idx="${globalIdx}" rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(a.name || ''))}</textarea>
+              <textarea class="admin-input mn-act-details-input" id="mn-act-details-${globalIdx}" data-idx="${globalIdx}" rows="2" placeholder="Enter Text Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(a.name || ''))}</textarea>
             </div>
           </div>`}
         </div>
@@ -25774,20 +25870,20 @@ function renderTemplateManageContent(template) {
           <span style="font-size:.8rem;color:#dc2626;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
           <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
             <div>
-              <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Title</div>
+              <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Sub-activity Title</div>
               <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
-                <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subGlobalIdx}" data-idx="${subGlobalIdx}" placeholder="Enter Activity Title Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+                <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subGlobalIdx}" data-idx="${subGlobalIdx}" placeholder="Enter Text Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
               </div>
             </div>
             <div>
-              <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Details</div>
+              <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Details</div>
               <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
                 <div style="display:flex;gap:.2rem;padding:.25rem .4rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
                   <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bold (Ctrl+B)">B</button>
                   <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Underline (Ctrl+U)">U</button>
                   <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
                 </div>
-                <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subGlobalIdx}" data-idx="${subGlobalIdx}" rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(sub.name || ''))}</textarea>
+                <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subGlobalIdx}" data-idx="${subGlobalIdx}" rows="2" placeholder="Enter Text Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(sub.name || ''))}</textarea>
               </div>
             </div>
           </div>
@@ -25821,20 +25917,20 @@ function renderTemplateManageContent(template) {
             <span style="font-size:.8rem;color:#dc2626;font-weight:700;flex-shrink:0;padding:.5rem .3rem 0 .55rem">${String.fromCharCode(97 + si)})</span>
             <div style="flex:1;display:flex;flex-direction:column;gap:.3rem;min-width:0">
               <div>
-                <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Title</div>
+                <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Sub-activity Title</div>
                 <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
-                  <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subGlobalIdx}" data-idx="${subGlobalIdx}" placeholder="Enter Activity Title Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
+                  <input type="text" class="admin-input mn-act-title-input" id="mn-act-title-${subGlobalIdx}" data-idx="${subGlobalIdx}" placeholder="Enter Text Here" value="${escHtml(sub.title || '')}" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block" />
                 </div>
               </div>
               <div>
-                <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Activity Details</div>
+                <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:.15rem">Details</div>
                 <div style="border:1px solid #b8bcc4;border-radius:.4rem;overflow:hidden">
                   <div style="display:flex;gap:.2rem;padding:.25rem .4rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
                     <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bold (Ctrl+B)">B</button>
                     <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Underline (Ctrl+U)">U</button>
                     <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${subGlobalIdx}" title="Bullet (Ctrl+Shift+L)">•</button>
                   </div>
-                  <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subGlobalIdx}" data-idx="${subGlobalIdx}" rows="2" placeholder="Enter Activity Detail Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(sub.name || ''))}</textarea>
+                  <textarea class="admin-input mn-act-details-input" id="mn-act-details-${subGlobalIdx}" data-idx="${subGlobalIdx}" rows="2" placeholder="Enter Text Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(sub.name || ''))}</textarea>
                 </div>
               </div>
             </div>
@@ -25878,6 +25974,7 @@ function renderTemplateManageContent(template) {
   mnRegroupInactiveCards($("manage-modal-body"), acts);
   mnInitActivityCollapse($("manage-modal-body"), acts);
   wireAssistantMenuLock($("manage-modal-body"), acts);
+  applyAssistantReadOnly($("manage-modal-body"), acts);
   $("manage-modal-body").querySelectorAll(".admin-list-item textarea").forEach(autoResizeTextarea);
 
   const saveTemplateFn = async () => {

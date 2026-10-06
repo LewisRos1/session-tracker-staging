@@ -4958,3 +4958,20 @@ button.wf-pill:hover { filter: brightness(.93); }
 /* The wrapped title text: take what is left of the row and wrap inside it,
    rather than dropping below the chip. */
 .mn-sub-title-text { flex: 1 1 0; min-width: 0; }
+
+/* A mastered or discontinued card keeps its chip INSIDE the title, where there
+   is no flex gap to separate it from the status badge that follows. */
+.mn-act-compact-title > .mn-row-chip { margin-right: .4rem; }
+
+/* Locked for an assistant: visibly inert, and it says so when clicked. */
+.mn-locked-field {
+  background: #f3f4f6 !important;
+  color: #6b7280 !important;
+  cursor: not-allowed !important;
+  opacity: .85;
+}
+.mn-locked-handle {
+  opacity: .3;
+  cursor: not-allowed !important;
+  pointer-events: auto;
+}
