@@ -204,7 +204,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2151";
+const APP_VERSION = "2152";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -2064,7 +2064,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   // straight to the sign-in screen rather than hang on the loading screen
   // waiting for an answer that was always going to be empty.
   let authResolved = false;
-  if (!hasSignedInBefore() || sessionEpochStale()) {
+  if (sessionEpochStale()) {
+    // A one-off sign-out is due. Do NOT draw the login screen yet: Firebase is
+    // still restoring the old session, and when it lands onAuthChange signs it
+    // out and draws the login screen itself. Drawing it here as well meant the
+    // form appeared, then was rebuilt underneath whoever had started typing --
+    // which is the "it logs in twice" everyone was seeing. The timeout below
+    // still covers the case where no session comes back at all.
+    setTimeout(() => { if (!authResolved) initPin(); }, 5000);
+  } else if (!hasSignedInBefore()) {
     initPin();
     authResolved = true; // prevent the timeout below from calling initPin a second time
   } else {

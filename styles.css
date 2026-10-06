@@ -341,6 +341,9 @@ html, body {
 .hu-me {
   display: inline-flex;
   align-items: center;
+  /* A flex container drops the whitespace between its items, so the space
+     typed between "Current User:" and the name was never rendered. */
+  gap: .3rem;
   padding: 0 .2rem;
   font-size: .82rem;
   font-weight: 600;
@@ -4983,3 +4986,25 @@ button.wf-pill:hover { filter: brightness(.93); }
   .hu-me .hu-label { display: none; }
   .hu-me { max-width: 8.5rem; }
 }
+
+/* Hold to show the password. Inside the field, clear of the floating label. */
+.pw-eye {
+  position: absolute;
+  right: .5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: none;
+  padding: .2rem .3rem;
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: .45;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+.pw-eye:hover { opacity: .7; }
+.pw-eye.is-on { opacity: 1; }
+/* Room for it, so a long password never runs underneath. */
+.float-field input#login-pw-input { padding-right: 2.4rem !important; }
