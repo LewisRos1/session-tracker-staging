@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2105";
+const APP_VERSION = "2106";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -14383,8 +14383,20 @@ const instructorName = id => (INSTRUCTORS.find(i => i.id === id) || { name: id }
  * proposes.
  */
 const proposesOnly = () => currentUser()?.role === "assistant";
-/** Main teachers and the owner decide. */
-const canApprove = () => canUseStaffTools();
+/**
+ * Ms. Daisy decides. Nigel is a main teacher and can do everything else on
+ * this screen, but approving is hers alone, and the To Do task goes only to
+ * her.
+ *
+ * An unidentified signer is allowed through for the same reason proposesOnly
+ * turns them down: the shared PIN cannot say who is holding it, and nobody
+ * being able to approve would strand every proposal.
+ */
+const canApprove = () => {
+  const u = currentUser();
+  if (!u) return true;
+  return u.id === "daisy" || u.role === "owner";
+};
 
 /**
  * Fold a target's proposals into its live list for editing.
