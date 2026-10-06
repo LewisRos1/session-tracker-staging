@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2116";
+const APP_VERSION = "2117";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -19534,7 +19534,8 @@ function periodSectionHtml(activeFrom, activeTo, idx, withBorder, inactiveReason
         <option value="discontinued"${inactiveReason === 'discontinued' ? ' selected' : ''}>Discontinued</option>
       </select>
     </div>` : '';
-  return `<div style="padding:.45rem .6rem;${border}">
+  // Classed so it can be hidden on a row that is not live yet.
+  return `<div class="mn-period-section" style="padding:.45rem .6rem;${border}">
     <div style="font-size:.84rem;color:inherit;margin-bottom:.35rem">📅 Active Period</div>
     <div style="display:flex;align-items:center;gap:.4rem">
       <div style="position:relative;flex:1;min-width:0">
@@ -21486,19 +21487,23 @@ function mnInitActivityCollapse(bodyEl, acts) {
     if (act && act._pending) {
       card.classList.add("mn-pending-card");
       const tagHost = card.querySelector(":scope > .mn-act-head") || titleEl;
-      // The kebab offers master, discontinue, maintain, colour, period and
-      // delete. None of them mean anything for something that is not live yet,
-      // and the only two decisions that do are right beside it.
+      // The kebab is trimmed, not taken away.
+      //
+      // Mastering, discontinuing and maintaining are about a live activity and
+      // mean nothing for one that has not been approved. A heading's colour and
+      // active period are the same. But the menu is also where sub-activities
+      // are built, and it is the only way the person who proposed something can
+      // withdraw it -- they have no Reject button, that is the reviewer's. Hiding
+      // the whole menu left a proposal that could be neither finished nor taken
+      // back.
       //
       // Both class names, because a section heading's menu is
-      // .mn-heading-color-btn rather than .mn-kebab-btn -- which is why the
-      // first pass took it off activities and left it on headings. A
-      // sub-activity's own menu is left alone: it belongs to that row, not
-      // this one.
-      card.querySelectorAll(".mn-kebab-btn, .mn-heading-color-btn").forEach(b => {
-        if (b.closest(".mn-sub-item") || b.closest(".mn-sub-compact")) return;
-        if (b.parentElement) b.parentElement.style.display = "none";
-      });
+      // .mn-heading-color-btn rather than .mn-kebab-btn. A sub-activity's own
+      // menu is left alone: it belongs to that row, not this one.
+      const ownMenu = sel => [...card.querySelectorAll(sel)]
+        .filter(el => !el.closest(".mn-sub-item") && !el.closest(".mn-sub-compact"));
+      ownMenu(".mn-km-status-btn, .mn-hkm-color-toggle, .mn-hkm-color-panel, .mn-period-section")
+        .forEach(el => { el.style.display = "none"; });
       if (!tagHost.querySelector(".mn-pending-tag")) {
         const tag = document.createElement("span");
         tag.className = "mn-pending-tag";
