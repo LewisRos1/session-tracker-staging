@@ -3,27 +3,31 @@ rules_version = '2';
 // ============================================================
 // FIRESTORE SECURITY RULES
 //
-// Paste this into Firebase Console -> Firestore Database -> Rules, for BOTH the
+// Paste into Firebase Console -> Firestore Database -> Rules, for BOTH the
 // staging and the live project, then press Publish. Keep this file in the repo
 // as the source of truth: rules that live only in the console cannot be
 // reviewed, diffed, or restored.
 //
-// WHAT THIS FIXES
-// The previous rules were:
-//     match /{document=**} { allow read, write: if request.auth != null; }
-// which grants every signed-in client full read and write over the entire
-// database, including collections the app never touches. The app signs in with
-// ONE shared account whose e-mail, password prefix and PIN are all readable in
-// the JavaScript the site serves to every visitor, so "signed in" is not a
-// meaningful barrier on its own.
+// WHY THESE EXIST
+// Everything the app enforces about who may do what is enforced in the browser:
+// a button is greyed out, a field is made read-only, a menu entry shows a lock.
+// All of that can be undone from the browser's own console by anyone who cares
+// to. These rules run on Google's servers and decide what the database will
+// accept, whatever the page asks for. They are the only boundary that holds.
 //
-// WHAT THIS DOES NOT FIX
-// These rules cannot tell one member of staff from another, because they all
-// share one account. Anyone who can sign in can still read every client's
-// records. Closing that needs either per-user accounts or Firebase App Check
-// (App Check is the smaller change: it rejects requests that do not come from
-// the real app, so stolen credentials alone stop being enough). Until one of
-// those is in place, treat this file as damage limitation rather than a fix.
+// The rules they replaced were:
+//     match /{document=**} { allow read, write: if request.auth != null; }
+// which handed every signed-in client the whole database, including collections
+// the app has never heard of.
+//
+// WHAT THESE DO NOT DO
+// They do not reproduce the approval system. A proposal is a field inside a
+// target inside an array inside a student document, and rules cannot
+// practically say "only the pending list changed" about a nested array. An
+// assistant must be able to write student documents in order to propose
+// anything, so at this level she can write them. The approval rules remain a
+// browser-side arrangement between colleagues; these rules stop the database
+// being used as something other than this app.
 // ============================================================
 
 service cloud.firestore {
@@ -31,6 +35,18 @@ service cloud.firestore {
 
     function signedIn() {
       return request.auth != null;
+    }
+
+    // Named accounts make this possible at all: it could not be written while
+    // the whole team shared one login. Kept to the settings below, where the
+    // app's own locks already agree, rather than spread thin over data an
+    // assistant has to be able to write.
+    function isMainTeacher() {
+      return signedIn() && request.auth.token.email in [
+        'daisy@session-tracker.app',
+        'nigel@session-tracker.app',
+        'lewis@session-tracker.app'
+      ];
     }
 
     // ── Session records ──────────────────────────────────────
@@ -61,12 +77,20 @@ service cloud.firestore {
     // ── App-wide settings ────────────────────────────────────
     // Two documents only: the half-year report prompt, and the trial score
     // scale. Naming them stops anything else being written into this space.
+    //
+    // Both are reached through Score Settings and the AI prompt editor, which
+    // are already locked to main teachers in the app, so the rule says out loud
+    // what the screens already do. One scale decides every score in the app and
+    // one prompt decides what goes into every report.
     match /config/{docId} {
       allow read: if signedIn();
-      allow write: if signedIn() && docId in ['halfYearReport', 'scoring'];
+      allow write: if isMainTeacher() && docId in ['halfYearReport', 'scoring'];
     }
 
     // ── Supporting collections ───────────────────────────────
+    // Left open to anyone signed in. trash in particular: expired items are
+    // cleared on startup by whoever opens the app first, so restricting writes
+    // here would break an ordinary session for an assistant.
     match /remarkPresets/{presetId} { allow read, write: if signedIn(); }
     match /templates/{templateId}   { allow read, write: if signedIn(); }
     match /trash/{trashId}          { allow read, write: if signedIn(); }
