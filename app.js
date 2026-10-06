@@ -205,7 +205,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2147";
+const APP_VERSION = "2148";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -15238,7 +15238,10 @@ function renderHeaderUser() {
   if (!el) return;
   const me = currentUser();
   const meName = me ? me.name : "Staff";
-  el.innerHTML = `<span class="hu-me" title="Signed in as ${escHtml(meName)}">${escHtml(meName)}</span>`;
+  // Labelled. A name on its own beside a Log Out button reads as whose account
+  // you are about to leave rather than whose you are in.
+  el.innerHTML = `<span class="hu-me" title="Signed in as ${escHtml(meName)}">`
+    + `<span class="hu-label">Current User:</span> ${escHtml(meName)}</span>`;
 }
 
 /**

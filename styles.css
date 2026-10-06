@@ -4975,3 +4975,11 @@ button.wf-pill:hover { filter: brightness(.93); }
   cursor: not-allowed !important;
   pointer-events: auto;
 }
+
+/* The label sits back so the name still reads first. */
+.hu-me .hu-label { font-weight: 500; opacity: .75; }
+@media (max-width: 560px) {
+  /* The header is one line and already carries the version and Log Out. */
+  .hu-me .hu-label { display: none; }
+  .hu-me { max-width: 8.5rem; }
+}
