@@ -205,7 +205,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2145";
+const APP_VERSION = "2146";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -15074,7 +15074,7 @@ function showEditTargetLock(msg) {
 const LIVE_ONLY_MENU_ITEMS = [
   ".mn-km-status-btn", ".mn-sub-km-status-btn",
   ".mn-km-move-to-parent", ".mn-move-sub-act", ".mn-make-standalone",
-  ".mn-km-add-sub", ".mn-del-sub-act",
+  ".mn-del-sub-act",
   ".mn-hkm-color-toggle", ".mn-hkm-opt",
   // Delete Activity shares .mn-km-opt with other entries, so it is picked out
   // by its action rather than by a class of its own.
@@ -15101,11 +15101,23 @@ function wireAssistantMenuLock(bodyEl, acts) {
       showEditTargetLock("Locked.");
       return;
     }
-    const btn = e.target.closest(LIVE_ONLY_MENU_ITEMS);
+    const btn = e.target.closest(LIVE_ONLY_MENU_ITEMS + ", .mn-km-add-sub");
     if (!btn) return;
     const idx = Number(btn.dataset.idx);
-    const item = bodyEl._mnActs?.[idx];
+    const acts = bodyEl._mnActs || [];
+    const item = acts[idx];
     if (item?._pending) return;   // her own proposal; Delete must still work
+
+    // Adding a sub-activity to something that is ALREADY a parent is proposing,
+    // not changing: the sub arrives waiting for approval and the parent is
+    // untouched. On a plain activity the same menu entry converts it -- it stops
+    // holding its own score and becomes a heading for the rows beneath it --
+    // and that is a change to approved work.
+    if (btn.classList.contains("mn-km-add-sub")) {
+      const key = item && (item._linkKey || item.title || item.name);
+      const alreadyParent = !!key && acts.some(x => x && x !== item && x.parentActivity === key);
+      if (alreadyParent) return;
+    }
     e.preventDefault();
     e.stopImmediatePropagation();
     bodyEl.querySelectorAll(".mn-kebab-menu, .mn-sub-kebab-menu, .mn-inactive-km, .mn-heading-color-menu")
