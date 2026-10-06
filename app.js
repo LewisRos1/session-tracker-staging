@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2109";
+const APP_VERSION = "2110";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -10818,8 +10818,27 @@ function renderDatePickerCalendar(displayDate, takenDates, today, currentDate) {
 // SESSION SCREEN
 // ============================================================
 
+/**
+ * Strip proposals out of a target for anything that displays it.
+ *
+ * The editor already works on a copy, so in principle nothing outside it ever
+ * holds a merged list. This is the guarantee rather than the argument: closing
+ * Edit Target was still showing the proposals for an instant before they went,
+ * and "shown for an instant" is shown. One filter on the way out of the
+ * accessor costs nothing and cannot be reasoned wrong.
+ *
+ * The SAME object comes back when nothing is pending, which is almost always.
+ * Callers that mutate what they are given therefore keep working exactly as
+ * before.
+ */
+function stripPendingFromTarget(t) {
+  const acts = t?.predefinedActivities;
+  if (!Array.isArray(acts) || !acts.some(a => a?._pending)) return t;
+  return { ...t, predefinedActivities: acts.filter(a => !a?._pending) };
+}
+
 function getEffectiveTargets() {
-  return state.currentStudent?.targets || [];
+  return (state.currentStudent?.targets || []).map(stripPendingFromTarget);
 }
 
 async function openSession(student, existingSessionId = null, dateStr = null, participants = null) {
@@ -21360,12 +21379,19 @@ function mnInitActivityCollapse(bodyEl, acts) {
     if (act && act._pending) {
       card.classList.add("mn-pending-card");
       const tagHost = card.querySelector(":scope > .mn-act-head") || titleEl;
-      // The kebab offers master, discontinue, maintain and delete. None of
-      // them mean anything for something that is not live yet, and the only
-      // two decisions that do are right beside it, so it comes off the row.
-      const keb = card.querySelector(":scope > .mn-act-head .mn-kebab-btn")
-               || card.querySelector(":scope .mn-kebab-btn");
-      if (keb?.parentElement) keb.parentElement.style.display = "none";
+      // The kebab offers master, discontinue, maintain, colour, period and
+      // delete. None of them mean anything for something that is not live yet,
+      // and the only two decisions that do are right beside it.
+      //
+      // Both class names, because a section heading's menu is
+      // .mn-heading-color-btn rather than .mn-kebab-btn -- which is why the
+      // first pass took it off activities and left it on headings. A
+      // sub-activity's own menu is left alone: it belongs to that row, not
+      // this one.
+      card.querySelectorAll(".mn-kebab-btn, .mn-heading-color-btn").forEach(b => {
+        if (b.closest(".mn-sub-item") || b.closest(".mn-sub-compact")) return;
+        if (b.parentElement) b.parentElement.style.display = "none";
+      });
       if (!tagHost.querySelector(".mn-pending-tag")) {
         const tag = document.createElement("span");
         tag.className = "mn-pending-tag";
@@ -21753,11 +21779,17 @@ function renderTargetManageContent(student, target) {
             </select>
           </div>
           ${(() => { const _np = noteParts(a); return `
-          <div>
-            <div style="font-size:.85rem;font-weight:700;color:#78350f;margin-bottom:.2rem">Note Title</div>
-            <textarea class="admin-input mn-note-title-input" id="mn-note-title-${idx}" data-idx="${idx}"
-              rows="1" placeholder="Enter Note Title Here (Optional)"
-              style="width:100%;box-sizing:border-box;display:block;overflow-y:hidden;resize:none">${escHtml(_np.title)}</textarea>
+          <div style="display:flex;gap:.6rem;align-items:flex-start">
+            <div style="flex-shrink:0">
+              <div style="font-size:.85rem;font-weight:700;color:#78350f;margin-bottom:.2rem">Start Date</div>
+              <button class="mn-act-start-btn" data-idx="${idx}" style="padding:.35rem .65rem;border:1.5px solid #fcd34d;border-radius:.4rem;background:#fef3c7;cursor:pointer;font-size:.95rem;color:#78350f;white-space:nowrap;display:block">📅 ${a.activeFrom ? fmtPeriodDate(a.activeFrom) : 'Set date'}</button>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:.85rem;font-weight:700;color:#78350f;margin-bottom:.2rem">Note Title</div>
+              <textarea class="admin-input mn-note-title-input" id="mn-note-title-${idx}" data-idx="${idx}"
+                rows="1" placeholder="Enter Note Title Here (Optional)"
+                style="width:100%;box-sizing:border-box;display:block;overflow-y:hidden;resize:none">${escHtml(_np.title)}</textarea>
+            </div>
           </div>
           <div>
             <div style="font-size:.85rem;font-weight:700;color:#78350f;margin-bottom:.2rem">Note Details</div>
@@ -23703,7 +23735,13 @@ function renderTargetManageContent(student, target) {
 
   $("btn-mn-add-note").addEventListener("click", () => {
     const btn = $("btn-mn-add-note"); if (btn) btn.disabled = true;
-    const _newNote = { id: cfgId("n"), isNote: true, text: "", order: acts.length, activeFrom: null };
+    // The session's date, not null. A note added today belongs to today, the
+    // same as an activity added today; a null start meant it was treated as
+    // having been there since the beginning.
+    const _newNoteDate = _groupForTargetEdit
+      ? (state.groupSessionData?.date || todayDateStr())
+      : (state.sessionData?.date || todayDateStr());
+    const _newNote = { id: cfgId("n"), isNote: true, text: "", order: acts.length, activeFrom: _newNoteDate };
     if (proposesOnly()) markAsProposal(_newNote);
     acts.push(_newNote);
     target.predefinedActivities = acts;
@@ -26675,12 +26713,12 @@ function renderGroupTargetContent() {
   if (!content) return;
   const group   = state.currentGroup;
   const data    = state.groupSessionData;
-  let   target  = group?.targets.find(t => t.name === state.selectedGroupTargetName);
+  let   target  = stripPendingFromTarget(group?.targets.find(t => t.name === state.selectedGroupTargetName));
   // Fallback: if state says a target is selected but it's not found (brief state mismatch),
   // auto-select the first available target so the screen never gets stuck on "No targets added yet"
   if (!target && state.selectedGroupTargetName && group?.targets.length) {
     const fallback = sortTargetsByOrder(group.targets).find(t => !t.discontinuedOn);
-    if (fallback) { state.selectedGroupTargetName = fallback.name; target = fallback; populateGroupTargetDropdown(group.targets); }
+    if (fallback) { state.selectedGroupTargetName = fallback.name; target = stripPendingFromTarget(fallback); populateGroupTargetDropdown(group.targets); }
   }
   if (!target || !data) {
     content.innerHTML = `<p class="empty-hint" contenteditable="false" style="padding:2rem;text-align:center">No targets added yet. Use the dropdown above to add one.</p>`;
