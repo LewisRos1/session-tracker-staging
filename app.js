@@ -204,7 +204,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2152";
+const APP_VERSION = "2153";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -21462,14 +21462,14 @@ function buildRemarkTypeControls(a, idx, maxPts = 3) {
     <div class="mn-act-note-starter-wrap" data-idx="${idx}" style="${showStarter ? "display:flex;flex-direction:column;gap:.3rem" : "display:none"}">
       <span style="font-size:.95rem;color:#374151;font-weight:700">Sentence Starter (for Remark)</span>
       <input class="admin-input mn-act-note-starter-text" data-idx="${idx}"
-        placeholder="Enter Sentence Starter Here (Optional)"
+        placeholder="Enter Text Here"
         style="width:100%;min-width:0;box-sizing:border-box;border-color:#b8bcc4"
         value="${escHtml(a.noteSentenceStarter || "")}">
     </div>
     <div class="mn-act-starter-wrap" data-idx="${idx}" style="${isMC ? "display:flex;flex-direction:column;gap:.3rem" : "display:none"}">
       <span class="mn-act-starter-label" style="font-size:.95rem;color:#374151;font-weight:700">${type === "starter_fixed_multi" ? "Sentence Starter (for Checkboxes)" : "Sentence Starter (for Multiple Choice)"}</span>
       <input class="admin-input mn-act-starter-text" data-idx="${idx}"
-        placeholder="Enter Sentence Starter Here (Optional)"
+        placeholder="Enter Text Here"
         style="width:100%;min-width:0;box-sizing:border-box;border-color:#b8bcc4"
         value="${escHtml(a.sentenceStarter || "")}">
     </div>
@@ -22545,23 +22545,27 @@ function renderTargetManageContent(student, target) {
           ${(() => { const _np = noteParts(a); return `
           <div style="display:flex;gap:.6rem;align-items:flex-start">
             <div style="flex-shrink:0">
-              <div style="font-size:.85rem;font-weight:700;color:#78350f;margin-bottom:.2rem">Start Date</div>
+              <div style="font-size:.95rem;font-weight:700;color:#78350f;margin-bottom:.28rem">Start Date</div>
               <button class="mn-act-start-btn" data-idx="${idx}" style="padding:.35rem .65rem;border:1.5px solid #fcd34d;border-radius:.4rem;background:#fef3c7;cursor:pointer;font-size:.95rem;color:#78350f;white-space:nowrap;display:block">📅 ${a.activeFrom ? fmtPeriodDate(a.activeFrom) : 'Set date'}</button>
             </div>
             <div style="flex:1;min-width:0">
-              <div style="font-size:.85rem;font-weight:700;color:#78350f;margin-bottom:.2rem">Note Title</div>
-              <textarea class="admin-input mn-note-title-input" id="mn-note-title-${idx}" data-idx="${idx}"
-                rows="1" placeholder="Enter Text Here"
-                style="width:100%;box-sizing:border-box;display:block;overflow-y:hidden;resize:none">${escHtml(_np.title)}</textarea>
+              <div style="font-size:.95rem;font-weight:700;color:#78350f;margin-bottom:.28rem">Note Title</div>
+              <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
+                <textarea class="admin-input mn-note-title-input" id="mn-note-title-${idx}" data-idx="${idx}"
+                  rows="1" placeholder="Enter Text Here"
+                  style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;overflow-y:hidden;resize:none">${escHtml(_np.title)}</textarea>
+              </div>
             </div>
           </div>
           <div>
-            <div style="font-size:.85rem;font-weight:700;color:#78350f;margin-bottom:.2rem">Details</div>
-            <div style="display:flex;align-items:flex-start;gap:.3rem">
-              ${formatButtonsHtml(`mn-note-details-${idx}`)}
+            <div style="font-size:.95rem;font-weight:700;color:#78350f;margin-bottom:.28rem">Details</div>
+            <div style="border:1px solid #b8bcc4;border-radius:.45rem;overflow:hidden">
+              <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:#f9fafb;border-bottom:1px solid #b8bcc4">
+                ${formatButtonsHtml(`mn-note-details-${idx}`)}
+              </div>
               <textarea class="admin-input mn-note-details-input" id="mn-note-details-${idx}" data-idx="${idx}"
                 rows="1" placeholder="Enter Text Here"
-                style="flex:1;overflow-y:hidden;resize:none">${escHtml(bulletifyForEditing(_np.details))}</textarea>
+                style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;overflow-y:hidden;resize:none">${escHtml(bulletifyForEditing(_np.details))}</textarea>
             </div>
           </div>`; })()}
         </div>
@@ -24435,7 +24439,7 @@ function renderTargetManageContent(student, target) {
     bar.innerHTML = `
       <span class="mn-pending-banner-count">${n} item${n === 1 ? "" : "s"} waiting for approval</span>
       <button class="mn-pending-filter${_mnPendingOnly ? " is-on" : ""}" id="btn-mn-pending-only">
-        ${_mnPendingOnly ? "Show everything" : "Show only these"}
+        ${_mnPendingOnly ? "\u21b6 Show everything" : "\u25a4 Show only these"}
       </button>`;
     bodyEl.insertBefore(bar, bodyEl.firstChild);
     bodyEl.classList.toggle("mn-pending-only", _mnPendingOnly);
@@ -24579,6 +24583,10 @@ function renderTargetManageContent(student, target) {
     const btn = $("btn-mn-add-heading"); if (btn) btn.disabled = true;
     const _newHead = { id: cfgId("h"), isHeading: true, name: "", order: acts.length, activeFrom: null };
     if (proposesOnly()) markAsProposal(_newHead);
+    // Straight into the editor, the way a new activity already does. Landing on
+    // an "(Untitled section heading)" row and having to click it to start
+    // typing is a step that exists for no reason.
+    _mnPanelOpenAfterRender = _newHead.id;
     acts.push(_newHead);
     target.predefinedActivities = acts;
     renderTargetManageContent(student, target);
@@ -24642,6 +24650,7 @@ function renderTargetManageContent(student, target) {
       : (state.sessionData?.date || todayDateStr());
     const _newNote = { id: cfgId("n"), isNote: true, text: "", order: acts.length, activeFrom: _newNoteDate };
     if (proposesOnly()) markAsProposal(_newNote);
+    _mnPanelOpenAfterRender = _newNote.id;
     acts.push(_newNote);
     target.predefinedActivities = acts;
     renderTargetManageContent(student, target);

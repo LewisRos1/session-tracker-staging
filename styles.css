@@ -4693,6 +4693,9 @@ button.wf-pill:hover { filter: brightness(.93); }
 .mn-pending-details {
   padding-left: 2.6rem;
   margin-top: .55rem;
+  /* Room under the last line. It was ending flush against the card's bottom
+     edge, which read as the text being cut off. */
+  padding-bottom: .55rem;
   font-size: inherit;
   line-height: 1.5;
   color: #78350f;
@@ -4735,24 +4738,29 @@ button.wf-pill:hover { filter: brightness(.93); }
   margin: 0 0 .75rem;
 }
 .mn-pending-banner-count {
-  font-size: .83rem;
+  font-size: .95rem;
   font-weight: 700;
   color: #92400e;
   flex: 1;
   min-width: 0;
 }
+/* Filled rather than outlined, and the size of the Approve and Reject buttons
+   it sits above. Outlined and smaller it read as a caption on the banner
+   rather than as the control that changes what the screen shows. */
 .mn-pending-filter {
-  font-size: .78rem;
+  font-size: .88rem;
   font-weight: 700;
-  padding: .28rem .7rem;
+  padding: .45rem 1rem;
   border-radius: .4rem;
-  border: 1.5px solid #f59e0b;
-  background: #fff;
-  color: #92400e;
+  border: 1.5px solid #b45309;
+  background: #d97706;
+  color: #fff;
   cursor: pointer;
   white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(0,0,0,.15);
 }
-.mn-pending-filter.is-on { background: #f59e0b; color: #fff; }
+.mn-pending-filter:hover { background: #b45309; }
+.mn-pending-filter.is-on { background: #78350f; border-color: #78350f; }
 
 /* display:none, not visibility: a hidden row must not keep its space, and the
    section rail is drawn from data-sec-* on the rows that remain. */
