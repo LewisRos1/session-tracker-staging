@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2126";
+const APP_VERSION = "2127";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -20108,6 +20108,24 @@ async function closeManageModal() {
         if (removedKey) acts.forEach(a2 => { if (a2.parentActivity === removedKey) delete a2.parentActivity; });
         acts.splice(i, 1);
       }
+    }
+    // A parent with no sub-activities at all is not a parent.
+    //
+    // The sweep above removes blank sub-activities, which can leave behind a
+    // parent that was given a title and never a real sub. It is not kept as an
+    // ordinary activity: a parent holds no score and no remark of its own, so
+    // on its own it is a row that can never be filled in. Almost always it is
+    // a "+ Add Parent Activity" that was abandoned half way.
+    //
+    // A parent whose sub-activities were mastered or discontinued still HAS
+    // those entries in the list, so it is untouched. This only catches one
+    // that never had any.
+    for (let i = acts.length - 1; i >= 0; i--) {
+      const a = acts[i];
+      if (!a?.noRemark) continue;
+      const key = a._linkKey || a.title || a.name;
+      if (key && acts.some(sub => sub !== a && sub.parentActivity === key)) continue;
+      acts.splice(i, 1);
     }
     if (acts.length !== before) acts.forEach((a, i) => a.order = i);
     // Always save on close — not just when empty items were removed. Any
