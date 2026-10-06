@@ -205,7 +205,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2135";
+const APP_VERSION = "2136";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -23540,6 +23540,10 @@ function renderTargetManageContent(student, target) {
         ? (state.groupSessionData?.date || todayDateStr())
         : (state.sessionData?.date || todayDateStr());
       const newSub = { id: subId, title: "", name: "", parentActivity: paKey, order: 0, activeFrom: _newSubDate, createdOn: todayDateStr() };
+      // The kebab is a fifth way to add something, and it was the one that got
+      // missed: everything an assistant adds is a proposal, whichever control
+      // they reached for.
+      if (proposesOnly()) markAsProposal(newSub);
       // After the last sub it already has, not straight under the parent. This
       // menu can now be used on an activity that is already a parent, and
       // dropping the new one in front would relabel every existing sub.
