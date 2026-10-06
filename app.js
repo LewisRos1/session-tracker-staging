@@ -203,7 +203,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2120";
+const APP_VERSION = "2121";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -21622,6 +21622,26 @@ function mnInitActivityCollapse(bodyEl, acts) {
         tag.textContent = "Waiting for approval";
         tagHost.appendChild(tag);
       }
+      // The details, in full, on the row itself.
+      //
+      // Every other row keeps them folded away behind a click, which is right
+      // when you already know what the activity is. A proposal is the opposite
+      // case: it is being read in order to be judged, and judging it one click
+      // at a time through a floating panel is the slow way to do the only job
+      // this screen has. Not truncated either -- the detail is the thing being
+      // approved.
+      if (!card.querySelector(":scope > .mn-pending-details")) {
+        const detailText = (act.isHeading || act.isMaintainHeading) ? ""
+          : (act.isNote || act.isExportNote) ? (noteParts(act).details || "")
+          : (act.name || "");
+        if (detailText.trim()) {
+          const d = document.createElement("div");
+          d.className = "mn-pending-details";
+          d.innerHTML = formatActivityMarkup(detailText);
+          card.appendChild(d);
+        }
+      }
+
       if (canApprove() && !tagHost.querySelector(".mn-pending-actions")) {
         // A heading that is itself unapproved cannot hold anything yet:
         // approving the activity now would file it under whichever heading

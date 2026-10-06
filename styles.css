@@ -4838,3 +4838,17 @@ button.wf-pill:hover { filter: brightness(.93); }
   white-space: nowrap;
 }
 .todo-notice-clear:hover { background: #d1fae5; }
+
+/* A proposal's details, shown rather than folded away: it is being read to be
+   judged. pre-wrap so typed line breaks and bullet lines survive. */
+.mn-pending-details {
+  font-size: .84rem;
+  line-height: 1.5;
+  color: #78350f;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: .1rem .2rem .35rem 2.6rem;
+}
+@media (max-width: 560px) {
+  .mn-pending-details { padding-left: .9rem; }
+}
