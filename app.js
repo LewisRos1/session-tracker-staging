@@ -120,6 +120,10 @@ import {
 
 // ── SW update detection — must run at parse time, before DOMContentLoaded,
 //   so the listener is in place before the new SW can fire controllerchange.
+// Set once a service-worker update has decided to reload the page. Read by
+// anything that is about to draw a screen the reload is going to throw away.
+let _swReloadQueued = false;
+
 if ("serviceWorker" in navigator) {
   const _swPageLoadTime = Date.now();
   let _reloadQueued = false;
@@ -145,6 +149,7 @@ if ("serviceWorker" in navigator) {
       }
     } catch { /* sessionStorage unavailable: fall through and reload as before */ }
     _reloadQueued = true;
+    _swReloadQueued = true;
     sessionStorage.setItem("justUpdated", "1");
     document.querySelectorAll(".screen").forEach(s => s.classList.toggle("hidden", s.id !== "screen-loading"));
     document.getElementById("updating-content")?.classList.remove("hidden");
@@ -204,7 +209,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2155";
+const APP_VERSION = "2156";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -2417,6 +2422,11 @@ checkVersionFromServer();
  * the old PIN was. The e-mail Firebase needs is built from the username.
  */
 function initPin() {
+  // An update is reloading the page in a moment, so drawing the sign-in form
+  // now only means showing it, taking it away and showing "Auto logging in..."
+  // again. That flicker is the "it loads twice" people see after a new version:
+  // the first screen is this page, the second is the reloaded one.
+  if (_swReloadQueued) return;
   showScreen("screen-pin");
   const vEl = $("pin-version");
   if (vEl) vEl.textContent = versionLineText();
