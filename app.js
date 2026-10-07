@@ -220,7 +220,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2168";
+const APP_VERSION = "2169";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -2125,14 +2125,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!(e.key === "b" && (e.ctrlKey || e.metaKey))) return;
     const el = document.activeElement;
     if (!el) return;
-    if (el.isContentEditable) {
-      e.preventDefault();
-      document.execCommand("bold");
-      return;
-    }
+    // A details box is contenteditable as well, so it has to be asked
+    // about BEFORE the general branch, which would otherwise swallow it:
+    // no styleWithCSS, so the browser was free to produce a styled span
+    // that richToMarkers does not read; no sync back to the field, so
+    // Discard Changes had nothing to compare against until you clicked
+    // away; and no refusal when nothing is highlighted, which turned bold
+    // on for whatever got typed next and left an empty <b> behind -- the
+    // stray marker pairs that appeared on reopening.
+    //
+    // The bullet shortcut below already asked in this order.
     if (isRichBox(el)) {
       e.preventDefault();
       richToggle(el, "bold");
+      return;
+    }
+    if (el.isContentEditable) {
+      e.preventDefault();
+      document.execCommand("bold");
       return;
     }
     if (isActivityMarkupField(el)) {
@@ -2148,14 +2158,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!(e.key === "u" && (e.ctrlKey || e.metaKey))) return;
     const el = document.activeElement;
     if (!el) return;
-    if (el.isContentEditable) {
-      e.preventDefault();
-      document.execCommand("underline");
-      return;
-    }
+    // A details box is contenteditable as well, so it has to be asked
+    // about BEFORE the general branch, which would otherwise swallow it:
+    // no styleWithCSS, so the browser was free to produce a styled span
+    // that richToMarkers does not read; no sync back to the field, so
+    // Discard Changes had nothing to compare against until you clicked
+    // away; and no refusal when nothing is highlighted, which turned bold
+    // on for whatever got typed next and left an empty <b> behind -- the
+    // stray marker pairs that appeared on reopening.
+    //
+    // The bullet shortcut below already asked in this order.
     if (isRichBox(el)) {
       e.preventDefault();
       richToggle(el, "underline");
+      return;
+    }
+    if (el.isContentEditable) {
+      e.preventDefault();
+      document.execCommand("underline");
       return;
     }
     if (isActivityMarkupField(el)) {
