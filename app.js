@@ -204,7 +204,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2153";
+const APP_VERSION = "2155";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -22134,8 +22134,22 @@ function mnInitActivityCollapse(bodyEl, acts) {
     }
 
     const body = card.querySelector(":scope > .mn-act-body") || card.querySelector(".mn-act-body");
-    titleEl.addEventListener("click", () =>
-      mnOpenActPanel(card, body, mnPanelTitleHtml(titleEl), card.dataset.panelKey));
+    // The whole row opens it, not just the words.
+    //
+    // The title text is a few characters wide on a short activity and the rest
+    // of the row did nothing, so opening one meant aiming. Everything that has
+    // its own job is excluded: the drag handle, the menus, the approval
+    // buttons, any field, and a sub-activity's own row, which opens the
+    // sub-activity rather than the parent it sits in.
+    card.classList.add("mn-act-clickable");
+    card.addEventListener("click", e => {
+      if (e.target.closest(
+        ".drag-handle, button, a, input, textarea, select, " +
+        ".mn-kebab-menu, .mn-heading-color-menu, .mn-sub-kebab-menu, .mn-inactive-km, " +
+        ".mn-pending-foot, .mn-sub-compact, .mn-sub-item, .mn-act-panel-open"
+      )) return;
+      mnOpenActPanel(card, body, mnPanelTitleHtml(titleEl), card.dataset.panelKey);
+    });
   });
 
   // ── Sub-activities: the indented rows under a parent open their own panel ──
@@ -24439,7 +24453,7 @@ function renderTargetManageContent(student, target) {
     bar.innerHTML = `
       <span class="mn-pending-banner-count">${n} item${n === 1 ? "" : "s"} waiting for approval</span>
       <button class="mn-pending-filter${_mnPendingOnly ? " is-on" : ""}" id="btn-mn-pending-only">
-        ${_mnPendingOnly ? "\u21b6 Show everything" : "\u25a4 Show only these"}
+        ${_mnPendingOnly ? "Show Everything" : "Show Items"}
       </button>`;
     bodyEl.insertBefore(bar, bodyEl.firstChild);
     bodyEl.classList.toggle("mn-pending-only", _mnPendingOnly);
