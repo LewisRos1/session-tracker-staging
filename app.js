@@ -209,7 +209,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2163";
+const APP_VERSION = "2164";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -13151,23 +13151,24 @@ function attachRichEditors(scope) {
     // appeared to do nothing, because a re-render had already taken the
     // selection away.
     //
-    // Checked on the next tick, because at blur time the new focus has not
-    // landed yet. Focus still inside this field's own box -- its toolbar -- is
-    // not finishing.
-    rich.addEventListener("blur", () => {
-      setTimeout(() => {
-        // Only "still inside this field". Treating a focus of nowhere as
-        // unfinished would have been wrong in the one case that matters:
-        // Save and Close detaches the panel, which blurs this box with focus
-        // landing nowhere, and that blur is what writes the details down.
-        //
-        // A press on the toolbar never reaches here at all, because the
-        // handler above stops it taking focus in the first place.
-        const home = rich.parentElement;
-        if (home && home.contains(document.activeElement)) return;
-        syncRichToField(rich);
-        ta.dispatchEvent(new Event("blur"));
-      }, 0);
+    // Where the focus is GOING, read from the event, not from the document a
+    // tick later.
+    //
+    // A tick later is too late. Discard Changes asks "has anything changed?" by
+    // comparing the activity list to the snapshot taken when the panel opened,
+    // and the details only reach that list when this blur is handed on. Deferred
+    // by even one tick, the handoff landed AFTER Discard had already decided
+    // nothing had changed and put the old list back -- so it asked for no
+    // confirmation, and then wrote the new text in on top of the restore.
+    //
+    // relatedTarget is null when focus lands nowhere, which is what Save and
+    // Close does when it detaches the panel. That has to pass through: it is
+    // the blur that writes the details down.
+    rich.addEventListener("blur", e => {
+      const goingTo = e.relatedTarget;
+      if (goingTo && rich.parentElement?.contains(goingTo)) return;
+      syncRichToField(rich);
+      ta.dispatchEvent(new Event("blur"));
     });
     // Paste arrives as whatever was copied, often a whole document's styling.
     // Only the words are wanted; bold and underline are applied here, not
@@ -22253,7 +22254,10 @@ function mnInitActivityCollapse(bodyEl, acts) {
     // the title line instead, rather than being a blank strip.
     const _noteNp = isNote ? noteParts(a) : null;
     const text = isNote ? (_noteNp.title || _noteNp.details || "") : (a.name || "");
-    const _notePreview = isNote && _noteNp.title ? _noteNp.details : "";
+    // No preview of the details on the row. A note's title is what identifies
+    // it; the details underneath turned every note into two lines of small
+    // print, markers and all, in a list meant to be scanned.
+    const _notePreview = "";
     const title = document.createElement("div");
     title.className = "mn-act-compact-title";
     title.innerHTML = `<span class="mn-act-title-text">${escHtml(truncateWords(text))}</span>`
