@@ -5016,3 +5016,10 @@ button.wf-pill:hover { filter: brightness(.93); }
 .pw-eye.is-on { opacity: 1; }
 /* Room for it, so a long password never runs underneath. */
 .float-field input#login-pw-input { padding-right: 2.4rem !important; }
+
+/* The whole row opens the editor, so it should look as though it does. */
+.mn-act-clickable { cursor: pointer; }
+.mn-act-clickable .drag-handle,
+.mn-act-clickable input,
+.mn-act-clickable textarea,
+.mn-act-clickable select { cursor: auto; }
