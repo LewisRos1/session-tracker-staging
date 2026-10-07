@@ -209,7 +209,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2164";
+const APP_VERSION = "2166";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -2160,8 +2160,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const el = document.activeElement;
     if (isRichBox(el)) {
       e.preventDefault();
-      const ta = el._richField;
-      if (ta) { toggleBulletSelection(ta); refreshRichFromField(el); }
+      richToggleBullet(el);
       return;
     }
     if (!el || !isActivityMarkupField(el)) return;
@@ -13051,7 +13050,13 @@ const RICH_FIELD_SELECTOR =
 
 /** Markers to HTML, for showing. */
 function markersToRichHtml(text) {
-  return escHtml(text || "")
+  // Empty pairs saved by the older version are dropped on the way in, so
+  // opening one of these boxes and saving again clears them. A marker around
+  // nothing but whitespace never meant anything.
+  const cleaned = String(text || "")
+    .replace(/\*\s*\*/g, "")
+    .replace(/_\s*_/g, "");
+  return escHtml(cleaned)
     .replace(/\*(.+?)\*/g, "<b>$1</b>")
     .replace(/_(.+?)_/g, "<u>$1</u>");
 }
@@ -13065,24 +13070,33 @@ function markersToRichHtml(text) {
  * underlined actually matter.
  */
 function richToMarkers(root) {
-  let out = "";
-  const walk = node => {
+  // Each node returns its own text instead of appending to a shared string,
+  // so a <b> can be asked what is inside it BEFORE deciding to mark it.
+  //
+  // Taking bold off a word leaves an empty <b></b> behind in most browsers,
+  // and the old version put a marker on each side of whatever it found
+  // without asking whether anything was there. An empty pair came out as
+  // *_ _*, on lines of its own where the tag had wrapped a line break.
+  const read = node => {
+    let out = "";
     for (const n of node.childNodes) {
       if (n.nodeType === 3) { out += n.nodeValue; continue; }
       if (n.nodeName === "BR") { out += "\n"; continue; }
       const tag = n.nodeName;
       if (tag === "DIV" || tag === "P") {
         if (out && !out.endsWith("\n")) out += "\n";
-        walk(n);
+        out += read(n);
         continue;
       }
-      if (tag === "B" || tag === "STRONG") { out += "*"; walk(n); out += "*"; continue; }
-      if (tag === "U") { out += "_"; walk(n); out += "_"; continue; }
-      walk(n);
+      const inner = read(n);
+      // A tag holding no actual text contributes only its whitespace.
+      if (tag === "B" || tag === "STRONG") { out += inner.trim() ? "*" + inner + "*" : inner; continue; }
+      if (tag === "U")                     { out += inner.trim() ? "_" + inner + "_" : inner; continue; }
+      out += inner;
     }
+    return out;
   };
-  walk(root);
-  return out;
+  return read(root);
 }
 
 /** Push what is on screen into the textarea, and let its own handlers run. */
@@ -13183,6 +13197,89 @@ function attachRichEditors(scope) {
 
 /** True when the caret is inside one of these boxes. */
 const isRichBox = el => !!el?.classList?.contains("mn-rich");
+
+/**
+ * Toggle a bullet on the line the caret is on.
+ *
+ * Done here rather than by calling the plain-textarea version, which reads
+ * selectionStart on the textarea. That textarea is hidden and never focused,
+ * so its selectionStart is stuck at 0 -- the bullet went on the first line
+ * whatever line you were on, and pressing again never found it to remove.
+ *
+ * Measured in what is on SCREEN, not in the marker text: the caret sits in
+ * the rendered box, where a bold run is <b> rather than *stars*, so the two
+ * count differently.
+ */
+function richToggleBullet(rich) {
+  const sel = window.getSelection();
+  if (!sel || !sel.focusNode || !rich.contains(sel.focusNode)) return;
+
+  // Where the caret is, counted in the box's visible characters.
+  let caret = 0, seen = false;
+  const measure = node => {
+    for (const n of node.childNodes) {
+      if (seen) return;
+      if (n === sel.focusNode && n.nodeType === 3) { caret += sel.focusOffset; seen = true; return; }
+      if (n.nodeType === 3) { caret += n.nodeValue.length; continue; }
+      if (n.nodeName === "BR") { caret += 1; continue; }
+      if (n.nodeName === "DIV" || n.nodeName === "P") { if (caret) caret += 1; }
+      measure(n);
+      if (n === sel.focusNode) { seen = true; return; }
+    }
+  };
+  measure(rich);
+
+  // The same text the caret was measured against.
+  const shown = rich.innerText.replace(/\r/g, "");
+  const lineStart = shown.lastIndexOf("\n", Math.max(0, caret - 1)) + 1;
+  const lineEnd   = (i => i === -1 ? shown.length : i)(shown.indexOf("\n", caret));
+  const line      = shown.slice(lineStart, lineEnd);
+  const bulleted  = /^\s*\u2022\s/.test(line);
+
+  // Marker text and shown text differ only by the markers, and a line keeps
+  // its position in both, so the same line index applies to each.
+  const lineNo  = shown.slice(0, lineStart).split("\n").length - 1;
+  const stored  = richToMarkers(rich).split("\n");
+  if (stored[lineNo] === undefined) return;
+  stored[lineNo] = bulleted
+    ? stored[lineNo].replace(/^(\s*)\u2022\s?/, "$1")
+    : "\u2022 " + stored[lineNo];
+
+  const ta = rich._richField;
+  if (ta) {
+    ta.value = stored.join("\n");
+    ta.dispatchEvent(new Event("input", { bubbles: true }));
+    refreshRichFromField(rich);
+  }
+
+  // Back to the end of the line that moved, so typing carries on where it
+  // was rather than jumping to the top of the box.
+  const after = rich.innerText.replace(/\r/g, "").split("\n");
+  let target = 0;
+  for (let i = 0; i < lineNo && i < after.length; i++) target += after[i].length + 1;
+  target += (after[lineNo] || "").length;
+  placeRichCaret(rich, target);
+}
+
+/** Put the caret at this many visible characters into the box. */
+function placeRichCaret(rich, offset) {
+  const walk = document.createTreeWalker(rich, NodeFilter.SHOW_TEXT);
+  let seen = 0, node;
+  while ((node = walk.nextNode())) {
+    const len = node.nodeValue.length;
+    if (seen + len >= offset) {
+      const range = document.createRange();
+      range.setStart(node, Math.max(0, offset - seen));
+      range.collapse(true);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      return;
+    }
+    seen += len;
+  }
+  rich.focus();
+}
 
 /**
  * Bold or underline whatever is selected inside a rich box.
@@ -23597,10 +23694,7 @@ function renderTargetManageContent(student, target) {
       if (!field) return;
       const rich = field._richTwin;
       if (btn.classList.contains("btn-fmt-bullet")) {
-        // Bullets are a line prefix rather than a span, so they are still done
-        // on the text and the box is redrawn from it afterwards.
-        toggleBulletSelection(field);
-        if (rich) refreshRichFromField(rich);
+        if (rich) richToggleBullet(rich); else toggleBulletSelection(field);
         return;
       }
       if (rich) {
@@ -26533,10 +26627,7 @@ function renderTemplateManageContent(template) {
       if (!field) return;
       const rich = field._richTwin;
       if (btn.classList.contains("btn-fmt-bullet")) {
-        // Bullets are a line prefix rather than a span, so they are still done
-        // on the text and the box is redrawn from it afterwards.
-        toggleBulletSelection(field);
-        if (rich) refreshRichFromField(rich);
+        if (rich) richToggleBullet(rich); else toggleBulletSelection(field);
         return;
       }
       if (rich) {
