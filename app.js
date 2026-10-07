@@ -209,7 +209,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2157";
+const APP_VERSION = "2158";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -22255,13 +22255,26 @@ function mnInitActivityCollapse(bodyEl, acts) {
 
   // A newly added activity, or one whose panel was interrupted by a rebuild,
   // opens straight back up.
+  //
+  // Deferred to the next frame, and that is the whole point of it.
+  //
+  // Opening the panel MOVES the card's fields out of the modal body and into
+  // the panel. This function runs partway through the render, and everything
+  // below it wires handlers with
+  // $("manage-modal-body").querySelectorAll(...) -- so a card whose fields had
+  // already been carried off was skipped by every one of them. Its bold,
+  // underline and bullet buttons did nothing, and neither did anything else
+  // wired after this point. It only showed on a BRAND NEW item, because that
+  // is the only time the panel opens during the render rather than on a click.
   if (_mnPanelOpenAfterRender) {
     const want = _mnPanelOpenAfterRender;
     _mnPanelOpenAfterRender = null;
-    const card = [...list.querySelectorAll("[data-panel-key]")].find(c => c.dataset.panelKey === want);
-    const titleEl = card?.querySelector(".mn-act-compact-title");
-    const body = card?.querySelector(".mn-act-body");
-    if (card && body) mnOpenActPanel(card, body, mnPanelTitleHtml(titleEl), want);
+    requestAnimationFrame(() => {
+      const card = [...list.querySelectorAll("[data-panel-key]")].find(c => c.dataset.panelKey === want);
+      const titleEl = card?.querySelector(".mn-act-compact-title");
+      const body = card?.querySelector(".mn-act-body");
+      if (card && body) mnOpenActPanel(card, body, mnPanelTitleHtml(titleEl), want);
+    });
   }
 }
 // Moves every card built into the hidden #mn-inactive-source into a collapsed
