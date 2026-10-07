@@ -209,7 +209,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2161";
+const APP_VERSION = "2162";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -2119,11 +2119,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       document.execCommand("bold");
       return;
     }
-    if (isRichBox(el)) {
-      e.preventDefault();
-      richToggle(el, "bold");
-      return;
-    }
     if (isActivityMarkupField(el)) {
       e.preventDefault();
       wrapTextareaSelection(el, "*");
@@ -2142,11 +2137,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       document.execCommand("underline");
       return;
     }
-    if (isRichBox(el)) {
-      e.preventDefault();
-      richToggle(el, "underline");
-      return;
-    }
     if (isActivityMarkupField(el)) {
       e.preventDefault();
       wrapTextareaSelection(el, "_");
@@ -2158,12 +2148,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.addEventListener("keydown", e => {
     if (!(e.key === "L" || e.key === "l") || !e.shiftKey || !(e.ctrlKey || e.metaKey)) return;
     const el = document.activeElement;
-    if (isRichBox(el)) {
-      e.preventDefault();
-      const ta = el._richField;
-      if (ta) { toggleBulletSelection(ta); refreshRichFromField(el); }
-      return;
-    }
     if (!el || !isActivityMarkupField(el)) return;
     e.preventDefault();
     toggleBulletSelection(el);
@@ -13031,136 +13015,6 @@ function findMarkerSpan(value, selStart, selEnd, marker) {
 // nothing between them. Caller is responsible for keeping the field focused
 // (see the mousedown handlers on the format buttons) so the selection
 // survives long enough to read it.
-// ─── RICH DETAILS BOXES ──────────────────────────────────────
-// Bold and underline are stored as *markers* and _markers_, which is what
-// every export, report and session screen reads. Showing those characters to
-// the person typing is the problem; the format itself is fine.
-//
-// So the format does not change. The <textarea> stays exactly where it is,
-// keeping its id, its class, its value and every listener already bound to it
-// -- the debounce, the blur save, the rename propagation. It is only hidden. A
-// contenteditable box is added beside it, shows the markers as real bold and
-// underline, and writes the markers back into the textarea on every keystroke.
-//
-// Nothing downstream can tell the difference, which is the point: the last
-// time this app used contenteditable for its text boxes it had to be reverted,
-// and that version WAS the storage.
-
-const RICH_FIELD_SELECTOR =
-  ".mn-act-details-input, .mn-note-details-input, .mn-act-name-input";
-
-/** Markers to HTML, for showing. */
-function markersToRichHtml(text) {
-  return escHtml(text || "")
-    .replace(/\*(.+?)\*/g, "<b>$1</b>")
-    .replace(/_(.+?)_/g, "<u>$1</u>");
-}
-
-/**
- * HTML back to markers, for storing.
- *
- * Walked rather than regexed off innerHTML: browsers produce different markup
- * for the same keystroke -- <div> on Enter in one, <br> in another, <strong>
- * where another gives <b> -- and only the text and which runs are bold or
- * underlined actually matter.
- */
-function richToMarkers(root) {
-  let out = "";
-  const walk = node => {
-    for (const n of node.childNodes) {
-      if (n.nodeType === 3) { out += n.nodeValue; continue; }
-      if (n.nodeName === "BR") { out += "\n"; continue; }
-      const tag = n.nodeName;
-      if (tag === "DIV" || tag === "P") {
-        if (out && !out.endsWith("\n")) out += "\n";
-        walk(n);
-        continue;
-      }
-      if (tag === "B" || tag === "STRONG") { out += "*"; walk(n); out += "*"; continue; }
-      if (tag === "U") { out += "_"; walk(n); out += "_"; continue; }
-      walk(n);
-    }
-  };
-  walk(root);
-  return out;
-}
-
-/** Push what is on screen into the textarea, and let its own handlers run. */
-function syncRichToField(rich) {
-  const ta = rich._richField;
-  if (!ta) return;
-  const next = richToMarkers(rich);
-  if (ta.value === next) return;
-  ta.value = next;
-  ta.dispatchEvent(new Event("input", { bubbles: true }));
-}
-
-/** Redraw the box from the textarea. Used after an edit made on the text. */
-function refreshRichFromField(rich) {
-  const ta = rich._richField;
-  if (!ta) return;
-  rich.innerHTML = markersToRichHtml(ta.value);
-}
-
-/**
- * Give every details box in `scope` a rich twin.
- *
- * Idempotent: a field that already has one is left alone, so this can run on
- * every render without stacking boxes or listeners.
- */
-function attachRichEditors(scope) {
-  if (!scope) return;
-  scope.querySelectorAll(RICH_FIELD_SELECTOR).forEach(ta => {
-    if (ta._richTwin) return;
-
-    const rich = document.createElement("div");
-    rich.className = "mn-rich";
-    rich.contentEditable = "true";
-    rich.spellcheck = true;
-    rich.dataset.placeholder = ta.placeholder || "";
-    rich.innerHTML = markersToRichHtml(ta.value);
-    rich._richField = ta;
-    ta._richTwin = rich;
-    ta.classList.add("mn-rich-hidden");
-    ta.after(rich);
-
-    rich.addEventListener("input", () => syncRichToField(rich));
-    // The textarea never receives focus now, so its own blur never fires and
-    // the save bound to it would never run. Handed on by hand.
-    rich.addEventListener("blur", () => {
-      syncRichToField(rich);
-      ta.dispatchEvent(new Event("blur"));
-    });
-    // Paste arrives as whatever was copied, often a whole document's styling.
-    // Only the words are wanted; bold and underline are applied here, not
-    // inherited from somewhere else.
-    rich.addEventListener("paste", e => {
-      e.preventDefault();
-      const text = (e.clipboardData || window.clipboardData)?.getData("text/plain") || "";
-      document.execCommand("insertText", false, text);
-    });
-  });
-}
-
-/** True when the caret is inside one of these boxes. */
-const isRichBox = el => !!el?.classList?.contains("mn-rich");
-
-/**
- * Bold or underline whatever is selected inside a rich box.
- *
- * execCommand is deprecated and still the only thing every browser implements
- * for this. styleWithCSS is turned off so it produces <b> and <u> rather than
- * spans carrying inline styles, which is what richToMarkers reads.
- */
-function richToggle(rich, what) {
-  const sel = window.getSelection();
-  // Nothing highlighted, nothing happens -- same rule as the plain boxes.
-  if (!sel || sel.isCollapsed || !rich.contains(sel.anchorNode)) return;
-  try { document.execCommand("styleWithCSS", false, false); } catch {}
-  document.execCommand(what, false, null);
-  syncRichToField(rich);
-}
-
 function wrapTextareaSelection(el, marker) {
   const value = el.value;
   const mLen = marker.length;
@@ -15398,14 +15252,6 @@ function applyAssistantReadOnly(bodyEl, acts) {
   // under.
   bodyEl.querySelectorAll(".drag-handle").forEach(h => {
     if (!isHers(h)) h.classList.add("mn-locked-handle");
-  });
-
-  // The rich box is a div, so readOnly means nothing to it. It follows the
-  // textarea it was built for.
-  bodyEl.querySelectorAll(".mn-rich").forEach(rich => {
-    if (!rich._richField?.readOnly) return;
-    rich.contentEditable = "false";
-    rich.classList.add("mn-locked-field");
   });
 }
 
@@ -23331,7 +23177,6 @@ function renderTargetManageContent(student, target) {
   // listener is bound, so every handler below finds them in their final home.
   mnRegroupInactiveCards($("manage-modal-body"), acts);
   mnInitActivityCollapse($("manage-modal-body"), acts);
-  attachRichEditors($("manage-modal-body"));
   wireAssistantMenuLock($("manage-modal-body"), acts);
   applyAssistantReadOnly($("manage-modal-body"), acts);
   $("manage-modal-body").querySelectorAll(".admin-list-item textarea").forEach(autoResizeTextarea);
@@ -23545,19 +23390,11 @@ function renderTargetManageContent(student, target) {
     btn.addEventListener("click", () => {
       const field = $(btn.dataset.inputId);
       if (!field) return;
-      const rich = field._richTwin;
       if (btn.classList.contains("btn-fmt-bullet")) {
-        // Bullets are a line prefix rather than a span, so they are still done
-        // on the text and the box is redrawn from it afterwards.
         toggleBulletSelection(field);
-        if (rich) refreshRichFromField(rich);
-        return;
+      } else {
+        wrapTextareaSelection(field, btn.classList.contains("btn-fmt-bold") ? "*" : "_");
       }
-      if (rich) {
-        richToggle(rich, btn.classList.contains("btn-fmt-bold") ? "bold" : "underline");
-        return;
-      }
-      wrapTextareaSelection(field, btn.classList.contains("btn-fmt-bold") ? "*" : "_");
     });
   });
 
@@ -26341,7 +26178,6 @@ function renderTemplateManageContent(template) {
   // See renderTargetManageContent — relocate before listeners are bound.
   mnRegroupInactiveCards($("manage-modal-body"), acts);
   mnInitActivityCollapse($("manage-modal-body"), acts);
-  attachRichEditors($("manage-modal-body"));
   wireAssistantMenuLock($("manage-modal-body"), acts);
   applyAssistantReadOnly($("manage-modal-body"), acts);
   $("manage-modal-body").querySelectorAll(".admin-list-item textarea").forEach(autoResizeTextarea);
@@ -26481,19 +26317,11 @@ function renderTemplateManageContent(template) {
     btn.addEventListener("click", () => {
       const field = $(btn.dataset.inputId);
       if (!field) return;
-      const rich = field._richTwin;
       if (btn.classList.contains("btn-fmt-bullet")) {
-        // Bullets are a line prefix rather than a span, so they are still done
-        // on the text and the box is redrawn from it afterwards.
         toggleBulletSelection(field);
-        if (rich) refreshRichFromField(rich);
-        return;
+      } else {
+        wrapTextareaSelection(field, btn.classList.contains("btn-fmt-bold") ? "*" : "_");
       }
-      if (rich) {
-        richToggle(rich, btn.classList.contains("btn-fmt-bold") ? "bold" : "underline");
-        return;
-      }
-      wrapTextareaSelection(field, btn.classList.contains("btn-fmt-bold") ? "*" : "_");
     });
   });
 
