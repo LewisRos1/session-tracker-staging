@@ -134,20 +134,23 @@ if ("serviceWorker" in navigator) {
     // happens when a deploy is still propagating and app.js and sw.js are served
     // from different edges, which a run of quick version bumps makes likely.
     // Count reloads across loads and give up rather than spin.
+    // localStorage, not sessionStorage: a session is per tab, so closing the
+    // app and opening it again wiped the count and the loop began afresh.
+    // Which is exactly what someone does when the app will not load.
     try {
       const now = Date.now();
-      const hist = JSON.parse(sessionStorage.getItem("swReloadHistory") || "[]")
+      const hist = JSON.parse(localStorage.getItem("swReloadHistory") || "[]")
         .filter(t => now - t < 60000);
       hist.push(now);
-      sessionStorage.setItem("swReloadHistory", JSON.stringify(hist));
+      localStorage.setItem("swReloadHistory", JSON.stringify(hist));
       if (hist.length > 3) {
-        sessionStorage.removeItem("swReloadHistory");
+        localStorage.removeItem("swReloadHistory");
         console.error("[SW] update reload loop detected after " + hist.length
           + " reloads in under a minute. Staying on version " + APP_VERSION
           + " instead of reloading again. Refresh by hand once the deploy has settled.");
         return;
       }
-    } catch { /* sessionStorage unavailable: fall through and reload as before */ }
+    } catch { /* storage unavailable: fall through and reload as before */ }
     _reloadQueued = true;
     _swReloadQueued = true;
     sessionStorage.setItem("justUpdated", "1");
@@ -168,8 +171,16 @@ if ("serviceWorker" in navigator) {
   // PWA mode. The new SW broadcasts "swActivated" after clients.claim(); if the
   // version differs from the running app, trigger a reload here instead.
   navigator.serviceWorker.addEventListener("message", event => {
-    if (event.data?.type === "swActivated" && event.data.version !== APP_VERSION)
-      _doUpdateReload();
+    if (event.data?.type !== "swActivated") return;
+    // Only when the worker is NEWER. "Different" was enough before, and a
+    // deploy that moved sw.js without moving app.js -- or an edge still
+    // serving the older app.js -- made them permanently different: reload,
+    // disagree again, reload. Reloading cannot help when the page is already
+    // ahead of the worker, so it does not try.
+    const swV  = Number(event.data.version);
+    const appV = Number(APP_VERSION);
+    if (Number.isFinite(swV) && Number.isFinite(appV) && swV <= appV) return;
+    _doUpdateReload();
   });
 }
 
@@ -209,7 +220,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2166";
+const APP_VERSION = "2167";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
