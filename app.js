@@ -220,7 +220,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2169";
+const APP_VERSION = "2172";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -20811,6 +20811,20 @@ function showGroupDupFromOtherPickTarget(group, sourceGroup) {
 
 
 async function closeManageModal() {
+  // An open activity panel is holding the save, so it has to be closed first.
+  //
+  // While a panel is open saveTarget deliberately writes nothing, so that
+  // Discard Changes has something to put back. Closing the modal ran the
+  // flush below -- which did copy the typed text into the list -- and then
+  // called saveTarget, which refused, because the panel was still open.
+  // Nothing closed the panel either, so the refusal was never revisited: the
+  // edit sat in memory looking saved and was gone on the next reload.
+  //
+  // mnPanelSave is the same path as Save and Close: it puts the fields back,
+  // lifts the hold and writes what changed. It runs BEFORE
+  // _groupForTargetEdit is cleared, because the write chooses between the
+  // group and the student by reading it.
+  if (_mnPanelOpen) await mnPanelSave();
   $("manage-modal").classList.add("hidden");
   const _savedGroupForTargetEdit = _groupForTargetEdit;
   _groupForTargetEdit = null;
@@ -22145,6 +22159,9 @@ function mnOpenActPanel(card, body, titleHtml, key, chipHtml) {
   // Remember exactly where the fields came from, so they go back in the same
   // place even if siblings shifted while they were away.
   _mnPanelOpen = { body, home: body.parentElement, next: body.nextSibling, card, key };
+  // Anything still in the slot is an orphan from an earlier open -- a body
+  // whose card has since been rebuilt. Only ever show the one being opened.
+  [...slot.children].forEach(n => { if (n !== body) n.remove(); });
   slot.appendChild(body);
   body.classList.add("mn-act-panel-open");
   el.style.display = "flex";
@@ -22186,7 +22203,20 @@ function mnDetachPanel(discardNode = false) {
     document.activeElement.blur();
   }
   open.body.classList.remove("mn-act-panel-open");
-  if (discardNode || !open.home || !open.home.isConnected) return;
+  if (discardNode || !open.home || !open.home.isConnected) {
+    // Nowhere to put it back, so it has to GO rather than be left sitting in
+    // the panel.
+    //
+    // It used to be left behind, and the panel appends the next body beside
+    // whatever is already there. So Discard Changes abandoned the fields
+    // holding the discarded text, and reopening that activity showed TWO
+    // Details boxes: the stale one first, with the words that had just been
+    // thrown away, and the real empty one under it. That is what "discard
+    // changes doesn't work" looked like, even once the data behind it was
+    // being restored correctly. Every discard leaked another copy.
+    open.body.remove();
+    return;
+  }
   open.home.insertBefore(open.body, open.next && open.next.isConnected ? open.next : null);
 }
 
@@ -22262,13 +22292,23 @@ function mnPanelDiscard() {
   _mnPanelSaveWanted = false;
   _mnPanelRenameQueue = [];
   _mnPanelSnapshot = null;
-  // Restore in place: handlers all close over this same array.
+  // Restore in place: every handler on this screen closes over this array.
   if (host && snap) {
     try {
       const before = JSON.parse(snap);
       host.acts.length = 0;
       host.acts.push(...before);
       host.target.predefinedActivities = host.acts;
+      // And back into state, or the restore only reaches this screen.
+      //
+      // The editor holds a merged COPY of the target, so putting the list
+      // back here left state still holding what was typed. The panel then
+      // rebuilt itself from state and the text reappeared -- which is why
+      // Discard Changes looked like it did nothing at all.
+      //
+      // Nothing is written to Firestore: saveTarget refuses to write while a
+      // panel is open, exactly so a discard has nothing to undo there.
+      host.syncState?.();
     } catch (err) { console.error("Could not restore the activity list:", err); }
   }
   // The snapshot was taken after "+ Add Activity" pushed the blank row, so a
@@ -23525,12 +23565,36 @@ function renderTargetManageContent(student, target) {
   _mnPanelHost = {
     acts,
     rerender: () => renderTargetManageContent(student, target),
-    // splitPendingTarget for the same reason saveTarget uses it: handing the
-    // editor's merged copy back would put proposals into the object the rest of
-    // the app reads.
-    flushSave: async () => { const i = student.targets.findIndex(t => t.id === target.id); if (i >= 0) student.targets[i] = splitPendingTarget(target);
-      if (_groupForTargetEdit) { const gi = state.groups.findIndex(g => g.id === _groupForTargetEdit.id); if (gi >= 0) state.groups[gi] = _groupForTargetEdit; await saveGroup(_groupForTargetEdit); }
-      else { const si = state.students.findIndex(s => s.id === student.id); if (si >= 0) state.students[si] = student; await saveStudent(student); } },
+    /**
+     * Put the edited list back where the rest of the app reads it, writing
+     * nothing.
+     *
+     * This screen does NOT edit the target the app reads. mergePendingForEdit
+     * hands it a merged COPY, so state only ever sees what gets pushed back
+     * here. Save and Close pushed it back; Discard Changes did not, and that
+     * was the bug: it restored its own copy, the screen was rebuilt from
+     * state, and the text that had just been thrown away was still there.
+     *
+     * splitPendingTarget for the same reason saveTarget uses it: handing the
+     * editor's merged copy back would put proposals into the object the rest
+     * of the app reads.
+     */
+    syncState: () => {
+      const i = student.targets.findIndex(t => t.id === target.id);
+      if (i >= 0) student.targets[i] = splitPendingTarget(target);
+      if (_groupForTargetEdit) {
+        const gi = state.groups.findIndex(g => g.id === _groupForTargetEdit.id);
+        if (gi >= 0) state.groups[gi] = _groupForTargetEdit;
+      } else {
+        const si = state.students.findIndex(s => s.id === student.id);
+        if (si >= 0) state.students[si] = student;
+      }
+    },
+    flushSave: async () => {
+      _mnPanelHost.syncState();
+      if (_groupForTargetEdit) await saveGroup(_groupForTargetEdit);
+      else await saveStudent(student);
+    },
     student, target
   };
 
