@@ -220,7 +220,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2167";
+const APP_VERSION = "2168";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -13061,13 +13061,17 @@ const RICH_FIELD_SELECTOR =
 
 /** Markers to HTML, for showing. */
 function markersToRichHtml(text) {
-  // Empty pairs saved by the older version are dropped on the way in, so
-  // opening one of these boxes and saving again clears them. A marker around
-  // nothing but whitespace never meant anything.
-  const cleaned = String(text || "")
-    .replace(/\*\s*\*/g, "")
-    .replace(/_\s*_/g, "");
-  return escHtml(cleaned)
+  // No tidying of stray marker pairs here, and there cannot be any.
+  //
+  // A rule that removed a star, any whitespace, a star could not tell an
+  // empty pair from the gap BETWEEN two marked runs. Two bold words on their
+  // own lines are stored as *yup*, newline, *hello*: the newline sits between
+  // two stars, so the rule ate it and the two lines became one bold line.
+  // Same for two bold words with a space between them.
+  //
+  // Empty pairs are not written in the first place now -- richToMarkers will
+  // not mark a tag with no text in it -- so there is nothing to clean up.
+  return escHtml(text || "")
     .replace(/\*(.+?)\*/g, "<b>$1</b>")
     .replace(/_(.+?)_/g, "<u>$1</u>");
 }
