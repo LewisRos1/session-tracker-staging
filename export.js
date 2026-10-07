@@ -2544,7 +2544,8 @@ async function buildSingleSessionWordBlob(entityName, sessionLabel, allTargets, 
   const { Document, Packer, LineRuleType } = docx;
   const stampImageBuffer = await getStampImageBuffer();
   // A target discontinued before this session happened is left out of the
-  // document entirely.
+  // document entirely. discontinuedOn is the LAST day it was used, so a session
+  // ON that day still includes it and the day after does not.
   //
   // Discontinuing a target hides it from the session dropdown, so no data is
   // ever recorded against it again -- but the Word report went on printing it

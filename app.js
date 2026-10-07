@@ -209,7 +209,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2158";
+const APP_VERSION = "2159";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -9951,7 +9951,7 @@ function renderManageActivityScreen(entity) {
   const isDiscontinued = !!target.discontinuedOn;
   const discBadge = isDiscontinued
     ? `<div style="font-size:.8rem;color:#dc2626;font-weight:600;padding:.2rem .1rem .4rem;display:flex;align-items:center;gap:.35rem">
-        🛑 Discontinued since ${fmtPeriodDate(target.discontinuedOn)} — hidden from session dropdown
+        🛑 Discontinued on ${fmtPeriodDate(target.discontinuedOn)} — hidden from ${fmtPeriodDate(addOneDay(target.discontinuedOn))} onwards
       </div>`
     : '';
   const dropHtml = `<div class="target-selector" style="position:static;margin-bottom:${isDiscontinued ? '.3rem' : '.8rem'};display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
@@ -11496,7 +11496,12 @@ function renderTargetCombo(comboId, selectId, items, busyFlag) {
 
 function populateTargetDropdown(targets) {
   const sel = $("target-select");
-  const sorted = sortTargetsByOrder(targets).filter(t => !t.discontinuedOn);
+  // Judged against the session being written, not against today. A target
+  // discontinued in August belongs in an August session and was being hidden
+  // from it, so writing up an old day showed fewer targets than that day
+  // actually had.
+  const _sessDate = state.sessionData?.date || todayDateStr();
+  const sorted = sortTargetsByOrder(targets).filter(t => targetActiveOn(t, _sessDate));
   // Rewriting the options closes an open menu, so the list is left alone while
   // the user is reading it. Everything below still runs: skipping the whole
   // function here would leave the Edit Instructors button unwired.
@@ -14476,12 +14481,32 @@ $("score-modal-backdrop").addEventListener("click", closeScorePicker);
 // SESSION VIEW SCREEN (table-based view/edit for past sessions)
 // ============================================================
 
+/**
+ * Was this target still in use on this date?
+ *
+ * discontinuedOn is the LAST day it was used, matching what the same field
+ * means on an activity and what masteredOn means. Targets used to store the
+ * first day they were HIDDEN, one day later, which is why a target could not be
+ * reasoned about the same way as the activities inside it.
+ *
+ * A missing date means it is still running.
+ */
+function targetActiveOn(t, dateStr) {
+  if (!t?.discontinuedOn) return true;
+  // No date to judge by: it is discontinued, so it is out. Showing it would be
+  // the old behaviour this is replacing.
+  if (!dateStr) return false;
+  return dateStr <= t.discontinuedOn;
+}
+
 function getViewEffectiveTargets() {
   const currentTargets = state.viewStudent?.targets || [];
   if (!state.viewSessionData) return currentTargets;
   // Always use the current target list: new targets appear in old sessions,
   // deleted targets disappear from all sessions (data removed by deleteTargetDataFromSessions).
-  return currentTargets;
+  // A discontinued one is the exception: it belongs to the days it was running
+  // and to no others, so it is judged against this session's own date.
+  return currentTargets.filter(t => targetActiveOn(t, state.viewSessionData.date));
 }
 
 async function openSessionView(student, sessionId) {
@@ -18332,7 +18357,8 @@ function attachViewListeners() {
 // ============================================================
 
 function getViewGroupEffectiveTargets() {
-  return state.viewGroup?.targets || [];
+  const d = state.viewGroupSessionData?.date;
+  return (state.viewGroup?.targets || []).filter(t => targetActiveOn(t, d));
 }
 
 async function openGroupSessionView(group, sessionId) {
@@ -20801,9 +20827,15 @@ async function handleDiscontinueTarget(entity, target, isGroup) {
     finally { if (btn) { btn.disabled = false; btn.textContent = origText; } }
   }
 
-  const minDate = lastDate ? addOneDay(lastDate) : todayDateStr();
+  // The last session itself, not the day after it.
+  //
+  // The date recorded is the last day the target was USED, which is what
+  // masteredOn and an activity's discontinuedOn have always meant. Targets
+  // alone counted from the day after, so the same field meant two things
+  // depending on what it was attached to.
+  const minDate = lastDate || todayDateStr();
   const infoHtml = lastDate
-    ? `<strong>"${escHtml(target.name)}"</strong> will be hidden from the session dropdown from this date onwards. All past session data is preserved and will still appear in exports.<br><br>The last recorded session for this target was on <strong>${fmtPeriodDate(lastDate)}</strong>. So, the earliest you can discontinue is <strong>${fmtPeriodDate(minDate)}</strong>.`
+    ? `<strong>"${escHtml(target.name)}"</strong> stays visible up to and including this date, and all past session data is preserved.<br><br>The last recorded session for this target was on <strong>${fmtPeriodDate(lastDate)}</strong>. So, the earliest you can discontinue is <strong>${fmtPeriodDate(minDate)}</strong>. This target will stop showing from <strong>${fmtPeriodDate(addOneDay(minDate))}</strong> onwards.`
     : `<strong>"${escHtml(target.name)}"</strong> will be hidden from the session dropdown from this date onwards. All past session data is preserved and will still appear in exports.<br><br>No previous session data was found for this target.`;
 
   const pickedDate = await showDatePickerOverlay({
@@ -27293,7 +27325,9 @@ function renderGroupSessionHeader(data) {
 function populateGroupTargetDropdown(targets) {
   const sel = $("group-target-select");
   if (!sel) return;
-  const sorted = sortTargetsByOrder(targets).filter(t => !t.discontinuedOn);
+  // Same as the individual screen: judged against the session's own date.
+  const _grpSessDate = state.groupSessionData?.date || todayDateStr();
+  const sorted = sortTargetsByOrder(targets).filter(t => targetActiveOn(t, _grpSessDate));
   // Rewriting the options closes an open menu, so the list is left alone while
   // the user is reading it. Everything below still runs: skipping the whole
   // function here would leave the Edit Target button unwired.
