@@ -209,7 +209,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2159";
+const APP_VERSION = "2160";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -13028,10 +13028,11 @@ function wrapTextareaSelection(el, marker) {
     return;
   }
 
-  if (start === end) {
-    if (!value.trim()) return;
-    start = 0; end = value.length;
-  }
+  // Nothing highlighted, nothing happens -- the way every word processor
+  // behaves. It used to take the whole field as the selection, so clicking B
+  // with the cursor resting somewhere bolded the entire block, and the only way
+  // back was to click it again and know that was why.
+  if (start === end) return;
 
   const before = value.slice(0, start);
   const selected = value.slice(start, end);
