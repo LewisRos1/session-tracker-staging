@@ -5043,3 +5043,52 @@ button.wf-pill:hover { filter: brightness(.93); }
 .mn-act-clickable input,
 .mn-act-clickable textarea,
 .mn-act-clickable select { cursor: auto; }
+
+/* ── Details boxes that show their formatting ─────────────── */
+/* The textarea is still there, still the thing that gets saved. It is only
+   out of sight. Not display:none: a field that is not laid out cannot be
+   scrolled to or measured, and some browsers skip it on form restore. */
+.mn-rich-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  border: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  white-space: nowrap !important;
+}
+
+/* Matches .admin-input, so swapping one for the other is invisible. */
+.mn-rich {
+  width: 100%;
+  box-sizing: border-box;
+  padding: .55rem .75rem;
+  border: none;
+  border-radius: 0;
+  font-size: .93rem;
+  font-family: var(--font);
+  line-height: 1.45;
+  color: var(--text);
+  background: var(--bg);
+  outline: none;
+  /* Typed line breaks and runs of spaces survive, and long words wrap rather
+     than pushing the card wider. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  min-height: 1.45em;
+  cursor: text;
+}
+.mn-rich:focus { background: var(--white); }
+/* contenteditable has no placeholder of its own. :empty alone is not enough --
+   a browser leaves a stray <br> behind after the last character is deleted. */
+.mn-rich:empty::before,
+.mn-rich:has(> br:only-child)::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.mn-rich b, .mn-rich strong { font-weight: 700; }
+.mn-rich u { text-decoration: underline; }
+.mn-rich.mn-locked-field { cursor: not-allowed !important; }
