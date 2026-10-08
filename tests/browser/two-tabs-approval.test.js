@@ -190,7 +190,7 @@ try {
     // Say NO to the "somebody else changed this" warning, which is what a
     // person would do, and yes to anything else.
     await page.eval(`window.__asked = [];
-      window.confirm = m => { window.__asked.push(m); return !/changed this target/i.test(m); };
+      window.confirm = m => { window.__asked.push(m); return !/resend Approval/i.test(m); };
       window.alert = () => {};`);
     await page.eval(`(() => {
       const s = window.__app.state.students.find(x => x.id === "bea");
@@ -246,7 +246,7 @@ try {
 
   const asked = await ray.eval(`window.__asked || []`);
   r.ok("she was warned before her save could overwrite it",
-    asked.some(m => /changed this target/i.test(m)),
+    asked.some(m => /resend Approval/i.test(m)),
     `she was asked: ${JSON.stringify(asked)}`);
 
   const spot = await whereIsQ1();

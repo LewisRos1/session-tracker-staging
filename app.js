@@ -220,7 +220,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2202";
+const APP_VERSION = "2203";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -22506,6 +22506,17 @@ let _mnEditTargetStale = false;
  * any more. They must not be able to write it.
  */
 let _mnRenderSeq = 0;
+/**
+ * The one drawing whose writes are refused, because the person was asked and
+ * said no.
+ *
+ * Refusing EVERY superseded drawing threw work away without a word: the
+ * screen is redrawn for all sorts of ordinary reasons, and a save that landed
+ * just after one -- a newly added parent activity, say -- was dropped in
+ * silence and never reached anybody. Only a drawing that was explicitly
+ * declined is refused now.
+ */
+let _mnDeclinedRender = -1;
 /** The newer copy an open window has not been able to take on yet. */
 let _mnStaleFrom = null;
 
@@ -22564,10 +22575,12 @@ function mnWarnIfStale() {
   _mnStaleFrom = null;
 
   if (confirm(
-    "Somebody else changed this target while this window was open.\n\n" +
-    "Saving now would put your version back and undo their change.\n\n" +
-    "Save anyway?"
+    "Ms. Daisy has approved the previous version.\n\n" +
+    "Do you want to resend Approval with the new changes?"
   )) return true;
+
+  // No: nothing from this drawing of the screen is written, now or later.
+  _mnDeclinedRender = _mnRenderSeq;
 
   // No: their version stands. Put it on screen, or this window carries on
   // holding the old copy and the very next save writes it without asking.
@@ -23244,7 +23257,7 @@ function renderTargetManageContent(student, target) {
     // Discard Changes, and a discard can only put things back if they never
     // left. Save and Close lifts the hold and writes once.
     if (_mnPanelHold) { _mnPanelSaveWanted = true; return; }
-    if (myRender !== _mnRenderSeq) return;   // the screen has moved on
+    if (myRender === _mnDeclinedRender) return;   // this drawing was declined
     // Same question as flushSave asks, and it is only asked once per change
     // made elsewhere.
     if (!mnWarnIfStale()) return;
@@ -24012,7 +24025,7 @@ function renderTargetManageContent(student, target) {
       // an activity panel writes straight through this, so a window holding
       // an older copy could undo somebody else's approval without ever being
       // asked -- and the approved activity came back as a proposal.
-      if (myRender !== _mnRenderSeq) return;   // the screen has moved on
+      if (myRender === _mnDeclinedRender) return;   // this drawing was declined
       if (!mnWarnIfStale()) return;
       _mnPanelHost.syncState();
       if (editingGroup) await saveGroup(editingGroup);
