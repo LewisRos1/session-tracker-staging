@@ -91,6 +91,20 @@ service cloud.firestore {
     // Left open to anyone signed in. trash in particular: expired items are
     // cleared on startup by whoever opens the app first, so restricting writes
     // here would break an ordinary session for an assistant.
+    // ── Edit Target locks ────────────────────────────────────
+    // One small document per target, saying who has that target's Edit Target
+    // screen open. It is written on opening and deleted on closing, so two
+    // people cannot both be editing one target and overwrite each other.
+    //
+    // Its own collection on purpose. Kept on the student document instead,
+    // every lock and unlock would rewrite that whole record -- which is the
+    // very thing the lock exists to prevent.
+    //
+    // Anyone signed in may take or release one: an assistant has to be able to
+    // lock a target to edit it, and has to be able to clear a dead lock left
+    // by a laptop that went to sleep.
+    match /editLocks/{lockId} { allow read, write: if signedIn(); }
+
     match /remarkPresets/{presetId} { allow read, write: if signedIn(); }
     match /templates/{templateId}   { allow read, write: if signedIn(); }
     match /trash/{trashId}          { allow read, write: if signedIn(); }

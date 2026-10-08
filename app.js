@@ -90,6 +90,10 @@ import {
   updateCommentAssignment,
   listenToReviewQueue,
   listenToStudent,
+  getEditLock,
+  setEditLock,
+  clearEditLock,
+  listenToEditLock,
   listenToGroup,
   getSessionsWithParticipant,
   getAllSessions,
@@ -220,7 +224,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2203";
+const APP_VERSION = "2204";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -20647,6 +20651,9 @@ function openManageModal(student, targetOrNull, templateOrNull = null, remarkPre
   _mnSweepOnOpen = true;
   // Watch for changes made elsewhere for as long as this window is open.
   if (targetOrNull && !templateOrNull && !remarkPresetOrNull) mnWatchWhileEditing(student, false);
+  if (targetOrNull && !templateOrNull && !remarkPresetOrNull) {
+    mnTakeLockOrBackOut(student, targetOrNull, false);
+  }
   mnDetachPanel(true); _mnPanelHold = false; _mnPanelSnapshot = null;   // never inherit a panel from the last target
   $("manage-modal").classList.remove("hidden");
   if (remarkPresetOrNull) {
@@ -20888,8 +20895,9 @@ async function closeManageModal() {
   // could not be refreshed underneath, ask before writing over them.
   // Answering no closes without writing, which leaves their version alone.
   const _mayWrite = mnWarnIfStale();
-  // Nothing to watch once the window is shut.
+  // Nothing to watch once the window is shut, and the target is free again.
   mnStopWatchingWhileEditing();
+  stopHoldingLock();
 
   // An open activity panel is holding the save, so it has to be closed first.
   //
@@ -22164,6 +22172,185 @@ let _mnPanelSnapshot = null;          // deep copy of acts as it was when the pa
 let _mnSweepOnOpen = false;
 /** Guards against a refresh starting another refresh. */
 let _mnRefreshing = false;
+// ── Only one person in a target at a time ────────────────────────────
+//
+// Saving writes the WHOLE student or group record, so two people editing one
+// target overwrite each other: whoever saves last wins and the other's work
+// is gone. Rather than try to merge two versions after the fact, the second
+// person is kept out until the first has finished.
+//
+// Locked per TARGET, not per student: Rayhanah in FEDC 1 does not stop
+// Ms. Daisy editing FEDC 2 on the same child.
+//
+// Nobody can take a lock from somebody else, main teacher or not.
+
+/** No typing and no clicking for this long and the window closes itself. */
+const LOCK_IDLE_MS = 5 * 60 * 1000;
+/** How often the holder says it is still there. */
+const LOCK_RENEW_MS = 30 * 1000;
+/**
+ * A lock nobody has refreshed for this long belongs to a browser that is
+ * asleep or gone.
+ *
+ * The holder's own window closes itself after LOCK_IDLE_MS -- but only while
+ * it is running. A sleeping laptop runs nothing, so without this the lock
+ * would sit there for as long as the lid stayed shut. Same five minutes from
+ * the other side, so the two cannot disagree.
+ */
+const LOCK_DEAD_AFTER_MS = LOCK_IDLE_MS;
+
+let _lock = null;          // { ownerId, targetId, renewTimer, tickTimer, lastActive }
+
+const lockIsDead = l => !l || (Date.now() - (l.heldAt || 0)) > LOCK_DEAD_AFTER_MS;
+
+/**
+ * Try to take a target's lock.
+ *
+ * Gives back { ok: true } or { ok: false, holder } so the caller can say who
+ * is in there. A dead lock is taken over without asking anybody.
+ */
+async function acquireEditLock(ownerId, targetId) {
+  const me = currentUser();
+  if (!me) return { ok: true };                 // not signed in as one of ours
+  try {
+    const held = await getEditLock(ownerId, targetId);
+    if (held && held.holderId !== me.id && !lockIsDead(held)) {
+      return { ok: false, holder: held };
+    }
+    await setEditLock(ownerId, targetId, { id: me.id, name: me.name });
+    return { ok: true };
+  } catch (err) {
+    // The lock is a courtesy between colleagues, not a security control. If
+    // the rules have not been published yet, or the network is down, editing
+    // still has to work -- the version that asks before overwriting is still
+    // underneath it.
+    console.warn("could not take the Edit Target lock:", err);
+    return { ok: true };
+  }
+}
+
+/** Hold it, and watch for going idle. */
+function startHoldingLock(ownerId, targetId) {
+  stopHoldingLock();
+  _lock = { ownerId, targetId, lastActive: Date.now(), renewTimer: null, tickTimer: null };
+
+  const touch = () => { if (_lock) _lock.lastActive = Date.now(); };
+  _lock.touch = touch;
+  for (const ev of ["keydown", "pointerdown", "input", "wheel"]) {
+    document.addEventListener(ev, touch, true);
+  }
+
+  _lock.renewTimer = setInterval(() => {
+    const me = currentUser();
+    if (!me || !_lock) return;
+    setEditLock(_lock.ownerId, _lock.targetId, { id: me.id, name: me.name })
+      .catch(err => console.warn("could not refresh the Edit Target lock:", err));
+  }, LOCK_RENEW_MS);
+
+  // Counted from the clock, not ticked down.
+  //
+  // A ticking number stops with the browser when a laptop sleeps, and would
+  // carry on from where it left off hours later. Read from the clock, the
+  // window notices the moment it wakes that its five minutes went long ago,
+  // and closes straight away.
+  _lock.tickTimer = setInterval(() => {
+    if (!_lock) return;
+    const left = LOCK_IDLE_MS - (Date.now() - _lock.lastActive);
+    if (left <= 0) { closeManageModalForIdle(); return; }
+    renderLockCountdown(left);
+  }, 1000);
+  renderLockCountdown(LOCK_IDLE_MS);
+}
+
+function stopHoldingLock() {
+  if (!_lock) return;
+  clearInterval(_lock.renewTimer);
+  clearInterval(_lock.tickTimer);
+  for (const ev of ["keydown", "pointerdown", "input", "wheel"]) {
+    document.removeEventListener(ev, _lock.touch, true);
+  }
+  const { ownerId, targetId } = _lock;
+  _lock = null;
+  clearEditLock(ownerId, targetId).catch(() => {});
+}
+
+/** Five minutes untouched: save what is there and close, as Done does. */
+function closeManageModalForIdle() {
+  if (!_lock) return;
+  const banner = $("mn-lock-timer");
+  if (banner) banner.textContent = "Closing\u2026";
+  closeManageModal();
+}
+
+/** The countdown, in a box of its own under the approval banner. */
+function renderLockCountdown(msLeft) {
+  const bodyEl = $("manage-modal-body");
+  if (!bodyEl) return;
+  const mins = Math.floor(Math.max(0, msLeft) / 60000);
+  const secs = Math.floor((Math.max(0, msLeft) % 60000) / 1000);
+  const clock = `${mins}:${String(secs).padStart(2, "0")}`;
+
+  let bar = bodyEl.querySelector(":scope > .mn-lock-banner");
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.className = "mn-lock-banner";
+    bar.innerHTML = `<span class="mn-pending-banner-count">`
+      + `This window will close by itself in <strong id="mn-lock-timer"></strong> `
+      + `if no changes are made.</span>`;
+    // Under the approval banner when there is one, otherwise at the top.
+    const pending = bodyEl.querySelector(":scope > .mn-pending-banner:not(.mn-lock-banner)");
+    if (pending) pending.after(bar); else bodyEl.insertBefore(bar, bodyEl.firstChild);
+  }
+  const out = bar.querySelector("#mn-lock-timer");
+  if (out && out.textContent !== clock) out.textContent = clock;
+}
+
+/**
+ * Take the lock for a target that has just been opened, or back out.
+ *
+ * Asked for after the window is on screen rather than before, so that the
+ * open functions stay synchronous -- they are called from a dozen places. If
+ * somebody else has it, the window is taken away again before anything can
+ * be typed into it. Nothing has changed by then, so nothing is saved.
+ */
+async function mnTakeLockOrBackOut(entity, target, isGroup) {
+  if (!entity?.id || !target) return;
+  const targetKey = target.id || target.name;
+  const res = await acquireEditLock(entity.id, targetKey);
+  if (res.ok) { startHoldingLock(entity.id, targetKey); return; }
+
+  // Somebody else is in there: shut this window without writing anything.
+  mnStopWatchingWhileEditing();
+  mnDetachPanel(true);
+  _mnPanelHold = false;
+  _mnPanelSnapshot = null;
+  _pendingActsCleanup = null;
+  $("manage-modal")?.classList.add("hidden");
+  showLockedByOther(res.holder);
+}
+
+/** Somebody else is in there. */
+function showLockedByOther(holder) {
+  const name = escHtml(holder?.holderName || "Somebody");
+  const host = $("manage-modal")?.querySelector(".modal-sheet") || document.body;
+  host.querySelectorAll("[data-lock-wait]").forEach(el => el.remove());
+  const overlay = document.createElement("div");
+  overlay.dataset.lockWait = "1";
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;"
+    + "align-items:center;justify-content:center;z-index:600;padding:1rem";
+  overlay.innerHTML = `<div style="background:#fff;padding:1.5rem 1.25rem;border-radius:.75rem;width:min(360px,92%);box-shadow:0 4px 24px rgba(0,0,0,.25);display:flex;flex-direction:column;align-items:center;gap:1rem;text-align:center">
+      <div style="font-size:2rem;line-height:1">\u{1F512}</div>
+      <div style="font-size:.95rem;color:#111;line-height:1.6">
+        <strong>${name}</strong> is currently making changes in this target\u2019s
+        \u201cEdit Target\u201d.
+      </div>
+      <div style="font-size:.9rem;color:#4b5563">Please try again in a moment.</div>
+      <button class="btn-primary-sm" data-lock-ok style="padding:.5rem 2rem">OK</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector("[data-lock-ok]").addEventListener("click", () => overlay.remove());
+}
+
 /** Dropped when the Edit Target window closes. */
 let _mnConfigUnsub = null;
 /** The target Edit Target is currently showing, for the live refresh. */
@@ -30098,6 +30285,7 @@ function openGroupManageModal(group, target = null, scrollToPaId = null) {
   // Opening the screen is when blank rows left behind by a closed tab go.
   _mnSweepOnOpen = true;
   if (target) mnWatchWhileEditing(group, true);
+  if (target) mnTakeLockOrBackOut(group, target, true);
   mnDetachPanel(true); _mnPanelHold = false; _mnPanelSnapshot = null;   // never inherit a panel from the last target
   $("manage-modal").classList.remove("hidden");
   if (target) {

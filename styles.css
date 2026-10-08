@@ -4794,6 +4794,24 @@ button.wf-pill:hover { filter: brightness(.93); }
   padding: .5rem .75rem;
   margin: 0 0 .75rem;
 }
+/* The idle countdown. Same box as the approval banner, its own class: that
+   one removes ":scope > .mn-pending-banner" before redrawing itself, and
+   would have taken this with it. Cooler colours so the two read as different
+   kinds of message -- one is about other people, this one is about time. */
+.mn-lock-banner {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  flex-wrap: wrap;
+  background: #eef2ff;
+  border: 1.5px solid #a5b4fc;
+  border-radius: .5rem;
+  padding: .5rem .75rem;
+  margin: 0 0 .75rem;
+}
+.mn-lock-banner .mn-pending-banner-count { color: #3730a3; font-weight: 600; }
+.mn-lock-banner strong { font-variant-numeric: tabular-nums; font-weight: 800; }
+
 .mn-pending-banner-count {
   font-size: .95rem;
   font-weight: 700;

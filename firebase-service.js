@@ -1002,6 +1002,56 @@ export function listenToGroup(groupId, callback, onError) {
     err => { console.error("listenToGroup:", err); onError?.(err); });
 }
 
+// ─── EDIT TARGET LOCKS ───────────────────────────────────────
+// One small document per target saying who has its Edit Target screen open.
+//
+// Two people editing one target both write the WHOLE student record when they
+// save, so whoever saves last silently undoes the other. Rather than try to
+// merge two versions after the fact, only one person is let in at a time.
+//
+// Its own collection on purpose: kept as a field on the student document,
+// every lock and unlock would rewrite that record, which is the very thing
+// this exists to prevent.
+//
+// `heldAt` is refreshed while the window is open. A lock whose heldAt has
+// stopped moving belongs to a browser that is asleep or gone, and is treated
+// as dead -- see LOCK_DEAD_AFTER_MS in app.js. Written from the client clock
+// rather than serverTimestamp() so it can be compared without a round trip.
+
+/** The document id for one target. Stable, and safe in a path. */
+export function editLockId(ownerId, targetId) {
+  return `${sanitizeKey(String(ownerId || ""))}__${sanitizeKey(String(targetId || ""))}`;
+}
+
+/** Read a target's lock, or null when nobody holds it. */
+export async function getEditLock(ownerId, targetId) {
+  const snap = await getDoc(doc(db, "editLocks", editLockId(ownerId, targetId)));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
+/** Take or refresh the lock. The caller decides whether it was free. */
+export async function setEditLock(ownerId, targetId, holder) {
+  await setDoc(doc(db, "editLocks", editLockId(ownerId, targetId)), {
+    ownerId: String(ownerId || ""),
+    targetId: String(targetId || ""),
+    holderId: holder.id,
+    holderName: holder.name,
+    heldAt: Date.now(),
+  });
+}
+
+/** Give it up. Safe to call when it was never taken. */
+export async function clearEditLock(ownerId, targetId) {
+  await deleteDoc(doc(db, "editLocks", editLockId(ownerId, targetId))).catch(() => {});
+}
+
+/** Watch one target's lock, so a waiting screen knows the moment it is free. */
+export function listenToEditLock(ownerId, targetId, callback, onError) {
+  return onSnapshot(doc(db, "editLocks", editLockId(ownerId, targetId)),
+    snap => callback(snap.exists() ? { id: snap.id, ...snap.data() } : null),
+    err => { console.error("listenToEditLock:", err); onError?.(err); });
+}
+
 /** Save (upsert) a student config document. */
 // ─── PENDING APPROVAL ────────────────────────────────────────
 // An activity an assistant proposes is not live. It must not appear in a

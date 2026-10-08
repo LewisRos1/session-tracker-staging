@@ -147,6 +147,16 @@ const behaving = {
   // whenever that student's record changes. Without this a second browser
   // never learns what the first one wrote, which is the whole point.
   listenToStudent: `(id, cb) => globalThis.__store.watch("students", id, cb)`,
+  // The Edit Target lock, through the shared store so two browsers really do
+  // compete for the same one.
+  editLockId: `(a, b) => String(a) + "__" + String(b)`,
+  getEditLock: `async (owner, target) => globalThis.__store.getLock(String(owner) + "__" + String(target))`,
+  setEditLock: `async (owner, target, holder) => globalThis.__store.setLock(String(owner) + "__" + String(target), {
+    ownerId: String(owner), targetId: String(target),
+    holderId: holder.id, holderName: holder.name, heldAt: Date.now(),
+  })`,
+  clearEditLock: `async (owner, target) => globalThis.__store.clearLock(String(owner) + "__" + String(target))`,
+  listenToEditLock: `() => () => {}`,
   listenToGroup:   `(id, cb) => globalThis.__store.watch("groups", id, cb)`,
   listenToSession: `() => () => {}`,
   listenToReviewQueue: `() => () => {}`,
@@ -259,7 +269,23 @@ globalThis.__store = (() => {
     return () => { stopped = true; };
   }
 
-  return { load, save, watch };
+  // Locks live in the same shared store, so one browser can see the other's.
+  async function getLock(id) {
+    if (!shared()) return (globalThis.__locks ||= {})[id] || null;
+    const res = await fetch("/__store/editLocks").then(r => r.json());
+    return res.docs.find(d => d.id === id) || null;
+  }
+  async function setLock(id, doc) {
+    if (!shared()) { (globalThis.__locks ||= {})[id] = { id, ...doc }; return; }
+    await fetch("/__store/editLocks/" + id,
+      { method: "POST", body: JSON.stringify({ id, ...doc }) });
+  }
+  async function clearLock(id) {
+    if (!shared()) { delete (globalThis.__locks ||= {})[id]; return; }
+    await fetch("/__store/editLocks/" + id, { method: "DELETE" });
+  }
+
+  return { load, save, watch, getLock, setLock, clearLock };
 })();
 `;
 

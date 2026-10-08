@@ -26,7 +26,7 @@ function serve(dir) {
   // one Firestore that two people on two machines are both writing to. Without
   // it each page has its own data and a test can never show one person's save
   // landing on top of another's.
-  const store = { students: new Map(), groups: new Map(), bump: 0 };
+  const store = { students: new Map(), groups: new Map(), editLocks: new Map(), bump: 0 };
 
   const ac = new AbortController();
   const server = Deno.serve(
