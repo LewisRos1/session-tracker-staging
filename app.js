@@ -220,7 +220,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2186";
+const APP_VERSION = "2187";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -23090,7 +23090,7 @@ function renderTargetManageContent(student, target) {
 
   let html = `
     <div class="admin-section">
-      <label class="admin-label">Target Name</label>
+      <label class="admin-section-title" for="mn-t-name">Target Name</label>
       <input class="admin-input" id="mn-t-name" value="${escHtml(target.name)}" />
     </div>
     ${editingGroup ? `
@@ -23720,6 +23720,9 @@ function renderTargetManageContent(student, target) {
   html += `</div>`; // close #mn-inactive-source
 
   html += `
+    <!-- Headed like the list above it, so the buttons read as their own
+         section rather than as another row in the list. -->
+    <div class="admin-section-title" style="margin-top:1.1rem">Add New</div>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.25rem">
       <button class="btn-admin-add" id="btn-mn-add-act" style="flex:0 0 auto;width:auto">+ Add Activity</button>
       <button class="btn-admin-add" id="btn-mn-add-parent" style="flex:0 0 auto;width:auto">+ Add Parent Activity with Sub-activities</button>

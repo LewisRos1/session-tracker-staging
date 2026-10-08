@@ -131,6 +131,21 @@ try {
   r.check("there is no second Done under the list",
     await page.eval(`!!document.getElementById("btn-mn-done-target")`), false);
 
+  // The headings down this screen are one style, not three.
+  const headings = await page.eval(`
+    [...document.querySelectorAll("#manage-modal .admin-section-title")]
+      .filter(e => e.offsetParent !== null)
+      .map(e => {
+        const cs = getComputedStyle(e);
+        return { text: e.innerText.trim(),
+                 look: [cs.fontSize, cs.fontWeight, cs.textTransform, cs.letterSpacing, cs.color].join("|") };
+      })`);
+  r.check("the screen is headed Target Name, Activities & Notes and Add New",
+    headings.map(h => h.text), ["TARGET NAME", "ACTIVITIES & NOTES", "ADD NEW"]);
+  r.ok("and all three are set the same way",
+    new Set(headings.map(h => h.look)).size === 1,
+    JSON.stringify(headings, null, 2));
+
   // ══ 2. a blank sub-activity survives Save and Close ══════════════════
   r.section("2. name the parent, Save and Close, the sub-activity is still there");
 
