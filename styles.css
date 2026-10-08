@@ -4664,6 +4664,19 @@ button.wf-pill:hover { filter: brightness(.93); }
 .mn-act-card.mn-pending-card > .mn-sub-compact-list {
   margin-right: calc(-1 * var(--pending-strip));
 }
+/* ...but not while the Approve / Reject column is on screen.
+
+   That column is about 102px tall against a 58px title row, so it reaches
+   down the right-hand side and over the sub-activities. Taking the strip
+   back there put the sub-activity's own tag and buttons underneath the
+   parent's, one set of buttons on top of the other.
+
+   So the strip is only reclaimed for the short, tag-only column that
+   everyone else sees. A reviewer keeps the inset, which is what holds the
+   two button columns apart. */
+.mn-act-card.mn-pending-card.mn-pending-decide > .mn-sub-compact-list {
+  margin-right: 0;
+}
 /* Two columns. The tag and both buttons live in the first, so they share a
    left edge and a width; the kebab sits in the second, level with the tag and
    as far right as every other kebab in the list. The top of the tag is the top
@@ -4712,7 +4725,16 @@ button.wf-pill:hover { filter: brightness(.93); }
    which not every browser this runs on understands. Only when the buttons are
    actually there: with just the tag, the reserved height would be empty
    space. */
+/* Even with only the tag showing, a proposed sub-activity row has to be tall
+   enough to hold it: the column starts .55rem down and is a line tall, so a
+   plain one-line row left the tag a few pixels below its own border. */
+.mn-sub-compact.mn-pending-card { min-height: 3.05rem; }
 .mn-pending-card.mn-pending-decide { min-height: 8.1rem; }
+/* A sub-activity whose parent has not been approved yet explains why its own
+   Approve is greyed out, and that explanation sits above the buttons. The
+   column is taller than 8.1rem because of it, so the Reject button dropped
+   through the bottom of the row. */
+.mn-pending-card.mn-pending-decide.mn-pending-blocked { min-height: 11rem; }
 .mn-pending-foot .mn-pending-hint { max-width: none; white-space: normal; text-align: center; }
 
 /* Same size as the title it sits under, with a gap above so the two read as

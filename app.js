@@ -220,7 +220,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2187";
+const APP_VERSION = "2191";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -22766,6 +22766,10 @@ function mnInitActivityCollapse(bodyEl, acts) {
           : "";
         row.appendChild(buildPendingFooter(sub, subIdx, hint));
         if (canApprove()) row.classList.add("mn-pending-decide");
+        // The hint is three more lines above the buttons, so the row needs
+        // more height than a plain approve column. Without it the Reject
+        // button hung below the row's own border.
+        if (hint) row.classList.add("mn-pending-blocked");
         adoptKebabIntoPendingFoot(row, row.querySelector(".mn-sub-kebab-btn")
                                     || item.querySelector(".mn-sub-kebab-btn"));
       }
@@ -24369,13 +24373,13 @@ function renderTargetManageContent(student, target) {
                  }${affectedSessions.length > 5 ? `<li style="color:#9ca3af">  …and ${affectedSessions.length - 5} more</li>` : ''}</ul>` : "";
             const hasData = affected > 0;
             overlay.innerHTML = `<div style="background:#fff;padding:1.25rem;border-radius:.75rem;width:min(320px,92%);box-shadow:0 4px 24px rgba(0,0,0,.25);margin-bottom:1rem">
-              <p style="font-size:.88rem;margin:0 0 .5rem;color:#111;font-weight:700">⚠️ Delete "${escHtml(pa.title || pa.name || 'this activity')}"?</p>
-              ${_delSubs.length ? `<p style="font-size:.84rem;margin:0 0 .5rem;color:#b91c1c;font-weight:600">Its ${_delSubs.length} sub-activit${_delSubs.length === 1 ? "y goes" : "ies go"} with it:</p><ul style="font-size:.82rem;color:#374151;margin:0 0 .6rem;padding-left:0;list-style:none;line-height:1.8">${_delSubs.map(sb => `<li>• ${escHtml(sb.title || sb.name || "(untitled)")}</li>`).join("")}</ul>` : ""}
+              <p style="font-size:.88rem;margin:0 0 .5rem;color:#111;font-weight:700">⚠️ ${_delSubs.length ? `Delete the &quot;${escHtml(pa.title || pa.name || 'this activity')}&quot; parent activity?` : `Delete &quot;${escHtml(pa.title || pa.name || 'this activity')}&quot;?`}</p>
+              ${_delSubs.length ? `<p style="font-size:.84rem;margin:0 0 .5rem;color:#b91c1c;font-weight:600">Its ${_delSubs.length} sub-activit${_delSubs.length === 1 ? "y" : "ies"} will also get deleted. ${_delSubs.length === 1 ? "This is the sub-activity" : "These are the sub-activities"}:</p><ul style="font-size:.82rem;color:#374151;margin:0 0 .6rem;padding-left:0;list-style:none;line-height:1.8">${_delSubs.map(sb => `<li>• ${escHtml(sb.title || sb.name || "(untitled)")}</li>`).join("")}</ul>` : ""}
               ${hasData
                 ? `<p style="font-size:.84rem;margin:0 0 .4rem;color:#374151">This activity contains data from ${affected} session${affected !== 1 ? "s" : ""}. Deleting it will permanently remove all associated data.</p>
                    ${sessionDateList}
-                   <p style="font-size:.84rem;margin:0 0 .6rem;color:#374151">We recommend selecting <strong>"Mark as Discontinued"</strong> instead. This will remove the activity from future sessions while keeping your past data intact.</p>
-                   <p style="font-size:.84rem;margin:0 0 .35rem;color:#374151">To confirm deletion, type: <strong>${confirmWord}</strong></p>
+                   <p style="font-size:.84rem;margin:0 0 .6rem;color:#374151">${_delSubs.length ? `Instead of deleting this parent activity with all its subactivities. ` : ``}We recommend selecting <strong>&quot;Mark as Discontinued&quot;</strong> instead. This will remove the activity from future sessions while keeping your past data intact.</p>
+                   <p style="font-size:.84rem;margin:0 0 .35rem;color:#374151">However, if you still wish to confirm deletion, type: <strong>${confirmWord}</strong></p>
                    <input id="del-type-input" type="text" autocomplete="off" inputmode="numeric"
                      style="width:100%;box-sizing:border-box;padding:.45rem .6rem;border:2px solid #d1d5db;border-radius:.4rem;font-size:1.1rem;text-align:center;outline:none;margin-bottom:.6rem" placeholder="${confirmWord}">`
                 : `<p style="font-size:.84rem;margin:0 0 .4rem;color:#374151">We checked all sessions — <strong>0 sessions</strong> have data for this activity.</p>

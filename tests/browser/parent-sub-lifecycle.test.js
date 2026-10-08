@@ -317,6 +317,83 @@ try {
   r.ok("no sub-activity was left pointing at a parent that is gone",
     !left.some(a => a.childOf), JSON.stringify(left));
 
+  // ══ 9. the approval buttons do not sit on top of each other ═════════
+  //
+  // A reviewer sees an Approve / Reject column that an assistant never does,
+  // and it is twice the height of a title row. Checking the layout as the
+  // assistant only is how a change that stacked the two columns on top of
+  // each other got through.
+  r.section("9. a proposed parent and sub, laid out for each of them");
+
+  /** Every pending row's box and its button column. */
+  const pendingBoxes = () => page.eval(`
+    [...document.querySelectorAll(".mn-pending-card")].map(el => {
+      const r = el.getBoundingClientRect();
+      const foot = el.querySelector(":scope > .mn-pending-foot");
+      const f = foot ? foot.getBoundingClientRect() : null;
+      return {
+        what: el.classList.contains("mn-sub-compact") ? "sub" : "parent",
+        box:  [r.left, r.right, r.top, r.bottom].map(Math.round),
+        foot: f ? [f.left, f.right, f.top, f.bottom].map(Math.round) : null,
+      };
+    })`);
+
+  const overlaps = (a, b) =>
+    a[0] < b[1] && b[0] < a[1] && a[2] < b[3] && b[2] < a[3];
+
+  for (const who of ["rayhanah", "daisy"]) {
+    await page.fixture({
+      today: "2026-10-08", authUser: who,
+      students: [{
+        id: "amy", name: "Amy", order: 1,
+        targets: [{
+          id: "t1", name: "FEDC 1", scale: 3,
+          predefinedActivities: [
+            { id: "a1", title: "Greeting", name: "", order: 0, createdOn: "2026-01-01" },
+          ],
+          pendingActivities: [
+            { id: "p1", title: "a proposed parent", name: "", noRemark: true,
+              _linkKey: "pk1", pendingAtIdx: 1, proposedBy: "ray", createdOn: "2026-10-08" },
+            { id: "s1", title: "its sub", name: "", parentActivity: "pk1",
+              pendingAtIdx: 2, proposedBy: "ray", createdOn: "2026-10-08" },
+          ],
+        }],
+      }],
+      groups: [], sessions: [],
+    });
+    await page.load();
+    await page.until(`!document.querySelector("#screen-home").classList.contains("hidden")`, "the home screen");
+    await page.eval(`(() => {
+      const s = window.__app.state.students.find(x => x.id === "amy");
+      window.__app.openManageModal(s, s.targets[0]);
+    })()`);
+    await page.until(`document.querySelectorAll(".mn-pending-card").length >= 2`, "the proposal rows");
+    await settle(800);
+
+    const boxes = await pendingBoxes();
+    const parentRow = boxes.find(b => b.what === "parent");
+    const subRow    = boxes.find(b => b.what === "sub");
+
+    r.ok(`${who}: both rows are on screen`, !!parentRow && !!subRow, JSON.stringify(boxes));
+
+    if (parentRow?.foot && subRow?.foot) {
+      r.ok(`${who}: the two button columns do not overlap`,
+        !overlaps(parentRow.foot, subRow.foot),
+        `parent column ${JSON.stringify(parentRow.foot)}\n        sub column    ${JSON.stringify(subRow.foot)}`);
+
+      r.ok(`${who}: the sub's buttons stay inside its own row`,
+        subRow.foot[3] <= subRow.box[3] + 2,
+        `row ends at ${subRow.box[3]}, buttons end at ${subRow.foot[3]}`);
+    }
+
+    if (parentRow && subRow) {
+      // The sub sits inside its parent, so it can never be wider than it.
+      r.ok(`${who}: the sub-activity does not stick out of its parent`,
+        subRow.box[1] <= parentRow.box[1],
+        `parent ends at ${parentRow.box[1]}, sub ends at ${subRow.box[1]}`);
+    }
+  }
+
   // ── console ──────────────────────────────────────────────────────────
   r.section("console");
   const noise = page.consoleLines.filter(l => l.level === "error");
