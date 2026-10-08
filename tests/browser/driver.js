@@ -196,8 +196,21 @@ export async function openPage(dir, { verbose = false } = {}) {
     /** A real key press, dispatched by the browser rather than by script. */
     async key(key, { ctrl = false, shift = false, text } = {}) {
       const mods = (ctrl ? 2 : 0) | (shift ? 8 : 0);
-      const base = { modifiers: mods, key, windowsVirtualKeyCode: key.toUpperCase().charCodeAt(0) };
-      await send("Input.dispatchKeyEvent", { type: "keyDown", ...base, text: text ?? (mods ? undefined : key) });
+      // Named keys need their own code; charCodeAt on "Enter" gives "E".
+      const NAMED = {
+        Enter: { code: 13, text: "\r" }, Tab: { code: 9, text: "\t" },
+        Backspace: { code: 8 }, Delete: { code: 46 }, Escape: { code: 27 },
+        ArrowLeft: { code: 37 }, ArrowRight: { code: 39 },
+        ArrowUp: { code: 38 }, ArrowDown: { code: 40 },
+        Home: { code: 36 }, End: { code: 35 },
+      };
+      const named = NAMED[key];
+      const base = {
+        modifiers: mods, key,
+        windowsVirtualKeyCode: named ? named.code : key.toUpperCase().charCodeAt(0),
+      };
+      const typed = text ?? (named ? named.text : (mods ? undefined : key));
+      await send("Input.dispatchKeyEvent", { type: "keyDown", ...base, ...(typed ? { text: typed } : {}) });
       await send("Input.dispatchKeyEvent", { type: "keyUp", ...base });
     },
 

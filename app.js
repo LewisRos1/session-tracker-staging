@@ -220,7 +220,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2177";
+const APP_VERSION = "2179";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -13239,84 +13239,135 @@ function attachRichEditors(scope) {
 const isRichBox = el => !!el?.classList?.contains("mn-rich");
 
 /**
- * Toggle a bullet on the line the caret is on.
+ * The box's visible text, and where each piece of it lives in the DOM.
+ *
+ * One traversal that everything else measures against. It writes line
+ * breaks exactly where richToMarkers writes them -- a BR, and the start of
+ * each DIV or P -- and markers never contain a newline, so line number N
+ * here is line number N of the stored text. That is the only thing the
+ * bullet toggle actually needs them to agree about.
+ *
+ * This replaced three different ways of counting the same box: a hand-rolled
+ * walk for the caret, element.innerText for the line, and richToMarkers for
+ * the text to edit. They agreed on simple content and parted company as soon
+ * as there was a blank line in the box -- an empty line is <div><br></div>,
+ * which innerText counts once and the marker walk counted twice. The line
+ * number then pointed past the end of the stored lines, the toggle gave up,
+ * and the bullet button did nothing at all.
+ */
+function richTextMap(root) {
+  let text = "";
+  const spans = [];                 // { node, start } for every text node
+  const read = node => {
+    for (const n of node.childNodes) {
+      if (n.nodeType === 3) { spans.push({ node: n, start: text.length }); text += n.nodeValue; continue; }
+      if (n.nodeName === "BR") { text += "\n"; continue; }
+      if (n.nodeName === "DIV" || n.nodeName === "P") {
+        if (text && !text.endsWith("\n")) text += "\n";
+        read(n);
+        continue;
+      }
+      read(n);
+    }
+  };
+  read(root);
+  return { text, spans };
+}
+
+/** Where the caret sits in that visible text, or null if it is not in the box. */
+function richCaretOffset(rich, map) {
+  const sel = window.getSelection();
+  if (!sel || !sel.focusNode || !rich.contains(sel.focusNode)) return null;
+  const node = sel.focusNode;
+
+  if (node.nodeType === 3) {
+    const hit = map.spans.find(sp => sp.node === node);
+    return hit ? hit.start + Math.min(sel.focusOffset, node.nodeValue.length) : null;
+  }
+
+  // An element focus node means the caret sits BETWEEN children, which is
+  // what an empty line gives you. Take the position of the first text node
+  // at or after that child; with none, the end of the box.
+  const after = node.childNodes[sel.focusOffset];
+  if (after) {
+    const inside = sp => sp.node === after || (after.contains && after.contains(sp.node));
+    const hit = map.spans.find(inside);
+    if (hit) return hit.start;
+  }
+  const before = node.childNodes[sel.focusOffset - 1];
+  if (before) {
+    const inside = sp => sp.node === before || (before.contains && before.contains(sp.node));
+    const last = [...map.spans].reverse().find(inside);
+    if (last) return last.start + last.node.nodeValue.length;
+  }
+  return map.text.length;
+}
+
+/**
+ * Toggle a bullet on the line the caret is on, the way Word does it.
  *
  * Done here rather than by calling the plain-textarea version, which reads
  * selectionStart on the textarea. That textarea is hidden and never focused,
  * so its selectionStart is stuck at 0 -- the bullet went on the first line
  * whatever line you were on, and pressing again never found it to remove.
- *
- * Measured in what is on SCREEN, not in the marker text: the caret sits in
- * the rendered box, where a bold run is <b> rather than *stars*, so the two
- * count differently.
  */
 function richToggleBullet(rich) {
-  const sel = window.getSelection();
-  if (!sel || !sel.focusNode || !rich.contains(sel.focusNode)) return;
+  const map   = richTextMap(rich);
+  const caret = richCaretOffset(rich, map);
+  if (caret === null) return;
 
-  // Where the caret is, counted in the box's visible characters.
-  let caret = 0, seen = false;
-  const measure = node => {
-    for (const n of node.childNodes) {
-      if (seen) return;
-      if (n === sel.focusNode && n.nodeType === 3) { caret += sel.focusOffset; seen = true; return; }
-      if (n.nodeType === 3) { caret += n.nodeValue.length; continue; }
-      if (n.nodeName === "BR") { caret += 1; continue; }
-      if (n.nodeName === "DIV" || n.nodeName === "P") { if (caret) caret += 1; }
-      measure(n);
-      if (n === sel.focusNode) { seen = true; return; }
-    }
-  };
-  measure(rich);
+  // Which line that offset falls on. Counted in the same text, so a blank
+  // line counts once here and once in the stored text.
+  const lineNo = map.text.slice(0, caret).split("\n").length - 1;
 
-  // The same text the caret was measured against.
-  const shown = rich.innerText.replace(/\r/g, "");
-  const lineStart = shown.lastIndexOf("\n", Math.max(0, caret - 1)) + 1;
-  const lineEnd   = (i => i === -1 ? shown.length : i)(shown.indexOf("\n", caret));
-  const line      = shown.slice(lineStart, lineEnd);
-  const bulleted  = /^\s*\u2022\s/.test(line);
-
-  // Marker text and shown text differ only by the markers, and a line keeps
-  // its position in both, so the same line index applies to each.
-  const lineNo  = shown.slice(0, lineStart).split("\n").length - 1;
-  const stored  = richToMarkers(rich).split("\n");
+  const stored = richToMarkers(rich).split("\n");
+  // Should not happen now the two are counted the same way, but a box with
+  // nothing in it still has a caret, and refusing beats writing to nowhere.
   if (stored[lineNo] === undefined) return;
+
+  const bulleted = /^\s*\u2022\s?/.test(stored[lineNo]);
   stored[lineNo] = bulleted
     ? stored[lineNo].replace(/^(\s*)\u2022\s?/, "$1")
     : "\u2022 " + stored[lineNo];
 
   const ta = rich._richField;
-  if (ta) {
-    ta.value = stored.join("\n");
-    ta.dispatchEvent(new Event("input", { bubbles: true }));
-    refreshRichFromField(rich);
-  }
+  if (!ta) return;
+  ta.value = stored.join("\n");
+  ta.dispatchEvent(new Event("input", { bubbles: true }));
+  refreshRichFromField(rich);
 
   // Back to the end of the line that moved, so typing carries on where it
   // was rather than jumping to the top of the box.
-  const after = rich.innerText.replace(/\r/g, "").split("\n");
+  const after = richTextMap(rich);
+  const lines = after.text.split("\n");
   let target = 0;
-  for (let i = 0; i < lineNo && i < after.length; i++) target += after[i].length + 1;
-  target += (after[lineNo] || "").length;
-  placeRichCaret(rich, target);
+  for (let i = 0; i < lineNo && i < lines.length; i++) target += lines[i].length + 1;
+  target += (lines[lineNo] || "").length;
+  placeRichCaret(rich, target, after);
 }
 
-/** Put the caret at this many visible characters into the box. */
-function placeRichCaret(rich, offset) {
-  const walk = document.createTreeWalker(rich, NodeFilter.SHOW_TEXT);
-  let seen = 0, node;
-  while ((node = walk.nextNode())) {
-    const len = node.nodeValue.length;
-    if (seen + len >= offset) {
-      const range = document.createRange();
-      range.setStart(node, Math.max(0, offset - seen));
-      range.collapse(true);
-      const sel = window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(range);
-      return;
-    }
-    seen += len;
+/**
+ * Put the caret this many visible characters into the box.
+ *
+ * Measured against richTextMap, not against the text nodes alone. A tree
+ * walker counts only the characters inside text nodes, so every line break
+ * -- which is a BR or the edge of a DIV, not a character in any text node --
+ * was missing from its count, and the caret landed earlier and earlier the
+ * further down the box you were.
+ */
+function placeRichCaret(rich, offset, map = null) {
+  const { spans } = map || richTextMap(rich);
+  const sel = window.getSelection();
+  if (!sel) return;
+  for (let i = spans.length - 1; i >= 0; i--) {
+    const sp = spans[i];
+    if (offset < sp.start) continue;
+    const range = document.createRange();
+    range.setStart(sp.node, Math.min(offset - sp.start, sp.node.nodeValue.length));
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    return;
   }
   rich.focus();
 }

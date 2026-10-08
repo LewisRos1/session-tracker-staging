@@ -25,6 +25,8 @@ function extract(name) {
 // ── fake nodes ─────────────────────────────────────────────────────────
 const BULLET = "•";
 const text = v => ({ nodeType: 3, nodeValue: v, childNodes: [] });
+/** An empty line in a real box is <div><br></div>. */
+const br = () => el("BR");
 
 function el(nodeName, ...kids) {
   const node = { nodeType: 1, nodeName, childNodes: kids };
@@ -105,7 +107,8 @@ globalThis.document = {
 const escHtml = s => String(s ?? "").replace(/[&<>"']/g,
   c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-const names = ["markersToRichHtml", "richToMarkers", "refreshRichFromField", "placeRichCaret", "richToggleBullet"];
+const names = ["markersToRichHtml", "richToMarkers", "richTextMap", "richCaretOffset",
+  "refreshRichFromField", "placeRichCaret", "richToggleBullet"];
 const api = new Function("escHtml",
   names.map(extract).join("\n") + `\n return { ${names.join(", ")} };`)(escHtml);
 const { markersToRichHtml, richToMarkers, richToggleBullet } = api;
@@ -210,6 +213,96 @@ const reopened = el("DIV");
 reopened._richField = { value: stored, dispatchEvent() {} };
 reopened.innerHTML = markersToRichHtml(stored);
 check("a reopened bullet line reads back unchanged", richToMarkers(reopened), stored);
+
+console.log("\nblank lines in the box, which is what a real one has\n");
+
+// A browser builds an empty line as <div><br></div>. That is the shape that
+// broke the bullet button: it counted once one way and twice another, so the
+// line number ran past the end of the stored text and nothing happened.
+//
+// Built here as the DOM, not from the stored text, because only the DOM shows
+// what the browser actually does with a blank line.
+function pressBulletOnDom(rich, stored, lineNo, col = 0) {
+  const ta = { value: stored, dispatchEvent() {} };
+  rich._richField = ta;
+
+  const map = api.richTextMap(rich);
+  const lines = map.text.split("\n");
+  let want = 0;
+  for (let i = 0; i < lineNo; i++) want += lines[i].length + 1;
+  want += Math.min(col, (lines[lineNo] || "").length);
+
+  // Put the caret in whichever text node holds that offset.
+  sel.focusNode = rich;
+  sel.focusOffset = 0;
+  for (let i = map.spans.length - 1; i >= 0; i--) {
+    const sp = map.spans[i];
+    if (want >= sp.start) {
+      sel.focusNode = sp.node;
+      sel.focusOffset = Math.min(want - sp.start, sp.node.nodeValue.length);
+      break;
+    }
+  }
+  richToggleBullet(rich);
+  return ta.value;
+}
+
+/** <div>alpha</div><div><br></div><div>beta</div> -- "alpha", blank, "beta". */
+const withBlankLine = () => el("DIV",
+  el("DIV", text("alpha")),
+  el("DIV", br()),
+  el("DIV", text("beta")));
+
+check("the map counts a blank line once",
+  api.richTextMap(withBlankLine()).text, "alpha\n\nbeta");
+
+check("bullet on the line AFTER a blank line",
+  pressBulletOnDom(withBlankLine(), "alpha\n\nbeta", 2),
+  `alpha\n\n${BULLET} beta`);
+
+check("bullet on the first line, blank line below",
+  pressBulletOnDom(withBlankLine(), "alpha\n\nbeta", 0),
+  `${BULLET} alpha\n\nbeta`);
+
+check("caret at the END of the last line still bullets it",
+  pressBulletOnDom(withBlankLine(), "alpha\n\nbeta", 2, 99),
+  `alpha\n\n${BULLET} beta`);
+
+// Two blank lines, the way the boss's box looked.
+const twoBlanks = () => el("DIV",
+  el("DIV", text("one")),
+  el("DIV", br()),
+  el("DIV", br()),
+  el("DIV", text("four")));
+
+check("two blank lines are counted once each",
+  api.richTextMap(twoBlanks()).text, "one\n\n\nfour");
+
+check("bullet after two blank lines",
+  pressBulletOnDom(twoBlanks(), "one\n\n\nfour", 3, 99),
+  `one\n\n\n${BULLET} four`);
+
+// The box in the screenshot: a bulleted line, a blank, a block, a blank, a
+// last line with the caret at its end.
+const bossBox = () => el("DIV",
+  el("DIV", text("• ddd")),
+  el("DIV", br()),
+  el("DIV", text("asdf")),
+  el("DIV", br()),
+  el("DIV", text("asdfadsfasf")));
+
+check("bullet on the final line of a box with blanks above",
+  pressBulletOnDom(bossBox(), "• ddd\n\nasdf\n\nasdfadsfasf", 4, 99),
+  `${BULLET} ddd\n\nasdf\n\n${BULLET} asdfadsfasf`);
+
+check("and pressing again takes it off",
+  pressBulletOnDom(
+    el("DIV",
+      el("DIV", text("• ddd")),
+      el("DIV", br()),
+      el("DIV", text("• asdfadsfasf"))),
+    "• ddd\n\n• asdfadsfasf", 2, 99),
+  `${BULLET} ddd\n\nasdfadsfasf`);
 
 console.log(failed ? `\n${failed} FAILED\n` : "\nall passed\n");
 Deno.exit(failed ? 1 : 0);

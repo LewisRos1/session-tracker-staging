@@ -36,6 +36,9 @@ results.push(await run("the app starts in a real browser",
 results.push(await run("Details: saving, in a real browser",
   ["run", "-A", "tests/browser/details-saving.test.js", HARNESS]));
 
+results.push(await run("Details toolbar: bold, underline and bullets, in a real browser",
+  ["run", "-A", "tests/browser/details-toolbar.test.js", HARNESS]));
+
 results.push(await run("Group targets: editing and saving, in a real browser",
   ["run", "-A", "tests/browser/group-target-edit.test.js", HARNESS]));
 

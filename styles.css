@@ -4629,9 +4629,21 @@ button.wf-pill:hover { filter: brightness(.93); }
    Padding every child pushed the chip, the title and the kebab around
    individually, which is what sent the row's own layout to pieces. */
 .mn-pending-card {
+  --pending-strip: 14rem;
   position: relative;
-  padding-right: 14rem !important;
+  padding-right: var(--pending-strip) !important;
   box-sizing: border-box;
+}
+/* A proposed PARENT holds its sub-activities inside its own card, and each
+   of those rows is a proposal with an approval tag of its own. The strip is
+   therefore reserved twice over them: once by the parent and again by the
+   row, so a sub-activity ended about 240px short of the card it sits in and
+   its tag sat well left of the parent's.
+
+   The list takes the parent's strip back. Each row still reserves its own,
+   so the two tags line up down the right-hand edge. */
+.mn-act-card.mn-pending-card > .mn-sub-compact-list {
+  margin-right: calc(-1 * var(--pending-strip));
 }
 /* Two columns. The tag and both buttons live in the first, so they share a
    left edge and a width; the kebab sits in the second, level with the tag and
@@ -4712,7 +4724,9 @@ button.wf-pill:hover { filter: brightness(.93); }
 
 @media (max-width: 760px) {
   /* No room for a column beside the text, so it goes back under it. */
-  .mn-pending-card { padding-right: .6rem !important; }
+  /* The variable goes with it, which cancels the claw-back above: with no
+     strip reserved there is nothing for the sub-activity list to take back. */
+  .mn-pending-card { --pending-strip: .6rem; padding-right: .6rem !important; }
   .mn-pending-foot {
     position: static;
     width: 100%;
