@@ -1,0 +1,7 @@
+# Written by the browser tests when a run fails, and by one-off screenshots.
+*-failure.png
+eye-*.png
+harness-smoke.png
+
+# The throwaway copy of the app that tests/run-all.js builds.
+.harness/

@@ -52,6 +52,27 @@ try {
     errors.slice(0, 4).map(e => e.text).join("\n        "));
 
   // What the app actually put on screen, to work out the selectors from.
+  // The sign-in box's reveal button is drawn, not an emoji: Windows renders
+  // the emoji as a dark shaded eyeball, which the boss asked to be rid of.
+  // Signed out first, because the app signs in on its own and the sign-in box
+  // is only built when there is nobody to sign in as.
+  await page.eval(`(() => { window.__auth.user = null; window.__auth.cb?.(null); })()`);
+  await page.until(`document.getElementById("login-pw-eye")`, "the sign-in box").catch(() => {});
+
+  const eye = await page.eval(`(() => {
+    const btn = document.getElementById("login-pw-eye");
+    if (!btn) return { missing: true };
+    return { svg: !!btn.querySelector("svg"), text: (btn.textContent || "").trim() };
+  })()`);
+  if (eye.missing) {
+    r.ok("the sign-in box was reachable", false, "#login-pw-eye never appeared after signing out");
+  } else {
+    r.ok("the reveal icon is a drawn eye", eye.svg, "no <svg> inside #login-pw-eye");
+    // An <svg> contributes no text, so anything left here is a stray character.
+    r.ok("no emoji left in the reveal button", eye.text === "",
+      `the button still contains ${JSON.stringify(eye.text)}`);
+  }
+
   const screens = await page.eval(`
     [...document.querySelectorAll("[id^='screen-'], .screen")]
       .map(e => e.id + (e.classList.contains("hidden") ? " (hidden)" : " VISIBLE"))`);

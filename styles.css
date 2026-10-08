@@ -5034,6 +5034,21 @@ button.wf-pill:hover { filter: brightness(.93); }
 }
 .pw-eye:hover { opacity: .7; }
 .pw-eye.is-on { opacity: 1; }
+/* The eye is drawn, not an emoji: Windows renders the emoji as a dark
+   shaded eyeball, and the boss found it unsettling on a sign-in box. Thin
+   even stroke and no fill, the way Windows draws its own. */
+.pw-eye svg {
+  display: block;
+  width: 1.15rem;
+  height: 1.15rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* Held down: the pupil fills in, so it is clear the password is showing. */
+.pw-eye.is-on svg circle { fill: currentColor; stroke: none; }
 /* Room for it, so a long password never runs underneath. */
 .float-field input#login-pw-input { padding-right: 2.4rem !important; }
 

@@ -220,7 +220,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2176";
+const APP_VERSION = "2177";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -2493,7 +2493,12 @@ function initPin() {
           autocomplete="current-password" autocapitalize="off" spellcheck="false">
         <label for="login-pw-input">Password</label>
         <button type="button" id="login-pw-eye" class="pw-eye" tabindex="-1"
-          aria-label="Hold to show password">👁</button>
+          aria-label="Hold to show password">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M1.9 12S5.9 5.9 12 5.9 22.1 12 22.1 12 18.1 18.1 12 18.1 1.9 12 1.9 12Z"/>
+            <circle cx="12" cy="12" r="2.45"/>
+          </svg>
+        </button>
       </div>
       <div id="login-err" class="pin-error hidden">Wrong username or password.</div>
       <div id="login-status" class="pin-status hidden">Signing in…</div>
