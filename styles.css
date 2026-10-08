@@ -4731,10 +4731,12 @@ button.wf-pill:hover { filter: brightness(.93); }
 .mn-sub-compact.mn-pending-card { min-height: 3.05rem; }
 .mn-pending-card.mn-pending-decide { min-height: 8.1rem; }
 /* A sub-activity whose parent has not been approved yet explains why its own
-   Approve is greyed out, and that explanation sits above the buttons. The
-   column is taller than 8.1rem because of it, so the Reject button dropped
-   through the bottom of the row. */
-.mn-pending-card.mn-pending-decide.mn-pending-blocked { min-height: 11rem; }
+   Approve is greyed out, and that explanation sits above the buttons, so the
+   column does not fit the 8.1rem a plain one needs and the Reject button
+   dropped through the bottom of the row. Measured against the rendered
+   column: the note wraps to two lines, which comes to just under 9.9rem
+   with the offset at the top and a little room underneath. */
+.mn-pending-card.mn-pending-decide.mn-pending-blocked { min-height: 9.9rem; }
 .mn-pending-foot .mn-pending-hint { max-width: none; white-space: normal; text-align: center; }
 
 /* Same size as the title it sits under, with a gap above so the two read as

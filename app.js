@@ -220,7 +220,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2191";
+const APP_VERSION = "2193";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -22760,10 +22760,7 @@ function mnInitActivityCollapse(bodyEl, acts) {
         const parent  = pKey ? acts.find(x => x && !x.parentActivity
                           && ((x._linkKey || x.title || x.name) === pKey)) : null;
         const blocked = parent?._pending ? parent : null;
-        const bName   = blocked ? (blocked.title || blocked.name || "").trim() : "";
-        const hint = blocked
-          ? `Approve ${bName ? `“${escHtml(truncateWords(bName))}” parent activity` : "the parent activity"} first`
-          : "";
+        const hint = blocked ? "Approve this sub-activity’s parent activity first" : "";
         row.appendChild(buildPendingFooter(sub, subIdx, hint));
         if (canApprove()) row.classList.add("mn-pending-decide");
         // The hint is three more lines above the buttons, so the row needs
