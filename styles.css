@@ -1522,6 +1522,25 @@ input.field-input::placeholder {
 
 .modal-close:hover { background: var(--bg); color: var(--text); }
 
+/* One way out, not two.
+
+   Edit Target had a full-width Done at the bottom AND an X at the top, and
+   it was never clear which one meant "keep what I typed". There is one now,
+   and it says what it does. */
+.modal-close-done {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  font-size: .92rem;
+  font-weight: 700;
+  letter-spacing: .01em;
+  padding: .42rem 1.3rem;
+  border-radius: .5rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.modal-close-done:hover { background: var(--primary-dark); color: #fff; }
+
 .score-buttons {
   display: flex;
   flex-direction: column;

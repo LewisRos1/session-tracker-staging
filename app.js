@@ -220,7 +220,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2179";
+const APP_VERSION = "2185";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -20630,6 +20630,8 @@ async function handleActStartPickerChange() {
 // ── Open / close ──────────────────────────────────────────────
 
 function openManageModal(student, targetOrNull, templateOrNull = null, remarkPresetOrNull = null, scrollToPaId = null) {
+  // Opening the screen is when blank rows left behind by a closed tab go.
+  _mnSweepOnOpen = true;
   mnDetachPanel(true); _mnPanelHold = false; _mnPanelSnapshot = null;   // never inherit a panel from the last target
   $("manage-modal").classList.remove("hidden");
   if (remarkPresetOrNull) {
@@ -20965,34 +20967,21 @@ async function closeManageModal() {
 
     _pendingActsCleanup = null;
     const before = acts.length;
-    for (let i = acts.length - 1; i >= 0; i--) {
-      if (isEmptyActItem(acts[i])) {
-        // Restore any sub-activities pointing to this empty parent so they
-        // become top-level instead of orphaned (invisible everywhere).
-        const removedKey = acts[i]._linkKey || acts[i].id;
-        if (removedKey) acts.forEach(a2 => { if (a2.parentActivity === removedKey) delete a2.parentActivity; });
-        acts.splice(i, 1);
-      }
-    }
-    // A parent with no sub-activities at all is not a parent.
+    // Anything left blank goes now. A blank row is allowed to sit there while
+    // the screen is open -- a new parent's sub-activity starts blank and has
+    // to survive the save that names the parent -- so this is where they are
+    // cleared instead.
     //
-    // The sweep above removes blank sub-activities, which can leave behind a
-    // parent that was given a title and never a real sub. It is not kept as an
-    // ordinary activity: a parent holds no score and no remark of its own, so
-    // on its own it is a row that can never be filled in. Almost always it is
-    // a "+ Add Parent Activity" that was abandoned half way.
-    //
-    // A parent whose sub-activities were mastered or discontinued still HAS
-    // those entries in the list, so it is untouched. This only catches one
-    // that never had any.
-    for (let i = acts.length - 1; i >= 0; i--) {
-      const a = acts[i];
-      if (!a?.noRemark) continue;
-      const key = a._linkKey || a.title || a.name;
-      if (key && acts.some(sub => sub !== a && sub.parentActivity === key)) continue;
-      acts.splice(i, 1);
-    }
-    if (acts.length !== before) acts.forEach((a, i) => a.order = i);
+    // A sub-activity whose parent is being removed with it does not need
+    // rescuing to the top level any more: sweepBlankActs only removes a
+    // parent when nothing real is left under it, so there is never a real
+    // child to orphan.
+    sweepBlankActs(acts);
+    // (A parent left with nothing real under it goes in the same sweep: a
+    //  parent holds no score and no remark of its own, so on its own it is a
+    //  row that can never be filled in. A parent whose sub-activities were
+    //  mastered or discontinued still HAS those entries, so it is untouched.)
+    void before;
     // Always save on close — not just when empty items were removed. Any
     // in-memory change (e.g. changing the remark type dropdown) that didn't
     // happen to trigger a blur on the inputs would otherwise silently fail
@@ -22130,6 +22119,16 @@ let _mnPanelHold = false;             // true while a panel is open: writes are 
 let _mnPanelSaveWanted = false;       // a held write asked to happen
 let _mnPanelRenameQueue = [];         // renames waiting for a save
 let _mnPanelSnapshot = null;          // deep copy of acts as it was when the panel opened
+/**
+ * Set by the two functions that OPEN Edit Target, cleared by the first
+ * render after that.
+ *
+ * The blank-row sweep belongs to opening the screen, not to drawing it.
+ * Running it on every draw deleted a brand new parent and its sub-activity
+ * the instant they were added, because both start blank -- which is the
+ * whole reason they are allowed to be blank in the first place.
+ */
+let _mnSweepOnOpen = false;
 let _mnPanelOpenAfterRender = null;   // an activity id to open once the list is rebuilt
 
 function mnActPanelEl() {
@@ -22300,6 +22299,57 @@ function mnDetachPanel(discardNode = false) {
  * A parent that still has sub-activities under it is kept whatever its own
  * fields say, or the children would be orphaned.
  */
+/**
+ * Clear blank rows out of an activity list.
+ *
+ * A blank row is one with no title and no details. They are allowed to
+ * exist while the screen is open -- a new parent's sub-activity starts
+ * blank and has to survive until it is filled in -- so they are cleared on
+ * the way out, and again on the way in, in case a tab was closed mid-edit.
+ *
+ * A parent goes with its children: a parent holds no score and no remark of
+ * its own, so once every row under it is blank the whole family is one
+ * "+ Add Parent Activity" that was never filled in. A parent with even one
+ * real sub-activity is left alone, and so is that sub-activity.
+ *
+ * Returns true if anything was removed.
+ */
+function sweepBlankActs(acts) {
+  if (!Array.isArray(acts)) return false;
+  const before = acts.length;
+  const keyOf = a => a && (a._linkKey || a.title || a.name);
+
+  // A parent counts as real when something under it has been filled in.
+  const parentHasRealChild = parent => {
+    const key = keyOf(parent);
+    if (!key) return false;
+    return acts.some(x => x !== parent && x.parentActivity === key && !isEmptyActItem(x));
+  };
+
+  for (let i = acts.length - 1; i >= 0; i--) {
+    const a = acts[i];
+    if (!a) { acts.splice(i, 1); continue; }
+
+    if (a.parentActivity) {
+      // A sub-activity: blank ones go.
+      if (isEmptyActItem(a)) acts.splice(i, 1);
+      continue;
+    }
+
+    // A parent with a real sub-activity stays, whatever its own fields say.
+    if (parentHasRealChild(a)) continue;
+
+    // Nothing real under it. It goes if it is blank itself, and it also goes
+    // if it is a parent row, which cannot stand on its own -- that is the
+    // named parent whose only sub-activity was never filled in.
+    const isParentRow = !!a._linkKey || !!a.noRemark;
+    if (isEmptyActItem(a) || isParentRow) acts.splice(i, 1);
+  }
+
+  if (acts.length !== before) acts.forEach((a, n) => { a.order = n; });
+  return acts.length !== before;
+}
+
 function mnDropEmptyPanelAct(host, key) {
   if (!host || !key) return false;
   const i = host.acts.findIndex(a => a && a.id === key);
@@ -22308,6 +22358,18 @@ function mnDropEmptyPanelAct(host, key) {
   if (!isEmptyActItem(a)) return false;
   const ownName = (a.title || a.name || "").trim();
   if (ownName && host.acts.some(s => s !== a && (s.parentActivity || "").trim() === ownName)) return false;
+  // A sub-activity under a parent is KEPT even with nothing in it.
+  //
+  // Adding a parent creates the parent and one blank sub together, and the
+  // two have to be filled in one at a time: name the parent, Save and Close,
+  // then open the sub. Dropping an empty row here threw the sub away on that
+  // first save, and the parent -- with nothing left under it -- stopped being
+  // a parent at all.
+  //
+  // It is not kept for ever. Done still clears out anything left blank, and
+  // so does opening Edit Target again.
+  if (a.parentActivity && host.acts.some(pr => pr !== a &&
+      (pr._linkKey || pr.title || pr.name) === a.parentActivity)) return false;
   host.acts.splice(i, 1);
   host.acts.forEach((x, n) => { x.order = n; });
   host.target.predefinedActivities = host.acts;
@@ -22911,6 +22973,29 @@ function renderTargetManageContent(student, target) {
   }
 
   const acts = target.predefinedActivities;
+
+  // Clear blank rows on the way IN as well as on the way out.
+  //
+  // A blank row is allowed to sit there while this screen is open: adding a
+  // parent creates a blank sub-activity that has to survive the save which
+  // names the parent. Done clears them -- but closing the tab, or the back
+  // arrow, never runs Done, and nobody should open this and find an empty row
+  // waiting from last time.
+  //
+  // ONLY on open. This function also runs on every redraw, and sweeping
+  // there removed a new parent and its sub-activity as soon as they appeared.
+  //
+  // After mergePendingForEdit, so it sees proposals too: an assistant's blank
+  // sub-activity lives in pendingActivities and would be invisible here
+  // otherwise. saveTarget splits them back out as it writes.
+  const _sweepNow = _mnSweepOnOpen;
+  _mnSweepOnOpen = false;
+  if (_sweepNow && sweepBlankActs(acts)) {
+    target.predefinedActivities = acts;
+    // Deferred: saveTarget is declared further down this function, and the
+    // list on screen should not wait on a write.
+    Promise.resolve().then(() => saveTarget().catch(() => {}));
+  }
 
   const saveTarget = async () => {
     // While an activity panel is open nothing is written. The panel offers
@@ -23625,8 +23710,6 @@ function renderTargetManageContent(student, target) {
       <button class="btn-admin-add" id="btn-mn-add-note" style="flex:0 0 auto;width:auto">+ Add Note</button>
     </div>
     <div style="margin-top:2rem;padding-bottom:1.5rem">
-      <button class="btn-primary-sm" id="btn-mn-done-target"
-        style="width:100%;padding:.75rem;margin-bottom:.75rem">Done</button>
       ${editingGroup ? `<button class="btn-adm-danger" id="btn-mn-del-target">Delete This Target</button>` : ''}
     </div>`;
 
@@ -26142,7 +26225,6 @@ function renderTargetManageContent(student, target) {
     });
   });
 
-  $("btn-mn-done-target").addEventListener("click", closeManageModal);
 
   $("btn-mn-del-target")?.addEventListener("click", async () => {
     const typed1 = prompt(`This will permanently delete "${target.name}" and ALL its session data across every date.\n\nType DELETE to confirm:`);
@@ -28184,9 +28266,15 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
   const allPas = target.predefinedActivities || [];
 
   // Pre-compute sub-activities per parent (group sessions: ignore activeFrom date)
+  //
+  // A row with no name and no details is skipped, the same as the individual
+  // screen does. One can exist for a while now -- adding a parent creates a
+  // blank sub-activity that has to survive until it is filled in -- and it
+  // must never reach this screen, where it would be an empty line in front of
+  // a client. The individual screen already checked; this one did not.
   const grpSubsByParent = new Map();
   for (const pa of allPas) {
-    if (pa.parentActivity && !pa.isCompleted && !pa.isArchived && !pa.isStopped && !pa.masteredOn && !pa.discontinuedOn) {
+    if (pa.parentActivity && (pa.title || pa.name || "").trim() && !pa.isCompleted && !pa.isArchived && !pa.isStopped && !pa.masteredOn && !pa.discontinuedOn) {
       if (!grpSubsByParent.has(pa.parentActivity)) grpSubsByParent.set(pa.parentActivity, []);
       grpSubsByParent.get(pa.parentActivity).push(pa);
     }
@@ -29705,6 +29793,8 @@ function renderGroupSessionsForMonth(group, month, monthSessions, byMonth, sessi
 
 // ── Group manage modal ───────────────────────────────────────
 function openGroupManageModal(group, target = null, scrollToPaId = null) {
+  // Opening the screen is when blank rows left behind by a closed tab go.
+  _mnSweepOnOpen = true;
   mnDetachPanel(true); _mnPanelHold = false; _mnPanelSnapshot = null;   // never inherit a panel from the last target
   $("manage-modal").classList.remove("hidden");
   if (target) {
