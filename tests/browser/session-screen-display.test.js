@@ -23,7 +23,10 @@ const ACTS = [
     parentActivity: "shes so bad", order: 1, createdOn: "2026-08-14" },
   { id: "s2", title: "*bold sub*", name: "second sub details",
     parentActivity: "shes so bad", order: 2, createdOn: "2026-08-14" },
-  { id: "a1", title: "", name: "Fah", order: 3, createdOn: "2026-01-01" },
+  // Details typed over several lines, with a blank line between them.
+  { id: "s3", title: "multi line sub", name: ["first line", "", "second line"].join("\n"),
+    parentActivity: "shes so bad", order: 3, createdOn: "2026-08-14" },
+  { id: "a1", title: "", name: "Fah", order: 4, createdOn: "2026-01-01" },
 ];
 
 const fixture = {
@@ -51,6 +54,11 @@ const sessionData = (targetName) => ({
 });
 
 const settle = (ms = 400) => new Promise(res => setTimeout(res, ms));
+
+const NL = String.fromCharCode(10);
+/** Indent a block of screen text so it reads as one lump under a failure. */
+const indent = (text, max = 800) =>
+  "        " + String(text).slice(0, max).split(NL).join(NL + "        ");
 
 try {
   await page.fixture(fixture);
@@ -87,6 +95,13 @@ try {
     `the title's * markers reached the screen: ${JSON.stringify(groupHtml.slice(0, 300))}`);
 
   r.ok("an activity with no title still shows its details", groupHtml.includes("Fah"));
+
+  // innerText collapses nothing that the CSS keeps, so two lines in the data
+  // must still be two lines here.
+  const multi = groupHtml.split(NL).map(l => l.trim());
+  r.ok("multi-line details stay on separate lines",
+    multi.includes("first line") && multi.includes("second line"),
+    "the two lines ran together. screen reads:" + NL + indent(groupHtml));
 
   // ══ the individual screen, which must agree ══════════════════════════
   r.section("individual Start Session screen (must match)");

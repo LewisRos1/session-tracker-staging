@@ -220,7 +220,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2175";
+const APP_VERSION = "2176";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -13015,7 +13015,7 @@ function paDisplayHtml(pa, showPlaceholder = false, titleOnly = false) {
   // lines deep for every activity in the list.
   const detailsText = titleOnly ? "" : detailsFull;
   if (detailsText && titleHasDetails) {
-    html += `<span style="display:block;margin-top:.1rem;font-weight:400;text-decoration:none">${formatActivityMarkup(detailsText)}</span>`;
+    html += `<span style="display:block;margin-top:.1rem;font-weight:400;text-decoration:none;white-space:pre-wrap">${formatActivityMarkup(detailsText)}</span>`;
   }
   return html;
 }
