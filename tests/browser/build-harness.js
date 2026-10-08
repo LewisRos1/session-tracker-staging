@@ -129,8 +129,11 @@ const behaving = {
   sanitizeKey: `(s) => String(s ?? "").replace(/[.#$/\\[\\]]/g, "_")`,
   // Both come back as ARRAYS of documents, sorted by `order` -- not as maps
   // keyed by id. A map made loadAppData throw "students is not iterable".
-  loadStudentsConfig: `async () => structuredClone(globalThis.__FIXTURE.students || [])`,
-  loadGroups:         `async () => structuredClone(globalThis.__FIXTURE.groups || [])`,
+  // Read through the shared store when the test asked for one, so two
+  // browsers see each other's writes the way two people on two machines do.
+  // __FIXTURE is the starting content; the store is where it then lives.
+  loadStudentsConfig: `async () => globalThis.__store.load("students")`,
+  loadGroups:         `async () => globalThis.__store.load("groups")`,
   loadScoringConfig:  `async () => structuredClone(globalThis.__FIXTURE.scoring || {})`,
   loadRemarkPresets:  `async () => []`,
   loadTemplates:      `async () => []`,
@@ -140,8 +143,11 @@ const behaving = {
   getAiCostAllTime: `async () => 0`,
   // Listeners never fire: the fixture is the only source of truth, so nothing
   // arrives later to overwrite what a test just did.
-  listenToStudent: `() => () => {}`,
-  listenToGroup:   `() => () => {}`,
+  // A real listener when the store is shared: it polls, and calls back
+  // whenever that student's record changes. Without this a second browser
+  // never learns what the first one wrote, which is the whole point.
+  listenToStudent: `(id, cb) => globalThis.__store.watch("students", id, cb)`,
+  listenToGroup:   `(id, cb) => globalThis.__store.watch("groups", id, cb)`,
   listenToSession: `() => () => {}`,
   listenToReviewQueue: `() => () => {}`,
   // Sessions, for the "open an old session" case.
@@ -150,7 +156,7 @@ const behaving = {
   getIndividualSessionsForStudent: `async () => structuredClone(globalThis.__FIXTURE.sessions || [])`,
   getAllSessions: `async () => structuredClone(globalThis.__FIXTURE.sessions || [])`,
   getSessionById: `async (id) => structuredClone((globalThis.__FIXTURE.sessions || []).find(s => s.id === id) || null)`,
-  getStudentById: `async (id) => structuredClone((globalThis.__FIXTURE.students || []).find(s => s.id === id) || null)`,
+  getStudentById: `async (id) => (await globalThis.__store.load("students")).find(s => s.id === id) || null`,
 };
 
 // saveStudent is the write the save tests are actually about. It records the
@@ -162,15 +168,11 @@ const behaving = {
 behaving.saveStudent = `async (student) => {
   if (!student?.name?.trim()) throw new Error("Cannot save a student with a blank name.");
   globalThis.__harness.log("saveStudent", [structuredClone(student)]);
-  const list = (globalThis.__FIXTURE.students ||= []);
-  const at = list.findIndex(s => s.id === student.id);
-  at === -1 ? list.push(structuredClone(student)) : (list[at] = structuredClone(student));
+  await globalThis.__store.save("students", student);
 }`;
 behaving.saveGroup = `async (group) => {
   globalThis.__harness.log("saveGroup", [structuredClone(group)]);
-  const list = (globalThis.__FIXTURE.groups ||= []);
-  const at = list.findIndex(g => g.id === group.id);
-  at === -1 ? list.push(structuredClone(group)) : (list[at] = structuredClone(group));
+  await globalThis.__store.save("groups", group);
 }`;
 
 // The login domain decides the role, so it is read from the app rather than
@@ -194,7 +196,69 @@ for (const name of [...needed].sort()) {
     ? `export const ${name} = ${behaving[name]};\n`
     : `export const ${name} = rec("${name}");\n`;
 }
-await Deno.writeTextFile(`${out}/firebase-service.js`, stub);
+// The store client, written into the page before anything else runs.
+//
+// With no shared store the fixture is used directly and nothing is polled,
+// so single-browser tests behave exactly as they did.
+const storeClient = `
+globalThis.__store = (() => {
+  const shared = () => !!globalThis.__FIXTURE.sharedStore;
+  const copy = v => JSON.parse(JSON.stringify(v));
+  const seeded = {};
+
+  async function load(collection) {
+    if (!shared()) return copy(globalThis.__FIXTURE[collection] || []);
+    // First read seeds the store from the fixture, so whichever browser
+    // gets there first fills it and the other reads what is already there.
+    if (!seeded[collection]) {
+      seeded[collection] = true;
+      const now = await fetch("/__store/" + collection).then(r => r.json());
+      if (!now.docs.length) {
+        for (const doc of (globalThis.__FIXTURE[collection] || [])) {
+          await fetch("/__store/" + collection + "/" + doc.id,
+            { method: "POST", body: JSON.stringify(doc) });
+        }
+      }
+    }
+    const res = await fetch("/__store/" + collection).then(r => r.json());
+    return res.docs;
+  }
+
+  async function save(collection, doc) {
+    if (!shared()) {
+      const list = (globalThis.__FIXTURE[collection] ||= []);
+      const at = list.findIndex(x => x.id === doc.id);
+      at === -1 ? list.push(copy(doc)) : (list[at] = copy(doc));
+      return;
+    }
+    await fetch("/__store/" + collection + "/" + doc.id,
+      { method: "POST", body: JSON.stringify(doc) });
+  }
+
+  function watch(collection, id, cb) {
+    if (!shared()) return () => {};
+    let last = null, stopped = false;
+    const tick = async () => {
+      if (stopped) return;
+      try {
+        const res = await fetch("/__store/" + collection).then(r => r.json());
+        const doc = res.docs.find(d => d.id === id);
+        const now = doc ? JSON.stringify(doc) : null;
+        if (now && now !== last) { last = now; cb(JSON.parse(now)); }
+      } catch (e) { /* server going away at the end of a run */ }
+      if (!stopped) setTimeout(tick, 150);
+    };
+    tick();
+    return () => { stopped = true; };
+  }
+
+  return { load, save, watch };
+})();
+`;
+
+// The client goes in front of the exports, so it exists before app.js
+// imports this module and starts calling them.
+await Deno.writeTextFile(`${out}/firebase-service.js`, storeClient + stub);
 
 // ── a way in to the module's own scope ─────────────────────────────────
 // app.js is an ES module, so nothing inside it can be reached from the

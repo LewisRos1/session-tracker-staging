@@ -22,11 +22,43 @@ const MIME = {
 
 /** Static file server over the built harness. */
 function serve(dir) {
+  // One shared store for every browser this server feeds, standing in for the
+  // one Firestore that two people on two machines are both writing to. Without
+  // it each page has its own data and a test can never show one person's save
+  // landing on top of another's.
+  const store = { students: new Map(), groups: new Map(), bump: 0 };
+
   const ac = new AbortController();
   const server = Deno.serve(
     { port: 0, signal: ac.signal, onListen: () => {} },
     async (req) => {
       let path = new URL(req.url).pathname;
+
+      // ── the shared store ──────────────────────────────────────────
+      if (path.startsWith("/__store")) {
+        const parts = path.split("/").filter(Boolean);   // __store, collection, id
+        const json = (body) => new Response(JSON.stringify(body), {
+          headers: { "content-type": "application/json", "cache-control": "no-store",
+                     "access-control-allow-origin": "*" },
+        });
+        const collection = parts[1] && store[parts[1]];
+        if (req.method === "GET" && parts.length === 2 && collection) {
+          return json({ bump: store.bump, docs: [...collection.values()] });
+        }
+        if (req.method === "POST" && parts.length === 3 && collection) {
+          const doc = await req.json();
+          collection.set(parts[2], doc);
+          store.bump++;
+          return json({ ok: true, bump: store.bump });
+        }
+        if (req.method === "DELETE" && parts.length === 3 && collection) {
+          collection.delete(parts[2]);
+          store.bump++;
+          return json({ ok: true, bump: store.bump });
+        }
+        return json({ error: "bad store request", path });
+      }
+
       if (path === "/") path = "/index.html";
       try {
         const body = await Deno.readFile(dir + path);
@@ -43,13 +75,23 @@ function serve(dir) {
       }
     },
   );
-  return { port: server.addr.port, stop: () => { ac.abort(); return server.finished; } };
+  return {
+    port: server.addr.port, store,
+    stop: () => { ac.abort(); return server.finished; },
+  };
 }
 
-/** A browser tab, with the pieces of CDP these tests need. */
-export async function openPage(dir, { verbose = false } = {}) {
+/**
+ * A browser, with the pieces of CDP these tests need.
+ *
+ * Pass `site` from another page to put this browser on the SAME server, and so
+ * on the same shared store: two separate browsers, each with its own profile
+ * and its own sign-in, both writing to one set of records. That is the setup
+ * where one person's save can land on top of another's.
+ */
+export async function openPage(dir, { verbose = false, site: shared = null } = {}) {
   const meta = JSON.parse(await Deno.readTextFile(`${dir}/harness-meta.json`));
-  const site = serve(dir);
+  const site = shared || serve(dir);
   const port = 9000 + Math.floor(Math.random() * 900);
   const profile = await Deno.makeTempDir({ prefix: "harness-profile-" });
 
@@ -129,6 +171,8 @@ export async function openPage(dir, { verbose = false } = {}) {
 
   const page = {
     url: `http://127.0.0.1:${site.port}/index.html`,
+    /** Pass this to openPage to put another browser on the same store. */
+    site,
     consoleLines, pageErrors, events,
 
     /** Run an expression in the page and give back its value. */
@@ -255,7 +299,9 @@ export async function openPage(dir, { verbose = false } = {}) {
       try { ws.close(); } catch { /* already gone */ }
       try { browser.kill(); } catch { /* already gone */ }
       await browser.status.catch(() => {});
-      await site.stop().catch(() => {});
+      // Only the browser that started the server shuts it down, or closing
+      // the first of two would pull the store out from under the second.
+      if (!shared) await site.stop().catch(() => {});
       await Deno.remove(profile, { recursive: true }).catch(() => {});
     },
   };
