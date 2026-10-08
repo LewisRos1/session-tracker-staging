@@ -240,6 +240,68 @@ try {
   const proposedAfter = await rows();
   r.check("Done clears the unfinished proposal too", proposedAfter.length, 1);
 
+  // ══ 8. deleting a parent takes its sub-activities with it ═══════════
+  r.section("8. the kebab's Delete on a parent");
+
+  await openEditTarget("daisy", [
+    { id: "a1", title: "Greeting", name: "", order: 0, createdOn: "2026-01-01" },
+    { id: "p1", title: "Voice", name: "", noRemark: true, order: 1, createdOn: "2026-01-01" },
+    { id: "s1", title: "Loud",   name: "", parentActivity: "Voice", order: 2, createdOn: "2026-01-01" },
+    { id: "s2", title: "Quiet",  name: "", parentActivity: "Voice", order: 3, createdOn: "2026-01-01" },
+  ]);
+
+  /** Open the kebab on the card at `index` and read its delete entry. */
+  const openKebab = async (index) => {
+    await page.eval(`(() => {
+      const card = document.querySelectorAll(".mn-act-card")[${index}];
+      card.querySelector(".mn-kebab-btn").click();
+    })()`);
+    await settle(350);
+    return page.eval(`(() => {
+      const btn = [...document.querySelectorAll('.mn-km-opt[data-action="delete"]')]
+        .filter(b => b.offsetParent !== null)[0];
+      return btn ? btn.innerText.trim() : "(no delete entry)";
+    })()`);
+  };
+
+  r.check("a plain activity still says Delete Activity",
+    await openKebab(0), "🗑️ Delete Activity");
+
+  r.check("a parent says what it will take with it",
+    await openKebab(1), "🗑️ Delete Parent Activity & All Its Sub-activities");
+
+  // Press it and work through the confirmation.
+  await page.eval(`(() => {
+    [...document.querySelectorAll('.mn-km-opt[data-action="delete"]')]
+      .filter(b => b.offsetParent !== null)[0].click();
+  })()`);
+  await page.until(`document.querySelector("#del-type-input")`, "the confirmation box");
+  await settle(400);
+
+  const warning = await page.eval(`document.querySelector("[data-del-overlay]")?.innerText || ""`);
+  r.ok("the box names the sub-activities", /Loud/.test(warning) && /Quiet/.test(warning),
+    `box reads:\n        ${warning.replace(/\n/g, "\n        ").slice(0, 500)}`);
+
+  const word = await page.eval(`document.querySelector("#del-type-input")?.placeholder || ""`);
+  await page.eval(`(() => {
+    const inp = document.querySelector("#del-type-input");
+    inp.focus();
+    inp.value = ${JSON.stringify("")};
+  })()`);
+  await page.type(word);
+  await settle(250);
+  r.check("the Delete button is enabled once the word matches",
+    await page.eval(`document.querySelector("#del-type-ok")?.disabled`), false);
+
+  await page.click("#del-type-ok");
+  await settle(1200);
+
+  const left = await rows();
+  r.check("the whole family went", left.length, 1);
+  r.check("and the untouched activity stayed", left[0]?.title, "Greeting");
+  r.ok("no sub-activity was left pointing at a parent that is gone",
+    !left.some(a => a.childOf), JSON.stringify(left));
+
   // ── console ──────────────────────────────────────────────────────────
   r.section("console");
   const noise = page.consoleLines.filter(l => l.level === "error");

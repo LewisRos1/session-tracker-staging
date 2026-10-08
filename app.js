@@ -220,7 +220,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2185";
+const APP_VERSION = "2186";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -22350,6 +22350,23 @@ function sweepBlankActs(acts) {
   return acts.length !== before;
 }
 
+/**
+ * The sub-activities belonging to `pa`, in list order.
+ *
+ * A sub-activity points at its parent by NAME, not by id: parentActivity
+ * holds the parent's link key, or its title, or its details line, whichever
+ * the parent had when the link was made. Asking in one place keeps the menu
+ * label, the session count and the delete itself from disagreeing about what
+ * is about to go.
+ */
+function subActivitiesOf(pa, acts) {
+  if (!pa || !Array.isArray(acts)) return [];
+  const key = pa._linkKey || pa.title || pa.name;
+  if (!key) return [];
+  return acts.filter(a => a !== pa && a.parentActivity === key
+    && !a.isHeading && !a.isNote && !a.isExportNote);
+}
+
 function mnDropEmptyPanelAct(host, key) {
   if (!host || !key) return false;
   const i = host.acts.findIndex(a => a && a.id === key);
@@ -23332,8 +23349,8 @@ function renderTargetManageContent(student, target) {
               ${mnStatusKebabHtml(a, idx, true)}
               <button class="mn-km-add-sub" data-idx="${idx}" style="width:100%;padding:.55rem .9rem;text-align:left;background:none;border:none;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:.84rem;color:#374151">➕ Add sub-activity</button>
               <div style="display:flex;align-items:stretch">
-                <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Activity</button>
-                <span title="Deletes this activity and all its sub-activities." style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
+                <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">${subActivitiesOf(a, acts).length ? "🗑️ Delete Parent Activity &amp; All Its Sub-activities" : "🗑️ Delete Activity"}</button>
+                <span title="${subActivitiesOf(a, acts).length ? `Deletes this parent and its ${subActivitiesOf(a, acts).length} sub-activity/ies, with all of their past session data.` : 'Permanently removes this activity and all of its session data.'}" style="padding:.55rem .5rem;cursor:default;color:#9ca3af;font-size:.8rem;display:flex;align-items:center">ⓘ</span>
               </div>
             </div>
           </div>
@@ -24295,6 +24312,9 @@ function renderTargetManageContent(student, target) {
         } else {
           btn.disabled = true;
           btn.textContent = "Checking…";
+          // Everything that is about to go. Worked out once and used by the
+          // count, the wording and the delete, so the three cannot disagree.
+          const _delSubs = subActivitiesOf(pa, acts);
           let affected = 0;
           let affectedSessions = [];
           try {
@@ -24304,8 +24324,7 @@ function renderTargetManageContent(student, target) {
             // Include sub-activities when checking a parent activity
             const paKey = pa._linkKey || pa.title || pa.name;
             const toCheck = [{ name: pa.name, title: pa.title, paPA: pa.parentActivity || null }];
-            (acts || []).filter(a => a.parentActivity === paKey && !a.isHeading && !a.isNote && !a.isExportNote)
-              .forEach(sub => toCheck.push({ name: sub.name, title: sub.title, paPA: paKey }));
+            _delSubs.forEach(sub => toCheck.push({ name: sub.name, title: sub.title, paPA: paKey }));
             const _tmpRx2 = /\(temp(orary)?\)$/i;
             affectedSessions = allSessions.filter(s => {
               const sActs = s.activities || {}; const sRems = s.remarks || {};
@@ -24330,7 +24349,9 @@ function renderTargetManageContent(student, target) {
             affected = affectedSessions.length;
           } catch { affected = -1; }
           btn.disabled = false;
-          btn.textContent = "🗑️ Delete Activity";
+          btn.textContent = _delSubs.length
+            ? "🗑️ Delete Parent Activity & All Its Sub-activities"
+            : "🗑️ Delete Activity";
           {
             const confirmWord = affected > 0 ? String(affected) : "DELETE";
             $("manage-modal").querySelectorAll("[data-del-overlay]").forEach(el => el.remove());
@@ -24346,6 +24367,7 @@ function renderTargetManageContent(student, target) {
             const hasData = affected > 0;
             overlay.innerHTML = `<div style="background:#fff;padding:1.25rem;border-radius:.75rem;width:min(320px,92%);box-shadow:0 4px 24px rgba(0,0,0,.25);margin-bottom:1rem">
               <p style="font-size:.88rem;margin:0 0 .5rem;color:#111;font-weight:700">⚠️ Delete "${escHtml(pa.title || pa.name || 'this activity')}"?</p>
+              ${_delSubs.length ? `<p style="font-size:.84rem;margin:0 0 .5rem;color:#b91c1c;font-weight:600">Its ${_delSubs.length} sub-activit${_delSubs.length === 1 ? "y goes" : "ies go"} with it:</p><ul style="font-size:.82rem;color:#374151;margin:0 0 .6rem;padding-left:0;list-style:none;line-height:1.8">${_delSubs.map(sb => `<li>• ${escHtml(sb.title || sb.name || "(untitled)")}</li>`).join("")}</ul>` : ""}
               ${hasData
                 ? `<p style="font-size:.84rem;margin:0 0 .4rem;color:#374151">This activity contains data from ${affected} session${affected !== 1 ? "s" : ""}. Deleting it will permanently remove all associated data.</p>
                    ${sessionDateList}
@@ -24380,20 +24402,35 @@ function renderTargetManageContent(student, target) {
             okBtn.addEventListener("click", async () => {
               if (inp && inp.value !== confirmWord) return;
               overlay.remove();
-              const actIdx = acts.indexOf(pa);
-              if (actIdx >= 0) { acts.splice(actIdx, 1); acts.forEach((a, i) => a.order = i); }
+              // The sub-activities go with the parent.
+              //
+              // Only the parent used to be removed. Its sub-activities stayed
+              // in the list pointing at a parent that no longer existed, so
+              // they were invisible on every screen and their past session
+              // data was never moved to the trash -- while the menu's own
+              // tooltip said they had been deleted.
+              const paKeyForDel = pa._linkKey || pa.title || pa.name;
+              const family = [pa, ..._delSubs];
+              for (const member of family) {
+                const at = acts.indexOf(member);
+                if (at >= 0) acts.splice(at, 1);
+              }
+              acts.forEach((a, i) => a.order = i);
               target.predefinedActivities = acts;
               await saveTarget();
-              try {
-                await softDeleteActivityAcrossSessions(
-                  editingGroup ? "group" : "student",
-                  editingGroup ? editingGroup.id   : student.id,
-                  editingGroup ? editingGroup.name : student.name,
-                  target.name, pa.name, pa.parentActivity || null
-                );
-              } catch (err) {
-                console.error("Failed to move activity to trash:", err);
-                alert("Activity removed from config, but failed to move past session data to trash:\n" + err.message);
+              for (const member of family) {
+                try {
+                  await softDeleteActivityAcrossSessions(
+                    editingGroup ? "group" : "student",
+                    editingGroup ? editingGroup.id   : student.id,
+                    editingGroup ? editingGroup.name : student.name,
+                    target.name, member.name,
+                    member === pa ? (pa.parentActivity || null) : paKeyForDel
+                  );
+                } catch (err) {
+                  console.error("Failed to move activity to trash:", err);
+                  alert("Removed from the list, but its past session data could not be moved to the trash:\n" + err.message);
+                }
               }
               renderTargetManageContent(student, target);
             });
