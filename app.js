@@ -220,7 +220,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2174";
+const APP_VERSION = "2175";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -28304,7 +28304,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
         groupHtml += `<div style="border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);border-top:1px solid var(--border);border-radius:${subRadius};overflow:hidden">
           <div style="padding:.4rem .6rem;display:flex;align-items:center;gap:.45rem">
             ${_subDot}<span style="flex-shrink:0;background:#dbeafe;color:#1e40af;border-radius:.4rem;padding:.12rem .5rem;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Subactivity</span>
-            <span style="font-size:.85rem;font-weight:700;color:#374151"><span style="color:#1e40af">${letters[si]})</span> ${escHtml(sub.title || sub.name)}</span>${inactiveReasonBadge(sub)}
+            <span style="font-size:.85rem;font-weight:700;color:#374151"><span style="color:#1e40af">${letters[si]})</span> ${inactiveReasonBadge(sub)}${paDisplayHtml(sub)}</span>
             ${_subCreatedDate ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;margin-left:auto">Created: ${fmtPeriodDate(_subCreatedDate)}</span>` : ""}
             ${sub.id ? `<button class="btn-icon btn-grp-edit-pencil" contenteditable="false" data-pa-id="${escHtml(sub.id)}" title="Edit in Edit Target" style="font-size:.85rem;opacity:.55;line-height:1">✏️</button>` : ""}
           </div>

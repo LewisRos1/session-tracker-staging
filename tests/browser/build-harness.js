@@ -207,6 +207,7 @@ await Deno.writeTextFile(`${out}/firebase-service.js`, stub);
 // button: it only saves walking three menus to reach the screen under test.
 const exposed = [
   "openManageModal", "openGroupManageModal", "closeManageModal",
+  "renderGroupTargetContent", "renderFedcTarget", "paDisplayHtml",
   "state", "currentUser", "currentRole",
   "mnPanelSave", "mnPanelDiscard", "mnPanelIsDirty",
   "richToMarkers", "markersToRichHtml", "attachRichEditors",

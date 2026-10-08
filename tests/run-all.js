@@ -39,6 +39,9 @@ results.push(await run("Details: saving, in a real browser",
 results.push(await run("Group targets: editing and saving, in a real browser",
   ["run", "-A", "tests/browser/group-target-edit.test.js", HARNESS]));
 
+results.push(await run("Start Session screens: what they print",
+  ["run", "-A", "tests/browser/session-screen-display.test.js", HARNESS]));
+
 console.log(`\n${"=".repeat(60)}`);
 let failed = 0;
 for (const res of results) {
