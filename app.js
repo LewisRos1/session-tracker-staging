@@ -220,7 +220,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2196";
+const APP_VERSION = "2202";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -22398,6 +22398,43 @@ function sweepBlankActs(acts) {
  * label, the session count and the delete itself from disagreeing about what
  * is about to go.
  */
+/**
+ * What to call this row in a sentence: activity, note, section heading,
+ * sub-activity or parent activity.
+ */
+/**
+ * Make a proposal row tall enough for its own approve column.
+ *
+ * The column is positioned absolutely, so it cannot push the row open by
+ * itself, and a row that is shorter than its column lets the Reject button
+ * hang out of the bottom. It was being held open by fixed min-heights in the
+ * stylesheet, which had to be guessed and then re-guessed every time any of
+ * the wording changed -- and a section heading, which is one short line, was
+ * never given one at all.
+ *
+ * Measured after a frame, because the text has to be laid out before its
+ * height means anything.
+ */
+function mnFitPendingRow(el) {
+  if (!el) return;
+  requestAnimationFrame(() => {
+    const foot = el.querySelector(":scope > .mn-pending-foot");
+    if (!foot) return;
+    const top = foot.offsetTop;
+    const needed = top + foot.offsetHeight + top;   // same gap under as over
+    if (needed > el.offsetHeight) el.style.minHeight = needed + "px";
+  });
+}
+
+function mnRowKindName(a, acts) {
+  if (!a) return "item";
+  if (a.isNote || a.isExportNote) return "note";
+  if (a.isHeading || a.isMaintainHeading) return "section heading";
+  if (a.parentActivity) return "sub-activity";
+  if (subActivitiesOf(a, acts).length || a._linkKey || a.noRemark) return "parent activity";
+  return "activity";
+}
+
 function subActivitiesOf(pa, acts) {
   if (!pa || !Array.isArray(acts)) return [];
   const key = pa._linkKey || pa.title || pa.name;
@@ -22459,6 +22496,18 @@ function mnEditTargetHasUnsavedWork() {
 
 /** Set when someone else changed this target while the window was open. */
 let _mnEditTargetStale = false;
+/**
+ * Which drawing of Edit Target is the current one.
+ *
+ * Every handler on that screen closes over the list it was drawn with. Once
+ * the screen has been drawn again -- because somebody else changed the
+ * target, or because a warning was declined and the newer version put up --
+ * the handlers from the previous drawing hold a list nobody is looking at
+ * any more. They must not be able to write it.
+ */
+let _mnRenderSeq = 0;
+/** The newer copy an open window has not been able to take on yet. */
+let _mnStaleFrom = null;
 
 /**
  * Put a fresh copy of the target in front of an open Edit Target window.
@@ -22476,7 +22525,13 @@ function mnRefreshOpenEditTarget(live, isGroup) {
   const fresh = (live.targets || []).find(t => t.name === open);
   if (!fresh) return;                                  // target itself has gone
 
-  if (mnEditTargetHasUnsavedWork()) { _mnEditTargetStale = true; return; }
+  if (mnEditTargetHasUnsavedWork()) {
+    // Keep what we could not show yet, so saying "no" to the warning can
+    // put the newer version on screen instead of leaving a stale one there.
+    _mnEditTargetStale = true;
+    _mnStaleFrom = { live, isGroup, name: open };
+    return;
+  }
 
   _mnEditTargetStale = false;
   // Redraw the contents, NOT reopen the window.
@@ -22504,12 +22559,26 @@ function mnRefreshOpenEditTarget(live, isGroup) {
  */
 function mnWarnIfStale() {
   if (!_mnEditTargetStale) return true;
+  const from = _mnStaleFrom;
   _mnEditTargetStale = false;
-  return confirm(
+  _mnStaleFrom = null;
+
+  if (confirm(
     "Somebody else changed this target while this window was open.\n\n" +
     "Saving now would put your version back and undo their change.\n\n" +
     "Save anyway?"
-  );
+  )) return true;
+
+  // No: their version stands. Put it on screen, or this window carries on
+  // holding the old copy and the very next save writes it without asking.
+  if (from) {
+    const fresh = (from.live.targets || []).find(t => t.name === from.name);
+    if (fresh) {
+      try { renderTargetManageContent(from.live, fresh); }
+      catch (err) { console.error("could not reload after declining:", err); }
+    }
+  }
+  return false;
 }
 
 function mnDropEmptyPanelAct(host, key) {
@@ -22840,11 +22909,17 @@ function mnInitActivityCollapse(bodyEl, acts) {
       if (!card.querySelector(":scope > .mn-pending-foot")) {
         const blocker = pendingBlockedByHeading(acts, gi);
         const bName   = blocker ? (blocker.name || blocker.title || "").trim() : "";
+        const kind    = mnRowKindName(act, acts);
         const hint = blocker
-          ? `Approve ${bName ? `“${escHtml(truncateWords(bName))}” section heading` : "the section heading above"} first`
+          ? `Approve the section heading ${bName ? `“${escHtml(truncateWords(bName))}” ` : ""}above first `
+            + `before you can approve this ${kind}`
           : "";
         card.appendChild(buildPendingFooter(act, gi, hint));
         if (canApprove()) card.classList.add("mn-pending-decide");
+        // The note is several lines, so the row needs the taller reservation
+        // or the buttons drop out of the bottom of it.
+        if (hint) card.classList.add("mn-pending-blocked");
+        mnFitPendingRow(card);
         adoptKebabIntoPendingFoot(card, ownMenu(".mn-kebab-btn, .mn-heading-color-btn")[0]);
       }
     }
@@ -22908,6 +22983,7 @@ function mnInitActivityCollapse(bodyEl, acts) {
         const hint = blocked ? "Approve this sub-activity’s parent activity first" : "";
         row.appendChild(buildPendingFooter(sub, subIdx, hint));
         if (canApprove()) row.classList.add("mn-pending-decide");
+        mnFitPendingRow(row);
         // The hint is three more lines above the buttons, so the row needs
         // more height than a plain approve column. Without it the Reject
         // button hung below the row's own border.
@@ -23137,6 +23213,8 @@ function renderTargetManageContent(student, target) {
 
   const acts = target.predefinedActivities;
   _mnOpenTargetName = target.name;
+  // This drawing. Everything below that writes checks it is still current.
+  const myRender = ++_mnRenderSeq;
 
   // Clear blank rows on the way IN as well as on the way out.
   //
@@ -23166,6 +23244,10 @@ function renderTargetManageContent(student, target) {
     // Discard Changes, and a discard can only put things back if they never
     // left. Save and Close lifts the hold and writes once.
     if (_mnPanelHold) { _mnPanelSaveWanted = true; return; }
+    if (myRender !== _mnRenderSeq) return;   // the screen has moved on
+    // Same question as flushSave asks, and it is only asked once per change
+    // made elsewhere.
+    if (!mnWarnIfStale()) return;
     // The split version, not the editor's copy. Handing back the merged list
     // would put the proposals straight into the object the session screen
     // reads, which is the leak this whole arrangement exists to prevent.
@@ -23926,6 +24008,12 @@ function renderTargetManageContent(student, target) {
       }
     },
     flushSave: async () => {
+      // Asked here rather than only when the window closes. Save and Close on
+      // an activity panel writes straight through this, so a window holding
+      // an older copy could undo somebody else's approval without ever being
+      // asked -- and the approved activity came back as a proposal.
+      if (myRender !== _mnRenderSeq) return;   // the screen has moved on
+      if (!mnWarnIfStale()) return;
       _mnPanelHost.syncState();
       if (editingGroup) await saveGroup(editingGroup);
       else await saveStudent(student);
@@ -25454,20 +25542,34 @@ function renderTargetManageContent(student, target) {
       order: acts.length + 1, createdOn: todayDateStr(), activeFrom: _newDate,
     };
     if (proposesOnly()) { markAsProposal(parent); markAsProposal(sub); }
+    // Open the parent's panel on the way out of the render, the same as
+    // "+ Add Activity" does.
+    //
+    // The title field lives inside the card's collapsed body, so it is
+    // hidden until that body is moved into the panel. Focusing it before
+    // then did nothing at all: the list scrolled, no field took the caret,
+    // and adding a parent looked like it had not worked.
+    _mnPanelOpenAfterRender = parent.id;
     acts.push(parent, sub);
     acts.forEach((a2, i) => { a2.order = i; });
     target.predefinedActivities = acts;
     renderTargetManageContent(student, target);
     // Straight into the parent's title. It is the one field that must be filled
     // before the modal will close, and it is what the sub-activities hang off.
-    requestAnimationFrame(() => {
-      const input = $(`mn-act-title-${acts.length - 2}`);
-      if (input) {
-        input.focus();
-        input.classList.add("input-bg-blink");
-        input.addEventListener("animationend", () => input.classList.remove("input-bg-blink"), { once: true });
-      }
-    });
+    //
+    // Found by the parent's OWN id, not by counting back from the end of the
+    // list. For an assistant both new rows are proposals, so the drawn list is
+    // mergePendingForEdit's copy and the last two entries are not necessarily
+    // these two -- the field was never found, nothing took focus, and adding a
+    // parent looked like it had done nothing but scroll.
+    // Once the panel has it, put the caret in the title.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const input = document.querySelector("#mn-act-panel-overlay .mn-act-title-input");
+      if (!input) return;
+      input.focus();
+      input.classList.add("input-bg-blink");
+      input.addEventListener("animationend", () => input.classList.remove("input-bg-blink"), { once: true });
+    }));
     saveTarget().catch(() => {});
   });
 

@@ -80,9 +80,18 @@ const onScreen = () => page.eval(`
         + "|" + (e.querySelector(".mn-act-compact-title, .mn-sub-title-text")?.innerText || "").trim();
     })`);
 
+/**
+ * "+ Add Parent Activity with Sub-activities".
+ *
+ * The parent's panel opens by itself, with the caret in its title -- the title
+ * field lives inside the card's collapsed body, so it cannot be typed into
+ * until the panel has taken that body.
+ */
 const addParent = async () => {
   await page.click("#btn-mn-add-parent");
-  await settle(900);
+  await page.until(`document.querySelector("#mn-act-panel-overlay .mn-act-title-input")`,
+    "the new parent's panel to open on its own");
+  await settle(600);
 };
 
 /** Open a row's panel by its position among the cards, or a sub row. */
@@ -153,8 +162,10 @@ try {
   await addParent();
   const added = await rows();
   r.check("a parent and a sub were added", added.length, 3);
+  r.ok("its panel opened with the caret in the title",
+    await page.eval(`document.activeElement?.classList?.contains("mn-act-title-input")`),
+    `focus is on ${await page.eval(`document.activeElement?.className || document.activeElement?.tagName`)}`);
 
-  await openRow(".mn-act-card", 1);          // the new parent
   await setTitle("my parent");
   await saveAndClose();
 
@@ -195,7 +206,6 @@ try {
 
   await openEditTarget();
   await addParent();
-  await openRow(".mn-act-card", 1);
   await setTitle("abandoned parent");
   await saveAndClose();
   await pressDone();
@@ -241,7 +251,6 @@ try {
 
   await openEditTarget("rayhanah");
   await addParent();
-  await openRow(".mn-act-card", 1);
   await setTitle("proposed parent");
   await saveAndClose();
 
