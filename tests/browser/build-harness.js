@@ -206,7 +206,8 @@ await Deno.writeTextFile(`${out}/firebase-service.js`, stub);
 // a real key press on the real markup, so this cannot paper over a broken
 // button: it only saves walking three menus to reach the screen under test.
 const exposed = [
-  "openManageModal", "state", "currentUser", "currentRole",
+  "openManageModal", "openGroupManageModal", "closeManageModal",
+  "state", "currentUser", "currentRole",
   "mnPanelSave", "mnPanelDiscard", "mnPanelIsDirty",
   "richToMarkers", "markersToRichHtml", "attachRichEditors",
   "showHome", "showScreen", "APP_VERSION",

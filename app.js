@@ -220,7 +220,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2172";
+const APP_VERSION = "2173";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -22809,6 +22809,18 @@ function mnRegroupInactiveCards(bodyEl, acts) {
 }
 
 function renderTargetManageContent(student, target) {
+  // Whether this edit belongs to a group, decided ONCE, here.
+  //
+  // _groupForTargetEdit is a module flag, and closeManageModal clears it on
+  // the way out. The saves below can run after that: the panel holds the
+  // write while it is open, so closing the window is what finally releases
+  // it. By then the flag said "not a group", and a group target was written
+  // as a STUDENT document under the group's id -- `student` here IS the
+  // group object when a group is being edited.
+  //
+  // Reading it once means the save cannot change its mind about where it is
+  // going between the edit and the write.
+  const editingGroup = _groupForTargetEdit;
   $("manage-modal-title").textContent = target.name;
   target.predefinedActivities = normalizeActivitiesFormat(target.predefinedActivities || []);
   // Proposals join the live list for the duration of the edit, on a copy. The
@@ -22837,10 +22849,10 @@ function renderTargetManageContent(student, target) {
     // reads, which is the leak this whole arrangement exists to prevent.
     const i = student.targets.findIndex(t => t.id === target.id);
     if (i >= 0) student.targets[i] = splitPendingTarget(target);
-    if (_groupForTargetEdit) {
-      const gi = state.groups.findIndex(g => g.id === _groupForTargetEdit.id);
-      if (gi >= 0) state.groups[gi] = _groupForTargetEdit;
-      await saveGroup(_groupForTargetEdit);
+    if (editingGroup) {
+      const gi = state.groups.findIndex(g => g.id === editingGroup.id);
+      if (gi >= 0) state.groups[gi] = editingGroup;
+      await saveGroup(editingGroup);
     } else {
       const si = state.students.findIndex(s => s.id === student.id);
       if (si >= 0) state.students[si] = student;
@@ -22859,7 +22871,7 @@ function renderTargetManageContent(student, target) {
     });
     if (orphanFixed) {
       acts.forEach((a, i) => a.order = i);
-      (_groupForTargetEdit ? saveGroup(_groupForTargetEdit) : saveStudent(student)).catch(() => {});
+      (editingGroup ? saveGroup(editingGroup) : saveStudent(student)).catch(() => {});
     }
   }
 
@@ -22871,7 +22883,7 @@ function renderTargetManageContent(student, target) {
         delete a.fixedRemark;
       }
     });
-    (_groupForTargetEdit ? saveGroup(_groupForTargetEdit) : saveStudent(student)).catch(() => {});
+    (editingGroup ? saveGroup(editingGroup) : saveStudent(student)).catch(() => {});
   }
 
   // Backfill activeFrom: any activity/subactivity missing it gets "2026-01-01" as default
@@ -22881,14 +22893,14 @@ function renderTargetManageContent(student, target) {
         a.activeFrom = "2026-01-01";
       }
     });
-    (_groupForTargetEdit ? saveGroup(_groupForTargetEdit) : saveStudent(student)).catch(() => {});
+    (editingGroup ? saveGroup(editingGroup) : saveStudent(student)).catch(() => {});
   }
 
   // Self-heal: clear isArchived from discontinued activities (set by old bug in btn-mn-switch-status)
   {
     let _archFixed = false;
     acts.forEach(a => { if (a.isArchived && a.discontinuedOn) { delete a.isArchived; _archFixed = true; } });
-    if (_archFixed) (_groupForTargetEdit ? saveGroup(_groupForTargetEdit) : saveStudent(student)).catch(() => {});
+    if (_archFixed) (editingGroup ? saveGroup(editingGroup) : saveStudent(student)).catch(() => {});
   }
 
   const masteredActs     = acts.filter(a => !a.isHeading && !a.isNote && !a.isExportNote && !a.isMaintain && !a.isMaintainHeading && (a.masteredOn || a.isCompleted));
@@ -22896,7 +22908,7 @@ function renderTargetManageContent(student, target) {
   // Use the currently-loaded session's date (if any) so that when the user
   // opens Edit Target while viewing a past session, Discontinued/Mastered is
   // stamped with that session's date rather than today's.
-  const _refDate = _groupForTargetEdit
+  const _refDate = editingGroup
     ? (state.groupSessionData?.date || todayDateStr())
     : (state.sessionData?.date || todayDateStr());
   const _refDateLabel = fmtPeriodDate(_refDate);
@@ -22906,7 +22918,7 @@ function renderTargetManageContent(student, target) {
       <label class="admin-label">Target Name</label>
       <input class="admin-input" id="mn-t-name" value="${escHtml(target.name)}" />
     </div>
-    ${_groupForTargetEdit ? `
+    ${editingGroup ? `
     <div class="admin-section">
       <div class="admin-label-row">
         <label class="admin-label">Layout</label>
@@ -23542,7 +23554,7 @@ function renderTargetManageContent(student, target) {
     <div style="margin-top:2rem;padding-bottom:1.5rem">
       <button class="btn-primary-sm" id="btn-mn-done-target"
         style="width:100%;padding:.75rem;margin-bottom:.75rem">Done</button>
-      ${_groupForTargetEdit ? `<button class="btn-adm-danger" id="btn-mn-del-target">Delete This Target</button>` : ''}
+      ${editingGroup ? `<button class="btn-adm-danger" id="btn-mn-del-target">Delete This Target</button>` : ''}
     </div>`;
 
   // A re-render replaces the very card the panel borrowed its fields from, so
@@ -23582,9 +23594,9 @@ function renderTargetManageContent(student, target) {
     syncState: () => {
       const i = student.targets.findIndex(t => t.id === target.id);
       if (i >= 0) student.targets[i] = splitPendingTarget(target);
-      if (_groupForTargetEdit) {
-        const gi = state.groups.findIndex(g => g.id === _groupForTargetEdit.id);
-        if (gi >= 0) state.groups[gi] = _groupForTargetEdit;
+      if (editingGroup) {
+        const gi = state.groups.findIndex(g => g.id === editingGroup.id);
+        if (gi >= 0) state.groups[gi] = editingGroup;
       } else {
         const si = state.students.findIndex(s => s.id === student.id);
         if (si >= 0) state.students[si] = student;
@@ -23592,7 +23604,7 @@ function renderTargetManageContent(student, target) {
     },
     flushSave: async () => {
       _mnPanelHost.syncState();
-      if (_groupForTargetEdit) await saveGroup(_groupForTargetEdit);
+      if (editingGroup) await saveGroup(editingGroup);
       else await saveStudent(student);
     },
     student, target
@@ -23637,7 +23649,7 @@ function renderTargetManageContent(student, target) {
   $("mn-t-name").addEventListener("blur", async () => {
     const v = $("mn-t-name").value.trim();
     if (!v || v === target.name) return;
-    const ownerTargets = (_groupForTargetEdit || student).targets || [];
+    const ownerTargets = (editingGroup || student).targets || [];
     if (ownerTargets.some(t => t.id !== target.id && t.name === v)) {
       alert(`A target named "${v}" already exists. Please use a different name.`);
       $("mn-t-name").value = target.name;
@@ -23830,8 +23842,8 @@ function renderTargetManageContent(student, target) {
       let affected = 0;
       let affectedSessions = [];
       try {
-        const allSessions = _groupForTargetEdit
-          ? await getAllSessionsForGroup(_groupForTargetEdit.id)
+        const allSessions = editingGroup
+          ? await getAllSessionsForGroup(editingGroup.id)
           : await getAllSessionsForStudent(student.id);
         const paKey = item._linkKey || item.title || item.name;
         const toCheck = [{ name: item.name, title: item.title, paPA: item.parentActivity || null }];
@@ -23926,9 +23938,9 @@ function renderTargetManageContent(student, target) {
           await saveTarget();
           try {
             await softDeleteActivityAcrossSessions(
-              _groupForTargetEdit ? "group" : "student",
-              _groupForTargetEdit ? _groupForTargetEdit.id   : student.id,
-              _groupForTargetEdit ? _groupForTargetEdit.name : student.name,
+              editingGroup ? "group" : "student",
+              editingGroup ? editingGroup.id   : student.id,
+              editingGroup ? editingGroup.name : student.name,
               target.name, item.name, item.parentActivity || null
             );
           } catch (err) {
@@ -24035,7 +24047,7 @@ function renderTargetManageContent(student, target) {
         const origText = btn.textContent;
         btn.disabled = true; btn.textContent = "Checking…";
         let result = { date: null, subName: null };
-        try { result = await maGetLastDataDate(_groupForTargetEdit || student, target, sub, !!_groupForTargetEdit); }
+        try { result = await maGetLastDataDate(editingGroup || student, target, sub, !!editingGroup); }
         finally { btn.disabled = false; btn.textContent = origText; }
         return result;
       };
@@ -24130,8 +24142,8 @@ function renderTargetManageContent(student, target) {
           let affected = 0;
           let affectedSessions = [];
           try {
-            const allSessions = _groupForTargetEdit
-              ? await getAllSessionsForGroup(_groupForTargetEdit.id)
+            const allSessions = editingGroup
+              ? await getAllSessionsForGroup(editingGroup.id)
               : await getAllSessionsForStudent(student.id);
             // Include sub-activities when checking a parent activity
             const paKey = pa._linkKey || pa.title || pa.name;
@@ -24218,9 +24230,9 @@ function renderTargetManageContent(student, target) {
               await saveTarget();
               try {
                 await softDeleteActivityAcrossSessions(
-                  _groupForTargetEdit ? "group" : "student",
-                  _groupForTargetEdit ? _groupForTargetEdit.id   : student.id,
-                  _groupForTargetEdit ? _groupForTargetEdit.name : student.name,
+                  editingGroup ? "group" : "student",
+                  editingGroup ? editingGroup.id   : student.id,
+                  editingGroup ? editingGroup.name : student.name,
                   target.name, pa.name, pa.parentActivity || null
                 );
               } catch (err) {
@@ -24246,8 +24258,8 @@ function renderTargetManageContent(student, target) {
       btn.disabled = true; btn.textContent = "Checking…";
       let affectedSessions = [];
       try {
-        const allSessions = _groupForTargetEdit
-          ? await getAllSessionsForGroup(_groupForTargetEdit.id)
+        const allSessions = editingGroup
+          ? await getAllSessionsForGroup(editingGroup.id)
           : await getAllSessionsForStudent(student.id);
         affectedSessions = allSessions.filter(s => {
           const sActs = s.activities || {}; const sRems = s.remarks || {};
@@ -24304,7 +24316,7 @@ function renderTargetManageContent(student, target) {
       // one began: it then appeared, unfilled, in every session since.
       // The session's own date rather than today, so a sub added while writing up
       // an earlier session belongs to that session.
-      const _newSubDate = _groupForTargetEdit
+      const _newSubDate = editingGroup
         ? (state.groupSessionData?.date || todayDateStr())
         : (state.sessionData?.date || todayDateStr());
       const newSub = { id: subId, title: "", name: "", parentActivity: paKey, order: 0, activeFrom: _newSubDate, createdOn: todayDateStr() };
@@ -24391,8 +24403,8 @@ function renderTargetManageContent(student, target) {
             pickBtn.textContent = "Checking…";
             let affectedSessions = [];
             try {
-              const allSessions = _groupForTargetEdit
-                ? await getAllSessionsForGroup(_groupForTargetEdit.id)
+              const allSessions = editingGroup
+                ? await getAllSessionsForGroup(editingGroup.id)
                 : await getAllSessionsForStudent(student.id);
               affectedSessions = allSessions.filter(s => {
                 const sActs = s.activities || {}; const sRems = s.remarks || {};
@@ -24502,7 +24514,7 @@ function renderTargetManageContent(student, target) {
         const origText = btn.textContent;
         btn.disabled = true; btn.textContent = "Checking…";
         let result = { date: null, subName: null };
-        try { result = await maGetLastDataDate(_groupForTargetEdit || student, target, pa, !!_groupForTargetEdit); }
+        try { result = await maGetLastDataDate(editingGroup || student, target, pa, !!editingGroup); }
         finally { btn.disabled = false; btn.textContent = origText; }
         return result;
       };
@@ -24655,8 +24667,8 @@ function renderTargetManageContent(student, target) {
       btn.disabled = true; btn.textContent = "Checking…";
       let latestDate = null;
       try {
-        const allSessions = _groupForTargetEdit
-          ? await getAllSessionsForGroup(_groupForTargetEdit.id)
+        const allSessions = editingGroup
+          ? await getAllSessionsForGroup(editingGroup.id)
           : await getAllSessionsForStudent(student.id);
         const paName = pa.title || pa.name;
         const paParent = pa.parentActivity || null;
@@ -24803,8 +24815,8 @@ function renderTargetManageContent(student, target) {
     let affected = 0;
     let affectedSessions = [];
     try {
-      const allSessions = _groupForTargetEdit
-        ? await getAllSessionsForGroup(_groupForTargetEdit.id)
+      const allSessions = editingGroup
+        ? await getAllSessionsForGroup(editingGroup.id)
         : await getAllSessionsForStudent(student.id);
       const paPA2 = pa.parentActivity || null;
         affectedSessions = allSessions.filter(s =>
@@ -24869,9 +24881,9 @@ function renderTargetManageContent(student, target) {
           await saveTarget();
           try {
             await softDeleteActivityAcrossSessions(
-              _groupForTargetEdit ? "group" : "student",
-              _groupForTargetEdit ? _groupForTargetEdit.id   : student.id,
-              _groupForTargetEdit ? _groupForTargetEdit.name : student.name,
+              editingGroup ? "group" : "student",
+              editingGroup ? editingGroup.id   : student.id,
+              editingGroup ? editingGroup.name : student.name,
               target.name, pa.name, pa.parentActivity || null
             );
           } catch (err) {
@@ -24993,7 +25005,7 @@ function renderTargetManageContent(student, target) {
       // Told to whoever asked for it. Recorded on the entity being edited, which
       // for a group target is the group rather than the student standing in for
       // it here.
-      noteApproval(_groupForTargetEdit || student, proposer, currentUser()?.id);
+      noteApproval(editingGroup || student, proposer, currentUser()?.id);
       target.predefinedActivities = acts;
       await saveTarget().catch(() => {});
       renderTargetManageContent(student, target);
@@ -25043,7 +25055,7 @@ function renderTargetManageContent(student, target) {
 
   $("btn-mn-add-act").addEventListener("click", () => {
     const btn = $("btn-mn-add-act"); if (btn) btn.disabled = true;
-    const _newActDate = _groupForTargetEdit ? (state.groupSessionData?.date || todayDateStr()) : (state.sessionData?.date || todayDateStr());
+    const _newActDate = editingGroup ? (state.groupSessionData?.date || todayDateStr()) : (state.sessionData?.date || todayDateStr());
     // Opened straight away: a brand new activity has nothing to read and every
     // field still to fill in.
     const _newAct = { id: cfgId("a"), name: "", order: acts.length, createdOn: todayDateStr(), activeFrom: _newActDate };
@@ -25086,7 +25098,7 @@ function renderTargetManageContent(student, target) {
    */
   $("btn-mn-add-parent").addEventListener("click", () => {
     const btn = $("btn-mn-add-parent"); if (btn) btn.disabled = true;
-    const _newDate = _groupForTargetEdit
+    const _newDate = editingGroup
       ? (state.groupSessionData?.date || todayDateStr())
       : (state.sessionData?.date || todayDateStr());
     const linkKey = cfgId("pk");
@@ -25121,7 +25133,7 @@ function renderTargetManageContent(student, target) {
     // The session's date, not null. A note added today belongs to today, the
     // same as an activity added today; a null start meant it was treated as
     // having been there since the beginning.
-    const _newNoteDate = _groupForTargetEdit
+    const _newNoteDate = editingGroup
       ? (state.groupSessionData?.date || todayDateStr())
       : (state.sessionData?.date || todayDateStr());
     const _newNote = { id: cfgId("n"), isNote: true, text: "", order: acts.length, activeFrom: _newNoteDate };
@@ -25156,8 +25168,8 @@ function renderTargetManageContent(student, target) {
       let affected = 0;
       let affectedSessions = [];
       try {
-        const allSessions = _groupForTargetEdit
-          ? await getAllSessionsForGroup(_groupForTargetEdit.id)
+        const allSessions = editingGroup
+          ? await getAllSessionsForGroup(editingGroup.id)
           : await getAllSessionsForStudent(student.id);
         const paPA = subAct.parentActivity || null;
         affectedSessions = allSessions.filter(s => {
@@ -25193,9 +25205,9 @@ function renderTargetManageContent(student, target) {
         await saveTarget();
         try {
           await softDeleteActivityAcrossSessions(
-            _groupForTargetEdit ? "group" : "student",
-            _groupForTargetEdit ? _groupForTargetEdit.id   : student.id,
-            _groupForTargetEdit ? _groupForTargetEdit.name : student.name,
+            editingGroup ? "group" : "student",
+            editingGroup ? editingGroup.id   : student.id,
+            editingGroup ? editingGroup.name : student.name,
             target.name, subAct.name, subAct.parentActivity || null
           );
         } catch (err) {
@@ -25263,8 +25275,8 @@ function renderTargetManageContent(student, target) {
   // for a group. Pick the query that matches the entity actually being edited.
   const getSessionsCached = () => {
     if (!_sessionsPromise) {
-      _sessionsPromise = _groupForTargetEdit
-        ? getAllSessionsForGroup(_groupForTargetEdit.id)
+      _sessionsPromise = editingGroup
+        ? getAllSessionsForGroup(editingGroup.id)
         : getAllSessionsForStudent(student.id);
     }
     return _sessionsPromise;
@@ -26066,9 +26078,9 @@ function renderTargetManageContent(student, target) {
     if (typed2 !== "DELETE") return;
     student.targets = student.targets.filter(t => t.id !== target.id);
     student.targets.forEach((t, i) => t.order = i);
-    if (_groupForTargetEdit) {
-      await saveGroup(_groupForTargetEdit);
-      await deleteGroupTargetDataFromSessions(_groupForTargetEdit.id, target.name);
+    if (editingGroup) {
+      await saveGroup(editingGroup);
+      await deleteGroupTargetDataFromSessions(editingGroup.id, target.name);
     } else {
       await saveStudent(student);
       await deleteTargetDataFromSessions(student.id, target.name);
