@@ -220,7 +220,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2173";
+const APP_VERSION = "2174";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -20982,22 +20982,39 @@ async function closeManageModal() {
   if (state.currentGroup) {
     populateGroupTargetDropdown(state.currentGroup.targets);
     if (state.groupSessionId && state.groupSessionData && state.selectedGroupTargetName) {
-      autoFillGroupSession(
-        state.currentGroup, state.groupSessionId, state.groupSessionData,
-        state.selectedGroupTargetName
-      ).then(filled => {
-        if (filled > 0) return;
-        return autoFillGroupStructuredRemarks(
-          state.currentGroup, state.groupSessionId, state.groupSessionData,
-          state.selectedGroupTargetName, state.groupAttendees
-        ).then(structuredFilled => {
-          if (structuredFilled > 0) return;
-          return autoFillGroupMaintainedRemarks(
+      // Redraw afterwards WHATEVER the auto-fills did.
+      //
+      // Saving the target config does not write to the session document, so
+      // no Firestore snapshot arrives on its own to redraw this screen --
+      // the individual branch above says exactly that and redraws
+      // unconditionally for that reason.
+      //
+      // Here the redraw sat at the bottom of a chain that returned early as
+      // soon as any auto-fill had filled something, so on a group with
+      // anything auto-filling, renaming an activity and closing the window
+      // left the session screen showing the old name until a reload. The
+      // individual and group screens are meant to behave the same.
+      //
+      // The auto-fills keep their order: a later one only runs when the one
+      // before it filled nothing. Only the redraw has moved.
+      (async () => {
+        try {
+          const filled = await autoFillGroupSession(
             state.currentGroup, state.groupSessionId, state.groupSessionData,
-            state.selectedGroupTargetName, state.groupAttendees
-          ).then(mFilled => { if (mFilled === 0) renderGroupTargetContent(); });
-        });
-      }).catch(() => renderGroupTargetContent());
+            state.selectedGroupTargetName);
+          if (filled === 0) {
+            const structuredFilled = await autoFillGroupStructuredRemarks(
+              state.currentGroup, state.groupSessionId, state.groupSessionData,
+              state.selectedGroupTargetName, state.groupAttendees);
+            if (structuredFilled === 0) {
+              await autoFillGroupMaintainedRemarks(
+                state.currentGroup, state.groupSessionId, state.groupSessionData,
+                state.selectedGroupTargetName, state.groupAttendees);
+            }
+          }
+        } catch (e) { console.error("auto-fill error after Edit Target (group):", e); }
+        renderGroupTargetContent();
+      })();
     } else if (state.groupSessionId) {
       renderGroupTargetContent();
     }
