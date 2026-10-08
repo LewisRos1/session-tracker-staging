@@ -47,9 +47,15 @@ function serve(dir) {
         }
         if (req.method === "POST" && parts.length === 3 && collection) {
           const doc = await req.json();
+          // Every document carries a version. A client never accepts a copy
+          // older than the one it wrote itself, which is the guarantee real
+          // Firestore gives through its local cache: onSnapshot hands you your
+          // own write immediately and never a server copy from before it.
+          // Without this the poll can answer with the copy from just before a
+          // save and the browser undoes its own change.
+          doc.__v = ++store.bump;
           collection.set(parts[2], doc);
-          store.bump++;
-          return json({ ok: true, bump: store.bump });
+          return json({ ok: true, bump: store.bump, version: doc.__v });
         }
         if (req.method === "DELETE" && parts.length === 3 && collection) {
           collection.delete(parts[2]);

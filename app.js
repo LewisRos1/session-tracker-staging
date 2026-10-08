@@ -220,7 +220,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2193";
+const APP_VERSION = "2196";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -15472,7 +15472,20 @@ function watchConfigForOpenSession(isGroup) {
     const i = list.findIndex(x => x.id === fresh.id);
     if (i >= 0) list[i] = live;
 
-    if (!$("manage-modal")?.classList.contains("hidden")) return;
+    // Edit Target is open: it holds its own COPY of the target, taken when
+    // it was drawn, and nothing above touches that copy. Leaving it alone
+    // meant the window sat on a copy from before whatever just happened and
+    // put it back the moment it saved anything -- which is how an approval
+    // made on one machine came undone from another.
+    //
+    // So it is redrawn, but only when that cannot take anything away:
+    // nothing focused, no activity panel open, and nothing typed that has
+    // not been saved. Otherwise the window is marked, and mnWarnIfStale asks
+    // before it is allowed to write over someone else.
+    if (!$("manage-modal")?.classList.contains("hidden")) {
+      mnRefreshOpenEditTarget(live, isGroup);
+      return;
+    }
     const ae = document.activeElement;
     const host = $(isGroup ? "group-target-content" : "target-content");
     if (host?.contains(ae) && (ae?.tagName === "TEXTAREA" || ae?.tagName === "INPUT")) return;
@@ -20632,6 +20645,8 @@ async function handleActStartPickerChange() {
 function openManageModal(student, targetOrNull, templateOrNull = null, remarkPresetOrNull = null, scrollToPaId = null) {
   // Opening the screen is when blank rows left behind by a closed tab go.
   _mnSweepOnOpen = true;
+  // Watch for changes made elsewhere for as long as this window is open.
+  if (targetOrNull && !templateOrNull && !remarkPresetOrNull) mnWatchWhileEditing(student, false);
   mnDetachPanel(true); _mnPanelHold = false; _mnPanelSnapshot = null;   // never inherit a panel from the last target
   $("manage-modal").classList.remove("hidden");
   if (remarkPresetOrNull) {
@@ -20869,6 +20884,13 @@ function showGroupDupFromOtherPickTarget(group, sourceGroup) {
 
 
 async function closeManageModal() {
+  // If somebody else changed this target while the window was open and it
+  // could not be refreshed underneath, ask before writing over them.
+  // Answering no closes without writing, which leaves their version alone.
+  const _mayWrite = mnWarnIfStale();
+  // Nothing to watch once the window is shut.
+  mnStopWatchingWhileEditing();
+
   // An open activity panel is holding the save, so it has to be closed first.
   //
   // While a panel is open saveTarget deliberately writes nothing, so that
@@ -20882,7 +20904,18 @@ async function closeManageModal() {
   // lifts the hold and writes what changed. It runs BEFORE
   // _groupForTargetEdit is cleared, because the write chooses between the
   // group and the student by reading it.
-  if (_mnPanelOpen) await mnPanelSave();
+  if (_mnPanelOpen) {
+    if (_mayWrite) await mnPanelSave();
+    else {
+      // Let the panel go without writing: the fields go back to their card,
+      // the hold is lifted, and nothing reaches Firestore.
+      mnDetachPanel();
+      _mnPanelHold = false;
+      _mnPanelSaveWanted = false;
+      _mnPanelRenameQueue = [];
+      _mnPanelSnapshot = null;
+    }
+  }
   $("manage-modal").classList.add("hidden");
   const _savedGroupForTargetEdit = _groupForTargetEdit;
   _groupForTargetEdit = null;
@@ -20987,7 +21020,7 @@ async function closeManageModal() {
     // happen to trigger a blur on the inputs would otherwise silently fail
     // to persist to Firestore.
     try {
-      await save();
+      if (_mayWrite) await save();
     } catch (err) {
       alert("Couldn't save — check your connection and try again.\n\n" + err.message);
     }
@@ -22129,6 +22162,12 @@ let _mnPanelSnapshot = null;          // deep copy of acts as it was when the pa
  * whole reason they are allowed to be blank in the first place.
  */
 let _mnSweepOnOpen = false;
+/** Guards against a refresh starting another refresh. */
+let _mnRefreshing = false;
+/** Dropped when the Edit Target window closes. */
+let _mnConfigUnsub = null;
+/** The target Edit Target is currently showing, for the live refresh. */
+let _mnOpenTargetName = null;
 let _mnPanelOpenAfterRender = null;   // an activity id to open once the list is rebuilt
 
 function mnActPanelEl() {
@@ -22365,6 +22404,112 @@ function subActivitiesOf(pa, acts) {
   if (!key) return [];
   return acts.filter(a => a !== pa && a.parentActivity === key
     && !a.isHeading && !a.isNote && !a.isExportNote);
+}
+
+/**
+ * True when this window has edits that have not been written yet.
+ *
+ * While an activity panel is open nothing is written at all -- saveTarget
+ * holds the write so Discard Changes has something to put back -- so an open
+ * panel always counts as unsaved work.
+ */
+/**
+ * Watch this student or group for as long as Edit Target is open.
+ *
+ * The session screen has its own listener, but Edit Target can be reached
+ * from the home screen too, and then there was none at all -- the window sat
+ * on a copy nothing could ever refresh. This one belongs to the window, so
+ * it is there however the window was opened, and goes when it closes.
+ */
+function mnWatchWhileEditing(entity, isGroup) {
+  mnStopWatchingWhileEditing();
+  if (!entity?.id) return;
+  const listen = isGroup ? listenToGroup : listenToStudent;
+  try {
+    _mnConfigUnsub = listen(entity.id, fresh => {
+      if (!fresh || fresh.id !== entity.id) return;
+      // Into the object the rest of the app already holds, not over it:
+      // handlers everywhere close over this one.
+      Object.assign(entity, fresh);
+      const list = isGroup ? (state.groups || []) : (state.students || []);
+      const i = list.findIndex(x => x.id === fresh.id);
+      if (i >= 0) list[i] = entity;
+      if ($("manage-modal")?.classList.contains("hidden")) return;
+      mnRefreshOpenEditTarget(entity, isGroup);
+    });
+  } catch (err) { console.error("could not watch while editing:", err); }
+}
+
+function mnStopWatchingWhileEditing() {
+  if (typeof _mnConfigUnsub === "function") {
+    try { _mnConfigUnsub(); } catch { /* already gone */ }
+  }
+  _mnConfigUnsub = null;
+}
+
+function mnEditTargetHasUnsavedWork() {
+  if (_mnPanelOpen) return true;
+  if (_mnPanelSaveWanted) return true;
+  const body = $("manage-modal-body");
+  if (!body) return false;
+  const ae = document.activeElement;
+  return !!(body.contains(ae) &&
+    (ae?.tagName === "TEXTAREA" || ae?.tagName === "INPUT" || ae?.isContentEditable));
+}
+
+/** Set when someone else changed this target while the window was open. */
+let _mnEditTargetStale = false;
+
+/**
+ * Put a fresh copy of the target in front of an open Edit Target window.
+ *
+ * Called from the live listener. The screen is only redrawn when there is
+ * nothing to lose by redrawing it; otherwise the window is flagged and
+ * mnWarnIfStale deals with it on the way out.
+ */
+function mnRefreshOpenEditTarget(live, isGroup) {
+  const body = $("manage-modal-body");
+  if (!body || !_pendingActsCleanup) return;          // not the target screen
+  const open = _mnOpenTargetName;
+  if (!open) return;
+
+  const fresh = (live.targets || []).find(t => t.name === open);
+  if (!fresh) return;                                  // target itself has gone
+
+  if (mnEditTargetHasUnsavedWork()) { _mnEditTargetStale = true; return; }
+
+  _mnEditTargetStale = false;
+  // Redraw the contents, NOT reopen the window.
+  //
+  // Reopening ran the whole open path again: it restarted this very listener
+  // from inside its own callback, re-ran the blank-row sweep, and did it all
+  // over again on the next poll. One approval turned into a loop of reopens,
+  // and a save made in the middle of it was built from whichever copy
+  // happened to be on screen.
+  if (_mnRefreshing) return;
+  _mnRefreshing = true;
+  try {
+    if (isGroup) renderTargetManageContent(live, fresh);
+    else renderTargetManageContent(live, fresh);
+  } catch (err) { console.error("could not refresh Edit Target:", err); _mnEditTargetStale = true; }
+  finally { _mnRefreshing = false; }
+}
+
+/**
+ * Ask before writing over somebody else.
+ *
+ * Only reached when this window could not be refreshed because something was
+ * half-typed. Answering no leaves the newer version alone and throws nothing
+ * away on screen -- the window simply closes without writing.
+ */
+function mnWarnIfStale() {
+  if (!_mnEditTargetStale) return true;
+  _mnEditTargetStale = false;
+  return confirm(
+    "Somebody else changed this target while this window was open.\n\n" +
+    "Saving now would put your version back and undo their change.\n\n" +
+    "Save anyway?"
+  );
 }
 
 function mnDropEmptyPanelAct(host, key) {
@@ -22991,6 +23136,7 @@ function renderTargetManageContent(student, target) {
   }
 
   const acts = target.predefinedActivities;
+  _mnOpenTargetName = target.name;
 
   // Clear blank rows on the way IN as well as on the way out.
   //
@@ -29836,6 +29982,7 @@ function renderGroupSessionsForMonth(group, month, monthSessions, byMonth, sessi
 function openGroupManageModal(group, target = null, scrollToPaId = null) {
   // Opening the screen is when blank rows left behind by a closed tab go.
   _mnSweepOnOpen = true;
+  if (target) mnWatchWhileEditing(group, true);
   mnDetachPanel(true); _mnPanelHold = false; _mnPanelSnapshot = null;   // never inherit a panel from the last target
   $("manage-modal").classList.remove("hidden");
   if (target) {

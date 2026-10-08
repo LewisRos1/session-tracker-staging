@@ -224,6 +224,8 @@ globalThis.__store = (() => {
     return res.docs;
   }
 
+  const mine = {};                 // id -> version this browser last wrote
+
   async function save(collection, doc) {
     if (!shared()) {
       const list = (globalThis.__FIXTURE[collection] ||= []);
@@ -231,8 +233,9 @@ globalThis.__store = (() => {
       at === -1 ? list.push(copy(doc)) : (list[at] = copy(doc));
       return;
     }
-    await fetch("/__store/" + collection + "/" + doc.id,
-      { method: "POST", body: JSON.stringify(doc) });
+    const res = await fetch("/__store/" + collection + "/" + doc.id,
+      { method: "POST", body: JSON.stringify(doc) }).then(r => r.json());
+    mine[collection + "/" + doc.id] = res.version;
   }
 
   function watch(collection, id, cb) {
@@ -243,8 +246,12 @@ globalThis.__store = (() => {
       try {
         const res = await fetch("/__store/" + collection).then(r => r.json());
         const doc = res.docs.find(d => d.id === id);
-        const now = doc ? JSON.stringify(doc) : null;
-        if (now && now !== last) { last = now; cb(JSON.parse(now)); }
+        // Never hand back a copy older than this browser's own last write.
+        const floor = mine[collection + "/" + id] || 0;
+        if (doc && (doc.__v || 0) >= floor) {
+          const now = JSON.stringify(doc);
+          if (now !== last) { last = now; cb(JSON.parse(now)); }
+        }
       } catch (e) { /* server going away at the end of a run */ }
       if (!stopped) setTimeout(tick, 150);
     };
