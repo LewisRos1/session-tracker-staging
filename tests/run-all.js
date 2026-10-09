@@ -45,6 +45,9 @@ results.push(await run("Group targets: editing and saving, in a real browser",
 results.push(await run("Parent activities and their sub-activities, in a real browser",
   ["run", "-A", "tests/browser/parent-sub-lifecycle.test.js", HARNESS]));
 
+results.push(await run("What an assistant may and may not touch",
+  ["run", "-A", "tests/browser/assistant-readonly.test.js", HARNESS]));
+
 results.push(await run("One person in a target at a time (the Edit Target lock)",
   ["run", "-A", "tests/browser/edit-target-lock.test.js", HARNESS]));
 

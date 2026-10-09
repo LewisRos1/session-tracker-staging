@@ -76,8 +76,21 @@ try {
 
   r.section("2. the second person is kept out, whoever they are");
 
+  // Watch the modal itself: it must never be shown at all, not shown and then
+  // taken away. Opening first and backing out flashed the whole screen up for
+  // about half a second, which reads as a fault.
+  await daisy.eval(`(() => {
+    window.__flashed = false;
+    const el = document.getElementById("manage-modal");
+    new MutationObserver(() => {
+      if (!el.classList.contains("hidden")) window.__flashed = true;
+    }).observe(el, { attributes: true, attributeFilter: ["class"] });
+  })()`);
+
   await openTarget(daisy, 0);
   r.ok("Ms. Daisy's window did not stay open", !(await modalOpen(daisy)));
+  r.ok("and it never flashed up on the way", !(await daisy.eval(`window.__flashed`)),
+    "the window was shown and then taken away again");
 
   const msg = await lockMessage(daisy);
   r.ok("she is told who is in there and to try again", !!msg && /Rayhanah/.test(msg) && /try again/i.test(msg),
@@ -113,7 +126,7 @@ try {
     document.querySelector(".mn-lock-banner")?.innerText.replace(/\\s+/g, " ").trim()`);
   console.log(`        banner: ${wording}`);
   r.ok("the banner says what will happen",
-    /close by itself/i.test(wording || "") && /no changes are made/i.test(wording || ""),
+    /"Edit Target" window will close by itself/i.test(wording || "") && /no changes are made/i.test(wording || ""),
     `banner reads ${JSON.stringify(wording)}`);
 
   r.section("4b. working in it keeps it open");

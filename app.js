@@ -224,7 +224,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2204";
+const APP_VERSION = "2207";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -15651,6 +15651,39 @@ function applyAssistantReadOnly(bodyEl, acts) {
     rich.contentEditable = "false";
     rich.classList.add("mn-locked-field");
   });
+
+  // An approved row does not open at all.
+  //
+  // Every field inside it was already read-only, but the row still opened its
+  // panel, so an assistant could sit in a screen full of dead boxes with no
+  // idea why nothing would type. The row now refuses the click and says who
+  // can change it.
+  bodyEl.querySelectorAll(".mn-act-card, .mn-sub-compact").forEach(row => {
+    row.classList.toggle("mn-locked-row", !isHers(row));
+  });
+
+  if (!bodyEl._assistantRowGuard) {
+    bodyEl._assistantRowGuard = true;
+    // On the way down, so it gets there before the row's own handler.
+    bodyEl.addEventListener("click", e => {
+      if (!proposesOnly()) return;
+
+      // Looking is fine. The mastered and discontinued lists still open, and
+      // the kebab still opens to show its own lock, which says more than a
+      // dead button does.
+      if (e.target.closest(".mn-inact-toggle, .mn-kebab-btn, .mn-kebab-menu, "
+                         + ".mn-sub-kebab-wrap, .mn-inactive-km, .mn-pending-foot")) return;
+
+      const row = e.target.closest(".mn-locked-row");
+      if (!row || !bodyEl.contains(row)) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      const i = ownIdx(row);
+      const kind = i == null ? "items" : mnRowKindPlural(acts[i], acts);
+      showEditTargetLock(`Only Ms. Daisy can make changes to approved ${kind}.`);
+    }, true);
+  }
 }
 
 /** Stamp an entry as somebody's proposal. */
@@ -20646,14 +20679,19 @@ async function handleActStartPickerChange() {
 
 // ── Open / close ──────────────────────────────────────────────
 
-function openManageModal(student, targetOrNull, templateOrNull = null, remarkPresetOrNull = null, scrollToPaId = null) {
+function openManageModal(student, targetOrNull, templateOrNull = null, remarkPresetOrNull = null, scrollToPaId = null, _lockHeld = false) {
+  // A target can only be edited by one person at a time, and that is settled
+  // before the window is drawn -- see mnOpenWhenFree. `_lockHeld` is how this
+  // function calls itself back once the target is ours.
+  if (targetOrNull && !templateOrNull && !remarkPresetOrNull && !_lockHeld) {
+    mnOpenWhenFree(student, targetOrNull, false, () =>
+      openManageModal(student, targetOrNull, templateOrNull, remarkPresetOrNull, scrollToPaId, true));
+    return;
+  }
   // Opening the screen is when blank rows left behind by a closed tab go.
   _mnSweepOnOpen = true;
   // Watch for changes made elsewhere for as long as this window is open.
   if (targetOrNull && !templateOrNull && !remarkPresetOrNull) mnWatchWhileEditing(student, false);
-  if (targetOrNull && !templateOrNull && !remarkPresetOrNull) {
-    mnTakeLockOrBackOut(student, targetOrNull, false);
-  }
   mnDetachPanel(true); _mnPanelHold = false; _mnPanelSnapshot = null;   // never inherit a panel from the last target
   $("manage-modal").classList.remove("hidden");
   if (remarkPresetOrNull) {
@@ -22295,7 +22333,7 @@ function renderLockCountdown(msLeft) {
     bar = document.createElement("div");
     bar.className = "mn-lock-banner";
     bar.innerHTML = `<span class="mn-pending-banner-count">`
-      + `This window will close by itself in <strong id="mn-lock-timer"></strong> `
+      + `This &quot;Edit Target&quot; window will close by itself in <strong id="mn-lock-timer"></strong> `
       + `if no changes are made.</span>`;
     // Under the approval banner when there is one, otherwise at the top.
     const pending = bodyEl.querySelector(":scope > .mn-pending-banner:not(.mn-lock-banner)");
@@ -22306,27 +22344,22 @@ function renderLockCountdown(msLeft) {
 }
 
 /**
- * Take the lock for a target that has just been opened, or back out.
+ * Take the target's lock, and only then let the window be drawn.
  *
- * Asked for after the window is on screen rather than before, so that the
- * open functions stay synchronous -- they are called from a dozen places. If
- * somebody else has it, the window is taken away again before anything can
- * be typed into it. Nothing has changed by then, so nothing is saved.
+ * Asked BEFORE anything is shown. Opening first and taking it away again
+ * when somebody else had it flashed the whole screen up for half a second,
+ * which looks like a fault even though nothing was ever editable.
+ *
+ * `proceed` draws the window. The countdown is started straight after it, so
+ * the banner is there with everything else rather than a second later.
  */
-async function mnTakeLockOrBackOut(entity, target, isGroup) {
-  if (!entity?.id || !target) return;
+async function mnOpenWhenFree(entity, target, isGroup, proceed) {
+  if (!entity?.id || !target) { proceed(); return; }
   const targetKey = target.id || target.name;
   const res = await acquireEditLock(entity.id, targetKey);
-  if (res.ok) { startHoldingLock(entity.id, targetKey); return; }
-
-  // Somebody else is in there: shut this window without writing anything.
-  mnStopWatchingWhileEditing();
-  mnDetachPanel(true);
-  _mnPanelHold = false;
-  _mnPanelSnapshot = null;
-  _pendingActsCleanup = null;
-  $("manage-modal")?.classList.add("hidden");
-  showLockedByOther(res.holder);
+  if (!res.ok) { showLockedByOther(res.holder); return; }
+  proceed();
+  startHoldingLock(entity.id, targetKey);
 }
 
 /** Somebody else is in there. */
@@ -22611,6 +22644,12 @@ function mnFitPendingRow(el) {
     const needed = top + foot.offsetHeight + top;   // same gap under as over
     if (needed > el.offsetHeight) el.style.minHeight = needed + "px";
   });
+}
+
+/** The same, said of more than one: activities, not activitys. */
+function mnRowKindPlural(a, acts) {
+  const one = mnRowKindName(a, acts);
+  return one.endsWith("y") ? one.slice(0, -1) + "ies" : one + "s";
 }
 
 function mnRowKindName(a, acts) {
@@ -30281,11 +30320,15 @@ function renderGroupSessionsForMonth(group, month, monthSessions, byMonth, sessi
 }
 
 // ── Group manage modal ───────────────────────────────────────
-function openGroupManageModal(group, target = null, scrollToPaId = null) {
+function openGroupManageModal(group, target = null, scrollToPaId = null, _lockHeld = false) {
+  if (target && !_lockHeld) {
+    mnOpenWhenFree(group, target, true, () =>
+      openGroupManageModal(group, target, scrollToPaId, true));
+    return;
+  }
   // Opening the screen is when blank rows left behind by a closed tab go.
   _mnSweepOnOpen = true;
   if (target) mnWatchWhileEditing(group, true);
-  if (target) mnTakeLockOrBackOut(group, target, true);
   mnDetachPanel(true); _mnPanelHold = false; _mnPanelSnapshot = null;   // never inherit a panel from the last target
   $("manage-modal").classList.remove("hidden");
   if (target) {
