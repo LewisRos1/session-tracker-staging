@@ -305,6 +305,7 @@ await Deno.writeTextFile(`${out}/firebase-service.js`, storeClient + stub);
 const exposed = [
   "openManageModal", "openGroupManageModal", "closeManageModal",
   "renderGroupTargetContent", "renderFedcTarget", "paDisplayHtml",
+  "mnSetIdleTimeoutForTests",
   "state", "currentUser", "currentRole",
   "mnPanelSave", "mnPanelDiscard", "mnPanelIsDirty",
   "richToMarkers", "markersToRichHtml", "attachRichEditors",

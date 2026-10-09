@@ -107,55 +107,69 @@ try {
   const both = await lockInStore();
   r.check("both targets are held, one each", both.length, 2);
 
-  r.section("4. the countdown is on screen");
+  r.section("4. the countdown, and closing itself");
 
-  // The banner is put up by the ticker, so wait for it rather than assuming
-  // it is there the instant the window opens.
-  await ray.until(`document.getElementById("mn-lock-timer")`, "the countdown to appear");
-  const shown = await countdown(ray);
-  r.ok("Rayhanah can see how long she has", /^\d:\d\d$/.test(shown || ""),
-    `the timer reads ${JSON.stringify(shown)}`);
-  const asSeconds = (t) => {
-    const m = /^(\d+):(\d\d)$/.exec(t || "");
-    return m ? Number(m[1]) * 60 + Number(m[2]) : -1;
-  };
-  r.ok("and it starts near five minutes", asSeconds(shown) > 4 * 60 && asSeconds(shown) <= 5 * 60,
-    `the timer reads ${JSON.stringify(shown)}`);
+  // There is no countdown on screen any more -- watching a clock run out while
+  // you work is its own small stress, so Lewis asked for it to go. The window
+  // still closes, so that is what gets checked.
+  //
+  // Ten minutes is the real wait. The test shortens it, or it could not be
+  // written at all.
+  await ray.click("#manage-modal-close");
+  await settle(1000);
+  await ray.eval(`window.__app.mnSetIdleTimeoutForTests(4000)`);
+  await openTarget(ray, 0);
+  r.ok("Rayhanah is in again", await modalOpen(ray));
 
-  const wording = await ray.eval(`
-    document.querySelector(".mn-lock-banner")?.innerText.replace(/\\s+/g, " ").trim()`);
-  console.log(`        banner: ${wording}`);
-  r.ok("the banner says what will happen",
-    /"Edit Target" window will close by itself/i.test(wording || "") && /no changes are made/i.test(wording || ""),
-    `banner reads ${JSON.stringify(wording)}`);
+  // Said beside the Done button, not across the top of the list.
+  await ray.until(`document.getElementById("mn-lock-countdown")`, "the countdown");
+  const beside = await ray.eval(`(() => {
+    const el = document.getElementById("mn-lock-countdown");
+    const done = document.getElementById("manage-modal-close");
+    return { text: el?.textContent || null, rightBeforeDone: el?.nextElementSibling === done };
+  })()`);
+  r.ok("the countdown sits next to Done", beside.rightBeforeDone,
+    `it is not beside the button: ${JSON.stringify(beside)}`);
+  r.ok("and reads as a quiet note", /^Auto-closes in \d+:\d\d$/.test(beside.text || ""),
+    `it reads ${JSON.stringify(beside.text)}`);
+  console.log(`        beside Done: ${beside.text}`);
+  r.ok("no banner across the list any more",
+    !(await ray.eval(`!!document.querySelector(".mn-lock-banner")`)));
 
-  r.section("4b. working in it keeps it open");
+  r.section("4b. looking at it counts as being in it");
 
-  // Lewis asked: somebody starts at 9pm and is still typing at 9:05 -- does it
-  // shut on them because of when they opened it? It must not. The countdown
-  // runs from the last thing they did, not from when the window opened.
-  await settle(3000);
-  const ranDown = asSeconds(await countdown(ray));
-  r.ok("the countdown does go down while nothing happens", ranDown < asSeconds(shown),
-    `was ${shown}, now ${await countdown(ray)}`);
+  // Lewis: somebody starts at 9pm and is still working at 9:10 -- it must not
+  // shut on them because of when they opened it. And he asked that scrolling
+  // count, not just typing: reading the list is still being in there.
+  await settle(1200);
+  await ray.eval(`document.getElementById("manage-modal-body").dispatchEvent(
+    new WheelEvent("wheel", { bubbles: true, deltaY: 40 }))`);
+  await settle(2600);
+  r.ok("a scroll keeps it open past the whole wait", await modalOpen(ray),
+    "it closed even though the window had been scrolled");
 
-  // Type into the target name, which is a real field on this screen.
   await ray.eval(`(() => {
     const el = document.getElementById("mn-t-name");
-    el.focus();
-    el.setSelectionRange(el.value.length, el.value.length);
+    el.focus(); el.setSelectionRange(el.value.length, el.value.length);
   })()`);
   await ray.type("x");
-  await settle(1300);
-
-  const afterTyping = asSeconds(await countdown(ray));
-  r.ok("typing puts it back to five minutes", afterTyping > ranDown && afterTyping > 4 * 60 + 30,
-    `it had run down to ${ranDown}s and typing left it at ${afterTyping}s`);
-  console.log(`        ran down to ${ranDown}s, typing reset it to ${afterTyping}s`);
-
-  // Undo the edit so the rest of the run starts from where it expects.
+  await settle(2600);
+  r.ok("so does typing", await modalOpen(ray),
+    "it closed even though something had just been typed");
   await ray.key("Backspace");
-  await settle(400);
+  await settle(300);
+
+  r.section("4c. left alone, it goes");
+
+  await settle(5200);
+  r.ok("the window closed by itself", !(await modalOpen(ray)),
+    "it was left alone for longer than the wait and stayed open");
+  const freed = await lockInStore();
+  r.ok("and the target is free again", !freed.some(l => l.id === "amy__t1"),
+    JSON.stringify(freed));
+
+  await ray.eval(`window.__app.mnSetIdleTimeoutForTests(10 * 60 * 1000)`);
+  await openTarget(ray, 0);
 
   r.section("5. letting go");
 
@@ -171,6 +185,10 @@ try {
 
   r.section("6. a lock from a browser that never came back");
 
+  // Older than the idle wait, which is now ten minutes for this too: a window
+  // that is awake gives its lock up after ten idle minutes, and one that is
+  // asleep has its taken after the same ten. The two cannot disagree.
+
   // A lock older than five minutes belongs to a laptop that went to sleep.
   await daisy.click("#manage-modal-close");
   await settle(900);
@@ -179,7 +197,7 @@ try {
     body: JSON.stringify({
       id: "amy__t1", ownerId: "amy", targetId: "t1",
       holderId: "nigel", holderName: "Nigel",
-      heldAt: Date.now() - (6 * 60 * 1000),
+      heldAt: Date.now() - (11 * 60 * 1000),
     }),
   });
 

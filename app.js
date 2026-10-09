@@ -224,7 +224,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2208";
+const APP_VERSION = "2212";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -22222,8 +22222,21 @@ let _mnRefreshing = false;
 //
 // Nobody can take a lock from somebody else, main teacher or not.
 
-/** No typing and no clicking for this long and the window closes itself. */
-const LOCK_IDLE_MS = 5 * 60 * 1000;
+/**
+ * Nothing touched for this long and the window closes itself.
+ *
+ * Anything counts: a keystroke, a click, a scroll. Reading the list without
+ * changing a thing is still being in there, and Lewis asked for it that way.
+ */
+let LOCK_IDLE_MS = 10 * 60 * 1000;
+/**
+ * Shorten the wait, for the tests only.
+ *
+ * Nothing in the app calls this. Without it a test of the close would have
+ * to sit there for ten minutes, so it would never be written and the close
+ * would go unchecked -- which is how it got built in the first place.
+ */
+function mnSetIdleTimeoutForTests(ms) { LOCK_IDLE_MS = ms; }
 /** How often the holder says it is still there. */
 const LOCK_RENEW_MS = 30 * 1000;
 /**
@@ -22232,8 +22245,8 @@ const LOCK_RENEW_MS = 30 * 1000;
  *
  * The holder's own window closes itself after LOCK_IDLE_MS -- but only while
  * it is running. A sleeping laptop runs nothing, so without this the lock
- * would sit there for as long as the lid stayed shut. Same five minutes from
- * the other side, so the two cannot disagree.
+ * would sit there for as long as the lid stayed shut. The same wait from the
+ * other side, so the two cannot disagree.
  */
 const LOCK_DEAD_AFTER_MS = LOCK_IDLE_MS;
 
@@ -22297,12 +22310,15 @@ function startHoldingLock(ownerId, targetId) {
       .catch(err => console.warn("could not refresh the Edit Target lock:", err));
   }, LOCK_RENEW_MS);
 
-  // Counted from the clock, not ticked down.
+  // Read from the clock, not counted down.
   //
-  // A ticking number stops with the browser when a laptop sleeps, and would
-  // carry on from where it left off hours later. Read from the clock, the
-  // window notices the moment it wakes that its five minutes went long ago,
-  // and closes straight away.
+  // A number ticking down stops with the browser when a laptop sleeps and
+  // would carry on hours later from where it left off. Compared against the
+  // clock, the window notices the moment it wakes that its ten minutes went
+  // long ago, and closes straight away.
+  //
+  // Said quietly, beside the Done button. It was a banner across the top of
+  // the list once, which is a clock running out at you while you work.
   _lock.tickTimer = setInterval(() => {
     if (!_lock) return;
     const left = LOCK_IDLE_MS - (Date.now() - _lock.lastActive);
@@ -22321,38 +22337,38 @@ function stopHoldingLock() {
   }
   const { ownerId, targetId } = _lock;
   _lock = null;
+  clearLockCountdown();
   clearEditLock(ownerId, targetId).catch(() => {});
 }
 
-/** Five minutes untouched: save what is there and close, as Done does. */
+/** Ten minutes untouched: save what is there and close, as Done does. */
 function closeManageModalForIdle() {
   if (!_lock) return;
-  const banner = $("mn-lock-timer");
-  if (banner) banner.textContent = "Closing\u2026";
   closeManageModal();
 }
 
-/** The countdown, in a box of its own under the approval banner. */
+/** The countdown, beside the Done button. */
 function renderLockCountdown(msLeft) {
-  const bodyEl = $("manage-modal-body");
-  if (!bodyEl) return;
+  const done = $("manage-modal-close");
+  if (!done) return;
   const mins = Math.floor(Math.max(0, msLeft) / 60000);
   const secs = Math.floor((Math.max(0, msLeft) % 60000) / 1000);
   const clock = `${mins}:${String(secs).padStart(2, "0")}`;
 
-  let bar = bodyEl.querySelector(":scope > .mn-lock-banner");
-  if (!bar) {
-    bar = document.createElement("div");
-    bar.className = "mn-lock-banner";
-    bar.innerHTML = `<span class="mn-pending-banner-count">`
-      + `This &quot;Edit Target&quot; window will close by itself in <strong id="mn-lock-timer"></strong> `
-      + `if no changes are made.</span>`;
-    // Under the approval banner when there is one, otherwise at the top.
-    const pending = bodyEl.querySelector(":scope > .mn-pending-banner:not(.mn-lock-banner)");
-    if (pending) pending.after(bar); else bodyEl.insertBefore(bar, bodyEl.firstChild);
+  let out = $("mn-lock-countdown");
+  if (!out) {
+    out = document.createElement("span");
+    out.id = "mn-lock-countdown";
+    out.className = "mn-lock-countdown";
+    done.before(out);
   }
-  const out = bar.querySelector("#mn-lock-timer");
-  if (out && out.textContent !== clock) out.textContent = clock;
+  const text = `Auto-closes in ${clock}`;
+  if (out.textContent !== text) out.textContent = text;
+}
+
+/** Take it away when the window is not holding a target. */
+function clearLockCountdown() {
+  $("mn-lock-countdown")?.remove();
 }
 
 /**

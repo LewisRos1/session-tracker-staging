@@ -1527,6 +1527,30 @@ input.field-input::placeholder {
    Edit Target had a full-width Done at the bottom AND an X at the top, and
    it was never clear which one meant "keep what I typed". There is one now,
    and it says what it does. */
+/* The idle countdown, beside Done. Said quietly: it is a note, not a
+   warning, and a clock counting down at someone while they work is its own
+   small stress. Tabular figures so the width does not jitter each second. */
+/* An approved row, seen by an assistant. The whole row refuses the click and
+   says who can change it, so the cursor should say so before the click.
+   The kebab and the mastered/discontinued toggles still work, so they keep
+   a pointer. */
+.mn-locked-row, .mn-locked-row * { cursor: not-allowed !important; }
+.mn-locked-row .mn-inact-toggle,
+.mn-locked-row .mn-kebab-btn,
+.mn-locked-row .mn-sub-kebab-wrap,
+.mn-locked-row .mn-sub-kebab-wrap * { cursor: pointer !important; }
+
+.mn-lock-countdown {
+  /* The header spreads its children apart, so without this the note lands in
+     the middle of the bar instead of against the button it belongs to. */
+  margin-left: auto;
+  font-size: .78rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  margin-right: .6rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .modal-close-done {
   background: var(--primary);
   color: #fff;
@@ -4794,31 +4818,6 @@ button.wf-pill:hover { filter: brightness(.93); }
   padding: .5rem .75rem;
   margin: 0 0 .75rem;
 }
-/* The idle countdown. Same box as the approval banner, its own class: that
-   one removes ":scope > .mn-pending-banner" before redrawing itself, and
-   would have taken this with it. Cooler colours so the two read as different
-   kinds of message -- one is about other people, this one is about time. */
-/* An approved row, seen by an assistant. The whole row refuses the click and
-   says who can change it, so the cursor should say so before the click. */
-.mn-locked-row, .mn-locked-row * { cursor: not-allowed !important; }
-.mn-locked-row .mn-inact-toggle,
-.mn-locked-row .mn-kebab-btn,
-.mn-locked-row .mn-sub-kebab-wrap,
-.mn-locked-row .mn-sub-kebab-wrap * { cursor: pointer !important; }
-
-.mn-lock-banner {
-  display: flex;
-  align-items: center;
-  gap: .6rem;
-  flex-wrap: wrap;
-  background: #eef2ff;
-  border: 1.5px solid #a5b4fc;
-  border-radius: .5rem;
-  padding: .5rem .75rem;
-  margin: 0 0 .75rem;
-}
-.mn-lock-banner .mn-pending-banner-count { color: #3730a3; font-weight: 600; }
-.mn-lock-banner strong { font-variant-numeric: tabular-nums; font-weight: 800; }
 
 .mn-pending-banner-count {
   font-size: .95rem;
