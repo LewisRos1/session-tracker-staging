@@ -204,7 +204,70 @@ try {
   r.check("Save and Close then writes it", await detailsSaved("a1"), "typed then clicked outside");
 
   // ══ 3. Clicking straight onto another activity's row ═════════════════
-  r.section("3. type in Details, then click another activity's row");
+  r.section("2b. clicking straight from one activity to the next, five in a row");
+
+  // Closing a panel now REMOVES the field boxes it borrowed rather than
+  // leaving them behind. Get that wrong and the fifth panel comes up empty,
+  // or showing the row before it. Done with real clicks, one row to the next,
+  // never pressing Save and Close.
+  await page.fixture({
+    today: "2026-10-08", authUser: "daisy",
+    students: [{
+      id: "amy", name: "Amy", order: 1,
+      targets: [{
+        id: "t1", name: "FEDC 1", scale: 3,
+        predefinedActivities: [1, 2, 3, 4, 5].map((n, i) => ({
+          id: `c${n}`, title: `Row ${n}`, name: `details for row ${n}`,
+          order: i, createdOn: "2026-01-01",
+        })),
+      }],
+    }],
+    groups: [], sessions: [],
+  });
+  await page.load();
+  await page.until(`!document.querySelector("#screen-home").classList.contains("hidden")`, "the home screen");
+  await page.eval(`(() => {
+    const s = window.__app.state.students.find(x => x.id === "amy");
+    window.__app.openManageModal(s, s.targets[0]);
+  })()`);
+  await page.until(`document.querySelectorAll(".mn-act-card").length >= 5`, "all five rows");
+  await settle();
+  await page.eval(`window.confirm = () => true; window.alert = () => {};`);
+
+  // Save and Close between each one. While a panel is open its overlay covers
+  // the screen, so another row cannot be clicked at all -- a click lands on
+  // the dimmed area, which points at Save and Close rather than switching.
+  for (const n of [1, 2, 3, 4, 5]) {
+    if (n > 1) {
+      await page.click("#mn-act-panel-overlay .mn-act-panel-save");
+      await page.until(`(() => {
+        const el = document.getElementById("mn-act-panel-overlay");
+        return !el || getComputedStyle(el).display === "none";
+      })()`, "the previous panel to close");
+      await settle(300);
+    }
+    await openCard(`Row ${n}`);
+    const seen = await page.eval(`(() => {
+      const p = document.querySelector("#mn-act-panel-overlay");
+      const title = p.querySelector(".mn-act-title-input");
+      const box = p.querySelector(".mn-rich") || p.querySelector(".mn-act-details-input");
+      return {
+        title: title ? title.value.trim() : "(no title field)",
+        details: box ? (box.isContentEditable ? box.innerText : box.value).trim() : "(no details box)",
+        titleFields: p.querySelectorAll(".mn-act-title-input").length,
+        detailBoxes: p.querySelectorAll(".mn-act-details-input").length,
+      };
+    })()`);
+    r.check(`row ${n}: the panel shows its own title`, seen.title, `Row ${n}`);
+    r.check(`row ${n}: and its own details`, seen.details, `details for row ${n}`);
+    r.check(`row ${n}: with one set of fields, not several`,
+      [seen.titleFields, seen.detailBoxes], [1, 1]);
+  }
+
+  // Named for what it really does. With a panel open its overlay covers the
+  // screen, so a click aimed at another row lands on the dimmed area -- which
+  // must keep the panel and the typing, not switch away and lose them.
+  r.section("3. type in Details, then click where another activity's row is");
 
   await openEditTarget();
   await openCard("Greeting");

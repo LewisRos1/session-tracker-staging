@@ -224,7 +224,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2207";
+const APP_VERSION = "2208";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -22255,7 +22255,19 @@ async function acquireEditLock(ownerId, targetId) {
     if (held && held.holderId !== me.id && !lockIsDead(held)) {
       return { ok: false, holder: held };
     }
-    await setEditLock(ownerId, targetId, { id: me.id, name: me.name });
+    // Claimed without waiting for the write to land.
+    //
+    // The read tells us it is free; the write only tells everyone else. Two
+    // round trips before the window appeared meant about three seconds of
+    // nothing when the target WAS free -- while being turned away was instant,
+    // because that path never wrote at all.
+    //
+    // Two people could in principle read "free" in the same few milliseconds
+    // and both claim it. This is a courtesy between colleagues, not a
+    // security control, and the version that asks before overwriting is still
+    // underneath it.
+    setEditLock(ownerId, targetId, { id: me.id, name: me.name })
+      .catch(err => console.warn("could not write the Edit Target lock:", err));
     return { ok: true };
   } catch (err) {
     // The lock is a courtesy between colleagues, not a security control. If
