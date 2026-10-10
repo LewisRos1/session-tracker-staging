@@ -226,7 +226,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2219";
+const APP_VERSION = "2220";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -15496,6 +15496,8 @@ function watchConfigForOpenSession(isGroup) {
   return listen(entity.id, fresh => {
     const live = isGroup ? state.currentGroup : state.currentStudent;
     if (!live || live.id !== fresh.id) return;
+    // Before the merge, while there is still something to compare.
+    const somebodyElse = mnEchoIsSomebodyElse(fresh, live);
     Object.assign(live, fresh);
     const list = isGroup ? (state.groups || []) : (state.students || []);
     const i = list.findIndex(x => x.id === fresh.id);
@@ -15512,7 +15514,7 @@ function watchConfigForOpenSession(isGroup) {
     // not been saved. Otherwise the window is marked, and mnWarnIfStale asks
     // before it is allowed to write over someone else.
     if (!$("manage-modal")?.classList.contains("hidden")) {
-      mnRefreshOpenEditTarget(live, isGroup);
+      if (somebodyElse) mnRefreshOpenEditTarget(live, isGroup);
       return;
     }
     const ae = document.activeElement;
@@ -22759,6 +22761,42 @@ function stableJson(v) {
     .map(k => JSON.stringify(k) + ":" + stableJson(v[k])).join(",") + "}";
 }
 
+/**
+ * Was this copy somebody else's doing?
+ *
+ * TWO listeners hand copies to Edit Target: this screen's own, and the
+ * session screen's, which is running whenever Edit Target was opened from a
+ * session. Only the first one asked this question. The second called the
+ * refresh on every copy that arrived, including the window's own saves, so
+ * anyone editing from inside a session was warned about their own work --
+ * which is exactly where Lewis was every time. Both go through here now.
+ *
+ * Must be asked BEFORE the incoming copy is merged into the held one, or
+ * there is nothing left to compare.
+ */
+function mnEchoIsSomebodyElse(fresh, held) {
+  // Written by the person sitting here. Not this tab -- this PERSON. A tab
+  // id is defeated by the cache, by a reload and by a second tab, and every
+  // one of those read as a stranger.
+  const me = (state.authEmail || "").toLowerCase();
+  if (fresh.lastWriteBy && me && fresh.lastWriteBy === me) return false;
+  if (fresh.lastWriteTab && fresh.lastWriteTab === WRITE_TAB_ID) return false;
+  // A save of ours is still on its way, so what arrived is the copy from
+  // before it -- older than what we hold, not newer.
+  if (writesInFlight() > 0) return false;
+  // Both sides in the shape they are stored in, so the editor having merged
+  // its proposals cannot look like a difference.
+  const stored = t => (t ? stableJson(splitPendingTarget(t)) : "");
+  const openName = _mnOpenTargetName;
+  // A change to some OTHER target of the same person is nothing to do with
+  // the window that is open.
+  if (openName) {
+    return stored((fresh.targets || []).find(t => t.name === openName))
+        !== stored((held.targets  || []).find(t => t.name === openName));
+  }
+  return stableJson(fresh.targets) !== stableJson(held.targets);
+}
+
 function mnWatchWhileEditing(entity, isGroup) {
   mnStopWatchingWhileEditing();
   // This window has seen nothing yet.
@@ -22789,36 +22827,7 @@ function mnWatchWhileEditing(entity, isGroup) {
       // Compared on the targets alone. The rest of the document carries
       // fields the server adds or reorders, and a whole-document comparison
       // would differ every time and flag every save.
-      // Three ways to know this is not somebody else, any one of which is
-      // enough. Warning when nobody else was involved is far worse than
-      // staying quiet: only one person can be in a target at a time now, so
-      // there is little left for the warning to catch anyway.
-      //
-      // 1. Stamped by this tab. Every save carries one.
-      // 2. This tab has a save in the air. The copy that arrives first is
-      //    the one from before it, older than what this window holds.
-      // 3. The target actually open is the same on both sides. A change to
-      //    some OTHER target of the same person is nothing to do with this
-      //    window, and the whole-record comparison used to flag it.
-      // Written by the person sitting here. Not this tab -- this PERSON.
-      // Lewis asked whether the somebody else might be Rayhanah herself. It
-      // was: a tab id is defeated by the cache, by a reload and by a second
-      // tab, and every one of those still reads as a stranger. A name cannot
-      // be, so this is the guard that settles it.
-      const me = (state.authEmail || "").toLowerCase();
-      const byMe = !!fresh.lastWriteBy && !!me && fresh.lastWriteBy === me;
-      const mine = byMe
-        || (!!fresh.lastWriteTab && fresh.lastWriteTab === WRITE_TAB_ID)
-        || writesInFlight() > 0;
-      // Both sides in the shape they are stored in, so the editor having
-      // merged its proposals cannot look like a difference.
-      const stored = t => (t ? stableJson(splitPendingTarget(t)) : "");
-      const openName = _mnOpenTargetName;
-      const sameOpenTarget = openName
-        ? stored((fresh.targets  || []).find(t => t.name === openName))
-          === stored((entity.targets || []).find(t => t.name === openName))
-        : stableJson(fresh.targets) === stableJson(entity.targets);
-      const unchanged = mine || sameOpenTarget;
+      const unchanged = !mnEchoIsSomebodyElse(fresh, entity);
 
       // Into the object the rest of the app already holds, not over it:
       // handlers everywhere close over this one.

@@ -171,6 +171,53 @@ try {
   r.check("nothing asked about her own work", await page.eval(`(window.__asked || [])
     .filter(m => /changed this target|Save your changes anyway/i.test(m))`), []);
 
+  // ── 5c. opened from a SESSION, which is how it is really opened ──────
+  // Lewis is always inside a session when he does this. The session screen
+  // keeps its own listener on the same record, and that one called the
+  // refresh on every copy that arrived -- its own saves included. Every test
+  // before this opened Edit Target from the home screen, so that listener was
+  // never even running, and four fixes in a row missed it.
+  r.section("Edit Target opened from inside a session");
+
+  await page.eval(`window.__asked = []`);
+  await page.eval(`(() => {
+    const s = window.__app.state.students.find(x => x.id === "amy");
+    window.__app.state.currentStudent = s;
+    window.__sessionUnsub = window.__app.watchConfigForOpenSession(false);
+  })()`);
+  await settle(400);
+  await openTarget(0);
+
+  // A parent activity brings a blank sub-activity with it, which has no start
+  // date, which makes the screen backfill one and SAVE -- a write that slips
+  // past the panel hold. Its echo is what the session listener then handed to
+  // Edit Target as somebody else's change.
+  await page.click("#btn-mn-add-parent");
+  await page.until(`document.querySelector("#mn-act-panel-overlay")`, "the panel");
+  await settle();
+  await page.eval(`(() => {
+    const p = document.querySelector("#mn-act-panel-overlay");
+    const el = p.querySelector(".mn-act-title-input, .mn-act-name-input, textarea, .mn-rich");
+    if (!el) return;
+    el.focus();
+    if (el.setSelectionRange) el.setSelectionRange(0, 0);
+  })()`);
+  await page.type("ABC");
+  await settle(900);
+  await page.click("#mn-act-panel-overlay .mn-act-panel-discard");
+  await settle(2200);
+
+  // The flag is set quietly and only speaks up at the next write or on the
+  // way out, so both moments have to be checked. Asserting only straight
+  // after the discard missed it entirely.
+  await page.eval(`window.__app.closeManageModal()`);
+  await settle(1600);
+  await page.eval(`try { window.__sessionUnsub?.(); } catch (e) {}`);
+
+  r.check("nothing asked while editing inside a session",
+    await page.eval(`(window.__asked || [])
+      .filter(m => /changed this target|Save your changes anyway/i.test(m))`), []);
+
   // ── 6. and the warning must still work when it is real ───────────────
   // Four separate guards were added to stop it mis-firing. If one of them is
   // too broad the warning never appears at all, and two people quietly

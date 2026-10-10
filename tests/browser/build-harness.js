@@ -288,11 +288,16 @@ globalThis.__store = (() => {
     const res = await fetch("/__store/" + collection + "/" + doc.id,
       { method: "POST", body: JSON.stringify(doc) }).then(r => r.json());
     mine[collection + "/" + doc.id] = res.version;
+    // Real onSnapshot fires again when a write is acknowledged, even when the
+    // document is byte for byte what the client already had. This poller only
+    // fired on a CHANGE, so a window never heard its own save come back --
+    // and the listener that mishandled that echo went unnoticed for days.
+    globalThis.__ackSeq = (globalThis.__ackSeq || 0) + 1;
   }
 
   function watch(collection, id, cb) {
     if (!shared()) return () => {};
-    let last = null, stopped = false;
+    let last = null, stopped = false, lastAck = globalThis.__ackSeq || 0;
     const tick = async () => {
       if (stopped) return;
       try {
@@ -308,7 +313,9 @@ globalThis.__store = (() => {
         const floor = globalThis.__FIXTURE.staleEchoes ? 0 : (mine[collection + "/" + id] || 0);
         if (doc && (doc.__v || 0) >= floor) {
           const now = JSON.stringify(doc);
-          if (now !== last) { last = now; cb(JSON.parse(now)); }
+          const acked = (globalThis.__ackSeq || 0) !== lastAck;
+          lastAck = globalThis.__ackSeq || 0;
+          if (now !== last || acked) { last = now; cb(JSON.parse(now)); }
         }
       } catch (e) { /* server going away at the end of a run */ }
       if (!stopped) setTimeout(tick, 150);
@@ -358,6 +365,11 @@ const exposed = [
   "mnPanelSave", "mnPanelDiscard", "mnPanelIsDirty",
   "richToMarkers", "markersToRichHtml", "attachRichEditors",
   "showHome", "showScreen", "APP_VERSION",
+  // The session screen's config listener. It runs whenever Edit Target was
+  // opened from a session, which is how it is nearly always opened, and no
+  // test had it running until it turned out to be the one calling the
+  // refresh with no guards at all.
+  "watchConfigForOpenSession",
 ];
 let shim = `
 
