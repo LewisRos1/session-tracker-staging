@@ -1,17 +1,12 @@
-// ============================================================
-// CLOUDFLARE WORKER — Anthropic API relay
+// Relay between the session tracker and the Anthropic API.
+// The API key lives in the ANTHROPIC_API_KEY secret and never reaches the browser.
 //
-// Deployed by hand at dash.cloudflare.com -> Workers & Pages ->
-// session-tracker-ai -> Edit code. This copy is here so the source can be
-// reviewed and restored; editing this file does NOT deploy anything.
-//
-// The API key lives in the ANTHROPIC_API_KEY secret and never reaches the
-// browser.
-// ============================================================
+// This file and the Worker in the Cloudflare dashboard drifted apart: the
+// dashboard had the upstream-refusal reporting below and no rate limiting at
+// all, while this file had the rate limiting and passed refusals through
+// blind. Both halves are here now. Paste this whole file into the dashboard
+// after changing it, or the two will part company again.
 
-// Both the live and staging sites are GitHub Pages projects under the same
-// origin. Add a line here if the site ever moves to a custom domain, or it
-// will start returning 403.
 const ALLOWED_ORIGINS = new Set([
   "https://lewisros1.github.io",
 ]);
@@ -19,6 +14,23 @@ const ALLOWED_ORIGINS = new Set([
 const ALLOWED_MODELS = new Set(["claude-sonnet-5"]);
 const MAX_TOKENS_CAP = 32000;
 const MAX_BODY_BYTES = 300000;   // a real half-year prompt is far below this
+
+// How many times to ask again when the API never saw the request.
+//
+// A half-year report failed with 403 twice over two days and then worked,
+// unchanged, on the same student and the same months. Not the key -- a
+// monthly report worked throughout; not the content -- the same report went
+// through later; and not Anthropic's own 403, whose documented type is
+// permission_error, where this said "forbidden" / "Request not allowed".
+// Something in front of the API was turning the relay away for a while.
+//
+// Nothing was generated, so nothing was billed, so asking again is free. A
+// person who would have seen a dead report now sees it arrive a few seconds
+// later.
+const RETRY_STATUSES = new Set([403, 500, 502, 503, 504, 529]);
+const RETRY_DELAYS_MS = [1500, 4000];
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 export default {
   async fetch(request, env) {
@@ -79,15 +91,43 @@ export default {
       messages: Array.isArray(req.messages) ? req.messages : [],
     });
 
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body,
-    });
+    const hasKey = typeof env.ANTHROPIC_API_KEY === "string" && env.ANTHROPIC_API_KEY.length > 0;
+
+    let resp, upstream = "", attempts = 0;
+    for (let attempt = 0; ; attempt++) {
+      attempts = attempt + 1;
+      resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": env.ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+        },
+        body,
+      });
+
+      if (resp.ok) break;
+
+      // Read it before deciding: the body is the only thing that says who
+      // refused, and a failed response is small.
+      upstream = await resp.text();
+
+      const canRetry = RETRY_STATUSES.has(resp.status) && attempt < RETRY_DELAYS_MS.length;
+      console.log("UPSTREAM FAIL", resp.status, "attempt=" + attempts,
+        "keyPresent=" + hasKey, "willRetry=" + canRetry, upstream.slice(0, 600));
+      if (!canRetry) break;
+      await sleep(RETRY_DELAYS_MS[attempt]);
+    }
+
+    // An upstream refusal is read and reported rather than passed through
+    // blind. Passed through, a 403 from Anthropic reaches the browser looking
+    // exactly like a 403 from this relay, and the two need different fixes.
+    if (!resp.ok) {
+      return fail(
+        `Anthropic refused this (HTTP ${resp.status}, key ${hasKey ? "present" : "MISSING"}, `
+        + `${attempts} attempt${attempts === 1 ? "" : "s"}): ${upstream.slice(0, 300)}`,
+        resp.status, cors);
+    }
 
     // Pass the body straight through instead of awaiting resp.text(). Each
     // event is forwarded the moment it arrives, so the connection is never
@@ -103,13 +143,13 @@ export default {
   }
 };
 
-function fail(message, status, cors, retryAfterSeconds) {
+function fail(message, status, cors, retryAfter) {
   return new Response(JSON.stringify({ error: { message } }), {
     status,
     headers: {
       ...cors,
       "Content-Type": "application/json",
-      ...(retryAfterSeconds ? { "Retry-After": String(retryAfterSeconds) } : {}),
+      ...(retryAfter ? { "Retry-After": String(retryAfter) } : {}),
     },
   });
 }

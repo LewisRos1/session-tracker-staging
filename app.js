@@ -224,7 +224,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2214";
+const APP_VERSION = "2215";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -4588,10 +4588,17 @@ async function aiRequest(aiPrompt, signal, meta = {}) {
     }
 
     if (!ours && fromAnthropic && resp.status === 403) {
-      // 403 from Anthropic is permission_error: the account behind the key is
-      // not allowed to make this request. Nothing about this computer, this
-      // network or this report changes it, so say so and stop the hunt.
-      throw new Error("Anthropic will not accept requests from this account (HTTP 403). It is an account setting, not your computer, your network or this report — it will do the same on every device. Lewis: check the API key’s organisation and workspace in the Anthropic Console, and whether anything there is waiting on verification or a spend limit.");
+      // A 403 here is transient, not a verdict on the account.
+      //
+      // A half-year report failed with 403 twice over two days and then
+      // worked, unchanged, on the same student and the same months. The key
+      // was never the problem -- monthly reports went through the whole
+      // time -- and nor was the content. Anthropic’s own 403 is
+      // documented as permission_error; this one said "forbidden" /
+      // "Request not allowed", so something in front of the API was turning
+      // the relay away for a while. The relay now asks again before giving
+      // up, so reaching here means several attempts were all refused.
+      throw new Error("The report service was turned away before it reached the AI (HTTP 403), on every attempt. This is not your account, your network or this report — it usually clears by itself. Wait a few minutes and try again; tell Lewis if it keeps happening.");
     }
     throw new Error(`${err.error?.message || "Request failed"} (HTTP ${resp.status}${err.error?.type ? ", " + err.error.type : ""})`);
   }
