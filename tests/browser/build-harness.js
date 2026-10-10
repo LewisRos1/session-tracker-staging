@@ -211,14 +211,16 @@ behaving.WRITE_TAB_ID = `"tab-" + Math.random().toString(36).slice(2) + "-" + Da
 
 behaving.saveStudent = `async (student) => {
   if (!student?.name?.trim()) throw new Error("Cannot save a student with a blank name.");
-  const doc = { ...(${SPLIT_FOR_WRITE})(student), lastWriteTab: WRITE_TAB_ID };
+  const doc = { ...(${SPLIT_FOR_WRITE})(student), lastWriteTab: WRITE_TAB_ID,
+    lastWriteBy: (globalThis.__auth?.user?.email || "").toLowerCase() };
   globalThis.__harness.log("saveStudent", [structuredClone(doc)]);
   globalThis.__harness.inFlight = (globalThis.__harness.inFlight || 0) + 1;
   try { await globalThis.__store.save("students", doc); }
   finally { globalThis.__harness.inFlight--; }
 }`;
 behaving.saveGroup = `async (group) => {
-  const doc = { ...(${SPLIT_FOR_WRITE})(group), lastWriteTab: WRITE_TAB_ID };
+  const doc = { ...(${SPLIT_FOR_WRITE})(group), lastWriteTab: WRITE_TAB_ID,
+    lastWriteBy: (globalThis.__auth?.user?.email || "").toLowerCase() };
   globalThis.__harness.log("saveGroup", [structuredClone(doc)]);
   globalThis.__harness.inFlight = (globalThis.__harness.inFlight || 0) + 1;
   try { await globalThis.__store.save("groups", doc); }

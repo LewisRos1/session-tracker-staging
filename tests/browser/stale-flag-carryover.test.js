@@ -78,6 +78,8 @@ try {
   // is correct, and is the whole point of the flag.
   const amy = (await store("students")).docs.find(d => d.id === "amy");
   amy.targets[0].predefinedActivities[0].title = "Greeting (changed by Ms. Daisy)";
+  amy.lastWriteBy = "daisy@example.com";
+  amy.lastWriteTab = "ms-daisys-machine";
   await store("students/amy", { method: "POST", body: JSON.stringify(amy) });
   await settle(1400);
 
@@ -144,6 +146,31 @@ try {
   r.ok("and the saved document carries one", !!stamped?.lastWriteTab,
     "the document in the store has no lastWriteTab");
 
+  // ── 5b. Lewis's own hypothesis: "maybe the somebody else is Rayhanah" ─
+  // It was. A reload, a second tab and the local cache all produce a copy
+  // carrying a tab id that is not this page load's, and every one of those
+  // read as a stranger. Her own work must never be somebody else's, however
+  // it reaches her.
+  r.section("her own change, arriving as if from another machine");
+
+  await page.eval(`window.__asked = []`);
+  await openTarget(0);
+  await page.click("#btn-mn-add-act");
+  await page.until(`document.querySelector("#mn-act-panel-overlay")`, "the panel");
+  await settle(900);
+
+  const hers = (await store("students")).docs.find(d => d.id === "amy");
+  hers.targets[0].predefinedActivities[0].title = "Greeting (saved by Rayhanah earlier)";
+  hers.lastWriteTab = "an-earlier-page-load";       // not this one
+  hers.lastWriteBy  = "rayhanah@session-tracker.app";
+  await store("students/amy", { method: "POST", body: JSON.stringify(hers) });
+  await settle(1600);
+
+  await page.eval(`window.__app.closeManageModal()`);
+  await settle(1400);
+  r.check("nothing asked about her own work", await page.eval(`(window.__asked || [])
+    .filter(m => /changed this target|Save your changes anyway/i.test(m))`), []);
+
   // ── 6. and the warning must still work when it is real ───────────────
   // Four separate guards were added to stop it mis-firing. If one of them is
   // too broad the warning never appears at all, and two people quietly
@@ -159,6 +186,9 @@ try {
   const amy2 = (await store("students")).docs.find(d => d.id === "amy");
   amy2.targets[0].predefinedActivities[0].title = "Greeting (changed again)";
   amy2.lastWriteTab = "some-other-machine";
+  // And by a different PERSON. Rayhanah's own writes are never somebody else,
+  // however they reach her, which is the whole point of the guard.
+  amy2.lastWriteBy = "daisy@example.com";
   await store("students/amy", { method: "POST", body: JSON.stringify(amy2) });
   await settle(1600);
 

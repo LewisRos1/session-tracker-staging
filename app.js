@@ -226,7 +226,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2218";
+const APP_VERSION = "2219";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -22800,7 +22800,15 @@ function mnWatchWhileEditing(entity, isGroup) {
       // 3. The target actually open is the same on both sides. A change to
       //    some OTHER target of the same person is nothing to do with this
       //    window, and the whole-record comparison used to flag it.
-      const mine = (!!fresh.lastWriteTab && fresh.lastWriteTab === WRITE_TAB_ID)
+      // Written by the person sitting here. Not this tab -- this PERSON.
+      // Lewis asked whether the somebody else might be Rayhanah herself. It
+      // was: a tab id is defeated by the cache, by a reload and by a second
+      // tab, and every one of those still reads as a stranger. A name cannot
+      // be, so this is the guard that settles it.
+      const me = (state.authEmail || "").toLowerCase();
+      const byMe = !!fresh.lastWriteBy && !!me && fresh.lastWriteBy === me;
+      const mine = byMe
+        || (!!fresh.lastWriteTab && fresh.lastWriteTab === WRITE_TAB_ID)
         || writesInFlight() > 0;
       // Both sides in the shape they are stored in, so the editor having
       // merged its proposals cannot look like a difference.
@@ -22892,6 +22900,8 @@ function mnRefreshOpenEditTarget(live, isGroup) {
     // which guard let it through.
     console.warn("Edit Target flagged stale:", {
       target: open,
+      writtenBy: live.lastWriteBy || "(none)",
+      me: (state.authEmail || "").toLowerCase(),
       stampedBy: live.lastWriteTab || "(none)",
       thisTab: WRITE_TAB_ID,
       panelOpen: !!_mnPanelOpen,

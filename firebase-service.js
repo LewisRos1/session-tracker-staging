@@ -1123,6 +1123,17 @@ export const WRITE_TAB_ID = "tab-" + Math.random().toString(36).slice(2) + "-" +
  * Counted here rather than at each call site because every screen writes the
  * whole record, and they all come through these two functions.
  */
+/**
+ * Who was signed in when a document was written.
+ *
+ * The point the stamps above kept missing. A tab id answers "did THIS page
+ * load write it", which the cache, a reload and a second tab can all defeat.
+ * This answers the question actually being asked -- "was somebody else
+ * involved" -- and when Rayhanah is the only person signed in anywhere, the
+ * answer can only be no.
+ */
+const writtenBy = () => (auth.currentUser?.email || "").toLowerCase();
+
 let _writesInFlight = 0;
 export const writesInFlight = () => _writesInFlight;
 
@@ -1133,7 +1144,8 @@ export async function saveStudent(student) {
   _writesInFlight++;
   try {
     await setDoc(doc(db, "students", student.id),
-      { ...splitPendingForWrite(student), lastWriteTab: WRITE_TAB_ID });
+      { ...splitPendingForWrite(student), lastWriteTab: WRITE_TAB_ID,
+        lastWriteBy: writtenBy() });
   } finally { _writesInFlight--; }
 }
 
@@ -1478,7 +1490,8 @@ export async function saveGroup(group) {
   _writesInFlight++;
   try {
     await setDoc(doc(db, "groups", group.id),
-      { ...splitPendingForWrite(group), lastWriteTab: WRITE_TAB_ID });
+      { ...splitPendingForWrite(group), lastWriteTab: WRITE_TAB_ID,
+        lastWriteBy: writtenBy() });
   } finally { _writesInFlight--; }
 }
 
