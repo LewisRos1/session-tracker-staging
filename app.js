@@ -226,7 +226,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2221";
+const APP_VERSION = "2222";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -15165,6 +15165,16 @@ let _grpSigningName      = "";
 let _stickyNoteSessionId      = null;
 let _stickyNoteIsGroup        = false;
 let _stickyNoteInstructorId   = null; // which instructor's corrections are shown
+/**
+ * The order the rows are in, settled when the note is opened.
+ *
+ * Whatever is waiting on the person reading goes to the top, so Ms. Daisy can
+ * work straight down the list. Settled ONCE and then kept: the note redraws on
+ * every keystroke and on every change from another device, and re-sorting
+ * there would pull a row out from under whoever was typing in it the instant
+ * they changed its status.
+ */
+let _snoteOrder = null;
 let _noteDebounce           = null;
 let _focusNewRow            = false;
 let _phase3Error            = null; // error string shown in Phase 3 node, auto-clears
@@ -15850,11 +15860,50 @@ function showWorkflowToast(msg) {
  * labelled choice, because an empty cell said nothing about whether anyone had
  * looked at the row.
  */
+/**
+ * A correction is one conversation going back and forth, not two opinions.
+ *
+ * It was a single box anyone could set to Undone, Corrected or Still Wrong,
+ * which said what had been decided but never who was holding the row. Lewis
+ * asked for a second column -- one for Ms. Daisy, one for whoever is being
+ * corrected -- and noticed himself that hers would have to drive theirs. Two
+ * boxes that always agree are one box, and two that can disagree ("approved"
+ * beside "undone") leave nobody able to say what is true. So it is one box
+ * that names whose turn it is.
+ *
+ * `turn` is who the row is waiting on. `setBy` is who is allowed to choose
+ * it: Ms. Daisy signs work off, and nobody signs off their own.
+ *
+ * The STORED values are untouched. "", "fixed" and "rejected" already exist
+ * in Firestore and renaming them would strand every correction ever written.
+ * "fixed" in particular still means finished -- every phase in the workflow
+ * asks whether a row is "fixed" -- so a session completed last month stays
+ * completed and Phase 3 does not reopen behind anybody. The new middle state
+ * needed a new value of its own, and that is "done": the work is done, the
+ * checking is not.
+ */
 const CORRECTION_STATUSES = [
-  { value: "",         label: "Undone",      cls: "snote-status--empty"    },
-  { value: "fixed",    label: "Corrected",   cls: "snote-status--fixed"    },
-  { value: "rejected", label: "Still Wrong", cls: "snote-status--rejected" },
+  { value: "",         label: "Needs fixing",          turn: "them",  setBy: "them",  cls: "snote-status--empty"    },
+  { value: "rejected", label: "Still wrong — fix again", turn: "them",  setBy: "daisy", cls: "snote-status--rejected" },
+  { value: "done",     label: "Fixed — check it",       turn: "daisy", setBy: "them",  cls: "snote-status--waiting"  },
+  { value: "fixed",    label: "Approved",              turn: null,    setBy: "daisy", cls: "snote-status--fixed"    },
 ];
+
+/** The row for a stored value, falling back to the first (Needs fixing). */
+const correctionState = v =>
+  CORRECTION_STATUSES.find(o => o.value === (v || "")) || CORRECTION_STATUSES[0];
+
+/**
+ * Is the person signed in Ms. Daisy, for the purpose of signing work off?
+ *
+ * Lewis counts too. He is the one who has to put things right when the app
+ * gets it wrong, and locking him out of a dropdown helps nobody. Anyone the
+ * app does not recognise gets the cautious half.
+ */
+const canSignOffCorrections = () => ["daisy", "lewis"].includes(currentUser()?.id);
+
+/** Whose turn a row is on: "them", "daisy", or null when it is finished. */
+const correctionTurn = c => correctionState(getCmtStatus(c)).turn;
 
 // Returns null | "fixed" | "rejected" for a correction entry.
 function getCmtStatus(c) {
@@ -16219,9 +16268,17 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
           // clears a row. An empty list and a fully corrected one both read
           // "0 left"; the green says which kind of nothing it is.
           const left = idComments.filter(([, c]) => getCmtStatus(c) !== "fixed").length;
+          // The number is what is waiting on the person reading it, so Ms.
+          // Daisy does not have to open the note to find out she is holding
+          // something. The colour still answers the other question -- whether
+          // the list is finished AT ALL -- so "0 to check" can sit on red
+          // while the fixing is still going on.
+          const mine = canSignOffCorrections() ? "daisy" : "them";
+          const yours = idComments.filter(([, c]) => correctionTurn(c) === mine).length;
+          const word  = mine === "daisy" ? "to check" : "to fix";
           const colorCls = left === 0 ? " wf-note-btn--green" : " wf-note-btn--red";
           return `<button class="wf-note-btn${colorCls}" data-action="open-note" data-inst-id="${escHtml(id)}">
-            📝 List of Corrections – ${escHtml(name)} (${left} left)
+            📝 List of Corrections – ${escHtml(name)} (${left === 0 ? "all approved" : `${yours} ${word}`})
           </button>`;
         }).join("")}
   </div>`;
@@ -16527,9 +16584,34 @@ function renderStickyNoteContent(data, isGroup) {
 
   const ws  = getWorkflowState(data);
   // Filter comments to the open instructor
-  const visible = _stickyNoteInstructorId
+  let visible = _stickyNoteInstructorId
     ? ws.commentsFor(_stickyNoteInstructorId)
     : ws.comments;
+
+  // Yours first, then anything still going, then what is finished. Worked out
+  // once per opening and remembered, so the list cannot reshuffle mid-edit.
+  const mine = canSignOffCorrections() ? "daisy" : "them";
+  if (!_snoteOrder) {
+    const rank = ([, c]) => {
+      const turn = correctionTurn(c);
+      if (turn === mine) return 0;
+      if (turn === null) return 2;     // approved, nothing left to do
+      return 1;                        // waiting on the other person
+    };
+    _snoteOrder = visible
+      .map((row, i) => ({ row, i }))
+      .sort((a, b) => rank(a.row) - rank(b.row) || a.i - b.i)
+      .map(({ row }) => row[0]);
+  }
+  {
+    const at = new Map(_snoteOrder.map((id, i) => [id, i]));
+    // A row added since the note opened has no place yet, so it goes last.
+    visible = visible
+      .map((row, i) => ({ row, i }))
+      .sort((a, b) => (at.has(a.row[0]) ? at.get(a.row[0]) : 1e9 + a.i)
+                    - (at.has(b.row[0]) ? at.get(b.row[0]) : 1e9 + b.i))
+      .map(({ row }) => row);
+  }
 
   // Preserve scroll position
   const scrollEl    = tbody.closest(".snote-list-scroll");
@@ -16547,14 +16629,34 @@ function renderStickyNoteContent(data, isGroup) {
     tbody.innerHTML = visible.map(([id, c], i) => {
       const text = (focusedCmtId === id && liveText !== null) ? liveText : (c.text || "");
       const st = getCmtStatus(c) || "";
-      const stCls = (CORRECTION_STATUSES.find(o => o.value === st) || CORRECTION_STATUSES[0]).cls;
-      const rowCls = st === "fixed" ? " snote-row--done" : st === "rejected" ? " snote-row--rejected" : "";
-      const opts = CORRECTION_STATUSES.map(o =>
-        `<option value="${o.value}"${o.value === st ? " selected" : ""}>${escHtml(o.label)}</option>`).join("");
+      const state = correctionState(st);
+      const stCls = state.cls;
+      const rowCls = st === "fixed" ? " snote-row--done"
+        : st === "rejected" ? " snote-row--rejected"
+        : st === "done" ? " snote-row--waiting" : "";
+      // Only the half of the list this person is allowed to choose, plus
+      // whatever the row says now so the box still reads correctly. Nobody
+      // signs off their own work: that is the whole point of the Ms. Daisy
+      // step, and a dropdown that offers Approved to the person who did the
+      // fixing offers them a way round it.
+      const mayPick = canSignOffCorrections() ? "daisy" : "them";
+      const opts = CORRECTION_STATUSES
+        .filter(o => o.setBy === mayPick || o.value === st)
+        .map(o => `<option value="${o.value}"${o.value === st ? " selected" : ""}>${escHtml(o.label)}</option>`)
+        .join("");
+      // Who is holding it, in words, for the person reading.
+      const yours = state.turn === (canSignOffCorrections() ? "daisy" : "them");
+      const whose = state.turn === null ? "done"
+        : yours ? "→ you"
+        : state.turn === "daisy" ? "→ Ms. Daisy"
+        : "→ " + escHtml(instructorName(_stickyNoteInstructorId) || "them");
       return `<tr class="snote-row${rowCls}">
         <td class="snote-no">${i + 1}</td>
         <td class="snote-text"><textarea class="snote-textarea" data-cmt-id="${id}" rows="1" placeholder="Type here…">${escHtml(text)}</textarea></td>
-        <td class="snote-tick"><select class="snote-status-sel ${stCls}" data-cmt-id="${id}">${opts}</select></td>
+        <td class="snote-tick">
+          <select class="snote-status-sel ${stCls}" data-cmt-id="${id}">${opts}</select>
+          <span class="snote-turn${yours ? " snote-turn--yours" : ""}">${whose}</span>
+        </td>
         <td class="snote-del"><button class="snote-del-btn" data-cmt-id="${id}" title="Delete row">🗑</button></td>
       </tr>`;
     }).join("");
@@ -16588,6 +16690,7 @@ function openStickyNote(sessionId, isGroup, data, instructorId = null) {
   _stickyNoteSessionId    = sessionId;
   _stickyNoteIsGroup      = !!isGroup;
   _stickyNoteInstructorId = instructorId || null;
+  _snoteOrder = null;      // settle the order again for this opening
   const el = document.getElementById("sticky-note");
   if (!el) return;
   el.style.width   = "";
