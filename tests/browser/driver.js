@@ -204,9 +204,14 @@ export async function openPage(dir, { verbose = false, site: shared = null } = {
       // everyone out once when the stored epoch does not match, which on a
       // fresh browser profile is always -- that would land every test on the
       // sign-in screen. The values come from app.js via the build.
+      //
+      // The epoch is worked out here rather than copied, because it contains
+      // the current week: everyone signs in again each Monday, and a test run
+      // on a Monday would otherwise be seeding last week's value.
       const seed = `
         try {
-          localStorage.setItem(${JSON.stringify(meta.sessionEpochKey)}, ${JSON.stringify(meta.sessionEpoch)});
+          localStorage.setItem(${JSON.stringify(meta.sessionEpochKey)},
+            (() => { ${meta.weekStartStampSrc}; return ${meta.sessionEpochExpr}; })());
           localStorage.setItem(${JSON.stringify(meta.lastLoginKey)}, "1");
         } catch (e) { /* storage blocked; the test will say so */ }`;
       await send("Page.addScriptToEvaluateOnNewDocument", {

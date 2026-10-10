@@ -226,7 +226,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2220";
+const APP_VERSION = "2221";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -2277,7 +2277,41 @@ document.addEventListener("DOMContentLoaded", async () => {
  * Change the string to do it again. Each browser clears itself once and
  * remembers that it has, so it is a single sign-out and not a loop.
  */
-const SESSION_EPOCH = "2026-10-08-named-accounts";
+/**
+ * The Monday of the week we are in, as YYYY-MM-DD.
+ *
+ * Monday starts the week, so Sunday belongs to the week just gone rather
+ * than the one about to start. getDay() calls Sunday 0, hence the shift.
+ *
+ * Read from the device clock, so everyone rolls over at their own midnight.
+ * The whole team is in one place, so that is the same midnight for all of
+ * them, and a laptop with the wrong date only signs its own user out.
+ */
+function weekStartStamp(now = new Date()) {
+  const d = new Date(now);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  const two = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`;
+}
+
+/**
+ * Everyone signs in again at the start of each week.
+ *
+ * Lewis asked for this so that nobody forgets their own password: a session
+ * that never ends is a password never typed, and the first time it is needed
+ * is the worst time to find out it has been forgotten.
+ *
+ * The week is part of the string, so it changes by itself every Monday and
+ * each browser signs itself out once when it next opens. Nobody is working
+ * at midnight, and a sign-out mid-screen would be a far worse thing to do
+ * than wait, so this only happens on opening the app.
+ *
+ * The named-accounts part stays in front: a browser that has still not been
+ * signed out for that change gets it now, and keeping it documents what the
+ * string is for. Add another piece to force an extra sign-out at any time.
+ */
+const SESSION_EPOCH = "2026-10-08-named-accounts|week-" + weekStartStamp();
 const SESSION_EPOCH_KEY = "sessionEpoch";
 const sessionEpochStale = () => localStorage.getItem(SESSION_EPOCH_KEY) !== SESSION_EPOCH;
 const markSessionEpoch  = () => localStorage.setItem(SESSION_EPOCH_KEY, SESSION_EPOCH);

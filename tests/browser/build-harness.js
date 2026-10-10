@@ -392,7 +392,22 @@ const pick = (re, what) => {
 };
 await Deno.writeTextFile(`${out}/harness-meta.json`, JSON.stringify({
   appVersion:     pick(/const APP_VERSION\s*=\s*"([^"]+)"/, "APP_VERSION"),
-  sessionEpoch:    pick(/const SESSION_EPOCH\s*=\s*"([^"]+)"/, "SESSION_EPOCH"),
+  // Not a plain string any more: it carries the current week, so that
+  // everyone signs in again each Monday. Taken as the expression it is,
+  // together with the function it calls, and worked out in the page -- a
+  // regex for a quoted literal silently stopped matching the day the weekly
+  // sign-out landed, and every browser test went to the sign-in screen.
+  sessionEpochExpr: pick(/const SESSION_EPOCH\s*=\s*([^;]+);/, "SESSION_EPOCH"),
+  weekStartStampSrc: (() => {
+    const at = appSrc.indexOf("function weekStartStamp(");
+    if (at < 0) throw new Error("could not find weekStartStamp in app.js");
+    let i = appSrc.indexOf("{", at), depth = 0;
+    for (; i < appSrc.length; i++) {
+      if (appSrc[i] === "{") depth++;
+      else if (appSrc[i] === "}") { depth--; if (depth === 0) return appSrc.slice(at, i + 1); }
+    }
+    throw new Error("weekStartStamp has no end");
+  })(),
   sessionEpochKey: pick(/const SESSION_EPOCH_KEY\s*=\s*"([^"]+)"/, "SESSION_EPOCH_KEY"),
   lastLoginKey:    pick(/const LAST_LOGIN_DATE_KEY\s*=\s*"([^"]+)"/, "LAST_LOGIN_DATE_KEY"),
 }, null, 2));
