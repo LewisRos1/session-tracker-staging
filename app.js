@@ -224,7 +224,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2212";
+const APP_VERSION = "2214";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -4574,8 +4574,24 @@ async function aiRequest(aiPrompt, signal, meta = {}) {
       + "\n  body:         " + (raw.slice(0, 400) || "(empty)")
     );
 
-    if (!ours && (mitigated || resp.status === 403)) {
+    // Anthropic answering IS the answer.
+    //
+    // Every 403 used to be reported as a Cloudflare block, which sent Lewis
+    // off trying other networks and other browsers while the body in front
+    // of him said, in Anthropic's own words, that the account was not
+    // allowed to make the request. A reply carrying Anthropic's error shape
+    // reached Anthropic, whatever its status.
+    const fromAnthropic = !!err.error?.type;
+
+    if (!ours && !fromAnthropic && (mitigated || resp.status === 403)) {
       throw new Error(`Blocked before the request reached the report service (HTTP ${resp.status}${mitigated ? ", " + mitigated : ""}). Cloudflare decides this from the network and the browser, not from the report, which is why the same report can fail on one computer and work on another. Try a different network or another browser, and send Lewis the red line in the console (F12).`);
+    }
+
+    if (!ours && fromAnthropic && resp.status === 403) {
+      // 403 from Anthropic is permission_error: the account behind the key is
+      // not allowed to make this request. Nothing about this computer, this
+      // network or this report changes it, so say so and stop the hunt.
+      throw new Error("Anthropic will not accept requests from this account (HTTP 403). It is an account setting, not your computer, your network or this report — it will do the same on every device. Lewis: check the API key’s organisation and workspace in the Anthropic Console, and whether anything there is waiting on verification or a spend limit.");
     }
     throw new Error(`${err.error?.message || "Request failed"} (HTTP ${resp.status}${err.error?.type ? ", " + err.error.type : ""})`);
   }
@@ -24876,7 +24892,7 @@ function renderTargetManageContent(student, target) {
               ${hasData
                 ? `<p style="font-size:.84rem;margin:0 0 .4rem;color:#374151">This activity contains data from ${affected} session${affected !== 1 ? "s" : ""}. Deleting it will permanently remove all associated data.</p>
                    ${sessionDateList}
-                   <p style="font-size:.84rem;margin:0 0 .6rem;color:#374151">${_delSubs.length ? `Instead of deleting this parent activity with all its subactivities. ` : ``}We recommend selecting <strong>&quot;Mark as Discontinued&quot;</strong> instead. This will remove the activity from future sessions while keeping your past data intact.</p>
+                   <p style="font-size:.84rem;margin:0 0 .6rem;color:#374151">${_delSubs.length ? `Instead of deleting this parent activity and all its sub-activities, we recommend selecting <strong>&quot;Mark as Discontinued&quot;</strong>.` : `We recommend selecting <strong>&quot;Mark as Discontinued&quot;</strong> instead.`} This will remove the activity from future sessions while keeping your past data intact.</p>
                    <p style="font-size:.84rem;margin:0 0 .35rem;color:#374151">However, if you still wish to confirm deletion, type: <strong>${confirmWord}</strong></p>
                    <input id="del-type-input" type="text" autocomplete="off" inputmode="numeric"
                      style="width:100%;box-sizing:border-box;padding:.45rem .6rem;border:2px solid #d1d5db;border-radius:.4rem;font-size:1.1rem;text-align:center;outline:none;margin-bottom:.6rem" placeholder="${confirmWord}">`
