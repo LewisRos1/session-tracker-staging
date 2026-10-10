@@ -224,7 +224,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2215";
+const APP_VERSION = "2216";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -22735,6 +22735,20 @@ function subActivitiesOf(pa, acts) {
  * on a copy nothing could ever refresh. This one belongs to the window, so
  * it is there however the window was opened, and goes when it closes.
  */
+/**
+ * JSON with the keys in a fixed order.
+ *
+ * Two objects holding the same thing compare equal whatever order they were
+ * built in, which plain JSON.stringify cannot promise once a value has been
+ * round-tripped through the database.
+ */
+function stableJson(v) {
+  if (v === null || typeof v !== "object") return JSON.stringify(v) ?? "null";
+  if (Array.isArray(v)) return "[" + v.map(stableJson).join(",") + "]";
+  return "{" + Object.keys(v).sort()
+    .map(k => JSON.stringify(k) + ":" + stableJson(v[k])).join(",") + "}";
+}
+
 function mnWatchWhileEditing(entity, isGroup) {
   mnStopWatchingWhileEditing();
   if (!entity?.id) return;
@@ -22742,12 +22756,27 @@ function mnWatchWhileEditing(entity, isGroup) {
   try {
     _mnConfigUnsub = listen(entity.id, fresh => {
       if (!fresh || fresh.id !== entity.id) return;
+
+      // Our own save coming back is not somebody else's change.
+      //
+      // Every write from this screen updates the object in state before it
+      // goes out, so when the listener hears that same write the two already
+      // match. Without this check the window flagged ITSELF: add an activity,
+      // press Discard Changes, and it asked whether to resend for approval --
+      // with nobody else involved and nothing ever approved.
+      //
+      // Compared on the targets alone. The rest of the document carries
+      // fields the server adds or reorders, and a whole-document comparison
+      // would differ every time and flag every save.
+      const unchanged = stableJson(fresh.targets) === stableJson(entity.targets);
+
       // Into the object the rest of the app already holds, not over it:
       // handlers everywhere close over this one.
       Object.assign(entity, fresh);
       const list = isGroup ? (state.groups || []) : (state.students || []);
       const i = list.findIndex(x => x.id === fresh.id);
       if (i >= 0) list[i] = entity;
+      if (unchanged) return;
       if ($("manage-modal")?.classList.contains("hidden")) return;
       mnRefreshOpenEditTarget(entity, isGroup);
     });

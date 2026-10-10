@@ -45,6 +45,9 @@ results.push(await run("Group targets: editing and saving, in a real browser",
 results.push(await run("Parent activities and their sub-activities, in a real browser",
   ["run", "-A", "tests/browser/parent-sub-lifecycle.test.js", HARNESS]));
 
+results.push(await run("A window must not flag its own save",
+  ["run", "-A", "tests/browser/own-save-echo.test.js", HARNESS]));
+
 results.push(await run("What an assistant may and may not touch",
   ["run", "-A", "tests/browser/assistant-readonly.test.js", HARNESS]));
 
