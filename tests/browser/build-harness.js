@@ -204,18 +204,25 @@ const SPLIT_FOR_WRITE = `(entity) => {
 
 // A value, not a recorder. New on every page load, exactly as the real one is,
 // so two browsers in one test count as two people.
+// A real counter, not a recorder: the app compares it against zero.
+behaving.writesInFlight = `() => globalThis.__harness.inFlight || 0`;
+
 behaving.WRITE_TAB_ID = `"tab-" + Math.random().toString(36).slice(2) + "-" + Date.now()`;
 
 behaving.saveStudent = `async (student) => {
   if (!student?.name?.trim()) throw new Error("Cannot save a student with a blank name.");
   const doc = { ...(${SPLIT_FOR_WRITE})(student), lastWriteTab: WRITE_TAB_ID };
   globalThis.__harness.log("saveStudent", [structuredClone(doc)]);
-  await globalThis.__store.save("students", doc);
+  globalThis.__harness.inFlight = (globalThis.__harness.inFlight || 0) + 1;
+  try { await globalThis.__store.save("students", doc); }
+  finally { globalThis.__harness.inFlight--; }
 }`;
 behaving.saveGroup = `async (group) => {
   const doc = { ...(${SPLIT_FOR_WRITE})(group), lastWriteTab: WRITE_TAB_ID };
   globalThis.__harness.log("saveGroup", [structuredClone(doc)]);
-  await globalThis.__store.save("groups", doc);
+  globalThis.__harness.inFlight = (globalThis.__harness.inFlight || 0) + 1;
+  try { await globalThis.__store.save("groups", doc); }
+  finally { globalThis.__harness.inFlight--; }
 }`;
 
 // The login domain decides the role, so it is read from the app rather than
@@ -290,7 +297,13 @@ globalThis.__store = (() => {
         const res = await fetch("/__store/" + collection).then(r => r.json());
         const doc = res.docs.find(d => d.id === id);
         // Never hand back a copy older than this browser's own last write.
-        const floor = mine[collection + "/" + id] || 0;
+        //
+        // Real Firestore makes no such promise. onSnapshot serves the local
+        // cache first, so a window CAN be handed a copy older than the one it
+        // is already holding -- which is how Edit Target came to call its own
+        // work somebody else's change. A fixture sets staleEchoes to drop the
+        // floor and model that.
+        const floor = globalThis.__FIXTURE.staleEchoes ? 0 : (mine[collection + "/" + id] || 0);
         if (doc && (doc.__v || 0) >= floor) {
           const now = JSON.stringify(doc);
           if (now !== last) { last = now; cb(JSON.parse(now)); }

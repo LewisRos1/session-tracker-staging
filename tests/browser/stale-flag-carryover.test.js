@@ -144,6 +144,31 @@ try {
   r.ok("and the saved document carries one", !!stamped?.lastWriteTab,
     "the document in the store has no lastWriteTab");
 
+  // ── 6. and the warning must still work when it is real ───────────────
+  // Four separate guards were added to stop it mis-firing. If one of them is
+  // too broad the warning never appears at all, and two people quietly
+  // overwrite each other again -- which is what it is there to prevent.
+  r.section("the warning still appears when somebody else really did change it");
+
+  await page.eval(`window.__asked = []`);
+  await openTarget(0);
+  await page.click("#btn-mn-add-act");
+  await page.until(`document.querySelector("#mn-act-panel-overlay")`, "the panel again");
+  await settle(900);
+
+  const amy2 = (await store("students")).docs.find(d => d.id === "amy");
+  amy2.targets[0].predefinedActivities[0].title = "Greeting (changed again)";
+  amy2.lastWriteTab = "some-other-machine";
+  await store("students/amy", { method: "POST", body: JSON.stringify(amy2) });
+  await settle(1600);
+
+  await page.eval(`window.__app.closeManageModal()`);
+  await settle(1400);
+  const warned = await page.eval(`(window.__asked || [])
+    .filter(m => /changed this target|Save your changes anyway/i.test(m))`);
+  r.ok("it warned", warned.length === 1,
+    `expected one warning, got ${JSON.stringify(warned)}`);
+
   r.section("console");
   const noise = page.consoleLines.filter(l => l.level === "error");
   r.ok("no console errors", noise.length === 0,

@@ -91,6 +91,7 @@ import {
   listenToReviewQueue,
   listenToStudent,
   WRITE_TAB_ID,
+  writesInFlight,
   getEditLock,
   setEditLock,
   clearEditLock,
@@ -225,7 +226,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2217";
+const APP_VERSION = "2218";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -22788,13 +22789,28 @@ function mnWatchWhileEditing(entity, isGroup) {
       // Compared on the targets alone. The rest of the document carries
       // fields the server adds or reorders, and a whole-document comparison
       // would differ every time and flag every save.
-      // The stamp settles it: this document came back from our own save.
-      // What reaches the database is not what state holds -- the write
-      // rebuilds a merged target on the way out -- so comparing the two
-      // never matched and the window flagged itself. The comparison is
-      // kept only for a document written before stamping existed.
-      const mine = !!fresh.lastWriteTab && fresh.lastWriteTab === WRITE_TAB_ID;
-      const unchanged = mine || stableJson(fresh.targets) === stableJson(entity.targets);
+      // Three ways to know this is not somebody else, any one of which is
+      // enough. Warning when nobody else was involved is far worse than
+      // staying quiet: only one person can be in a target at a time now, so
+      // there is little left for the warning to catch anyway.
+      //
+      // 1. Stamped by this tab. Every save carries one.
+      // 2. This tab has a save in the air. The copy that arrives first is
+      //    the one from before it, older than what this window holds.
+      // 3. The target actually open is the same on both sides. A change to
+      //    some OTHER target of the same person is nothing to do with this
+      //    window, and the whole-record comparison used to flag it.
+      const mine = (!!fresh.lastWriteTab && fresh.lastWriteTab === WRITE_TAB_ID)
+        || writesInFlight() > 0;
+      // Both sides in the shape they are stored in, so the editor having
+      // merged its proposals cannot look like a difference.
+      const stored = t => (t ? stableJson(splitPendingTarget(t)) : "");
+      const openName = _mnOpenTargetName;
+      const sameOpenTarget = openName
+        ? stored((fresh.targets  || []).find(t => t.name === openName))
+          === stored((entity.targets || []).find(t => t.name === openName))
+        : stableJson(fresh.targets) === stableJson(entity.targets);
+      const unchanged = mine || sameOpenTarget;
 
       // Into the object the rest of the app already holds, not over it:
       // handlers everywhere close over this one.
@@ -22872,6 +22888,15 @@ function mnRefreshOpenEditTarget(live, isGroup) {
   if (!fresh) return;                                  // target itself has gone
 
   if (mnEditTargetHasUnsavedWork()) {
+    // If this ever fires when nobody else was involved, the console says
+    // which guard let it through.
+    console.warn("Edit Target flagged stale:", {
+      target: open,
+      stampedBy: live.lastWriteTab || "(none)",
+      thisTab: WRITE_TAB_ID,
+      panelOpen: !!_mnPanelOpen,
+      saveWanted: _mnPanelSaveWanted,
+    });
     // Keep what we could not show yet, so saying "no" to the warning can
     // put the newer version on screen instead of leaving a stale one there.
     _mnEditTargetStale = true;

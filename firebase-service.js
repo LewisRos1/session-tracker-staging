@@ -1111,12 +1111,30 @@ function splitPendingForWrite(entity) {
  */
 export const WRITE_TAB_ID = "tab-" + Math.random().toString(36).slice(2) + "-" + Date.now();
 
+/**
+ * How many saves this tab has in the air right now.
+ *
+ * The stamp alone is not enough. onSnapshot serves the local cache first, so
+ * while a save is on its way a window can be handed the copy from BEFORE it
+ * -- older than what it is already holding, and carrying whatever stamp was
+ * on it last time. Edit Target read that as somebody else and asked Lewis
+ * about an activity he had just typed himself.
+ *
+ * Counted here rather than at each call site because every screen writes the
+ * whole record, and they all come through these two functions.
+ */
+let _writesInFlight = 0;
+export const writesInFlight = () => _writesInFlight;
+
 export async function saveStudent(student) {
   if (!student.name || !student.name.trim()) {
     throw new Error("Cannot save a student with a blank name.");
   }
-  await setDoc(doc(db, "students", student.id),
-    { ...splitPendingForWrite(student), lastWriteTab: WRITE_TAB_ID });
+  _writesInFlight++;
+  try {
+    await setDoc(doc(db, "students", student.id),
+      { ...splitPendingForWrite(student), lastWriteTab: WRITE_TAB_ID });
+  } finally { _writesInFlight--; }
 }
 
 /** Delete a student config document. */
@@ -1457,8 +1475,11 @@ export async function loadGroups() {
 }
 
 export async function saveGroup(group) {
-  await setDoc(doc(db, "groups", group.id),
-    { ...splitPendingForWrite(group), lastWriteTab: WRITE_TAB_ID });
+  _writesInFlight++;
+  try {
+    await setDoc(doc(db, "groups", group.id),
+      { ...splitPendingForWrite(group), lastWriteTab: WRITE_TAB_ID });
+  } finally { _writesInFlight--; }
 }
 
 export async function deleteGroup(groupId) {
