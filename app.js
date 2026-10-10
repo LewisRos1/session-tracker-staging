@@ -90,6 +90,7 @@ import {
   updateCommentAssignment,
   listenToReviewQueue,
   listenToStudent,
+  WRITE_TAB_ID,
   getEditLock,
   setEditLock,
   clearEditLock,
@@ -224,7 +225,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2216";
+const APP_VERSION = "2217";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -20715,7 +20716,15 @@ function openManageModal(student, targetOrNull, templateOrNull = null, remarkPre
   _mnSweepOnOpen = true;
   // Watch for changes made elsewhere for as long as this window is open.
   if (targetOrNull && !templateOrNull && !remarkPresetOrNull) mnWatchWhileEditing(student, false);
-  mnDetachPanel(true); _mnPanelHold = false; _mnPanelSnapshot = null;   // never inherit a panel from the last target
+  // never inherit a panel from the last target
+  //
+  // _mnPanelSaveWanted was missed here. It is what tells the window it
+  // has work that has not been written, and a window that was left by the
+  // back arrow rather than by Done carried it into the NEXT window --
+  // which then treated the very first copy the database handed it as
+  // somebody else's change.
+  mnDetachPanel(true); _mnPanelHold = false; _mnPanelSnapshot = null;
+  _mnPanelSaveWanted = false;
   $("manage-modal").classList.remove("hidden");
   if (remarkPresetOrNull) {
     renderRemarkPresetManageContent(remarkPresetOrNull);
@@ -22751,6 +22760,17 @@ function stableJson(v) {
 
 function mnWatchWhileEditing(entity, isGroup) {
   mnStopWatchingWhileEditing();
+  // This window has seen nothing yet.
+  //
+  // These outlive any one window, and nothing used to clear them. A flag
+  // set in an earlier window -- by somebody really changing something --
+  // sat there through the close, and the next window to be opened asked
+  // about it: over a different student, a different target, a brand new
+  // activity nobody had ever been asked to approve. _mnStaleFrom was
+  // worse: declining would have drawn that other student's target into
+  // this window.
+  _mnEditTargetStale = false;
+  _mnStaleFrom = null;
   if (!entity?.id) return;
   const listen = isGroup ? listenToGroup : listenToStudent;
   try {
@@ -22768,7 +22788,13 @@ function mnWatchWhileEditing(entity, isGroup) {
       // Compared on the targets alone. The rest of the document carries
       // fields the server adds or reorders, and a whole-document comparison
       // would differ every time and flag every save.
-      const unchanged = stableJson(fresh.targets) === stableJson(entity.targets);
+      // The stamp settles it: this document came back from our own save.
+      // What reaches the database is not what state holds -- the write
+      // rebuilds a merged target on the way out -- so comparing the two
+      // never matched and the window flagged itself. The comparison is
+      // kept only for a document written before stamping existed.
+      const mine = !!fresh.lastWriteTab && fresh.lastWriteTab === WRITE_TAB_ID;
+      const unchanged = mine || stableJson(fresh.targets) === stableJson(entity.targets);
 
       // Into the object the rest of the app already holds, not over it:
       // handlers everywhere close over this one.
@@ -22784,6 +22810,9 @@ function mnWatchWhileEditing(entity, isGroup) {
 }
 
 function mnStopWatchingWhileEditing() {
+  // Nothing to carry out of a window that is closing.
+  _mnEditTargetStale = false;
+  _mnStaleFrom = null;
   if (typeof _mnConfigUnsub === "function") {
     try { _mnConfigUnsub(); } catch { /* already gone */ }
   }
@@ -22881,8 +22910,8 @@ function mnWarnIfStale() {
   _mnStaleFrom = null;
 
   if (confirm(
-    "Ms. Daisy has approved the previous version.\n\n" +
-    "Do you want to resend Approval with the new changes?"
+    "Somebody else changed this target while you had it open.\n\n" +
+    "Save your changes anyway?"
   )) return true;
 
   // No: nothing from this drawing of the screen is written, now or later.
@@ -30409,7 +30438,15 @@ function openGroupManageModal(group, target = null, scrollToPaId = null, _lockHe
   // Opening the screen is when blank rows left behind by a closed tab go.
   _mnSweepOnOpen = true;
   if (target) mnWatchWhileEditing(group, true);
-  mnDetachPanel(true); _mnPanelHold = false; _mnPanelSnapshot = null;   // never inherit a panel from the last target
+  // never inherit a panel from the last target
+  //
+  // _mnPanelSaveWanted was missed here. It is what tells the window it
+  // has work that has not been written, and a window that was left by the
+  // back arrow rather than by Done carried it into the NEXT window --
+  // which then treated the very first copy the database handed it as
+  // somebody else's change.
+  mnDetachPanel(true); _mnPanelHold = false; _mnPanelSnapshot = null;
+  _mnPanelSaveWanted = false;
   $("manage-modal").classList.remove("hidden");
   if (target) {
     _groupForTargetEdit = group;

@@ -5,10 +5,11 @@
 // back through that same watch. Without telling the two apart, the window
 // flagged ITSELF: add anything, press Discard Changes, and it asked
 //
-//   Ms. Daisy has approved the previous version.
-//   Do you want to resend Approval with the new changes?
+//   Somebody else changed this target while you had it open.
+//   Save your changes anyway?
 //
-// with nobody else involved and nothing ever approved.
+// with nobody else involved. It used to name Ms. Daisy and claim an approval,
+// which it knew nothing about -- see stale-flag-carryover.test.js.
 //
 // All four "+ Add" buttons go the same way, so all four are checked.
 //
@@ -90,7 +91,8 @@ async function typeSomething(text) {
 }
 
 const falseApproval = () => page.eval(`
-  (window.__asked || []).filter(m => /resend Approval/i.test(m))`);
+  (window.__asked || []).filter(m =>
+    /resend Approval|changed this target|Save your changes anyway/i.test(m))`);
 
 const BUTTONS = [
   ["+ Add Activity",                        "btn-mn-add-act"],

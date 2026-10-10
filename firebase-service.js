@@ -1094,11 +1094,29 @@ function splitPendingForWrite(entity) {
   return changed ? { ...entity, targets: out } : entity;
 }
 
+/**
+ * Which tab wrote a document, so a listener can tell its own save from
+ * somebody else's change.
+ *
+ * Edit Target used to compare the copy that came back against the copy it
+ * was holding, and treat a difference as somebody else's work. It never
+ * matched: splitPendingForWrite rebuilds a merged target on the way out, so
+ * what reaches the database is not what state holds, and the window flagged
+ * ITSELF -- "Ms. Daisy has approved the previous version" over a brand new
+ * activity that had never been sent to anybody.
+ *
+ * A stamp cannot be fooled by that, nor by anything the database normalises
+ * on the way through. New on every page load, so two tabs of the same
+ * browser still count as two people -- which they are.
+ */
+export const WRITE_TAB_ID = "tab-" + Math.random().toString(36).slice(2) + "-" + Date.now();
+
 export async function saveStudent(student) {
   if (!student.name || !student.name.trim()) {
     throw new Error("Cannot save a student with a blank name.");
   }
-  await setDoc(doc(db, "students", student.id), splitPendingForWrite(student));
+  await setDoc(doc(db, "students", student.id),
+    { ...splitPendingForWrite(student), lastWriteTab: WRITE_TAB_ID });
 }
 
 /** Delete a student config document. */
@@ -1439,7 +1457,8 @@ export async function loadGroups() {
 }
 
 export async function saveGroup(group) {
-  await setDoc(doc(db, "groups", group.id), splitPendingForWrite(group));
+  await setDoc(doc(db, "groups", group.id),
+    { ...splitPendingForWrite(group), lastWriteTab: WRITE_TAB_ID });
 }
 
 export async function deleteGroup(groupId) {

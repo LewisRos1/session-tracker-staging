@@ -175,14 +175,47 @@ const behaving = {
 //
 // It takes the whole student object, not (id, data) -- the real one reads
 // student.id itself and refuses a blank name, so that refusal is kept here.
+// What the real service writes is NOT what state holds: splitPendingForWrite
+// rebuilds every merged target on the way out, moving proposals back into
+// pendingActivities. A stub that stored the object verbatim made the harness
+// disagree with the real app, and hid a bug that bit Lewis in the real app --
+// Edit Target comparing the copy that came back against the copy it held,
+// never matching, and flagging its own save as somebody else's change. So the
+// stub does the same split, and stamps the write the same way.
+const SPLIT_FOR_WRITE = `(entity) => {
+  const targets = entity?.targets;
+  if (!Array.isArray(targets)) return entity;
+  let changed = false;
+  const out = targets.map(t => {
+    const acts = t?.predefinedActivities;
+    if (!t?._pendingMerged && !(Array.isArray(acts) && acts.some(a => a?._pending))) return t;
+    changed = true;
+    const live = [], pend = [];
+    (acts || []).forEach((a, i) => {
+      if (!a?._pending) { live.push(a); return; }
+      const { _pending, ...rest } = a;
+      pend.push({ ...rest, pendingAtIdx: i });
+    });
+    const { _pendingMerged, ...tRest } = t;
+    return { ...tRest, predefinedActivities: live, pendingActivities: pend };
+  });
+  return changed ? { ...entity, targets: out } : entity;
+}`;
+
+// A value, not a recorder. New on every page load, exactly as the real one is,
+// so two browsers in one test count as two people.
+behaving.WRITE_TAB_ID = `"tab-" + Math.random().toString(36).slice(2) + "-" + Date.now()`;
+
 behaving.saveStudent = `async (student) => {
   if (!student?.name?.trim()) throw new Error("Cannot save a student with a blank name.");
-  globalThis.__harness.log("saveStudent", [structuredClone(student)]);
-  await globalThis.__store.save("students", student);
+  const doc = { ...(${SPLIT_FOR_WRITE})(student), lastWriteTab: WRITE_TAB_ID };
+  globalThis.__harness.log("saveStudent", [structuredClone(doc)]);
+  await globalThis.__store.save("students", doc);
 }`;
 behaving.saveGroup = `async (group) => {
-  globalThis.__harness.log("saveGroup", [structuredClone(group)]);
-  await globalThis.__store.save("groups", group);
+  const doc = { ...(${SPLIT_FOR_WRITE})(group), lastWriteTab: WRITE_TAB_ID };
+  globalThis.__harness.log("saveGroup", [structuredClone(doc)]);
+  await globalThis.__store.save("groups", doc);
 }`;
 
 // The login domain decides the role, so it is read from the app rather than
