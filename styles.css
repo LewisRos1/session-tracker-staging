@@ -3370,7 +3370,7 @@ button.wf-pill:hover { filter: brightness(.93); }
   z-index: 9999;
   top: 110px;
   right: 20px;
-  width: 540px;
+  width: 580px;
   height: 285px;
   min-width: 280px;
   min-height: 200px;
@@ -3469,7 +3469,7 @@ button.wf-pill:hover { filter: brightness(.93); }
 .snote-table thead th:last-child { border-right: none; }
 .snote-th-no   { width: 2rem; text-align: center; }
 .snote-th-del  { width: 1.8rem; }
-.snote-table thead th.snote-th-tick { width: 13rem; text-align: center; }
+.snote-table thead th.snote-th-tick { width: 14.4rem; text-align: center; }
 .snote-table thead .snote-th-text { text-align: center; }
 
 .snote-row td {
@@ -3483,6 +3483,27 @@ button.wf-pill:hover { filter: brightness(.93); }
 .snote-no   { color: #92400e; font-weight: 600; text-align: right; padding-right: .6rem; }
 .snote-text { word-break: break-word; }
 .snote-tick { text-align: center; vertical-align: middle; }
+/* The dropdown and, when there is one, Undo beside it. */
+.snote-tick-wrap { display: flex; align-items: center; gap: .25rem; }
+.snote-tick-wrap .snote-status-sel { flex: 1 1 auto; min-width: 0; }
+/* Undo: only on a row the instructor has marked Done, and only for them.
+   Needs Revision belongs to Ms. Daisy, so this is the one way back from a
+   mis-click without having to ask her to send the row back. */
+.snote-undo-btn {
+  flex: 0 0 auto;
+  width: 1.5rem; height: 1.5rem;
+  display: flex; align-items: center; justify-content: center;
+  border: 1.5px solid #f59e0b;
+  border-radius: 6px;
+  background: #fffbeb;
+  color: #b45309;
+  font-size: .95rem;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background .1s, border-color .1s;
+}
+.snote-undo-btn:hover { background: #fde68a; border-color: #d97706; }
 /* Was a 1.5rem circle that cycled through three states on click. It is a
    dropdown now, so the column has to fit the longest label ("Needs Revision")
    AND the arrow. At 6.6rem it read "Needs fixin" with the arrow sitting on

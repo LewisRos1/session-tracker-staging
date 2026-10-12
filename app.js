@@ -226,7 +226,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2230";
+const APP_VERSION = "2231";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -15878,11 +15878,15 @@ function showWorkflowToast(msg) {
  * needed a new value of its own, and that is "done": the work is done, the
  * checking is not.
  */
+// Grouped by person, hers together, so the list does not alternate between
+// two names and a mis-aimed click lands on somebody's own row.
 const CORRECTION_STATUSES = [
   { value: "",      label: "Needs Revision", turn: "them",  who: "daisy", cls: "snote-status--empty"   },
-  { value: "done",  label: "Done",           turn: "daisy", who: "them",  cls: "snote-status--waiting" },
   { value: "fixed", label: "Approved",       turn: null,    who: "daisy", cls: "snote-status--fixed"   },
+  { value: "done",  label: "Done",           turn: "daisy", who: "them",  cls: "snote-status--waiting" },
 ];
+/** Needs Revision: where a row starts, and where Undo puts it back. */
+const CORRECTION_OPEN = "";
 
 /** Whether the person signed in may put a row into this state. */
 const mayPickCorrection = o => (o.who === "daisy") === canSignOffCorrections();
@@ -15918,7 +15922,8 @@ const normaliseCorrection = v => (v === "rejected" ? "" : (v || ""));
 
 /** The row for a stored value, falling back to the first (Needs Revision). */
 const correctionState = v =>
-  CORRECTION_STATUSES.find(o => o.value === normaliseCorrection(v)) || CORRECTION_STATUSES[0];
+  CORRECTION_STATUSES.find(o => o.value === normaliseCorrection(v))
+  || CORRECTION_STATUSES.find(o => o.value === CORRECTION_OPEN);
 
 /**
  * Is the person signed in Ms. Daisy, for the purpose of signing work off?
@@ -16702,26 +16707,32 @@ function renderStickyNoteContent(data, isGroup) {
       // The state the row is actually in is always listed, or the box would
       // show the wrong thing -- but greyed out when it is not this person's
       // to choose, so it reads as information rather than an option.
-      // Greyed out says you cannot, not why. Hovering says why.
-      const whoMayPick = o => `Only ${o.who === "daisy" ? "Ms. Daisy" : (instructorName(_stickyNoteInstructorId) || "the instructor")} can choose "${o.label}".`;
-      // All three are listed, always. The name in front says whose it is and
-      // the greying says which are yours, so hiding any of them would only
-      // make the list look different from one person to the next.
+      // Nothing is disabled and nothing explains itself on hover. A tooltip
+      // is easy to miss and a greyed row still looks like a row; picking
+      // somebody else's says so in a box you have to dismiss, and leaves the
+      // row exactly as it was.
       const opts = CORRECTION_STATUSES
-        .map(o => mayPickCorrection(o)
-          ? `<option value="${o.value}"${o.value === st ? " selected" : ""}>${escHtml(correctionOptionLabel(o))}</option>`
-          : `<option value="${o.value}"${o.value === st ? " selected" : ""} disabled`
-            + ` title="${escHtml(whoMayPick(o))}">${escHtml(correctionOptionLabel(o))}</option>`)
+        .map(o => `<option value="${o.value}"${o.value === st ? " selected" : ""}>`
+          + `${escHtml(correctionOptionLabel(o))}</option>`)
         .join("");
-      // A tooltip on an <option> is not shown by every browser, so the box
-      // itself carries the same sentence as a fallback.
-      const lockedNote = CORRECTION_STATUSES
-        .filter(o => !mayPickCorrection(o))
-        .map(whoMayPick).join(" ");
+
+      // Undo, for "I clicked Done and I am not done".
+      //
+      // Needs Revision is Ms. Daisy's, so without this the person being
+      // corrected could not take back a mis-click and had to ask her to send
+      // the row back. It is a labelled way out of one mistake, not a free
+      // choice in her list -- which is why it is a button and not an option.
+      const canUndo = st === "done" && !canSignOffCorrections();
+      const undoBtn = canUndo
+        ? `<button class="snote-undo-btn" data-cmt-id="${id}"`
+          + ` title="Not done yet - put this back to Needs Revision">&#8630;</button>`
+        : "";
       return `<tr class="snote-row${rowCls}">
         <td class="snote-no">${i + 1}</td>
         <td class="snote-text"><textarea class="snote-textarea" data-cmt-id="${id}" rows="1" placeholder="Type here…">${escHtml(text)}</textarea></td>
-        <td class="snote-tick"><select class="snote-status-sel ${stCls}" data-cmt-id="${id}"${lockedNote ? ` title="${escHtml(lockedNote)}"` : ""}>${opts}</select></td>
+        <td class="snote-tick"><div class="snote-tick-wrap">
+          <select class="snote-status-sel ${stCls}" data-cmt-id="${id}">${opts}</select>${undoBtn}
+        </div></td>
         <td class="snote-del"><button class="snote-del-btn" data-cmt-id="${id}" title="Delete row">🗑</button></td>
       </tr>`;
     }).join("");
@@ -16923,6 +16934,22 @@ function setupStickyNote() {
       return;
     }
 
+    // Undo: "I clicked Done and I am not done."
+    //
+    // Goes straight to the writer rather than through the dropdown. Needs
+    // Revision is Ms. Daisy's choice, so a dropdown change to it would be
+    // refused -- this is the one deliberate way back, and only from Done.
+    const undoBtn = e.target.closest(".snote-undo-btn");
+    if (undoBtn) {
+      const { sid, data } = getCtx();
+      if (!sid) return;
+      const cmtId = undoBtn.dataset.cmtId;
+      const cmt   = (data?.reviewComments || {})[cmtId];
+      if (!cmt) return;
+      await applyCorrectionStatus(sid, data, cmtId, cmt, null);
+      return;
+    }
+
     // Delete row
     const delBtn = e.target.closest(".snote-del-btn");
     if (delBtn) {
@@ -16935,6 +16962,31 @@ function setupStickyNote() {
       return;
     }
   });
+
+  /**
+   * Write a row's status, and put the phases back where they belong.
+   *
+   * Shared by the dropdown and by Undo, so the two cannot drift: anything
+   * other than Approved means this instructor is not finished, and Phases 3
+   * and 4 go back to pending whichever way the row got there.
+   */
+  async function applyCorrectionStatus(sid, data, cmtId, cmt, next) {
+    try {
+      await setCommentStatus(sid, cmtId, next);
+      if (next !== "fixed") {
+        const instId = cmt.forInstructor || _stickyNoteInstructorId;
+        const ws2 = getWorkflowState(data);
+        const affected = instId ? [instId] : ws2.p3Ids;
+        const checks = { ...(data?.checks || {}) };
+        let changed = false;
+        affected.forEach(id => {
+          if (checks[`p3_${id}`]) { delete checks[`p3_${id}`]; changed = true; }
+          if (checks[`p4_check_${id}`]) { delete checks[`p4_check_${id}`]; changed = true; }
+        });
+        if (changed) { delete checks["p4_nigel"]; await updateSessionChecks(sid, checks).catch(() => {}); }
+      }
+    } catch (err) { console.error("setCommentStatus:", err); }
+  }
 
   // ── Status dropdown ──────────────────────────────────────────
   // A "change" listener, not a click. The old button cycled
@@ -16950,24 +17002,21 @@ function setupStickyNote() {
     const cmtId = sel.dataset.cmtId;
     const cmt   = (data?.reviewComments || {})[cmtId];
     if (!cmt) return;
-    const next = sel.value || null;   // "" is stored as null, exactly as before
-    try {
-      await setCommentStatus(sid, cmtId, next);
-      // Anything other than Corrected means this instructor is not finished,
-      // so Phases 3 and 4 go back to pending.
-      if (next !== "fixed") {
-        const instId = cmt.forInstructor || _stickyNoteInstructorId;
-        const ws2 = getWorkflowState(data);
-        const affected = instId ? [instId] : ws2.p3Ids;
-        const checks = { ...(data?.checks || {}) };
-        let changed = false;
-        affected.forEach(id => {
-          if (checks[`p3_${id}`]) { delete checks[`p3_${id}`]; changed = true; }
-          if (checks[`p4_check_${id}`]) { delete checks[`p4_check_${id}`]; changed = true; }
-        });
-        if (changed) { delete checks["p4_nigel"]; await updateSessionChecks(sid, checks).catch(() => {}); }
-      }
-    } catch (err) { console.error("setCommentStatus:", err); }
+
+    // Picking somebody else's choice says so and changes nothing.
+    const chosen = correctionState(sel.value);
+    if (!mayPickCorrection(chosen)) {
+      const owner = chosen.who === "daisy"
+        ? "Ms. Daisy"
+        : (instructorName(_stickyNoteInstructorId) || "the instructor");
+      alert(`Only ${owner} can choose "${chosen.label}".`);
+      const was = normaliseCorrection(getCmtStatus(cmt));
+      sel.value = was;
+      sel.className = `snote-status-sel ${correctionState(was).cls}`;
+      return;
+    }
+
+    await applyCorrectionStatus(sid, data, cmtId, cmt, sel.value || null);
   });
 
   // ── Textarea auto-save (debounced, per-row) ──────────────────

@@ -34,7 +34,7 @@ const turnOf  = v => (STATES.find(s => s.value === v) || {}).turn;
 console.log("\nthree states, and the values Firestore already holds");
 check("Needs Revision, Done, Approved", [...stored].sort(), ["", "done", "fixed"]);
 check("the words Lewis asked for",
-  stored.map(labelOf), ["Needs Revision", "Done", "Approved"]);
+  [...stored].sort().map(labelOf), ["Needs Revision", "Done", "Approved"]);
 
 console.log("\neach choice says whose it is");
 // "so they know which one to click" -- Lewis. The name goes in front of the
@@ -59,23 +59,43 @@ check("they are not offered Approved -- nobody signs off their own work",
 check("every state belongs to exactly one of them",
   STATES.every(o => o.who === "daisy" || o.who === "them"), true);
 
-console.log("\nall three are always listed, so the box reads the same to everyone");
+console.log("\nall three are always listed, grouped by person");
 check("nothing is filtered out of the dropdown",
   /const opts = CORRECTION_STATUSES\s*\r?\n\s*\.map\(o =>/.test(src), true);
+check("hers together, then theirs -- not alternating",
+  STATES.map(o => o.who), ["daisy", "daisy", "them"]);
+check("in that order: Needs Revision, Approved, Done",
+  STATES.map(o => o.label), ["Needs Revision", "Approved", "Done"]);
 check("the name goes in front of the label, and the label is in quotes",
   /const correctionOptionLabel = o => `\$\{correctionOwnerName\(o\)\}: "\$\{o\.label\}"`/.test(src), true);
 check("she is called Ms. Daisy here, as everywhere else in the app",
   /\? "Ms\. Daisy"\s*\r?\n/.test(src), true);
-check("the other name follows whose list is open",
-  /instructorName\(_stickyNoteInstructorId\) \|\| "Instructor"/.test(src), true);
+check("Needs Revision is still where a row starts, whatever the order",
+  /const CORRECTION_OPEN = "";/.test(src)
+  && /CORRECTION_STATUSES\.find\(o => o\.value === CORRECTION_OPEN\)/.test(src), true);
 
-console.log("\nwhat is not yours is greyed out and says why on hover");
-check("greyed rather than hidden",
-  /mayPickCorrection\(o\)\s*\r?\n?\s*\? `<option/.test(src), true);
-check("and carries a reason",
-  /title="\$\{escHtml\(whoMayPick\(o\)\)\}"/.test(src), true);
-check("the box itself repeats it, since option tooltips are patchy",
-  /lockedNote \? ` title=/.test(src), true);
+console.log("\npicking somebody else's choice says so and changes nothing");
+check("no option is disabled any more",
+  /<option value="\$\{o\.value\}"[^`]*disabled/.test(src), false);
+check("nothing explains itself on hover instead",
+  /title="\$\{escHtml\(whoMayPick/.test(src), false);
+check("a refusal is a box you have to dismiss",
+  /alert\(`Only \$\{owner\} can choose "\$\{chosen\.label\}"\.`\)/.test(src), true);
+check("and the row goes back to what it was",
+  /sel\.value = was;/.test(src), true);
+
+console.log("\nUndo, for a Done pressed by mistake");
+// Needs Revision is Ms. Daisy's, so without this the person being corrected
+// could not take back a mis-click and had to ask her to send the row back.
+check("only on a row that says Done",
+  /const canUndo = st === "done" && !canSignOffCorrections\(\);/.test(src), true);
+check("and only for the person being corrected, not for her",
+  /!canSignOffCorrections\(\)/.test(src), true);
+check("it puts the row back to Needs Revision",
+  /applyCorrectionStatus\(sid, data, cmtId, cmt, null\)/.test(src), true);
+check("through the same writer the dropdown uses, so the phases agree",
+  /async function applyCorrectionStatus\(/.test(src)
+  && /await applyCorrectionStatus\(sid, data, cmtId, cmt, sel\.value \|\| null\)/.test(src), true);
 
 
 console.log("\nwhose turn each state is (what the button outside counts)");
