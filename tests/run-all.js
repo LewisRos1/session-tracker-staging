@@ -33,7 +33,7 @@ results.push(await run("Details: bullet points (no browser)",
 results.push(await run("Everyone signs in again each Monday (no browser)",
   ["run", "--allow-read", "tests/week-signout.test.js"]));
 
-results.push(await run("List of Corrections: whose turn each row is (no browser)",
+results.push(await run("List of Corrections: three states, Ms. Daisy approves (no browser)",
   ["run", "--allow-read", "tests/corrections-status.test.js"]));
 
 results.push(await run("the app starts in a real browser",

@@ -3327,6 +3327,12 @@ button.wf-pill:hover { filter: brightness(.93); }
 .wf-note-wrap .wf-note-btn {
   width: 100%;
   text-align: center;
+  /* Wrap rather than spill. These pills sit in a fixed grid column, so at a
+     half-width window "List of Corrections - Rayhanah (0 to fix)" ran
+     straight out through the right-hand edge of its own border. */
+  white-space: normal;
+  line-height: 1.3;
+  overflow-wrap: break-word;
 }
 .wf-export-wrap {
   grid-column: 9;
@@ -3463,7 +3469,7 @@ button.wf-pill:hover { filter: brightness(.93); }
 .snote-table thead th:last-child { border-right: none; }
 .snote-th-no   { width: 2rem; text-align: center; }
 .snote-th-del  { width: 1.8rem; }
-.snote-table thead th.snote-th-tick { width: 6.6rem; text-align: center; }
+.snote-table thead th.snote-th-tick { width: 9.8rem; text-align: center; }
 .snote-table thead .snote-th-text { text-align: center; }
 
 .snote-row td {
@@ -3478,8 +3484,9 @@ button.wf-pill:hover { filter: brightness(.93); }
 .snote-text { word-break: break-word; }
 .snote-tick { text-align: center; vertical-align: middle; }
 /* Was a 1.5rem circle that cycled through three states on click. It is a
-   dropdown now, so it needs room for the longest label ("Still Wrong") and
-   keeps the same three colours, which are what makes the list scannable. */
+   dropdown now, so the column has to fit the longest label ("Needs Revision")
+   AND the arrow. At 6.6rem it read "Needs fixin" with the arrow sitting on
+   top of the word. The three colours are what make the list scannable. */
 .snote-status-sel {
   width: 100%;
   border-radius: 6px; border: 1.5px solid #d1d5db;
@@ -3491,23 +3498,10 @@ button.wf-pill:hover { filter: brightness(.93); }
 }
 .snote-status--empty  { color: #6b7280; }
 .snote-status--fixed  { background: #d1fae5; border-color: #10b981; color: #065f46; }
-.snote-status--rejected { background: #fee2e2; border-color: #ef4444; color: #b91c1c; }
 /* Fixed, waiting for Ms. Daisy. Amber on purpose: the work is done, so it is
    not red, but the row is not finished either, so it is not green. */
 .snote-status--waiting { background: #ffedd5; border-color: #f97316; color: #9a3412; }
 
-/* Who the row is waiting on, under the dropdown. Quiet unless it is you. */
-.snote-turn {
-  display: block;
-  font-size: .64rem;
-  font-weight: 700;
-  line-height: 1.3;
-  margin-top: .15rem;
-  color: #92400e;
-  opacity: .65;
-  white-space: nowrap;
-}
-.snote-turn--yours { opacity: 1; color: #9a3412; }
 
 /* Refusals from the phase row. Fixed to the viewport so a refusal never
    reflows the row of phase cards it came from. */
@@ -3535,7 +3529,6 @@ button.wf-pill:hover { filter: brightness(.93); }
   transform: translateX(-50%) translateY(0);
 }
 .snote-row--done .snote-text { text-decoration: line-through; opacity: .6; }
-.snote-row--rejected .snote-text { color: #ef4444; }
 .snote-row--waiting .snote-text { color: #9a3412; }
 .snote-empty { color: #92400e; opacity: .7; font-style: italic; font-size: .82rem; padding: .5rem .35rem; }
 

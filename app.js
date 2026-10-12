@@ -226,7 +226,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2222";
+const APP_VERSION = "2223";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -15852,15 +15852,6 @@ function showWorkflowToast(msg) {
 }
 
 /**
- * The three statuses as people say them, rather than as they are stored.
- *
- * "", "fixed" and "rejected" are what Firestore holds and are not changed
- * here: renaming the stored values would strand every correction already
- * written. Only the words on screen change, and a blank circle is now a
- * labelled choice, because an empty cell said nothing about whether anyone had
- * looked at the row.
- */
-/**
  * A correction is one conversation going back and forth, not two opinions.
  *
  * It was a single box anyone could set to Undone, Corrected or Still Wrong,
@@ -15871,11 +15862,12 @@ function showWorkflowToast(msg) {
  * beside "undone") leave nobody able to say what is true. So it is one box
  * that names whose turn it is.
  *
- * `turn` is who the row is waiting on. `setBy` is who is allowed to choose
- * it: Ms. Daisy signs work off, and nobody signs off their own.
+ * `turn` is who the row is waiting on, which is what the button outside
+ * counts. `anyone` is false for Approved alone: Ms. Daisy signs work off,
+ * and nobody signs off their own.
  *
- * The STORED values are untouched. "", "fixed" and "rejected" already exist
- * in Firestore and renaming them would strand every correction ever written.
+ * The STORED values are untouched. "" and "fixed" already exist in Firestore
+ * and renaming them would strand every correction ever written.
  * "fixed" in particular still means finished -- every phase in the workflow
  * asks whether a row is "fixed" -- so a session completed last month stays
  * completed and Phase 3 does not reopen behind anybody. The new middle state
@@ -15883,15 +15875,25 @@ function showWorkflowToast(msg) {
  * checking is not.
  */
 const CORRECTION_STATUSES = [
-  { value: "",         label: "Needs fixing",          turn: "them",  setBy: "them",  cls: "snote-status--empty"    },
-  { value: "rejected", label: "Still wrong — fix again", turn: "them",  setBy: "daisy", cls: "snote-status--rejected" },
-  { value: "done",     label: "Fixed — check it",       turn: "daisy", setBy: "them",  cls: "snote-status--waiting"  },
-  { value: "fixed",    label: "Approved",              turn: null,    setBy: "daisy", cls: "snote-status--fixed"    },
+  { value: "",     label: "Needs Revision", turn: "them",  anyone: true,  cls: "snote-status--empty"   },
+  { value: "done", label: "Done",           turn: "daisy", anyone: true,  cls: "snote-status--waiting" },
+  { value: "fixed", label: "Approved",      turn: null,    anyone: false, cls: "snote-status--fixed"   },
 ];
 
-/** The row for a stored value, falling back to the first (Needs fixing). */
+/**
+ * "rejected" is retired.
+ *
+ * It said "Still wrong, fix again", which is the same thing as Needs
+ * Revision: the row is back with the person being corrected. Two words for
+ * one state only made the dropdown longer. Rows written before this still
+ * hold it, so they are read as Needs Revision and quietly take the new value
+ * the next time anybody touches them. Nothing has to be migrated.
+ */
+const normaliseCorrection = v => (v === "rejected" ? "" : (v || ""));
+
+/** The row for a stored value, falling back to the first (Needs Revision). */
 const correctionState = v =>
-  CORRECTION_STATUSES.find(o => o.value === (v || "")) || CORRECTION_STATUSES[0];
+  CORRECTION_STATUSES.find(o => o.value === normaliseCorrection(v)) || CORRECTION_STATUSES[0];
 
 /**
  * Is the person signed in Ms. Daisy, for the purpose of signing work off?
@@ -15905,9 +15907,10 @@ const canSignOffCorrections = () => ["daisy", "lewis"].includes(currentUser()?.i
 /** Whose turn a row is on: "them", "daisy", or null when it is finished. */
 const correctionTurn = c => correctionState(getCmtStatus(c)).turn;
 
-// Returns null | "fixed" | "rejected" for a correction entry.
+// Returns null | "" | "done" | "fixed" for a correction entry. Older rows can
+// still say "rejected"; normaliseCorrection reads that as Needs Revision.
 function getCmtStatus(c) {
-  if (c.fixStatus) return c.fixStatus;  // new field ("fixed" | "rejected")
+  if (c.fixStatus) return c.fixStatus;  // "done" | "fixed" | legacy "rejected"
   if (c.fixedByName) return "fixed";    // backward compat
   return null;
 }
@@ -16628,35 +16631,25 @@ function renderStickyNoteContent(data, isGroup) {
   } else {
     tbody.innerHTML = visible.map(([id, c], i) => {
       const text = (focusedCmtId === id && liveText !== null) ? liveText : (c.text || "");
-      const st = getCmtStatus(c) || "";
+      const st = normaliseCorrection(getCmtStatus(c));
       const state = correctionState(st);
       const stCls = state.cls;
       const rowCls = st === "fixed" ? " snote-row--done"
-        : st === "rejected" ? " snote-row--rejected"
         : st === "done" ? " snote-row--waiting" : "";
-      // Only the half of the list this person is allowed to choose, plus
-      // whatever the row says now so the box still reads correctly. Nobody
-      // signs off their own work: that is the whole point of the Ms. Daisy
-      // step, and a dropdown that offers Approved to the person who did the
-      // fixing offers them a way round it.
-      const mayPick = canSignOffCorrections() ? "daisy" : "them";
+      // Approved is Ms. Daisy's alone -- nobody signs off their own work, and
+      // a dropdown offering it to the person who did the fixing offers them a
+      // way round the whole point of the step. Needs Revision and Done are
+      // open to everyone, so she can also send a row back by choosing Needs
+      // Revision. The current value is always listed, or the box would show
+      // the wrong thing.
       const opts = CORRECTION_STATUSES
-        .filter(o => o.setBy === mayPick || o.value === st)
+        .filter(o => o.anyone || canSignOffCorrections() || o.value === st)
         .map(o => `<option value="${o.value}"${o.value === st ? " selected" : ""}>${escHtml(o.label)}</option>`)
         .join("");
-      // Who is holding it, in words, for the person reading.
-      const yours = state.turn === (canSignOffCorrections() ? "daisy" : "them");
-      const whose = state.turn === null ? "done"
-        : yours ? "→ you"
-        : state.turn === "daisy" ? "→ Ms. Daisy"
-        : "→ " + escHtml(instructorName(_stickyNoteInstructorId) || "them");
       return `<tr class="snote-row${rowCls}">
         <td class="snote-no">${i + 1}</td>
         <td class="snote-text"><textarea class="snote-textarea" data-cmt-id="${id}" rows="1" placeholder="Type here…">${escHtml(text)}</textarea></td>
-        <td class="snote-tick">
-          <select class="snote-status-sel ${stCls}" data-cmt-id="${id}">${opts}</select>
-          <span class="snote-turn${yours ? " snote-turn--yours" : ""}">${whose}</span>
-        </td>
+        <td class="snote-tick"><select class="snote-status-sel ${stCls}" data-cmt-id="${id}">${opts}</select></td>
         <td class="snote-del"><button class="snote-del-btn" data-cmt-id="${id}" title="Delete row">🗑</button></td>
       </tr>`;
     }).join("");

@@ -1,8 +1,7 @@
-// The List of Corrections: one box that says whose turn it is.
+// The List of Corrections: three states, and only Ms. Daisy may approve.
 //
 // It used to be Undone / Corrected / Still Wrong, settable by anyone. Lewis
-// asked for Ms. Daisy to sign work off, and for the note to say who is
-// holding each row. The two rules that matter:
+// asked for Ms. Daisy to sign work off. The two rules that matter:
 //
 //   1. Nobody signs off their own work. The person being corrected must not
 //      be offered Approved.
@@ -28,32 +27,37 @@ const check = (what, got, want) => {
   console.log(`${ok ? "  ok  " : "FAIL  "}${what}${ok ? "" : `\n        want ${w}\n        got  ${g}`}`);
 };
 
-const stored = STATES.map(s => s.value);
-const pickable = who => STATES.filter(s => s.setBy === who).map(s => s.value);
-const turnOf = v => (STATES.find(s => s.value === v) || {}).turn;
+const stored  = STATES.map(s => s.value);
+const labelOf = v => (STATES.find(s => s.value === v) || {}).label;
+const turnOf  = v => (STATES.find(s => s.value === v) || {}).turn;
 
-console.log("\nthe four states, and the values Firestore already holds");
-check("every stored value is one already in use, plus the new middle one",
-  stored.sort(), ["", "done", "fixed", "rejected"]);
+console.log("\nthree states, and the values Firestore already holds");
+check("Needs Revision, Done, Approved", [...stored].sort(), ["", "done", "fixed"]);
+check("the words Lewis asked for",
+  stored.map(labelOf), ["Needs Revision", "Done", "Approved"]);
 
 console.log("\nnobody signs off their own work");
-check("the person being corrected cannot pick Approved",
-  pickable("them").includes("fixed"), false);
-check("nor can they overrule Ms. Daisy with Still wrong",
-  pickable("them").includes("rejected"), false);
-check("they can say it needs fixing, or that they have fixed it",
-  pickable("them").sort(), ["", "done"]);
-check("Ms. Daisy approves or sends it back",
-  pickable("daisy").sort(), ["fixed", "rejected"]);
+check("Approved is the only one not open to everybody",
+  STATES.filter(s => !s.anyone).map(s => s.value), ["fixed"]);
+check("the other two are open to all, so Ms. Daisy can send a row back too",
+  STATES.filter(s => s.anyone).map(s => s.value).sort(), ["", "done"]);
 
-console.log("\nwhose turn each state is");
+console.log("\nwhose turn each state is (what the button outside counts)");
 check("nothing done yet -> the person being corrected", turnOf(""), "them");
-check("sent back -> the person being corrected",       turnOf("rejected"), "them");
-check("they say it is fixed -> Ms. Daisy",             turnOf("done"), "daisy");
-check("approved -> nobody, it is finished",            turnOf("fixed"), null);
+check("they say it is done -> Ms. Daisy",               turnOf("done"), "daisy");
+check("approved -> nobody, it is finished",             turnOf("fixed"), null);
+check("exactly one finished state", STATES.filter(s => s.turn === null).length, 1);
+
+console.log("\nthe retired state still reads correctly");
+// "Still wrong, fix again" is gone, but rows written before this still say it.
+const normalise = new Function(
+  `return ${src.match(/const normaliseCorrection = ([^;]+);/)[1]};`)();
+check("an old 'rejected' row reads as Needs Revision", normalise("rejected"), "");
+check("it is not offered as a choice any more", stored.includes("rejected"), false);
+check("nothing else is changed",
+  ["", "done", "fixed", null, undefined].map(normalise), ["", "done", "fixed", "", ""]);
 
 console.log("\na finished session must not reopen");
-// Phase 3 and 4 ask this question, and a row written months ago says "fixed".
 check("the finished state is still the one already stored as fixed",
   STATES.find(s => s.turn === null).value, "fixed");
 check("the workflow still asks for exactly that value",
@@ -61,14 +65,16 @@ check("the workflow still asks for exactly that value",
 check("and a change away from it still reopens the phases",
   /if \(next !== "fixed"\)/.test(src), true);
 
-console.log("\nonly one state can be the finished one");
-check("exactly one", STATES.filter(s => s.turn === null).length, 1);
-
-console.log("\nLewis can sign off too, so he can unstick the team");
+console.log("\nLewis can approve too, so he can unstick the team");
 const signers = src.match(/canSignOffCorrections = \(\) => (\[[^\]]*\])/)?.[1];
 check("Ms. Daisy and Lewis", new Function(`return ${signers};`)().sort(), ["daisy", "lewis"]);
 check("not Nigel or Rayhanah",
   new Function(`return ${signers};`)().some(id => ["nigel", "ray"].includes(id)), false);
+
+console.log("\nthe '-> you' line under the dropdown is gone");
+check("no turn label in the row", /snote-turn/.test(src), false);
+check("nor any styling left behind for it",
+  /snote-turn/.test(await Deno.readTextFile("styles.css")), false);
 
 console.log(failed ? `\n${failed} failed.\n` : "\nAll good.\n");
 Deno.exit(failed ? 1 : 0);
