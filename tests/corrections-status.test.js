@@ -64,8 +64,8 @@ check("nothing is filtered out of the dropdown",
   /const opts = CORRECTION_STATUSES\s*\r?\n\s*\.map\(o =>/.test(src), true);
 check("the name goes in front of the label, and the label is in quotes",
   /const correctionOptionLabel = o => `\$\{correctionOwnerName\(o\)\}: "\$\{o\.label\}"`/.test(src), true);
-check("'Daisy', not 'Ms. Daisy' -- the column has to hold the longest one",
-  /\? "Daisy"\s*\r?\n/.test(src), true);
+check("she is called Ms. Daisy here, as everywhere else in the app",
+  /\? "Ms\. Daisy"\s*\r?\n/.test(src), true);
 check("the other name follows whose list is open",
   /instructorName\(_stickyNoteInstructorId\) \|\| "Instructor"/.test(src), true);
 

@@ -226,7 +226,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2229";
+const APP_VERSION = "2230";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -15890,17 +15890,18 @@ const mayPickCorrection = o => (o.who === "daisy") === canSignOffCorrections();
 /**
  * The name in front of each choice, so nobody has to work out which is theirs.
  *
- *   Daisy: "Needs Revision"
- *   Daisy: "Approved"
+ *   Ms. Daisy: "Needs Revision"
+ *   Ms. Daisy: "Approved"
  *   Rayhanah: "Done"
  *
  * In quotes, so it reads as the person saying it rather than as a category.
  *
- * "Daisy", not "Ms. Daisy": the column has to hold the longest of these and
- * was already cutting labels off at the old width.
+ * "Ms. Daisy" in full, as she is called everywhere else in the app. It is the
+ * longest label in the list and the note had to be widened to hold it, which
+ * is the right way round: the name is what people read, the panel is not.
  */
 const correctionOwnerName = o => o.who === "daisy"
-  ? "Daisy"
+  ? "Ms. Daisy"
   : (instructorName(_stickyNoteInstructorId) || "Instructor");
 const correctionOptionLabel = o => `${correctionOwnerName(o)}: "${o.label}"`;
 

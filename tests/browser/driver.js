@@ -148,8 +148,37 @@ export async function openPage(dir, { verbose = false, site: shared = null } = {
     for (const fn of listeners) fn(msg);
   };
 
-  const send = (method, params = {}) =>
-    new Promise((ok, no) => { waiting.set(++seq, { ok, no }); ws.send(JSON.stringify({ id: seq, method, params })); });
+  /**
+   * Every call has to be able to fail.
+   *
+   * This used to be a promise with no timeout that nothing ever rejected, so
+   * if the browser died the call simply never came back -- and neither did
+   * the one after it. A hung suite sat there for an hour looking busy, with
+   * no output and nothing to read, because the output is piped and prints
+   * only at the end. A dead browser now fails the run in thirty seconds and
+   * says so.
+   */
+  const SEND_TIMEOUT_MS = 30000;
+  let socketGone = null;
+  const failAllWaiting = (why) => {
+    socketGone = socketGone || why;
+    for (const [id, { no }] of waiting) { waiting.delete(id); no(new Error(why)); }
+  };
+  ws.onclose = () => failAllWaiting("the browser closed the connection");
+  ws.onerror = () => failAllWaiting("the connection to the browser failed");
+
+  const send = (method, params = {}) => new Promise((ok, no) => {
+    if (socketGone) return no(new Error(socketGone));
+    const id = ++seq;
+    const timer = setTimeout(() => {
+      waiting.delete(id);
+      no(new Error(`the browser did not answer ${method} within ${SEND_TIMEOUT_MS / 1000}s`));
+    }, SEND_TIMEOUT_MS);
+    const done = (fn) => (v) => { clearTimeout(timer); fn(v); };
+    waiting.set(id, { ok: done(ok), no: done(no) });
+    try { ws.send(JSON.stringify({ id, method, params })); }
+    catch (err) { clearTimeout(timer); waiting.delete(id); no(err); }
+  });
 
   // Everything the page logs, so a test can fail on a page error it did not
   // expect rather than passing while the console fills with them.
