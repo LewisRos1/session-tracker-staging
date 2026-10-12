@@ -226,7 +226,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2231";
+const APP_VERSION = "2232";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -16722,10 +16722,16 @@ function renderStickyNoteContent(data, isGroup) {
       // corrected could not take back a mis-click and had to ask her to send
       // the row back. It is a labelled way out of one mistake, not a free
       // choice in her list -- which is why it is a button and not an option.
-      const canUndo = st === "done" && !canSignOffCorrections();
+      //
+      // Shown to everybody, not only to the person being corrected. It was
+      // hidden from anyone who can approve, on the grounds that they have
+      // Needs Revision in the list anyway -- but that put Lewis in front of
+      // a row saying Done with no button on it and nothing to explain why.
+      // One rule, visible to all, and it does the same thing either way.
+      const canUndo = st === "done";
       const undoBtn = canUndo
         ? `<button class="snote-undo-btn" data-cmt-id="${id}"`
-          + ` title="Not done yet - put this back to Needs Revision">&#8630;</button>`
+          + ` title="Not done yet - put this back to Needs Revision">&#8630; Undo</button>`
         : "";
       return `<tr class="snote-row${rowCls}">
         <td class="snote-no">${i + 1}</td>

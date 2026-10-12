@@ -3483,22 +3483,26 @@ button.wf-pill:hover { filter: brightness(.93); }
 .snote-no   { color: #92400e; font-weight: 600; text-align: right; padding-right: .6rem; }
 .snote-text { word-break: break-word; }
 .snote-tick { text-align: center; vertical-align: middle; }
-/* The dropdown and, when there is one, Undo beside it. */
-.snote-tick-wrap { display: flex; align-items: center; gap: .25rem; }
-.snote-tick-wrap .snote-status-sel { flex: 1 1 auto; min-width: 0; }
+/* The dropdown, with Undo UNDER it rather than beside it. Beside would have
+   meant widening the column again to fit both, and the status labels are
+   already the longest text in the app's narrowest panel. */
+.snote-tick-wrap { display: flex; flex-direction: column; gap: .25rem; }
+.snote-tick-wrap .snote-status-sel { width: 100%; }
 /* Undo: only on a row the instructor has marked Done, and only for them.
    Needs Revision belongs to Ms. Daisy, so this is the one way back from a
    mis-click without having to ask her to send the row back. */
 .snote-undo-btn {
-  flex: 0 0 auto;
-  width: 1.5rem; height: 1.5rem;
+  align-self: stretch;
   display: flex; align-items: center; justify-content: center;
+  gap: .25rem;
+  padding: .15rem .4rem;
   border: 1.5px solid #f59e0b;
   border-radius: 6px;
   background: #fffbeb;
   color: #b45309;
-  font-size: .95rem;
-  line-height: 1;
+  font-size: .72rem;
+  font-weight: 700;
+  line-height: 1.3;
   cursor: pointer;
   font-family: inherit;
   transition: background .1s, border-color .1s;

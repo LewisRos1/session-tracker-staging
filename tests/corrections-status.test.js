@@ -88,14 +88,25 @@ console.log("\nUndo, for a Done pressed by mistake");
 // Needs Revision is Ms. Daisy's, so without this the person being corrected
 // could not take back a mis-click and had to ask her to send the row back.
 check("only on a row that says Done",
-  /const canUndo = st === "done" && !canSignOffCorrections\(\);/.test(src), true);
-check("and only for the person being corrected, not for her",
-  /!canSignOffCorrections\(\)/.test(src), true);
+  /const canUndo = st === "done";/.test(src), true);
+check("shown to everybody -- hiding it from approvers left Lewis staring at a row with no button",
+  /canUndo = st === "done" && !canSignOffCorrections/.test(src), false);
+check("the button says the word, not just a symbol",
+  /&#8630; Undo<\/button>/.test(src), true);
+check("and says what it will do when you hover it",
+  /title="Not done yet - put this back to Needs Revision"/.test(src), true);
 check("it puts the row back to Needs Revision",
   /applyCorrectionStatus\(sid, data, cmtId, cmt, null\)/.test(src), true);
 check("through the same writer the dropdown uses, so the phases agree",
   /async function applyCorrectionStatus\(/.test(src)
   && /await applyCorrectionStatus\(sid, data, cmtId, cmt, sel\.value \|\| null\)/.test(src), true);
+
+console.log("\nit sits under the dropdown, not beside it");
+const css = await Deno.readTextFile("styles.css");
+check("stacked, so the column does not have to grow again",
+  /\.snote-tick-wrap \{ display: flex; flex-direction: column;/.test(css), true);
+check("and spans the width so the word fits",
+  /\.snote-undo-btn \{[\s\S]*?align-self: stretch;/.test(css), true);
 
 
 console.log("\nwhose turn each state is (what the button outside counts)");
