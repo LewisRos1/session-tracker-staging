@@ -3469,7 +3469,7 @@ button.wf-pill:hover { filter: brightness(.93); }
 .snote-table thead th:last-child { border-right: none; }
 .snote-th-no   { width: 2rem; text-align: center; }
 .snote-th-del  { width: 1.8rem; }
-.snote-table thead th.snote-th-tick { width: 9.8rem; text-align: center; }
+.snote-table thead th.snote-th-tick { width: 11.8rem; text-align: center; }
 .snote-table thead .snote-th-text { text-align: center; }
 
 .snote-row td {

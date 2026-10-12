@@ -226,7 +226,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2227";
+const APP_VERSION = "2228";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -15879,14 +15879,28 @@ function showWorkflowToast(msg) {
  * checking is not.
  */
 const CORRECTION_STATUSES = [
-  { value: "",      label: "Needs Revision", turn: "them",  who: "both",  cls: "snote-status--empty"   },
+  { value: "",      label: "Needs Revision", turn: "them",  who: "daisy", cls: "snote-status--empty"   },
   { value: "done",  label: "Done",           turn: "daisy", who: "them",  cls: "snote-status--waiting" },
   { value: "fixed", label: "Approved",       turn: null,    who: "daisy", cls: "snote-status--fixed"   },
 ];
 
 /** Whether the person signed in may put a row into this state. */
-const mayPickCorrection = o =>
-  o.who === "both" || (o.who === "daisy") === canSignOffCorrections();
+const mayPickCorrection = o => (o.who === "daisy") === canSignOffCorrections();
+
+/**
+ * The name in front of each choice, so nobody has to work out which is theirs.
+ *
+ *   Daisy: Needs Revision
+ *   Daisy: Approved
+ *   Rayhanah: Done
+ *
+ * "Daisy", not "Ms. Daisy": the column has to hold the longest of these and
+ * was already cutting labels off at the old width.
+ */
+const correctionOwnerName = o => o.who === "daisy"
+  ? "Daisy"
+  : (instructorName(_stickyNoteInstructorId) || "Instructor");
+const correctionOptionLabel = o => `${correctionOwnerName(o)}: ${o.label}`;
 
 /**
  * "rejected" is retired.
@@ -16686,15 +16700,15 @@ function renderStickyNoteContent(data, isGroup) {
       // show the wrong thing -- but greyed out when it is not this person's
       // to choose, so it reads as information rather than an option.
       // Greyed out says you cannot, not why. Hovering says why.
-      const whoMayPick = o => o.who === "daisy"
-        ? "Only Ms. Daisy can approve."
-        : `Only ${instructorName(_stickyNoteInstructorId) || "the instructor"} can set this to ${o.label}.`;
+      const whoMayPick = o => `Only ${o.who === "daisy" ? "Ms. Daisy" : (instructorName(_stickyNoteInstructorId) || "the instructor")} can choose "${o.label}".`;
+      // All three are listed, always. The name in front says whose it is and
+      // the greying says which are yours, so hiding any of them would only
+      // make the list look different from one person to the next.
       const opts = CORRECTION_STATUSES
-        .filter(o => mayPickCorrection(o) || o.value === st)
         .map(o => mayPickCorrection(o)
-          ? `<option value="${o.value}"${o.value === st ? " selected" : ""}>${escHtml(o.label)}</option>`
+          ? `<option value="${o.value}"${o.value === st ? " selected" : ""}>${escHtml(correctionOptionLabel(o))}</option>`
           : `<option value="${o.value}"${o.value === st ? " selected" : ""} disabled`
-            + ` title="${escHtml(whoMayPick(o))}">${escHtml(o.label)}</option>`)
+            + ` title="${escHtml(whoMayPick(o))}">${escHtml(correctionOptionLabel(o))}</option>`)
         .join("");
       // A tooltip on an <option> is not shown by every browser, so the box
       // itself carries the same sentence as a fallback.

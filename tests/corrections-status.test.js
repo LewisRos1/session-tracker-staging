@@ -36,8 +36,13 @@ check("Needs Revision, Done, Approved", [...stored].sort(), ["", "done", "fixed"
 check("the words Lewis asked for",
   stored.map(labelOf), ["Needs Revision", "Done", "Approved"]);
 
-console.log("\neach person sees their own two choices");
-// Pull the real rule out of app.js rather than restating it here.
+console.log("\neach choice says whose it is");
+// "so they know which one to click" -- Lewis. The name goes in front of the
+// label, and the greying says which are yours:
+//
+//   Daisy: Needs Revision
+//   Daisy: Approved
+//   Rayhanah: Done
 const mayPick = new Function("o", "canSignOffCorrections",
   // Bracketed: the rule starts on the line AFTER the arrow, and a bare
   // `return` followed by a newline returns undefined.
@@ -45,26 +50,33 @@ const mayPick = new Function("o", "canSignOffCorrections",
 const choicesFor = isDaisy =>
   STATES.filter(o => mayPick(o, () => isDaisy)).map(o => o.value).sort();
 
-check("Nigel and Rayhanah: Needs Revision and Done", choicesFor(false), ["", "done"]);
-check("Ms. Daisy: Needs Revision and Approved",      choicesFor(true),  ["", "fixed"]);
+check("Ms. Daisy: Needs Revision and Approved", choicesFor(true),  ["", "fixed"]);
+check("Nigel and Rayhanah: Done",               choicesFor(false), ["done"]);
 check("she is not offered Done -- that is theirs to say",
   choicesFor(true).includes("done"), false);
 check("they are not offered Approved -- nobody signs off their own work",
   choicesFor(false).includes("fixed"), false);
-check("Needs Revision belongs to both, so she can send a row back",
-  choicesFor(true).includes("") && choicesFor(false).includes(""), true);
+check("every state belongs to exactly one of them",
+  STATES.every(o => o.who === "daisy" || o.who === "them"), true);
 
-console.log("\nthe state a row is in shows even when it is not yours to pick");
-check("such an option is greyed out rather than hidden",
-  /mayPickCorrection\(o\) \|\| o\.value === st/.test(src), true);
-check("and says who it belongs to when you hover it",
-  /disabled`\s*\+ ` title="\$\{escHtml\(whoMayPick\(o\)\)\}"/.test(src), true);
-check("the box itself carries the same sentence, since option tooltips are patchy",
+console.log("\nall three are always listed, so the box reads the same to everyone");
+check("nothing is filtered out of the dropdown",
+  /const opts = CORRECTION_STATUSES\s*\r?\n\s*\.map\(o =>/.test(src), true);
+check("the name goes in front of the label",
+  /const correctionOptionLabel = o => `\$\{correctionOwnerName\(o\)\}: \$\{o\.label\}`/.test(src), true);
+check("'Daisy', not 'Ms. Daisy' -- the column has to hold the longest one",
+  /\? "Daisy"\s*\r?\n/.test(src), true);
+check("the other name follows whose list is open",
+  /instructorName\(_stickyNoteInstructorId\) \|\| "Instructor"/.test(src), true);
+
+console.log("\nwhat is not yours is greyed out and says why on hover");
+check("greyed rather than hidden",
+  /mayPickCorrection\(o\)\s*\r?\n?\s*\? `<option/.test(src), true);
+check("and carries a reason",
+  /title="\$\{escHtml\(whoMayPick\(o\)\)\}"/.test(src), true);
+check("the box itself repeats it, since option tooltips are patchy",
   /lockedNote \? ` title=/.test(src), true);
-check("it names Ms. Daisy for Approved",
-  /Only Ms\. Daisy can approve\./.test(src), true);
-check("and names the instructor whose list it is for Done",
-  /Only \$\{instructorName\(_stickyNoteInstructorId\)/.test(src), true);
+
 
 console.log("\nwhose turn each state is (what the button outside counts)");
 check("nothing done yet -> the person being corrected", turnOf(""), "them");
