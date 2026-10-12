@@ -226,7 +226,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2223";
+const APP_VERSION = "2224";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -15178,6 +15178,9 @@ let _snoteOrder = null;
 let _noteDebounce           = null;
 let _focusNewRow            = false;
 let _phase3Error            = null; // error string shown in Phase 3 node, auto-clears
+// Its own, so a refusal from Ms. Daisy's phase does not appear under
+// somebody else's. Approving the corrections is asked for in Phase 4 now.
+let _phase4Error            = null; // the same, for Phase 4
 const _textareaDebounce     = new Map();
 
 /**
@@ -15961,10 +15964,26 @@ function getWorkflowState(data) {
     const a = c.assignedTo;
     return !a || a.length === 0 || a.includes(id);
   });
-  const allFixedFor = id => {
-    const mine = commentsFor(id);
-    return mine.length === 0 || mine.every(([, c]) => getCmtStatus(c) === "fixed");
-  };
+  /**
+   * Phase 3 is the instructor's own phase, Phase 4 is Ms. Daisy's, so they
+   * ask different questions.
+   *
+   * Both used to ask whether every row was Approved, which meant Rayhanah
+   * could mark her whole list Done, see "0 to fix" on her own button, and
+   * still be unable to tick Phase 3 -- because it was waiting on a decision
+   * that was not hers to make. Phase 4, the one that IS Ms. Daisy's, did not
+   * look at the corrections at all.
+   */
+  const notDoneFor     = id => commentsFor(id).filter(([, c]) => {
+    const st = normaliseCorrection(getCmtStatus(c));
+    return st !== "done" && st !== "fixed";
+  });
+  const notApprovedFor = id => commentsFor(id)
+    .filter(([, c]) => normaliseCorrection(getCmtStatus(c)) !== "fixed");
+  /** Phase 3: the instructor has dealt with every row. */
+  const allDoneFor     = id => notDoneFor(id).length === 0;
+  /** Phase 4: Ms. Daisy has approved every row. */
+  const allFixedFor    = id => notApprovedFor(id).length === 0;
   const allFixed = comments.length > 0 && comments.every(([, c]) => getCmtStatus(c) === "fixed");
 
   // ── No-corrections per instructor ─────────────────────────────
@@ -16044,7 +16063,7 @@ function getWorkflowState(data) {
     p2CheckRaw, p2CheckDone, p2CheckStale, p2EffDone, p2CheckAt, allP2Done,
     p4CheckRaw, p4CheckDone, allP4Done,
     p4Check, p4Done,
-    comments, commentsFor, allFixedFor,
+    comments, commentsFor, allFixedFor, allDoneFor, notDoneFor, notApprovedFor,
     commentsForPerson, allFixedForPerson,
     allFixed, noComments,
     ready, revisionDone, daisyOnly,
@@ -16229,6 +16248,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
   const p4Node = `<div class="wf-node wf-node--${p4State}">
     <div class="wf-node-label">Phase 4: Check #2</div>
     <div class="wf-node-body">${p4Body}</div>
+    ${_phase4Error ? `<div class="wf-error-msg">${escHtml(_phase4Error)}</div>` : ""}
   </div>`;
 
   // ── Phase 5: Export (Nigel) ───────────────────────────────────
@@ -16522,10 +16542,10 @@ async function handleCheckedByClick(e, isGroup) {
       const ws     = getWorkflowState(data);
       const id     = role.slice(3);
       const newDone = !ws.p3Done(id);
-      if (newDone && !ws.allFixedFor(id)) {
-        const notFixed = ws.commentsFor(id).filter(([, c]) => getCmtStatus(c) !== "fixed");
-        const nRemain = notFixed.length;
-        _phase3Error = `⚠ ${nRemain} task${nRemain === 1 ? "" : "s"} remain${nRemain === 1 ? "s" : ""} in the "List of Corrections – ${instName(id)}". Tick ${nRemain === 1 ? "it" : "them"} (✓) to complete this phase.`;
+      if (newDone && !ws.allDoneFor(id)) {
+        const n = ws.notDoneFor(id).length;
+        _phase4Error = null;
+        _phase3Error = `⚠ ${n} item${n === 1 ? "" : "s"} in the "List of Corrections – ${instName(id)}" ${n === 1 ? "is" : "are"} still Needs Revision. Set ${n === 1 ? "it" : "them"} to Done to complete this phase.`;
         rerender();
         return true;
       }
@@ -16546,6 +16566,17 @@ async function handleCheckedByClick(e, isGroup) {
     } else if (role.startsWith("p4_check_")) {
       const id  = role.slice("p4_check_".length);
       const ws  = getWorkflowState(data);
+      // Ms. Daisy's phase, so this is where approving the corrections is
+      // asked for. Only on the way IN: unticking has to stay possible, or a
+      // mistaken tick could never be taken back.
+      if (!ws.p4CheckDone(id) && !ws.allFixedFor(id)) {
+        const n = ws.notApprovedFor(id).length;
+        _phase3Error = null;
+        _phase4Error = `⚠ ${n} item${n === 1 ? "" : "s"} in the "List of Corrections – ${instName(id)}" ${n === 1 ? "is" : "are"} not Approved yet. Approve ${n === 1 ? "it" : "them"} to complete this phase.`;
+        rerender();
+        return true;
+      }
+      _phase4Error = null;
       const checks = { ...(data?.checks || {}) };
       try {
         if (!ws.p4CheckDone(id)) {

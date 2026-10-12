@@ -71,6 +71,26 @@ check("Ms. Daisy and Lewis", new Function(`return ${signers};`)().sort(), ["dais
 check("not Nigel or Rayhanah",
   new Function(`return ${signers};`)().some(id => ["nigel", "ray"].includes(id)), false);
 
+console.log("\neach phase asks its own question");
+// Rayhanah could mark her whole list Done, see "0 to fix" on her own button,
+// and still not tick Phase 3 -- because it waited on Ms. Daisy. Phase 4, the
+// one that IS hers, did not look at the list at all.
+check("Phase 3 asks whether the instructor is done",
+  /if \(newDone && !ws\.allDoneFor\(id\)\)/.test(src), true);
+check("Phase 4 asks whether Ms. Daisy has approved",
+  /if \(!ws\.p4CheckDone\(id\) && !ws\.allFixedFor\(id\)\)/.test(src), true);
+check("Phase 3 no longer demands Approved",
+  /if \(newDone && !ws\.allFixedFor\(id\)\)/.test(src), false);
+
+console.log("\nthe warnings use the words that are on the dropdown");
+check("Phase 3 names Needs Revision and Done",
+  /still Needs Revision[\s\S]{0,90}to Done to complete this phase/.test(src), true);
+check("Phase 4 names Approved",
+  /not Approved yet[\s\S]{0,60}Approve /.test(src), true);
+check("nothing still says 'Tick it'", /Tick \$\{/.test(src), false);
+check("Phase 4 has its own warning box, not Phase 3's",
+  /_phase4Error \? `<div class="wf-error-msg">/.test(src), true);
+
 console.log("\nthe '-> you' line under the dropdown is gone");
 check("no turn label in the row", /snote-turn/.test(src), false);
 check("nor any styling left behind for it",
