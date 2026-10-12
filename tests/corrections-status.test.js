@@ -62,8 +62,8 @@ check("every state belongs to exactly one of them",
 console.log("\nall three are always listed, so the box reads the same to everyone");
 check("nothing is filtered out of the dropdown",
   /const opts = CORRECTION_STATUSES\s*\r?\n\s*\.map\(o =>/.test(src), true);
-check("the name goes in front of the label",
-  /const correctionOptionLabel = o => `\$\{correctionOwnerName\(o\)\}: \$\{o\.label\}`/.test(src), true);
+check("the name goes in front of the label, and the label is in quotes",
+  /const correctionOptionLabel = o => `\$\{correctionOwnerName\(o\)\}: "\$\{o\.label\}"`/.test(src), true);
 check("'Daisy', not 'Ms. Daisy' -- the column has to hold the longest one",
   /\? "Daisy"\s*\r?\n/.test(src), true);
 check("the other name follows whose list is open",
