@@ -226,7 +226,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2224";
+const APP_VERSION = "2225";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -15866,8 +15866,9 @@ function showWorkflowToast(msg) {
  * that names whose turn it is.
  *
  * `turn` is who the row is waiting on, which is what the button outside
- * counts. `anyone` is false for Approved alone: Ms. Daisy signs work off,
- * and nobody signs off their own.
+ * counts. `who` is whose choice the state is to make: Done belongs to the
+ * person doing the fixing, Approved to Ms. Daisy, and Needs Revision to
+ * both, so she can send a row back.
  *
  * The STORED values are untouched. "" and "fixed" already exist in Firestore
  * and renaming them would strand every correction ever written.
@@ -15878,10 +15879,14 @@ function showWorkflowToast(msg) {
  * checking is not.
  */
 const CORRECTION_STATUSES = [
-  { value: "",     label: "Needs Revision", turn: "them",  anyone: true,  cls: "snote-status--empty"   },
-  { value: "done", label: "Done",           turn: "daisy", anyone: true,  cls: "snote-status--waiting" },
-  { value: "fixed", label: "Approved",      turn: null,    anyone: false, cls: "snote-status--fixed"   },
+  { value: "",      label: "Needs Revision", turn: "them",  who: "both",  cls: "snote-status--empty"   },
+  { value: "done",  label: "Done",           turn: "daisy", who: "them",  cls: "snote-status--waiting" },
+  { value: "fixed", label: "Approved",       turn: null,    who: "daisy", cls: "snote-status--fixed"   },
 ];
+
+/** Whether the person signed in may put a row into this state. */
+const mayPickCorrection = o =>
+  o.who === "both" || (o.who === "daisy") === canSignOffCorrections();
 
 /**
  * "rejected" is retired.
@@ -16667,15 +16672,23 @@ function renderStickyNoteContent(data, isGroup) {
       const stCls = state.cls;
       const rowCls = st === "fixed" ? " snote-row--done"
         : st === "done" ? " snote-row--waiting" : "";
-      // Approved is Ms. Daisy's alone -- nobody signs off their own work, and
-      // a dropdown offering it to the person who did the fixing offers them a
-      // way round the whole point of the step. Needs Revision and Done are
-      // open to everyone, so she can also send a row back by choosing Needs
-      // Revision. The current value is always listed, or the box would show
-      // the wrong thing.
+      // Each person sees their own two choices.
+      //
+      //   Nigel / Rayhanah   Needs Revision, Done
+      //   Ms. Daisy          Needs Revision, Approved
+      //
+      // Approved is hers because nobody signs off their own work. Done is
+      // theirs because saying the work is finished is their statement to
+      // make, not hers. Needs Revision belongs to both, and is how she sends
+      // a row back.
+      //
+      // The state the row is actually in is always listed, or the box would
+      // show the wrong thing -- but greyed out when it is not this person's
+      // to choose, so it reads as information rather than an option.
       const opts = CORRECTION_STATUSES
-        .filter(o => o.anyone || canSignOffCorrections() || o.value === st)
-        .map(o => `<option value="${o.value}"${o.value === st ? " selected" : ""}>${escHtml(o.label)}</option>`)
+        .filter(o => mayPickCorrection(o) || o.value === st)
+        .map(o => `<option value="${o.value}"${o.value === st ? " selected" : ""}`
+          + `${mayPickCorrection(o) ? "" : " disabled"}>${escHtml(o.label)}</option>`)
         .join("");
       return `<tr class="snote-row${rowCls}">
         <td class="snote-no">${i + 1}</td>

@@ -36,11 +36,28 @@ check("Needs Revision, Done, Approved", [...stored].sort(), ["", "done", "fixed"
 check("the words Lewis asked for",
   stored.map(labelOf), ["Needs Revision", "Done", "Approved"]);
 
-console.log("\nnobody signs off their own work");
-check("Approved is the only one not open to everybody",
-  STATES.filter(s => !s.anyone).map(s => s.value), ["fixed"]);
-check("the other two are open to all, so Ms. Daisy can send a row back too",
-  STATES.filter(s => s.anyone).map(s => s.value).sort(), ["", "done"]);
+console.log("\neach person sees their own two choices");
+// Pull the real rule out of app.js rather than restating it here.
+const mayPick = new Function("o", "canSignOffCorrections",
+  // Bracketed: the rule starts on the line AFTER the arrow, and a bare
+  // `return` followed by a newline returns undefined.
+  `return (${src.match(/const mayPickCorrection = o =>([\s\S]*?);\r?\n/)[1]});`);
+const choicesFor = isDaisy =>
+  STATES.filter(o => mayPick(o, () => isDaisy)).map(o => o.value).sort();
+
+check("Nigel and Rayhanah: Needs Revision and Done", choicesFor(false), ["", "done"]);
+check("Ms. Daisy: Needs Revision and Approved",      choicesFor(true),  ["", "fixed"]);
+check("she is not offered Done -- that is theirs to say",
+  choicesFor(true).includes("done"), false);
+check("they are not offered Approved -- nobody signs off their own work",
+  choicesFor(false).includes("fixed"), false);
+check("Needs Revision belongs to both, so she can send a row back",
+  choicesFor(true).includes("") && choicesFor(false).includes(""), true);
+
+console.log("\nthe state a row is in shows even when it is not yours to pick");
+check("such an option is greyed out rather than hidden",
+  /mayPickCorrection\(o\) \|\| o\.value === st/.test(src)
+  && /mayPickCorrection\(o\) \? "" : " disabled"/.test(src), true);
 
 console.log("\nwhose turn each state is (what the button outside counts)");
 check("nothing done yet -> the person being corrected", turnOf(""), "them");
