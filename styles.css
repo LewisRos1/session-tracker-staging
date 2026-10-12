@@ -5205,3 +5205,68 @@ button.wf-pill:hover { filter: brightness(.93); }
 .mn-rich b, .mn-rich strong { font-weight: 700; }
 .mn-rich u { text-decoration: underline; }
 .mn-rich.mn-locked-field { cursor: not-allowed !important; }
+
+/* ── AI Translator ─────────────────────────────────────────
+   Checked that none of these names were already taken. A dead
+   .snote-undo-btn sitting further down this file once won against a live
+   rule and left a button on screen at 0 by 0 pixels. */
+.tr-wrap { max-width: 42rem; margin: 0 auto; }
+.tr-label {
+  display: block;
+  font-size: .9rem; font-weight: 700;
+  color: var(--text); margin-bottom: .4rem;
+}
+.tr-select { width: 100%; font-size: .95rem; padding: .55rem .6rem; cursor: pointer; }
+.tr-note { font-size: .82rem; color: var(--text-muted); margin: .5rem 0 1.1rem; line-height: 1.5; }
+
+/* Said plainly rather than greyed out: the way forward is a different
+   screen, so it needs a sentence and a button, not a disabled control. */
+.tr-blocked {
+  border: 1.5px solid #f59e0b; background: #fffbeb;
+  border-radius: 10px; padding: 1rem 1.1rem; margin-top: .4rem;
+}
+.tr-blocked strong { color: #92400e; }
+.tr-blocked p { font-size: .86rem; color: #78350f; line-height: 1.55; margin: .5rem 0 .9rem; }
+
+.tr-drop {
+  margin-top: .4rem;
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 2.4rem 1rem;
+  text-align: center;
+  cursor: pointer;
+  background: var(--surface, #fff);
+  transition: border-color .12s, background .12s;
+}
+.tr-drop:hover, .tr-drop:focus-visible { border-color: var(--primary); background: #f5f3ff; }
+.tr-drop--over { border-color: var(--primary); background: #ede9fe; }
+.tr-drop--busy { pointer-events: none; opacity: .55; }
+.tr-drop-big   { font-size: 1rem; font-weight: 700; color: var(--text); }
+.tr-drop-small { font-size: .82rem; color: var(--text-muted); margin-top: .35rem; }
+
+.tr-running, .tr-done, .tr-failed {
+  margin-top: 1rem; padding: .8rem 1rem;
+  border-radius: 10px; font-size: .88rem; line-height: 1.55;
+}
+.tr-running { background: #eff6ff; border: 1.5px solid #93c5fd; color: #1d4ed8; }
+.tr-done    { background: #f0fdf4; border: 1.5px solid #86efac; color: #166534; }
+.tr-failed  { background: #fef2f2; border: 1.5px solid #fca5a5; color: #991b1b; }
+.tr-warn    { color: #b45309; }
+
+/* The corner pill. A translation takes about a minute and nobody is going
+   to sit watching a drop zone, so the progress follows them around. */
+#tr-pill {
+  position: fixed;
+  right: 1.1rem; bottom: 1.1rem;
+  z-index: 3000;
+  background: #111827; color: #fff;
+  font-size: .82rem; font-weight: 600;
+  padding: .55rem 1rem;
+  border-radius: 999px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.3);
+  opacity: 0; transform: translateY(.4rem);
+  transition: opacity .2s ease, transform .2s ease;
+  pointer-events: none;
+  max-width: min(90vw, 24rem);
+}
+#tr-pill.tr-pill--in { opacity: 1; transform: translateY(0); }

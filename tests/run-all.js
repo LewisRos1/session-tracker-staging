@@ -63,6 +63,9 @@ results.push(await run("A window must not ask about an earlier window",
 results.push(await run("The Undo button is actually visible",
   ["run", "-A", "tests/browser/sticky-note-undo.test.js", HARNESS]));
 
+results.push(await run("AI Translator: the screen and what it tells the model",
+  ["run", "-A", "tests/browser/ai-translator.test.js", HARNESS]));
+
 results.push(await run("What an assistant may and may not touch",
   ["run", "-A", "tests/browser/assistant-readonly.test.js", HARNESS]));
 

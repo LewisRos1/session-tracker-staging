@@ -226,7 +226,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2234";
+const APP_VERSION = "2235";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -2080,7 +2080,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Register SW immediately — don't wait for Firebase so updates are never blocked.
   registerServiceWorker();
   setupStickyNote();
-  $("btn-ai-report-back").addEventListener("click", showHome);
+  $("btn-ai-report-back").addEventListener("click", showHome);
+  $("btn-ai-translate-back").addEventListener("click", showHome);
 
   // Nothing stored means Firebase has no session to restore either, so go
   // straight to the sign-in screen rather than hang on the loading screen
@@ -2939,6 +2940,7 @@ function renderStudentDatabaseButton() {
   container.innerHTML = `<div class="info-btn-row">
     <button class="export-btn export-btn-all" id="btn-open-student-registry" style="margin-bottom:0">Student Database</button>
     <button class="export-btn" id="btn-open-ai-report">AI Report Generator</button>
+    ${canUseStaffTools() ? `<button class="export-btn" id="btn-open-ai-translate">AI Translator</button>` : ""}
     <button class="export-btn" id="btn-open-score-settings">Score Settings</button>
   </div>`;
   // Open to everyone: reading the list is useful and harmless. Every control
@@ -2954,6 +2956,10 @@ function renderStudentDatabaseButton() {
   // around it and only stopping them at the last step guards the wrong thing.
   $("btn-open-ai-report").addEventListener("click", () =>
     requirePassword(() => showScreen("screen-ai-report"), EXPORT_MSG));
+  // Not shown to an assistant at all, so this is the second lock rather than
+  // the first. A finished report leaves the building through here.
+  $("btn-open-ai-translate")?.addEventListener("click", () =>
+    requirePassword(() => openAiTranslateScreen(), EXPORT_MSG));
 }
 
 function renderTodoHomeSection() {
@@ -3570,19 +3576,23 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
           <colgroup>
             <col style="width:42px">
             <col style="width:15%">
-            <col style="width:190px">
+            <col style="width:12%">
+            <col style="width:170px">
             <col style="width:10%">
-            <col style="width:190px">
-            <col style="width:120px">
-            <col style="width:160px">
+            <col style="width:10%">
+            <col style="width:170px">
+            <col style="width:110px">
+            <col style="width:150px">
             <col style="width:48px">
           </colgroup>
           <thead>
             <tr>
               <th>No.</th>
               <th>Full Name</th>
+              <th style="white-space:normal">Full Name (Chinese)</th>
               <th style="white-space:normal">Gender (For pronoun purposes in AI Reports)</th>
               <th style="white-space:normal">Short Name (Used in AI Reports)</th>
+              <th style="white-space:normal">Short Name (Chinese)</th>
               <th>Note</th>
               <th style="white-space:normal">Report Type</th>
               <th style="white-space:normal">Latest Individual Session Recorded</th>
@@ -3599,11 +3609,23 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
                     style="width:100%;text-align:center" />
                 </td>
                 <td style="text-align:center" onclick="event.stopPropagation()">
+                  <input class="admin-input db-fullname-zh-input" data-id="${escHtml(s.id)}"
+                    value="${escHtml(s.nameZh || '')}" placeholder="—" autocomplete="off"
+                    title="Only needed for a Chinese report. Leave it empty otherwise."
+                    style="width:100%;text-align:center" />
+                </td>
+                <td style="text-align:center" onclick="event.stopPropagation()">
                   ${genderSelectHtml(s)}
                 </td>
                 <td style="text-align:center" onclick="event.stopPropagation()">
                   <input class="admin-input db-shortname-input" data-id="${escHtml(s.id)}"
                     value="${escHtml(s.preferredName || '')}" placeholder="—" autocomplete="off"
+                    style="width:100%;text-align:center" />
+                </td>
+                <td style="text-align:center" onclick="event.stopPropagation()">
+                  <input class="admin-input db-shortname-zh-input" data-id="${escHtml(s.id)}"
+                    value="${escHtml(s.shortNameZh || '')}" placeholder="—" autocomplete="off"
+                    title="Only needed for a Chinese report. Leave it empty otherwise."
                     style="width:100%;text-align:center" />
                 </td>
                 <td style="text-align:center" onclick="event.stopPropagation()">
@@ -3677,6 +3699,22 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
       await saveStudent(s);
     });
   });
+
+  // The Chinese names. Optional: only a Chinese report needs them, and the
+  // translator says which student is missing one rather than guessing.
+  for (const [cls, field] of [["db-fullname-zh-input", "nameZh"],
+                              ["db-shortname-zh-input", "shortNameZh"]]) {
+    $("student-registry-body").querySelectorAll("." + cls).forEach(input => {
+      input.addEventListener("blur", async () => {
+        const s = state.students.find(x => x.id === input.dataset.id);
+        if (!s) return;
+        const val = input.value.trim();
+        if (val === (s[field] || "")) return;
+        s[field] = val || null;
+        await saveStudent(s);
+      });
+    });
+  }
 
   $("student-registry-body").querySelectorAll(".db-note-input").forEach(input => {
     input.addEventListener("blur", async () => {
@@ -16635,6 +16673,456 @@ async function handleCheckedByClick(e, isGroup) {
   if (noBtn) { clearTimer(); setConfirm(null); rerender(); return true; }
 
   return false;
+}
+
+// ── AI Translator: the screen ────────────────────────────────
+//
+// The boss writes a report in English, edits it in Word, and drops the
+// edited file in here. What comes back is the same file in Chinese.
+//
+// Not a Chinese report generated from scratch: she changes things after
+// generating, and those changes are the point. The only way to keep them is
+// to translate the file she actually has.
+
+/** Which student the open translator is for. */
+let _trStudentId = null;
+/** True while a translation is running, so a second one cannot start. */
+let _trBusy = false;
+
+/**
+ * The word list.
+ *
+ * Clinical language has to come out the same in every report. Without this,
+ * one report says one thing for "self-regulation" and the next says another,
+ * and a parent reading both thinks the therapy changed.
+ *
+ * Lewis chose these, correcting several of the first draft: 试次 rather than
+ * 回合 for a trial, 转换 rather than 活动转换 for transitions, and the
+ * Taiwan form 职能治疗 for occupational therapy.
+ *
+ * It lives here rather than in a settings screen because a prompt belongs
+ * with the code that sends it, the way the report prompt does.
+ */
+const TRANSLATE_GLOSSARY = [
+  // Report headings
+  ["Report", "报告"],
+  ["Half-Year Progress Report", "半年进展报告"],
+  ["Monthly Report", "月度报告"],
+  ["Assessment Report", "评估报告"],
+  ["Date of Report", "报告日期"],
+  ["Progress", "进展"],
+  ["Strengths", "优势"],
+  ["Recommendations", "建议"],
+  ["Target", "目标"],
+  ["Target Behaviour", "目标行为"],
+  ["Activity", "活动"],
+  ["Session", "课程"],
+  ["Score", "分数"],
+  ["Average", "平均分"],
+  ["Trial", "试次"],
+  ["Remark", "观察记录"],
+  ["Prepared by", "撰写人"],
+  // Therapy terms
+  ["self-regulation", "自我调节"],
+  ["co-regulation", "共同调节"],
+  ["prompt / prompting", "提示"],
+  ["prompt level", "提示程度"],
+  ["independent / independently", "独立完成"],
+  ["baseline", "基线"],
+  ["mastery", "掌握"],
+  ["maintained", "维持"],
+  ["generalisation", "泛化"],
+  ["sensory", "感官"],
+  ["sensory experiences", "感官体验"],
+  ["sensory integration", "感觉统合"],
+  ["fine motor", "精细动作"],
+  ["gross motor", "粗大动作"],
+  ["communication", "沟通"],
+  ["verbal communication", "口语沟通"],
+  ["expressive vocabulary", "表达性词汇"],
+  ["receptive vocabulary", "理解性词汇"],
+  ["attention", "专注力"],
+  ["engagement", "参与度"],
+  ["transitions", "转换"],
+  ["caregiver", "照顾者"],
+  ["behavioural intervention", "行为干预"],
+  ["intervention", "干预"],
+  ["occupational therapy", "职能治疗"],
+  ["therapist", "治疗师"],
+  ["emotional responses", "情绪反应"],
+  ["distress", "情绪困扰"],
+  ["frustration", "挫折感"],
+  ["dressing tasks", "穿衣任务"],
+  // House style. The report prompt insists on these exact English phrases,
+  // so they appear in every report and must land the same way every time.
+  ["demonstrates", "表现出"],
+  ["requires support", "需要协助"],
+  ["would benefit from support in developing", "若能获得协助，将有助于发展"],
+  ["is able to", "能够"],
+  ["experiences difficulty", "感到困难"],
+  ["initiates", "主动发起"],
+  ["attends to", "专注于"],
+  ["request", "提出要求"],
+  ["has not yet developed", "尚未发展"],
+  ["not yet consistently", "尚未稳定"],
+  ["emerging", "正在萌发"],
+  ["remains limited", "仍然有限"],
+  ["remains inconsistent", "仍不稳定"],
+  ["may display physical behaviours such as", "可能出现肢体行为，例如"],
+];
+
+/** Names and phrases that must survive the translation unchanged. */
+function translateKeepList(student) {
+  const keep = ["ZORA", "ZORA Behavioural Intervention"];
+  // Target names are clinical terms the boss writes herself, often already
+  // carrying their own Chinese. Whatever she typed is what the report says.
+  for (const t of student?.targets || []) if (t?.name) keep.push(t.name);
+  return [...new Set(keep)];
+}
+
+/** What the model is told, once, for every chunk. */
+function translateInstructions(student) {
+  const zhFull  = (student?.nameZh || "").trim();
+  const zhShort = (student?.shortNameZh || "").trim() || zhFull;
+  const enFull  = (student?.name || "").trim();
+  const enShort = (student?.preferredName || "").trim() || enFull.split(" ")[0];
+
+  const names = [
+    enFull && zhFull  ? `"${enFull}" is always written "${zhFull}"` : "",
+    enShort && zhShort && enShort !== enFull ? `"${enShort}" is always written "${zhShort}"` : "",
+  ].filter(Boolean);
+
+  return `You are translating a children's therapy progress report from English into Simplified Chinese. The readers are the child's parents in Malaysia.
+
+HOW TO ANSWER
+Each line you are given starts with a number in square brackets. Answer with the same numbers, in the same order, one line each, and nothing else. No notes, no English, no explanation, no blank lines between.
+
+RULES
+- Simplified Chinese only. Never Traditional characters.
+- Translate the meaning exactly. This is a clinical document a parent may act on: never soften it, never strengthen it, never add anything, never leave anything out.
+- Numbers, dates, percentages, scores and times stay exactly as written.
+- Keep the warmth and the plain language of the English. Write as a therapist writing to a parent, not as a textbook.
+- Leave these EXACTLY as they appear, in English, untranslated:
+${translateKeepList(student).map(k => `    ${k}`).join("\n")}
+${names.length ? `- The child's name is written in Chinese:\n${names.map(n => `    ${n}`).join("\n")}` : ""}
+
+SPLIT LINES
+Some lines arrive split into pieces, like <s1>Calming Himself</s1><s2>: he needed support.</s2>. Those pieces are bold and plain text in the real document, so they must stay separate. Translate the line as a whole so it reads naturally, then put your translation back inside the SAME tags with the SAME numbers. Never add a tag, never drop one, never merge two, never renumber. A line with no tags is answered with no tags.
+
+WORD LIST
+Use exactly these, every time they appear. Consistency between reports matters more than variety.
+${TRANSLATE_GLOSSARY.map(([en, zh]) => `    ${en} = ${zh}`).join("\n")}`;
+}
+
+/**
+ * Paragraphs into batches.
+ *
+ * Big enough that the model sees the surrounding sentences and the writing
+ * flows, small enough that one refusal does not cost the whole document and
+ * the progress figure moves often enough to be believed.
+ */
+function translateChunks(items, maxChars = 3000, maxLines = 40) {
+  const chunks = [];
+  let cur = [], size = 0;
+  for (const item of items) {
+    if (cur.length && (cur.length >= maxLines || size + item.text.length > maxChars)) {
+      chunks.push(cur); cur = []; size = 0;
+    }
+    cur.push(item); size += item.text.length;
+  }
+  if (cur.length) chunks.push(cur);
+  return chunks;
+}
+
+/** One batch as the numbered block the model answers in kind. */
+function translateChunkPrompt(chunk) {
+  return chunk.map((item, i) => `[${i + 1}] ${item.text}`).join("\n");
+}
+
+/**
+ * The model's block back into one string per line.
+ *
+ * Read by the numbers rather than by line order: a translation can run onto
+ * a second line, and splitting on newlines would lose half of it.
+ */
+function translateParseReply(reply, count) {
+  const out = new Array(count).fill(null);
+  const re = /\[(\d+)\][ \t]*/g;
+  const marks = [];
+  let m;
+  // Both ends of the marker are kept: where it starts, to know where the
+  // line before it ended, and where it finishes, to know where this one
+  // begins. Working the first out from the number alone left the newline
+  // and the opening bracket on the end of every line.
+  while ((m = re.exec(String(reply))) !== null) {
+    marks.push({ n: Number(m[1]), from: m.index, at: m.index + m[0].length });
+  }
+  for (let i = 0; i < marks.length; i++) {
+    const end = i + 1 < marks.length ? marks[i + 1].from : reply.length;
+    const idx = marks[i].n - 1;
+    if (idx >= 0 && idx < count) out[idx] = String(reply).slice(marks[i].at, end).trim();
+  }
+  return out;
+}
+
+/** Ask the Worker, which asks OpenAI. The key never comes near the browser. */
+async function translateRequest(instructions, input, signal) {
+  const resp = await fetch("https://session-tracker-ai.wang-loys22.workers.dev/translate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model: "gpt-6.1-sol", instructions, input }),
+    signal,
+  });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(data?.error?.message || `The translator failed (HTTP ${resp.status}).`);
+  if (!data.text) throw new Error("The translator sent nothing back.");
+  return data.text;
+}
+
+/**
+ * The whole job: a .docx in, a Chinese .docx out.
+ *
+ * All or nothing. If a batch cannot be translated after asking twice the
+ * whole thing stops and nothing is downloaded, because half a document in
+ * Chinese is worse than none -- it looks finished.
+ */
+async function translateDocxFile(file, student, onProgress, signal) {
+  const zip = await JSZip.loadAsync(file);
+
+  // Every part of the zip that holds words a reader sees. Headers and
+  // footers are separate files and carry the date and the page number.
+  const partNames = Object.keys(zip.files).filter(n => DOCX_TEXT_PARTS.test(n));
+  if (!partNames.length) throw new Error("That file does not look like a Word document.");
+
+  const parts = [];
+  for (const name of partNames) {
+    const xml = await zip.file(name).async("string");
+    parts.push({ name, xml, paragraphs: docxParagraphs(xml) });
+  }
+
+  // The safety net. Nothing is previewed before it downloads, so the one
+  // thing worth checking is that this really is this student's report --
+  // otherwise another child's Chinese name goes out on it.
+  const enName = (student?.name || "").trim();
+  const enShort = (student?.preferredName || "").trim();
+  const allText = parts.map(p => p.paragraphs.map(par =>
+    par.runs.map(r => r.text).join("")).join("\n")).join("\n");
+  const mentioned = [enName, enShort, ...enName.split(" ")]
+    .filter(n => n && n.length > 2)
+    .some(n => allText.toLowerCase().includes(n.toLowerCase()));
+  if (!mentioned) {
+    throw new Error(`This file does not mention ${enName || "that student"} anywhere. `
+      + `Check you picked the right student, or dropped the right file.`);
+  }
+
+  // One flat list across every part, so the batches are full and the
+  // progress figure counts the whole job rather than one file at a time.
+  const items = [];
+  parts.forEach((part, pi) => part.paragraphs.forEach((para, gi) => {
+    items.push({ pi, gi, runs: para.runs.length, text: markParagraph(para.runs) });
+  }));
+  if (!items.length) throw new Error("There is no text in that file to translate.");
+
+  const instructions = translateInstructions(student);
+  const chunks = translateChunks(items);
+  const translations = parts.map(p => p.paragraphs.map(() => null));
+  let softFailures = 0;
+
+  for (let c = 0; c < chunks.length; c++) {
+    if (signal?.aborted) throw new Error("Stopped.");
+    onProgress?.(c, chunks.length);
+    const chunk = chunks[c];
+    const prompt = translateChunkPrompt(chunk);
+
+    let lines = null;
+    for (let attempt = 0; attempt < 2 && !lines; attempt++) {
+      const reply = await translateRequest(instructions, prompt, signal);
+      const parsed = translateParseReply(reply, chunk.length);
+      // Asking again is worth one go: a batch that comes back short is
+      // usually the model running on, not the model refusing.
+      if (parsed.every(x => x !== null)) lines = parsed;
+      else if (attempt === 1) lines = parsed;
+    }
+
+    chunk.forEach((item, i) => {
+      const line = lines[i];
+      if (line == null) {
+        throw new Error(`The translator skipped part of the report (line ${i + 1} of batch `
+          + `${c + 1}). Nothing has been downloaded. Try again.`);
+      }
+      let pieces = unmarkParagraph(line, item.runs);
+      if (!pieces) {
+        // The split markers came back wrong. Rather than lose the paragraph,
+        // the whole translation goes in the first piece and the rest are
+        // emptied: the words survive, the bold on a label does not.
+        softFailures++;
+        pieces = new Array(item.runs).fill("");
+        pieces[0] = String(line).replace(/<\/?s\d+>/g, "");
+      }
+      translations[item.pi][item.gi] = pieces;
+    });
+  }
+
+  onProgress?.(chunks.length, chunks.length);
+
+  for (const [i, part] of parts.entries()) {
+    zip.file(part.name, applyDocxText(part.xml, part.paragraphs, translations[i]));
+  }
+  const blob = await zip.generateAsync({
+    type: "blob",
+    mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  });
+  return { blob, softFailures, chunks: chunks.length };
+}
+
+/** Save it under the name she gave it, marked as the Chinese one. */
+function translateDownload(blob, originalName) {
+  const base = String(originalName || "report.docx").replace(/\.docx$/i, "");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `(中文) ${base}.docx`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+/**
+ * The little pill in the bottom corner.
+ *
+ * Lewis asked for progress there. The report generator shows its bar inside
+ * its own screen, which is no use here: a translation takes a minute and
+ * nobody is going to sit and watch a drop zone.
+ */
+function trPill(text) {
+  let el = document.getElementById("tr-pill");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "tr-pill";
+    document.body.appendChild(el);
+  }
+  el.textContent = text;
+  el.classList.add("tr-pill--in");
+}
+function trPillHide() {
+  const el = document.getElementById("tr-pill");
+  if (!el) return;
+  el.classList.remove("tr-pill--in");
+  setTimeout(() => el.remove(), 250);
+}
+
+// ── The screen ───────────────────────────────────────────────
+
+function openAiTranslateScreen() {
+  _trStudentId = null;
+  showScreen("screen-ai-translate");
+  renderAiTranslateBody();
+}
+
+function renderAiTranslateBody() {
+  const body = $("ai-translate-body");
+  if (!body) return;
+
+  const student = (state.students || []).find(s => s.id === _trStudentId) || null;
+  const zhFull  = (student?.nameZh || "").trim();
+
+  const picker = `
+    <label class="tr-label" for="tr-student">Who is this report for?</label>
+    <select id="tr-student" class="admin-input tr-select">
+      <option value="">Choose a student…</option>
+      ${(state.students || []).slice()
+        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")))
+        .map(s => `<option value="${escHtml(s.id)}"${s.id === _trStudentId ? " selected" : ""}>`
+          + `${escHtml(studentLabel(s))}</option>`).join("")}
+    </select>
+    <p class="tr-note">Individual sessions only. Group reports are not translated.</p>`;
+
+  let step2 = "";
+  if (student && !zhFull) {
+    step2 = `<div class="tr-blocked">
+      <strong>${escHtml(student.name)} has no Chinese name yet.</strong>
+      <p>Open the Student Database and fill in <em>Full Name (Chinese)</em> for this student,
+         then come back. The report cannot go out with an English name on it.</p>
+      <button class="export-btn" id="tr-goto-db">Open Student Database</button>
+    </div>`;
+  } else if (student) {
+    step2 = `
+      <div class="tr-drop" id="tr-drop" tabindex="0" role="button"
+           aria-label="Drop the edited Word report here, or click to choose it">
+        <div class="tr-drop-big">Drop the edited Word report here</div>
+        <div class="tr-drop-small">or click to choose it &nbsp;·&nbsp; .docx only</div>
+      </div>
+      <input type="file" id="tr-file" accept=".docx" hidden />
+      <p class="tr-note">It will be translated into Simplified Chinese and downloaded as
+         <strong>(中文) &lt;your file name&gt;.docx</strong>. The original is not changed.</p>`;
+  }
+
+  body.innerHTML = `<div class="tr-wrap">${picker}${step2}<div id="tr-status"></div></div>`;
+
+  $("tr-student").addEventListener("change", e => {
+    _trStudentId = e.target.value || null;
+    renderAiTranslateBody();
+  });
+  $("tr-goto-db")?.addEventListener("click", () => openStudentRegistryScreen());
+
+  const drop = $("tr-drop");
+  if (!drop) return;
+  const fileInput = $("tr-file");
+  drop.addEventListener("click", () => fileInput.click());
+  drop.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") fileInput.click(); });
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files?.[0]) startTranslation(fileInput.files[0], student);
+    fileInput.value = "";
+  });
+  ["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => {
+    e.preventDefault(); drop.classList.add("tr-drop--over");
+  }));
+  ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => {
+    e.preventDefault(); drop.classList.remove("tr-drop--over");
+  }));
+  drop.addEventListener("drop", e => {
+    const f = e.dataTransfer?.files?.[0];
+    if (f) startTranslation(f, student);
+  });
+}
+
+async function startTranslation(file, student) {
+  if (_trBusy) return;
+  if (!/\.docx$/i.test(file.name)) {
+    alert("That is not a Word document. Drop the .docx the report was downloaded as.");
+    return;
+  }
+  const status = $("tr-status");
+  const drop = $("tr-drop");
+  _trBusy = true;
+  drop?.classList.add("tr-drop--busy");
+
+  const show = (html) => { if (status) status.innerHTML = html; };
+  show(`<div class="tr-running">Reading <strong>${escHtml(file.name)}</strong>…</div>`);
+  trPill("Reading the file…");
+
+  try {
+    const { blob, softFailures } = await translateDocxFile(file, student, (done, total) => {
+      const pct = total ? Math.round((done / total) * 100) : 0;
+      show(`<div class="tr-running">Translating… batch ${Math.min(done + 1, total)} of ${total}</div>`);
+      trPill(`Translating ${pct}% · batch ${Math.min(done + 1, total)} of ${total}`);
+    });
+    translateDownload(blob, file.name);
+    trPillHide();
+    show(`<div class="tr-done">Downloaded <strong>(中文) ${escHtml(file.name.replace(/\.docx$/i, ""))}.docx</strong>.`
+      + (softFailures
+        ? `<br><span class="tr-warn">${softFailures} paragraph${softFailures === 1 ? "" : "s"} `
+          + `lost its bold on a label. The words are all there.</span>`
+        : "")
+      + `</div>`);
+  } catch (err) {
+    trPillHide();
+    console.error("translate:", err);
+    show(`<div class="tr-failed"><strong>Nothing was downloaded.</strong><br>${escHtml(err.message)}</div>`);
+  } finally {
+    _trBusy = false;
+    drop?.classList.remove("tr-drop--busy");
+  }
 }
 
 // ── AI Translator: swapping the text inside a .docx ──────────
