@@ -12,6 +12,17 @@ const ALLOWED_ORIGINS = new Set([
 ]);
 
 const ALLOWED_MODELS = new Set(["claude-sonnet-5"]);
+
+// ── Translation ─────────────────────────────────────────────
+// A second upstream, on /translate, for turning a finished report into
+// Chinese. OpenAI rather than Anthropic because Lewis judged its Chinese
+// better, having read both. Its key lives in OPENAI_API_KEY and, like the
+// other one, never reaches the browser.
+//
+// Models as OpenAI's own documentation names them. Sol is the default: near
+// flagship quality at a lower price, and translation leans on language
+// rather than on reasoning.
+const ALLOWED_OPENAI_MODELS = new Set(["gpt-6.1-sol", "gpt-6-astra", "gpt-6-luna"]);
 const MAX_TOKENS_CAP = 32000;
 const MAX_BODY_BYTES = 300000;   // a real half-year prompt is far below this
 
@@ -78,6 +89,13 @@ export default {
 
     let req;
     try { req = JSON.parse(raw); } catch (_) { return fail("Invalid JSON", 400, cors); }
+
+    // Which upstream, decided by the path rather than by a field in the body,
+    // so the two request shapes never have to be told apart by guesswork.
+    if (new URL(request.url).pathname === "/translate") {
+      return translate(req, env, cors);
+    }
+
     if (!ALLOWED_MODELS.has(req.model)) return fail("Model not allowed", 400, cors);
 
     // Rebuild the upstream body from known fields only. Whatever the caller
@@ -142,6 +160,75 @@ export default {
     });
   }
 };
+
+/**
+ * Report text to Chinese, through OpenAI's Responses API.
+ *
+ * No cap on the output. A translation is bounded by what it is translating,
+ * so it cannot run away the way an open-ended report can, and the body limit
+ * above already bounds the input. A cap would need a parameter name I could
+ * not confirm in OpenAI's reference, and a wrong one is a 400 on every call.
+ *
+ * Reasoning effort is low on purpose: this is a language job, not a thinking
+ * one, and the reports are long enough that the difference is real money.
+ */
+async function translate(req, env, cors) {
+  const model = ALLOWED_OPENAI_MODELS.has(req.model) ? req.model : "gpt-6.1-sol";
+  const instructions = typeof req.instructions === "string" ? req.instructions : "";
+  const input = typeof req.input === "string" ? req.input : "";
+  if (!input) return fail("Nothing to translate", 400, cors);
+
+  const hasKey = typeof env.OPENAI_API_KEY === "string" && env.OPENAI_API_KEY.length > 0;
+  if (!hasKey) return fail("The translator is not set up: OPENAI_API_KEY is missing.", 500, cors);
+
+  const body = JSON.stringify({
+    model,
+    instructions,
+    input: [{ role: "user", content: input }],
+    reasoning: { effort: "low" },
+  });
+
+  let resp, upstream = "", attempts = 0;
+  for (let attempt = 0; ; attempt++) {
+    attempts = attempt + 1;
+    resp = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body,
+    });
+    if (resp.ok) break;
+    upstream = await resp.text();
+    const canRetry = RETRY_STATUSES.has(resp.status) && attempt < RETRY_DELAYS_MS.length;
+    console.log("OPENAI FAIL", resp.status, "attempt=" + attempts,
+      "willRetry=" + canRetry, upstream.slice(0, 600));
+    if (!canRetry) break;
+    await sleep(RETRY_DELAYS_MS[attempt]);
+  }
+
+  if (!resp.ok) {
+    return fail(
+      `OpenAI refused this (HTTP ${resp.status}, ${attempts} attempt${attempts === 1 ? "" : "s"}): `
+      + upstream.slice(0, 300), resp.status, cors);
+  }
+
+  // The reply carries reasoning items as well as the message, so the text is
+  // gathered by type rather than taken from output[0], which OpenAI's own
+  // guide warns against.
+  let data;
+  try { data = await resp.json(); } catch (_) { return fail("OpenAI sent something unreadable", 502, cors); }
+  const text = (data.output || [])
+    .filter(item => item.type === "message")
+    .flatMap(item => (item.content || []).filter(c => c.type === "output_text").map(c => c.text || ""))
+    .join("");
+
+  if (!text) return fail("OpenAI returned no text", 502, cors);
+  return new Response(JSON.stringify({ text }), {
+    headers: { ...cors, "Content-Type": "application/json", "Cache-Control": "no-cache" },
+  });
+}
 
 function fail(message, status, cors, retryAfter) {
   return new Response(JSON.stringify({ error: { message } }), {

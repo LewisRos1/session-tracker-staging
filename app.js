@@ -226,7 +226,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2233";
+const APP_VERSION = "2234";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -16636,6 +16636,124 @@ async function handleCheckedByClick(e, isGroup) {
 
   return false;
 }
+
+// ── AI Translator: swapping the text inside a .docx ──────────
+//
+// A .docx is a zip of XML. Everything that makes the report look like the
+// report -- tables, headings, the stamp, the charts, page breaks, fonts --
+// lives in that XML alongside the words. So nothing is rebuilt here. The
+// file that comes back is the file that went in, with the text nodes
+// replaced and every byte around them untouched.
+//
+// Word splits a sentence into several runs wherever formatting changes, so
+// "**Calming Himself**: he needed..." is two runs, not one. Translating runs
+// separately gives nonsense, and translating the paragraph as one loses the
+// bold. Both are avoided by sending the paragraph whole with the splits
+// marked, and putting each piece back where it came from.
+
+/** Text out of an XML text node. */
+function xmlUnescape(s) {
+  return String(s)
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&");   // last, or &amp;lt; would become <
+}
+
+/** Text back into an XML text node. */
+function xmlEscape(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")    // first, for the same reason
+    .replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/**
+ * Every paragraph in a document part, and the text runs inside it.
+ *
+ * Positions are indices into the original string, so the text can be put
+ * back without the rest of the XML being touched. <w:instrText> is a field
+ * code, not prose, and is left alone by only ever matching <w:t>.
+ */
+function docxParagraphs(xml) {
+  const out = [];
+  const paraRe = /<w:p(?:\s[^>]*)?>([\s\S]*?)<\/w:p>/g;
+  let p;
+  while ((p = paraRe.exec(xml)) !== null) {
+    const body = p[1];
+    const bodyAt = p.index + p[0].length - body.length - "</w:p>".length;
+    const runs = [];
+    const runRe = /<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g;
+    let r;
+    while ((r = runRe.exec(body)) !== null) {
+      const inner = r[1];
+      const start = bodyAt + r.index + r[0].length - inner.length - "</w:t>".length;
+      runs.push({ start, end: start + inner.length, text: xmlUnescape(inner) });
+    }
+    // A paragraph with nothing to say is skipped: spacers, empty cells, and
+    // the blank paragraphs Word leaves between blocks.
+    if (runs.some(run => run.text.trim())) out.push({ runs });
+  }
+  return out;
+}
+
+/**
+ * A paragraph as one string for the model.
+ *
+ * One run goes as plain text -- which is most of them, and markers the model
+ * could drop are not worth adding for nothing. Two or more are marked, so
+ * each piece can go back into the run it came from with its formatting.
+ */
+function markParagraph(runs) {
+  if (runs.length === 1) return runs[0].text;
+  return runs.map((r, i) => `<s${i + 1}>${r.text}</s${i + 1}>`).join("");
+}
+
+/**
+ * The model's answer back into one string per run.
+ *
+ * Returns null when the pieces do not match what was sent, which is the
+ * caller's signal to ask again rather than write nonsense into the file.
+ */
+function unmarkParagraph(reply, count) {
+  if (count === 1) return [String(reply)];
+  const parts = [];
+  for (let i = 1; i <= count; i++) {
+    const m = new RegExp("<s" + i + ">([\\s\\S]*?)</s" + i + ">").exec(reply);
+    if (!m) return null;
+    parts.push(m[1]);
+  }
+  return parts;
+}
+
+/**
+ * Put the translations back, last first.
+ *
+ * Last first because every replacement changes the length of the string, and
+ * working backwards means the positions ahead of the cursor are still the
+ * ones that were measured.
+ */
+function applyDocxText(xml, paragraphs, translations) {
+  const edits = [];
+  paragraphs.forEach((para, i) => {
+    const parts = translations[i];
+    if (!parts) return;                       // left in English on purpose
+    para.runs.forEach((run, j) => {
+      if (parts[j] === undefined) return;
+      edits.push({ start: run.start, end: run.end, text: xmlEscape(parts[j]) });
+    });
+  });
+  edits.sort((a, b) => b.start - a.start);
+  let out = xml;
+  for (const e of edits) out = out.slice(0, e.start) + e.text + out.slice(e.end);
+  return out;
+}
+
+/**
+ * The parts of a .docx that hold words a reader sees.
+ *
+ * Headers and footers are separate files inside the zip and are easy to
+ * forget; the page number and the date live there.
+ */
+const DOCX_TEXT_PARTS = /^word\/(document|header\d*|footer\d*|footnotes|endnotes)\.xml$/;
 
 // ── Sticky Note — "List of Corrections" ──────────────────────
 
