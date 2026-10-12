@@ -56,8 +56,15 @@ check("Needs Revision belongs to both, so she can send a row back",
 
 console.log("\nthe state a row is in shows even when it is not yours to pick");
 check("such an option is greyed out rather than hidden",
-  /mayPickCorrection\(o\) \|\| o\.value === st/.test(src)
-  && /mayPickCorrection\(o\) \? "" : " disabled"/.test(src), true);
+  /mayPickCorrection\(o\) \|\| o\.value === st/.test(src), true);
+check("and says who it belongs to when you hover it",
+  /disabled`\s*\+ ` title="\$\{escHtml\(whoMayPick\(o\)\)\}"/.test(src), true);
+check("the box itself carries the same sentence, since option tooltips are patchy",
+  /lockedNote \? ` title=/.test(src), true);
+check("it names Ms. Daisy for Approved",
+  /Only Ms\. Daisy can approve\./.test(src), true);
+check("and names the instructor whose list it is for Done",
+  /Only \$\{instructorName\(_stickyNoteInstructorId\)/.test(src), true);
 
 console.log("\nwhose turn each state is (what the button outside counts)");
 check("nothing done yet -> the person being corrected", turnOf(""), "them");

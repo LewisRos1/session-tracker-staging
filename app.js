@@ -226,7 +226,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2225";
+const APP_VERSION = "2226";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -16685,15 +16685,26 @@ function renderStickyNoteContent(data, isGroup) {
       // The state the row is actually in is always listed, or the box would
       // show the wrong thing -- but greyed out when it is not this person's
       // to choose, so it reads as information rather than an option.
+      // Greyed out says you cannot, not why. Hovering says why.
+      const whoMayPick = o => o.who === "daisy"
+        ? "Only Ms. Daisy can approve."
+        : `Only ${instructorName(_stickyNoteInstructorId) || "the instructor"} can set this to ${o.label}.`;
       const opts = CORRECTION_STATUSES
         .filter(o => mayPickCorrection(o) || o.value === st)
-        .map(o => `<option value="${o.value}"${o.value === st ? " selected" : ""}`
-          + `${mayPickCorrection(o) ? "" : " disabled"}>${escHtml(o.label)}</option>`)
+        .map(o => mayPickCorrection(o)
+          ? `<option value="${o.value}"${o.value === st ? " selected" : ""}>${escHtml(o.label)}</option>`
+          : `<option value="${o.value}"${o.value === st ? " selected" : ""} disabled`
+            + ` title="${escHtml(whoMayPick(o))}">${escHtml(o.label)}</option>`)
         .join("");
+      // A tooltip on an <option> is not shown by every browser, so the box
+      // itself carries the same sentence as a fallback.
+      const lockedNote = CORRECTION_STATUSES
+        .filter(o => !mayPickCorrection(o))
+        .map(whoMayPick).join(" ");
       return `<tr class="snote-row${rowCls}">
         <td class="snote-no">${i + 1}</td>
         <td class="snote-text"><textarea class="snote-textarea" data-cmt-id="${id}" rows="1" placeholder="Type here…">${escHtml(text)}</textarea></td>
-        <td class="snote-tick"><select class="snote-status-sel ${stCls}" data-cmt-id="${id}">${opts}</select></td>
+        <td class="snote-tick"><select class="snote-status-sel ${stCls}" data-cmt-id="${id}"${lockedNote ? ` title="${escHtml(lockedNote)}"` : ""}>${opts}</select></td>
         <td class="snote-del"><button class="snote-del-btn" data-cmt-id="${id}" title="Delete row">🗑</button></td>
       </tr>`;
     }).join("");
