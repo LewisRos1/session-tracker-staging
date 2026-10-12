@@ -372,6 +372,7 @@ const exposed = [
   "watchConfigForOpenSession",
   // The AI Translator screen, and the pieces its tests drive directly.
   "openAiTranslateScreen", "renderAiTranslateBody", "translateInstructions",
+  "openStudentRegistryScreen",
   "translateChunks", "translateChunkPrompt", "translateParseReply",
   "renderStudentDatabaseButton",
 ];

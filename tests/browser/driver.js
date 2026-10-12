@@ -265,6 +265,18 @@ export async function openPage(dir, { verbose = false, site: shared = null } = {
       return page;
     },
 
+    /**
+     * Pretend the window is a different size.
+     *
+     * Lewis keeps finding layout faults at half screen width, which is how
+     * he actually works, and a test at 1400 wide will never see one.
+     */
+    async resize(width, height = 1000) {
+      await send("Emulation.setDeviceMetricsOverride", {
+        width, height, deviceScaleFactor: 1, mobile: false,
+      });
+    },
+
     /** Poll an expression until it is true. */
     async until(expression, what = expression, timeoutMs = 15000) {
       const deadline = Date.now() + timeoutMs;

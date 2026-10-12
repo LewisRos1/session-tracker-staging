@@ -226,7 +226,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2235";
+const APP_VERSION = "2236";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -3572,15 +3572,15 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
         <button class="export-btn" id="btn-add-student-row">+ Add New Student</button>
       </div>
       <div class="view-table-wrapper">
-        <table class="view-table">
+        <table class="view-table registry-table">
           <colgroup>
             <col style="width:42px">
-            <col style="width:15%">
-            <col style="width:12%">
+            <col style="width:150px">
+            <col style="width:130px">
             <col style="width:170px">
-            <col style="width:10%">
-            <col style="width:10%">
-            <col style="width:170px">
+            <col style="width:130px">
+            <col style="width:130px">
+            <col style="width:160px">
             <col style="width:110px">
             <col style="width:150px">
             <col style="width:48px">

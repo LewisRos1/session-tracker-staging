@@ -66,6 +66,9 @@ results.push(await run("The Undo button is actually visible",
 results.push(await run("AI Translator: the screen and what it tells the model",
   ["run", "-A", "tests/browser/ai-translator.test.js", HARNESS]));
 
+results.push(await run("The Student Database at half a screen",
+  ["run", "-A", "tests/browser/student-database-layout.test.js", HARNESS]));
+
 results.push(await run("What an assistant may and may not touch",
   ["run", "-A", "tests/browser/assistant-readonly.test.js", HARNESS]));
 

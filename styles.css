@@ -5270,3 +5270,11 @@ button.wf-pill:hover { filter: brightness(.93); }
   max-width: min(90vw, 24rem);
 }
 #tr-pill.tr-pill--in { opacity: 1; transform: translateY(0); }
+
+/* The Student Database, which is ten columns wide.
+   .view-table has min-width 600px, which is right for the narrower tables
+   but left this one dividing a half-width window between ten columns: the
+   name boxes came out four characters wide and the headers wrapped one
+   letter to a line. It is wider than a half screen and it should say so, by
+   scrolling sideways rather than by crushing itself. */
+.registry-table { min-width: 1220px; }
