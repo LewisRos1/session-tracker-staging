@@ -88,6 +88,19 @@ check("the workflow still asks for exactly that value",
   /getCmtStatus\(c\) === "fixed"/.test(src), true);
 check("and a change away from it still reopens the phases",
   /if \(next !== "fixed"\)/.test(src), true);
+console.log("\nthe to-do pills say who, in words");
+// "Check R1" was a first initial and a phase number. It needed explaining
+// every time, and matched nothing else on the screen.
+check("the first check names the person",
+  /tasks\.push\(`Check #1 \(\$\{instructorName\(id\)\}\)`\)/.test(src), true);
+check("and so does the second",
+  /tasks\.push\(`Check #2 \(\$\{instructorName\(id\)\}\)`\)/.test(src), true);
+check("the initial-letter version is gone",
+  /\.name\[0\] \+ "[12]"/.test(src), false);
+check("they match the phase names on the workflow chart",
+  /Phase 2: Check #1/.test(src) && /Phase 4: Check #2/.test(src), true);
+
+
 
 console.log("\nLewis can approve too, so he can unstick the team");
 const signers = src.match(/canSignOffCorrections = \(\) => (\[[^\]]*\])/)?.[1];
