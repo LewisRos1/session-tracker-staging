@@ -57,6 +57,9 @@ results.push(await run("A window must not flag its own save",
 results.push(await run("A window must not ask about an earlier window",
   ["run", "-A", "tests/browser/stale-flag-carryover.test.js", HARNESS]));
 
+results.push(await run("The Undo button is actually visible",
+  ["run", "-A", "tests/browser/sticky-note-undo.test.js", HARNESS]));
+
 results.push(await run("What an assistant may and may not touch",
   ["run", "-A", "tests/browser/assistant-readonly.test.js", HARNESS]));
 

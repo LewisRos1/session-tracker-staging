@@ -3741,19 +3741,6 @@ button.wf-pill:hover { filter: brightness(.93); }
   cursor: pointer;
 }
 .snote-submit-btn:hover { background: #059669; }
-.snote-undo-btn {
-  display: none;
-  width: 100%;
-  padding: .35rem;
-  background: white;
-  border: 1.5px solid #d1d5db;
-  border-radius: 6px;
-  color: #6b7280;
-  font-size: .8rem;
-  font-family: inherit;
-  cursor: pointer;
-}
-.snote-undo-btn:hover { background: #f3f4f6; }
 
 @media (max-width: 600px) {
   .checked-by-strip { margin: -1rem -.9rem .6rem; padding: .45rem .9rem; }
