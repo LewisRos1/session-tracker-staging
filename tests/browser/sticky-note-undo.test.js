@@ -32,7 +32,7 @@ const ROWS = `
         <option>Ms. Daisy: "Needs Revision"</option>
         <option>Ms. Daisy: "Approved"</option>
         <option selected>Rayhanah: "Done"</option>
-      </select><button class="snote-undo-btn" id="undo">&#8630; Undo</button>
+      </select><button class="snote-undo-btn" id="undo">&#8630; Revert back to Needs Revision</button>
     </div></td>
     <td class="snote-del"><button class="snote-del-btn">x</button></td>
   </tr>
@@ -64,7 +64,10 @@ try {
     const cs = getComputedStyle(b);
     return { w: Math.round(rect.width), h: Math.round(rect.height),
              display: cs.display, visibility: cs.visibility, opacity: cs.opacity,
-             text: b.textContent.replace(/\s+/g, " ").trim() };
+             // Doubled on purpose: this runs inside a template literal, where
+             // a lone \s is just s -- the regex became /s+/g and replaced
+             // every letter s in the label with a space.
+             text: b.textContent.replace(/\\s+/g, " ").trim() };
   })()`);
 
   r.ok("it is not display:none", box.display !== "none", `display is ${box.display}`);
@@ -73,7 +76,8 @@ try {
     `visibility ${box.visibility}, opacity ${box.opacity}`);
   r.ok("it has a real size on screen", box.w > 40 && box.h > 10,
     `measured ${box.w} by ${box.h} pixels`);
-  r.ok("it says the word, not just an arrow", /Undo/.test(box.text), `reads "${box.text}"`);
+  r.ok("it spells out what it does",
+    /Revert back to Needs Revision/.test(box.text), `reads "${box.text}"`);
 
   r.section("and sits under the dropdown, not beside it");
   const stacked = await page.eval(`(() => {

@@ -226,7 +226,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2237";
+const APP_VERSION = "2238";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -17337,7 +17337,8 @@ function renderStickyNoteContent(data, isGroup) {
       const canUndo = st === "done";
       const undoBtn = canUndo
         ? `<button class="snote-undo-btn" data-cmt-id="${id}"`
-          + ` title="Not done yet - put this back to Needs Revision">&#8630; Undo</button>`
+          + ` title="Not done yet - put this back to Needs Revision">`
+          + `&#8630; Revert back to Needs Revision</button>`
         : "";
       return `<tr class="snote-row${rowCls}">
         <td class="snote-no">${i + 1}</td>

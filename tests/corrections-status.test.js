@@ -91,8 +91,8 @@ check("only on a row that says Done",
   /const canUndo = st === "done";/.test(src), true);
 check("shown to everybody -- hiding it from approvers left Lewis staring at a row with no button",
   /canUndo = st === "done" && !canSignOffCorrections/.test(src), false);
-check("the button says the word, not just a symbol",
-  /&#8630; Undo<\/button>/.test(src), true);
+check("the button spells out what it does",
+  /&#8630; Revert back to Needs Revision<\/button>/.test(src), true);
 check("and says what it will do when you hover it",
   /title="Not done yet - put this back to Needs Revision"/.test(src), true);
 check("it puts the row back to Needs Revision",
