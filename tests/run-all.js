@@ -39,6 +39,9 @@ results.push(await run("List of Corrections: three states, Ms. Daisy approves (n
 results.push(await run("AI Translator: swapping text inside a .docx (no browser)",
   ["run", "--allow-read", "tests/docx-text-swap.test.js"]));
 
+results.push(await run("AI Translator: telling Word the text is Chinese (no browser)",
+  ["run", "--allow-read", "tests/docx-chinese-font.test.js"]));
+
 results.push(await run("the app starts in a real browser",
   ["run", "-A", "tests/browser/smoke.test.js", HARNESS]));
 

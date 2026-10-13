@@ -226,7 +226,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2239";
+const APP_VERSION = "2240";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -16965,9 +16965,20 @@ async function translateDocxFile(file, student, onProgress, signal) {
 
   onProgress?.(chunks.length, chunks.length);
 
-  for (const [i, part] of parts.entries()) {
-    zip.file(part.name, applyDocxText(part.xml, part.paragraphs, translations[i]));
+  // The words first.
+  const rewritten = new Map();
+  parts.forEach((part, i) =>
+    rewritten.set(part.name, applyDocxText(part.xml, part.paragraphs, translations[i])));
+
+  // Then the fonts, over a wider set: styles.xml carries no text at all but
+  // holds the document default that decides how Chinese is broken into
+  // lines, which is the whole reason this step exists.
+  for (const name of Object.keys(zip.files)) {
+    if (!DOCX_FONT_PARTS.test(name)) continue;
+    const xml = rewritten.has(name) ? rewritten.get(name) : await zip.file(name).async("string");
+    rewritten.set(name, setChineseFonts(xml));
   }
+  for (const [name, xml] of rewritten) zip.file(name, xml);
   const blob = await zip.generateAsync({
     type: "blob",
     mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -17275,6 +17286,49 @@ function applyDocxText(xml, paragraphs, translations) {
 }
 
 /**
+ * Tell Word the text is Chinese.
+ *
+ * This is what put "3)" on a line of its own above the sentence it
+ * belonged to, and what covered the Chinese in red spell-check squiggles.
+ *
+ * The report is built with Times New Roman, and the docx library writes
+ * that into EVERY slot including w:eastAsia -- so the document says "use
+ * Times New Roman for East Asian text". Times New Roman has no Chinese in
+ * it. Word then treats the characters as Latin, and Latin only breaks at
+ * spaces: a Chinese sentence has none, so the whole thing becomes one
+ * unbreakable word. It cannot fit after "3)", drops to the next line, and
+ * is then force-broken in the middle because it is longer than the line.
+ * Short lines looked fine, which is why the headings were right and the
+ * sentences were not.
+ *
+ * SimSun because it is on every Windows machine with Word and sits beside
+ * Times New Roman without looking out of place. The language tag stops the
+ * English spellchecker underlining every character.
+ */
+const CHINESE_EASTASIA_FONT = "SimSun";
+function setChineseFonts(xml) {
+  // Only inside <w:rFonts>. A blanket search for w:eastAsia also finds it
+  // on <w:lang>, where it names a LANGUAGE -- so the first version of this
+  // set the language to "SimSun" and then added a second <w:lang> every
+  // time it ran again.
+  let out = String(xml).replace(/<w:rFonts\b([^>]*?)(\/?)>/g, (whole, attrs, slash) => {
+    const next = /w:eastAsia="/.test(attrs)
+      ? attrs.replace(/w:eastAsia="[^"]*"/, `w:eastAsia="${CHINESE_EASTASIA_FONT}"`)
+      : `${attrs} w:eastAsia="${CHINESE_EASTASIA_FONT}"`;
+    return `<w:rFonts${next}${slash}>`;
+  });
+  // And say it is Chinese, so it is not proofed as English.
+  out = out.replace(/<w:rPrDefault><w:rPr>([\s\S]*?)<\/w:rPr><\/w:rPrDefault>/,
+    (whole, inner) => inner.includes("w:eastAsia=\"zh")
+      ? whole
+      : `<w:rPrDefault><w:rPr>${inner}<w:lang w:eastAsia="zh-CN"/></w:rPr></w:rPrDefault>`);
+  return out;
+}
+
+/** The parts that carry fonts worth correcting, text or not. */
+const DOCX_FONT_PARTS = /^word\/(document|header\d*|footer\d*|footnotes|endnotes|styles)\.xml$/;
+
+/**
  * The parts of a .docx that hold words a reader sees.
  *
  * Headers and footers are separate files inside the zip and are easy to
