@@ -78,6 +78,9 @@ results.push(await run("The kebab menu on a short screen",
 results.push(await run("The daily session note's footer",
   ["run", "-A", "tests/browser/session-note-footer.test.js", HARNESS]));
 
+results.push(await run("Two notices in the corner, stacked",
+  ["run", "-A", "tests/browser/notice-stack.test.js", HARNESS]));
+
 results.push(await run("What an assistant may and may not touch",
   ["run", "-A", "tests/browser/assistant-readonly.test.js", HARNESS]));
 

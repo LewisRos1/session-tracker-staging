@@ -373,6 +373,7 @@ const exposed = [
   // The AI Translator screen, and the pieces its tests drive directly.
   "openAiTranslateScreen", "renderAiTranslateBody", "translateInstructions",
   "openStudentRegistryScreen",
+  "aiPillShow", "aiPillHide", "trPill", "trPillHide",
   // So a test can build a real Word report and look inside it, rather
   // than guessing at the XML the app actually produces.
   "exportStudentSingleSessionWord",

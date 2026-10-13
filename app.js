@@ -226,7 +226,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2241";
+const APP_VERSION = "2242";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -5654,20 +5654,70 @@ function getGroupEffectiveTargets(studentId) {
 // section's HTML and would destroy it mid-run.
 let _aiJob = null;
 
-function aiPillEl() {
-  let el = document.getElementById("ai-report-pill");
+/**
+ * The corner where notices live, so two of them do not sit on top of each
+ * other.
+ *
+ * The report pill and the translator pill were both fixed to the same
+ * corner, and the report's sat higher, so finishing a translation while an
+ * old "Done!" was still on screen looked like nothing had happened. They
+ * stack now, the way a phone does it, newest nearest the corner.
+ *
+ * The stack itself ignores the mouse; only the notices in it take clicks,
+ * or an empty corner would swallow them.
+ */
+function noticeStack() {
+  let el = document.getElementById("notice-stack");
   if (el) return el;
   el = document.createElement("div");
-  el.id = "ai-report-pill";
+  el.id = "notice-stack";
+  document.body.appendChild(el);
+  return el;
+}
+
+/**
+ * A notice with a filling ring and a percentage in it.
+ *
+ * One component, more than one on screen. The report generator has had
+ * this since it was built; the translator showed a plain line of text
+ * saying "batch 4 of 10", which means nothing to anybody who has not read
+ * the code. A ring and a number are the same thing said in a way that
+ * needs no explaining.
+ */
+function makeProgressPill(id, onClose) {
+  let el = document.getElementById(id);
+  if (el) return el;
+  el = document.createElement("div");
+  el.id = id;
+  el.className = "progress-pill";
   el.innerHTML = `<span class="ai-pill-ring"><span class="ai-pill-pct">0%</span></span>`
     + `<span class="ai-pill-text"></span><span class="ai-pill-time"></span>`
     + `<button class="ai-pill-x" title="Cancel">✕</button>`;
-  el.querySelector(".ai-pill-x").addEventListener("click", () => {
+  el.querySelector(".ai-pill-x").addEventListener("click", onClose);
+  noticeStack().appendChild(el);
+  return el;
+}
+
+/** Put a message, a state and a percentage into one of them. */
+function pillShow(el, text, cls, pct) {
+  el.classList.toggle("is-done", cls === "done");
+  el.classList.toggle("is-fail", cls === "fail");
+  el.querySelector(".ai-pill-text").textContent = text;
+  if (typeof pct === "number") {
+    const ring = el.querySelector(".ai-pill-ring");
+    const p = Math.max(0, Math.min(100, Math.round(pct)));
+    ring.style.setProperty("--pct", p + "%");
+    ring.querySelector(".ai-pill-pct").textContent = p + "%";
+  }
+  el.querySelector(".ai-pill-x").title = cls ? "Dismiss" : "Cancel";
+  el.style.display = "flex";
+}
+
+function aiPillEl() {
+  return makeProgressPill("ai-report-pill", () => {
     if (_aiJob) _aiJob.abort();
     else aiPillHide();
   });
-  document.body.appendChild(el);
-  return el;
 }
 let _aiTimerId = null, _aiStartedAt = 0;
 
@@ -5694,18 +5744,7 @@ function aiTimerStop() {
 }
 
 function aiPillShow(text, cls, pct) {
-  const el = aiPillEl();
-  el.classList.toggle("is-done", cls === "done");
-  el.classList.toggle("is-fail", cls === "fail");
-  el.querySelector(".ai-pill-text").textContent = text;
-  if (typeof pct === "number") {
-    const ring = el.querySelector(".ai-pill-ring");
-    const p = Math.max(0, Math.min(100, Math.round(pct)));
-    ring.style.setProperty("--pct", p + "%");
-    ring.querySelector(".ai-pill-pct").textContent = p + "%";
-  }
-  el.querySelector(".ai-pill-x").title = cls ? "Dismiss" : "Cancel";
-  el.style.display = "flex";
+  pillShow(aiPillEl(), text, cls, pct);
 }
 function aiPillHide() {
   const el = document.getElementById("ai-report-pill");
@@ -17005,21 +17044,19 @@ function translateDownload(blob, originalName) {
  * its own screen, which is no use here: a translation takes a minute and
  * nobody is going to sit and watch a drop zone.
  */
-function trPill(text) {
-  let el = document.getElementById("tr-pill");
-  if (!el) {
-    el = document.createElement("div");
-    el.id = "tr-pill";
-    document.body.appendChild(el);
-  }
-  el.textContent = text;
-  el.classList.add("tr-pill--in");
+/** The short name a notice shows, as the report generator does it. */
+function translateShortName(student) {
+  return student?.preferredName || String(student?.name || "").split(" ")[0] || "Report";
+}
+
+function trPillEl() {
+  return makeProgressPill("tr-pill", () => trPillHide());
+}
+function trPill(text, cls, pct) {
+  pillShow(trPillEl(), text, cls, pct);
 }
 function trPillHide() {
-  const el = document.getElementById("tr-pill");
-  if (!el) return;
-  el.classList.remove("tr-pill--in");
-  setTimeout(() => el.remove(), 250);
+  document.getElementById("tr-pill")?.remove();
 }
 
 // ── The screen ───────────────────────────────────────────────
@@ -17110,16 +17147,20 @@ async function startTranslation(file, student) {
 
   const show = (html) => { if (status) status.innerHTML = html; };
   show(`<div class="tr-running">Reading <strong>${escHtml(file.name)}</strong>…</div>`);
-  trPill("Reading the file…");
+  trPill("Reading the file…", null, 0);
 
   try {
+    // A percentage, not "batch 4 of 10". Batches are how the work is cut
+    // up for the model; nobody using this has any reason to know that.
     const { blob, softFailures } = await translateDocxFile(file, student, (done, total) => {
-      const pct = total ? Math.round((done / total) * 100) : 0;
-      show(`<div class="tr-running">Translating… batch ${Math.min(done + 1, total)} of ${total}</div>`);
-      trPill(`Translating ${pct}% · batch ${Math.min(done + 1, total)} of ${total}`);
+      const pct = total ? (done / total) * 100 : 0;
+      show(`<div class="tr-running">Translating…</div>`);
+      trPill("Translating into Chinese…", null, pct);
     });
     translateDownload(blob, file.name);
-    trPillHide();
+    // Left on screen like the report's, so it is still there when she comes
+    // back to the tab. It stacks under any other notice rather than over it.
+    trPill(`Done! → ${translateShortName(student)} (Chinese)`, "done", 100);
     show(`<div class="tr-done">Downloaded <strong>(中文) ${escHtml(file.name.replace(/\.docx$/i, ""))}.docx</strong>.`
       + (softFailures
         ? `<br><span class="tr-warn">${softFailures} paragraph${softFailures === 1 ? "" : "s"} `
@@ -17127,7 +17168,7 @@ async function startTranslation(file, student) {
         : "")
       + `</div>`);
   } catch (err) {
-    trPillHide();
+    trPill("The translation failed. Nothing was downloaded.", "fail");
     console.error("translate:", err);
     show(`<div class="tr-failed"><strong>Nothing was downloaded.</strong><br>${escHtml(err.message)}</div>`);
   } finally {

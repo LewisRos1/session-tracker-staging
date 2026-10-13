@@ -4227,8 +4227,17 @@ button.wf-pill:hover { filter: brightness(.93); }
 /* ── Background AI report indicator ────────────────────────────
    Fixed to the viewport, not to the AI Report section, because going
    home rebuilds that section's HTML and would destroy it mid-run. */
-#ai-report-pill {
+/* The corner where notices live. They used to be fixed to it one on top of
+   the other, so a finished translation was hidden behind an old "Done!"
+   from the report generator. Newest nearest the corner, like a phone. */
+#notice-stack {
   position: fixed; right: 1rem; bottom: 1rem; z-index: 9999;
+  display: flex; flex-direction: column; align-items: flex-end; gap: .5rem;
+  pointer-events: none;            /* an empty corner must not eat clicks */
+}
+#notice-stack > * { pointer-events: auto; }
+
+.progress-pill {
   display: none; align-items: center; gap: .65rem;
   padding: .6rem .95rem; border-radius: 999px;
   background: #111827; color: #fff;
@@ -4237,41 +4246,41 @@ button.wf-pill:hover { filter: brightness(.93); }
   max-width: min(92vw, 460px);
   --pill-bg: #111827;
 }
-#ai-report-pill.is-done { background: #15803d; --pill-bg: #15803d; }
-#ai-report-pill.is-fail { background: #b91c1c; --pill-bg: #b91c1c; }
+.progress-pill.is-done { background: #15803d; --pill-bg: #15803d; }
+.progress-pill.is-fail { background: #b91c1c; --pill-bg: #b91c1c; }
 /* A failure message is a sentence rather than a word, so it drops the fully
    rounded ends and lets the text wrap from the top. */
-#ai-report-pill.is-fail { border-radius: 14px; align-items: flex-start; }
+.progress-pill.is-fail { border-radius: 14px; align-items: flex-start; }
 /* Determinate ring: fills clockwise to the percentage, with the number in the
    middle. The inner disc uses --pill-bg so it stays invisible on every state. */
-#ai-report-pill .ai-pill-ring {
+.progress-pill .ai-pill-ring {
   position: relative; width: 34px; height: 34px; flex-shrink: 0;
   border-radius: 50%;
   background: conic-gradient(#fff 0 var(--pct, 0%), rgba(255,255,255,.25) var(--pct, 0%) 100%);
   display: flex; align-items: center; justify-content: center;
 }
-#ai-report-pill .ai-pill-ring::before {
+.progress-pill .ai-pill-ring::before {
   content: ""; position: absolute; inset: 4px;
   border-radius: 50%; background: var(--pill-bg);
 }
-#ai-report-pill .ai-pill-pct {
+.progress-pill .ai-pill-pct {
   position: relative; font-size: .6rem; font-weight: 700;
   letter-spacing: -.02em; color: #fff;
 }
-#ai-report-pill.is-done .ai-pill-ring,
-#ai-report-pill.is-fail .ai-pill-ring { display: none; }
-#ai-report-pill .ai-pill-text { flex: 1; min-width: 0; }
+.progress-pill.is-done .ai-pill-ring,
+.progress-pill.is-fail .ai-pill-ring { display: none; }
+.progress-pill .ai-pill-text { flex: 1; min-width: 0; }
 /* Tabular figures so the clock does not jiggle the text beside it every second. */
-#ai-report-pill .ai-pill-time {
+.progress-pill .ai-pill-time {
   flex-shrink: 0; font-variant-numeric: tabular-nums;
   font-size: .8rem; font-weight: 700; opacity: .75;
 }
-#ai-report-pill .ai-pill-time:empty { display: none; }
-#ai-report-pill .ai-pill-x {
+.progress-pill .ai-pill-time:empty { display: none; }
+.progress-pill .ai-pill-x {
   background: none; border: none; color: rgba(255,255,255,.8);
   font-size: .95rem; cursor: pointer; padding: 0 0 0 .2rem; flex-shrink: 0;
 }
-#ai-report-pill .ai-pill-x:hover { color: #fff; }
+.progress-pill .ai-pill-x:hover { color: #fff; }
 
 /* ── Score Settings page ───────────────────────────────────────
    Two cards: the scale itself, and a sandbox that works off the unsaved
@@ -5255,21 +5264,6 @@ button.wf-pill:hover { filter: brightness(.93); }
 
 /* The corner pill. A translation takes about a minute and nobody is going
    to sit watching a drop zone, so the progress follows them around. */
-#tr-pill {
-  position: fixed;
-  right: 1.1rem; bottom: 1.1rem;
-  z-index: 3000;
-  background: #111827; color: #fff;
-  font-size: .82rem; font-weight: 600;
-  padding: .55rem 1rem;
-  border-radius: 999px;
-  box-shadow: 0 6px 24px rgba(0,0,0,.3);
-  opacity: 0; transform: translateY(.4rem);
-  transition: opacity .2s ease, transform .2s ease;
-  pointer-events: none;
-  max-width: min(90vw, 24rem);
-}
-#tr-pill.tr-pill--in { opacity: 1; transform: translateY(0); }
 
 /* The Student Database, which is ten columns wide.
    .view-table has min-width 600px, which is right for the narrower tables
@@ -5278,3 +5272,6 @@ button.wf-pill:hover { filter: brightness(.93); }
    letter to a line. It is wider than a half screen and it should say so, by
    scrolling sideways rather than by crushing itself. */
 .registry-table { min-width: 1220px; }
+
+/* The translator's notice is the same component as the report's. */
+.progress-pill.tr-pill--in { opacity: 1; }
