@@ -226,7 +226,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2238";
+const APP_VERSION = "2239";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -16795,7 +16795,7 @@ function translateInstructions(student) {
   return `You are translating a children's therapy progress report from English into Simplified Chinese. The readers are the child's parents in Malaysia.
 
 HOW TO ANSWER
-Each line you are given starts with a number in square brackets. Answer with the same numbers, in the same order, one line each, and nothing else. No notes, no English, no explanation, no blank lines between.
+Each line you are given starts with a number in square brackets. Answer with the same numbers, in the same order, one line each, and nothing else. No notes, no English, no explanation, no blank lines between. Never break a line in two: one line in, one line out, however long it is. A line break inside an answer becomes a real break in the Word document and splits a sentence from the number in front of it.
 
 RULES
 - Simplified Chinese only. Never Traditional characters.
@@ -17212,6 +17212,44 @@ function unmarkParagraph(reply, count) {
   return parts;
 }
 
+/** A character Chinese is written in, where a space would be wrong. */
+const isCjkChar = ch => /[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uff00-\uffef]/.test(ch || "");
+
+/**
+ * A line break that arrived with the translation is not a line break.
+ *
+ * A <w:t> never holds one: Word writes a real break as its own <w:br/>
+ * element, outside the text. So a newline here is an accident of how the
+ * model laid its answer out -- and Word renders it, which is how "3)" ended
+ * up alone on a line above the sentence it belongs to.
+ *
+ * Dropped only when Chinese sits on BOTH sides, where a space would be
+ * wrong. Anywhere else it becomes one space: running two English words
+ * together is worse, and a space between Chinese and Latin is right
+ * anyway -- which is also what keeps the space in "3) 对环境".
+ */
+function joinWrappedLines(text) {
+  return String(text).replace(/[ \t]*[\r\n]+[ \t]*/g, (m, at, whole) =>
+    (isCjkChar(whole[at - 1]) && isCjkChar(whole[at + m.length])) ? "" : " ");
+}
+
+/**
+ * Keep the spacing the English had around a run.
+ *
+ * The space in "3) " belongs to the layout, not to the language, and the
+ * model has no reason to preserve it -- it is translating words, and a
+ * trailing space looks like nothing to translate. Put back from the
+ * original either way, so a numbered line reads "3) 对环境..." and not
+ * "3)对环境..." or "3)" on a line of its own.
+ *
+ * A run that was only spacing is left exactly as it was.
+ */
+function keepRunSpacing(original, translated) {
+  const was = String(original);
+  if (!was.trim()) return was;
+  return was.match(/^\s*/)[0] + joinWrappedLines(translated).trim() + was.match(/\s*$/)[0];
+}
+
 /**
  * Put the translations back, last first.
  *
@@ -17226,7 +17264,8 @@ function applyDocxText(xml, paragraphs, translations) {
     if (!parts) return;                       // left in English on purpose
     para.runs.forEach((run, j) => {
       if (parts[j] === undefined) return;
-      edits.push({ start: run.start, end: run.end, text: xmlEscape(parts[j]) });
+      edits.push({ start: run.start, end: run.end,
+                   text: xmlEscape(keepRunSpacing(run.text, parts[j])) });
     });
   });
   edits.sort((a, b) => b.start - a.start);

@@ -25,9 +25,13 @@ function extract(name) {
 }
 
 const names = ["xmlUnescape", "xmlEscape", "docxParagraphs", "markParagraph",
-               "unmarkParagraph", "applyDocxText"];
-const fns = new Function(names.map(extract).join("\n") + `\nreturn { ${names.join(", ")} };`)();
-const { docxParagraphs, markParagraph, unmarkParagraph, applyDocxText } = fns;
+               "unmarkParagraph", "joinWrappedLines", "keepRunSpacing",
+               "applyDocxText"];
+const cjk = src.match(/const isCjkChar = [^;]+;/)[0];
+const fns = new Function(cjk + "\n" + names.map(extract).join("\n")
+  + `\nreturn { ${names.join(", ")} };`)();
+const { docxParagraphs, markParagraph, unmarkParagraph,
+        joinWrappedLines, keepRunSpacing, applyDocxText } = fns;
 
 let failed = 0;
 const check = (what, got, want) => {
@@ -134,6 +138,46 @@ console.log("\nputting it back");
   check("translating to the same words changes nothing at all",
     applyDocxText(xml, docxParagraphs(xml), [["hello"]]), xml);
 }
+
+console.log("\na line break the model added is not a line break");
+// Word writes a real break as its own <w:br/>, outside the text, so a
+// newline inside a text node is an accident of how the model laid out its
+// answer -- and Word renders it. This is what put "3)" alone on a line
+// above the sentence it belonged to.
+check("dropped between Chinese characters, where a space would be wrong",
+  joinWrappedLines("对环境\n和活动"), "对环境和活动");
+check("a space anywhere else, so English words do not run together",
+  joinWrappedLines("ZORA\nBehavioural"), "ZORA Behavioural");
+check("spaces around it are not doubled up",
+  joinWrappedLines("3) \n对环境"), "3) 对环境");
+check("several in a row count once", joinWrappedLines("a\n\n\nb"), "a b");
+check("text with none is untouched", joinWrappedLines("对环境和活动"), "对环境和活动");
+
+console.log("\nthe spacing around a run belongs to the layout, not the language");
+// "3) " is a numbered-list prefix in a run of its own. The model has no
+// reason to keep that trailing space -- there is nothing there to
+// translate -- so it is put back from the original.
+check("a trailing space is put back", keepRunSpacing("3) ", "3)"), "3) ");
+check("even when the model wrapped the line too", keepRunSpacing("3) ", "3)\n"), "3) ");
+check("a leading space too", keepRunSpacing(" and then", "然后"), " 然后");
+check("a run that was only spacing is left exactly as it was",
+  keepRunSpacing("   ", "什么"), "   ");
+check("a run with no spacing to keep is just the translation",
+  keepRunSpacing("Greeting", "问候"), "问候");
+
+console.log("\nand the whole numbered line, end to end");
+{
+  const xml = `<w:body>${para("3) ", "Showing interest and calm attention")}</w:body>`;
+  const ps = docxParagraphs(xml);
+  // What came back from the model: the number unchanged but wrapped onto
+  // its own line, and the sentence in Chinese.
+  const out = applyDocxText(xml, ps, [["3)\n", "对环境表现出兴趣"]]);
+  check("the number and the sentence read as one line",
+    docxParagraphs(out)[0].runs.map(r => r.text).join(""), "3) 对环境表现出兴趣");
+  const inside = (out.match(/<w:t[^>]*>[\s\S]*?<\/w:t>/g) || []).join("");
+  check("with no newline left anywhere in the text", /\n/.test(inside), false);
+}
+
 
 console.log("\nthe round trip, on something shaped like a real report");
 {
