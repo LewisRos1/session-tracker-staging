@@ -2530,10 +2530,21 @@ function buildSessionDocxBody(entityName, sessionLabel, allTargets, session, sta
     })]
   });
 
+  // Company name in the middle, page number still on the right. Tab stops
+  // rather than three paragraphs, the same way the header does it, so the
+  // two sit on one line.
   const footer = new Footer({
     children: [new Paragraph({
-      alignment: AlignmentType.RIGHT,
-      children: [new TextRun({ children: [PageNumber.CURRENT] })]
+      tabStops: [
+        { type: TabStopType.CENTER, position: 4680 },
+        { type: TabStopType.RIGHT,  position: 9360 }
+      ],
+      children: [
+        new TextRun({ text: "\t" }),
+        new TextRun({ text: "ZORA Behavioural Intervention" }),
+        new TextRun({ text: "\t" }),
+        new TextRun({ children: [PageNumber.CURRENT] })
+      ]
     })]
   });
 

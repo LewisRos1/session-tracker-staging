@@ -32,7 +32,11 @@ function serve(dir) {
   const server = Deno.serve(
     { port: 0, signal: ac.signal, onListen: () => {} },
     async (req) => {
-      let path = new URL(req.url).pathname;
+      // Decoded, or a file whose name has a space in it is looked for with
+      // a literal %20 and never found. Three of the app's images are named
+      // like that, including the company stamp -- so every document built
+      // in a test came out without it, and no test could ever have noticed.
+      let path = decodeURIComponent(new URL(req.url).pathname);
 
       // ── the shared store ──────────────────────────────────────────
       if (path.startsWith("/__store")) {
