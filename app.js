@@ -226,7 +226,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2236";
+const APP_VERSION = "2237";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -23578,6 +23578,42 @@ function mnRowKindPlural(a, acts) {
   return one.endsWith("y") ? one.slice(0, -1) + "ies" : one + "s";
 }
 
+/**
+ * Put an open menu where it can actually be read.
+ *
+ * A menu hangs off its own row, so a long one near the bottom of the
+ * window fell off the screen. Flipping it above the button fixed that end
+ * and broke the other: on a shorter laptop the top slid up under the
+ * modal's own header, and "Activity Mastered" -- the first item, and the
+ * one people reach for -- was the one covered.
+ *
+ * Both edges are respected now. Below if it fits, above if THAT fits, and
+ * when neither does it takes the roomier side and scrolls. Called after
+ * the menu is shown, because a hidden element has no height to measure,
+ * and after anything that changes what is in it.
+ */
+function placeKebabMenu(btn, menu) {
+  const GAP = 8;
+  menu.style.top = "100%";
+  menu.style.bottom = "auto";
+  menu.style.maxHeight = "";
+  menu.style.overflowY = "";
+
+  const b = btn.getBoundingClientRect();
+  const header = document.querySelector("#manage-modal .modal-header");
+  const ceiling = header ? header.getBoundingClientRect().bottom : 0;
+  const height = menu.offsetHeight;
+  const below = window.innerHeight - b.bottom - GAP;
+  const above = b.top - ceiling - GAP;
+
+  if (height <= below) return;
+  if (height <= above) { menu.style.top = "auto"; menu.style.bottom = "100%"; return; }
+
+  if (above > below) { menu.style.top = "auto"; menu.style.bottom = "100%"; }
+  menu.style.maxHeight = Math.max(120, Math.floor(Math.max(above, below))) + "px";
+  menu.style.overflowY = "auto";
+}
+
 function mnRowKindName(a, acts) {
   if (!a) return "item";
   if (a.isNote || a.isExportNote) return "note";
@@ -25658,8 +25694,6 @@ function renderTargetManageContent(student, target) {
       const wasHidden = menu.style.display !== "block";
       $("manage-modal-body").querySelectorAll(".mn-kebab-menu, .mn-sub-kebab-menu, .mn-inactive-km").forEach(m => m.style.display = "none");
       if (wasHidden) {
-        menu.style.top    = "100%";
-        menu.style.bottom = "auto";
         menu.style.display = "block";
         // Say up front whether this activity can take sub-activities.
         //
@@ -25671,11 +25705,7 @@ function renderTargetManageContent(student, target) {
         // cost a query on every render. The click still re-checks: this is a
         // label, not the gate.
         markAddSubAvailability(menu, Number(idx));
-        const rect = menu.getBoundingClientRect();
-        if (rect.bottom > window.innerHeight - 8) {
-          menu.style.top    = "auto";
-          menu.style.bottom = "100%";
-        }
+        placeKebabMenu(btn, menu);
         const closeMenu = ev => {
           if (!menu.contains(ev.target)) { menu.style.display = "none"; document.removeEventListener("click", closeMenu); }
         };
@@ -25692,6 +25722,7 @@ function renderTargetManageContent(student, target) {
       $("manage-modal-body").querySelectorAll(".mn-kebab-menu, .mn-sub-kebab-menu, .mn-inactive-km").forEach(m => m.style.display = "none");
       if (wasHidden) {
         menu.style.display = "block";
+        placeKebabMenu(btn, menu);
         const closeMenu = ev => {
           if (!menu.contains(ev.target)) { menu.style.display = "none"; document.removeEventListener("click", closeMenu); }
         };
@@ -26334,6 +26365,7 @@ function renderTargetManageContent(student, target) {
       $("manage-modal-body").querySelectorAll(".mn-kebab-menu, .mn-inactive-km").forEach(m => m.style.display = "none");
       if (wasHidden) {
         menu.style.display = "block";
+        placeKebabMenu(btn, menu);
         const closeMenu = ev => {
           if (!menu.contains(ev.target)) { menu.style.display = "none"; document.removeEventListener("click", closeMenu); }
         };
@@ -27385,6 +27417,7 @@ function renderTargetManageContent(student, target) {
       $("manage-modal-body").querySelectorAll(".mn-heading-color-menu, .mn-kebab-menu").forEach(m => m.style.display = "none");
       if (wasHidden) {
         menu.style.display = "block";
+        placeKebabMenu(btn, menu);
         const closeMenu = ev => {
           if (!menu.contains(ev.target)) { menu.style.display = "none"; document.removeEventListener("click", closeMenu); }
         };
@@ -28634,6 +28667,7 @@ function renderTemplateManageContent(template) {
       $("manage-modal-body").querySelectorAll(".mn-heading-color-menu, .mn-kebab-menu").forEach(m => m.style.display = "none");
       if (wasHidden) {
         menu.style.display = "block";
+        placeKebabMenu(btn, menu);
         const closeMenu = ev => {
           if (!menu.contains(ev.target)) { menu.style.display = "none"; document.removeEventListener("click", closeMenu); }
         };
@@ -28674,6 +28708,7 @@ function renderTemplateManageContent(template) {
       $("manage-modal-body").querySelectorAll(".mn-kebab-menu, .mn-heading-color-menu").forEach(m => m.style.display = "none");
       if (wasHidden) {
         menu.style.display = "block";
+        placeKebabMenu(btn, menu);
         const closeMenu = ev => {
           if (!menu.contains(ev.target)) { menu.style.display = "none"; document.removeEventListener("click", closeMenu); }
         };
@@ -28834,6 +28869,7 @@ function renderTemplateManageContent(template) {
       $("manage-modal-body").querySelectorAll(".mn-kebab-menu, .mn-inactive-km").forEach(m => m.style.display = "none");
       if (wasHidden) {
         menu.style.display = "block";
+        placeKebabMenu(btn, menu);
         const closeMenu = ev => {
           if (!menu.contains(ev.target)) { menu.style.display = "none"; document.removeEventListener("click", closeMenu); }
         };

@@ -69,6 +69,9 @@ results.push(await run("AI Translator: the screen and what it tells the model",
 results.push(await run("The Student Database at half a screen",
   ["run", "-A", "tests/browser/student-database-layout.test.js", HARNESS]));
 
+results.push(await run("The kebab menu on a short screen",
+  ["run", "-A", "tests/browser/kebab-menu-position.test.js", HARNESS]));
+
 results.push(await run("What an assistant may and may not touch",
   ["run", "-A", "tests/browser/assistant-readonly.test.js", HARNESS]));
 
