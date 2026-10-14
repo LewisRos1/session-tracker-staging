@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2253";
+const APP_VERSION = "2254";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -17219,7 +17219,8 @@ Each line you are given starts with a number in square brackets. Answer with the
 RULES
 - Simplified Chinese only. Never Traditional characters.
 - Translate the meaning exactly. This is a clinical document a parent may act on: never soften it, never strengthen it, never add anything, never leave anything out.
-- Numbers, dates, percentages, scores and times stay exactly as written.
+- Numbers, percentages, scores and times stay exactly as written. Never change a figure.
+- Dates keep the same day, month and year, but are written the Chinese way. "18 Aug 2026" is written "2026年8月18日". "Aug 2026" and "August 2026" are written "2026年8月". A month standing on its own, "August", is written "8月". This applies everywhere a date appears, including inside a table.
 - Keep the warmth and the plain language of the English. Write as a therapist writing to a parent, not as a textbook.
 - Leave these EXACTLY as they appear, in English, untranslated:
 ${translateKeepList().map(k => `    ${k}`).join("\n")}

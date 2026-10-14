@@ -114,8 +114,26 @@ try {
   r.ok("the child's Chinese name", ins.includes("陈嘉登"), "the full name is missing");
   r.ok("and the short one", ins.includes("嘉登"), "the short name is missing");
   r.ok("ZORA is left in English", /ZORA/.test(ins), "ZORA is not protected");
-  r.ok("so is the target name, exactly as it was typed",
-    ins.includes("FEDC (1) – 学习目标一"), "the target name is not protected");
+  // Target names used to be on the leave-in-English list. That kept them in
+  // English on every chart, and because a target is called "Play" it also
+  // protected that word everywhere else in the report.
+  r.ok("target names are listed to be translated, not protected",
+    ins.includes("FEDC (1) – 学习目标一")
+    && /names of the therapy targets/.test(ins),
+    "the target name is not in the list to translate");
+  r.ok("with the clinical name kept in brackets after it",
+    /模仿（Imitation）/.test(ins), "the bracketed form is not shown");
+
+  // "18 Aug 2026" sat in English in a table on a page of Chinese, because
+  // the rule protecting scores and percentages said "dates" as well.
+  r.ok("a date is written the Chinese way",
+    /2026年8月18日/.test(ins), "no worked example of a date");
+  r.ok("and a month and year without a day",
+    /2026年8月/.test(ins), "no example of a month and year");
+  r.ok("but a figure is still never changed",
+    /Never change a figure/.test(ins), "nothing protects the scores");
+  r.ok("and dates are no longer told to stay as written",
+    !/dates, percentages/.test(ins), "the old rule is still in there");
   r.ok("the word list is sent", /self-regulation = 自我调节/.test(ins), "the glossary is missing");
   r.ok("with Lewis's corrections in it",
     /Trial = 试次/.test(ins) && /transitions = 转换/.test(ins)
