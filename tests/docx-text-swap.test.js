@@ -29,6 +29,7 @@ const names = ["xmlUnescape", "xmlEscape", "docxParagraphs", "markParagraph",
                "readChartDataTag", "findChartPictures", "chartPhrases",
                "stripMarkers",
                "periodLabelZh", "chartTitleZh", "overviewTitleZh",
+               "overviewChartTitle",
                "resizeDrawingToChart",
                "applyDocxText"];
 const tagPrefix = src.match(/const CHART_TAG_PREFIX = "([^"]+)";/)[1];
@@ -47,7 +48,7 @@ const { xmlUnescape, docxParagraphs, markParagraph, unmarkParagraph,
         joinWrappedLines, keepRunSpacing, readChartDataTag,
         findChartPictures, chartPhrases, periodLabelZh, chartTitleZh,
         resizeDrawingToChart, applyDocxText, stripMarkers,
-        hasChinese, looksTranslated, overviewTitleZh } = fns;
+        hasChinese, looksTranslated, overviewTitleZh, overviewChartTitle } = fns;
 
 let failed = 0;
 const check = (what, got, want) => {
@@ -406,6 +407,32 @@ check("no Chinese name typed in, so the English one stands",
 check("an empty box counts as none",
   overviewTitleZh({ name: "Ryan Lee", nameZh: "   " }, "Jul 2026"),
   "Ryan Lee（2026年 7月）");
+
+console.log("\nthe progress chart title is built when the report is translated");
+// It used to be written into the English file when the report was generated,
+// so changing the wording meant paying to generate every report again. The
+// student is known at translation time -- she picks them on the screen -- so
+// the Chinese name comes from there.
+const qipei = { name: "Zhang Qi Pei", nameZh: "张祺培" };
+check("a report that carries its range",
+  overviewChartTitle({ title: "Zhang Qi Pei (Jan 2026 - Jun 2026 Progress)",
+                       range: "Jan 2026 - Jun 2026" }, qipei),
+  "张祺培（2026年 1月 – 2026年 6月）");
+// An older report has no range in it, only a Chinese title frozen in the
+// wording of the day it was made. The range is read back out of the English
+// title so it comes out in today's wording all the same.
+check("and an older one that does not",
+  overviewChartTitle({ title: "Zhang Qi Pei (Jan 2026 - Jun 2026 Progress)",
+                       titleZh: "Zhang Qi Pei（2026年1月–2026年6月）" }, qipei),
+  "张祺培（2026年 1月 – 2026年 6月）");
+check("with no student to hand, the English name is taken from the title",
+  overviewChartTitle({ title: "Ryan Lee (Jul 2026 - Dec 2026 Progress)" }, null),
+  "Ryan Lee（2026年 7月 – 2026年 12月）");
+// Nothing to work from: what the file already said, rather than a blank.
+check("a title in a shape this does not know is left alone",
+  overviewChartTitle({ title: "Something else", titleZh: "其他" }, qipei), "其他");
+check("and with not even that, the English one",
+  overviewChartTitle({ title: "Something else" }, qipei), "Something else");
 
 console.log("\nresizing the slot the picture sits in");
 // Chinese is more compact, so the chart is usually shorter. Left alone,

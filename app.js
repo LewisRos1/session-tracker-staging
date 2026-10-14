@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2256";
+const APP_VERSION = "2257";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -7364,8 +7364,10 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
         transformation: { width: ovDocW, height: ovH }, type: "png", outline: REPORT_CHART_BORDER,
         altText: { name: "Progress Overview", title: "", description: chartDataTag({
           kind: "overview", baseW: ovNativeW, title: ovTitle,
-          titleZh: overviewTitleZh(student,
-            `${firstMonthName.slice(0, 3)} ${R.startY} - ${R.endShort} ${R.endY}`),
+          // The range rather than a finished title: the title is built when
+          // the report is translated, so a change to the wording reaches a
+          // report generated weeks ago instead of needing a new one.
+          range: `${firstMonthName.slice(0, 3)} ${R.startY} - ${R.endShort} ${R.endY}`,
           rows: chartTrendRows.map(r => ({ name: r.name, delta: r.delta, tStart: r.tStart, tEnd: r.tEnd })),
         }) } })],
       alignment: AlignmentType.CENTER, spacing: { after: 60 }
@@ -16974,6 +16976,22 @@ function periodLabelZh(label) {
  * drawn by the app rather than translated, so it has to be put on here:
  * nothing further down would ever turn the English name into Chinese.
  */
+/**
+ * What to paint on the overall progress chart of a report being translated.
+ *
+ * Built here rather than read out of the file. A report made before this
+ * change carries a finished Chinese title instead of a range, frozen in the
+ * wording of the day it was made; its range is read back out of the English
+ * title so those come out in today's wording too, and nobody has to pay to
+ * generate a report again just to change how a date is written.
+ */
+function overviewChartTitle(spec, student) {
+  const m = /^(.*) \((.+) Progress\)$/.exec(spec?.title || "");
+  const range = spec?.range || (m ? m[2] : "");
+  if (!range) return spec?.titleZh || spec?.title || "";
+  return overviewTitleZh(student || { name: m ? m[1] : "" }, range);
+}
+
 function overviewTitleZh(student, range) {
   const name = (student?.nameZh || "").trim() || student?.name || "";
   return `${name}（${periodLabelZh(range)}）`;
@@ -16999,13 +17017,13 @@ function chartTitleZh(spec, zh) {
  * this code does not know is refused rather than guessed at, so a chart
  * added later and not taught here is left in English instead of mangled.
  */
-function redrawChartZh(spec, zh) {
+function redrawChartZh(spec, zh, student) {
   _chartZh = true;
-  try { return redrawChartInner(spec, zh); }
+  try { return redrawChartInner(spec, zh, student); }
   finally { _chartZh = false; }   // always, or an English report would come out Chinese
 }
 
-function redrawChartInner(spec, zh) {
+function redrawChartInner(spec, zh, student) {
   const name = (s) => zh(s) || s;
   const fixed = (s) => CHART_FIXED_ZH[s] || s;
 
@@ -17013,7 +17031,7 @@ function redrawChartInner(spec, zh) {
     // Status is drawn from the numbers, so the words are swapped by giving
     // the drawing code Chinese ones rather than by editing the picture.
     const rows = (spec.rows || []).map(r => ({ ...r, name: name(r.name) }));
-    return hyrDrawOverviewChartC(rows, spec.titleZh || spec.title);
+    return hyrDrawOverviewChartC(rows, overviewChartTitle(spec, student));
   }
 
   if (spec?.kind === "line") {
@@ -17454,7 +17472,7 @@ async function translateDocxFile(file, student, onProgress, signal) {
     if (!pics.length) continue;
     // Backwards, so replacing one cannot move the one before it.
     for (const pic of [...pics].reverse()) {
-      const drawn = redrawChartZh(pic.spec, zh);
+      const drawn = redrawChartZh(pic.spec, zh, student);
       const media = drawn?.base64 ? await chartMediaPath(zip, name, pic.rid) : null;
       if (!media) { chartsSkipped++; continue; }
       // The bytes of the picture are replaced, so the drawing keeps the same
