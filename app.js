@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2245";
+const APP_VERSION = "2246";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -7146,7 +7146,15 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
       const _wValues = r.values.slice(_wordGlobalFirstIdx);
       const lb64 = hyrDrawLineChart(r.name, _wLabels, _wValues, period, year, r.tStart, r.tEnd, r.delta, r.direction);
       if (lb64) paras.push(new Paragraph({
-        children: [new ImageRun({ data: b64ToUint8(lb64), transformation: { width: 540, height: 280 }, type: "png", outline: REPORT_CHART_BORDER })],
+        children: [new ImageRun({ data: b64ToUint8(lb64),
+          transformation: { width: 540, height: 280 }, type: "png", outline: REPORT_CHART_BORDER,
+          // Drawn at a fixed size in the document whatever shape the canvas
+          // is, so this one is never resized when it is drawn again.
+          altText: { name: "Target Progress", title: "", description: chartDataTag({
+            kind: "line", target: r.name, labels: _wLabels, values: _wValues,
+            period, year, tStart: r.tStart, tEnd: r.tEnd, delta: r.delta,
+            direction: r.direction,
+          }) } })],
         alignment: AlignmentType.CENTER, spacing: { after: 100 }
       }));
       paras.push(...obsParas(hyrPickObs(parsed[obsKey], r.name)));
@@ -7294,7 +7302,13 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     const ovDocW = 600;
     const ovH = Math.round(ovDocW * ovResult.height / ovNativeW);
     paragraphs.push(new Paragraph({
-      children: [new ImageRun({ data: b64ToUint8(ovResult.base64), transformation: { width: ovDocW, height: ovH }, type: "png", outline: REPORT_CHART_BORDER })],
+      children: [new ImageRun({ data: b64ToUint8(ovResult.base64),
+        transformation: { width: ovDocW, height: ovH }, type: "png", outline: REPORT_CHART_BORDER,
+        altText: { name: "Progress Overview", title: "", description: chartDataTag({
+          kind: "overview", baseW: ovNativeW, title: ovTitle,
+          titleZh: `${student.name}（${firstMonthName.slice(0, 3)} ${R.startY} - ${R.endShort} ${R.endY}）`,
+          rows: chartTrendRows.map(r => ({ name: r.name, delta: r.delta, tStart: r.tStart, tEnd: r.tEnd })),
+        }) } })],
       alignment: AlignmentType.CENTER, spacing: { after: 60 }
     }));
   }
@@ -9636,7 +9650,12 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
     const dispW = 620;
     summaryParas.push(new Paragraph({
       children: [new ImageRun({ data: b64ToUint8(barChart.base64),
-        transformation: { width: dispW, height: Math.round(dispW * barChart.height / barChart.width) }, type: "png", outline: REPORT_CHART_BORDER })],
+        transformation: { width: dispW, height: Math.round(dispW * barChart.height / barChart.width) },
+        type: "png", outline: REPORT_CHART_BORDER,
+        altText: { name: "Scores", title: "", description: chartDataTag({
+          kind: "monthlyBars", baseW: barChart.width,
+          rows: scoreRows.map(r => ({ ...r })),
+        }) } })],
       alignment: AlignmentType.CENTER, spacing: { before: 80, after: 140 }
     }));
   } else {
@@ -16767,6 +16786,7 @@ function chartPhrases(spec) {
     if (row?.isSectionHeader) { if (row.label) out.push(row.label); }
     else if (row?.name) out.push(row.name);
   }
+  for (const row of spec?.rows || []) if (row?.name) out.push(row.name);
   return out;
 }
 
@@ -16775,18 +16795,25 @@ function chartPhrases(spec) {
  *
  * Fixed, so they are written here rather than translated: they are the same
  * on every chart in every report, and paying to translate them again each
- * time would be daft.
+ * time would be daft. The arrows are left as they are -- an arrow means the
+ * same thing in both languages.
  */
 const CHART_FIXED_ZH = {
   "Activity": "活动",
+  "Target": "目标",
+  "Score": "分数",
+  "Status": "状态",
   "Overall Performance (%)": "整体表现（%）",
+  "Overall Progress (%)": "整体进展（%）",
+  "Net Change (points)": "净变化（分）",
   "Duration": "持续时间",
   "(Months)": "（月）",
   "Progress": "进展",
+  "Improving": "进步中",
+  "Declining": "退步中",
+  "Stable": "稳定",
   "Start of Term/Trendline": "学期初／趋势线",
   "End of Term/Trendline": "学期末／趋势线",
-  "Page": "第",
-  "of": "页，共",
 };
 
 const MONTHS_ZH = {
@@ -16817,19 +16844,45 @@ function chartTitleZh(spec, zh) {
     + (page ? `［第${page[1]}页，共${page[2]}页］` : "");
 }
 
-/** The same chart, drawn again with Chinese on it. */
+/**
+ * The same chart, drawn again with Chinese on it.
+ *
+ * One function per kind of chart, chosen by what the tag says it is. A kind
+ * this code does not know is refused rather than guessed at, so a chart
+ * added later and not taught here is left in English instead of mangled.
+ */
 function redrawChartZh(spec, zh) {
-  const data = (spec.data || []).map(row => row?.isSectionHeader
-    ? { ...row, label: zh(row.label) || row.label }
-    : { ...row, name: zh(row.name) || row.name });
-  return renderActivityBreakdownChart(
-    zh(spec.target) || spec.target,
-    data,
-    periodLabelZh(spec.range),
-    chartTitleZh(spec, zh),
-    false,
-    (spec.legend || []).map(l => CHART_FIXED_ZH[l] || l),
-  );
+  const name = (s) => zh(s) || s;
+  const fixed = (s) => CHART_FIXED_ZH[s] || s;
+
+  if (spec?.kind === "overview") {
+    // Status is drawn from the numbers, so the words are swapped by giving
+    // the drawing code Chinese ones rather than by editing the picture.
+    const rows = (spec.rows || []).map(r => ({ ...r, name: name(r.name) }));
+    return hyrDrawOverviewChartC(rows, spec.titleZh || spec.title);
+  }
+
+  if (spec?.kind === "line") {
+    return { base64: hyrDrawLineChart(
+      name(spec.target), spec.labels, spec.values, spec.period, spec.year,
+      spec.tStart, spec.tEnd, spec.delta, fixed(spec.direction)),
+      height: spec.baseH, width: spec.baseW, fixedSize: true };
+  }
+
+  if (spec?.kind === "monthlyBars") {
+    const rows = (spec.rows || []).map(r => ({ ...r, name: name(r.name) }));
+    return monthlyDrawScoreBarChart(rows);
+  }
+
+  if (spec?.kind === "breakdown" || !spec?.kind) {
+    const data = (spec.data || []).map(row => row?.isSectionHeader
+      ? { ...row, label: name(row.label) }
+      : { ...row, name: name(row.name) });
+    return renderActivityBreakdownChart(
+      name(spec.target), data, periodLabelZh(spec.range),
+      chartTitleZh(spec, zh), false, (spec.legend || []).map(fixed));
+  }
+  return null;
 }
 
 /**
@@ -17214,9 +17267,15 @@ async function translateDocxFile(file, student, onProgress, signal) {
       // The bytes of the picture are replaced, so the drawing keeps the same
       // relationship and nothing else in the document has to change.
       zip.file(media, drawn.base64, { base64: true });
-      xml = xml.slice(0, pic.start)
-        + resizeDrawingToChart(pic.block, drawn.height)
-        + xml.slice(pic.end);
+      // Each kind of chart is drawn on a canvas of its own width, so the
+      // slot is worked out against THAT rather than one number for all of
+      // them. The line charts go in at a fixed size whatever shape the
+      // canvas is, so those are left exactly as they are.
+      const block = (drawn.fixedSize || !drawn.height)
+        ? pic.block
+        : resizeDrawingToChart(pic.block, drawn.height,
+            drawn.width || pic.spec.baseW || 760);
+      xml = xml.slice(0, pic.start) + block + xml.slice(pic.end);
       chartsDone++;
     }
     rewritten.set(name, xml);

@@ -172,6 +172,57 @@ try {
     Math.abs(swap.cyAfter - Math.round(swap.cxAfter * swap.cnHeight / 760)) <= 1,
     `height ${swap.cyAfter}, expected ${Math.round(swap.cxAfter * swap.cnHeight / 760)}`);
 
+  // ── the other three kinds of chart ───────────────────────────────────
+  // The report has four. Only the Activity Breakdown was handled at first,
+  // and saying "the last English thing" about it was wrong.
+  r.section("every kind of chart can be drawn again");
+  const kinds = await page.eval(`(() => {
+    const zh = { "FEDC 2": "学习目标二", "Self-Regulation": "自我调节" };
+    const lookup = (k) => zh[k] || null;
+    const out = {};
+    const draw = (name, spec) => {
+      try {
+        const en = window.__app.redrawChartZh(spec, () => null);
+        const cn = window.__app.redrawChartZh(spec, lookup);
+        out[name] = { drew: !!(en?.base64 && cn?.base64), differs: en?.base64 !== cn?.base64,
+                      height: cn?.height || 0, fixedSize: !!cn?.fixedSize };
+      } catch (e) { out[name] = { error: e.message }; }
+    };
+    draw("overview", { kind: "overview", baseW: 700, title: "Caden (Jan 2026 - Jun 2026 Progress)",
+      titleZh: "Caden（Jan 2026 - Jun 2026）",
+      rows: [{ name: "FEDC 2", delta: 12, tStart: 70, tEnd: 82 },
+             { name: "Self-Regulation", delta: -10, tStart: 80, tEnd: 70 }] });
+    draw("line", { kind: "line", target: "FEDC 2", labels: ["Jan", "Feb", "Mar"],
+      values: [70, 75, 82], period: "h1", year: 2026, tStart: 70, tEnd: 82,
+      delta: 12, direction: "Improving" });
+    draw("monthlyBars", { kind: "monthlyBars", baseW: 700,
+      rows: [{ name: "FEDC 2", score: 82 }, { name: "Self-Regulation", score: 64 }] });
+    draw("unknown", { kind: "something-added-later" });
+    return out;
+  })()`, 90000);
+
+  for (const k of ["overview", "line", "monthlyBars"]) {
+    r.ok(`${k}: drew in both languages`, kinds[k]?.drew === true, JSON.stringify(kinds[k]));
+    r.ok(`${k}: the Chinese one is a different picture`, kinds[k]?.differs === true,
+      JSON.stringify(kinds[k]));
+  }
+  r.ok("a line chart is marked fixed size, so its slot is left alone",
+    kinds.line?.fixedSize === true, JSON.stringify(kinds.line));
+  r.ok("a kind this code does not know is refused, not guessed at",
+    kinds.unknown?.drew === false || !!kinds.unknown?.error === false,
+    JSON.stringify(kinds.unknown));
+
+  r.section("the words those charts carry");
+  const phrases = await page.eval(`(() => ({
+    overview: window.__app.chartPhrases({ kind: "overview",
+      rows: [{ name: "FEDC 2" }, { name: "Self-Regulation" }] }),
+    monthly: window.__app.chartPhrases({ kind: "monthlyBars", rows: [{ name: "FEDC 2" }] }),
+    line: window.__app.chartPhrases({ kind: "line", target: "FEDC 2" }),
+  }))()`);
+  r.check("the overview asks for every target on it", phrases.overview, ["FEDC 2", "Self-Regulation"]);
+  r.check("so does the monthly chart", phrases.monthly, ["FEDC 2"]);
+  r.check("and a line chart asks for its own target", phrases.line, ["FEDC 2"]);
+
   r.section("console");
   const noise = page.consoleLines.filter(l => l.level === "error");
   r.ok("no console errors", noise.length === 0,
