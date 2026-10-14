@@ -967,15 +967,27 @@ export function renderActivityBreakdownChart(targetName, activityData, periodLab
 
   const tmpCtx = document.createElement("canvas").getContext("2d");
   tmpCtx.font = "14px sans-serif";
+  // Wrapping on spaces alone is only right for a language that has them.
+  // A Chinese label arrives as one long "word", never wraps, and runs
+  // straight over the bars beside it -- the same fault as Word treating a
+  // Chinese sentence as unbreakable. So anything still too wide on its own
+  // is broken a character at a time, which is how Chinese wraps anyway and
+  // is better than nothing for an over-long English word too.
   const wrapText = (text, maxW) => {
-    const words = (text || "").split(" ");
-    const lines = []; let cur = "";
-    for (const w of words) {
+    const lines = [];
+    let cur = "";
+    const push = () => { if (cur) { lines.push(cur); cur = ""; } };
+    for (const w of (text || "").split(" ")) {
       const test = cur ? cur + " " + w : w;
-      if (tmpCtx.measureText(test).width > maxW && cur) { lines.push(cur); cur = w; }
-      else cur = test;
+      if (tmpCtx.measureText(test).width <= maxW) { cur = test; continue; }
+      push();
+      if (tmpCtx.measureText(w).width <= maxW) { cur = w; continue; }
+      for (const ch of w) {
+        if (cur && tmpCtx.measureText(cur + ch).width > maxW) push();
+        cur += ch;
+      }
     }
-    if (cur) lines.push(cur);
+    push();
     return lines.length ? lines : [""];
   };
   for (const act of activityData) {

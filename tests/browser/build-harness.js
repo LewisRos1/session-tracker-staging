@@ -382,6 +382,10 @@ const exposed = [
   "openAiTranslateScreen", "renderAiTranslateBody", "translateInstructions",
   "openStudentRegistryScreen",
   "aiPillShow", "aiPillHide", "trPill", "trPillHide",
+  // The chart redraw, so a test can run it against a real canvas and a
+  // real zip rather than only its pure parts.
+  "redrawChartZh", "findChartPictures", "chartMediaPath",
+  "resizeDrawingToChart", "chartDataTag", "chartPhrases",
   // So a test can build a real Word report and look inside it, rather
   // than guessing at the XML the app actually produces.
   "exportStudentSingleSessionWord",

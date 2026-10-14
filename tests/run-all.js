@@ -81,6 +81,9 @@ results.push(await run("The daily session note's footer",
 results.push(await run("Two notices in the corner, stacked",
   ["run", "-A", "tests/browser/notice-stack.test.js", HARNESS]));
 
+results.push(await run("Redrawing a chart in Chinese",
+  ["run", "-A", "tests/browser/chart-redraw.test.js", HARNESS]));
+
 results.push(await run("What an assistant may and may not touch",
   ["run", "-A", "tests/browser/assistant-readonly.test.js", HARNESS]));
 
