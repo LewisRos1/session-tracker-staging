@@ -26,16 +26,23 @@ function extract(name) {
 
 const names = ["xmlUnescape", "xmlEscape", "docxParagraphs", "markParagraph",
                "unmarkParagraph", "joinWrappedLines", "keepRunSpacing",
-               "readChartDataTag",
+               "readChartDataTag", "findChartPictures", "chartPhrases",
+               "periodLabelZh", "chartTitleZh", "resizeDrawingToChart",
                "applyDocxText"];
 const tagPrefix = src.match(/const CHART_TAG_PREFIX = "([^"]+)";/)[1];
 const tagFn = src.match(/const chartDataTag = [^;]+;/)[0];
+const consts = ["CHART_FIXED_ZH", "MONTHS_ZH"]
+  .map(n => src.match(new RegExp(`const ${n} = \\{[\\s\\S]*?\\n};`))[0])
+  .join("\n");
 const cjk = src.match(/const isCjkChar = [^;]+;/)[0];
 const fns = new Function(`const CHART_TAG_PREFIX = ${JSON.stringify(tagPrefix)};`
-  + tagFn + "\n" + cjk + "\n" + names.map(extract).join("\n")
+  + tagFn + "\n" + consts + "\n" + cjk + "\n"
+  + names.map(extract).join("\n")
   + `\nreturn { chartDataTag, ${names.join(", ")} };`)();
 const { xmlUnescape, docxParagraphs, markParagraph, unmarkParagraph,
-        joinWrappedLines, keepRunSpacing, readChartDataTag, applyDocxText } = fns;
+        joinWrappedLines, keepRunSpacing, readChartDataTag,
+        findChartPictures, chartPhrases, periodLabelZh, chartTitleZh,
+        resizeDrawingToChart, applyDocxText } = fns;
 
 let failed = 0;
 const check = (what, got, want) => {
@@ -257,6 +264,93 @@ function xmlEscapeAttr(t) {
   return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;")
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
+
+
+console.log("\nfinding the charts in a document");
+// The real shape: a drawing holds the description, the size and the id of
+// the file it shows.
+const drawing = (descr, rid, cx, cy) =>
+  `<w:p><w:r><w:drawing><wp:inline distT="0">`
+  + `<wp:extent cx="${cx}" cy="${cy}"/>`
+  + `<wp:docPr id="1" name="Activity Breakdown" descr="${attr(descr)}" title=""/>`
+  + `<a:graphic><a:graphicData><pic:pic><pic:blipFill>`
+  + `<a:blip r:embed="${rid}"/></pic:blipFill>`
+  + `<pic:spPr><a:xfrm><a:ext cx="${cx}" cy="${cy}"/></a:xfrm></pic:spPr>`
+  + `</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`;
+function attr(t) {
+  return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+const chartSpec = {
+  target: "FEDC 2",
+  title: "3) FEDC 2 - Progress (Jan 2026 - Jun 2026)",
+  range: "Jan 2026 - Jun 2026",
+  legend: ["Start of Term/Trendline", "End of Term/Trendline"],
+  data: [
+    { isSectionHeader: true, label: "Stage 2: Engagement & Relating" },
+    { name: "Responds to your overtures", earliestAvg: 78, latestAvg: 89 },
+    { name: "Protest and grows angry when frustrated", earliestAvg: 100, latestAvg: 38 },
+  ],
+};
+{
+  const xml = `<w:body>${para("3) FEDC 2")}`
+    + drawing(fns.chartDataTag(chartSpec), "rId7", 5486400, 3200400)
+    + `${drawing("just a photo", "rId8", 100, 100)}</w:body>`;
+  const found = findChartPictures(xml);
+  check("one chart, and the ordinary picture is left alone", found.length, 1);
+  check("it knows which target", found[0].spec.target, "FEDC 2");
+  check("and which file it shows", found[0].rid, "rId7");
+  check("and where it sits in the document",
+    xml.slice(found[0].start, found[0].end).startsWith("<w:drawing>"), true);
+}
+
+console.log("\nthe words a chart needs");
+check("the target, the stage heading and every activity",
+  chartPhrases(chartSpec),
+  ["FEDC 2", "Stage 2: Engagement & Relating",
+   "Responds to your overtures", "Protest and grows angry when frustrated"]);
+check("a chart with nothing on it asks for nothing", chartPhrases({}), []);
+
+console.log("\nthe months, which are the app's own words");
+check("a range becomes Chinese months", periodLabelZh("Jan 2026 - Jun 2026"), "1月 2026 - 6月 2026");
+check("the years are left alone", /2026/.test(periodLabelZh("Jan 2026 - Jun 2026")), true);
+check("something with no month in it is untouched", periodLabelZh("Term 1"), "Term 1");
+
+console.log("\nthe title, which is built rather than translated");
+// Every piece of it is already known, so translating it would only risk it
+// coming back different from the heading printed above the chart.
+{
+  const zh = (en) => ({ "FEDC 2": "学习目标二" })[en] || null;
+  check("number, Chinese target, Progress, Chinese months",
+    chartTitleZh(chartSpec, zh), "3) 学习目标二 - 进展（1月 2026 - 6月 2026）");
+  check("a page marker is carried over",
+    chartTitleZh({ ...chartSpec, title: "3) FEDC 2 - Progress (x) [Page 2 of 3]" }, zh),
+    "3) 学习目标二 - 进展（1月 2026 - 6月 2026）［第2页，共3页］");
+  check("an unknown target keeps its English rather than vanishing",
+    chartTitleZh({ ...chartSpec, target: "FEDC 9" }, zh),
+    "3) FEDC 9 - 进展（1月 2026 - 6月 2026）");
+}
+
+console.log("\nresizing the slot the picture sits in");
+// Chinese is more compact, so the chart is usually shorter. Left alone,
+// Word stretches the new picture to fill the old one's space.
+{
+  const block = `<wp:extent cx="5486400" cy="3200400"/>`
+    + `<a:ext cx="5486400" cy="3200400"/>`;
+  const out = resizeDrawingToChart(block, 380);     // 380px tall, 760px wide
+  const cys = [...out.matchAll(/cy="(\d+)"/g)].map(m => Number(m[1]));
+  check("both heights are updated together", cys.length, 2);
+  check("and they agree", cys[0], cys[1]);
+  check("half as tall as it is wide, because the chart is",
+    cys[0], Math.round(5486400 * 380 / 760));
+  check("the width is untouched, so it still fits the page",
+    [...out.matchAll(/cx="(\d+)"/g)].map(m => m[1]), ["5486400", "5486400"]);
+}
+check("a block with no width is left alone rather than guessed at",
+  resizeDrawingToChart(`<a:ext cy="100"/>`, 380), `<a:ext cy="100"/>`);
+check("and so is a chart with no height",
+  resizeDrawingToChart(`<wp:extent cx="10" cy="20"/>`, 0), `<wp:extent cx="10" cy="20"/>`);
 
 
 console.log("\nwhich files inside the zip hold words");

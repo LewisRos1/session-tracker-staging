@@ -91,6 +91,7 @@ import {
   listenToReviewQueue,
   listenToStudent,
   WRITE_TAB_ID,
+  loadTranslationTerms, saveTranslationTerms,
   writesInFlight,
   getEditLock,
   setEditLock,
@@ -226,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2243";
+const APP_VERSION = "2244";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -16731,6 +16732,146 @@ async function handleCheckedByClick(e, isGroup) {
   return false;
 }
 
+// ── AI Translator: the charts ────────────────────────────────
+//
+// A chart is a picture, so none of the text-swapping above can touch it.
+// But a chart is only its data, and v2243 made every chart carry its own
+// data in the picture's description. So the picture is not edited: it is
+// thrown away and a new one drawn, in Chinese, from the same numbers.
+
+/** Every chart picture in a part, with the data that drew it. */
+function findChartPictures(xml) {
+  const out = [];
+  // One <w:drawing> holds one picture: its description, its size, and the
+  // relationship id pointing at the file in word/media.
+  const re = /<w:drawing>[\s\S]*?<\/w:drawing>/g;
+  let m;
+  while ((m = re.exec(xml)) !== null) {
+    const block = m[0];
+    const descr = /<wp:docPr\b[^>]*\bdescr="([^"]*)"/.exec(block);
+    if (!descr) continue;
+    const spec = readChartDataTag(xmlUnescape(descr[1]));
+    if (!spec) continue;
+    const embed = /r:embed="([^"]+)"/.exec(block);
+    if (!embed) continue;
+    out.push({ spec, rid: embed[1], start: m.index, end: m.index + block.length, block });
+  }
+  return out;
+}
+
+/** Every phrase on a chart that a reader would want in their own language. */
+function chartPhrases(spec) {
+  const out = [];
+  if (spec?.target) out.push(spec.target);
+  for (const row of spec?.data || []) {
+    if (row?.isSectionHeader) { if (row.label) out.push(row.label); }
+    else if (row?.name) out.push(row.name);
+  }
+  return out;
+}
+
+/**
+ * The words the app itself puts on a chart.
+ *
+ * Fixed, so they are written here rather than translated: they are the same
+ * on every chart in every report, and paying to translate them again each
+ * time would be daft.
+ */
+const CHART_FIXED_ZH = {
+  "Activity": "活动",
+  "Overall Performance (%)": "整体表现（%）",
+  "Duration": "持续时间",
+  "(Months)": "（月）",
+  "Progress": "进展",
+  "Start of Term/Trendline": "学期初／趋势线",
+  "End of Term/Trendline": "学期末／趋势线",
+  "Page": "第",
+  "of": "页，共",
+};
+
+const MONTHS_ZH = {
+  Jan: "1月", Feb: "2月", Mar: "3月", Apr: "4月", May: "5月", Jun: "6月",
+  Jul: "7月", Aug: "8月", Sep: "9月", Oct: "10月", Nov: "11月", Dec: "12月",
+};
+
+/** "Jan 2026 - Jun 2026" into Chinese, leaving the years alone. */
+function periodLabelZh(label) {
+  return String(label || "").replace(/\b([A-Z][a-z]{2})\b/g, (m) => MONTHS_ZH[m] || m);
+}
+
+/**
+ * A chart's title in Chinese.
+ *
+ * Built rather than translated. The title is a number, a target name, the
+ * word Progress and a date range -- every piece of which is already known,
+ * so sending it to be translated would only risk it coming back different
+ * from the heading above it.
+ */
+function chartTitleZh(spec, zh) {
+  const num = /^(\s*\d+\)\s*)/.exec(spec.title || "");
+  const page = /\[Page (\d+) of (\d+)\]\s*$/.exec(spec.title || "");
+  return (num ? num[1] : "")
+    + (zh(spec.target) || spec.target)
+    + " - " + CHART_FIXED_ZH["Progress"]
+    + "（" + periodLabelZh(spec.range) + "）"
+    + (page ? `［第${page[1]}页，共${page[2]}页］` : "");
+}
+
+/** The same chart, drawn again with Chinese on it. */
+function redrawChartZh(spec, zh) {
+  const data = (spec.data || []).map(row => row?.isSectionHeader
+    ? { ...row, label: zh(row.label) || row.label }
+    : { ...row, name: zh(row.name) || row.name });
+  return renderActivityBreakdownChart(
+    zh(spec.target) || spec.target,
+    data,
+    periodLabelZh(spec.range),
+    chartTitleZh(spec, zh),
+    false,
+    (spec.legend || []).map(l => CHART_FIXED_ZH[l] || l),
+  );
+}
+
+/**
+ * Resize the slot the picture sits in.
+ *
+ * Chinese is more compact, so the labels wrap onto fewer lines and the new
+ * chart is usually shorter. Left alone, Word would stretch it to fill the
+ * space the English one took. The width is kept -- it is what makes the
+ * chart fit the page -- and the height follows the new shape.
+ */
+function resizeDrawingToChart(block, chartPxHeight, basePxWidth = 760) {
+  // Worked out from the width rather than from the old height. The width is
+  // what makes the chart fit the page and never changes, so the height that
+  // keeps the new picture in proportion follows from it: a taller or shorter
+  // Chinese chart then sits in a slot of its own shape instead of being
+  // stretched into the English one's.
+  const cx = Number((/<wp:extent\b[^>]*\bcx="(\d+)"/.exec(block) || [])[1]);
+  if (!cx || !chartPxHeight) return block;
+  const cy = Math.max(1, Math.round(cx * chartPxHeight / basePxWidth));
+  return block.replace(/(<(?:wp:extent|a:ext)\b[^>]*\bcy=")\d+(")/g, `$1${cy}$2`);
+}
+
+/**
+ * The file in the zip that a picture actually shows.
+ *
+ * A drawing points at a relationship id, and the part's own .rels file says
+ * which file that id means. Replacing the bytes there changes the picture
+ * without touching anything else in the document.
+ */
+async function chartMediaPath(zip, partName, rid) {
+  const rels = partName.replace(/([^/]+)$/, "_rels/$1.rels");
+  const file = zip.file(rels);
+  if (!file) return null;
+  const xml = await file.async("string");
+  const tag = new RegExp(`<Relationship\\b[^>]*\\bId="${rid}"[^>]*>`).exec(xml);
+  if (!tag) return null;
+  const target = (/\bTarget="([^"]+)"/.exec(tag[0]) || [])[1];
+  if (!target) return null;
+  const path = "word/" + String(target).replace(/^\.?\//, "");
+  return zip.file(path) ? path : null;
+}
+
 // ── AI Translator: the screen ────────────────────────────────
 //
 // The boss writes a report in English, edits it in Word, and drops the
@@ -16980,6 +17121,19 @@ async function translateDocxFile(file, student, onProgress, signal) {
   if (!items.length) throw new Error("There is no text in that file to translate.");
 
   const instructions = translateInstructions(student);
+  // The charts' words. They are pictures, so none of them appear in the
+  // text above -- in the appendix the activity names live only inside the
+  // images. Only names nobody has translated before are sent, so a week
+  // where nothing changed costs nothing at all.
+  const charts = parts.flatMap(p => findChartPictures(p.xml));
+  const wanted = [...new Set(charts.flatMap(c => chartPhrases(c.spec)))];
+  const learned = await loadTranslationTerms().catch(() => ({}));
+  // The built-in list always wins, so a term corrected in the code cannot be
+  // overruled by one the model guessed months ago.
+  const pinned = Object.fromEntries(TRANSLATE_GLOSSARY);
+  const zh = (en) => pinned[en] || learned[en] || null;
+  const missing = wanted.filter(w => !zh(w));
+
   const chunks = translateChunks(items);
   const translations = parts.map(p => p.paragraphs.map(() => null));
   let softFailures = 0;
@@ -17019,12 +17173,54 @@ async function translateDocxFile(file, student, onProgress, signal) {
     });
   }
 
-  onProgress?.(chunks.length, chunks.length);
+  if (missing.length) {
+    onProgress?.(chunks.length, chunks.length + 1);
+    const reply = await translateRequest(instructions,
+      missing.map((m, i) => `[${i + 1}] ${m}`).join("\n"), signal);
+    const got = translateParseReply(reply, missing.length);
+    const fresh = {};
+    missing.forEach((en, i) => { if (got[i]) fresh[en] = got[i]; });
+    if (Object.keys(fresh).length) {
+      Object.assign(learned, fresh);
+      // Kept for every later report. Failing to save is not worth losing the
+      // translation over -- the names are already in hand for this one.
+      await saveTranslationTerms(learned).catch(err =>
+        console.error("could not remember the translated names:", err));
+    }
+  }
+
+  onProgress?.(1, 1);
 
   // The words first.
   const rewritten = new Map();
   parts.forEach((part, i) =>
     rewritten.set(part.name, applyDocxText(part.xml, part.paragraphs, translations[i])));
+
+  // ── the charts ───────────────────────────────────────────────────────
+  // Found again in the rewritten text rather than reused from before it: the
+  // swap above changes the length of the document, so every position taken
+  // from the original has already moved. The tag itself is an attribute, not
+  // a text node, so it comes through untouched.
+  let chartsDone = 0, chartsSkipped = 0;
+  for (const name of [...rewritten.keys()]) {
+    let xml = rewritten.get(name);
+    const pics = findChartPictures(xml);
+    if (!pics.length) continue;
+    // Backwards, so replacing one cannot move the one before it.
+    for (const pic of [...pics].reverse()) {
+      const drawn = redrawChartZh(pic.spec, zh);
+      const media = drawn?.base64 ? await chartMediaPath(zip, name, pic.rid) : null;
+      if (!media) { chartsSkipped++; continue; }
+      // The bytes of the picture are replaced, so the drawing keeps the same
+      // relationship and nothing else in the document has to change.
+      zip.file(media, drawn.base64, { base64: true });
+      xml = xml.slice(0, pic.start)
+        + resizeDrawingToChart(pic.block, drawn.height)
+        + xml.slice(pic.end);
+      chartsDone++;
+    }
+    rewritten.set(name, xml);
+  }
 
   // Then the fonts, over a wider set: styles.xml carries no text at all but
   // holds the document default that decides how Chinese is broken into
@@ -17039,7 +17235,7 @@ async function translateDocxFile(file, student, onProgress, signal) {
     type: "blob",
     mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   });
-  return { blob, softFailures, chunks: chunks.length };
+  return { blob, softFailures, chunks: chunks.length, chartsDone, chartsSkipped };
 }
 
 /** Save it under the name she gave it, marked as the Chinese one. */
@@ -17122,13 +17318,18 @@ function renderAiTranslateBody() {
          <strong>(中文) &lt;your file name&gt;.docx</strong>. The original is not changed.</p>`;
   }
 
-  body.innerHTML = `<div class="tr-wrap">${picker}${step2}<div id="tr-status"></div></div>`;
+  body.innerHTML = `<div class="tr-wrap">${picker}${step2}<div id="tr-status"></div>
+    <div class="tr-terms">
+      <button class="tr-terms-btn" id="tr-terms-btn">Chinese terms used in reports</button>
+      <div id="tr-terms-list"></div>
+    </div></div>`;
 
   $("tr-student").addEventListener("change", e => {
     _trStudentId = e.target.value || null;
     renderAiTranslateBody();
   });
   $("tr-goto-db")?.addEventListener("click", () => openStudentRegistryScreen());
+  $("tr-terms-btn")?.addEventListener("click", () => showTranslatedTerms());
 
   const drop = $("tr-drop");
   if (!drop) return;
@@ -17151,6 +17352,47 @@ function renderAiTranslateBody() {
   });
 }
 
+/**
+ * Every name that has been put into Chinese, so Lewis can check them.
+ *
+ * Read-only on purpose. A term that is wrong is pinned in the built-in list
+ * in the code, which always wins -- an editable box here would be a second
+ * place for the same answer to live, and the two would disagree.
+ *
+ * Nothing is translated to show this. It lists what earlier reports already
+ * produced, so opening it costs nothing.
+ */
+async function showTranslatedTerms() {
+  const box = $("tr-terms-list");
+  if (!box) return;
+  box.innerHTML = `<p class="tr-note">Loading…</p>`;
+  let learned = {};
+  try { learned = await loadTranslationTerms(); }
+  catch (err) { box.innerHTML = `<p class="tr-failed">Could not read the list: ${escHtml(err.message)}</p>`; return; }
+
+  const pinned = Object.fromEntries(TRANSLATE_GLOSSARY);
+  const rows = [...new Set([...Object.keys(pinned), ...Object.keys(learned)])]
+    .filter(en => pinned[en] || learned[en])
+    .sort((a, b) => a.localeCompare(b));
+
+  if (!rows.length) {
+    box.innerHTML = `<p class="tr-note">Nothing yet. Terms appear here once a report has been
+      translated — that is when the names are put into Chinese.</p>`;
+    return;
+  }
+  box.innerHTML = `
+    <p class="tr-note">Read-only. If one of these is wrong, tell Lewis the English and what it
+      should say; it gets pinned in the app and every later report uses it.</p>
+    <table class="tr-terms-table">
+      <thead><tr><th>English</th><th>Chinese</th><th>Where from</th></tr></thead>
+      <tbody>${rows.map(en => `<tr>
+        <td>${escHtml(en)}</td>
+        <td>${escHtml(pinned[en] || learned[en])}</td>
+        <td>${pinned[en] ? "Fixed in the app" : "Translated once"}</td>
+      </tr>`).join("")}</tbody>
+    </table>`;
+}
+
 async function startTranslation(file, student) {
   if (_trBusy) return;
   if (!/\.docx$/i.test(file.name)) {
@@ -17169,7 +17411,7 @@ async function startTranslation(file, student) {
   try {
     // A percentage, not "batch 4 of 10". Batches are how the work is cut
     // up for the model; nobody using this has any reason to know that.
-    const { blob, softFailures } = await translateDocxFile(file, student, (done, total) => {
+    const { blob, softFailures, chartsDone, chartsSkipped } = await translateDocxFile(file, student, (done, total) => {
       const pct = total ? (done / total) * 100 : 0;
       show(`<div class="tr-running">Translating…</div>`);
       trPill("Translating into Chinese…", null, pct);
@@ -17179,6 +17421,14 @@ async function startTranslation(file, student) {
     // back to the tab. It stacks under any other notice rather than over it.
     trPill(`Done! → ${translateShortName(student)} (Chinese)`, "done", 100);
     show(`<div class="tr-done">Downloaded <strong>(中文) ${escHtml(file.name.replace(/\.docx$/i, ""))}.docx</strong>.`
+      + (chartsDone
+        ? `<br>${chartsDone} chart${chartsDone === 1 ? "" : "s"} redrawn in Chinese.`
+        : "")
+      + (chartsSkipped
+        ? `<br><span class="tr-warn">${chartsSkipped} chart${chartsSkipped === 1 ? "" : "s"} `
+          + `left in English. Reports made before this feature existed carry no `
+          + `chart data, so they cannot be redrawn.</span>`
+        : "")
       + (softFailures
         ? `<br><span class="tr-warn">${softFailures} paragraph${softFailures === 1 ? "" : "s"} `
           + `lost its bold on a label. The words are all there.</span>`

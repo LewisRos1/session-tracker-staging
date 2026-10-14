@@ -5275,3 +5275,23 @@ button.wf-pill:hover { filter: brightness(.93); }
 
 /* The translator's notice is the same component as the report's. */
 .progress-pill.tr-pill--in { opacity: 1; }
+
+/* The read-only list of translated names. Checked that these names were
+   free first: a dead rule further down this file once won against a live
+   one and left a button on screen at 0 by 0 pixels. */
+.tr-terms { margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 1rem; }
+.tr-terms-btn {
+  background: none; border: none; padding: 0; cursor: pointer;
+  font-family: inherit; font-size: .86rem; font-weight: 700;
+  color: var(--primary); text-decoration: underline; text-underline-offset: 3px;
+}
+.tr-terms-btn:hover { color: var(--primary-dark, #4c1d95); }
+.tr-terms-table {
+  width: 100%; border-collapse: collapse; margin-top: .6rem; font-size: .82rem;
+}
+.tr-terms-table th, .tr-terms-table td {
+  border: 1px solid var(--border); padding: .35rem .55rem; text-align: left;
+  vertical-align: top;
+}
+.tr-terms-table th { background: var(--primary-light); color: var(--primary-dark); font-weight: 700; }
+.tr-terms-table td:last-child { color: var(--text-muted); white-space: nowrap; }

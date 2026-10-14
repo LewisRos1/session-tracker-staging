@@ -207,6 +207,14 @@ const SPLIT_FOR_WRITE = `(entity) => {
 // A real counter, not a recorder: the app compares it against zero.
 behaving.writesInFlight = `() => globalThis.__harness.inFlight || 0`;
 
+// The shared list of translated names. Kept in memory for the run, so a
+// test can watch what gets written to it without a database.
+behaving.loadTranslationTerms = `async () => ({ ...(globalThis.__terms || {}) })`;
+behaving.saveTranslationTerms = `async (terms) => {
+  globalThis.__terms = { ...terms };
+  globalThis.__harness.log("saveTranslationTerms", [structuredClone(terms)]);
+}`;
+
 behaving.WRITE_TAB_ID = `"tab-" + Math.random().toString(36).slice(2) + "-" + Date.now()`;
 
 behaving.saveStudent = `async (student) => {

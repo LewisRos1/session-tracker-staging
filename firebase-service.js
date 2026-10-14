@@ -1450,6 +1450,30 @@ export async function saveHalfYearReportConfig(data) {
   await setDoc(doc(db, "config", "halfYearReport"), data, { merge: true });
 }
 
+// ─── TRANSLATED TERMS ────────────────────────────────────────
+// Every target and activity name that has been put into Chinese, English on
+// one side and Chinese on the other, for the whole site rather than per
+// student: "FEDC 1" is "FEDC 1" whoever it belongs to, and two students
+// must never be sent reports calling the same thing different things.
+//
+// One document on its own, NOT a field added to each target and activity.
+// Those records are the ones behind the rename and duplicate-activity bugs,
+// and a feature like this is not worth going near them for.
+//
+// Written once per name: the translator sends only what is missing, so a
+// week where nothing changed costs nothing. A name that is wrong is pinned
+// in the built-in list in app.js, which always wins over this one, so a bad
+// entry can never get stuck.
+
+export async function loadTranslationTerms() {
+  const snap = await getDoc(doc(db, "config", "translationTerms"));
+  return snap.exists() ? (snap.data()?.terms || {}) : {};
+}
+
+export async function saveTranslationTerms(terms) {
+  await setDoc(doc(db, "config", "translationTerms"), { terms }, { merge: true });
+}
+
 // ─── SCORING CONFIG ──────────────────────────────────────────
 // What each trial mark is worth as a percentage. One document for the whole
 // site: the scale has to be the same everywhere or two staff members reading
