@@ -226,7 +226,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2242";
+const APP_VERSION = "2243";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -7528,13 +7528,30 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
         const numPrefix = targetNum ? `${targetNum}) ` : "";
         const chartTitle = `${numPrefix}${target.name} - Progress (${rangeLabel})${pageSuffix}`;
         const headingTitle = `${numPrefix}${target.name}${pageSuffix}`;
-        const abResult = renderActivityBreakdownChart(target.name, pageData, rangeLabel, chartTitle, false, ["Start of Term/Trendline", "End of Term/Trendline"]);
+        const legend = ["Start of Term/Trendline", "End of Term/Trendline"];
+        const abResult = renderActivityBreakdownChart(target.name, pageData, rangeLabel, chartTitle, false, legend);
         if (abResult) {
           const abH = Math.round(600 * abResult.height / 760);
           appendixParas.push(mkPara(headingTitle, { heading: HeadingLevel.HEADING_2, before: firstChart ? 120 : 0, after: 100, size: 24, bold: true, pageBreak: !firstChart }));
           firstChart = false;
           appendixParas.push(new Paragraph({
-            children: [new ImageRun({ data: b64ToUint8(abResult.base64), transformation: { width: 600, height: abH }, type: "png", outline: REPORT_CHART_BORDER })],
+            children: [new ImageRun({
+              data: b64ToUint8(abResult.base64),
+              transformation: { width: 600, height: abH },
+              type: "png", outline: REPORT_CHART_BORDER,
+              // Everything the chart was drawn from, carried in the picture's
+              // own description.
+              //
+              // A chart is a picture, so a translator can do nothing with it.
+              // But a chart is also only its data, and here that data is: the
+              // AI Translator reads this, puts the labels into Chinese and
+              // draws the whole thing again. Carried rather than looked up
+              // again, so the chart that comes back is the chart that was
+              // generated even if the sessions behind it have since changed,
+              // and so nothing has to guess which picture is which.
+              altText: { name: "Activity Breakdown", title: "", description: chartDataTag(
+                { target: target.name, title: chartTitle, range: rangeLabel, legend, data: pageData }) },
+            })],
             alignment: AlignmentType.CENTER, spacing: { after: 240 }
           }));
         }
@@ -17262,6 +17279,23 @@ function unmarkParagraph(reply, count) {
     parts.push(m[1]);
   }
   return parts;
+}
+
+/**
+ * The marker that says "this picture is a chart, and here is what drew it".
+ *
+ * Prefixed so it can be told apart from a description somebody typed, and
+ * versioned so an older report can be recognised and left alone rather than
+ * mangled by a newer reader.
+ */
+const CHART_TAG_PREFIX = "zora-chart-v1:";
+const chartDataTag = (spec) => CHART_TAG_PREFIX + JSON.stringify(spec);
+/** Reads one back, or null when the description is not one of ours. */
+function readChartDataTag(descr) {
+  const text = String(descr || "");
+  if (!text.startsWith(CHART_TAG_PREFIX)) return null;
+  try { return JSON.parse(text.slice(CHART_TAG_PREFIX.length)); }
+  catch { return null; }
 }
 
 /** A character Chinese is written in, where a space would be wrong. */

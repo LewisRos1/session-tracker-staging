@@ -26,12 +26,16 @@ function extract(name) {
 
 const names = ["xmlUnescape", "xmlEscape", "docxParagraphs", "markParagraph",
                "unmarkParagraph", "joinWrappedLines", "keepRunSpacing",
+               "readChartDataTag",
                "applyDocxText"];
+const tagPrefix = src.match(/const CHART_TAG_PREFIX = "([^"]+)";/)[1];
+const tagFn = src.match(/const chartDataTag = [^;]+;/)[0];
 const cjk = src.match(/const isCjkChar = [^;]+;/)[0];
-const fns = new Function(cjk + "\n" + names.map(extract).join("\n")
-  + `\nreturn { ${names.join(", ")} };`)();
-const { docxParagraphs, markParagraph, unmarkParagraph,
-        joinWrappedLines, keepRunSpacing, applyDocxText } = fns;
+const fns = new Function(`const CHART_TAG_PREFIX = ${JSON.stringify(tagPrefix)};`
+  + tagFn + "\n" + cjk + "\n" + names.map(extract).join("\n")
+  + `\nreturn { chartDataTag, ${names.join(", ")} };`)();
+const { xmlUnescape, docxParagraphs, markParagraph, unmarkParagraph,
+        joinWrappedLines, keepRunSpacing, readChartDataTag, applyDocxText } = fns;
 
 let failed = 0;
 const check = (what, got, want) => {
@@ -207,6 +211,53 @@ console.log("\nthe round trip, on something shaped like a real report");
   const skeleton = t => t.replace(/<w:t([^>]*)>[\s\S]*?<\/w:t>/g, "<w:t$1>#</w:t>");
   check("nothing outside the text nodes moved", skeleton(out), skeleton(xml));
 }
+
+console.log("\nthe chart's own data, carried in the picture");
+// A chart is a picture, so a translator can do nothing with it. But a chart
+// is also only its data -- so the data travels with it, and the translator
+// draws the whole thing again in Chinese rather than trying to edit a
+// picture. Carried rather than looked up again, so the chart that comes
+// back is the chart that was generated even if the sessions behind it have
+// changed since, and so nothing has to guess which picture is which.
+const spec = {
+  target: "FEDC 2",
+  title: "3) FEDC 2 - Progress (Jan 2026 - Jun 2026)",
+  range: "Jan 2026 - Jun 2026",
+  legend: ["Start of Term/Trendline", "End of Term/Trendline"],
+  data: [
+    { isSectionHeader: true, label: "Stage 2: Engagement & Relating" },
+    { name: "Responds to your overtures", earliestAvg: 78, latestAvg: 89, monthCount: 6 },
+    { name: "Recover from distress with 15mins with your help", earliestAvg: 100, latestAvg: 39 },
+  ],
+};
+const tagged = fns.chartDataTag ? fns.chartDataTag(spec) : null;
+check("a tag is produced", typeof tagged, "string");
+check("it says what it is up front", tagged.startsWith("zora-chart-v1:"), true);
+check("and reads back as exactly what went in", readChartDataTag(tagged), spec);
+
+console.log("\nit is read strictly, so nothing else is mistaken for one");
+check("a description somebody typed is not a chart", readChartDataTag("A bar chart of progress"), null);
+check("nor is an empty one", readChartDataTag(""), null);
+check("nor a missing one", readChartDataTag(undefined), null);
+check("a damaged tag is refused rather than half-read",
+  readChartDataTag("zora-chart-v1:{not json"), null);
+check("and a version we do not know is left alone",
+  readChartDataTag("zora-chart-v2:{}"), null);
+
+console.log("\nthrough the XML and back, which is how it really travels");
+// Word stores it as an attribute, so every quote in the JSON comes back as
+// &quot;. A tag that cannot survive that is no use.
+const asAttribute = `<wp:docPr id="1" name="Activity Breakdown" descr="${xmlEscapeAttr(tagged)}" title=""/>`;
+const pulled = /descr="([^"]*)"/.exec(asAttribute)[1];
+check("the quotes really are escaped in the attribute", /&quot;/.test(pulled), true);
+check("and it survives being unescaped again",
+  readChartDataTag(xmlUnescape(pulled)), spec);
+
+function xmlEscapeAttr(t) {
+  return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 
 console.log("\nwhich files inside the zip hold words");
 {
