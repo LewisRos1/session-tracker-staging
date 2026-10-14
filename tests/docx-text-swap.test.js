@@ -36,14 +36,17 @@ const consts = ["CHART_FIXED_ZH", "MONTHS_ZH"]
   .map(n => src.match(new RegExp(`const ${n} = \\{[\\s\\S]*?\\n};`))[0])
   .join("\n");
 const cjk = src.match(/const isCjkChar = [^;]+;/)[0];
+const chineseFns = [/const hasChinese = [^;]+;/, /const looksTranslated =[\s\S]*?;/]
+  .map(re => src.match(re)[0]).join("\n");
 const fns = new Function(`const CHART_TAG_PREFIX = ${JSON.stringify(tagPrefix)};`
-  + tagFn + "\n" + consts + "\n" + cjk + "\n"
+  + tagFn + "\n" + consts + "\n" + cjk + "\n" + chineseFns + "\n"
   + names.map(extract).join("\n")
-  + `\nreturn { chartDataTag, ${names.join(", ")} };`)();
+  + `\nreturn { chartDataTag, hasChinese, looksTranslated, ${names.join(", ")} };`)();
 const { xmlUnescape, docxParagraphs, markParagraph, unmarkParagraph,
         joinWrappedLines, keepRunSpacing, readChartDataTag,
         findChartPictures, chartPhrases, periodLabelZh, chartTitleZh,
-        resizeDrawingToChart, applyDocxText, stripMarkers } = fns;
+        resizeDrawingToChart, applyDocxText, stripMarkers,
+        hasChinese, looksTranslated } = fns;
 
 let failed = 0;
 const check = (what, got, want) => {
@@ -333,6 +336,19 @@ check("the chart asks for the clean name",
   chartPhrases({ target: "*_Self-Regulation:_*",
                  rows: [{ name: "*Imitation*" }, { name: "Play" }] }),
   ["Self-Regulation:", "Imitation", "Play"]);
+
+console.log("\ntelling a translation from the English handed back");
+// Three shapes of leftover, all from when target names were kept in English.
+check("the English straight back", looksTranslated("Imitation"), false);
+check("English wedged into the Chinese", looksTranslated("社交行为与社交Play"), false);
+check("and the other way round", looksTranslated("动作Imitation"), false);
+check("a bracketed number inside it is fine",
+  looksTranslated("独立完成游戏（0-18个月）"), true);
+// The clinical name is kept on purpose, in full-width brackets.
+check("the name we actually want", looksTranslated("模仿（Imitation）"), true);
+check("plain Chinese", looksTranslated("自我调节"), true);
+check("nothing", looksTranslated(""), false);
+check("a number beside Chinese is not English", looksTranslated("共5次"), true);
 
 console.log("\nspaces where Chinese meets the run beside it");
 // "Strength:" is written as a bold run followed by a run that starts with a

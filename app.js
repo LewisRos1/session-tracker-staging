@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2249";
+const APP_VERSION = "2250";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -16853,8 +16853,24 @@ function stripMarkers(name) {
     .trim();
 }
 
+/**
+ * The translating rules in force. Bumped when a change makes what was
+ * learned before wrong, which forgets the lot rather than trusting it.
+ */
+const TRANSLATE_TERMS_RULE = "2026-10-14-targets-translated";
+
 /** Whether a string holds any Chinese at all. */
 const hasChinese = (s) => /[\u4e00-\u9fff]/.test(String(s || ""));
+
+/**
+ * Whether a remembered term is really a translation.
+ *
+ * A clinical name kept on purpose sits inside full-width brackets, as in
+ * 模仿（Imitation）. English touching Chinese with nothing between them is
+ * a leftover from when the word was protected everywhere: "社交行为与社交Play".
+ */
+const looksTranslated = (s) =>
+  hasChinese(s) && !/[\u4e00-\u9fff][A-Za-z]|[A-Za-z][\u4e00-\u9fff]/.test(String(s));
 
 /** Every phrase on a chart that a reader would want in their own language. */
 function chartPhrases(spec) {
@@ -16894,8 +16910,11 @@ const CHART_FIXED_ZH = {
   // child; 表现下降 says the same thing without the edge.
   "Declining": "表现下降",
   "Stable": "稳定",
-  "Start of Term/Trendline": "学期初／趋势线",
-  "End of Term/Trendline": "学期末／趋势线",
+  // The English means the start of the term, or the start of the trendline.
+  // "学期初／趋势线" lost that: it reads as the start of term, and then
+  // separately a trendline. The point has to be said on both halves.
+  "Start of Term/Trendline": "学期初／趋势线起点",
+  "End of Term/Trendline": "学期末／趋势线终点",
 };
 
 const MONTHS_ZH = {
@@ -17297,7 +17316,7 @@ async function translateDocxFile(file, student, onProgress, signal) {
   // where nothing changed costs nothing at all.
   const charts = parts.flatMap(p => findChartPictures(p.xml));
   const wanted = [...new Set(charts.flatMap(c => chartPhrases(c.spec)))];
-  const learned = await loadTranslationTerms().catch(() => ({}));
+  const learned = await loadTranslationTerms(TRANSLATE_TERMS_RULE).catch(() => ({}));
   // The built-in list always wins, so a term corrected in the code cannot be
   // overruled by one the model guessed months ago. Matched without regard to
   // case: the list carries "self-regulation" and a chart asks for
@@ -17316,8 +17335,9 @@ async function translateDocxFile(file, student, onProgress, signal) {
    */
   const zh = (en) => {
     const k = stripMarkers(en);
-    const hit = pinned[k] || pinnedLower[k.toLowerCase()] || learned[k];
-    return hasChinese(hit) ? hit : null;
+    const fixed = pinned[k] || pinnedLower[k.toLowerCase()];
+    if (fixed) return fixed;
+    return looksTranslated(learned[k]) ? learned[k] : null;
   };
   const missing = wanted.filter(w => !zh(w));
 
@@ -17366,12 +17386,15 @@ async function translateDocxFile(file, student, onProgress, signal) {
       missing.map((m, i) => `[${i + 1}] ${m}`).join("\n"), signal);
     const got = translateParseReply(reply, missing.length);
     const fresh = {};
-    missing.forEach((en, i) => { if (got[i]) fresh[en] = got[i]; });
+    // Only what is really a translation is kept. A reply that hands the
+    // English back, or leaves a word of it wedged into the Chinese, would
+    // otherwise be remembered as that name's Chinese for good.
+    missing.forEach((en, i) => { if (looksTranslated(got[i])) fresh[en] = got[i]; });
     if (Object.keys(fresh).length) {
       Object.assign(learned, fresh);
       // Kept for every later report. Failing to save is not worth losing the
       // translation over -- the names are already in hand for this one.
-      await saveTranslationTerms(learned).catch(err =>
+      await saveTranslationTerms(learned, TRANSLATE_TERMS_RULE).catch(err =>
         console.error("could not remember the translated names:", err));
     }
   }
@@ -17563,7 +17586,7 @@ async function showTranslatedTerms() {
   if (!box) return;
   box.innerHTML = `<p class="tr-note">Loading…</p>`;
   let learned = {};
-  try { learned = await loadTranslationTerms(); }
+  try { learned = await loadTranslationTerms(TRANSLATE_TERMS_RULE); }
   catch (err) { box.innerHTML = `<p class="tr-failed">Could not read the list: ${escHtml(err.message)}</p>`; return; }
 
   const pinned = Object.fromEntries(TRANSLATE_GLOSSARY);

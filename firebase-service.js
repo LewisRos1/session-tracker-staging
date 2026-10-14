@@ -1465,13 +1465,32 @@ export async function saveHalfYearReportConfig(data) {
 // in the built-in list in app.js, which always wins over this one, so a bad
 // entry can never get stuck.
 
-export async function loadTranslationTerms() {
+/**
+ * The Chinese names learned from earlier reports.
+ *
+ * `rule` names the translating rules in force when a term was learned. A
+ * term learned under older rules is forgotten rather than trusted: the rule
+ * that kept target names in English left behind "Imitation" for "Imitation",
+ * "社交行为与社交Play" and "动作Imitation" -- three shapes of wrong, and
+ * picking them out one by one would always miss a fourth.
+ */
+export async function loadTranslationTerms(rule) {
   const snap = await getDoc(doc(db, "config", "translationTerms"));
-  return snap.exists() ? (snap.data()?.terms || {}) : {};
+  if (!snap.exists()) return {};
+  const data = snap.data() || {};
+  if (rule && data.rule !== rule) return {};
+  return data.terms || {};
 }
 
-export async function saveTranslationTerms(terms) {
-  await setDoc(doc(db, "config", "translationTerms"), { terms }, { merge: true });
+/**
+ * Written whole, not merged.
+ *
+ * Firestore merges a map field key by key, so a merge would have kept every
+ * term learned under the old rules sitting underneath the new ones. The
+ * caller holds the whole list either way.
+ */
+export async function saveTranslationTerms(terms, rule) {
+  await setDoc(doc(db, "config", "translationTerms"), { terms, rule: rule || null });
 }
 
 // ─── SCORING CONFIG ──────────────────────────────────────────
