@@ -952,7 +952,14 @@ const sectionBandFill = label =>
 const sectionBandText = label =>
   label === "Mastered" ? "#166534" : label === "Discontinued" ? "#92400e" : "#374151";
 
-export function renderActivityBreakdownChart(targetName, activityData, periodLabel, chartTitle = null, showDuration = false, legendLabels = null) {
+// headerLabels lets the caller name the columns. The chart is drawn again in
+// Chinese when a report is translated, and this file cannot see the app's
+// word list -- so the words come in the same way the legend already does.
+export function renderActivityBreakdownChart(targetName, activityData, periodLabel, chartTitle = null, showDuration = false, legendLabels = null, headerLabels = null) {
+  const HDR = {
+    activity: "Activity", performance: "Overall Performance (%)",
+    duration: "Duration", months: "(Months)", ...(headerLabels || {}),
+  };
   if (!activityData || activityData.length === 0) return null;
   const SCALE = 2, SECTION_H = 28;
   const C_START = "#7dd3fc", C_END = "#a78bfa";
@@ -1013,13 +1020,13 @@ export function renderActivityBreakdownChart(targetName, activityData, periodLab
 
   // Column headers
   ctx.font = "bold 14px sans-serif"; ctx.fillStyle = "#6b7280";
-  ctx.textAlign = "right"; ctx.fillText("Activity", PAD.left - 10, PAD.top - 7);
-  ctx.textAlign = "center"; ctx.fillText("Overall Performance (%)", PAD.left + cW / 2, PAD.top - 7);
+  ctx.textAlign = "right"; ctx.fillText(HDR.activity, PAD.left - 10, PAD.top - 7);
+  ctx.textAlign = "center"; ctx.fillText(HDR.performance, PAD.left + cW / 2, PAD.top - 7);
   if (showDuration) {
     const DUR_CX = PAD.left + cW + DUR_COL_W / 2;
     ctx.font = "bold 13px sans-serif"; ctx.fillStyle = "#6b7280"; ctx.textAlign = "center";
-    ctx.fillText("Duration", DUR_CX, PAD.top - 18);
-    ctx.fillText("(Months)", DUR_CX, PAD.top - 4);
+    ctx.fillText(HDR.duration, DUR_CX, PAD.top - 18);
+    ctx.fillText(HDR.months, DUR_CX, PAD.top - 4);
   }
   ctx.strokeStyle = "#9ca3af"; ctx.lineWidth = 0.5;
   ctx.beginPath(); ctx.moveTo(0, PAD.top - 1); ctx.lineTo(W, PAD.top - 1); ctx.stroke();

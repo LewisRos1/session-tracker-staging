@@ -223,6 +223,40 @@ try {
   r.check("so does the monthly chart", phrases.monthly, ["FEDC 2"]);
   r.check("and a line chart asks for its own target", phrases.line, ["FEDC 2"]);
 
+  // ── the direction words ──────────────────────────────────────────────
+  // The overview chart coloured these and the line charts drew the same
+  // three words in flat grey, so the same fact was green on one page and
+  // grey on the next.
+  r.section("Improving, Declining and Stable look the same wherever they appear");
+  const dirs = await page.eval(`(() => {
+    const m = window.__app.HYR_DIRECTION;
+    const of = window.__app.hyrDirectionOf;
+    return { map: m, up: of(20), down: of(-20), flat: of(0), edgeUp: of(8), edgeDown: of(-8) };
+  })()`);
+  r.check("improving is green", dirs.map?.Improving?.color, "#16a34a");
+  r.check("declining is red", dirs.map?.Declining?.color, "#dc2626");
+  r.check("stable is grey", dirs.map?.Stable?.color, "#6b7280");
+  r.check("and the arrows match the words",
+    [dirs.map?.Improving?.icon, dirs.map?.Declining?.icon, dirs.map?.Stable?.icon],
+    ["↑", "↓", "→"]);
+  r.section("and the line between them");
+  r.check("a clear rise is improving", dirs.up, "Improving");
+  r.check("a clear fall is declining", dirs.down, "Declining");
+  r.check("no real movement is stable", dirs.flat, "Stable");
+  r.check("exactly 8 is still stable, not improving", dirs.edgeUp, "Stable");
+  r.check("and minus 8 is still stable", dirs.edgeDown, "Stable");
+
+  r.section("the fixed chart words only turn Chinese while a Chinese chart is drawn");
+  const words = await page.eval(`(() => {
+    const before = window.__app.chartWord("Status");
+    let during = null;
+    window.__app.redrawChartZh({ kind: "monthlyBars", baseW: 700,
+      rows: [{ name: "x", score: 50 }] }, () => { during = window.__app.chartWord("Status"); return null; });
+    return { before, during, after: window.__app.chartWord("Status") };
+  })()`);
+  r.check("English before", words.before, "Status");
+  r.check("English again afterwards, so a normal report is unaffected", words.after, "Status");
+
   r.section("console");
   const noise = page.consoleLines.filter(l => l.level === "error");
   r.ok("no console errors", noise.length === 0,

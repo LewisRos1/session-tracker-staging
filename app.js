@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2246";
+const APP_VERSION = "2247";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -6565,6 +6565,33 @@ function hyrDrawActivityBreakdown(targetName, activities, period, year) {
   return canvas.toDataURL("image/png").split(",")[1];
 }
 
+/**
+ * What each direction looks like, everywhere it is shown.
+ *
+ * The overview chart had these colours and the per-target line charts drew
+ * the same three words in flat grey, so the same fact was green on one page
+ * and grey on the next. One map now, read by both.
+ */
+const HYR_DIRECTION = {
+  Improving: { icon: "↑", color: "#16a34a" },
+  Declining: { icon: "↓", color: "#dc2626" },
+  Stable:    { icon: "→", color: "#6b7280" },
+};
+const hyrDirectionOf = (delta) => delta > 8 ? "Improving" : delta < -8 ? "Declining" : "Stable";
+
+/**
+ * Whether the chart being drawn right now is a Chinese one.
+ *
+ * The charts are drawn by the same code either way, so rather than thread a
+ * language through every one of them this is set for the length of a single
+ * redraw. Fixed words ask chartWord for themselves; a word with no Chinese
+ * of its own comes back as it went in.
+ */
+let _chartZh = false;
+const chartWord = (en) => (_chartZh && CHART_FIXED_ZH[en]) ? CHART_FIXED_ZH[en] : en;
+/** The same, named for where it reads best: Improving, Declining, Stable. */
+const chartStatusWord = chartWord;
+
 function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd, delta, direction) {
   const SCALE = 2;
   const W = 580, H = 330;
@@ -6652,9 +6679,10 @@ function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd
   // Trend annotation subtitle — use pre-computed delta/direction if available
   const dispDelta = delta ?? Math.round(tStartVal !== tEndVal ? tEndVal - tStartVal : ys[ys.length-1] - ys[0]);
   const dispDir   = direction ?? (dispDelta > 8 ? "Improving" : dispDelta < -8 ? "Declining" : "Stable");
-  const icon   = dispDir === "Improving" ? "↑" : dispDir === "Declining" ? "↓" : "→";
-  ctx.fillStyle = "#6b7280"; ctx.font = "italic 16px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(`${icon} ${dispDir}`, W / 2, 42);
+  const dirStyle = HYR_DIRECTION[dispDir] || HYR_DIRECTION.Stable;
+  const icon   = dirStyle.icon;
+  ctx.fillStyle = dirStyle.color; ctx.font = "italic 16px sans-serif"; ctx.textAlign = "center";
+  ctx.fillText(`${icon} ${chartStatusWord(dispDir)}`, W / 2, 42);
 
   // Data line — skip nulls, don't connect across gaps
   ctx.strokeStyle = "#4472c4"; ctx.lineWidth = 2.5;
@@ -6707,9 +6735,9 @@ function hyrDrawOverviewChartB(chartTrendRows, title) {
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
   if (title) { ctx.fillStyle = "#111827"; ctx.font = "bold 19px sans-serif"; ctx.textAlign = "center"; ctx.fillText(title, W / 2, 30); }
   ctx.save(); ctx.fillStyle = "#374151"; ctx.font = "bold 17px sans-serif"; ctx.textAlign = "center";
-  ctx.translate(42, PAD_TOP + TOP_H / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("Overall Performance (%)", 0, 0); ctx.restore();
+  ctx.translate(42, PAD_TOP + TOP_H / 2); ctx.rotate(-Math.PI / 2); ctx.fillText(chartWord("Overall Performance (%)"), 0, 0); ctx.restore();
   ctx.save(); ctx.fillStyle = "#374151"; ctx.font = "bold 17px sans-serif"; ctx.textAlign = "center";
-  ctx.translate(42, BTM_Y0 + BTM_H / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("Net Change (points)", 0, 0); ctx.restore();
+  ctx.translate(42, BTM_Y0 + BTM_H / 2); ctx.rotate(-Math.PI / 2); ctx.fillText(chartWord("Net Change (points)"), 0, 0); ctx.restore();
   for (const tick of [0, 20, 40, 60, 80, 100]) {
     const y = TOP_BTM_Y - (tick / 100) * TOP_H;
     ctx.strokeStyle = tick === 0 ? "#9ca3af" : "#e5e7eb"; ctx.lineWidth = 1;
@@ -6810,9 +6838,9 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
 
   // Column headers: Activity | Overall Progress (%) | Status
   ctx.fillStyle = "#374151"; ctx.font = "bold 15px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText("Activity", NAME_W / 2, PAD_TOP + 18);
-  ctx.fillText("Overall Progress (%)", PERF_X + (PERF_W + PAD_VAL) / 2, PAD_TOP + 18);
-  ctx.fillText("Status", STATUS_CENTER_X, PAD_TOP + 18);
+  ctx.fillText(chartWord("Activity"), NAME_W / 2, PAD_TOP + 18);
+  ctx.fillText(chartWord("Overall Progress (%)"), PERF_X + (PERF_W + PAD_VAL) / 2, PAD_TOP + 18);
+  ctx.fillText(chartWord("Status"), STATUS_CENTER_X, PAD_TOP + 18);
 
   // Light gridlines at 25, 50, 75, 100 only (0% is covered by the bold Activity separator)
   [25, 50, 75, 100].forEach(v => {
@@ -6868,9 +6896,11 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
     // Status column: ±8 threshold
     const delta = r.delta ?? (r.tEnd - r.tStart);
     let statusText, statusColor;
-    if      (delta > 8)  { statusText = "↑ Improving"; statusColor = "#16a34a"; }
-    else if (delta < -8) { statusText = "↓ Declining"; statusColor = "#dc2626"; }
-    else                 { statusText = "→ Stable";    statusColor = "#6b7280"; }
+    // From the shared map, so a target that is Improving looks the same here
+    // as it does on its own line chart further down the report.
+    const dirName = hyrDirectionOf(delta);
+    statusText  = `${HYR_DIRECTION[dirName].icon} ${chartStatusWord(dirName)}`;
+    statusColor = HYR_DIRECTION[dirName].color;
     ctx.font = "15px sans-serif"; ctx.fillStyle = statusColor; ctx.textAlign = "center";
     ctx.fillText(statusText, STATUS_CENTER_X, cy + 6);
 
@@ -7896,7 +7926,7 @@ function assessmentDrawDayChart(scored, days, title) {
   ctx.fillText("Score (%)", 0, 0);
   ctx.restore();
   ctx.font = `bold ${F_BODY}px Arial`; ctx.fillStyle = "#111827"; ctx.textAlign = "center";
-  ctx.fillText("Target", W / 2, base + drop + Math.round(F_BODY * 0.9));
+  ctx.fillText(chartWord("Target"), W / 2, base + drop + Math.round(F_BODY * 0.9));
 
   ctx.font = `${F_BODY}px Arial`;
   const BOX = F_BODY, G = Math.round(F_BODY * 0.5), SP = Math.round(F_BODY * 1.4);
@@ -7979,7 +8009,7 @@ function assessmentDrawAvgChart(scored, title) {
   ctx.fillText("Score (%)", 0, 0);
   ctx.restore();
   ctx.font = `bold ${F_BODY}px Arial`; ctx.fillStyle = "#111827"; ctx.textAlign = "center";
-  ctx.fillText("Target", W / 2, base + drop + Math.round(F_BODY * 0.9));
+  ctx.fillText(chartWord("Target"), W / 2, base + drop + Math.round(F_BODY * 0.9));
 
   return { base64: canvas.toDataURL("image/png").split(",")[1], width: W, height: H };
 }
@@ -9229,8 +9259,8 @@ function monthlyDrawScoreBarChart(rows) {
   // Column headings
   ctx.fillStyle = "#f3f4f6"; ctx.fillRect(0, 0, W, HDR_H);
   ctx.fillStyle = "#374151"; ctx.font = `bold ${FONT_PX}px Arial`;
-  ctx.textAlign = "right"; ctx.fillText("Target", PAD_L - 14, HDR_H - 13);
-  ctx.textAlign = "center"; ctx.fillText("Score", PAD_L + plotW / 2, HDR_H - 13);
+  ctx.textAlign = "right"; ctx.fillText(chartWord("Target"), PAD_L - 14, HDR_H - 13);
+  ctx.textAlign = "center"; ctx.fillText(chartWord("Score"), PAD_L + plotW / 2, HDR_H - 13);
   ctx.strokeStyle = "#d1d5db"; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(0, HDR_H + 0.5); ctx.lineTo(W, HDR_H + 0.5); ctx.stroke();
 
@@ -16852,6 +16882,12 @@ function chartTitleZh(spec, zh) {
  * added later and not taught here is left in English instead of mangled.
  */
 function redrawChartZh(spec, zh) {
+  _chartZh = true;
+  try { return redrawChartInner(spec, zh); }
+  finally { _chartZh = false; }   // always, or an English report would come out Chinese
+}
+
+function redrawChartInner(spec, zh) {
   const name = (s) => zh(s) || s;
   const fixed = (s) => CHART_FIXED_ZH[s] || s;
 
@@ -16880,7 +16916,9 @@ function redrawChartZh(spec, zh) {
       : { ...row, name: name(row.name) });
     return renderActivityBreakdownChart(
       name(spec.target), data, periodLabelZh(spec.range),
-      chartTitleZh(spec, zh), false, (spec.legend || []).map(fixed));
+      chartTitleZh(spec, zh), false, (spec.legend || []).map(fixed),
+      { activity: fixed("Activity"), performance: fixed("Overall Performance (%)"),
+        duration: fixed("Duration"), months: fixed("(Months)") });
   }
   return null;
 }
