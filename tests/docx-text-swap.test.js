@@ -28,7 +28,8 @@ const names = ["xmlUnescape", "xmlEscape", "docxParagraphs", "markParagraph",
                "unmarkParagraph", "joinWrappedLines", "keepRunSpacing",
                "readChartDataTag", "findChartPictures", "chartPhrases",
                "stripMarkers",
-               "periodLabelZh", "chartTitleZh", "resizeDrawingToChart",
+               "periodLabelZh", "chartTitleZh", "overviewTitleZh",
+               "resizeDrawingToChart",
                "applyDocxText"];
 const tagPrefix = src.match(/const CHART_TAG_PREFIX = "([^"]+)";/)[1];
 const tagFn = src.match(/const chartDataTag = [^;]+;/)[0];
@@ -46,7 +47,7 @@ const { xmlUnescape, docxParagraphs, markParagraph, unmarkParagraph,
         joinWrappedLines, keepRunSpacing, readChartDataTag,
         findChartPictures, chartPhrases, periodLabelZh, chartTitleZh,
         resizeDrawingToChart, applyDocxText, stripMarkers,
-        hasChinese, looksTranslated } = fns;
+        hasChinese, looksTranslated, overviewTitleZh } = fns;
 
 let failed = 0;
 const check = (what, got, want) => {
@@ -391,6 +392,20 @@ console.log("\nthe title, which is built rather than translated");
     chartTitleZh({ ...chartSpec, title: "FEDC 2 - Progress (Jan 2026 - Jun 2026)" }, zh),
     "学习目标二：进展（2026年1月–2026年6月）");
 }
+
+console.log("\nthe overall progress chart's own title");
+// The chart is drawn by the app rather than translated, so the Chinese name
+// has to be put on it here. Nothing further down would ever turn the English
+// one into Chinese, and it sat there in English on a page of Chinese.
+check("his Chinese name and the months",
+  overviewTitleZh({ name: "Zhang Qi Pei", nameZh: "张祺培" }, "Jan 2026 - Jun 2026"),
+  "张祺培（2026年1月–2026年6月）");
+check("no Chinese name typed in, so the English one stands",
+  overviewTitleZh({ name: "Ryan Lee" }, "Jan 2026 - Jun 2026"),
+  "Ryan Lee（2026年1月–2026年6月）");
+check("an empty box counts as none",
+  overviewTitleZh({ name: "Ryan Lee", nameZh: "   " }, "Jul 2026"),
+  "Ryan Lee（2026年7月）");
 
 console.log("\nresizing the slot the picture sits in");
 // Chinese is more compact, so the chart is usually shorter. Left alone,

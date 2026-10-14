@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2252";
+const APP_VERSION = "2253";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -7364,7 +7364,8 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
         transformation: { width: ovDocW, height: ovH }, type: "png", outline: REPORT_CHART_BORDER,
         altText: { name: "Progress Overview", title: "", description: chartDataTag({
           kind: "overview", baseW: ovNativeW, title: ovTitle,
-          titleZh: `${student.name}（${periodLabelZh(`${firstMonthName.slice(0, 3)} ${R.startY} - ${R.endShort} ${R.endY}`)}）`,
+          titleZh: overviewTitleZh(student,
+            `${firstMonthName.slice(0, 3)} ${R.startY} - ${R.endShort} ${R.endY}`),
           rows: chartTrendRows.map(r => ({ name: r.name, delta: r.delta, tStart: r.tStart, tEnd: r.tEnd })),
         }) } })],
       alignment: AlignmentType.CENTER, spacing: { after: 60 }
@@ -16965,6 +16966,18 @@ function periodLabelZh(label) {
  * so sending it to be translated would only risk it coming back different
  * from the heading above it.
  */
+/**
+ * The overall-progress chart's title in Chinese.
+ *
+ * His Chinese name, the one typed into the Student Database. The chart is
+ * drawn by the app rather than translated, so it has to be put on here:
+ * nothing further down would ever turn the English name into Chinese.
+ */
+function overviewTitleZh(student, range) {
+  const name = (student?.nameZh || "").trim() || student?.name || "";
+  return `${name}（${periodLabelZh(range)}）`;
+}
+
 function chartTitleZh(spec, zh) {
   const num = /^(\s*)(\d+)\)\s*/.exec(spec.title || "");
   const page = /\[Page (\d+) of (\d+)\]\s*$/.exec(spec.title || "");
