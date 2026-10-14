@@ -23,6 +23,7 @@
 const src = await Deno.readTextFile("app.js");
 const realStyles = await Deno.readTextFile("tests/fixtures-real-styles.xml");
 const realDoc = await Deno.readTextFile("tests/fixtures-real-document.xml");
+const realSettings = await Deno.readTextFile("tests/fixtures-real-settings.xml");
 
 function extract(name) {
   const start = src.indexOf(`function ${name}(`);
@@ -38,6 +39,10 @@ const font = src.match(/const CHINESE_EASTASIA_FONT = "([^"]+)";/)[1];
 const setChineseFonts = new Function(
   `const CHINESE_EASTASIA_FONT = ${JSON.stringify(font)};`
   + extract("setChineseFonts") + "; return setChineseFonts;")();
+const lists = ["CHINESE_NO_BREAK_AFTER", "CHINESE_NO_BREAK_BEFORE"]
+  .map(n => src.match(new RegExp(`const ${n} = "[^"]*";`))[0]).join("\n");
+const setChineseLineBreaks = new Function(
+  lists + extract("setChineseLineBreaks") + "; return setChineseLineBreaks;")();
 
 let failed = 0;
 const check = (what, got, want) => {
@@ -131,6 +136,41 @@ console.log("\nwhich parts get the treatment");
   for (const n of ["word/theme/theme1.xml", "word/numbering.xml", "[Content_Types].xml"]) {
     check(`${n} is left alone`, re.test(n), false);
   }
+}
+
+console.log("\nwhere Word may not break a Chinese line");
+// <w:kinsoku/> says to apply the rules. It does not say what they are: those
+// are two character lists, and a file the app builds has none, so a line was
+// free to start with "，" or to hold nothing but "。". This fixture is the real
+// settings.xml, read out of a report the app built.
+const settings = setChineseLineBreaks(realSettings);
+check("the lists were not there to begin with",
+  /noLineBreaks/.test(realSettings), false);
+check("a line may not start with a comma",
+  /<w:noLineBreaksBefore[^>]*w:val="[^"]*，/.test(settings), true);
+check("nor with a full stop",
+  /<w:noLineBreaksBefore[^>]*w:val="[^"]*。/.test(settings), true);
+check("nor end with an opening bracket",
+  /<w:noLineBreaksAfter[^>]*w:val="[^"]*（/.test(settings), true);
+check("they say which language they are for",
+  (settings.match(/w:lang="zh-CN"/g) || []).length, 2);
+// They are part of the compatibility block, which the file already has.
+check("they sit inside w:compat",
+  /<w:compat><w:noLineBreaksAfter/.test(settings), true);
+check("the compatibility setting that was there is kept",
+  settings.includes('w:name="compatibilityMode"'), true);
+check("running it twice does not add them again",
+  setChineseLineBreaks(settings), settings);
+check("nothing else in the file changed",
+  settings.replace(/<w:noLineBreaks(After|Before)[^>]*\/>/g, ""), realSettings);
+
+// A settings file with no compatibility block at all still gets them.
+{
+  const bare = `<?xml version="1.0"?><w:settings xmlns:w="x"><w:zoom/></w:settings>`;
+  const out = setChineseLineBreaks(bare);
+  check("a file with no compat block gets one",
+    /<w:compat><w:noLineBreaksAfter[\s\S]*<\/w:compat><\/w:settings>$/.test(out), true);
+  check("and what was already in it survives", out.includes("<w:zoom/>"), true);
 }
 
 console.log(failed ? `\n${failed} failed.\n` : "\nAll good.\n");

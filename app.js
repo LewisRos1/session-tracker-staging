@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2250";
+const APP_VERSION = "2251";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -17446,6 +17446,13 @@ async function translateDocxFile(file, student, onProgress, signal) {
     const xml = rewritten.has(name) ? rewritten.get(name) : await zip.file(name).async("string");
     rewritten.set(name, setChineseFonts(xml));
   }
+  // And where a Chinese line may break, which is settled in its own part
+  // and nowhere else.
+  for (const name of Object.keys(zip.files)) {
+    if (!DOCX_SETTINGS_PART.test(name)) continue;
+    const xml = rewritten.has(name) ? rewritten.get(name) : await zip.file(name).async("string");
+    rewritten.set(name, setChineseLineBreaks(xml));
+  }
   for (const [name, xml] of rewritten) zip.file(name, xml);
   const blob = await zip.generateAsync({
     type: "blob",
@@ -17893,6 +17900,36 @@ function setChineseFonts(xml) {
 
 /** The parts that carry fonts worth correcting, text or not. */
 const DOCX_FONT_PARTS = /^word\/(document|header\d*|footer\d*|footnotes|endnotes|styles)\.xml$/;
+/** The one part that says which characters may not start or end a line. */
+const DOCX_SETTINGS_PART = /^word\/settings\.xml$/;
+
+/** A line may not END with one of these: an opening bracket or quote. */
+const CHINESE_NO_BREAK_AFTER = "([{£¥·‘“〈《「『【〔〖〝﹙﹛﹝＄（．［｛￡￥";
+/** A line may not START with one of these: a comma, a full stop, a closing bracket. */
+const CHINESE_NO_BREAK_BEFORE = "!),.:;?]}¢·ˇˉ—―’”…‰′″、。〃〉》」』】〕〗〞﹐﹑﹒﹔﹕﹖﹗﹚﹜﹞！＂％＇），．：；？］｀｜｝～￠";
+
+/**
+ * Teach Word where a Chinese line may not break.
+ *
+ * <w:kinsoku/> only says to apply the rules. The rules themselves are these
+ * two lists, and a file built by the docx library carries no <w:compat>
+ * beyond a compatibility number, so there was nothing to apply: a line was
+ * free to start with "，" or to hold a lone "。". These are the lists Word
+ * itself writes for zh-CN.
+ */
+function setChineseLineBreaks(xml) {
+  const out = String(xml);
+  if (out.includes("w:noLineBreaksBefore")) return out;
+  const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const lists =
+    `<w:noLineBreaksAfter w:lang="zh-CN" w:val="${esc(CHINESE_NO_BREAK_AFTER)}"/>`
+    + `<w:noLineBreaksBefore w:lang="zh-CN" w:val="${esc(CHINESE_NO_BREAK_BEFORE)}"/>`;
+  // They belong inside <w:compat>, which the file already has.
+  if (/<w:compat>/.test(out)) return out.replace("<w:compat>", "<w:compat>" + lists);
+  return out.replace(/<\/w:settings>/,
+    "<w:compat>" + lists + "</w:compat></w:settings>");
+}
 
 /**
  * The parts of a .docx that hold words a reader sees.
