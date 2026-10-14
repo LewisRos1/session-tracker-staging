@@ -284,6 +284,7 @@ try {
       enStatus: find(en, "Improving"),
       cnTitle: (find(cn, "学习目标二") || {}).text || "",
       cnMonths: months(cn),
+      ovLegend: ov.filter(c => /趋势线|Trendline/.test(c.text)).map(c => c.text),
       enTitle: (find(en, "FEDC 2") || {}).text || "",
       enMonths: months(en),
     };
@@ -302,6 +303,34 @@ try {
     painted.enTitle.indexOf("Jan 2026") >= 0, painted.enTitle);
   r.ok("with its own month labels intact", painted.enMonths.length >= 3,
     JSON.stringify(painted.enMonths));
+
+  // The legend was written straight onto the canvas rather than going through
+  // the word list, so it stayed English under a chart whose every heading had
+  // been swapped.
+  r.ok("the overview chart's legend is Chinese too",
+    painted.ovLegend.length === 2 && painted.ovLegend.every(t => /[一-鿿]/.test(t)),
+    JSON.stringify(painted.ovLegend));
+
+  r.section("a student's note follows them onto the file");
+  const labels = await page.eval(`(() => {
+    const s = { name: "Zhang Qi Pei", note: "EIP" };
+    return {
+      plain:   window.__app.studentLabel(s),
+      file:    window.__app.studentFileLabel(s),
+      none:    window.__app.studentFileLabel({ name: "Ryan Lee", note: "" }),
+      wrapped: window.__app.studentLabel({ name: "Hiew Cheng Yu", note: "(Assessment)" }),
+      nasty:   window.__app.studentFileLabel({ name: "Mon/Wed", note: "a:b?c" }),
+    };
+  })()`);
+  r.check("on screen", labels.plain, "Zhang Qi Pei (EIP)");
+  r.check("and on the file", labels.file, "Zhang Qi Pei (EIP)");
+  r.check("no note, no brackets", labels.none, "Ryan Lee");
+  r.check("a note typed with its own brackets is not doubled",
+    labels.wrapped, "Hiew Cheng Yu (Assessment)");
+  // A note is free text, and Windows refuses these in a file name: a download
+  // carrying one just quietly fails.
+  r.check("characters Windows will not accept are taken out",
+    labels.nasty, "Mon Wed (a b c)");
 
   r.section("the fixed chart words only turn Chinese while a Chinese chart is drawn");
   const words = await page.eval(`(() => {

@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2248";
+const APP_VERSION = "2249";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -3499,6 +3499,17 @@ function findDuplicateStudent(name, note, exceptId = null) {
 function studentLabel(s) {
   const l = noteLabel(s.note);
   return l ? `${s.name} ${l}` : s.name;
+}
+/**
+ * The same label, safe to sit in a file name.
+ *
+ * Two students really do share a name -- the note is the only thing telling
+ * their reports apart once the file is sitting in a downloads folder. The
+ * note is free text, so it can hold a character Windows refuses in a file
+ * name, and a download carrying one of those just quietly fails.
+ */
+function studentFileLabel(s) {
+  return studentLabel(s).replace(/[\\/:*?"<>|]/g, " ").replace(/\s+/g, " ").trim();
 }
 
 // Gender drives the pronouns in the AI reports, so it is a fixed set rather
@@ -6947,7 +6958,11 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
   ctx.font = "15px sans-serif";
   const legBoxTop0 = CHART_Y1 + XAXIS_H + LEG_PAD;
   const legY0 = legBoxTop0 + BOX - 2;
-  const legRow = [{ color: C_START, label: "Start of Term/Trendline" }, { color: C_END, label: "End of Term/Trendline" }];
+  // Through chartWord like every other word the app puts on a chart. These
+  // two were written straight onto the canvas, so they stayed English on a
+  // Chinese chart whose headings beside them had all been swapped.
+  const legRow = [{ color: C_START, label: chartWord("Start of Term/Trendline") },
+                  { color: C_END,   label: chartWord("End of Term/Trendline") }];
   const legRowW = legRow.reduce((acc, { label }) => acc + BOX + GAP + Math.ceil(ctx.measureText(label).width) + SPC, 0) - SPC;
   let lx = (W - legRowW) / 2;
   legRow.forEach(({ color, label }) => {
@@ -7294,7 +7309,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   paragraphs.push(new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
     rows: [
-      mkDetailRow("Name:", student.name),
+      mkDetailRow("Name:", studentLabel(student)),
       mkDetailRow("Date of Birth:", ""),
       mkDetailRow("Age:", ""),
       mkDetailRow("Tracking Period:", monthRangeFull),
@@ -7670,8 +7685,8 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   // period is a range object for a custom report, so it cannot be interpolated
   // directly: that is what produced "[object Object]" in the file name.
   a.download = R.isCustom
-    ? `${student.name} - ${R.startShort} ${R.startY} to ${R.endShort} ${R.endY} - Custom Months Report - Generated On ${exportStampDate()}.docx`
-    : `${student.name} - ${period} ${year} Report - Generated On ${exportStampDate()}.docx`;
+    ? `${studentFileLabel(student)} - ${R.startShort} ${R.startY} to ${R.endShort} ${R.endY} - Custom Months Report - Generated On ${exportStampDate()}.docx`
+    : `${studentFileLabel(student)} - ${period} ${year} Report - Generated On ${exportStampDate()}.docx`;
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -8333,7 +8348,7 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
   paragraphs.push(new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
     rows: [
-      mkDetailRow("Name:", student.name),
+      mkDetailRow("Name:", studentLabel(student)),
       mkDetailRow("Date of Birth:", ""),
       mkDetailRow("Age:", ""),
       mkDetailRow("Assessment Dates:", collected.days.map(d => d.label).join(", ")),
@@ -8582,7 +8597,7 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
     const [fy, fm] = String(firstDay.date).split("-").map(Number);
     if (fy && fm) assessPeriod = `${SHORT_M[fm - 1]} ${fy} `;
   }
-  a.download = `${student.name} - ${assessPeriod}Assessment Report - Generated On ${exportStampDate()}.docx`;
+  a.download = `${studentFileLabel(student)} - ${assessPeriod}Assessment Report - Generated On ${exportStampDate()}.docx`;
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -9831,7 +9846,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
   const blob = await Packer.toBlob(doc);
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
   // Short month in the file name, full month inside the document.
-  a.download = `${student.name} - ${HYR_SHORT_MONTHS[month - 1]} ${year} Report - Generated On ${exportStampDate()}.docx`;
+  a.download = `${studentFileLabel(student)} - ${HYR_SHORT_MONTHS[month - 1]} ${year} Report - Generated On ${exportStampDate()}.docx`;
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -9901,7 +9916,7 @@ async function monthlyDownloadExcel(student, year, month, monthName, overviewDat
   const buf = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
-  a.download = `${student.name} Monthly Charts ${monthName} ${year}.xlsx`; a.click();
+  a.download = `${studentFileLabel(student)} Monthly Charts ${monthName} ${year}.xlsx`; a.click();
   URL.revokeObjectURL(a.href);
 }
 
@@ -16821,6 +16836,26 @@ function findChartPictures(xml) {
   return out;
 }
 
+/**
+ * A name with its bold and underline markers taken off.
+ *
+ * An activity can be written bold or underlined, which is stored in the name
+ * itself as "*_Self-Regulation:_*". Sent out like that, the model could not
+ * tell what it was being asked and handed the English straight back, which
+ * was then remembered as that name's Chinese.
+ */
+function stripMarkers(name) {
+  return String(name || "")
+    .replace(/\*_([\s\S]+?)_\*/g, "$1")
+    .replace(/_\*([\s\S]+?)\*_/g, "$1")
+    .replace(/\*([\s\S]+?)\*/g, "$1")
+    .replace(/_([\s\S]+?)_/g, "$1")
+    .trim();
+}
+
+/** Whether a string holds any Chinese at all. */
+const hasChinese = (s) => /[\u4e00-\u9fff]/.test(String(s || ""));
+
 /** Every phrase on a chart that a reader would want in their own language. */
 function chartPhrases(spec) {
   const out = [];
@@ -16830,7 +16865,9 @@ function chartPhrases(spec) {
     else if (row?.name) out.push(row.name);
   }
   for (const row of spec?.rows || []) if (row?.name) out.push(row.name);
-  return out;
+  // Cleaned here rather than at each caller, so what is asked for and what
+  // is looked up afterwards are the same string.
+  return out.map(stripMarkers).filter(Boolean);
 }
 
 /**
@@ -17003,6 +17040,8 @@ async function chartMediaPath(zip, partName, rid) {
 let _trStudentId = null;
 /** True while a translation is running, so a second one cannot start. */
 let _trBusy = false;
+/** The last thing the translator said, so going back does not lose it. */
+let _trLastStatus = "";
 
 /**
  * The word list.
@@ -17087,12 +17126,24 @@ const TRANSLATE_GLOSSARY = [
 ];
 
 /** Names and phrases that must survive the translation unchanged. */
-function translateKeepList(student) {
-  const keep = ["ZORA", "ZORA Behavioural Intervention"];
-  // Target names are clinical terms the boss writes herself, often already
-  // carrying their own Chinese. Whatever she typed is what the report says.
-  for (const t of student?.targets || []) if (t?.name) keep.push(t.name);
-  return [...new Set(keep)];
+function translateKeepList() {
+  // Only the company's own name. Every target name used to be on this list,
+  // which left them in English on every chart -- and, because a target is
+  // called "Play", protected that word everywhere else too: "Social Behaviour
+  // and Social Play" came back as "社交行为与社交Play".
+  return ["ZORA", "ZORA Behavioural Intervention"];
+}
+
+/**
+ * The target names, which are translated with the English kept beside them.
+ *
+ * A parent reads the Chinese; the boss, checking this report against the
+ * English one it was made from, needs the clinical name she typed to still
+ * be findable.
+ */
+function translateTargetNames(student) {
+  return [...new Set((student?.targets || [])
+    .map(t => stripMarkers(t?.name)).filter(Boolean))];
 }
 
 /** What the model is told, once, for every chunk. */
@@ -17118,7 +17169,8 @@ RULES
 - Numbers, dates, percentages, scores and times stay exactly as written.
 - Keep the warmth and the plain language of the English. Write as a therapist writing to a parent, not as a textbook.
 - Leave these EXACTLY as they appear, in English, untranslated:
-${translateKeepList(student).map(k => `    ${k}`).join("\n")}
+${translateKeepList().map(k => `    ${k}`).join("\n")}
+${translateTargetNames(student).length ? `- These are the names of the therapy targets. Translate each one into Chinese, then put the English after it in full-width brackets, exactly as spelt here. Write "模仿（Imitation）", never "Imitation" on its own and never the Chinese on its own. Use the same wording every time the name appears, in a heading, in a sentence or on a chart:\n${translateTargetNames(student).map(k => `    ${k}`).join("\n")}` : ""}
 ${names.length ? `- The child's name is written in Chinese:\n${names.map(n => `    ${n}`).join("\n")}` : ""}
 
 SPLIT LINES
@@ -17247,9 +17299,26 @@ async function translateDocxFile(file, student, onProgress, signal) {
   const wanted = [...new Set(charts.flatMap(c => chartPhrases(c.spec)))];
   const learned = await loadTranslationTerms().catch(() => ({}));
   // The built-in list always wins, so a term corrected in the code cannot be
-  // overruled by one the model guessed months ago.
+  // overruled by one the model guessed months ago. Matched without regard to
+  // case: the list carries "self-regulation" and a chart asks for
+  // "Self-Regulation", which never matched.
   const pinned = Object.fromEntries(TRANSLATE_GLOSSARY);
-  const zh = (en) => pinned[en] || learned[en] || null;
+  const pinnedLower = Object.fromEntries(
+    TRANSLATE_GLOSSARY.map(([en, cn]) => [en.toLowerCase(), cn]));
+  /**
+   * The Chinese for a phrase, or null if nobody knows it yet.
+   *
+   * A remembered term with no Chinese in it is not a translation: it is the
+   * English handed back. Reports were full of these ("Imitation = Imitation")
+   * from when target names were on the leave-in-English list, and treating
+   * them as known meant they were never asked about again. Ignored here, so
+   * the list mends itself on the next report rather than needing a clear-out.
+   */
+  const zh = (en) => {
+    const k = stripMarkers(en);
+    const hit = pinned[k] || pinnedLower[k.toLowerCase()] || learned[k];
+    return hasChinese(hit) ? hit : null;
+  };
   const missing = wanted.filter(w => !zh(w));
 
   const chunks = translateChunks(items);
@@ -17442,7 +17511,10 @@ function renderAiTranslateBody() {
          <strong>(中文) &lt;your file name&gt;.docx</strong>. The original is not changed.</p>`;
   }
 
-  body.innerHTML = `<div class="tr-wrap">${picker}${step2}<div id="tr-status"></div>
+  // The result goes back on screen when the screen does. It said how many
+  // charts were redrawn and what was left in English, and clicking back
+  // threw all of that away while the pill in the corner still said "Done!".
+  body.innerHTML = `<div class="tr-wrap">${picker}${step2}<div id="tr-status">${_trLastStatus}</div>
     <div class="tr-terms">
       <button class="tr-terms-btn" id="tr-terms-btn">Chinese terms used in reports</button>
       <div id="tr-terms-list"></div>
@@ -17528,7 +17600,7 @@ async function startTranslation(file, student) {
   _trBusy = true;
   drop?.classList.add("tr-drop--busy");
 
-  const show = (html) => { if (status) status.innerHTML = html; };
+  const show = (html) => { _trLastStatus = html; if (status) status.innerHTML = html; };
   show(`<div class="tr-running">Reading <strong>${escHtml(file.name)}</strong>…</div>`);
   trPill("Reading the file…", null, 0);
 
@@ -17707,7 +17779,15 @@ function joinWrappedLines(text) {
 function keepRunSpacing(original, translated) {
   const was = String(original);
   if (!was.trim()) return was;
-  return was.match(/^\s*/)[0] + joinWrappedLines(translated).trim() + was.match(/\s*$/)[0];
+  const text = joinWrappedLines(translated).trim();
+  // A space next to Chinese is not a gap, it is somewhere Word is allowed to
+  // break the line. A "Strength:" line is written as a bold run and then a
+  // run starting with a space, and Word broke it there, leaving 优势： alone
+  // on a line with the whole sentence beneath it. Chinese puts no space
+  // after a colon anyway, so the space goes.
+  const lead  = /^[\u4e00-\u9fff]/.test(text) ? "" : was.match(/^\s*/)[0];
+  const trail = /[\u4e00-\u9fff]$/.test(text) ? "" : was.match(/\s*$/)[0];
+  return lead + text + trail;
 }
 
 /**
@@ -17761,9 +17841,13 @@ function setChineseFonts(xml) {
   // set the language to "SimSun" and then added a second <w:lang> every
   // time it ran again.
   let out = String(xml).replace(/<w:rFonts\b([^>]*?)(\/?)>/g, (whole, attrs, slash) => {
-    const next = /w:eastAsia="/.test(attrs)
+    let next = /w:eastAsia="/.test(attrs)
       ? attrs.replace(/w:eastAsia="[^"]*"/, `w:eastAsia="${CHINESE_EASTASIA_FONT}"`)
       : `${attrs} w:eastAsia="${CHINESE_EASTASIA_FONT}"`;
+    // Which of the two fonts a character belongs to. Without it Word reads
+    // the text as Latin that happens to look Chinese, and lays it out by
+    // Latin rules.
+    if (!/w:hint="/.test(next)) next += ' w:hint="eastAsia"';
     return `<w:rFonts${next}${slash}>`;
   });
   // And say it is Chinese, so it is not proofed as English.
@@ -17771,6 +17855,16 @@ function setChineseFonts(xml) {
     (whole, inner) => inner.includes("w:eastAsia=\"zh")
       ? whole
       : `<w:rPrDefault><w:rPr>${inner}<w:lang w:eastAsia="zh-CN"/></w:rPr></w:rPrDefault>`);
+  // The rules that stop a line starting with a comma or a full stop.
+  //
+  // A report written by the app carries none of these, so Word was left to
+  // its own defaults and broke the Chinese wherever the margin fell, which
+  // put "，" at the start of a line. They belong at the front of the
+  // paragraph defaults: the order of these elements is fixed, and all four
+  // come before <w:spacing>, which is already in there.
+  out = out.replace(/<w:pPrDefault><w:pPr>(?!<w:kinsoku\/>)/,
+    (whole) => whole +
+      "<w:kinsoku/><w:overflowPunct/><w:autoSpaceDE/><w:autoSpaceDN/>");
   return out;
 }
 

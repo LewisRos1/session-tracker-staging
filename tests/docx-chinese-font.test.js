@@ -77,7 +77,11 @@ check("every other style survives",
   (realStyles.match(/<w:style /g) || []).length);
 // The language tag is removed BEFORE the font slots are blanked, or it
 // would already read <w:lang #/> and survive the comparison.
+// Everything this function is meant to add, taken back out again: whatever
+// is left over is something it changed that it had no business changing.
 const bare = t => t.replace(/<w:lang w:eastAsia="zh-CN"\/>/g, "")
+  .replace(/<w:kinsoku\/><w:overflowPunct\/><w:autoSpaceDE\/><w:autoSpaceDN\/>/g, "")
+  .replace(/ w:hint="eastAsia"/g, "")
   .replace(/w:eastAsia="[^"]*"/g, "#");
 check("nothing changed but the font slot and the language",
   bare(fixed), bare(realStyles));
@@ -95,6 +99,27 @@ const fixedDoc = setChineseFonts(withRunFont);
 check("a run's own East Asian font is corrected as well",
   /w:eastAsia="Times New Roman"/.test(fixedDoc), false);
 check("but its Latin font is left alone", /w:ascii="Arial"/.test(fixedDoc), true);
+
+console.log("\nthe rules that stop a line starting with a comma");
+// A report written by the app carries none of these, so Word was left to its
+// own defaults: it broke the Chinese wherever the margin fell and put "，" at
+// the start of a line.
+check("every run says which characters are the East Asian ones",
+  /<w:rFonts[^>]*w:hint="eastAsia"/.test(fixed), true);
+check("the four line-breaking rules are set",
+  ["kinsoku", "overflowPunct", "autoSpaceDE", "autoSpaceDN"]
+    .every(r => fixed.includes(`<w:${r}/>`)), true);
+// The order of these elements is fixed by the format, and all four belong
+// before <w:spacing>, which the app already writes.
+check("and they come before the spacing that was already there",
+  fixed.indexOf("<w:kinsoku/>") < fixed.indexOf("<w:spacing"), true);
+check("they sit in the paragraph defaults, not loose in the file",
+  /<w:pPrDefault><w:pPr><w:kinsoku\/>/.test(fixed), true);
+check("running it twice does not add them again",
+  (setChineseFonts(fixed).match(/<w:kinsoku\/>/g) || []).length, 1);
+check("nor a second hint on one run",
+  (setChineseFonts(fixed).match(/w:hint="eastAsia"/g) || []).length,
+  (fixed.match(/w:hint="eastAsia"/g) || []).length);
 
 console.log("\nwhich parts get the treatment");
 {

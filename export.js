@@ -1854,15 +1854,22 @@ function safePathSegment(text) {
 }
 
 /**
- * The name a workbook is filed under: the student's name and their note.
+ * A student or group as they are named on a file: the name, and the note.
  *
  * Without the note, two students whose names match wrote to the same path in
  * the zip and the second quietly replaced the first. "Caden Tan" and "Caden Tan
- * (School Readiness)" went in as one file, and nothing said so.
+ * (School Readiness)" went in as one file, and nothing said so. The same two
+ * records produced two identically named reports in a downloads folder, where
+ * nothing marked which was which either.
  */
-function exportEntityFilename(entity, now) {
+function entityLabel(entity) {
   const note = String(entity?.note || "").replace(/^\(|\)$/g, "").trim();
-  return formatExportFilename(note ? `${entity.name} (${note})` : entity.name, now);
+  return note ? `${entity?.name} (${note})` : String(entity?.name || "");
+}
+
+/** The name a workbook is filed under. */
+function exportEntityFilename(entity, now) {
+  return formatExportFilename(entityLabel(entity), now);
 }
 
 export async function exportStudentData(student, includeTrials = false) {
@@ -1880,7 +1887,7 @@ export async function exportStudentData(student, includeTrials = false) {
   const url    = URL.createObjectURL(blob);
   const a      = document.createElement("a");
   a.href       = url;
-  a.download   = formatExportFilename(student.name, now);
+  a.download   = formatExportFilename(entityLabel(student), now);
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -2616,7 +2623,9 @@ function formatExportFilenameWord(name, sessionLabel, sessionDate) {
     datePart = ` - ${d} ${months[mo - 1]} ${y}`;
   }
   const sessionPart = sessionLabel ? ` - ${sessionLabel}` : "";
-  return `${name}${sessionPart}${datePart}.docx`;
+  // Cleaned the same way a workbook's name is: a note is free text, and one
+  // slash in it would send the download somewhere nobody asked for.
+  return `${safePathSegment(name)}${sessionPart}${datePart}.docx`;
 }
 
 function downloadBlob(blob, filename) {
@@ -2675,7 +2684,7 @@ export async function exportStudentSingleSessionWord(student, session) {
   const allTargets   = getAllTargets(studentToExport).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
   const sessionLabel = sessionToExport.sessionNumber != null ? `Session ${sessionToExport.sessionNumber}` : "";
   const blob = await buildSingleSessionWordBlob(studentToExport.name, sessionLabel, allTargets, sessionToExport);
-  downloadBlob(blob, formatExportFilenameWord(studentToExport.name, sessionLabel, sessionToExport.date));
+  downloadBlob(blob, formatExportFilenameWord(entityLabel(studentToExport), sessionLabel, sessionToExport.date));
 }
 
 export async function exportGroupMemberSingleSessionWord(studentName, groups, session) {

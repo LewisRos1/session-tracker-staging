@@ -27,6 +27,7 @@ function extract(name) {
 const names = ["xmlUnescape", "xmlEscape", "docxParagraphs", "markParagraph",
                "unmarkParagraph", "joinWrappedLines", "keepRunSpacing",
                "readChartDataTag", "findChartPictures", "chartPhrases",
+               "stripMarkers",
                "periodLabelZh", "chartTitleZh", "resizeDrawingToChart",
                "applyDocxText"];
 const tagPrefix = src.match(/const CHART_TAG_PREFIX = "([^"]+)";/)[1];
@@ -42,7 +43,7 @@ const fns = new Function(`const CHART_TAG_PREFIX = ${JSON.stringify(tagPrefix)};
 const { xmlUnescape, docxParagraphs, markParagraph, unmarkParagraph,
         joinWrappedLines, keepRunSpacing, readChartDataTag,
         findChartPictures, chartPhrases, periodLabelZh, chartTitleZh,
-        resizeDrawingToChart, applyDocxText } = fns;
+        resizeDrawingToChart, applyDocxText, stripMarkers } = fns;
 
 let failed = 0;
 const check = (what, got, want) => {
@@ -170,7 +171,10 @@ console.log("\nthe spacing around a run belongs to the layout, not the language"
 // translate -- so it is put back from the original.
 check("a trailing space is put back", keepRunSpacing("3) ", "3)"), "3) ");
 check("even when the model wrapped the line too", keepRunSpacing("3) ", "3)\n"), "3) ");
-check("a leading space too", keepRunSpacing(" and then", "然后"), " 然后");
+check("a leading space is put back in front of English",
+  keepRunSpacing(" and then", "and then"), " and then");
+check("but not in front of Chinese, where it is a place to break the line",
+  keepRunSpacing(" and then", "然后"), "然后");
 check("a run that was only spacing is left exactly as it was",
   keepRunSpacing("   ", "什么"), "   ");
 check("a run with no spacing to keep is just the translation",
@@ -311,6 +315,36 @@ check("the target, the stage heading and every activity",
   ["FEDC 2", "Stage 2: Engagement & Relating",
    "Responds to your overtures", "Protest and grows angry when frustrated"]);
 check("a chart with nothing on it asks for nothing", chartPhrases({}), []);
+
+console.log("\nnames with bold and underline markers on them");
+// An activity can be written bold or underlined, and that is kept in the name
+// itself. Sent out as "*_Self-Regulation:_*" the model could not tell what was
+// being asked and handed the English back, which was then remembered as that
+// name's Chinese.
+check("bold and underline together", stripMarkers("*_Self-Regulation:_*"), "Self-Regulation:");
+check("the other way round", stripMarkers("_*Play*_"), "Play");
+check("bold on its own", stripMarkers("*Imitation*"), "Imitation");
+check("underline on its own", stripMarkers("_Label_"), "Label");
+check("a plain name is left alone", stripMarkers("FEDC 2"), "FEDC 2");
+check("a name with an underscore inside it survives",
+  stripMarkers("Pre_School Skills"), "Pre_School Skills");
+check("nothing at all", stripMarkers(null), "");
+check("the chart asks for the clean name",
+  chartPhrases({ target: "*_Self-Regulation:_*",
+                 rows: [{ name: "*Imitation*" }, { name: "Play" }] }),
+  ["Self-Regulation:", "Imitation", "Play"]);
+
+console.log("\nspaces where Chinese meets the run beside it");
+// "Strength:" is written as a bold run followed by a run that starts with a
+// space. In Chinese that space is somewhere Word may break the line, and it
+// did: the label sat alone on one line with the whole sentence beneath it.
+check("the space before Chinese goes",
+  keepRunSpacing(" Qi Pei is improving.", "祁培有所进步。"), "祁培有所进步。");
+check("and so does the one after it",
+  keepRunSpacing("Strengths ", "优势"), "优势");
+check("a space between two English words stays",
+  keepRunSpacing(" ZORA ", "ZORA"), " ZORA ");
+check("a run that is only a space is untouched", keepRunSpacing("  ", "x"), "  ");
 
 console.log("\nthe months, which are the app's own words");
 // Written the way a date is written in Chinese: the year first, then the

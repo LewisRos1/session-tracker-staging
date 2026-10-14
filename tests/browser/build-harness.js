@@ -395,6 +395,9 @@ const exposed = [
   "exportStudentSingleSessionWord",
   "translateChunks", "translateChunkPrompt", "translateParseReply",
   "renderStudentDatabaseButton",
+  // A student's note is the only thing telling two records with the same
+  // name apart once a report is sitting in a downloads folder.
+  "studentLabel", "studentFileLabel",
 ];
 let shim = `
 
