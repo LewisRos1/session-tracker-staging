@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2251";
+const APP_VERSION = "2252";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -6836,6 +6836,8 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
   const PAD_VAL = 55;           // Padding zone after 100% for value labels
   const BOLD_SEP_X = NAME_W + PERF_W + PAD_VAL;  // 565: bold separator before Status
   const PAD_R = 5;
+  const NAME_PAD_L = 14, NAME_PAD_R = 12;   // white space either side of a name
+
   const STATUS_W = W - BOLD_SEP_X - PAD_R;        // 130
   const STATUS_CENTER_X = BOLD_SEP_X + STATUS_W / 2;  // 630
   const PERF_X = NAME_W;
@@ -6888,15 +6890,13 @@ function hyrDrawOverviewChartC(chartTrendRows, title) {
       });
     }
 
-    // Activity name (right-aligned, split to 2 lines if long)
-    const t = r.name.trim();
-    const words = t.split(" ");
-    const splitAt = t.length > 16 ? Math.ceil(words.length / 2) : words.length;
-    const line1 = words.slice(0, splitAt).join(" ");
-    const line2 = words.slice(splitAt).join(" ");
+    // Activity name, right-aligned, with a gap on both sides of it: the names
+    // are longer in Chinese and were running into the border of the chart.
     ctx.fillStyle = "#111827"; ctx.font = "15px sans-serif"; ctx.textAlign = "right";
-    if (line2) { ctx.fillText(line1, NAME_W - 8, cy - 9); ctx.fillText(line2, NAME_W - 8, cy + 10); }
-    else { ctx.fillText(line1, NAME_W - 8, cy + 6); }
+    const nameLines = wrapChartLabel(ctx, r.name, NAME_W - NAME_PAD_L - NAME_PAD_R, 3);
+    const NAME_LH = 19;
+    const nameTop = cy + 5 - ((nameLines.length - 1) * NAME_LH) / 2;
+    nameLines.forEach((ln, k) => ctx.fillText(ln, NAME_W - NAME_PAD_R, nameTop + k * NAME_LH));
 
     // Performance bars
     const BAR_HP = 16;
@@ -9251,28 +9251,11 @@ function monthlyDrawScoreBarChart(rows) {
 
   const measure = document.createElement("canvas").getContext("2d");
   measure.font = `${FONT_PX}px Arial`;
-  // Names wrap to at most two lines; anything longer is cut with an ellipsis so
-  // one very long target can't stretch the whole chart.
-  const wrap = name => {
-    const words = String(name).split(/\s+/);
-    const maxW = PAD_L - 24;
-    const out = [];
-    let line = "";
-    for (const w of words) {
-      const test = line ? `${line} ${w}` : w;
-      if (measure.measureText(test).width <= maxW) { line = test; continue; }
-      if (line) out.push(line);
-      line = w;
-      if (out.length === 2) break;
-    }
-    if (out.length < 2 && line) out.push(line);
-    if (out.length === 2 && measure.measureText(out[1]).width > maxW) {
-      let t = out[1];
-      while (t.length > 4 && measure.measureText(t + "\u2026").width > maxW) t = t.slice(0, -1);
-      out[1] = t + "\u2026";
-    }
-    return out.length ? out : [String(name)];
-  };
+  // Names wrap to at most two lines; anything longer is cut with an ellipsis
+  // so one very long target cannot stretch the whole chart. Shared with the
+  // overview chart, which had the same fault: splitting on spaces alone made
+  // a Chinese name one unbreakable word that ran off the side.
+  const wrap = name => wrapChartLabel(measure, name, PAD_L - 24, 2);
 
   const wrapped = rows.map(r => ({ ...r, lines: wrap(r.name) }));
   const rowH = wrapped.some(r => r.lines.length > 1) ? 54 : 40;
@@ -16858,6 +16841,44 @@ function stripMarkers(name) {
  * learned before wrong, which forgets the lot rather than trusting it.
  */
 const TRANSLATE_TERMS_RULE = "2026-10-14-targets-translated";
+
+/**
+ * A name broken into lines that fit the space it is drawn in.
+ *
+ * Splitting on spaces is only right for a language that has them. A Chinese
+ * name arrives as one long word, never wraps, and runs off the edge of the
+ * chart: 功能性情绪发展能力第3阶段（FEDC 3）lost its first four characters
+ * altogether. Anything still too wide on its own is broken a character at a
+ * time, which is how Chinese wraps anyway and is better than nothing for an
+ * over-long English word too.
+ *
+ * `measure` is a canvas context with the font already set on it.
+ */
+function wrapChartLabel(measure, text, maxW, maxLines = 3) {
+  const lines = [];
+  let cur = "";
+  const push = () => { if (cur) { lines.push(cur); cur = ""; } };
+  for (const w of String(text || "").trim().split(/\s+/)) {
+    const test = cur ? cur + " " + w : w;
+    if (measure.measureText(test).width <= maxW) { cur = test; continue; }
+    push();
+    if (measure.measureText(w).width <= maxW) { cur = w; continue; }
+    for (const ch of w) {
+      if (cur && measure.measureText(cur + ch).width > maxW) push();
+      cur += ch;
+    }
+  }
+  push();
+  if (!lines.length) return [""];
+  if (lines.length <= maxLines) return lines;
+  // Longer than there is room for: the last line keeps what fits and says so,
+  // rather than one name stretching the whole chart.
+  const kept = lines.slice(0, maxLines);
+  let last = kept[maxLines - 1];
+  while (last.length > 1 && measure.measureText(last + "…").width > maxW) last = last.slice(0, -1);
+  kept[maxLines - 1] = last + "…";
+  return kept;
+}
 
 /** Whether a string holds any Chinese at all. */
 const hasChinese = (s) => /[\u4e00-\u9fff]/.test(String(s || ""));

@@ -311,6 +311,45 @@ try {
     painted.ovLegend.length === 2 && painted.ovLegend.every(t => /[一-鿿]/.test(t)),
     JSON.stringify(painted.ovLegend));
 
+  // A Chinese target name is longer than its English one and has no spaces in
+  // it, so the old wrap kept it on one line and it ran off the left edge of
+  // the chart: 功能性情绪发展能力第3阶段（FEDC 3）arrived with its first four
+  // characters missing. This asks the canvas where the text actually landed.
+  r.section("a long Chinese name stays inside the chart");
+  const fitted = await page.eval(`(() => {
+    const long = "功能性情绪发展能力第3阶段（FEDC 3）";
+    const proto = CanvasRenderingContext2D.prototype;
+    const origText = proto.fillText, origMeasure = proto.measureText;
+    const drawn = [];
+    proto.fillText = function (t, x) {
+      // Right-aligned, so the left edge is x minus the width of the text.
+      drawn.push({ text: String(t), right: x, width: origMeasure.call(this, String(t)).width, font: this.font });
+      return origText.apply(this, arguments);
+    };
+    try {
+      window.__app.redrawChartZh({ kind: "overview", baseW: 700, title: "T", titleZh: "T",
+        rows: [{ name: long, delta: 12, tStart: 70, tEnd: 82 }] }, () => null);
+    } finally { proto.fillText = origText; }
+    const parts = drawn.filter(d => long.indexOf(d.text) >= 0 && d.text.length > 1);
+    return {
+      pieces: parts.map(p => p.text),
+      leftMost: Math.min(...parts.map(p => p.right - p.width)),
+      rightMost: Math.max(...parts.map(p => p.right)),
+    };
+  })()`, 90000);
+
+  r.ok("the name was broken into more than one line",
+    fitted.pieces.length > 1, JSON.stringify(fitted.pieces));
+  r.ok("with nothing lost off the end of it",
+    fitted.pieces.join("").replace(/\s/g, "")
+      === "\u529f\u80fd\u6027\u60c5\u7eea\u53d1\u5c55\u80fd\u529b\u7b2c3\u9636\u6bb5\uff08FEDC3\uff09",
+    JSON.stringify(fitted.pieces));
+  // The boss asked for white space between the words and the border.
+  r.ok("it does not touch the left border", fitted.leftMost >= 10,
+    `nearest edge was ${Math.round(fitted.leftMost)}px from it`);
+  r.ok("nor the bars on its right", fitted.rightMost <= 195 - 8,
+    `reached ${Math.round(fitted.rightMost)}px`);
+
   r.section("a student's note follows them onto the file");
   const labels = await page.eval(`(() => {
     const s = { name: "Zhang Qi Pei", note: "EIP" };
