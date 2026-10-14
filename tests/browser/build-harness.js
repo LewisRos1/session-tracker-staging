@@ -407,6 +407,19 @@ globalThis.__app = {};
 for (const name of exposed) {
   shim += `try { globalThis.__app.${name} = ${name}; } catch (e) { /* not in this build */ }\n`;
 }
+// Nothing in a test may actually save a file.
+//
+// The export code hands a blob to a download link and clicks it, which is a
+// real download: running the suite filled Lewis's own Downloads folder with
+// 22 copies of a report for a student who does not exist. A test that wants
+// the file catches the blob on its way to the link instead.
+shim += `
+const _realAnchorClick = HTMLAnchorElement.prototype.click;
+HTMLAnchorElement.prototype.click = function () {
+  if (this.download || String(this.href || "").startsWith("blob:")) return;
+  return _realAnchorClick.apply(this, arguments);
+};
+`;
 shim += `globalThis.__appReady = true;\n`;
 await Deno.writeTextFile(`${out}/app.js`, await Deno.readTextFile(`${out}/app.js`) + shim);
 
