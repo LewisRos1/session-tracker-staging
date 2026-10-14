@@ -297,7 +297,7 @@ try {
     painted.ovStatus?.fill, painted.cnStatus?.fill);
   r.check("and the English chart was always that green", painted.enStatus?.fill, "#16a34a");
   r.ok("the title carries Chinese months, not English ones",
-    painted.cnTitle.indexOf("2026年1月") >= 0, painted.cnTitle);
+    painted.cnTitle.indexOf("2026年 1月") >= 0, painted.cnTitle);
   r.check("and no English month is left anywhere on it", painted.cnMonths, []);
   r.ok("while the English chart still reads in English",
     painted.enTitle.indexOf("Jan 2026") >= 0, painted.enTitle);

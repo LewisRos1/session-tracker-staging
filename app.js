@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2255";
+const APP_VERSION = "2256";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -16950,12 +16950,13 @@ function periodLabelZh(label) {
     // The year comes first in Chinese: "Jan 2026" is written "2026年1月",
     // not "1月 2026".
     .replace(/\b([A-Z][a-z]{2})\s+(\d{4})\b/g,
-      (whole, mon, yr) => MONTHS_ZH[mon] ? `${yr}年${MONTHS_ZH[mon]}` : whole)
+      // A space between the year and the month, which is how Lewis wants a
+      // date read. Chinese normally runs them together.
+      (whole, mon, yr) => MONTHS_ZH[mon] ? `${yr}年 ${MONTHS_ZH[mon]}` : whole)
     // A month standing on its own still becomes a Chinese one.
     .replace(/\b([A-Z][a-z]{2})\b/g, (m) => MONTHS_ZH[m] || m)
-    // An en dash with no spaces round it, which is how a date range is
-    // written in Chinese.
-    .replace(/\s*[-–]\s*/g, "–");
+    // An en dash with a space either side of it.
+    .replace(/\s*[-–]\s*/g, " – ");
 }
 
 /**
@@ -17220,7 +17221,7 @@ RULES
 - Simplified Chinese only. Never Traditional characters.
 - Translate the meaning exactly. This is a clinical document a parent may act on: never soften it, never strengthen it, never add anything, never leave anything out.
 - Numbers, percentages, scores and times stay exactly as written. Never change a figure.
-- Dates keep the same day, month and year, but are written the Chinese way. "18 Aug 2026" is written "2026年8月18日". "Aug 2026" and "August 2026" are written "2026年8月". A month standing on its own, "August", is written "8月". This applies everywhere a date appears, including inside a table.
+- Dates keep the same day, month and year, but are written the Chinese way. "18 Aug 2026" is written "2026年 8月 18日", with a space after the year and after the month. "Aug 2026" and "August 2026" are written "2026年 8月". A month standing on its own, "August", is written "8月". This applies everywhere a date appears, including inside a table.
 - Keep the warmth and the plain language of the English. Write as a therapist writing to a parent, not as a textbook.
 - Leave these EXACTLY as they appear, in English, untranslated:
 ${translateKeepList().map(k => `    ${k}`).join("\n")}

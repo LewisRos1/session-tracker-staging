@@ -127,9 +127,9 @@ try {
   // "18 Aug 2026" sat in English in a table on a page of Chinese, because
   // the rule protecting scores and percentages said "dates" as well.
   r.ok("a date is written the Chinese way",
-    /2026年8月18日/.test(ins), "no worked example of a date");
+    /2026年 8月 18日/.test(ins), "no worked example of a date");
   r.ok("and a month and year without a day",
-    /2026年8月/.test(ins), "no example of a month and year");
+    /2026年 8月/.test(ins), "no example of a month and year");
   r.ok("but a figure is still never changed",
     /Never change a figure/.test(ins), "nothing protects the scores");
   r.ok("and dates are no longer told to stay as written",

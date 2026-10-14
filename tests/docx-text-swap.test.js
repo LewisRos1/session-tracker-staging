@@ -367,10 +367,10 @@ console.log("\nthe months, which are the app's own words");
 // Written the way a date is written in Chinese: the year first, then the
 // month, and an en dash with no spaces around it.
 check("a range becomes Chinese months",
-  periodLabelZh("Jan 2026 - Jun 2026"), "2026年1月–2026年6月");
-check("a single month too", periodLabelZh("Jul 2026"), "2026年7月");
+  periodLabelZh("Jan 2026 - Jun 2026"), "2026年 1月 – 2026年 6月");
+check("a single month too", periodLabelZh("Jul 2026"), "2026年 7月");
 check("a month with no year beside it is still translated",
-  periodLabelZh("Jan - Jun"), "1月–6月");
+  periodLabelZh("Jan - Jun"), "1月 – 6月");
 check("something with no month in it is untouched", periodLabelZh("Term 1"), "Term 1");
 
 console.log("\nthe title, which is built rather than translated");
@@ -381,16 +381,16 @@ console.log("\nthe title, which is built rather than translated");
 {
   const zh = (en) => ({ "FEDC 2": "学习目标二" })[en] || null;
   check("number, Chinese target, Progress, Chinese months",
-    chartTitleZh(chartSpec, zh), "3）学习目标二：进展（2026年1月–2026年6月）");
+    chartTitleZh(chartSpec, zh), "3）学习目标二：进展（2026年 1月 – 2026年 6月）");
   check("a page marker is carried over",
     chartTitleZh({ ...chartSpec, title: "3) FEDC 2 - Progress (x) [Page 2 of 3]" }, zh),
-    "3）学习目标二：进展（2026年1月–2026年6月）［第2页，共3页］");
+    "3）学习目标二：进展（2026年 1月 – 2026年 6月）［第2页，共3页］");
   check("an unknown target keeps its English rather than vanishing",
     chartTitleZh({ ...chartSpec, target: "FEDC 9" }, zh),
-    "3）FEDC 9：进展（2026年1月–2026年6月）");
+    "3）FEDC 9：进展（2026年 1月 – 2026年 6月）");
   check("a title with no number in front of it loses nothing",
     chartTitleZh({ ...chartSpec, title: "FEDC 2 - Progress (Jan 2026 - Jun 2026)" }, zh),
-    "学习目标二：进展（2026年1月–2026年6月）");
+    "学习目标二：进展（2026年 1月 – 2026年 6月）");
 }
 
 console.log("\nthe overall progress chart's own title");
@@ -399,13 +399,13 @@ console.log("\nthe overall progress chart's own title");
 // one into Chinese, and it sat there in English on a page of Chinese.
 check("his Chinese name and the months",
   overviewTitleZh({ name: "Zhang Qi Pei", nameZh: "张祺培" }, "Jan 2026 - Jun 2026"),
-  "张祺培（2026年1月–2026年6月）");
+  "张祺培（2026年 1月 – 2026年 6月）");
 check("no Chinese name typed in, so the English one stands",
   overviewTitleZh({ name: "Ryan Lee" }, "Jan 2026 - Jun 2026"),
-  "Ryan Lee（2026年1月–2026年6月）");
+  "Ryan Lee（2026年 1月 – 2026年 6月）");
 check("an empty box counts as none",
   overviewTitleZh({ name: "Ryan Lee", nameZh: "   " }, "Jul 2026"),
-  "Ryan Lee（2026年7月）");
+  "Ryan Lee（2026年 7月）");
 
 console.log("\nresizing the slot the picture sits in");
 // Chinese is more compact, so the chart is usually shorter. Left alone,
