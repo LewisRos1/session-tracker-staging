@@ -246,6 +246,63 @@ try {
   r.check("exactly 8 is still stable, not improving", dirs.edgeUp, "Stable");
   r.check("and minus 8 is still stable", dirs.edgeDown, "Stable");
 
+  // The overview chart's colours were only half the job: the line chart
+  // picked its colour from the same map but was handed an already-translated
+  // word, so the lookup missed and every Chinese line chart came out grey.
+  // Asking whether the picture "differs" never caught that, so this watches
+  // what is actually painted onto the canvas.
+  r.section("what a Chinese line chart actually paints");
+  const painted = await page.eval(`(() => {
+    const spec = { kind: "line", target: "FEDC 2", labels: ["Jan", "Feb", "Mar"],
+      values: [70, 75, 82], period: "h1", year: 2026, tStart: 70, tEnd: 82,
+      delta: 12, direction: "Improving" };
+    const zh = (k) => ({ "FEDC 2": "学习目标二" })[k] || null;
+    const proto = CanvasRenderingContext2D.prototype;
+    const orig = proto.fillText;
+    const grab = (draw) => {
+      const calls = [];
+      proto.fillText = function (t) { calls.push({ text: String(t), fill: String(this.fillStyle) }); return orig.apply(this, arguments); };
+      try { draw(); } finally { proto.fillText = orig; }
+      return calls;
+    };
+    // The Chinese chart, and the ordinary English one drawn the way a normal
+    // report draws it -- not through the translator.
+    const cn = grab(() => window.__app.redrawChartZh(spec, zh));
+    const en = grab(() => window.__app.hyrDrawLineChart(spec.target, spec.labels,
+      spec.values, spec.period, spec.year, spec.tStart, spec.tEnd, spec.delta, spec.direction));
+    // The overview chart is the one whose colours the boss pointed at.
+    const ov = grab(() => window.__app.redrawChartZh({ kind: "overview", baseW: 700,
+      title: "Caden", titleZh: "Caden",
+      rows: [{ name: "FEDC 2", delta: 12, tStart: 70, tEnd: 82 }] }, zh));
+    const find = (calls, needle) => calls.find(c => c.text.indexOf(needle) >= 0) || null;
+    const months = (calls) => calls
+      .filter(c => ["Jan", "Feb", "Mar", "Jun", "Dec"].some(m => c.text.indexOf(m) >= 0))
+      .map(c => c.text);
+    return {
+      cnStatus: find(cn, "进步中"),
+      ovStatus: find(ov, "进步中"),
+      enStatus: find(en, "Improving"),
+      cnTitle: (find(cn, "学习目标二") || {}).text || "",
+      cnMonths: months(cn),
+      enTitle: (find(en, "FEDC 2") || {}).text || "",
+      enMonths: months(en),
+    };
+  })()`, 90000);
+
+  r.ok("the Chinese chart says the Chinese word for Improving",
+    !!painted.cnStatus, JSON.stringify(painted.cnStatus));
+  r.check("and paints it green, not grey", painted.cnStatus?.fill, "#16a34a");
+  r.check("the same green the overview chart paints the same word",
+    painted.ovStatus?.fill, painted.cnStatus?.fill);
+  r.check("and the English chart was always that green", painted.enStatus?.fill, "#16a34a");
+  r.ok("the title carries Chinese months, not English ones",
+    painted.cnTitle.indexOf("2026年1月") >= 0, painted.cnTitle);
+  r.check("and no English month is left anywhere on it", painted.cnMonths, []);
+  r.ok("while the English chart still reads in English",
+    painted.enTitle.indexOf("Jan 2026") >= 0, painted.enTitle);
+  r.ok("with its own month labels intact", painted.enMonths.length >= 3,
+    JSON.stringify(painted.enMonths));
+
   r.section("the fixed chart words only turn Chinese while a Chinese chart is drawn");
   const words = await page.eval(`(() => {
     const before = window.__app.chartWord("Status");

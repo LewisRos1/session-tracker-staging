@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2247";
+const APP_VERSION = "2248";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -6591,6 +6591,14 @@ let _chartZh = false;
 const chartWord = (en) => (_chartZh && CHART_FIXED_ZH[en]) ? CHART_FIXED_ZH[en] : en;
 /** The same, named for where it reads best: Improving, Declining, Stable. */
 const chartStatusWord = chartWord;
+/**
+ * A date range, or a single month, written the Chinese way while a Chinese
+ * chart is being drawn.
+ *
+ * The months are not in the fixed word list because they are not whole
+ * phrases -- they arrive stuck to a year, or as a range with a dash.
+ */
+const chartPeriod = (label) => (_chartZh ? periodLabelZh(label) : label);
 
 function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd, delta, direction) {
   const SCALE = 2;
@@ -6619,7 +6627,12 @@ function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd
     ? `${allPts[0].label} ${_lcFirst.y} - ${_lcR.endShort} ${_lcR.endY}`
     : _lcR.shortLabel;
   ctx.fillStyle = "#1f2937"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(`${(targetName || "").trim()} (${rangeLabel})`, W / 2, 24);
+  // The brackets are the Chinese ones on a Chinese chart. A half-width ")"
+  // beside Chinese text is what put a number on a line of its own before.
+  const _lcName = (targetName || "").trim();
+  ctx.fillText(_chartZh
+    ? `${_lcName}（${periodLabelZh(rangeLabel)}）`
+    : `${_lcName} (${rangeLabel})`, W / 2, 24);
 
   // Fixed 0–100 Y range; Y-axis labels hidden (data point labels carry the values)
   const toY = v => PAD.top + cH * (1 - v / 100);
@@ -6705,7 +6718,7 @@ function hyrDrawLineChart(targetName, labels, values, period, year, tStart, tEnd
 
   // Month labels on X-axis — all months including empty positions
   ctx.fillStyle = "#374151"; ctx.font = "14px sans-serif"; ctx.textAlign = "center";
-  allPts.forEach(p => ctx.fillText(p.label, toX(p.i), PAD.top + cH + 16));
+  allPts.forEach(p => ctx.fillText(chartPeriod(p.label), toX(p.i), PAD.top + cH + 16));
 
   // Thin border around entire canvas
   ctx.strokeStyle = "#000000"; ctx.lineWidth = 1;
@@ -7336,7 +7349,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
         transformation: { width: ovDocW, height: ovH }, type: "png", outline: REPORT_CHART_BORDER,
         altText: { name: "Progress Overview", title: "", description: chartDataTag({
           kind: "overview", baseW: ovNativeW, title: ovTitle,
-          titleZh: `${student.name}（${firstMonthName.slice(0, 3)} ${R.startY} - ${R.endShort} ${R.endY}）`,
+          titleZh: `${student.name}（${periodLabelZh(`${firstMonthName.slice(0, 3)} ${R.startY} - ${R.endShort} ${R.endY}`)}）`,
           rows: chartTrendRows.map(r => ({ name: r.name, delta: r.delta, tStart: r.tStart, tEnd: r.tEnd })),
         }) } })],
       alignment: AlignmentType.CENTER, spacing: { after: 60 }
@@ -16840,7 +16853,9 @@ const CHART_FIXED_ZH = {
   "(Months)": "（月）",
   "Progress": "进展",
   "Improving": "进步中",
-  "Declining": "退步中",
+  // Not 退步中. Accurate, but blunt for a parent reading about their own
+  // child; 表现下降 says the same thing without the edge.
+  "Declining": "表现下降",
   "Stable": "稳定",
   "Start of Term/Trendline": "学期初／趋势线",
   "End of Term/Trendline": "学期末／趋势线",
@@ -16853,7 +16868,16 @@ const MONTHS_ZH = {
 
 /** "Jan 2026 - Jun 2026" into Chinese, leaving the years alone. */
 function periodLabelZh(label) {
-  return String(label || "").replace(/\b([A-Z][a-z]{2})\b/g, (m) => MONTHS_ZH[m] || m);
+  return String(label || "")
+    // The year comes first in Chinese: "Jan 2026" is written "2026年1月",
+    // not "1月 2026".
+    .replace(/\b([A-Z][a-z]{2})\s+(\d{4})\b/g,
+      (whole, mon, yr) => MONTHS_ZH[mon] ? `${yr}年${MONTHS_ZH[mon]}` : whole)
+    // A month standing on its own still becomes a Chinese one.
+    .replace(/\b([A-Z][a-z]{2})\b/g, (m) => MONTHS_ZH[m] || m)
+    // An en dash with no spaces round it, which is how a date range is
+    // written in Chinese.
+    .replace(/\s*[-–]\s*/g, "–");
 }
 
 /**
@@ -16865,11 +16889,14 @@ function periodLabelZh(label) {
  * from the heading above it.
  */
 function chartTitleZh(spec, zh) {
-  const num = /^(\s*\d+\)\s*)/.exec(spec.title || "");
+  const num = /^(\s*)(\d+)\)\s*/.exec(spec.title || "");
   const page = /\[Page (\d+) of (\d+)\]\s*$/.exec(spec.title || "");
-  return (num ? num[1] : "")
+  // Full-width brackets and a colon rather than a hyphen: the colon is what
+  // separates a name from what follows it in Chinese, and a hyphen between
+  // two Chinese phrases reads as a join rather than a break.
+  return (num ? `${num[2]}）` : "")
     + (zh(spec.target) || spec.target)
-    + " - " + CHART_FIXED_ZH["Progress"]
+    + "：" + CHART_FIXED_ZH["Progress"]
     + "（" + periodLabelZh(spec.range) + "）"
     + (page ? `［第${page[1]}页，共${page[2]}页］` : "");
 }
@@ -16901,7 +16928,7 @@ function redrawChartInner(spec, zh) {
   if (spec?.kind === "line") {
     return { base64: hyrDrawLineChart(
       name(spec.target), spec.labels, spec.values, spec.period, spec.year,
-      spec.tStart, spec.tEnd, spec.delta, fixed(spec.direction)),
+      spec.tStart, spec.tEnd, spec.delta, spec.direction),
       height: spec.baseH, width: spec.baseW, fixedSize: true };
   }
 

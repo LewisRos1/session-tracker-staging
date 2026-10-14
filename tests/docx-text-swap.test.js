@@ -313,23 +313,33 @@ check("the target, the stage heading and every activity",
 check("a chart with nothing on it asks for nothing", chartPhrases({}), []);
 
 console.log("\nthe months, which are the app's own words");
-check("a range becomes Chinese months", periodLabelZh("Jan 2026 - Jun 2026"), "1月 2026 - 6月 2026");
-check("the years are left alone", /2026/.test(periodLabelZh("Jan 2026 - Jun 2026")), true);
+// Written the way a date is written in Chinese: the year first, then the
+// month, and an en dash with no spaces around it.
+check("a range becomes Chinese months",
+  periodLabelZh("Jan 2026 - Jun 2026"), "2026年1月–2026年6月");
+check("a single month too", periodLabelZh("Jul 2026"), "2026年7月");
+check("a month with no year beside it is still translated",
+  periodLabelZh("Jan - Jun"), "1月–6月");
 check("something with no month in it is untouched", periodLabelZh("Term 1"), "Term 1");
 
 console.log("\nthe title, which is built rather than translated");
 // Every piece of it is already known, so translating it would only risk it
-// coming back different from the heading printed above the chart.
+// coming back different from the heading printed above the chart. The colon
+// is the Chinese one, and so is the bracket after the number: a half-width
+// ")" beside Chinese text is what put the number on a line of its own.
 {
   const zh = (en) => ({ "FEDC 2": "学习目标二" })[en] || null;
   check("number, Chinese target, Progress, Chinese months",
-    chartTitleZh(chartSpec, zh), "3) 学习目标二 - 进展（1月 2026 - 6月 2026）");
+    chartTitleZh(chartSpec, zh), "3）学习目标二：进展（2026年1月–2026年6月）");
   check("a page marker is carried over",
     chartTitleZh({ ...chartSpec, title: "3) FEDC 2 - Progress (x) [Page 2 of 3]" }, zh),
-    "3) 学习目标二 - 进展（1月 2026 - 6月 2026）［第2页，共3页］");
+    "3）学习目标二：进展（2026年1月–2026年6月）［第2页，共3页］");
   check("an unknown target keeps its English rather than vanishing",
     chartTitleZh({ ...chartSpec, target: "FEDC 9" }, zh),
-    "3) FEDC 9 - 进展（1月 2026 - 6月 2026）");
+    "3）FEDC 9：进展（2026年1月–2026年6月）");
+  check("a title with no number in front of it loses nothing",
+    chartTitleZh({ ...chartSpec, title: "FEDC 2 - Progress (Jan 2026 - Jun 2026)" }, zh),
+    "学习目标二：进展（2026年1月–2026年6月）");
 }
 
 console.log("\nresizing the slot the picture sits in");

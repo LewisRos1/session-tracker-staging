@@ -385,7 +385,10 @@ const exposed = [
   // The chart redraw, so a test can run it against a real canvas and a
   // real zip rather than only its pure parts.
   "redrawChartZh", "findChartPictures", "chartMediaPath",
-  "HYR_DIRECTION", "hyrDirectionOf", "chartWord",
+  "HYR_DIRECTION", "hyrDirectionOf", "chartWord", "chartPeriod",
+  // The line chart itself, so a test can draw the ordinary English one
+  // and compare it with the Chinese one beside it.
+  "hyrDrawLineChart",
   "resizeDrawingToChart", "chartDataTag", "chartPhrases",
   // So a test can build a real Word report and look inside it, rather
   // than guessing at the XML the app actually produces.
