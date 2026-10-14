@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2254";
+const APP_VERSION = "2255";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -17916,10 +17916,17 @@ function setChineseFonts(xml) {
     return `<w:rFonts${next}${slash}>`;
   });
   // And say it is Chinese, so it is not proofed as English.
+  //
+  // Both slots. w:eastAsia alone covers only the East Asian one, and the
+  // main language was left unset, so Word fell back to whatever the reader
+  // has set -- English (Malaysia) on the boss's machine. It then spell
+  // checked every Chinese sentence as English and underlined the lot in
+  // red, with no suggestions to offer.
   out = out.replace(/<w:rPrDefault><w:rPr>([\s\S]*?)<\/w:rPr><\/w:rPrDefault>/,
-    (whole, inner) => inner.includes("w:eastAsia=\"zh")
+    (whole, inner) => /<w:lang[^>]*w:val="zh/.test(inner)
       ? whole
-      : `<w:rPrDefault><w:rPr>${inner}<w:lang w:eastAsia="zh-CN"/></w:rPr></w:rPrDefault>`);
+      : `<w:rPrDefault><w:rPr>${inner.replace(/<w:lang[^>]*\/>/g, "")}`
+        + `<w:lang w:val="zh-CN" w:eastAsia="zh-CN"/></w:rPr></w:rPrDefault>`);
   // The rules that stop a line starting with a comma or a full stop.
   //
   // A report written by the app carries none of these, so Word was left to

@@ -66,9 +66,9 @@ check("a real Chinese font is named instead",
   new RegExp(`w:eastAsia="${font}"`).test(fixed), true);
 check("the font chosen is one every Windows Word has", font, "SimSun");
 check("and the text is declared Chinese, so it is not proofed as English",
-  /<w:lang w:eastAsia="zh-CN"\/>/.test(fixed), true);
+  /<w:lang w:val="zh-CN" w:eastAsia="zh-CN"\/>/.test(fixed), true);
 check("the language sits inside the document defaults",
-  /<w:rPrDefault><w:rPr>[\s\S]*<w:lang w:eastAsia="zh-CN"\/><\/w:rPr><\/w:rPrDefault>/.test(fixed), true);
+  /<w:rPrDefault><w:rPr>[\s\S]*<w:lang[^>]*\/><\/w:rPr><\/w:rPrDefault>/.test(fixed), true);
 
 console.log("\nand nothing else is disturbed");
 check("the Latin font is untouched",
@@ -84,14 +84,24 @@ check("every other style survives",
 // would already read <w:lang #/> and survive the comparison.
 // Everything this function is meant to add, taken back out again: whatever
 // is left over is something it changed that it had no business changing.
-const bare = t => t.replace(/<w:lang w:eastAsia="zh-CN"\/>/g, "")
+const bare = t => t.replace(/<w:lang[^>]*zh-CN[^>]*\/>/g, "")
   .replace(/<w:kinsoku\/><w:overflowPunct\/><w:autoSpaceDE\/><w:autoSpaceDN\/>/g, "")
   .replace(/ w:hint="eastAsia"/g, "")
   .replace(/w:eastAsia="[^"]*"/g, "#");
 check("nothing changed but the font slot and the language",
   bare(fixed), bare(realStyles));
 check("the language tag is a language, not a font name",
-  /<w:lang w:eastAsia="SimSun"/.test(fixed), false);
+  /<w:lang[^>]*"SimSun"/.test(fixed), false);
+// Word spell checked every Chinese sentence as English and underlined the
+// lot in red. w:eastAsia fills only the East Asian slot; the main one was
+// left unset, so Word used whatever the reader has set -- English
+// (Malaysia) on the boss's machine.
+check("the main language slot says Chinese too",
+  /<w:lang[^>]*w:val="zh-CN"/.test(fixed), true);
+check("and so does the East Asian one",
+  /<w:lang[^>]*w:eastAsia="zh-CN"/.test(fixed), true);
+check("one language tag, not two",
+  (fixed.match(/<w:lang/g) || []).length, 1);
 
 console.log("\nrunning it twice changes nothing the second time");
 check("the language is not added again", setChineseFonts(fixed), fixed);
