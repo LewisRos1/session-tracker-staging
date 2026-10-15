@@ -772,7 +772,26 @@ export async function deleteGroupOrphanAcrossSessions(groupId, targetName, activ
 
 const TRASH_EXPIRY_DAYS = 30;
 
-export async function softDeleteActivityAcrossSessions(entityType, entityId, entityName, targetName, activityName, paParentActivity = undefined) {
+/**
+ * Move one activity's session data to the trash and take it out of the
+ * sessions.
+ *
+ * `opts.configId` is the activity being deleted. A session record written
+ * since activities carried an id names its owner outright, and is only
+ * taken when that is this activity: matching on the word instead meant a
+ * newly added "Antecedent" would have taken 96 sessions belonging to
+ * another activity of the same name.
+ *
+ * `opts.rivalsCreated` is when the other activities sharing this name were
+ * created. An older record carries no id, so it is taken only when every
+ * one of those was created after that session happened -- nothing else
+ * could have written it. Otherwise it is left where it is.
+ */
+export async function softDeleteActivityAcrossSessions(entityType, entityId, entityName, targetName, activityName, paParentActivity = undefined, opts = {}) {
+  // `anyOwner` is for clearing out orphans: records whose activity is gone
+  // from the config altogether. Those are matched by name on purpose --
+  // there is no id left to match them against.
+  const { configId = null, rivalsCreated = [], anyOwner = false } = opts;
   const q = entityType === "group"
     ? query(collection(db, "sessions"), where("groupId",   "==", entityId))
     : query(collection(db, "sessions"), where("studentId", "==", entityId));
@@ -786,12 +805,15 @@ export async function softDeleteActivityAcrossSessions(entityType, entityId, ent
     const acts    = data.activities || {};
     const remarks = data.remarks    || {};
 
-    const matches = Object.entries(acts).filter(([, a]) =>
-      a.targetName === targetName && a.activityName === activityName &&
-      (paParentActivity === undefined ? true
+    const matches = Object.entries(acts).filter(([, a]) => {
+      if (a.targetName !== targetName || a.activityName !== activityName) return false;
+      if (!(paParentActivity === undefined ? true
         : paParentActivity === null ? !a.parentActivity
-        : a.parentActivity === paParentActivity)
-    );
+        : a.parentActivity === paParentActivity)) return false;
+      if (anyOwner) return true;
+      if (a.configId) return !!configId && a.configId === configId;
+      return rivalsCreated.every(c => c && data.date && c > data.date);
+    });
     if (matches.length === 0) continue;
 
     const updates = {};
@@ -802,9 +824,15 @@ export async function softDeleteActivityAcrossSessions(entityType, entityId, ent
       }
       updates[`activities.${actId}`] = deleteField();
 
+      // A select score and a sentence starter note count too. The warning
+      // shown before a delete counts them, and this did not, so a remark
+      // holding only one of those was deleted with nothing kept in the
+      // trash to put back.
       const hasData = Object.values(actRemarks).some(r =>
         (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
-        (r.trials || []).some(t => t !== null && t !== -1)
+        (r.masteryNote || "").trim().length > 0 ||
+        (r.trials || []).some(t => t !== null && t !== -1) ||
+        (r.optionScore !== undefined && r.optionScore !== null)
       );
       if (hasData) {
         sessionsData.push({

@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2257";
+const APP_VERSION = "2258";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -3468,6 +3468,70 @@ function openStudentRegistryScreen(opts = {}) {
 // brackets can never go missing because someone forgot to type them. Older
 // notes were typed with brackets already, so strip any wrapping pair first
 // rather than migrating the data or ending up with "((EIP))".
+/**
+ * Whether a remark holds anything a person typed or scored.
+ *
+ * Used to decide how loudly to warn before a delete, and to decide what is
+ * worth keeping in the trash. Those two disagreed: the warning counted a
+ * select score and a note, the trash copy did not, so a remark holding only
+ * one of those was deleted with no way back.
+ */
+function remarkHasData(r) {
+  if (!r) return false;
+  return (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0
+    || (r.masteryNote || "").trim().length > 0
+    || (r.trials || []).some(t => t !== null && t !== -1)
+    || (r.optionScore !== undefined && r.optionScore !== null);
+}
+
+/**
+ * The other activities in this target that a record of this name could
+ * equally have come from.
+ *
+ * Two activities may share a name on purpose -- a Behaviour Chart has an
+ * "Antecedent" under each behaviour -- so the name alone never says which
+ * one a record belongs to.
+ */
+function rivalActivities(allActs, act, recName, paPA) {
+  return (allActs || []).filter(o =>
+    o && o !== act && !o.isHeading && !o.isMaintainHeading && !o.isNote && !o.isExportNote &&
+    (!act?.id || o.id !== act.id) &&
+    ((o.name && recName === o.name) || (o.title && recName === o.title)) &&
+    ((o.parentActivity || null) === (paPA ?? null)));
+}
+
+/**
+ * The records in one session that belong to one activity.
+ *
+ * By id wherever there is one. A record written since activities carried an
+ * id says outright which one it belongs to, and matching on the word instead
+ * is what let a newly added "Antecedent" claim 96 sessions of another
+ * activity's data and offer to delete the lot.
+ *
+ * An older record carries only a name. It is claimed only when nothing else
+ * could have written it: every activity that shares the name was created
+ * after that session happened. Two possible owners means the record is left
+ * alone rather than guessed at.
+ */
+function recordIdsForActivity(sActs, spec, allActs, targetName, sessionDate) {
+  const paPA = spec.paPA ?? null;
+  return Object.entries(sActs || {}).filter(([, a]) => {
+    if (a.targetName !== targetName) return false;
+    if (paPA === null ? !!a.parentActivity : a.parentActivity !== paPA) return false;
+    if (!((spec.name && a.activityName === spec.name) || (spec.title && a.activityName === spec.title))) return false;
+    if (a.configId) return !!spec.id && a.configId === spec.id;
+    return rivalActivities(allActs, spec, a.activityName, paPA)
+      .every(o => o.created && sessionDate && o.created > sessionDate);
+  }).map(([id]) => id);
+}
+
+/** Whether one session holds data for this activity. */
+function sessionHasActivityData(s, spec, allActs, targetName) {
+  const ids = recordIdsForActivity(s.activities, spec, allActs, targetName, s.date || "");
+  const rems = s.remarks || {};
+  return ids.some(actId => Object.values(rems).some(r => r.activityId === actId && remarkHasData(r)));
+}
+
 function noteBare(note) {
   return (note || "").trim().replace(/^\(([\s\S]*)\)$/, "$1").trim();
 }
@@ -4271,7 +4335,9 @@ function renderDataIntegrityReport() {
         await softDeleteActivityAcrossSessions(
           f.isGroup ? "group" : "student",
           f.entityId, f.who,
-          f.targetName, f.orphanName
+          f.targetName, f.orphanName, undefined,
+          // An orphan has no entry in the config, so there is no id to go on.
+          { anyOwner: true }
         );
         f.deleted = true;
         renderDataIntegrityReport();
@@ -26306,32 +26372,11 @@ function renderTargetManageContent(student, target) {
           ? await getAllSessionsForGroup(editingGroup.id)
           : await getAllSessionsForStudent(student.id);
         const paKey = item._linkKey || item.title || item.name;
-        const toCheck = [{ name: item.name, title: item.title, paPA: item.parentActivity || null }];
+        const toCheck = [{ name: item.name, title: item.title, paPA: item.parentActivity || null, id: item.id }];
         (acts || []).filter(a => a.parentActivity === paKey && !a.isHeading && !a.isNote && !a.isExportNote)
-          .forEach(sub => toCheck.push({ name: sub.name, title: sub.title, paPA: paKey }));
-        const _tmpRx = /\(temp(orary)?\)$/i;
-        affectedSessions = allSessions.filter(s => {
-          const sActs = s.activities || {}; const sRems = s.remarks || {};
-          const hit = toCheck.some(({ name, title, paPA }) => {
-            const matchIds = Object.entries(sActs).filter(([, a]) => {
-              if (a.targetName !== target.name) return false;
-              const isTemp = _tmpRx.test(a.activityName);
-              const nameOk = (name && a.activityName === name) || (title && a.activityName === title);
-              if (!nameOk && !isTemp) return false;
-              if (isTemp) return false;
-              return (paPA === null ? !a.parentActivity : a.parentActivity === paPA);
-            }).map(([id]) => id);
-            return matchIds.some(actId => Object.values(sRems).some(r =>
-              r.activityId === actId && (
-                (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
-                (r.masteryNote || "").trim().length > 0 ||
-                (r.trials || []).some(t => t !== null && t !== -1) ||
-                (r.optionScore !== undefined && r.optionScore !== null)
-              )
-            ));
-          });
-          return hit;
-        });
+          .forEach(sub => toCheck.push({ name: sub.name, title: sub.title, paPA: paKey, id: sub.id }));
+        affectedSessions = allSessions.filter(s =>
+          toCheck.some(spec => sessionHasActivityData(s, spec, acts, target.name)));
         affected = affectedSessions.length;
       } catch { affected = -1; }
       btn.disabled = false;
@@ -26401,7 +26446,10 @@ function renderTargetManageContent(student, target) {
               editingGroup ? "group" : "student",
               editingGroup ? editingGroup.id   : student.id,
               editingGroup ? editingGroup.name : student.name,
-              target.name, item.name, item.parentActivity || null
+              target.name, item.name, item.parentActivity || null,
+              { configId: item.id,
+                rivalsCreated: rivalActivities(acts, item, item.name, item.parentActivity || null)
+                  .map(o => o.created || "") }
             );
           } catch (err) {
             console.error("Failed to move activity to trash:", err);
@@ -26605,29 +26653,10 @@ function renderTargetManageContent(student, target) {
               : await getAllSessionsForStudent(student.id);
             // Include sub-activities when checking a parent activity
             const paKey = pa._linkKey || pa.title || pa.name;
-            const toCheck = [{ name: pa.name, title: pa.title, paPA: pa.parentActivity || null }];
-            _delSubs.forEach(sub => toCheck.push({ name: sub.name, title: sub.title, paPA: paKey }));
-            const _tmpRx2 = /\(temp(orary)?\)$/i;
-            affectedSessions = allSessions.filter(s => {
-              const sActs = s.activities || {}; const sRems = s.remarks || {};
-              return toCheck.some(({ name, title, paPA }) => {
-                const matchIds = Object.entries(sActs).filter(([, a]) => {
-                  if (a.targetName !== target.name) return false;
-                  const isTemp = _tmpRx2.test(a.activityName);
-                  if (isTemp) return false;
-                  if (!((name && a.activityName === name) || (title && a.activityName === title))) return false;
-                  return (paPA === null ? !a.parentActivity : a.parentActivity === paPA);
-                }).map(([id]) => id);
-                return matchIds.some(actId => Object.values(sRems).some(r =>
-                  r.activityId === actId && (
-                    (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
-                    (r.masteryNote || "").trim().length > 0 ||
-                    (r.trials || []).some(t => t !== null && t !== -1) ||
-                    (r.optionScore !== undefined && r.optionScore !== null)
-                  )
-                ));
-              });
-            });
+            const toCheck = [{ name: pa.name, title: pa.title, paPA: pa.parentActivity || null, id: pa.id }];
+            _delSubs.forEach(sub => toCheck.push({ name: sub.name, title: sub.title, paPA: paKey, id: sub.id }));
+            affectedSessions = allSessions.filter(s =>
+              toCheck.some(spec => sessionHasActivityData(s, spec, acts, target.name)));
             affected = affectedSessions.length;
           } catch { affected = -1; }
           btn.disabled = false;
@@ -26707,7 +26736,11 @@ function renderTargetManageContent(student, target) {
                     editingGroup ? editingGroup.id   : student.id,
                     editingGroup ? editingGroup.name : student.name,
                     target.name, member.name,
-                    member === pa ? (pa.parentActivity || null) : paKeyForDel
+                    member === pa ? (pa.parentActivity || null) : paKeyForDel,
+                    { configId: member.id,
+                      rivalsCreated: rivalActivities(acts, member, member.name,
+                        member === pa ? (pa.parentActivity || null) : paKeyForDel)
+                        .map(o => o.created || "") }
                   );
                 } catch (err) {
                   console.error("Failed to move activity to trash:", err);
@@ -26736,24 +26769,8 @@ function renderTargetManageContent(student, target) {
         const allSessions = editingGroup
           ? await getAllSessionsForGroup(editingGroup.id)
           : await getAllSessionsForStudent(student.id);
-        affectedSessions = allSessions.filter(s => {
-          const sActs = s.activities || {}; const sRems = s.remarks || {};
-          const matchIds = Object.entries(sActs).filter(([, a]) => {
-            if (a.targetName !== target.name || a.parentActivity) return false;
-            // If this session record already has a configId from a *different* predefined
-            // activity, exclude it — it's an orphan from a deleted/recreated activity
-            // with the same name, not data for the current one.
-            if (a.configId && act.id && a.configId !== act.id) return false;
-            return (act.name && a.activityName === act.name) || (act.title && a.activityName === act.title);
-          }).map(([id]) => id);
-          return matchIds.some(actId => Object.values(sRems).some(r =>
-            r.activityId === actId && (
-              (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
-              (r.masteryNote || "").trim().length > 0 ||
-              (r.trials || []).some(t => t !== null && t !== -1) || (r.optionScore !== undefined && r.optionScore !== null)
-            )
-          ));
-        });
+        affectedSessions = allSessions.filter(s => sessionHasActivityData(s,
+          { name: act.name, title: act.title, paPA: null, id: act.id }, acts, target.name));
       } catch (err) {
         btn.disabled = false; btn.textContent = origText;
         return;
@@ -26881,22 +26898,8 @@ function renderTargetManageContent(student, target) {
               const allSessions = editingGroup
                 ? await getAllSessionsForGroup(editingGroup.id)
                 : await getAllSessionsForStudent(student.id);
-              affectedSessions = allSessions.filter(s => {
-                const sActs = s.activities || {}; const sRems = s.remarks || {};
-                const matchIds = Object.entries(sActs).filter(([, a]) =>
-                  a.targetName === target.name &&
-                  ((chosen.name && a.activityName === chosen.name) || (chosen.title && a.activityName === chosen.title)) &&
-                  !a.parentActivity
-                ).map(([id]) => id);
-                return matchIds.some(actId => Object.values(sRems).some(r =>
-                  r.activityId === actId && (
-                    (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
-                    (r.masteryNote || "").trim().length > 0 ||
-                    (r.trials || []).some(t => t !== null && t !== -1) ||
-                    (r.optionScore !== undefined && r.optionScore !== null)
-                  )
-                ));
-              });
+              affectedSessions = allSessions.filter(s => sessionHasActivityData(s,
+                { name: chosen.name, title: chosen.title, paPA: null, id: chosen.id }, acts, target.name));
             } catch (err) {
               showPicker(`<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:.4rem;padding:.5rem .7rem;font-size:.82rem;color:#dc2626;margin-bottom:.6rem">Error checking session data: ${escHtml(err.message)}</div>`);
               return;
@@ -27296,11 +27299,9 @@ function renderTargetManageContent(student, target) {
         : await getAllSessionsForStudent(student.id);
       const paPA2 = pa.parentActivity || null;
         affectedSessions = allSessions.filter(s =>
-          Object.values(s.activities || {}).some(a =>
-            a.targetName === target.name && a.activityName === pa.name &&
-            (paPA2 === null ? !a.parentActivity : a.parentActivity === paPA2)
-          )
-        );
+          recordIdsForActivity(s.activities,
+            { name: pa.name, title: pa.title, paPA: paPA2, id: pa.id },
+            acts, target.name, s.date || "").length > 0);
         affected = affectedSessions.length;
       } catch { affected = -1; }
       btn.disabled = false;
@@ -27360,7 +27361,10 @@ function renderTargetManageContent(student, target) {
               editingGroup ? "group" : "student",
               editingGroup ? editingGroup.id   : student.id,
               editingGroup ? editingGroup.name : student.name,
-              target.name, pa.name, pa.parentActivity || null
+              target.name, pa.name, pa.parentActivity || null,
+              { configId: pa.id,
+                rivalsCreated: rivalActivities(acts, pa, pa.name, pa.parentActivity || null)
+                  .map(o => o.created || "") }
             );
           } catch (err) {
             console.error("Failed to move activity to trash:", err);
@@ -27662,22 +27666,8 @@ function renderTargetManageContent(student, target) {
           ? await getAllSessionsForGroup(editingGroup.id)
           : await getAllSessionsForStudent(student.id);
         const paPA = subAct.parentActivity || null;
-        affectedSessions = allSessions.filter(s => {
-          const sActs = s.activities || {}; const sRems = s.remarks || {};
-          const matchIds = Object.entries(sActs).filter(([, a]) => {
-            if (a.targetName !== target.name) return false;
-            if (a.activityName !== subAct.name && a.activityName !== subAct.title) return false;
-            return paPA === null ? !a.parentActivity : a.parentActivity === paPA;
-          }).map(([id]) => id);
-          return matchIds.some(actId => Object.values(sRems).some(r =>
-            r.activityId === actId && (
-              (r.text || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
-              (r.masteryNote || "").trim().length > 0 ||
-              (r.trials || []).some(t => t !== null && t !== -1) ||
-              (r.optionScore !== undefined && r.optionScore !== null)
-            )
-          ));
-        });
+        affectedSessions = allSessions.filter(s => sessionHasActivityData(s,
+          { name: subAct.name, title: subAct.title, paPA, id: subAct.id }, acts, target.name));
         affected = affectedSessions.length;
       } catch { affected = -1; }
       btn.disabled = false;
@@ -27698,7 +27688,10 @@ function renderTargetManageContent(student, target) {
             editingGroup ? "group" : "student",
             editingGroup ? editingGroup.id   : student.id,
             editingGroup ? editingGroup.name : student.name,
-            target.name, subAct.name, subAct.parentActivity || null
+            target.name, subAct.name, subAct.parentActivity || null,
+            { configId: subAct.id,
+              rivalsCreated: rivalActivities(acts, subAct, subAct.name, subAct.parentActivity || null)
+                .map(o => o.created || "") }
           );
         } catch (err) {
           console.error("Failed to move sub-activity to trash:", err);

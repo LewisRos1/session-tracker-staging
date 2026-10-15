@@ -36,6 +36,9 @@ results.push(await run("Everyone signs in again each Monday (no browser)",
 results.push(await run("List of Corrections: three states, Ms. Daisy approves (no browser)",
   ["run", "--allow-read", "tests/corrections-status.test.js"]));
 
+results.push(await run("Which session records belong to which activity (no browser)",
+  ["run", "--allow-read", "tests/activity-identity.test.js"]));
+
 results.push(await run("AI Translator: swapping text inside a .docx (no browser)",
   ["run", "--allow-read", "tests/docx-text-swap.test.js"]));
 
