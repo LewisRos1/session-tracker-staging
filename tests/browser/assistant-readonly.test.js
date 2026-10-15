@@ -129,6 +129,39 @@ try {
   r.ok("and opening it did not show a lock",
     !(await page.eval(`!!document.querySelector("[data-lock-overlay]")`)));
 
+  // The AI Translator was hidden from her outright while the AI Report
+  // Generator beside it was shown and locked. Two buttons that do the same
+  // kind of thing behaved differently for no reason, and Lewis asked why.
+  r.section("the AI buttons on the home screen");
+
+  const home = await page.eval(`(() => {
+    const s = window.__app.state;
+    window.__app.renderStudentDatabaseButton();
+    const ids = ["btn-open-ai-report", "btn-open-ai-translate", "btn-open-student-registry"];
+    return Object.fromEntries(ids.map(id => [id, !!document.getElementById(id)]));
+  })()`);
+  r.ok("she sees the AI Report Generator", home["btn-open-ai-report"] === true, JSON.stringify(home));
+  r.ok("and the AI Translator beside it", home["btn-open-ai-translate"] === true, JSON.stringify(home));
+
+  const locked = await page.eval(`(() => {
+    document.querySelectorAll("[data-lock-overlay]").forEach(el => el.remove());
+    document.getElementById("btn-open-ai-translate").click();
+    // Over a panel it draws its own overlay; on the home screen it uses the
+    // modal instead. Either counts as locked.
+    const overlay = document.querySelector("[data-lock-overlay]");
+    const modal = document.getElementById("manage-modal");
+    const modalShut = !modal || modal.classList.contains("hidden");
+    const title = document.getElementById("manage-modal-title");
+    const screenOpen = !document.getElementById("screen-ai-translate")?.classList.contains("hidden");
+    return {
+      lock: overlay ? "overlay" : (!modalShut && /Locked/i.test(title?.textContent || "") ? "modal" : null),
+      saw: (overlay?.innerText || title?.textContent || "").trim().slice(0, 40),
+      screenOpen,
+    };
+  })()`);
+  r.ok("pressing it locks rather than opens", !!locked.lock, JSON.stringify(locked));
+  r.ok("and the translator screen stays shut", locked.screenOpen === false, JSON.stringify(locked));
+
   r.section("a main teacher is not restricted");
 
   await open("daisy");

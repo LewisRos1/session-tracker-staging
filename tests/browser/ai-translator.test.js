@@ -47,12 +47,18 @@ const open = async (who) => {
 
 try {
   // ── who may see it ───────────────────────────────────────────────────
-  r.section("the button is for the people who send reports out");
+  r.section("the button is there for everyone, and locked for most");
   await open("rayhanah");
   await page.eval(`window.__app.renderStudentDatabaseButton()`);
   await settle(200);
-  r.check("an assistant does not get one",
-    await page.eval(`!!document.getElementById("btn-open-ai-translate")`), false);
+  // It used to be hidden from an assistant outright, while the AI Report
+  // Generator next to it was shown and locked. Lewis asked why the two
+  // behaved differently; they no longer do. The lock itself is what keeps
+  // her out, and it is checked in assistant-readonly.test.js.
+  r.check("an assistant can see it",
+    await page.eval(`!!document.getElementById("btn-open-ai-translate")`), true);
+  r.check("just as she sees the AI Report Generator",
+    await page.eval(`!!document.getElementById("btn-open-ai-report")`), true);
 
   await open("daisy");
   await page.eval(`window.__app.renderStudentDatabaseButton()`);

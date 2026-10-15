@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2261";
+const APP_VERSION = "2262";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -2941,7 +2941,11 @@ function renderStudentDatabaseButton() {
   container.innerHTML = `<div class="info-btn-row">
     <button class="export-btn export-btn-all" id="btn-open-student-registry" style="margin-bottom:0">Student Database</button>
     <button class="export-btn" id="btn-open-ai-report">AI Report Generator</button>
-    ${canUseStaffTools() ? `<button class="export-btn" id="btn-open-ai-translate">AI Translator</button>` : ""}
+    <!-- Shown to everyone, like the AI Report Generator beside it. An
+         assistant clicking it gets the same "Locked." panel: the screen
+         never opens, so nothing can be spent from here. Hiding it as well
+         only made the two buttons behave differently for no reason. -->
+    <button class="export-btn" id="btn-open-ai-translate">AI Translator</button>
     <button class="export-btn" id="btn-open-score-settings">Score Settings</button>
   </div>`;
   // Open to everyone: reading the list is useful and harmless. Every control
