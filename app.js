@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2258";
+const APP_VERSION = "2259";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -12123,7 +12123,8 @@ function paIsWritten(pa, target, parentName = null) {
     const _d = state.sessionData?.date || todayDateStr();
     if (_d >= (pa.maintainedAt || "2026-08-21")) return true;
   }
-  const actData = findActivityByName(target.name, pa.title || pa.name, parentName, pa.id);
+  const actData = findActivityByName(target.name, pa.title || pa.name, parentName, pa.id,
+    target.predefinedActivities);
   if (!actData) return false;
   const stripH = t => (t || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
   return getRemarksForActivity(actData.id).some(r =>
@@ -12330,7 +12331,8 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
         </div>
       </div>`;
       children.forEach((sub, si) => {
-        let subActData = findActivityByName(target.name, sub.title || sub.name, pa.title || pa.name, sub.id);
+        let subActData = findActivityByName(target.name, sub.title || sub.name, pa.title || pa.name, sub.id,
+          target.predefinedActivities);
         // Root cause of the alternating-display bug: a real data record (Record A, no
         // configId — created before configIds existed) coexists with an auto-fill
         // placeholder (Record B, has configId). findActivityByName always returns Record B
@@ -12445,7 +12447,8 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
     }
 
     const pendingKey = pa.name || pa.title;
-    const actData    = findActivityByName(target.name, pa.name || pa.title, null, pa.id);
+    const actData    = findActivityByName(target.name, pa.name || pa.title, null, pa.id,
+      target.predefinedActivities);
     // Claim unlinked records in local state immediately so the next same-named predefined
     // activity in the loop can't find and share the same Firestore record.
     // Also persist the configId to Firestore so future session opens can find this
@@ -14347,7 +14350,8 @@ function attachTargetListeners(target) {
         // waiting produced a second remark. Nothing is awaited before the render
         // now, so there is nothing to click twice.
         if (paName) {
-          const existing = findActivityByName(target.name, paName, btn.dataset.paParent || null, btn.dataset.cfgId || null);
+          const existing = findActivityByName(target.name, paName, btn.dataset.paParent || null,
+            btn.dataset.cfgId || null, target.predefinedActivities);
           if (existing) {
             actId = existing.id;
             if (btn.dataset.cfgId && !existing.configId) {
@@ -15040,8 +15044,9 @@ async function cleanupEmptyEntries(sessionId, data, targetName, target = null, i
   }
 }
 
-async function ensureFedcActivity(targetName, activityName, order, parentActivity = null, configId = null) {
-  const existing = findActivityByName(targetName, activityName, parentActivity, configId);
+async function ensureFedcActivity(targetName, activityName, order, parentActivity = null, configId = null, cfgActs = null) {
+  const existing = findActivityByName(targetName, activityName, parentActivity, configId,
+    cfgActs || activitiesOfTarget(targetName));
   if (existing) {
     // Persist configId to Firestore for any unlinked record adopted by name so future
     // lookups use exact matching and same-named activities stop sharing Firestore data.
@@ -32365,9 +32370,34 @@ function getRemarksForActivity(actId) {
     .map(([id, r]) => ({ id, ...r }));
 }
 
-function findActivityByName(targetName, activityName, parentActivity = null, configId = null) {
+/**
+ * The configured activities of a target, found by its name.
+ *
+ * For the callers that only know the name. Whichever of the two the screen
+ * is on, a student or a group, only one of them is open at a time.
+ */
+function activitiesOfTarget(targetName) {
+  const holders = [state.currentGroup, state.currentStudent];
+  for (const h of holders) {
+    const t = (h?.targets || []).find(x => x.name === targetName);
+    if (t) return t.predefinedActivities || [];
+  }
+  return null;
+}
+
+function findActivityByName(targetName, activityName, parentActivity = null, configId = null, cfgActs = null) {
   const entries = Object.entries(state.sessionData?.activities || {});
   const byName = ([, a]) => a.targetName === targetName && a.activityName === activityName;
+  /**
+   * Already belongs to a different activity that is still in the target.
+   *
+   * Two activities share a name all the time -- a Behaviour Chart has an
+   * "Antecedent" under each behaviour. The second one must not pick up the
+   * first one's record, or a remark typed under one appears under both and
+   * typing under the other overwrites it.
+   */
+  const ownedByALiveSibling = (a) => !!a.configId && a.configId !== configId
+    && (cfgActs || []).some(o => o && o.id === a.configId);
   // Exact configId match wins over everything (handles same-named activities at any level)
   if (configId) {
     const exact = entries.find(([, a]) => a.configId === configId && a.targetName === targetName);
@@ -32397,7 +32427,11 @@ function findActivityByName(targetName, activityName, parentActivity = null, con
     // predefined activity was re-saved with a new ID). The View/Edit screen matches by
     // name and finds it; Start Session was silently blocked here. Only adopt when the
     // name match is unambiguous — exactly one top-level candidate with that activity name.
-    const staleCands = entries.filter(e => byName(e) && !e[1].parentActivity);
+    // A record whose owner is gone from the config can be picked up by name.
+    // One whose owner is still there cannot, however few candidates there are:
+    // that is somebody else's data.
+    const staleCands = entries.filter(e =>
+      byName(e) && !e[1].parentActivity && !ownedByALiveSibling(e[1]));
     return staleCands.length === 1 ? { id: staleCands[0][0], ...staleCands[0][1] } : null;
   }
   if (parentActivity) {
@@ -32414,8 +32448,9 @@ function findActivityByName(targetName, activityName, parentActivity = null, con
     }
     return null;
   }
-  // Top-level: only match records with no parentActivity set
-  const top = entries.find(e => byName(e) && !e[1].parentActivity);
+  // Top-level: only match records with no parentActivity set, and never one
+  // another activity in this target already owns.
+  const top = entries.find(e => byName(e) && !e[1].parentActivity && !ownedByALiveSibling(e[1]));
   return top ? { id: top[0], ...top[1] } : null;
 }
 

@@ -96,6 +96,9 @@ results.push(await run("One person in a target at a time (the Edit Target lock)"
 results.push(await run("Two people in two browsers at once",
   ["run", "-A", "tests/browser/two-tabs-approval.test.js", HARNESS]));
 
+results.push(await run("Two activities with the same name, in a real browser",
+  ["run", "-A", "tests/browser/same-name-activities.test.js", HARNESS]));
+
 results.push(await run("Start Session screens: what they print",
   ["run", "-A", "tests/browser/session-screen-display.test.js", HARNESS]));
 
