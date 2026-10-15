@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2259";
+const APP_VERSION = "2261";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -24423,10 +24423,29 @@ function mnRowKindPlural(a, acts) {
  */
 function placeKebabMenu(btn, menu) {
   const GAP = 8;
+  unliftKebabCards();
+  menu.classList.remove("mn-km-scrolls");
+  // Back to absolute by name, not by clearing it: the menu is created with
+  // position:absolute in its own style attribute, so clearing the property
+  // makes it static and it drops into the page.
+  menu.style.position = "absolute";
   menu.style.top = "100%";
   menu.style.bottom = "auto";
-  menu.style.maxHeight = "";
-  menu.style.overflowY = "";
+  menu.style.right = "0";
+  // Put back by name, never cleared. The menu carries z-index and
+  // overflow:hidden in its own style attribute, and clearing a longhand
+  // takes it out of the shorthand: overflow-x hidden with overflow-y unset
+  // computes to auto, which is a scrollbar nobody asked for.
+  menu.style.zIndex = "100";
+  menu.style.maxHeight = "none";
+  menu.style.overflowY = "hidden";
+
+  // A card with a Waiting for Approval strip gives that strip its own layer,
+  // and a later card's strip paints over an earlier card's open menu. The
+  // card holding the open one is lifted above its neighbours while it is up.
+  for (const sel of [".mn-pending-foot", ".mn-act-card"]) {
+    btn.closest(sel)?.classList.add("mn-km-lifted");
+  }
 
   const b = btn.getBoundingClientRect();
   const header = document.querySelector("#manage-modal .modal-header");
@@ -24438,9 +24457,32 @@ function placeKebabMenu(btn, menu) {
   if (height <= below) return;
   if (height <= above) { menu.style.top = "auto"; menu.style.bottom = "100%"; return; }
 
-  if (above > below) { menu.style.top = "auto"; menu.style.bottom = "100%"; }
-  menu.style.maxHeight = Math.max(120, Math.floor(Math.max(above, below))) + "px";
+  // Neither side has room where it hangs. Rather than scroll a list of eight
+  // things -- the boss hunting for Delete Activity in a 120px window was how
+  // this came back -- it is taken off the card and put against the window,
+  // where the whole band between the modal header and the bottom is free.
+  const band = window.innerHeight - ceiling - GAP * 2;
+  menu.style.position = "fixed";
+  menu.style.zIndex = "1000";
+  menu.style.right = Math.max(GAP, Math.round(window.innerWidth - b.right)) + "px";
+  if (height <= band) {
+    menu.style.top = Math.round(Math.min(
+      Math.max(ceiling + GAP, b.bottom + GAP),
+      window.innerHeight - GAP - height)) + "px";
+    return;
+  }
+  // Taller than the window itself. It has to scroll, so the bar is made
+  // plain to see rather than left as a hairline.
+  menu.style.top = Math.round(ceiling + GAP) + "px";
+  menu.style.maxHeight = Math.floor(band) + "px";
   menu.style.overflowY = "auto";
+  menu.classList.add("mn-km-scrolls");
+}
+
+/** Put every card back on its own layer once no menu is open above it. */
+function unliftKebabCards() {
+  document.querySelectorAll(".mn-km-lifted")
+    .forEach(el => el.classList.remove("mn-km-lifted"));
 }
 
 function mnRowKindName(a, acts) {
@@ -26504,6 +26546,7 @@ function renderTargetManageContent(student, target) {
       const menu = $(`mn-km-${idx}`);
       const wasHidden = menu.style.display !== "block";
       $("manage-modal-body").querySelectorAll(".mn-kebab-menu, .mn-sub-kebab-menu, .mn-inactive-km").forEach(m => m.style.display = "none");
+      unliftKebabCards();
       if (wasHidden) {
         menu.style.display = "block";
         // Say up front whether this activity can take sub-activities.
@@ -26531,6 +26574,7 @@ function renderTargetManageContent(student, target) {
       const menu = btn.nextElementSibling;
       const wasHidden = menu.style.display !== "block";
       $("manage-modal-body").querySelectorAll(".mn-kebab-menu, .mn-sub-kebab-menu, .mn-inactive-km").forEach(m => m.style.display = "none");
+      unliftKebabCards();
       if (wasHidden) {
         menu.style.display = "block";
         placeKebabMenu(btn, menu);
@@ -27476,17 +27520,18 @@ function renderTargetManageContent(student, target) {
       delete a.proposedBy;
       delete a.proposedAt;
 
-      // It starts the day it is approved, not the day it was asked for.
+      // Its dates are left exactly as proposed.
       //
-      // Proposed on the 7th and approved on the 9th, it did not exist on the
-      // 7th or the 8th: it was in nobody's session and nobody could write
-      // against it. Dating it back makes it look unfilled for days it was never
-      // part of. Today's real date, not the open session's -- the approval
-      // happens now, whatever day is being written up.
-      const approvedOn = todayDateStr();
-      if (a.createdOn !== undefined) a.createdOn = approvedOn;
-      // A section heading's activeFrom is deliberately null and stays that way.
-      if (a.activeFrom) a.activeFrom = approvedOn;
+      // This used to be re-dated to the day of approval, on the reasoning that
+      // an activity approved on the 9th did not exist on the 7th. That reads
+      // well and is wrong in practice: an assistant proposes an activity while
+      // writing up a session, so it already carries that session's date, and
+      // re-dating it took the activity out of the very session she added it
+      // for. Proposed on the 12th, it belongs to the 12th onwards, whenever
+      // Ms. Daisy gets to it.
+      //
+      // The cost, which is the lesser one: a session between the proposal and
+      // the approval now shows the activity with nothing filled in.
       // Told to whoever asked for it. Recorded on the entity being edited, which
       // for a group target is the group rather than the student standing in for
       // it here.

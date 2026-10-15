@@ -5295,3 +5295,21 @@ button.wf-pill:hover { filter: brightness(.93); }
 }
 .tr-terms-table th { background: var(--primary-light); color: var(--primary-dark); font-weight: 700; }
 .tr-terms-table td:last-child { color: var(--text-muted); white-space: nowrap; }
+
+/* An open kebab menu, and the card it belongs to.
+ *
+ * A card waiting for approval puts its Approve / Reject strip on its own
+ * layer, so the NEXT card's strip painted over the menu hanging out of the
+ * one above it. The card holding the open menu is lifted while it is up. */
+.mn-act-card.mn-km-lifted { position: relative; z-index: 60; }
+.mn-pending-foot.mn-km-lifted { z-index: 60; }
+
+/* A menu too tall for the window has to scroll, and the bar has to be
+ * findable: the boss could not see that there was more below, and went
+ * looking for Delete Activity. */
+.mn-km-scrolls { scrollbar-width: auto; scrollbar-color: #9ca3af #f3f4f6; }
+.mn-km-scrolls::-webkit-scrollbar { width: 11px; }
+.mn-km-scrolls::-webkit-scrollbar-track { background: #f3f4f6; border-radius: 6px; }
+.mn-km-scrolls::-webkit-scrollbar-thumb {
+  background: #9ca3af; border-radius: 6px; border: 2px solid #f3f4f6;
+}

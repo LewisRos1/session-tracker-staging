@@ -58,7 +58,13 @@ try {
   const openAt = async (which) => {
     // Shut whatever is open first. Clicking the same kebab twice toggles it,
     // so without this the second call measures a menu that is not there.
-    await page.eval(`document.body.click()`);
+    // Shut them by hand: a click on the body does not always reach the
+    // handler, and a menu left open is the one the measurement then finds.
+    await page.eval(`(() => {
+      document.querySelectorAll(".mn-kebab-menu, .mn-sub-kebab-menu, .mn-inactive-km")
+        .forEach(m => { m.style.display = "none"; });
+      document.body.click();
+    })()`);
     await settle(150);
     await page.eval(`(() => {
       const btns = [...document.querySelectorAll(".mn-kebab-btn")];
@@ -149,6 +155,66 @@ try {
     tall.scrolls === "auto" || tall.scrolls === "scroll",
     `overflow-y is ${tall.scrolls}`);
   await page.eval(`document.getElementById("tall-menu")?.remove()`);
+
+  // ── no scrolling when the window has room ───────────────────────────
+  //
+  // The boss went looking for Delete Activity in a menu that had quietly
+  // become a 120px scrolling window. A menu that fits between the header and
+  // the bottom of the screen is shown whole, off the card if need be.
+  r.section("a long menu on a short screen is shown whole");
+
+  const whole = await openAt("last");
+  r.ok("the menu opened", !!whole, "no menu is showing");
+  r.ok("it does not scroll", whole && whole.scrolls !== "auto" && whole.scrolls !== "scroll",
+    JSON.stringify(whole));
+  r.ok("and all of it is on screen",
+    whole && whole.top >= whole.headerBottom && whole.bottom <= whole.viewport,
+    JSON.stringify(whole));
+
+  // ── in front of the card below it ───────────────────────────────────
+  //
+  // A card waiting for approval puts its Approve / Reject strip on its own
+  // layer. The NEXT card's strip painted over a menu hanging out of the one
+  // above it, so half the menu was behind a yellow "Waiting for approval".
+  r.section("a menu opened above a card that is waiting for approval");
+
+  const covered = await page.eval(`(() => {
+    const s = window.__app.state.students.find(x => x.id === "caden");
+    const acts = s.targets[0].predefinedActivities;
+    // The last two rows proposed by somebody else, as an assistant's would be.
+    for (const a of acts.slice(-2)) { a._pending = true; a.proposedBy = "rayhanah"; }
+    window.__app.openManageModal(s, s.targets[0]);
+    return acts.length;
+  })()`);
+  r.ok("the target still has its activities", covered === 9, String(covered));
+  await settle(400);
+
+  const stacking = await page.eval(`(() => {
+    const btns = [...document.querySelectorAll(".mn-kebab-btn")];
+    const btn = btns[btns.length - 2];
+    if (!btn) return { error: "no second-to-last kebab" };
+    btn.scrollIntoView({ block: "center" });
+    btn.click();
+    const menu = [...document.querySelectorAll(".mn-kebab-menu")]
+      .find(m => m.style.display === "block");
+    if (!menu) return { error: "no menu opened" };
+    const m = menu.getBoundingClientRect();
+    // What the browser says is actually drawn at the middle of the menu. If a
+    // badge is on top, this is the badge.
+    const x = Math.round(m.left + m.width / 2);
+    const y = Math.round(m.top + m.height / 2);
+    const hit = document.elementFromPoint(x, y);
+    return {
+      inMenu: !!(hit && menu.contains(hit)),
+      hitClass: hit ? (hit.className || hit.tagName) : "(nothing)",
+      lifted: !!btn.closest(".mn-km-lifted"),
+    };
+  })()`);
+
+  r.ok("the middle of the menu is the menu, not something on top of it",
+    stacking.inMenu === true, JSON.stringify(stacking));
+  r.ok("and the card it belongs to was lifted above its neighbours",
+    stacking.lifted === true, JSON.stringify(stacking));
 
   r.section("console");
   const noise = page.consoleLines.filter(l => l.level === "error");
