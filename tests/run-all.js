@@ -105,6 +105,9 @@ results.push(await run("Two people in two browsers at once",
 results.push(await run("An approved activity keeps the date it was proposed for",
   ["run", "-A", "tests/browser/approval-keeps-date.test.js", HARNESS]));
 
+results.push(await run("Deleting an activity with its panel open",
+  ["run", "-A", "tests/browser/delete-after-refresh.test.js", HARNESS]));
+
 results.push(await run("Two activities with the same name, in a real browser",
   ["run", "-A", "tests/browser/same-name-activities.test.js", HARNESS]));
 

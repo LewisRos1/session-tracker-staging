@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2265";
+const APP_VERSION = "2266";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -26525,6 +26525,10 @@ function renderTargetManageContent(student, target) {
       const idx = Number(btn.dataset.idx);
       const item = acts[idx];
       if (!item) return;
+      // A panel open over this list holds back every write, and keeps a
+      // snapshot Discard Changes can restore from. Closed first, or the
+      // delete writes nothing and the row comes back on the next draw.
+      if (_mnPanelOpen) await mnPanelSave();
 
       // Non-activity rows (headings, internal notes) — simple confirm, no data check needed
       if (item.isHeading || item.isMaintainHeading || item.isNote || item.isExportNote) {
@@ -26816,6 +26820,13 @@ function renderTargetManageContent(student, target) {
       // asks for a date. The branches for color_white/gray/blue/red, master and
       // stop were left behind by that move and nothing could reach them.
       if (action === "delete") {
+        // An open panel holds back every write, so the delete took the
+        // activity out of the list in memory, wrote nothing, and the next
+        // draw put it back: press Delete, type the word, nothing happens,
+        // press it again and it goes. The panel also keeps a snapshot that
+        // Discard Changes restores from, which would bring a deleted
+        // activity back later. Closed first, committing whatever was typed.
+        if (_mnPanelOpen) await mnPanelSave();
         if (pa.isNote || pa.isExportNote) {
           if (!confirm(`Delete this note?`)) return;
           const actIdx = acts.indexOf(pa);
@@ -27850,6 +27861,10 @@ function renderTargetManageContent(student, target) {
       const idx = Number(btn.dataset.idx);
       const subAct = acts[idx];
       if (!subAct) return;
+      // A panel open over this list holds back every write, and keeps a
+      // snapshot Discard Changes can restore from. Closed first, or the
+      // delete writes nothing and the row comes back on the next draw.
+      if (_mnPanelOpen) await mnPanelSave();
 
       btn.disabled = true;
       btn.textContent = "⏳";
