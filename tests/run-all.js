@@ -36,6 +36,9 @@ results.push(await run("Everyone signs in again each Monday (no browser)",
 results.push(await run("List of Corrections: three states, Ms. Daisy approves (no browser)",
   ["run", "--allow-read", "tests/corrections-status.test.js"]));
 
+results.push(await run("Why something was discontinued (no browser)",
+  ["run", "--allow-read", "tests/discontinue-reason.test.js"]));
+
 results.push(await run("Which targets a report for a period covers (no browser)",
   ["run", "--allow-read", "tests/report-period-targets.test.js"]));
 

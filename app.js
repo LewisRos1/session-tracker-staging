@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2263";
+const APP_VERSION = "2264";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -6003,6 +6003,7 @@ async function hyrCollectData(student, period, year, excludedActivities = new Se
     lines.push(`=== TARGET: ${tName} ===`);
     // Raw trial values are meaningless without the scale they were scored on.
     lines.push(`Each trial is scored out of ${target.maxPoints || 3}.`);
+    { const d = discontinuedFactLine(target, "target"); if (d) lines.push(d); }
 
     // Monthly averages
     const chartLabels = [];
@@ -7837,6 +7838,7 @@ function assessmentCollect(student, sessions, excludedActivities) {
 
     lines.push(`=== TARGET: ${t.name} ===`);
     lines.push(`Each trial is scored out of ${t.maxPoints || 3}.`);
+    { const d = discontinuedFactLine(t, "target"); if (d) lines.push(d); }
     lines.push(avg === null
       ? "This target is observation-only and carries no numeric score."
       : `Average across the assessment: ${avg}%${days.map((d, i) => avgs[i] === null ? "" : `\n  ${d.label}: ${avgs[i]}%`).join("")}`);
@@ -9152,6 +9154,7 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
     // AI data: per-target context lines
     const lines = [];
     lines.push(`Each trial is scored out of ${target.maxPoints || 3}.`);
+    { const d = discontinuedFactLine(target, "target"); if (d) lines.push(d); }
     lines.push(`Past 3 months (${tLabels.join(", ")}): ${tAvgs.map(v => v !== null ? v + "%" : "no data").join(", ")}`);
     lines.push(`Last month (${lastMonthLabel}): ${lastMonthAvg !== null ? lastMonthAvg + "%" : "no data"}`);
     lines.push(`This month (${thisMonthLabel}): ${thisMonthAvg !== null ? thisMonthAvg + "%" : "no data"}`);
@@ -10250,6 +10253,45 @@ async function maGetLastDataDate(entity, target, pa, isGroup = false) {
 }
 
 function maIsMastered(pa)   { return !!(pa.masteredOn || pa.inactiveReason === 'mastered'); }
+/**
+ * Store a discontinue reason, or take it off.
+ *
+ * Optional by design: targets and activities stopped before this box existed
+ * have none, and an empty box means none rather than an empty string sitting
+ * in the record and printing as a blank line in a report.
+ */
+/** The reason, as a line to sit under a discontinued activity or target. */
+function discontinuedReasonHtml(item) {
+  const t = String(item?.discontinuedReason || "").trim();
+  if (!t) return "";
+  return `<div class="mn-disc-reason" title="Why this was discontinued">`
+    + `<span class="mn-disc-reason-tag">\u{1F6A9} Why</span>`
+    + `<span>${escHtml(t)}</span></div>`;
+}
+
+/**
+ * What to tell the model about something that was stopped.
+ *
+ * A parent reading a half-year report sees the line stop in April and asks
+ * what happened. Saying when, and why where there is a why, answers it
+ * before it is asked. Where no reason was recorded it says so, rather than
+ * leaving the model to invent one.
+ */
+function discontinuedFactLine(item, what) {
+  if (!item?.discontinuedOn) return "";
+  const why = String(item.discontinuedReason || "").trim();
+  return `This ${what} was discontinued on ${fmtPeriodDate(item.discontinuedOn)}`
+    + (why ? `. Reason given: ${why}` : ". No reason was recorded")
+    + ". Mention this where it helps the reader understand why the data stops,"
+    + " and do not write about it as a failure or a lack of progress.";
+}
+
+function setDiscontinuedReason(item, reason) {
+  const t = String(reason || "").trim();
+  if (t) item.discontinuedReason = t;
+  else delete item.discontinuedReason;
+}
+
 function maIsDiscont(pa)    { return !!(pa.discontinuedOn || pa.inactiveReason === 'discontinued') && !maIsMastered(pa); }
 function maIsMaintained(pa) { return !!pa.maintained; }
 function maIsActive(pa)     { return !maIsMastered(pa) && !maIsDiscont(pa) && !maIsMaintained(pa); }
@@ -22218,7 +22260,15 @@ function showAutoDateConfirm({ message, confirmLabel }) {
   });
 }
 
-function showDatePickerOverlay({ heading, infoHtml, minDate, defaultDate, confirmLabel, dateLabel = "activity" }) {
+/**
+ * Pick a date, and for a discontinue, say why.
+ *
+ * The reason is optional on purpose: plenty of targets were stopped long
+ * before there was a box to type one in, and it can be filled in later.
+ * Callers that ask for it get { date, reason }; the rest still get the date
+ * on its own, so nothing that only wants a date had to change.
+ */
+function showDatePickerOverlay({ heading, infoHtml, minDate, defaultDate, confirmLabel, dateLabel = "activity", withReason = false, reasonValue = "" }) {
   return new Promise(resolve => {
     const overlay = document.createElement("div");
     overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem";
@@ -22234,6 +22284,12 @@ function showDatePickerOverlay({ heading, infoHtml, minDate, defaultDate, confir
         <input type="date" id="dp-date-inp" value="${def}" min="${min}" style="position:absolute;inset:0;width:100%;height:100%;border:none;background:transparent;opacity:0;outline:none;cursor:pointer;box-sizing:border-box">
         <div id="dp-date-display" style="padding:.5rem .7rem;font-size:.95rem;color:#111;pointer-events:none;display:flex;align-items:center"><span id="dp-date-text">${defFormatted}</span><span style="margin-left:auto;padding-left:.5rem;font-size:1rem;color:#6b7280">🗓</span></div>
       </div>
+      ${withReason ? `
+      <label style="font-size:.82rem;font-weight:600;color:#374151;display:block;margin-bottom:.35rem">
+        Why? <span style="font-weight:400;color:#6b7280">(optional &mdash; shown in reports)</span>
+      </label>
+      <textarea id="dp-reason-inp" rows="2" placeholder="e.g. met in daily routine, moved into another target"
+        style="width:100%;box-sizing:border-box;padding:.5rem .7rem;border:1.5px solid #d1d5db;border-radius:.4rem;font-size:.9rem;font-family:inherit;resize:vertical;margin-bottom:1rem">${escHtml(reasonValue || "")}</textarea>` : ""}
       <div style="display:flex;gap:.6rem;justify-content:flex-end">
         <button class="dp-cancel" style="padding:.5rem 1rem;border:1px solid #d1d5db;border-radius:.4rem;background:#fff;cursor:pointer;font-size:.9rem">Cancel</button>
         <button class="dp-confirm" style="padding:.5rem 1rem;border:none;border-radius:.4rem;background:var(--primary);color:#fff;cursor:pointer;font-size:.9rem;font-weight:600">${confirmLabel}</button>
@@ -22247,7 +22303,8 @@ function showDatePickerOverlay({ heading, infoHtml, minDate, defaultDate, confir
     overlay.querySelector(".dp-cancel").addEventListener("click", () => finish(null));
     overlay.querySelector(".dp-confirm").addEventListener("click", () => {
       if (!inp.value || inp.value < min) { inp.style.borderColor = "#dc2626"; return; }
-      finish(inp.value);
+      const reason = (overlay.querySelector("#dp-reason-inp")?.value || "").trim();
+      finish(withReason ? { date: inp.value, reason } : inp.value);
     });
     const onKey = e => { if (e.key === "Escape") finish(null); };
     document.addEventListener("keydown", onKey);
@@ -23088,17 +23145,20 @@ async function handleDiscontinueTarget(entity, target, isGroup) {
     ? `<strong>"${escHtml(target.name)}"</strong> stays visible up to and including this date, and all past session data is preserved.<br><br>The last recorded session for this target was on <strong>${fmtPeriodDate(lastDate)}</strong>. So, the earliest you can discontinue is <strong>${fmtPeriodDate(minDate)}</strong>. This target will stop showing from <strong>${fmtPeriodDate(addOneDay(minDate))}</strong> onwards.`
     : `<strong>"${escHtml(target.name)}"</strong> will be hidden from the session dropdown from this date onwards. All past session data is preserved and will still appear in exports.<br><br>No previous session data was found for this target.`;
 
-  const pickedDate = await showDatePickerOverlay({
+  const picked = await showDatePickerOverlay({
     heading: '🛑 Discontinue Target',
     infoHtml,
     minDate,
     defaultDate: minDate,
     confirmLabel: 'Confirm 🛑',
-    dateLabel: 'target'
+    dateLabel: 'target',
+    withReason: true,
+    reasonValue: target.discontinuedReason || ''
   });
-  if (!pickedDate) return;
+  if (!picked) return;
 
-  target.discontinuedOn = pickedDate;
+  target.discontinuedOn = picked.date;
+  setDiscontinuedReason(target, picked.reason);
   const si = isGroup
     ? state.groups.findIndex(g => g.id === entity.id)
     : state.students.findIndex(s => s.id === entity.id);
@@ -26046,6 +26106,7 @@ function renderTargetManageContent(student, target) {
             </div>
           </div>`}
         </div>
+        ${discontinuedReasonHtml(a)}
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.3rem;flex-shrink:0">
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.2rem">
             <span style="font-size:.72rem;color:#9ca3af;white-space:nowrap">${_mnCreatedLabel2}</span>
@@ -26658,12 +26719,16 @@ function renderTargetManageContent(student, target) {
           : (_subCreated && minDate === _subCreated
             ? `No previous session data was found for <strong>"${subDisplayName}"</strong>. Defaulting to <strong>${fmtPeriodDate(_subCreated)}</strong>, the date this sub-activity was created.`
             : `No previous session data was found for <strong>"${subDisplayName}"</strong>.`);
-        const pickedDate = await showDatePickerOverlay({
+        const _picked = await showDatePickerOverlay({
           heading: action === 'master' ? '⭐ Mark Sub-activity as Mastered' : '🚩 Discontinue Sub-activity',
           infoHtml, minDate, defaultDate: minDate,
-          confirmLabel: action === 'master' ? 'Confirm ⭐' : 'Confirm 🚩'
+          confirmLabel: action === 'master' ? 'Confirm ⭐' : 'Confirm 🚩',
+          withReason: action !== 'master',
+          reasonValue: sub.discontinuedReason || ''
         });
-        if (!pickedDate) return;
+        if (!_picked) return;
+        const pickedDate = typeof _picked === "string" ? _picked : _picked.date;
+        if (action !== 'master') setDiscontinuedReason(sub, _picked.reason);
         if (action === 'master') {
           delete sub.maintained; delete sub.activityColor; delete sub.maintainedAt;
           delete sub.discontinuedOn; delete sub.isArchived; delete sub.isStopped; delete sub.inactiveReason;
@@ -27125,13 +27190,17 @@ function renderTargetManageContent(student, target) {
         const restrictionText = action === 'master'
           ? 'The earliest you can mark this as mastered is'
           : 'The earliest you can discontinue this activity is';
-        const pickedDate = await showDatePickerOverlay({
+        const _picked = await showDatePickerOverlay({
           heading: action === 'master' ? '⭐ Mark as Mastered' : '🚩 Discontinue Activity',
           infoHtml: _buildInfo(latestDate, minDate, latestSubName, restrictionText),
           minDate, defaultDate: minDate,
-          confirmLabel: action === 'master' ? 'Confirm ⭐' : 'Confirm 🚩'
+          confirmLabel: action === 'master' ? 'Confirm ⭐' : 'Confirm 🚩',
+          withReason: action !== 'master',
+          reasonValue: pa.discontinuedReason || ''
         });
-        if (!pickedDate) return;
+        if (!_picked) return;
+        const pickedDate = typeof _picked === "string" ? _picked : _picked.date;
+        if (action !== 'master') setDiscontinuedReason(pa, _picked.reason);
         if (action === 'master') {
           delete pa.maintained; delete pa.activityColor; delete pa.maintainedAt;
           delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped; delete pa.inactiveReason;
@@ -27274,14 +27343,19 @@ function renderTargetManageContent(student, target) {
         ? `The last recorded session for <strong>"${_paName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>. The earliest you can set this date is <strong>${fmtPeriodDate(minDate)}</strong>. This activity will stop showing from <strong>${fmtPeriodDate(addOneDay(minDate))}</strong> onwards.`
         : `No previous session data was found for <strong>"${_paName}"</strong>.`;
       const current = type === "mastered" ? pa.masteredOn : pa.discontinuedOn;
-      const pickedDate = await showDatePickerOverlay({
+      // Where an activity stopped before there was a reason box gets one.
+      const picked = await showDatePickerOverlay({
         heading: type === "mastered" ? "📅 Change Mastered Date" : "📅 Change Discontinued Date",
         infoHtml,
         minDate,
         defaultDate: current || minDate,
-        confirmLabel: "Save Date"
+        confirmLabel: "Save Date",
+        withReason: type !== "mastered",
+        reasonValue: pa.discontinuedReason || ""
       });
-      if (!pickedDate) return;
+      if (!picked) return;
+      const pickedDate = typeof picked === "string" ? picked : picked.date;
+      if (type !== "mastered") setDiscontinuedReason(pa, picked.reason);
       if (type === "mastered") pa.masteredOn = pickedDate;
       else pa.discontinuedOn = pickedDate;
       await saveTarget();

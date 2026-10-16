@@ -27,7 +27,7 @@ function extract(name) {
 const names = ["xmlUnescape", "xmlEscape", "docxParagraphs", "markParagraph",
                "unmarkParagraph", "joinWrappedLines", "keepRunSpacing",
                "readChartDataTag", "findChartPictures", "chartPhrases",
-               "stripMarkers",
+               "stripMarkers", "translateTargetNames",
                "periodLabelZh", "chartTitleZh", "overviewTitleZh",
                "overviewChartTitle",
                "resizeDrawingToChart",
@@ -48,7 +48,8 @@ const { xmlUnescape, docxParagraphs, markParagraph, unmarkParagraph,
         joinWrappedLines, keepRunSpacing, readChartDataTag,
         findChartPictures, chartPhrases, periodLabelZh, chartTitleZh,
         resizeDrawingToChart, applyDocxText, stripMarkers,
-        hasChinese, looksTranslated, overviewTitleZh, overviewChartTitle } = fns;
+        hasChinese, looksTranslated, overviewTitleZh, overviewChartTitle,
+        translateTargetNames } = fns;
 
 let failed = 0;
 const check = (what, got, want) => {
@@ -320,6 +321,24 @@ check("the target, the stage heading and every activity",
   ["FEDC 2", "Stage 2: Engagement & Relating",
    "Responds to your overtures", "Protest and grows angry when frustrated"]);
 check("a chart with nothing on it asks for nothing", chartPhrases({}), []);
+
+console.log("\nthe target names the model is told to translate");
+// A target stopped in April is still in a January to June report, so its
+// name has to be translated the same way as a live one. The list is taken
+// from every target, with no filter for stopped or archived.
+{
+  const student = { targets: [
+    { name: "Self-Regulation" },
+    { name: "Handwriting", isStopped: true },
+    { name: "Toilet Training", isArchived: true },
+    { name: "Swimming", discontinuedOn: "2026-04-18" },
+    { name: "*_Play_*" },
+  ] };
+  check("every target, however it ended",
+    translateTargetNames(student),
+    ["Self-Regulation", "Handwriting", "Toilet Training", "Swimming", "Play"]);
+}
+check("no targets is not an error", translateTargetNames({}), []);
 
 console.log("\nnames with bold and underline markers on them");
 // An activity can be written bold or underlined, and that is kept in the name
