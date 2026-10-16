@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2262";
+const APP_VERSION = "2263";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -7145,7 +7145,11 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   // failing on the destructure below with "cannot read Document of undefined".
   if (!(await ensureDocx())) throw new Error("The Word library did not load, so the document could not be built. Check your connection and try again.");
   const firstName   = student.preferredName || student.name.split(" ")[0];
-  const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
+  // A target stopped part way through still belongs to the months it was
+  // worked on. trendRows already says which ones have data in this period.
+  const _worked = new Set((trendRows || []).filter(r => !r.noData).map(r => r.name));
+  const activeTargets = (student.targets || []).filter(t =>
+    (!t.isArchived && !t.isStopped) || _worked.has(t.name));
   const n = activeTargets.length;
   const tNames = activeTargets.map(t => t.name);
   const targetList = n <= 1 ? (tNames[0] || "") : tNames.slice(0, -1).join(", ") + " and " + tNames[n - 1];
@@ -7564,7 +7568,9 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   }
 
   const appendixParas = [];
-  const appendixTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped && breakdownData[t.name]?.length);
+  // Needing breakdown data is the only condition that matters: a stopped
+  // target with data in these months gets its chart like any other.
+  const appendixTargets = (student.targets || []).filter(t => breakdownData[t.name]?.length);
   if (appendixTargets.length || hyrMastered.length) {
     appendixParas.push(mkPara(`Section ${nextSectionNum + 1}: Appendix`, { heading: HeadingLevel.HEADING_1, before: 560, after: 160, size: 32, bold: true }));
 
@@ -7781,7 +7787,7 @@ const ASSESS_AVG_COLOR  = "#0f766e";
  * here match the spreadsheet rather than drifting from it.
  */
 function assessmentCollect(student, sessions, excludedActivities) {
-  const targets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
+  const targets = targetsCoveringPeriod(student.targets, sessions);
   const days = [...sessions]
     .sort((a, b) => String(a.date).localeCompare(String(b.date)))
     .map(s => ({ date: s.date, label: fmtPeriodDate(s.date), sess: s }));
@@ -8746,7 +8752,11 @@ async function monthlyGenerate() {
     const collected = monthlyCollectData(effectiveStudent, year, month, allSessions, excludedActivities, sessionType);
     const { threeMonthData, miniData, aiData, sessionCount, threeMonthPeriodLabel, oneMonthPeriodLabel } = collected;
 
-    const activeTargets = (effectiveStudent.targets || []).filter(t => !t.isArchived && !t.isStopped);
+    const activeTargets = targetsCoveringPeriod(effectiveStudent.targets,
+      (allSessions || []).filter(s => {
+        const [y, m] = String(s.date || "").split("-").map(Number);
+        return y === year && m === month;
+      }));
     const excludedList = excludedActivities.size > 0
       ? [...excludedActivities].map(k => { const [t, a] = k.split("|"); return `  - ${a} (under target: ${t})`; }).join("\n")
       : null;
@@ -9042,9 +9052,37 @@ function monthlyComputeTrend(values) {
   return delta > 8 ? "up" : delta < -8 ? "down" : "stable";
 }
 
+/**
+ * The targets a report for this period should cover.
+ *
+ * A target stopped in April was still being worked on in February, and a
+ * February report that leaves it out is simply wrong -- the sessions
+ * happened. A parent reading a Jan to June report would see a line stop in
+ * April with no explanation, or not see the target at all.
+ *
+ * Kept if it is still live, or if anything at all was recorded against it
+ * during the period. A target stopped last year with nothing in these
+ * months stays out, so old work does not pile up in every report.
+ */
+function targetsCoveringPeriod(targets, sessions) {
+  const worked = new Set();
+  for (const sess of sessions || []) {
+    for (const a of Object.values(sess?.activities || {})) {
+      if (a?.targetName) worked.add(a.targetName);
+    }
+    for (const t of sess?.targetsSnapshot || []) if (t?.name) worked.add(t.name);
+  }
+  return (targets || []).filter(t =>
+    t && ((!t.isArchived && !t.isStopped) || worked.has(t.name)));
+}
+
 function monthlyCollectData(student, year, month, allSessions, excludedActivities = new Set(), sessionType = "individual") {
   const ABBRS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  const activeTargets = (student.targets || []).filter(t => !t.isArchived && !t.isStopped);
+  const _monthSessions = (allSessions || []).filter(s => {
+    const [y, m] = String(s.date || "").split("-").map(Number);
+    return y === year && m === month;
+  });
+  const activeTargets = targetsCoveringPeriod(student.targets, _monthSessions);
 
   const _filterGroupSess = sessionType === "group"
     ? sess => {
