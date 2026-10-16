@@ -18,13 +18,13 @@ function extract(name) {
   }
   throw new Error(`${name} has no end`);
 }
-const names = ["setDiscontinuedReason", "discontinuedReasonHtml", "discontinuedFactLine"];
+const names = ["setDiscontinuedReason", "discontinuedFactLine"];
 const fns = new Function(
   "const escHtml = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');"
   + "const fmtPeriodDate = (d) => ({ '2026-04-18': '18 Apr 2026' })[d] || d;"
   + names.map(extract).join("\n")
   + `\nreturn { ${names.join(", ")} };`)();
-const { setDiscontinuedReason, discontinuedReasonHtml, discontinuedFactLine } = fns;
+const { setDiscontinuedReason, discontinuedFactLine } = fns;
 
 let failed = 0;
 const check = (what, got, want) => {
@@ -45,18 +45,6 @@ console.log("\nwriting it down");
   check("and so does nothing at all", "discontinuedReason" in t, false);
 }
 
-console.log("\nshowing it under the item");
-check("nothing to show when none was given", discontinuedReasonHtml({}), "");
-check("nor for an empty one", discontinuedReasonHtml({ discontinuedReason: "  " }), "");
-{
-  const html = discontinuedReasonHtml({ discontinuedReason: "moved into another target" });
-  check("the text is there", html.includes("moved into another target"), true);
-  check("and it says what it is", html.includes("Why"), true);
-}
-// Typed by a person, so it cannot be trusted as markup.
-check("a reason cannot smuggle in markup",
-  discontinuedReasonHtml({ discontinuedReason: "<img src=x onerror=alert(1)>" }).includes("<img"), false);
-
 console.log("\ntelling the report writer");
 check("nothing is said about something still running", discontinuedFactLine({}, "target"), "");
 {
@@ -65,11 +53,17 @@ check("nothing is said about something still running", discontinuedFactLine({}, 
   check("it says when", withWhy.includes("18 Apr 2026"), true);
   check("and why", withWhy.includes("met in daily routine"), true);
   // Or the model fills the silence with something that sounds like failure.
-  check("and that it is not a failure", /not.*failure|not a failure/i.test(withWhy), true);
+  check("and that it is not a failure", /never a failure/i.test(withWhy), true);
+  // A rule that says "mention this" gets followed every time, and the
+  // reports would stop sounding like the ones already signed off.
+  check("and that most reports should not raise it",
+    /should not mention this at all/i.test(withWhy), true);
+  check("it is marked as background",
+    /BACKGROUND, not a topic/.test(withWhy), true);
 }
 {
   const noWhy = discontinuedFactLine({ discontinuedOn: "2026-04-18" }, "target");
-  check("with no reason recorded, it says so", noWhy.includes("No reason was recorded"), true);
+  check("with no reason recorded, it says so", noWhy.includes("no reason recorded"), true);
   check("rather than leaving one to be invented", noWhy.includes("Reason given"), false);
 }
 

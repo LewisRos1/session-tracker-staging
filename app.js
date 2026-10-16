@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2264";
+const APP_VERSION = "2265";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -10260,30 +10260,27 @@ function maIsMastered(pa)   { return !!(pa.masteredOn || pa.inactiveReason === '
  * have none, and an empty box means none rather than an empty string sitting
  * in the record and printing as a blank line in a report.
  */
-/** The reason, as a line to sit under a discontinued activity or target. */
-function discontinuedReasonHtml(item) {
-  const t = String(item?.discontinuedReason || "").trim();
-  if (!t) return "";
-  return `<div class="mn-disc-reason" title="Why this was discontinued">`
-    + `<span class="mn-disc-reason-tag">\u{1F6A9} Why</span>`
-    + `<span>${escHtml(t)}</span></div>`;
-}
-
 /**
  * What to tell the model about something that was stopped.
  *
- * A parent reading a half-year report sees the line stop in April and asks
- * what happened. Saying when, and why where there is a why, answers it
- * before it is asked. Where no reason was recorded it says so, rather than
- * leaving the model to invent one.
+ * Background, not a subject. An earlier version told it to mention this
+ * where it helps, and a rule phrased that way gets followed every time: the
+ * reports would have filled up with discontinuing, and read differently
+ * from the ones the boss has already signed off. It is here so that a
+ * reader left wondering why a line stops can be answered, and for nothing
+ * else. Where no reason was recorded it says so, rather than leaving one to
+ * be invented.
  */
 function discontinuedFactLine(item, what) {
   if (!item?.discontinuedOn) return "";
   const why = String(item.discontinuedReason || "").trim();
-  return `This ${what} was discontinued on ${fmtPeriodDate(item.discontinuedOn)}`
-    + (why ? `. Reason given: ${why}` : ". No reason was recorded")
-    + ". Mention this where it helps the reader understand why the data stops,"
-    + " and do not write about it as a failure or a lack of progress.";
+  return `BACKGROUND, not a topic to write about: this ${what} was `
+    + `discontinued on ${fmtPeriodDate(item.discontinuedOn)}`
+    + (why ? `, reason given: ${why}` : ", with no reason recorded")
+    + ". Most reports should not mention this at all. Bring it up only if the"
+    + " reader would otherwise be left wondering why the data stops part way"
+    + " through, and then in a few words, not a paragraph. It is never a"
+    + " failure or a lack of progress.";
 }
 
 function setDiscontinuedReason(item, reason) {
@@ -26105,8 +26102,18 @@ function renderTargetManageContent(student, target) {
               <textarea class="admin-input mn-act-details-input" id="mn-act-details-${globalIdx}" data-idx="${globalIdx}" rows="2" placeholder="Enter Text Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(a.name || ''))}</textarea>
             </div>
           </div>`}
+          <div class="mn-disc-reason-field">
+            <div style="font-size:.85rem;font-weight:700;color:#b91c1c;margin-bottom:.2rem">
+              🚩 Why this was discontinued
+              <span style="font-weight:400;color:#6b7280">(optional &mdash; used in reports)</span>
+            </div>
+            <div style="border:1px solid #fca5a5;border-radius:.45rem;overflow:hidden;background:#fef2f2">
+              <textarea class="admin-input mn-disc-reason-input" id="mn-disc-reason-${globalIdx}"
+                data-idx="${globalIdx}" rows="2" placeholder="e.g. met in daily routine, moved into another target"
+                style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none;background:transparent">${escHtml(a.discontinuedReason || '')}</textarea>
+            </div>
+          </div>
         </div>
-        ${discontinuedReasonHtml(a)}
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.3rem;flex-shrink:0">
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.2rem">
             <span style="font-size:.72rem;color:#9ca3af;white-space:nowrap">${_mnCreatedLabel2}</span>
@@ -26449,6 +26456,27 @@ function renderTargetManageContent(student, target) {
         await saveTarget();
         flashSaved(detailsInput);
         if (oldName && v) propagateActivityRename(student, target.name, oldName, v);
+      });
+    }
+
+    // Why it was discontinued. Only inside the panel, so a long reason
+    // cannot crowd out the activity's own title on the row.
+    const discReasonInput = $(`mn-disc-reason-${idx}`);
+    if (discReasonInput) {
+      const resizeR = () => { discReasonInput.style.height = "auto"; discReasonInput.style.height = discReasonInput.scrollHeight + "px"; };
+      resizeR();
+      let drTimer;
+      discReasonInput.addEventListener("input", () => {
+        resizeR();
+        setDiscontinuedReason(a, discReasonInput.value);
+        clearTimeout(drTimer);
+        drTimer = setTimeout(async () => { await saveTarget(); }, 800);
+      });
+      discReasonInput.addEventListener("blur", async () => {
+        if (discReasonInput.value.trim() === (a.discontinuedReason || "")) return;
+        setDiscontinuedReason(a, discReasonInput.value);
+        await saveTarget();
+        flashSaved(discReasonInput);
       });
     }
 

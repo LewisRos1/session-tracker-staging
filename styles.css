@@ -5314,15 +5314,11 @@ button.wf-pill:hover { filter: brightness(.93); }
   background: #9ca3af; border-radius: 6px; border: 2px solid #f3f4f6;
 }
 
-/* Why something was discontinued, under the thing it belongs to.
+/* Why something was discontinued.
  *
- * A parent seeing a line stop in April asks what happened, so the reason
- * is written down once and shown wherever the item is. Optional: plenty
- * were stopped long before there was a box to type one in. */
-.mn-disc-reason {
-  display: flex; align-items: baseline; gap: .4rem;
-  font-size: .8rem; color: #7f1d1d; line-height: 1.45;
-  background: #fef2f2; border: 1px solid #fecaca; border-radius: .4rem;
-  padding: .3rem .5rem; margin-top: .4rem;
-}
-.mn-disc-reason-tag { font-weight: 700; white-space: nowrap; flex-shrink: 0; }
+ * Only when you click into the activity, never on the row. On the row a
+ * long reason pushed the activity's own title out of sight, which is the
+ * one thing that has to be readable at a glance. The panel borrows these
+ * fields from the card, so the field travels with them. */
+.mn-disc-reason-field { display: none; }
+.mn-act-panel .mn-disc-reason-field { display: block; }
