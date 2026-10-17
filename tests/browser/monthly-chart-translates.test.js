@@ -59,6 +59,7 @@ try {
     if (!blob) return { error: "no report was produced" };
     const zip = await JSZip.loadAsync(new Uint8Array(await blob.arrayBuffer()));
     const xml = await zip.file("word/document.xml").async("string");
+    window.__lastMonthlyXml = xml;
     const pics = window.__app.findChartPictures(xml);
     const pic = pics[0];
     const zhNames = { "FEDC 1": "功能性情绪发展能力（FEDC 1）",
@@ -92,6 +93,20 @@ try {
   // Without this the new picture has nowhere to go and the chart stays English.
   r.ok("the picture it replaces was found in the file",
     /^word\/media\//.test(out.media || ""), String(out.media));
+
+  // The Target column was the only one left-aligned, in the English report as
+  // well as the Chinese. Read out of the real file rather than from the code.
+  r.section("the mastered-activities table");
+
+  const table = await page.eval(`(() => {
+    const xml = window.__lastMonthlyXml || "";
+    // The cell holding the target name is the one that spans its group.
+    const i = xml.lastIndexOf("Self Help Skills");
+    if (i < 0) return { missing: true };
+    const cell = xml.slice(xml.lastIndexOf("<w:tc", i), i);
+    return { centred: cell.includes('<w:jc w:val="center"/>'), len: cell.length };
+  })()`);
+  r.ok("the target name is centred", table.centred === true, JSON.stringify(table));
 
   r.section("console");
   const noise = page.consoleLines.filter(l => l.level === "error");

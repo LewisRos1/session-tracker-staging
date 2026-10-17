@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2272";
+const APP_VERSION = "2273";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -7634,7 +7634,8 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
             rowSpan: rowsFor.length, width: { size: 2360, type: WidthType.DXA },
             verticalAlign: VerticalAlign.CENTER,
             margins: { top: 100, bottom: 100, left: 150, right: 150 },
-            children: [new Paragraph({ children: [new TextRun({ text: tName, size: 20 })], spacing: { before: 80, after: 80 } })]
+            children: [new Paragraph({ children: [new TextRun({ text: tName, size: 20 })],
+              alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })]
           }));
           if (d.heading) {
             // Deeper grey than the repeating header row, so a band is never
@@ -9893,7 +9894,8 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
           rowSpan: rowsFor.length, width: { size: 2360, type: WidthType.DXA },
           verticalAlign: VerticalAlign.CENTER,
           margins: { top: 100, bottom: 100, left: 150, right: 150 },
-          children: [new Paragraph({ children: [new TextRun({ text: tName, size: 20 })], spacing: { before: 80, after: 80 } })]
+          children: [new Paragraph({ children: [new TextRun({ text: tName, size: 20 })],
+            alignment: AlignmentType.CENTER, spacing: { before: 80, after: 80 } })]
         }));
         if (d.heading) {
           // Deeper grey than the repeating header row, so a band is never
