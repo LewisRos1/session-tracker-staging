@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2269";
+const APP_VERSION = "2270";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -18207,8 +18207,17 @@ const DOCX_SETTINGS_PART = /^word\/settings\.xml$/;
 
 /** A line may not END with one of these: an opening bracket or quote. */
 const CHINESE_NO_BREAK_AFTER = "([{£¥·‘“〈《「『【〔〖〝﹙﹛﹝＄（．［｛￡￥";
-/** A line may not START with one of these: a comma, a full stop, a closing bracket. */
-const CHINESE_NO_BREAK_BEFORE = "!),.:;?]}¢·ˇˉ—―’”…‰′″、。〃〉》」』】〕〗〞﹐﹑﹒﹔﹕﹖﹗﹚﹜﹞！＂％＇），．：；？］｀｜｝～￠";
+/**
+ * A line may not START with one of these.
+ *
+ * Closing punctuation, a comma, a full stop -- and the three characters
+ * that finish a date. "2026年 9月 4日" in a narrow cell broke between the 9
+ * and the 月, because Chinese may break between any two characters. Tying
+ * the day to its month only moved the break one character earlier. Saying
+ * no line may begin with 年, 月 or 日 leaves the break after the year, which
+ * is where Lewis wants it.
+ */
+const CHINESE_NO_BREAK_BEFORE = "!),.:;?]}¢·ˇˉ—―’”…‰′″、。〃〉》」』】〕〗〞﹐﹑﹒﹔﹕﹖﹗﹚﹜﹞！＂％＇），．：；？］｀｜｝～￠年月日";
 
 /**
  * Teach Word where a Chinese line may not break.

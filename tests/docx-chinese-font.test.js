@@ -158,6 +158,13 @@ check("the lists were not there to begin with",
   /noLineBreaks/.test(realSettings), false);
 check("a line may not start with a comma",
   /<w:noLineBreaksBefore[^>]*w:val="[^"]*，/.test(settings), true);
+// "2026年 9月 4日" in a narrow cell broke between the 9 and the 月: Chinese
+// may break between any two characters, so tying the day to its month only
+// moved the break one character earlier.
+for (const [ch, what] of [["年", "a year"], ["月", "a month"], ["日", "a day"]]) {
+  check(`nor with ${what}`,
+    new RegExp(`<w:noLineBreaksBefore[^>]*w:val="[^"]*${ch}`).test(settings), true);
+}
 check("nor with a full stop",
   /<w:noLineBreaksBefore[^>]*w:val="[^"]*。/.test(settings), true);
 check("nor end with an opening bracket",
