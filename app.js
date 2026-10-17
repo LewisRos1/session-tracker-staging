@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2268";
+const APP_VERSION = "2269";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -18062,8 +18062,9 @@ function joinWrappedLines(text) {
  * month with a non-breaking space, so the line breaks after the year
  * instead, which is how Lewis wants it read.
  */
-/** The note at the top of every translated report. */
+/** The note at the top of every translated report, in both languages. */
 const TRANSLATED_NOTE_ZH = "本报告根据英文原文翻译而成。由于中英文表达方式有所不同，部分内容的措辞可能会略有差异。如果您对报告中的内容有任何疑问，欢迎随时与孩子的指导老师联系，我们很乐意为您进一步说明。";
+const TRANSLATED_NOTE_EN = "This report has been translated from the original English version. As Chinese and English differ in their ways of expression, some wording may vary slightly. If you have any questions about the report, please feel free to contact your child's instructor. We will be happy to provide further clarification.";
 
 /**
  * Say, once and up front, that this is a translation.
@@ -18082,12 +18083,16 @@ function addTranslatedNote(xml) {
   const open = out.indexOf("<w:body>");
   if (open < 0) return out;
   const at = open + "<w:body>".length;
-  const para =
-    `<w:p><w:pPr><w:jc w:val="both"/><w:spacing w:after="240"/></w:pPr>`
+  // Both languages: the parent reads the Chinese, and the boss checking the
+  // report against the English one should see the same note she signed off.
+  const line = (text, after) =>
+    `<w:p><w:pPr><w:jc w:val="both"/><w:spacing w:after="${after}"/></w:pPr>`
     + `<w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/>`
     + `<w:i/><w:iCs/><w:sz w:val="18"/><w:szCs w:val="18"/><w:color w:val="6B7280"/></w:rPr>`
-    + `<w:t xml:space="preserve">${xmlEscape(TRANSLATED_NOTE_ZH)}</w:t></w:r></w:p>`;
-  return out.slice(0, at) + para + out.slice(at);
+    + `<w:t xml:space="preserve">${xmlEscape(text)}</w:t></w:r></w:p>`;
+  return out.slice(0, at)
+    + line(TRANSLATED_NOTE_ZH, 60) + line(TRANSLATED_NOTE_EN, 240)
+    + out.slice(at);
 }
 
 function tieChineseDate(text) {

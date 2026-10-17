@@ -393,6 +393,9 @@ const exposed = [
   // So a test can build a real Word report and look inside it, rather
   // than guessing at the XML the app actually produces.
   "exportStudentSingleSessionWord",
+  // So a test can build a real monthly report and read the chart data out
+  // of it, rather than trusting that it was written.
+  "monthlyDownloadWord",
   "translateChunks", "translateChunkPrompt", "translateParseReply",
   "renderStudentDatabaseButton",
   // A student's note is the only thing telling two records with the same

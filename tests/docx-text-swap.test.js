@@ -39,7 +39,8 @@ const consts = ["CHART_FIXED_ZH", "MONTHS_ZH"]
   .map(n => src.match(new RegExp(`const ${n} = \\{[\\s\\S]*?\\n};`))[0])
   .join("\n");
 const cjk = src.match(/const isCjkChar = [^;]+;/)[0];
-const noteConst = src.match(/const TRANSLATED_NOTE_ZH = "[^"]*";/)[0];
+const noteConst = ["TRANSLATED_NOTE_ZH", "TRANSLATED_NOTE_EN"]
+  .map(n => src.match(new RegExp(`const ${n} = "[^"]*";`))[0]).join("\n");
 const chineseFns = [/const hasChinese = [^;]+;/, /const looksTranslated =[\s\S]*?;/]
   .map(re => src.match(re)[0]).join("\n");
 const fns = new Function(`const CHART_TAG_PREFIX = ${JSON.stringify(tagPrefix)};`
@@ -383,6 +384,11 @@ console.log("\nthe note saying this is a translation");
   check("before anything else in the body",
     out.indexOf("本报告") < out.indexOf("First thing"), true);
   check("and the report itself is untouched", out.includes("First thing"), true);
+  // Both languages: the parent reads the Chinese, and the boss checking it
+  // against the English report should see the same note she signed off.
+  check("the English half is there too",
+    /translated from the original English/.test(out), true);
+  check("with the Chinese first", out.indexOf("本报告") < out.indexOf("This report"), true);
   // Someone translating a file twice should not stack two notes.
   check("translating twice does not add it again", addTranslatedNote(out), out);
 }
