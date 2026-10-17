@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2266";
+const APP_VERSION = "2268";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -7634,7 +7634,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
             // Deeper grey than the repeating header row, so a band is never
             // mistaken for a header after a page break.
             cells.push(new TableCell({
-              columnSpan: 2, width: { size: 6300, type: WidthType.DXA },
+              columnSpan: 2, width: { size: 6100, type: WidthType.DXA },
               verticalAlign: VerticalAlign.CENTER, shading: { fill: "e5e7eb" },
               margins: { top: 80, bottom: 80, left: 150, right: 150 },
               children: [new Paragraph({ children: [new TextRun({ text: d.heading, bold: true, size: 20 })], spacing: { before: 60, after: 60 } })]
@@ -7644,7 +7644,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
           }
           const m = d.m;
           cells.push(new TableCell({
-            width: { size: 4900, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER,
+            width: { size: 4700, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER,
             margins: { top: 100, bottom: 100, left: 150, right: 150 },
             children: [new Paragraph({
               children: [new TextRun({ text: m.activity, size: 22 })].concat(
@@ -9426,10 +9426,13 @@ function monthlyDrawScoreBarChart(rows) {
 
   // Legend along the bottom. The bar colour encodes a band, and without this a
   // parent sees green and blue bars with no way to know what separates them.
+  // Through chartWord like every other word on a chart. These three were
+  // written straight onto the canvas, so they stayed English under a chart
+  // whose headings had all been swapped.
   const legend = [
-    { c: "#16a34a", t: "80% and above" },
-    { c: "#eab308", t: "50% to 79%" },
-    { c: "#dc2626", t: "Below 50%" }
+    { c: "#16a34a", t: chartWord("80% and above") },
+    { c: "#eab308", t: chartWord("50% to 79%") },
+    { c: "#dc2626", t: chartWord("Below 50%") }
   ];
   ctx.font = `${FONT_PX}px Arial`;
   ctx.textAlign = "left";
@@ -9890,7 +9893,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
           // Deeper grey than the repeating header row, so a band is never
           // mistaken for a header after a page break.
           cells.push(new TableCell({
-            columnSpan: 2, width: { size: 6300, type: WidthType.DXA },
+            columnSpan: 2, width: { size: 6100, type: WidthType.DXA },
             verticalAlign: VerticalAlign.CENTER, shading: { fill: "e5e7eb" },
             margins: { top: 80, bottom: 80, left: 150, right: 150 },
             children: [new Paragraph({ children: [new TextRun({ text: d.heading, bold: true, size: 20 })], spacing: { before: 60, after: 60 } })]
@@ -9900,7 +9903,7 @@ async function monthlyDownloadWord(student, year, month, monthName, sessionCount
         }
         const m = d.m;
         cells.push(new TableCell({
-          width: { size: 4900, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER,
+          width: { size: 4700, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER,
           margins: { top: 100, bottom: 100, left: 150, right: 150 },
           children: [new Paragraph({
             children: [new TextRun({ text: m.activity, size: 22 })].concat(
@@ -17089,6 +17092,9 @@ const CHART_FIXED_ZH = {
   // The English means the start of the term, or the start of the trendline.
   // "学期初／趋势线" lost that: it reads as the start of term, and then
   // separately a trendline. The point has to be said on both halves.
+  "80% and above": "80% 及以上",
+  "50% to 79%": "50% 至 79%",
+  "Below 50%": "低于 50%",
   "Start of Term/Trendline": "学期初／趋势线起点",
   "End of Term/Trendline": "学期末／趋势线终点",
 };
@@ -17264,6 +17270,14 @@ async function chartMediaPath(zip, partName, rid) {
 let _trStudentId = null;
 /** True while a translation is running, so a second one cannot start. */
 let _trBusy = false;
+/**
+ * The running translation, so it can be stopped.
+ *
+ * translateDocxFile already took a signal and checked it between batches;
+ * nothing ever made one, so there was no way to stop a long report once it
+ * had started.
+ */
+let _trAbort = null;
 /** The last thing the translator said, so going back does not lose it. */
 let _trLastStatus = "";
 
@@ -17290,6 +17304,10 @@ const TRANSLATE_GLOSSARY = [
   ["Date of Report", "报告日期"],
   ["Progress", "进展"],
   ["Strengths", "优势"],
+  // Not 我们仍在努力的方面, which is about the staff trying. This is about
+  // what the child is building.
+  ["What we're still working on", "正在培养的能力"],
+  ["What we are still working on", "正在培养的能力"],
   ["Recommendations", "建议"],
   ["Target", "目标"],
   ["Target Behaviour", "目标行为"],
@@ -17611,6 +17629,11 @@ async function translateDocxFile(file, student, onProgress, signal) {
   const rewritten = new Map();
   parts.forEach((part, i) =>
     rewritten.set(part.name, applyDocxText(part.xml, part.paragraphs, translations[i])));
+  // Before the font pass, so the note is given the Chinese font and the
+  // line-breaking rules along with everything else.
+  if (rewritten.has("word/document.xml")) {
+    rewritten.set("word/document.xml", addTranslatedNote(rewritten.get("word/document.xml")));
+  }
 
   // ── the charts ───────────────────────────────────────────────────────
   // Found again in the rewritten text rather than reused from before it: the
@@ -17837,17 +17860,26 @@ async function startTranslation(file, student) {
   drop?.classList.add("tr-drop--busy");
 
   const show = (html) => { _trLastStatus = html; if (status) status.innerHTML = html; };
-  show(`<div class="tr-running">Reading <strong>${escHtml(file.name)}</strong>…</div>`);
+  _trAbort = new AbortController();
+  // The box is redrawn on every progress tick, so the button is caught on
+  // the box rather than wired to each one as it is made.
+  const running = (what) => show(`<div class="tr-running">${what}<button type="button" class="tr-cancel" id="tr-cancel-btn">Stop</button></div>`);
+  running(`Reading <strong>${escHtml(file.name)}</strong>…`);
   trPill("Reading the file…", null, 0);
+  status?.addEventListener("click", e => {
+    if (!e.target.closest(".tr-cancel")) return;
+    _trAbort?.abort();
+    show(`<div class="tr-running">Stopping…</div>`);
+  });
 
   try {
     // A percentage, not "batch 4 of 10". Batches are how the work is cut
     // up for the model; nobody using this has any reason to know that.
     const { blob, softFailures, chartsDone, chartsSkipped } = await translateDocxFile(file, student, (done, total) => {
       const pct = total ? (done / total) * 100 : 0;
-      show(`<div class="tr-running">Translating…</div>`);
+      running(`Translating…`);
       trPill("Translating into Chinese…", null, pct);
-    });
+    }, _trAbort.signal);
     translateDownload(blob, file.name);
     // Left on screen like the report's, so it is still there when she comes
     // back to the tab. It stacks under any other notice rather than over it.
@@ -17867,11 +17899,21 @@ async function startTranslation(file, student) {
         : "")
       + `</div>`);
   } catch (err) {
-    trPill("The translation failed. Nothing was downloaded.", "fail");
-    console.error("translate:", err);
-    show(`<div class="tr-failed"><strong>Nothing was downloaded.</strong><br>${escHtml(err.message)}</div>`);
+    // Stopping on purpose is not a failure and should not be dressed as
+    // one: the word "failed" next to something you chose to do reads as
+    // a fault of yours.
+    const stopped = /^stopped\.?$/i.test(err?.message || "") || err?.name === "AbortError";
+    if (stopped) {
+      trPill("Stopped. Nothing was downloaded.", "fail");
+      show(`<div class="tr-failed"><strong>Stopped.</strong><br>Nothing was downloaded, and your original file is untouched.</div>`);
+    } else {
+      trPill("The translation failed. Nothing was downloaded.", "fail");
+      console.error("translate:", err);
+      show(`<div class="tr-failed"><strong>Nothing was downloaded.</strong><br>${escHtml(err.message)}</div>`);
+    }
   } finally {
     _trBusy = false;
+    _trAbort = null;
     drop?.classList.remove("tr-drop--busy");
   }
 }
@@ -18012,10 +18054,52 @@ function joinWrappedLines(text) {
  *
  * A run that was only spacing is left exactly as it was.
  */
+/**
+ * Keep a Chinese date from breaking in the wrong place.
+ *
+ * "2026年 8月 18日" in a narrow table cell broke after the month, leaving
+ * "2026年 8月" on one line and "18日" on the next. The day is tied to its
+ * month with a non-breaking space, so the line breaks after the year
+ * instead, which is how Lewis wants it read.
+ */
+/** The note at the top of every translated report. */
+const TRANSLATED_NOTE_ZH = "本报告根据英文原文翻译而成。由于中英文表达方式有所不同，部分内容的措辞可能会略有差异。如果您对报告中的内容有任何疑问，欢迎随时与孩子的指导老师联系，我们很乐意为您进一步说明。";
+
+/**
+ * Say, once and up front, that this is a translation.
+ *
+ * A parent who reads a phrase that sounds odd should know why before they
+ * read it, not after. At the top of the first page rather than the end: at
+ * the end it is an apology, at the top it is an invitation to ask. Small
+ * and grey, so it is plainly a note and not part of the report.
+ *
+ * On every translated report, with nothing to tick. A box that has to be
+ * remembered is missing from the one report that needed it.
+ */
+function addTranslatedNote(xml) {
+  const out = String(xml);
+  if (out.includes(TRANSLATED_NOTE_ZH)) return out;   // translated twice
+  const open = out.indexOf("<w:body>");
+  if (open < 0) return out;
+  const at = open + "<w:body>".length;
+  const para =
+    `<w:p><w:pPr><w:jc w:val="both"/><w:spacing w:after="240"/></w:pPr>`
+    + `<w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/>`
+    + `<w:i/><w:iCs/><w:sz w:val="18"/><w:szCs w:val="18"/><w:color w:val="6B7280"/></w:rPr>`
+    + `<w:t xml:space="preserve">${xmlEscape(TRANSLATED_NOTE_ZH)}</w:t></w:r></w:p>`;
+  return out.slice(0, at) + para + out.slice(at);
+}
+
+function tieChineseDate(text) {
+  return String(text).replace(
+    /(\d{4}年)[ \u00A0]*(\d{1,2}月)[ \u00A0]+(\d{1,2}日)/g,
+    "$1 $2\u00A0$3");
+}
+
 function keepRunSpacing(original, translated) {
   const was = String(original);
   if (!was.trim()) return was;
-  const text = joinWrappedLines(translated).trim();
+  const text = tieChineseDate(joinWrappedLines(translated).trim());
   // A space next to Chinese is not a gap, it is somewhere Word is allowed to
   // break the line. A "Strength:" line is written as a bold run and then a
   // run starting with a space, and Word broke it there, leaving 优势： alone

@@ -27,7 +27,8 @@ function extract(name) {
 const names = ["xmlUnescape", "xmlEscape", "docxParagraphs", "markParagraph",
                "unmarkParagraph", "joinWrappedLines", "keepRunSpacing",
                "readChartDataTag", "findChartPictures", "chartPhrases",
-               "stripMarkers", "translateTargetNames",
+               "stripMarkers", "translateTargetNames", "tieChineseDate",
+               "addTranslatedNote",
                "periodLabelZh", "chartTitleZh", "overviewTitleZh",
                "overviewChartTitle",
                "resizeDrawingToChart",
@@ -38,10 +39,11 @@ const consts = ["CHART_FIXED_ZH", "MONTHS_ZH"]
   .map(n => src.match(new RegExp(`const ${n} = \\{[\\s\\S]*?\\n};`))[0])
   .join("\n");
 const cjk = src.match(/const isCjkChar = [^;]+;/)[0];
+const noteConst = src.match(/const TRANSLATED_NOTE_ZH = "[^"]*";/)[0];
 const chineseFns = [/const hasChinese = [^;]+;/, /const looksTranslated =[\s\S]*?;/]
   .map(re => src.match(re)[0]).join("\n");
 const fns = new Function(`const CHART_TAG_PREFIX = ${JSON.stringify(tagPrefix)};`
-  + tagFn + "\n" + consts + "\n" + cjk + "\n" + chineseFns + "\n"
+  + tagFn + "\n" + consts + "\n" + cjk + "\n" + chineseFns + "\n" + noteConst + "\n"
   + names.map(extract).join("\n")
   + `\nreturn { chartDataTag, hasChinese, looksTranslated, ${names.join(", ")} };`)();
 const { xmlUnescape, docxParagraphs, markParagraph, unmarkParagraph,
@@ -49,7 +51,7 @@ const { xmlUnescape, docxParagraphs, markParagraph, unmarkParagraph,
         findChartPictures, chartPhrases, periodLabelZh, chartTitleZh,
         resizeDrawingToChart, applyDocxText, stripMarkers,
         hasChinese, looksTranslated, overviewTitleZh, overviewChartTitle,
-        translateTargetNames } = fns;
+        translateTargetNames, tieChineseDate, addTranslatedNote } = fns;
 
 let failed = 0;
 const check = (what, got, want) => {
@@ -370,6 +372,38 @@ check("the name we actually want", looksTranslated("模仿（Imitation）"), tru
 check("plain Chinese", looksTranslated("自我调节"), true);
 check("nothing", looksTranslated(""), false);
 check("a number beside Chinese is not English", looksTranslated("共5次"), true);
+
+console.log("\nthe note saying this is a translation");
+// A parent who reads a phrase that sounds odd should know why before they
+// read it, so it goes at the top rather than the end.
+{
+  const doc = `<w:document><w:body><w:p><w:r><w:t>First thing</w:t></w:r></w:p></w:body></w:document>`;
+  const out = addTranslatedNote(doc);
+  check("the note is there", /翻译而成/.test(out), true);
+  check("before anything else in the body",
+    out.indexOf("本报告") < out.indexOf("First thing"), true);
+  check("and the report itself is untouched", out.includes("First thing"), true);
+  // Someone translating a file twice should not stack two notes.
+  check("translating twice does not add it again", addTranslatedNote(out), out);
+}
+check("a part with no body is left alone",
+  addTranslatedNote("<w:hdr><w:p/></w:hdr>"), "<w:hdr><w:p/></w:hdr>");
+
+console.log("\nwhere a Chinese date is allowed to break");
+// In a narrow table cell "2026年 8月 18日" broke after the month, leaving
+// "18日" alone on the next line. The day is tied to its month so the break
+// lands after the year instead.
+check("the day is tied to its month",
+  tieChineseDate("2026年 8月 18日"), "2026年 8月\u00A018日");
+check("the year keeps an ordinary space, so it can break there",
+  tieChineseDate("2026年 8月 18日").split(" ")[0], "2026年");
+check("a month and year with no day is left alone",
+  tieChineseDate("2026年 8月"), "2026年 8月");
+check("running it twice changes nothing",
+  tieChineseDate(tieChineseDate("2026年 8月 18日")), "2026年 8月\u00A018日");
+check("a sentence with a date in it keeps the rest",
+  tieChineseDate("掌握于 2026年 8月 18日。"), "掌握于 2026年 8月\u00A018日。");
+check("text with no date at all", tieChineseDate("没有日期"), "没有日期");
 
 console.log("\nspaces where Chinese meets the run beside it");
 // "Strength:" is written as a bold run followed by a run that starts with a

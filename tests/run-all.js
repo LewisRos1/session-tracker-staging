@@ -4,7 +4,13 @@
 //
 // Exits non-zero if anything fails, so it can gate a deploy.
 
-const HARNESS = ".harness";   // throwaway; rebuilt on every run
+// Throwaway, rebuilt on every run, and named after this process.
+//
+// Two runs at once used to share one folder: the second rebuilt it while
+// the first was reading it, and eighteen suites failed with "harness-meta
+// not found". That looked exactly like the app being broken, twice, and
+// cost more time than the tests it was running.
+const HARNESS = `.harness-${Deno.pid}`;
 
 const run = async (label, cmd) => {
   console.log(`\n${"=".repeat(60)}\n${label}\n${"=".repeat(60)}`);

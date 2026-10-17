@@ -5322,3 +5322,16 @@ button.wf-pill:hover { filter: brightness(.93); }
  * fields from the card, so the field travels with them. */
 .mn-disc-reason-field { display: none; }
 .mn-act-panel .mn-disc-reason-field { display: block; }
+
+/* Stopping a translation that is already running.
+ *
+ * Quiet, and to one side of the message: it stops work that costs money,
+ * so it should not be the thing your eye lands on. */
+.tr-running { display: flex; align-items: center; gap: .6rem; }
+.tr-cancel {
+  margin-left: auto; flex-shrink: 0;
+  padding: .25rem .7rem; font-size: .8rem; font-weight: 600;
+  color: #b91c1c; background: #fff; cursor: pointer;
+  border: 1px solid #fca5a5; border-radius: .35rem;
+}
+.tr-cancel:hover { background: #fef2f2; }

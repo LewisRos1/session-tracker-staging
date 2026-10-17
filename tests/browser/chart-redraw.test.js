@@ -285,6 +285,9 @@ try {
       cnTitle: (find(cn, "学习目标二") || {}).text || "",
       cnMonths: months(cn),
       ovLegend: ov.filter(c => /趋势线|Trendline/.test(c.text)).map(c => c.text),
+      barBands: grab(() => window.__app.redrawChartZh({ kind: "monthlyBars", baseW: 700,
+        rows: [{ name: "FEDC 2", score: 82 }] }, zh))
+        .filter(c => /%/.test(c.text) && /[一-鿿]/.test(c.text)).map(c => c.text),
       enTitle: (find(en, "FEDC 2") || {}).text || "",
       enMonths: months(en),
     };
@@ -307,6 +310,13 @@ try {
   // The legend was written straight onto the canvas rather than going through
   // the word list, so it stayed English under a chart whose every heading had
   // been swapped.
+  // The monthly chart's three score bands were written straight onto the
+  // canvas as well, so they stayed English under Chinese headings.
+  r.ok("the monthly chart's score bands are Chinese",
+    painted.barBands.length === 3
+      && painted.barBands.every(t => /[一-鿿]/.test(t)) && !painted.barBands.some(t => /above|Below|to 79/.test(t)),
+    JSON.stringify(painted.barBands));
+
   r.ok("the overview chart's legend is Chinese too",
     painted.ovLegend.length === 2 && painted.ovLegend.every(t => /[一-鿿]/.test(t)),
     JSON.stringify(painted.ovLegend));
