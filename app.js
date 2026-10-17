@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2271";
+const APP_VERSION = "2272";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -4737,7 +4737,13 @@ async function aiRequest(aiPrompt, signal, meta = {}) {
     // of him said, in Anthropic's own words, that the account was not
     // allowed to make the request. A reply carrying Anthropic's error shape
     // reached Anthropic, whatever its status.
-    const fromAnthropic = !!err.error?.type;
+    // Three shapes mean the same thing: Anthropic's own error, the marker
+    // the Worker adds when it is relaying a refusal, and -- for a Worker
+    // deployed before that marker existed -- the words it wraps it in.
+    // Reading only error.type sent Lewis off trying other networks while
+    // the body in front of him said Anthropic had answered.
+    const fromAnthropic = !!err.error?.type || !!err.error?.upstream
+      || /refused this/i.test(err.error?.message || "");
 
     if (!ours && !fromAnthropic && (mitigated || resp.status === 403)) {
       throw new Error(`Blocked before the request reached the report service (HTTP ${resp.status}${mitigated ? ", " + mitigated : ""}). Cloudflare decides this from the network and the browser, not from the report, which is why the same report can fail on one computer and work on another. Try a different network or another browser, and send Lewis the red line in the console (F12).`);

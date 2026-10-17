@@ -39,7 +39,12 @@ const MAX_BODY_BYTES = 300000;   // a real half-year prompt is far below this
 // person who would have seen a dead report now sees it arrive a few seconds
 // later.
 const RETRY_STATUSES = new Set([403, 500, 502, 503, 504, 529]);
-const RETRY_DELAYS_MS = [1500, 4000];
+// Anthropic refuses the odd request with a 403 that means nothing: eight
+// identical streaming requests, seven through and one refused. A failed
+// attempt produces no tokens, so retrying costs nothing but time, and a
+// report that has to be started again costs real money. Five attempts
+// over half a minute rather than three over six seconds.
+const RETRY_DELAYS_MS = [1500, 4000, 10000, 20000];
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -144,7 +149,7 @@ export default {
       return fail(
         `Anthropic refused this (HTTP ${resp.status}, key ${hasKey ? "present" : "MISSING"}, `
         + `${attempts} attempt${attempts === 1 ? "" : "s"}): ${upstream.slice(0, 300)}`,
-        resp.status, cors);
+        resp.status, cors, undefined, resp.status);
     }
 
     // Pass the body straight through instead of awaiting resp.text(). Each
@@ -211,7 +216,7 @@ async function translate(req, env, cors) {
   if (!resp.ok) {
     return fail(
       `OpenAI refused this (HTTP ${resp.status}, ${attempts} attempt${attempts === 1 ? "" : "s"}): `
-      + upstream.slice(0, 300), resp.status, cors);
+      + upstream.slice(0, 300), resp.status, cors, undefined, resp.status);
   }
 
   // The reply carries reasoning items as well as the message, so the text is
@@ -230,8 +235,16 @@ async function translate(req, env, cors) {
   });
 }
 
-function fail(message, status, cors, retryAfter) {
-  return new Response(JSON.stringify({ error: { message } }), {
+/**
+ * An error the browser can act on.
+ *
+ * `upstream` says the refusal came from the service behind this relay,
+ * not from the relay or from Cloudflare in front of it. Without it the
+ * app read a relayed 403 as "blocked before it reached us" and told Lewis
+ * to try another network, while the body said Anthropic had answered.
+ */
+function fail(message, status, cors, retryAfter, upstream) {
+  return new Response(JSON.stringify({ error: { message, ...(upstream ? { upstream } : {}) } }), {
     status,
     headers: {
       ...cors,
