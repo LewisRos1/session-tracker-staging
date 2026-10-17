@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2270";
+const APP_VERSION = "2271";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -17038,6 +17038,22 @@ function wrapChartLabel(measure, text, maxW, maxLines = 3) {
   return kept;
 }
 
+/**
+ * The Chinese for a phrase from the built-in list, with the English after
+ * it when the phrase is the name of a target.
+ *
+ * The list holds plain terms, because in a sentence "self-regulation"
+ * should read 自我调节 and nothing more. As the name of a target it needs
+ * the English after it like every other target name, or one bar on a chart
+ * reads 自我调节 while the one below it reads 模仿（Imitation）.
+ */
+function pinnedTermZh(k, pinned, pinnedLower, targetNames) {
+  const fixed = pinned[k] || pinnedLower[k.toLowerCase()];
+  if (!fixed) return null;
+  const isTargetName = targetNames?.has ? targetNames.has(k) : false;
+  return isTargetName && !fixed.includes(k) ? `${fixed}（${k}）` : fixed;
+}
+
 /** Whether a string holds any Chinese at all. */
 const hasChinese = (s) => /[\u4e00-\u9fff]/.test(String(s || ""));
 
@@ -17557,9 +17573,12 @@ async function translateDocxFile(file, student, onProgress, signal) {
    * them as known meant they were never asked about again. Ignored here, so
    * the list mends itself on the next report rather than needing a clear-out.
    */
+  // The names of this student's targets, which are written with the English
+  // after them wherever they appear.
+  const targetNames = new Set(translateTargetNames(student));
   const zh = (en) => {
     const k = stripMarkers(en);
-    const fixed = pinned[k] || pinnedLower[k.toLowerCase()];
+    const fixed = pinnedTermZh(k, pinned, pinnedLower, targetNames);
     if (fixed) return fixed;
     return looksTranslated(learned[k]) ? learned[k] : null;
   };

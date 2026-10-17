@@ -28,6 +28,7 @@ const names = ["xmlUnescape", "xmlEscape", "docxParagraphs", "markParagraph",
                "unmarkParagraph", "joinWrappedLines", "keepRunSpacing",
                "readChartDataTag", "findChartPictures", "chartPhrases",
                "stripMarkers", "translateTargetNames", "tieChineseDate",
+               "pinnedTermZh",
                "addTranslatedNote",
                "periodLabelZh", "chartTitleZh", "overviewTitleZh",
                "overviewChartTitle",
@@ -52,7 +53,8 @@ const { xmlUnescape, docxParagraphs, markParagraph, unmarkParagraph,
         findChartPictures, chartPhrases, periodLabelZh, chartTitleZh,
         resizeDrawingToChart, applyDocxText, stripMarkers,
         hasChinese, looksTranslated, overviewTitleZh, overviewChartTitle,
-        translateTargetNames, tieChineseDate, addTranslatedNote } = fns;
+        translateTargetNames, tieChineseDate, addTranslatedNote,
+        pinnedTermZh } = fns;
 
 let failed = 0;
 const check = (what, got, want) => {
@@ -324,6 +326,31 @@ check("the target, the stage heading and every activity",
   ["FEDC 2", "Stage 2: Engagement & Relating",
    "Responds to your overtures", "Protest and grows angry when frustrated"]);
 check("a chart with nothing on it asks for nothing", chartPhrases({}), []);
+
+console.log("\na built-in term that is also the name of a target");
+// On the chart every bar read 模仿（Imitation）, 命名（Label） and so on, except
+// 自我调节, which has no brackets. "self-regulation" is in the built-in word
+// list as a plain term, and the built-in list wins over what the model
+// produced, so that one bar came out bare.
+{
+  const pinned = { "Activity": "活动" };
+  const pinnedLower = { "self-regulation": "自我调节", "activity": "活动" };
+  const targets = new Set(["Self-Regulation", "Imitation"]);
+  check("a target name gets the English after it",
+    pinnedTermZh("Self-Regulation", pinned, pinnedLower, targets),
+    "自我调节（Self-Regulation）");
+  // In a sentence it should read as a term, not as a heading.
+  check("the same word elsewhere is left plain",
+    pinnedTermZh("Activity", pinned, pinnedLower, targets), "活动");
+  check("a term nobody pinned is not invented",
+    pinnedTermZh("Attending", pinned, pinnedLower, targets), null);
+  // Pinning the bracketed form by hand should not double it up.
+  check("a pinned term that already names the English is left alone",
+    pinnedTermZh("Imitation", { "Imitation": "模仿（Imitation）" }, {}, targets),
+    "模仿（Imitation）");
+  check("no target list at all is not an error",
+    pinnedTermZh("Self-Regulation", pinned, pinnedLower, null), "自我调节");
+}
 
 console.log("\nthe target names the model is told to translate");
 // A target stopped in April is still in a January to June report, so its
