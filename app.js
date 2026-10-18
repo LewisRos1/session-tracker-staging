@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2282";
+const APP_VERSION = "2283";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -18261,11 +18261,34 @@ function applyDocxText(xml, paragraphs, translations) {
  */
 const CHINESE_EASTASIA_FONT = "SimSun";
 function setChineseFonts(xml) {
+  // The defaults have to exist before anything can be put in them.
+  //
+  // The half-year report is built without any default styling, so the docx
+  // library wrote <w:docDefaults><w:rPrDefault/><w:pPrDefault/></w:docDefaults>
+  // -- both self-closing and empty. Every rule below looks for
+  // <w:rPrDefault><w:rPr> or <w:pPrDefault><w:pPr>, neither of which is
+  // there, so NOTHING was applied: no kinsoku, so a line could start with a
+  // full stop, and no language, so Word justified and proofed the Chinese
+  // as English. The monthly report sets a default line spacing, which is
+  // the only reason it had the elements and came out right.
+  let out = String(xml);
+  if (/<w:styles\b/.test(out) && !/<w:docDefaults>/.test(out)) {
+    // docDefaults must be the first child of w:styles.
+    out = out.replace(/(<w:styles\b[^>]*>)/,
+      "$1<w:docDefaults><w:rPrDefault/><w:pPrDefault/></w:docDefaults>");
+  }
+  out = out
+    .replace(/<w:rPrDefault\s*\/>/, "<w:rPrDefault><w:rPr></w:rPr></w:rPrDefault>")
+    .replace(/<w:rPrDefault><w:rPr\s*\/><\/w:rPrDefault>/,
+      "<w:rPrDefault><w:rPr></w:rPr></w:rPrDefault>")
+    .replace(/<w:pPrDefault\s*\/>/, "<w:pPrDefault><w:pPr></w:pPr></w:pPrDefault>")
+    .replace(/<w:pPrDefault><w:pPr\s*\/><\/w:pPrDefault>/,
+      "<w:pPrDefault><w:pPr></w:pPr></w:pPrDefault>");
   // Only inside <w:rFonts>. A blanket search for w:eastAsia also finds it
   // on <w:lang>, where it names a LANGUAGE -- so the first version of this
   // set the language to "SimSun" and then added a second <w:lang> every
   // time it ran again.
-  let out = String(xml).replace(/<w:rFonts\b([^>]*?)(\/?)>/g, (whole, attrs, slash) => {
+  out = out.replace(/<w:rFonts\b([^>]*?)(\/?)>/g, (whole, attrs, slash) => {
     let next = /w:eastAsia="/.test(attrs)
       ? attrs.replace(/w:eastAsia="[^"]*"/, `w:eastAsia="${CHINESE_EASTASIA_FONT}"`)
       : `${attrs} w:eastAsia="${CHINESE_EASTASIA_FONT}"`;

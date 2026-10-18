@@ -147,6 +147,45 @@ check("nor a second hint on one run",
   (setChineseFonts(fixed).match(/w:hint="eastAsia"/g) || []).length,
   (fixed.match(/w:hint="eastAsia"/g) || []).length);
 
+console.log("\nstyles.xml with nothing in its defaults");
+// The half-year report is built with no default styling, so the docx
+// library wrote both defaults self-closing and empty. Every rule above
+// looked for <w:rPrDefault><w:rPr>, so none of them fired and the report
+// came back with Chinese laid out by English rules: a line could start
+// with a full stop, and one space on a justified line stretched across
+// half the page.
+{
+  const empty = `<w:styles xmlns:w="x"><w:docDefaults><w:rPrDefault/>`
+    + `<w:pPrDefault/></w:docDefaults><w:style w:styleId="a"><w:name w:val="a"/>`
+    + `</w:style></w:styles>`;
+  const got = setChineseFonts(empty);
+  check("the language is set even so", /<w:lang[^>]*w:val="zh-CN"/.test(got), true);
+  check("and the line-breaking rules are too",
+    ["kinsoku", "overflowPunct", "autoSpaceDE", "autoSpaceDN"]
+      .every(r => got.includes(`<w:${r}/>`)), true);
+  check("including the one that keeps English words whole",
+    /<w:wordWrap w:val="0"\/>/.test(got), true);
+  check("the style that was there survives", got.includes(`w:styleId="a"`), true);
+  check("running it twice changes nothing", setChineseFonts(got), got);
+}
+{
+  // The same thing written the other way round.
+  const empty2 = `<w:styles xmlns:w="x"><w:docDefaults><w:rPrDefault><w:rPr/>`
+    + `</w:rPrDefault><w:pPrDefault><w:pPr/></w:pPrDefault></w:docDefaults></w:styles>`;
+  const got2 = setChineseFonts(empty2);
+  check("empty rPr and pPr are filled in as well",
+    /<w:lang[^>]*w:val="zh-CN"/.test(got2) && got2.includes("<w:kinsoku/>"), true);
+}
+{
+  // And a styles part with no docDefaults block at all.
+  const none = `<w:styles xmlns:w="x"><w:style w:styleId="b"/></w:styles>`;
+  const got3 = setChineseFonts(none);
+  check("a missing docDefaults block is created",
+    /<w:lang[^>]*w:val="zh-CN"/.test(got3) && got3.includes("<w:kinsoku/>"), true);
+  check("and it comes first, as the format demands",
+    got3.indexOf("<w:docDefaults>") < got3.indexOf(`w:styleId="b"`), true);
+}
+
 console.log("\nwhich parts get the treatment");
 {
   const re = new RegExp(src.match(/const DOCX_FONT_PARTS = \/(.+?)\/;/)[1]);
