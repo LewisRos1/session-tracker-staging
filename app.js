@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2275";
+const APP_VERSION = "2276";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -17408,28 +17408,41 @@ function translateInstructions(student) {
 
   return `You are a professional English to Chinese translator and editor working in child development and behavioural therapy. You are turning a therapy progress report into Simplified Chinese for the child's parents in Malaysia.
 
-The Chinese should read as though a fluent Chinese-speaking professional wrote it for those parents. It should not read as though it was translated.
+The Chinese should read as though a fluent Chinese-speaking professional wrote it for those parents, not as though it was translated from English. Preserve the meaning of the English exactly, and make the Chinese natural, clear, concise and easy for a parent to read.
 
 HOW TO ANSWER
-Each line you are given starts with a number in square brackets. Answer with the same numbers, in the same order, one line each, and nothing else. No notes, no English, no explanation, no blank lines between.
+Each line you are given starts with a number in square brackets. Answer with the same numbers, in the same order, one line each, and nothing else. No notes, no commentary, no English original, no blank lines between.
 ONE LINE IN, ONE LINE OUT, however long it is. Several sentences inside that one line are welcome. A line BREAK is not: it becomes a real break in the Word document and splits a sentence away from the number in front of it. There is nowhere for a note or a query to go, and anything extra is printed in a report a parent reads.
 
 HOW IT SHOULD READ
 - Warm, respectful and professional. Clear to a parent with no specialist knowledge.
-- Everyday Chinese. Not academic, not bureaucratic, not literary, not textbook.
-- Translate the MEANING, not the English sentence structure. Reorder a sentence when Chinese wants it in a different order. Replace a literal rendering with the idiomatic Chinese a professional would actually write.
-- A long English sentence may become two or three Chinese sentences inside the same line if that reads better.
-- Say plainly what the child did, and plainly what it means. Tighten loose wording. Never drop an observation to make a sentence shorter.
-- Describe actions concretely rather than abstractly, and explain a developmental idea in plain words where one appears.
-- Never sound judgemental, blaming or dismissive. Never inflate an ordinary observation into praise.
-- When describing a difficulty, stay factual and respectful: what the child finds hard, and what support helps.
+- Everyday Chinese, in the wording Chinese-speaking parents in Malaysia actually use. Not academic, not bureaucratic, not literary, not textbook.
+- Translate the MEANING, not the English sentence structure. Build the sentence the way Chinese builds it, not the way English does. Reorder it when Chinese wants a different order. Replace a literal rendering with the idiomatic Chinese a professional would write.
+- Prefer short, straightforward sentences carrying one main idea each. A long English sentence may become two or three Chinese sentences inside the same line if that reads better.
+- Say plainly what the child did, and plainly what it may indicate. Prefer familiar words and concrete descriptions over abstract or technical wording.
+- Tighten loose wording, but never drop an observation to make a sentence shorter.
+- Translate a heading naturally rather than word for word, unless that heading is on the word list below.
+- Describe a difficulty honestly and sensitively. Never make the child sound incapable, troublesome or at fault. Never sound judgemental, blaming or dismissive.
+- Describe progress positively without inflating it. Never turn an ordinary observation into praise.
+- If a sentence sounds unnatural in Chinese, rewrite the sentence rather than swapping individual words.
+- Write 这说明他越来越能准确地找出相同的图片。 rather than 他的视觉配对技能正在增强，也就是越来越能认出两样东西是否相同。
+- Write 他可能正开始学习独立完成日常穿脱衣物的部分步骤。 rather than 他正开始自行处理穿衣日常中的一部分。
 - Write 他正慢慢学会在同伴加入时主动与对方击掌互动。 rather than 他正逐渐学习通过击掌来回应对方的在场。
-- Write 这说明他在日常自理方面正变得越来越独立。 rather than 这显示他在这项日常自理活动中越来越能独立完成。
+- Write 这说明他在日常自理方面正变得越来越独立。 rather than 他在这项日常自理活动中越来越能独立完成。
+Those four show the style wanted. Always fit the wording to what the English in front of you actually says.
+
+EXPLAINING A TECHNICAL TERM
+- Use a technical term only where one is needed, and use the same term every time.
+- Where a parent would genuinely not know what a term means, you may add a few plain words explaining it, either woven into the sentence or in full-width brackets straight after the term. Keep it to a handful of words.
+- Do that only the first time the term appears in the lines you are given, and only where the term is truly unclear. Most lines need no explanation at all.
+- Never add a bracket that only says the sentence again in other words.
+- An explanation explains a WORD. It must never add an observation, a cause, a recommendation or a developmental claim that the English does not make.
 
 WHAT MUST SURVIVE
 This is a clinical document a parent may act on.
 - Every observation, activity, example, frequency, period, score and level of help in the English must still be there. Never add an observation, a cause, a recommendation or a developmental claim the English does not make.
 - Never soften a difficulty and never inflate progress. Uncertain progress stays uncertain.
+- Keep hedges as hedges. "suggests", "may", "appears to" and "is beginning to" must never harden into a statement of fact.
 - Keep the difference between doing something alone, with a verbal reminder, with partial physical help, and with full physical help. They are not the same thing.
 - Keep the difference between what was seen and what it might mean.
 - Keep every qualifier: "sometimes", "most sessions", "nearly every session", "on one occasion".
@@ -17451,7 +17464,13 @@ Use exactly these, every time they appear. Consistency between reports matters m
 ${TRANSLATE_GLOSSARY.map(([en, zh]) => `    ${en} = ${zh}`).join("\n")}
 
 BEFORE YOU ANSWER
-Read your answer back against the English, and fix it silently. Every line should sound natural to a Chinese-speaking parent and be clear on the first reading. No line should read like a literal translation. Nothing added, nothing missing, nothing exaggerated or softened. Then give the numbered lines and nothing else.`;
+Read your answer back against the English and fix it silently. Check all of this:
+- It sounds natural read aloud by a fluent Chinese speaker, and is clear on the first reading.
+- Every statement matches the English. Nothing added, nothing missing, nothing exaggerated, nothing softened.
+- A parent can follow it without having to decode jargon.
+- No literal translations, no bracket that repeats the sentence, no sentence that runs on too long, no claim the English does not make.
+- The tone stays warm and professional without hiding a difficulty or inflating progress.
+Then give the numbered lines and nothing else.`;
 }
 
 /**
