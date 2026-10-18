@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2276";
+const APP_VERSION = "2277";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -17432,11 +17432,10 @@ HOW IT SHOULD READ
 Those four show the style wanted. Always fit the wording to what the English in front of you actually says.
 
 EXPLAINING A TECHNICAL TERM
-- Use a technical term only where one is needed, and use the same term every time.
-- Where a parent would genuinely not know what a term means, you may add a few plain words explaining it, either woven into the sentence or in full-width brackets straight after the term. Keep it to a handful of words.
-- Do that only the first time the term appears in the lines you are given, and only where the term is truly unclear. Most lines need no explanation at all.
+- Mirror the English, exactly. If the English explains a term, translate that explanation. If the English does not explain it, do not explain it either, however helpful an explanation would be.
+- Never add a bracket, a clause or a sentence that explains something the English left unexplained. The Chinese report and the English report must say the same amount.
 - Never add a bracket that only says the sentence again in other words.
-- An explanation explains a WORD. It must never add an observation, a cause, a recommendation or a developmental claim that the English does not make.
+- Use a technical term only where the English uses one, and use the same Chinese for it every time it appears.
 
 WHAT MUST SURVIVE
 This is a clinical document a parent may act on.

@@ -161,10 +161,11 @@ try {
   // is a licence to add claims the English never made.
   r.ok("explaining a term is allowed", /EXPLAINING A TECHNICAL TERM/.test(ins),
     "the section is missing");
-  r.ok("but only ever explains a word, never adds a claim",
-    /An explanation explains a WORD/.test(ins)
-    && /never add an observation, a cause, a recommendation or a developmental claim/.test(ins),
-    "the explanation rule is not fenced");
+  r.ok("but only where the English explained it too",
+    /Mirror the English, exactly/.test(ins)
+    && /do not explain it either/.test(ins)
+    && /must say the same amount/.test(ins),
+    "the explanation rule is not tied to the English");
   r.ok("and never repeats the sentence in brackets",
     /bracket that only says the sentence again/.test(ins),
     "nothing stops a redundant bracket");
