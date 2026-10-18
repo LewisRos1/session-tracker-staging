@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2274";
+const APP_VERSION = "2275";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -17347,7 +17347,6 @@ const TRANSLATE_GLOSSARY = [
   ["co-regulation", "共同调节"],
   ["prompt / prompting", "提示"],
   ["prompt level", "提示程度"],
-  ["independent / independently", "独立完成"],
   ["baseline", "基线"],
   ["mastery", "掌握"],
   ["maintained", "维持"],
@@ -17372,23 +17371,6 @@ const TRANSLATE_GLOSSARY = [
   ["emotional responses", "情绪反应"],
   ["distress", "情绪困扰"],
   ["frustration", "挫折感"],
-  ["dressing tasks", "穿衣任务"],
-  // House style. The report prompt insists on these exact English phrases,
-  // so they appear in every report and must land the same way every time.
-  ["demonstrates", "表现出"],
-  ["requires support", "需要协助"],
-  ["would benefit from support in developing", "若能获得协助，将有助于发展"],
-  ["is able to", "能够"],
-  ["experiences difficulty", "感到困难"],
-  ["initiates", "主动发起"],
-  ["attends to", "专注于"],
-  ["request", "提出要求"],
-  ["has not yet developed", "尚未发展"],
-  ["not yet consistently", "尚未稳定"],
-  ["emerging", "正在萌发"],
-  ["remains limited", "仍然有限"],
-  ["remains inconsistent", "仍不稳定"],
-  ["may display physical behaviours such as", "可能出现肢体行为，例如"],
 ];
 
 /** Names and phrases that must survive the translation unchanged. */
