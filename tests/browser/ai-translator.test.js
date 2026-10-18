@@ -141,6 +141,12 @@ try {
   r.ok("and dates are no longer told to stay as written",
     !/dates, percentages/.test(ins), "the old rule is still in there");
   r.ok("the word list is sent", /self-regulation = 自我调节/.test(ins), "the glossary is missing");
+  // "instructor" and "teacher" were unpinned, so one report called the same
+  // person 指导员 and 老师 in different paragraphs.
+  r.ok("one word for the adult, every time",
+    /instructor = 老师/.test(ins) && /teacher = 老师/.test(ins)
+    && /Never 指导员/.test(ins),
+    "the adult is still free to be named two ways");
   r.ok("with Lewis's corrections in it",
     /Trial = 试次/.test(ins) && /transitions = 转换/.test(ins)
     && /occupational therapy = 职能治疗/.test(ins),

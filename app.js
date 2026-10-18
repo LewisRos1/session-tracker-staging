@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2278";
+const APP_VERSION = "2279";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -17368,6 +17368,10 @@ const TRANSLATE_GLOSSARY = [
   ["intervention", "干预"],
   ["occupational therapy", "职能治疗"],
   ["therapist", "治疗师"],
+  // The reports say "instructor" far more often than "teacher", and the
+  // model was rendering it 指导员 in one paragraph and 老师 in the next.
+  ["instructor", "老师"],
+  ["teacher", "老师"],
   ["emotional responses", "情绪反应"],
   ["distress", "情绪困扰"],
   ["frustration", "挫折感"],
@@ -17462,6 +17466,7 @@ Some lines arrive split into pieces, like <s1>Calming Himself</s1><s2>: he neede
 
 WORD LIST
 Use exactly these, every time they appear. Consistency between reports matters more than variety. Anything NOT on this list should be worded in whatever way reads most naturally.
+The adult who works with the child is always 老师, whether the English calls them an instructor or a teacher. Never 指导员, never 导师, never 辅导员. Use 老师 every single time, so a parent never wonders whether two different people are meant.
 ${TRANSLATE_GLOSSARY.map(([en, zh]) => `    ${en} = ${zh}`).join("\n")}
 
 BEFORE YOU ANSWER
