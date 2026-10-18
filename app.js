@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2280";
+const APP_VERSION = "2282";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -17134,9 +17134,10 @@ function periodLabelZh(label) {
     // The year comes first in Chinese: "Jan 2026" is written "2026年1月",
     // not "1月 2026".
     .replace(/\b([A-Z][a-z]{2})\s+(\d{4})\b/g,
-      // A space between the year and the month, which is how Lewis wants a
-      // date read. Chinese normally runs them together.
-      (whole, mon, yr) => MONTHS_ZH[mon] ? `${yr}年 ${MONTHS_ZH[mon]}` : whole)
+      // Nothing between the year and the month. A single space on a line of
+      // justified Chinese is the only thing Word can stretch, and it opened
+      // a gap half the width of the page.
+      (whole, mon, yr) => MONTHS_ZH[mon] ? `${yr}年${MONTHS_ZH[mon]}` : whole)
     // A month standing on its own still becomes a Chinese one.
     .replace(/\b([A-Z][a-z]{2})\b/g, (m) => MONTHS_ZH[m] || m)
     // An en dash with a space either side of it.
@@ -17455,7 +17456,7 @@ This is a clinical document a parent may act on.
 - Where the English is ambiguous, translate it faithfully and leave it ambiguous. Do not resolve it by guessing, and do not add a note about it.
 - Simplified Chinese only. Never Traditional characters.
 - Numbers, percentages, scores and times stay exactly as written. Never change a figure.
-- Dates keep the same day, month and year, written the Chinese way. "18 Aug 2026" is written "2026年 8月 18日", with a space after the year and after the month. "Aug 2026" and "August 2026" are written "2026年 8月". A month on its own, "August", is written "8月". This applies everywhere, including inside a table.
+- Dates keep the same day, month and year, written the Chinese way, with NOTHING between the parts. "18 Aug 2026" is written "2026年8月18日". "Aug 2026" and "August 2026" are written "2026年8月". A month on its own, "August", is written "8月". Never put a space inside a date, not even between the year and the month. This applies everywhere, including inside a table.
 - Leave these EXACTLY as they appear, in English, untranslated:
 ${translateKeepList().map(k => `    ${k}`).join("\n")}
 ${translateTargetNames(student).length ? `- These are the names of the therapy targets. Translate each one into Chinese, then put the English after it in full-width brackets, exactly as spelt here. Write "模仿（Imitation）", never "Imitation" on its own and never the Chinese on its own. Use the same wording every time the name appears, in a heading, in a sentence or on a chart:\n${translateTargetNames(student).map(k => `    ${k}`).join("\n")}` : ""}
@@ -18113,15 +18114,19 @@ function joinWrappedLines(text) {
  * A run that was only spacing is left exactly as it was.
  */
 /**
- * Keep a Chinese date from breaking in the wrong place.
+ * Close a Chinese date up.
  *
- * "2026年 8月 18日" in a narrow table cell broke after the month, leaving
- * "2026年 8月" on one line and "18日" on the next. The day is tied to its
- * month with a non-breaking space, so the line breaks after the year
- * instead, which is how Lewis wants it read.
+ * Chinese writes a date with nothing between its parts: 2026年10月18日. The
+ * model is told that, but a space still creeps in, and one space on a line
+ * of justified Chinese is the only thing Word is able to stretch -- which
+ * opened a gap half the width of the page between 2026年 and 1月.
+ *
+ * The date can still break after the year or after the month, because no
+ * line may begin with 年, 月 or 日 (CHINESE_NO_BREAK_BEFORE) and the digits
+ * either side are kept whole by <w:wordWrap w:val="0"/>.
  */
 /** The note at the top of every translated report, in both languages. */
-const TRANSLATED_NOTE_ZH = "本报告根据英文原文翻译而成。由于中英文表达方式有所不同，部分内容的措辞可能会略有差异。如果您对报告中的内容有任何疑问，欢迎随时与孩子的指导老师联系，我们很乐意为您进一步说明。";
+const TRANSLATED_NOTE_ZH = "本报告根据英文原文翻译而成。由于中英文表达方式有所不同，部分内容的措辞可能会略有差异。如果您对报告中的内容有任何疑问，欢迎随时与孩子的老师联系，我们很乐意为您进一步说明。";
 const TRANSLATED_NOTE_EN = "This report has been translated from the original English version. As Chinese and English differ in their ways of expression, some wording may vary slightly. If you have any questions about the report, please feel free to contact your child's instructor. We will be happy to provide further clarification.";
 
 /**
@@ -18135,6 +18140,28 @@ const TRANSLATED_NOTE_EN = "This report has been translated from the original En
  * On every translated report, with nothing to tick. A box that has to be
  * remembered is missing from the one report that needed it.
  */
+const PAGE_BREAK_BEFORE = /<w:pageBreakBefore(?:\s[^>]*)?\/>/;
+
+/**
+ * The paragraph that starts the second page, when the first one is a cover.
+ *
+ * A cover page is a page break on a paragraph near the top of the document:
+ * the half-year report breaks on "Section 1: Overview" and the assessment
+ * report on the same heading. The monthly report has no page break at all,
+ * so this returns null for it and the note stays where it was.
+ */
+function firstPageBreakParagraph(xml, from) {
+  const re = /<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g;
+  re.lastIndex = from;
+  let m;
+  while ((m = re.exec(xml)) !== null) {
+    if (PAGE_BREAK_BEFORE.test(m[0])) {
+      return { start: m.index, end: m.index + m[0].length, text: m[0] };
+    }
+  }
+  return null;
+}
+
 function addTranslatedNote(xml) {
   const out = String(xml);
   if (out.includes(TRANSLATED_NOTE_ZH)) return out;   // translated twice
@@ -18143,20 +18170,35 @@ function addTranslatedNote(xml) {
   const at = open + "<w:body>".length;
   // Both languages: the parent reads the Chinese, and the boss checking the
   // report against the English one should see the same note she signed off.
-  const line = (text, after) =>
-    `<w:p><w:pPr><w:jc w:val="both"/><w:spacing w:after="${after}"/></w:pPr>`
+  // The order inside <w:pPr> is fixed by the format: the break, then the
+  // spacing, then the alignment.
+  const line = (text, after, breaks) =>
+    `<w:p><w:pPr>${breaks ? "<w:pageBreakBefore/>" : ""}`
+    + `<w:spacing w:after="${after}"/><w:jc w:val="both"/></w:pPr>`
     + `<w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/>`
     + `<w:i/><w:iCs/><w:sz w:val="18"/><w:szCs w:val="18"/><w:color w:val="6B7280"/></w:rPr>`
     + `<w:t xml:space="preserve">${xmlEscape(text)}</w:t></w:r></w:p>`;
+
+  // The half-year report's cover page is already full: two more lines at the
+  // very top pushed the company details onto a page of their own. The note
+  // goes to the top of page 2 instead, by taking the page break off the
+  // paragraph that starts it and carrying it itself.
+  const cover = firstPageBreakParagraph(out, at);
+  if (cover) {
+    return out.slice(0, cover.start)
+      + line(TRANSLATED_NOTE_ZH, 60, true) + line(TRANSLATED_NOTE_EN, 240, false)
+      + cover.text.replace(PAGE_BREAK_BEFORE, "")
+      + out.slice(cover.end);
+  }
   return out.slice(0, at)
-    + line(TRANSLATED_NOTE_ZH, 60) + line(TRANSLATED_NOTE_EN, 240)
+    + line(TRANSLATED_NOTE_ZH, 60, false) + line(TRANSLATED_NOTE_EN, 240, false)
     + out.slice(at);
 }
 
 function tieChineseDate(text) {
-  return String(text).replace(
-    /(\d{4}年)[ \u00A0]*(\d{1,2}月)[ \u00A0]+(\d{1,2}日)/g,
-    "$1 $2\u00A0$3");
+  return String(text)
+    .replace(/(\d{4}年)[ \u00A0]+(\d{1,2}月)/g, "$1$2")
+    .replace(/(\d{1,2}月)[ \u00A0]+(\d{1,2}日)/g, "$1$2");
 }
 
 function keepRunSpacing(original, translated) {

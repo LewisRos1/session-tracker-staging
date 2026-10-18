@@ -29,7 +29,7 @@ const names = ["xmlUnescape", "xmlEscape", "docxParagraphs", "markParagraph",
                "readChartDataTag", "findChartPictures", "chartPhrases",
                "stripMarkers", "translateTargetNames", "tieChineseDate",
                "pinnedTermZh",
-               "addTranslatedNote",
+               "addTranslatedNote", "firstPageBreakParagraph",
                "periodLabelZh", "chartTitleZh", "overviewTitleZh",
                "overviewChartTitle",
                "resizeDrawingToChart",
@@ -40,12 +40,13 @@ const consts = ["CHART_FIXED_ZH", "MONTHS_ZH"]
   .map(n => src.match(new RegExp(`const ${n} = \\{[\\s\\S]*?\\n};`))[0])
   .join("\n");
 const cjk = src.match(/const isCjkChar = [^;]+;/)[0];
+const pbConst = src.match(/const PAGE_BREAK_BEFORE = [^;]+;/)[0];
 const noteConst = ["TRANSLATED_NOTE_ZH", "TRANSLATED_NOTE_EN"]
   .map(n => src.match(new RegExp(`const ${n} = "[^"]*";`))[0]).join("\n");
 const chineseFns = [/const hasChinese = [^;]+;/, /const looksTranslated =[\s\S]*?;/]
   .map(re => src.match(re)[0]).join("\n");
 const fns = new Function(`const CHART_TAG_PREFIX = ${JSON.stringify(tagPrefix)};`
-  + tagFn + "\n" + consts + "\n" + cjk + "\n" + chineseFns + "\n" + noteConst + "\n"
+  + tagFn + "\n" + consts + "\n" + cjk + "\n" + chineseFns + "\n" + noteConst + "\n" + pbConst + "\n"
   + names.map(extract).join("\n")
   + `\nreturn { chartDataTag, hasChinese, looksTranslated, ${names.join(", ")} };`)();
 const { xmlUnescape, docxParagraphs, markParagraph, unmarkParagraph,
@@ -422,20 +423,60 @@ console.log("\nthe note saying this is a translation");
 check("a part with no body is left alone",
   addTranslatedNote("<w:hdr><w:p/></w:hdr>"), "<w:hdr><w:p/></w:hdr>");
 
-console.log("\nwhere a Chinese date is allowed to break");
-// In a narrow table cell "2026年 8月 18日" broke after the month, leaving
-// "18日" alone on the next line. The day is tied to its month so the break
-// lands after the year instead.
-check("the day is tied to its month",
-  tieChineseDate("2026年 8月 18日"), "2026年 8月\u00A018日");
-check("the year keeps an ordinary space, so it can break there",
-  tieChineseDate("2026年 8月 18日").split(" ")[0], "2026年");
-check("a month and year with no day is left alone",
-  tieChineseDate("2026年 8月"), "2026年 8月");
+// The half-year and assessment reports open on a full cover page. Two more
+// lines at the very top pushed the company details onto a second page, so on
+// those the note starts page 2 instead.
+{
+  const cover = `<w:document><w:body>`
+    + `<w:p><w:r><w:t>ZORA</w:t></w:r></w:p>`
+    + `<w:p><w:r><w:t>Half-Year Progress Report</w:t></w:r></w:p>`
+    + `<w:p><w:pPr><w:pageBreakBefore/><w:spacing w:after="200"/></w:pPr>`
+    + `<w:r><w:t>Section 1: Overview</w:t></w:r></w:p>`
+    + `<w:p><w:r><w:t>body text</w:t></w:r></w:p>`
+    + `</w:body></w:document>`;
+  const out = addTranslatedNote(cover);
+  check("the cover page still comes first",
+    out.indexOf("Half-Year Progress Report") < out.indexOf("本报告"), true);
+  check("the note comes before the first heading",
+    out.indexOf("本报告") < out.indexOf("Section 1: Overview"), true);
+  // If the note did not take the break over it would sit at the bottom of the
+  // cover page and push it over, which is the bug being fixed.
+  check("the note is what starts the new page",
+    out.indexOf("<w:pageBreakBefore/>") < out.indexOf("本报告"), true);
+  check("and the heading no longer breaks a page of its own",
+    (out.match(/<w:pageBreakBefore\/>/g) || []).length, 1);
+  check("the cover page is not touched otherwise", out.includes("ZORA"), true);
+  check("twice is still once", addTranslatedNote(out), out);
+}
+// The monthly report has no cover page and no page break, so nothing moves.
+{
+  const flat = `<w:document><w:body><w:p><w:r><w:t>First thing</w:t></w:r></w:p></w:body></w:document>`;
+  const out = addTranslatedNote(flat);
+  check("a report with no cover page keeps the note at the very top",
+    out.indexOf("本报告") < out.indexOf("First thing"), true);
+  check("and gains no page break", /<w:pageBreakBefore/.test(out), false);
+}
+
+console.log("\nclosing a Chinese date up");
+// "2026年 1月" on a justified line left a gap half the width of the page:
+// that one space was the only thing Word could stretch. Chinese writes a
+// date with nothing between its parts anyway.
+check("the parts of a date are closed up",
+  tieChineseDate("2026年 8月 18日"), "2026年8月18日");
+check("a month and year too",
+  tieChineseDate("2026年 8月"), "2026年8月");
+check("a range loses both gaps",
+  tieChineseDate("2026年 1月至2026年 6月"), "2026年1月至2026年6月");
+// The non-breaking space the old version put in, so an already translated
+// report tidies up rather than keeping the gap.
+check("a non-breaking space goes too",
+  tieChineseDate("2026年\u00A08月\u00A018日"), "2026年8月18日");
+check("a date already closed up is left alone",
+  tieChineseDate("2026年8月18日"), "2026年8月18日");
 check("running it twice changes nothing",
-  tieChineseDate(tieChineseDate("2026年 8月 18日")), "2026年 8月\u00A018日");
-check("a sentence with a date in it keeps the rest",
-  tieChineseDate("掌握于 2026年 8月 18日。"), "掌握于 2026年 8月\u00A018日。");
+  tieChineseDate(tieChineseDate("2026年 8月 18日")), "2026年8月18日");
+check("the words around it keep their spaces",
+  tieChineseDate("掌握于 2026年 8月 18日。"), "掌握于 2026年8月18日。");
 check("text with no date at all", tieChineseDate("没有日期"), "没有日期");
 
 console.log("\nspaces where Chinese meets the run beside it");
@@ -454,8 +495,8 @@ console.log("\nthe months, which are the app's own words");
 // Written the way a date is written in Chinese: the year first, then the
 // month, and an en dash with no spaces around it.
 check("a range becomes Chinese months",
-  periodLabelZh("Jan 2026 - Jun 2026"), "2026年 1月 – 2026年 6月");
-check("a single month too", periodLabelZh("Jul 2026"), "2026年 7月");
+  periodLabelZh("Jan 2026 - Jun 2026"), "2026年1月 – 2026年6月");
+check("a single month too", periodLabelZh("Jul 2026"), "2026年7月");
 check("a month with no year beside it is still translated",
   periodLabelZh("Jan - Jun"), "1月 – 6月");
 check("something with no month in it is untouched", periodLabelZh("Term 1"), "Term 1");
@@ -468,16 +509,16 @@ console.log("\nthe title, which is built rather than translated");
 {
   const zh = (en) => ({ "FEDC 2": "学习目标二" })[en] || null;
   check("number, Chinese target, Progress, Chinese months",
-    chartTitleZh(chartSpec, zh), "3）学习目标二：进展（2026年 1月 – 2026年 6月）");
+    chartTitleZh(chartSpec, zh), "3）学习目标二：进展（2026年1月 – 2026年6月）");
   check("a page marker is carried over",
     chartTitleZh({ ...chartSpec, title: "3) FEDC 2 - Progress (x) [Page 2 of 3]" }, zh),
-    "3）学习目标二：进展（2026年 1月 – 2026年 6月）［第2页，共3页］");
+    "3）学习目标二：进展（2026年1月 – 2026年6月）［第2页，共3页］");
   check("an unknown target keeps its English rather than vanishing",
     chartTitleZh({ ...chartSpec, target: "FEDC 9" }, zh),
-    "3）FEDC 9：进展（2026年 1月 – 2026年 6月）");
+    "3）FEDC 9：进展（2026年1月 – 2026年6月）");
   check("a title with no number in front of it loses nothing",
     chartTitleZh({ ...chartSpec, title: "FEDC 2 - Progress (Jan 2026 - Jun 2026)" }, zh),
-    "学习目标二：进展（2026年 1月 – 2026年 6月）");
+    "学习目标二：进展（2026年1月 – 2026年6月）");
 }
 
 console.log("\nthe overall progress chart's own title");
@@ -486,13 +527,13 @@ console.log("\nthe overall progress chart's own title");
 // one into Chinese, and it sat there in English on a page of Chinese.
 check("his Chinese name and the months",
   overviewTitleZh({ name: "Zhang Qi Pei", nameZh: "张祺培" }, "Jan 2026 - Jun 2026"),
-  "张祺培（2026年 1月 – 2026年 6月）");
+  "张祺培（2026年1月 – 2026年6月）");
 check("no Chinese name typed in, so the English one stands",
   overviewTitleZh({ name: "Ryan Lee" }, "Jan 2026 - Jun 2026"),
-  "Ryan Lee（2026年 1月 – 2026年 6月）");
+  "Ryan Lee（2026年1月 – 2026年6月）");
 check("an empty box counts as none",
   overviewTitleZh({ name: "Ryan Lee", nameZh: "   " }, "Jul 2026"),
-  "Ryan Lee（2026年 7月）");
+  "Ryan Lee（2026年7月）");
 
 console.log("\nthe progress chart title is built when the report is translated");
 // It used to be written into the English file when the report was generated,
@@ -503,17 +544,17 @@ const qipei = { name: "Zhang Qi Pei", nameZh: "张祺培" };
 check("a report that carries its range",
   overviewChartTitle({ title: "Zhang Qi Pei (Jan 2026 - Jun 2026 Progress)",
                        range: "Jan 2026 - Jun 2026" }, qipei),
-  "张祺培（2026年 1月 – 2026年 6月）");
+  "张祺培（2026年1月 – 2026年6月）");
 // An older report has no range in it, only a Chinese title frozen in the
 // wording of the day it was made. The range is read back out of the English
 // title so it comes out in today's wording all the same.
 check("and an older one that does not",
   overviewChartTitle({ title: "Zhang Qi Pei (Jan 2026 - Jun 2026 Progress)",
                        titleZh: "Zhang Qi Pei（2026年1月–2026年6月）" }, qipei),
-  "张祺培（2026年 1月 – 2026年 6月）");
+  "张祺培（2026年1月 – 2026年6月）");
 check("with no student to hand, the English name is taken from the title",
   overviewChartTitle({ title: "Ryan Lee (Jul 2026 - Dec 2026 Progress)" }, null),
-  "Ryan Lee（2026年 7月 – 2026年 12月）");
+  "Ryan Lee（2026年7月 – 2026年12月）");
 // Nothing to work from: what the file already said, rather than a blank.
 check("a title in a shape this does not know is left alone",
   overviewChartTitle({ title: "Something else", titleZh: "其他" }, qipei), "其他");
