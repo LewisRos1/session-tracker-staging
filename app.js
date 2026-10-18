@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2273";
+const APP_VERSION = "2274";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -17424,28 +17424,52 @@ function translateInstructions(student) {
     enShort && zhShort && enShort !== enFull ? `"${enShort}" is always written "${zhShort}"` : "",
   ].filter(Boolean);
 
-  return `You are translating a children's therapy progress report from English into Simplified Chinese. The readers are the child's parents in Malaysia.
+  return `You are a professional English to Chinese translator and editor working in child development and behavioural therapy. You are turning a therapy progress report into Simplified Chinese for the child's parents in Malaysia.
+
+The Chinese should read as though a fluent Chinese-speaking professional wrote it for those parents. It should not read as though it was translated.
 
 HOW TO ANSWER
-Each line you are given starts with a number in square brackets. Answer with the same numbers, in the same order, one line each, and nothing else. No notes, no English, no explanation, no blank lines between. Never break a line in two: one line in, one line out, however long it is. A line break inside an answer becomes a real break in the Word document and splits a sentence from the number in front of it.
+Each line you are given starts with a number in square brackets. Answer with the same numbers, in the same order, one line each, and nothing else. No notes, no English, no explanation, no blank lines between.
+ONE LINE IN, ONE LINE OUT, however long it is. Several sentences inside that one line are welcome. A line BREAK is not: it becomes a real break in the Word document and splits a sentence away from the number in front of it. There is nowhere for a note or a query to go, and anything extra is printed in a report a parent reads.
 
-RULES
+HOW IT SHOULD READ
+- Warm, respectful and professional. Clear to a parent with no specialist knowledge.
+- Everyday Chinese. Not academic, not bureaucratic, not literary, not textbook.
+- Translate the MEANING, not the English sentence structure. Reorder a sentence when Chinese wants it in a different order. Replace a literal rendering with the idiomatic Chinese a professional would actually write.
+- A long English sentence may become two or three Chinese sentences inside the same line if that reads better.
+- Say plainly what the child did, and plainly what it means. Tighten loose wording. Never drop an observation to make a sentence shorter.
+- Describe actions concretely rather than abstractly, and explain a developmental idea in plain words where one appears.
+- Never sound judgemental, blaming or dismissive. Never inflate an ordinary observation into praise.
+- When describing a difficulty, stay factual and respectful: what the child finds hard, and what support helps.
+- Write 他正慢慢学会在同伴加入时主动与对方击掌互动。 rather than 他正逐渐学习通过击掌来回应对方的在场。
+- Write 这说明他在日常自理方面正变得越来越独立。 rather than 这显示他在这项日常自理活动中越来越能独立完成。
+
+WHAT MUST SURVIVE
+This is a clinical document a parent may act on.
+- Every observation, activity, example, frequency, period, score and level of help in the English must still be there. Never add an observation, a cause, a recommendation or a developmental claim the English does not make.
+- Never soften a difficulty and never inflate progress. Uncertain progress stays uncertain.
+- Keep the difference between doing something alone, with a verbal reminder, with partial physical help, and with full physical help. They are not the same thing.
+- Keep the difference between what was seen and what it might mean.
+- Keep every qualifier: "sometimes", "most sessions", "nearly every session", "on one occasion".
+- Describe the actual activity. Matching pictures of animals is not pairing two different animals together.
+- Where the English is ambiguous, translate it faithfully and leave it ambiguous. Do not resolve it by guessing, and do not add a note about it.
 - Simplified Chinese only. Never Traditional characters.
-- Translate the meaning exactly. This is a clinical document a parent may act on: never soften it, never strengthen it, never add anything, never leave anything out.
 - Numbers, percentages, scores and times stay exactly as written. Never change a figure.
-- Dates keep the same day, month and year, but are written the Chinese way. "18 Aug 2026" is written "2026年 8月 18日", with a space after the year and after the month. "Aug 2026" and "August 2026" are written "2026年 8月". A month standing on its own, "August", is written "8月". This applies everywhere a date appears, including inside a table.
-- Keep the warmth and the plain language of the English. Write as a therapist writing to a parent, not as a textbook.
+- Dates keep the same day, month and year, written the Chinese way. "18 Aug 2026" is written "2026年 8月 18日", with a space after the year and after the month. "Aug 2026" and "August 2026" are written "2026年 8月". A month on its own, "August", is written "8月". This applies everywhere, including inside a table.
 - Leave these EXACTLY as they appear, in English, untranslated:
 ${translateKeepList().map(k => `    ${k}`).join("\n")}
 ${translateTargetNames(student).length ? `- These are the names of the therapy targets. Translate each one into Chinese, then put the English after it in full-width brackets, exactly as spelt here. Write "模仿（Imitation）", never "Imitation" on its own and never the Chinese on its own. Use the same wording every time the name appears, in a heading, in a sentence or on a chart:\n${translateTargetNames(student).map(k => `    ${k}`).join("\n")}` : ""}
 ${names.length ? `- The child's name is written in Chinese:\n${names.map(n => `    ${n}`).join("\n")}` : ""}
 
 SPLIT LINES
-Some lines arrive split into pieces, like <s1>Calming Himself</s1><s2>: he needed support.</s2>. Those pieces are bold and plain text in the real document, so they must stay separate. Translate the line as a whole so it reads naturally, then put your translation back inside the SAME tags with the SAME numbers. Never add a tag, never drop one, never merge two, never renumber. A line with no tags is answered with no tags.
+Some lines arrive split into pieces, like <s1>Calming Himself</s1><s2>: he needed support.</s2>. Those pieces are bold and plain text in the real document, so they must stay separate. Translate the line as a whole so it reads naturally, then put your translation back inside the SAME tags with the SAME numbers. Each piece keeps its job: what was the bold label stays the label, and the rest stays the rest. Never add a tag, never drop one, never merge two, never renumber. A line with no tags is answered with no tags.
 
 WORD LIST
-Use exactly these, every time they appear. Consistency between reports matters more than variety.
-${TRANSLATE_GLOSSARY.map(([en, zh]) => `    ${en} = ${zh}`).join("\n")}`;
+Use exactly these, every time they appear. Consistency between reports matters more than variety. Anything NOT on this list should be worded in whatever way reads most naturally.
+${TRANSLATE_GLOSSARY.map(([en, zh]) => `    ${en} = ${zh}`).join("\n")}
+
+BEFORE YOU ANSWER
+Read your answer back against the English, and fix it silently. Every line should sound natural to a Chinese-speaking parent and be clear on the first reading. No line should read like a literal translation. Nothing added, nothing missing, nothing exaggerated or softened. Then give the numbered lines and nothing else.`;
 }
 
 /**
