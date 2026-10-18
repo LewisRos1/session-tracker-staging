@@ -166,9 +166,17 @@ try {
     && /do not explain it either/.test(ins)
     && /must say the same amount/.test(ins),
     "the explanation rule is not tied to the English");
-  r.ok("and never repeats the sentence in brackets",
-    /bracket that only says the sentence again/.test(ins),
-    "nothing stops a redundant bracket");
+  // Lewis asked for the opposite of the old rule here: a bracket the English
+  // wrote is part of what the English says, so dropping it loses meaning.
+  r.ok("a bracket the English wrote is kept, not dropped",
+    /KEEP both and translate both naturally/.test(ins)
+    && /Never drop the bracket just because it repeats/.test(ins),
+    "nothing protects the English's own bracketed explanations");
+  r.ok("and the closer rendering wins when both are good Chinese",
+    /Stay as close to the English as you can/.test(ins)
+    && /never introduce a new interpretation/.test(ins)
+    && /choose the closer one/.test(ins),
+    "the minimal-change rule is missing");
 
   // ── batching and reading the answer ──────────────────────────────────
   r.section("batching, and reading the answer back");
