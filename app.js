@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2279";
+const APP_VERSION = "2280";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -18250,11 +18250,21 @@ function setChineseFonts(xml) {
   // A report written by the app carries none of these, so Word was left to
   // its own defaults and broke the Chinese wherever the margin fell, which
   // put "，" at the start of a line. They belong at the front of the
-  // paragraph defaults: the order of these elements is fixed, and all four
-  // come before <w:spacing>, which is already in there.
+  // paragraph defaults: the order of these elements is fixed, and all of
+  // them come before <w:spacing>, which is already in there.
+  //
+  // <w:wordWrap w:val="0"/> is the one that is about ENGLISH. Turning the
+  // document Chinese switches Word to East Asian line breaking, which may
+  // break a line between any two characters -- including two letters in the
+  // middle of an English word. The translated-from-English note under the
+  // title came out as "repor / t" and "clarific / ation", and so would the
+  // English inside a target name like 模仿（Imitation）. Setting it to 0 says
+  // a Latin word stays whole. It goes between kinsoku and overflowPunct,
+  // because the format fixes the order of these elements.
   out = out.replace(/<w:pPrDefault><w:pPr>(?!<w:kinsoku\/>)/,
     (whole) => whole +
-      "<w:kinsoku/><w:overflowPunct/><w:autoSpaceDE/><w:autoSpaceDN/>");
+      "<w:kinsoku/><w:wordWrap w:val=\"0\"/><w:overflowPunct/>"
+      + "<w:autoSpaceDE/><w:autoSpaceDN/>");
   return out;
 }
 

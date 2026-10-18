@@ -85,7 +85,7 @@ check("every other style survives",
 // Everything this function is meant to add, taken back out again: whatever
 // is left over is something it changed that it had no business changing.
 const bare = t => t.replace(/<w:lang[^>]*zh-CN[^>]*\/>/g, "")
-  .replace(/<w:kinsoku\/><w:overflowPunct\/><w:autoSpaceDE\/><w:autoSpaceDN\/>/g, "")
+  .replace(/<w:kinsoku\/><w:wordWrap w:val="0"\/><w:overflowPunct\/><w:autoSpaceDE\/><w:autoSpaceDN\/>/g, "")
   .replace(/ w:hint="eastAsia"/g, "")
   .replace(/w:eastAsia="[^"]*"/g, "#");
 check("nothing changed but the font slot and the language",
@@ -124,6 +124,17 @@ check("every run says which characters are the East Asian ones",
 check("the four line-breaking rules are set",
   ["kinsoku", "overflowPunct", "autoSpaceDE", "autoSpaceDN"]
     .every(r => fixed.includes(`<w:${r}/>`)), true);
+// Turning the document Chinese switches Word to East Asian line breaking,
+// which breaks between any two characters -- so the English note under the
+// title came out as "repor / t" and "clarific / ation".
+check("and English words are told to stay whole",
+  /<w:wordWrap w:val="0"\/>/.test(fixed), true);
+// CT_PPrBase fixes the order: kinsoku, then wordWrap, then overflowPunct.
+check("in the order the format demands",
+  fixed.indexOf("<w:kinsoku/>") < fixed.indexOf(`<w:wordWrap w:val="0"/>`)
+  && fixed.indexOf(`<w:wordWrap w:val="0"/>`) < fixed.indexOf("<w:overflowPunct/>"), true);
+check("and not added twice",
+  (setChineseFonts(fixed).match(/<w:wordWrap/g) || []).length, 1);
 // The order of these elements is fixed by the format, and all four belong
 // before <w:spacing>, which the app already writes.
 check("and they come before the spacing that was already there",
