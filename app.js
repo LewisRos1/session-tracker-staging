@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2298";
+const APP_VERSION = "2297";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -17503,8 +17503,6 @@ Before providing the translation, silently check that:
 - The Chinese sounds natural when read aloud and does not contain awkward literal translations.
 - The wording is clear and parent-friendly without hiding difficulties or making unsupported claims.
 - The original headings, numbering, dates, scores, and report structure have been preserved.
-
-If the English original contains incomplete sentences, grammatical errors, or unclear wording, translate the intended meaning accurately into natural Chinese without inventing missing information. Where the intended meaning cannot be determined confidently, keep the Chinese exactly as unclear as the English is rather than resolving it by guessing. There is nowhere to raise a query, so never add a note, a bracket or a mark about it: anything you add is printed in a report a parent reads.
 
 FINAL PRIORITY: accuracy first, natural Chinese second, parent-friendliness third. Make the smallest changes necessary to produce a clear, natural, accurate translation. Return only the numbered lines and nothing else.`;
 }
