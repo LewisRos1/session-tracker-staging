@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2291";
+const APP_VERSION = "2293";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -18190,7 +18190,7 @@ function translatedNoteParagraph(text, after, zh) {
     : `<w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"`
       + ` w:cs="Times New Roman" w:hint="default"/><w:lang w:val="en-GB"/></w:rPr>`;
   return `<w:p><w:pPr>${latinOff}`
-    + `<w:spacing w:after="${after}"/><w:jc w:val="left"/>${markRPr}</w:pPr>`
+    + `<w:spacing w:after="${after}"/><w:jc w:val="both"/>${markRPr}</w:pPr>`
     + `<w:r><w:rPr>${fonts}`
     + `<w:i/><w:iCs/><w:sz w:val="20"/><w:szCs w:val="20"/><w:color w:val="6B7280"/>`
     + `<w:lang w:val="${zh ? "zh-CN" : "en-GB"}"/></w:rPr>`
@@ -18289,6 +18289,14 @@ function applyDocxText(xml, paragraphs, translations) {
  * English spellchecker underlining every character.
  */
 const CHINESE_EASTASIA_FONT = "SimSun";
+/**
+ * The language of the LATIN text in a translated report.
+ *
+ * Not zh-CN. w:val names the language of the Latin characters, and saying
+ * they are Chinese makes Word break English words anywhere it likes. The
+ * East Asian slot carries zh-CN instead. See setChineseFonts.
+ */
+const DOC_LATIN_LANG = "en-MY";
 function setChineseFonts(xml) {
   // The defaults have to exist before anything can be put in them.
   //
@@ -18354,7 +18362,7 @@ function setChineseFonts(xml) {
     (whole, inner) => /<w:lang[^>]*w:val="zh/.test(inner)
       ? whole
       : `<w:rPrDefault><w:rPr>${inner.replace(/<w:lang[^>]*\/>/g, "")}`
-        + `<w:lang w:val="en-MY" w:eastAsia="zh-CN"/></w:rPr></w:rPrDefault>`);
+        + `<w:lang w:val="${DOC_LATIN_LANG}" w:eastAsia="zh-CN"/></w:rPr></w:rPrDefault>`);
   // The rules that stop a line starting with a comma or a full stop.
   //
   // A report written by the app carries none of these, so Word was left to
@@ -18410,9 +18418,20 @@ function setChineseLineBreaks(xml) {
   if (out.includes("w:noLineBreaksBefore")) return out;
   const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;")
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  // Written for BOTH languages, which is the whole point.
+  //
+  // Word looks the no-break list up by the language in force, and the
+  // document says its Latin language is en-MY so that English words are not
+  // split in half. With a list filed only under zh-CN there was nothing for
+  // it to find, kinsoku had no characters to work from, and Chinese lines
+  // started with 。 and ， again. The same list under both names costs
+  // nothing: it holds only CJK punctuation, none of which occurs in English.
+  //
+  // CT_Compat wants every noLineBreaksAfter before any noLineBreaksBefore.
+  const langs = ["zh-CN", DOC_LATIN_LANG];
   const lists =
-    `<w:noLineBreaksAfter w:lang="zh-CN" w:val="${esc(CHINESE_NO_BREAK_AFTER)}"/>`
-    + `<w:noLineBreaksBefore w:lang="zh-CN" w:val="${esc(CHINESE_NO_BREAK_BEFORE)}"/>`;
+    langs.map(l => `<w:noLineBreaksAfter w:lang="${l}" w:val="${esc(CHINESE_NO_BREAK_AFTER)}"/>`).join("")
+    + langs.map(l => `<w:noLineBreaksBefore w:lang="${l}" w:val="${esc(CHINESE_NO_BREAK_BEFORE)}"/>`).join("");
   // They belong inside <w:compat>, which the file already has.
   if (/<w:compat>/.test(out)) return out.replace("<w:compat>", "<w:compat>" + lists);
   return out.replace(/<\/w:settings>/,

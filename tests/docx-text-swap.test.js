@@ -464,8 +464,10 @@ check("a part with no body is left alone",
   // something to reach the margin, which is how "repor / t" happened.
   check("the note is the size Lewis asked for",
     /<w:sz w:val="20"\/>/.test(zhRun) && /<w:sz w:val="20"\/>/.test(enRun), true);
-  check("and neither half is justified",
-    /w:jc w:val="left"/.test(out) && !/w:jc w:val="both"/.test(out), true);
+  // Justified, which is only safe because the Latin language slot is
+  // right: Word stretches the spaces instead of splitting a word.
+  check("and both halves are justified",
+    /w:jc w:val="both"/.test(out) && !/w:jc w:val="left"/.test(out), true);
   // The switch that actually governs this. The document defaults turn CJK
   // line breaking on for every paragraph, and over Latin text that lets
   // Word break between any two letters: "questi / ons", "happ / y".
@@ -485,7 +487,7 @@ check("a part with no body is left alone",
   // inherited zh-CN, so the mark ending an all-English paragraph claimed
   // to be Chinese.
   check("and the paragraph mark is English too",
-    /<w:jc w:val="left"\/><w:rPr>[^]*?w:lang w:val="en-GB"/.test(enRun), true);
+    /<w:jc w:val="both"\/><w:rPr>[^]*?w:lang w:val="en-GB"/.test(enRun), true);
   // The Chinese half must keep all of it.
   check("the Chinese half keeps East Asian line breaking",
     /<w:kinsoku w:val="0"/.test(zhRun), false);

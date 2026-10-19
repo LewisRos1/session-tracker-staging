@@ -36,13 +36,15 @@ function extract(name) {
   throw new Error(`${name} has no end`);
 }
 const font = src.match(/const CHINESE_EASTASIA_FONT = "([^"]+)";/)[1];
+const latinLang = src.match(/const DOC_LATIN_LANG = "([^"]+)";/)[1];
 const setChineseFonts = new Function(
   `const CHINESE_EASTASIA_FONT = ${JSON.stringify(font)};`
+  + `const DOC_LATIN_LANG = ${JSON.stringify(latinLang)};`
   + extract("setChineseFonts") + "; return setChineseFonts;")();
 const lists = ["CHINESE_NO_BREAK_AFTER", "CHINESE_NO_BREAK_BEFORE"]
   .map(n => src.match(new RegExp(`const ${n} = "[^"]*";`))[0]).join("\n");
 const setChineseLineBreaks = new Function(
-  lists + extract("setChineseLineBreaks") + "; return setChineseLineBreaks;")();
+  lists + `const DOC_LATIN_LANG = ${JSON.stringify(latinLang)};` + extract("setChineseLineBreaks") + "; return setChineseLineBreaks;")();
 
 let failed = 0;
 const check = (what, got, want) => {
@@ -241,6 +243,15 @@ check("nor end with an opening bracket",
   /<w:noLineBreaksAfter[^>]*w:val="[^"]*（/.test(settings), true);
 check("they say which language they are for",
   (settings.match(/w:lang="zh-CN"/g) || []).length, 2);
+// Word looks the list up by the language in force. The document says its
+// Latin language is en-MY, so a list filed only under zh-CN is never found
+// and Chinese lines start with a full stop again.
+check("and the same lists under the document's own language",
+  (settings.match(/w:lang="en-MY"/g) || []).length, 2);
+// CT_Compat wants every noLineBreaksAfter ahead of any noLineBreaksBefore.
+check("every After comes before every Before",
+  settings.lastIndexOf("<w:noLineBreaksAfter")
+  < settings.indexOf("<w:noLineBreaksBefore"), true);
 // They are part of the compatibility block, which the file already has.
 check("they sit inside w:compat",
   /<w:compat><w:noLineBreaksAfter/.test(settings), true);
