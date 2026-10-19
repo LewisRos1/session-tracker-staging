@@ -520,8 +520,9 @@ console.log("\nthe English note drawn as a picture");
   check("and the same size on the shape",
     /<a:ext cx="5734050" cy="400050"\/>/.test(pic), true);
   // The words still have to be findable by search and by a screen reader.
-  check("the English is kept in the description",
-    pic.includes("This report has been translated"), true);
+  check("both languages are kept in the description",
+    pic.includes("This report has been translated")
+    && pic.includes("本报告"), true);
   // findChartPictures must not mistake it for one of our charts.
   check("and it is not mistaken for a chart",
     readChartDataTag(/descr="([^"]*)"/.exec(pic)[1]), null);
@@ -537,19 +538,21 @@ console.log("\nthe English note drawn as a picture");
   check("and a document with no page size falls back", docTextWidthPx("<w:p/>"), 602);
 }
 {
-  // With a picture the English text paragraph is replaced, not added to.
+  // With a picture BOTH halves are replaced: one image, one paragraph.
   const doc = `<w:document><w:body><w:p><w:r><w:t>x</w:t></w:r></w:p></w:body></w:document>`;
   const out = addTranslatedNote(doc, { rid: "rId7", width: 602, height: 42 });
-  check("the Chinese half is still text", out.includes("\u672c\u62a5\u544a"), true);
-  check("the English half is the picture",
-    /<wp:inline/.test(out), true);
-  check("and is not also there as text",
-    out.includes("<w:t xml:space=\"preserve\">This report"), false);
+  check("the whole note is one picture", /<wp:inline/.test(out), true);
+  check("and it is only one picture",
+    (out.match(/<wp:inline/g) || []).length, 1);
+  check("neither half is left behind as text",
+    out.includes("<w:t xml:space=\"preserve\">This report")
+    || out.includes("<w:t xml:space=\"preserve\">\u672c\u62a5\u544a"), false);
   // No picture to hand, which is how the tests above run: fall back to text
   // rather than lose the note.
   const plain = addTranslatedNote(doc, null);
-  check("without one it falls back to text",
-    plain.includes("This report has been translated") && !/<wp:inline/.test(plain), true);
+  check("without one both halves fall back to text",
+    plain.includes("This report has been translated")
+    && plain.includes("\u672c\u62a5\u544a") && !/<wp:inline/.test(plain), true);
 }
 
 console.log("\nclosing a Chinese date up");

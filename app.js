@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2294";
+const APP_VERSION = "2295";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -17693,13 +17693,14 @@ async function translateDocxFile(file, student, onProgress, signal) {
   // line-breaking rules along with everything else.
   if (rewritten.has("word/document.xml")) {
     const docXml = rewritten.get("word/document.xml");
-    // The English half of the note goes in as a picture, because Word would
-    // otherwise cut its words in half -- see DOC_PRIMARY_LANG. Everything
-    // here is skipped if the note is already in the file, and any failure
-    // falls back to ordinary text rather than losing the note.
-    let enImage = null;
-    if (!docXml.includes(TRANSLATED_NOTE_ZH)) {
-      const drawn = renderNoteImagePng(TRANSLATED_NOTE_EN, docTextWidthPx(docXml));
+    // The note goes in as a picture, both languages together, because Word
+    // would otherwise cut the English words in half -- see
+    // DOC_PRIMARY_LANG. Skipped if the note is already in the file, and
+    // any failure falls back to ordinary text rather than losing it.
+    let image = null;
+    if (!docXml.includes(TRANSLATED_NOTE_ZH) && !/zora-translated-note/.test(docXml)) {
+      const drawn = renderNoteImagePng(TRANSLATED_NOTE_ZH, TRANSLATED_NOTE_EN,
+        docTextWidthPx(docXml));
       if (drawn?.base64) {
         const relsName = "word/_rels/document.xml.rels";
         const relsXml = rewritten.get(relsName)
@@ -17709,7 +17710,7 @@ async function translateDocxFile(file, student, onProgress, signal) {
           let n = 1;
           while (used.has(`rId${n}`)) n++;
           const rid = `rId${n}`;
-          const target = "media/zora-translated-note-en.png";
+          const target = "media/zora-translated-note.png";
           // .png is already covered by a Default extension in
           // [Content_Types].xml, so there is no Override to add.
           zip.file("word/" + target, drawn.base64, { base64: true });
@@ -17717,11 +17718,11 @@ async function translateDocxFile(file, student, onProgress, signal) {
             `<Relationship Id="${rid}" Type="http://schemas.openxmlformats.org/`
             + `officeDocument/2006/relationships/image" Target="${target}"/>`
             + `</Relationships>`));
-          enImage = { rid, width: drawn.width, height: drawn.height };
+          image = { rid, width: drawn.width, height: drawn.height };
         }
       }
     }
-    rewritten.set("word/document.xml", addTranslatedNote(docXml, enImage));
+    rewritten.set("word/document.xml", addTranslatedNote(docXml, image));
   }
 
   // ── the charts ───────────────────────────────────────────────────────
@@ -18250,48 +18251,89 @@ function docTextWidthPx(docXml) {
 }
 
 /**
- * The English half of the note, drawn once as a picture.
+ * The whole note, both languages, drawn once as a picture.
  *
- * Word decides East Asian line breaking for the whole document, and that is
- * what keeps Chinese punctuation off the start of a line. The same setting
- * lets it cut a Latin word in half, and nothing below the document level
- * overrides it. A picture cannot be re-wrapped, so the English is laid out
- * here, at the width it will be shown, and Word only has to place it.
+ * Word decides East Asian line breaking for the entire document, and no
+ * value suits both languages: zh-CN keeps Chinese punctuation off the start
+ * of a line and lets Word cut English words in half, en-MY does the
+ * reverse, and nothing below document level overrides it. Drawing the note
+ * settles it, because Word cannot re-wrap a picture.
+ *
+ * Laying it out here also means the Chinese no-break rules are applied by
+ * this code rather than asked of Word: a line never begins with a comma or
+ * a full stop, and never ends with an opening bracket.
  *
  * Drawn at three times the size and shown at one third, so it is not soft
  * on a printed page. Returns null if anything goes wrong, and the caller
  * falls back to ordinary text.
  */
-function renderNoteImagePng(text, widthPx, scale = 3) {
+function renderNoteImagePng(zhText, enText, widthPx, scale = 3) {
   try {
     const SIZE = 10 * 96 / 72;                     // 10pt in px
-    const LINE = SIZE * 1.38;
-    const font = `italic ${SIZE}px "Times New Roman", serif`;
-    const measure = document.createElement("canvas").getContext("2d");
-    measure.font = font;
-    const lines = [];
-    let line = "";
-    for (const word of String(text).split(" ")) {
-      const next = line ? line + " " + word : word;
-      if (line && measure.measureText(next).width > widthPx) { lines.push(line); line = word; }
-      else line = next;
-    }
-    if (line) lines.push(line);
-    const height = Math.ceil(lines.length * LINE);
+    const ZH_FONT = `italic ${SIZE}px "SimSun", "Microsoft YaHei", serif`;
+    const EN_FONT = `italic ${SIZE}px "Times New Roman", serif`;
+    const ZH_LINE = SIZE * 1.5, EN_LINE = SIZE * 1.38, GAP = SIZE * 0.5;
+    const ctx = document.createElement("canvas").getContext("2d");
+
+    // Chinese wraps between any two characters, with two exceptions.
+    const wrapZh = (text) => {
+      ctx.font = ZH_FONT;
+      const out = [];
+      let line = "";
+      for (const ch of String(text)) {
+        if (line && ctx.measureText(line + ch).width > widthPx) {
+          // Punctuation that may not begin a line stays on this one, even
+          // though it overhangs the margin slightly, which is what Word
+          // does too.
+          if (CHINESE_NO_BREAK_BEFORE.includes(ch)) { out.push(line + ch); line = ""; continue; }
+          // An opening bracket may not end a line, so it goes down with
+          // whatever it opens.
+          const last = line.slice(-1);
+          if (CHINESE_NO_BREAK_AFTER.includes(last)) { out.push(line.slice(0, -1)); line = last; }
+          else { out.push(line); line = ""; }
+        }
+        line += ch;
+      }
+      if (line) out.push(line);
+      return out;
+    };
+    // English wraps between words, and only between words.
+    const wrapEn = (text) => {
+      ctx.font = EN_FONT;
+      const out = [];
+      let line = "";
+      for (const word of String(text).split(" ")) {
+        const next = line ? line + " " + word : word;
+        if (line && ctx.measureText(next).width > widthPx) { out.push(line); line = word; }
+        else line = next;
+      }
+      if (line) out.push(line);
+      return out;
+    };
+
+    const zh = zhText ? wrapZh(zhText) : [];
+    const en = enText ? wrapEn(enText) : [];
+    const height = Math.ceil(zh.length * ZH_LINE + (zh.length && en.length ? GAP : 0)
+      + en.length * EN_LINE);
 
     const c = document.createElement("canvas");
     c.width = Math.ceil(widthPx * scale);
     c.height = Math.ceil(height * scale);
     const g = c.getContext("2d");
     g.scale(scale, scale);
-    g.font = font;
     g.textBaseline = "alphabetic";
     g.fillStyle = "#6B7280";
-    lines.forEach((l, i) => g.fillText(l, 0, (i + 1) * LINE - LINE * 0.25));
+    let y = 0;
+    g.font = ZH_FONT;
+    for (const l of zh) { y += ZH_LINE; g.fillText(l, 0, y - ZH_LINE * 0.28); }
+    if (zh.length && en.length) y += GAP;
+    g.font = EN_FONT;
+    for (const l of en) { y += EN_LINE; g.fillText(l, 0, y - EN_LINE * 0.25); }
+
     return { base64: c.toDataURL("image/png").split(",")[1],
-             width: Math.round(widthPx), height, lines: lines.length };
+             width: Math.round(widthPx), height, lines: zh.length + en.length };
   } catch (err) {
-    console.error("could not draw the English note:", err);
+    console.error("could not draw the note:", err);
     return null;
   }
 }
@@ -18310,7 +18352,7 @@ function translatedNoteImageParagraph(rid, widthPx, heightPx, after) {
   return `<w:p><w:pPr><w:spacing w:after="${after}"/><w:jc w:val="left"/></w:pPr>`
     + `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">`
     + `<wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent t="0" r="0" b="0" l="0"/>`
-    + `<wp:docPr id="9001" name="" descr="${xmlEscape(TRANSLATED_NOTE_EN)}" title=""/>`
+    + `<wp:docPr id="9001" name="" descr="${xmlEscape(TRANSLATED_NOTE_ZH + " " + TRANSLATED_NOTE_EN)}" title=""/>`
     + `<wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="${A}" noChangeAspect="1"/></wp:cNvGraphicFramePr>`
     + `<a:graphic xmlns:a="${A}"><a:graphicData uri="${PIC}">`
     + `<pic:pic xmlns:pic="${PIC}"><pic:nvPicPr><pic:cNvPr id="0" name="" descr=""/>`
@@ -18322,7 +18364,7 @@ function translatedNoteImageParagraph(rid, widthPx, heightPx, after) {
     + `</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`;
 }
 
-function addTranslatedNote(xml, enImage) {
+function addTranslatedNote(xml, image) {
   const out = String(xml);
   if (out.includes(TRANSLATED_NOTE_ZH)) return out;   // translated twice
   const open = out.indexOf("<w:body>");
@@ -18336,12 +18378,10 @@ function addTranslatedNote(xml, enImage) {
   // where Lewis judged nobody would read it. The cover's own type is smaller
   // now, so there is room for it on the page itself.
   const line = translatedNoteParagraph;
-  return out.slice(0, at)
-    + line(TRANSLATED_NOTE_ZH, 60, true)
-    + (enImage
-        ? translatedNoteImageParagraph(enImage.rid, enImage.width, enImage.height, 240)
-        : line(TRANSLATED_NOTE_EN, 240, false))
-    + out.slice(at);
+  const note = image
+    ? translatedNoteImageParagraph(image.rid, image.width, image.height, 240)
+    : line(TRANSLATED_NOTE_ZH, 60, true) + line(TRANSLATED_NOTE_EN, 240, false);
+  return out.slice(0, at) + note + out.slice(at);
 }
 
 function tieChineseDate(text) {

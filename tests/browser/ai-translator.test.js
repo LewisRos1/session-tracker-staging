@@ -210,7 +210,8 @@ try {
   r.section("the English note is drawn as a picture");
   const png = await page.eval(`(() => {
     const img = window.__app.renderNoteImagePng(
-      window.__app.TRANSLATED_NOTE_EN, window.__app.docTextWidthPx(
+      window.__app.TRANSLATED_NOTE_ZH, window.__app.TRANSLATED_NOTE_EN,
+      window.__app.docTextWidthPx(
         '<w:pgSz w:w="11906"/><w:pgMar w:left="1440" w:right="1440"/>'));
     if (!img || !img.base64) return null;
     const b = atob(img.base64);
@@ -221,10 +222,10 @@ try {
   r.ok("it really is a PNG", !!png && png.png, JSON.stringify(png));
   r.ok("the full width of the text column", !!png && png.width === 602,
     JSON.stringify(png));
-  r.ok("wrapped onto a few lines, not one",
-    !!png && png.lines >= 2 && png.lines <= 6, JSON.stringify(png));
+  r.ok("both halves wrapped onto their own lines",
+    !!png && png.lines >= 3 && png.lines <= 10, JSON.stringify(png));
   r.ok("tall enough to hold them",
-    !!png && png.height > 20 && png.height < 160, JSON.stringify(png));
+    !!png && png.height > 40 && png.height < 240, JSON.stringify(png));
   r.ok("and has real pixels in it", !!png && png.bytes > 500, JSON.stringify(png));
 
   r.section("console");
