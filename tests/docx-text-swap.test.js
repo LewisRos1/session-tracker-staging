@@ -476,6 +476,16 @@ check("a part with no body is left alone",
     && /<w:autoSpaceDN w:val="0"\/>/.test(enRun), true);
   check("and names no East Asian font at all",
     /w:eastAsia/.test(enRun.slice(0, enRun.indexOf("This report"))), false);
+  // wordWrap is the one of those properties that is specifically about
+  // Latin. Leaving it unspecified is what the v2289 file did, and Word
+  // still printed "questi / ons".
+  check("and says to wrap whole words",
+    /<w:wordWrap w:val="1"\/>/.test(enRun), true);
+  // The paragraph mark has run properties of its own. With none it
+  // inherited zh-CN, so the mark ending an all-English paragraph claimed
+  // to be Chinese.
+  check("and the paragraph mark is English too",
+    /<w:jc w:val="left"\/><w:rPr>[^]*?w:lang w:val="en-GB"/.test(enRun), true);
   // The Chinese half must keep all of it.
   check("the Chinese half keeps East Asian line breaking",
     /<w:kinsoku w:val="0"/.test(zhRun), false);

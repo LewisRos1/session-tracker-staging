@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2289";
+const APP_VERSION = "2290";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -18165,8 +18165,12 @@ function translatedNoteParagraph(text, after, zh) {
   // on a single paragraph, and this is the paragraph that needs it. Order
   // is fixed by CT_PPrBase: kinsoku, overflowPunct, autoSpaceDE,
   // autoSpaceDN, then spacing, then jc.
+  // wordWrap is the one of these that is specifically about Latin, and it
+  // was the only one left unspecified. Absent, Word broke the word; the
+  // reading that fits is that this element means "wrap whole words", so
+  // 1 is on. CT_PPrBase puts it straight after kinsoku.
   const latinOff = zh ? ""
-    : `<w:kinsoku w:val="0"/><w:overflowPunct w:val="0"/>`
+    : `<w:kinsoku w:val="0"/><w:wordWrap w:val="1"/><w:overflowPunct w:val="0"/>`
       + `<w:autoSpaceDE w:val="0"/><w:autoSpaceDN w:val="0"/>`;
   // The English run names no East Asian font at all, so there is nothing
   // left to make Word read it as East Asian. Both halves state their own
@@ -18177,8 +18181,16 @@ function translatedNoteParagraph(text, after, zh) {
       + ` w:hAnsi="Times New Roman" w:hint="eastAsia"/>`
     : `<w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"`
       + ` w:cs="Times New Roman" w:hint="default"/>`;
+  // The paragraph MARK has its own run properties, separate from the text
+  // run. With none, it inherited w:lang zh-CN from the document defaults,
+  // so the mark that ends an all-English paragraph claimed to be Chinese.
+  // Word reads the mark when it decides how to lay the line out. In pPr,
+  // rPr comes last.
+  const markRPr = zh ? ""
+    : `<w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"`
+      + ` w:cs="Times New Roman" w:hint="default"/><w:lang w:val="en-GB"/></w:rPr>`;
   return `<w:p><w:pPr>${latinOff}`
-    + `<w:spacing w:after="${after}"/><w:jc w:val="left"/></w:pPr>`
+    + `<w:spacing w:after="${after}"/><w:jc w:val="left"/>${markRPr}</w:pPr>`
     + `<w:r><w:rPr>${fonts}`
     + `<w:i/><w:iCs/><w:sz w:val="20"/><w:szCs w:val="20"/><w:color w:val="6B7280"/>`
     + `<w:lang w:val="${zh ? "zh-CN" : "en-GB"}"/></w:rPr>`
