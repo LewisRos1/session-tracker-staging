@@ -65,8 +65,8 @@ check("no Latin font is left in an East Asian slot",
 check("a real Chinese font is named instead",
   new RegExp(`w:eastAsia="${font}"`).test(fixed), true);
 check("the font chosen is one every Windows Word has", font, "SimSun");
-check("and the text is declared Chinese, so it is not proofed as English",
-  /<w:lang w:val="zh-CN" w:eastAsia="zh-CN"\/>/.test(fixed), true);
+check("and the East Asian text is declared Chinese",
+  /<w:lang w:val="en-MY" w:eastAsia="zh-CN"\/>/.test(fixed), true);
 check("the language sits inside the document defaults",
   /<w:rPrDefault><w:rPr>[\s\S]*<w:lang[^>]*\/><\/w:rPr><\/w:rPrDefault>/.test(fixed), true);
 
@@ -96,8 +96,15 @@ check("the language tag is a language, not a font name",
 // lot in red. w:eastAsia fills only the East Asian slot; the main one was
 // left unset, so Word used whatever the reader has set -- English
 // (Malaysia) on the boss's machine.
-check("the main language slot says Chinese too",
-  /<w:lang[^>]*w:val="zh-CN"/.test(fixed), true);
+// w:val is the language of the LATIN text, w:eastAsia the language of the
+// East Asian text. v2267 set w:val to zh-CN to stop red squiggles, which
+// told Word every English letter in the report was Chinese -- so it broke
+// English words anywhere it liked: "repor / t", "questi / ons". Found by
+// diffing a report that wraps correctly against one that does not.
+check("the Latin slot stays English, or English breaks mid-word",
+  /<w:lang[^>]*w:val="en-MY"/.test(fixed), true);
+check("and never says the English is Chinese",
+  /<w:lang[^>]*w:val="zh-CN"/.test(fixed), false);
 check("and so does the East Asian one",
   /<w:lang[^>]*w:eastAsia="zh-CN"/.test(fixed), true);
 check("one language tag, not two",
@@ -172,7 +179,8 @@ console.log("\nstyles.xml with nothing in its defaults");
     + `<w:pPrDefault/></w:docDefaults><w:style w:styleId="a"><w:name w:val="a"/>`
     + `</w:style></w:styles>`;
   const got = setChineseFonts(empty);
-  check("the language is set even so", /<w:lang[^>]*w:val="zh-CN"/.test(got), true);
+  check("the language is set even so",
+    /<w:lang[^>]*w:val="en-MY"[^>]*w:eastAsia="zh-CN"/.test(got), true);
   check("and the line-breaking rules are too",
     ["kinsoku", "overflowPunct", "autoSpaceDE", "autoSpaceDN"]
       .every(r => got.includes(`<w:${r}/>`)), true);
@@ -186,14 +194,14 @@ console.log("\nstyles.xml with nothing in its defaults");
     + `</w:rPrDefault><w:pPrDefault><w:pPr/></w:pPrDefault></w:docDefaults></w:styles>`;
   const got2 = setChineseFonts(empty2);
   check("empty rPr and pPr are filled in as well",
-    /<w:lang[^>]*w:val="zh-CN"/.test(got2) && got2.includes("<w:kinsoku/>"), true);
+    /<w:lang[^>]*w:eastAsia="zh-CN"/.test(got2) && got2.includes("<w:kinsoku/>"), true);
 }
 {
   // And a styles part with no docDefaults block at all.
   const none = `<w:styles xmlns:w="x"><w:style w:styleId="b"/></w:styles>`;
   const got3 = setChineseFonts(none);
   check("a missing docDefaults block is created",
-    /<w:lang[^>]*w:val="zh-CN"/.test(got3) && got3.includes("<w:kinsoku/>"), true);
+    /<w:lang[^>]*w:eastAsia="zh-CN"/.test(got3) && got3.includes("<w:kinsoku/>"), true);
   check("and it comes first, as the format demands",
     got3.indexOf("<w:docDefaults>") < got3.indexOf(`w:styleId="b"`), true);
 }

@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2290";
+const APP_VERSION = "2291";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -18332,7 +18332,18 @@ function setChineseFonts(xml) {
     if (!/w:hint="/.test(next)) next += ' w:hint="eastAsia"';
     return `<w:rFonts${next}${slash}>`;
   });
-  // And say it is Chinese, so it is not proofed as English.
+  // And say which language is which.
+  //
+  // w:val is the language of the LATIN text in a run; w:eastAsia is the
+  // language of the East Asian text. They are two different slots.
+  //
+  // Setting w:val to zh-CN told Word that every Latin letter in the
+  // document was Chinese, so it broke English with Chinese rules, at any
+  // character: "repor / t", "questi / ons", "happ / y". Six attempts at
+  // paragraph level could not fix that, because the paragraph was never
+  // what decided it. Found by diffing a translated report that wraps
+  // correctly against one that does not: the only meaningful difference
+  // was this attribute.
   //
   // Both slots. w:eastAsia alone covers only the East Asian one, and the
   // main language was left unset, so Word fell back to whatever the reader
@@ -18343,7 +18354,7 @@ function setChineseFonts(xml) {
     (whole, inner) => /<w:lang[^>]*w:val="zh/.test(inner)
       ? whole
       : `<w:rPrDefault><w:rPr>${inner.replace(/<w:lang[^>]*\/>/g, "")}`
-        + `<w:lang w:val="zh-CN" w:eastAsia="zh-CN"/></w:rPr></w:rPrDefault>`);
+        + `<w:lang w:val="en-MY" w:eastAsia="zh-CN"/></w:rPr></w:rPrDefault>`);
   // The rules that stop a line starting with a comma or a full stop.
   //
   // A report written by the app carries none of these, so Word was left to
