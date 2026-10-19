@@ -70,7 +70,7 @@ try {
   // one line however wide it was, straight over the bars beside it. A label
   // too wide for its column must make the chart taller, because it has to
   // take a second line.
-  const wrapped = await page.eval(`(() => {
+  const labelLines = await page.eval(`(() => {
     const spec = ${JSON.stringify(SPEC)};
     const short = "回应";
     const long = "回应".repeat(40);
@@ -86,10 +86,10 @@ try {
     };
   })()`, 60000);
   r.ok("the long label is far wider than its column",
-    wrapped.longWidth > 349, `it measures ${wrapped.longWidth}px, the column is 349px`);
+    labelLines.longWidth > 349, `it measures ${labelLines.longWidth}px, the column is 349px`);
   r.ok("so it takes more than one line and the chart grows",
-    wrapped.longH > wrapped.shortH,
-    `short label ${wrapped.shortH}px tall, long label ${wrapped.longH}px -- `
+    labelLines.longH > labelLines.shortH,
+    `short label ${labelLines.shortH}px tall, long label ${labelLines.longH}px -- `
     + `the same height means it never wrapped`);
 
   r.section("the Chinese renders as characters, not empty boxes");
@@ -391,6 +391,54 @@ try {
   })()`);
   r.check("English before", words.before, "Status");
   r.check("English again afterwards, so a normal report is unaffected", words.after, "Status");
+
+  // 自我调节（Self-Regulation）has no spaces in it, so the whole label went
+  // down the character-by-character path and came out as "自我调节（Self-
+  // Regulati" / "on）". Right for Chinese, wrong inside an English word.
+  r.section("a chart label never splits an English word");
+  const labelWrap = await page.eval(`(() => {
+    const ctx = document.createElement("canvas").getContext("2d");
+    ctx.font = "13px Arial";
+    const w = (t, px) => window.__app.wrapChartLabel(ctx, t, px, 3);
+    return {
+      selfReg: w("自我调节（Self-Regulation）", 110),
+      movement: w("动作（Movement）", 110),
+      fedc: w("功能性情绪发展能力第3阶段（FEDC 3）", 110),
+      narrow: w("Self-Regulation", 30),
+    };
+  })()`);
+  // A break between two lines is a split word only if gluing the pieces
+  // back together reproduces something the original actually said. "FEDC"
+  // then "3" is a break at the space that used to be there, which is fine;
+  // "Regulati" then "on" is not.
+  const splitsAWord = (lines, original) => lines.some((l, i) => {
+    if (i === lines.length - 1) return false;
+    const tail = (/[A-Za-z0-9]+$/.exec(l) || [""])[0];
+    const head = (/^[A-Za-z0-9]+/.exec(lines[i + 1]) || [""])[0];
+    return !!tail && !!head && original.includes(tail + head);
+  });
+  r.ok("Regulation survives in one piece",
+    labelWrap.selfReg.some(l => l.includes("Regulation")),
+    JSON.stringify(labelWrap.selfReg));
+  r.ok("and no line ends mid-word", !splitsAWord(labelWrap.selfReg, "自我调节（Self-Regulation）"),
+    JSON.stringify(labelWrap.selfReg));
+  r.ok("Movement too",
+    labelWrap.movement.some(l => l.includes("Movement")) && !splitsAWord(labelWrap.movement, "动作（Movement）"),
+    JSON.stringify(labelWrap.movement));
+  r.ok("and FEDC 3 is not cut either", !splitsAWord(labelWrap.fedc, "功能性情绪发展能力第3阶段（FEDC 3）"),
+    JSON.stringify(labelWrap.fedc));
+  // The Chinese must still wrap between characters, which is what made
+  // this function necessary in the first place.
+  r.ok("Chinese still wraps between characters",
+    labelWrap.fedc.length > 1 && labelWrap.fedc[0].startsWith("功能性"),
+    JSON.stringify(labelWrap.fedc));
+  r.ok("nothing is lost from the name",
+    labelWrap.fedc.join("").replace(/\u2026/g, "").length >= 10,
+    JSON.stringify(labelWrap.fedc));
+  // One word wider than the whole line still has to go somewhere.
+  r.ok("a word too wide for the line is still broken rather than lost",
+    labelWrap.narrow.join("").replace(/\u2026/g, "").length >= 6,
+    JSON.stringify(labelWrap.narrow));
 
   r.section("console");
   const noise = page.consoleLines.filter(l => l.level === "error");

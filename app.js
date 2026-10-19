@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2295";
+const APP_VERSION = "2296";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -17015,9 +17015,11 @@ const TRANSLATE_TERMS_RULE = "2026-10-14-targets-translated";
  * Splitting on spaces is only right for a language that has them. A Chinese
  * name arrives as one long word, never wraps, and runs off the edge of the
  * chart: 功能性情绪发展能力第3阶段（FEDC 3）lost its first four characters
- * altogether. Anything still too wide on its own is broken a character at a
- * time, which is how Chinese wraps anyway and is better than nothing for an
- * over-long English word too.
+ * altogether. Anything still too wide on its own is broken into pieces that
+ * may each begin a line: a run of Latin letters or digits is one piece and
+ * is never split down the middle, and every other character is a piece of
+ * its own, which is how Chinese wraps. Breaking blindly per character put
+ * "自我调节（Self-Regulati" on one line and "on）" on the next.
  *
  * `measure` is a canvas context with the font already set on it.
  */
@@ -17030,9 +17032,18 @@ function wrapChartLabel(measure, text, maxW, maxLines = 3) {
     if (measure.measureText(test).width <= maxW) { cur = test; continue; }
     push();
     if (measure.measureText(w).width <= maxW) { cur = w; continue; }
-    for (const ch of w) {
-      if (cur && measure.measureText(cur + ch).width > maxW) push();
-      cur += ch;
+    for (const piece of w.match(/[A-Za-z0-9]+|[\s\S]/g) || []) {
+      if (cur && measure.measureText(cur + piece).width > maxW) push();
+      // One Latin word too wide for a line even on its own. Nothing to do
+      // but break it, which still beats running off the chart.
+      if (measure.measureText(piece).width > maxW) {
+        for (const ch of piece) {
+          if (cur && measure.measureText(cur + ch).width > maxW) push();
+          cur += ch;
+        }
+        continue;
+      }
+      cur += piece;
     }
   }
   push();
