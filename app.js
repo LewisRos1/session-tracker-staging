@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2284";
+const APP_VERSION = "2285";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -17691,7 +17691,27 @@ async function translateDocxFile(file, student, onProgress, signal) {
   // Before the font pass, so the note is given the Chinese font and the
   // line-breaking rules along with everything else.
   if (rewritten.has("word/document.xml")) {
-    rewritten.set("word/document.xml", addTranslatedNote(rewritten.get("word/document.xml")));
+    const docXml = rewritten.get("word/document.xml");
+    // A report that opens on a cover page puts the note in a header of its
+    // own, shown on page 1 only. Everything else keeps it at the top of the
+    // body, which is where a report with no cover wants it anyway.
+    const hasCover = !!firstPageBreakParagraph(docXml, docXml.indexOf("<w:body>"));
+    let placed = null;
+    if (hasCover && !zip.file(NOTE_HEADER_PART)) {
+      const relsName = "word/_rels/document.xml.rels";
+      const ctName = "[Content_Types].xml";
+      const relsXml = await zip.file(relsName)?.async("string");
+      const ctXml = await zip.file(ctName)?.async("string");
+      if (relsXml && ctXml) placed = addNoteAsFirstPageHeader(docXml, relsXml, ctXml);
+    }
+    if (placed) {
+      rewritten.set("word/document.xml", placed.doc);
+      rewritten.set("word/_rels/document.xml.rels", placed.rels);
+      rewritten.set("[Content_Types].xml", placed.ct);
+      rewritten.set(NOTE_HEADER_PART, placed.header);
+    } else if (!zip.file(NOTE_HEADER_PART)) {
+      rewritten.set("word/document.xml", addTranslatedNote(docXml));
+    }
   }
 
   // ── the charts ───────────────────────────────────────────────────────
@@ -18162,6 +18182,95 @@ function firstPageBreakParagraph(xml, from) {
   return null;
 }
 
+/**
+ * One line of the translated-from-English note.
+ *
+ * Each half says which language it is. setChineseFonts stamps
+ * w:hint="eastAsia" on every run that has not already said otherwise, and on
+ * the English half that told Word the letters were East Asian characters, so
+ * it broke the line between any two of them and printed "repor / t" and
+ * "clarific / ation". wordWrap does not help, because it only governs text
+ * Word believes is Latin. hint="default" is left alone by that pass and puts
+ * the English back under Latin rules, where a word stays whole.
+ */
+function translatedNoteParagraph(text, after, breaks, zh) {
+  return `<w:p><w:pPr>${breaks ? "<w:pageBreakBefore/>" : ""}`
+    + `<w:spacing w:after="${after}"/><w:jc w:val="both"/></w:pPr>`
+    + `<w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"`
+    + ` w:cs="Times New Roman" w:hint="${zh ? "eastAsia" : "default"}"/>`
+    + `<w:i/><w:iCs/><w:sz w:val="18"/><w:szCs w:val="18"/><w:color w:val="6B7280"/>`
+    + `<w:lang w:val="${zh ? "zh-CN" : "en-GB"}"/></w:rPr>`
+    + `<w:t xml:space="preserve">${xmlEscape(text)}</w:t></w:r></w:p>`;
+}
+
+/**
+ * Where the note's own header lives inside the .docx.
+ *
+ * Deliberately not header<number>.xml: DOCX_FONT_PARTS matches that shape,
+ * and this part must NOT go through the font pass. Every run in it already
+ * states its font, its hint and its language.
+ */
+const NOTE_HEADER_PART = "word/headerZoraNote.xml";
+
+/**
+ * Put the note in a header shown on the first page only.
+ *
+ * The half-year and assessment reports open on a cover page that is already
+ * full. At the top of the body the note pushed the company details onto a
+ * page of their own; after the cover, nobody reads it. A header sits in the
+ * top margin, so it costs the page almost nothing, and Word's "different
+ * first page" leaves pages 2 onwards with the ZORA logo they already had.
+ *
+ * Returns the four parts that have to change together, or null when this
+ * document cannot take one -- in which case the caller falls back to the
+ * note in the body.
+ */
+function addNoteAsFirstPageHeader(docXml, relsXml, ctXml) {
+  const m = /<w:sectPr\b[\s\S]*?<\/w:sectPr>/.exec(docXml);
+  if (!m) return null;
+  let sect = m[0];
+  if (/w:type="first"/.test(sect)) return null;   // it already has one
+
+  // An id nothing else in the document is using. They are not contiguous, so
+  // this counts up from 1 rather than adding one to the largest.
+  const used = new Set((relsXml.match(/Id="[^"]+"/g) || []).map(s => s.slice(4, -1)));
+  let n = 1;
+  while (used.has(`rId${n}`)) n++;
+  const rid = `rId${n}`;
+  const target = NOTE_HEADER_PART.replace("word/", "");
+
+  sect = /<w:headerReference/.test(sect)
+    ? sect.replace(/(<w:headerReference[^>]*\/>)/,
+        `$1<w:headerReference w:type="first" r:id="${rid}"/>`)
+    : sect.replace(/(<w:sectPr\b[^>]*>)/,
+        `$1<w:headerReference w:type="first" r:id="${rid}"/>`);
+  // The order inside <w:sectPr> is fixed by the format: titlePg comes after
+  // pgNumType and before docGrid.
+  if (!/<w:titlePg/.test(sect)) {
+    sect = /<w:docGrid/.test(sect)
+      ? sect.replace("<w:docGrid", "<w:titlePg/><w:docGrid")
+      : sect.replace("</w:sectPr>", "<w:titlePg/></w:sectPr>");
+  }
+
+  const REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header";
+  const CT_HDR = "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml";
+  return {
+    rid,
+    doc: docXml.slice(0, m.index) + sect + docXml.slice(m.index + m[0].length),
+    rels: relsXml.replace("</Relationships>",
+      `<Relationship Id="${rid}" Type="${REL_NS}" Target="${target}"/></Relationships>`),
+    // This file declares every part by name and has no <Default> extensions,
+    // so a part with no Override here is a document Word refuses to open.
+    ct: ctXml.replace("</Types>",
+      `<Override PartName="/${NOTE_HEADER_PART}" ContentType="${CT_HDR}"/></Types>`),
+    header: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`
+      + `<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">`
+      + translatedNoteParagraph(TRANSLATED_NOTE_ZH, 40, false, true)
+      + translatedNoteParagraph(TRANSLATED_NOTE_EN, 0, false, false)
+      + `</w:hdr>`,
+  };
+}
+
 function addTranslatedNote(xml) {
   const out = String(xml);
   if (out.includes(TRANSLATED_NOTE_ZH)) return out;   // translated twice
@@ -18172,23 +18281,7 @@ function addTranslatedNote(xml) {
   // report against the English one should see the same note she signed off.
   // The order inside <w:pPr> is fixed by the format: the break, then the
   // spacing, then the alignment.
-  // Each half says which language it is.
-  //
-  // setChineseFonts stamps w:hint="eastAsia" on every run that has not
-  // already said otherwise. On the English half that told Word the letters
-  // were East Asian characters, so it broke the line between any two of
-  // them and printed "repor / t" and "clarific / ation". wordWrap does not
-  // help, because it only governs text Word thinks is Latin. Saying
-  // hint="default" here is left alone by that pass and puts the English
-  // back under Latin rules, where a word stays whole.
-  const line = (text, after, breaks, zh) =>
-    `<w:p><w:pPr>${breaks ? "<w:pageBreakBefore/>" : ""}`
-    + `<w:spacing w:after="${after}"/><w:jc w:val="both"/></w:pPr>`
-    + `<w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"`
-    + ` w:cs="Times New Roman" w:hint="${zh ? "eastAsia" : "default"}"/>`
-    + `<w:i/><w:iCs/><w:sz w:val="18"/><w:szCs w:val="18"/><w:color w:val="6B7280"/>`
-    + `<w:lang w:val="${zh ? "zh-CN" : "en-GB"}"/></w:rPr>`
-    + `<w:t xml:space="preserve">${xmlEscape(text)}</w:t></w:r></w:p>`;
+  const line = translatedNoteParagraph;
 
   // The half-year report's cover page is already full: two more lines at the
   // very top pushed the company details onto a page of their own. The note
