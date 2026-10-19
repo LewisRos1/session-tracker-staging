@@ -233,6 +233,51 @@ try {
     !!png && png.height > 40 && png.height < 240, JSON.stringify(png));
   r.ok("and has real pixels in it", !!png && png.bytes > 500, JSON.stringify(png));
 
+  // Justified, like the rest of the report. The picture cannot be re-wrapped by Word,
+  // so the spacing has to be right when it is drawn. Checked by looking at the
+  // pixels: every line but the last of each half should end at the same place.
+  const edges = await page.eval(`(async () => {
+    const img = window.__app.renderNoteImagePng(
+      window.__app.TRANSLATED_NOTE_ZH, window.__app.TRANSLATED_NOTE_EN, 602);
+    if (!img) return null;
+    const bmp = await createImageBitmap(await (await fetch(
+      "data:image/png;base64," + img.base64)).blob());
+    const c = document.createElement("canvas");
+    c.width = bmp.width; c.height = bmp.height;
+    c.getContext("2d").drawImage(bmp, 0, 0);
+    const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+    // The rightmost pixel with ink on it, row by row.
+    const rightOf = [];
+    for (let y = 0; y < c.height; y++) {
+      let right = -1;
+      for (let x = c.width - 1; x >= 0; x--) {
+        if (d[(y * c.width + x) * 4 + 3] > 24) { right = x; break; }
+      }
+      if (right >= 0) rightOf.push(right);
+    }
+    // One number per line of text: the widest row in each run of inked rows.
+    const lines = [];
+    let runMax = -1, blank = 0;
+    for (let y = 0; y < c.height; y++) {
+      let right = -1;
+      for (let x = c.width - 1; x >= 0; x--) {
+        if (d[(y * c.width + x) * 4 + 3] > 24) { right = x; break; }
+      }
+      if (right >= 0) { runMax = Math.max(runMax, right); blank = 0; }
+      else if (runMax >= 0 && ++blank > 2) { lines.push(runMax); runMax = -1; }
+    }
+    if (runMax >= 0) lines.push(runMax);
+    return { width: c.width, lines };
+  })()`);
+  r.ok("the picture could be read back", !!edges && edges.lines.length >= 3,
+    JSON.stringify(edges));
+  // Allow a couple of pixels: a full stop carries less ink than a letter.
+  const flush = edges ? edges.lines.filter(x => x > edges.width - 14).length : 0;
+  r.ok("most lines end flush at the right margin",
+    !!edges && flush >= edges.lines.length - 2,
+    `${flush} of ${edges && edges.lines.length} lines reach the margin `
+    + `(width ${edges && edges.width}): ${JSON.stringify(edges && edges.lines)}`);
+
   r.section("console");
   const noise = page.consoleLines.filter(l => l.level === "error");
   r.ok("no console errors", noise.length === 0,

@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2297";
+const APP_VERSION = "2298";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -17504,6 +17504,8 @@ Before providing the translation, silently check that:
 - The wording is clear and parent-friendly without hiding difficulties or making unsupported claims.
 - The original headings, numbering, dates, scores, and report structure have been preserved.
 
+If the English original contains incomplete sentences, grammatical errors, or unclear wording, use the surrounding context to determine the intended meaning and translate it into natural Chinese. Do not invent missing information or make unsupported assumptions.
+
 FINAL PRIORITY: accuracy first, natural Chinese second, parent-friendliness third. Make the smallest changes necessary to produce a clear, natural, accurate translation. Return only the numbered lines and nothing else.`;
 }
 
@@ -18349,12 +18351,33 @@ function renderNoteImagePng(zhText, enText, widthPx, scale = 3) {
     g.scale(scale, scale);
     g.textBaseline = "alphabetic";
     g.fillStyle = "#6B7280";
+
+    // Justified, like the rest of the report. Word would normally do this,
+    // but this is a picture, so the spacing is worked out here instead.
+    // English is stretched between its words and Chinese between its
+    // characters, which is how each language is justified. The last line of
+    // each half is left alone, as it is in any justified paragraph.
+    const drawLine = (text, y, isLast, isZh) => {
+      const pieces = isZh ? Array.from(text) : text.split(" ");
+      const slack = widthPx - g.measureText(text).width;
+      // A Chinese line can overhang slightly where punctuation was pulled
+      // back onto it, and then there is nothing to share out.
+      if (isLast || pieces.length < 2 || slack <= 0) { g.fillText(text, 0, y); return; }
+      const space = isZh ? 0 : g.measureText(" ").width;
+      const gap = slack / (pieces.length - 1);
+      let x = 0;
+      for (const piece of pieces) {
+        g.fillText(piece, x, y);
+        x += g.measureText(piece).width + space + gap;
+      }
+    };
+
     let y = 0;
     g.font = ZH_FONT;
-    for (const l of zh) { y += ZH_LINE; g.fillText(l, 0, y - ZH_LINE * 0.28); }
+    zh.forEach((l, i) => { y += ZH_LINE; drawLine(l, y - ZH_LINE * 0.28, i === zh.length - 1, true); });
     if (zh.length && en.length) y += GAP;
     g.font = EN_FONT;
-    for (const l of en) { y += EN_LINE; g.fillText(l, 0, y - EN_LINE * 0.25); }
+    en.forEach((l, i) => { y += EN_LINE; drawLine(l, y - EN_LINE * 0.25, i === en.length - 1, false); });
 
     return { base64: c.toDataURL("image/png").split(",")[1],
              width: Math.round(widthPx), height, lines: zh.length + en.length };
