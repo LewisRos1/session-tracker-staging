@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2285";
+const APP_VERSION = "2286";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -7319,7 +7319,9 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     children: logoData
       ? [new ImageRun({ data: logoData, transformation: { width: 454, height: 135 }, type: "png" })]
       : [],
-    alignment: AlignmentType.CENTER, spacing: { before: 480, after: 560, ...CPL }
+    // Tightened so the cover still fits on one page once the translated
+    // note is sitting in the first-page header above it.
+    alignment: AlignmentType.CENTER, spacing: { before: 240, after: 400, ...CPL }
   }));
   // The only thing a custom range changes on the page: a half-year report is
   // always six months and can name itself, whereas a chosen range has to say
@@ -7332,7 +7334,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   }));
   paragraphs.push(new Paragraph({
     children: [new TextRun({ text: `${sessionType === "group" ? "Group" : "Individual"} Session (${fullTermLabel})`, bold: true, size: 36, font: TNR })],
-    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 640, ...CPL }
+    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 480, ...CPL }
   }));
 
   const mkCoverLabelPara = text => new Paragraph({
@@ -18142,12 +18144,12 @@ function joinWrappedLines(text) {
  * opened a gap half the width of the page between 2026年 and 1月.
  *
  * The date can still break after the year or after the month, because no
- * line may begin with 年, 月 or 日 (CHINESE_NO_BREAK_BEFORE) and the digits
- * either side are kept whole by <w:wordWrap w:val="0"/>.
+ * line may begin with 年, 月 or 日 (CHINESE_NO_BREAK_BEFORE), and a run of
+ * digits is a word to Word, so it is not split down the middle.
  */
 /** The note at the top of every translated report, in both languages. */
-const TRANSLATED_NOTE_ZH = "本报告根据英文原文翻译而成。由于中英文表达方式有所不同，部分内容的措辞可能会略有差异。如果您对报告中的内容有任何疑问，欢迎随时与孩子的老师联系，我们很乐意为您进一步说明。";
-const TRANSLATED_NOTE_EN = "This report has been translated from the original English version. As Chinese and English differ in their ways of expression, some wording may vary slightly. If you have any questions about the report, please feel free to contact your child's instructor. We will be happy to provide further clarification.";
+const TRANSLATED_NOTE_ZH = "本报告由英文原文翻译而成，部分措辞可能略有差异。如有疑问，欢迎随时联系孩子的老师。";
+const TRANSLATED_NOTE_EN = "This report has been translated from the original English. Some wording may differ slightly between the two languages. If you have any questions, please contact your child's instructor.";
 
 /**
  * Say, once and up front, that this is a translation.
@@ -18189,13 +18191,13 @@ function firstPageBreakParagraph(xml, from) {
  * w:hint="eastAsia" on every run that has not already said otherwise, and on
  * the English half that told Word the letters were East Asian characters, so
  * it broke the line between any two of them and printed "repor / t" and
- * "clarific / ation". wordWrap does not help, because it only governs text
- * Word believes is Latin. hint="default" is left alone by that pass and puts
- * the English back under Latin rules, where a word stays whole.
+ * "clarific / ation". hint="default" is left alone by that pass and puts
+ * the English back under Latin rules, where a word stays whole. The note is
+ * also left aligned, so no line has to be stretched or broken to fit.
  */
 function translatedNoteParagraph(text, after, breaks, zh) {
   return `<w:p><w:pPr>${breaks ? "<w:pageBreakBefore/>" : ""}`
-    + `<w:spacing w:after="${after}"/><w:jc w:val="both"/></w:pPr>`
+    + `<w:spacing w:after="${after}"/><w:jc w:val="left"/></w:pPr>`
     + `<w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"`
     + ` w:cs="Times New Roman" w:hint="${zh ? "eastAsia" : "default"}"/>`
     + `<w:i/><w:iCs/><w:sz w:val="18"/><w:szCs w:val="18"/><w:color w:val="6B7280"/>`
@@ -18424,18 +18426,17 @@ function setChineseFonts(xml) {
   // paragraph defaults: the order of these elements is fixed, and all of
   // them come before <w:spacing>, which is already in there.
   //
-  // <w:wordWrap w:val="0"/> is the one that is about ENGLISH. Turning the
-  // document Chinese switches Word to East Asian line breaking, which may
-  // break a line between any two characters -- including two letters in the
-  // middle of an English word. The translated-from-English note under the
-  // title came out as "repor / t" and "clarific / ation", and so would the
-  // English inside a target name like 模仿（Imitation）. Setting it to 0 says
-  // a Latin word stays whole. It goes between kinsoku and overflowPunct,
-  // because the format fixes the order of these elements.
+  // No <w:wordWrap/> here, on purpose.
+  //
+  // v2280 added <w:wordWrap w:val="0"/> to stop "repor / t". It did the
+  // opposite: that element is what lets Word break a Latin word in the
+  // middle. The English report proves it -- its body text is justified
+  // English, it carries no wordWrap, and it never breaks a word. The real
+  // cause of the original fault was w:hint="eastAsia" being stamped on the
+  // note's English run, which is fixed where the note is built.
   out = out.replace(/<w:pPrDefault><w:pPr>(?!<w:kinsoku\/>)/,
     (whole) => whole +
-      "<w:kinsoku/><w:wordWrap w:val=\"0\"/><w:overflowPunct/>"
-      + "<w:autoSpaceDE/><w:autoSpaceDN/>");
+      "<w:kinsoku/><w:overflowPunct/><w:autoSpaceDE/><w:autoSpaceDN/>");
   return out;
 }
 

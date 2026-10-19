@@ -508,6 +508,9 @@ console.log("\nthe note as a first-page header");
   check("the header holds both halves of the note",
     /翻译而成/.test(got.header)
     && /translated from the original English/.test(got.header), true);
+  // Lewis asked for three lines at most; the long version ran to four.
+  check("and the English half is short enough to fit",
+    got.header.includes("We will be happy to provide"), false);
   // Second paragraph of the header. The hint sits in the run properties,
   // ahead of the text it applies to.
   const enPara = got.header.split("</w:p>")[1];

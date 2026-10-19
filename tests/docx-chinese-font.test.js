@@ -85,7 +85,7 @@ check("every other style survives",
 // Everything this function is meant to add, taken back out again: whatever
 // is left over is something it changed that it had no business changing.
 const bare = t => t.replace(/<w:lang[^>]*zh-CN[^>]*\/>/g, "")
-  .replace(/<w:kinsoku\/><w:wordWrap w:val="0"\/><w:overflowPunct\/><w:autoSpaceDE\/><w:autoSpaceDN\/>/g, "")
+  .replace(/<w:kinsoku\/><w:overflowPunct\/><w:autoSpaceDE\/><w:autoSpaceDN\/>/g, "")
   .replace(/ w:hint="eastAsia"/g, "")
   .replace(/w:eastAsia="[^"]*"/g, "#");
 check("nothing changed but the font slot and the language",
@@ -124,17 +124,12 @@ check("every run says which characters are the East Asian ones",
 check("the four line-breaking rules are set",
   ["kinsoku", "overflowPunct", "autoSpaceDE", "autoSpaceDN"]
     .every(r => fixed.includes(`<w:${r}/>`)), true);
-// Turning the document Chinese switches Word to East Asian line breaking,
-// which breaks between any two characters -- so the English note under the
-// title came out as "repor / t" and "clarific / ation".
-check("and English words are told to stay whole",
-  /<w:wordWrap w:val="0"\/>/.test(fixed), true);
-// CT_PPrBase fixes the order: kinsoku, then wordWrap, then overflowPunct.
-check("in the order the format demands",
-  fixed.indexOf("<w:kinsoku/>") < fixed.indexOf(`<w:wordWrap w:val="0"/>`)
-  && fixed.indexOf(`<w:wordWrap w:val="0"/>`) < fixed.indexOf("<w:overflowPunct/>"), true);
-check("and not added twice",
-  (setChineseFonts(fixed).match(/<w:wordWrap/g) || []).length, 1);
+// v2280 added <w:wordWrap w:val="0"/> here to stop "repor / t". It did the
+// opposite: that element is what lets Word break a Latin word in half. The
+// English report is the proof -- justified English, no wordWrap, no broken
+// words. It must not come back.
+check("nothing tells Word it may split a Latin word",
+  /<w:wordWrap/.test(fixed), false);
 // The order of these elements is fixed by the format, and all four belong
 // before <w:spacing>, which the app already writes.
 check("and they come before the spacing that was already there",
@@ -176,8 +171,7 @@ console.log("\nstyles.xml with nothing in its defaults");
   check("and the line-breaking rules are too",
     ["kinsoku", "overflowPunct", "autoSpaceDE", "autoSpaceDN"]
       .every(r => got.includes(`<w:${r}/>`)), true);
-  check("including the one that keeps English words whole",
-    /<w:wordWrap w:val="0"\/>/.test(got), true);
+  check("and still no wordWrap", /<w:wordWrap/.test(got), false);
   check("the style that was there survives", got.includes(`w:styleId="a"`), true);
   check("running it twice changes nothing", setChineseFonts(got), got);
 }
