@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2283";
+const APP_VERSION = "2284";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -18172,11 +18172,22 @@ function addTranslatedNote(xml) {
   // report against the English one should see the same note she signed off.
   // The order inside <w:pPr> is fixed by the format: the break, then the
   // spacing, then the alignment.
-  const line = (text, after, breaks) =>
+  // Each half says which language it is.
+  //
+  // setChineseFonts stamps w:hint="eastAsia" on every run that has not
+  // already said otherwise. On the English half that told Word the letters
+  // were East Asian characters, so it broke the line between any two of
+  // them and printed "repor / t" and "clarific / ation". wordWrap does not
+  // help, because it only governs text Word thinks is Latin. Saying
+  // hint="default" here is left alone by that pass and puts the English
+  // back under Latin rules, where a word stays whole.
+  const line = (text, after, breaks, zh) =>
     `<w:p><w:pPr>${breaks ? "<w:pageBreakBefore/>" : ""}`
     + `<w:spacing w:after="${after}"/><w:jc w:val="both"/></w:pPr>`
-    + `<w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/>`
-    + `<w:i/><w:iCs/><w:sz w:val="18"/><w:szCs w:val="18"/><w:color w:val="6B7280"/></w:rPr>`
+    + `<w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"`
+    + ` w:cs="Times New Roman" w:hint="${zh ? "eastAsia" : "default"}"/>`
+    + `<w:i/><w:iCs/><w:sz w:val="18"/><w:szCs w:val="18"/><w:color w:val="6B7280"/>`
+    + `<w:lang w:val="${zh ? "zh-CN" : "en-GB"}"/></w:rPr>`
     + `<w:t xml:space="preserve">${xmlEscape(text)}</w:t></w:r></w:p>`;
 
   // The half-year report's cover page is already full: two more lines at the
@@ -18186,12 +18197,14 @@ function addTranslatedNote(xml) {
   const cover = firstPageBreakParagraph(out, at);
   if (cover) {
     return out.slice(0, cover.start)
-      + line(TRANSLATED_NOTE_ZH, 60, true) + line(TRANSLATED_NOTE_EN, 240, false)
+      + line(TRANSLATED_NOTE_ZH, 60, true, true)
+      + line(TRANSLATED_NOTE_EN, 240, false, false)
       + cover.text.replace(PAGE_BREAK_BEFORE, "")
       + out.slice(cover.end);
   }
   return out.slice(0, at)
-    + line(TRANSLATED_NOTE_ZH, 60, false) + line(TRANSLATED_NOTE_EN, 240, false)
+    + line(TRANSLATED_NOTE_ZH, 60, false, true)
+    + line(TRANSLATED_NOTE_EN, 240, false, false)
     + out.slice(at);
 }
 

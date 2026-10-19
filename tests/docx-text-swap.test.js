@@ -448,6 +448,21 @@ check("a part with no body is left alone",
   check("the cover page is not touched otherwise", out.includes("ZORA"), true);
   check("twice is still once", addTranslatedNote(out), out);
 }
+// The English half printed as "repor / t": setChineseFonts marks every run
+// it has not been told about as East Asian, and Word then breaks between
+// any two letters. Each half now says which language it is.
+{
+  const out = addTranslatedNote(
+    `<w:document><w:body><w:p><w:r><w:t>x</w:t></w:r></w:p></w:body></w:document>`);
+  const zhRun = out.slice(out.indexOf("<w:p>"), out.indexOf("本报告"));
+  const enRun = out.slice(out.indexOf("本报告"), out.indexOf("This report"));
+  check("the Chinese half is marked East Asian",
+    /w:hint="eastAsia"/.test(zhRun) && /w:lang w:val="zh-CN"/.test(zhRun), true);
+  check("the English half is not",
+    /w:hint="default"/.test(enRun) && /w:lang w:val="en-GB"/.test(enRun), true);
+  check("and it is never marked East Asian",
+    /w:hint="eastAsia"/.test(enRun), false);
+}
 // The monthly report has no cover page and no page break, so nothing moves.
 {
   const flat = `<w:document><w:body><w:p><w:r><w:t>First thing</w:t></w:r></w:p></w:body></w:document>`;

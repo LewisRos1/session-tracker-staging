@@ -147,6 +147,19 @@ check("nor a second hint on one run",
   (setChineseFonts(fixed).match(/w:hint="eastAsia"/g) || []).length,
   (fixed.match(/w:hint="eastAsia"/g) || []).length);
 
+console.log("\na run that already says which language it is");
+// The English half of the translated note sets hint="default" so Word keeps
+// its words whole. This pass must not overwrite that with eastAsia.
+{
+  const en = `<w:p><w:r><w:rPr><w:rFonts w:ascii="Times New Roman"`
+    + ` w:hAnsi="Times New Roman" w:hint="default"/></w:rPr>`
+    + `<w:t>This report has been translated</w:t></w:r></w:p>`;
+  const got = setChineseFonts(en);
+  check("an existing hint is left alone", /w:hint="default"/.test(got), true);
+  check("and not joined by a second one",
+    (got.match(/w:hint=/g) || []).length, 1);
+}
+
 console.log("\nstyles.xml with nothing in its defaults");
 // The half-year report is built with no default styling, so the docx
 // library wrote both defaults self-closing and empty. Every rule above
