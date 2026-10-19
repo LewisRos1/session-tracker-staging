@@ -29,8 +29,7 @@ const names = ["xmlUnescape", "xmlEscape", "docxParagraphs", "markParagraph",
                "readChartDataTag", "findChartPictures", "chartPhrases",
                "stripMarkers", "translateTargetNames", "tieChineseDate",
                "pinnedTermZh",
-               "addTranslatedNote", "firstPageBreakParagraph",
-               "translatedNoteParagraph", "addNoteAsFirstPageHeader",
+               "addTranslatedNote", "translatedNoteParagraph",
                "periodLabelZh", "chartTitleZh", "overviewTitleZh",
                "overviewChartTitle",
                "resizeDrawingToChart",
@@ -41,14 +40,12 @@ const consts = ["CHART_FIXED_ZH", "MONTHS_ZH"]
   .map(n => src.match(new RegExp(`const ${n} = \\{[\\s\\S]*?\\n};`))[0])
   .join("\n");
 const cjk = src.match(/const isCjkChar = [^;]+;/)[0];
-const pbConst = src.match(/const PAGE_BREAK_BEFORE = [^;]+;/)[0]
-  + "\n" + src.match(/const NOTE_HEADER_PART = "[^"]*";/)[0];
 const noteConst = ["TRANSLATED_NOTE_ZH", "TRANSLATED_NOTE_EN"]
   .map(n => src.match(new RegExp(`const ${n} = "[^"]*";`))[0]).join("\n");
 const chineseFns = [/const hasChinese = [^;]+;/, /const looksTranslated =[\s\S]*?;/]
   .map(re => src.match(re)[0]).join("\n");
 const fns = new Function(`const CHART_TAG_PREFIX = ${JSON.stringify(tagPrefix)};`
-  + tagFn + "\n" + consts + "\n" + cjk + "\n" + chineseFns + "\n" + noteConst + "\n" + pbConst + "\n"
+  + tagFn + "\n" + consts + "\n" + cjk + "\n" + chineseFns + "\n" + noteConst + "\n"
   + names.map(extract).join("\n")
   + `\nreturn { chartDataTag, hasChinese, looksTranslated, ${names.join(", ")} };`)();
 const { xmlUnescape, docxParagraphs, markParagraph, unmarkParagraph,
@@ -57,7 +54,7 @@ const { xmlUnescape, docxParagraphs, markParagraph, unmarkParagraph,
         resizeDrawingToChart, applyDocxText, stripMarkers,
         hasChinese, looksTranslated, overviewTitleZh, overviewChartTitle,
         translateTargetNames, tieChineseDate, addTranslatedNote,
-        pinnedTermZh, addNoteAsFirstPageHeader } = fns;
+        pinnedTermZh } = fns;
 
 let failed = 0;
 const check = (what, got, want) => {
@@ -425,29 +422,27 @@ console.log("\nthe note saying this is a translation");
 check("a part with no body is left alone",
   addTranslatedNote("<w:hdr><w:p/></w:hdr>"), "<w:hdr><w:p/></w:hdr>");
 
-// The half-year and assessment reports open on a full cover page. Two more
-// lines at the very top pushed the company details onto a second page, so on
-// those the note starts page 2 instead.
+// Lewis wants the note at the top of the cover page itself, in full view. It
+// spent two versions in a first-page header, which kept the cover intact but
+// put it where he judged nobody would read it. The cover's own type is
+// smaller now, so it fits on the page.
 {
   const cover = `<w:document><w:body>`
     + `<w:p><w:r><w:t>ZORA</w:t></w:r></w:p>`
     + `<w:p><w:r><w:t>Half-Year Progress Report</w:t></w:r></w:p>`
     + `<w:p><w:pPr><w:pageBreakBefore/><w:spacing w:after="200"/></w:pPr>`
     + `<w:r><w:t>Section 1: Overview</w:t></w:r></w:p>`
-    + `<w:p><w:r><w:t>body text</w:t></w:r></w:p>`
     + `</w:body></w:document>`;
   const out = addTranslatedNote(cover);
-  check("the cover page still comes first",
-    out.indexOf("Half-Year Progress Report") < out.indexOf("本报告"), true);
-  check("the note comes before the first heading",
-    out.indexOf("本报告") < out.indexOf("Section 1: Overview"), true);
-  // If the note did not take the break over it would sit at the bottom of the
-  // cover page and push it over, which is the bug being fixed.
-  check("the note is what starts the new page",
-    out.indexOf("<w:pageBreakBefore/>") < out.indexOf("本报告"), true);
-  check("and the heading no longer breaks a page of its own",
+  check("the note is the first thing on the cover",
+    out.indexOf("本报告") < out.indexOf("ZORA"), true);
+  check("the cover page is otherwise untouched",
+    out.includes("ZORA") && out.includes("Half-Year Progress Report"), true);
+  // It used to take this break over so the note started page 2 instead.
+  check("the page break stays with the heading that had it",
+    out.indexOf("<w:pageBreakBefore/>") > out.indexOf("Half-Year Progress Report"), true);
+  check("and there is still only one",
     (out.match(/<w:pageBreakBefore\/>/g) || []).length, 1);
-  check("the cover page is not touched otherwise", out.includes("ZORA"), true);
   check("twice is still once", addTranslatedNote(out), out);
 }
 // The English half printed as "repor / t": setChineseFonts marks every run
@@ -464,6 +459,12 @@ check("a part with no body is left alone",
     /w:hint="default"/.test(enRun) && /w:lang w:val="en-GB"/.test(enRun), true);
   check("and it is never marked East Asian",
     /w:hint="eastAsia"/.test(enRun), false);
+  // 10pt, and left aligned: a justified line has to stretch or break
+  // something to reach the margin, which is how "repor / t" happened.
+  check("the note is the size Lewis asked for",
+    /<w:sz w:val="20"\/>/.test(zhRun) && /<w:sz w:val="20"\/>/.test(enRun), true);
+  check("and neither half is justified",
+    /w:jc w:val="left"/.test(out) && !/w:jc w:val="both"/.test(out), true);
 }
 // The monthly report has no cover page and no page break, so nothing moves.
 {
@@ -472,64 +473,6 @@ check("a part with no body is left alone",
   check("a report with no cover page keeps the note at the very top",
     out.indexOf("本报告") < out.indexOf("First thing"), true);
   check("and gains no page break", /<w:pageBreakBefore/.test(out), false);
-}
-
-console.log("\nthe note as a first-page header");
-// Lewis asked for this: the cover page is full, so the note goes in a
-// header of its own shown on page 1 only. A header sits in the top margin,
-// so it costs the page almost nothing, and pages 2 on keep the ZORA logo.
-{
-  const sect = `<w:sectPr><w:headerReference w:type="default" r:id="rId6"/>`
-    + `<w:footerReference w:type="default" r:id="rId7"/>`
-    + `<w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440"/>`
-    + `<w:pgNumType/><w:docGrid w:linePitch="360"/></w:sectPr>`;
-  const doc = `<w:document><w:body><w:p><w:r><w:t>cover</w:t></w:r></w:p>`
-    + sect + `</w:body></w:document>`;
-  const rels = `<Relationships><Relationship Id="rId6" Target="header1.xml"/>`
-    + `<Relationship Id="rId7" Target="footer1.xml"/></Relationships>`;
-  const ct = `<Types><Override PartName="/word/header1.xml"/></Types>`;
-  const got = addNoteAsFirstPageHeader(doc, rels, ct);
-
-  check("a first-page header is referenced",
-    /<w:headerReference w:type="first" r:id="rId1"\/>/.test(got.doc), true);
-  check("the id is one nothing else was using", got.rid, "rId1");
-  check("the default header is still there",
-    /<w:headerReference w:type="default" r:id="rId6"\/>/.test(got.doc), true);
-  // CT_SectPr fixes the order: titlePg after pgNumType, before docGrid.
-  check("different-first-page is switched on",
-    got.doc.includes("<w:pgNumType/><w:titlePg/><w:docGrid"), true);
-  check("the relationship points at the new part",
-    got.rels.includes(`Id="rId1"`)
-    && got.rels.includes(`Target="headerZoraNote.xml"`), true);
-  // This file names every part and Word refuses to open a document with a
-  // part that is not declared here.
-  check("and the part is declared",
-    got.ct.includes(`PartName="/word/headerZoraNote.xml"`), true);
-  check("the header holds both halves of the note",
-    /翻译而成/.test(got.header)
-    && /translated from the original English/.test(got.header), true);
-  // Lewis asked for three lines at most; the long version ran to four.
-  check("and the English half is short enough to fit",
-    got.header.includes("We will be happy to provide"), false);
-  // Second paragraph of the header. The hint sits in the run properties,
-  // ahead of the text it applies to.
-  const enPara = got.header.split("</w:p>")[1];
-  check("the English half stays under Latin rules",
-    enPara.includes(`w:hint="default"`) && enPara.includes("This report"), true);
-  check("translating twice does not add a second one",
-    addNoteAsFirstPageHeader(got.doc, got.rels, got.ct), null);
-}
-{
-  // A document that already has a first-page header of its own is left
-  // alone, and the caller falls back to the note in the body.
-  const taken = `<w:document><w:body><w:sectPr>`
-    + `<w:headerReference w:type="first" r:id="rId9"/></w:sectPr></w:body></w:document>`;
-  check("a header already set for page one is not replaced",
-    addNoteAsFirstPageHeader(taken, `<Relationships></Relationships>`, `<Types></Types>`),
-    null);
-  check("and a document with no section at all is refused",
-    addNoteAsFirstPageHeader(`<w:document><w:body/></w:document>`,
-      `<Relationships></Relationships>`, `<Types></Types>`), null);
 }
 
 console.log("\nclosing a Chinese date up");

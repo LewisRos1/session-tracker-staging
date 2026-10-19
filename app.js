@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2286";
+const APP_VERSION = "2287";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -7312,16 +7312,15 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     if (logoResp.ok) logoData = new Uint8Array(await logoResp.arrayBuffer());
   } catch (_) {}
 
-  // logo natural size 1658×493 → display at 454×135 in body, 180×54 in header
+  // logo natural size 1658×493 → display at 258×77 in body (0.8in tall, the
+  // height Lewis asked for), 180×54 in header
   // CPL = 1.15 line spacing applied to every cover-page paragraph
   const CPL = { line: 276, lineRule: "auto" };
   paragraphs.push(new Paragraph({
     children: logoData
-      ? [new ImageRun({ data: logoData, transformation: { width: 454, height: 135 }, type: "png" })]
+      ? [new ImageRun({ data: logoData, transformation: { width: 258, height: 77 }, type: "png" })]
       : [],
-    // Tightened so the cover still fits on one page once the translated
-    // note is sitting in the first-page header above it.
-    alignment: AlignmentType.CENTER, spacing: { before: 240, after: 400, ...CPL }
+    alignment: AlignmentType.CENTER, spacing: { before: 480, after: 560, ...CPL }
   }));
   // The only thing a custom range changes on the page: a half-year report is
   // always six months and can name itself, whereas a chosen range has to say
@@ -7329,20 +7328,20 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   paragraphs.push(new Paragraph({
     children: [new TextRun({
       text: R.isCustom ? `${R.count} Month${R.count === 1 ? "" : "s"} Progress Report` : "Half-Year Progress Report",
-      bold: true, size: 72, font: TNR })],
+      bold: true, size: 56, font: TNR })],
     alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, ...CPL }
   }));
   paragraphs.push(new Paragraph({
-    children: [new TextRun({ text: `${sessionType === "group" ? "Group" : "Individual"} Session (${fullTermLabel})`, bold: true, size: 36, font: TNR })],
-    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 480, ...CPL }
+    children: [new TextRun({ text: `${sessionType === "group" ? "Group" : "Individual"} Session (${fullTermLabel})`, bold: true, size: 32, font: TNR })],
+    alignment: AlignmentType.CENTER, spacing: { before: 0, after: 640, ...CPL }
   }));
 
   const mkCoverLabelPara = text => new Paragraph({
-    children: [new TextRun({ text, bold: true, size: 36, font: TNR })],
+    children: [new TextRun({ text, bold: true, size: 32, font: TNR })],
     alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0, ...CPL }
   });
   // Shaded paragraph (White, Background 1, Darker 15% = #D9D9D9) replaces single-col tables
-  const mkCoverShaded = (value, size = 32) => new Paragraph({
+  const mkCoverShaded = (value, size = 28) => new Paragraph({
     shading: { type: "clear", fill: "D9D9D9", color: "auto" },
     run: { size },
     children: [new TextRun({ text: value, size, font: TNR })],
@@ -7353,8 +7352,8 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   const mkCoverSpacer = () => new Paragraph({ children: [], spacing: { before: 0, after: 480, ...CPL } });
   const mkCompanyLine = label => new Paragraph({
     children: [
-      new TextRun({ text: `${label} `, bold: true, size: 28, font: TNR, underline: { type: "none" } }),
-      new TextRun({ text: "[insert text]", size: 28, font: TNR, underline: { type: "none" } })
+      new TextRun({ text: `${label} `, bold: true, size: 24, font: TNR, underline: { type: "none" } }),
+      new TextRun({ text: "[insert text]", size: 24, font: TNR, underline: { type: "none" } })
     ],
     alignment: AlignmentType.CENTER, spacing: { before: 40, after: 40, ...CPL }
   });
@@ -7364,7 +7363,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   paragraphs.push(mkCoverShaded(studentLabel(student)));
   paragraphs.push(mkCoverSpacer());
   paragraphs.push(mkCoverLabelPara("Program:"));
-  paragraphs.push(mkCoverShaded("", 32));
+  paragraphs.push(mkCoverShaded("", 28));
   paragraphs.push(mkCoverSpacer());
   paragraphs.push(mkCoverLabelPara("Date of Report:"));
   paragraphs.push(mkCoverShaded(reportDate));
@@ -17693,27 +17692,7 @@ async function translateDocxFile(file, student, onProgress, signal) {
   // Before the font pass, so the note is given the Chinese font and the
   // line-breaking rules along with everything else.
   if (rewritten.has("word/document.xml")) {
-    const docXml = rewritten.get("word/document.xml");
-    // A report that opens on a cover page puts the note in a header of its
-    // own, shown on page 1 only. Everything else keeps it at the top of the
-    // body, which is where a report with no cover wants it anyway.
-    const hasCover = !!firstPageBreakParagraph(docXml, docXml.indexOf("<w:body>"));
-    let placed = null;
-    if (hasCover && !zip.file(NOTE_HEADER_PART)) {
-      const relsName = "word/_rels/document.xml.rels";
-      const ctName = "[Content_Types].xml";
-      const relsXml = await zip.file(relsName)?.async("string");
-      const ctXml = await zip.file(ctName)?.async("string");
-      if (relsXml && ctXml) placed = addNoteAsFirstPageHeader(docXml, relsXml, ctXml);
-    }
-    if (placed) {
-      rewritten.set("word/document.xml", placed.doc);
-      rewritten.set("word/_rels/document.xml.rels", placed.rels);
-      rewritten.set("[Content_Types].xml", placed.ct);
-      rewritten.set(NOTE_HEADER_PART, placed.header);
-    } else if (!zip.file(NOTE_HEADER_PART)) {
-      rewritten.set("word/document.xml", addTranslatedNote(docXml));
-    }
+    rewritten.set("word/document.xml", addTranslatedNote(rewritten.get("word/document.xml")));
   }
 
   // ── the charts ───────────────────────────────────────────────────────
@@ -18162,28 +18141,6 @@ const TRANSLATED_NOTE_EN = "This report has been translated from the original En
  * On every translated report, with nothing to tick. A box that has to be
  * remembered is missing from the one report that needed it.
  */
-const PAGE_BREAK_BEFORE = /<w:pageBreakBefore(?:\s[^>]*)?\/>/;
-
-/**
- * The paragraph that starts the second page, when the first one is a cover.
- *
- * A cover page is a page break on a paragraph near the top of the document:
- * the half-year report breaks on "Section 1: Overview" and the assessment
- * report on the same heading. The monthly report has no page break at all,
- * so this returns null for it and the note stays where it was.
- */
-function firstPageBreakParagraph(xml, from) {
-  const re = /<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g;
-  re.lastIndex = from;
-  let m;
-  while ((m = re.exec(xml)) !== null) {
-    if (PAGE_BREAK_BEFORE.test(m[0])) {
-      return { start: m.index, end: m.index + m[0].length, text: m[0] };
-    }
-  }
-  return null;
-}
-
 /**
  * One line of the translated-from-English note.
  *
@@ -18200,7 +18157,7 @@ function translatedNoteParagraph(text, after, breaks, zh) {
     + `<w:spacing w:after="${after}"/><w:jc w:val="left"/></w:pPr>`
     + `<w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"`
     + ` w:cs="Times New Roman" w:hint="${zh ? "eastAsia" : "default"}"/>`
-    + `<w:i/><w:iCs/><w:sz w:val="18"/><w:szCs w:val="18"/><w:color w:val="6B7280"/>`
+    + `<w:i/><w:iCs/><w:sz w:val="20"/><w:szCs w:val="20"/><w:color w:val="6B7280"/>`
     + `<w:lang w:val="${zh ? "zh-CN" : "en-GB"}"/></w:rPr>`
     + `<w:t xml:space="preserve">${xmlEscape(text)}</w:t></w:r></w:p>`;
 }
@@ -18212,67 +18169,6 @@ function translatedNoteParagraph(text, after, breaks, zh) {
  * and this part must NOT go through the font pass. Every run in it already
  * states its font, its hint and its language.
  */
-const NOTE_HEADER_PART = "word/headerZoraNote.xml";
-
-/**
- * Put the note in a header shown on the first page only.
- *
- * The half-year and assessment reports open on a cover page that is already
- * full. At the top of the body the note pushed the company details onto a
- * page of their own; after the cover, nobody reads it. A header sits in the
- * top margin, so it costs the page almost nothing, and Word's "different
- * first page" leaves pages 2 onwards with the ZORA logo they already had.
- *
- * Returns the four parts that have to change together, or null when this
- * document cannot take one -- in which case the caller falls back to the
- * note in the body.
- */
-function addNoteAsFirstPageHeader(docXml, relsXml, ctXml) {
-  const m = /<w:sectPr\b[\s\S]*?<\/w:sectPr>/.exec(docXml);
-  if (!m) return null;
-  let sect = m[0];
-  if (/w:type="first"/.test(sect)) return null;   // it already has one
-
-  // An id nothing else in the document is using. They are not contiguous, so
-  // this counts up from 1 rather than adding one to the largest.
-  const used = new Set((relsXml.match(/Id="[^"]+"/g) || []).map(s => s.slice(4, -1)));
-  let n = 1;
-  while (used.has(`rId${n}`)) n++;
-  const rid = `rId${n}`;
-  const target = NOTE_HEADER_PART.replace("word/", "");
-
-  sect = /<w:headerReference/.test(sect)
-    ? sect.replace(/(<w:headerReference[^>]*\/>)/,
-        `$1<w:headerReference w:type="first" r:id="${rid}"/>`)
-    : sect.replace(/(<w:sectPr\b[^>]*>)/,
-        `$1<w:headerReference w:type="first" r:id="${rid}"/>`);
-  // The order inside <w:sectPr> is fixed by the format: titlePg comes after
-  // pgNumType and before docGrid.
-  if (!/<w:titlePg/.test(sect)) {
-    sect = /<w:docGrid/.test(sect)
-      ? sect.replace("<w:docGrid", "<w:titlePg/><w:docGrid")
-      : sect.replace("</w:sectPr>", "<w:titlePg/></w:sectPr>");
-  }
-
-  const REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header";
-  const CT_HDR = "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml";
-  return {
-    rid,
-    doc: docXml.slice(0, m.index) + sect + docXml.slice(m.index + m[0].length),
-    rels: relsXml.replace("</Relationships>",
-      `<Relationship Id="${rid}" Type="${REL_NS}" Target="${target}"/></Relationships>`),
-    // This file declares every part by name and has no <Default> extensions,
-    // so a part with no Override here is a document Word refuses to open.
-    ct: ctXml.replace("</Types>",
-      `<Override PartName="/${NOTE_HEADER_PART}" ContentType="${CT_HDR}"/></Types>`),
-    header: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`
-      + `<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">`
-      + translatedNoteParagraph(TRANSLATED_NOTE_ZH, 40, false, true)
-      + translatedNoteParagraph(TRANSLATED_NOTE_EN, 0, false, false)
-      + `</w:hdr>`,
-  };
-}
-
 function addTranslatedNote(xml) {
   const out = String(xml);
   if (out.includes(TRANSLATED_NOTE_ZH)) return out;   // translated twice
@@ -18281,22 +18177,12 @@ function addTranslatedNote(xml) {
   const at = open + "<w:body>".length;
   // Both languages: the parent reads the Chinese, and the boss checking the
   // report against the English one should see the same note she signed off.
-  // The order inside <w:pPr> is fixed by the format: the break, then the
-  // spacing, then the alignment.
+  //
+  // Always at the very top, above the cover's logo. It lived in a first-page
+  // header for two versions, which kept the cover intact but hid the note
+  // where Lewis judged nobody would read it. The cover's own type is smaller
+  // now, so there is room for it on the page itself.
   const line = translatedNoteParagraph;
-
-  // The half-year report's cover page is already full: two more lines at the
-  // very top pushed the company details onto a page of their own. The note
-  // goes to the top of page 2 instead, by taking the page break off the
-  // paragraph that starts it and carrying it itself.
-  const cover = firstPageBreakParagraph(out, at);
-  if (cover) {
-    return out.slice(0, cover.start)
-      + line(TRANSLATED_NOTE_ZH, 60, true, true)
-      + line(TRANSLATED_NOTE_EN, 240, false, false)
-      + cover.text.replace(PAGE_BREAK_BEFORE, "")
-      + out.slice(cover.end);
-  }
   return out.slice(0, at)
     + line(TRANSLATED_NOTE_ZH, 60, false, true)
     + line(TRANSLATED_NOTE_EN, 240, false, false)
