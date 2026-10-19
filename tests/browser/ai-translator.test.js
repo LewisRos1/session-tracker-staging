@@ -116,7 +116,8 @@ try {
     const s = window.__app.state.students.find(x => x.id === "caden");
     return window.__app.translateInstructions(s);
   })()`);
-  r.ok("Simplified, never Traditional", /Simplified Chinese only/.test(ins), "not stated");
+  r.ok("Simplified, never Traditional",
+    /Never Traditional characters/.test(ins), "not stated");
   r.ok("the child's Chinese name", ins.includes("陈嘉登"), "the full name is missing");
   r.ok("and the short one", ins.includes("嘉登"), "the short name is missing");
   r.ok("ZORA is left in English", /ZORA/.test(ins), "ZORA is not protected");
@@ -138,8 +139,11 @@ try {
     /2026年8月/.test(ins), "no example of a month and year");
   r.ok("but a figure is still never changed",
     /Never change a figure/.test(ins), "nothing protects the scores");
-  r.ok("and dates are no longer told to stay as written",
-    !/dates, percentages/.test(ins), "the old rule is still in there");
+  // The rule protecting figures used to say "dates" too, which left
+  // "18 Aug 2026" sitting in English in a table on a page of Chinese.
+  r.ok("and the rule protecting figures leaves dates out of it",
+    /Numbers, percentages, scores and times stay exactly as written/.test(ins)
+    && !/Numbers, dates/.test(ins), "the old rule is still in there");
   r.ok("the word list is sent", /self-regulation = 自我调节/.test(ins), "the glossary is missing");
   // "instructor" and "teacher" were unpinned, so one report called the same
   // person 指导员 and 老师 in different paragraphs.
@@ -156,32 +160,33 @@ try {
 
   // The prompt was rewritten to Lewis's spec in v2276. The machinery above
   // still has to be in it; these are the new style rules it brought in.
+  // The model copies the worked examples far more readily than the rule
+  // above them, so both of Lewis's pairs have to be there, the awkward
+  // version as well as the better one.
   r.ok("the worked examples teach the style, not just the rule",
     ins.includes("这说明他越来越能准确地找出相同的图片")
     && ins.includes("他可能正开始学习独立完成日常穿脱衣物的部分步骤")
-    && ins.includes("他正慢慢学会在同伴加入时主动与对方击掌互动"),
+    && /Awkward:/.test(ins) && /Better:/.test(ins),
     "a worked example is missing");
-  r.ok("a hedge may not harden into a fact", /Keep hedges as hedges/.test(ins),
+  r.ok("a hedge may not harden into a fact",
+    /Preserve uncertainty/.test(ins)
+    && /do not turn "suggests" into a definite conclusion/.test(ins),
     "nothing protects \"suggests\" and \"may\"");
   // Lewis asked for short explanations of technical terms. Unfenced, that
   // is a licence to add claims the English never made.
-  r.ok("explaining a term is allowed", /EXPLAINING A TECHNICAL TERM/.test(ins),
-    "the section is missing");
-  r.ok("but only where the English explained it too",
-    /Mirror the English, exactly/.test(ins)
-    && /do not explain it either/.test(ins)
-    && /must say the same amount/.test(ins),
-    "the explanation rule is not tied to the English");
+  r.ok("a term is explained only where the English explains it",
+    /Do not add explanations that are not supported by the English original/.test(ins),
+    "nothing stops it inventing an explanation");
+  r.ok("and its bracketed explanation is kept, not dropped",
+    /Preserve technical terms followed by plain-language explanations/.test(ins)
+    && /Do not remove a bracketed explanation simply because it repeats/.test(ins),
+    "nothing protects the English's own bracketed explanations");
   // Lewis asked for the opposite of the old rule here: a bracket the English
   // wrote is part of what the English says, so dropping it loses meaning.
-  r.ok("a bracket the English wrote is kept, not dropped",
-    /KEEP both and translate both naturally/.test(ins)
-    && /Never drop the bracket just because it repeats/.test(ins),
-    "nothing protects the English's own bracketed explanations");
-  r.ok("and the closer rendering wins when both are good Chinese",
-    /Stay as close to the English as you can/.test(ins)
-    && /never introduce a new interpretation/.test(ins)
-    && /choose the closer one/.test(ins),
+  r.ok("and the smallest change that works is the right one",
+    /Stay as close to the English original as possible/.test(ins)
+    && /Do not unnecessarily restructure sentences/.test(ins)
+    && /Make the smallest changes necessary/.test(ins),
     "the minimal-change rule is missing");
 
   // ── batching and reading the answer ──────────────────────────────────
