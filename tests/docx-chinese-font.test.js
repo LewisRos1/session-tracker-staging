@@ -153,6 +153,11 @@ console.log("\na run that already says which language it is");
   check("an existing hint is left alone", /w:hint="default"/.test(got), true);
   check("and not joined by a second one",
     (got.match(/w:hint=/g) || []).length, 1);
+  // And no East Asian font is bolted on either. One more thing saying
+  // "this is East Asian" is one more reason for Word to break a word.
+  check("and no East Asian font is added to it",
+    /w:eastAsia/.test(got), false);
+  check("the run comes through completely untouched", got, en);
 }
 
 console.log("\nstyles.xml with nothing in its defaults");

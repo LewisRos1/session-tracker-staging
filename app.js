@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2288";
+const APP_VERSION = "2289";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -18152,11 +18152,34 @@ const TRANSLATED_NOTE_EN = "This report has been translated from the original En
  * the English back under Latin rules, where a word stays whole. The note is
  * also left aligned, so no line has to be stretched or broken to fit.
  */
-function translatedNoteParagraph(text, after, breaks, zh) {
-  return `<w:p><w:pPr>${breaks ? "<w:pageBreakBefore/>" : ""}`
+function translatedNoteParagraph(text, after, zh) {
+  // The English half switches East Asian typography OFF for its own
+  // paragraph, and that is the point of this function.
+  //
+  // Everything else in a translated report is Chinese, so the document
+  // defaults turn kinsoku and its friends on for EVERY paragraph. Left on
+  // over Latin text, Word treats the letters as characters it is free to
+  // break between, and printed "questi / ons" and "happ / y". Taking
+  // wordWrap out did not help, nor the hint, nor left aligning it, because
+  // none of those is the switch. Each of these elements can be overridden
+  // on a single paragraph, and this is the paragraph that needs it. Order
+  // is fixed by CT_PPrBase: kinsoku, overflowPunct, autoSpaceDE,
+  // autoSpaceDN, then spacing, then jc.
+  const latinOff = zh ? ""
+    : `<w:kinsoku w:val="0"/><w:overflowPunct w:val="0"/>`
+      + `<w:autoSpaceDE w:val="0"/><w:autoSpaceDN w:val="0"/>`;
+  // The English run names no East Asian font at all, so there is nothing
+  // left to make Word read it as East Asian. Both halves state their own
+  // hint, and setChineseFonts leaves a run alone once it has, so this
+  // survives the font pass instead of being overwritten by it.
+  const fonts = zh
+    ? `<w:rFonts w:ascii="Times New Roman" w:eastAsia="${CHINESE_EASTASIA_FONT}"`
+      + ` w:hAnsi="Times New Roman" w:hint="eastAsia"/>`
+    : `<w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"`
+      + ` w:cs="Times New Roman" w:hint="default"/>`;
+  return `<w:p><w:pPr>${latinOff}`
     + `<w:spacing w:after="${after}"/><w:jc w:val="left"/></w:pPr>`
-    + `<w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"`
-    + ` w:cs="Times New Roman" w:hint="${zh ? "eastAsia" : "default"}"/>`
+    + `<w:r><w:rPr>${fonts}`
     + `<w:i/><w:iCs/><w:sz w:val="20"/><w:szCs w:val="20"/><w:color w:val="6B7280"/>`
     + `<w:lang w:val="${zh ? "zh-CN" : "en-GB"}"/></w:rPr>`
     + `<w:t xml:space="preserve">${xmlEscape(text)}</w:t></w:r></w:p>`;
@@ -18184,8 +18207,8 @@ function addTranslatedNote(xml) {
   // now, so there is room for it on the page itself.
   const line = translatedNoteParagraph;
   return out.slice(0, at)
-    + line(TRANSLATED_NOTE_ZH, 60, false, true)
-    + line(TRANSLATED_NOTE_EN, 240, false, false)
+    + line(TRANSLATED_NOTE_ZH, 60, true)
+    + line(TRANSLATED_NOTE_EN, 240, false)
     + out.slice(at);
 }
 
@@ -18283,6 +18306,11 @@ function setChineseFonts(xml) {
   // set the language to "SimSun" and then added a second <w:lang> every
   // time it ran again.
   out = out.replace(/<w:rFonts\b([^>]*?)(\/?)>/g, (whole, attrs, slash) => {
+    // A run that already names its own hint was set up deliberately -- the
+    // two halves of the translated note -- so it is left exactly as written.
+    // Without this the English half was also given w:eastAsia="SimSun", one
+    // more thing telling Word the text is East Asian.
+    if (/w:hint="/.test(attrs)) return whole;
     let next = /w:eastAsia="/.test(attrs)
       ? attrs.replace(/w:eastAsia="[^"]*"/, `w:eastAsia="${CHINESE_EASTASIA_FONT}"`)
       : `${attrs} w:eastAsia="${CHINESE_EASTASIA_FONT}"`;

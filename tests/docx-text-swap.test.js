@@ -40,12 +40,13 @@ const consts = ["CHART_FIXED_ZH", "MONTHS_ZH"]
   .map(n => src.match(new RegExp(`const ${n} = \\{[\\s\\S]*?\\n};`))[0])
   .join("\n");
 const cjk = src.match(/const isCjkChar = [^;]+;/)[0];
+const eaFont = src.match(/const CHINESE_EASTASIA_FONT = "[^"]*";/)[0];
 const noteConst = ["TRANSLATED_NOTE_ZH", "TRANSLATED_NOTE_EN"]
   .map(n => src.match(new RegExp(`const ${n} = "[^"]*";`))[0]).join("\n");
 const chineseFns = [/const hasChinese = [^;]+;/, /const looksTranslated =[\s\S]*?;/]
   .map(re => src.match(re)[0]).join("\n");
 const fns = new Function(`const CHART_TAG_PREFIX = ${JSON.stringify(tagPrefix)};`
-  + tagFn + "\n" + consts + "\n" + cjk + "\n" + chineseFns + "\n" + noteConst + "\n"
+  + tagFn + "\n" + consts + "\n" + cjk + "\n" + chineseFns + "\n" + noteConst + "\n" + eaFont + "\n"
   + names.map(extract).join("\n")
   + `\nreturn { chartDataTag, hasChinese, looksTranslated, ${names.join(", ")} };`)();
 const { xmlUnescape, docxParagraphs, markParagraph, unmarkParagraph,
@@ -465,6 +466,20 @@ check("a part with no body is left alone",
     /<w:sz w:val="20"\/>/.test(zhRun) && /<w:sz w:val="20"\/>/.test(enRun), true);
   check("and neither half is justified",
     /w:jc w:val="left"/.test(out) && !/w:jc w:val="both"/.test(out), true);
+  // The switch that actually governs this. The document defaults turn CJK
+  // line breaking on for every paragraph, and over Latin text that lets
+  // Word break between any two letters: "questi / ons", "happ / y".
+  check("the English half turns East Asian line breaking off",
+    /<w:kinsoku w:val="0"\/>/.test(enRun)
+    && /<w:overflowPunct w:val="0"\/>/.test(enRun)
+    && /<w:autoSpaceDE w:val="0"\/>/.test(enRun)
+    && /<w:autoSpaceDN w:val="0"\/>/.test(enRun), true);
+  check("and names no East Asian font at all",
+    /w:eastAsia/.test(enRun.slice(0, enRun.indexOf("This report"))), false);
+  // The Chinese half must keep all of it.
+  check("the Chinese half keeps East Asian line breaking",
+    /<w:kinsoku w:val="0"/.test(zhRun), false);
+  check("and does name an East Asian font", /w:eastAsia="/.test(zhRun), true);
 }
 // The monthly report has no cover page and no page break, so nothing moves.
 {
