@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2287";
+const APP_VERSION = "2288";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -18127,8 +18127,8 @@ function joinWrappedLines(text) {
  * digits is a word to Word, so it is not split down the middle.
  */
 /** The note at the top of every translated report, in both languages. */
-const TRANSLATED_NOTE_ZH = "本报告由英文原文翻译而成，部分措辞可能略有差异。如有疑问，欢迎随时联系孩子的老师。";
-const TRANSLATED_NOTE_EN = "This report has been translated from the original English. Some wording may differ slightly between the two languages. If you have any questions, please contact your child's instructor.";
+const TRANSLATED_NOTE_ZH = "本报告根据英文原文翻译而成。由于中英文表达方式有所不同，部分内容的措辞可能会略有差异。如果您对报告中的内容有任何疑问，欢迎随时与孩子的老师联系，我们很乐意为您进一步说明。";
+const TRANSLATED_NOTE_EN = "This report has been translated from the original English version. As Chinese and English differ in their ways of expression, some wording may vary slightly. If you have any questions about the report, please feel free to contact your child's instructor. We will be happy to provide further clarification.";
 
 /**
  * Say, once and up front, that this is a translation.
