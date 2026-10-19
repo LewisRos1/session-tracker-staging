@@ -30,6 +30,7 @@ const names = ["xmlUnescape", "xmlEscape", "docxParagraphs", "markParagraph",
                "stripMarkers", "translateTargetNames", "tieChineseDate",
                "pinnedTermZh",
                "addTranslatedNote", "translatedNoteParagraph",
+               "translatedNoteImageParagraph", "docTextWidthPx",
                "periodLabelZh", "chartTitleZh", "overviewTitleZh",
                "overviewChartTitle",
                "resizeDrawingToChart",
@@ -55,7 +56,7 @@ const { xmlUnescape, docxParagraphs, markParagraph, unmarkParagraph,
         resizeDrawingToChart, applyDocxText, stripMarkers,
         hasChinese, looksTranslated, overviewTitleZh, overviewChartTitle,
         translateTargetNames, tieChineseDate, addTranslatedNote,
-        pinnedTermZh } = fns;
+        pinnedTermZh, translatedNoteImageParagraph, docTextWidthPx } = fns;
 
 let failed = 0;
 const check = (what, got, want) => {
@@ -500,6 +501,55 @@ check("a part with no body is left alone",
   check("a report with no cover page keeps the note at the very top",
     out.indexOf("本报告") < out.indexOf("First thing"), true);
   check("and gains no page break", /<w:pageBreakBefore/.test(out), false);
+}
+
+console.log("\nthe English note drawn as a picture");
+// Word decides East Asian line breaking for the whole document. That is
+// what keeps Chinese punctuation off the start of a line, and the same
+// setting lets it cut a Latin word in half. Nothing below document level
+// overrides it, so the English is drawn once and placed as a picture,
+// which Word cannot re-wrap.
+{
+  const pic = translatedNoteImageParagraph("rId7", 602, 42, 240);
+  check("it is an inline drawing", /<wp:inline/.test(pic), true);
+  check("pointing at the relationship given",
+    /<a:blip r:embed="rId7"\/>/.test(pic), true);
+  // 9525 EMU to the pixel.
+  check("at the size asked for, in EMU",
+    /<wp:extent cx="5734050" cy="400050"\/>/.test(pic), true);
+  check("and the same size on the shape",
+    /<a:ext cx="5734050" cy="400050"\/>/.test(pic), true);
+  // The words still have to be findable by search and by a screen reader.
+  check("the English is kept in the description",
+    pic.includes("This report has been translated"), true);
+  // findChartPictures must not mistake it for one of our charts.
+  check("and it is not mistaken for a chart",
+    readChartDataTag(/descr="([^"]*)"/.exec(pic)[1]), null);
+}
+{
+  // Width comes from the document, not a guess, so a report with other
+  // margins still gets a picture that fits.
+  const a4 = `<w:pgSz w:w="11906" w:h="16838"/>`
+    + `<w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/>`;
+  check("A4 with one inch margins is 602px", docTextWidthPx(a4), 602);
+  const wide = `<w:pgSz w:w="11906"/><w:pgMar w:left="720" w:right="720"/>`;
+  check("narrower margins give a wider picture", docTextWidthPx(wide), 698);
+  check("and a document with no page size falls back", docTextWidthPx("<w:p/>"), 602);
+}
+{
+  // With a picture the English text paragraph is replaced, not added to.
+  const doc = `<w:document><w:body><w:p><w:r><w:t>x</w:t></w:r></w:p></w:body></w:document>`;
+  const out = addTranslatedNote(doc, { rid: "rId7", width: 602, height: 42 });
+  check("the Chinese half is still text", out.includes("\u672c\u62a5\u544a"), true);
+  check("the English half is the picture",
+    /<wp:inline/.test(out), true);
+  check("and is not also there as text",
+    out.includes("<w:t xml:space=\"preserve\">This report"), false);
+  // No picture to hand, which is how the tests above run: fall back to text
+  // rather than lose the note.
+  const plain = addTranslatedNote(doc, null);
+  check("without one it falls back to text",
+    plain.includes("This report has been translated") && !/<wp:inline/.test(plain), true);
 }
 
 console.log("\nclosing a Chinese date up");

@@ -385,6 +385,9 @@ const exposed = [
   // The chart redraw, so a test can run it against a real canvas and a
   // real zip rather than only its pure parts.
   "redrawChartZh", "findChartPictures", "chartMediaPath",
+  // Drawing the English note needs a real canvas, so only a browser can
+  // check it produces an image at all.
+  "renderNoteImagePng", "docTextWidthPx", "TRANSLATED_NOTE_EN",
   "HYR_DIRECTION", "hyrDirectionOf", "chartWord", "chartPeriod",
   // The line chart itself, so a test can draw the ordinary English one
   // and compare it with the Chinese one beside it.

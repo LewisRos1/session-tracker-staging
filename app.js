@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2293";
+const APP_VERSION = "2294";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -17692,7 +17692,36 @@ async function translateDocxFile(file, student, onProgress, signal) {
   // Before the font pass, so the note is given the Chinese font and the
   // line-breaking rules along with everything else.
   if (rewritten.has("word/document.xml")) {
-    rewritten.set("word/document.xml", addTranslatedNote(rewritten.get("word/document.xml")));
+    const docXml = rewritten.get("word/document.xml");
+    // The English half of the note goes in as a picture, because Word would
+    // otherwise cut its words in half -- see DOC_PRIMARY_LANG. Everything
+    // here is skipped if the note is already in the file, and any failure
+    // falls back to ordinary text rather than losing the note.
+    let enImage = null;
+    if (!docXml.includes(TRANSLATED_NOTE_ZH)) {
+      const drawn = renderNoteImagePng(TRANSLATED_NOTE_EN, docTextWidthPx(docXml));
+      if (drawn?.base64) {
+        const relsName = "word/_rels/document.xml.rels";
+        const relsXml = rewritten.get(relsName)
+          ?? await zip.file(relsName)?.async("string");
+        if (relsXml) {
+          const used = new Set((relsXml.match(/Id="[^"]+"/g) || []).map(x => x.slice(4, -1)));
+          let n = 1;
+          while (used.has(`rId${n}`)) n++;
+          const rid = `rId${n}`;
+          const target = "media/zora-translated-note-en.png";
+          // .png is already covered by a Default extension in
+          // [Content_Types].xml, so there is no Override to add.
+          zip.file("word/" + target, drawn.base64, { base64: true });
+          rewritten.set(relsName, relsXml.replace("</Relationships>",
+            `<Relationship Id="${rid}" Type="http://schemas.openxmlformats.org/`
+            + `officeDocument/2006/relationships/image" Target="${target}"/>`
+            + `</Relationships>`));
+          enImage = { rid, width: drawn.width, height: drawn.height };
+        }
+      }
+    }
+    rewritten.set("word/document.xml", addTranslatedNote(docXml, enImage));
   }
 
   // ── the charts ───────────────────────────────────────────────────────
@@ -18204,7 +18233,96 @@ function translatedNoteParagraph(text, after, zh) {
  * and this part must NOT go through the font pass. Every run in it already
  * states its font, its hint and its language.
  */
-function addTranslatedNote(xml) {
+/**
+ * How wide the text is on the page, in pixels at 96dpi.
+ *
+ * Read from the document rather than assumed, so a report with different
+ * margins still gets a picture the right width.
+ */
+function docTextWidthPx(docXml) {
+  const sz = /<w:pgSz[^>]*w:w="(\d+)"/.exec(String(docXml));
+  const mar = /<w:pgMar[^>]*>/.exec(String(docXml));
+  const left = mar && /w:left="(\d+)"/.exec(mar[0]);
+  const right = mar && /w:right="(\d+)"/.exec(mar[0]);
+  if (!sz || !left || !right) return 602;          // A4 with 1in margins
+  const twips = Number(sz[1]) - Number(left[1]) - Number(right[1]);
+  return Math.max(120, Math.round(twips / 1440 * 96));
+}
+
+/**
+ * The English half of the note, drawn once as a picture.
+ *
+ * Word decides East Asian line breaking for the whole document, and that is
+ * what keeps Chinese punctuation off the start of a line. The same setting
+ * lets it cut a Latin word in half, and nothing below the document level
+ * overrides it. A picture cannot be re-wrapped, so the English is laid out
+ * here, at the width it will be shown, and Word only has to place it.
+ *
+ * Drawn at three times the size and shown at one third, so it is not soft
+ * on a printed page. Returns null if anything goes wrong, and the caller
+ * falls back to ordinary text.
+ */
+function renderNoteImagePng(text, widthPx, scale = 3) {
+  try {
+    const SIZE = 10 * 96 / 72;                     // 10pt in px
+    const LINE = SIZE * 1.38;
+    const font = `italic ${SIZE}px "Times New Roman", serif`;
+    const measure = document.createElement("canvas").getContext("2d");
+    measure.font = font;
+    const lines = [];
+    let line = "";
+    for (const word of String(text).split(" ")) {
+      const next = line ? line + " " + word : word;
+      if (line && measure.measureText(next).width > widthPx) { lines.push(line); line = word; }
+      else line = next;
+    }
+    if (line) lines.push(line);
+    const height = Math.ceil(lines.length * LINE);
+
+    const c = document.createElement("canvas");
+    c.width = Math.ceil(widthPx * scale);
+    c.height = Math.ceil(height * scale);
+    const g = c.getContext("2d");
+    g.scale(scale, scale);
+    g.font = font;
+    g.textBaseline = "alphabetic";
+    g.fillStyle = "#6B7280";
+    lines.forEach((l, i) => g.fillText(l, 0, (i + 1) * LINE - LINE * 0.25));
+    return { base64: c.toDataURL("image/png").split(",")[1],
+             width: Math.round(widthPx), height, lines: lines.length };
+  } catch (err) {
+    console.error("could not draw the English note:", err);
+    return null;
+  }
+}
+
+/**
+ * The paragraph that holds that picture.
+ *
+ * Markup copied from a drawing the report already contains, so Word is
+ * given nothing it has not been given before. The English goes in descr as
+ * well, so the words are still there for search and for a screen reader.
+ */
+function translatedNoteImageParagraph(rid, widthPx, heightPx, after) {
+  const cx = Math.round(widthPx * 9525), cy = Math.round(heightPx * 9525);
+  const A = "http://schemas.openxmlformats.org/drawingml/2006/main";
+  const PIC = "http://schemas.openxmlformats.org/drawingml/2006/picture";
+  return `<w:p><w:pPr><w:spacing w:after="${after}"/><w:jc w:val="left"/></w:pPr>`
+    + `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">`
+    + `<wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent t="0" r="0" b="0" l="0"/>`
+    + `<wp:docPr id="9001" name="" descr="${xmlEscape(TRANSLATED_NOTE_EN)}" title=""/>`
+    + `<wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="${A}" noChangeAspect="1"/></wp:cNvGraphicFramePr>`
+    + `<a:graphic xmlns:a="${A}"><a:graphicData uri="${PIC}">`
+    + `<pic:pic xmlns:pic="${PIC}"><pic:nvPicPr><pic:cNvPr id="0" name="" descr=""/>`
+    + `<pic:cNvPicPr><a:picLocks noChangeAspect="1" noChangeArrowheads="1"/></pic:cNvPicPr>`
+    + `</pic:nvPicPr><pic:blipFill><a:blip r:embed="${rid}"/><a:srcRect/>`
+    + `<a:stretch><a:fillRect/></a:stretch></pic:blipFill>`
+    + `<pic:spPr bwMode="auto"><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm>`
+    + `<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/></pic:spPr>`
+    + `</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`;
+}
+
+function addTranslatedNote(xml, enImage) {
   const out = String(xml);
   if (out.includes(TRANSLATED_NOTE_ZH)) return out;   // translated twice
   const open = out.indexOf("<w:body>");
@@ -18220,7 +18338,9 @@ function addTranslatedNote(xml) {
   const line = translatedNoteParagraph;
   return out.slice(0, at)
     + line(TRANSLATED_NOTE_ZH, 60, true)
-    + line(TRANSLATED_NOTE_EN, 240, false)
+    + (enImage
+        ? translatedNoteImageParagraph(enImage.rid, enImage.width, enImage.height, 240)
+        : line(TRANSLATED_NOTE_EN, 240, false))
     + out.slice(at);
 }
 
@@ -18290,13 +18410,20 @@ function applyDocxText(xml, paragraphs, translations) {
  */
 const CHINESE_EASTASIA_FONT = "SimSun";
 /**
- * The language of the LATIN text in a translated report.
+ * The language the whole translated document is in.
  *
- * Not zh-CN. w:val names the language of the Latin characters, and saying
- * they are Chinese makes Word break English words anywhere it likes. The
- * East Asian slot carries zh-CN instead. See setChineseFonts.
+ * It decides two things at once, in opposite directions, and there is no
+ * value that suits both. With zh-CN, Word applies East Asian line breaking:
+ * Chinese punctuation never starts a line, and English words may be cut in
+ * half. With en-MY it is the other way round. Tried per run, per paragraph
+ * and per paragraph mark; the setting is per DOCUMENT and nothing below it
+ * overrides it, which cost ten versions to establish.
+ *
+ * Chinese wins, because the whole report is Chinese. The one piece of long
+ * English left, the note at the top, is drawn as a picture instead --
+ * a picture cannot be re-wrapped. See renderNoteImagePng.
  */
-const DOC_LATIN_LANG = "en-MY";
+const DOC_PRIMARY_LANG = "zh-CN";
 function setChineseFonts(xml) {
   // The defaults have to exist before anything can be put in them.
   //
@@ -18362,7 +18489,7 @@ function setChineseFonts(xml) {
     (whole, inner) => /<w:lang[^>]*w:val="zh/.test(inner)
       ? whole
       : `<w:rPrDefault><w:rPr>${inner.replace(/<w:lang[^>]*\/>/g, "")}`
-        + `<w:lang w:val="${DOC_LATIN_LANG}" w:eastAsia="zh-CN"/></w:rPr></w:rPrDefault>`);
+        + `<w:lang w:val="${DOC_PRIMARY_LANG}" w:eastAsia="zh-CN"/></w:rPr></w:rPrDefault>`);
   // The rules that stop a line starting with a comma or a full stop.
   //
   // A report written by the app carries none of these, so Word was left to
@@ -18418,20 +18545,12 @@ function setChineseLineBreaks(xml) {
   if (out.includes("w:noLineBreaksBefore")) return out;
   const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;")
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-  // Written for BOTH languages, which is the whole point.
-  //
-  // Word looks the no-break list up by the language in force, and the
-  // document says its Latin language is en-MY so that English words are not
-  // split in half. With a list filed only under zh-CN there was nothing for
-  // it to find, kinsoku had no characters to work from, and Chinese lines
-  // started with 。 and ， again. The same list under both names costs
-  // nothing: it holds only CJK punctuation, none of which occurs in English.
-  //
-  // CT_Compat wants every noLineBreaksAfter before any noLineBreaksBefore.
-  const langs = ["zh-CN", DOC_LATIN_LANG];
+  // Filed under the document's own language. Word looks the list up by the
+  // language in force and ignores a list filed under any other, including
+  // one filed under a language that is not East Asian at all.
   const lists =
-    langs.map(l => `<w:noLineBreaksAfter w:lang="${l}" w:val="${esc(CHINESE_NO_BREAK_AFTER)}"/>`).join("")
-    + langs.map(l => `<w:noLineBreaksBefore w:lang="${l}" w:val="${esc(CHINESE_NO_BREAK_BEFORE)}"/>`).join("");
+    `<w:noLineBreaksAfter w:lang="${DOC_PRIMARY_LANG}" w:val="${esc(CHINESE_NO_BREAK_AFTER)}"/>`
+    + `<w:noLineBreaksBefore w:lang="${DOC_PRIMARY_LANG}" w:val="${esc(CHINESE_NO_BREAK_BEFORE)}"/>`;
   // They belong inside <w:compat>, which the file already has.
   if (/<w:compat>/.test(out)) return out.replace("<w:compat>", "<w:compat>" + lists);
   return out.replace(/<\/w:settings>/,

@@ -36,15 +36,15 @@ function extract(name) {
   throw new Error(`${name} has no end`);
 }
 const font = src.match(/const CHINESE_EASTASIA_FONT = "([^"]+)";/)[1];
-const latinLang = src.match(/const DOC_LATIN_LANG = "([^"]+)";/)[1];
+const primaryLang = src.match(/const DOC_PRIMARY_LANG = "([^"]+)";/)[1];
 const setChineseFonts = new Function(
   `const CHINESE_EASTASIA_FONT = ${JSON.stringify(font)};`
-  + `const DOC_LATIN_LANG = ${JSON.stringify(latinLang)};`
+  + `const DOC_PRIMARY_LANG = ${JSON.stringify(primaryLang)};`
   + extract("setChineseFonts") + "; return setChineseFonts;")();
 const lists = ["CHINESE_NO_BREAK_AFTER", "CHINESE_NO_BREAK_BEFORE"]
   .map(n => src.match(new RegExp(`const ${n} = "[^"]*";`))[0]).join("\n");
 const setChineseLineBreaks = new Function(
-  lists + `const DOC_LATIN_LANG = ${JSON.stringify(latinLang)};` + extract("setChineseLineBreaks") + "; return setChineseLineBreaks;")();
+  lists + `const DOC_PRIMARY_LANG = ${JSON.stringify(primaryLang)};` + extract("setChineseLineBreaks") + "; return setChineseLineBreaks;")();
 
 let failed = 0;
 const check = (what, got, want) => {
@@ -68,7 +68,7 @@ check("a real Chinese font is named instead",
   new RegExp(`w:eastAsia="${font}"`).test(fixed), true);
 check("the font chosen is one every Windows Word has", font, "SimSun");
 check("and the East Asian text is declared Chinese",
-  /<w:lang w:val="en-MY" w:eastAsia="zh-CN"\/>/.test(fixed), true);
+  /<w:lang w:val="zh-CN" w:eastAsia="zh-CN"\/>/.test(fixed), true);
 check("the language sits inside the document defaults",
   /<w:rPrDefault><w:rPr>[\s\S]*<w:lang[^>]*\/><\/w:rPr><\/w:rPrDefault>/.test(fixed), true);
 
@@ -98,15 +98,14 @@ check("the language tag is a language, not a font name",
 // lot in red. w:eastAsia fills only the East Asian slot; the main one was
 // left unset, so Word used whatever the reader has set -- English
 // (Malaysia) on the boss's machine.
-// w:val is the language of the LATIN text, w:eastAsia the language of the
-// East Asian text. v2267 set w:val to zh-CN to stop red squiggles, which
-// told Word every English letter in the report was Chinese -- so it broke
-// English words anywhere it liked: "repor / t", "questi / ons". Found by
-// diffing a report that wraps correctly against one that does not.
-check("the Latin slot stays English, or English breaks mid-word",
-  /<w:lang[^>]*w:val="en-MY"/.test(fixed), true);
-check("and never says the English is Chinese",
-  /<w:lang[^>]*w:val="zh-CN"/.test(fixed), false);
+// This one setting decides East Asian line breaking for the whole document
+// and there is no value that suits both languages: zh-CN keeps Chinese
+// punctuation off the start of a line and lets Word cut English words in
+// half; en-MY does the reverse. Nothing below document level overrides it.
+// Chinese wins, because the report is Chinese, and the one piece of long
+// English is drawn as a picture instead.
+check("the document says it is Chinese",
+  /<w:lang[^>]*w:val="zh-CN"/.test(fixed), true);
 check("and so does the East Asian one",
   /<w:lang[^>]*w:eastAsia="zh-CN"/.test(fixed), true);
 check("one language tag, not two",
@@ -182,7 +181,7 @@ console.log("\nstyles.xml with nothing in its defaults");
     + `</w:style></w:styles>`;
   const got = setChineseFonts(empty);
   check("the language is set even so",
-    /<w:lang[^>]*w:val="en-MY"[^>]*w:eastAsia="zh-CN"/.test(got), true);
+    /<w:lang[^>]*w:val="zh-CN"[^>]*w:eastAsia="zh-CN"/.test(got), true);
   check("and the line-breaking rules are too",
     ["kinsoku", "overflowPunct", "autoSpaceDE", "autoSpaceDN"]
       .every(r => got.includes(`<w:${r}/>`)), true);
@@ -243,11 +242,10 @@ check("nor end with an opening bracket",
   /<w:noLineBreaksAfter[^>]*w:val="[^"]*（/.test(settings), true);
 check("they say which language they are for",
   (settings.match(/w:lang="zh-CN"/g) || []).length, 2);
-// Word looks the list up by the language in force. The document says its
-// Latin language is en-MY, so a list filed only under zh-CN is never found
-// and Chinese lines start with a full stop again.
-check("and the same lists under the document's own language",
-  (settings.match(/w:lang="en-MY"/g) || []).length, 2);
+// Word looks the list up by the language in force and ignores one filed
+// under any other, so the list and DOC_PRIMARY_LANG have to agree.
+check("filed under no other language",
+  (settings.match(/w:noLineBreaks(?:After|Before) w:lang="(?!zh-CN)/g) || []).length, 0);
 // CT_Compat wants every noLineBreaksAfter ahead of any noLineBreaksBefore.
 check("every After comes before every Before",
   settings.lastIndexOf("<w:noLineBreaksAfter")

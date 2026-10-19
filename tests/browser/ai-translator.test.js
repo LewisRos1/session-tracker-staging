@@ -203,6 +203,30 @@ try {
   r.check("a missing line comes back as missing, not as something else",
     await page.eval(`window.__app.translateParseReply("[1] 一", 2)`), ["一", null]);
 
+  // ── the English note, drawn ──────────────────────────────────────────
+  // The XML builder is covered without a browser; this is the half that
+  // needs a real canvas. If it ever returns null the translator quietly
+  // falls back to text, and the text is what Word cuts in half.
+  r.section("the English note is drawn as a picture");
+  const png = await page.eval(`(() => {
+    const img = window.__app.renderNoteImagePng(
+      window.__app.TRANSLATED_NOTE_EN, window.__app.docTextWidthPx(
+        '<w:pgSz w:w="11906"/><w:pgMar w:left="1440" w:right="1440"/>'));
+    if (!img || !img.base64) return null;
+    const b = atob(img.base64);
+    return { lines: img.lines, width: img.width, height: img.height,
+             bytes: b.length, png: b.charCodeAt(0) === 0x89 && b.slice(1, 4) === "PNG" };
+  })()`);
+  r.ok("something came back", !!png, "renderNoteImagePng returned null");
+  r.ok("it really is a PNG", !!png && png.png, JSON.stringify(png));
+  r.ok("the full width of the text column", !!png && png.width === 602,
+    JSON.stringify(png));
+  r.ok("wrapped onto a few lines, not one",
+    !!png && png.lines >= 2 && png.lines <= 6, JSON.stringify(png));
+  r.ok("tall enough to hold them",
+    !!png && png.height > 20 && png.height < 160, JSON.stringify(png));
+  r.ok("and has real pixels in it", !!png && png.bytes > 500, JSON.stringify(png));
+
   r.section("console");
   const noise = page.consoleLines.filter(l => l.level === "error");
   r.ok("no console errors", noise.length === 0,
