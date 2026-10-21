@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2298";
+const APP_VERSION = "2299";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -22767,7 +22767,7 @@ function showAutoDateConfirm({ message, confirmLabel }) {
  * Callers that ask for it get { date, reason }; the rest still get the date
  * on its own, so nothing that only wants a date had to change.
  */
-function showDatePickerOverlay({ heading, infoHtml, minDate, defaultDate, confirmLabel, dateLabel = "activity", withReason = false, reasonValue = "" }) {
+function showDatePickerOverlay({ heading, infoHtml, minDate, defaultDate, confirmLabel, dateLabel = "activity", changeLabel = "", withReason = false, reasonValue = "" }) {
   return new Promise(resolve => {
     const overlay = document.createElement("div");
     overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem";
@@ -22777,17 +22777,17 @@ function showDatePickerOverlay({ heading, infoHtml, minDate, defaultDate, confir
     overlay.innerHTML = `<div style="background:#fff;border-radius:.75rem;padding:1.5rem;max-width:400px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.22)">
       <div style="font-size:.93rem;font-weight:700;color:#111;margin-bottom:.55rem">${heading}</div>
       ${infoHtml ? `<div style="font-size:.85rem;color:#374151;margin-bottom:.9rem;line-height:1.6">${infoHtml}</div>` : ''}
-      <label style="font-size:.82rem;font-weight:600;color:#374151;display:block;margin-bottom:.35rem">Please select the final date you want this ${dateLabel} to appear.</label>
+      <label style="font-size:.82rem;font-weight:600;color:#374151;display:block;margin-bottom:.35rem">${changeLabel || `Please select the final date you want this ${dateLabel} to appear.`}</label>
       <style>#dp-date-inp::-webkit-calendar-picker-indicator{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}</style>
       <div style="position:relative;margin-bottom:1rem;border:1.5px solid #d1d5db;border-radius:.4rem;background:#fff;cursor:pointer">
         <input type="date" id="dp-date-inp" value="${def}" min="${min}" style="position:absolute;inset:0;width:100%;height:100%;border:none;background:transparent;opacity:0;outline:none;cursor:pointer;box-sizing:border-box">
-        <div id="dp-date-display" style="padding:.5rem .7rem;font-size:.95rem;color:#111;pointer-events:none;display:flex;align-items:center"><span id="dp-date-text">${defFormatted}</span><span style="margin-left:auto;padding-left:.5rem;font-size:1rem;color:#6b7280">🗓</span></div>
+        <div id="dp-date-display" style="padding:.5rem .7rem;font-size:.95rem;color:#111;pointer-events:none;display:flex;align-items:center"><span id="dp-date-text">${defFormatted}</span><span id="dp-date-default" style="margin-left:.35rem;color:#6b7280;font-size:.85rem">(Default)</span><span style="margin-left:auto;padding-left:.5rem;font-size:1rem;color:#6b7280">🗓</span></div>
       </div>
       ${withReason ? `
       <label style="font-size:.82rem;font-weight:600;color:#374151;display:block;margin-bottom:.35rem">
         Why? <span style="font-weight:400;color:#6b7280">(optional &mdash; shown in reports)</span>
       </label>
-      <textarea id="dp-reason-inp" rows="2" placeholder="e.g. met in daily routine, moved into another target"
+      <textarea id="dp-reason-inp" rows="2" placeholder="Enter Reason Here"
         style="width:100%;box-sizing:border-box;padding:.5rem .7rem;border:1.5px solid #d1d5db;border-radius:.4rem;font-size:.9rem;font-family:inherit;resize:vertical;margin-bottom:1rem">${escHtml(reasonValue || "")}</textarea>` : ""}
       <div style="display:flex;gap:.6rem;justify-content:flex-end">
         <button class="dp-cancel" style="padding:.5rem 1rem;border:1px solid #d1d5db;border-radius:.4rem;background:#fff;cursor:pointer;font-size:.9rem">Cancel</button>
@@ -22797,7 +22797,12 @@ function showDatePickerOverlay({ heading, infoHtml, minDate, defaultDate, confir
     document.body.appendChild(overlay);
     const inp = overlay.querySelector("#dp-date-inp");
     const dpDisplay = overlay.querySelector("#dp-date-display");
-    inp.addEventListener("input", () => { overlay.querySelector("#dp-date-text").textContent = inp.value ? (fmtPeriodDate(inp.value) || inp.value) : "Select a date"; });
+    inp.addEventListener("input", () => {
+      overlay.querySelector("#dp-date-text").textContent = inp.value ? (fmtPeriodDate(inp.value) || inp.value) : "Select a date";
+      // "(Default)" is only true until they pick something else.
+      const tag = overlay.querySelector("#dp-date-default");
+      if (tag) tag.style.display = inp.value === def ? "" : "none";
+    });
     const finish = val => { overlay.remove(); document.removeEventListener("keydown", onKey); resolve(val); };
     overlay.querySelector(".dp-cancel").addEventListener("click", () => finish(null));
     overlay.querySelector(".dp-confirm").addEventListener("click", () => {
@@ -23647,6 +23652,7 @@ async function handleDiscontinueTarget(entity, target, isGroup) {
   const picked = await showDatePickerOverlay({
     heading: '🛑 Discontinue Target',
     infoHtml,
+    changeLabel: 'If you want this target to be discontinued on another date, please select a new date:',
     minDate,
     defaultDate: minDate,
     confirmLabel: 'Confirm 🛑',
@@ -27244,18 +27250,18 @@ function renderTargetManageContent(student, target) {
         const { date: latestDate } = await _loadLatestSub();
         const rawMin = statusChangeFloorDate(sub, latestDate);
         const minDate = (sub.maintainedAt && sub.maintainedAt > rawMin) ? sub.maintainedAt : rawMin;
-        const restrictionText = action === 'master'
-          ? 'The earliest you can mark this as mastered is'
-          : 'The earliest you can discontinue this sub-activity is';
+        const _verb = action === 'master' ? 'mastered' : 'discontinued';
+        const _doing = action === 'master' ? 'master' : 'discontinue';
         const _subCreated = sub.activeFrom || sub.createdOn;
         const infoHtml = latestDate
-          ? `The last recorded session for <strong>"${subDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>. ${restrictionText} <strong>${fmtPeriodDate(minDate)}</strong>. This sub-activity will stop showing from <strong>${fmtPeriodDate(addOneDay(minDate))}</strong> onwards.`
+          ? `The latest data collected for <strong>"${subDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>, so the earliest you can ${_doing} this sub-activity is <strong>${fmtPeriodDate(minDate)}</strong>. This sub-activity will stop showing from <strong>${fmtPeriodDate(addOneDay(minDate))}</strong> onwards.`
           : (_subCreated && minDate === _subCreated
-            ? `No previous session data was found for <strong>"${subDisplayName}"</strong>. Defaulting to <strong>${fmtPeriodDate(_subCreated)}</strong>, the date this sub-activity was created.`
-            : `No previous session data was found for <strong>"${subDisplayName}"</strong>.`);
+            ? `No data was found for <strong>"${subDisplayName}"</strong>. Since this sub-activity was created on <strong>${fmtPeriodDate(_subCreated)}</strong>, it will also be ${_verb} on this date too.`
+            : `No data was found for <strong>"${subDisplayName}"</strong>. The earliest you can ${_doing} this sub-activity is <strong>${fmtPeriodDate(minDate)}</strong>.`);
         const _picked = await showDatePickerOverlay({
           heading: action === 'master' ? '⭐ Mark Sub-activity as Mastered' : '🚩 Discontinue Sub-activity',
           infoHtml, minDate, defaultDate: minDate,
+          changeLabel: `If you want this sub-activity to be ${_verb} on another date, please select a new date:`,
           confirmLabel: action === 'master' ? 'Confirm ⭐' : 'Confirm 🚩',
           withReason: action !== 'master',
           reasonValue: sub.discontinuedReason || ''
@@ -27274,11 +27280,15 @@ function renderTargetManageContent(student, target) {
       } else if (action === 'maintain') {
         const { date: latestDate } = await _loadLatestSub();
         const rawMin = latestDate ? addOneDay(latestDate) : todayDateStr();
+        // Maintaining starts today, as it does for a whole activity.
+        const defMaintain = todayDateStr() > rawMin ? todayDateStr() : rawMin;
         const infoHtml = latestDate
-          ? `The last recorded session for <strong>"${subDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>. The earliest you can maintain this sub-activity is <strong>${fmtPeriodDate(rawMin)}</strong>. From this date onwards, this sub-activity will automatically have a note "Maintain" for every session.`
-          : `No previous session data was found for <strong>"${subDisplayName}"</strong>. From this date onwards, this sub-activity will automatically have a note "Maintain" for every session.`;
+          ? `The latest data collected for <strong>"${subDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>, so the earliest you can maintain this sub-activity is <strong>${fmtPeriodDate(rawMin)}</strong>. It will be maintained from <strong>${fmtPeriodDate(defMaintain)}</strong> onwards, and from this date this sub-activity will automatically have a note "Maintain" for every session.`
+          : `No data was found for <strong>"${subDisplayName}"</strong>. It will be maintained from <strong>${fmtPeriodDate(defMaintain)}</strong> onwards, and from this date this sub-activity will automatically have a note "Maintain" for every session.`;
         const pickedDate = await showDatePickerOverlay({
-          heading: '🆗 Maintain Sub-activity', infoHtml, minDate: rawMin, defaultDate: rawMin, confirmLabel: 'Confirm 🆗'
+          heading: '🆗 Maintain Sub-activity', infoHtml, minDate: rawMin, defaultDate: defMaintain,
+          changeLabel: 'If you want this sub-activity to be maintained on another date, please select a new date:',
+          confirmLabel: 'Confirm 🆗'
         });
         if (!pickedDate) return;
         delete sub.masteredOn; delete sub.isCompleted; delete sub.discontinuedOn; delete sub.isArchived; delete sub.isStopped; delete sub.inactiveReason;
@@ -27290,7 +27300,8 @@ function renderTargetManageContent(student, target) {
           ? `The last recorded session for <strong>"${subDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>. The earliest you can set the maintained date is <strong>${fmtPeriodDate(rawMin)}</strong>.`
           : `No previous session data was found for <strong>"${subDisplayName}"</strong>.`;
         const pickedDate = await showDatePickerOverlay({
-          heading: '📅 Change Maintained Date', infoHtml, minDate: rawMin, defaultDate: sub.maintainedAt || rawMin, confirmLabel: 'Save Date'
+          heading: '📅 Change Maintained Date', infoHtml, minDate: rawMin, defaultDate: sub.maintainedAt || rawMin,
+          changeLabel: 'If you want another date, please select a new date:', confirmLabel: 'Save Date'
         });
         if (!pickedDate) return;
         sub.maintainedAt = pickedDate;
@@ -27693,19 +27704,20 @@ function renderTargetManageContent(student, target) {
         finally { btn.disabled = false; btn.textContent = origText; }
         return result;
       };
-      const _buildInfo = (latestDate, minDate, latestSubName, restrictionText) => {
+      // verb is "mastered" or "discontinued"; doing is "master" or "discontinue".
+      const _buildInfo = (latestDate, minDate, latestSubName, verb, doing) => {
         if (!latestDate) {
           const created = pa.activeFrom || pa.createdOn;
           // Only claim it's the creation date when that's genuinely what the
           // default landed on — a maintained date can push the floor later.
           return created && minDate === created
-            ? `No previous session data was found for <strong>"${paDisplayName}"</strong>. Defaulting to <strong>${fmtPeriodDate(created)}</strong>, the date this activity was created.`
-            : `No previous session data was found for <strong>"${paDisplayName}"</strong>.`;
+            ? `No data was found for <strong>"${paDisplayName}"</strong>. Since this activity was created on <strong>${fmtPeriodDate(created)}</strong>, it will also be ${verb} on this date too.`
+            : `No data was found for <strong>"${paDisplayName}"</strong>. The earliest you can ${doing} this activity is <strong>${fmtPeriodDate(minDate)}</strong>.`;
         }
         const src = latestSubName
-          ? `The last recorded session for the sub-activity <strong>"${escHtml(_stripMk(latestSubName))}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>.`
-          : `The last recorded session for <strong>"${paDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>.`;
-        return `${src} ${restrictionText} <strong>${fmtPeriodDate(minDate)}</strong>. This activity will stop showing from <strong>${fmtPeriodDate(addOneDay(minDate))}</strong> onwards.`;
+          ? `The latest data collected for the sub-activity <strong>"${escHtml(_stripMk(latestSubName))}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>`
+          : `The latest data collected for <strong>"${paDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>`;
+        return `${src}, so the earliest you can ${doing} this activity is <strong>${fmtPeriodDate(minDate)}</strong>. This activity will stop showing from <strong>${fmtPeriodDate(addOneDay(minDate))}</strong> onwards.`;
       };
       const _isSubActive = sub => !sub.masteredOn && !sub.discontinuedOn && !sub.isArchived && !sub.isStopped && !sub.isCompleted;
       const _cascadeToActiveSubs = fn => {
@@ -27728,12 +27740,12 @@ function renderTargetManageContent(student, target) {
         const { date: latestDate, subName: latestSubName } = await _loadLatest();
         const rawMin = statusChangeFloorDate(pa, latestDate);
         const minDate = (pa.maintainedAt && pa.maintainedAt > rawMin) ? pa.maintainedAt : rawMin;
-        const restrictionText = action === 'master'
-          ? 'The earliest you can mark this as mastered is'
-          : 'The earliest you can discontinue this activity is';
+        const _verb = action === 'master' ? 'mastered' : 'discontinued';
+        const _doing = action === 'master' ? 'master' : 'discontinue';
         const _picked = await showDatePickerOverlay({
           heading: action === 'master' ? '⭐ Mark as Mastered' : '🚩 Discontinue Activity',
-          infoHtml: _buildInfo(latestDate, minDate, latestSubName, restrictionText),
+          infoHtml: _buildInfo(latestDate, minDate, latestSubName, _verb, _doing),
+          changeLabel: `If you want this activity to be ${_verb} on another date, please select a new date:`,
           minDate, defaultDate: minDate,
           confirmLabel: action === 'master' ? 'Confirm ⭐' : 'Confirm 🚩',
           withReason: action !== 'master',
@@ -27771,14 +27783,20 @@ function renderTargetManageContent(student, target) {
       } else if (action === 'maintain') {
         const { date: latestDate, subName: latestSubName } = await _loadLatest();
         const rawMin = latestDate ? addOneDay(latestDate) : todayDateStr();
+        // Maintaining starts today, not the day after the last session and not
+        // the day the activity was created. The floor still stands, so a
+        // session recorded today cannot be written over.
+        const defMaintain = todayDateStr() > rawMin ? todayDateStr() : rawMin;
         const src = latestSubName
-          ? `The last recorded session for the sub-activity <strong>"${escHtml(_stripMk(latestSubName))}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>.`
-          : `The last recorded session for <strong>"${paDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>.`;
+          ? `The latest data collected for the sub-activity <strong>"${escHtml(_stripMk(latestSubName))}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>`
+          : `The latest data collected for <strong>"${paDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>`;
         const infoHtml = latestDate
-          ? `${src} The earliest you can maintain this activity is <strong>${fmtPeriodDate(rawMin)}</strong>. From this date onwards, this activity will automatically have a note "Maintain" for every session.`
-          : `No previous session data was found for <strong>"${paDisplayName}"</strong>. From this date onwards, this activity will automatically have a note "Maintain" for every session.`;
+          ? `${src}, so the earliest you can maintain this activity is <strong>${fmtPeriodDate(rawMin)}</strong>. It will be maintained from <strong>${fmtPeriodDate(defMaintain)}</strong> onwards, and from this date this activity will automatically have a note "Maintain" for every session.`
+          : `No data was found for <strong>"${paDisplayName}"</strong>. It will be maintained from <strong>${fmtPeriodDate(defMaintain)}</strong> onwards, and from this date this activity will automatically have a note "Maintain" for every session.`;
         const pickedDate = await showDatePickerOverlay({
-          heading: '🆗 Maintain Activity', infoHtml, minDate: rawMin, defaultDate: rawMin, confirmLabel: 'Confirm 🆗'
+          heading: '🆗 Maintain Activity', infoHtml, minDate: rawMin, defaultDate: defMaintain,
+          changeLabel: 'If you want this activity to be maintained on another date, please select a new date:',
+          confirmLabel: 'Confirm 🆗'
         });
         if (!pickedDate) return;
         delete pa.masteredOn; delete pa.isCompleted; delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped; delete pa.inactiveReason;
@@ -27793,7 +27811,8 @@ function renderTargetManageContent(student, target) {
           ? `${src} The earliest you can set the maintained date is <strong>${fmtPeriodDate(rawMin)}</strong>.`
           : `No previous session data was found for <strong>"${paDisplayName}"</strong>.`;
         const pickedDate = await showDatePickerOverlay({
-          heading: '📅 Change Maintained Date', infoHtml, minDate: rawMin, defaultDate: pa.maintainedAt || rawMin, confirmLabel: 'Save Date'
+          heading: '📅 Change Maintained Date', infoHtml, minDate: rawMin, defaultDate: pa.maintainedAt || rawMin,
+          changeLabel: 'If you want another date, please select a new date:', confirmLabel: 'Save Date'
         });
         if (!pickedDate) return;
         pa.maintainedAt = pickedDate;
@@ -27888,6 +27907,7 @@ function renderTargetManageContent(student, target) {
       const picked = await showDatePickerOverlay({
         heading: type === "mastered" ? "📅 Change Mastered Date" : "📅 Change Discontinued Date",
         infoHtml,
+        changeLabel: "If you want another date, please select a new date:",
         minDate,
         defaultDate: current || minDate,
         confirmLabel: "Save Date",
