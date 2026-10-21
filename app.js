@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2299";
+const APP_VERSION = "2300";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -22785,7 +22785,7 @@ function showDatePickerOverlay({ heading, infoHtml, minDate, defaultDate, confir
       </div>
       ${withReason ? `
       <label style="font-size:.82rem;font-weight:600;color:#374151;display:block;margin-bottom:.35rem">
-        Why? <span style="font-weight:400;color:#6b7280">(optional &mdash; shown in reports)</span>
+        Why? <span style="font-weight:400;color:#6b7280">(optional &mdash; shown in reports when necessary)</span>
       </label>
       <textarea id="dp-reason-inp" rows="2" placeholder="Enter Reason Here"
         style="width:100%;box-sizing:border-box;padding:.5rem .7rem;border:1.5px solid #d1d5db;border-radius:.4rem;font-size:.9rem;font-family:inherit;resize:vertical;margin-bottom:1rem">${escHtml(reasonValue || "")}</textarea>` : ""}
@@ -27281,12 +27281,14 @@ function renderTargetManageContent(student, target) {
         const { date: latestDate } = await _loadLatestSub();
         const rawMin = latestDate ? addOneDay(latestDate) : todayDateStr();
         // Maintaining starts today, as it does for a whole activity.
-        const defMaintain = todayDateStr() > rawMin ? todayDateStr() : rawMin;
+        const today = todayDateStr();
+        const minMaintain = rawMin < today ? rawMin : today;
+        const _fromToday = `This sub-activity will be maintained from today (<strong>${fmtPeriodDate(today)}</strong>) onwards, and from this date this sub-activity will automatically have a note "Maintain" for every session.`;
         const infoHtml = latestDate
-          ? `The latest data collected for <strong>"${subDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>, so the earliest you can maintain this sub-activity is <strong>${fmtPeriodDate(rawMin)}</strong>. It will be maintained from <strong>${fmtPeriodDate(defMaintain)}</strong> onwards, and from this date this sub-activity will automatically have a note "Maintain" for every session.`
-          : `No data was found for <strong>"${subDisplayName}"</strong>. It will be maintained from <strong>${fmtPeriodDate(defMaintain)}</strong> onwards, and from this date this sub-activity will automatically have a note "Maintain" for every session.`;
+          ? `The latest data collected for <strong>"${subDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>, so the earliest you can maintain this sub-activity is <strong>${fmtPeriodDate(minMaintain)}</strong>.<br><br>${_fromToday}`
+          : `No data was found for <strong>"${subDisplayName}"</strong>. ${_fromToday}`;
         const pickedDate = await showDatePickerOverlay({
-          heading: '🆗 Maintain Sub-activity', infoHtml, minDate: rawMin, defaultDate: defMaintain,
+          heading: '🆗 Maintain Sub-activity', infoHtml, minDate: minMaintain, defaultDate: today,
           changeLabel: 'If you want this sub-activity to be maintained on another date, please select a new date:',
           confirmLabel: 'Confirm 🆗'
         });
@@ -27783,18 +27785,25 @@ function renderTargetManageContent(student, target) {
       } else if (action === 'maintain') {
         const { date: latestDate, subName: latestSubName } = await _loadLatest();
         const rawMin = latestDate ? addOneDay(latestDate) : todayDateStr();
-        // Maintaining starts today, not the day after the last session and not
-        // the day the activity was created. The floor still stands, so a
-        // session recorded today cannot be written over.
-        const defMaintain = todayDateStr() > rawMin ? todayDateStr() : rawMin;
+        // Maintaining starts today. Always today: not the day after the last
+        // session, not the day the activity was created.
+        //
+        // The floor used to be rawMin, which put it out of reach on a day a
+        // session had already been recorded. Nothing needed protecting: the
+        // auto-fill skips any activity that already has a remark in that
+        // session, so a "Maintain" note can never land on real data. The
+        // floor only stops you maintaining from before your last session.
+        const today = todayDateStr();
+        const minMaintain = rawMin < today ? rawMin : today;
         const src = latestSubName
           ? `The latest data collected for the sub-activity <strong>"${escHtml(_stripMk(latestSubName))}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>`
           : `The latest data collected for <strong>"${paDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>`;
+        const _fromToday = `This activity will be maintained from today (<strong>${fmtPeriodDate(today)}</strong>) onwards, and from this date this activity will automatically have a note "Maintain" for every session.`;
         const infoHtml = latestDate
-          ? `${src}, so the earliest you can maintain this activity is <strong>${fmtPeriodDate(rawMin)}</strong>. It will be maintained from <strong>${fmtPeriodDate(defMaintain)}</strong> onwards, and from this date this activity will automatically have a note "Maintain" for every session.`
-          : `No data was found for <strong>"${paDisplayName}"</strong>. It will be maintained from <strong>${fmtPeriodDate(defMaintain)}</strong> onwards, and from this date this activity will automatically have a note "Maintain" for every session.`;
+          ? `${src}, so the earliest you can maintain this activity is <strong>${fmtPeriodDate(minMaintain)}</strong>.<br><br>${_fromToday}`
+          : `No data was found for <strong>"${paDisplayName}"</strong>. ${_fromToday}`;
         const pickedDate = await showDatePickerOverlay({
-          heading: '🆗 Maintain Activity', infoHtml, minDate: rawMin, defaultDate: defMaintain,
+          heading: '🆗 Maintain Activity', infoHtml, minDate: minMaintain, defaultDate: today,
           changeLabel: 'If you want this activity to be maintained on another date, please select a new date:',
           confirmLabel: 'Confirm 🆗'
         });
