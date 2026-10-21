@@ -120,6 +120,9 @@ results.push(await run("Deleting an activity with its panel open",
 results.push(await run("Maintain repaints the row",
   ["run", "-A", "tests/browser/maintain-repaints.test.js", HARNESS]));
 
+results.push(await run("Moving an activity under a parent",
+  ["run", "-A", "tests/browser/move-under-parent.test.js", HARNESS]));
+
 results.push(await run("Two activities with the same name, in a real browser",
   ["run", "-A", "tests/browser/same-name-activities.test.js", HARNESS]));
 

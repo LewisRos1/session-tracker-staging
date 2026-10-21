@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2300";
+const APP_VERSION = "2302";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -27584,15 +27584,38 @@ function renderTargetManageContent(student, target) {
       const paLabel = escHtml(pa.title || pa.name || "this activity");
 
       const showPicker = (errorHtml = '') => {
-        const candHtml = candidates.length > 0
-          ? candidates.map(cand => {
-              const label = cand.title || cand.name;
-              const alreadyParent = acts.some(a2 => a2.parentActivity === (cand.title || cand.name));
-              const badge = alreadyParent
-                ? ` <span style="font-size:.7rem;background:#dbeafe;color:#1e40af;border-radius:.3rem;padding:.05rem .3rem;vertical-align:middle;margin-left:.3rem">has sub-activities</span>`
-                : '';
-              return `<button class="mn-move-pick-btn" data-cand-idx="${acts.indexOf(cand)}" style="width:100%;text-align:left;padding:.5rem .7rem;border:1px solid #e5e7eb;border-radius:.4rem;background:#f9fafb;cursor:pointer;font-size:.84rem;color:#111;margin-bottom:.3rem;display:block">${escHtml(label)}${badge}</button>`;
-            }).join('')
+        // Laid out the way the target itself is laid out: each activity under
+        // the section heading it really sits in, and indented beneath it. A
+        // heading is drawn only when something under it can actually be
+        // picked, since a heading cannot be a parent and an empty one would
+        // be noise. Sub-activities are not listed at all -- an activity
+        // cannot go under one -- so a parent says how many it already has
+        // instead of listing them.
+        const candSet = new Set(candidates);
+        const rows = [];
+        let heading = null, headingDrawn = false;
+        for (const cand of acts) {
+          if (cand.isHeading) { heading = cand; headingDrawn = false; continue; }
+          if (!candSet.has(cand)) continue;
+          if (heading && !headingDrawn) {
+            headingDrawn = true;
+            rows.push(`<div style="font-size:.72rem;font-weight:700;letter-spacing:.03em;
+              text-transform:uppercase;color:#6b7280;margin:.55rem 0 .25rem">`
+              + `${escHtml(heading.title || heading.name || "Section")}</div>`);
+          }
+          const label = cand.title || cand.name;
+          const subs = acts.filter(a2 => a2.parentActivity === (cand.title || cand.name)).length;
+          const badge = subs
+            ? ` <span style="font-size:.72rem;color:#6b7280;margin-left:.3rem">(${subs} sub-activit${subs === 1 ? "y" : "ies"})</span>`
+            : '';
+          rows.push(`<button class="mn-move-pick-btn" data-cand-idx="${acts.indexOf(cand)}"`
+            + ` style="width:calc(100% - ${heading ? "0.9rem" : "0px"});text-align:left;padding:.5rem .7rem;`
+            + `border:1px solid #e5e7eb;border-radius:.4rem;background:#f9fafb;cursor:pointer;`
+            + `font-size:.84rem;color:#111;margin-bottom:.3rem;display:block;`
+            + `margin-left:${heading ? ".9rem" : "0"}">${escHtml(label)}${badge}</button>`);
+        }
+        const candHtml = rows.length > 0
+          ? rows.join('')
           : `<div style="font-size:.82rem;color:#6b7280;font-style:italic;padding:.4rem 0">No other activities available in this target.</div>`;
         overlay.innerHTML = `<div style="background:#fff;padding:1.25rem;border-radius:.75rem;width:min(360px,92%);box-shadow:0 4px 24px rgba(0,0,0,.25);margin-bottom:1rem">
           <div style="font-size:.88rem;font-weight:700;color:#111;margin-bottom:.25rem">↳ Move "${paLabel}" under:</div>
