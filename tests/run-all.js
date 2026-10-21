@@ -117,6 +117,9 @@ results.push(await run("An approved activity keeps the date it was proposed for"
 results.push(await run("Deleting an activity with its panel open",
   ["run", "-A", "tests/browser/delete-after-refresh.test.js", HARNESS]));
 
+results.push(await run("Maintain repaints the row",
+  ["run", "-A", "tests/browser/maintain-repaints.test.js", HARNESS]));
+
 results.push(await run("Two activities with the same name, in a real browser",
   ["run", "-A", "tests/browser/same-name-activities.test.js", HARNESS]));
 

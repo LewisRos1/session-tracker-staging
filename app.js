@@ -27279,16 +27279,22 @@ function renderTargetManageContent(student, target) {
         }
       } else if (action === 'maintain') {
         const { date: latestDate } = await _loadLatestSub();
-        const rawMin = latestDate ? addOneDay(latestDate) : todayDateStr();
-        // Maintaining starts today, as it does for a whole activity.
+        // The same floor as a whole activity: the later of its creation date
+        // and the day after the last session with data for it.
+        const _created = sub.activeFrom || sub.createdOn;
+        const _afterLast = latestDate ? addOneDay(latestDate) : null;
+        const minMaintain = [_created, _afterLast].filter(Boolean).sort().pop() || todayDateStr();
         const today = todayDateStr();
-        const minMaintain = rawMin < today ? rawMin : today;
-        const _fromToday = `This sub-activity will be maintained from today (<strong>${fmtPeriodDate(today)}</strong>) onwards, and from this date this sub-activity will automatically have a note "Maintain" for every session.`;
+        const defMaintain = today > minMaintain ? today : minMaintain;
+        const _when = defMaintain === today
+          ? `today (<strong>${fmtPeriodDate(today)}</strong>)`
+          : `<strong>${fmtPeriodDate(defMaintain)}</strong>`;
+        const _fromToday = `This sub-activity will be maintained from ${_when} onwards, and from this date this sub-activity will automatically have a note "Maintain" for every session.`;
         const infoHtml = latestDate
           ? `The latest data collected for <strong>"${subDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>, so the earliest you can maintain this sub-activity is <strong>${fmtPeriodDate(minMaintain)}</strong>.<br><br>${_fromToday}`
           : `No data was found for <strong>"${subDisplayName}"</strong>. ${_fromToday}`;
         const pickedDate = await showDatePickerOverlay({
-          heading: '🆗 Maintain Sub-activity', infoHtml, minDate: minMaintain, defaultDate: today,
+          heading: '🆗 Maintain Sub-activity', infoHtml, minDate: minMaintain, defaultDate: defMaintain,
           changeLabel: 'If you want this sub-activity to be maintained on another date, please select a new date:',
           confirmLabel: 'Confirm 🆗'
         });
@@ -27784,26 +27790,30 @@ function renderTargetManageContent(student, target) {
         }
       } else if (action === 'maintain') {
         const { date: latestDate, subName: latestSubName } = await _loadLatest();
-        const rawMin = latestDate ? addOneDay(latestDate) : todayDateStr();
-        // Maintaining starts today. Always today: not the day after the last
-        // session, not the day the activity was created.
-        //
-        // The floor used to be rawMin, which put it out of reach on a day a
-        // session had already been recorded. Nothing needed protecting: the
-        // auto-fill skips any activity that already has a remark in that
-        // session, so a "Maintain" note can never land on real data. The
-        // floor only stops you maintaining from before your last session.
+        // How far back the calendar may go: the later of the day this activity
+        // was created and the day after the last session that has data for it.
+        // Back-dating is allowed within that, so a maintain can be recorded
+        // from the day it really started, but never back into months that
+        // already have data and have been reported on.
+        const _created = pa.activeFrom || pa.createdOn;
+        const _afterLast = latestDate ? addOneDay(latestDate) : null;
+        const minMaintain = [_created, _afterLast].filter(Boolean).sort().pop() || todayDateStr();
+        // Today unless the floor is later than today, which only happens when
+        // a session was recorded today.
         const today = todayDateStr();
-        const minMaintain = rawMin < today ? rawMin : today;
+        const defMaintain = today > minMaintain ? today : minMaintain;
         const src = latestSubName
           ? `The latest data collected for the sub-activity <strong>"${escHtml(_stripMk(latestSubName))}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>`
           : `The latest data collected for <strong>"${paDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>`;
-        const _fromToday = `This activity will be maintained from today (<strong>${fmtPeriodDate(today)}</strong>) onwards, and from this date this activity will automatically have a note "Maintain" for every session.`;
+        const _when = defMaintain === today
+          ? `today (<strong>${fmtPeriodDate(today)}</strong>)`
+          : `<strong>${fmtPeriodDate(defMaintain)}</strong>`;
+        const _fromToday = `This activity will be maintained from ${_when} onwards, and from this date this activity will automatically have a note "Maintain" for every session.`;
         const infoHtml = latestDate
           ? `${src}, so the earliest you can maintain this activity is <strong>${fmtPeriodDate(minMaintain)}</strong>.<br><br>${_fromToday}`
           : `No data was found for <strong>"${paDisplayName}"</strong>. ${_fromToday}`;
         const pickedDate = await showDatePickerOverlay({
-          heading: '🆗 Maintain Activity', infoHtml, minDate: minMaintain, defaultDate: today,
+          heading: '🆗 Maintain Activity', infoHtml, minDate: minMaintain, defaultDate: defMaintain,
           changeLabel: 'If you want this activity to be maintained on another date, please select a new date:',
           confirmLabel: 'Confirm 🆗'
         });
