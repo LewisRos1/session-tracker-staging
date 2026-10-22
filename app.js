@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2302";
+const APP_VERSION = "2303";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -23646,8 +23646,8 @@ async function handleDiscontinueTarget(entity, target, isGroup) {
   // depending on what it was attached to.
   const minDate = lastDate || todayDateStr();
   const infoHtml = lastDate
-    ? `<strong>"${escHtml(target.name)}"</strong> stays visible up to and including this date, and all past session data is preserved.<br><br>The last recorded session for this target was on <strong>${fmtPeriodDate(lastDate)}</strong>. So, the earliest you can discontinue is <strong>${fmtPeriodDate(minDate)}</strong>. This target will stop showing from <strong>${fmtPeriodDate(addOneDay(minDate))}</strong> onwards.`
-    : `<strong>"${escHtml(target.name)}"</strong> will be hidden from the session dropdown from this date onwards. All past session data is preserved and will still appear in exports.<br><br>No previous session data was found for this target.`;
+    ? `The latest data collected for <strong>"${escHtml(target.name)}"</strong> was on <strong>${fmtPeriodDate(lastDate)}</strong>, so the earliest you can discontinue this target is <strong>${fmtPeriodDate(minDate)}</strong>. This target will stop showing from <strong>${fmtPeriodDate(addOneDay(minDate))}</strong> onwards.<br><br>All past session data is preserved and will still appear in exports.`
+    : `No data was found for <strong>"${escHtml(target.name)}"</strong>. It will be hidden from the session dropdown from this date onwards.<br><br>All past session data is preserved and will still appear in exports.`;
 
   const picked = await showDatePickerOverlay({
     heading: '🛑 Discontinue Target',
@@ -27289,7 +27289,7 @@ function renderTargetManageContent(student, target) {
         const _when = defMaintain === today
           ? `today (<strong>${fmtPeriodDate(today)}</strong>)`
           : `<strong>${fmtPeriodDate(defMaintain)}</strong>`;
-        const _fromToday = `This sub-activity will be maintained from ${_when} onwards, and from this date this sub-activity will automatically have a note "Maintain" for every session.`;
+        const _fromToday = `From ${_when} onwards, this sub-activity will automatically have a note "Maintain" for every session.`;
         const infoHtml = latestDate
           ? `The latest data collected for <strong>"${subDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>, so the earliest you can maintain this sub-activity is <strong>${fmtPeriodDate(minMaintain)}</strong>.<br><br>${_fromToday}`
           : `No data was found for <strong>"${subDisplayName}"</strong>. ${_fromToday}`;
@@ -27305,8 +27305,8 @@ function renderTargetManageContent(student, target) {
         const { date: latestDate } = await _loadLatestSub();
         const rawMin = latestDate ? addOneDay(latestDate) : todayDateStr();
         const infoHtml = latestDate
-          ? `The last recorded session for <strong>"${subDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>. The earliest you can set the maintained date is <strong>${fmtPeriodDate(rawMin)}</strong>.`
-          : `No previous session data was found for <strong>"${subDisplayName}"</strong>.`;
+          ? `The latest data collected for <strong>"${subDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>, so the earliest you can set the maintained date is <strong>${fmtPeriodDate(rawMin)}</strong>.`
+          : `No data was found for <strong>"${subDisplayName}"</strong>.`;
         const pickedDate = await showDatePickerOverlay({
           heading: '📅 Change Maintained Date', infoHtml, minDate: rawMin, defaultDate: sub.maintainedAt || rawMin,
           changeLabel: 'If you want another date, please select a new date:', confirmLabel: 'Save Date'
@@ -27831,7 +27831,7 @@ function renderTargetManageContent(student, target) {
         const _when = defMaintain === today
           ? `today (<strong>${fmtPeriodDate(today)}</strong>)`
           : `<strong>${fmtPeriodDate(defMaintain)}</strong>`;
-        const _fromToday = `This activity will be maintained from ${_when} onwards, and from this date this activity will automatically have a note "Maintain" for every session.`;
+        const _fromToday = `From ${_when} onwards, this activity will automatically have a note "Maintain" for every session.`;
         const infoHtml = latestDate
           ? `${src}, so the earliest you can maintain this activity is <strong>${fmtPeriodDate(minMaintain)}</strong>.<br><br>${_fromToday}`
           : `No data was found for <strong>"${paDisplayName}"</strong>. ${_fromToday}`;
@@ -27847,11 +27847,11 @@ function renderTargetManageContent(student, target) {
         const { date: latestDate, subName: latestSubName } = await _loadLatest();
         const rawMin = latestDate ? addOneDay(latestDate) : todayDateStr();
         const src = latestSubName
-          ? `The last recorded session for the sub-activity <strong>"${escHtml(_stripMk(latestSubName))}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>.`
-          : `The last recorded session for <strong>"${paDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>.`;
+          ? `The latest data collected for the sub-activity <strong>"${escHtml(_stripMk(latestSubName))}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>`
+          : `The latest data collected for <strong>"${paDisplayName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>`;
         const infoHtml = latestDate
-          ? `${src} The earliest you can set the maintained date is <strong>${fmtPeriodDate(rawMin)}</strong>.`
-          : `No previous session data was found for <strong>"${paDisplayName}"</strong>.`;
+          ? `${src}, so the earliest you can set the maintained date is <strong>${fmtPeriodDate(rawMin)}</strong>.`
+          : `No data was found for <strong>"${paDisplayName}"</strong>.`;
         const pickedDate = await showDatePickerOverlay({
           heading: '📅 Change Maintained Date', infoHtml, minDate: rawMin, defaultDate: pa.maintainedAt || rawMin,
           changeLabel: 'If you want another date, please select a new date:', confirmLabel: 'Save Date'
@@ -27942,8 +27942,8 @@ function renderTargetManageContent(student, target) {
       const minDate = (pa.maintainedAt && pa.maintainedAt > rawMin) ? pa.maintainedAt : rawMin;
       const _paName = escHtml(pa.title || pa.name || '');
       const infoHtml = latestDate
-        ? `The last recorded session for <strong>"${_paName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>. The earliest you can set this date is <strong>${fmtPeriodDate(minDate)}</strong>. This activity will stop showing from <strong>${fmtPeriodDate(addOneDay(minDate))}</strong> onwards.`
-        : `No previous session data was found for <strong>"${_paName}"</strong>.`;
+        ? `The latest data collected for <strong>"${_paName}"</strong> was on <strong>${fmtPeriodDate(latestDate)}</strong>, so the earliest you can set this date is <strong>${fmtPeriodDate(minDate)}</strong>. This activity will stop showing from <strong>${fmtPeriodDate(addOneDay(minDate))}</strong> onwards.`
+        : `No data was found for <strong>"${_paName}"</strong>.`;
       const current = type === "mastered" ? pa.masteredOn : pa.discontinuedOn;
       // Where an activity stopped before there was a reason box gets one.
       const picked = await showDatePickerOverlay({
