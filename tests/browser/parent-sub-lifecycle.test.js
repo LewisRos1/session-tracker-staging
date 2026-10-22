@@ -201,8 +201,8 @@ try {
     kept.some(a => a.title === "my parent") && kept.some(a => a.title === "my sub"),
     JSON.stringify(kept));
 
-  // ══ 4. Done clears a family that was never filled in ═════════════════
-  r.section("4. Done removes a named parent whose sub-activity is still blank");
+  // ══ 4. a named parent is rescued, not deleted ═══════════════════════
+  r.section("4. Done keeps a named parent and names its blank sub-activity");
 
   await openEditTarget();
   await addParent();
@@ -210,9 +210,15 @@ try {
   await saveAndClose();
   await pressDone();
 
+  // It used to delete the whole family. One stray "Add sub-activity" then
+  // destroyed an activity that had been in the target for months, so a
+  // named parent is now kept and its blank sub-activity given a name.
   const swept = await rows();
-  r.check("only the original activity is left", swept.length, 1);
-  r.check("and it is the right one", swept[0]?.title, "Greeting");
+  r.check("nothing was deleted", swept.length, 3);
+  r.ok("the parent kept its name",
+    swept.some(a => a.title === "abandoned parent"), JSON.stringify(swept));
+  r.ok("and the blank sub-activity was named instead of dropped",
+    swept.some(a => a.title === "[Unnamed Subactivity]"), JSON.stringify(swept));
 
   // ══ 5. only the blank row goes when a real sub exists ════════════════
   r.section("5. a parent with one real sub and one blank keeps both parent and real sub");
@@ -241,10 +247,16 @@ try {
   await settle(700);
 
   const onOpen = await rows();
-  r.check("the leftover family is gone on open", onOpen.length, 1);
-  const shown = await onScreen();
-  r.ok("and nothing blank is on screen",
-    !shown.some(x => x.endsWith("|") || x.includes("Leftover")), JSON.stringify(shown));
+  r.check("the named family is kept on open", onOpen.length, 3);
+  r.ok("its blank sub-activity was named",
+    onOpen.some(a => a.title === "[Unnamed Subactivity]"), JSON.stringify(onOpen));
+  // Read from the sub row itself rather than the collapsed-title span,
+  // which is only built once a row is collapsed.
+  const subText = await page.eval(`
+    [...document.querySelectorAll("#manage-modal-body .mn-sub-compact")]
+      .map(e => e.innerText.replace(/\s+/g, " ").trim())`);
+  r.ok("and the named sub-activity is on screen",
+    subText.some(x => x.includes("[Unnamed Subactivity]")), JSON.stringify(subText));
 
   // ══ 7. an assistant's proposal follows the same rules ════════════════
   r.section("7. the same for a proposal (Rayhanah)");
@@ -262,7 +274,9 @@ try {
 
   await pressDone();
   const proposedAfter = await rows();
-  r.check("Done clears the unfinished proposal too", proposedAfter.length, 1);
+  r.check("the proposed family is kept too", proposedAfter.length, 3);
+  r.ok("with its blank sub-activity named",
+    proposedAfter.some(a => a.title === "[Unnamed Subactivity]"), JSON.stringify(proposedAfter));
 
   // ══ 8. deleting a parent takes its sub-activities with it ═══════════
   r.section("8. the kebab's Delete on a parent");

@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2303";
+const APP_VERSION = "2305";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -24933,12 +24933,31 @@ function mnDetachPanel(discardNode = false) {
  * "+ Add Parent Activity" that was never filled in. A parent with even one
  * real sub-activity is left alone, and so is that sub-activity.
  *
+ * An activity that was only turned INTO a parent is a different matter. It
+ * is put back the way it was instead of being deleted -- see below.
+ *
  * Returns true if anything was removed.
  */
+/**
+ * What a sub-activity is called when nobody got round to naming it.
+ *
+ * Square brackets, not angle brackets. isEmptyActItem strips anything
+ * shaped like an HTML tag out of a name before deciding whether it is
+ * blank, so "<Unnamed Subactivity>" strips to nothing: the sweep would
+ * name the row and then delete it on the very next pass, and the name
+ * would read as blank wherever else it was shown. The app writes its
+ * other placeholders this way too -- [insert text], [Insert Cover Page].
+ */
+const UNNAMED_SUB = "[Unnamed Subactivity]";
+
 function sweepBlankActs(acts) {
   if (!Array.isArray(acts)) return false;
   const before = acts.length;
+  // Naming a sub-activity is a change worth saving even though the list is
+  // the same length afterwards.
+  let named = false;
   const keyOf = a => a && (a._linkKey || a.title || a.name);
+  const nameOf = a => String((a && (a.title || a.name)) || "").trim();
 
   // A parent counts as real when something under it has been filled in.
   const parentHasRealChild = parent => {
@@ -24947,12 +24966,45 @@ function sweepBlankActs(acts) {
     return acts.some(x => x !== parent && x.parentActivity === key && !isEmptyActItem(x));
   };
 
+  // ── A blank sub-activity under a NAMED parent is named, not thrown away ──
+  //
+  // "Add sub-activity" turns the activity it is pressed on into a parent, so
+  // one stray click followed by closing the window used to destroy an
+  // activity that had been in the target for months. The same went for a
+  // parent somebody had named but whose sub-activity they never filled in.
+  //
+  // A parent with NO name of its own is a different thing: that is
+  // "+ Add Parent Activity with Sub-activities" pressed and abandoned
+  // outright, and it still goes, along with whatever blank sat under it.
+  const parentOf = new Map();
+  for (const a of acts) {
+    if (!a || a.parentActivity) continue;
+    const k = keyOf(a);
+    if (k && !parentOf.has(k)) parentOf.set(k, a);
+  }
+  for (const a of acts) {
+    if (!a || !a.parentActivity || !isEmptyActItem(a)) continue;
+    const parent = parentOf.get(a.parentActivity);
+    if (!parent || !nameOf(parent)) continue;      // nameless parent: let it go
+    // Only when naming it is what saves the family. A stray blank beside a
+    // sub-activity that was really filled in is just tidied away, as it
+    // always was -- nothing is at risk there, and keeping it would leave a
+    // row to delete by hand after every misclick.
+    if (parentHasRealChild(parent)) continue;
+    // Exactly one is ever named. Naming it makes it a real sub-activity, so
+    // any further blank under the same parent takes the branch above and is
+    // tidied away -- which also means two can never end up sharing a name.
+    a.title = UNNAMED_SUB;
+    named = true;
+  }
+
   for (let i = acts.length - 1; i >= 0; i--) {
     const a = acts[i];
     if (!a) { acts.splice(i, 1); continue; }
 
     if (a.parentActivity) {
-      // A sub-activity: blank ones go.
+      // A sub-activity: blank ones go. Anything under a named parent was
+      // given a name above and is no longer blank.
       if (isEmptyActItem(a)) acts.splice(i, 1);
       continue;
     }
@@ -24962,13 +25014,13 @@ function sweepBlankActs(acts) {
 
     // Nothing real under it. It goes if it is blank itself, and it also goes
     // if it is a parent row, which cannot stand on its own -- that is the
-    // named parent whose only sub-activity was never filled in.
+    // nameless parent whose only sub-activity was never filled in.
     const isParentRow = !!a._linkKey || !!a.noRemark;
     if (isEmptyActItem(a) || isParentRow) acts.splice(i, 1);
   }
 
   if (acts.length !== before) acts.forEach((a, n) => { a.order = n; });
-  return acts.length !== before;
+  return acts.length !== before || named;
 }
 
 /**
