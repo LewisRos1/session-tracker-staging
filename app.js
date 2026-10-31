@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2305";
+const APP_VERSION = "2306";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -25157,6 +25157,20 @@ function subActivitiesOf(pa, acts) {
   if (!pa || !Array.isArray(acts)) return [];
   const key = pa._linkKey || pa.title || pa.name;
   if (!key) return [];
+  // A sub-activity belongs to ONE parent.
+  //
+  // The key is a NAME, so two parents called the same thing both matched
+  // it and each drew a row for every sub-activity under that name. The
+  // kebab is moved into a row rather than copied, so the first set of rows
+  // took the menus and the second set had none -- which is how this was
+  // noticed. Worse, deleting the second parent offered to take the first
+  // one's sub-activities with it.
+  //
+  // The first parent with the name owns them. A later one owns nothing,
+  // which is the truth: its name is a duplicate, not a second home.
+  const owner = acts.find(a => a && !a.parentActivity
+    && (a._linkKey || a.title || a.name) === key);
+  if (owner && owner !== pa) return [];
   return acts.filter(a => a !== pa && a.parentActivity === key
     && !a.isHeading && !a.isNote && !a.isExportNote);
 }
@@ -26287,7 +26301,14 @@ function renderTargetManageContent(student, target) {
       manageActNo++;
 
       const _paKey = a._linkKey || a.title || a.name;
-      const subActs = _paKey ? acts.filter(a2 => a2.parentActivity === _paKey && !a2.isCompleted && !a2.isArchived && !a2.isStopped && !a2.masteredOn && !a2.discontinuedOn) : [];
+      // Only the FIRST parent with this name owns them. The key is a name,
+      // so two parents called the same thing both matched it and each drew a
+      // row for every sub-activity under that name. The kebab is moved into
+      // a row rather than copied, so the first set took the menus and the
+      // second set had none, which is how this was noticed.
+      const _paOwns = !_paKey || acts.find(a2 => a2 && !a2.parentActivity
+        && (a2._linkKey || a2.title || a2.name) === _paKey) === a;
+      const subActs = (_paKey && _paOwns) ? acts.filter(a2 => a2.parentActivity === _paKey && !a2.isCompleted && !a2.isArchived && !a2.isStopped && !a2.masteredOn && !a2.discontinuedOn) : [];
       const hasSubActs = subActs.length > 0;
       const _emptyParent = hasSubActs ? null : emptyParentInfo(a, acts);
       const isGray = a.activityColor === "gray" || a.isMaintainLive;

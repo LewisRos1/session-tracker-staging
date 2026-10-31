@@ -95,6 +95,35 @@ try {
     approved.length > 0 && approved.every(x => x.hasKebab),
     JSON.stringify(withPending));
 
+  // ── 3. two parents sharing one name ─────────────────────────────────
+  // subActivitiesOf matches by name:
+  //   const key = pa._linkKey || pa.title || pa.name;
+  //   return acts.filter(a => a.parentActivity === key ...)
+  // so two parents called the same thing BOTH claim the same
+  // sub-activities and each draws a row for them. The kebab is moved into
+  // the row rather than copied, so the first copy takes it and the second
+  // is left bare -- which is what Lewis saw.
+  r.section("3. two parents with the same name");
+  await open({
+    id: "t1", name: "FEDC 1", scale: 3,
+    predefinedActivities: [
+      { id: "p1", title: "hello", name: "", noRemark: true, order: 0, createdOn: "2026-01-01" },
+      { id: "sa", title: "[Unnamed Subactivity]", name: "", parentActivity: "hello", order: 1, createdOn: "2026-01-01" },
+      { id: "sb", title: "bch nga", name: "", parentActivity: "hello", order: 2, createdOn: "2026-01-01" },
+      { id: "p2", title: "hello", name: "", noRemark: true, order: 3, createdOn: "2026-02-01" },
+    ],
+  });
+  await settle(900);
+
+  const twinned = await kebabs();
+  const idxs = await page.eval(`
+    [...document.querySelectorAll("#manage-modal-body .mn-sub-compact")]
+      .map(e => e.dataset.idx)`);
+  r.ok("each sub-activity is drawn once, not twice",
+    new Set(idxs).size === idxs.length, `rows at indexes ${JSON.stringify(idxs)}`);
+  r.ok("and every row still has its kebab",
+    twinned.every(x => x.hasKebab), JSON.stringify(twinned));
+
   r.section("console");
   const noise = page.consoleLines.filter(l => l.level === "error");
   r.ok("no console errors", noise.length === 0,
