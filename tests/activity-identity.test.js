@@ -104,5 +104,65 @@ check("not for the new activity beside it",
 check("an empty remark is not data",
   sessionHasActivityData(session("amp83ynw4rfmn", { text: "" }), B1_ANT, ACTS, T), false);
 
+// ── the same question for the other kinds of row ─────────────────────────
+// Lewis asked whether same-name trouble is confined to plain activities, or
+// whether parents, sub-activities, notes and headings have it too.
+
+console.log("\ntwo sub-activities with the same name under DIFFERENT parents");
+{
+  // A sub-activity carries the name of its parent, so the pair are told
+  // apart by that even when nothing else distinguishes them.
+  const P1 = { id: "p1", title: "Behaviour Chart 1", name: "" };
+  const P2 = { id: "p2", title: "Behaviour Chart 2", name: "" };
+  const S1 = { id: "s1", title: "Antecedent", name: "", parentActivity: "Behaviour Chart 1" };
+  const S2 = { id: "s2", title: "Antecedent", name: "", parentActivity: "Behaviour Chart 2" };
+  const ACTS2 = [P1, S1, P2, S2];
+  const recs = {
+    r1: { targetName: T, activityName: "Antecedent", parentActivity: "Behaviour Chart 1" },
+    r2: { targetName: T, activityName: "Antecedent", parentActivity: "Behaviour Chart 2" },
+  };
+  const spec = (s) => ({ id: s.id, title: s.title, name: s.name, paPA: s.parentActivity });
+  check("the first one claims only its own record",
+    recordIdsForActivity(recs, spec(S1), ACTS2, T, "2026-10-12"), ["r1"]);
+  check("and the second only its own",
+    recordIdsForActivity(recs, spec(S2), ACTS2, T, "2026-10-12"), ["r2"]);
+}
+
+console.log("\ntwo sub-activities with the same name under the SAME parent");
+{
+  // Nothing but the id separates these: same name, same parent. A record
+  // that carries a configId belongs to that one and no other.
+  const P1 = { id: "p1", title: "Behaviour Chart", name: "" };
+  const S1 = { id: "s1", title: "Antecedent", name: "", parentActivity: "Behaviour Chart" };
+  const S2 = { id: "s2", title: "Antecedent", name: "", parentActivity: "Behaviour Chart" };
+  const ACTS3 = [P1, S1, S2];
+  const recs = {
+    r1: { targetName: T, activityName: "Antecedent", parentActivity: "Behaviour Chart", configId: "s1" },
+  };
+  const spec = (s) => ({ id: s.id, title: s.title, name: s.name, paPA: s.parentActivity });
+  check("the one the record names claims it",
+    recordIdsForActivity(recs, spec(S1), ACTS3, T, "2026-10-12"), ["r1"]);
+  check("its twin does not",
+    recordIdsForActivity(recs, spec(S2), ACTS3, T, "2026-10-12"), []);
+}
+
+console.log("\na sub-activity and a plain activity sharing a name");
+{
+  const P1 = { id: "p1", title: "Behaviour Chart", name: "" };
+  const SUB = { id: "s1", title: "Antecedent", name: "", parentActivity: "Behaviour Chart" };
+  const TOP = { id: "t9", title: "Antecedent", name: "" };
+  const ACTS4 = [P1, SUB, TOP];
+  const recs = {
+    rSub: { targetName: T, activityName: "Antecedent", parentActivity: "Behaviour Chart" },
+    rTop: { targetName: T, activityName: "Antecedent" },
+  };
+  check("the sub-activity takes only the record under its parent",
+    recordIdsForActivity(recs, { id: SUB.id, title: SUB.title, name: SUB.name,
+      paPA: SUB.parentActivity }, ACTS4, T, "2026-10-12"), ["rSub"]);
+  check("and the plain activity only the loose one",
+    recordIdsForActivity(recs, { id: TOP.id, title: TOP.title, name: TOP.name, paPA: null },
+      ACTS4, T, "2026-10-12"), ["rTop"]);
+}
+
 console.log(failed ? `\n${failed} failed.\n` : `\nAll good.\n`);
 Deno.exit(failed ? 1 : 0);
