@@ -151,6 +151,27 @@ const STYLE_ACT_HEADING = {
   fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFE4F0F8" } },
   font: { bold: true, color: { argb: "FF2A4060" } }
 };
+/**
+ * The status tags that follow an activity name in an export.
+ *
+ * An activity can be two things at once: "Maintained" says the skill is
+ * being checked over time, "Mastered" says it is finished. Mastering one
+ * that had been maintained for a year used to drop the maintained tag, so
+ * a column of "Maintain" remarks sat under a name that gave no hint why.
+ * Both are shown now, maintained first, each with its own date.
+ *
+ * The 2026-08-21 fallback is the one already used elsewhere in this file,
+ * for records maintained before the date was being stored.
+ */
+function statusTags(pa) {
+  if (!pa) return "";
+  let out = "";
+  if (pa.maintained) out += ` (Maintained on ${fmtDate(pa.maintainedAt || "2026-08-21")})`;
+  if (pa.discontinuedOn) out += ` (Discontinued on ${fmtDate(pa.discontinuedOn)})`;
+  else if (pa.masteredOn) out += ` (Mastered on ${fmtDate(pa.masteredOn)})`;
+  return out;
+}
+
 function isActivityActive(pa, dateStr) {
   if (!dateStr) return true;
   if (pa.masteredOn     && dateStr > pa.masteredOn)     return false;
@@ -1536,10 +1557,12 @@ function addActivityScoreSheet(wb, allTargets, sessions) {
         displayName = `    ${String.fromCharCode(97 + n)}) ${stripActivityMarkup((pa.title || pa.name || "").trim())}`;
       } else {
         actNum++;
-        const status = (pa.isCompleted || pa.masteredOn)              ? " — Mastered"
-                     : (pa.isArchived || pa.isStopped || pa.discontinuedOn) ? " — Discontinued"
-                     : pa.isMaintain                                   ? " — Maintained"
-                     : "";
+        // Maintained first, then how it finished, so an activity that was
+        // both reads "— Maintained — Mastered" rather than losing one.
+        const _fin = (pa.isCompleted || pa.masteredOn)                    ? " — Mastered"
+                   : (pa.isArchived || pa.isStopped || pa.discontinuedOn) ? " — Discontinued"
+                   : "";
+        const status = ((pa.maintained || pa.isMaintain) ? " — Maintained" : "") + _fin;
         displayName = `${actNum}) ${stripActivityMarkup((pa.title || pa.name || "").trim())}${status}`;
       }
 
@@ -3375,13 +3398,10 @@ function getAllActivitiesForTarget(session, target, opts = {}) {
       subLabelCounters[pa.parentActivity] = si + 1;
       const subLabel = String.fromCharCode(97 + si);
       const parentPa = (target.predefinedActivities || []).find(p => !p.parentActivity && (p.title || p.name) === pa.parentActivity);
-      const subStatusSuffix = pa.discontinuedOn ? ` (Discontinued on ${fmtDate(pa.discontinuedOn)})`
-        : pa.masteredOn ? ` (Mastered on ${fmtDate(pa.masteredOn)})`
-        : pa.maintained ? ` (Maintained on ${fmtDate(pa.maintainedAt || "2026-08-21")})`
-        : parentPa?.discontinuedOn ? ` (Discontinued on ${fmtDate(parentPa.discontinuedOn)})`
-        : parentPa?.masteredOn ? ` (Mastered on ${fmtDate(parentPa.masteredOn)})`
-        : parentPa?.maintained ? ` (Maintained on ${fmtDate(parentPa.maintainedAt || "2026-08-21")})`
-        : '';
+      // Its own status if it has one, otherwise the parent it hangs off.
+      // A sub-activity can be maintained and mastered at once, like any
+      // other, so both tags come back together.
+      const subStatusSuffix = statusTags(pa) || statusTags(parentPa);
       const subActName = (pa.title || pa.name) + subStatusSuffix;
       const sessionAct = claimAct(pa);
       if (sessionAct) {
@@ -3410,7 +3430,14 @@ function getAllActivitiesForTarget(session, target, opts = {}) {
     const _noTrialsProp    = pa.noTrials    ? { noTrials: true }    : {};
     const _colorProps      = (pa.activityColor === "gray" || pa.isMaintainLive) ? { isGray: true }
                            : pa.activityColor === "green" ? { isGreen: true } : {};
-    const _isMaintainedForSession = !!pa.maintained && (session.date >= (pa.maintainedAt || "2026-08-21"));
+    // Written into an empty remark cell, so it must stop where the real
+    // auto-fill stopped. The maintained flag now survives mastering, and
+    // without the second half of this an activity mastered in June would
+    // have the word "Maintain" invented for every session after it.
+    const _finishedOn = pa.masteredOn || pa.discontinuedOn || null;
+    const _isMaintainedForSession = !!pa.maintained
+      && (session.date >= (pa.maintainedAt || "2026-08-21"))
+      && (!_finishedOn || session.date <= _finishedOn);
     const _statusProps = { ..._colorProps, ..._manualScoreProp, ..._noTrialsProp, isMaintained: _isMaintainedForSession };
 
     if (pa.masteredOn) {
@@ -3419,7 +3446,7 @@ function getAllActivitiesForTarget(session, target, opts = {}) {
       else {
       const _sAct = claimAct(pa);
       const _paKey = pa.title || pa.name;
-      const _name = `x) ${_paKey} (Mastered on ${fmtDate(pa.masteredOn)})`;
+      const _name = `x) ${_paKey}${statusTags(pa)}`;
       const _subs = (target.predefinedActivities || []).filter(p => p.parentActivity === _paKey);
       const _subText = _subs.length > 0 ? _subs.map((p, i) => `${String.fromCharCode(97 + i)}. ${p.title || p.name}`).join("\n") : null;
       const _extra = { activityDisplayDetails: _subText || (pa.title ? (pa.name || null) : null), activityTitleBold: !!pa.isBold, activityTitleUnderline: !!pa.isUnderline };
@@ -3434,7 +3461,7 @@ function getAllActivitiesForTarget(session, target, opts = {}) {
       else {
       const _sAct = claimAct(pa);
       const _paKey = pa.title || pa.name;
-      const _name = `x) ${_paKey} (Discontinued on ${fmtDate(pa.discontinuedOn)})`;
+      const _name = `x) ${_paKey}${statusTags(pa)}`;
       const _subs = (target.predefinedActivities || []).filter(p => p.parentActivity === _paKey);
       const _subText = _subs.length > 0 ? _subs.map((p, i) => `${String.fromCharCode(97 + i)}. ${p.title || p.name}`).join("\n") : null;
       const _extra = { activityDisplayDetails: _subText || (pa.title ? (pa.name || null) : null), activityTitleBold: !!pa.isBold, activityTitleUnderline: !!pa.isUnderline };
@@ -3448,7 +3475,7 @@ function getAllActivitiesForTarget(session, target, opts = {}) {
     exportActNum++;
     // After the title, not before it: the label says something about the
     // activity, it is not part of what the activity is called.
-    const _exportStatusSuffix = pa.maintained ? ` (Maintained on ${fmtDate(pa.maintainedAt || "2026-08-21")})` : '';
+    const _exportStatusSuffix = statusTags(pa);
     const _paDisplayBase = pa.title || pa.name;
     const numberedName = `${exportActNum}) ${_paDisplayBase}${_exportStatusSuffix}`;
     const paExtraProps = { activityDisplayDetails: pa.title ? (pa.name || null) : null, activityTitleBold: !!pa.isBold, activityTitleUnderline: !!pa.isUnderline };

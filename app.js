@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2307";
+const APP_VERSION = "2308";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -10234,9 +10234,16 @@ async function maGetLastDataDate(entity, target, pa, isGroup = false) {
           const rTrials = (r.trials || []).some(t => t !== null && t !== -1);
           const rOpt = r.optionScore !== undefined && r.optionScore !== null;
           const rSel = (r.selectedOptions || []).length > 0;
-          // "Maintain" alone (auto-fill or written during a maintained period) is not
-          // real therapy data — never count it for last-data-date purposes.
-          if ((rText === "Maintain" || rNote === "Maintain") && !rTrials && !rOpt && !rSel) return false;
+          // A bare "Maintain" counts, and has to.
+          //
+          // It used to be skipped here as "not real therapy data", which is
+          // true of the therapy and false of what this date is for. The date
+          // is the floor on mastering and discontinuing, and anything dated
+          // after that floor stops being shown: isActivityActive hides the
+          // row, and the Word session note leaves the activity out entirely.
+          // So skipping them put the floor back before months of "Maintain"
+          // remarks and hid the lot. They are data, they are on the page, and
+          // the activity has to stay visible up to the last of them.
           return rText.length > 0 || rNote.length > 0 || rTrials || rOpt || rSel;
         }));
       })
@@ -15007,7 +15014,10 @@ async function autoFillMaintainedRemarks(student, sessionId, selectedTargetName 
     const bucket = (selectedTargetName === null || target.name === selectedTargetName)
       ? currentFill : bgFill;
     for (const pa of (target.predefinedActivities || [])) {
-      if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || (!pa.name && !pa.title) || pa.parentActivity) continue;
+      // Finished activities are skipped. The maintained flag now survives
+      // mastering and discontinuing, and without this it would keep
+      // auto-filling "Maintain" into sessions after that date.
+      if (!pa.maintained || pa.masteredOn || pa.discontinuedOn || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || (!pa.name && !pa.title) || pa.parentActivity) continue;
       // Non-Notes-Only activities (checkbox/MC/manual score) show their real UI via
       // autoFillStructuredRemarks; only Notes-Only gets a "Maintain" text remark here.
       if (getActivityInlineOptions(pa) || pa.optionsMulti || pa.manualScore) continue;
@@ -19812,7 +19822,10 @@ async function autoFillViewMaintainedRemarks(student, sessionId, data) {
   let count = 0;
   for (const target of (student.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
-      if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || (!pa.name && !pa.title) || pa.parentActivity) continue;
+      // Finished activities are skipped. The maintained flag now survives
+      // mastering and discontinuing, and without this it would keep
+      // auto-filling "Maintain" into sessions after that date.
+      if (!pa.maintained || pa.masteredOn || pa.discontinuedOn || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || (!pa.name && !pa.title) || pa.parentActivity) continue;
       // Non-Notes-Only activities handled by autoFillViewStructuredRemarks
       if (getActivityInlineOptions(pa) || pa.optionsMulti || pa.manualScore) continue;
       // Only auto-fill "Maintain" for sessions on or after the maintained date
@@ -19963,7 +19976,10 @@ async function autoFillViewGroupMaintainedRemarks(group, sessionId, data) {
   let count = 0;
   for (const target of (group.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
-      if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || (!pa.name && !pa.title) || pa.parentActivity) continue;
+      // Finished activities are skipped. The maintained flag now survives
+      // mastering and discontinuing, and without this it would keep
+      // auto-filling "Maintain" into sessions after that date.
+      if (!pa.maintained || pa.masteredOn || pa.discontinuedOn || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || (!pa.name && !pa.title) || pa.parentActivity) continue;
       // Non-Notes-Only activities handled by autoFillViewGroupStructuredRemarks
       if (getActivityInlineOptions(pa) || pa.optionsMulti || pa.manualScore) continue;
       const _maintAt = pa.maintainedAt || "2026-01-01";
@@ -27362,11 +27378,14 @@ function renderTargetManageContent(student, target) {
         const pickedDate = typeof _picked === "string" ? _picked : _picked.date;
         if (action !== 'master') setDiscontinuedReason(sub, _picked.reason);
         if (action === 'master') {
-          delete sub.maintained; delete sub.activityColor; delete sub.maintainedAt;
+          // Keeps the maintained tag and its date, drops the grey — the same
+          // as a whole activity.
+          delete sub.activityColor;
           delete sub.discontinuedOn; delete sub.isArchived; delete sub.isStopped; delete sub.inactiveReason;
           sub.masteredOn = pickedDate;
         } else {
           sub.discontinuedOn = pickedDate;
+          delete sub.activityColor;
           delete sub.masteredOn; delete sub.isCompleted; delete sub.inactiveReason;
         }
       } else if (action === 'maintain') {
@@ -27878,11 +27897,19 @@ function renderTargetManageContent(student, target) {
         const pickedDate = typeof _picked === "string" ? _picked : _picked.date;
         if (action !== 'master') setDiscontinuedReason(pa, _picked.reason);
         if (action === 'master') {
-          delete pa.maintained; delete pa.activityColor; delete pa.maintainedAt;
+          // Maintained AND mastered. The maintained tag and its date are what
+          // explain a year of "Maintain" remarks sitting under this name;
+          // mastering used to delete both and leave that history unaccounted
+          // for. Discontinuing has always kept them, so the two actions now
+          // agree instead of one quietly throwing the tag away.
+          //
+          // The grey goes either way. Grey means "being checked over time",
+          // and once it is finished it is not being checked any more.
+          delete pa.activityColor;
           delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped; delete pa.inactiveReason;
           pa.masteredOn = pickedDate;
           _cascadeToActiveSubs(sub => {
-            delete sub.maintained; delete sub.activityColor; delete sub.maintainedAt;
+            delete sub.activityColor;
             delete sub.discontinuedOn; delete sub.isArchived; delete sub.isStopped; delete sub.inactiveReason;
             sub.masteredOn = pickedDate;
           });
@@ -27892,14 +27919,15 @@ function renderTargetManageContent(student, target) {
           // sections check mastered first, so it stayed under Mastered
           // Activities however many times the page was refreshed. The
           // sub-activity branch below already did this; the parent did not.
-          const paWasMaintained = !!pa.maintained;
+          // The maintained tag and its date stay, as they always have here.
+          // Only the grey goes, to match mastering: a finished activity is
+          // not being checked over time any more, whichever way it finished.
           delete pa.masteredOn; delete pa.isCompleted; delete pa.inactiveReason;
-          if (!paWasMaintained) { delete pa.maintained; delete pa.activityColor; delete pa.maintainedAt; }
+          delete pa.activityColor;
           pa.discontinuedOn = pickedDate;
           _cascadeToActiveSubs(sub => {
-            const subWasMaintained = !!sub.maintained;
             delete sub.masteredOn; delete sub.isCompleted; delete sub.inactiveReason;
-            if (!subWasMaintained) { delete sub.maintained; delete sub.activityColor; delete sub.maintainedAt; }
+            delete sub.activityColor;
             sub.discontinuedOn = pickedDate;
           });
         }
@@ -28088,6 +28116,10 @@ function renderTargetManageContent(student, target) {
       // any sub is restored from its own menu.
       if (type === "mastered") { delete pa.masteredOn; delete pa.isCompleted; }
       else { delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped; }
+      // Mastering and discontinuing drop the grey but keep the maintained
+      // tag, so an activity coming back to active is being checked over
+      // time again and needs its grey back with it.
+      if (pa.maintained) pa.activityColor = "gray";
       await saveTarget();
       renderTargetManageContent(student, target);
     });
@@ -30502,6 +30534,10 @@ function renderTemplateManageContent(template) {
       if (!pa) return;
       if (type === "mastered") { delete pa.masteredOn; delete pa.isCompleted; }
       else { delete pa.discontinuedOn; delete pa.isArchived; delete pa.isStopped; }
+      // Mastering and discontinuing drop the grey but keep the maintained
+      // tag, so an activity coming back to active is being checked over
+      // time again and needs its grey back with it.
+      if (pa.maintained) pa.activityColor = "gray";
       await saveTemplateFn();
       renderTemplateManageContent(template);
     });
@@ -31237,7 +31273,10 @@ async function autoFillGroupMaintainedRemarks(group, sessionId, attendees) {
   let count = 0;
   for (const target of (group.targets || [])) {
     for (const pa of (target.predefinedActivities || [])) {
-      if (!pa.maintained || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || (!pa.name && !pa.title) || pa.parentActivity) continue;
+      // Finished activities are skipped. The maintained flag now survives
+      // mastering and discontinuing, and without this it would keep
+      // auto-filling "Maintain" into sessions after that date.
+      if (!pa.maintained || pa.masteredOn || pa.discontinuedOn || pa.isHeading || pa.isNote || pa.isExportNote || pa.isMaintainHeading || (!pa.name && !pa.title) || pa.parentActivity) continue;
       // Non-Notes-Only activities handled by autoFillGroupStructuredRemarks
       if (getActivityInlineOptions(pa) || pa.optionsMulti || pa.manualScore) continue;
       // Only auto-fill "Maintain" for sessions on or after the maintained date
