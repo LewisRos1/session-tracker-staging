@@ -126,6 +126,9 @@ results.push(await run("Maintain repaints the row",
 results.push(await run("Moving an activity under a parent",
   ["run", "-A", "tests/browser/move-under-parent.test.js", HARNESS]));
 
+results.push(await run("A sub-activity's kebab menu",
+  ["run", "-A", "tests/browser/sub-kebab-reachable.test.js", HARNESS]));
+
 results.push(await run("Two activities with the same name, in a real browser",
   ["run", "-A", "tests/browser/same-name-activities.test.js", HARNESS]));
 
