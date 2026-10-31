@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2306";
+const APP_VERSION = "2307";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -25153,6 +25153,27 @@ function mnRowKindName(a, acts) {
   return "activity";
 }
 
+/**
+ * Which parent a sub-activity of this name belongs to.
+ *
+ * A parent claims its children by NAME, so two parents called the same
+ * thing both matched and every sub-activity under that name was drawn
+ * twice, once under each. One of them owns them; the other owns nothing.
+ *
+ * A live parent is preferred over a finished one. Taking simply the first
+ * would hand them to a discontinued parent, which is drawn in its own
+ * section away from the list, and the sub-activities would then appear
+ * nowhere at all -- worse than seeing them twice.
+ */
+function parentOwningSubs(key, acts) {
+  if (!key || !Array.isArray(acts)) return null;
+  const sameName = acts.filter(a => a && !a.parentActivity
+    && (a._linkKey || a.title || a.name) === key);
+  const live = a => !a.masteredOn && !a.discontinuedOn && !a.isArchived
+    && !a.isStopped && !a.isCompleted;
+  return sameName.find(live) || sameName[0] || null;
+}
+
 function subActivitiesOf(pa, acts) {
   if (!pa || !Array.isArray(acts)) return [];
   const key = pa._linkKey || pa.title || pa.name;
@@ -25168,8 +25189,7 @@ function subActivitiesOf(pa, acts) {
   //
   // The first parent with the name owns them. A later one owns nothing,
   // which is the truth: its name is a duplicate, not a second home.
-  const owner = acts.find(a => a && !a.parentActivity
-    && (a._linkKey || a.title || a.name) === key);
+  const owner = parentOwningSubs(key, acts);
   if (owner && owner !== pa) return [];
   return acts.filter(a => a !== pa && a.parentActivity === key
     && !a.isHeading && !a.isNote && !a.isExportNote);
@@ -26306,8 +26326,7 @@ function renderTargetManageContent(student, target) {
       // row for every sub-activity under that name. The kebab is moved into
       // a row rather than copied, so the first set took the menus and the
       // second set had none, which is how this was noticed.
-      const _paOwns = !_paKey || acts.find(a2 => a2 && !a2.parentActivity
-        && (a2._linkKey || a2.title || a2.name) === _paKey) === a;
+      const _paOwns = !_paKey || parentOwningSubs(_paKey, acts) === a;
       const subActs = (_paKey && _paOwns) ? acts.filter(a2 => a2.parentActivity === _paKey && !a2.isCompleted && !a2.isArchived && !a2.isStopped && !a2.masteredOn && !a2.discontinuedOn) : [];
       const hasSubActs = subActs.length > 0;
       const _emptyParent = hasSubActs ? null : emptyParentInfo(a, acts);

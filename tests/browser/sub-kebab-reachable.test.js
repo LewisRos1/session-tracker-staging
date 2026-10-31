@@ -124,6 +124,28 @@ try {
   r.ok("and every row still has its kebab",
     twinned.every(x => x.hasKebab), JSON.stringify(twinned));
 
+  // ── 4. the first parent of that name is discontinued ────────────────
+  // The risk in making the FIRST parent the owner: if that one is finished
+  // with, it is drawn in the Discontinued section, and the live duplicate
+  // below would own nothing. The sub-activities would then be on screen
+  // nowhere at all, which would be worse than the duplicate rows.
+  r.section("4. when the first parent of that name is discontinued");
+  await open({
+    id: "t1", name: "FEDC 1", scale: 3,
+    predefinedActivities: [
+      { id: "p1", title: "hello", name: "", noRemark: true, order: 0,
+        createdOn: "2026-01-01", discontinuedOn: "2026-06-01" },
+      { id: "p2", title: "hello", name: "", noRemark: true, order: 1, createdOn: "2026-07-01" },
+      { id: "sa", title: "[Unnamed Subactivity]", name: "", parentActivity: "hello", order: 2, createdOn: "2026-07-01" },
+      { id: "sb", title: "bch nga", name: "", parentActivity: "hello", order: 3, createdOn: "2026-07-01" },
+    ],
+  });
+  await settle(900);
+  const orphaned = await kebabs();
+  r.check("the sub-activities are still on screen", orphaned.length, 2);
+  r.ok("and still have their kebabs",
+    orphaned.length > 0 && orphaned.every(x => x.hasKebab), JSON.stringify(orphaned));
+
   r.section("console");
   const noise = page.consoleLines.filter(l => l.level === "error");
   r.ok("no console errors", noise.length === 0,
