@@ -1,23 +1,27 @@
 // A sub-activity should look like it belongs to the row above it.
 //
-// The Start Session screen already draws a parent and its sub-activities as
-// one block: the parent's bottom edge is open and each sub carries a 5px
-// rail down its left. The View/Edit past session table showed the same thing
-// as a flat list, where the only cue was the a) b) in the No. column -- easy
-// to miss once a row runs several lines tall, which they do.
+// The View/Edit past session table showed a parent and its subs as a flat
+// list, where the only cue was the a) b) in the No. column -- easy to miss
+// once a row runs several lines tall, which they do.
 //
-// So the sub rows now indent and carry the same rail. What this checks is
-// that the rail is actually painted (a class name proves nothing on its own),
-// that only sub rows get it, and that marking the row did not drop the
-// colour classes that were already on it -- the grey Maintain row and the
-// green activity row share that same attribute.
+// Sub rows now indent, by the same amount the Word export uses, so the
+// screen and the document agree. They briefly carried a rail down the left
+// as well, the way the Start Session screen marks a sub, but a table draws
+// a border between every row: the rail came out as one short tick per row
+// instead of a line down the group, and read as a stray mark.
 //
-//   deno run -A tests/browser/view-sub-rail.test.js <harness-dir>
+// What this checks is that the indent is measured as the browser applies it
+// (a class name proves nothing on its own), that only sub rows get it, and
+// that marking the row did not drop the colour classes that were already on
+// it -- the grey Maintain row and the green activity row share that same
+// attribute.
+//
+//   deno run -A tests/browser/view-sub-indent.test.js <harness-dir>
 
 import { openPage, reporter } from "./driver.js";
 
 const dir = Deno.args[0];
-if (!dir) { console.error("usage: view-sub-rail.test.js <harness-dir>"); Deno.exit(2); }
+if (!dir) { console.error("usage: view-sub-indent.test.js <harness-dir>"); Deno.exit(2); }
 
 const r = reporter();
 const page = await openPage(dir, { verbose: Deno.args.includes("--verbose") });
@@ -30,7 +34,7 @@ const ACTS = [
   { id: "s2", title: "shit", name: "yup",
     parentActivity: "vibe coding", order: 3, createdOn: "2026-01-01" },
   { id: "a2", title: "do it like u", name: "", order: 4, createdOn: "2026-01-01" },
-  // Shares the row attribute the rail had to be merged into.
+  // Shares the row attribute the sub marker had to be merged into.
   { id: "g1", title: "a grey one", name: "", order: 5, createdOn: "2026-01-01",
     activityColor: "gray" },
   { id: "s3", title: "a grey sub", name: "", parentActivity: "vibe coding",
@@ -47,14 +51,14 @@ try {
   await page.load();
   await page.until(`!document.querySelector("#screen-home").classList.contains("hidden")`, "home");
 
-  // Build the real table and put it on the page, so the rail is measured as
+  // Build the real table and put it on the page, so the indent is measured as
   // the browser paints it rather than read out of a string.
   const rows = await page.eval(`(() => {
     const s = window.__app.state;
     const target = s.students.find(x => x.id === "s1").targets[0];
     const data = { date: "2026-10-22", studentId: "s1", activities: {}, remarks: {} };
     const host = document.createElement("div");
-    host.id = "rail-probe";
+    host.id = "sub-probe";
     host.innerHTML = String(window.__app.buildTargetViewTable(target, data) ?? "");
     document.body.appendChild(host);
     return [...host.querySelectorAll("tr")].map(tr => {
@@ -88,18 +92,15 @@ try {
     const row = byText(name);
     r.ok(`"${name}" is marked as a sub`, !!row && row.sub, JSON.stringify(row));
     r.check(`"${name}" is indented`, row && row.padLeft, "30.4px");   // 1.9rem
-    r.ok(`"${name}" has a rail painted beside it`,
-      !!row && row.railWidth === "3px", JSON.stringify(row));
-    r.ok(`and the rail is actually visible`,
-      !!row && row.railColor !== "rgba(0, 0, 0, 0)" && row.railColor !== "transparent",
-      JSON.stringify(row && row.railColor));
+    r.ok(`"${name}" draws nothing extra beside it`,
+      !!row && row.railWidth === "auto", JSON.stringify(row));
   }
   r.check("and they are still lettered", [byText("silhoutte")?.no, byText("shit")?.no],
     ["a)", "b)"]);
 
   r.section("3. and nothing else is");
   const parent = byText("vibe coding");
-  r.ok("the parent row is not railed", !!parent && !parent.sub, JSON.stringify(parent));
+  r.ok("the parent row is not indented", !!parent && !parent.sub, JSON.stringify(parent));
   r.ok("the parent still spans the table", !!parent && parent.colspan === "5",
     JSON.stringify(parent));
   for (const name of ["NEW NAME", "do it like u"]) {
@@ -110,7 +111,7 @@ try {
 
   // ── 4. the bug this shape could easily have introduced ──────────────
   //
-  // The colour classes and the rail class share one attribute. Building that
+  // The colour classes and the sub class share one attribute. Building that
   // attribute wrongly would silently drop view-gray-row, and a Maintain row
   // would stop being grey -- which nothing else in the suite would notice.
   r.section("4. the colour classes survived");
@@ -128,22 +129,19 @@ try {
   r.section("5. in dark mode too");
   await page.eval(`document.querySelector('.theme-opt[data-theme="dark"]').click()`);
   await new Promise(res => setTimeout(res, 400));
-  const darkRail = await page.eval(`(() => {
-    const host = document.getElementById("rail-probe");
-    const sub = host && [...host.querySelectorAll("tr.vrow-sub .vcol-act")][0];
-    if (!sub) return { missing: true };
-    const bar = getComputedStyle(sub, "::before");
-    const cell = getComputedStyle(sub);
-    const lum = c => { const m = String(c).match(/[0-9]+/g);
-      return m ? 0.299*+m[0] + 0.587*+m[1] + 0.114*+m[2] : null; };
-    return { rail: bar.backgroundColor, railLum: lum(bar.backgroundColor),
-      bg: cell.backgroundColor, bgLum: lum(cell.backgroundColor) };
+  const dark = await page.eval(`(() => {
+    const host = document.getElementById("sub-probe");
+    const sub = host && host.querySelector("tr.vrow-sub .vcol-act");
+    const plain = host && [...host.querySelectorAll("tr:not(.vrow-sub) .vcol-act")]
+      .find(c => !c.getAttribute("colspan"));
+    if (!sub || !plain) return { missing: true };
+    return { sub: getComputedStyle(sub).paddingLeft,
+      plain: getComputedStyle(plain).paddingLeft };
   })()`);
-  r.ok("a sub row is still there to look at", !darkRail.missing, JSON.stringify(darkRail));
-  r.ok("the rail is still visible against the row behind it",
-    !darkRail.missing && darkRail.railLum !== null
-      && Math.abs(darkRail.railLum - darkRail.bgLum) > 40,
-    JSON.stringify(darkRail));
+  r.ok("a sub row is still there to look at", !dark.missing, JSON.stringify(dark));
+  r.check("and still indented", dark.sub, "30.4px");
+  r.ok("while a plain row is not", !dark.missing && dark.plain !== dark.sub,
+    JSON.stringify(dark));
 
   r.section("console");
   const noise = page.consoleLines.filter(l => l.level === "error");

@@ -145,7 +145,7 @@ results.push(await run("Duplicate activity names: refused, and allowed",
   ["run", "-A", "tests/browser/duplicate-activity-names.test.js", HARNESS]));
 
 results.push(await run("Sub-activities in the View table",
-  ["run", "-A", "tests/browser/view-sub-rail.test.js", HARNESS]));
+  ["run", "-A", "tests/browser/view-sub-indent.test.js", HARNESS]));
 
 results.push(await run("Dark mode: the theme, and the exports it must not touch",
   ["run", "-A", "tests/browser/dark-mode.test.js", HARNESS]));

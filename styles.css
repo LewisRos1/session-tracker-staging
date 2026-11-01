@@ -4187,29 +4187,13 @@ button.wf-pill:hover { filter: brightness(.93); }
 .vcol-act     { width: 250px; white-space: pre-wrap; word-break: break-word; }
 /* A sub-activity in the View table.
 
-   The Start Session screen already draws a parent and its subs as one
-   block: the parent's bottom edge is open and each sub carries a 5px rail
-   down its left. The View table showed the same thing as a flat list where
-   the only cue was the a) b) in the No. column, which is easy to miss once
-   a row runs several lines tall. Same idea, fitted to a table: the name
-   cell indents and the rail runs the full height of each sub row, so a run
-   of them reads as one continuous line down the group. */
-.vrow-sub .vcol-act {
-  position: relative;
-  padding-left: 1.9rem;
-}
-.vrow-sub .vcol-act::before {
-  content: "";
-  position: absolute;
-  left: .72rem;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: var(--primary-accent);
-}
-/* The letter leans toward the rail rather than sitting under the parent's
-   number, so the eye reads a) and b) as belonging to the row above. */
-.vrow-sub .vcol-no { padding-left: .9rem; }
+   Indent and nothing else. It first had a rail down the left as well, the
+   way the Start Session screen marks a sub, but a table draws a border
+   between every row, so the rail was chopped into one short tick per row
+   instead of running down the group. It read as a stray mark. The indent
+   on its own is the same amount the Word export uses, so the screen and
+   the document now agree. */
+.vrow-sub .vcol-act { padding-left: 1.9rem; }
 .vcol-student { width: 100px; text-align: center; white-space: pre-wrap; word-break: break-word; font-weight: 600; }
 .vcol-rem    { width: 340px; height: 1px; padding: 0; }
 .vcol-rem > * { padding: .4rem .6rem; box-sizing: border-box; }
