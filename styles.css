@@ -295,6 +295,12 @@
   --c-ffffff: #1b1f24;   /* card / panel surface */
   --c-onaccent: #ffffff;   /* (unchanged, see above) */
   --c-accent: #c3c9d4;   /* label / border where the brand used to be */
+  /* Picked inverts rather than following the brand down to ash. */
+  --pick-bg:       #ffffff;
+  --pick-bg-hover: #e6e9ee;
+  --pick-fg:       #1b1f24;
+  --badge-bg:      #ffffff;
+  --badge-fg:      #1b1f24;
 }
 
 /* ─── RESET & TOKENS ────────────────────────────────────── */
@@ -308,6 +314,22 @@
      same thing in dark: a fill goes to ash grey, a label has to stay
      readable. Light mode is unchanged either way. */
   --primary-accent: var(--c-accent);
+  /* "This is the one that is picked."
+
+     Separate from --primary because the two stopped agreeing when the dark
+     theme went ash: a picked day, a ticked option and an active chip were
+     all filled with the brand colour, and the brand colour in dark mode is
+     now a near-black that is barely a shade off the cell beside it. Picked
+     has to be the loudest thing in the row, so in dark mode it inverts to
+     white instead of following the brand down. Light mode is the same
+     indigo it always was. */
+  --pick-bg:       var(--c-6366f1);
+  --pick-bg-hover: var(--c-4f46e5);
+  --pick-fg:       #ffffff;
+  /* The to-do count. Blue rather than indigo in light mode, so it keeps its
+     own value rather than being folded into --pick-bg. */
+  --badge-bg:      var(--c-3b82f6);
+  --badge-fg:      #ffffff;
   --success:        var(--c-22c55e);
   --danger:         var(--c-ef4444);
   --danger-light:   var(--c-fef2f2);
@@ -828,15 +850,6 @@ html, body {
 .export-btn:hover  { background: var(--primary-light); border-color: var(--primary-accent); }
 .export-btn:active { opacity: .8; }
 .export-btn:disabled { opacity: .5; cursor: not-allowed; }
-.export-btn-all {
-  background: var(--primary);
-  color: var(--c-onaccent);
-  border-color: var(--primary-accent);
-  font-weight: 700;
-  margin-bottom: .6rem;
-}
-.export-btn-all:hover { background: var(--primary-dark, var(--c-4338ca)); border-color: var(--primary-dark, var(--c-4338ca)); }
-
 /* ============================================================
    SESSION SCREEN
    ============================================================ */
@@ -1044,8 +1057,8 @@ html, body {
 .day-num { line-height: 1; }
 .date-picker-day:hover { background: var(--primary-light); }
 .date-picker-day-current {
-  background: var(--primary);
-  color: var(--c-onaccent);
+  background: var(--pick-bg);
+  color: var(--pick-fg);
   font-weight: 700;
 }
 /* Today: a darker grey fill. Every other cell is the same pale grey, so a
@@ -1056,15 +1069,15 @@ html, body {
    purple block, and hover is restated because this rule would otherwise sit
    on top of it. */
 .date-picker-day-today:not(.date-picker-day-current) {
-  background: var(--primary);
-  color: var(--c-onaccent);
+  background: var(--pick-bg);
+  color: var(--pick-fg);
 }
 /* The tick is purple on the pale cells and would disappear into this one. */
 .date-picker-day-today:not(.date-picker-day-current) .date-taken-dot {
-  color: var(--c-onaccent);
+  color: var(--pick-fg);
 }
 .date-picker-day-today:not(.date-picker-day-current):hover {
-  background: var(--primary-dark);
+  background: var(--pick-bg-hover);
 }
 .date-picker-day-future { color: var(--c-bbbbbb); cursor: default; }
 .date-picker-day-taken  { cursor: default; }
@@ -1078,7 +1091,7 @@ html, body {
   flex-shrink: 0;
 }
 .date-taken-dot { color: var(--primary-accent); }
-.date-picker-day-current .date-taken-dot { color: var(--c-onaccent); }
+.date-picker-day-current .date-taken-dot { color: var(--pick-fg); }
 .day-dot-spacer { background: transparent; }
 .date-picker-subtitle {
   font-size: 1rem;
@@ -1535,9 +1548,9 @@ input.field-input::placeholder {
 .btn-remark-opt--multi { border-radius: 4px; }
 
 .btn-remark-opt.active {
-  background: var(--primary);
-  border-color: var(--primary-accent);
-  color: var(--c-onaccent);
+  background: var(--pick-bg);
+  border-color: var(--pick-bg);
+  color: var(--pick-fg);
   font-weight: 600;
 }
 
@@ -1558,9 +1571,9 @@ input.field-input::placeholder {
 }
 .view-remark-multi-btn:hover { border-color: var(--primary-accent); color: var(--primary-accent); }
 .view-remark-multi-btn.active {
-  background: var(--primary);
-  border-color: var(--primary-accent);
-  color: var(--c-onaccent);
+  background: var(--pick-bg);
+  border-color: var(--pick-bg);
+  color: var(--pick-fg);
   font-weight: 600;
 }
 .view-remark-multi-btn--rect,
@@ -1586,9 +1599,9 @@ input.field-input::placeholder {
 .view-multi-create-btn:hover,
 .view-group-multi-create-btn:hover { border-color: var(--primary-accent); color: var(--primary-accent); }
 .view-remark-single-btn.active {
-  background: var(--primary);
-  border-color: var(--primary-accent);
-  color: var(--c-onaccent);
+  background: var(--pick-bg);
+  border-color: var(--pick-bg);
+  color: var(--pick-fg);
   font-weight: 600;
 }
 
@@ -2942,9 +2955,9 @@ div.admin-note-editable:empty::before {
 }
 .btn-mastery:hover { border-color: var(--primary-accent); background: var(--primary-light); }
 .btn-mastery.active {
-  background: var(--primary);
-  border-color: var(--primary-accent);
-  color: var(--c-onaccent);
+  background: var(--pick-bg);
+  border-color: var(--pick-bg);
+  color: var(--pick-fg);
   font-weight: 600;
 }
 /* slightly smaller in the view table */
@@ -3502,7 +3515,6 @@ div.admin-note-editable:empty::before {
   flex-wrap: wrap;
   gap: .5rem;
 }
-.info-btn-row .export-btn-all { margin-bottom: 0; }
 
 /* ─── Checklist modal ───────────────────────────────────────── */
 .checklist-group-header {

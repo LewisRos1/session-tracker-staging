@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2314";
+const APP_VERSION = "2315";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -2986,7 +2986,7 @@ function renderStudentDatabaseButton() {
   const container = $("student-database-button");
   if (!container) return;
   container.innerHTML = `<div class="info-btn-row">
-    <button class="export-btn export-btn-all" id="btn-open-student-registry" style="margin-bottom:0">Student Database</button>
+    <button class="export-btn" id="btn-open-student-registry">Student Database</button>
     <button class="export-btn" id="btn-open-ai-report">AI Report Generator</button>
     <!-- Shown to everyone, like the AI Report Generator beside it. An
          assistant clicking it gets the same "Locked." panel: the screen
@@ -3069,8 +3069,8 @@ async function loadTodoHomeCounts() {
       const badge = document.querySelector(`.todo-home-badge[data-id="${inst.id}"]`);
       if (badge) {
         badge.textContent = total;
-        badge.style.background = total > 0 ? "var(--c-3b82f6)" : "var(--c-d1d5db)";
-        badge.style.color      = total > 0 ? "var(--c-ffffff)"    : "var(--c-6b7280)";
+        badge.style.background = total > 0 ? "var(--badge-bg)" : "var(--c-d1d5db)";
+        badge.style.color      = total > 0 ? "var(--badge-fg)" : "var(--c-6b7280)";
       }
     } catch { /* silently skip this instructor if query fails */ }
   });
@@ -3444,7 +3444,7 @@ function renderTodoTiles(results, filterInst = null) {
               style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:.9rem 1rem;border:none;background:var(--c-f9fafb);cursor:${hasPending ? "pointer" : "default"};text-align:left">
               <div style="display:flex;align-items:center;gap:.5rem">
                 <span style="font-weight:700;font-size:.95rem;color:var(--c-1f2937)">${escHtml(inst.name)}</span>
-                <span style="background:${hasPending ? 'var(--c-3b82f6)' : 'var(--c-d1d5db)'};color:${hasPending ? 'var(--c-ffffff)' : 'var(--c-6b7280)'};border-radius:999px;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;padding:0 5px;flex-shrink:0">${pending.length + approvalRows + noticeRows}</span>
+                <span style="background:${hasPending ? 'var(--badge-bg)' : 'var(--c-d1d5db)'};color:${hasPending ? 'var(--badge-fg)' : 'var(--c-6b7280)'};border-radius:999px;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;padding:0 5px;flex-shrink:0">${pending.length + approvalRows + noticeRows}</span>
               </div>
               ${hasPending ? `<span class="todo-chevron" style="color:var(--c-6b7280);font-size:1.5rem;line-height:1;transition:transform .2s;transform:rotate(-90deg)">▾</span>` : ""}
             </button>
@@ -4569,7 +4569,7 @@ function renderExportButtons() {
 
   exportAllContainer.innerHTML = `
     <div style="display:flex;gap:.6rem;flex-wrap:wrap">
-      <button class="export-btn export-btn-all" id="btn-export-all-trials">Backup All Excel (ZIP)</button>
+      <button class="export-btn" id="btn-export-all-trials">Backup All Excel (ZIP)</button>
       <button class="export-btn" id="btn-data-integrity-check">🔍 Run Data Integrity Check</button>
       <button class="export-btn" id="btn-recently-deleted">🗑️ Recently Deleted (30 days)</button>
       <button class="export-btn" id="btn-hyr-settings">✏️ Prompt for AI Report</button>

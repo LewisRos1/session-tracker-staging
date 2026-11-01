@@ -209,6 +209,74 @@ try {
   r.ok("with readable text on it", lum(chrome.headerText) > 200, chrome.headerText);
   r.ok("and on the filled buttons", lum(chrome.filledText) > 200, chrome.filledText);
 
+  // ── 2c. the button rows are uniform ─────────────────────────────────
+  //
+  // Student Database and Backup All Excel used to be filled brand-coloured
+  // buttons sitting in rows of outline ones. Lewis wants them to match their
+  // neighbours, in either theme, so this compares each against the button
+  // beside it rather than against a colour written down here.
+  r.section("2c. no button stands out from its row");
+  const rowUniformity = () => page.eval(`(() => {
+    const check = (id) => {
+      const me = document.getElementById(id);
+      if (!me) return { id, missing: true };
+      const peer = [...me.parentElement.querySelectorAll(".export-btn")]
+        .find(b => b !== me);
+      if (!peer) return { id, noPeer: true };
+      const a = getComputedStyle(me), b = getComputedStyle(peer);
+      const same = k => a[k] === b[k];
+      return {
+        id,
+        peer: peer.id,
+        matches: ["backgroundColor", "color", "borderColor", "borderTopWidth",
+                  "fontWeight", "fontSize", "borderRadius", "padding",
+                  "marginBottom"].filter(k => !same(k)),
+      };
+    };
+    return [check("btn-open-student-registry"), check("btn-export-all-trials")];
+  })()`);
+  for (const row of await rowUniformity()) {
+    r.ok(`${row.id} looks like the button next to it`,
+      !row.missing && !row.noPeer && row.matches.length === 0,
+      JSON.stringify(row));
+  }
+
+  // ── 2d. picked things invert instead of going dark ──────────────────
+  //
+  // A picked day, a ticked option and an active chip were all filled with
+  // the brand colour. Once the brand went ash they became a near-black that
+  // is barely a shade off the cell beside it, which is how Lewis found this:
+  // today's date looked darker than the rest rather than picked. Picked has
+  // to be the loudest thing in the row, so in dark mode it inverts to white.
+  r.section("2d. a picked thing is the brightest thing in its row");
+  const picked = await page.eval(`(() => {
+    const root = getComputedStyle(document.documentElement);
+    const probe = (prop) => {
+      const el = document.createElement("span");
+      el.style.background = "var(" + prop + ")";
+      document.body.appendChild(el);
+      const v = getComputedStyle(el).backgroundColor;
+      el.remove();
+      return v;
+    };
+    return {
+      pickBg: probe("--pick-bg"),
+      pickFg: root.getPropertyValue("--pick-fg").trim(),
+      badgeBg: probe("--badge-bg"),
+      badgeFg: root.getPropertyValue("--badge-fg").trim(),
+      page: getComputedStyle(document.body).backgroundColor,
+    };
+  })()`);
+  r.ok("a picked cell is near white", lum(picked.pickBg) > 230,
+    `${picked.pickBg} (brightness ${lum(picked.pickBg)})`);
+  r.ok("and stands right out from the page",
+    lum(picked.pickBg) - lum(picked.page) > 180,
+    `pick ${lum(picked.pickBg)} vs page ${lum(picked.page)}`);
+  r.check("with dark text on it", picked.pickFg, "#1b1f24");
+  r.ok("the to-do badge is white too", lum(picked.badgeBg) > 230,
+    `${picked.badgeBg} (brightness ${lum(picked.badgeBg)})`);
+  r.check("with dark digits", picked.badgeFg, "#1b1f24");
+
   r.section("3. the choice is remembered, on this device");
   r.check("it is written to the browser, not the account", await stored(), "dark");
   r.check("and the filled word moves to Dark", await page.eval(
@@ -343,6 +411,27 @@ try {
   r.check("the header is the original indigo", lightChrome.header, "rgb(99, 102, 241)");
   r.check("and the label colour is that same indigo", lightChrome.accent, "rgb(99, 102, 241)");
   r.check("the brand token is untouched in light mode", lightChrome.primary, "#6366f1");
+  // Lewis asked for the dark version only, so the picked states must be the
+  // same indigo and blue they have always been here.
+  const lightPick = await page.eval(`(() => {
+    const probe = (prop) => {
+      const el = document.createElement("span");
+      el.style.background = "var(" + prop + ")";
+      document.body.appendChild(el);
+      const v = getComputedStyle(el).backgroundColor;
+      el.remove(); return v;
+    };
+    return { pick: probe("--pick-bg"), badge: probe("--badge-bg") };
+  })()`);
+  r.check("a picked cell is still the indigo", lightPick.pick, "rgb(99, 102, 241)");
+  r.check("and the to-do badge still the blue", lightPick.badge, "rgb(59, 130, 246)");
+  // The mode Lewis screenshotted. The class is shared now, so this holds by
+  // construction rather than by two palettes agreeing.
+  for (const row of await rowUniformity()) {
+    r.ok(`${row.id} matches its row in light mode too`,
+      !row.missing && !row.noPeer && row.matches.length === 0,
+      JSON.stringify(row));
+  }
 
   // ── 7. the exports must not be able to drift ────────────────────────
   //
