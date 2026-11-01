@@ -41,6 +41,40 @@ const painted = () => page.eval(`(() => {
   };
 })()`);
 
+// How legible is an element's text against the background actually painted
+// behind it? Injected into the page by each sweep below.
+//
+// The first version of this asked "is the text dark on a dark page", which
+// is the wrong question twice over: it flagged the switch's filled segment,
+// which is deliberately dark text on a deliberately pale chip, and it would
+// have missed dark text sitting on a dark TINT. Contrast against the real
+// backdrop is the thing that matters, and it needs no exceptions.
+const CONTRAST_FN = `
+  const lumOf = c => { const m = String(c).match(/[0-9]+/g);
+    return m ? 0.299*+m[0] + 0.587*+m[1] + 0.114*+m[2] : null; };
+  const alphaOf = c => { const m = String(c).match(/[0-9.]+/g);
+    return m && m[3] !== undefined ? Number(m[3]) : 1; };
+  const backdropOf = el => {
+    for (let n = el; n; n = n.parentElement) {
+      const bg = getComputedStyle(n).backgroundColor;
+      if (alphaOf(bg) > 0.25) return bg;
+    }
+    return getComputedStyle(document.body).backgroundColor;
+  };
+  const unreadable = el => {
+    const cs = getComputedStyle(el);
+    if (!el.textContent.trim()) return null;
+    if (cs.visibility === "hidden" || cs.display === "none") return null;
+    if (alphaOf(cs.color) < 0.3) return null;
+    const back = backdropOf(el);
+    const fg = lumOf(cs.color), bg = lumOf(back);
+    if (fg === null || bg === null) return null;
+    return Math.abs(fg - bg) < 45
+      ? cs.color + " on " + back + " (gap " + Math.round(Math.abs(fg - bg)) + ")"
+      : null;
+  };
+`;
+
 // Rough brightness, 0 black to 255 white. This one runs in Deno, not in the
 // page, so the escape is a plain regex literal -- doubled, it matched a
 // backslash and never a digit.
@@ -137,6 +171,44 @@ try {
     `text ${darkFg} on background ${darkBg}`);
   r.check("the browser is told to draw its own parts dark too", dark.scheme, "dark");
 
+  // ── 2b. the chrome is ash, not blurple ──────────────────────────────
+  //
+  // Lewis pointed at Chrome's Incognito window and Discord's Ash theme: a
+  // dark neutral toolbar over a darker page, with no blue left in the frame.
+  // "Dark" alone would pass with a navy header, so this measures how far
+  // from grey each surface actually is.
+  r.section("2b. the frame is neutral grey, not blue");
+  const spread = rgb => {
+    const m = String(rgb).match(/\d+/g);
+    if (!m) return null;
+    return Math.max(+m[0], +m[1], +m[2]) - Math.min(+m[0], +m[1], +m[2]);
+  };
+  const chrome = await page.eval(`(() => {
+    const pick = sel => {
+      const el = document.querySelector(sel);
+      return el ? getComputedStyle(el).backgroundColor : null;
+    };
+    const header = document.querySelector(".app-header");
+    const filled = document.querySelector(".export-btn-all");
+    return {
+      header: header ? getComputedStyle(header).backgroundColor : null,
+      headerText: header ? getComputedStyle(header).color : null,
+      filled: filled ? getComputedStyle(filled).backgroundColor : null,
+      filledText: filled ? getComputedStyle(filled).color : null,
+      page: getComputedStyle(document.body).backgroundColor,
+    };
+  })()`);
+  r.ok("the header is a neutral grey", spread(chrome.header) !== null
+    && spread(chrome.header) <= 14, `${chrome.header} (spread ${spread(chrome.header)})`);
+  r.ok("and the filled buttons are too", spread(chrome.filled) !== null
+    && spread(chrome.filled) <= 14, `${chrome.filled} (spread ${spread(chrome.filled)})`);
+  // Incognito's toolbar sits above a darker page rather than merging with it.
+  r.ok("the header still stands off the page behind it",
+    lum(chrome.header) - lum(chrome.page) >= 6,
+    `header ${chrome.header} (${lum(chrome.header)}) vs page ${chrome.page} (${lum(chrome.page)})`);
+  r.ok("with readable text on it", lum(chrome.headerText) > 200, chrome.headerText);
+  r.ok("and on the filled buttons", lum(chrome.filledText) > 200, chrome.filledText);
+
   r.section("3. the choice is remembered, on this device");
   r.check("it is written to the browser, not the account", await stored(), "dark");
   r.check("and the filled word moves to Dark", await page.eval(
@@ -144,7 +216,7 @@ try {
        .filter(o => o.getAttribute("aria-pressed") === "true")
        .map(o => o.dataset.theme)`), ["dark"]);
   r.check("the address-bar colour follows", await page.eval(
-    `document.querySelector('meta[name="theme-color"]').getAttribute("content")`), "#15181b");
+    `document.querySelector('meta[name="theme-color"]').getAttribute("content")`), "#2f3137");
 
   // ── 4. a reload must not flash white ────────────────────────────────
   r.section("4. reloading");
@@ -168,31 +240,22 @@ try {
     !!inHead && inHead.beforeStylesheet, JSON.stringify(inHead));
 
   // ── 5. nothing left behind on a literal colour ──────────────────────
-  r.section("5. no card left white on a dark page");
+  r.section("5. nothing unreadable on the home screen");
   const strays = await page.eval(`(() => {
-    const out = [];
-    const seen = new Set();
+    ${CONTRAST_FN}
+    const out = [], seen = new Set();
     for (const el of document.querySelectorAll("#screen-home *")) {
-      const cs = getComputedStyle(el);
-      for (const prop of ["backgroundColor", "color"]) {
-        const m = String(cs[prop]).match(/\\d+/g);
-        if (!m || (m[3] !== undefined && Number(m[3]) === 0)) continue;
-        const L = 0.299 * +m[0] + 0.587 * +m[1] + 0.114 * +m[2];
-        // A light background, or dark text, is wrong way round on a dark page.
-        const wrong = prop === "backgroundColor" ? L > 215 : L < 70;
-        if (!wrong) continue;
-        const key = el.tagName + "." + (el.className || "") + prop;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        out.push({ tag: el.tagName, cls: String(el.className || "").slice(0, 40),
-          prop, value: cs[prop] });
-      }
+      const bad = unreadable(el);
+      if (!bad) continue;
+      const key = el.tagName + "." + String(el.className || "").slice(0, 36);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(key + "  " + bad);
     }
     return out;
   })()`);
-  r.ok("every visible element on the home screen flipped",
-    strays.length === 0,
-    strays.slice(0, 6).map(s => `${s.tag}.${s.cls} ${s.prop}=${s.value}`).join("\n        "));
+  r.ok("every word reads against what is actually behind it",
+    strays.length === 0, strays.slice(0, 8).join("\n        "));
 
   // ── 5b. the screens that hold the inline styles ─────────────────────
   //
@@ -201,21 +264,16 @@ try {
   // holds hundreds of them, so a sweep that stops at the home screen would
   // pass while the screen Daisy spends her time in stayed white.
   const sweep = (sel) => page.eval(`(() => {
-    const out = []; const seen = new Set();
+    ${CONTRAST_FN}
+    const out = [], seen = new Set();
     for (const el of document.querySelectorAll(${JSON.stringify(sel)} + " *")) {
       if (!el.offsetParent && el.tagName !== "BODY") continue;
-      const cs = getComputedStyle(el);
-      for (const prop of ["backgroundColor", "color"]) {
-        const m = String(cs[prop]).match(/\\d+/g);
-        if (!m || (m[3] !== undefined && Number(m[3]) === 0)) continue;
-        const L = 0.299 * +m[0] + 0.587 * +m[1] + 0.114 * +m[2];
-        if (prop === "backgroundColor" ? L <= 215 : L >= 70) continue;
-        const key = el.tagName + "." + (el.className || "") + prop;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        out.push(el.tagName + "." + String(el.className || "").slice(0, 36)
-          + " " + prop + "=" + cs[prop]);
-      }
+      const bad = unreadable(el);
+      if (!bad) continue;
+      const key = el.tagName + "." + String(el.className || "").slice(0, 36);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(key + "  " + bad);
     }
     return out;
   })()`);
@@ -244,20 +302,15 @@ try {
     host.innerHTML = String(window.__app.renderFedcTarget(s.currentStudent.targets[0]) ?? "");
     document.body.appendChild(host);
     await new Promise(r2 => setTimeout(r2, 300));
-    const out = []; const seen = new Set();
+    ${CONTRAST_FN}
+    const out = [], seen = new Set();
     for (const el of host.querySelectorAll("*")) {
-      const cs = getComputedStyle(el);
-      for (const prop of ["backgroundColor", "color"]) {
-        const m = String(cs[prop]).match(/\\d+/g);
-        if (!m || (m[3] !== undefined && Number(m[3]) === 0)) continue;
-        const L = 0.299 * +m[0] + 0.587 * +m[1] + 0.114 * +m[2];
-        if (prop === "backgroundColor" ? L <= 215 : L >= 70) continue;
-        const key = el.tagName + "." + (el.className || "") + prop;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        out.push(el.tagName + "." + String(el.className || "").slice(0, 36)
-          + " " + prop + "=" + cs[prop]);
-      }
+      const bad = unreadable(el);
+      if (!bad) continue;
+      const key = el.tagName + "." + String(el.className || "").slice(0, 36);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(key + "  " + bad);
     }
     host.remove();
     return out;
@@ -274,6 +327,22 @@ try {
   const back = await painted();
   r.check("the token is the original colour again", back.token, "#374151");
   r.ok("and the page is light again", lum(back.bodyBg) > 200, back.bodyBg);
+  // Splitting --primary into a fill and a label must not have moved light
+  // mode: both resolve to the same indigo there, exactly as before.
+  const lightChrome = await page.eval(`(() => {
+    const h = document.querySelector(".app-header");
+    const root = getComputedStyle(document.documentElement);
+    const probe = document.createElement("span");
+    probe.style.color = "var(--primary-accent)";
+    document.body.appendChild(probe);
+    const accent = getComputedStyle(probe).color;
+    probe.remove();
+    return { header: getComputedStyle(h).backgroundColor, accent,
+      primary: root.getPropertyValue("--c-6366f1").trim() };
+  })()`);
+  r.check("the header is the original indigo", lightChrome.header, "rgb(99, 102, 241)");
+  r.check("and the label colour is that same indigo", lightChrome.accent, "rgb(99, 102, 241)");
+  r.check("the brand token is untouched in light mode", lightChrome.primary, "#6366f1");
 
   // ── 7. the exports must not be able to drift ────────────────────────
   //

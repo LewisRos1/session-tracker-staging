@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2313";
+const APP_VERSION = "2314";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -1385,7 +1385,7 @@ function applyTheme(mode) {
   // The browser paints the address bar and the task switcher from this, so
   // leaving it indigo puts a bright band above a dark page.
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", dark ? "#15181b" : "#6366f1");
+  if (meta) meta.setAttribute("content", dark ? "#2f3137" : "#6366f1");
   try { localStorage.setItem(THEME_KEY, dark ? "dark" : "light"); }
   catch (e) { /* blocked storage: it still applies for this visit */ }
   // Both words stay on screen; the one in use is the one marked pressed,
@@ -12454,7 +12454,7 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
     if (children.length === 0) {
       const _ep = emptyParentInfo(pa, allPas);
       if (_ep) {
-        html += `<div class="entry-block" contenteditable="false" style="border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);box-shadow:var(--shadow)">
+        html += `<div class="entry-block" contenteditable="false" style="border:1px solid var(--border);border-left:5px solid var(--primary-accent);background:var(--white);box-shadow:var(--shadow)">
           <div class="entry-field" contenteditable="false">
             <span class="field-label">Activity</span>
             <span class="field-value-fixed"><span style="color:var(--c-6b7280);font-weight:600;margin-right:.2rem">${actNum})</span>${paDisplayHtml(pa, true)}</span>
@@ -12470,7 +12470,7 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
       const isGreenP = pa.activityColor === "green";
       const pBorder  = isGreenP ? 'border:1px solid var(--c-a9d18e);border-left:4px solid var(--c-70ad47);background:var(--c-e2efda);'
                      : isGrayP  ? 'border:1px solid var(--c-e5e7eb);border-left:4px solid var(--c-d1d5db);background:var(--c-f3f4f6);'
-                     : 'border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);';
+                     : 'border:1px solid var(--border);border-left:5px solid var(--primary-accent);background:var(--white);';
       html += `<div style="display:flex;flex-direction:column;gap:0">`;
       html += `<div class="entry-block" style="${pBorder}border-radius:var(--radius) var(--radius) 0 0;border-bottom:none;box-shadow:var(--shadow)">
         <div class="entry-field" contenteditable="false">
@@ -12562,7 +12562,7 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
             ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:var(--c-22c55e);color:var(--c-onaccent);font-size:.6rem;font-weight:900;margin-right:.3rem;flex-shrink:0;align-self:flex-start;margin-top:.45rem">✓</span>`
             : `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;border:2px solid var(--c-d1d5db);margin-right:.3rem;flex-shrink:0;align-self:flex-start;margin-top:.45rem"></span>`)
           : '';
-        html += `<div class="entry-block" style="border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);border-top:1px solid var(--border);border-radius:${subRadius};box-shadow:var(--shadow)">
+        html += `<div class="entry-block" style="border:1px solid var(--border);border-left:5px solid var(--primary-accent);background:var(--white);border-top:1px solid var(--border);border-radius:${subRadius};box-shadow:var(--shadow)">
           <div class="entry-field" contenteditable="false">
             ${subWrittenDot}<span style="flex-shrink:0;align-self:flex-start;margin-top:.45rem;display:inline-block;background:var(--c-dbeafe);color:var(--c-1e40af);border-radius:.4rem;padding:.12rem .5rem;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Subactivity</span>
             <span class="field-value-fixed"><span style="color:var(--c-1e40af);font-weight:700;margin-right:.25rem">${subLabel})</span>${inactiveReasonBadge(sub)}${paDisplayHtml(sub)}</span>
@@ -12851,7 +12851,7 @@ function renderFedcTargetWithSidebar(target, allPas, subActsByParent, sessionDat
   if (_sidebarCollapsed) {
     return `<div class="sec-layout" contenteditable="false" style="display:flex;flex-direction:column;gap:0">
       <div contenteditable="false" style="display:flex;align-items:center;gap:.6rem;padding:.3rem 0 .5rem;margin-bottom:.4rem;border-bottom:1px solid var(--c-e5e7eb)">
-        <button class="sec-toggle-btn" contenteditable="false" title="Show sections" onmousedown="event.preventDefault()" style="background:none;border:1.5px solid var(--primary);border-radius:.4rem;cursor:pointer;font-size:1.21rem;color:var(--primary);padding:.2rem .4rem;line-height:1;flex-shrink:0">☰</button>
+        <button class="sec-toggle-btn" contenteditable="false" title="Show sections" onmousedown="event.preventDefault()" style="background:none;border:1.5px solid var(--primary-accent);border-radius:.4rem;cursor:pointer;font-size:1.21rem;color:var(--primary-accent);padding:.2rem .4rem;line-height:1;flex-shrink:0">☰</button>
         <span style="font-size:.9rem;font-weight:700;color:var(--c-374151);white-space:nowrap">${totalWritten} of ${totalActs} written</span>
         <div style="flex:1;background:var(--c-e5e7eb);border-radius:9999px;height:4px;max-width:100px">
           <div style="background:var(--primary);height:100%;width:${pct}%;border-radius:9999px"></div>
@@ -13224,7 +13224,7 @@ function renderExtraActivitiesSection(target) {
     // Small bottom margin only — .target-content now carries the padding that
     // keeps the last element clear of the window edge, so a big margin here just
     // opened a gap between this button and the Mastered/Discontinued sections.
-    html += `<button class="btn-add-session-activity" style="display:block;margin-top:.6rem;margin-bottom:.6rem;padding:.55rem .9rem;background:transparent;border:1.5px dashed var(--c-a5b4fc);border-radius:.5rem;cursor:pointer;font-size:.85rem;color:var(--c-6366f1);margin-left:auto;margin-right:auto" contenteditable="false">+ Add Activity (only for this session, not saved to the target permanently)</button>`;
+    html += `<button class="btn-add-session-activity" style="display:block;margin-top:.6rem;margin-bottom:.6rem;padding:.55rem .9rem;background:transparent;border:1.5px dashed var(--c-a5b4fc);border-radius:.5rem;cursor:pointer;font-size:.85rem;color:var(--primary-accent);margin-left:auto;margin-right:auto" contenteditable="false">+ Add Activity (only for this session, not saved to the target permanently)</button>`;
   }
   return html;
 }
@@ -31930,7 +31930,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
       const grpIsGreenP = pa.activityColor === "green";
       const grpPBorder = grpIsGreenP ? 'border:1px solid var(--c-a9d18e);border-left:4px solid var(--c-70ad47);background:var(--c-e2efda);'
                        : grpIsGrayP  ? 'border:1px solid var(--c-e5e7eb);border-left:4px solid var(--c-d1d5db);background:var(--c-f3f4f6);'
-                       : 'border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);';
+                       : 'border:1px solid var(--border);border-left:5px solid var(--primary-accent);background:var(--white);';
       let groupHtml = `<div style="display:flex;flex-direction:column;gap:0">`;
       groupHtml += `<div class="entry-block" style="${grpPBorder}border-radius:var(--radius) var(--radius) 0 0;border-bottom:none;box-shadow:var(--shadow)">
         <div class="entry-field" contenteditable="false">
@@ -32017,7 +32017,7 @@ function buildGroupItemsByActivity(target, data, attendees, _grpFilterPaSet = nu
         const subCard  = renderGroupActivityCard(sub.title || sub.name, subActId, target, data, attendees, null, sub, true, sub.parentActivity, sub.id, _grpFilterPaSet, 0, true);
         const subRadius = isLast ? '0 0 var(--radius) var(--radius)' : '0';
         const _subCreatedDate = sub.activeFrom || sub.createdOn;
-        groupHtml += `<div style="border:1px solid var(--border);border-left:5px solid var(--primary);background:var(--white);border-top:1px solid var(--border);border-radius:${subRadius};overflow:hidden">
+        groupHtml += `<div style="border:1px solid var(--border);border-left:5px solid var(--primary-accent);background:var(--white);border-top:1px solid var(--border);border-radius:${subRadius};overflow:hidden">
           <div style="padding:.4rem .6rem;display:flex;align-items:center;gap:.45rem">
             ${_subDot}<span style="flex-shrink:0;background:var(--c-dbeafe);color:var(--c-1e40af);border-radius:.4rem;padding:.12rem .5rem;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">Subactivity</span>
             <span style="font-size:.85rem;font-weight:700;color:var(--c-374151)"><span style="color:var(--c-1e40af)">${letters[si]})</span> ${inactiveReasonBadge(sub)}${paDisplayHtml(sub)}</span>
@@ -32213,7 +32213,7 @@ function buildGroupItemsWithSidebar(target, data, attendees, allPas, grpSubsByPa
   if (_grpSidebarCollapsed) {
     return [`<div class="sec-layout" contenteditable="false" style="display:flex;flex-direction:column;gap:0">
       <div contenteditable="false" style="display:flex;align-items:center;gap:.6rem;padding:.3rem 0 .5rem;margin-bottom:.4rem;border-bottom:1px solid var(--c-e5e7eb)">
-        <button class="grp-sec-toggle-btn" contenteditable="false" title="Show sections" onmousedown="event.preventDefault()" style="background:none;border:1.5px solid var(--primary);border-radius:.4rem;cursor:pointer;font-size:1.21rem;color:var(--primary);padding:.2rem .4rem;line-height:1;flex-shrink:0">☰</button>
+        <button class="grp-sec-toggle-btn" contenteditable="false" title="Show sections" onmousedown="event.preventDefault()" style="background:none;border:1.5px solid var(--primary-accent);border-radius:.4rem;cursor:pointer;font-size:1.21rem;color:var(--primary-accent);padding:.2rem .4rem;line-height:1;flex-shrink:0">☰</button>
         <span style="font-size:.9rem;font-weight:700;color:var(--c-374151);white-space:nowrap">${totalWritten} of ${totalActs} written</span>
         <div style="flex:1;background:var(--c-e5e7eb);border-radius:9999px;height:4px;max-width:100px">
           <div style="background:var(--primary);height:100%;width:${pct}%;border-radius:9999px"></div>
