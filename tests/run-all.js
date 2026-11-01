@@ -144,6 +144,9 @@ results.push(await run("Two activities with the same name, in a real browser",
 results.push(await run("Duplicate activity names: refused, and allowed",
   ["run", "-A", "tests/browser/duplicate-activity-names.test.js", HARNESS]));
 
+results.push(await run("Dark mode: the theme, and the exports it must not touch",
+  ["run", "-A", "tests/browser/dark-mode.test.js", HARNESS]));
+
 results.push(await run("Start Session screens: what they print",
   ["run", "-A", "tests/browser/session-screen-display.test.js", HARNESS]));
 

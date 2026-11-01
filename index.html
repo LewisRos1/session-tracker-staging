@@ -8,7 +8,7 @@
 
   <!-- PWA / iOS -->
   <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#6366f1" />
+  <meta name="theme-color" content="var(--c-6366f1)" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -16,6 +16,22 @@
   <link rel="icon" href="icon-192.png" />
   <link rel="apple-touch-icon" href="icon-192.png" />
 
+  <!-- Before the stylesheet and before anything paints. Read from the
+       browser, not from the account: Lewis asked for the setting to live
+       on the device, so the office PC can be dark while the phone is not.
+
+       Inline on purpose. In an external file the page paints white first
+       and then snaps to dark, which is the flash this exists to avoid. -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("st-theme");
+        if (t === "dark" || t === "light") {
+          document.documentElement.setAttribute("data-theme", t);
+        }
+      } catch (e) { /* private window, blocked storage: stay light */ }
+    })();
+  </script>
   <link rel="stylesheet" href="styles.css" />
 
   <!-- Libraries are served from this site, not from a CDN.
