@@ -88,11 +88,18 @@
     <header class="app-header">
       <h1>Session Tracker</h1>
       <span id="app-version" class="app-version"></span>
-      <!-- Left of the name, in the same group as Log Out and wearing the
+      <!-- Left of the name, in the same group as Log Out and built to the
            same pill, so the right-hand end of the header reads as one set
-           of controls rather than three unrelated things. Its words are
-           filled in by applyTheme, which runs before the first paint. -->
-      <button id="btn-theme" class="btn-logout btn-theme" type="button"></button>
+           of controls rather than three unrelated things.
+
+           Both words are on it, with the one in use filled in. A single
+           button naming the other mode was smaller, but it never showed
+           which mode you were actually in. applyTheme marks the pressed
+           one, and runs before the first paint. -->
+      <div id="theme-switch" class="theme-switch" role="group" aria-label="Appearance">
+        <button type="button" class="theme-opt" data-theme="light">☀️ Light</button>
+        <button type="button" class="theme-opt" data-theme="dark">🌙 Dark</button>
+      </div>
       <div id="header-user" class="header-user"></div>
       <button id="btn-logout" class="btn-logout">Log Out</button>
     </header>

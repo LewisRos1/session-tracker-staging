@@ -73,43 +73,55 @@ try {
 
   // ── 2. the switch ───────────────────────────────────────────────────
   //
-  // One button in the header, beside the name and wearing the same pill as
-  // Log Out. It is named for what pressing it does, not for the mode you are
-  // already in, which is what makes it read as a button.
-  r.section("2. the button in the header");
-  const btn = await page.eval(`(() => {
-    const b = document.getElementById("btn-theme");
-    if (!b) return null;
-    const hdr = b.closest(".app-header");
+  // Both words on screen at once, Light beside Dark, with the one in use
+  // filled in. A single button naming the other mode was smaller, but it
+  // never showed which mode you were actually in.
+  r.section("2. the switch in the header");
+  const sw = await page.eval(`(() => {
+    const box = document.getElementById("theme-switch");
+    if (!box) return null;
     const user = document.getElementById("header-user");
     const out = document.getElementById("btn-logout");
-    const cs = getComputedStyle(b), outCs = getComputedStyle(out);
+    const cs = getComputedStyle(box), outCs = getComputedStyle(out);
+    const opts = [...box.querySelectorAll(".theme-opt")];
     return {
-      inHeader: !!hdr,
-      label: b.textContent.trim(),
-      title: b.title,
+      inHeader: !!box.closest(".app-header"),
+      labels: opts.map(o => o.textContent.trim()),
+      modes: opts.map(o => o.dataset.theme),
+      pressed: opts.filter(o => o.getAttribute("aria-pressed") === "true")
+        .map(o => o.dataset.theme),
       // Document order: Appearance, then the name, then Log Out.
-      beforeUser: !!(b.compareDocumentPosition(user) & Node.DOCUMENT_POSITION_FOLLOWING),
-      beforeLogout: !!(b.compareDocumentPosition(out) & Node.DOCUMENT_POSITION_FOLLOWING),
-      // And it must actually look like Log Out, not merely claim the class.
-      sameLook: cs.fontSize === outCs.fontSize && cs.padding === outCs.padding
-        && cs.borderRadius === outCs.borderRadius && cs.backgroundColor === outCs.backgroundColor
-        && cs.color === outCs.color && cs.borderColor === outCs.borderColor,
-      height: Math.round(b.getBoundingClientRect().height),
+      beforeUser: !!(box.compareDocumentPosition(user) & Node.DOCUMENT_POSITION_FOLLOWING),
+      beforeLogout: !!(box.compareDocumentPosition(out) & Node.DOCUMENT_POSITION_FOLLOWING),
+      // Same pill as Log Out: not the same class, so this is the only thing
+      // keeping the two from drifting apart.
+      sameFrame: cs.borderRadius === outCs.borderRadius
+        && cs.backgroundColor === outCs.backgroundColor
+        && cs.borderColor === outCs.borderColor
+        && cs.borderTopWidth === outCs.borderTopWidth,
+      sameFont: getComputedStyle(opts[0]).fontSize === outCs.fontSize
+        && getComputedStyle(opts[0]).fontWeight === outCs.fontWeight,
+      height: Math.round(box.getBoundingClientRect().height),
       outHeight: Math.round(out.getBoundingClientRect().height),
+      width: Math.round(box.getBoundingClientRect().width),
     };
   })()`);
-  r.ok("the button is in the header", !!btn && btn.inHeader, JSON.stringify(btn));
-  r.ok("to the left of the current user", !!btn && btn.beforeUser, JSON.stringify(btn));
-  r.ok("and to the left of Log Out", !!btn && btn.beforeLogout, JSON.stringify(btn));
-  r.check("in light mode it offers Dark", btn && btn.label, "\u{1F319} Dark");
-  r.check("and says so on hover", btn && btn.title, "Switch to dark mode");
-  r.ok("it is styled exactly like Log Out", !!btn && btn.sameLook, JSON.stringify(btn));
-  r.check("and is the same height", btn && btn.height, btn && btn.outHeight);
+  r.ok("the switch is in the header", !!sw && sw.inHeader, JSON.stringify(sw));
+  r.ok("to the left of the current user", !!sw && sw.beforeUser, JSON.stringify(sw));
+  r.ok("and to the left of Log Out", !!sw && sw.beforeLogout, JSON.stringify(sw));
+  r.check("both words are on it at once", sw && sw.labels,
+    ["☀️ Light", "\u{1F319} Dark"]);
+  r.check("in that order", sw && sw.modes, ["light", "dark"]);
+  r.check("and exactly one is filled in", sw && sw.pressed, ["light"]);
+  r.ok("it is built to the same pill as Log Out", !!sw && sw.sameFrame, JSON.stringify(sw));
+  r.ok("with the same text size and weight", !!sw && sw.sameFont, JSON.stringify(sw));
+  r.check("and is the same height", sw && sw.height, sw && sw.outHeight);
+  r.ok("while staying small enough for a header",
+    !!sw && sw.width < 190, `${sw && sw.width}px wide`);
   r.check("nothing is left on the home screen",
-    await page.eval(`document.querySelectorAll(".theme-row, .theme-opt").length`), 0);
+    await page.eval(`document.querySelectorAll(".home-main .theme-opt").length`), 0);
 
-  await page.eval(`document.getElementById("btn-theme").click()`);
+  await page.eval(`document.querySelector('.theme-opt[data-theme="dark"]').click()`);
   await settle();
   const dark = await painted();
   r.check("the attribute goes on the root", await theme(), "dark");
@@ -127,8 +139,10 @@ try {
 
   r.section("3. the choice is remembered, on this device");
   r.check("it is written to the browser, not the account", await stored(), "dark");
-  r.check("and the button now offers the way back", await page.eval(
-    `document.getElementById("btn-theme").textContent.trim()`), "☀️ Light");
+  r.check("and the filled word moves to Dark", await page.eval(
+    `[...document.querySelectorAll(".theme-opt")]
+       .filter(o => o.getAttribute("aria-pressed") === "true")
+       .map(o => o.dataset.theme)`), ["dark"]);
   r.check("the address-bar colour follows", await page.eval(
     `document.querySelector('meta[name="theme-color"]').getAttribute("content")`), "#15181b");
 
@@ -253,7 +267,7 @@ try {
 
   // ── 6. back to light ────────────────────────────────────────────────
   r.section("6. and back again");
-  await page.eval(`document.getElementById("btn-theme").click()`);
+  await page.eval(`document.querySelector('.theme-opt[data-theme="light"]').click()`);
   await settle();
   r.check("the attribute says light", await theme(), "light");
   r.check("it is remembered", await stored(), "light");

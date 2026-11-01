@@ -315,6 +315,10 @@
   --shadow:         0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08);
   --shadow-lg:      0 10px 30px rgba(0,0,0,.15);
   --tap-min:        48px;
+  /* The header pills. Log Out spends it all on itself; the Appearance
+     switch spends 2px of it on the frame around the filled segment, so
+     the two come out the same height from one number. */
+  --pill-pad-y:     .3rem;
   --font:           -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
@@ -618,8 +622,8 @@ html, body {
 /* The right-hand end of the header is one group: Appearance, the name,
    then Log Out. The spacer that pushes the group over belongs to whichever
    of them comes first, which is now the Appearance button. */
-.app-header .btn-theme { margin-left: auto; }
-.app-header .btn-theme + .header-user { margin-left: .75rem; }
+.app-header .theme-switch { margin-left: auto; }
+.app-header .theme-switch + .header-user { margin-left: .75rem; }
 
 .header-user {
   margin-left: auto;
@@ -654,7 +658,7 @@ html, body {
   color: var(--c-onaccent);
   border: 1.5px solid rgba(255,255,255,.4);
   border-radius: var(--radius-sm);
-  padding: .3rem .75rem;
+  padding: var(--pill-pad-y) .75rem;
   font-size: .8rem;
   font-weight: 600;
   cursor: pointer;
@@ -5647,4 +5651,39 @@ button.wf-pill:hover { filter: brightness(.93); }
 
 /* Nothing of its own beyond the hook above: it wears .btn-logout, so the
    two pills cannot drift apart. */
-.btn-theme { white-space: nowrap; }
+/* Built from the same pieces as .btn-logout -- the same border, the same
+   translucent white over the header, the same radius -- so the two sit
+   together as one set. The padding is the segments' job, not the box's,
+   which is what keeps the whole thing the height of the button beside it. */
+.theme-switch {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 2px;
+  background: rgba(255,255,255,.15);
+  border: 1.5px solid rgba(255,255,255,.4);
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+.theme-opt {
+  border: none;
+  background: none;
+  color: var(--c-onaccent);
+  font-family: inherit;
+  font-size: .8rem;
+  font-weight: 600;
+  line-height: 1.35;
+  padding: calc(var(--pill-pad-y) - 2px) .5rem;
+  border-radius: calc(var(--radius-sm) - 3px);
+  cursor: pointer;
+  white-space: nowrap;
+  opacity: .7;
+}
+.theme-opt:hover { opacity: 1; }
+/* The one in use is filled, so which mode you are in is readable at a
+   glance rather than inferred from which word is missing. */
+.theme-opt[aria-pressed="true"] {
+  background: rgba(255,255,255,.92);
+  color: var(--primary);
+  opacity: 1;
+}

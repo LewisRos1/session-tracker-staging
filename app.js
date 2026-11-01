@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2312";
+const APP_VERSION = "2313";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -1388,21 +1388,20 @@ function applyTheme(mode) {
   if (meta) meta.setAttribute("content", dark ? "#15181b" : "#6366f1");
   try { localStorage.setItem(THEME_KEY, dark ? "dark" : "light"); }
   catch (e) { /* blocked storage: it still applies for this visit */ }
-  // Named for what pressing it does, the way Log Out beside it is. Showing
-  // the mode you are already in would read as a label rather than a button.
-  const btn = document.getElementById("btn-theme");
-  if (btn) {
-    btn.textContent = dark ? "\u2600\ufe0f Light" : "\u{1F319} Dark";
-    btn.title = dark ? "Switch to light mode" : "Switch to dark mode";
-    btn.setAttribute("aria-label", btn.title);
-  }
+  // Both words stay on screen; the one in use is the one marked pressed,
+  // which is what fills it in.
+  document.querySelectorAll(".theme-opt").forEach(opt => {
+    const mine = opt.dataset.theme === (dark ? "dark" : "light");
+    opt.setAttribute("aria-pressed", String(mine));
+    opt.title = mine ? "Already in this mode"
+      : `Switch to ${opt.dataset.theme} mode`;
+  });
 }
 
 // Delegated, so it keeps working through any re-render of the header.
 document.addEventListener("click", e => {
-  if (e.target.closest("#btn-theme")) {
-    applyTheme(currentTheme() === "dark" ? "light" : "dark");
-  }
+  const opt = e.target.closest(".theme-opt");
+  if (opt) applyTheme(opt.dataset.theme);
 });
 
 // The attribute is already set by the inline script in the head; this is for
