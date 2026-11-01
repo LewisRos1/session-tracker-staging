@@ -4185,15 +4185,37 @@ button.wf-pill:hover { filter: brightness(.93); }
 
 .vcol-no      { width: 36px; text-align: center; white-space: nowrap; }
 .vcol-act     { width: 250px; white-space: pre-wrap; word-break: break-word; }
-/* A sub-activity in the View table.
+/* A sub-activity in the View table: an elbow, the way a file tree draws one.
 
-   Indent and nothing else. It first had a rail down the left as well, the
-   way the Start Session screen marks a sub, but a table draws a border
-   between every row, so the rail was chopped into one short tick per row
-   instead of running down the group. It read as a stray mark. The indent
-   on its own is the same amount the Word export uses, so the screen and
-   the document now agree. */
-.vrow-sub .vcol-act { padding-left: 1.9rem; }
+   This started as a full-height rail down the left, which a table cannot
+   do -- a border is drawn between every row, so the line came out as one
+   short tick per row instead of running down the group. An elbow does not
+   need to survive the row boundary: it begins at the top of its own cell
+   and ends at its own text, so each sub carries a complete mark.
+
+   One element draws it. A box with only a left and a bottom border IS an L,
+   which beats two pseudo-elements that have to be kept in step.
+
+   It stops at 50% because the cells are vertical-align:middle, so the arm
+   has to meet the middle of the text rather than the top of the row. On a
+   row that runs ten lines tall the upright simply gets longer, which is
+   what a tree does anyway. */
+.vrow-sub .vcol-act {
+  position: relative;
+  padding-left: 2.1rem;
+}
+.vrow-sub .vcol-act::before {
+  content: "";
+  position: absolute;
+  left: .95rem;
+  top: 0;
+  height: 50%;
+  width: .7rem;
+  border-left: 2px solid var(--c-9ca3af);
+  border-bottom: 2px solid var(--c-9ca3af);
+  border-bottom-left-radius: 3px;
+  pointer-events: none;
+}
 .vcol-student { width: 100px; text-align: center; white-space: pre-wrap; word-break: break-word; font-weight: 600; }
 .vcol-rem    { width: 340px; height: 1px; padding: 0; }
 .vcol-rem > * { padding: .4rem .6rem; box-sizing: border-box; }

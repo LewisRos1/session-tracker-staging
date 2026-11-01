@@ -73,8 +73,11 @@ try {
         cls: tr.className,
         sub: tr.classList.contains("vrow-sub"),
         padLeft: cs.paddingLeft,
-        railWidth: bar.width,
-        railColor: bar.backgroundColor,
+        elbowW: bar.width,
+        elbowH: bar.height,
+        elbowLeft: bar.borderLeftWidth,
+        elbowBottom: bar.borderBottomWidth,
+        elbowColor: bar.borderLeftColor,
         colspan: act.getAttribute("colspan"),
       };
     }).filter(Boolean);
@@ -91,9 +94,16 @@ try {
   for (const name of ["silhoutte", "shit"]) {
     const row = byText(name);
     r.ok(`"${name}" is marked as a sub`, !!row && row.sub, JSON.stringify(row));
-    r.check(`"${name}" is indented`, row && row.padLeft, "30.4px");   // 1.9rem
-    r.ok(`"${name}" draws nothing extra beside it`,
-      !!row && row.railWidth === "auto", JSON.stringify(row));
+    r.check(`"${name}" is indented`, row && row.padLeft, "33.6px");   // 1.9rem
+    r.ok(`"${name}" has an elbow drawn beside it`,
+      !!row && row.elbowLeft === "2px" && row.elbowBottom === "2px",
+      JSON.stringify(row));
+    r.ok(`and it is an L, not a box`,
+      !!row && row.elbowW !== "auto" && row.elbowH !== "auto",
+      JSON.stringify(row));
+    r.ok(`and it is actually visible`,
+      !!row && row.elbowColor !== "rgba(0, 0, 0, 0)",
+      JSON.stringify(row && row.elbowColor));
   }
   r.check("and they are still lettered", [byText("silhoutte")?.no, byText("shit")?.no],
     ["a)", "b)"]);
@@ -107,7 +117,37 @@ try {
     const row = byText(name);
     r.ok(`"${name}" is a plain row`, !!row && !row.sub, JSON.stringify(row));
     r.check(`"${name}" is not indented`, row && row.padLeft, parent.padLeft);
+    r.check(`"${name}" has no elbow`, row && row.elbowLeft, "0px");
   }
+
+  // ── 3b. the elbow has to fit in the space the indent makes ──────────
+  //
+  // Measured rather than reasoned about: the elbow is positioned and the
+  // text is padded by two separate numbers, and if they ever cross, the L
+  // is drawn through the first letter of the activity name.
+  r.section("3b. the elbow does not run into the text");
+  const fit = await page.eval(`(() => {
+    const cell = document.querySelector("#sub-probe tr.vrow-sub .vcol-act");
+    if (!cell) return { missing: true };
+    const cs = getComputedStyle(cell);
+    const bar = getComputedStyle(cell, "::before");
+    const px = v => parseFloat(v) || 0;
+    const elbowRight = px(bar.left) + px(bar.width) + px(bar.borderLeftWidth);
+    return {
+      textStartsAt: px(cs.paddingLeft),
+      elbowEndsAt: elbowRight,
+      gap: px(cs.paddingLeft) - elbowRight,
+      // The arm meets the middle, because the cells centre their content.
+      armAt: bar.height,
+      cellH: Math.round(cell.getBoundingClientRect().height),
+    };
+  })()`);
+  r.ok("the elbow is measurable", !fit.missing, JSON.stringify(fit));
+  r.ok("and the text starts clear of it",
+    !fit.missing && fit.gap > 2, JSON.stringify(fit));
+  r.ok("with the arm at the middle of the row, where the text sits",
+    !fit.missing && Math.abs(parseFloat(fit.armAt) - fit.cellH / 2) < 2,
+    JSON.stringify(fit));
 
   // ── 4. the bug this shape could easily have introduced ──────────────
   //
@@ -139,7 +179,7 @@ try {
       plain: getComputedStyle(plain).paddingLeft };
   })()`);
   r.ok("a sub row is still there to look at", !dark.missing, JSON.stringify(dark));
-  r.check("and still indented", dark.sub, "30.4px");
+  r.check("and still indented", dark.sub, "33.6px");
   r.ok("while a plain row is not", !dark.missing && dark.plain !== dark.sub,
     JSON.stringify(dark));
 
