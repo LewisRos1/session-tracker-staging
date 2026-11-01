@@ -129,6 +129,9 @@ results.push(await run("Status tags in the exports",
 results.push(await run("Maintained for months, then mastered",
   ["run", "-A", "tests/browser/maintained-then-mastered.test.js", HARNESS]));
 
+results.push(await run("A note's dates, and the collapsed lists",
+  ["run", "-A", "tests/browser/note-dates-and-sections.test.js", HARNESS]));
+
 results.push(await run("Moving an activity under a parent",
   ["run", "-A", "tests/browser/move-under-parent.test.js", HARNESS]));
 

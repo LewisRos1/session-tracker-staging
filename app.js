@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2308";
+const APP_VERSION = "2309";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -1770,6 +1770,8 @@ let _actStartPickerIdx    = null;
 let _actStartPickerActs   = null;
 let _actStartPickerStudent = null;
 let _actStartPickerTarget  = null;
+// Which end of the period the sheet is setting: "activeFrom" or "activeTo".
+let _actStartPickerField   = "activeFrom";
 
 // Tracks in-flight rename-propagation operations so the manage modal can show
 // "Syncing history…" while they run, and warn the boss if one fails silently.
@@ -2081,7 +2083,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Register SW immediately — don't wait for Firebase so updates are never blocked.
   registerServiceWorker();
   setupStickyNote();
-  $("btn-ai-report-back").addEventListener("click", showHome);
+  $("btn-ai-report-back").addEventListener("click", showHome);
   $("btn-ai-translate-back").addEventListener("click", showHome);
 
   // Nothing stored means Firebase has no session to restore either, so go
@@ -12325,10 +12327,15 @@ function renderFedcTarget(target, _filterPaSet = null, _sectionOnly = false) {
         const noteTag = pa.isExportNote
           ? `<div style="font-size:.82rem;color:#c2410c;margin-bottom:.25rem">📄 Included in Word export</div>`
           : `<div style="font-size:.82rem;color:#9a3412;margin-bottom:.25rem">🔒 This note is for ZORA's use only. Excluded from Word report</div>`;
+        // Dated like every activity row above it. A note is the one thing
+        // on this screen that did not say when it started, so there was no
+        // way to tell an old standing note from one added this week.
+        const _noteCreated = pa.activeFrom || pa.createdOn;
         html += `<div class="entry-block" contenteditable="false" style="border-left:4px solid #f59e0b;">
           <div class="entry-field">
             <span class="field-label" style="color:#b45309">Note</span>
             <div style="flex:1;font-size:.93rem;font-weight:600">${noteTag}<div style="white-space:pre-wrap">${noteBodyHtml(pa)}</div></div>
+            ${_noteCreated ? `<span style="font-size:.75rem;color:#9ca3af;white-space:nowrap;flex-shrink:0;align-self:flex-start">Created: ${fmtPeriodDate(_noteCreated)}</span>` : ""}
           </div>
         </div>`;
       }
@@ -17721,7 +17728,7 @@ async function translateDocxFile(file, student, onProgress, signal) {
     }
   }
 
-  onProgress?.(1, 1);
+  onProgress?.(1, 1);
 
   // The words first.
   const rewritten = new Map();
@@ -18656,7 +18663,7 @@ function setChineseLineBreaks(xml) {
     "<w:compat>" + lists + "</w:compat></w:settings>");
 }
 
-/**
+/**
  * The parts of a .docx that hold words a reader sees.
  *
  * Headers and footers are separate files inside the zip and are easy to
@@ -22930,9 +22937,22 @@ function actStartDateHtml(activeFrom, idx) {
 
 function showActStartDatePicker() {
   const act = _actStartPickerActs?.[_actStartPickerIdx];
-  const hasExistingDate = !!act?.activeFrom;
-  const activeFrom = act?.activeFrom || todayDateStr();
-  const actName = (act?.title || act?.name || '').replace(/<[^>]*>/g, '').trim();
+  const isEnd = _actStartPickerField === "activeTo";
+  const hasExistingDate = !!(isEnd ? act?.activeTo : act?.activeFrom);
+  const activeFrom = (isEnd ? act?.activeTo : act?.activeFrom) || todayDateStr();
+  // A note keeps its words in text/noteTitle, not in title or name, so
+  // asking for those gave an empty pair of brackets: "this activity ()".
+  const isNote = !!(act?.isNote || act?.isExportNote);
+  const actWord = isNote ? "note" : "activity";
+  // A note written as one block has no title at all -- noteParts only
+  // finds one where the opening words were bolded by hand -- so its first
+  // line stands in, or the sheet would name nothing.
+  const _np = isNote ? noteParts(act || {}) : null;
+  const _noteName = _np
+    ? (_np.title || (_np.details || "").split(/\r?\n/)[0] || "").slice(0, 60)
+    : "";
+  const actName = (isNote ? _noteName
+    : (act?.title || act?.name || '')).replace(/<[^>]*>/g, '').trim();
   let overlay = document.getElementById('act-start-picker-overlay');
   if (!overlay) {
     overlay = document.createElement('div');
@@ -22941,12 +22961,12 @@ function showActStartDatePicker() {
   }
   overlay.innerHTML = `<div style="position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.45);display:flex;flex-direction:column;justify-content:flex-end" id="act-start-picker-backdrop">
     <div style="background:#fff;border-radius:1.1rem 1.1rem 0 0;padding:1.3rem 1.3rem calc(env(safe-area-inset-bottom,0px) + 1.3rem);box-shadow:0 -4px 24px rgba(0,0,0,.14)">
-      <div style="font-weight:700;font-size:1rem;color:#111827;margin-bottom:.25rem">Set Start Date</div>
-      <div style="font-size:.85rem;color:#6b7280;margin-bottom:.85rem">What date do you want this activity <strong style="color:#374151">(${escHtml(actName)})</strong> to start appearing?</div>
+      <div style="font-weight:700;font-size:1rem;color:#111827;margin-bottom:.25rem">${isEnd ? "Set End Date" : "Set Start Date"}</div>
+      <div style="font-size:.85rem;color:#6b7280;margin-bottom:.85rem">${isEnd ? "What date do you want this" : "What date do you want this"} ${actWord}${actName ? ` <strong style="color:#374151">(${escHtml(actName)})</strong>` : ""} to ${isEnd ? "stop" : "start"} appearing?</div>
       <div id="act-start-picker-err" style="display:none;font-size:.82rem;color:#dc2626;margin-bottom:.5rem;line-height:1.4;padding:.4rem .6rem;background:#fee2e2;border-radius:.4rem"></div>
       <input type="date" id="act-start-picker-inp" value="${activeFrom}" style="width:100%;font-size:1rem;border:1.5px solid #d1d5db;border-radius:.5rem;padding:.55rem .65rem;box-sizing:border-box;margin-bottom:.85rem">
       <div style="display:flex;gap:.5rem">
-        ${hasExistingDate ? `<button id="act-start-picker-clear" style="flex:1;padding:.65rem;font-size:.9rem;border:1px solid #fca5a5;border-radius:.5rem;background:#fee2e2;cursor:pointer;color:#dc2626;font-weight:600">✕ Clear Date</button>` : ''}
+        ${hasExistingDate ? `<button id="act-start-picker-clear" style="flex:1;padding:.65rem;font-size:.9rem;border:1px solid #fca5a5;border-radius:.5rem;background:#fee2e2;cursor:pointer;color:#dc2626;font-weight:600">✕ ${isEnd ? "No End Date" : "Clear Date"}</button>` : ''}
         <button id="act-start-picker-cancel" style="flex:1;padding:.65rem;font-size:.9rem;border:1px solid #d1d5db;border-radius:.5rem;background:#f9fafb;cursor:pointer;color:#6b7280;font-weight:600">Cancel</button>
       </div>
     </div>
@@ -22954,7 +22974,7 @@ function showActStartDatePicker() {
   document.getElementById('act-start-picker-backdrop').onclick = e => { if (e.target.id === 'act-start-picker-backdrop') closeActStartDatePicker(); };
   document.getElementById('act-start-picker-inp').addEventListener('change', handleActStartPickerChange);
   const clearBtn = document.getElementById('act-start-picker-clear');
-  if (clearBtn) clearBtn.addEventListener('click', async () => { closeActStartDatePicker(); await _actStartPickerSaveFn(_actStartPickerIdx, 'activeFrom', null); });
+  if (clearBtn) clearBtn.addEventListener('click', async () => { closeActStartDatePicker(); await _actStartPickerSaveFn(_actStartPickerIdx, _actStartPickerField, null); });
   document.getElementById('act-start-picker-cancel').addEventListener('click', closeActStartDatePicker);
 }
 
@@ -22972,15 +22992,25 @@ async function handleActStartPickerChange() {
   const act = _actStartPickerActs?.[_actStartPickerIdx];
   if (!act) return;
   const actName = act.title || act.name;
+  const isEnd = _actStartPickerField === "activeTo";
+  // An end date before the start date is a period with nothing in it.
+  if (isEnd && act.activeFrom && value < act.activeFrom) {
+    if (inp) inp.value = act.activeTo || "";
+    await showAlertOverlay({
+      title: "⚠️ End date is before the start date",
+      message: `This starts on <strong>${fmtPeriodDate(act.activeFrom)}</strong>, so it cannot stop before then.`
+    });
+    return;
+  }
   if (!_actStartPickerStudent && !_groupForTargetEdit) {
     closeActStartDatePicker();
-    await _actStartPickerSaveFn(_actStartPickerIdx, 'activeFrom', value);
+    await _actStartPickerSaveFn(_actStartPickerIdx, _actStartPickerField, value);
     return;
   }
   const allSessions = _groupForTargetEdit
     ? await getAllSessionsForGroup(_groupForTargetEdit.id).catch(() => [])
     : await getAllSessionsForStudent(_actStartPickerStudent.id).catch(() => []);
-  let oldestDate = null;
+  let oldestDate = null, newestDate = null;
   for (const session of allSessions) {
     const sActs = session.activities || {};
     const sRems = session.remarks || {};
@@ -23000,8 +23030,23 @@ async function handleActStartPickerChange() {
       )
     ));
     if (hasData && (!oldestDate || session.date < oldestDate)) oldestDate = session.date;
+    // The newest one matters for the other end of the period.
+    if (hasData && (!newestDate || session.date > newestDate)) newestDate = session.date;
   }
-  if (oldestDate && value > oldestDate) {
+  // Each end is fenced in by the data, from its own side: a start date
+  // after the first session with data, or an end date before the last
+  // one, would hide sessions that already have something in them.
+  if (isEnd && newestDate && value < newestDate) {
+    if (inp) inp.value = act.activeTo || "";
+    await showAlertOverlay({
+      title: "⚠️ End date is too early",
+      message: `This activity already has recorded data as recently as <strong>${fmtPeriodDate(newestDate)}</strong>. ` +
+               `Setting the end date earlier than that would hide sessions that already have data in them, ` +
+               `so the earliest end date you can choose is <strong>${fmtPeriodDate(newestDate)}</strong>.`
+    });
+    return;
+  }
+  if (!isEnd && oldestDate && value > oldestDate) {
     if (inp) inp.value = act.activeFrom || '';
     await showAlertOverlay({
       title: "⚠️ Start date is too late",
@@ -23012,12 +23057,17 @@ async function handleActStartPickerChange() {
     return;
   }
   closeActStartDatePicker();
-  await _actStartPickerSaveFn(_actStartPickerIdx, 'activeFrom', value);
+  await _actStartPickerSaveFn(_actStartPickerIdx, _actStartPickerField, value);
 }
 
 // ── Open / close ──────────────────────────────────────────────
 
 function openManageModal(student, targetOrNull, templateOrNull = null, remarkPresetOrNull = null, scrollToPaId = null, _lockHeld = false) {
+  // Opening the window is a fresh start: the Mastered and Discontinued
+  // lists are collapsed again. The set survives a re-render on purpose,
+  // so that editing a row inside one does not shut it, but it used to
+  // survive closing the window too and they came back open.
+  _mnOpenInactGroups.clear();
   // A target can only be edited by one person at a time, and that is settled
   // before the window is drawn -- see mnOpenWhenFree. `_lockHeld` is how this
   // function calls itself back once the target is ours.
@@ -26264,8 +26314,8 @@ function renderTargetManageContent(student, target) {
       const noteBaseBg = 'background:#fffbeb;border:1px solid #f59e0b;color:#78350f';
       const noteItemStyle = noteExpired
         ? ` style="position:relative;${noteBaseBg}"`
-        : ` style="${noteBaseBg}${noteInactive ? ';opacity:0.3' : ''}"`;
-      const noteOverlay  = noteExpired ? `<div style="position:absolute;inset:0 2.5rem 0 0;background:rgba(255,255,255,.7);pointer-events:none;z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center"><div style="pointer-events:none;background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.35rem .75rem;text-align:center;font-size:1.17rem;color:#374151;max-width:80%">⏸ This activity's period has ended — tap ⋮ on the right side to adjust the dates and bring it back.</div></div>` : '';
+        : ` style="${noteBaseBg}"`;
+      const noteOverlay  = noteExpired ? `<div style="position:absolute;inset:0 2.5rem 0 0;background:rgba(255,255,255,.7);pointer-events:none;z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center"><div style="pointer-events:none;background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.35rem .75rem;text-align:center;font-size:1.17rem;color:#374151;max-width:80%">⏸ This note's period has ended — change its End Date above to bring it back.</div></div>` : '';
       html += `<div class="admin-list-item admin-note-item" data-idx="${idx}"${noteItemStyle}>
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.25rem">
@@ -26280,6 +26330,11 @@ function renderTargetManageContent(student, target) {
             <div style="flex-shrink:0">
               <div style="font-size:.95rem;font-weight:700;color:#78350f;margin-bottom:.28rem">Start Date</div>
               <button class="mn-act-start-btn" data-idx="${idx}" style="padding:.35rem .65rem;border:1.5px solid #fcd34d;border-radius:.4rem;background:#fef3c7;cursor:pointer;font-size:.95rem;color:#78350f;white-space:nowrap;display:block">📅 ${a.activeFrom ? fmtPeriodDate(a.activeFrom) : 'Set date'}</button>
+              <!-- Both ends of the period live on the row. The kebab used to
+                   carry a second copy of the start date beside the end date,
+                   so there were two places to set the same thing. -->
+              <div style="font-size:.95rem;font-weight:700;color:#78350f;margin:.45rem 0 .28rem">End Date</div>
+              <button class="mn-act-end-btn" data-idx="${idx}" style="padding:.35rem .65rem;border:1.5px solid #fcd34d;border-radius:.4rem;background:#fef3c7;cursor:pointer;font-size:.95rem;color:#78350f;white-space:nowrap;display:block">📅 ${a.activeTo ? fmtPeriodDate(a.activeTo) : 'No end date'}</button>
             </div>
             <div style="flex:1;min-width:0">
               <div style="font-size:.95rem;font-weight:700;color:#78350f;margin-bottom:.28rem">Note Title</div>
@@ -26305,7 +26360,6 @@ function renderTargetManageContent(student, target) {
         <div style="position:relative">
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Note options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:200px;overflow:hidden">
-            ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true)}
             <div style="display:flex;align-items:stretch">
               <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Note</button>
             </div>
@@ -29157,12 +29211,13 @@ function renderTargetManageContent(student, target) {
   document.addEventListener("click", window._closePeriodPanels);
 
   // Activity start date — opens global bottom sheet
-  $("manage-modal-body").querySelectorAll(".mn-act-start-btn").forEach(btn => {
+  $("manage-modal-body").querySelectorAll(".mn-act-start-btn, .mn-act-end-btn").forEach(btn => {
     btn.addEventListener("click", e => {
       e.stopPropagation();
       // Close kebab before opening picker
       $("manage-modal-body").querySelectorAll(".mn-kebab-menu").forEach(m => m.style.display = "none");
       _actStartPickerSaveFn  = savePeriodField;
+      _actStartPickerField   = btn.classList.contains("mn-act-end-btn") ? "activeTo" : "activeFrom";
       _actStartPickerIdx     = +btn.dataset.idx;
       _actStartPickerActs    = acts;
       _actStartPickerStudent = student;
@@ -29562,8 +29617,8 @@ function renderTemplateManageContent(template) {
       const noteBaseBg = 'background:#fffbeb;border:1px solid #f59e0b;color:#78350f';
       const noteItemStyle = noteExpired
         ? ` style="position:relative;${noteBaseBg}"`
-        : ` style="${noteBaseBg}${noteInactive ? ';opacity:0.3' : ''}"`;
-      const noteOverlay  = noteExpired ? `<div style="position:absolute;inset:0 2.5rem 0 0;background:rgba(255,255,255,.7);pointer-events:none;z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center"><div style="pointer-events:none;background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.35rem .75rem;text-align:center;font-size:1.17rem;color:#374151;max-width:80%">⏸ This activity's period has ended — tap ⋮ on the right side to adjust the dates and bring it back.</div></div>` : '';
+        : ` style="${noteBaseBg}"`;
+      const noteOverlay  = noteExpired ? `<div style="position:absolute;inset:0 2.5rem 0 0;background:rgba(255,255,255,.7);pointer-events:none;z-index:5;border-radius:inherit;display:flex;align-items:center;justify-content:center"><div style="pointer-events:none;background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:.45rem;padding:.35rem .75rem;text-align:center;font-size:1.17rem;color:#374151;max-width:80%">⏸ This note's period has ended — change its End Date above to bring it back.</div></div>` : '';
       html += `<div class="admin-list-item admin-note-item" data-idx="${idx}"${noteItemStyle}>
         <span class="drag-handle">⠿</span>
         <div style="flex:1;display:flex;flex-direction:column;gap:.25rem">
@@ -29574,6 +29629,16 @@ function renderTemplateManageContent(template) {
             </select>
           </div>
           ${(() => { const _np = noteParts(a); return `
+          <div style="display:flex;gap:.6rem;align-items:flex-start;flex-wrap:wrap">
+            <div style="flex-shrink:0">
+              <div style="font-size:.85rem;font-weight:700;color:#78350f;margin-bottom:.2rem">Start Date</div>
+              <button class="mn-act-start-btn" data-idx="${idx}" style="padding:.35rem .65rem;border:1.5px solid #fcd34d;border-radius:.4rem;background:#fef3c7;cursor:pointer;font-size:.9rem;color:#78350f;white-space:nowrap;display:block">📅 ${a.activeFrom ? fmtPeriodDate(a.activeFrom) : 'Set date'}</button>
+            </div>
+            <div style="flex-shrink:0">
+              <div style="font-size:.85rem;font-weight:700;color:#78350f;margin-bottom:.2rem">End Date</div>
+              <button class="mn-act-end-btn" data-idx="${idx}" style="padding:.35rem .65rem;border:1.5px solid #fcd34d;border-radius:.4rem;background:#fef3c7;cursor:pointer;font-size:.9rem;color:#78350f;white-space:nowrap;display:block">📅 ${a.activeTo ? fmtPeriodDate(a.activeTo) : 'No end date'}</button>
+            </div>
+          </div>
           <div>
             <div style="font-size:.85rem;font-weight:700;color:#78350f;margin-bottom:.2rem">Note Title</div>
             <textarea class="admin-input mn-note-title-input" id="mn-note-title-${idx}" data-idx="${idx}"
@@ -29593,7 +29658,6 @@ function renderTemplateManageContent(template) {
         <div style="position:relative">
           <button class="btn-adm-del mn-kebab-btn" data-idx="${idx}" title="Note options" style="font-size:1.35rem;font-weight:900;min-width:36px;min-height:36px">⋮</button>
           <div class="mn-kebab-menu" id="mn-km-${idx}" style="display:none;position:absolute;right:0;top:100%;z-index:100;background:white;border:1px solid #e5e7eb;border-radius:.5rem;box-shadow:0 4px 12px rgba(0,0,0,.15);min-width:200px;overflow:hidden">
-            ${periodSectionHtml(a.activeFrom, a.activeTo, idx, true)}
             <div style="display:flex;align-items:stretch">
               <button class="mn-km-opt" data-idx="${idx}" data-action="delete" style="flex:1;padding:.55rem .9rem;text-align:left;background:none;border:none;cursor:pointer;font-size:.84rem;color:#dc2626">🗑️ Delete Note</button>
             </div>
@@ -30365,7 +30429,7 @@ function renderTemplateManageContent(template) {
     });
   });
 
-  $("manage-modal-body").querySelectorAll(".mn-act-start-btn").forEach(btn => {
+  $("manage-modal-body").querySelectorAll(".mn-act-start-btn, .mn-act-end-btn").forEach(btn => {
     btn.addEventListener("click", e => {
       e.stopPropagation();
       _actStartPickerSaveFn = async (idx, field, value) => {
@@ -30375,6 +30439,7 @@ function renderTemplateManageContent(template) {
         await saveTemplateFn();
         renderTemplateManageContent(template);
       };
+      _actStartPickerField   = btn.classList.contains("mn-act-end-btn") ? "activeTo" : "activeFrom";
       _actStartPickerIdx     = +btn.dataset.idx;
       _actStartPickerActs    = acts;
       _actStartPickerStudent = null;
@@ -33028,6 +33093,11 @@ function renderGroupSessionsForMonth(group, month, monthSessions, byMonth, sessi
 
 // ── Group manage modal ───────────────────────────────────────
 function openGroupManageModal(group, target = null, scrollToPaId = null, _lockHeld = false) {
+  // Opening the window is a fresh start: the Mastered and Discontinued
+  // lists are collapsed again. The set survives a re-render on purpose,
+  // so that editing a row inside one does not shut it, but it used to
+  // survive closing the window too and they came back open.
+  _mnOpenInactGroups.clear();
   if (target && !_lockHeld) {
     mnOpenWhenFree(group, target, true, () =>
       openGroupManageModal(group, target, scrollToPaId, true));
