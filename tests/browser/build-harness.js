@@ -409,6 +409,9 @@ const exposed = [
   // test; calling it directly covers the rest, including the shapes that only
   // exist on live (a Behaviour Chart's two ABC sets, a mastered twin).
   "mnNameConflict", "mnNormName", "mnIsParentRow",
+  // The View/Edit past session table, so a test can read the rows it builds
+  // rather than driving the whole screen to get at them.
+  "buildTargetViewTable",
 ];
 let shim = `
 

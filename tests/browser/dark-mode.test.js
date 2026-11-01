@@ -277,6 +277,30 @@ try {
     `${picked.badgeBg} (brightness ${lum(picked.badgeBg)})`);
   r.check("with dark digits", picked.badgeFg, "#1b1f24");
 
+  // ── 2e. colour keywords, not just hex ───────────────────────────────
+  //
+  // The v2311 pass rewrote hex literals and never looked at the keyword
+  // "white", so a dozen surfaces stayed white in dark mode. The Export to
+  // Word pill is how it surfaced: its text had correctly moved to a light
+  // accent while its background had not moved at all, so it was light on
+  // light. Nothing may name a raw colour keyword any more.
+  r.section("2e. no raw colour keyword is left in a style");
+  const keywords = [];
+  for (const [file, text] of [
+    ["styles.css", await Deno.readTextFile(new URL("../../styles.css", import.meta.url))],
+    ["app.js", await Deno.readTextFile(new URL("../../app.js", import.meta.url))],
+  ]) {
+    text.split(/\r?\n/).forEach((line, i) => {
+      if (/^\s*(\/\/|\*|\/\*)/.test(line)) return;
+      if (/ctx\.|fillStyle|strokeStyle|addColorStop/.test(line)) return;
+      if (/(background(-color)?|color)\s*:\s*(white|black)\b/.test(line)) {
+        keywords.push(`${file}:${i + 1}  ${line.trim().slice(0, 80)}`);
+      }
+    });
+  }
+  r.ok("every surface and label names a token instead",
+    keywords.length === 0, keywords.slice(0, 6).join("\n        "));
+
   r.section("3. the choice is remembered, on this device");
   r.check("it is written to the browser, not the account", await stored(), "dark");
   r.check("and the filled word moves to Dark", await page.eval(
