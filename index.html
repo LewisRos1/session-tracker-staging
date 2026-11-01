@@ -88,6 +88,11 @@
     <header class="app-header">
       <h1>Session Tracker</h1>
       <span id="app-version" class="app-version"></span>
+      <!-- Left of the name, in the same group as Log Out and wearing the
+           same pill, so the right-hand end of the header reads as one set
+           of controls rather than three unrelated things. Its words are
+           filled in by applyTheme, which runs before the first paint. -->
+      <button id="btn-theme" class="btn-logout btn-theme" type="button"></button>
       <div id="header-user" class="header-user"></div>
       <button id="btn-logout" class="btn-logout">Log Out</button>
     </header>

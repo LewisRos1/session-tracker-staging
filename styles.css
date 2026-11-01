@@ -615,6 +615,12 @@ html, body {
    being pushed to the far edge on its own. Scoped to the header, since the
    class is styling elsewhere too. */
 .app-header .btn-logout { margin-left: 0; }
+/* The right-hand end of the header is one group: Appearance, the name,
+   then Log Out. The spacer that pushes the group over belongs to whichever
+   of them comes first, which is now the Appearance button. */
+.app-header .btn-theme { margin-left: auto; }
+.app-header .btn-theme + .header-user { margin-left: .75rem; }
+
 .header-user {
   margin-left: auto;
   display: flex;
@@ -652,6 +658,12 @@ html, body {
   font-size: .8rem;
   font-weight: 600;
   cursor: pointer;
+  /* Fixed rather than inherited so the two pills are the same height
+     whatever is in them. An emoji has a taller glyph box than text, so
+     Appearance came out 2px over Log Out while both were 'the same'. */
+  line-height: 1.35;
+  display: inline-flex;
+  align-items: center;
 }
 .btn-logout:hover { background: rgba(255,255,255,.25); }
 
@@ -5633,32 +5645,6 @@ button.wf-pill:hover { filter: brightness(.93); }
    their own copies, so nothing printed changes. */
 :root[data-theme="dark"] img:not([data-theme-keep]) { filter: brightness(.88); }
 
-/* ── The Appearance switch ──────────────────────────────── */
-.theme-row {
-  display: flex;
-  gap: .4rem;
-  align-items: center;
-  padding: .25rem;
-  background: var(--c-f3f4f6);
-  border: 1px solid var(--c-e5e7eb);
-  border-radius: var(--radius-sm);
-}
-.theme-opt {
-  flex: 1;
-  padding: .5rem .4rem;
-  border: none;
-  border-radius: calc(var(--radius-sm) - 2px);
-  background: none;
-  color: var(--c-6b7280);
-  font-size: .85rem;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.theme-opt:hover { color: var(--c-374151); }
-.theme-opt[aria-pressed="true"] {
-  background: var(--c-ffffff);
-  color: var(--c-111827);
-  box-shadow: 0 1px 2px rgba(0,0,0,.14);
-}
+/* Nothing of its own beyond the hook above: it wears .btn-logout, so the
+   two pills cannot drift apart. */
+.btn-theme { white-space: nowrap; }

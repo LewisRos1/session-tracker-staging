@@ -72,21 +72,44 @@ try {
     `${light.bodyBg} (brightness ${lightBg})`);
 
   // ── 2. the switch ───────────────────────────────────────────────────
-  r.section("2. pressing Dark");
-  const hasSwitch = await page.eval(`(() => {
-    const row = document.querySelector(".theme-row");
-    if (!row) return null;
-    return [...row.querySelectorAll(".theme-opt")].map(b => ({
-      mode: b.dataset.theme, on: b.getAttribute("aria-pressed"),
+  //
+  // One button in the header, beside the name and wearing the same pill as
+  // Log Out. It is named for what pressing it does, not for the mode you are
+  // already in, which is what makes it read as a button.
+  r.section("2. the button in the header");
+  const btn = await page.eval(`(() => {
+    const b = document.getElementById("btn-theme");
+    if (!b) return null;
+    const hdr = b.closest(".app-header");
+    const user = document.getElementById("header-user");
+    const out = document.getElementById("btn-logout");
+    const cs = getComputedStyle(b), outCs = getComputedStyle(out);
+    return {
+      inHeader: !!hdr,
       label: b.textContent.trim(),
-    }));
+      title: b.title,
+      // Document order: Appearance, then the name, then Log Out.
+      beforeUser: !!(b.compareDocumentPosition(user) & Node.DOCUMENT_POSITION_FOLLOWING),
+      beforeLogout: !!(b.compareDocumentPosition(out) & Node.DOCUMENT_POSITION_FOLLOWING),
+      // And it must actually look like Log Out, not merely claim the class.
+      sameLook: cs.fontSize === outCs.fontSize && cs.padding === outCs.padding
+        && cs.borderRadius === outCs.borderRadius && cs.backgroundColor === outCs.backgroundColor
+        && cs.color === outCs.color && cs.borderColor === outCs.borderColor,
+      height: Math.round(b.getBoundingClientRect().height),
+      outHeight: Math.round(out.getBoundingClientRect().height),
+    };
   })()`);
-  r.ok("the switch is on the home screen", !!hasSwitch, "no .theme-row found");
-  r.check("with two choices", hasSwitch && hasSwitch.length, 2);
-  r.check("and Light is the one showing as picked",
-    hasSwitch && hasSwitch.find(b => b.on === "true")?.mode, "light");
+  r.ok("the button is in the header", !!btn && btn.inHeader, JSON.stringify(btn));
+  r.ok("to the left of the current user", !!btn && btn.beforeUser, JSON.stringify(btn));
+  r.ok("and to the left of Log Out", !!btn && btn.beforeLogout, JSON.stringify(btn));
+  r.check("in light mode it offers Dark", btn && btn.label, "\u{1F319} Dark");
+  r.check("and says so on hover", btn && btn.title, "Switch to dark mode");
+  r.ok("it is styled exactly like Log Out", !!btn && btn.sameLook, JSON.stringify(btn));
+  r.check("and is the same height", btn && btn.height, btn && btn.outHeight);
+  r.check("nothing is left on the home screen",
+    await page.eval(`document.querySelectorAll(".theme-row, .theme-opt").length`), 0);
 
-  await page.eval(`document.querySelector('.theme-opt[data-theme="dark"]').click()`);
+  await page.eval(`document.getElementById("btn-theme").click()`);
   await settle();
   const dark = await painted();
   r.check("the attribute goes on the root", await theme(), "dark");
@@ -104,8 +127,8 @@ try {
 
   r.section("3. the choice is remembered, on this device");
   r.check("it is written to the browser, not the account", await stored(), "dark");
-  r.check("and the pressed state moves", await page.eval(
-    `document.querySelector('.theme-opt[data-theme="dark"]').getAttribute("aria-pressed")`), "true");
+  r.check("and the button now offers the way back", await page.eval(
+    `document.getElementById("btn-theme").textContent.trim()`), "☀️ Light");
   r.check("the address-bar colour follows", await page.eval(
     `document.querySelector('meta[name="theme-color"]').getAttribute("content")`), "#15181b");
 
@@ -230,7 +253,7 @@ try {
 
   // ── 6. back to light ────────────────────────────────────────────────
   r.section("6. and back again");
-  await page.eval(`document.querySelector('.theme-opt[data-theme="light"]').click()`);
+  await page.eval(`document.getElementById("btn-theme").click()`);
   await settle();
   r.check("the attribute says light", await theme(), "light");
   r.check("it is remembered", await stored(), "light");

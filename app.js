@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2311";
+const APP_VERSION = "2312";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -1388,25 +1388,21 @@ function applyTheme(mode) {
   if (meta) meta.setAttribute("content", dark ? "#15181b" : "#6366f1");
   try { localStorage.setItem(THEME_KEY, dark ? "dark" : "light"); }
   catch (e) { /* blocked storage: it still applies for this visit */ }
-  document.querySelectorAll(".theme-opt").forEach(btn => {
-    btn.setAttribute("aria-pressed", String(btn.dataset.theme === (dark ? "dark" : "light")));
-  });
+  // Named for what pressing it does, the way Log Out beside it is. Showing
+  // the mode you are already in would read as a label rather than a button.
+  const btn = document.getElementById("btn-theme");
+  if (btn) {
+    btn.textContent = dark ? "\u2600\ufe0f Light" : "\u{1F319} Dark";
+    btn.title = dark ? "Switch to light mode" : "Switch to dark mode";
+    btn.setAttribute("aria-label", btn.title);
+  }
 }
 
-function themeSwitchHtml() {
-  const now = currentTheme();
-  const opt = (val, label) =>
-    `<button type="button" class="theme-opt" data-theme="${val}"` +
-    ` aria-pressed="${String(val === now)}">${label}</button>`;
-  return `<div class="theme-row" role="group" aria-label="Appearance">` +
-    opt("light", "\u2600\ufe0f Light") + opt("dark", "\u{1F319} Dark") +
-    `</div>`;
-}
-
-// Delegated, so the switch keeps working wherever it is re-rendered.
+// Delegated, so it keeps working through any re-render of the header.
 document.addEventListener("click", e => {
-  const btn = e.target.closest(".theme-opt");
-  if (btn) applyTheme(btn.dataset.theme);
+  if (e.target.closest("#btn-theme")) {
+    applyTheme(currentTheme() === "dark" ? "light" : "dark");
+  }
 });
 
 // The attribute is already set by the inline script in the head; this is for
@@ -2999,12 +2995,7 @@ function renderStudentDatabaseButton() {
          only made the two buttons behave differently for no reason. -->
     <button class="export-btn" id="btn-open-ai-translate">AI Translator</button>
     <button class="export-btn" id="btn-open-score-settings">Score Settings</button>
-  </div>
-  <!-- Not behind the password the other buttons use. Changing how the
-       screen looks on this one device cannot affect anybody else's data,
-       and an assistant working an evening shift should be able to turn
-       the lights down without asking. -->
-  <div style="margin-top:.6rem">${themeSwitchHtml()}</div>`;
+  </div>`;
   // Open to everyone: reading the list is useful and harmless. Every control
   // on the screen is locked instead, which is the difference between looking
   // something up and changing it.
