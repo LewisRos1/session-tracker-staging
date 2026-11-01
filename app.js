@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2309";
+const APP_VERSION = "2310";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -24228,8 +24228,26 @@ function initDragSort(listEl, onReorder) {
     placeholder = null;
     // Suppress the synthetic click that the browser fires at the drop position —
     // otherwise buttons (e.g. "Add Sub-activity") under the release point get clicked.
-    document.addEventListener('click', e => { e.stopPropagation(); e.preventDefault(); },
-      { capture: true, once: true });
+    //
+    // Only a click inside the panel that was dragged in, and only for a moment.
+    // Armed for any click anywhere and left armed until one arrived, it would
+    // eat whatever the person pressed next if the drop never produced a click
+    // of its own — including the OK on a dialog the drop had just raised, which
+    // is how this was found: the warning for a refused drag needed two clicks
+    // to close. A dialog is appended to the body, outside this panel, so both
+    // bounds leave what the suppressor is for untouched: the click it exists to
+    // swallow lands inside the panel, immediately.
+    const swallowRoot = scrollEl || listEl.parentElement || listEl;
+    const unswallow = () => {
+      document.removeEventListener('click', swallow, { capture: true });
+      clearTimeout(swallowTimer);
+    };
+    function swallow(e) {
+      if (swallowRoot.contains(e.target)) { e.stopPropagation(); e.preventDefault(); }
+      unswallow();
+    }
+    document.addEventListener('click', swallow, { capture: true });
+    const swallowTimer = setTimeout(unswallow, 400);
     onReorder(newOrder, Number.isFinite(movedIdx) ? movedIdx : null, anchorTop);
   };
 
@@ -25217,6 +25235,144 @@ function mnRowKindName(a, acts) {
   if (a.parentActivity) return "sub-activity";
   if (subActivitiesOf(a, acts).length || a._linkKey || a.noRemark) return "parent activity";
   return "activity";
+}
+
+/**
+ * Two rows in one target that a person could not tell apart.
+ *
+ * Not every repeated name is a mistake. A Behaviour Chart is built as one
+ * Antecedent / Behaviours / Consequence set per behaviour, each set under its
+ * own section heading, and Leven has a Situation and a Comment under both
+ * "Social Detective" and "SSJ Diary". Those read correctly: the heading above
+ * says which one you are looking at. Every duplicate name on live is of that
+ * kind, so a blanket refusal would have outlawed the way the charts are
+ * already written.
+ *
+ * What is refused is the pair with nothing to tell them apart:
+ *
+ *   - two activities with one name under the SAME heading. Side by side,
+ *     identical, and nothing on the page says which is which.
+ *   - two sub-activities with one name under the same parent, for the same
+ *     reason.
+ *   - two PARENT activities with one name anywhere in the target, heading or
+ *     no heading. A sub-activity stores its parent as a NAME and nothing
+ *     else, so a second parent with that name takes a share of the children:
+ *     parentOwningSubs has to pick one and the other parent draws empty.
+ *     This is the bug Lewis found -- a parent called "hello" showing no
+ *     sub-activities while the session screen showed two.
+ *
+ * A finished activity does not hold its name. Hayden mastered "I can wait"
+ * and started it again months later, which is a decision, not a slip. The
+ * exception is a finished PARENT, because parentOwningSubs falls back to one
+ * when no live parent has the name.
+ *
+ * Which section a row is in is not stored on it. It comes from where the row
+ * sits in the list, the same walk the Start Session screen and the Word
+ * export use, so the answer here is the one the page shows.
+ */
+function mnNormName(s) {
+  return String(s == null ? "" : s)
+    .replace(/<[^>]*>/g, "")
+    .replace(/\*_([\s\S]+?)_\*/g, "$1")
+    .replace(/_\*([\s\S]+?)\*_/g, "$1")
+    .replace(/\*([\s\S]+?)\*/g, "$1")
+    .replace(/_([\s\S]+?)_/g, "$1")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+/** Which section heading each row sits under. null = above the first one. */
+function mnHeadingOf(acts) {
+  const map = new Map();
+  let current = null;
+  for (const a of (acts || [])) {
+    if (!a) continue;
+    if (a.isHeading || a.isMaintainHeading) { current = a; continue; }
+    map.set(a, current);
+  }
+  return map;
+}
+
+/** True when this row is, or is about to become, a parent of other rows. */
+function mnIsParentRow(a, acts) {
+  if (!a || a.parentActivity) return false;
+  if (a._linkKey || a.noRemark) return true;
+  const key = a.title || a.name;
+  return !!key && (acts || []).some(x => x !== a && x.parentActivity === key);
+}
+
+/** A row that has been mastered, discontinued or otherwise put away. */
+function mnIsFinishedRow(a) {
+  return !!(a && (a.masteredOn || a.discontinuedOn || a.isArchived || a.isStopped || a.isCompleted));
+}
+
+/**
+ * The row that `item` would be indistinguishable from if it were called
+ * `proposedName`, or null when the name is free. `asParent` forces the parent
+ * rule on for a row that is in the middle of becoming one.
+ */
+function mnNameConflict(acts, item, proposedName, asParent = false) {
+  const want = mnNormName(proposedName);
+  if (!want || !Array.isArray(acts)) return null;
+
+  // A heading is display text and a note is prose. Neither is matched against
+  // session data and neither owns a sub-activity, so neither can clash.
+  if (item && (item.isHeading || item.isMaintainHeading || item.isNote || item.isExportNote)) return null;
+
+  const named = a => a && a !== item
+    && !a.isHeading && !a.isMaintainHeading && !a.isNote && !a.isExportNote
+    && mnNormName(a.title || a.name) === want;
+
+  // ── a sub-activity: only its own siblings matter ──────────────────
+  if (item && item.parentActivity) {
+    return acts.find(a => named(a) && !mnIsFinishedRow(a)
+      && a.parentActivity === item.parentActivity) || null;
+  }
+
+  // ── a parent: no other top-level row anywhere may hold the name ───
+  const meParent = asParent || mnIsParentRow(item, acts);
+  const clashAnywhere = acts.find(a => named(a) && !a.parentActivity
+    && (meParent || mnIsParentRow(a, acts)));
+  if (clashAnywhere) return clashAnywhere;
+
+  // ── a plain activity: only inside the same section ────────────────
+  const headingOf = mnHeadingOf(acts);
+  const mySection = headingOf.get(item) ?? null;
+  return acts.find(a => named(a) && !a.parentActivity && !mnIsFinishedRow(a)
+    && (headingOf.get(a) ?? null) === mySection) || null;
+}
+
+/** Says who the name is already taken by, and where. */
+function mnNameClashMessage(acts, item, proposedName, clash) {
+  const plain = s => String(s == null ? "" : s).replace(/<[^>]*>/g, "").trim();
+  const shown = escHtml(plain(proposedName));
+  const kind  = mnRowKindName(clash, acts);
+  // "a activity" otherwise. Only "activity" of the words this can return
+  // starts with a vowel, but the rule is cheap and does not care.
+  const a_an  = /^[aeiou]/i.test(kind) ? "an" : "a";
+  const head  = clash.parentActivity ? null : mnHeadingOf(acts).get(clash);
+  const where = clash.parentActivity
+    ? " under the same parent activity"
+    : head ? ` in the same section (<strong>${escHtml(plain(head.title || head.name))}</strong>)`
+           : " in this target";
+  const why = (mnIsParentRow(clash, acts) || mnIsParentRow(item, acts))
+    ? "<br><br>A sub-activity finds its parent by name, so two parent activities"
+      + " with the same name would end up sharing each other's sub-activities."
+    : "";
+  return `There is already ${a_an} ${kind} called <strong>${shown}</strong>${where}.` + why;
+}
+
+/** Tells the user the name is taken. Always returns true, so callers can
+ *  write `if (clash) return mnRefuseNameClash(...)`. */
+async function mnRefuseNameClash(acts, item, proposedName, clash) {
+  await showAlertOverlay({
+    title: "\u26a0\ufe0f That name is already used",
+    message: mnNameClashMessage(acts, item, proposedName, clash),
+  });
+  return true;
 }
 
 /**
@@ -26970,7 +27126,38 @@ function renderTargetManageContent(student, target) {
 
   initDragSort($("mn-act-list"), async (newOrder, movedIdx, anchorTop) => {
     const moved = movedIdx != null ? acts[movedIdx] : null;
+    // mnReorderActs renumbers every row's order field as it builds the new
+    // list, so the undo below has to put those back as well as leave the array
+    // alone. Without it a refused drag left the orders describing a list that
+    // was never saved, and the next save wrote them.
+    const orderWas = acts.map(a => a && a.order);
     const result = mnReorderActs(acts, newOrder);
+    // A section heading is not stored on the row -- it is whichever heading the
+    // row has been dropped below -- so a drag is a way of changing the section
+    // an activity belongs to, and it can land one next to its own twin.
+    //
+    // The move is tested against the list it WOULD produce and then thrown
+    // away, so nothing is saved and the row springs back to where it started.
+    // Refusing the drop halfway through the gesture was the alternative, and it
+    // gives the person nothing to look at while being told what is wrong.
+    if (moved && !moved.isHeading && !moved.isMaintainHeading) {
+      const clash = mnNameConflict(result, moved, moved.title || moved.name);
+      if (clash) {
+        acts.forEach((a, i) => { if (a) a.order = orderWas[i]; });
+        renderTargetManageContent(student, target);
+        mnScrollToMovedRow(acts.indexOf(moved), anchorTop);
+        // Let go of the drop before putting a dialog in front of the person.
+        //
+        // endDrag arms a one-shot capture listener that swallows the click the
+        // browser fires at the release point, so that letting go over a button
+        // does not press it. That listener is still armed here, and the first
+        // thing this dialog wants is a click on OK -- which it ate, leaving the
+        // message on screen until it was clicked a second time.
+        await new Promise(res => setTimeout(res, 0));
+        await mnRefuseNameClash(result, moved, moved.title || moved.name, clash);
+        return;
+      }
+    }
     target.predefinedActivities = result;
     await saveTarget();
     renderTargetManageContent(student, target);
@@ -27096,6 +27283,16 @@ function renderTargetManageContent(student, target) {
       titleInput.addEventListener("blur", async () => {
         const v = titleInput.value.trim();
         if (v === (a.title || "")) return;
+        // Refused before anything is written, and the box put back to what it
+        // held. Renaming a row INTO a name that is already taken is the way
+        // most duplicates would be made now that adding one starts blank.
+        const _clash = mnNameConflict(acts, a, v);
+        if (_clash) {
+          titleInput.value = a.title || "";
+          await mnRefuseNameClash(acts, a, v, _clash);
+          titleInput.focus();
+          return;
+        }
         const oldKey = a._linkKey || a.title || a.name;
         a.title = v;
         const newKey = a.title || a.name;
@@ -27118,6 +27315,17 @@ function renderTargetManageContent(student, target) {
       detailsInput.addEventListener("blur", async () => {
         const v = detailsInput.value.trim();
         if (v === (a.name || "")) return;
+        // Details are the name whenever the title is blank, so this box can
+        // make a duplicate exactly as the title box can.
+        if (!(a.title || "").trim()) {
+          const _clashD = mnNameConflict(acts, a, v);
+          if (_clashD) {
+            detailsInput.value = a.name || "";
+            await mnRefuseNameClash(acts, a, v, _clashD);
+            detailsInput.focus();
+            return;
+          }
+        }
         const oldName = a._linkKey || a.name;
         a.name = v;
         acts.forEach(a2 => { if (a2.parentActivity === oldName) a2.parentActivity = v; });
@@ -27679,6 +27887,14 @@ function renderTargetManageContent(student, target) {
         errOverlay.querySelector("#mn-addsub-err-close").addEventListener("click", () => errOverlay.remove());
         return;
       }
+      // Becoming a parent tightens the rule on this row: a plain activity only
+      // has to be unique inside its own section, a parent has to be unique in
+      // the whole target, because a sub-activity stores nothing but the name.
+      const _pClash = mnNameConflict(acts, act, act.title || act.name, true);
+      if (_pClash) {
+        await mnRefuseNameClash(acts, act, act.title || act.name, _pClash);
+        return;
+      }
       // No past data — make this activity a parent and create a blank sub-activity below it
       act.noRemark = true;
       const subId = cfgId("a");
@@ -27820,6 +28036,17 @@ function renderTargetManageContent(student, target) {
               return;
             }
             const chosenKey = chosen.title || chosen.name;
+            // Two things can clash here at once: the row arrives beside new
+            // siblings, and the activity it is moving under becomes a parent.
+            const _mvClash = acts.find(a2 => a2 !== pa && a2.parentActivity === chosenKey
+              && !mnIsFinishedRow(a2)
+              && mnNormName(a2.title || a2.name) === mnNormName(pa.title || pa.name))
+              || mnNameConflict(acts, chosen, chosenKey, true);
+            if (_mvClash) {
+              closeOverlay();
+              await mnRefuseNameClash(acts, pa, pa.title || pa.name, _mvClash);
+              return;
+            }
             const oldParentKey = pa.parentActivity || null;
             pa.parentActivity = chosenKey;
             chosen.noRemark = true;

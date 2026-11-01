@@ -141,6 +141,9 @@ results.push(await run("A sub-activity's kebab menu",
 results.push(await run("Two activities with the same name, in a real browser",
   ["run", "-A", "tests/browser/same-name-activities.test.js", HARNESS]));
 
+results.push(await run("Duplicate activity names: refused, and allowed",
+  ["run", "-A", "tests/browser/duplicate-activity-names.test.js", HARNESS]));
+
 results.push(await run("Start Session screens: what they print",
   ["run", "-A", "tests/browser/session-screen-display.test.js", HARNESS]));
 
