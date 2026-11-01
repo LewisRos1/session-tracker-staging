@@ -73,11 +73,9 @@ try {
         cls: tr.className,
         sub: tr.classList.contains("vrow-sub"),
         padLeft: cs.paddingLeft,
-        elbowW: bar.width,
-        elbowH: bar.height,
         elbowLeft: bar.borderLeftWidth,
-        elbowBottom: bar.borderBottomWidth,
         elbowColor: bar.borderLeftColor,
+        armBottom: getComputedStyle(act, "::after").borderBottomWidth,
         colspan: act.getAttribute("colspan"),
       };
     }).filter(Boolean);
@@ -95,12 +93,10 @@ try {
     const row = byText(name);
     r.ok(`"${name}" is marked as a sub`, !!row && row.sub, JSON.stringify(row));
     r.check(`"${name}" is indented`, row && row.padLeft, "33.6px");   // 1.9rem
-    r.ok(`"${name}" has an elbow drawn beside it`,
-      !!row && row.elbowLeft === "2px" && row.elbowBottom === "2px",
-      JSON.stringify(row));
-    r.ok(`and it is an L, not a box`,
-      !!row && row.elbowW !== "auto" && row.elbowH !== "auto",
-      JSON.stringify(row));
+    r.ok(`"${name}" has an upright beside it`,
+      !!row && row.elbowLeft === "2px", JSON.stringify(row));
+    r.ok(`and an arm reaching into the text`,
+      !!row && row.armBottom === "2px", JSON.stringify(row));
     r.ok(`and it is actually visible`,
       !!row && row.elbowColor !== "rgba(0, 0, 0, 0)",
       JSON.stringify(row && row.elbowColor));
@@ -117,7 +113,8 @@ try {
     const row = byText(name);
     r.ok(`"${name}" is a plain row`, !!row && !row.sub, JSON.stringify(row));
     r.check(`"${name}" is not indented`, row && row.padLeft, parent.padLeft);
-    r.check(`"${name}" has no elbow`, row && row.elbowLeft, "0px");
+    r.check(`"${name}" has no upright`, row && row.elbowLeft, "0px");
+    r.check(`"${name}" has no arm either`, row && row.armBottom, "0px");
   }
 
   // ── 3b. the elbow has to fit in the space the indent makes ──────────
@@ -125,6 +122,64 @@ try {
   // Measured rather than reasoned about: the elbow is positioned and the
   // text is padded by two separate numbers, and if they ever cross, the L
   // is drawn through the first letter of the activity name.
+  // ── 3a. the thing Lewis actually asked for ──────────────────────────
+  //
+  // The elbows have to join up into one line down the group. This is the
+  // check that cannot be done by reading CSS: the uprights are laid out
+  // inside each cell's padding box, and border-collapse puts a shared 1px
+  // line between the rows, so without a deliberate bleed every upright
+  // stops short at both ends and the line comes out dashed. Measured as
+  // painted rectangles, and the gap between one upright and the next has
+  // to be zero or less.
+  r.section("3a. the uprights join into one line");
+  const chain = await page.eval(`(() => {
+    const px = v => parseFloat(v) || 0;
+    // A pseudo-element has no rect of its own, so build it: the cell's
+    // padding box, offset by the resolved top and bottom. getComputedStyle
+    // hands both back in pixels, so a 50% bottom arrives already worked out.
+    const upright = (tr) => {
+      const cell = tr.querySelector(".vcol-act");
+      const cs = getComputedStyle(cell);
+      const bar = getComputedStyle(cell, "::before");
+      const r = cell.getBoundingClientRect();
+      const padTop = r.top + px(cs.borderTopWidth);
+      const padBottom = r.bottom - px(cs.borderBottomWidth);
+      return {
+        top: padTop + px(bar.top),
+        bottom: padBottom - px(bar.bottom),
+        padBottom,
+        height: padBottom - padTop,
+      };
+    };
+    const rows = [...document.querySelectorAll("#sub-probe tr")];
+    const out = [];
+    for (let i = 0; i < rows.length; i++) {
+      if (!rows[i].classList.contains("vrow-sub")) continue;
+      const me = upright(rows[i]);
+      const nextIsSub = rows[i + 1] && rows[i + 1].classList.contains("vrow-sub");
+      out.push({
+        // Does it stop short of the row's bottom? That is the L.
+        closed: me.padBottom - me.bottom > me.height * 0.25,
+        nextIsSub: !!nextIsSub,
+        // Only a sub immediately followed by another sub has a join to make.
+        gap: nextIsSub
+          ? Math.round((upright(rows[i + 1]).top - me.bottom) * 10) / 10
+          : null,
+      });
+    }
+    return out;
+  })()`);
+  r.ok("there are subs to look at", chain.length >= 2, JSON.stringify(chain));
+  const joins = chain.filter(c => c.nextIsSub);
+  r.ok("a sub followed by another sub has no gap between the uprights",
+    joins.length > 0 && joins.every(c => c.gap <= 0), JSON.stringify(chain));
+  // Closing the last one is what stops the line running on past the group
+  // and into the next activity.
+  r.ok("a sub followed by another sub runs the full row",
+    chain.filter(c => c.nextIsSub).every(c => !c.closed), JSON.stringify(chain));
+  r.ok("and the last sub of a group closes off into an L",
+    chain.filter(c => !c.nextIsSub).every(c => c.closed), JSON.stringify(chain));
+
   r.section("3b. the elbow does not run into the text");
   const fit = await page.eval(`(() => {
     const cell = document.querySelector("#sub-probe tr.vrow-sub .vcol-act");
@@ -138,7 +193,7 @@ try {
       elbowEndsAt: elbowRight,
       gap: px(cs.paddingLeft) - elbowRight,
       // The arm meets the middle, because the cells centre their content.
-      armAt: bar.height,
+      armAt: getComputedStyle(cell, "::after").top,
       cellH: Math.round(cell.getBoundingClientRect().height),
     };
   })()`);

@@ -4185,21 +4185,27 @@ button.wf-pill:hover { filter: brightness(.93); }
 
 .vcol-no      { width: 36px; text-align: center; white-space: nowrap; }
 .vcol-act     { width: 250px; white-space: pre-wrap; word-break: break-word; }
-/* A sub-activity in the View table: an elbow, the way a file tree draws one.
+/* A sub-activity in the View table: a file-tree elbow.
 
-   This started as a full-height rail down the left, which a table cannot
-   do -- a border is drawn between every row, so the line came out as one
-   short tick per row instead of running down the group. An elbow does not
-   need to survive the row boundary: it begins at the top of its own cell
-   and ends at its own text, so each sub carries a complete mark.
+   Two pieces, because one cannot be both. The upright runs the full height
+   of the row so it meets the upright above and below it, and the arm
+   reaches from it into the text. The last sub in a group closes it off:
+   its upright stops at the arm, turning the T into an L.
 
-   One element draws it. A box with only a left and a bottom border IS an L,
-   which beats two pseudo-elements that have to be kept in step.
+   Which sub is last is asked of the DOM rather than worked out in app.js.
+   A sub row that is not followed by another sub row is the last one, and
+   the subs of one parent are always consecutive -- the next parent's own
+   row sits between two groups, and that row is not a .vrow-sub.
 
-   It stops at 50% because the cells are vertical-align:middle, so the arm
+   The arm sits at 50% because these cells are vertical-align:middle, so it
    has to meet the middle of the text rather than the top of the row. On a
-   row that runs ten lines tall the upright simply gets longer, which is
-   what a tree does anyway. */
+   row ten lines tall the upright simply gets longer, which is what a tree
+   does anyway.
+
+   The -1px bleed is the table's own border. border-collapse:collapse puts
+   a shared 1px line between the rows, and an absolutely positioned child
+   is laid out inside the padding box, so without the bleed every upright
+   stopped 1px short at each end and the line came out dashed. */
 .vrow-sub .vcol-act {
   position: relative;
   padding-left: 2.1rem;
@@ -4208,12 +4214,21 @@ button.wf-pill:hover { filter: brightness(.93); }
   content: "";
   position: absolute;
   left: .95rem;
-  top: 0;
-  height: 50%;
-  width: .7rem;
+  top: -1px;
+  bottom: -1px;
   border-left: 2px solid var(--c-9ca3af);
+  pointer-events: none;
+}
+.vrow-sub:not(:has(+ .vrow-sub)) .vcol-act::before {
+  bottom: 50%;
+}
+.vrow-sub .vcol-act::after {
+  content: "";
+  position: absolute;
+  left: .95rem;
+  top: 50%;
+  width: .7rem;
   border-bottom: 2px solid var(--c-9ca3af);
-  border-bottom-left-radius: 3px;
   pointer-events: none;
 }
 .vcol-student { width: 100px; text-align: center; white-space: pre-wrap; word-break: break-word; font-weight: 600; }
