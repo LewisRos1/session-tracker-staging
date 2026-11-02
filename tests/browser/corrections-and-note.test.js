@@ -102,10 +102,9 @@ try {
 
   // -- 1. what the pill says ------------------------------------------
   //
-  // Only three states say anything in words. These pills are read as a
-  // row of them under the chart, so a sentence on every one is three
-  // sentences to get through before you find the one that wants you. The
-  // rest carry their state in the colour and say nothing.
+  // Only the two that nobody has read yet say nothing. These pills are
+  // read as a row of them under the chart, so what one says has to be
+  // short enough to take in at a glance -- three words at most.
   r.section("1. the corrections pill says what is outstanding");
   // What the whole button reads, for a state whose words are `words`.
   const pill = words =>
@@ -115,7 +114,7 @@ try {
      "before the instructor has entered anything"],
     ["", "grey", sessionWith([], "entered"),
      "entered, but Ms. Daisy has not looked"],
-    ["", "green", sessionWith([], "checked"),
+    ["All Correct", "green", sessionWith([], "checked"),
      "checked, and she found nothing wrong"],
     ["All Approved", "green", sessionWith(["fixed", "fixed"], "checked"),
      "she wrote some and signed them all off"],
@@ -130,8 +129,8 @@ try {
     r.check(`and it is ${colour}`, info && info.colour, colour);
   }
 
-  // The four quiet states are quiet, not blank: the name is still there to
-  // click, and the colour still says which of the four it is.
+  // The quiet states are quiet, not blank: the name is still there to
+  // click, and the colour still says what they are.
   r.section("1a. a quiet pill is still a pill");
   for (const [words, , data, why] of states.filter(st => st[0] === "")) {
     const info = await buttonInfo(data, "daisy");
@@ -147,10 +146,9 @@ try {
   for (const [, , data] of states.filter(st => st[0] === "")) {
     quietColours.push((await buttonInfo(data, "daisy")).colour);
   }
-  r.check("three of them, no more", quietColours.length, 3);
-  r.check("grey before anyone has read it, twice over",
-    quietColours.slice(0, 2), ["grey", "grey"]);
-  r.check("green when there was nothing wrong", quietColours[2], "green");
+  // Only the two nobody has read say nothing now, and both are grey.
+  r.check("two of them, no more", quietColours.length, 2);
+  r.check("and both are grey", quietColours, ["grey", "grey"]);
 
   // Two untouched corrections used to read "0 to check", because both sat
   // on Needs Revision and Ms. Daisy was holding neither of them.
@@ -199,6 +197,19 @@ try {
   r.check("every row approved outright, Phase 3 never ticked",
     (await buttonInfo(sessionWith(["fixed", "fixed"]), "daisy")).text,
     pill("All Approved"));
+
+  // Nothing written is not the same as everything signed off, so the two
+  // greens do not share a sentence.
+  r.check("an empty checked list is All Correct, not All Approved",
+    (await buttonInfo(sessionWith([], "checked"), "daisy")).text,
+    pill("All Correct"));
+  r.check("and so is one Ms. Daisy marked as needing no revisions",
+    (await buttonInfo({
+      ...sessionWith([], "checked"),
+      checks: { p1_ray: { by: "ray", at: 1 }, p2_check_ray: { by: "daisy", at: 2 },
+                no_corr_ray: { by: "daisy", at: 2 } },
+    }, "daisy")).text,
+    pill("All Correct"));
 
   // -- 1c. it reads the same to everybody -----------------------------
   //

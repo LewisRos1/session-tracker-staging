@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2332";
+const APP_VERSION = "2333";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -16324,15 +16324,15 @@ const correctionTurn = c => correctionState(getCmtStatus(c)).turn;
 /**
  * What the corrections pill says about one instructor, and its colour.
  *
- * Only three states say anything in words. The pill is read in a row of
- * them under the chart, so a sentence on every one is three sentences to
- * get through before you find the one that wants you; the rest carry
- * their state in the colour and say nothing:
+ * Only the two that nobody has read yet say nothing. The pill is read in
+ * a row of them under the chart, so what it says has to be short enough
+ * to take in at a glance -- which is why these are three words at most,
+ * and why the two with nothing to report stay quiet:
  *
  *   grey, no words        nothing to read yet -- either the instructor
  *                         has not entered the data, or Ms. Daisy has not
  *                         checked it
- *   green, no words       she checked and found nothing wrong, so Phase 3
+ *   green, (All Correct)  she checked and found nothing wrong, so Phase 3
  *                         and Phase 4 are skipped
  *   red, (N mistakes)     N rows are back with the instructor
  *   red, (N to approve)   every row is fixed, and N are waiting on her
@@ -16353,11 +16353,11 @@ const correctionTurn = c => correctionState(getCmtStatus(c)).turn;
  */
 
 function correctionSummaryFor(ws, id) {
-  if (ws.noCorr(id))     return { tone: "green", text: "" };
+  if (ws.noCorr(id))     return { tone: "green", text: "All Correct" };
   if (!ws.p1Done(id))    return { tone: "grey",  text: "" };
   if (!ws.p2EffDone(id)) return { tone: "grey",  text: "" };
   const rows = ws.commentsFor(id);
-  if (!rows.length) return { tone: "green", text: "" };
+  if (!rows.length) return { tone: "green", text: "All Correct" };
   const mistakes = rows.filter(([, c]) => correctionTurn(c) === "them").length;
   if (mistakes) {
     return { tone: "red", text: `${mistakes} mistake${mistakes === 1 ? "" : "s"}` };
