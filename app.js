@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2333";
+const APP_VERSION = "2334";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -15592,8 +15592,21 @@ function pillOwnerId(role) {
   return null;
 }
 
-/** You may tick your own pills and nobody else's. */
+/**
+ * You may tick your own pills and nobody else's -- unless you are the one
+ * supervising the work.
+ *
+ * Ms. Daisy was held to the same rule as Nigel and Rayhanah and could not
+ * tick their Phase 1 or Phase 3, which left her unable to move a session
+ * on for somebody who was out, or who had already told her in person. She
+ * is the one who checks all of it in Phases 2 and 4; refusing her the two
+ * phases in between was a rule nobody had asked for.
+ *
+ * The same pair as every other override in the app -- Ms. Daisy, and
+ * Lewis, who has to put things right when it goes wrong.
+ */
 function canTickPill(role) {
+  if (canSignOffCorrections()) return true;
   const me = workflowActorId();
   if (me === null) return true;
   const owner = pillOwnerId(role);
@@ -16335,7 +16348,9 @@ const correctionTurn = c => correctionState(getCmtStatus(c)).turn;
  *   green, (All Correct)  she checked and found nothing wrong, so Phase 3
  *                         and Phase 4 are skipped
  *   red, (N mistakes)     N rows are back with the instructor
- *   red, (N to approve)   every row is fixed, and N are waiting on her
+ *   red, no words         every row fixed, Phase 3 not ticked -- the work
+ *                         is done but has not been handed over
+ *   red, (N to approve)   ticked, and N are waiting on Ms. Daisy
  *   green, (All Approved) every row signed off
  *
  * What it says is about that person, not about whoever is reading it. It
@@ -16347,9 +16362,10 @@ const correctionTurn = c => correctionState(getCmtStatus(c)).turn;
  * in.
  *
  * Where a list holds both, it names the mistakes, because Phase 3 cannot
- * be ticked until those are gone. It hands over the moment the last one
- * is fixed, not when Phase 3 is ticked: those are two separate clicks,
- * and waiting for the second would leave a pill with nobody to count.
+ * be ticked until those are gone. It hands over on the Phase 3 tick and
+ * not on the last row being fixed: the tick is the instructor saying they
+ * are finished, and until it lands the list is not Ms. Daisy's to count.
+ * Between the two clicks there is nobody to name, so it says nothing.
  */
 
 function correctionSummaryFor(ws, id) {
@@ -16366,6 +16382,11 @@ function correctionSummaryFor(ws, id) {
   // either, so every one has been signed off.
   const toApprove = rows.filter(([, c]) => correctionTurn(c) === "daisy").length;
   if (!toApprove) return { tone: "green", text: "All Approved" };
+  // Fixed, but the instructor has not said so yet. Ticking Phase 3 is how
+  // they hand the list over, and until it lands the work is not Ms.
+  // Daisy's to count -- so the pill names nobody rather than counting
+  // rows onto a plate they are not on yet.
+  if (!ws.p3Done(id)) return { tone: "red", text: "" };
   return { tone: "red", text: `${toApprove} to approve` };
 }
 
@@ -18773,9 +18794,66 @@ const DOCX_TEXT_PARTS = /^word\/(document|header\d*|footer\d*|footnotes|endnotes
 
 // ── Sticky Note — "List of Corrections" ──────────────────────
 
+/**
+ * A status dropdown somebody has open, and the render waiting on them.
+ *
+ * renderStickyNoteContent rebuilds the rows with innerHTML, which throws
+ * the <select> node away and shuts the list with it. Any render does it:
+ * a Firestore snapshot from the other window, or the focusout handler
+ * cashing in one that was deferred -- and opening a dropdown moves focus,
+ * which fires exactly that focusout. So the list opened and shut itself
+ * about half a second later, every single time.
+ *
+ * The app has had this fight before, over the target picker, which is what
+ * trackSelectOpen and state._targetSelDown are for. That one keeps its own
+ * node and only needed the render held off; these rows are rebuilt, so the
+ * render is held AND replayed once the dropdown is done with.
+ */
+let _snoteSelOpen = false;
+let _snoteSelTimer = null;
+let _snoteRenderPending = null;
+
+function snoteSelClosed() {
+  if (!_snoteSelOpen) return;
+  _snoteSelOpen = false;
+  clearTimeout(_snoteSelTimer);
+  // One tick late, so that picking an option runs its own handler against
+  // the row it was picked on rather than one the replay has just replaced.
+  setTimeout(() => {
+    const pending = _snoteRenderPending;
+    _snoteRenderPending = null;
+    if (pending) renderStickyNoteContent(pending[0], pending[1]);
+  }, 0);
+}
+
+function watchStickyNoteSelects() {
+  ["pointerdown", "touchstart"].forEach(ev =>
+    document.addEventListener(ev, e => {
+      if (e.target?.closest?.(".snote-status-sel")) {
+        _snoteSelOpen = true;
+        clearTimeout(_snoteSelTimer);
+        // A dropdown whose closing we never hear about must not freeze the
+        // note for the rest of the session.
+        _snoteSelTimer = setTimeout(snoteSelClosed, 30000);
+      } else {
+        snoteSelClosed();
+      }
+    }, { passive: true, capture: true }));
+  document.addEventListener("change", e => {
+    if (e.target?.closest?.(".snote-status-sel")) snoteSelClosed();
+  }, true);
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" || e.key === "Enter" || e.key === "Tab") snoteSelClosed();
+  }, true);
+}
+
+
 function renderStickyNoteContent(data, isGroup) {
   const tbody = document.getElementById("sticky-note-rows");
   if (!tbody) return;
+  // Somebody has a status dropdown open. Rebuilding now would take it out
+  // from under them; this runs again the moment they are done with it.
+  if (_snoteSelOpen) { _snoteRenderPending = [data, isGroup]; return; }
 
   const ws  = getWorkflowState(data);
   // Filter comments to the open instructor
@@ -18944,6 +19022,8 @@ function setupStickyNote() {
   const handle  = document.getElementById("sticky-note-drag-handle");
   const closeEl = document.getElementById("btn-sticky-note-close");
   if (!note || !handle || !closeEl) return;
+
+  watchStickyNoteSelects();
 
   // ── Drag ─────────────────────────────────────────────────────
   let dragging = false, ox = 0, oy = 0, nl = 0, nt = 0;

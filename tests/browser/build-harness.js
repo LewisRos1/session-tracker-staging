@@ -422,6 +422,8 @@ const exposed = [
   // state.authEmail matched against this list.
   "USERS",
   "getWorkflowState",
+  // Who may tick which phase pill.
+  "canTickPill",
 ];
 let shim = `
 

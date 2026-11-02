@@ -102,7 +102,8 @@ try {
 
   // -- 1. what the pill says ------------------------------------------
   //
-  // Only the two that nobody has read yet say nothing. These pills are
+  // Three of them say nothing: the two nobody has read yet, and the one
+  // where the work is done but has not been handed over. These pills are
   // read as a row of them under the chart, so what one says has to be
   // short enough to take in at a glance -- three words at most.
   r.section("1. the corrections pill says what is outstanding");
@@ -120,8 +121,10 @@ try {
      "she wrote some and signed them all off"],
     ["2 mistakes", "red", sessionWith([null, null]),
      "two written, neither fixed"],
-    ["2 to approve", "red", sessionWith(["done", "done"]),
-     "both fixed, waiting on Ms. Daisy"],
+    ["", "red", sessionWith(["done", "done"]),
+     "both fixed, Phase 3 not ticked"],
+    ["2 to approve", "red", ticked(sessionWith(["done", "done"])),
+     "ticked, so it is Ms. Daisy's to approve"],
   ];
   for (const [words, colour, data, why] of states) {
     const info = await buttonInfo(data, "daisy");
@@ -146,9 +149,10 @@ try {
   for (const [, , data] of states.filter(st => st[0] === "")) {
     quietColours.push((await buttonInfo(data, "daisy")).colour);
   }
-  // Only the two nobody has read say nothing now, and both are grey.
-  r.check("two of them, no more", quietColours.length, 2);
-  r.check("and both are grey", quietColours, ["grey", "grey"]);
+  r.check("three of them, no more", quietColours.length, 3);
+  r.check("grey while nobody has read it, twice over",
+    quietColours.slice(0, 2), ["grey", "grey"]);
+  r.check("red while the tick is still missing", quietColours[2], "red");
 
   // Two untouched corrections used to read "0 to check", because both sat
   // on Needs Revision and Ms. Daisy was holding neither of them.
@@ -160,7 +164,7 @@ try {
   r.check("one mistake, not one mistakes",
     (await buttonInfo(sessionWith([null]), "daisy")).text, pill("1 mistake"));
   r.check("one to approve",
-    (await buttonInfo(sessionWith(["done"]), "daisy")).text,
+    (await buttonInfo(ticked(sessionWith(["done"])), "daisy")).text,
     pill("1 to approve"));
 
   // The rename, while we are reading the label.
@@ -170,10 +174,9 @@ try {
   // -- 1b. a list holding both names the instructor's half ------------
   //
   // Phase 3 cannot be ticked until the Needs Revision rows are gone, so
-  // the mistakes are what it names while any are left. It hands over the
-  // moment the last one is fixed, not when Phase 3 is ticked -- those are
-  // two separate clicks, and waiting for the second would leave a pill
-  // with nobody to count.
+  // the mistakes are what it names while any are left. It hands over on
+  // the tick and not on the last row being fixed -- and says nothing in
+  // between, rather than counting rows onto a plate they are not on yet.
   r.section("1b. a list holding both names the mistakes");
   r.check("one fixed, one mistake left",
     (await buttonInfo(sessionWith(["done", null]), "daisy")).text,
@@ -181,14 +184,13 @@ try {
   r.check("one approved, one mistake left",
     (await buttonInfo(sessionWith(["fixed", null]), "daisy")).text,
     pill("1 mistake"));
-  r.check("the last one fixed hands it straight over",
-    (await buttonInfo(sessionWith(["done", "done"]), "daisy")).text,
-    pill("2 to approve"));
-  r.check("without waiting for the Phase 3 tick",
+  r.check("all fixed, not ticked: it says nothing",
+    (await buttonInfo(sessionWith(["done", "done"]), "daisy")).text, pill(""));
+  r.check("and the tick is what hands it over",
     (await buttonInfo(ticked(sessionWith(["done", "done"])), "daisy")).text,
-    (await buttonInfo(sessionWith(["done", "done"]), "daisy")).text);
-  r.check("one approved, one fixed",
-    (await buttonInfo(sessionWith(["fixed", "done"]), "daisy")).text,
+    pill("2 to approve"));
+  r.check("one approved, one fixed, and ticked",
+    (await buttonInfo(ticked(sessionWith(["fixed", "done"])), "daisy")).text,
     pill("1 to approve"));
   r.check("and never reads as nought",
     /0/.test((await buttonInfo(sessionWith(["done", "done"]), "daisy")).text),
@@ -307,6 +309,99 @@ try {
   r.ok("the button checks before it does anything else",
     /closest\("\.chk-export-btn"\);[\s\S]{0,400}?if \(!getWorkflowState\(getData\(\)\)\.ready\) \{[\s\S]{0,80}?alert\(EXPORT_NOT_READY_MSG\);[\s\S]{0,40}?return true;[\s\S]{0,40}?\}[\s\S]{0,40}?requirePassword\(/
       .test(src), "the gate sits between the button and requirePassword");
+
+  // -- 1f. who may tick a phase pill ----------------------------------
+  //
+  // Everybody ticks their own and nobody else's, except the two who
+  // supervise. Ms. Daisy was held to the same rule as the instructors and
+  // could not move a session on for somebody who was out, or who had
+  // already told her in person -- though she is the one who checks all of
+  // it in Phases 2 and 4.
+  r.section("1f. Ms. Daisy may tick anybody's pill");
+  const mayTick = (asUser, role) => page.eval(`(() => {
+    const u = window.__app.USERS.find(x => x.id === ${JSON.stringify(asUser)});
+    window.__app.state.authEmail = u ? u.email : null;
+    return window.__app.canTickPill(${JSON.stringify(role)});
+  })()`);
+
+  const EVERY_PILL = ["p1_daisy", "p1_nigel", "p1_ray", "p2_check_ray",
+                      "p3_nigel", "p3_ray", "p4_check_ray", "p4_nigel"];
+  for (const role of EVERY_PILL) {
+    r.check(`Ms. Daisy: ${role}`, await mayTick("daisy", role), true);
+  }
+  r.check("and Lewis keeps it too",
+    await Promise.all(EVERY_PILL.map(role => mayTick("lewis", role))),
+    EVERY_PILL.map(() => true));
+
+  // The instructors are unchanged: their own, and nothing else.
+  r.section("1g. the instructors still only tick their own");
+  r.check("Nigel: his own Phase 1",   await mayTick("nigel", "p1_nigel"), true);
+  r.check("Nigel: his own Phase 3",   await mayTick("nigel", "p3_nigel"), true);
+  r.check("Nigel: his own Phase 5",   await mayTick("nigel", "p4_nigel"), true);
+  r.check("Nigel: not Rayhanah's",    await mayTick("nigel", "p1_ray"),   false);
+  r.check("Nigel: not Ms. Daisy's",   await mayTick("nigel", "p2_check_ray"), false);
+  r.check("Rayhanah: her own",        await mayTick("ray", "p3_ray"),     true);
+  r.check("Rayhanah: not Nigel's",    await mayTick("ray", "p3_nigel"),   false);
+  r.check("Rayhanah: not the export", await mayTick("ray", "p4_nigel"),   false);
+
+  // -- 1h. the status dropdown survives a re-render -------------------
+  //
+  // The rows are rebuilt with innerHTML, which throws the <select> away
+  // and shuts the list with it. Any render did it -- a snapshot from the
+  // other window, or the focusout handler cashing in a deferred one, and
+  // opening a dropdown moves focus, which fires exactly that focusout. So
+  // it opened and shut itself about half a second later, every time.
+  r.section("1h. an open status dropdown is not rebuilt underneath you");
+  const dropTest = await page.eval(`(async () => {
+    const data = ${JSON.stringify(sessionWith([null]))};
+    const u = window.__app.USERS.find(x => x.id === "daisy");
+    window.__app.state.authEmail = u.email;
+    const render = () => window.__app.renderStickyNoteContent(data, false);
+    const sel = () => document.querySelector("#sticky-note-rows .snote-status-sel");
+
+    render();
+    const before = sel();
+    if (!before) return { error: "no dropdown rendered" };
+    before.dataset.probe = "1";          // survives only if the node does
+
+    // Open it, then let a render land the way a snapshot would.
+    before.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    render();
+    const held = sel()?.dataset.probe === "1";
+
+    // A second render while it is still open must also be held.
+    render();
+    const stillHeld = sel()?.dataset.probe === "1";
+
+    // Picking an option closes it, and the held render is replayed.
+    before.dispatchEvent(new Event("change", { bubbles: true }));
+    await new Promise(res => setTimeout(res, 30));
+    const replayed = !!sel() && sel().dataset.probe !== "1";
+
+    // And with nothing open, a render rebuilds as it always did.
+    sel().dataset.probe = "2";
+    render();
+    const freeAgain = !!sel() && sel().dataset.probe !== "2";
+    return { held, stillHeld, replayed, freeAgain };
+  })()`);
+
+  r.check("no error setting it up", dropTest.error ?? null, null);
+  r.ok("a render while it is open leaves the dropdown alone",
+    dropTest.held, JSON.stringify(dropTest));
+  r.ok("and so does a second one", dropTest.stillHeld, JSON.stringify(dropTest));
+  r.ok("the held render is replayed once it closes",
+    dropTest.replayed, JSON.stringify(dropTest));
+  r.ok("with nothing open, renders rebuild as before",
+    dropTest.freeAgain, JSON.stringify(dropTest));
+
+  // The guard has to be inside the renderer, not at one call site: the note
+  // is rebuilt from the phase strip as well as from its own handlers.
+  const appSrc = await Deno.readTextFile("app.js");
+  r.check("every caller is covered, because the guard is in the renderer",
+    /function renderStickyNoteContent\(data, isGroup\) \{[\s\S]{0,400}?if \(_snoteSelOpen\) \{ _snoteRenderPending = \[data, isGroup\]; return; \}/
+      .test(appSrc), true);
+  r.check("and a dropdown left open cannot freeze the note for good",
+    /_snoteSelTimer = setTimeout\(snoteSelClosed, 30000\);/.test(appSrc), true);
 
   // ── 2. the ticked bubble ────────────────────────────────────────────
   r.section("2. a ticked answer bubble is grey in dark mode, not white");
