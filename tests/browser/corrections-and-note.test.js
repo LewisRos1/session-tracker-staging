@@ -236,6 +236,64 @@ try {
     && /Nigel: Check #1 not done yet/.test(String(placing.phase3Text)),
     String(placing.phase3Text));
 
+  // -- 1e. Export to Word waits for the phases ------------------------
+  //
+  // The button had no check on it at all. You could open a session nobody
+  // had looked at, sitting in Phase 1, and send the note out -- which is
+  // the whole thing the five phases exist to stop, two clicks from the
+  // screen showing them all unfinished. Phase 5 is locked until the four
+  // before it are done; the button sits outside the chart and was not
+  // covered by that lock.
+  r.section("1e. Export to Word is refused until Phase 4 is done");
+  const ready = data => page.eval(
+    `!!window.__app.getWorkflowState(${JSON.stringify(data)}).ready`);
+
+  // One instructor, one approved correction, carried as far as phase `n`.
+  // A real session can only ever be a prefix like this -- Ms. Daisy cannot
+  // do Check #2 on a revision that has not happened -- which is why
+  // ws.ready gets away with testing only Phase 1 and Phase 4.
+  const CHECKS = [
+    ["p1_ray",       { by: "ray",   at: 1 }],
+    ["p2_check_ray", { by: "daisy", at: 2 }],
+    ["p3_ray",       { by: "ray",   at: 3 }],
+    ["p4_check_ray", { by: "daisy", at: 4 }],
+  ];
+  const upTo = n => ({
+    ...sessionWith(["fixed"], "checked"),
+    checks: Object.fromEntries(CHECKS.slice(0, n)),
+  });
+
+  r.check("nothing entered: refused",        await ready(upTo(0)), false);
+  r.check("entered, not checked: refused",   await ready(upTo(1)), false);
+  r.check("checked, not revised: refused",   await ready(upTo(2)), false);
+  r.check("revised, no Check #2: refused",   await ready(upTo(3)), false);
+  r.check("every phase done: allowed",       await ready(upTo(4)), true);
+
+  // An instructor Ms. Daisy marked as needing no revisions skips Phases 3
+  // and 4, so neither may hold the export up. Without this every clean
+  // session would be blocked for good.
+  r.check("no revisions needed skips Phase 3 and Phase 4", await ready({
+    ...sessionWith([], "checked"),
+    checks: { p1_ray: { by: "ray", at: 1 }, p2_check_ray: { by: "daisy", at: 2 },
+              no_corr_ray: { by: "daisy", at: 2 } },
+  }), true);
+
+  // Two instructors: one behind is enough to hold it.
+  r.check("one instructor behind blocks it",
+    await ready({ ...upTo(4), participants: ["ray", "nigel"] }), false);
+
+  // The refusal itself: one line, and it stops before the password prompt
+  // and the export. Both screens go through this one handler.
+  const src = await Deno.readTextFile("app.js");
+  r.check("the refusal is a single sentence",
+    /const EXPORT_NOT_READY_MSG = "You can export to Word once Phase 4 is complete\.";/
+      .test(src), true);
+  r.check("it does not name the phase that is behind, or who",
+    /EXPORT_NOT_READY_MSG[\s\S]{0,200}not done yet/.test(src), false);
+  r.ok("the button checks before it does anything else",
+    /closest\("\.chk-export-btn"\);[\s\S]{0,400}?if \(!getWorkflowState\(getData\(\)\)\.ready\) \{[\s\S]{0,80}?alert\(EXPORT_NOT_READY_MSG\);[\s\S]{0,40}?return true;[\s\S]{0,40}?\}[\s\S]{0,40}?requirePassword\(/
+      .test(src), "the gate sits between the button and requirePassword");
+
   // ── 2. the ticked bubble ────────────────────────────────────────────
   r.section("2. a ticked answer bubble is grey in dark mode, not white");
   const chip = async () => page.eval(`(() => {

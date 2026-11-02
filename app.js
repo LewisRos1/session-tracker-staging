@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2330";
+const APP_VERSION = "2331";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -16536,6 +16536,22 @@ function getWorkflowState(data) {
 }
 
 // Derives the correct workflowStatus string from a ws snapshot.
+/**
+ * Exporting belongs to Phase 5, which stays locked until the four before
+ * it are done. The Export to Word button sits outside the chart and was
+ * not covered by that lock: you could open a session nobody had looked at,
+ * sitting in Phase 1, and send the note out -- which is the whole thing
+ * the five phases exist to stop, two clicks from the screen showing them
+ * all unfinished.
+ *
+ * The refusal names the last phase and nothing else. It first named the
+ * earliest outstanding phase and who it was waiting on, which is more
+ * than anybody wants from a button they pressed too early; the chart is
+ * right there and already says who is holding what.
+ */
+const EXPORT_NOT_READY_MSG = "You can export to Word once Phase 4 is complete.";
+
+
 function computeWorkflowStatus(ws) {
   if (ws.daisyOnly || ws.p3Ids.length === 0) return null;
   // Phase 4 check pending (highest priority — work almost done)
@@ -16796,6 +16812,13 @@ async function handleCheckedByClick(e, isGroup) {
   // ── Export to Word button ────────────────────────────────────
   const exportBtn = e.target.closest(".chk-export-btn");
   if (exportBtn) {
+    // Phase 5 is where exporting belongs, and it stays locked until the
+    // four before it are done. The button sits outside the chart, so it
+    // was not covered by that lock and let anyone export from Phase 1.
+    if (!getWorkflowState(getData()).ready) {
+      alert(EXPORT_NOT_READY_MSG);
+      return true;
+    }
     requirePassword(() => {
       if (isGroup) {
         const attendees = state.viewGroupSessionData?.attendees || state.viewGroup?.students || [];
