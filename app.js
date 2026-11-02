@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2326";
+const APP_VERSION = "2327";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -16321,6 +16321,39 @@ const canSignOffCorrections = () => ["daisy", "lewis"].includes(currentUser()?.i
 /** Whose turn a row is on: "them", "daisy", or null when it is finished. */
 const correctionTurn = c => correctionState(getCmtStatus(c)).turn;
 
+/**
+ * What the Phase 3 card says about the person named on it.
+ *
+ * The sentence is about that person, not about whoever is reading it. The
+ * loose pill this replaced read "1 to check" for Ms. Daisy and "1 to fix"
+ * for Nigel off the same list, which was fine on a button sitting by itself
+ * and wrong on a card with his name at the top: a card headed Nigel has to
+ * say the same thing to everybody, or two people cannot talk about it.
+ *
+ * The name is not repeated in the line, because the card is already headed
+ * with it. Ms. Daisy IS named, because she is not whose card this is.
+ *
+ * Where a list holds both -- some rows back with the instructor, some
+ * waiting on Ms. Daisy -- the instructor's half is what it names. Phase 3
+ * cannot be ticked until those are gone, so that is the sentence that still
+ * asks for something.
+ *
+ * Precedence follows the tick beside it exactly, so the two never disagree.
+ */
+function correctionSummaryFor(ws, id) {
+  const plural = n => `${n} correction${n === 1 ? "" : "s"}`;
+  if (ws.noCorr(id))     return { tone: "clear", icon: "✓", text: "Nothing to fix" };
+  if (!ws.p1Done(id))    return { tone: "wait",  icon: "⏳", text: "Waiting to complete Phase 1" };
+  if (!ws.p2EffDone(id)) return { tone: "wait",  icon: "⏳", text: "Ms. Daisy hasn't checked yet" };
+  const rows    = ws.commentsFor(id);
+  const toFix   = rows.filter(([, c]) => correctionTurn(c) === "them").length;
+  if (toFix)   return { tone: "work", icon: "⚠", text: `Ms. Daisy has checked, kindly make ${plural(toFix)}` };
+  const toCheck = rows.filter(([, c]) => correctionTurn(c) === "daisy").length;
+  if (toCheck) return { tone: "work", icon: "⚠", text: `${plural(toCheck)} done, kindly check` };
+  return { tone: "clear", icon: "✓", text: rows.length === 0 ? "Nothing to fix" : "All approved" };
+}
+
+
 // Returns null | "" | "done" | "fixed" for a correction entry. Older rows can
 // still say "rejected"; normaliseCorrection reads that as Needs Revision.
 function getCmtStatus(c) {
@@ -16588,21 +16621,42 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     <div class="wf-node-body">${p2Body}</div>
   </div>`;
 
-  // ── Phase 3: Revision — per instructor, unlocks after their Phase 2 ──
-  const mkPill3 = id => {
+  // ── Phase 3: Revision — one card per instructor ──────────────────
+  //
+  // Name, what is outstanding, and the two things you can do about it, in
+  // one box. The corrections pill used to live in its own row under the
+  // whole chart with no line joining it to anything, so the same person
+  // appeared twice and you had to match the two up by reading the name off
+  // both. There is one row per person now, inside the phase it belongs to.
+  //
+  // The tick keeps every state it had and writes the same check; it has
+  // just dropped the name off its own label, which the card now carries.
+  const mkTick3 = id => {
     const name = instName(id);
     const role = `p3_${id}`;
     if (ws.noCorr(id)) {
-      return `<div class="wf-pill wf-pill--done">✓ ${escHtml(name)}: No revisions needed</div>`;
+      return `<div class="wf-pill wf-pill--done">✓ No revisions needed</div>`;
     }
     if (!ws.p2EffDone(id)) {
-      return `<div class="wf-pill wf-pill--locked">🔒 ${escHtml(name)}: Check #1 not done yet</div>`;
+      return `<div class="wf-pill wf-pill--locked">🔒 Locked</div>`;
     }
     const done = ws.p3Done(id);
     const at   = ws.p3Check(id)?.at;
     if (confirmRole === role) return mkConfirm(role, done ? `Undo ${name}?` : `${name}: Sure?`);
-    if (done) return `<button class="wf-pill wf-pill--done" data-role="${role}">✓ ${escHtml(name)} · ${escHtml(fmtCheckTimestamp(at))}</button>`;
-    return `<button class="wf-pill wf-pill--warn" data-role="${role}">○ ${escHtml(name)}: Incomplete</button>`;
+    if (done) return `<button class="wf-pill wf-pill--done" data-role="${role}">✓ ${escHtml(fmtCheckTimestamp(at))}</button>`;
+    return `<button class="wf-pill wf-pill--warn" data-role="${role}">○ Incomplete</button>`;
+  };
+
+  const mkCard3 = id => {
+    const s = correctionSummaryFor(ws, id);
+    return `<div class="wf-card wf-card--${s.tone}">
+      <div class="wf-card-name">${escHtml(instName(id))}</div>
+      <div class="wf-card-status"><span class="wf-card-icon" aria-hidden="true">${s.icon}</span><span class="wf-card-text">${escHtml(s.text)}</span></div>
+      <div class="wf-card-btns">
+        ${mkTick3(id)}
+        <button class="wf-note-btn wf-card-note" data-action="open-note" data-inst-id="${escHtml(id)}">→ View Corrections</button>
+      </div>
+    </div>`;
   };
 
   let p3State, p3Body;
@@ -16617,7 +16671,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
   } else {
     const anyUnlocked = ws.p3Ids.some(id => ws.p2EffDone(id));
     p3State = ws.allP3Done ? "done" : (anyUnlocked ? "corrections" : "locked");
-    p3Body  = ws.p3Ids.map(mkPill3).join("");
+    p3Body  = ws.p3Ids.map(mkCard3).join("");
   }
   const p3Node = `<div class="wf-node wf-node--${p3State}">
     <div class="wf-node-label">Phase 3: Revision</div>
@@ -16686,62 +16740,19 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
     <div class="wf-node-body">${nigelBody}</div>
   </div>`;
 
-  // ── Note trigger: one button per instructor ───────────────────
-  const noteIds = ws.daisyOnly ? [] : ws.p3Ids;
-  const noteTrigger = `<div class="wf-note-wrap">
-    ${noteIds.length === 0
-      ? `<button class="wf-note-btn" data-action="open-note" data-inst-id="">📝 Corrections</button>`
-      : noteIds.map(id => {
-          const idComments = ws.commentsFor(id);
-          const name = instName(id);
-          // What is still to do, not how many rows exist. The old count never
-          // moved as rows were worked through, so a list of five said "(5)"
-          // whether four were done or none were.
-          //
-          // Undone and Still Wrong both count as outstanding; only Corrected
-          // clears a row. An empty list and a fully corrected one both read
-          // "0 left"; the green says which kind of nothing it is.
-          const left = idComments.filter(([, c]) => getCmtStatus(c) !== "fixed").length;
-          // The number is what is waiting on the person reading it, so Ms.
-          // Daisy does not have to open the note to find out she is holding
-          // something. The colour still answers the other question -- whether
-          // the list is finished AT ALL -- so "0 to check" can sit on red
-          // while the fixing is still going on.
-          const mine = canSignOffCorrections() ? "daisy" : "them";
-          const yours = idComments.filter(([, c]) => correctionTurn(c) === mine).length;
-          const word  = mine === "daisy" ? "to check" : "to fix";
-          // Four different situations used to read "all approved", and only
-          // one of them was. Rayhanah had not so much as entered her data
-          // and the pill was already green and telling Ms. Daisy the work
-          // was signed off. Each says what is true of it now, and the two
-          // that nobody has looked at yet are grey: red means there is work
-          // here and green means it is done, and neither is honest before
-          // anyone has read it.
-          const notStarted = !ws.p1Done(id);
-          const notChecked = !notStarted && !ws.p2EffDone(id);
-          const untouched  = notStarted || notChecked;
-          // Nought on your plate is not the same as nothing outstanding.
-          //
-          // Every row sat on Needs Revision, which is the instructor's turn,
-          // so Ms. Daisy had nothing to check and the button said "0 to
-          // check" beside two corrections nobody had touched. The sentence
-          // was true and still told her the wrong thing. When her own count
-          // is nought but the list is not finished, it names who it is
-          // waiting on instead.
-          const otherName = mine === "daisy" ? name : "Ms. Daisy";
-          const summary = notStarted ? "waiting for Phase 1"
-            : notChecked ? "not checked yet"
-            // Nothing written is not the same as everything signed off.
-            : left === 0 ? (idComments.length === 0 ? "nothing to fix" : "all approved")
-            : yours > 0 ? `${yours} ${word}`
-            : `${left} waiting on ${otherName}`;
-          const colorCls = untouched ? " wf-note-btn--grey"
-            : left === 0 ? " wf-note-btn--green" : " wf-note-btn--red";
-          return `<button class="wf-note-btn${colorCls}" data-action="open-note" data-inst-id="${escHtml(id)}">
-            📝 Corrections – ${escHtml(name)} (${summary})
-          </button>`;
-        }).join("")}
-  </div>`;
+  // ── Note trigger ─────────────────────────────────────────────
+  //
+  // One button per instructor used to sit here, in its own row under the
+  // chart. Those are cards inside Phase 3 now. What is left is the session
+  // that has no instructor to make a card for -- Ms. Daisy ran it alone, or
+  // nobody else was added -- where the note is still worth being able to
+  // open even though it will be empty.
+  const noteTrigger = (ws.daisyOnly || ws.p3Ids.length === 0)
+    ? `<div class="wf-note-wrap">
+        <button class="wf-note-btn" data-action="open-note" data-inst-id="">📝 Corrections</button>
+      </div>`
+    : "";
+
 
   const exportTrigger = `<div class="wf-export-wrap">
     <button class="chk-export-btn" title="Export this session to Word">📄 Export to Word</button>

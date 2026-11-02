@@ -1,11 +1,18 @@
 // Four things Lewis found on live, in one place because two of them turned
 // out to be the same bug.
 //
-//   1. "List of Corrections - Rayhanah (0 to check)" sat beside two
-//      corrections nobody had touched. The number was Ms. Daisy's own
-//      workload, and both rows were on Needs Revision, which is the
-//      instructor's turn -- so nought was true and told her the wrong
-//      thing. It now names who the list is waiting on.
+//   1. The same person appeared twice: once as a pill inside Phase 3, and
+//      again as a loose button in a row under the whole chart, with no line
+//      joining the two. You matched them up by reading the name off both.
+//      They are one card per person now, inside the phase they belong to --
+//      name, what is outstanding, the tick, and the way into the list.
+//
+//      The sentence had to change with it. The loose pill counted whatever
+//      was on the reader's own plate: "1 to check" for Ms. Daisy, "1 to
+//      fix" for Rayhanah, off one list. Fine on a button sitting by itself,
+//      wrong on a card headed with her name. (Before that again it read "0
+//      to check" beside two corrections nobody had touched, because both
+//      sat on Needs Revision, which is the instructor's turn.)
 //
 //   2. A ticked answer bubble went white in dark mode. White is right for a
 //      picked day in the date grid, one cell out of thirty-five, but a row
@@ -61,24 +68,31 @@ const sessionWith = (statuses, phase = "checked") => ({
   activities: {}, remarks: {},
 });
 
-const buttonInfo = (data, asUser) => page.eval(`(() => {
+// One Phase 3 card, pulled apart. Everything the card says about a person
+// lives in one box now, so one read gets all of it.
+const cardInfo = (data, asUser) => page.eval(`(() => {
   const u = window.__app.USERS.find(x => x.id === ${JSON.stringify(asUser)});
   if (u) window.__app.state.authEmail = u.email;
   const host = document.createElement("div");
   host.innerHTML = String(window.__app.renderCheckedByStripHtml(${JSON.stringify(data)}, null, false) ?? "");
-  const btn = [...host.querySelectorAll(".wf-note-btn")]
-    .find(b => /Corrections/.test(b.textContent));
-  if (!btn) return null;
+  const card = host.querySelector(".wf-card");
+  const flat = el => el ? el.textContent.replace(/\\s+/g, " ").trim() : null;
+  const pick = sel => card ? card.querySelector(sel) : null;
   return {
-    text: btn.textContent.replace(/\\s+/g, " ").trim(),
-    // Red means there is work here, green means it is done, grey means
-    // nobody has looked yet.
-    colour: /--red/.test(btn.className) ? "red"
-      : /--green/.test(btn.className) ? "green"
-      : /--grey/.test(btn.className) ? "grey" : "none",
+    card: !!card,
+    name:   flat(pick(".wf-card-name")),
+    status: flat(pick(".wf-card-text")),
+    tone:   card ? (card.className.match(/wf-card--(\\w+)/) || ["", null])[1] : null,
+    tick:     flat(pick(".wf-card-btns .wf-pill")),
+    tickRole: pick(".wf-card-btns [data-role]")
+      ? pick(".wf-card-btns [data-role]").dataset.role : null,
+    note:    flat(pick(".wf-card-note")),
+    noteFor: pick(".wf-card-note") ? pick(".wf-card-note").dataset.instId : null,
+    // The old row of loose pills under the whole chart. It should be empty
+    // whenever there is an instructor to make a card for.
+    loose: [...host.querySelectorAll(".wf-note-wrap .wf-note-btn")].map(flat),
   };
 })()`);
-const buttonText = async (d, u) => (await buttonInfo(d, u))?.text ?? null;
 
 try {
   await page.fixture({
@@ -91,52 +105,116 @@ try {
   await page.load();
   await page.until(`!document.querySelector("#screen-home").classList.contains("hidden")`, "home");
 
-  // ── 1. the count ────────────────────────────────────────────────────
-  r.section("1. the List of Corrections button says what is outstanding");
-  const twoOpen = await buttonText(sessionWith([null, null]), "daisy");
-  r.ok("the button is rendered", !!twoOpen, String(twoOpen));
-  r.ok("two untouched corrections never read as nought",
-    !!twoOpen && !/\b0\b/.test(twoOpen), String(twoOpen));
-  r.ok("it says how many and who has them",
-    !!twoOpen && /2 waiting on Rayhanah/.test(twoOpen), String(twoOpen));
+  // -- 1. the card ----------------------------------------------------
+  r.section("1. Phase 3 holds one card per instructor");
+  const open2 = await cardInfo(sessionWith([null, null]), "daisy");
+  r.ok("a card is rendered", open2.card, JSON.stringify(open2));
+  r.check("headed with the instructor's name", open2.name, "Rayhanah");
+  r.ok("it holds the tick", !!open2.tick, JSON.stringify(open2));
+  r.check("which still writes that instructor's Phase 3 check",
+    open2.tickRole, "p3_ray");
+  r.ok("and a way into the list", /View Corrections/.test(String(open2.note)),
+    String(open2.note));
+  r.check("aimed at the same person", open2.noteFor, "ray");
 
-  // The other states must keep working.
-  const oneBack = await buttonText(sessionWith(["done", null]), "daisy");
-  r.ok("one marked Done is one for Ms. Daisy to check",
-    !!oneBack && /1 to check/.test(oneBack), String(oneBack));
-  const allFixed = await buttonText(sessionWith(["fixed", "fixed"]), "daisy");
-  r.ok("and a finished list still says all approved",
-    !!allFixed && /all approved/.test(allFixed), String(allFixed));
-  const mixed = await buttonText(sessionWith(["fixed", null]), "daisy");
-  r.ok("one approved, one not, is still one waiting on Rayhanah",
-    !!mixed && /1 waiting on Rayhanah/.test(mixed), String(mixed));
+  // The whole point of the move: the person appeared twice, once in the
+  // phase box and again in a loose row under the chart with no line joining
+  // it to anything, so you matched the two up by reading the name off both.
+  r.check("and the loose row under the chart is gone", open2.loose.length, 0);
+  r.ok("the tick no longer repeats the name the card is headed with",
+    !/Rayhanah/.test(String(open2.tick)), String(open2.tick));
 
-  // ── 1b. the four kinds of nothing ───────────────────────────────────
+  // -- 1b. what the card says -----------------------------------------
   //
-  // All four used to read "all approved", and only the last one was.
-  // Rayhanah had not so much as entered her data and the pill was already
-  // green, telling Ms. Daisy the work was signed off.
-  r.section("1b. an empty list says which kind of empty it is");
+  // Six states. Each says what is true of that person now -- "all approved"
+  // used to cover four of them, and only one was: Rayhanah had not so much
+  // as entered her data and the pill was already green, telling Ms. Daisy
+  // the work was signed off.
+  r.section("1b. the six things a card can say");
   const states = [
-    ["waiting for Phase 1", "grey", sessionWith([], "none"),
+    ["Waiting to complete Phase 1", "wait", sessionWith([], "none"),
      "before the instructor has entered anything"],
-    ["not checked yet", "grey", sessionWith([], "entered"),
+    ["Ms. Daisy hasn't checked yet", "wait", sessionWith([], "entered"),
      "entered, but Ms. Daisy has not looked"],
-    ["nothing to fix", "green", sessionWith([], "checked"),
+    ["Nothing to fix", "clear", sessionWith([], "checked"),
      "checked, and she wrote nothing"],
-    ["all approved", "green", sessionWith(["fixed", "fixed"], "checked"),
+    ["All approved", "clear", sessionWith(["fixed", "fixed"], "checked"),
      "she wrote some and signed them all off"],
+    ["Ms. Daisy has checked, kindly make 2 corrections", "work",
+     sessionWith([null, null]), "two written, neither fixed"],
+    ["2 corrections done, kindly check", "work",
+     sessionWith(["done", "done"]), "both fixed, neither approved"],
   ];
-  for (const [words, colour, data, why] of states) {
-    const info = await buttonInfo(data, "daisy");
-    r.ok(`${why} -> "${words}"`,
-      !!info && info.text.includes(words), JSON.stringify(info));
-    r.check(`and it is ${colour}`, info && info.colour, colour);
+  for (const [words, tone, data, why] of states) {
+    const info = await cardInfo(data, "daisy");
+    r.check(`${why} -> "${words}"`, info.status, words);
+    r.check(`and it is ${tone}`, info.tone, tone);
   }
-  // The rename, while we are reading the label.
-  const anyBtn = await buttonInfo(sessionWith([], "checked"), "daisy");
-  r.ok("the pill is called Corrections, not List of Corrections",
-    !!anyBtn && !/List of Corrections/.test(anyBtn.text), JSON.stringify(anyBtn));
+
+  // One is one, not "1 corrections".
+  r.check("one to fix reads as one",
+    (await cardInfo(sessionWith([null]), "daisy")).status,
+    "Ms. Daisy has checked, kindly make 1 correction");
+  r.check("and so does one to check",
+    (await cardInfo(sessionWith(["done"]), "daisy")).status,
+    "1 correction done, kindly check");
+
+  // Both halves can be true at once. Phase 3 cannot be ticked until the
+  // instructor's are gone, so that is the half that still asks for
+  // something and that is what the card names.
+  r.section("1c. a list holding both names the instructor's half");
+  const mixed = await cardInfo(sessionWith(["done", null]), "daisy");
+  r.check("one done, one still to fix",
+    mixed.status, "Ms. Daisy has checked, kindly make 1 correction");
+  r.check("one approved, one still to fix",
+    (await cardInfo(sessionWith(["fixed", null]), "daisy")).status,
+    "Ms. Daisy has checked, kindly make 1 correction");
+  r.check("approved and done, with nothing left on her plate",
+    (await cardInfo(sessionWith(["fixed", "done"]), "daisy")).status,
+    "1 correction done, kindly check");
+
+  // -- 1d. the card reads the same to everybody -----------------------
+  //
+  // The loose pill it replaced counted whatever was on the reader's own
+  // plate: "1 to check" for Ms. Daisy, "1 to fix" for Rayhanah, off one
+  // list. Fine on a button sitting by itself, wrong on a card with her name
+  // at the top -- two people could not talk about what it said.
+  r.section("1d. a card headed Rayhanah says the same to everybody");
+  for (const [words, , data, why] of states) {
+    const asRay = await cardInfo(data, "ray");
+    r.check(`${why}, read by Rayhanah`, asRay.status, words);
+  }
+  r.check("and a mixed list too",
+    (await cardInfo(sessionWith(["done", null]), "ray")).status, mixed.status);
+
+  // -- 1e. the tick ---------------------------------------------------
+  r.section("1e. the tick keeps every state it had");
+  const locked = await cardInfo(sessionWith([], "entered"), "daisy");
+  r.ok("locked until Ms. Daisy has checked", /Locked/.test(String(locked.tick)),
+    String(locked.tick));
+  r.check("and is not a button while it is locked", locked.tickRole, null);
+  const unlocked = await cardInfo(sessionWith([], "checked"), "daisy");
+  r.ok("unlocked once she has", /Incomplete/.test(String(unlocked.tick)),
+    String(unlocked.tick));
+  r.check("and is a button again", unlocked.tickRole, "p3_ray");
+  const ticked = await cardInfo({
+    ...sessionWith(["fixed"], "checked"),
+    checks: { p1_ray: { by: "ray", at: 1 }, p2_check_ray: { by: "daisy", at: 2 },
+              p3_ray: { by: "ray", at: new Date("2026-10-29T18:54:00").getTime() } },
+  }, "daisy");
+  r.ok("a ticked row shows when it was ticked",
+    /29 Oct 6:54pm/.test(String(ticked.tick)), String(ticked.tick));
+  r.check("and can still be undone", ticked.tickRole, "p3_ray");
+
+  // The session nobody else was added to has no card to put it on, so the
+  // plain button stays where it was.
+  r.section("1f. a session with no instructor keeps the plain button");
+  const alone = await cardInfo(
+    { ...sessionWith([], "checked"), participants: [] }, "daisy");
+  r.check("no card", alone.card, false);
+  r.check("one loose button", alone.loose.length, 1);
+  r.ok("with no name on it", /^.{0,3}Corrections$/.test(String(alone.loose[0])),
+    String(alone.loose[0]));
 
   // ── 2. the ticked bubble ────────────────────────────────────────────
   r.section("2. a ticked answer bubble is grey in dark mode, not white");

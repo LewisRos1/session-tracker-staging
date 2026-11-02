@@ -144,7 +144,7 @@ results.push(await run("Two activities with the same name, in a real browser",
 results.push(await run("Duplicate activity names: refused, and allowed",
   ["run", "-A", "tests/browser/duplicate-activity-names.test.js", HARNESS]));
 
-results.push(await run("Corrections count, ticked bubbles, and the sticky note",
+results.push(await run("Phase 3 cards, ticked bubbles, and the sticky note",
   ["run", "-A", "tests/browser/corrections-and-note.test.js", HARNESS]));
 
 results.push(await run("Sub-activities in the View table",

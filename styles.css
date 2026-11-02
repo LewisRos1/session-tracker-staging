@@ -3662,6 +3662,59 @@ button.wf-pill:hover { filter: brightness(.93); }
 .wf-pill--attention,
 .wf-pill--warn    { border-color: var(--c-d1d5db); background: var(--c-ffffff); color: var(--c-374151); }
 
+/* ─── Phase 3 cards — one row per instructor ────────────── */
+/* Name, what is outstanding, and the two things you can do about it. The
+   card sits on a tinted phase box, so it carries a surface of its own --
+   without one, two people's rows run together into a single block of
+   colour and the names are the only thing separating them. */
+.wf-card {
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+  padding: .45rem .55rem;
+  border: 1.5px solid var(--c-d1d5db);
+  border-radius: 8px;
+  background: var(--c-ffffff);
+  color: var(--c-374151);
+}
+.wf-card-name {
+  font-size: .85rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--c-111827);
+  overflow-wrap: break-word;
+}
+.wf-card-status {
+  display: flex;
+  align-items: flex-start;
+  gap: .3rem;
+  font-size: .75rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--c-6b7280);
+  overflow-wrap: break-word;
+}
+.wf-card-icon { flex: none; }
+.wf-card-btns {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .3rem;
+}
+/* The confirm step takes the line to itself rather than squeezing in beside
+   View Corrections, where its two buttons had nowhere to go. */
+.wf-card-btns .wf-confirming { flex: 1 1 100%; }
+/* These sit in a fixed grid column, so they wrap rather than spill. */
+.wf-card-note { white-space: normal; line-height: 1.25; }
+
+/* Tone says whether the row still asks for something. Grey is the default:
+   nobody has looked at this list yet, so it is neither. */
+.wf-card--work  { border-color: var(--c-f59e0b); }
+.wf-card--work  .wf-card-status { color: var(--c-92400e); }
+.wf-card--clear { border-color: var(--c-34d399); }
+.wf-card--clear .wf-card-status { color: var(--c-065f46); }
+
+
 /* Confirm state (replaces a pill in Phase 1) */
 .wf-confirming {
   background: var(--c-fef3c7);

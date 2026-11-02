@@ -422,6 +422,9 @@ const exposed = [
   // state.authEmail matched against this list.
   "USERS",
   "getWorkflowState",
+  // The sentence on a Phase 3 card. Six states, and it has to read the
+  // same to everybody, so a test calls it rather than signing in twice.
+  "correctionSummaryFor",
 ];
 let shim = `
 
