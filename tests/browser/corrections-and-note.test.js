@@ -115,7 +115,7 @@ try {
      "before the instructor has entered anything"],
     ["", "grey", sessionWith([], "entered"),
      "entered, but Ms. Daisy has not looked"],
-    ["All Correct", "green", sessionWith([], "checked"),
+    ["All Correct, No Corrections Needed", "green", sessionWith([], "checked"),
      "checked, and she found nothing wrong"],
     ["All Approved", "green", sessionWith(["fixed", "fixed"], "checked"),
      "she wrote some and signed them all off"],
@@ -204,14 +204,14 @@ try {
   // greens do not share a sentence.
   r.check("an empty checked list is All Correct, not All Approved",
     (await buttonInfo(sessionWith([], "checked"), "daisy")).text,
-    pill("All Correct"));
+    pill("All Correct, No Corrections Needed"));
   r.check("and so is one Ms. Daisy marked as needing no revisions",
     (await buttonInfo({
       ...sessionWith([], "checked"),
       checks: { p1_ray: { by: "ray", at: 1 }, p2_check_ray: { by: "daisy", at: 2 },
                 no_corr_ray: { by: "daisy", at: 2 } },
     }, "daisy")).text,
-    pill("All Correct"));
+    pill("All Correct, No Corrections Needed"));
 
   // -- 1c. it reads the same to everybody -----------------------------
   //

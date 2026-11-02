@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2334";
+const APP_VERSION = "2335";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -16345,8 +16345,9 @@ const correctionTurn = c => correctionState(getCmtStatus(c)).turn;
  *   grey, no words        nothing to read yet -- either the instructor
  *                         has not entered the data, or Ms. Daisy has not
  *                         checked it
- *   green, (All Correct)  she checked and found nothing wrong, so Phase 3
- *                         and Phase 4 are skipped
+ *   green, (All Correct, No Corrections Needed)
+ *                         she checked and found nothing wrong, so
+ *                         Phase 3 and Phase 4 are skipped
  *   red, (N mistakes)     N rows are back with the instructor
  *   red, no words         every row fixed, Phase 3 not ticked -- the work
  *                         is done but has not been handed over
@@ -16369,11 +16370,11 @@ const correctionTurn = c => correctionState(getCmtStatus(c)).turn;
  */
 
 function correctionSummaryFor(ws, id) {
-  if (ws.noCorr(id))     return { tone: "green", text: "All Correct" };
+  if (ws.noCorr(id))     return { tone: "green", text: "All Correct, No Corrections Needed" };
   if (!ws.p1Done(id))    return { tone: "grey",  text: "" };
   if (!ws.p2EffDone(id)) return { tone: "grey",  text: "" };
   const rows = ws.commentsFor(id);
-  if (!rows.length) return { tone: "green", text: "All Correct" };
+  if (!rows.length) return { tone: "green", text: "All Correct, No Corrections Needed" };
   const mistakes = rows.filter(([, c]) => correctionTurn(c) === "them").length;
   if (mistakes) {
     return { tone: "red", text: `${mistakes} mistake${mistakes === 1 ? "" : "s"}` };
