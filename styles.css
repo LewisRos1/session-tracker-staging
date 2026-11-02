@@ -304,6 +304,10 @@
   /* Lighter than the row so it reads as chosen, nowhere near white. */
   --chip-on-bg:    #555b66;
   --chip-on-fg:    #f2f5f9;
+  /* Unchanged on purpose: see the light block. */
+  --pill-dark:     #1f2430;
+  --pill-done:     #15803d;
+  --pill-fail:     #b91c1c;
 }
 
 /* ─── RESET & TOKENS ────────────────────────────────────── */
@@ -335,6 +339,18 @@
      was shouting. Grey in dark mode, still clearly the chosen one. */
   --chip-on-bg:    var(--c-6366f1);
   --chip-on-fg:    #ffffff;
+  /* A toast and a progress pill are dark objects floating over the page,
+     in both themes, with white text on them. They were written with the
+     TEXT end of the grey ramp -- --c-111827 and --c-1f2937 -- which is a
+     near-black in light mode and so looked right, then mirrored to a
+     near-white in dark mode and left white text sitting on it. Lewis could
+     not read "Locked. Only Nigel can tick this." at all.
+
+     Same for the done and fail pills: a 700-weight green and red flip to
+     pale, and white text does not survive either. These five hold still. */
+  --pill-dark:     #1f2430;
+  --pill-done:     #15803d;
+  --pill-fail:     #b91c1c;
   /* The to-do count. Blue rather than indigo in light mode, so it keeps its
      own value rather than being folded into --pick-bg. */
   --badge-bg:      var(--c-3b82f6);
@@ -2098,7 +2114,7 @@ input.field-input::placeholder {
   bottom: 80px;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--c-1f2937);
+  background: var(--pill-dark);
   color: var(--c-onaccent);
   padding: .65rem 1.25rem;
   border-radius: 20px;
@@ -3910,7 +3926,7 @@ button.wf-pill:hover { filter: brightness(.93); }
   bottom: 2.2rem;
   transform: translateX(-50%) translateY(.5rem);
   z-index: 2000;
-  background: var(--c-111827);
+  background: var(--pill-dark);
   color: var(--c-onaccent);
   font-size: .85rem;
   font-weight: 600;
@@ -4660,14 +4676,14 @@ button.wf-pill:hover { filter: brightness(.93); }
 .progress-pill {
   display: none; align-items: center; gap: .65rem;
   padding: .6rem .95rem; border-radius: 999px;
-  background: var(--c-111827); color: var(--c-onaccent);
+  background: var(--pill-dark); color: var(--c-onaccent);
   font-size: .85rem; font-weight: 600; line-height: 1.3;
   box-shadow: 0 8px 28px rgba(0,0,0,.28);
   max-width: min(92vw, 460px);
-  --pill-bg: var(--c-111827);
+  --pill-bg: var(--pill-dark);
 }
-.progress-pill.is-done { background: var(--c-15803d); --pill-bg: var(--c-15803d); }
-.progress-pill.is-fail { background: var(--c-b91c1c); --pill-bg: var(--c-b91c1c); }
+.progress-pill.is-done { background: var(--pill-done); --pill-bg: var(--pill-done); }
+.progress-pill.is-fail { background: var(--pill-fail); --pill-bg: var(--pill-fail); }
 /* A failure message is a sentence rather than a word, so it drops the fully
    rounded ends and lets the text wrap from the top. */
 .progress-pill.is-fail { border-radius: 14px; align-items: flex-start; }

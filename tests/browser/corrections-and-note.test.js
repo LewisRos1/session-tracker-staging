@@ -171,6 +171,100 @@ try {
     }
   }
 
+  // ── 5. white text needs something dark under it ─────────────────────
+  //
+  // A toast and a progress pill float over the page as dark objects with
+  // white text, in both themes. They were written with the TEXT end of the
+  // grey ramp, which is a near-black in light mode -- so they looked right
+  // -- and mirrors to a near-white in dark mode, leaving white on white.
+  // Lewis could not read "Locked. Only Nigel can tick this." at all.
+  //
+  // Checked in both themes, because the light one is where the mistake
+  // hides: it looks perfect there and that is why it shipped.
+  r.section("5. a floating pill is dark in both themes");
+  for (const mode of ["light", "dark"]) {
+    await setTheme(mode);
+    await settle(250);
+    const pills = await page.eval(`(() => {
+      const mk = (cls) => {
+        const el = document.createElement("div");
+        el.className = cls;
+        el.textContent = "x";
+        el.style.display = "flex";
+        document.body.appendChild(el);
+        const cs = getComputedStyle(el);
+        const out = { bg: cs.backgroundColor, fg: cs.color };
+        el.remove();
+        return out;
+      };
+      const toast = document.createElement("div");
+      toast.id = "wf-toast";
+      toast.textContent = "x";
+      document.body.appendChild(toast);
+      const tcs = getComputedStyle(toast);
+      const wf = { bg: tcs.backgroundColor, fg: tcs.color };
+      toast.remove();
+      return {
+        "the workflow toast": wf,
+        "the general toast": mk("toast"),
+        "the progress pill": mk("progress-pill"),
+        "the done pill": mk("progress-pill is-done"),
+        "the fail pill": mk("progress-pill is-fail"),
+      };
+    })()`);
+    for (const [what, c] of Object.entries(pills)) {
+      const gap = lum(c.fg) - lum(c.bg);
+      r.ok(`${mode}: ${what} keeps its white text readable (gap ${gap})`,
+        gap >= 90, JSON.stringify(c));
+    }
+  }
+
+  // ── 6. who gets the Revert button ───────────────────────────────────
+  //
+  // Needs Revision is the first entry in Ms. Daisy's own dropdown, so for
+  // her the button is a second door onto the same room, under every row an
+  // instructor has ticked. The instructor has no such entry and needs it.
+  //
+  // Lewis keeps it. This was once hidden from everyone who can approve,
+  // which is the same test, and putting it back is recorded in app.js as
+  // being because it left him looking at a Done row with no button and
+  // nothing to say why. The two are only different if the rule names her.
+  r.section("6. the Revert button is only for the people who need it");
+  // currentUser() resolves the signed-in person from state.authEmail against
+  // the USERS list, so setting a currentUser object does nothing. Sign in as
+  // each person the way the app actually knows who you are.
+  const revertFor = (userId) => page.eval(`(() => {
+    const u = window.__app.USERS.find(x => x.id === ${JSON.stringify(userId)});
+    if (!u) return { noSuchUser: ${JSON.stringify(userId)} };
+    window.__app.state.authEmail = u.email;
+    const note = document.getElementById("sticky-note");
+    note.classList.remove("hidden");
+    window.__app.renderStickyNoteContent(${JSON.stringify(sessionWith(["done", null]))}, false);
+    const rows = [...document.querySelectorAll("#sticky-note-rows tr")];
+    const out = {
+      rows: rows.length,
+      undo: document.querySelectorAll("#sticky-note-rows .snote-undo-btn").length,
+      selects: document.querySelectorAll("#sticky-note-rows .snote-status-sel").length,
+    };
+    note.classList.add("hidden");
+    return out;
+  })()`);
+
+  const daisy = await revertFor("daisy");
+  r.ok("Ms. Daisy sees both correction rows", daisy.rows === 2, JSON.stringify(daisy));
+  r.check("and no Revert button on the one marked Done", daisy.undo, 0);
+  r.check("but she still has the dropdown to send it back", daisy.selects, 2);
+
+  for (const who of ["nigel", "ray"]) {
+    const them = await revertFor(who);
+    r.ok(`${who} does get the Revert button`,
+      !them.noSuchUser && them.undo === 1, JSON.stringify(them));
+  }
+
+  // The reason the rule names her rather than reusing canSignOffCorrections.
+  const lewis = await revertFor("lewis");
+  r.check("and Lewis keeps it, as he did before", lewis.undo, 1);
+
   r.section("console");
   const noise = page.consoleLines.filter(l => l.level === "error");
   r.ok("no console errors", noise.length === 0,

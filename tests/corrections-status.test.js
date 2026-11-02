@@ -88,8 +88,17 @@ console.log("\nUndo, for a Done pressed by mistake");
 // Needs Revision is Ms. Daisy's, so without this the person being corrected
 // could not take back a mis-click and had to ask her to send the row back.
 check("only on a row that says Done",
-  /const canUndo = st === "done";/.test(src), true);
-check("shown to everybody -- hiding it from approvers left Lewis staring at a row with no button",
+  /const canUndo = st === "done" &&/.test(src), true);
+// She has Needs Revision at the top of her own dropdown, so for her the
+// button is a second door onto the same room, sitting under every row an
+// instructor has ticked.
+check("and not for Ms. Daisy, who has the dropdown instead",
+  /st === "done" && currentUser\(\)\?\.id !== "daisy"/.test(src), true);
+// Lewis can approve too, so that test would take it from him as well -- and
+// it was put back once already because it left him looking at a row saying
+// Done with no button on it and nothing to say why. Naming her is the
+// difference between the two.
+check("by name, not by who can approve, so Lewis keeps it",
   /canUndo = st === "done" && !canSignOffCorrections/.test(src), false);
 check("the button spells out what it does",
   /&#8630; Revert back to Needs Revision<\/button>/.test(src), true);
