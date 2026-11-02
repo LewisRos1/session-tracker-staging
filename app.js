@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2331";
+const APP_VERSION = "2332";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -16325,48 +16325,47 @@ const correctionTurn = c => correctionState(getCmtStatus(c)).turn;
  * What the corrections pill says about one instructor, and its colour.
  *
  * Only three states say anything in words. The pill is read in a row of
- * them under the chart, so a sentence on every one is four sentences to
+ * them under the chart, so a sentence on every one is three sentences to
  * get through before you find the one that wants you; the rest carry
  * their state in the colour and say nothing:
  *
- *   grey, no words    nothing to read yet -- either the instructor has
- *                     not entered the data or Ms. Daisy has not checked it
- *   green, no words   she checked and found nothing wrong, so Phase 3 and
- *                     Phase 4 are skipped
- *   red, (N)          N rows are back with the instructor
- *   red, no words     every row is fixed and the Phase 3 tick is all that
- *                     is missing
- *   red, (N to approve)   ticked, and N rows are waiting on Ms. Daisy
+ *   grey, no words        nothing to read yet -- either the instructor
+ *                         has not entered the data, or Ms. Daisy has not
+ *                         checked it
+ *   green, no words       she checked and found nothing wrong, so Phase 3
+ *                         and Phase 4 are skipped
+ *   red, (N mistakes)     N rows are back with the instructor
+ *   red, (N to approve)   every row is fixed, and N are waiting on her
  *   green, (All Approved) every row signed off
  *
  * What it says is about that person, not about whoever is reading it. It
  * used to count whatever was on the reader's own plate -- "1 to check" for
  * Ms. Daisy and "1 to fix" for Nigel, off one list -- so two people could
  * not talk about what the pill said, and the half that was not yours went
- * unmentioned. (N) now always means rows sitting on Needs Revision and
- * "to approve" always means rows sitting on Done, whoever is signed in.
+ * unmentioned. The mistakes are always the rows sitting on Needs Revision
+ * and "to approve" is always the rows sitting on Done, whoever is signed
+ * in.
  *
- * Where a list holds both, it names the instructor's half, because Phase 3
- * cannot be ticked until those are gone. It hands over on the Phase 3 tick,
- * not on the last row being fixed: the tick is the instructor saying they
- * are finished, and until it lands Ms. Daisy has not been given the list.
- * Between the two there is nobody to count, which is the red pill with no
- * words; writing "0" there is the shape of complaint that started all of
- * this.
+ * Where a list holds both, it names the mistakes, because Phase 3 cannot
+ * be ticked until those are gone. It hands over the moment the last one
+ * is fixed, not when Phase 3 is ticked: those are two separate clicks,
+ * and waiting for the second would leave a pill with nobody to count.
  */
+
 function correctionSummaryFor(ws, id) {
   if (ws.noCorr(id))     return { tone: "green", text: "" };
   if (!ws.p1Done(id))    return { tone: "grey",  text: "" };
   if (!ws.p2EffDone(id)) return { tone: "grey",  text: "" };
   const rows = ws.commentsFor(id);
   if (!rows.length) return { tone: "green", text: "" };
-  const toCorrect = rows.filter(([, c]) => correctionTurn(c) === "them").length;
-  if (toCorrect)    return { tone: "red", text: String(toCorrect) };
+  const mistakes = rows.filter(([, c]) => correctionTurn(c) === "them").length;
+  if (mistakes) {
+    return { tone: "red", text: `${mistakes} mistake${mistakes === 1 ? "" : "s"}` };
+  }
   // Rows sitting on Done. None of them, and nothing is on Needs Revision
   // either, so every one has been signed off.
   const toApprove = rows.filter(([, c]) => correctionTurn(c) === "daisy").length;
-  if (!toApprove)   return { tone: "green", text: "All Approved" };
-  if (!ws.p3Done(id)) return { tone: "red", text: "" };
+  if (!toApprove) return { tone: "green", text: "All Approved" };
   return { tone: "red", text: `${toApprove} to approve` };
 }
 

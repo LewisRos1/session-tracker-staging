@@ -103,7 +103,7 @@ try {
   // -- 1. what the pill says ------------------------------------------
   //
   // Only three states say anything in words. These pills are read as a
-  // row of them under the chart, so a sentence on every one is four
+  // row of them under the chart, so a sentence on every one is three
   // sentences to get through before you find the one that wants you. The
   // rest carry their state in the colour and say nothing.
   r.section("1. the corrections pill says what is outstanding");
@@ -119,12 +119,10 @@ try {
      "checked, and she found nothing wrong"],
     ["All Approved", "green", sessionWith(["fixed", "fixed"], "checked"),
      "she wrote some and signed them all off"],
-    ["2", "red", sessionWith([null, null]),
+    ["2 mistakes", "red", sessionWith([null, null]),
      "two written, neither fixed"],
-    ["", "red", sessionWith(["done", "done"]),
-     "both fixed, but Phase 3 not ticked"],
-    ["2 to approve", "red", ticked(sessionWith(["done", "done"])),
-     "both fixed and Phase 3 ticked"],
+    ["2 to approve", "red", sessionWith(["done", "done"]),
+     "both fixed, waiting on Ms. Daisy"],
   ];
   for (const [words, colour, data, why] of states) {
     const info = await buttonInfo(data, "daisy");
@@ -149,10 +147,10 @@ try {
   for (const [, , data] of states.filter(st => st[0] === "")) {
     quietColours.push((await buttonInfo(data, "daisy")).colour);
   }
+  r.check("three of them, no more", quietColours.length, 3);
   r.check("grey before anyone has read it, twice over",
     quietColours.slice(0, 2), ["grey", "grey"]);
   r.check("green when there was nothing wrong", quietColours[2], "green");
-  r.check("red when it is only the tick that is missing", quietColours[3], "red");
 
   // Two untouched corrections used to read "0 to check", because both sat
   // on Needs Revision and Ms. Daisy was holding neither of them.
@@ -161,10 +159,10 @@ try {
     !!twoOpen && !/\b0\b/.test(twoOpen), String(twoOpen));
 
   // One is one.
-  r.check("one to correct",
-    (await buttonInfo(sessionWith([null]), "daisy")).text, pill("1"));
+  r.check("one mistake, not one mistakes",
+    (await buttonInfo(sessionWith([null]), "daisy")).text, pill("1 mistake"));
   r.check("one to approve",
-    (await buttonInfo(ticked(sessionWith(["done"])), "daisy")).text,
+    (await buttonInfo(sessionWith(["done"]), "daisy")).text,
     pill("1 to approve"));
 
   // The rename, while we are reading the label.
@@ -174,26 +172,30 @@ try {
   // -- 1b. a list holding both names the instructor's half ------------
   //
   // Phase 3 cannot be ticked until the Needs Revision rows are gone, so
-  // that is the half still asking for something. It hands over on the tick,
-  // not on the last row being fixed -- and goes quiet in the gap between
-  // the two, rather than saying "0".
-  r.section("1b. a list holding both names the instructor's half");
-  r.check("one fixed, one still to correct",
-    (await buttonInfo(sessionWith(["done", null]), "daisy")).text, pill("1"));
-  r.check("one approved, one still to correct",
-    (await buttonInfo(sessionWith(["fixed", null]), "daisy")).text, pill("1"));
-  r.check("nothing left to correct, and ticked, so it is hers",
-    (await buttonInfo(ticked(sessionWith(["fixed", "done"])), "daisy")).text,
+  // the mistakes are what it names while any are left. It hands over the
+  // moment the last one is fixed, not when Phase 3 is ticked -- those are
+  // two separate clicks, and waiting for the second would leave a pill
+  // with nobody to count.
+  r.section("1b. a list holding both names the mistakes");
+  r.check("one fixed, one mistake left",
+    (await buttonInfo(sessionWith(["done", null]), "daisy")).text,
+    pill("1 mistake"));
+  r.check("one approved, one mistake left",
+    (await buttonInfo(sessionWith(["fixed", null]), "daisy")).text,
+    pill("1 mistake"));
+  r.check("the last one fixed hands it straight over",
+    (await buttonInfo(sessionWith(["done", "done"]), "daisy")).text,
+    pill("2 to approve"));
+  r.check("without waiting for the Phase 3 tick",
+    (await buttonInfo(ticked(sessionWith(["done", "done"])), "daisy")).text,
+    (await buttonInfo(sessionWith(["done", "done"]), "daisy")).text);
+  r.check("one approved, one fixed",
+    (await buttonInfo(sessionWith(["fixed", "done"]), "daisy")).text,
     pill("1 to approve"));
-  // The gap: everything fixed, the tick not yet pressed. Nobody has a
-  // number to show, so it shows none.
-  r.check("the last one fixed, Phase 3 not ticked",
-    (await buttonInfo(sessionWith(["done", "done"]), "daisy")).text, pill(""));
   r.check("and never reads as nought",
     /0/.test((await buttonInfo(sessionWith(["done", "done"]), "daisy")).text),
     false);
-  // She can approve a row outright, without it ever being marked Done. The
-  // tick is then nothing to wait for, because nothing is on her plate.
+  // She can approve a row outright, without it ever being marked Done.
   r.check("every row approved outright, Phase 3 never ticked",
     (await buttonInfo(sessionWith(["fixed", "fixed"]), "daisy")).text,
     pill("All Approved"));
@@ -209,7 +211,8 @@ try {
       (await buttonInfo(data, "ray")).text, pill(words));
   }
   r.check("and a mixed list too",
-    (await buttonInfo(sessionWith(["done", null]), "ray")).text, pill("1"));
+    (await buttonInfo(sessionWith(["done", null]), "ray")).text,
+    pill("1 mistake"));
 
   // -- 1d. the pill sits under the chart, one per instructor ----------
   r.section("1d. one pill per instructor, under the chart");
