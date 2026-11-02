@@ -421,6 +421,7 @@ const exposed = [
   // So a test can sign in as each person the way currentUser() reads it:
   // state.authEmail matched against this list.
   "USERS",
+  "getWorkflowState",
 ];
 let shim = `
 

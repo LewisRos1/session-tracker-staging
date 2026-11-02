@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2322";
+const APP_VERSION = "2326";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -16690,7 +16690,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
   const noteIds = ws.daisyOnly ? [] : ws.p3Ids;
   const noteTrigger = `<div class="wf-note-wrap">
     ${noteIds.length === 0
-      ? `<button class="wf-note-btn" data-action="open-note" data-inst-id="">📝 List of Corrections</button>`
+      ? `<button class="wf-note-btn" data-action="open-note" data-inst-id="">📝 Corrections</button>`
       : noteIds.map(id => {
           const idComments = ws.commentsFor(id);
           const name = instName(id);
@@ -16710,7 +16710,16 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
           const mine = canSignOffCorrections() ? "daisy" : "them";
           const yours = idComments.filter(([, c]) => correctionTurn(c) === mine).length;
           const word  = mine === "daisy" ? "to check" : "to fix";
-          const colorCls = left === 0 ? " wf-note-btn--green" : " wf-note-btn--red";
+          // Four different situations used to read "all approved", and only
+          // one of them was. Rayhanah had not so much as entered her data
+          // and the pill was already green and telling Ms. Daisy the work
+          // was signed off. Each says what is true of it now, and the two
+          // that nobody has looked at yet are grey: red means there is work
+          // here and green means it is done, and neither is honest before
+          // anyone has read it.
+          const notStarted = !ws.p1Done(id);
+          const notChecked = !notStarted && !ws.p2EffDone(id);
+          const untouched  = notStarted || notChecked;
           // Nought on your plate is not the same as nothing outstanding.
           //
           // Every row sat on Needs Revision, which is the instructor's turn,
@@ -16720,11 +16729,16 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
           // is nought but the list is not finished, it names who it is
           // waiting on instead.
           const otherName = mine === "daisy" ? name : "Ms. Daisy";
-          const summary = left === 0 ? "all approved"
+          const summary = notStarted ? "waiting for Phase 1"
+            : notChecked ? "not checked yet"
+            // Nothing written is not the same as everything signed off.
+            : left === 0 ? (idComments.length === 0 ? "nothing to fix" : "all approved")
             : yours > 0 ? `${yours} ${word}`
             : `${left} waiting on ${otherName}`;
+          const colorCls = untouched ? " wf-note-btn--grey"
+            : left === 0 ? " wf-note-btn--green" : " wf-note-btn--red";
           return `<button class="wf-note-btn${colorCls}" data-action="open-note" data-inst-id="${escHtml(id)}">
-            📝 List of Corrections – ${escHtml(name)} (${summary})
+            📝 Corrections – ${escHtml(name)} (${summary})
           </button>`;
         }).join("")}
   </div>`;
@@ -19013,6 +19027,14 @@ function setupStickyNote() {
   note.addEventListener("click", async e => {
     // + Add Correction
     if (e.target.id === "sticky-note-add-row-btn") {
+      // Writing a correction is Ms. Daisy's, the same as choosing Approved,
+      // and refused the same way: a box you have to dismiss, and the list
+      // left exactly as it was. The instructor's side of this panel is the
+      // Done tick and the text of a row she has already opened.
+      if (!canSignOffCorrections()) {
+        alert(`Only Ms. Daisy can add a correction.`);
+        return;
+      }
       const { sid, data } = getCtx();
       if (!sid) return;
       _focusNewRow = true;
@@ -19055,6 +19077,14 @@ function setupStickyNote() {
     // Delete row
     const delBtn = e.target.closest(".snote-del-btn");
     if (delBtn) {
+      // Hers, like adding one. A correction is Ms. Daisy saying something
+      // needs doing, so the person it was written for cannot make it go
+      // away -- and this one deletes without a trace, which is the reason
+      // it matters more than the other two.
+      if (!canSignOffCorrections()) {
+        alert(`Only Ms. Daisy can delete a correction.`);
+        return;
+      }
       const { sid } = getCtx();
       if (!sid) return;
       if (!confirm("Delete this row? This cannot be undone.")) return;

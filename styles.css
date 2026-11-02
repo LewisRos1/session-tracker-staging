@@ -306,8 +306,16 @@
   --chip-on-fg:    #f2f5f9;
   /* Unchanged on purpose: see the light block. */
   --pill-dark:     #1f2430;
-  --pill-done:     #15803d;
-  --pill-fail:     #b91c1c;
+  --pill-done:     #16a34a;   /* a step brighter over a dark page */
+  --pill-fail:     #dc2626;   /* a step brighter over a dark page */
+  /* A toast interrupts. It is the one thing on screen that has to be
+     read now, so rather than holding still it goes the opposite way to
+     the page: a dark pill over a light page, a white one over a dark
+     page. Lewis asked for white-on-black having seen it in dark mode,
+     and a white pill over the light page would be the same fault he
+     reported, the other way up. */
+  --toast-bg:      #ffffff;
+  --toast-fg:      #111827;
 }
 
 /* ─── RESET & TOKENS ────────────────────────────────────── */
@@ -351,6 +359,9 @@
   --pill-dark:     #1f2430;
   --pill-done:     #15803d;
   --pill-fail:     #b91c1c;
+  /* Inverted, so it still shouts. */
+  --toast-bg:      #1f2430;
+  --toast-fg:      #ffffff;
   /* The to-do count. Blue rather than indigo in light mode, so it keeps its
      own value rather than being folded into --pick-bg. */
   --badge-bg:      var(--c-3b82f6);
@@ -2114,8 +2125,8 @@ input.field-input::placeholder {
   bottom: 80px;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--pill-dark);
-  color: var(--c-onaccent);
+  background: var(--toast-bg);
+  color: var(--toast-fg);
   padding: .65rem 1.25rem;
   border-radius: 20px;
   font-size: .9rem;
@@ -3712,6 +3723,9 @@ button.wf-pill:hover { filter: brightness(.93); }
 .wf-note-btn.wf-note-btn--red:hover { background: var(--c-fecaca); border-color: var(--c-dc2626); }
 .wf-note-btn.wf-note-btn--green { background: var(--c-d1fae5); border-color: var(--c-10b981); color: var(--c-064e3b); }
 .wf-note-btn.wf-note-btn--green:hover { background: var(--c-a7f3d0); border-color: var(--c-059669); }
+/* Nobody has looked at this list yet, so it is neither. */
+.wf-note-btn.wf-note-btn--grey { background: var(--c-f3f4f6); border-color: var(--c-d1d5db); color: var(--c-6b7280); }
+.wf-note-btn.wf-note-btn--grey:hover { background: var(--c-e5e7eb); border-color: var(--c-9ca3af); }
 
 /* chk-export-btn keeps its pill style but sits in the grid */
 .wf-export-wrap .chk-export-btn { margin: 0; }
@@ -3926,8 +3940,8 @@ button.wf-pill:hover { filter: brightness(.93); }
   bottom: 2.2rem;
   transform: translateX(-50%) translateY(.5rem);
   z-index: 2000;
-  background: var(--pill-dark);
-  color: var(--c-onaccent);
+  background: var(--toast-bg);
+  color: var(--toast-fg);
   font-size: .85rem;
   font-weight: 600;
   padding: .6rem 1.1rem;
@@ -3943,8 +3957,13 @@ button.wf-pill:hover { filter: brightness(.93); }
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
-.snote-row--done .snote-text { text-decoration: line-through; opacity: .6; }
-.snote-row--waiting .snote-text { color: var(--c-9a3412); }
+/* A correction reads the same whatever its status. It used to fade to 60%
+   once approved and turn orange while it waited, so the same sentence was
+   three different colours over its life and the one still needing work was
+   the hardest of the three to read. The status is the dropdown's job; this
+   column is just the words. Approved keeps the line through it, which says
+   the same thing without touching the colour. */
+.snote-row--done .snote-text { text-decoration: line-through; }
 .snote-empty { color: var(--c-92400e); opacity: .7; font-style: italic; font-size: .82rem; padding: .5rem .35rem; }
 
 .snote-textarea {
@@ -3954,7 +3973,11 @@ button.wf-pill:hover { filter: brightness(.93); }
   background: transparent;
   font-family: inherit;
   font-size: .84rem;
-  color: var(--c-422006);
+  /* Near-black on the light note, near-white on the dark one: --c-111827
+     is the headings token and mirrors, which is exactly the pair Lewis
+     asked for. It was the darkest amber before, which went pale in dark
+     mode and sat badly on the note's new background. */
+  color: var(--c-111827);
   overflow: hidden;
   min-height: 1.4em;
   padding: 0;
@@ -4676,14 +4699,14 @@ button.wf-pill:hover { filter: brightness(.93); }
 .progress-pill {
   display: none; align-items: center; gap: .65rem;
   padding: .6rem .95rem; border-radius: 999px;
-  background: var(--pill-dark); color: var(--c-onaccent);
+  background: var(--toast-bg); color: var(--toast-fg);
   font-size: .85rem; font-weight: 600; line-height: 1.3;
   box-shadow: 0 8px 28px rgba(0,0,0,.28);
   max-width: min(92vw, 460px);
-  --pill-bg: var(--pill-dark);
+  --pill-bg: var(--toast-bg);
 }
-.progress-pill.is-done { background: var(--pill-done); --pill-bg: var(--pill-done); }
-.progress-pill.is-fail { background: var(--pill-fail); --pill-bg: var(--pill-fail); }
+.progress-pill.is-done { background: var(--pill-done); color: var(--c-onaccent); --pill-bg: var(--pill-done); }
+.progress-pill.is-fail { background: var(--pill-fail); color: var(--c-onaccent); --pill-bg: var(--pill-fail); }
 /* A failure message is a sentence rather than a word, so it drops the fully
    rounded ends and lets the text wrap from the top. */
 .progress-pill.is-fail { border-radius: 14px; align-items: flex-start; }

@@ -37,10 +37,20 @@ const setTheme = mode =>
 
 // A session where Rayhanah entered the data and Ms. Daisy has written two
 // corrections, both still on Needs Revision.
-const sessionWith = (statuses) => ({
+const sessionWith = (statuses, phase = "checked") => ({
   date: "2026-10-29", studentId: "s1",
   participants: ["ray"],
-  checks: { p1_ray: { by: "ray", at: 1 }, p2_daisy: { by: "daisy", at: 2 } },
+  // How far the session has got, which is what tells the four kinds of
+  // empty list apart:
+  //   "none"    Rayhanah has not entered her data
+  //   "entered" she has, Ms. Daisy has not checked it
+  //   "checked" Ms. Daisy has checked it
+  //
+  // The key for Ms. Daisy's check is p2_check_<instructor>, not p2_daisy --
+  // it records whose work was checked, not who did the checking.
+  checks: phase === "none" ? {}
+    : phase === "entered" ? { p1_ray: { by: "ray", at: 1 } }
+    : { p1_ray: { by: "ray", at: 1 }, p2_check_ray: { by: "daisy", at: 2 } },
   // The field is reviewComments. "comments" is not one the app reads.
   reviewComments: Object.fromEntries(statuses.map((s, i) => [
     "c" + i,
@@ -51,14 +61,24 @@ const sessionWith = (statuses) => ({
   activities: {}, remarks: {},
 });
 
-const buttonText = (data, asUser) => page.eval(`(() => {
-  window.__app.state.currentUser = { id: ${JSON.stringify(asUser)}, name: ${JSON.stringify(asUser)} };
+const buttonInfo = (data, asUser) => page.eval(`(() => {
+  const u = window.__app.USERS.find(x => x.id === ${JSON.stringify(asUser)});
+  if (u) window.__app.state.authEmail = u.email;
   const host = document.createElement("div");
   host.innerHTML = String(window.__app.renderCheckedByStripHtml(${JSON.stringify(data)}, null, false) ?? "");
   const btn = [...host.querySelectorAll(".wf-note-btn")]
-    .find(b => /List of Corrections/.test(b.textContent));
-  return btn ? btn.textContent.replace(/\\s+/g, " ").trim() : null;
+    .find(b => /Corrections/.test(b.textContent));
+  if (!btn) return null;
+  return {
+    text: btn.textContent.replace(/\\s+/g, " ").trim(),
+    // Red means there is work here, green means it is done, grey means
+    // nobody has looked yet.
+    colour: /--red/.test(btn.className) ? "red"
+      : /--green/.test(btn.className) ? "green"
+      : /--grey/.test(btn.className) ? "grey" : "none",
+  };
 })()`);
+const buttonText = async (d, u) => (await buttonInfo(d, u))?.text ?? null;
 
 try {
   await page.fixture({
@@ -90,6 +110,33 @@ try {
   const mixed = await buttonText(sessionWith(["fixed", null]), "daisy");
   r.ok("one approved, one not, is still one waiting on Rayhanah",
     !!mixed && /1 waiting on Rayhanah/.test(mixed), String(mixed));
+
+  // ── 1b. the four kinds of nothing ───────────────────────────────────
+  //
+  // All four used to read "all approved", and only the last one was.
+  // Rayhanah had not so much as entered her data and the pill was already
+  // green, telling Ms. Daisy the work was signed off.
+  r.section("1b. an empty list says which kind of empty it is");
+  const states = [
+    ["waiting for Phase 1", "grey", sessionWith([], "none"),
+     "before the instructor has entered anything"],
+    ["not checked yet", "grey", sessionWith([], "entered"),
+     "entered, but Ms. Daisy has not looked"],
+    ["nothing to fix", "green", sessionWith([], "checked"),
+     "checked, and she wrote nothing"],
+    ["all approved", "green", sessionWith(["fixed", "fixed"], "checked"),
+     "she wrote some and signed them all off"],
+  ];
+  for (const [words, colour, data, why] of states) {
+    const info = await buttonInfo(data, "daisy");
+    r.ok(`${why} -> "${words}"`,
+      !!info && info.text.includes(words), JSON.stringify(info));
+    r.check(`and it is ${colour}`, info && info.colour, colour);
+  }
+  // The rename, while we are reading the label.
+  const anyBtn = await buttonInfo(sessionWith([], "checked"), "daisy");
+  r.ok("the pill is called Corrections, not List of Corrections",
+    !!anyBtn && !/List of Corrections/.test(anyBtn.text), JSON.stringify(anyBtn));
 
   // ── 2. the ticked bubble ────────────────────────────────────────────
   r.section("2. a ticked answer bubble is grey in dark mode, not white");
@@ -181,7 +228,7 @@ try {
   //
   // Checked in both themes, because the light one is where the mistake
   // hides: it looks perfect there and that is why it shipped.
-  r.section("5. a floating pill is dark in both themes");
+  r.section("5. a floating pill is readable, and stands off the page");
   for (const mode of ["light", "dark"]) {
     await setTheme(mode);
     await settle(250);
@@ -212,10 +259,18 @@ try {
         "the fail pill": mk("progress-pill is-fail"),
       };
     })()`);
+    const page_bg = await page.eval(`getComputedStyle(document.body).backgroundColor`);
     for (const [what, c] of Object.entries(pills)) {
-      const gap = lum(c.fg) - lum(c.bg);
-      r.ok(`${mode}: ${what} keeps its white text readable (gap ${gap})`,
-        gap >= 90, JSON.stringify(c));
+      // Not "is the text white on something dark" any more -- the toasts
+      // invert with the theme now, so the question is whether the text reads
+      // on its own pill, whichever way round that pill is.
+      const gap = Math.abs(lum(c.fg) - lum(c.bg));
+      r.ok(`${mode}: ${what} is readable (gap ${gap})`, gap >= 90, JSON.stringify(c));
+      // And whether the pill itself stands off the page behind it. A toast
+      // that matches the page is the fault Lewis reported, either way up.
+      const standOff = Math.abs(lum(c.bg) - lum(page_bg));
+      r.ok(`${mode}: ${what} stands off the page (gap ${standOff})`,
+        standOff >= 60, `${c.bg} on page ${page_bg}`);
     }
   }
 
@@ -264,6 +319,109 @@ try {
   // The reason the rule names her rather than reusing canSignOffCorrections.
   const lewis = await revertFor("lewis");
   r.check("and Lewis keeps it, as he did before", lewis.undo, 1);
+
+  // ── 7. Add Correction, and the colour of a correction ───────────────
+  //
+  // Writing a correction is Ms. Daisy's, like choosing Approved, and is
+  // refused the same way. The instructor's side of this panel is the Done
+  // tick and the words of a row she has already opened.
+  r.section("7. only Ms. Daisy may add a correction");
+  const addFor = (userId) => page.eval(`(async () => {
+    const u = window.__app.USERS.find(x => x.id === ${JSON.stringify(userId)});
+    window.__app.state.authEmail = u.email;
+    let said = null;
+    const realAlert = window.alert;
+    window.alert = m => { said = String(m); };
+    const note = document.getElementById("sticky-note");
+    note.classList.remove("hidden");
+    window.__app.renderStickyNoteContent(${JSON.stringify(sessionWith(["done", null]))}, false);
+    const before = document.querySelectorAll("#sticky-note-rows tr").length;
+    document.getElementById("sticky-note-add-row-btn").click();
+    await new Promise(r2 => setTimeout(r2, 250));
+    const after = document.querySelectorAll("#sticky-note-rows tr").length;
+    window.alert = realAlert;
+    note.classList.add("hidden");
+    return { said, before, after };
+  })()`);
+
+  for (const who of ["nigel", "ray"]) {
+    const res = await addFor(who);
+    r.ok(`${who} is refused`, /Only Ms\. Daisy can add a correction/.test(String(res.said)),
+      JSON.stringify(res));
+    r.check(`and no row is added for ${who}`, res.after, res.before);
+  }
+  const daisyAdd = await addFor("daisy");
+  r.check("Ms. Daisy is not refused", daisyAdd.said, null);
+
+  // Deleting matters more than the other two: it goes without a trace, so
+  // the person a correction was written for must not be able to make it
+  // disappear. The confirm() is stubbed so a refused click cannot be
+  // mistaken for someone simply cancelling the dialog.
+  r.section("7a. and only Ms. Daisy may delete one");
+  const delFor = (userId) => page.eval(`(async () => {
+    const u = window.__app.USERS.find(x => x.id === ${JSON.stringify(userId)});
+    window.__app.state.authEmail = u.email;
+    let said = null, asked = false;
+    const realAlert = window.alert, realConfirm = window.confirm;
+    window.alert = m => { said = String(m); };
+    window.confirm = () => { asked = true; return false; };
+    const note = document.getElementById("sticky-note");
+    note.classList.remove("hidden");
+    window.__app.renderStickyNoteContent(${JSON.stringify(sessionWith(["done", null]))}, false);
+    document.querySelector("#sticky-note-rows .snote-del-btn").click();
+    await new Promise(r2 => setTimeout(r2, 250));
+    window.alert = realAlert; window.confirm = realConfirm;
+    note.classList.add("hidden");
+    return { said, asked };
+  })()`);
+
+  for (const who of ["nigel", "ray"]) {
+    const res = await delFor(who);
+    r.ok(`${who} is refused`,
+      /Only Ms\. Daisy can delete a correction/.test(String(res.said)), JSON.stringify(res));
+    r.ok(`and ${who} is never even asked to confirm`, res.asked === false, JSON.stringify(res));
+  }
+  const daisyDel = await delFor("daisy");
+  r.check("Ms. Daisy is not refused", daisyDel.said, null);
+  // She is not asked to confirm here either, and that is the harness rather
+  // than the gate: the note is rendered without a live session, so the
+  // handler returns at the missing id a line later. What this pair proves is
+  // the difference that matters -- she passes the gate silently, they do not
+  // pass it at all.
+  r.ok("the refusal is what separates them, not the confirm",
+    daisyDel.said === null && daisyDel.asked === false, JSON.stringify(daisyDel));
+
+  r.section("7b. a correction is the same colour whatever its status");
+  for (const mode of ["light", "dark"]) {
+    await setTheme(mode);
+    await settle(250);
+    const colours = await page.eval(`(() => {
+      const u = window.__app.USERS.find(x => x.id === "daisy");
+      window.__app.state.authEmail = u.email;
+      const note = document.getElementById("sticky-note");
+      note.classList.remove("hidden");
+      // One of each status, so every row class is on screen at once.
+      window.__app.renderStickyNoteContent(${JSON.stringify(sessionWith([null, "done", "fixed"]))}, false);
+      const out = [...document.querySelectorAll("#sticky-note-rows .snote-textarea")]
+        .map(el => getComputedStyle(el).color);
+      const noteBg = getComputedStyle(note).backgroundColor;
+      const faded = [...document.querySelectorAll("#sticky-note-rows .snote-text")]
+        .map(el => getComputedStyle(el).opacity);
+      note.classList.add("hidden");
+      return { out, noteBg, faded };
+    })()`);
+    r.check(`${mode}: three statuses, one text colour`,
+      new Set(colours.out).size, 1);
+    r.ok(`${mode}: and none of them is faded`,
+      colours.faded.every(o => Number(o) === 1), JSON.stringify(colours.faded));
+    const want = mode === "dark" ? 200 : 60;
+    const got = lum(colours.out[0]);
+    r.ok(`${mode}: the words are ${mode === "dark" ? "near-white" : "near-black"} (${got})`,
+      mode === "dark" ? got > want : got < want, JSON.stringify(colours));
+    r.ok(`${mode}: and they read against the note behind them`,
+      Math.abs(got - lum(colours.noteBg)) > 120,
+      `${colours.out[0]} on ${colours.noteBg}`);
+  }
 
   r.section("console");
   const noise = page.consoleLines.filter(l => l.level === "error");
