@@ -1,18 +1,16 @@
 // Four things Lewis found on live, in one place because two of them turned
 // out to be the same bug.
 //
-//   1. The same person appeared twice: once as a pill inside Phase 3, and
-//      again as a loose button in a row under the whole chart, with no line
-//      joining the two. You matched them up by reading the name off both.
-//      They are one card per person now, inside the phase they belong to --
-//      name, what is outstanding, the tick, and the way into the list.
+//   1. "List of Corrections - Rayhanah (0 to check)" sat beside two
+//      corrections nobody had touched. The number was Ms. Daisy's own
+//      workload, and both rows were on Needs Revision, which is the
+//      instructor's turn -- so nought was true and told her the wrong
+//      thing.
 //
-//      The sentence had to change with it. The loose pill counted whatever
-//      was on the reader's own plate: "1 to check" for Ms. Daisy, "1 to
-//      fix" for Rayhanah, off one list. Fine on a button sitting by itself,
-//      wrong on a card headed with her name. (Before that again it read "0
-//      to check" beside two corrections nobody had touched, because both
-//      sat on Needs Revision, which is the instructor's turn.)
+//      The pill no longer counts what is on the reader's plate at all.
+//      "to correct" means rows on Needs Revision and "to approve" means
+//      rows on Done, whoever is signed in, so two people can talk about
+//      what it says and neither half goes unmentioned.
 //
 //   2. A ticked answer bubble went white in dark mode. White is right for a
 //      picked day in the date grid, one cell out of thirty-five, but a row
@@ -68,31 +66,28 @@ const sessionWith = (statuses, phase = "checked") => ({
   activities: {}, remarks: {},
 });
 
-// One Phase 3 card, pulled apart. Everything the card says about a person
-// lives in one box now, so one read gets all of it.
-const cardInfo = (data, asUser) => page.eval(`(() => {
+const buttonInfo = (data, asUser) => page.eval(`(() => {
   const u = window.__app.USERS.find(x => x.id === ${JSON.stringify(asUser)});
   if (u) window.__app.state.authEmail = u.email;
   const host = document.createElement("div");
   host.innerHTML = String(window.__app.renderCheckedByStripHtml(${JSON.stringify(data)}, null, false) ?? "");
-  const card = host.querySelector(".wf-card");
-  const flat = el => el ? el.textContent.replace(/\\s+/g, " ").trim() : null;
-  const pick = sel => card ? card.querySelector(sel) : null;
+  const btn = [...host.querySelectorAll(".wf-note-btn")]
+    .find(b => /Corrections/.test(b.textContent));
+  if (!btn) return null;
   return {
-    card: !!card,
-    name:   flat(pick(".wf-card-name")),
-    status: flat(pick(".wf-card-text")),
-    tone:   card ? (card.className.match(/wf-card--(\\w+)/) || ["", null])[1] : null,
-    tick:     flat(pick(".wf-card-btns .wf-pill")),
-    tickRole: pick(".wf-card-btns [data-role]")
-      ? pick(".wf-card-btns [data-role]").dataset.role : null,
-    note:    flat(pick(".wf-card-note")),
-    noteFor: pick(".wf-card-note") ? pick(".wf-card-note").dataset.instId : null,
-    // The old row of loose pills under the whole chart. It should be empty
-    // whenever there is an instructor to make a card for.
-    loose: [...host.querySelectorAll(".wf-note-wrap .wf-note-btn")].map(flat),
+    text: btn.textContent.replace(/\\s+/g, " ").trim(),
+    // Red means there is work here, green means it is done, grey means
+    // nobody has looked yet.
+    colour: /--red/.test(btn.className) ? "red"
+      : /--green/.test(btn.className) ? "green"
+      : /--grey/.test(btn.className) ? "grey" : "none",
   };
 })()`);
+const buttonText = async (d, u) => (await buttonInfo(d, u))?.text ?? null;
+
+// The same session with Rayhanah's Phase 3 ticked. The pill does not hand
+// the list to Ms. Daisy until that click lands.
+const ticked = d => ({ ...d, checks: { ...d.checks, p3_ray: { by: "ray", at: 3 } } });
 
 try {
   await page.fixture({
@@ -105,116 +100,121 @@ try {
   await page.load();
   await page.until(`!document.querySelector("#screen-home").classList.contains("hidden")`, "home");
 
-  // -- 1. the card ----------------------------------------------------
-  r.section("1. Phase 3 holds one card per instructor");
-  const open2 = await cardInfo(sessionWith([null, null]), "daisy");
-  r.ok("a card is rendered", open2.card, JSON.stringify(open2));
-  r.check("headed with the instructor's name", open2.name, "Rayhanah");
-  r.ok("it holds the tick", !!open2.tick, JSON.stringify(open2));
-  r.check("which still writes that instructor's Phase 3 check",
-    open2.tickRole, "p3_ray");
-  r.ok("and a way into the list", /Open Correction List/.test(String(open2.note)),
-    String(open2.note));
-  r.check("aimed at the same person", open2.noteFor, "ray");
-
-  // The whole point of the move: the person appeared twice, once in the
-  // phase box and again in a loose row under the chart with no line joining
-  // it to anything, so you matched the two up by reading the name off both.
-  r.check("and the loose row under the chart is gone", open2.loose.length, 0);
-  r.ok("the tick no longer repeats the name the card is headed with",
-    !/Rayhanah/.test(String(open2.tick)), String(open2.tick));
-
-  // -- 1b. what the card says -----------------------------------------
+  // -- 1. what the pill says ------------------------------------------
   //
-  // Six states. Each says what is true of that person now -- "all approved"
-  // used to cover four of them, and only one was: Rayhanah had not so much
-  // as entered her data and the pill was already green, telling Ms. Daisy
-  // the work was signed off.
-  r.section("1b. the six things a card can say");
+  // Six states. Each says what is true of that person now; "all approved"
+  // used to cover four of them and only one of them was.
+  r.section("1. the corrections pill says what is outstanding");
   const states = [
-    ["Waiting to complete Phase 1", "wait", sessionWith([], "none"),
+    ["Waiting for Phase 1", "grey", sessionWith([], "none"),
      "before the instructor has entered anything"],
-    ["Ms. Daisy hasn't checked yet", "wait", sessionWith([], "entered"),
+    ["Not checked yet", "grey", sessionWith([], "entered"),
      "entered, but Ms. Daisy has not looked"],
-    ["Nothing to fix", "clear", sessionWith([], "checked"),
+    ["No corrections needed", "green", sessionWith([], "checked"),
      "checked, and she wrote nothing"],
-    ["All approved", "clear", sessionWith(["fixed", "fixed"], "checked"),
+    ["All Approved", "green", sessionWith(["fixed", "fixed"], "checked"),
      "she wrote some and signed them all off"],
-    ["Ms. Daisy has checked, kindly make 2 corrections", "work",
-     sessionWith([null, null]), "two written, neither fixed"],
-    ["2 corrections done, kindly check", "work",
-     sessionWith(["done", "done"]), "both fixed, neither approved"],
+    ["2 to correct", "red", sessionWith([null, null]),
+     "two written, neither fixed"],
+    ["Waiting for Phase 3", "red", sessionWith(["done", "done"]),
+     "both fixed, but Phase 3 not ticked"],
+    ["2 to approve", "red", ticked(sessionWith(["done", "done"])),
+     "both fixed and Phase 3 ticked"],
   ];
-  for (const [words, tone, data, why] of states) {
-    const info = await cardInfo(data, "daisy");
-    r.check(`${why} -> "${words}"`, info.status, words);
-    r.check(`and it is ${tone}`, info.tone, tone);
+  for (const [words, colour, data, why] of states) {
+    const info = await buttonInfo(data, "daisy");
+    r.check(`${why} -> "(${words})"`, info && info.text,
+      `\u{1F4DD} Corrections – Rayhanah (${words})`);
+    r.check(`and it is ${colour}`, info && info.colour, colour);
   }
 
-  // One is one, not "1 corrections".
-  r.check("one to fix reads as one",
-    (await cardInfo(sessionWith([null]), "daisy")).status,
-    "Ms. Daisy has checked, kindly make 1 correction");
-  r.check("and so does one to check",
-    (await cardInfo(sessionWith(["done"]), "daisy")).status,
-    "1 correction done, kindly check");
+  // Two untouched corrections used to read "0 to check", because both sat
+  // on Needs Revision and Ms. Daisy was holding neither of them.
+  const twoOpen = await buttonText(sessionWith([null, null]), "daisy");
+  r.ok("two untouched corrections never read as nought",
+    !!twoOpen && !/\b0\b/.test(twoOpen), String(twoOpen));
 
-  // Both halves can be true at once. Phase 3 cannot be ticked until the
-  // instructor's are gone, so that is the half that still asks for
-  // something and that is what the card names.
-  r.section("1c. a list holding both names the instructor's half");
-  const mixed = await cardInfo(sessionWith(["done", null]), "daisy");
-  r.check("one done, one still to fix",
-    mixed.status, "Ms. Daisy has checked, kindly make 1 correction");
-  r.check("one approved, one still to fix",
-    (await cardInfo(sessionWith(["fixed", null]), "daisy")).status,
-    "Ms. Daisy has checked, kindly make 1 correction");
-  r.check("approved and done, with nothing left on her plate",
-    (await cardInfo(sessionWith(["fixed", "done"]), "daisy")).status,
-    "1 correction done, kindly check");
+  // One is one.
+  r.check("one to correct",
+    (await buttonInfo(sessionWith([null]), "daisy")).text,
+    "\u{1F4DD} Corrections – Rayhanah (1 to correct)");
+  r.check("one to approve",
+    (await buttonInfo(ticked(sessionWith(["done"])), "daisy")).text,
+    "\u{1F4DD} Corrections – Rayhanah (1 to approve)");
 
-  // -- 1d. the card reads the same to everybody -----------------------
+  // The rename, while we are reading the label.
+  r.ok("the pill is called Corrections, not List of Corrections",
+    !/List of Corrections/.test(String(twoOpen)), String(twoOpen));
+
+  // -- 1b. a list holding both names the instructor's half ------------
   //
-  // The loose pill it replaced counted whatever was on the reader's own
-  // plate: "1 to check" for Ms. Daisy, "1 to fix" for Rayhanah, off one
-  // list. Fine on a button sitting by itself, wrong on a card with her name
-  // at the top -- two people could not talk about what it said.
-  r.section("1d. a card headed Rayhanah says the same to everybody");
+  // Phase 3 cannot be ticked until the Needs Revision rows are gone, so
+  // that is the half still asking for something. It hands over on the tick,
+  // not on the last row being fixed -- and says what it is waiting for in
+  // the gap between the two, rather than "0 to correct".
+  r.section("1b. a list holding both names the instructor's half");
+  r.check("one fixed, one still to correct",
+    (await buttonInfo(sessionWith(["done", null]), "daisy")).text,
+    "\u{1F4DD} Corrections – Rayhanah (1 to correct)");
+  r.check("one approved, one still to correct",
+    (await buttonInfo(sessionWith(["fixed", null]), "daisy")).text,
+    "\u{1F4DD} Corrections – Rayhanah (1 to correct)");
+  r.check("nothing left to correct, and ticked, so it is hers",
+    (await buttonInfo(ticked(sessionWith(["fixed", "done"])), "daisy")).text,
+    "\u{1F4DD} Corrections – Rayhanah (1 to approve)");
+  // The gap: everything fixed, the tick not yet pressed. Nobody has a
+  // number to show, so it names what it is waiting for.
+  r.check("the last one fixed, Phase 3 not ticked",
+    (await buttonInfo(sessionWith(["done", "done"]), "daisy")).text,
+    "\u{1F4DD} Corrections – Rayhanah (Waiting for Phase 3)");
+  r.check("and never reads as nought",
+    /0 to/.test((await buttonInfo(sessionWith(["done", "done"]), "daisy")).text),
+    false);
+  // She can approve a row outright, without it ever being marked Done. The
+  // tick is then nothing to wait for, because nothing is on her plate.
+  r.check("every row approved outright, Phase 3 never ticked",
+    (await buttonInfo(sessionWith(["fixed", "fixed"]), "daisy")).text,
+    "\u{1F4DD} Corrections – Rayhanah (All Approved)");
+
+  // -- 1c. it reads the same to everybody -----------------------------
+  //
+  // It used to count the reader's own workload: "1 to check" for Ms. Daisy
+  // and "1 to fix" for Rayhanah off one list, with the other half going
+  // unmentioned.
+  r.section("1c. the pill says the same thing to everybody");
   for (const [words, , data, why] of states) {
-    const asRay = await cardInfo(data, "ray");
-    r.check(`${why}, read by Rayhanah`, asRay.status, words);
+    r.check(`${why}, read by Rayhanah`,
+      (await buttonInfo(data, "ray")).text,
+      `\u{1F4DD} Corrections – Rayhanah (${words})`);
   }
   r.check("and a mixed list too",
-    (await cardInfo(sessionWith(["done", null]), "ray")).status, mixed.status);
+    (await buttonInfo(sessionWith(["done", null]), "ray")).text,
+    "\u{1F4DD} Corrections – Rayhanah (1 to correct)");
 
-  // -- 1e. the tick ---------------------------------------------------
-  r.section("1e. the tick keeps every state it had");
-  const locked = await cardInfo(sessionWith([], "entered"), "daisy");
-  r.ok("locked until Ms. Daisy has checked", /Locked/.test(String(locked.tick)),
-    String(locked.tick));
-  r.check("and is not a button while it is locked", locked.tickRole, null);
-  const unlocked = await cardInfo(sessionWith([], "checked"), "daisy");
-  r.ok("unlocked once she has", /Incomplete/.test(String(unlocked.tick)),
-    String(unlocked.tick));
-  r.check("and is a button again", unlocked.tickRole, "p3_ray");
-  const ticked = await cardInfo({
-    ...sessionWith(["fixed"], "checked"),
-    checks: { p1_ray: { by: "ray", at: 1 }, p2_check_ray: { by: "daisy", at: 2 },
-              p3_ray: { by: "ray", at: new Date("2026-10-29T18:54:00").getTime() } },
-  }, "daisy");
-  r.ok("a ticked row shows when it was ticked",
-    /29 Oct 6:54pm/.test(String(ticked.tick)), String(ticked.tick));
-  r.check("and can still be undone", ticked.tickRole, "p3_ray");
-
-  // The session nobody else was added to has no card to put it on, so the
-  // plain button stays where it was.
-  r.section("1f. a session with no instructor keeps the plain button");
-  const alone = await cardInfo(
-    { ...sessionWith([], "checked"), participants: [] }, "daisy");
-  r.check("no card", alone.card, false);
-  r.check("one loose button", alone.loose.length, 1);
-  r.ok("with no name on it", /^.{0,3}Corrections$/.test(String(alone.loose[0])),
-    String(alone.loose[0]));
+  // -- 1d. the pill sits under the chart, one per instructor ----------
+  r.section("1d. one pill per instructor, under the chart");
+  const placing = await page.eval(`(() => {
+    const host = document.createElement("div");
+    host.innerHTML = String(window.__app.renderCheckedByStripHtml(
+      ${JSON.stringify({ ...sessionWith([null]), participants: ["ray", "nigel"] })},
+      null, false) ?? "");
+    const wrap = host.querySelector(".wf-note-wrap");
+    const p3 = [...host.querySelectorAll(".wf-node")]
+      .find(n => /Phase 3/.test(n.textContent));
+    return {
+      pills: wrap ? [...wrap.querySelectorAll(".wf-note-btn")].length : 0,
+      inPhase3: p3 ? p3.querySelectorAll(".wf-note-btn").length : -1,
+      phase3Text: p3 ? p3.textContent.replace(/\\s+/g, " ").trim() : null,
+    };
+  })()`);
+  r.check("one pill each for the two instructors", placing.pills, 2);
+  r.check("and none of them inside the Phase 3 box", placing.inPhase3, 0);
+  // Plain name pills, as before the cards. Nigel's Phase 2 is not ticked in
+  // this fixture, so his row is the locked one.
+  r.ok("which still holds the plain name pills",
+    /Rayhanah: Incomplete/.test(String(placing.phase3Text))
+    && /Nigel: Check #1 not done yet/.test(String(placing.phase3Text)),
+    String(placing.phase3Text));
 
   // ── 2. the ticked bubble ────────────────────────────────────────────
   r.section("2. a ticked answer bubble is grey in dark mode, not white");
