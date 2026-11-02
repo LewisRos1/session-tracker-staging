@@ -102,31 +102,57 @@ try {
 
   // -- 1. what the pill says ------------------------------------------
   //
-  // Six states. Each says what is true of that person now; "all approved"
-  // used to cover four of them and only one of them was.
+  // Only three states say anything in words. These pills are read as a
+  // row of them under the chart, so a sentence on every one is four
+  // sentences to get through before you find the one that wants you. The
+  // rest carry their state in the colour and say nothing.
   r.section("1. the corrections pill says what is outstanding");
+  // What the whole button reads, for a state whose words are `words`.
+  const pill = words =>
+    `\u{1F4DD} Corrections – Rayhanah${words ? ` (${words})` : ""}`;
   const states = [
-    ["Waiting for Phase 1", "grey", sessionWith([], "none"),
+    ["", "grey", sessionWith([], "none"),
      "before the instructor has entered anything"],
-    ["Not checked yet", "grey", sessionWith([], "entered"),
+    ["", "grey", sessionWith([], "entered"),
      "entered, but Ms. Daisy has not looked"],
-    ["No corrections needed", "green", sessionWith([], "checked"),
-     "checked, and she wrote nothing"],
+    ["", "green", sessionWith([], "checked"),
+     "checked, and she found nothing wrong"],
     ["All Approved", "green", sessionWith(["fixed", "fixed"], "checked"),
      "she wrote some and signed them all off"],
-    ["2 to correct", "red", sessionWith([null, null]),
+    ["2", "red", sessionWith([null, null]),
      "two written, neither fixed"],
-    ["Waiting for Phase 3", "red", sessionWith(["done", "done"]),
+    ["", "red", sessionWith(["done", "done"]),
      "both fixed, but Phase 3 not ticked"],
     ["2 to approve", "red", ticked(sessionWith(["done", "done"])),
      "both fixed and Phase 3 ticked"],
   ];
   for (const [words, colour, data, why] of states) {
     const info = await buttonInfo(data, "daisy");
-    r.check(`${why} -> "(${words})"`, info && info.text,
-      `\u{1F4DD} Corrections – Rayhanah (${words})`);
+    r.check(`${why} -> "${pill(words)}"`, info && info.text, pill(words));
     r.check(`and it is ${colour}`, info && info.colour, colour);
   }
+
+  // The four quiet states are quiet, not blank: the name is still there to
+  // click, and the colour still says which of the four it is.
+  r.section("1a. a quiet pill is still a pill");
+  for (const [words, , data, why] of states.filter(st => st[0] === "")) {
+    const info = await buttonInfo(data, "daisy");
+    r.check(`${why}: no bracket`, /\(/.test(info.text), false);
+    r.ok(`${why}: the name is still on it`,
+      /Corrections – Rayhanah$/.test(info.text), info.text);
+    r.ok(`${why}: and it still opens the list`, info.colour !== "none",
+      JSON.stringify(info));
+  }
+  // Three of them look the same but for the colour, so the colour has to
+  // actually differ.
+  const quietColours = [];
+  for (const [, , data] of states.filter(st => st[0] === "")) {
+    quietColours.push((await buttonInfo(data, "daisy")).colour);
+  }
+  r.check("grey before anyone has read it, twice over",
+    quietColours.slice(0, 2), ["grey", "grey"]);
+  r.check("green when there was nothing wrong", quietColours[2], "green");
+  r.check("red when it is only the tick that is missing", quietColours[3], "red");
 
   // Two untouched corrections used to read "0 to check", because both sat
   // on Needs Revision and Ms. Daisy was holding neither of them.
@@ -136,11 +162,10 @@ try {
 
   // One is one.
   r.check("one to correct",
-    (await buttonInfo(sessionWith([null]), "daisy")).text,
-    "\u{1F4DD} Corrections – Rayhanah (1 to correct)");
+    (await buttonInfo(sessionWith([null]), "daisy")).text, pill("1"));
   r.check("one to approve",
     (await buttonInfo(ticked(sessionWith(["done"])), "daisy")).text,
-    "\u{1F4DD} Corrections – Rayhanah (1 to approve)");
+    pill("1 to approve"));
 
   // The rename, while we are reading the label.
   r.ok("the pill is called Corrections, not List of Corrections",
@@ -150,31 +175,28 @@ try {
   //
   // Phase 3 cannot be ticked until the Needs Revision rows are gone, so
   // that is the half still asking for something. It hands over on the tick,
-  // not on the last row being fixed -- and says what it is waiting for in
-  // the gap between the two, rather than "0 to correct".
+  // not on the last row being fixed -- and goes quiet in the gap between
+  // the two, rather than saying "0".
   r.section("1b. a list holding both names the instructor's half");
   r.check("one fixed, one still to correct",
-    (await buttonInfo(sessionWith(["done", null]), "daisy")).text,
-    "\u{1F4DD} Corrections – Rayhanah (1 to correct)");
+    (await buttonInfo(sessionWith(["done", null]), "daisy")).text, pill("1"));
   r.check("one approved, one still to correct",
-    (await buttonInfo(sessionWith(["fixed", null]), "daisy")).text,
-    "\u{1F4DD} Corrections – Rayhanah (1 to correct)");
+    (await buttonInfo(sessionWith(["fixed", null]), "daisy")).text, pill("1"));
   r.check("nothing left to correct, and ticked, so it is hers",
     (await buttonInfo(ticked(sessionWith(["fixed", "done"])), "daisy")).text,
-    "\u{1F4DD} Corrections – Rayhanah (1 to approve)");
+    pill("1 to approve"));
   // The gap: everything fixed, the tick not yet pressed. Nobody has a
-  // number to show, so it names what it is waiting for.
+  // number to show, so it shows none.
   r.check("the last one fixed, Phase 3 not ticked",
-    (await buttonInfo(sessionWith(["done", "done"]), "daisy")).text,
-    "\u{1F4DD} Corrections – Rayhanah (Waiting for Phase 3)");
+    (await buttonInfo(sessionWith(["done", "done"]), "daisy")).text, pill(""));
   r.check("and never reads as nought",
-    /0 to/.test((await buttonInfo(sessionWith(["done", "done"]), "daisy")).text),
+    /0/.test((await buttonInfo(sessionWith(["done", "done"]), "daisy")).text),
     false);
   // She can approve a row outright, without it ever being marked Done. The
   // tick is then nothing to wait for, because nothing is on her plate.
   r.check("every row approved outright, Phase 3 never ticked",
     (await buttonInfo(sessionWith(["fixed", "fixed"]), "daisy")).text,
-    "\u{1F4DD} Corrections – Rayhanah (All Approved)");
+    pill("All Approved"));
 
   // -- 1c. it reads the same to everybody -----------------------------
   //
@@ -184,12 +206,10 @@ try {
   r.section("1c. the pill says the same thing to everybody");
   for (const [words, , data, why] of states) {
     r.check(`${why}, read by Rayhanah`,
-      (await buttonInfo(data, "ray")).text,
-      `\u{1F4DD} Corrections – Rayhanah (${words})`);
+      (await buttonInfo(data, "ray")).text, pill(words));
   }
   r.check("and a mixed list too",
-    (await buttonInfo(sessionWith(["done", null]), "ray")).text,
-    "\u{1F4DD} Corrections – Rayhanah (1 to correct)");
+    (await buttonInfo(sessionWith(["done", null]), "ray")).text, pill("1"));
 
   // -- 1d. the pill sits under the chart, one per instructor ----------
   r.section("1d. one pill per instructor, under the chart");

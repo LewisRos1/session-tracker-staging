@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2329";
+const APP_VERSION = "2330";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -16324,43 +16324,49 @@ const correctionTurn = c => correctionState(getCmtStatus(c)).turn;
 /**
  * What the corrections pill says about one instructor, and its colour.
  *
- * The sentence is about that person, not about whoever is reading it. It
+ * Only three states say anything in words. The pill is read in a row of
+ * them under the chart, so a sentence on every one is four sentences to
+ * get through before you find the one that wants you; the rest carry
+ * their state in the colour and say nothing:
+ *
+ *   grey, no words    nothing to read yet -- either the instructor has
+ *                     not entered the data or Ms. Daisy has not checked it
+ *   green, no words   she checked and found nothing wrong, so Phase 3 and
+ *                     Phase 4 are skipped
+ *   red, (N)          N rows are back with the instructor
+ *   red, no words     every row is fixed and the Phase 3 tick is all that
+ *                     is missing
+ *   red, (N to approve)   ticked, and N rows are waiting on Ms. Daisy
+ *   green, (All Approved) every row signed off
+ *
+ * What it says is about that person, not about whoever is reading it. It
  * used to count whatever was on the reader's own plate -- "1 to check" for
  * Ms. Daisy and "1 to fix" for Nigel, off one list -- so two people could
  * not talk about what the pill said, and the half that was not yours went
- * unmentioned. "to correct" now always means rows sitting on Needs
- * Revision and "to approve" always means rows sitting on Done, whoever is
- * signed in.
+ * unmentioned. (N) now always means rows sitting on Needs Revision and
+ * "to approve" always means rows sitting on Done, whoever is signed in.
  *
  * Where a list holds both, it names the instructor's half, because Phase 3
  * cannot be ticked until those are gone. It hands over on the Phase 3 tick,
  * not on the last row being fixed: the tick is the instructor saying they
  * are finished, and until it lands Ms. Daisy has not been given the list.
- *
- * That leaves a gap -- every row fixed, Phase 3 not ticked -- where nobody
- * has anything to correct or approve. It says "Waiting for Phase 3" there
- * rather than "0 to correct", which is the shape of complaint that started
- * all of this.
- *
- * Four different situations used to read "all approved", and only one of
- * them was: Rayhanah had not so much as entered her data and the pill was
- * already green, telling Ms. Daisy the work was signed off. Red means
- * there is work here and green means it is done, and neither is honest
- * before anybody has read the list, so those two are grey.
+ * Between the two there is nobody to count, which is the red pill with no
+ * words; writing "0" there is the shape of complaint that started all of
+ * this.
  */
 function correctionSummaryFor(ws, id) {
-  if (ws.noCorr(id))     return { tone: "green", text: "No corrections needed" };
-  if (!ws.p1Done(id))    return { tone: "grey",  text: "Waiting for Phase 1" };
-  if (!ws.p2EffDone(id)) return { tone: "grey",  text: "Not checked yet" };
+  if (ws.noCorr(id))     return { tone: "green", text: "" };
+  if (!ws.p1Done(id))    return { tone: "grey",  text: "" };
+  if (!ws.p2EffDone(id)) return { tone: "grey",  text: "" };
   const rows = ws.commentsFor(id);
-  if (!rows.length) return { tone: "green", text: "No corrections needed" };
+  if (!rows.length) return { tone: "green", text: "" };
   const toCorrect = rows.filter(([, c]) => correctionTurn(c) === "them").length;
-  if (toCorrect)    return { tone: "red", text: `${toCorrect} to correct` };
+  if (toCorrect)    return { tone: "red", text: String(toCorrect) };
   // Rows sitting on Done. None of them, and nothing is on Needs Revision
   // either, so every one has been signed off.
   const toApprove = rows.filter(([, c]) => correctionTurn(c) === "daisy").length;
   if (!toApprove)   return { tone: "green", text: "All Approved" };
-  if (!ws.p3Done(id)) return { tone: "red", text: "Waiting for Phase 3" };
+  if (!ws.p3Done(id)) return { tone: "red", text: "" };
   return { tone: "red", text: `${toApprove} to approve` };
 }
 
@@ -16737,8 +16743,9 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
       ? `<button class="wf-note-btn" data-action="open-note" data-inst-id="">📝 Corrections</button>`
       : noteIds.map(id => {
           const s = correctionSummaryFor(ws, id);
+          const tail = s.text ? ` (${s.text})` : "";
           return `<button class="wf-note-btn wf-note-btn--${s.tone}" data-action="open-note" data-inst-id="${escHtml(id)}">
-            📝 Corrections – ${escHtml(instName(id))} (${escHtml(s.text)})
+            📝 Corrections – ${escHtml(instName(id) + tail)}
           </button>`;
         }).join("")}
   </div>`;
