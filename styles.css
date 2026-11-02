@@ -3702,7 +3702,7 @@ button.wf-pill:hover { filter: brightness(.93); }
   gap: .3rem;
 }
 /* The confirm step takes the line to itself rather than squeezing in beside
-   View Corrections, where its two buttons had nowhere to go. */
+   Open Correction List, where its two buttons had nowhere to go. */
 .wf-card-btns .wf-confirming { flex: 1 1 100%; }
 /* These sit in a fixed grid column, so they wrap rather than spill. */
 .wf-card-note { white-space: normal; line-height: 1.25; }

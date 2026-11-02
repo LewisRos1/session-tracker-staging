@@ -113,7 +113,7 @@ try {
   r.ok("it holds the tick", !!open2.tick, JSON.stringify(open2));
   r.check("which still writes that instructor's Phase 3 check",
     open2.tickRole, "p3_ray");
-  r.ok("and a way into the list", /View Corrections/.test(String(open2.note)),
+  r.ok("and a way into the list", /Open Correction List/.test(String(open2.note)),
     String(open2.note));
   r.check("aimed at the same person", open2.noteFor, "ray");
 

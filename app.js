@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2327";
+const APP_VERSION = "2328";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -16654,7 +16654,7 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
       <div class="wf-card-status"><span class="wf-card-icon" aria-hidden="true">${s.icon}</span><span class="wf-card-text">${escHtml(s.text)}</span></div>
       <div class="wf-card-btns">
         ${mkTick3(id)}
-        <button class="wf-note-btn wf-card-note" data-action="open-note" data-inst-id="${escHtml(id)}">→ View Corrections</button>
+        <button class="wf-note-btn wf-card-note" data-action="open-note" data-inst-id="${escHtml(id)}">→ Open Correction List</button>
       </div>
     </div>`;
   };
