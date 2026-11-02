@@ -301,6 +301,9 @@
   --pick-fg:       #1b1f24;
   --badge-bg:      #ffffff;
   --badge-fg:      #1b1f24;
+  /* Lighter than the row so it reads as chosen, nowhere near white. */
+  --chip-on-bg:    #555b66;
+  --chip-on-fg:    #f2f5f9;
 }
 
 /* ─── RESET & TOKENS ────────────────────────────────────── */
@@ -326,6 +329,12 @@
   --pick-bg:       var(--c-6366f1);
   --pick-bg-hover: var(--c-4f46e5);
   --pick-fg:       #ffffff;
+  /* A ticked option is its own thing again. White is right for a picked
+     day in the date grid -- one cell out of thirty-five, and it has to be
+     findable at a glance -- but a row of ticked answer bubbles in white
+     was shouting. Grey in dark mode, still clearly the chosen one. */
+  --chip-on-bg:    var(--c-6366f1);
+  --chip-on-fg:    #ffffff;
   /* The to-do count. Blue rather than indigo in light mode, so it keeps its
      own value rather than being folded into --pick-bg. */
   --badge-bg:      var(--c-3b82f6);
@@ -1548,9 +1557,9 @@ input.field-input::placeholder {
 .btn-remark-opt--multi { border-radius: 4px; }
 
 .btn-remark-opt.active {
-  background: var(--pick-bg);
-  border-color: var(--pick-bg);
-  color: var(--pick-fg);
+  background: var(--chip-on-bg);
+  border-color: var(--chip-on-bg);
+  color: var(--chip-on-fg);
   font-weight: 600;
 }
 
@@ -1571,9 +1580,9 @@ input.field-input::placeholder {
 }
 .view-remark-multi-btn:hover { border-color: var(--primary-accent); color: var(--primary-accent); }
 .view-remark-multi-btn.active {
-  background: var(--pick-bg);
-  border-color: var(--pick-bg);
-  color: var(--pick-fg);
+  background: var(--chip-on-bg);
+  border-color: var(--chip-on-bg);
+  color: var(--chip-on-fg);
   font-weight: 600;
 }
 .view-remark-multi-btn--rect,
@@ -1599,9 +1608,9 @@ input.field-input::placeholder {
 .view-multi-create-btn:hover,
 .view-group-multi-create-btn:hover { border-color: var(--primary-accent); color: var(--primary-accent); }
 .view-remark-single-btn.active {
-  background: var(--pick-bg);
-  border-color: var(--pick-bg);
-  color: var(--pick-fg);
+  background: var(--chip-on-bg);
+  border-color: var(--chip-on-bg);
+  color: var(--chip-on-fg);
   font-weight: 600;
 }
 
@@ -2955,9 +2964,9 @@ div.admin-note-editable:empty::before {
 }
 .btn-mastery:hover { border-color: var(--primary-accent); background: var(--primary-light); }
 .btn-mastery.active {
-  background: var(--pick-bg);
-  border-color: var(--pick-bg);
-  color: var(--pick-fg);
+  background: var(--chip-on-bg);
+  border-color: var(--chip-on-bg);
+  color: var(--chip-on-fg);
   font-weight: 600;
 }
 /* slightly smaller in the view table */
@@ -3712,6 +3721,44 @@ button.wf-pill:hover { filter: brightness(.93); }
   user-select: none;
 }
 .sticky-note.hidden { display: none; }
+
+/* The sticky note in dark mode.
+
+   It is a note, so in light mode it is yellow and meant to be. On a dark
+   page that yellow was the brightest thing on screen and read as an alarm.
+
+   This also puts the close button back. It was never missing: its colour
+   and its header's colour both come from the amber family, so in dark mode
+   it was pale amber on yellow -- measured at 19 points of brightness
+   apart, where about 60 is the floor for something you have to find. The
+   note now has a header that is darker than its own body, and the cross
+   sits on it in near-white. */
+:root[data-theme="dark"] .sticky-note {
+  background: #20242a;
+  border-color: #3a4049;
+  box-shadow: 3px 6px 22px rgba(0,0,0,.5);
+}
+:root[data-theme="dark"] .sticky-note-header {
+  background: #2b3038;
+  color: #e6eaf0;
+}
+:root[data-theme="dark"] .sticky-note-close { color: #e6eaf0; }
+:root[data-theme="dark"] .sticky-note-close:hover { color: #ffffff; }
+:root[data-theme="dark"] .snote-table {
+  color: #d7dce3;
+  border-color: #3a4049;
+}
+:root[data-theme="dark"] .snote-table thead th {
+  background: #2b3038;
+  color: #e6eaf0;
+  border-bottom-color: #3a4049;
+  border-right-color: #3a4049;
+}
+:root[data-theme="dark"] .snote-row td {
+  border-bottom-color: #30353d;
+  border-right-color: #30353d;
+}
+:root[data-theme="dark"] .snote-no { color: #a3abb8; }
 
 .sticky-note-header {
   background: var(--c-fde047);

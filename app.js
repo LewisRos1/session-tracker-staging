@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2319";
+const APP_VERSION = "2320";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -16711,8 +16711,20 @@ function renderCheckedByStripHtml(data, confirmRole, isGroup = false) {
           const yours = idComments.filter(([, c]) => correctionTurn(c) === mine).length;
           const word  = mine === "daisy" ? "to check" : "to fix";
           const colorCls = left === 0 ? " wf-note-btn--green" : " wf-note-btn--red";
+          // Nought on your plate is not the same as nothing outstanding.
+          //
+          // Every row sat on Needs Revision, which is the instructor's turn,
+          // so Ms. Daisy had nothing to check and the button said "0 to
+          // check" beside two corrections nobody had touched. The sentence
+          // was true and still told her the wrong thing. When her own count
+          // is nought but the list is not finished, it names who it is
+          // waiting on instead.
+          const otherName = mine === "daisy" ? name : "Ms. Daisy";
+          const summary = left === 0 ? "all approved"
+            : yours > 0 ? `${yours} ${word}`
+            : `${left} waiting on ${otherName}`;
           return `<button class="wf-note-btn${colorCls}" data-action="open-note" data-inst-id="${escHtml(id)}">
-            📝 List of Corrections – ${escHtml(name)} (${left === 0 ? "all approved" : `${yours} ${word}`})
+            📝 List of Corrections – ${escHtml(name)} (${summary})
           </button>`;
         }).join("")}
   </div>`;

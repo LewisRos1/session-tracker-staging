@@ -412,6 +412,9 @@ const exposed = [
   // The View/Edit past session table, so a test can read the rows it builds
   // rather than driving the whole screen to get at them.
   "buildTargetViewTable",
+  // The phase strip, so a test can read the List of Corrections button's
+  // wording without driving a whole session screen to reach it.
+  "renderCheckedByStripHtml",
 ];
 let shim = `
 

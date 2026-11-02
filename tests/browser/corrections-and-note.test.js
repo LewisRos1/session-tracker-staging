@@ -1,0 +1,185 @@
+// Four things Lewis found on live, in one place because two of them turned
+// out to be the same bug.
+//
+//   1. "List of Corrections - Rayhanah (0 to check)" sat beside two
+//      corrections nobody had touched. The number was Ms. Daisy's own
+//      workload, and both rows were on Needs Revision, which is the
+//      instructor's turn -- so nought was true and told her the wrong
+//      thing. It now names who the list is waiting on.
+//
+//   2. A ticked answer bubble went white in dark mode. White is right for a
+//      picked day in the date grid, one cell out of thirty-five, but a row
+//      of white bubbles was shouting. Grey, still clearly chosen.
+//
+//   3 and 4. The sticky note's close button was reported missing. It was
+//      never missing. Its colour and its header's colour both came from the
+//      amber family, so in dark mode it was pale amber on yellow: 19 points
+//      of brightness apart, where about 60 is the floor for something you
+//      have to find. Giving the note a dark theme put the cross back.
+//
+//   deno run -A tests/browser/corrections-and-note.test.js <harness-dir>
+
+import { openPage, reporter } from "./driver.js";
+
+const dir = Deno.args[0];
+if (!dir) { console.error("usage: corrections-and-note.test.js <harness-dir>"); Deno.exit(2); }
+
+const r = reporter();
+const page = await openPage(dir, { verbose: Deno.args.includes("--verbose") });
+const settle = (ms = 400) => new Promise(res => setTimeout(res, ms));
+
+const lum = rgb => {
+  const m = String(rgb).match(/\d+/g);
+  return m ? Math.round(0.299 * +m[0] + 0.587 * +m[1] + 0.114 * +m[2]) : null;
+};
+const setTheme = mode =>
+  page.eval(`document.documentElement.setAttribute("data-theme", ${JSON.stringify(mode)})`);
+
+// A session where Rayhanah entered the data and Ms. Daisy has written two
+// corrections, both still on Needs Revision.
+const sessionWith = (statuses) => ({
+  date: "2026-10-29", studentId: "s1",
+  participants: ["ray"],
+  checks: { p1_ray: { by: "ray", at: 1 }, p2_daisy: { by: "daisy", at: 2 } },
+  // The field is reviewComments. "comments" is not one the app reads.
+  reviewComments: Object.fromEntries(statuses.map((s, i) => [
+    "c" + i,
+    // forInstructor is the field the app reads; instructorId is not one.
+    { text: "correction " + i, byId: "daisy", forInstructor: "ray",
+      ...(s === null ? {} : { fixStatus: s }) },
+  ])),
+  activities: {}, remarks: {},
+});
+
+const buttonText = (data, asUser) => page.eval(`(() => {
+  window.__app.state.currentUser = { id: ${JSON.stringify(asUser)}, name: ${JSON.stringify(asUser)} };
+  const host = document.createElement("div");
+  host.innerHTML = String(window.__app.renderCheckedByStripHtml(${JSON.stringify(data)}, null, false) ?? "");
+  const btn = [...host.querySelectorAll(".wf-note-btn")]
+    .find(b => /List of Corrections/.test(b.textContent));
+  return btn ? btn.textContent.replace(/\\s+/g, " ").trim() : null;
+})()`);
+
+try {
+  await page.fixture({
+    today: "2026-11-02", authUser: "daisy",
+    students: [{ id: "s1", name: "Kayden Koh", order: 1,
+      targets: [{ id: "t1", name: "Self-Regulation", scale: 3, predefinedActivities: [] }] }],
+    groups: [],
+    sessions: [],
+  });
+  await page.load();
+  await page.until(`!document.querySelector("#screen-home").classList.contains("hidden")`, "home");
+
+  // ── 1. the count ────────────────────────────────────────────────────
+  r.section("1. the List of Corrections button says what is outstanding");
+  const twoOpen = await buttonText(sessionWith([null, null]), "daisy");
+  r.ok("the button is rendered", !!twoOpen, String(twoOpen));
+  r.ok("two untouched corrections never read as nought",
+    !!twoOpen && !/\b0\b/.test(twoOpen), String(twoOpen));
+  r.ok("it says how many and who has them",
+    !!twoOpen && /2 waiting on Rayhanah/.test(twoOpen), String(twoOpen));
+
+  // The other states must keep working.
+  const oneBack = await buttonText(sessionWith(["done", null]), "daisy");
+  r.ok("one marked Done is one for Ms. Daisy to check",
+    !!oneBack && /1 to check/.test(oneBack), String(oneBack));
+  const allFixed = await buttonText(sessionWith(["fixed", "fixed"]), "daisy");
+  r.ok("and a finished list still says all approved",
+    !!allFixed && /all approved/.test(allFixed), String(allFixed));
+  const mixed = await buttonText(sessionWith(["fixed", null]), "daisy");
+  r.ok("one approved, one not, is still one waiting on Rayhanah",
+    !!mixed && /1 waiting on Rayhanah/.test(mixed), String(mixed));
+
+  // ── 2. the ticked bubble ────────────────────────────────────────────
+  r.section("2. a ticked answer bubble is grey in dark mode, not white");
+  const chip = async () => page.eval(`(() => {
+    const probe = (prop) => {
+      const el = document.createElement("span");
+      el.style.background = "var(" + prop + ")";
+      document.body.appendChild(el);
+      const v = getComputedStyle(el).backgroundColor;
+      el.remove(); return v;
+    };
+    return { chip: probe("--chip-on-bg"), day: probe("--pick-bg") };
+  })()`);
+
+  await setTheme("dark");
+  await settle(250);
+  const darkChip = await chip();
+  r.ok("the bubble is a mid grey, well short of white",
+    lum(darkChip.chip) > 70 && lum(darkChip.chip) < 160,
+    `${darkChip.chip} (brightness ${lum(darkChip.chip)})`);
+  r.ok("but still clearly lighter than the page behind it",
+    lum(darkChip.chip) - lum(await page.eval(
+      `getComputedStyle(document.body).backgroundColor`)) > 45,
+    JSON.stringify(darkChip));
+  // The date grid keeps white. One cell out of thirty-five has to be
+  // findable at a glance; a row of bubbles does not.
+  r.ok("a picked day in the date grid is still white",
+    lum(darkChip.day) > 230, `${darkChip.day} (brightness ${lum(darkChip.day)})`);
+
+  await setTheme("light");
+  await settle(250);
+  const lightChip = await chip();
+  r.check("and light mode is the indigo it always was",
+    lightChip.chip, "rgb(99, 102, 241)");
+
+  // ── 3 and 4. the sticky note ────────────────────────────────────────
+  for (const mode of ["light", "dark"]) {
+    r.section(`3. the sticky note's close button, in ${mode} mode`);
+    await setTheme(mode);
+    await settle(250);
+    const x = await page.eval(`(() => {
+      const note = document.getElementById("sticky-note");
+      note.classList.remove("hidden");
+      document.getElementById("sticky-note-title").textContent =
+        "\\u{1F4DD} List of Corrections \\u2013 Rayhanah";
+      const btn = document.getElementById("btn-sticky-note-close");
+      if (!btn) return { missing: true };
+      const nb = note.getBoundingClientRect(), xb = btn.getBoundingClientRect();
+      return {
+        w: Math.round(xb.width),
+        inside: xb.right <= nb.right + 1 && xb.left >= nb.left - 1,
+        fg: getComputedStyle(btn).color,
+        headerBg: getComputedStyle(btn.parentElement).backgroundColor,
+        noteBg: getComputedStyle(note).backgroundColor,
+      };
+    })()`);
+    r.ok("the cross is there and has a size", !x.missing && x.w > 0, JSON.stringify(x));
+    r.ok("it is inside the note rather than clipped off the edge",
+      !x.missing && x.inside, JSON.stringify(x));
+    // The number that mattered: it was 19 in dark mode, which is why it was
+    // reported as missing rather than as hard to see.
+    const gap = Math.abs(lum(x.fg) - lum(x.headerBg));
+    r.ok(`it stands out from its header (gap ${gap})`, gap >= 60, JSON.stringify(x));
+    const closed = await page.eval(`(() => {
+      document.getElementById("btn-sticky-note-close").click();
+      return document.getElementById("sticky-note").classList.contains("hidden");
+    })()`);
+    r.ok("and clicking it closes the note", closed, String(closed));
+
+    if (mode === "dark") {
+      r.section("4. and the note itself is dark, not a yellow lamp");
+      r.ok("the note body is dark", lum(x.noteBg) < 70,
+        `${x.noteBg} (brightness ${lum(x.noteBg)})`);
+      r.ok("and its header is not the bright yellow it was",
+        lum(x.headerBg) < 90, `${x.headerBg} (brightness ${lum(x.headerBg)})`);
+    } else {
+      r.ok("the note is still yellow in light mode, as a note should be",
+        lum(x.noteBg) > 200, `${x.noteBg} (brightness ${lum(x.noteBg)})`);
+    }
+  }
+
+  r.section("console");
+  const noise = page.consoleLines.filter(l => l.level === "error");
+  r.ok("no console errors", noise.length === 0,
+    noise.slice(0, 3).map(n => n.text.slice(0, 140)).join("\n        "));
+} catch (err) {
+  console.log(`\nThe run stopped early: ${err.message}`);
+  r.ok("the run finished", false, err.message);
+} finally {
+  await page.close();
+}
+
+r.done("Corrections count, ticked bubbles, and the sticky note");
