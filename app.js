@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2335";
+const APP_VERSION = "2336";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -23154,7 +23154,15 @@ function actStartDateHtml(activeFrom, idx) {
 function showActStartDatePicker() {
   const act = _actStartPickerActs?.[_actStartPickerIdx];
   const isEnd = _actStartPickerField === "activeTo";
-  const hasExistingDate = !!(isEnd ? act?.activeTo : act?.activeFrom);
+  // Only an END date can be taken off.
+  //
+  // Clearing a START date meant "show this in every session, however old",
+  // which nobody wanted and which did not even hold: a backfill set any
+  // empty one to 2026-01-01 the next time a session was started, so the
+  // button quietly reset the date instead of removing it. An end date is
+  // the opposite -- no end date is the normal state, and there has to be a
+  // way back to it once one is set.
+  const hasExistingDate = isEnd && !!act?.activeTo;
   const activeFrom = (isEnd ? act?.activeTo : act?.activeFrom) || todayDateStr();
   // A note keeps its words in text/noteTitle, not in title or name, so
   // asking for those gave an empty pair of brackets: "this activity ()".
@@ -23181,17 +23189,54 @@ function showActStartDatePicker() {
       <div style="font-size:.85rem;color:var(--c-6b7280);margin-bottom:.85rem">${isEnd ? "What date do you want this" : "What date do you want this"} ${actWord}${actName ? ` <strong style="color:var(--c-374151)">(${escHtml(actName)})</strong>` : ""} to ${isEnd ? "stop" : "start"} appearing?</div>
       <div id="act-start-picker-err" style="display:none;font-size:.82rem;color:var(--c-dc2626);margin-bottom:.5rem;line-height:1.4;padding:.4rem .6rem;background:var(--c-fee2e2);border-radius:.4rem"></div>
       <input type="date" id="act-start-picker-inp" value="${activeFrom}" style="width:100%;font-size:1rem;border:1.5px solid var(--c-d1d5db);border-radius:.5rem;padding:.55rem .65rem;box-sizing:border-box;margin-bottom:.85rem">
+      ${hasExistingDate ? `<button id="act-start-picker-clear" style="width:100%;padding:.65rem;font-size:.9rem;border:1px solid var(--c-fca5a5);border-radius:.5rem;background:var(--c-fee2e2);cursor:pointer;color:var(--c-dc2626);font-weight:600;margin-bottom:.5rem">✕ No End Date</button>` : ''}
       <div style="display:flex;gap:.5rem">
-        ${hasExistingDate ? `<button id="act-start-picker-clear" style="flex:1;padding:.65rem;font-size:.9rem;border:1px solid var(--c-fca5a5);border-radius:.5rem;background:var(--c-fee2e2);cursor:pointer;color:var(--c-dc2626);font-weight:600">✕ ${isEnd ? "No End Date" : "Clear Date"}</button>` : ''}
         <button id="act-start-picker-cancel" style="flex:1;padding:.65rem;font-size:.9rem;border:1px solid var(--c-d1d5db);border-radius:.5rem;background:var(--c-f9fafb);cursor:pointer;color:var(--c-6b7280);font-weight:600">Cancel</button>
+        <button id="act-start-picker-confirm" style="flex:1;padding:.65rem;font-size:.9rem;border:1px solid var(--c-6366f1);border-radius:.5rem;background:var(--c-6366f1);cursor:pointer;color:var(--c-onaccent);font-weight:700">Confirm</button>
       </div>
     </div>
   </div>`;
   document.getElementById('act-start-picker-backdrop').onclick = e => { if (e.target.id === 'act-start-picker-backdrop') closeActStartDatePicker(); };
-  document.getElementById('act-start-picker-inp').addEventListener('change', handleActStartPickerChange);
+  // Picking a date used to be the whole decision: the sheet acted on
+  // 'change' and shut itself. A calendar fires that the instant you touch a
+  // day, so there was no way to look at what you had chosen, and no way back
+  // except re-opening the sheet. The date is chosen here and applied by
+  // Confirm, which is also when it is checked against the sessions.
+  document.getElementById('act-start-picker-inp').addEventListener('change', () => {
+    const errDiv = document.getElementById('act-start-picker-err');
+    if (errDiv) { errDiv.style.display = 'none'; errDiv.textContent = ''; }
+  });
+  document.getElementById('act-start-picker-confirm')
+    .addEventListener('click', handleActStartPickerChange);
   const clearBtn = document.getElementById('act-start-picker-clear');
   if (clearBtn) clearBtn.addEventListener('click', async () => { closeActStartDatePicker(); await _actStartPickerSaveFn(_actStartPickerIdx, _actStartPickerField, null); });
   document.getElementById('act-start-picker-cancel').addEventListener('click', closeActStartDatePicker);
+}
+
+/**
+ * Put a new date on the buttons that show it, without redrawing the screen.
+ *
+ * The Edit Target screen writes nothing while an activity panel is open,
+ * because Discard Changes can only put things back if they never left. The
+ * date picker did not know that: it set the value, called a save that the
+ * hold swallowed, and then forced a full redraw -- which tore down the panel
+ * you were working in and lost the date with it. Nothing ever reached
+ * Firestore and the row still showed the old day.
+ *
+ * So while a panel is open the date behaves like every other field in it:
+ * it goes into the list in memory, the button shows it, and Save and Close
+ * writes it along with everything else. Discard Changes takes it back out,
+ * which is the same promise the panel makes about the title and the details.
+ *
+ * Notes, parent activities, sub-activities and template rows all draw this
+ * button from the same two classes, so they are all covered by this.
+ */
+function mnPaintDateBtn(idx, field, value) {
+  const isEnd = field === "activeTo";
+  const cls   = isEnd ? "mn-act-end-btn" : "mn-act-start-btn";
+  const label = value ? fmtPeriodDate(value) : (isEnd ? "No end date" : "Set date");
+  document.querySelectorAll(`.${cls}[data-idx="${idx}"]`)
+    .forEach(btn => { btn.textContent = `📅 ${label}`; });
 }
 
 function closeActStartDatePicker() {
@@ -29613,6 +29658,9 @@ function renderTargetManageContent(student, target) {
     if (!acts[idx]) return;
     acts[idx][field] = value || null;
     target.predefinedActivities = acts;
+    // A panel is open, so this is part of the draft it is holding. Redrawing
+    // here would shut the panel, and saveTarget would write nothing anyway.
+    if (_mnPanelHold) { mnPaintDateBtn(idx, field, value || null); return; }
     await saveTarget();
     renderTargetManageContent(student, target);
   };
@@ -30879,6 +30927,8 @@ function renderTemplateManageContent(template) {
         if (!acts[idx]) return;
         acts[idx][field] = value || null;
         template.predefinedActivities = acts;
+        // Same hold as the target screen: see mnPaintDateBtn.
+        if (_mnPanelHold) { mnPaintDateBtn(idx, field, value || null); return; }
         await saveTemplateFn();
         renderTemplateManageContent(template);
       };

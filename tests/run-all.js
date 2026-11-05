@@ -156,6 +156,9 @@ results.push(await run("Dark mode: the theme, and the exports it must not touch"
 results.push(await run("Start Session screens: what they print",
   ["run", "-A", "tests/browser/session-screen-display.test.js", HARNESS]));
 
+results.push(await run("Setting an activity's Start Date",
+  ["run", "-A", "tests/browser/activity-start-date.test.js", HARNESS]));
+
 console.log(`\n${"=".repeat(60)}`);
 let failed = 0;
 for (const res of results) {

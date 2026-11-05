@@ -424,6 +424,9 @@ const exposed = [
   "getWorkflowState",
   // Who may tick which phase pill.
   "canTickPill",
+  // Repainting a date button in place, instead of redrawing the screen
+  // and tearing down the panel the person is working in.
+  "mnPaintDateBtn",
 ];
 let shim = `
 
