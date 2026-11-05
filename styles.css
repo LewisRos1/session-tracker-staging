@@ -3563,6 +3563,81 @@ div.admin-note-editable:empty::before {
 }
 .checklist-group-header:first-child { border-top: none; margin-top: 0; }
 
+/* ─── Student Database ──────────────────────────────── */
+/* A list of names, then one student at a time. It was a table eleven
+   columns wide that scrolled sideways, with four name variants and two
+   columns empty for everybody -- and nowhere to say what a field was for,
+   which is how Note and Program came to sound like the same thing. */
+.reg-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--c-e5e7eb);
+  border-radius: .6rem;
+  overflow: hidden;
+  background: var(--c-ffffff);
+}
+.reg-list-row {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  width: 100%;
+  padding: .85rem 1rem;
+  border: none;
+  border-bottom: 1px solid var(--c-f3f4f6);
+  background: none;
+  font: inherit;
+  font-size: 1rem;
+  color: var(--c-111827);
+  text-align: left;
+  cursor: pointer;
+}
+.reg-list-row:last-child { border-bottom: none; }
+.reg-list-row:hover  { background: var(--c-f3f4f6); }
+.reg-list-row:active { background: var(--c-e5e7eb); }
+.reg-list-name { flex: 1; min-width: 0; overflow-wrap: break-word; }
+.reg-list-go   { flex: none; color: var(--c-9ca3af); font-size: 1.2rem; }
+
+/* One student. Every field on its own line, with room under the label to
+   say where the value actually shows up. */
+.reg-back { margin-bottom: .9rem; }
+.reg-detail-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--c-111827);
+  margin: 0 0 1.1rem;
+  overflow-wrap: break-word;
+}
+.reg-field { margin-bottom: 1.1rem; }
+.reg-field-label {
+  font-size: .95rem;
+  font-weight: 700;
+  color: var(--c-111827);
+  margin-bottom: .15rem;
+}
+.reg-field-hint {
+  font-size: .8rem;
+  color: var(--c-6b7280);
+  line-height: 1.35;
+  margin-bottom: .4rem;
+}
+.reg-field .admin-input,
+.reg-field select { width: 100%; box-sizing: border-box; }
+.reg-save { width: 100%; margin-top: .4rem; }
+.reg-delete {
+  width: 100%;
+  margin-top: 1.6rem;
+  padding: .7rem;
+  border: 1px solid var(--c-fca5a5);
+  border-radius: .5rem;
+  background: var(--c-fee2e2);
+  color: var(--c-dc2626);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.reg-delete:hover { background: var(--c-fecaca); }
+
+
 /* ─── Workflow Flowchart ─────────────────────────────────────── */
 .workflow-chart {
   display: grid;

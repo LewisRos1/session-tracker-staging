@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2339";
+const APP_VERSION = "2340";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -3687,94 +3687,161 @@ function applyRegistryReadOnly() {
   }, true);
 }
 
+/**
+ * The student whose details are open, or null for the list.
+ *
+ * The screen used to be one table eleven columns wide, scrolling sideways,
+ * with every field of every student on it at once. Four of those columns
+ * were name variants and two were empty for everybody. Reading one student
+ * meant tracking a row across a scroll, and there was nowhere to say what a
+ * field was for -- which is how Note and Program came to sound like the
+ * same thing.
+ *
+ * A list of names, then one student at a time, with each field on its own
+ * line and a sentence under it saying where it shows up.
+ */
+let _registryOpenId = null;
+
+/** Date of birth to the day it falls on, or "" when none is set. */
+function dobOn(student) {
+  const raw = (student?.dob || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return "";
+  const d = new Date(raw + "T00:00:00");
+  return isNaN(d) ? "" : d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+}
+
+/**
+ * How old the student is on a given day, as "7 years, 9 months".
+ *
+ * Whole months, counted the way a person counts them: the day of the month
+ * has to have come round again before the month is over. Blank when there
+ * is no date of birth, or when the date is after the day asked about.
+ */
+function ageOn(student, onDate = new Date()) {
+  const raw = (student?.dob || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return "";
+  const born = new Date(raw + "T00:00:00");
+  if (isNaN(born) || born > onDate) return "";
+  let years  = onDate.getFullYear() - born.getFullYear();
+  let months = onDate.getMonth() - born.getMonth();
+  if (onDate.getDate() < born.getDate()) months--;
+  if (months < 0) { years--; months += 12; }
+  const y = `${years} year${years === 1 ? "" : "s"}`;
+  const m = `${months} month${months === 1 ? "" : "s"}`;
+  return years ? `${y}, ${m}` : m;
+}
+
 async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
   const body = $("student-registry-body");
   if (!body) return;
 
   const sorted = [...state.students].sort((a, b) => a.name.localeCompare(b.name));
 
+  const openStudent = _registryOpenId
+    ? state.students.find(x => x.id === _registryOpenId)
+    : null;
+  // The student was deleted from under us, or the id is stale.
+  if (_registryOpenId && !openStudent) _registryOpenId = null;
+
+  if (openStudent) {
+    renderStudentDetail(body, openStudent);
+    wireStudentRegistryHandlers(body, [openStudent], false);
+    return;
+  }
+
   body.innerHTML = `
     <div style="padding:1rem">
       <div style="display:flex;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap">
         <button class="export-btn" id="btn-add-student-row">+ Add New Student</button>
       </div>
-      <div class="view-table-wrapper">
-        <table class="view-table registry-table">
-          <colgroup>
-            <col style="width:42px">
-            <col style="width:150px">
-            <col style="width:130px">
-            <col style="width:170px">
-            <col style="width:130px">
-            <col style="width:130px">
-            <col style="width:160px">
-            <col style="width:110px">
-            <col style="width:150px">
-            <col style="width:48px">
-          </colgroup>
-          <thead>
-            <tr>
-              <th>No.</th>
-              <th>Full Name</th>
-              <th style="white-space:normal">Full Name (Chinese)</th>
-              <th style="white-space:normal">Gender (For pronoun purposes in AI Reports)</th>
-              <th style="white-space:normal">Short Name (Used in AI Reports)</th>
-              <th style="white-space:normal">Short Name (Chinese)</th>
-              <th>Note</th>
-              <th style="white-space:normal">Report Type</th>
-              <th style="white-space:normal">Latest Individual Session Recorded</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="student-registry-tbody">
-            ${sorted.map((s, i) => `
-              <tr class="registry-row" data-id="${escHtml(s.id)}">
-                <td style="text-align:center">${i + 1}</td>
-                <td style="text-align:center" onclick="event.stopPropagation()">
-                  <input class="admin-input db-fullname-input" data-id="${escHtml(s.id)}"
-                    value="${escHtml(s.name || '')}" autocomplete="off"
-                    style="width:100%;text-align:center" />
-                </td>
-                <td style="text-align:center" onclick="event.stopPropagation()">
-                  <input class="admin-input db-fullname-zh-input" data-id="${escHtml(s.id)}"
-                    value="${escHtml(s.nameZh || '')}" placeholder="—" autocomplete="off"
-                    title="Only needed for a Chinese report. Leave it empty otherwise."
-                    style="width:100%;text-align:center" />
-                </td>
-                <td style="text-align:center" onclick="event.stopPropagation()">
-                  ${genderSelectHtml(s)}
-                </td>
-                <td style="text-align:center" onclick="event.stopPropagation()">
-                  <input class="admin-input db-shortname-input" data-id="${escHtml(s.id)}"
-                    value="${escHtml(s.preferredName || '')}" placeholder="—" autocomplete="off"
-                    style="width:100%;text-align:center" />
-                </td>
-                <td style="text-align:center" onclick="event.stopPropagation()">
-                  <input class="admin-input db-shortname-zh-input" data-id="${escHtml(s.id)}"
-                    value="${escHtml(s.shortNameZh || '')}" placeholder="—" autocomplete="off"
-                    title="Only needed for a Chinese report. Leave it empty otherwise."
-                    style="width:100%;text-align:center" />
-                </td>
-                <td style="text-align:center" onclick="event.stopPropagation()">
-                  <input class="admin-input db-note-input" data-id="${escHtml(s.id)}"
-                    value="${escHtml(noteBare(s.note))}" placeholder="—" autocomplete="off"
-                    title="No brackets needed — they are added automatically in the sessions list and the reports."
-                    style="width:100%;text-align:center" />
-                </td>
-                <td style="text-align:center" onclick="event.stopPropagation()">
-                  ${(() => { const m = s.exportDuration === "monthly"; return `<select class="db-export-dur-select admin-input" data-id="${escHtml(s.id)}" style="width:100%;text-align:center;font-size:.82rem;font-weight:600;cursor:pointer;background:${m ? "var(--c-f3f4f6)" : "var(--c-dbeafe)"};color:${m ? "var(--c-6b7280)" : "var(--c-1d4ed8)"};border-color:${m ? "var(--c-d1d5db)" : "var(--c-93c5fd)"}"><option value="monthly"${m ? " selected" : ""}>Monthly</option><option value="every_session"${m ? "" : " selected"}>Every Session</option></select>`; })()}
-                </td>
-                <td class="reg-indiv-num" data-id="${escHtml(s.id)}" title="Click to renumber this student's sessions" style="text-align:center;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px">…</td>
-                <td style="text-align:center" onclick="event.stopPropagation()">
-                  <button class="db-del-student" data-id="${escHtml(s.id)}" title="Delete this student"
-                    style="background:none;border:none;cursor:pointer;font-size:1rem;line-height:1;padding:.3rem;color:var(--c-dc2626)">🗑</button>
-                </td>
-              </tr>`).join("")}
-          </tbody>
-        </table>
+      <div class="reg-list">
+        ${sorted.map(st => `
+          <button class="reg-list-row" data-id="${escHtml(st.id)}">
+            <span class="reg-list-name">${escHtml(studentLabel(st))}</span>
+            <span class="reg-list-go" aria-hidden="true">›</span>
+          </button>`).join("")}
       </div>
       ${sorted.length === 0 ? `<p class="empty-hint" style="padding:1rem">No students registered yet.</p>` : ""}
     </div>`;
+
+  // studentLabel puts the note in brackets after the name, which is the
+  // only thing telling three records called Caden Tan apart.
+  body.querySelectorAll(".reg-list-row").forEach(row => {
+    row.addEventListener("click", () => {
+      _registryOpenId = row.dataset.id;
+      renderStudentRegistryBody();
+    });
+  });
+
+  wireStudentRegistryHandlers(body, sorted, highlightAdd);
+
+}
+
+
+/**
+ * One student, every field on its own line with a note saying where it
+ * lands. The classes are the same ones the table used, so the handlers
+ * below work on either view without knowing which is on screen.
+ */
+function renderStudentDetail(body, st) {
+  const id = escHtml(st.id);
+  const field = (label, hint, control) => `
+    <div class="reg-field">
+      <div class="reg-field-label">${escHtml(label)}</div>
+      <div class="reg-field-hint">${escHtml(hint)}</div>
+      ${control}
+    </div>`;
+  const text = (cls, value, extra = "") => `
+    <input class="admin-input ${cls}" data-id="${id}" value="${escHtml(value || "")}"
+      placeholder="\u2014" autocomplete="off" ${extra} />`;
+
+  body.innerHTML = `
+    <div style="padding:1rem;max-width:620px;margin:0 auto">
+      <button class="export-btn reg-back" id="btn-reg-back">\u2190 All Students</button>
+      <h2 class="reg-detail-title">${escHtml(studentLabel(st))}</h2>
+
+      ${field("Full Name", "The student's name, as it appears everywhere.",
+        text("db-fullname-input", st.name))}
+      ${field("Full Name (Chinese)", "Only needed for a Chinese report. Leave it empty otherwise.",
+        text("db-fullname-zh-input", st.nameZh))}
+      ${field("Gender", "Decides which pronouns the AI uses in a report.",
+        genderSelectHtml(st))}
+      ${field("Short Name", "What the AI calls the student in a report.",
+        text("db-shortname-input", st.preferredName))}
+      ${field("Short Name (Chinese)", "Only needed for a Chinese report. Leave it empty otherwise.",
+        text("db-shortname-zh-input", st.shortNameZh))}
+      ${field("Date of Birth", "Fills Date of Birth and Age on the report's Student Details.",
+        `<input type="date" class="admin-input db-dob-input" data-id="${id}" value="${escHtml(st.dob || "")}" />`
+        + (ageOn(st) ? `<div class="reg-field-hint" style="margin-top:.3rem">Age today: ${escHtml(ageOn(st))}</div>` : ""))}
+      ${field("Note", "Shown in brackets after the name, here and everywhere else. It is what tells two records of the same student apart. No brackets needed.",
+        text("db-note-input", noteBare(st.note)))}
+      ${field("Program", "Shown on the report cover page. Leave it empty to leave the box blank.",
+        text("db-program-input", st.program))}
+      ${field("Report Type", "Whether this student gets a report every session or once a month.",
+        `${(() => { const m = st.exportDuration === "monthly";
+          return `<select class="db-export-dur-select admin-input" data-id="${id}"><option value="monthly"${m ? " selected" : ""}>Monthly</option><option value="every_session"${m ? "" : " selected"}>Every Session</option></select>`; })()}`)}
+
+      <div class="reg-field">
+        <div class="reg-field-label">Sessions Recorded</div>
+        <div class="reg-field-hint">Click the number to renumber this student's sessions.</div>
+        <span class="reg-indiv-num" data-id="${id}"
+          style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px">\u2026</span>
+      </div>
+
+      <button class="db-del-student reg-delete" data-id="${id}">\u{1F5D1} Delete Student</button>
+    </div>`;
+
+  body.querySelector("#btn-reg-back")?.addEventListener("click", () => {
+    _registryOpenId = null;
+    renderStudentRegistryBody();
+  });
+}
+
+/**
+ * Everything you can do to a student. Attached after either view is drawn;
+ * whichever controls are not on screen simply match nothing.
+ */
+function wireStudentRegistryHandlers(body, sorted, highlightAdd) {
 
   // Only the session number opens the renumbering popup. Clicking anywhere else
   // on the row used to open it, which is how a popup about session numbers
@@ -3842,6 +3909,43 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
       });
     });
   }
+
+  // Program and Date of Birth. Neither is shown anywhere in the app, and
+  // neither changes how a student is identified, so they save on blur with
+  // none of the duplicate checking the name and note need.
+  $("student-registry-body").querySelectorAll(".db-program-input").forEach(input => {
+    input.addEventListener("keydown", e => { if (e.key === "Enter") input.blur(); });
+    input.addEventListener("blur", async () => {
+      const st = state.students.find(x => x.id === input.dataset.id);
+      if (!st) return;
+      const v = input.value.trim();
+      if (v === (st.program || "")) return;
+      st.program = v;
+      await saveStudent(st);
+      flashSaved(input);
+    });
+  });
+
+  $("student-registry-body").querySelectorAll(".db-dob-input").forEach(input => {
+    input.addEventListener("change", async () => {
+      const st = state.students.find(x => x.id === input.dataset.id);
+      if (!st) return;
+      const v = (input.value || "").trim();
+      if (v === (st.dob || "")) return;
+      // A date in the future is somebody mistyping the year, and it would
+      // put a blank Age in the report with no clue why.
+      if (v && new Date(v + "T00:00:00") > new Date()) {
+        alert("That date of birth is in the future. Please check the year.");
+        input.value = st.dob || "";
+        return;
+      }
+      st.dob = v;
+      await saveStudent(st);
+      flashSaved(input);
+      // The age line under the field is now out of date.
+      renderStudentRegistryBody();
+    });
+  });
 
   $("student-registry-body").querySelectorAll(".db-note-input").forEach(input => {
     input.addEventListener("blur", async () => {
@@ -3929,18 +4033,19 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
     });
   });
 
-  $("btn-add-student-row").addEventListener("click", () =>
+  // Only on the list. The student's own page has no Add button.
+  $("btn-add-student-row")?.addEventListener("click", () =>
     requirePassword(startAddStudentRow, EXPORT_MSG));
   applyRegistryReadOnly();
 
-  if (highlightAdd) {
-    const btn = $("btn-add-student-row");
-    btn.classList.add("btn-flash-hint");
-    setTimeout(() => btn.classList.remove("btn-flash-hint"), 3400);
+  const addBtn = $("btn-add-student-row");
+  if (highlightAdd && addBtn) {
+    addBtn.classList.add("btn-flash-hint");
+    setTimeout(() => addBtn.classList.remove("btn-flash-hint"), 3400);
   }
 
   const latestNumber = sessions => sessions.reduce((max, s) => Math.max(max, s.number || 0), 0);
-  sorted.forEach(s => {
+  (sorted || []).forEach(s => {
     getIndividualSessionsForStudent(s.id).catch(() => []).then(indiv => {
       const indivCell = body.querySelector(`.reg-indiv-num[data-id="${s.id}"]`);
       if (indivCell) indivCell.textContent = latestNumber(indiv) || "—";
@@ -3948,28 +4053,50 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
   });
 }
 
+
+/**
+ * Adding a student, as a form rather than a row in a table.
+ *
+ * It used to append a <tr> to the registry table and mirror its columns.
+ * There is no table any more, so it is the same three required fields in
+ * the same shape as the student's own page, with the same duplicate check
+ * -- two records sharing a full name AND a note cannot be told apart, here
+ * or in an exported file.
+ */
 function startAddStudentRow() {
-  const tbody = $("student-registry-tbody");
-  if (!tbody || $("new-student-row")) return;
-  $("btn-add-student-row").disabled = true;
-  const nextNo = tbody.querySelectorAll("tr").length + 1;
-  const tr = document.createElement("tr");
-  tr.id = "new-student-row";
-  // The row mirrors the columns it sits under, so what is typed lands where it
-  // will be read back. Gender uses the same pill as the rest of the column.
+  const body = $("student-registry-body");
+  if (!body || $("new-student-form")) return;
+
   let newGender = "";
-  tr.innerHTML = `
-    <td style="padding:.5rem .3rem;text-align:center">${nextNo}</td>
-    <td style="padding:.3rem"><input class="admin-input" id="new-student-name" placeholder="Full name" style="width:100%;text-align:center" /></td>
-    <td style="padding:.3rem;text-align:center">${genderSelectHtml({ id: "new-student", gender: "" }).replace('class="db-gender-select admin-input"', 'class="db-gender-select admin-input" id="new-student-gender"')}</td>
-    <td style="padding:.3rem"><input class="admin-input" id="new-student-short" placeholder="Short name" style="width:100%;text-align:center" /></td>
-    <td style="padding:.3rem"><input class="admin-input" id="new-student-note" placeholder="—" title="No brackets needed — they are added automatically." style="width:100%;text-align:center" /></td>
-    <td colspan="2" style="padding:.3rem;display:flex;gap:.4rem">
-      <button class="btn-primary-sm" id="btn-save-new-student">Save</button>
-      <button class="btn-adm-edit" id="btn-cancel-new-student">Cancel</button>
-    </td>`;
-  tbody.appendChild(tr);
-  tr.scrollIntoView({ block: "center" });
+  body.innerHTML = `
+    <div id="new-student-form" style="padding:1rem;max-width:620px;margin:0 auto">
+      <button class="export-btn reg-back" id="btn-cancel-new-student">\u2190 All Students</button>
+      <h2 class="reg-detail-title">New Student</h2>
+
+      <div class="reg-field">
+        <div class="reg-field-label">Full Name</div>
+        <div class="reg-field-hint">The student's name, as it appears everywhere.</div>
+        <input class="admin-input" id="new-student-name" placeholder="Full name" />
+      </div>
+      <div class="reg-field">
+        <div class="reg-field-label">Gender</div>
+        <div class="reg-field-hint">Decides which pronouns the AI uses in a report.</div>
+        ${genderSelectHtml({ id: "new-student", gender: "" })
+          .replace('class="db-gender-select admin-input"', 'class="db-gender-select admin-input" id="new-student-gender"')}
+      </div>
+      <div class="reg-field">
+        <div class="reg-field-label">Short Name</div>
+        <div class="reg-field-hint">What the AI calls the student in a report.</div>
+        <input class="admin-input" id="new-student-short" placeholder="Short name" />
+      </div>
+      <div class="reg-field">
+        <div class="reg-field-label">Note</div>
+        <div class="reg-field-hint">Optional. Shown in brackets after the name, and the only thing telling two records of the same student apart. No brackets needed.</div>
+        <input class="admin-input" id="new-student-note" placeholder="\u2014" />
+      </div>
+
+      <button class="btn-primary-sm reg-save" id="btn-save-new-student">Save Student</button>
+    </div>`;
 
   const nameInput  = $("new-student-name");
   const shortInput = $("new-student-short");
@@ -4026,10 +4153,15 @@ function startAddStudentRow() {
     };
     state.students.push(s);
     await withSaveFeedback($("btn-save-new-student"), saveStudent(s));
+    // Straight into the new student's page, where the rest of the fields are.
+    _registryOpenId = s.id;
     renderStudentRegistryBody();
   });
 
-  $("btn-cancel-new-student").addEventListener("click", renderStudentRegistryBody);
+  $("btn-cancel-new-student").addEventListener("click", () => {
+    _registryOpenId = null;
+    renderStudentRegistryBody();
+  });
 }
 
 // Dice's coefficient over character bigrams — a cheap, dependency-free way
@@ -7410,8 +7542,10 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   // Note (e.g. "(EIP)") sits beside the name, as it does everywhere else.
   paragraphs.push(mkCoverShaded(studentLabel(student)));
   paragraphs.push(mkCoverSpacer());
+  // Typed on the student's page in the Student Database. The box used to
+  // come out blank for somebody to fill in by hand after the download.
   paragraphs.push(mkCoverLabelPara("Program:"));
-  paragraphs.push(mkCoverShaded("", 28));
+  paragraphs.push(mkCoverShaded((student?.program || "").trim(), 28));
   paragraphs.push(mkCoverSpacer());
   paragraphs.push(mkCoverLabelPara("Date of Report:"));
   paragraphs.push(mkCoverShaded(reportDate));
@@ -7440,8 +7574,10 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     width: { size: 100, type: WidthType.PERCENTAGE },
     rows: [
       mkDetailRow("Name:", studentLabel(student)),
-      mkDetailRow("Date of Birth:", ""),
-      mkDetailRow("Age:", ""),
+      mkDetailRow("Date of Birth:", dobOn(student)),
+      // Worked out on the day the report is made, which is the date two
+      // rows below it.
+      mkDetailRow("Age:", ageOn(student)),
       mkDetailRow("Tracking Period:", monthRangeFull),
       mkDetailRow("Date of Report:", reportDate)
     ]
@@ -8486,8 +8622,10 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
     width: { size: 100, type: WidthType.PERCENTAGE },
     rows: [
       mkDetailRow("Name:", studentLabel(student)),
-      mkDetailRow("Date of Birth:", ""),
-      mkDetailRow("Age:", ""),
+      mkDetailRow("Date of Birth:", dobOn(student)),
+      // Worked out on the day the report is made, which is the date two
+      // rows below it.
+      mkDetailRow("Age:", ageOn(student)),
       mkDetailRow("Assessment Dates:", collected.days.map(d => d.label).join(", ")),
       mkDetailRow("Total Assessment Hours:", ""),
       mkDetailRow("Date of Report:", reportDate)
