@@ -48,6 +48,9 @@ results.push(await run("Why something was discontinued (no browser)",
 results.push(await run("Blank rows swept out of an activity list (no browser)",
   ["run", "-A", "tests/sweep-blank-acts.test.js"]));
 
+results.push(await run("An empty activity says which kind of empty (no browser)",
+  ["run", "--allow-read", "tests/empty-activity-tags.test.js"]));
+
 results.push(await run("Which targets a report for a period covers (no browser)",
   ["run", "--allow-read", "tests/report-period-targets.test.js"]));
 

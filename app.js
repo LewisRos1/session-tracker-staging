@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2338";
+const APP_VERSION = "2339";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -4900,6 +4900,7 @@ GLOBAL RULES (apply to every section):
   • Maintain (also written "Maintained"): the program continues to be reviewed over time to ensure the skill is retained, based on the behaviour analyst's discretion. A run of "Maintain" remarks means the skill is HOLDING. It is evidence of a retained skill, not evidence that nothing is happening, that progress has stalled, or that the activity was skipped. Never describe a maintained activity as a lack of progress.
   • Mastered: the learner has met the required criteria and successfully completed the program.
 - CRITICAL: ABSENT SESSIONS. Before analysing any session, determine whether the student was absent. A session is absent if: (1) every single activity across every target has no data, no remarks, and no score; OR (2) any activity remark contains the words "absent", "not present", "did not attend", or "no show" (case-insensitive match). Absent sessions must be completely excluded from all analysis: do not count them, do not average them, do not draw any conclusions from the empty activities, and do not mention absences anywhere in the report. The student was simply not there. Treat absent sessions as if they never happened.
+- CRITICAL: Two labels mean an activity had nothing recorded in this period, and NEITHER is a weakness, a difficulty, a decline or anything to write about. "not started yet" means the programme has been set up but not begun. "started, not covered this period" means it has been worked on before and other programmes took the time this period. Both say the same thing the In Progress note above says: NOTHING about the student's ability. Do not mention either one, do not count it against the student, and never write that something "has not yet been observed" or "remains untested" on the strength of it. Write about the activities that have remarks and leave these out.
 - CRITICAL: If an activity does not appear in the data below, it was never tested this period. The student's ability is completely unknown. NEVER mention it, NEVER describe it as a weakness or difficulty, NEVER say things like "has not yet been observed doing X" or "we do not yet know how they manage X". Simply do not write about it at all. No data = silence.
 - CRITICAL: Write ONLY what the session remarks directly and explicitly state. Do NOT extrapolate or infer related skills. "Identifies a face" is NOT the same as "knows a name." "Follows a one-step instruction" is NOT the same as "follows two-step instructions." "Points to an object" is NOT the same as "can name it." Stay word-for-word within what was actually recorded. Never assume a student can or cannot do something that was not directly observed.
 - CRITICAL: NEVER restate a number, a duration or a count as anything other than what the record says, and never drop the words that qualify it. "45 min" is 45 minutes: it is not "close to an hour", not "almost an hour", and not "a long stretch of time". "45 min on and off" is not 45 minutes of continuous distress, and the "on and off" must survive into whatever you write. If a figure cannot be stated exactly, leave it out rather than round it.
@@ -9291,7 +9292,20 @@ function monthlyCollectData(student, year, month, allSessions, excludedActivitie
       allRemarks.sort((a,b) => a.date.localeCompare(b.date));
       const scored = allRemarks.filter(r => r.avg !== null);
       const avgLine = scored.length ? ` (avg ${Math.round(scored.reduce((a,b)=>a+b.avg,0)/scored.length)}%)` : "";
-      const _mStatusLabel = paKeyToStatusM[actName];
+      // Nothing this month. Say WHICH kind of nothing, rather than leaving
+      // the model to read it off a blank space: a named skill with four
+      // months of "no data" beside it is exactly the shape that invites
+      // "we have not yet seen him do this" into a parent's report.
+      //
+      // The half-year and assessment reports do not need this -- neither
+      // emits a line at all for an activity with no data, which is
+      // stronger than any label.
+      let _mEmptyTag = "";
+      if (!allRemarks.length) {
+        _mEmptyTag = activityEverHadData(allSessions, tName, actName, aliases, configId, _filterGroupSess)
+          ? EMPTY_ACT_IDLE : EMPTY_ACT_NEW;
+      }
+      const _mStatusLabel = [paKeyToStatusM[actName], _mEmptyTag].filter(Boolean).join(", ");
       lines.push(`  • ${actDisplayNames[actName]||actName}${_mStatusLabel ? ` [${_mStatusLabel}]` : ""}${avgLine}`);
 
       // This activity's average for each of the 3 prior months plus this one, so a
@@ -16616,6 +16630,44 @@ function getWorkflowState(data) {
  */
 const EXPORT_NOT_READY_MSG = "You can export to Word once Phase 4 is complete.";
 
+
+/**
+ * Has anything ever been written against this activity, in any session?
+ *
+ * An activity with nothing in the reported month can be in one of two
+ * situations, and they look identical if you only count that month:
+ * it has not been started yet, or it was started earlier and this month
+ * went elsewhere. Counting across every session the student has tells
+ * them apart. A mastered or discontinued one already carries its own
+ * label, so it is not confused with either.
+ */
+function activityEverHadData(allSessions, tName, actName, aliases, configId, filterSess) {
+  for (const sess of (allSessions || [])) {
+    const fs = filterSess ? filterSess(sess) : sess;
+    const entry = Object.entries(fs.activities || {}).find(
+      ([, a]) => (a.activityName === actName
+                  || (aliases || []).includes(a.activityName)
+                  || (configId && a.configId === configId))
+                 && (a.targetName === tName || a.target === tName));
+    if (!entry) continue;
+    const [key, act] = entry;
+    const id = act.id || key;
+    const used = Object.values(fs.remarks || {}).some(r => {
+      if (r.activityId !== id) return false;
+      if ((r.text || "").replace(/<[^>]*>/g, "").trim()) return true;
+      if ((r.masteryNote || "").trim()) return true;
+      if ((r.trials || []).some(t => t !== null && t !== -1)) return true;
+      if (r.optionScore !== undefined && r.optionScore !== null) return true;
+      return (r.selectedOptions || []).length > 0;
+    });
+    if (used) return true;
+  }
+  return false;
+}
+
+/** What to put beside an activity that has nothing in the reported period. */
+const EMPTY_ACT_NEW  = "not started yet";
+const EMPTY_ACT_IDLE = "started, not covered this period";
 
 function computeWorkflowStatus(ws) {
   if (ws.daisyOnly || ws.p3Ids.length === 0) return null;
