@@ -159,6 +159,9 @@ results.push(await run("Start Session screens: what they print",
 results.push(await run("Setting an activity's Start Date",
   ["run", "-A", "tests/browser/activity-start-date.test.js", HARNESS]));
 
+results.push(await run("A parent activity's Details",
+  ["run", "-A", "tests/browser/parent-details.test.js", HARNESS]));
+
 console.log(`\n${"=".repeat(60)}`);
 let failed = 0;
 for (const res of results) {

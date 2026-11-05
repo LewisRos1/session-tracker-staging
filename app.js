@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2336";
+const APP_VERSION = "2337";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -26915,6 +26915,18 @@ function renderTargetManageContent(student, target) {
                   </div>
                 </div>
               </div>
+              <div>
+                <div style="font-size:.95rem;font-weight:700;color:var(--c-374151);margin-bottom:.28rem">Details</div>
+                <div style="border:1px solid var(--c-b8bcc4);border-radius:.45rem;overflow:hidden">
+                  <div style="display:flex;gap:.2rem;padding:.28rem .45rem;background:var(--c-f9fafb);border-bottom:1px solid var(--c-b8bcc4)">
+                    <button class="btn-fmt btn-fmt-bold" type="button" data-input-id="mn-act-details-${idx}" title="Bold (Ctrl+B)">B</button>
+                    <button class="btn-fmt btn-fmt-underline" type="button" data-input-id="mn-act-details-${idx}" title="Underline (Ctrl+U)">U</button>
+                    <button class="btn-fmt btn-fmt-bullet" type="button" data-input-id="mn-act-details-${idx}" title="Bullet (Ctrl+Shift+L)">•</button>
+                  </div>
+                  <textarea class="admin-input mn-act-details-input" id="mn-act-details-${idx}" data-idx="${idx}"
+                    rows="2" placeholder="Enter Text Here" style="border:none;border-radius:0;width:100%;box-sizing:border-box;display:block;resize:none">${escHtml(bulletifyForEditing(a.name || ''))}</textarea>
+                </div>
+              </div>
               <div class="mn-sub-list" data-parent-key="${escHtml(_paKey || "")}">${subActsHtml}</div>
               ${maintainedRowSub}
               </div>
@@ -27587,14 +27599,26 @@ function renderTargetManageContent(student, target) {
             return;
           }
         }
+        // A row that has a title is identified BY that title; its name is
+        // only the details line underneath. This used to rename on every
+        // details edit regardless, which repointed every sub-activity at
+        // whatever had just been typed and rewrote every session document
+        // to match. That is why a parent activity -- which always has a
+        // title -- was never given a Details box at all.
+        //
+        // The duplicate check three lines up already asks this question.
+        // The rename did not, and the two disagreed.
+        const isIdentity = !(a.title || "").trim();
         const oldName = a._linkKey || a.name;
         a.name = v;
-        acts.forEach(a2 => { if (a2.parentActivity === oldName) a2.parentActivity = v; });
-        delete a._linkKey;
+        if (isIdentity) {
+          acts.forEach(a2 => { if (a2.parentActivity === oldName) a2.parentActivity = v; });
+          delete a._linkKey;
+        }
         renderTargetContent();
         await saveTarget();
         flashSaved(detailsInput);
-        if (oldName && v) propagateActivityRename(student, target.name, oldName, v);
+        if (isIdentity && oldName && v) propagateActivityRename(student, target.name, oldName, v);
       });
     }
 
@@ -30636,9 +30660,13 @@ function renderTemplateManageContent(template) {
       tmDetailsInput.addEventListener("blur", async () => {
         const v = tmDetailsInput.value.trim();
         if (v === (a.name || "")) return;
+        // Same rule as the target screen: only a row with no title is
+        // identified by its name, so only that one repoints anything.
         const oldName = a.name;
         a.name = v;
-        acts.forEach(a2 => { if (a2.parentActivity === oldName) a2.parentActivity = v; });
+        if (!(a.title || "").trim()) {
+          acts.forEach(a2 => { if (a2.parentActivity === oldName) a2.parentActivity = v; });
+        }
         await saveTemplateFn();
         flashSaved(tmDetailsInput);
       });
