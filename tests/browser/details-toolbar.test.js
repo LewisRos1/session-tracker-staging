@@ -84,6 +84,40 @@ async function caretToEnd() {
   await settle(120);
 }
 
+/** Highlight the whole box, as Ctrl+A would. */
+async function selectAll() {
+  await page.eval(`(() => {
+    const box = document.querySelector("#mn-act-panel-overlay .mn-rich");
+    box.focus();
+    const sel = window.getSelection(), rg = document.createRange();
+    rg.selectNodeContents(box);
+    sel.removeAllRanges(); sel.addRange(rg);
+  })()`);
+  await settle(120);
+}
+
+/**
+ * Drag across part of the box: from inside the `from`th piece of text to
+ * inside the `to`th, counting only the text nodes. Catching one character
+ * of a line has to be enough to bullet the whole of it.
+ */
+async function selectAcross(from, to) {
+  await page.eval(`(() => {
+    const box = document.querySelector("#mn-act-panel-overlay .mn-rich");
+    box.focus();
+    const walk = document.createTreeWalker(box, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while (walk.nextNode()) if (walk.currentNode.nodeValue.trim()) nodes.push(walk.currentNode);
+    const a = nodes[${from}], b = nodes[${to}];
+    if (!a || !b) throw new Error("only " + nodes.length + " pieces of text");
+    const sel = window.getSelection(), rg = document.createRange();
+    rg.setStart(a, Math.min(1, a.nodeValue.length));
+    rg.setEnd(b, Math.min(2, b.nodeValue.length));
+    sel.removeAllRanges(); sel.addRange(rg);
+  })()`);
+  await settle(120);
+}
+
 const clickBullet = async () => {
   await page.click("#mn-act-panel-overlay .btn-fmt-bullet");
   await settle(350);
@@ -173,6 +207,52 @@ try {
     mid.split("\n").filter(l => l.startsWith(BULLET)).length === 1
       && mid.includes(`${BULLET} bbb`),
     `stored is ${JSON.stringify(mid)}`);
+
+  // ══ 4b. a highlighted block, which is how Word does it ══════════════
+  //
+  // Highlighting five lines and pressing the button bulleted ONE of them:
+  // the code read a single caret position and worked on that line alone.
+  r.section("4b. every line the selection touches");
+
+  await openDetails();
+  await typeLines(["one", "two", "three", "four"]);
+  await selectAll();
+  await clickBullet();
+  r.check("all four are bulleted", await stored(),
+    [1, 2, 3, 4].map((_, i) => `${BULLET} ${["one","two","three","four"][i]}`).join("\n"));
+
+  await selectAll();
+  await clickBullet();
+  r.check("and pressing again takes them all off", await stored(),
+    "one\ntwo\nthree\nfour");
+
+  // Part of a line counts as the line, the same as Word.
+  r.section("4c. catching part of a line is enough");
+
+  await openDetails();
+  await typeLines(["one", "two", "three", "four"]);
+  await selectAcross(1, 2);          // inside "two" .. inside "three"
+  await clickBullet();
+  r.check("the two lines touched are bulleted, the others left alone",
+    await stored(), `one\n${BULLET} two\n${BULLET} three\nfour`);
+
+  // Half-bulleted means finish the job, not undo half of it.
+  r.section("4d. a mixed selection adds, it does not toggle");
+
+  await openDetails();
+  await typeLines(["one", "two", "three"]);
+  await caretToEnd();
+  await clickBullet();               // only "three" has one
+  r.check("one of the three is bulleted", await stored(),
+    `one\ntwo\n${BULLET} three`);
+  await selectAll();
+  await clickBullet();
+  r.check("now every line has one", await stored(),
+    `${BULLET} one\n${BULLET} two\n${BULLET} three`);
+  await selectAll();
+  await clickBullet();
+  r.check("and only then does pressing it clear them", await stored(),
+    "one\ntwo\nthree");
 
   // ══ 5. bold still works alongside ════════════════════════════════════
   r.section("5. bold on a selection");

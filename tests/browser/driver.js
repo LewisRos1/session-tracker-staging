@@ -383,9 +383,20 @@ export function reporter() {
       if (!cond && detail) console.log(`        ${detail}`);
       return !!cond;
     },
+    // Ends the process, pass or fail.
+    //
+    // This used to only RETURN the count, and 11 of the 33 browser suites
+    // called it as a statement -- so they exited 0 however many checks had
+    // failed, the runner printed "ok" beside them, and "Everything passed"
+    // meant "every suite that remembered to exit". Three suites were red
+    // for some time without anything saying so.
+    //
+    // Exiting here rather than at each call site means a suite cannot
+    // forget. The 22 that already wrap it in Deno.exit(r.done(...)) are
+    // unaffected: this fires first with the same number.
     done() {
       console.log(`\n${passed} passed, ${failed} failed\n`);
-      return failed;
+      Deno.exit(failed ? 1 : 0);
     },
   };
 }

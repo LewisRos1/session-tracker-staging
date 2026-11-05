@@ -107,7 +107,11 @@ globalThis.document = {
 const escHtml = s => String(s ?? "").replace(/[&<>"']/g,
   c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-const names = ["markersToRichHtml", "richToMarkers", "richTextMap", "richCaretOffset",
+// richOffsetAt maps one end of a selection to an offset; richCaretOffset and
+// richSelectionRange are both thin wrappers over it, and the bullet button
+// uses the range so that it can work on every line a selection touches.
+const names = ["markersToRichHtml", "richToMarkers", "richTextMap",
+  "richOffsetAt", "richCaretOffset", "richSelectionRange",
   "refreshRichFromField", "placeRichCaret", "richToggleBullet"];
 const api = new Function("escHtml",
   names.map(extract).join("\n") + `\n return { ${names.join(", ")} };`)(escHtml);

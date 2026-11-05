@@ -167,8 +167,12 @@ try {
     const html = window.__app.renderFedcTarget(s.currentStudent.targets[0]);
     return Array.isArray(html) ? html.join("") : String(html ?? "");
   })()`);
+  // The amber edge down the left of a note. Dark mode turned every colour
+  // into a token, so this was looking for a literal the app stopped writing
+  // -- and said the note was missing ever since, unnoticed, because this
+  // suite could not fail.
   const noteBlock = sessionHtml
-    .split('border-left:4px solid #f59e0b')[1] || "";
+    .split('border-left:4px solid var(--c-f59e0b)')[1] || "";
   const noteText = noteBlock.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
   r.ok("the note is on the screen", noteText.includes("sadf asd fd"), noteText.slice(0, 200));
   r.ok("and carries its created date, like the activities above it",

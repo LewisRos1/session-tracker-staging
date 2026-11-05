@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2337";
+const APP_VERSION = "2338";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -13717,32 +13717,53 @@ function richTextMap(root) {
 }
 
 /** Where the caret sits in that visible text, or null if it is not in the box. */
-function richCaretOffset(rich, map) {
-  const sel = window.getSelection();
-  if (!sel || !sel.focusNode || !rich.contains(sel.focusNode)) return null;
-  const node = sel.focusNode;
+function richOffsetAt(rich, map, node, offset) {
+  if (!node || !rich.contains(node)) return null;
 
   if (node.nodeType === 3) {
     const hit = map.spans.find(sp => sp.node === node);
-    return hit ? hit.start + Math.min(sel.focusOffset, node.nodeValue.length) : null;
+    return hit ? hit.start + Math.min(offset, node.nodeValue.length) : null;
   }
 
-  // An element focus node means the caret sits BETWEEN children, which is
-  // what an empty line gives you. Take the position of the first text node
-  // at or after that child; with none, the end of the box.
-  const after = node.childNodes[sel.focusOffset];
+  // An element node means the point sits BETWEEN children, which is what an
+  // empty line gives you. Take the position of the first text node at or
+  // after that child; with none, the end of the box.
+  const after = node.childNodes[offset];
   if (after) {
     const inside = sp => sp.node === after || (after.contains && after.contains(sp.node));
     const hit = map.spans.find(inside);
     if (hit) return hit.start;
   }
-  const before = node.childNodes[sel.focusOffset - 1];
+  const before = node.childNodes[offset - 1];
   if (before) {
     const inside = sp => sp.node === before || (before.contains && before.contains(sp.node));
     const last = [...map.spans].reverse().find(inside);
     if (last) return last.start + last.node.nodeValue.length;
   }
   return map.text.length;
+}
+
+function richCaretOffset(rich, map) {
+  const sel = window.getSelection();
+  if (!sel) return null;
+  return richOffsetAt(rich, map, sel.focusNode, sel.focusOffset);
+}
+
+/**
+ * Both ends of the selection, in order, as offsets into the visible text.
+ *
+ * A caret is a selection whose two ends are the same, so this covers that
+ * too and the bullet button does not need to ask which it is looking at.
+ */
+function richSelectionRange(rich, map) {
+  const sel = window.getSelection();
+  if (!sel) return null;
+  const a = richOffsetAt(rich, map, sel.anchorNode, sel.anchorOffset);
+  const f = richOffsetAt(rich, map, sel.focusNode, sel.focusOffset);
+  if (a === null && f === null) return null;
+  const one = a === null ? f : a;
+  const two = f === null ? a : f;
+  return { start: Math.min(one, two), end: Math.max(one, two) };
 }
 
 /**
@@ -13755,22 +13776,45 @@ function richCaretOffset(rich, map) {
  */
 function richToggleBullet(rich) {
   const map   = richTextMap(rich);
-  const caret = richCaretOffset(rich, map);
-  if (caret === null) return;
+  const range = richSelectionRange(rich, map);
+  if (!range) return;
 
-  // Which line that offset falls on. Counted in the same text, so a blank
-  // line counts once here and once in the stored text.
-  const lineNo = map.text.slice(0, caret).split("\n").length - 1;
+  // Every line the selection touches, the way Word's bullet button works:
+  // catching one character of a line is enough to bullet the whole of it.
+  // This read one caret position and did one line, so highlighting five
+  // lines and pressing the button bulleted whichever single line the
+  // selection happened to end on.
+  //
+  // Counted in the same text as the stored version, so a blank line counts
+  // once here and once there.
+  const lineAt = off => map.text.slice(0, off).split("\n").length - 1;
+  const first  = lineAt(range.start);
+  // A selection stopping exactly at the start of a line has not touched it.
+  const last   = lineAt(Math.max(range.end - 1, range.start));
 
   const stored = richToMarkers(rich).split("\n");
   // Should not happen now the two are counted the same way, but a box with
   // nothing in it still has a caret, and refusing beats writing to nowhere.
-  if (stored[lineNo] === undefined) return;
+  if (stored[first] === undefined) return;
 
-  const bulleted = /^\s*\u2022\s?/.test(stored[lineNo]);
-  stored[lineNo] = bulleted
-    ? stored[lineNo].replace(/^(\s*)\u2022\s?/, "$1")
-    : "\u2022 " + stored[lineNo];
+  const lineNo = Math.min(last, stored.length - 1);
+  const isBullet = ln => /^\s*\u2022\s?/.test(ln);
+  const idxs = [];
+  for (let i = first; i <= lineNo; i++) idxs.push(i);
+
+  // Mixed means add, the same as Word: pressing it once on a half-bulleted
+  // selection finishes the job rather than undoing half of it.
+  const written = idxs.filter(i => stored[i].trim() !== "");
+  const shouldAdd = written.length === 0 || !written.every(i => isBullet(stored[i]));
+
+  for (const i of idxs) {
+    // Blank lines inside a selection are separators, not list items. A bare
+    // caret on one is different -- that is somebody starting a new bullet.
+    if (stored[i].trim() === "" && idxs.length > 1) continue;
+    stored[i] = shouldAdd
+      ? (isBullet(stored[i]) ? stored[i] : "\u2022 " + stored[i])
+      : stored[i].replace(/^(\s*)\u2022\s?/, "$1");
+  }
 
   const ta = rich._richField;
   if (!ta) return;

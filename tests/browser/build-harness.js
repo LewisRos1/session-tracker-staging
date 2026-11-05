@@ -432,6 +432,19 @@ let shim = `
 
 // ── appended by tests/browser/build-harness.js ──────────────────────────
 globalThis.__app = {};
+
+// The fixture's today has to be the app's today as well.
+//
+// Only firebase-service's getTodayString was stubbed. app.js has its own
+// todayDateStr(), which reads the real clock, so a test that set a fixture
+// date and then checked what the app offered was comparing the fixture
+// against whatever day the suite happened to run on. One did exactly that
+// and had been failing unnoticed, because its suite could not fail.
+// A date test must not depend on the date.
+todayDateStr = () => {
+  const d = globalThis.__FIXTURE && globalThis.__FIXTURE.today;
+  return d || new Date().toISOString().slice(0, 10);
+};
 `;
 for (const name of exposed) {
   shim += `try { globalThis.__app.${name} = ${name}; } catch (e) { /* not in this build */ }\n`;

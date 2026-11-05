@@ -189,25 +189,26 @@ try {
       return el ? getComputedStyle(el).backgroundColor : null;
     };
     const header = document.querySelector(".app-header");
-    const filled = document.querySelector(".export-btn-all");
     return {
       header: header ? getComputedStyle(header).backgroundColor : null,
       headerText: header ? getComputedStyle(header).color : null,
-      filled: filled ? getComputedStyle(filled).backgroundColor : null,
-      filledText: filled ? getComputedStyle(filled).color : null,
       page: getComputedStyle(document.body).backgroundColor,
     };
   })()`);
   r.ok("the header is a neutral grey", spread(chrome.header) !== null
     && spread(chrome.header) <= 14, `${chrome.header} (spread ${spread(chrome.header)})`);
-  r.ok("and the filled buttons are too", spread(chrome.filled) !== null
-    && spread(chrome.filled) <= 14, `${chrome.filled} (spread ${spread(chrome.filled)})`);
   // Incognito's toolbar sits above a darker page rather than merging with it.
   r.ok("the header still stands off the page behind it",
     lum(chrome.header) - lum(chrome.page) >= 6,
     `header ${chrome.header} (${lum(chrome.header)}) vs page ${chrome.page} (${lum(chrome.page)})`);
   r.ok("with readable text on it", lum(chrome.headerText) > 200, chrome.headerText);
-  r.ok("and on the filled buttons", lum(chrome.filledText) > 200, chrome.filledText);
+  // There were two more checks here, on a filled button. They looked for
+  // .export-btn-all, which v2315 deleted on purpose: Lewis asked for those
+  // two buttons to stop standing out from the outline ones around them.
+  // The probe found nothing from that version onwards and the checks were
+  // failing on the spread of a null, unseen, because this suite could not
+  // fail. There is no filled button left on this screen to point them at,
+  // and 2c below already checks these buttons match their neighbours.
 
   // ── 2c. the button rows are uniform ─────────────────────────────────
   //
