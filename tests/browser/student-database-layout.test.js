@@ -50,13 +50,26 @@ const openRow = async (label) => {
   await settle(300);
 };
 
-/** Every field on the open student's page, label -> what is in the control. */
+/**
+ * Every field on the open student's page.
+ *
+ * The explanation is no longer printed under the label -- it is behind the
+ * ? at the end of the row, so the hint comes off that button's data-tip.
+ * A trailing * on the label is the required marker, not part of the name.
+ */
 const fields = () => page.eval(`(() => {
   const out = {};
   document.querySelectorAll(".reg-field").forEach(f => {
-    const label = f.querySelector(".reg-field-label")?.textContent.trim();
+    const raw = (f.querySelector(".reg-field-label")?.textContent || "").trim();
+    const required = raw.endsWith("*");
+    const label = (required ? raw.slice(0, -1) : raw).trim();
     const ctl = f.querySelector("input, select");
-    out[label] = { value: ctl ? ctl.value : null, hint: f.querySelector(".reg-field-hint")?.textContent.trim() || "" };
+    out[label] = {
+      value: ctl ? ctl.value : null,
+      placeholder: ctl ? (ctl.placeholder || "") : "",
+      required,
+      hint: f.querySelector(".reg-help")?.getAttribute("data-tip") || "",
+    };
   });
   return out;
 })()`);
@@ -119,8 +132,27 @@ try {
   r.check("and the Chinese ones have not been dropped",
     !!f["Full Name (Chinese)"] && !!f["Short Name (Chinese)"], true);
 
+  // Label, box and ? sit on one line. At half a screen that still has to
+  // fit, which is the whole point this suite was written for.
+  const page3 = await page.eval(`(() => {
+    const el  = document.getElementById("student-registry-body");
+    const row = document.querySelector(".reg-field-row");
+    const lab = row.querySelector(".reg-field-label");
+    const ctl = row.querySelector(".reg-field-ctl");
+    return {
+      overflow: el.scrollWidth - el.clientWidth,
+      sameLine: Math.abs(lab.getBoundingClientRect().top - ctl.getBoundingClientRect().top) < 12,
+      ctlW: Math.round(ctl.getBoundingClientRect().width),
+    };
+  })()`);
+  r.ok("the page fits the window", page3.overflow <= 1, `overflows by ${page3.overflow}px`);
+  r.ok("the label and the box are on one line", page3.sameLine, "they wrapped");
+  r.ok("and the box is not squeezed", page3.ctlW > 200, `${page3.ctlW}px`);
+
   // The whole reason for the rewrite: a field can now say what it is for.
-  r.section("4. Note and Program say where they show up");
+  // It says it on hover, out of a ? at the end of the row, instead of
+  // printing a sentence under every one of nine labels.
+  r.section("4. the ? says where the field shows up");
   r.ok("Note says it appears after the name",
     /brackets after the name/i.test(f["Note"]?.hint || ""), f["Note"]?.hint);
   r.ok("Note says it is what tells two records apart",
@@ -130,17 +162,69 @@ try {
   r.ok("Date of Birth says it fills the age too",
     /Date of Birth and Age/i.test(f["Date of Birth"]?.hint || ""), f["Date of Birth"]?.hint);
 
-  r.section("5. back to the list");
+  // Every field has one, and it is reachable by keyboard as well as hover,
+  // which is also what makes it work on a tablet.
+  const help = await page.eval(`(() => {
+    const btns = [...document.querySelectorAll(".reg-field .reg-help")];
+    return {
+      count: btns.length,
+      fields: document.querySelectorAll(".reg-field").length,
+      allButtons: btns.every(b => b.tagName === "BUTTON"),
+      allLabelled: btns.every(b => (b.getAttribute("aria-label") || "").length > 20),
+      allTipped: btns.every(b => (b.getAttribute("data-tip") || "").length > 10),
+      text: btns[0]?.textContent.trim(),
+    };
+  })()`);
+  r.check("every field has a ?", help.count, help.fields);
+  r.ok("it is a real button, so tab and tap reach it", help.allButtons, "not all buttons");
+  r.ok("and a screen reader gets the sentence", help.allLabelled, "an aria-label is missing or too short");
+  r.ok("every ? carries its explanation", help.allTipped, "a data-tip is missing or too short");
+  r.check("it reads as a question mark", help.text, "?");
+
+  // A blank box should show what belongs in it. "Full name" was the old
+  // placeholder, which says nothing the label had not already said.
+  r.section("5. the boxes show an example, and required fields are marked");
+  r.ok("Full Name shows a whole name",
+    /^e\.g\. \w+ \w+/.test(f["Full Name"]?.placeholder || ""), f["Full Name"]?.placeholder);
+  r.ok("the Chinese box shows Chinese",
+    /[一-鿿]/.test(f["Full Name (Chinese)"]?.placeholder || ""), f["Full Name (Chinese)"]?.placeholder);
+  r.ok("Short Name shows one name only",
+    /^e\.g\. \w+$/.test(f["Short Name"]?.placeholder || ""), f["Short Name"]?.placeholder);
+  r.ok("Note shows a note", /^e\.g\. /.test(f["Note"]?.placeholder || ""), f["Note"]?.placeholder);
+  r.ok("Program shows a programme", /^e\.g\. /.test(f["Program"]?.placeholder || ""), f["Program"]?.placeholder);
+  r.check("the three that cannot be blank are starred",
+    ["Full Name", "Gender", "Short Name"].map(k => !!f[k]?.required), [true, true, true]);
+  r.check("and nothing else is",
+    ["Full Name (Chinese)", "Short Name (Chinese)", "Date of Birth", "Note", "Program", "Report Type"]
+      .filter(k => f[k]?.required), []);
+
+  r.section("6. back to the list");
   await page.eval(`document.getElementById("btn-reg-back").click()`);
   await settle(300);
   r.check("every student is listed again", (await rows()).length, 4);
 
-  // ── 6. the age maths ────────────────────────────────────────────────
+  // The add form is the same four rows in the same shape, not a second
+  // design that drifts away from the student's page.
+  await page.eval(`document.getElementById("btn-add-student-row").click()`);
+  await settle(300);
+  const nf = await fields();
+  r.check("the add form asks for the three that cannot be blank, and the note",
+    Object.keys(nf).sort(), ["Full Name", "Gender", "Note", "Short Name"]);
+  r.check("starred the same way there",
+    ["Full Name", "Gender", "Short Name"].map(k => !!nf[k]?.required), [true, true, true]);
+  r.ok("and the examples came with it",
+    /^e\.g\. /.test(nf["Full Name"]?.placeholder || ""), nf["Full Name"]?.placeholder);
+  r.ok("the ? says the same thing as on the student's page",
+    nf["Note"]?.hint === f["Note"]?.hint, `${nf["Note"]?.hint} vs ${f["Note"]?.hint}`);
+  await page.eval(`document.getElementById("btn-cancel-new-student").click()`);
+  await settle(300);
+
+  // ── 7. the age maths ────────────────────────────────────────────────
   //
   // "7 years, 9 months" on the report's Student Details. Counted the way a
   // person counts: the day of the month has to come round again before the
   // month is over.
-  r.section("6. age, counted the way a person counts it");
+  r.section("7. age, counted the way a person counts it");
   const age = (dob, on) => page.eval(
     `window.__app.ageOn({ dob: ${JSON.stringify(dob)} }, new Date(${JSON.stringify(on)} + "T00:00:00"))`);
   r.check("the report's own example",   await age("2018-10-18", "2026-08-01"), "7 years, 9 months");
@@ -156,8 +240,8 @@ try {
   r.check("the date of birth reads as a date", await dobText("2018-10-18"), "18 October 2018");
   r.check("and blank when there is none", await dobText(""), "");
 
-  // ── 7. the reports read these two ───────────────────────────────────
-  r.section("7. the reports read Program and Date of Birth");
+  // ── 8. the reports read these two ───────────────────────────────────
+  r.section("8. the reports read Program and Date of Birth");
   const src = await Deno.readTextFile("app.js");
   r.check("the cover page prints the programme",
     /mkCoverShaded\(\(student\?\.program \|\| ""\)\.trim\(\), 28\)/.test(src), true);

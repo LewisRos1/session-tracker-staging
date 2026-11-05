@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2340";
+const APP_VERSION = "2341";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -3783,50 +3783,75 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
  * lands. The classes are the same ones the table used, so the handlers
  * below work on either view without knowing which is on screen.
  */
+const REG_TIPS = {
+  name:       "The student's name, as it appears everywhere in the app and on every exported report.",
+  nameZh:     "Only needed for a Chinese report. Leave it empty otherwise.",
+  gender:     "Decides which pronouns the AI uses when it writes a report.",
+  short:      "What the AI calls the student in a report, instead of the full name.",
+  shortZh:    "Only needed for a Chinese report. Leave it empty otherwise.",
+  dob:        "Fills Date of Birth and Age on the report's Student Details table.",
+  note:       "Shown in brackets after the name, here and everywhere else. It is what tells two records of the same student apart. No brackets needed.",
+  program:    "Shown on the report cover page. Leave it empty to leave the box blank.",
+  reportType: "Whether this student gets a report every session or once a month.",
+  sessions:   "Click the number to renumber this student's sessions.",
+};
+
+/**
+ * One row of the form: the label, then the control, then a ? that says what
+ * the field is for when you hover it or tap it.
+ *
+ * The explanation used to sit under every label as a full sentence, which
+ * made nine fields read like a page of prose. It is the same sentence; it
+ * just waits to be asked for now.
+ */
+function regField(label, tip, control, { required = false, under = "" } = {}) {
+  return `
+    <div class="reg-field">
+      <div class="reg-field-row">
+        <label class="reg-field-label">${escHtml(label)}${required ? `<span class="reg-req" aria-hidden="true">*</span>` : ""}</label>
+        <div class="reg-field-ctl">${control}</div>
+        <button type="button" class="reg-help" data-tip="${escHtml(tip)}"
+          aria-label="${escHtml(label + ": " + tip)}">?</button>
+      </div>
+      ${under}
+    </div>`;
+}
+
 function renderStudentDetail(body, st) {
   const id = escHtml(st.id);
-  const field = (label, hint, control) => `
-    <div class="reg-field">
-      <div class="reg-field-label">${escHtml(label)}</div>
-      <div class="reg-field-hint">${escHtml(hint)}</div>
-      ${control}
-    </div>`;
-  const text = (cls, value, extra = "") => `
+  const field = regField;
+  const text = (cls, value, placeholder, extra = "") => `
     <input class="admin-input ${cls}" data-id="${id}" value="${escHtml(value || "")}"
-      placeholder="\u2014" autocomplete="off" ${extra} />`;
+      placeholder="${escHtml(placeholder)}" autocomplete="off" ${extra} />`;
 
   body.innerHTML = `
-    <div style="padding:1rem;max-width:620px;margin:0 auto">
+    <div style="padding:1rem;max-width:680px;margin:0 auto">
       <button class="export-btn reg-back" id="btn-reg-back">\u2190 All Students</button>
       <h2 class="reg-detail-title">${escHtml(studentLabel(st))}</h2>
+      <p class="reg-req-note"><span class="reg-req">*</span> required</p>
 
-      ${field("Full Name", "The student's name, as it appears everywhere.",
-        text("db-fullname-input", st.name))}
-      ${field("Full Name (Chinese)", "Only needed for a Chinese report. Leave it empty otherwise.",
-        text("db-fullname-zh-input", st.nameZh))}
-      ${field("Gender", "Decides which pronouns the AI uses in a report.",
-        genderSelectHtml(st))}
-      ${field("Short Name", "What the AI calls the student in a report.",
-        text("db-shortname-input", st.preferredName))}
-      ${field("Short Name (Chinese)", "Only needed for a Chinese report. Leave it empty otherwise.",
-        text("db-shortname-zh-input", st.shortNameZh))}
-      ${field("Date of Birth", "Fills Date of Birth and Age on the report's Student Details.",
-        `<input type="date" class="admin-input db-dob-input" data-id="${id}" value="${escHtml(st.dob || "")}" />`
-        + (ageOn(st) ? `<div class="reg-field-hint" style="margin-top:.3rem">Age today: ${escHtml(ageOn(st))}</div>` : ""))}
-      ${field("Note", "Shown in brackets after the name, here and everywhere else. It is what tells two records of the same student apart. No brackets needed.",
-        text("db-note-input", noteBare(st.note)))}
-      ${field("Program", "Shown on the report cover page. Leave it empty to leave the box blank.",
-        text("db-program-input", st.program))}
-      ${field("Report Type", "Whether this student gets a report every session or once a month.",
+      ${field("Full Name", REG_TIPS.name,
+        text("db-fullname-input", st.name, "e.g. Michelle Yeoh Choo Kheng"), { required: true })}
+      ${field("Full Name (Chinese)", REG_TIPS.nameZh,
+        text("db-fullname-zh-input", st.nameZh, "e.g. \u694a\u7d2b\u74ca"))}
+      ${field("Gender", REG_TIPS.gender, genderSelectHtml(st), { required: true })}
+      ${field("Short Name", REG_TIPS.short,
+        text("db-shortname-input", st.preferredName, "e.g. Michelle"), { required: true })}
+      ${field("Short Name (Chinese)", REG_TIPS.shortZh,
+        text("db-shortname-zh-input", st.shortNameZh, "e.g. \u7d2b\u74ca"))}
+      ${field("Date of Birth", REG_TIPS.dob,
+        `<input type="date" class="admin-input db-dob-input" data-id="${id}" value="${escHtml(st.dob || "")}" />`,
+        { under: ageOn(st) ? `<div class="reg-field-under">Age today: ${escHtml(ageOn(st))}</div>` : "" })}
+      ${field("Note", REG_TIPS.note,
+        text("db-note-input", noteBare(st.note), "e.g. School Readiness"))}
+      ${field("Program", REG_TIPS.program,
+        text("db-program-input", st.program, "e.g. Early Intervention Programme"))}
+      ${field("Report Type", REG_TIPS.reportType,
         `${(() => { const m = st.exportDuration === "monthly";
           return `<select class="db-export-dur-select admin-input" data-id="${id}"><option value="monthly"${m ? " selected" : ""}>Monthly</option><option value="every_session"${m ? "" : " selected"}>Every Session</option></select>`; })()}`)}
-
-      <div class="reg-field">
-        <div class="reg-field-label">Sessions Recorded</div>
-        <div class="reg-field-hint">Click the number to renumber this student's sessions.</div>
-        <span class="reg-indiv-num" data-id="${id}"
-          style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px">\u2026</span>
-      </div>
+      ${field("Sessions Recorded", REG_TIPS.sessions,
+        `<span class="reg-indiv-num" data-id="${id}"
+          style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px">\u2026</span>`)}
 
       <button class="db-del-student reg-delete" data-id="${id}">\u{1F5D1} Delete Student</button>
     </div>`;
@@ -4073,27 +4098,20 @@ function startAddStudentRow() {
       <button class="export-btn reg-back" id="btn-cancel-new-student">\u2190 All Students</button>
       <h2 class="reg-detail-title">New Student</h2>
 
-      <div class="reg-field">
-        <div class="reg-field-label">Full Name</div>
-        <div class="reg-field-hint">The student's name, as it appears everywhere.</div>
-        <input class="admin-input" id="new-student-name" placeholder="Full name" />
-      </div>
-      <div class="reg-field">
-        <div class="reg-field-label">Gender</div>
-        <div class="reg-field-hint">Decides which pronouns the AI uses in a report.</div>
-        ${genderSelectHtml({ id: "new-student", gender: "" })
-          .replace('class="db-gender-select admin-input"', 'class="db-gender-select admin-input" id="new-student-gender"')}
-      </div>
-      <div class="reg-field">
-        <div class="reg-field-label">Short Name</div>
-        <div class="reg-field-hint">What the AI calls the student in a report.</div>
-        <input class="admin-input" id="new-student-short" placeholder="Short name" />
-      </div>
-      <div class="reg-field">
-        <div class="reg-field-label">Note</div>
-        <div class="reg-field-hint">Optional. Shown in brackets after the name, and the only thing telling two records of the same student apart. No brackets needed.</div>
-        <input class="admin-input" id="new-student-note" placeholder="\u2014" />
-      </div>
+      <p class="reg-req-note"><span class="reg-req">*</span> required. The rest is on the student's page once this is saved.</p>
+
+      ${regField("Full Name", REG_TIPS.name,
+        `<input class="admin-input" id="new-student-name" placeholder="e.g. Michelle Yeoh Choo Kheng" autocomplete="off" />`,
+        { required: true })}
+      ${regField("Gender", REG_TIPS.gender,
+        genderSelectHtml({ id: "new-student", gender: "" })
+          .replace('class="db-gender-select admin-input"', 'class="db-gender-select admin-input" id="new-student-gender"'),
+        { required: true })}
+      ${regField("Short Name", REG_TIPS.short,
+        `<input class="admin-input" id="new-student-short" placeholder="e.g. Michelle" autocomplete="off" />`,
+        { required: true })}
+      ${regField("Note", REG_TIPS.note,
+        `<input class="admin-input" id="new-student-note" placeholder="e.g. School Readiness" autocomplete="off" />`)}
 
       <button class="btn-primary-sm reg-save" id="btn-save-new-student">Save Student</button>
     </div>`;
