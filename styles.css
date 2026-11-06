@@ -3659,60 +3659,75 @@ div.admin-note-editable:empty::before {
 .reg-list-name { flex: 1; min-width: 0; overflow-wrap: break-word; }
 .reg-list-go   { flex: none; color: var(--c-9ca3af); font-size: 1.2rem; }
 
-/* One student. Every field on its own line, with room under the label to
-   say where the value actually shows up. */
-.reg-back { margin-bottom: .9rem; }
+/* One student: a page of titled cards, two fields to a row. */
+.reg-detail { padding: 1rem; max-width: 820px; margin: 0 auto; }
+.reg-back {
+  display: inline-block;
+  margin-bottom: .5rem;
+  padding: .2rem 0;
+  border: none;
+  background: none;
+  color: var(--c-6366f1);
+  font: inherit;
+  font-size: .88rem;
+  cursor: pointer;
+}
+.reg-back:hover { color: var(--c-4338ca); text-decoration: underline; }
 .reg-detail-title {
-  font-size: 1.25rem;
-  font-weight: 700;
+  font-size: 1.6rem;
+  font-weight: 800;
   color: var(--c-111827);
   margin: 0 0 1.1rem;
   overflow-wrap: break-word;
 }
-/* One row per field: label, control, and a ? that explains the field when
-   you hover or tap it. The explanation used to sit under every label as a
-   full sentence, which made nine fields read like a page of prose. */
-/* The fields are grouped by what reads them, because "which of these does
-   the report use?" is the question anybody opening this page has. */
-.reg-group {
-  margin: 1.7rem 0 .3rem;
-  padding-bottom: .35rem;
-  border-bottom: 1px solid var(--c-e5e7eb);
+.reg-card {
+  margin-bottom: 1rem;
+  padding: 1.1rem 1.2rem 1.2rem;
+  border: 1px solid var(--c-e5e7eb);
+  border-radius: .75rem;
+  background: var(--c-ffffff);
+}
+.reg-card-title {
+  margin: 0 0 1rem;
   font-size: 1rem;
   font-weight: 800;
   color: var(--c-111827);
 }
-.reg-group-hint {
-  margin: .4rem 0 .9rem;
-  font-size: .8rem;
-  line-height: 1.4;
+.reg-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .9rem 1.4rem;
+}
+.reg-field--wide { grid-column: 1 / -1; }
+.reg-rest-note {
+  margin: 0 .2rem 1rem;
+  font-size: .82rem;
   color: var(--c-6b7280);
 }
-.reg-field { margin-bottom: .8rem; }
-.reg-field-row {
+/* One row per field: label, control, and a ? that explains the field when
+   you hover or tap it. The explanation used to sit under every label as a
+   full sentence, which made nine fields read like a page of prose. */
+/* The label sits ABOVE its box. Beside it, every box was held to the same
+   narrow column and a long label wrapped in a space that could not grow. */
+.reg-field { min-width: 0; }
+.reg-field-head {
   display: flex;
   align-items: center;
-  gap: .6rem;
-  flex-wrap: wrap;
+  gap: .35rem;
+  margin-bottom: .3rem;
 }
 .reg-field-label {
-  flex: 0 0 10.5rem;
-  font-size: .95rem;
+  font-size: .88rem;
   font-weight: 700;
   color: var(--c-111827);
   overflow-wrap: break-word;
 }
-.reg-req { color: var(--c-dc2626); margin-left: .1rem; }
-.reg-req-note {
-  font-size: .8rem;
-  color: var(--c-6b7280);
-  margin: 0 0 1rem;
-}
-.reg-field-ctl { flex: 1 1 12rem; min-width: 0; }
+.reg-req { color: var(--c-dc2626); margin-left: .15rem; }
+.reg-field-ctl { min-width: 0; }
 .reg-field-under {
   font-size: .8rem;
   color: var(--c-6b7280);
-  margin: .3rem 0 0 11.1rem;
+  margin: .3rem 0 0;
 }
 .reg-field .admin-input,
 .reg-field select { width: 100%; box-sizing: border-box; }
@@ -3721,8 +3736,13 @@ div.admin-note-editable:empty::before {
 
 /* Sessions Recorded: the number, then the button that changes it. The
    number itself used to be the button -- an 8 with a dotted underline. */
+.reg-sessnum {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  min-height: 2.3rem;
+}
 .reg-sessnum-btn {
-  margin-left: .6rem;
   padding: .35rem .7rem;
   border: 1px solid var(--c-d1d5db);
   border-radius: .4rem;
@@ -3734,35 +3754,41 @@ div.admin-note-editable:empty::before {
 }
 .reg-sessnum-btn:hover { background: var(--c-e5e7eb); }
 
-/* Nothing is written until Save is pressed, so the page has to say when
-   it is holding something. */
-.reg-save-row {
+/* Delete on one side, Cancel and Save on the other, with the page's own
+   word on whether anything is outstanding. */
+.reg-actions {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: .75rem;
+  flex-wrap: wrap;
   margin-top: 1.4rem;
 }
-.reg-save {
-  flex: 1 1 auto;
-  padding: .7rem;
-  font-weight: 700;
+.reg-actions-end {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
-.reg-dirty-note {
-  display: none;
-  flex: none;
-  font-size: .82rem;
-  font-weight: 700;
-  color: var(--c-dc2626);
+.reg-save { padding: .6rem 1.2rem; font-weight: 700; }
+.reg-cancel {
+  padding: .6rem 1rem;
+  border: 1px solid var(--c-d1d5db);
+  border-radius: .5rem;
+  background: var(--c-ffffff);
+  color: var(--c-4b5563);
+  font: inherit;
+  cursor: pointer;
 }
-.reg-dirty .reg-dirty-note { display: inline; }
+.reg-cancel:hover { background: var(--c-f3f4f6); }
 
-/* Saved, and still on the same page. The message stays up for seven
-   seconds because it is also the answer to "is it safe to leave now?". */
-.reg-save-done {
-  background: var(--c-dcfce7);
-  border-color: var(--c-86efac);
-  color: var(--c-166534);
-}
+/* Nothing is written until Save is pressed, so the page has to say when it
+   is holding something -- and say so again once it has let go. The message
+   sits here rather than on the Save button, which cannot hold a sentence. */
+.reg-status { font-size: .82rem; font-weight: 700; }
+.reg-status--unsaved { color: var(--c-dc2626); }
+.reg-status--saved   { color: var(--c-166534); }
 
 /* A student registered before the date of birth was asked for. */
 .reg-list-flag {
@@ -3824,15 +3850,14 @@ div.admin-note-editable:empty::before {
 .reg-help:hover::after,
 .reg-help:focus::after { opacity: 1; visibility: visible; }
 
-@media (max-width: 520px) {
-  .reg-field-label { flex: 1 1 100%; }
-  .reg-field-under { margin-left: 0; }
+@media (max-width: 620px) {
+  .reg-grid { grid-template-columns: 1fr; }
+  .reg-actions { justify-content: stretch; }
+  .reg-actions-end { flex: 1 1 100%; }
 }
 .reg-save { width: 100%; margin-top: .4rem; }
 .reg-delete {
-  width: 100%;
-  margin-top: 1.6rem;
-  padding: .7rem;
+  padding: .6rem 1rem;
   border: 1px solid var(--c-fca5a5);
   border-radius: .5rem;
   background: var(--c-fee2e2);

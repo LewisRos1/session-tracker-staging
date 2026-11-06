@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2346";
+const APP_VERSION = "2347";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -3675,7 +3675,7 @@ function applyRegistryReadOnly() {
   const body = $("student-registry-body");
   if (!body) return;
 
-  body.querySelectorAll("select, .db-del-student, .reg-save, .reg-sessnum-btn").forEach(el => {
+  body.querySelectorAll("select, .db-del-student, .reg-save, .reg-sessnum-btn, .reg-cancel").forEach(el => {
     el.disabled = true;
     el.classList.add("mn-locked-field");
   });
@@ -3869,91 +3869,97 @@ const REG_TIPS = {
 };
 
 /**
- * One row of the form: the label, then the control, then a ? that says what
- * the field is for when you hover it or tap it.
+ * One field: the label with a ? beside it, then the control under them.
  *
- * The explanation used to sit under every label as a full sentence, which
- * made nine fields read like a page of prose. It is the same sentence; it
- * just waits to be asked for now.
+ * The label used to sit to the LEFT of the box, which held every box to the
+ * same narrow column and left a long label wrapping in a space that could
+ * not grow. Above the box, two fields fit side by side instead.
+ *
+ * The ? carries the sentence that used to be printed under every label.
  */
-function regField(label, tip, control, { required = false, under = "" } = {}) {
+function regField(label, tip, control, { required = false, under = "", wide = false } = {}) {
   return `
-    <div class="reg-field">
-      <div class="reg-field-row">
+    <div class="reg-field${wide ? " reg-field--wide" : ""}">
+      <div class="reg-field-head">
         <label class="reg-field-label">${escHtml(label)}${required ? `<span class="reg-req" aria-hidden="true">*</span>` : ""}</label>
-        <div class="reg-field-ctl">${control}</div>
         <button type="button" class="reg-help" data-tip="${escHtml(tip)}"
           aria-label="${escHtml(label + ": " + tip)}">?</button>
       </div>
+      <div class="reg-field-ctl">${control}</div>
       ${under}
     </div>`;
+}
+
+/** A titled panel holding a grid of fields. */
+function regCard(title, fields) {
+  return `
+    <section class="reg-card">
+      ${title ? `<h3 class="reg-card-title">${escHtml(title)}</h3>` : ""}
+      <div class="reg-grid">${fields}</div>
+    </section>`;
 }
 
 function renderStudentDetail(body, st) {
   const id = escHtml(st.id);
   const field = regField;
-  // Nine fields in one unbroken column gave no clue which of them the
-  // reports read, which is the question anybody opening this page has.
-  const group = (title, hint) => `
-    <h3 class="reg-group">${escHtml(title)}</h3>
-    ${hint ? `<p class="reg-group-hint">${escHtml(hint)}</p>` : ""}`;
   const text = (cls, value, placeholder, extra = "") => `
     <input class="admin-input ${cls}" data-id="${id}" value="${escHtml(value || "")}"
       placeholder="${escHtml(placeholder)}" autocomplete="off" ${extra} />`;
 
   body.innerHTML = `
-    <div style="padding:1rem;max-width:680px;margin:0 auto">
-      <button class="export-btn reg-back" id="btn-reg-back">\u2190 All Students</button>
+    <div class="reg-detail">
+      <button class="reg-back" id="btn-reg-back">\u2190 Back to Students</button>
       <h2 class="reg-detail-title">${escHtml(studentLabel(st))}</h2>
-      <p class="reg-req-note"><span class="reg-req">*</span> required</p>
 
-      ${group("Student Details",
-        "Who the student is. The name, the date of birth and the age worked out from it are the top rows of the report's Student Details table.")}
-      ${field("Full Name", REG_TIPS.name,
-        text("db-fullname-input", st.name, "e.g. Michelle Yeoh Choo Kheng"), { required: true })}
-      ${field("Gender", REG_TIPS.gender, genderSelectHtml(st), { required: true })}
-      ${field("Date of Birth", REG_TIPS.dob,
-        `<input type="date" class="admin-input db-dob-input" data-id="${id}" value="${escHtml(st.dob || "")}" />`,
-        { required: true,
-          under: `<div class="reg-field-under" id="reg-age-line">${ageOn(st) ? `Age today: ${escHtml(ageOn(st))}` : ""}</div>` })}
-      ${field("Note", REG_TIPS.note,
-        text("db-note-input", noteBare(st.note), "e.g. School Readiness"))}
+      ${regCard("Student Details", `
+        ${field("Full Name", REG_TIPS.name,
+          text("db-fullname-input", st.name, "e.g. Michelle Yeoh Choo Kheng"),
+          { required: true, wide: true })}
+        ${field("Gender", REG_TIPS.gender, genderSelectHtml(st), { required: true })}
+        ${field("Date of Birth", REG_TIPS.dob,
+          `<input type="date" class="admin-input db-dob-input" data-id="${id}" value="${escHtml(st.dob || "")}" />`,
+          { required: true,
+            under: `<div class="reg-field-under" id="reg-age-line">${ageOn(st) ? `Age today: ${escHtml(ageOn(st))}` : ""}</div>` })}
+        ${field("Note (Optional)", REG_TIPS.note,
+          text("db-note-input", noteBare(st.note), "e.g. School Readiness"), { wide: true })}`)}
 
-      ${group("For the Reports",
-        "What the writing calls this student, what the cover page says, and how often a report is made.")}
-      ${field("Short Name", REG_TIPS.short,
-        text("db-shortname-input", st.preferredName, "e.g. Michelle"), { required: true })}
-      ${field("Program", REG_TIPS.program,
-        text("db-program-input", st.program, "e.g. Early Intervention Programme"))}
-      ${field("Report Type", REG_TIPS.reportType,
-        `${(() => { const m = st.exportDuration === "monthly";
-          return `<select class="db-export-dur-select admin-input" data-id="${id}"><option value="monthly"${m ? " selected" : ""}>Monthly</option><option value="every_session"${m ? "" : " selected"}>Every Session</option></select>`; })()}`)}
+      ${regCard("Report Details", `
+        ${field("Short Name", REG_TIPS.short,
+          text("db-shortname-input", st.preferredName, "e.g. Michelle"), { required: true })}
+        ${field("Program", REG_TIPS.program,
+          text("db-program-input", st.program, "e.g. Early Intervention Programme"))}
+        ${field("Report Type", REG_TIPS.reportType,
+          `${(() => { const m = st.exportDuration === "monthly";
+            return `<select class="db-export-dur-select admin-input" data-id="${id}"><option value="monthly"${m ? " selected" : ""}>Monthly</option><option value="every_session"${m ? "" : " selected"}>Every Session</option></select>`; })()}`)}
+        ${field("Sessions Recorded", REG_TIPS.sessions,
+          `<div class="reg-sessnum">
+             <span class="reg-indiv-num" data-id="${id}">\u2026</span>
+             <button type="button" class="reg-sessnum-btn" data-id="${id}">Change Session Number</button>
+           </div>`)}`)}
 
-      ${group("For a Chinese Report",
-        "Only read when the report is written in Chinese. Leave both empty otherwise.")}
-      ${field("Full Name (Chinese)", REG_TIPS.nameZh,
-        text("db-fullname-zh-input", st.nameZh, "e.g. \u694a\u7d2b\u74ca"))}
-      ${field("Short Name (Chinese)", REG_TIPS.shortZh,
-        text("db-shortname-zh-input", st.shortNameZh, "e.g. \u7d2b\u74ca"))}
+      ${regCard("Chinese Report", `
+        ${field("Full Name (Chinese)", REG_TIPS.nameZh,
+          text("db-fullname-zh-input", st.nameZh, "e.g. \u694a\u7d2b\u74ca"))}
+        ${field("Short Name (Chinese)", REG_TIPS.shortZh,
+          text("db-shortname-zh-input", st.shortNameZh, "e.g. \u7d2b\u74ca"))}`)}
 
-      ${group("Sessions", "")}
-      ${field("Sessions Recorded", REG_TIPS.sessions,
-        `<span class="reg-indiv-num" data-id="${id}">\u2026</span>
-         <button type="button" class="reg-sessnum-btn" data-id="${id}">Change Session Number</button>`)}
-
-      <div class="reg-save-row">
-        <button class="btn-primary-sm reg-save" id="btn-save-student" data-id="${id}">Save Changes</button>
-        <span class="reg-dirty-note">Not saved yet</span>
+      <div class="reg-actions">
+        <button class="db-del-student reg-delete" data-id="${id}">\u{1F5D1} Delete Student</button>
+        <div class="reg-actions-end">
+          <span class="reg-status" id="reg-status"></span>
+          <button type="button" class="reg-cancel" id="btn-reg-cancel">Cancel</button>
+          <button class="btn-primary-sm reg-save" id="btn-save-student" data-id="${id}">Save Changes</button>
+        </div>
       </div>
-
-      <button class="db-del-student reg-delete" data-id="${id}">\u{1F5D1} Delete Student</button>
     </div>`;
 
-  body.querySelector("#btn-reg-back")?.addEventListener("click", () => {
+  const leave = () => {
     if (!regConfirmLeave()) return;
     _registryOpenId = null;
     renderStudentRegistryBody();
-  });
+  };
+  body.querySelector("#btn-reg-back")?.addEventListener("click", leave);
+  body.querySelector("#btn-reg-cancel")?.addEventListener("click", leave);
   wireStudentDetailForm(body);
 }
 
@@ -4017,35 +4023,47 @@ function regConfirmLeave() {
 function regPaintDirty() {
   const dirty = regIsDirty();
   $("student-registry-body")?.classList.toggle("reg-dirty", dirty);
-  // Typing again makes the last save old news.
-  if (dirty) regClearSaved();
+  const el = $("reg-status");
+  if (!el) return;
+  if (dirty) {
+    // Typing again makes the last save old news.
+    clearTimeout(_regSavedTimer);
+    _regSavedTimer = null;
+    el.textContent = "Not saved yet";
+    el.className = "reg-status reg-status--unsaved";
+  } else if (!_regSavedTimer) {
+    el.textContent = "";
+    el.className = "reg-status";
+  }
 }
 
 let _regSavedTimer = null;
 
 /**
- * What the Save button says once the write is through.
+ * What the page says once the write is through.
  *
  * It stays up for seven seconds rather than the usual flash, because it is
  * also the answer to "is it safe to leave now?" -- which is exactly the
- * moment someone reaches for the back arrow and gets asked a question.
+ * moment someone reaches for the back arrow and gets asked a question. It
+ * sits beside the buttons rather than on the Save button, which is not
+ * wide enough to hold a sentence.
  */
 function regShowSaved() {
-  const btn = $("btn-save-student");
-  if (!btn) return;
+  const el = $("reg-status");
+  if (!el) return;
   clearTimeout(_regSavedTimer);
-  btn.textContent = "Saved! Feel free to go back to home page";
-  btn.classList.add("reg-save-done");
+  el.textContent = "Saved! Feel free to go back to home page";
+  el.className = "reg-status reg-status--saved";
   _regSavedTimer = setTimeout(regClearSaved, 7000);
 }
 
 function regClearSaved() {
   clearTimeout(_regSavedTimer);
   _regSavedTimer = null;
-  const btn = $("btn-save-student");
-  if (!btn) return;
-  btn.textContent = "Save Changes";
-  btn.classList.remove("reg-save-done");
+  const el = $("reg-status");
+  if (!el) return;
+  el.textContent = "";
+  el.className = "reg-status";
 }
 
 /**
@@ -4252,29 +4270,36 @@ function startAddStudentRow() {
 
   let newGender = "";
   body.innerHTML = `
-    <div id="new-student-form" style="padding:1rem;max-width:620px;margin:0 auto">
-      <button class="export-btn reg-back" id="btn-cancel-new-student">\u2190 All Students</button>
+    <div id="new-student-form" class="reg-detail">
+      <button class="reg-back" id="btn-cancel-new-student">\u2190 Back to Students</button>
       <h2 class="reg-detail-title">New Student</h2>
 
-      <p class="reg-req-note"><span class="reg-req">*</span> required. The rest is on the student's page once this is saved.</p>
+      ${regCard("Student Details", `
+        ${regField("Full Name", REG_TIPS.name,
+          `<input class="admin-input" id="new-student-name" placeholder="e.g. Michelle Yeoh Choo Kheng" autocomplete="off" />`,
+          { required: true, wide: true })}
+        ${regField("Gender", REG_TIPS.gender,
+          genderSelectHtml({ id: "new-student", gender: "" })
+            .replace('class="db-gender-select admin-input"', 'class="db-gender-select admin-input" id="new-student-gender"'),
+          { required: true })}
+        ${regField("Date of Birth", REG_TIPS.dob,
+          `<input type="date" class="admin-input" id="new-student-dob" />`,
+          { required: true })}
+        ${regField("Short Name", REG_TIPS.short,
+          `<input class="admin-input" id="new-student-short" placeholder="e.g. Michelle" autocomplete="off" />`,
+          { required: true })}
+        ${regField("Note (Optional)", REG_TIPS.note,
+          `<input class="admin-input" id="new-student-note" placeholder="e.g. School Readiness" autocomplete="off" />`)}`)}
 
-      ${regField("Full Name", REG_TIPS.name,
-        `<input class="admin-input" id="new-student-name" placeholder="e.g. Michelle Yeoh Choo Kheng" autocomplete="off" />`,
-        { required: true })}
-      ${regField("Gender", REG_TIPS.gender,
-        genderSelectHtml({ id: "new-student", gender: "" })
-          .replace('class="db-gender-select admin-input"', 'class="db-gender-select admin-input" id="new-student-gender"'),
-        { required: true })}
-      ${regField("Short Name", REG_TIPS.short,
-        `<input class="admin-input" id="new-student-short" placeholder="e.g. Michelle" autocomplete="off" />`,
-        { required: true })}
-      ${regField("Date of Birth", REG_TIPS.dob,
-        `<input type="date" class="admin-input" id="new-student-dob" />`,
-        { required: true })}
-      ${regField("Note", REG_TIPS.note,
-        `<input class="admin-input" id="new-student-note" placeholder="e.g. School Readiness" autocomplete="off" />`)}
+      <p class="reg-rest-note">The rest of the fields are on the student's page once this is saved.</p>
 
-      <button class="btn-primary-sm reg-save" id="btn-save-new-student">Save Student</button>
+      <div class="reg-actions">
+        <div></div>
+        <div class="reg-actions-end">
+          <button type="button" class="reg-cancel" id="btn-cancel-new-student-2">Cancel</button>
+          <button class="btn-primary-sm reg-save" id="btn-save-new-student">Save Student</button>
+        </div>
+      </div>
     </div>`;
 
   const nameInput  = $("new-student-name");
@@ -4350,10 +4375,12 @@ function startAddStudentRow() {
     renderStudentRegistryBody();
   });
 
-  $("btn-cancel-new-student").addEventListener("click", () => {
+  const cancelAdd = () => {
     _registryOpenId = null;
     renderStudentRegistryBody();
-  });
+  };
+  $("btn-cancel-new-student").addEventListener("click", cancelAdd);
+  $("btn-cancel-new-student-2")?.addEventListener("click", cancelAdd);
 }
 
 // Dice's coefficient over character bigrams — a cheap, dependency-free way

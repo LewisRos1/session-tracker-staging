@@ -170,45 +170,48 @@ try {
 
   // Nine fields in one unbroken column gave no clue which of them the
   // reports read, which is the question anybody opening this page has.
-  const groups = await page.eval(`(() => {
-    const out = []; let cur = null;
-    [...document.querySelectorAll(".reg-group, .reg-field")].forEach(el => {
-      if (el.classList.contains("reg-group")) { cur = { title: el.textContent.trim(), fields: [] }; out.push(cur); }
-      else if (cur) {
-        const raw = (el.querySelector(".reg-field-label")?.textContent || "").trim();
-        cur.fields.push(raw.endsWith("*") ? raw.slice(0, -1).trim() : raw);
-      }
-    });
-    return out;
-  })()`);
-  r.check("the page is in four named sections", groups.map(g => g.title),
-    ["Student Details", "For the Reports", "For a Chinese Report", "Sessions"]);
+  const groups = await page.eval(`(() => [...document.querySelectorAll(".reg-card")].map(c => ({
+    title: c.querySelector(".reg-card-title")?.textContent.trim() || "",
+    fields: [...c.querySelectorAll(".reg-field")].map(f => {
+      const raw = (f.querySelector(".reg-field-label")?.textContent || "").trim();
+      return raw.endsWith("*") ? raw.slice(0, -1).trim() : raw;
+    }),
+  })))()`);
+  r.check("the page is three titled cards", groups.map(g => g.title),
+    ["Student Details", "Report Details", "Chinese Report"]);
   r.check("who the student is", groups[0]?.fields,
-    ["Full Name", "Gender", "Date of Birth", "Note"]);
+    ["Full Name", "Gender", "Date of Birth", "Note (Optional)"]);
   r.check("what the reports read", groups[1]?.fields,
-    ["Short Name", "Program", "Report Type"]);
+    ["Short Name", "Program", "Report Type", "Sessions Recorded"]);
   r.check("the two only a Chinese report needs", groups[2]?.fields,
     ["Full Name (Chinese)", "Short Name (Chinese)"]);
-  r.check("and the session count on its own", groups[3]?.fields, ["Sessions Recorded"]);
-  r.check("every field is inside a section",
+  r.check("every field is inside a card",
     groups.reduce((n, g) => n + g.fields.length, 0),
     await page.eval(`document.querySelectorAll(".reg-field").length`));
+  // The paragraph under each heading was the thing Lewis asked to go.
+  r.check("and no card explains itself in a paragraph",
+    await page.eval(`document.querySelectorAll(".reg-card p").length`), 0);
 
   // Label, box and ? sit on one line. At half a screen that still has to
   // fit, which is the whole point this suite was written for.
   const page3 = await page.eval(`(() => {
     const el  = document.getElementById("student-registry-body");
-    const row = document.querySelector(".reg-field-row");
-    const lab = row.querySelector(".reg-field-label");
-    const ctl = row.querySelector(".reg-field-ctl");
+    const fld = document.querySelector(".reg-field");
+    const lab = fld.querySelector(".reg-field-label");
+    const ctl = fld.querySelector(".reg-field-ctl");
+    const g = document.querySelector(".db-gender-select").getBoundingClientRect();
+    const d = document.querySelector(".db-dob-input").getBoundingClientRect();
     return {
       overflow: el.scrollWidth - el.clientWidth,
-      sameLine: Math.abs(lab.getBoundingClientRect().top - ctl.getBoundingClientRect().top) < 12,
+      labelAbove: ctl.getBoundingClientRect().top >= lab.getBoundingClientRect().bottom,
       ctlW: Math.round(ctl.getBoundingClientRect().width),
+      paired: Math.abs(g.top - d.top) < 12 && d.left > g.right - 4,
     };
   })()`);
   r.ok("the page fits the window", page3.overflow <= 1, `overflows by ${page3.overflow}px`);
-  r.ok("the label and the box are on one line", page3.sameLine, "they wrapped");
+  // The label moved above its box so that two fields can share a row.
+  r.ok("the label sits above its box", page3.labelAbove, "it is still beside it");
+  r.ok("Gender and Date of Birth share a row", page3.paired, "they are stacked");
   r.ok("and the box is not squeezed", page3.ctlW > 200, `${page3.ctlW}px`);
 
   // The whole reason for the rewrite: a field can now say what it is for.
@@ -216,9 +219,9 @@ try {
   // printing a sentence under every one of nine labels.
   r.section("4. the ? says where the field shows up");
   r.ok("Note says it appears after the name",
-    /brackets after the name/i.test(f["Note"]?.hint || ""), f["Note"]?.hint);
+    /brackets after the name/i.test(f["Note (Optional)"]?.hint || ""), f["Note (Optional)"]?.hint);
   r.ok("Note says it is what tells two records apart",
-    /tells two records of the same student apart/i.test(f["Note"]?.hint || ""), f["Note"]?.hint);
+    /tells two records of the same student apart/i.test(f["Note (Optional)"]?.hint || ""), f["Note (Optional)"]?.hint);
   r.ok("Program says it appears on the report cover",
     /report cover/i.test(f["Program"]?.hint || ""), f["Program"]?.hint);
   r.ok("Date of Birth says it fills the age too",
@@ -252,13 +255,13 @@ try {
     /[一-鿿]/.test(f["Full Name (Chinese)"]?.placeholder || ""), f["Full Name (Chinese)"]?.placeholder);
   r.ok("Short Name shows one name only",
     /^e\.g\. \w+$/.test(f["Short Name"]?.placeholder || ""), f["Short Name"]?.placeholder);
-  r.ok("Note shows a note", /^e\.g\. /.test(f["Note"]?.placeholder || ""), f["Note"]?.placeholder);
+  r.ok("Note shows a note", /^e\.g\. /.test(f["Note (Optional)"]?.placeholder || ""), f["Note (Optional)"]?.placeholder);
   r.ok("Program shows a programme", /^e\.g\. /.test(f["Program"]?.placeholder || ""), f["Program"]?.placeholder);
   r.check("the four that cannot be blank are starred",
     ["Full Name", "Gender", "Short Name", "Date of Birth"].map(k => !!f[k]?.required),
     [true, true, true, true]);
   r.check("and nothing else is",
-    ["Full Name (Chinese)", "Short Name (Chinese)", "Note", "Program", "Report Type"]
+    ["Full Name (Chinese)", "Short Name (Chinese)", "Note (Optional)", "Program", "Report Type"]
       .filter(k => f[k]?.required), []);
 
   // ── 6. saving ───────────────────────────────────────────────────────
@@ -283,6 +286,8 @@ try {
   r.ok("and the page says so",
     await page.eval(`document.getElementById("student-registry-body").classList.contains("reg-dirty")`),
     "no mark on screen");
+  r.check("in words, beside the buttons",
+    await page.eval(`document.getElementById("reg-status").textContent.trim()`), "Not saved yet");
   r.check("clicking out of the box writes nothing", await stored("program"), "Personal Care");
 
   // Walking away has to ask, and "no" has to mean stay.
@@ -311,9 +316,11 @@ try {
   // It stays on the student's page. The button is what says the write went
   // through, and it says so for long enough to read.
   r.check("it stays on the student's page", (await rows()).length, 0);
-  r.check("the button says so", await page.eval(
-    `document.getElementById("btn-save-student").textContent.trim()`),
+  r.check("the page says so", await page.eval(
+    `document.getElementById("reg-status").textContent.trim()`),
     "Saved! Feel free to go back to home page");
+  r.check("and the Save button keeps its own name", await page.eval(
+    `document.getElementById("btn-save-student").textContent.trim()`), "Save Changes");
   r.ok("and the unsaved mark is gone",
     !(await page.eval(`document.getElementById("student-registry-body").classList.contains("reg-dirty")`)),
     "still marked unsaved");
@@ -322,11 +329,29 @@ try {
   r.ok("leaving no longer asks",
     (await page.eval(`window.__regAsked`)) === 1, "it asked again");
 
+  await setBox("db-program-input", "Something to throw away");
+  await settle(200);
+  await page.eval(`window.__regAsked = 0;`);
+  await page.eval(`document.getElementById("btn-reg-cancel").click()`);
+  await settle(300);
+  r.check("Cancel asks once", await page.eval(`window.__regAsked`), 1);
+  r.ok("and no keeps you on the page",
+    await page.eval(`!!document.getElementById("btn-save-student")`), "it left anyway");
+  r.check("nothing was written", await stored("program"), "Speech and Language");
+
+  await page.eval(`window.confirm = () => { window.__regAsked++; return true; };`);
+  await page.eval(`document.getElementById("btn-reg-cancel").click()`);
+  await settle(300);
+  r.check("yes throws the typing away and goes back", (await rows()).length, 4);
+  r.check("and still nothing was written", await stored("program"), "Speech and Language");
+  await page.eval(`window.confirm = () => { window.__regAsked++; return false; };`);
+  await openRow("Kayden Koh");
+
   // Typing again makes the last save old news, so the message goes.
   await setBox("db-program-input", "Something else");
   await settle(200);
-  r.check("typing again puts Save Changes back", await page.eval(
-    `document.getElementById("btn-save-student").textContent.trim()`), "Save Changes");
+  r.check("typing again replaces it with the warning", await page.eval(
+    `document.getElementById("reg-status").textContent.trim()`), "Not saved yet");
   await setBox("db-program-input", "Speech and Language");
   await settle(200);
 
@@ -358,14 +383,18 @@ try {
   await settle(300);
   const nf = await fields();
   r.check("the add form asks for the four that cannot be blank, and the note",
-    Object.keys(nf).sort(), ["Date of Birth", "Full Name", "Gender", "Note", "Short Name"]);
+    Object.keys(nf).sort(),
+    ["Date of Birth", "Full Name", "Gender", "Note (Optional)", "Short Name"]);
   r.check("starred the same way there",
     ["Full Name", "Gender", "Short Name", "Date of Birth"].map(k => !!nf[k]?.required),
     [true, true, true, true]);
   r.ok("and the examples came with it",
     /^e\.g\. /.test(nf["Full Name"]?.placeholder || ""), nf["Full Name"]?.placeholder);
   r.ok("the ? says the same thing as on the student's page",
-    nf["Note"]?.hint === f["Note"]?.hint, `${nf["Note"]?.hint} vs ${f["Note"]?.hint}`);
+    nf["Note (Optional)"]?.hint === f["Note (Optional)"]?.hint,
+    `${nf["Note (Optional)"]?.hint} vs ${f["Note (Optional)"]?.hint}`);
+  r.check("and it is a card like the rest",
+    await page.eval(`document.querySelectorAll("#new-student-form .reg-card").length`), 1);
   await page.eval(`document.getElementById("btn-cancel-new-student").click()`);
   await settle(300);
 
