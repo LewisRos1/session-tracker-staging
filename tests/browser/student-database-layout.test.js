@@ -60,14 +60,16 @@ const openRow = async (label) => {
 const fields = () => page.eval(`(() => {
   const out = {};
   document.querySelectorAll(".reg-field").forEach(f => {
-    const raw = (f.querySelector(".reg-field-label")?.textContent || "").trim();
+    let raw = (f.querySelector(".reg-field-label")?.textContent || "").trim();
+    const optional = raw.endsWith("(Optional)");
+    if (optional) raw = raw.slice(0, -"(Optional)".length).trim();
     const required = raw.endsWith("*");
-    const label = (required ? raw.slice(0, -1) : raw).trim();
+    if (required) raw = raw.slice(0, -1).trim();
     const ctl = f.querySelector("input, select");
-    out[label] = {
+    out[raw] = {
       value: ctl ? ctl.value : null,
       placeholder: ctl ? (ctl.placeholder || "") : "",
-      required,
+      required, optional,
       hint: f.querySelector(".reg-help")?.getAttribute("data-tip") || "",
     };
   });
@@ -110,11 +112,12 @@ try {
   // need one, rather than blocking anybody's work until they are filled in.
   const flags = await page.eval(`(() => [...document.querySelectorAll(".reg-list-row")]
     .map(b => ({ name: b.querySelector(".reg-list-name").textContent.trim(),
-                 flag: b.querySelector(".reg-list-flag")?.textContent.trim() || "" })))()`);
-  r.check("the three with no date of birth are marked", flags.filter(x => x.flag).length, 3);
-  r.check("the mark says what is missing", flags.find(x => x.flag)?.flag, "No date of birth");
-  r.check("and the one that has a date of birth is left alone",
-    flags.find(x => x.name === "Kayden Koh")?.flag, "");
+                 flags: [...b.querySelectorAll(".reg-list-flag")].map(f => f.textContent.trim()) })))()`);
+  r.check("the three unfinished records are marked", flags.filter(x => x.flags.length).length, 3);
+  r.check("and each mark names what is missing", flags.find(x => x.flags.length)?.flags,
+    ["No date of birth", "No program"]);
+  r.check("the finished one is left alone",
+    flags.find(x => x.name === "Kayden Koh")?.flags, []);
 
   // The No. column. It is the position in the list, so it doubles as the
   // count -- nobody has to run a finger down the rows to total them.
@@ -178,19 +181,31 @@ try {
     }),
   })))()`);
   r.check("the page is three titled cards", groups.map(g => g.title),
-    ["Student Details", "Report Details", "Chinese Report"]);
+    ["Student Details", "Report Details",
+     "Chinese Report (Only fill this in if the student requires a translated chinese report)"]);
   r.check("who the student is", groups[0]?.fields,
     ["Full Name", "Gender", "Date of Birth", "Note (Optional)"]);
   r.check("what the reports read", groups[1]?.fields,
     ["Short Name", "Program", "Report Type", "Sessions Recorded"]);
   r.check("the two only a Chinese report needs", groups[2]?.fields,
-    ["Full Name (Chinese)", "Short Name (Chinese)"]);
+    ["Full Name (Chinese) (Optional)", "Short Name (Chinese) (Optional)"]);
   r.check("every field is inside a card",
     groups.reduce((n, g) => n + g.fields.length, 0),
     await page.eval(`document.querySelectorAll(".reg-field").length`));
   // The paragraph under each heading was the thing Lewis asked to go.
   r.check("and no card explains itself in a paragraph",
     await page.eval(`document.querySelectorAll(".reg-card p").length`), 0);
+
+  // Only the card headings are bold. Bold on every label as well left the
+  // page with no shape to it.
+  const weights = await page.eval(`(() => ({
+    title: getComputedStyle(document.querySelector(".reg-card-title")).fontWeight,
+    sub:   getComputedStyle(document.querySelector(".reg-card-sub")).fontWeight,
+    label: getComputedStyle(document.querySelector(".reg-field-label")).fontWeight,
+  }))()`);
+  r.ok("the card heading is bold", Number(weights.title) >= 700, weights.title);
+  r.ok("the line beside it is not", Number(weights.sub) < 600, weights.sub);
+  r.ok("and nor is a field label", Number(weights.label) < 600, weights.label);
 
   // Label, box and ? sit on one line. At half a screen that still has to
   // fit, which is the whole point this suite was written for.
@@ -219,9 +234,9 @@ try {
   // printing a sentence under every one of nine labels.
   r.section("4. the ? says where the field shows up");
   r.ok("Note says it appears after the name",
-    /brackets after the name/i.test(f["Note (Optional)"]?.hint || ""), f["Note (Optional)"]?.hint);
+    /brackets after the name/i.test(f["Note"]?.hint || ""), f["Note"]?.hint);
   r.ok("Note says it is what tells two records apart",
-    /tells two records of the same student apart/i.test(f["Note (Optional)"]?.hint || ""), f["Note (Optional)"]?.hint);
+    /tells two records of the same student apart/i.test(f["Note"]?.hint || ""), f["Note"]?.hint);
   r.ok("Program says it appears on the report cover",
     /report cover/i.test(f["Program"]?.hint || ""), f["Program"]?.hint);
   r.ok("Date of Birth says it fills the age too",
@@ -246,6 +261,32 @@ try {
   r.ok("every ? carries its explanation", help.allTipped, "a data-tip is missing or too short");
   r.check("it reads as a question mark", help.text, "?");
 
+  // Hung off the little round button, the tooltip was pinned by its RIGHT
+  // edge, so a ? on a left-hand field pushed its sentence off the left of
+  // the screen as soon as the window was less than full width. This runs
+  // at 700px, which is where Lewis found it.
+  const tips = await page.eval(`(() => {
+    const page = document.getElementById("student-registry-body");
+    const pr = page.getBoundingClientRect();
+    let worstLeft = 0, worstRight = 0;
+    [...document.querySelectorAll(".reg-field .reg-help")].forEach(b => {
+      const t = getComputedStyle(b, "::after");
+      // The box is only laid out while it is shown, so measure the field it
+      // is anchored to and the width the rule allows it.
+      const f = b.closest(".reg-field").getBoundingClientRect();
+      worstLeft  = Math.min(worstLeft, f.left - pr.left);
+      worstRight = Math.max(worstRight, (f.right - pr.right));
+      void t;
+    });
+    return { worstLeft, worstRight,
+      maxWidth: getComputedStyle(document.querySelector(".reg-help"), "::after").maxWidth,
+      anchored: getComputedStyle(document.querySelector(".reg-field")).position };
+  })()`);
+  r.check("the tooltip is anchored to the field, not the button", tips.anchored, "relative");
+  r.check("and can never be wider than it", tips.maxWidth, "100%");
+  r.ok("so no field starts off the left of the page", tips.worstLeft >= -1, `${tips.worstLeft}px`);
+  r.ok("and none ends off the right", tips.worstRight <= 1, `${tips.worstRight}px`);
+
   // A blank box should show what belongs in it. "Full name" was the old
   // placeholder, which says nothing the label had not already said.
   r.section("5. the boxes show an example, and required fields are marked");
@@ -255,14 +296,16 @@ try {
     /[一-鿿]/.test(f["Full Name (Chinese)"]?.placeholder || ""), f["Full Name (Chinese)"]?.placeholder);
   r.ok("Short Name shows one name only",
     /^e\.g\. \w+$/.test(f["Short Name"]?.placeholder || ""), f["Short Name"]?.placeholder);
-  r.ok("Note shows a note", /^e\.g\. /.test(f["Note (Optional)"]?.placeholder || ""), f["Note (Optional)"]?.placeholder);
+  r.ok("Note shows a note", /^e\.g\. /.test(f["Note"]?.placeholder || ""), f["Note"]?.placeholder);
   r.ok("Program shows a programme", /^e\.g\. /.test(f["Program"]?.placeholder || ""), f["Program"]?.placeholder);
-  r.check("the four that cannot be blank are starred",
-    ["Full Name", "Gender", "Short Name", "Date of Birth"].map(k => !!f[k]?.required),
-    [true, true, true, true]);
-  r.check("and nothing else is",
-    ["Full Name (Chinese)", "Short Name (Chinese)", "Note (Optional)", "Program", "Report Type"]
-      .filter(k => f[k]?.required), []);
+  r.check("everything a report needs is starred",
+    Object.keys(f).filter(k => f[k].required).sort(),
+    ["Date of Birth", "Full Name", "Gender", "Program", "Report Type", "Short Name"]);
+  // The three that are genuinely optional say so in the label, rather than
+  // leaving an unstarred field to be read as an oversight.
+  r.check("and the three that are not say Optional",
+    Object.keys(f).filter(k => f[k].optional).sort(),
+    ["Full Name (Chinese)", "Note", "Short Name (Chinese)"]);
 
   // ── 6. saving ───────────────────────────────────────────────────────
   //
@@ -321,6 +364,22 @@ try {
     "Saved! Feel free to go back to home page");
   r.check("and the Save button keeps its own name", await page.eval(
     `document.getElementById("btn-save-student").textContent.trim()`), "Save Changes");
+
+  const bar = await page.eval(`(() => {
+    const d = document.querySelector(".db-del-student").getBoundingClientRect();
+    const s = document.getElementById("btn-save-student").getBoundingClientRect();
+    const c = document.getElementById("btn-reg-cancel").getBoundingClientRect();
+    return {
+      oneLine: Math.abs(d.top - s.top) < 12 && Math.abs(s.top - c.top) < 12,
+      saveLeftOfCancel: s.right <= c.left + 1,
+      deleteFirst: d.right <= s.left + 1,
+      deleteFullWidth: Math.round(d.width) > 400,
+    };
+  })()`);
+  r.ok("Delete, Save and Cancel are on one line", bar.oneLine, "the row wrapped");
+  r.ok("Save sits to the left of Cancel", bar.saveLeftOfCancel, "Cancel is first");
+  r.ok("and Delete is away on the other side", bar.deleteFirst, "Delete is not first");
+  r.ok("Delete is not a full-width bar any more", !bar.deleteFullWidth, "still full width");
   r.ok("and the unsaved mark is gone",
     !(await page.eval(`document.getElementById("student-registry-body").classList.contains("reg-dirty")`)),
     "still marked unsaved");
@@ -384,15 +443,17 @@ try {
   const nf = await fields();
   r.check("the add form asks for the four that cannot be blank, and the note",
     Object.keys(nf).sort(),
-    ["Date of Birth", "Full Name", "Gender", "Note (Optional)", "Short Name"]);
+    ["Date of Birth", "Full Name", "Gender", "Note", "Program", "Short Name"]);
   r.check("starred the same way there",
-    ["Full Name", "Gender", "Short Name", "Date of Birth"].map(k => !!nf[k]?.required),
-    [true, true, true, true]);
+    Object.keys(nf).filter(k => nf[k].required).sort(),
+    ["Date of Birth", "Full Name", "Gender", "Program", "Short Name"]);
+  r.check("and the Note is the only one marked Optional",
+    Object.keys(nf).filter(k => nf[k].optional), ["Note"]);
   r.ok("and the examples came with it",
     /^e\.g\. /.test(nf["Full Name"]?.placeholder || ""), nf["Full Name"]?.placeholder);
   r.ok("the ? says the same thing as on the student's page",
-    nf["Note (Optional)"]?.hint === f["Note (Optional)"]?.hint,
-    `${nf["Note (Optional)"]?.hint} vs ${f["Note (Optional)"]?.hint}`);
+    nf["Note"]?.hint === f["Note"]?.hint,
+    `${nf["Note"]?.hint} vs ${f["Note"]?.hint}`);
   r.check("and it is a card like the rest",
     await page.eval(`document.querySelectorAll("#new-student-form .reg-card").length`), 1);
   await page.eval(`document.getElementById("btn-cancel-new-student").click()`);

@@ -3693,6 +3693,13 @@ div.admin-note-editable:empty::before {
   font-weight: 800;
   color: var(--c-111827);
 }
+/* Rides on the title line in ordinary weight: a card may say when it can
+   be skipped without that turning into a second bold heading. */
+.reg-card-sub {
+  font-size: .82rem;
+  font-weight: 400;
+  color: var(--c-6b7280);
+}
 .reg-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -3718,11 +3725,12 @@ div.admin-note-editable:empty::before {
 }
 .reg-field-label {
   font-size: .88rem;
-  font-weight: 700;
-  color: var(--c-111827);
+  font-weight: 500;
+  color: var(--c-374151);
   overflow-wrap: break-word;
 }
 .reg-req { color: var(--c-dc2626); margin-left: .15rem; }
+.reg-opt { color: var(--c-9ca3af); font-weight: 400; }
 .reg-field-ctl { min-width: 0; }
 .reg-field-under {
   font-size: .8rem;
@@ -3759,7 +3767,6 @@ div.admin-note-editable:empty::before {
 .reg-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: .75rem;
   flex-wrap: wrap;
   margin-top: 1.4rem;
@@ -3768,11 +3775,17 @@ div.admin-note-editable:empty::before {
   display: flex;
   align-items: center;
   gap: .6rem;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  flex: none;
+  margin-left: auto;
 }
-.reg-save { padding: .6rem 1.2rem; font-weight: 700; }
+.reg-save {
+  flex: none;
+  width: auto;
+  padding: .6rem 1.2rem;
+  font-weight: 700;
+}
 .reg-cancel {
+  flex: none;
   padding: .6rem 1rem;
   border: 1px solid var(--c-d1d5db);
   border-radius: .5rem;
@@ -3786,7 +3799,13 @@ div.admin-note-editable:empty::before {
 /* Nothing is written until Save is pressed, so the page has to say when it
    is holding something -- and say so again once it has let go. The message
    sits here rather than on the Save button, which cannot hold a sentence. */
-.reg-status { font-size: .82rem; font-weight: 700; }
+.reg-status {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: center;
+  font-size: .82rem;
+  font-weight: 700;
+}
 .reg-status--unsaved { color: var(--c-dc2626); }
 .reg-status--saved   { color: var(--c-166534); }
 
@@ -3802,8 +3821,13 @@ div.admin-note-editable:empty::before {
   white-space: nowrap;
 }
 
+/* The tooltip hangs off the field, not off the button. Hung off the
+   button it was pinned by its right edge, so the ? on a left-hand field
+   pushed its sentence off the left of the screen the moment the window
+   was anything less than full width. */
+.reg-field { position: relative; }
 .reg-help {
-  position: relative;
+  position: static;
   flex: none;
   width: 1.4rem;
   height: 1.4rem;
@@ -3827,11 +3851,11 @@ div.admin-note-editable:empty::before {
 .reg-help::after {
   content: attr(data-tip);
   position: absolute;
-  right: 0;
-  bottom: calc(100% + .45rem);
+  left: 0;
+  bottom: calc(100% + .3rem);
   z-index: 60;
   width: max-content;
-  max-width: 17rem;
+  max-width: 100%;
   padding: .5rem .6rem;
   border-radius: .4rem;
   background: var(--c-111827);
@@ -3855,8 +3879,9 @@ div.admin-note-editable:empty::before {
   .reg-actions { justify-content: stretch; }
   .reg-actions-end { flex: 1 1 100%; }
 }
-.reg-save { width: 100%; margin-top: .4rem; }
 .reg-delete {
+  flex: none;
+  width: auto;
   padding: .6rem 1rem;
   border: 1px solid var(--c-fca5a5);
   border-radius: .5rem;

@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2347";
+const APP_VERSION = "2348";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -3766,6 +3766,21 @@ function ageOn(student, onDate = new Date()) {
   return years ? `${y}, ${m}` : m;
 }
 
+/**
+ * What this record still owes a report, in the order the page asks for it.
+ *
+ * Date of birth and programme were not asked for until v2342 and v2348, so
+ * most records have neither. They keep working -- a report prints a green
+ * [Please Enter Text] where the value should be -- and the list says which
+ * ones to go and finish rather than blocking anybody's work.
+ */
+function regMissing(st) {
+  const out = [];
+  if (!dobOn(st)) out.push("date of birth");
+  if (!(st?.program || "").trim()) out.push("program");
+  return out;
+}
+
 async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
   const body = $("student-registry-body");
   if (!body) return;
@@ -3814,7 +3829,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
             <button class="reg-list-row" data-id="${escHtml(st.id)}">
               <span class="reg-list-no">${i + 1}</span>
               <span class="reg-list-name">${escHtml(studentLabel(st))}</span>
-              ${dobOn(st) ? "" : `<span class="reg-list-flag">No date of birth</span>`}
+              ${regMissing(st).map(m => `<span class="reg-list-flag">No ${escHtml(m)}</span>`).join("")}
               <span class="reg-list-go" aria-hidden="true">›</span>
             </button>`;
           }).join("")}
@@ -3877,11 +3892,11 @@ const REG_TIPS = {
  *
  * The ? carries the sentence that used to be printed under every label.
  */
-function regField(label, tip, control, { required = false, under = "", wide = false } = {}) {
+function regField(label, tip, control, { required = false, optional = false, under = "", wide = false } = {}) {
   return `
     <div class="reg-field${wide ? " reg-field--wide" : ""}">
       <div class="reg-field-head">
-        <label class="reg-field-label">${escHtml(label)}${required ? `<span class="reg-req" aria-hidden="true">*</span>` : ""}</label>
+        <label class="reg-field-label">${escHtml(label)}${required ? `<span class="reg-req" aria-hidden="true">*</span>` : ""}${optional ? ` <span class="reg-opt">(Optional)</span>` : ""}</label>
         <button type="button" class="reg-help" data-tip="${escHtml(tip)}"
           aria-label="${escHtml(label + ": " + tip)}">?</button>
       </div>
@@ -3890,11 +3905,16 @@ function regField(label, tip, control, { required = false, under = "", wide = fa
     </div>`;
 }
 
-/** A titled panel holding a grid of fields. */
-function regCard(title, fields) {
+/**
+ * A titled panel holding a grid of fields. `sub` rides along on the title
+ * line in ordinary weight, so the card can say when it may be skipped
+ * without putting a bold paragraph above the fields.
+ */
+function regCard(title, fields, sub = "") {
   return `
     <section class="reg-card">
-      ${title ? `<h3 class="reg-card-title">${escHtml(title)}</h3>` : ""}
+      ${title ? `<h3 class="reg-card-title">${escHtml(title)}${
+        sub ? ` <span class="reg-card-sub">${escHtml(sub)}</span>` : ""}</h3>` : ""}
       <div class="reg-grid">${fields}</div>
     </section>`;
 }
@@ -3920,17 +3940,20 @@ function renderStudentDetail(body, st) {
           `<input type="date" class="admin-input db-dob-input" data-id="${id}" value="${escHtml(st.dob || "")}" />`,
           { required: true,
             under: `<div class="reg-field-under" id="reg-age-line">${ageOn(st) ? `Age today: ${escHtml(ageOn(st))}` : ""}</div>` })}
-        ${field("Note (Optional)", REG_TIPS.note,
-          text("db-note-input", noteBare(st.note), "e.g. School Readiness"), { wide: true })}`)}
+        ${field("Note", REG_TIPS.note,
+          text("db-note-input", noteBare(st.note), "e.g. School Readiness"),
+          { optional: true, wide: true })}`)}
 
       ${regCard("Report Details", `
         ${field("Short Name", REG_TIPS.short,
           text("db-shortname-input", st.preferredName, "e.g. Michelle"), { required: true })}
         ${field("Program", REG_TIPS.program,
-          text("db-program-input", st.program, "e.g. Early Intervention Programme"))}
+          text("db-program-input", st.program, "e.g. Early Intervention Programme"),
+          { required: true })}
         ${field("Report Type", REG_TIPS.reportType,
           `${(() => { const m = st.exportDuration === "monthly";
-            return `<select class="db-export-dur-select admin-input" data-id="${id}"><option value="monthly"${m ? " selected" : ""}>Monthly</option><option value="every_session"${m ? "" : " selected"}>Every Session</option></select>`; })()}`)}
+            return `<select class="db-export-dur-select admin-input" data-id="${id}"><option value="monthly"${m ? " selected" : ""}>Monthly</option><option value="every_session"${m ? "" : " selected"}>Every Session</option></select>`; })()}`,
+          { required: true })}
         ${field("Sessions Recorded", REG_TIPS.sessions,
           `<div class="reg-sessnum">
              <span class="reg-indiv-num" data-id="${id}">\u2026</span>
@@ -3939,16 +3962,17 @@ function renderStudentDetail(body, st) {
 
       ${regCard("Chinese Report", `
         ${field("Full Name (Chinese)", REG_TIPS.nameZh,
-          text("db-fullname-zh-input", st.nameZh, "e.g. \u694a\u7d2b\u74ca"))}
+          text("db-fullname-zh-input", st.nameZh, "e.g. \u694a\u7d2b\u74ca"), { optional: true })}
         ${field("Short Name (Chinese)", REG_TIPS.shortZh,
-          text("db-shortname-zh-input", st.shortNameZh, "e.g. \u7d2b\u74ca"))}`)}
+          text("db-shortname-zh-input", st.shortNameZh, "e.g. \u7d2b\u74ca"), { optional: true })}`,
+        "(Only fill this in if the student requires a translated chinese report)")}
 
       <div class="reg-actions">
         <button class="db-del-student reg-delete" data-id="${id}">\u{1F5D1} Delete Student</button>
+        <span class="reg-status" id="reg-status"></span>
         <div class="reg-actions-end">
-          <span class="reg-status" id="reg-status"></span>
-          <button type="button" class="reg-cancel" id="btn-reg-cancel">Cancel</button>
           <button class="btn-primary-sm reg-save" id="btn-save-student" data-id="${id}">Save Changes</button>
+          <button type="button" class="reg-cancel" id="btn-reg-cancel">Cancel</button>
         </div>
       </div>
     </div>`;
@@ -4288,8 +4312,12 @@ function startAddStudentRow() {
         ${regField("Short Name", REG_TIPS.short,
           `<input class="admin-input" id="new-student-short" placeholder="e.g. Michelle" autocomplete="off" />`,
           { required: true })}
-        ${regField("Note (Optional)", REG_TIPS.note,
-          `<input class="admin-input" id="new-student-note" placeholder="e.g. School Readiness" autocomplete="off" />`)}`)}
+        ${regField("Program", REG_TIPS.program,
+          `<input class="admin-input" id="new-student-program" placeholder="e.g. Early Intervention Programme" autocomplete="off" />`,
+          { required: true })}
+        ${regField("Note", REG_TIPS.note,
+          `<input class="admin-input" id="new-student-note" placeholder="e.g. School Readiness" autocomplete="off" />`,
+          { optional: true, wide: true })}`)}
 
       <p class="reg-rest-note">The rest of the fields are on the student's page once this is saved.</p>
 
@@ -4305,6 +4333,7 @@ function startAddStudentRow() {
   const nameInput  = $("new-student-name");
   const shortInput = $("new-student-short");
   const dobInput   = $("new-student-dob");
+  const progInput  = $("new-student-program");
   const noteInput  = $("new-student-note");
   const genderBtn  = $("new-student-gender");
   nameInput.focus();
@@ -4327,15 +4356,18 @@ function startAddStudentRow() {
     // are marked in the list rather than blocked -- but nothing new should
     // join them, because the reports print a green [Please Enter Text] in
     // the Date of Birth and Age rows when it is missing.
-    const dobVal = (dobInput.value || "").trim();
+    const dobVal  = (dobInput.value || "").trim();
+    const progVal = (progInput.value || "").trim();
     const missing = [];
     if (!fullName)  missing.push("Full Name");
     if (!newGender) missing.push("Gender");
     if (!shortName) missing.push("Short Name");
     if (!dobVal)    missing.push("Date of Birth");
+    if (!progVal)   missing.push("Program");
     if (missing.length) {
       alert(`Please fill in: ${missing.join(", ")}.\n\nOnly the Note may be left blank.`);
-      (!fullName ? nameInput : !shortName ? shortInput : !dobVal ? dobInput : genderBtn).focus();
+      (!fullName ? nameInput : !shortName ? shortInput : !dobVal ? dobInput
+        : !progVal ? progInput : genderBtn).focus();
       return;
     }
     if (new Date(dobVal + "T00:00:00") > new Date()) {
@@ -4363,6 +4395,7 @@ function startAddStudentRow() {
       preferredName: shortName,
       gender: newGender,
       dob: dobVal,
+      program: progVal,
       note: noteBare(noteInput.value),
       type: "existing",
       order: state.students.length,
