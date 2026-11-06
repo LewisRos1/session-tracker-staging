@@ -242,16 +242,30 @@ try {
   r.ok("and saying no keeps you on the page",
     await page.eval(`!!document.getElementById("btn-save-student")`), "it left anyway");
 
+  // The arrow out of the Student Database had two listeners on it, both
+  // calling the same function. That was invisible while leaving was silent.
+  // Once leaving asked a question, one click put the question up twice and
+  // Cancel had to be pressed twice to stay on the page.
+  await page.eval(`window.__regAsked = 0;`);
+  await page.eval(`document.getElementById("btn-student-registry-back").click()`);
+  await settle(300);
+  r.check("the arrow out of the screen asks once, not twice",
+    await page.eval(`window.__regAsked`), 1);
+  r.ok("and that no keeps you here too",
+    await page.eval(`!!document.getElementById("btn-save-student")`), "it left anyway");
+
   await page.eval(`document.getElementById("btn-save-student").click()`);
-  await settle(600);
+  await settle(800);
   r.check("Save writes it", await stored("program"), "Speech and Language");
-  r.ok("and the page is clean again",
-    !(await page.eval(`window.__app.regIsDirty()`)), "still dirty after saving");
-  r.ok("so leaving no longer asks",
+  // Saving is the end of the job, so it goes back to the list rather than
+  // leaving you looking at the form wondering whether it took.
+  r.check("and goes back to the list", (await rows()).length, 4);
+  r.ok("the page is clean, so nothing was asked on the way out",
     (await page.eval(`window.__regAsked`)) === 1, "it asked again");
 
   // The number used to be the button: an 8 with a dotted underline.
   r.section("7. Sessions Recorded has a button of its own");
+  await openRow("Kayden Koh");
   const sess = await page.eval(`(() => {
     const b = document.querySelector(".reg-sessnum-btn");
     const n = document.querySelector(".reg-indiv-num");

@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2342";
+const APP_VERSION = "2344";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -3505,8 +3505,11 @@ function leaveStudentRegistry() {
 function openStudentRegistryScreen(opts = {}) {
   showScreen("screen-student-registry");
   renderStudentRegistryBody(opts);
-  const backBtn = $("btn-student-registry-back");
-  if (backBtn) backBtn.onclick = leaveStudentRegistry;
+  // The arrow out of this screen is wired once, at the bottom of this file.
+  // It used to be wired here as well, with both handlers calling showHome --
+  // harmless while leaving was silent, but once leaving asked "not saved,
+  // leave anyway?" the one click put the question up twice, and Cancel had
+  // to be pressed twice to stay.
 }
 
 // Full-page Student Database screen — table of every registered student
@@ -3995,8 +3998,12 @@ function wireStudentDetailForm(body) {
 /**
  * Writes the open student. Returns false when it refused, so a caller that
  * wanted to go somewhere afterwards knows to stay put.
+ *
+ * Saving finishes the job, so it drops back to the list afterwards. The one
+ * caller that passes thenClose: false is Change Session Number, which saves
+ * only so that it can open its popup over this same student.
  */
-async function saveOpenStudent() {
+async function saveOpenStudent({ thenClose = true } = {}) {
   const st = state.students.find(x => x.id === _registryOpenId);
   const v  = regFormValues();
   if (!st || !v) return false;
@@ -4038,9 +4045,18 @@ async function saveOpenStudent() {
   st.program        = v.program;
   st.exportDuration = v.exportDuration;
 
-  await withSaveFeedback($("btn-save-student"), saveStudent(st));
+  // Going back to the list is the confirmation, so the 700ms hold on
+  // "Saved!" would just be 700ms of nothing happening after a click.
+  await withSaveFeedback($("btn-save-student"), saveStudent(st),
+    thenClose ? { savedHold: 0 } : {});
   if (nameChanged) propagateStudentRenameToGroups(st, oldName, v.name);
   renderExistingStudentButtons();
+
+  if (thenClose) {
+    _registryOpenId = null;
+    renderStudentRegistryBody();
+    return true;
+  }
 
   // Repainted by hand rather than by redrawing the page, because redrawing
   // it would wipe the "Saved!" the button is still showing.
@@ -4081,7 +4097,7 @@ function wireStudentRegistryHandlers(body, sorted, highlightAdd) {
       // throw away anything typed here and not saved.
       if (regIsDirty()) {
         if (!confirm("This student has changes that have not been saved.\n\nSave them and carry on?")) return;
-        if (!await saveOpenStudent()) return;
+        if (!await saveOpenStudent({ thenClose: false })) return;
       }
       // The student's own page is where renaming, session numbering and
       // deletion live, so it is the gate rather than the screen behind it.
