@@ -105,6 +105,17 @@ try {
   r.check("a student with no note is just the name",
     listed.filter(x => x === "Caden Tan").length, 1);
 
+  // Date of birth was not asked for until v2342, so the records made before
+  // it have none. They keep working -- the list just says which ones still
+  // need one, rather than blocking anybody's work until they are filled in.
+  const flags = await page.eval(`(() => [...document.querySelectorAll(".reg-list-row")]
+    .map(b => ({ name: b.querySelector(".reg-list-name").textContent.trim(),
+                 flag: b.querySelector(".reg-list-flag")?.textContent.trim() || "" })))()`);
+  r.check("the three with no date of birth are marked", flags.filter(x => x.flag).length, 3);
+  r.check("the mark says what is missing", flags.find(x => x.flag)?.flag, "No date of birth");
+  r.check("and the one that has a date of birth is left alone",
+    flags.find(x => x.name === "Kayden Koh")?.flag, "");
+
   r.section("2. nothing is crushed, and nothing scrolls sideways");
   const fit = await page.eval(`(() => {
     const el = document.getElementById("student-registry-body");
@@ -192,13 +203,71 @@ try {
     /^e\.g\. \w+$/.test(f["Short Name"]?.placeholder || ""), f["Short Name"]?.placeholder);
   r.ok("Note shows a note", /^e\.g\. /.test(f["Note"]?.placeholder || ""), f["Note"]?.placeholder);
   r.ok("Program shows a programme", /^e\.g\. /.test(f["Program"]?.placeholder || ""), f["Program"]?.placeholder);
-  r.check("the three that cannot be blank are starred",
-    ["Full Name", "Gender", "Short Name"].map(k => !!f[k]?.required), [true, true, true]);
+  r.check("the four that cannot be blank are starred",
+    ["Full Name", "Gender", "Short Name", "Date of Birth"].map(k => !!f[k]?.required),
+    [true, true, true, true]);
   r.check("and nothing else is",
-    ["Full Name (Chinese)", "Short Name (Chinese)", "Date of Birth", "Note", "Program", "Report Type"]
+    ["Full Name (Chinese)", "Short Name (Chinese)", "Note", "Program", "Report Type"]
       .filter(k => f[k]?.required), []);
 
-  r.section("6. back to the list");
+  // ── 6. saving ───────────────────────────────────────────────────────
+  //
+  // Every box used to write to the database the moment you clicked out of
+  // it, so there was nothing a Save button could have done and no way to
+  // change your mind. Nothing is written now until Save is pressed.
+  r.section("6. nothing is written until Save is pressed");
+  const setBox = (cls, val) => page.eval(`(() => {
+    const el = document.querySelector(".${cls}");
+    el.value = ${JSON.stringify(val)};
+    el.dispatchEvent(new Event("input",  { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+    el.dispatchEvent(new Event("blur",   { bubbles: true }));
+  })()`);
+  const stored = key => page.eval(
+    `window.__app.state.students.find(s => s.id === "k1")[${JSON.stringify(key)}] ?? null`);
+
+  await setBox("db-program-input", "Speech and Language");
+  await settle(200);
+  r.ok("typing marks the page as unsaved", await page.eval(`window.__app.regIsDirty()`), "not dirty");
+  r.ok("and the page says so",
+    await page.eval(`document.getElementById("student-registry-body").classList.contains("reg-dirty")`),
+    "no mark on screen");
+  r.check("clicking out of the box writes nothing", await stored("program"), "Personal Care");
+
+  // Walking away has to ask, and "no" has to mean stay.
+  await page.eval(`window.__regAsked = 0; window.confirm = () => { window.__regAsked++; return false; };`);
+  await page.eval(`document.getElementById("btn-reg-back").click()`);
+  await settle(300);
+  r.check("going back asks first", await page.eval(`window.__regAsked`), 1);
+  r.ok("and saying no keeps you on the page",
+    await page.eval(`!!document.getElementById("btn-save-student")`), "it left anyway");
+
+  await page.eval(`document.getElementById("btn-save-student").click()`);
+  await settle(600);
+  r.check("Save writes it", await stored("program"), "Speech and Language");
+  r.ok("and the page is clean again",
+    !(await page.eval(`window.__app.regIsDirty()`)), "still dirty after saving");
+  r.ok("so leaving no longer asks",
+    (await page.eval(`window.__regAsked`)) === 1, "it asked again");
+
+  // The number used to be the button: an 8 with a dotted underline.
+  r.section("7. Sessions Recorded has a button of its own");
+  const sess = await page.eval(`(() => {
+    const b = document.querySelector(".reg-sessnum-btn");
+    const n = document.querySelector(".reg-indiv-num");
+    return {
+      label: b?.textContent.trim() || "",
+      isButton: b?.tagName === "BUTTON",
+      numberStillShown: !!n,
+      numberUnderlined: /underline/.test(n?.getAttribute("style") || ""),
+    };
+  })()`);
+  r.check("the button says what it does", sess.label, "Change Session Number");
+  r.ok("and it is a button", sess.isButton, "not a button");
+  r.ok("the number is still shown", sess.numberStillShown, "the count went missing");
+  r.ok("but is no longer pretending to be a link", !sess.numberUnderlined, "still underlined");
+
+  r.section("8. back to the list");
   await page.eval(`document.getElementById("btn-reg-back").click()`);
   await settle(300);
   r.check("every student is listed again", (await rows()).length, 4);
@@ -208,10 +277,11 @@ try {
   await page.eval(`document.getElementById("btn-add-student-row").click()`);
   await settle(300);
   const nf = await fields();
-  r.check("the add form asks for the three that cannot be blank, and the note",
-    Object.keys(nf).sort(), ["Full Name", "Gender", "Note", "Short Name"]);
+  r.check("the add form asks for the four that cannot be blank, and the note",
+    Object.keys(nf).sort(), ["Date of Birth", "Full Name", "Gender", "Note", "Short Name"]);
   r.check("starred the same way there",
-    ["Full Name", "Gender", "Short Name"].map(k => !!nf[k]?.required), [true, true, true]);
+    ["Full Name", "Gender", "Short Name", "Date of Birth"].map(k => !!nf[k]?.required),
+    [true, true, true, true]);
   r.ok("and the examples came with it",
     /^e\.g\. /.test(nf["Full Name"]?.placeholder || ""), nf["Full Name"]?.placeholder);
   r.ok("the ? says the same thing as on the student's page",
@@ -219,12 +289,12 @@ try {
   await page.eval(`document.getElementById("btn-cancel-new-student").click()`);
   await settle(300);
 
-  // ── 7. the age maths ────────────────────────────────────────────────
+  // ── 9. the age maths ────────────────────────────────────────────────
   //
   // "7 years, 9 months" on the report's Student Details. Counted the way a
   // person counts: the day of the month has to come round again before the
   // month is over.
-  r.section("7. age, counted the way a person counts it");
+  r.section("9. age, counted the way a person counts it");
   const age = (dob, on) => page.eval(
     `window.__app.ageOn({ dob: ${JSON.stringify(dob)} }, new Date(${JSON.stringify(on)} + "T00:00:00"))`);
   r.check("the report's own example",   await age("2018-10-18", "2026-08-01"), "7 years, 9 months");
@@ -237,18 +307,48 @@ try {
   r.check("something that is not a date", await age("not a date", "2026-11-05"), "");
 
   const dobText = d => page.eval(`window.__app.dobOn({ dob: ${JSON.stringify(d)} })`);
-  r.check("the date of birth reads as a date", await dobText("2018-10-18"), "18 October 2018");
+  r.check("the date of birth reads as a date", await dobText("2018-10-18"), "18th October 2018");
   r.check("and blank when there is none", await dobText(""), "");
 
-  // ── 8. the reports read these two ───────────────────────────────────
-  r.section("8. the reports read Program and Date of Birth");
+  // The reports have always been typed with an ordinal. en-GB's own long
+  // format has none, so the two generated rows were the odd pair in their
+  // own table.
+  r.section("9b. the ordinal, which the reports write by hand");
+  const ord = n => page.eval(`window.__app.ordinalDay(${n})`);
+  r.check("1st",  await ord(1),  "1st");
+  r.check("2nd",  await ord(2),  "2nd");
+  r.check("3rd",  await ord(3),  "3rd");
+  r.check("4th",  await ord(4),  "4th");
+  // The three that break the pattern: 11th, not 11st.
+  r.check("11th", await ord(11), "11th");
+  r.check("12th", await ord(12), "12th");
+  r.check("13th", await ord(13), "13th");
+  r.check("21st", await ord(21), "21st");
+  r.check("22nd", await ord(22), "22nd");
+  r.check("31st", await ord(31), "31st");
+  const long = d => page.eval(`window.__app.longDateText(${JSON.stringify(d)})`);
+  r.check("the report's own Date of Report", await long("2026-08-01"), "1st August 2026");
+  r.check("nothing from a date that is not one", await long("31 Feb"), "");
+
+  // ── 10. the reports read these two ───────────────────────────────────
+  r.section("10. the reports read Program and Date of Birth");
   const src = await Deno.readTextFile("app.js");
   r.check("the cover page prints the programme",
     /mkCoverShaded\(\(student\?\.program \|\| ""\)\.trim\(\), 28\)/.test(src), true);
   r.check("both Student Details tables print the date of birth",
-    (src.match(/mkDetailRow\("Date of Birth:", dobOn\(student\)\)/g) || []).length, 2);
+    (src.match(/mkDetailRow\("Date of Birth:", mkLongDateRuns\(student\?\.dob\)\)/g) || []).length, 2);
   r.check("and the age beside it",
     (src.match(/mkDetailRow\("Age:", ageOn\(student\)\)/g) || []).length, 2);
+  // Both Date of Report rows and the cover box, so no date in that table
+  // is left in the old format while the one above it changed.
+  r.check("both Date of Report rows use the same builder",
+    (src.match(/mkDetailRow\("Date of Report:", mkLongDateRuns\(new Date\(\)\)\)/g) || []).length, 2);
+  r.check("and the cover box with it",
+    /mkCoverShaded\(mkLongDateRuns\(new Date\(\), 28, TNR\)\)/.test(src), true);
+  r.check("the ordinal letters are raised, as the typed reports have them",
+    /text: suffix, superScript: true/.test(src), true);
+  r.check("and the old en-GB long date is gone from the documents",
+    (src.match(/const reportDate = /g) || []).length, 0);
 
   r.section("console");
   const noise = page.consoleLines.filter(l => l.level === "error");

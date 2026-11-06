@@ -3638,6 +3638,57 @@ div.admin-note-editable:empty::before {
 }
 .reg-field .admin-input,
 .reg-field select { width: 100%; box-sizing: border-box; }
+.reg-field .admin-input::placeholder { color: var(--c-9ca3af); opacity: 1; }
+.reg-field-under:empty { display: none; }
+
+/* Sessions Recorded: the number, then the button that changes it. The
+   number itself used to be the button -- an 8 with a dotted underline. */
+.reg-sessnum-btn {
+  margin-left: .6rem;
+  padding: .35rem .7rem;
+  border: 1px solid var(--c-d1d5db);
+  border-radius: .4rem;
+  background: var(--c-f3f4f6);
+  color: var(--c-111827);
+  font: inherit;
+  font-size: .85rem;
+  cursor: pointer;
+}
+.reg-sessnum-btn:hover { background: var(--c-e5e7eb); }
+
+/* Nothing is written until Save is pressed, so the page has to say when
+   it is holding something. */
+.reg-save-row {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  margin-top: 1.4rem;
+}
+.reg-save {
+  flex: 1 1 auto;
+  padding: .7rem;
+  font-weight: 700;
+}
+.reg-dirty-note {
+  display: none;
+  flex: none;
+  font-size: .82rem;
+  font-weight: 700;
+  color: var(--c-dc2626);
+}
+.reg-dirty .reg-dirty-note { display: inline; }
+
+/* A student registered before the date of birth was asked for. */
+.reg-list-flag {
+  flex: none;
+  padding: .15rem .5rem;
+  border-radius: 999px;
+  background: var(--c-fee2e2);
+  color: var(--c-dc2626);
+  font-size: .75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
 
 .reg-help {
   position: relative;

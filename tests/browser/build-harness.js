@@ -429,7 +429,8 @@ const exposed = [
   "mnPaintDateBtn",
   // Date of birth and age, which fill two rows of the report's Student
   // Details. The maths is worth testing on its own.
-  "dobOn", "ageOn",
+  "dobOn", "ageOn", "longDateText", "ordinalDay", "toDateOrNull",
+  "regIsDirty", "regFormValues", "saveOpenStudent",
 ];
 let shim = `
 

@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2341";
+const APP_VERSION = "2342";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -3495,11 +3495,18 @@ function renderTodoTiles(results, filterInst = null) {
 // highlightAdd: briefly glows "+ Add New Student" — used when redirected
 // here from another screen's "register a new student" option, instead of
 // a popup the boss has to stop and read.
+/** The header arrow out of the Student Database, asking first if need be. */
+function leaveStudentRegistry() {
+  if (!regConfirmLeave()) return;
+  _registryOpenId = null;
+  showHome();
+}
+
 function openStudentRegistryScreen(opts = {}) {
   showScreen("screen-student-registry");
   renderStudentRegistryBody(opts);
   const backBtn = $("btn-student-registry-back");
-  if (backBtn) backBtn.onclick = showHome;
+  if (backBtn) backBtn.onclick = leaveStudentRegistry;
 }
 
 // Full-page Student Database screen — table of every registered student
@@ -3665,7 +3672,7 @@ function applyRegistryReadOnly() {
   const body = $("student-registry-body");
   if (!body) return;
 
-  body.querySelectorAll("select, .db-del-student").forEach(el => {
+  body.querySelectorAll("select, .db-del-student, .reg-save, .reg-sessnum-btn").forEach(el => {
     el.disabled = true;
     el.classList.add("mn-locked-field");
   });
@@ -3702,12 +3709,37 @@ function applyRegistryReadOnly() {
  */
 let _registryOpenId = null;
 
+/** A Date from "YYYY-MM-DD" or from a Date, or null when it is neither. */
+function toDateOrNull(d) {
+  if (d instanceof Date) return isNaN(d) ? null : d;
+  const raw = String(d == null ? "" : d).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+  const dt = new Date(raw + "T00:00:00");
+  return isNaN(dt) ? null : dt;
+}
+
+/** "1st", "2nd", "18th". 11, 12 and 13 are the ones that break the pattern. */
+function ordinalDay(n) {
+  const v = n % 100;
+  if (v >= 11 && v <= 13) return `${n}th`;
+  return `${n}${["th", "st", "nd", "rd"][n % 10] || "th"}`;
+}
+
+/**
+ * A date the way the reports write it: "18th October 2018".
+ *
+ * en-GB's own long format gives "18 October 2018", with no ordinal. The
+ * reports have always been typed with one, so the generated ones were the
+ * odd pair of rows in their own table.
+ */
+function longDateText(d) {
+  const dt = toDateOrNull(d);
+  return dt ? `${ordinalDay(dt.getDate())} ${HYR_FULL_MONTHS[dt.getMonth()]} ${dt.getFullYear()}` : "";
+}
+
 /** Date of birth to the day it falls on, or "" when none is set. */
 function dobOn(student) {
-  const raw = (student?.dob || "").trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return "";
-  const d = new Date(raw + "T00:00:00");
-  return isNaN(d) ? "" : d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  return longDateText((student?.dob || "").trim());
 }
 
 /**
@@ -3758,6 +3790,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
         ${sorted.map(st => `
           <button class="reg-list-row" data-id="${escHtml(st.id)}">
             <span class="reg-list-name">${escHtml(studentLabel(st))}</span>
+            ${dobOn(st) ? "" : `<span class="reg-list-flag">No date of birth</span>`}
             <span class="reg-list-go" aria-hidden="true">›</span>
           </button>`).join("")}
       </div>
@@ -3793,7 +3826,7 @@ const REG_TIPS = {
   note:       "Shown in brackets after the name, here and everywhere else. It is what tells two records of the same student apart. No brackets needed.",
   program:    "Shown on the report cover page. Leave it empty to leave the box blank.",
   reportType: "Whether this student gets a report every session or once a month.",
-  sessions:   "Click the number to renumber this student's sessions.",
+  sessions:   "How many individual sessions this student has. Change Session Number sets the true number of one of them, and the rest shift to match.",
 };
 
 /**
@@ -3841,7 +3874,8 @@ function renderStudentDetail(body, st) {
         text("db-shortname-zh-input", st.shortNameZh, "e.g. \u7d2b\u74ca"))}
       ${field("Date of Birth", REG_TIPS.dob,
         `<input type="date" class="admin-input db-dob-input" data-id="${id}" value="${escHtml(st.dob || "")}" />`,
-        { under: ageOn(st) ? `<div class="reg-field-under">Age today: ${escHtml(ageOn(st))}</div>` : "" })}
+        { required: true,
+          under: `<div class="reg-field-under" id="reg-age-line">${ageOn(st) ? `Age today: ${escHtml(ageOn(st))}` : ""}</div>` })}
       ${field("Note", REG_TIPS.note,
         text("db-note-input", noteBare(st.note), "e.g. School Readiness"))}
       ${field("Program", REG_TIPS.program,
@@ -3850,17 +3884,186 @@ function renderStudentDetail(body, st) {
         `${(() => { const m = st.exportDuration === "monthly";
           return `<select class="db-export-dur-select admin-input" data-id="${id}"><option value="monthly"${m ? " selected" : ""}>Monthly</option><option value="every_session"${m ? "" : " selected"}>Every Session</option></select>`; })()}`)}
       ${field("Sessions Recorded", REG_TIPS.sessions,
-        `<span class="reg-indiv-num" data-id="${id}"
-          style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px">\u2026</span>`)}
+        `<span class="reg-indiv-num" data-id="${id}">\u2026</span>
+         <button type="button" class="reg-sessnum-btn" data-id="${id}">Change Session Number</button>`)}
+
+      <div class="reg-save-row">
+        <button class="btn-primary-sm reg-save" id="btn-save-student" data-id="${id}">Save Changes</button>
+        <span class="reg-dirty-note">Not saved yet</span>
+      </div>
 
       <button class="db-del-student reg-delete" data-id="${id}">\u{1F5D1} Delete Student</button>
     </div>`;
 
   body.querySelector("#btn-reg-back")?.addEventListener("click", () => {
+    if (!regConfirmLeave()) return;
     _registryOpenId = null;
     renderStudentRegistryBody();
   });
+  wireStudentDetailForm(body);
 }
+
+// -- Saving a student --------------------------------------------------
+//
+// Every box used to write to the database the moment you clicked out of
+// it. There was no Save button because there was nothing left to save --
+// and no way to change your mind either. The page now holds what you type
+// until Save is pressed, and says so before you leave with it unsaved.
+
+/** What is in the boxes right now, in the shape the record is stored in. */
+function regFormValues() {
+  const b = $("student-registry-body");
+  const v = cls => b?.querySelector("." + cls)?.value;
+  // The list has none of these, and neither does the add form.
+  if (!b || !b.querySelector(".db-fullname-input")) return null;
+  const g = v("db-gender-select");
+  return {
+    name:           (v("db-fullname-input") || "").trim().replace(/\s+/g, " "),
+    nameZh:         (v("db-fullname-zh-input") || "").trim(),
+    gender:         GENDER_STYLE[g] ? g : "",
+    preferredName:  (v("db-shortname-input") || "").trim(),
+    shortNameZh:    (v("db-shortname-zh-input") || "").trim(),
+    dob:            (v("db-dob-input") || "").trim(),
+    note:           noteBare(v("db-note-input") || ""),
+    program:        (v("db-program-input") || "").trim(),
+    exportDuration: v("db-export-dur-select") === "monthly" ? "monthly" : "every_session",
+  };
+}
+
+/** The same fields as they are saved, so the two can be compared. */
+function regStoredValues(st) {
+  return {
+    name:           st.name || "",
+    nameZh:         st.nameZh || "",
+    gender:         st.gender || "",
+    preferredName:  st.preferredName || "",
+    shortNameZh:    st.shortNameZh || "",
+    dob:            st.dob || "",
+    note:           st.note || "",
+    program:        st.program || "",
+    exportDuration: st.exportDuration === "monthly" ? "monthly" : "every_session",
+  };
+}
+
+/** True when the boxes no longer say what the database says. */
+function regIsDirty() {
+  const st = _registryOpenId ? state.students.find(x => x.id === _registryOpenId) : null;
+  if (!st) return false;
+  const now = regFormValues();
+  if (!now) return false;
+  return JSON.stringify(now) !== JSON.stringify(regStoredValues(st));
+}
+
+/** Asks before walking away from unsaved typing. False means "stay". */
+function regConfirmLeave() {
+  return !regIsDirty()
+    || confirm("This student has changes that have not been saved.\n\nLeave without saving them?");
+}
+
+function regPaintDirty() {
+  $("student-registry-body")?.classList.toggle("reg-dirty", regIsDirty());
+}
+
+/**
+ * Wires the Save button and the two coloured dropdowns.
+ *
+ * The dropdowns recoloured themselves inside the save-on-change handlers
+ * that are gone now, so the colour had to be pulled out of them.
+ */
+function wireStudentDetailForm(body) {
+  body.addEventListener("input",  regPaintDirty);
+  body.addEventListener("change", regPaintDirty);
+
+  const gsel = body.querySelector(".db-gender-select");
+  gsel?.addEventListener("change", () => {
+    const g = GENDER_STYLE[gsel.value];
+    if (!g) return;
+    gsel.style.background = g.bg; gsel.style.color = g.fg; gsel.style.borderColor = g.bd;
+  });
+  const dsel = body.querySelector(".db-export-dur-select");
+  dsel?.addEventListener("change", () => {
+    const m = dsel.value === "monthly";
+    dsel.style.background  = m ? "var(--c-f3f4f6)" : "var(--c-dbeafe)";
+    dsel.style.color       = m ? "var(--c-6b7280)" : "var(--c-1d4ed8)";
+    dsel.style.borderColor = m ? "var(--c-d1d5db)" : "var(--c-93c5fd)";
+  });
+
+  body.querySelector("#btn-save-student")?.addEventListener("click", () => saveOpenStudent());
+  regPaintDirty();
+}
+
+/**
+ * Writes the open student. Returns false when it refused, so a caller that
+ * wanted to go somewhere afterwards knows to stay put.
+ */
+async function saveOpenStudent() {
+  const st = state.students.find(x => x.id === _registryOpenId);
+  const v  = regFormValues();
+  if (!st || !v) return false;
+
+  const missing = [];
+  if (!v.name)          missing.push("Full Name");
+  if (!v.gender)        missing.push("Gender");
+  if (!v.preferredName) missing.push("Short Name");
+  if (missing.length) {
+    alert(`Please fill in: ${missing.join(", ")}.`);
+    return false;
+  }
+  // A date in the future is somebody mistyping the year, and it would put
+  // a blank Age in the report with no clue why.
+  if (v.dob && new Date(v.dob + "T00:00:00") > new Date()) {
+    alert("That date of birth is in the future. Please check the year.");
+    return false;
+  }
+  const clash = findDuplicateStudent(v.name, v.note, st.id);
+  if (clash) {
+    alert(`There is already a student called "${studentLabel(clash)}".\n\n`
+      + `Two records with the same full name AND the same note cannot be told apart, `
+      + `in the app or in the exported files. Give one of them a note that says which is which.`);
+    return false;
+  }
+
+  const oldName     = st.name;
+  const nameChanged = v.name !== oldName;
+  const parts       = v.name.split(/\s+/);
+  st.firstName      = parts[0];
+  st.lastName       = parts.slice(1).join(" ");
+  st.name           = v.name;
+  st.nameZh         = v.nameZh || null;
+  st.gender         = v.gender;
+  st.preferredName  = v.preferredName || null;
+  st.shortNameZh    = v.shortNameZh || null;
+  st.dob            = v.dob;
+  st.note           = v.note;
+  st.program        = v.program;
+  st.exportDuration = v.exportDuration;
+
+  await withSaveFeedback($("btn-save-student"), saveStudent(st));
+  if (nameChanged) propagateStudentRenameToGroups(st, oldName, v.name);
+  renderExistingStudentButtons();
+
+  // Repainted by hand rather than by redrawing the page, because redrawing
+  // it would wipe the "Saved!" the button is still showing.
+  const body  = $("student-registry-body");
+  const title = body?.querySelector(".reg-detail-title");
+  if (title) title.textContent = studentLabel(st);
+  const ageLine = $("reg-age-line");
+  if (ageLine) ageLine.textContent = ageOn(st) ? `Age today: ${ageOn(st)}` : "";
+  const noteBox = body?.querySelector(".db-note-input");
+  if (noteBox) noteBox.value = st.note || "";
+  const nameBox = body?.querySelector(".db-fullname-input");
+  if (nameBox) nameBox.value = st.name;
+  regPaintDirty();
+  return true;
+}
+
+// Closing the tab or reloading mid-edit. All a page can do is ask for the
+// browser's own prompt; the wording is the browser's.
+window.addEventListener("beforeunload", e => {
+  if (!regIsDirty()) return;
+  e.preventDefault();
+  e.returnValue = "";
+});
 
 /**
  * Everything you can do to a student. Attached after either view is drawn;
@@ -3868,158 +4071,21 @@ function renderStudentDetail(body, st) {
  */
 function wireStudentRegistryHandlers(body, sorted, highlightAdd) {
 
-  // Only the session number opens the renumbering popup. Clicking anywhere else
-  // on the row used to open it, which is how a popup about session numbers
-  // ended up feeling like the place to edit a student.
-  $("student-registry-body").querySelectorAll(".reg-indiv-num").forEach(cell => {
-    cell.addEventListener("click", () => {
-      const s = state.students.find(x => x.id === cell.dataset.id);
+  // The number used to be the button: an 8 with a dotted underline, which
+  // nobody read as "click me to renumber this student's sessions".
+  $("student-registry-body").querySelectorAll(".reg-sessnum-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const s = state.students.find(x => x.id === btn.dataset.id);
+      if (!s) return;
+      // Closing that popup refreshes the screen behind it, which would
+      // throw away anything typed here and not saved.
+      if (regIsDirty()) {
+        if (!confirm("This student has changes that have not been saved.\n\nSave them and carry on?")) return;
+        if (!await saveOpenStudent()) return;
+      }
       // The student's own page is where renaming, session numbering and
       // deletion live, so it is the gate rather than the screen behind it.
-      if (s) requirePassword(() => openManageModal(s), EXPORT_MSG);
-    });
-  });
-
-  $("student-registry-body").querySelectorAll(".db-fullname-input").forEach(input => {
-    input.addEventListener("keydown", e => { if (e.key === "Enter") input.blur(); });
-    input.addEventListener("blur", async () => {
-      const id = input.dataset.id;
-      const s = state.students.find(x => x.id === id);
-      if (!s) return;
-      const newName = input.value.trim();
-      if (!newName || newName === s.name) return;
-      const clash = findDuplicateStudent(newName, s.note, s.id);
-      if (clash) {
-        alert(`There is already a student called "${studentLabel(clash)}".\n\n`
-          + `Two records with the same full name AND the same note cannot be told apart, `
-          + `in the app or in the exported files. Give one of them a note that says which is which.`);
-        input.value = s.name;
-        input.focus();
-        return;
-      }
-      const parts = newName.split(/\s+/);
-      const oldName = s.name;
-      s.firstName = parts[0];
-      s.lastName  = parts.slice(1).join(" ");
-      s.name      = newName;
-      await saveStudent(s);
-      propagateStudentRenameToGroups(s, oldName, newName);
-    });
-  });
-
-  $("student-registry-body").querySelectorAll(".db-shortname-input").forEach(input => {
-    input.addEventListener("blur", async () => {
-      const id = input.dataset.id;
-      const s = state.students.find(x => x.id === id);
-      if (!s) return;
-      const val = input.value.trim();
-      if (val === (s.preferredName || "")) return;
-      s.preferredName = val || null;
-      await saveStudent(s);
-    });
-  });
-
-  // The Chinese names. Optional: only a Chinese report needs them, and the
-  // translator says which student is missing one rather than guessing.
-  for (const [cls, field] of [["db-fullname-zh-input", "nameZh"],
-                              ["db-shortname-zh-input", "shortNameZh"]]) {
-    $("student-registry-body").querySelectorAll("." + cls).forEach(input => {
-      input.addEventListener("blur", async () => {
-        const s = state.students.find(x => x.id === input.dataset.id);
-        if (!s) return;
-        const val = input.value.trim();
-        if (val === (s[field] || "")) return;
-        s[field] = val || null;
-        await saveStudent(s);
-      });
-    });
-  }
-
-  // Program and Date of Birth. Neither is shown anywhere in the app, and
-  // neither changes how a student is identified, so they save on blur with
-  // none of the duplicate checking the name and note need.
-  $("student-registry-body").querySelectorAll(".db-program-input").forEach(input => {
-    input.addEventListener("keydown", e => { if (e.key === "Enter") input.blur(); });
-    input.addEventListener("blur", async () => {
-      const st = state.students.find(x => x.id === input.dataset.id);
-      if (!st) return;
-      const v = input.value.trim();
-      if (v === (st.program || "")) return;
-      st.program = v;
-      await saveStudent(st);
-      flashSaved(input);
-    });
-  });
-
-  $("student-registry-body").querySelectorAll(".db-dob-input").forEach(input => {
-    input.addEventListener("change", async () => {
-      const st = state.students.find(x => x.id === input.dataset.id);
-      if (!st) return;
-      const v = (input.value || "").trim();
-      if (v === (st.dob || "")) return;
-      // A date in the future is somebody mistyping the year, and it would
-      // put a blank Age in the report with no clue why.
-      if (v && new Date(v + "T00:00:00") > new Date()) {
-        alert("That date of birth is in the future. Please check the year.");
-        input.value = st.dob || "";
-        return;
-      }
-      st.dob = v;
-      await saveStudent(st);
-      flashSaved(input);
-      // The age line under the field is now out of date.
-      renderStudentRegistryBody();
-    });
-  });
-
-  $("student-registry-body").querySelectorAll(".db-note-input").forEach(input => {
-    input.addEventListener("blur", async () => {
-      const id = input.dataset.id;
-      const s = state.students.find(x => x.id === id);
-      if (!s) return;
-      // Stored without brackets; every display site adds them. Typing them
-      // anyway is harmless, they are just stripped back off here.
-      const note = noteBare(input.value);
-      input.value = note;
-      if (note === (s.note || "")) return;
-      const clash = findDuplicateStudent(s.name, note, s.id);
-      if (clash) {
-        alert(`There is already a student called "${studentLabel(clash)}".\n\n`
-          + `Two records with the same full name AND the same note cannot be told apart, `
-          + `in the app or in the exported files. Pick a different note.`);
-        input.value = s.note || "";
-        input.focus();
-        return;
-      }
-      s.note = note;
-      await setStudentNote(id, note);
-      renderExistingStudentButtons();
-    });
-  });
-
-  $("student-registry-body").querySelectorAll(".db-gender-select").forEach(sel => {
-    sel.addEventListener("change", async () => {
-      const s = state.students.find(x => x.id === sel.dataset.id);
-      if (!s) return;
-      s.gender = GENDER_STYLE[sel.value] ? sel.value : "";
-      const st = GENDER_STYLE[s.gender];
-      sel.style.background  = st.bg;
-      sel.style.color       = st.fg;
-      sel.style.borderColor = st.bd;
-      await saveStudent(s);
-    });
-  });
-
-  $("student-registry-body").querySelectorAll(".db-export-dur-select").forEach(sel => {
-    sel.addEventListener("change", async () => {
-      const s = state.students.find(x => x.id === sel.dataset.id);
-      if (!s) return;
-      s.exportDuration = sel.value;
-      const m = sel.value === "monthly";
-      sel.style.background  = m ? "var(--c-f3f4f6)" : "var(--c-dbeafe)";
-      sel.style.color       = m ? "var(--c-6b7280)" : "var(--c-1d4ed8)";
-      sel.style.borderColor = m ? "var(--c-d1d5db)" : "var(--c-93c5fd)";
-      await saveStudent(s);
+      requirePassword(() => openManageModal(s), EXPORT_MSG);
     });
   });
 
@@ -4110,6 +4176,9 @@ function startAddStudentRow() {
       ${regField("Short Name", REG_TIPS.short,
         `<input class="admin-input" id="new-student-short" placeholder="e.g. Michelle" autocomplete="off" />`,
         { required: true })}
+      ${regField("Date of Birth", REG_TIPS.dob,
+        `<input type="date" class="admin-input" id="new-student-dob" />`,
+        { required: true })}
       ${regField("Note", REG_TIPS.note,
         `<input class="admin-input" id="new-student-note" placeholder="e.g. School Readiness" autocomplete="off" />`)}
 
@@ -4118,6 +4187,7 @@ function startAddStudentRow() {
 
   const nameInput  = $("new-student-name");
   const shortInput = $("new-student-short");
+  const dobInput   = $("new-student-dob");
   const noteInput  = $("new-student-note");
   const genderBtn  = $("new-student-gender");
   nameInput.focus();
@@ -4136,13 +4206,24 @@ function startAddStudentRow() {
   $("btn-save-new-student").addEventListener("click", async () => {
     const fullName = nameInput.value.trim().replace(/\s+/g, " ");
     const shortName = shortInput.value.trim();
+    // Required from v2342 on. Students registered before it have none, and
+    // are marked in the list rather than blocked -- but nothing new should
+    // join them, because the reports print a green [Please Enter Text] in
+    // the Date of Birth and Age rows when it is missing.
+    const dobVal = (dobInput.value || "").trim();
     const missing = [];
     if (!fullName)  missing.push("Full Name");
     if (!newGender) missing.push("Gender");
     if (!shortName) missing.push("Short Name");
+    if (!dobVal)    missing.push("Date of Birth");
     if (missing.length) {
       alert(`Please fill in: ${missing.join(", ")}.\n\nOnly the Note may be left blank.`);
-      (!fullName ? nameInput : !shortName ? shortInput : genderBtn).focus();
+      (!fullName ? nameInput : !shortName ? shortInput : !dobVal ? dobInput : genderBtn).focus();
+      return;
+    }
+    if (new Date(dobVal + "T00:00:00") > new Date()) {
+      alert("That date of birth is in the future. Please check the year.");
+      dobInput.focus();
       return;
     }
     const clash = findDuplicateStudent(fullName, noteInput.value, null);
@@ -4164,6 +4245,7 @@ function startAddStudentRow() {
       firstName, lastName,
       preferredName: shortName,
       gender: newGender,
+      dob: dobVal,
       note: noteBare(noteInput.value),
       type: "existing",
       order: state.students.length,
@@ -7337,6 +7419,31 @@ function parseActionPlan(text) {
  * noticing. Green because it means "type here": red is kept for the separate
  * case of the AI failing to produce a section, which is a fault, not a task.
  */
+/**
+ * A date for a Word document, with the ordinal letters raised: 18th October
+ * 2018. An empty array when there is no date, which is what lets the
+ * [Please Enter Text] marker take its place.
+ */
+function mkLongDateRuns(d, size = 22, font = null) {
+  const { TextRun } = window.docx;
+  const dt = toDateOrNull(d);
+  if (!dt) return [];
+  const day    = dt.getDate();
+  const suffix = ordinalDay(day).slice(String(day).length);
+  const base   = font ? { size, font } : { size };
+  return [
+    new TextRun({ ...base, text: String(day) }),
+    new TextRun({ ...base, text: suffix, superScript: true }),
+    new TextRun({ ...base, text: ` ${HYR_FULL_MONTHS[dt.getMonth()]} ${dt.getFullYear()}` })
+  ];
+}
+
+/** One value for a Student Details cell, as runs. A plain string still works. */
+function mkDetailValueRuns(value) {
+  if (!Array.isArray(value)) return [mkDetailValueRun(value)];
+  return value.length ? value : [mkDetailValueRun("")];
+}
+
 function mkDetailValueRun(value) {
   const { TextRun } = window.docx;
   const t = String(value == null ? "" : value).trim();
@@ -7503,7 +7610,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
 
   // ── Cover Page ──────────────────────────────────────────────
   const TNR = "Times New Roman";
-  const reportDate = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+
   let logoData = null;
   try {
     const logoResp = await fetch("ZORA Logo for AI Report.png", { cache: "no-cache" });
@@ -7542,7 +7649,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   const mkCoverShaded = (value, size = 28) => new Paragraph({
     shading: { type: "clear", fill: "D9D9D9", color: "auto" },
     run: { size },
-    children: [new TextRun({ text: value, size, font: TNR })],
+    children: Array.isArray(value) ? value : [new TextRun({ text: value, size, font: TNR })],
     alignment: AlignmentType.CENTER,
     spacing: { before: 80, after: 160, ...CPL },
     indent: { left: 120, right: 120 }
@@ -7566,7 +7673,7 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
   paragraphs.push(mkCoverShaded((student?.program || "").trim(), 28));
   paragraphs.push(mkCoverSpacer());
   paragraphs.push(mkCoverLabelPara("Date of Report:"));
-  paragraphs.push(mkCoverShaded(reportDate));
+  paragraphs.push(mkCoverShaded(mkLongDateRuns(new Date(), 28, TNR)));
   paragraphs.push(mkCoverSpacer());
   paragraphs.push(mkCoverLabelPara("Company Details:"));
   ["Tel:", "Email:", "Website:", "Address:"].forEach(label => paragraphs.push(mkCompanyLine(label)));
@@ -7585,19 +7692,19 @@ async function hyrDownloadWord(student, period, year, trendRows, categorized, pa
     new TableCell({
       width: { size: 70, type: WidthType.PERCENTAGE },
       margins: { top: 60, bottom: 60, left: 120, right: 120 },
-      children: [new Paragraph({ run: { size: 22 }, children: [mkDetailValueRun(value)], spacing: { before: 40, after: 40 } })]
+      children: [new Paragraph({ run: { size: 22 }, children: mkDetailValueRuns(value), spacing: { before: 40, after: 40 } })]
     })
   ]});
   paragraphs.push(new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
     rows: [
       mkDetailRow("Name:", studentLabel(student)),
-      mkDetailRow("Date of Birth:", dobOn(student)),
+      mkDetailRow("Date of Birth:", mkLongDateRuns(student?.dob)),
       // Worked out on the day the report is made, which is the date two
       // rows below it.
       mkDetailRow("Age:", ageOn(student)),
       mkDetailRow("Tracking Period:", monthRangeFull),
-      mkDetailRow("Date of Report:", reportDate)
+      mkDetailRow("Date of Report:", mkLongDateRuns(new Date()))
     ]
   }));
   paragraphs.push(new Paragraph({ run: { size: 22 }, children: [], spacing: { before: 200, after: 0 } }));
@@ -8591,7 +8698,7 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
           Table, TableRow, TableCell, WidthType, SectionType, Header, Footer, PageNumber } = window.docx;
 
   const LS = { line: 276, lineRule: "auto" };
-  const reportDate = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+
   const nDays = collected.days.length;
 
   let logoData = null;
@@ -8633,20 +8740,20 @@ async function assessmentDownloadWord(effectiveStudent, student, collected, pars
     new TableCell({
       width: { size: 70, type: WidthType.PERCENTAGE },
       margins: { top: 60, bottom: 60, left: 120, right: 120 },
-      children: [new Paragraph({ children: [mkDetailValueRun(value)], spacing: { before: 40, after: 40 } })]
+      children: [new Paragraph({ children: mkDetailValueRuns(value), spacing: { before: 40, after: 40 } })]
     })
   ]});
   paragraphs.push(new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
     rows: [
       mkDetailRow("Name:", studentLabel(student)),
-      mkDetailRow("Date of Birth:", dobOn(student)),
+      mkDetailRow("Date of Birth:", mkLongDateRuns(student?.dob)),
       // Worked out on the day the report is made, which is the date two
       // rows below it.
       mkDetailRow("Age:", ageOn(student)),
       mkDetailRow("Assessment Dates:", collected.days.map(d => d.label).join(", ")),
       mkDetailRow("Total Assessment Hours:", ""),
-      mkDetailRow("Date of Report:", reportDate)
+      mkDetailRow("Date of Report:", mkLongDateRuns(new Date()))
     ]
   }));
   paragraphs.push(new Paragraph({ children: [], spacing: { before: 200, after: 0 } }));
@@ -15735,7 +15842,7 @@ async function leaveSessionView() {
 }
 
 $("btn-view-back").addEventListener("click", leaveSessionView);
-$("btn-student-registry-back")?.addEventListener("click", showHome);
+$("btn-student-registry-back")?.addEventListener("click", leaveStudentRegistry);
 $("btn-todo-back")?.addEventListener("click", showHome);
 
 // ── Checked By strip (View/Edit Past Sessions approval flow) ──────────────────
