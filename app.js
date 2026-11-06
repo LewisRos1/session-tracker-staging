@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2344";
+const APP_VERSION = "2345";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -3964,7 +3964,37 @@ function regConfirmLeave() {
 }
 
 function regPaintDirty() {
-  $("student-registry-body")?.classList.toggle("reg-dirty", regIsDirty());
+  const dirty = regIsDirty();
+  $("student-registry-body")?.classList.toggle("reg-dirty", dirty);
+  // Typing again makes the last save old news.
+  if (dirty) regClearSaved();
+}
+
+let _regSavedTimer = null;
+
+/**
+ * What the Save button says once the write is through.
+ *
+ * It stays up for seven seconds rather than the usual flash, because it is
+ * also the answer to "is it safe to leave now?" -- which is exactly the
+ * moment someone reaches for the back arrow and gets asked a question.
+ */
+function regShowSaved() {
+  const btn = $("btn-save-student");
+  if (!btn) return;
+  clearTimeout(_regSavedTimer);
+  btn.textContent = "Saved! Feel free to go back to home page";
+  btn.classList.add("reg-save-done");
+  _regSavedTimer = setTimeout(regClearSaved, 7000);
+}
+
+function regClearSaved() {
+  clearTimeout(_regSavedTimer);
+  _regSavedTimer = null;
+  const btn = $("btn-save-student");
+  if (!btn) return;
+  btn.textContent = "Save Changes";
+  btn.classList.remove("reg-save-done");
 }
 
 /**
@@ -3999,11 +4029,12 @@ function wireStudentDetailForm(body) {
  * Writes the open student. Returns false when it refused, so a caller that
  * wanted to go somewhere afterwards knows to stay put.
  *
- * Saving finishes the job, so it drops back to the list afterwards. The one
- * caller that passes thenClose: false is Change Session Number, which saves
- * only so that it can open its popup over this same student.
+ * The page stays where it is afterwards; the Save button says so for seven
+ * seconds. The one caller that passes announce: false is Change Session
+ * Number, which saves only so that it can open its popup over this same
+ * student, and should not be held up by a message about going home.
  */
-async function saveOpenStudent({ thenClose = true } = {}) {
+async function saveOpenStudent({ announce = true } = {}) {
   const st = state.students.find(x => x.id === _registryOpenId);
   const v  = regFormValues();
   if (!st || !v) return false;
@@ -4045,18 +4076,11 @@ async function saveOpenStudent({ thenClose = true } = {}) {
   st.program        = v.program;
   st.exportDuration = v.exportDuration;
 
-  // Going back to the list is the confirmation, so the 700ms hold on
-  // "Saved!" would just be 700ms of nothing happening after a click.
-  await withSaveFeedback($("btn-save-student"), saveStudent(st),
-    thenClose ? { savedHold: 0 } : {});
+  // No hold on the built-in "Saved!", because regShowSaved puts its own
+  // longer message on the same button straight afterwards.
+  await withSaveFeedback($("btn-save-student"), saveStudent(st), { savedHold: 0 });
   if (nameChanged) propagateStudentRenameToGroups(st, oldName, v.name);
   renderExistingStudentButtons();
-
-  if (thenClose) {
-    _registryOpenId = null;
-    renderStudentRegistryBody();
-    return true;
-  }
 
   // Repainted by hand rather than by redrawing the page, because redrawing
   // it would wipe the "Saved!" the button is still showing.
@@ -4070,6 +4094,7 @@ async function saveOpenStudent({ thenClose = true } = {}) {
   const nameBox = body?.querySelector(".db-fullname-input");
   if (nameBox) nameBox.value = st.name;
   regPaintDirty();
+  if (announce) regShowSaved();
   return true;
 }
 
@@ -4097,7 +4122,7 @@ function wireStudentRegistryHandlers(body, sorted, highlightAdd) {
       // throw away anything typed here and not saved.
       if (regIsDirty()) {
         if (!confirm("This student has changes that have not been saved.\n\nSave them and carry on?")) return;
-        if (!await saveOpenStudent({ thenClose: false })) return;
+        if (!await saveOpenStudent({ announce: false })) return;
       }
       // The student's own page is where renaming, session numbering and
       // deletion live, so it is the gate rather than the screen behind it.

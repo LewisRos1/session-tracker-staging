@@ -257,15 +257,30 @@ try {
   await page.eval(`document.getElementById("btn-save-student").click()`);
   await settle(800);
   r.check("Save writes it", await stored("program"), "Speech and Language");
-  // Saving is the end of the job, so it goes back to the list rather than
-  // leaving you looking at the form wondering whether it took.
-  r.check("and goes back to the list", (await rows()).length, 4);
-  r.ok("the page is clean, so nothing was asked on the way out",
+  // It stays on the student's page. The button is what says the write went
+  // through, and it says so for long enough to read.
+  r.check("it stays on the student's page", (await rows()).length, 0);
+  r.check("the button says so", await page.eval(
+    `document.getElementById("btn-save-student").textContent.trim()`),
+    "Saved! Feel free to go back to home page");
+  r.ok("and the unsaved mark is gone",
+    !(await page.eval(`document.getElementById("student-registry-body").classList.contains("reg-dirty")`)),
+    "still marked unsaved");
+  r.ok("the button is usable again, not left disabled",
+    !(await page.eval(`document.getElementById("btn-save-student").disabled`)), "still disabled");
+  r.ok("leaving no longer asks",
     (await page.eval(`window.__regAsked`)) === 1, "it asked again");
+
+  // Typing again makes the last save old news, so the message goes.
+  await setBox("db-program-input", "Something else");
+  await settle(200);
+  r.check("typing again puts Save Changes back", await page.eval(
+    `document.getElementById("btn-save-student").textContent.trim()`), "Save Changes");
+  await setBox("db-program-input", "Speech and Language");
+  await settle(200);
 
   // The number used to be the button: an 8 with a dotted underline.
   r.section("7. Sessions Recorded has a button of its own");
-  await openRow("Kayden Koh");
   const sess = await page.eval(`(() => {
     const b = document.querySelector(".reg-sessnum-btn");
     const n = document.querySelector(".reg-indiv-num");

@@ -3678,6 +3678,14 @@ div.admin-note-editable:empty::before {
 }
 .reg-dirty .reg-dirty-note { display: inline; }
 
+/* Saved, and still on the same page. The message stays up for seven
+   seconds because it is also the answer to "is it safe to leave now?". */
+.reg-save-done {
+  background: var(--c-dcfce7);
+  border-color: var(--c-86efac);
+  color: var(--c-166534);
+}
+
 /* A student registered before the date of birth was asked for. */
 .reg-list-flag {
   flex: none;
