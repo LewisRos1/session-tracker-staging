@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2348";
+const APP_VERSION = "2349";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -3878,7 +3878,7 @@ const REG_TIPS = {
   shortZh:    "Only needed for a Chinese report. Leave it empty otherwise.",
   dob:        "Fills Date of Birth and Age on the report's Student Details table.",
   note:       "Shown in brackets after the name, here and everywhere else. It is what tells two records of the same student apart. No brackets needed.",
-  program:    "Shown on the report cover page. Leave it empty to leave the box blank.",
+  program:    "Shown on the report cover page, in the Program box.",
   reportType: "Whether this student gets a report every session or once a month.",
   sessions:   "How many individual sessions this student has. Change Session Number sets the true number of one of them, and the rest shift to match.",
 };
@@ -3945,7 +3945,7 @@ function renderStudentDetail(body, st) {
           { optional: true, wide: true })}`)}
 
       ${regCard("Report Details", `
-        ${field("Short Name", REG_TIPS.short,
+        ${field("English Short Name", REG_TIPS.short,
           text("db-shortname-input", st.preferredName, "e.g. Michelle"), { required: true })}
         ${field("Program", REG_TIPS.program,
           text("db-program-input", st.program, "e.g. Early Intervention Programme"),
@@ -3961,9 +3961,9 @@ function renderStudentDetail(body, st) {
            </div>`)}`)}
 
       ${regCard("Chinese Report", `
-        ${field("Full Name (Chinese)", REG_TIPS.nameZh,
+        ${field("Chinese Full Name", REG_TIPS.nameZh,
           text("db-fullname-zh-input", st.nameZh, "e.g. \u694a\u7d2b\u74ca"), { optional: true })}
-        ${field("Short Name (Chinese)", REG_TIPS.shortZh,
+        ${field("Chinese Short Name", REG_TIPS.shortZh,
           text("db-shortname-zh-input", st.shortNameZh, "e.g. \u7d2b\u74ca"), { optional: true })}`,
         "(Only fill this in if the student requires a translated chinese report)")}
 
@@ -4309,7 +4309,7 @@ function startAddStudentRow() {
         ${regField("Date of Birth", REG_TIPS.dob,
           `<input type="date" class="admin-input" id="new-student-dob" />`,
           { required: true })}
-        ${regField("Short Name", REG_TIPS.short,
+        ${regField("English Short Name", REG_TIPS.short,
           `<input class="admin-input" id="new-student-short" placeholder="e.g. Michelle" autocomplete="off" />`,
           { required: true })}
         ${regField("Program", REG_TIPS.program,

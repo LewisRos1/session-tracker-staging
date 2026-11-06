@@ -164,12 +164,12 @@ try {
   const f = await fields();
   r.check("the list is gone", await rows(), []);
   r.check("Full Name",            f["Full Name"]?.value, "Kayden Koh");
-  r.check("Short Name",           f["Short Name"]?.value, "Kayden");
+  r.check("English Short Name",           f["English Short Name"]?.value, "Kayden");
   r.check("Date of Birth",        f["Date of Birth"]?.value, "2018-10-18");
   r.check("Program",              f["Program"]?.value, "Personal Care");
   r.check("Report Type is there", !!f["Report Type"], true);
   r.check("and the Chinese ones have not been dropped",
-    !!f["Full Name (Chinese)"] && !!f["Short Name (Chinese)"], true);
+    !!f["Chinese Full Name"] && !!f["Chinese Short Name"], true);
 
   // Nine fields in one unbroken column gave no clue which of them the
   // reports read, which is the question anybody opening this page has.
@@ -186,9 +186,9 @@ try {
   r.check("who the student is", groups[0]?.fields,
     ["Full Name", "Gender", "Date of Birth", "Note (Optional)"]);
   r.check("what the reports read", groups[1]?.fields,
-    ["Short Name", "Program", "Report Type", "Sessions Recorded"]);
+    ["English Short Name", "Program", "Report Type", "Sessions Recorded"]);
   r.check("the two only a Chinese report needs", groups[2]?.fields,
-    ["Full Name (Chinese) (Optional)", "Short Name (Chinese) (Optional)"]);
+    ["Chinese Full Name (Optional)", "Chinese Short Name (Optional)"]);
   r.check("every field is inside a card",
     groups.reduce((n, g) => n + g.fields.length, 0),
     await page.eval(`document.querySelectorAll(".reg-field").length`));
@@ -293,19 +293,19 @@ try {
   r.ok("Full Name shows a whole name",
     /^e\.g\. \w+ \w+/.test(f["Full Name"]?.placeholder || ""), f["Full Name"]?.placeholder);
   r.ok("the Chinese box shows Chinese",
-    /[一-鿿]/.test(f["Full Name (Chinese)"]?.placeholder || ""), f["Full Name (Chinese)"]?.placeholder);
-  r.ok("Short Name shows one name only",
-    /^e\.g\. \w+$/.test(f["Short Name"]?.placeholder || ""), f["Short Name"]?.placeholder);
+    /[一-鿿]/.test(f["Chinese Full Name"]?.placeholder || ""), f["Chinese Full Name"]?.placeholder);
+  r.ok("the short name shows one name only",
+    /^e\.g\. \w+$/.test(f["English Short Name"]?.placeholder || ""), f["English Short Name"]?.placeholder);
   r.ok("Note shows a note", /^e\.g\. /.test(f["Note"]?.placeholder || ""), f["Note"]?.placeholder);
   r.ok("Program shows a programme", /^e\.g\. /.test(f["Program"]?.placeholder || ""), f["Program"]?.placeholder);
   r.check("everything a report needs is starred",
     Object.keys(f).filter(k => f[k].required).sort(),
-    ["Date of Birth", "Full Name", "Gender", "Program", "Report Type", "Short Name"]);
+    ["Date of Birth", "English Short Name", "Full Name", "Gender", "Program", "Report Type"]);
   // The three that are genuinely optional say so in the label, rather than
   // leaving an unstarred field to be read as an oversight.
   r.check("and the three that are not say Optional",
     Object.keys(f).filter(k => f[k].optional).sort(),
-    ["Full Name (Chinese)", "Note", "Short Name (Chinese)"]);
+    ["Chinese Full Name", "Chinese Short Name", "Note"]);
 
   // ── 6. saving ───────────────────────────────────────────────────────
   //
@@ -443,10 +443,10 @@ try {
   const nf = await fields();
   r.check("the add form asks for the four that cannot be blank, and the note",
     Object.keys(nf).sort(),
-    ["Date of Birth", "Full Name", "Gender", "Note", "Program", "Short Name"]);
+    ["Date of Birth", "English Short Name", "Full Name", "Gender", "Note", "Program"]);
   r.check("starred the same way there",
     Object.keys(nf).filter(k => nf[k].required).sort(),
-    ["Date of Birth", "Full Name", "Gender", "Program", "Short Name"]);
+    ["Date of Birth", "English Short Name", "Full Name", "Gender", "Program"]);
   r.check("and the Note is the only one marked Optional",
     Object.keys(nf).filter(k => nf[k].optional), ["Note"]);
   r.ok("and the examples came with it",
