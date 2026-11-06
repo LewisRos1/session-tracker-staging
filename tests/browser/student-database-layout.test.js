@@ -116,6 +116,31 @@ try {
   r.check("and the one that has a date of birth is left alone",
     flags.find(x => x.name === "Kayden Koh")?.flag, "");
 
+  // The No. column. It is the position in the list, so it doubles as the
+  // count -- nobody has to run a finger down the rows to total them.
+  r.check("every row is numbered, in order",
+    await page.eval(`(() => [...document.querySelectorAll(".reg-list-no")]
+      .map(n => n.textContent.trim()))()`), ["1", "2", "3", "4"]);
+  r.check("and the total is spelled out once",
+    (await page.eval(`document.querySelector(".reg-count")?.textContent.trim()`)), "4 students");
+
+  // A to Z, the way a phone's contact list works.
+  r.section("1b. the A to Z headings and the rail");
+  const az = await page.eval(`(() => ({
+    heads: [...document.querySelectorAll(".reg-letter")].map(h => h.textContent.trim()),
+    sticky: getComputedStyle(document.querySelector(".reg-letter")).position,
+    rail: [...document.querySelectorAll(".reg-rail-btn")].map(b => b.textContent.trim()),
+    live: [...document.querySelectorAll(".reg-rail-btn:not([disabled])")].map(b => b.textContent.trim()),
+  }))()`);
+  // Three Caden Tans under one C, one Kayden Koh under K.
+  r.check("one heading each time the first letter changes", az.heads, ["C", "K"]);
+  r.check("and it sticks to the top as you scroll", az.sticky, "sticky");
+  r.check("the rail runs # then A to Z", az.rail.length, 27);
+  r.check("only the letters that have somebody are live", az.live, ["C", "K"]);
+
+  // Tapping a letter is checked at the end of this file, on a list long
+  // enough to scroll. Four rows do not fill the window, so nothing moves.
+
   r.section("2. nothing is crushed, and nothing scrolls sideways");
   const fit = await page.eval(`(() => {
     const el = document.getElementById("student-registry-body");
@@ -142,6 +167,32 @@ try {
   r.check("Report Type is there", !!f["Report Type"], true);
   r.check("and the Chinese ones have not been dropped",
     !!f["Full Name (Chinese)"] && !!f["Short Name (Chinese)"], true);
+
+  // Nine fields in one unbroken column gave no clue which of them the
+  // reports read, which is the question anybody opening this page has.
+  const groups = await page.eval(`(() => {
+    const out = []; let cur = null;
+    [...document.querySelectorAll(".reg-group, .reg-field")].forEach(el => {
+      if (el.classList.contains("reg-group")) { cur = { title: el.textContent.trim(), fields: [] }; out.push(cur); }
+      else if (cur) {
+        const raw = (el.querySelector(".reg-field-label")?.textContent || "").trim();
+        cur.fields.push(raw.endsWith("*") ? raw.slice(0, -1).trim() : raw);
+      }
+    });
+    return out;
+  })()`);
+  r.check("the page is in four named sections", groups.map(g => g.title),
+    ["Student Details", "For the Reports", "For a Chinese Report", "Sessions"]);
+  r.check("who the student is", groups[0]?.fields,
+    ["Full Name", "Gender", "Date of Birth", "Note"]);
+  r.check("what the reports read", groups[1]?.fields,
+    ["Short Name", "Program", "Report Type"]);
+  r.check("the two only a Chinese report needs", groups[2]?.fields,
+    ["Full Name (Chinese)", "Short Name (Chinese)"]);
+  r.check("and the session count on its own", groups[3]?.fields, ["Sessions Recorded"]);
+  r.check("every field is inside a section",
+    groups.reduce((n, g) => n + g.fields.length, 0),
+    await page.eval(`document.querySelectorAll(".reg-field").length`));
 
   // Label, box and ? sit on one line. At half a screen that still has to
   // fit, which is the whole point this suite was written for.
@@ -378,6 +429,54 @@ try {
     /text: suffix, superScript: true/.test(src), true);
   r.check("and the old en-GB long date is gone from the documents",
     (src.match(/const reportDate = /g) || []).length, 0);
+
+  // ── 11. the rail, on a list long enough to need one ─────────────────
+  //
+  // Four students do not fill the window, so there is nothing for a jump
+  // to do. This reloads with one student per letter, which is the shape
+  // the rail was asked for.
+  r.section("11. tapping a rail letter on a long list");
+  const AZ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+  await page.fixture({
+    today: "2026-11-05", authUser: "daisy", groups: [], sessions: [],
+    students: AZ.map((L, i) => ({
+      id: "x" + L, name: `${L}aniel ${L}ee`, order: i,
+      preferredName: L + "an", gender: "male", dob: "2018-10-18", targets: [],
+    })),
+  });
+  await page.load();
+  await page.until(`!document.querySelector("#screen-home").classList.contains("hidden")`, "home again");
+  await page.eval(`window.__app.openStudentRegistryScreen()`);
+  await page.until(`!!document.querySelector(".reg-list-row")`, "the long list");
+  await settle(400);
+
+  r.check("every letter has somebody now",
+    await page.eval(`document.querySelectorAll(".reg-rail-btn:not([disabled])").length`), 26);
+  r.check("and the count says so",
+    await page.eval(`document.querySelector(".reg-count").textContent.trim()`), "26 students");
+  r.check("the last row is numbered 26",
+    await page.eval(`[...document.querySelectorAll(".reg-list-no")].pop().textContent.trim()`), "26");
+  r.ok("the list is long enough to scroll", await page.eval(`(() => {
+    const b = document.getElementById("student-registry-body");
+    return b.scrollHeight - b.clientHeight > 200;
+  })()`), "it still fits the window, so the jump proves nothing");
+
+  await page.eval(`(() => [...document.querySelectorAll(".reg-rail-btn")]
+    .find(x => x.textContent.trim() === "H").click())()`);
+  await settle(800);
+  const landed = await page.eval(`(() => {
+    const body = document.getElementById("student-registry-body");
+    const head = document.getElementById("reg-letter-H");
+    return Math.round(head.getBoundingClientRect().top - body.getBoundingClientRect().top);
+  })()`);
+  r.ok("tapping H brings H to the top", Math.abs(landed) < 40, `${landed}px off`);
+
+  // The rail itself must not scroll away with the list.
+  r.ok("and the rail stays put", await page.eval(`(() => {
+    const body = document.getElementById("student-registry-body");
+    const rail = document.querySelector(".reg-rail");
+    return rail.getBoundingClientRect().top - body.getBoundingClientRect().top < 40;
+  })()`), "the rail scrolled off the top");
 
   r.section("console");
   const noise = page.consoleLines.filter(l => l.level === "error");

@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2345";
+const APP_VERSION = "2346";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -3784,21 +3784,57 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
     return;
   }
 
+  // A to Z, the way a phone's contact list works: a heading each time the
+  // first letter changes, and a rail of letters down the side to jump by.
+  // A name that does not start with a letter lands under #.
+  const initialOf = st => {
+    const c = (st.name || "").trim().charAt(0).toUpperCase();
+    return /^[A-Z]$/.test(c) ? c : "#";
+  };
+  const letterId = L => (L === "#" ? "hash" : L);
+  const LETTERS  = ["#", ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
+  const present  = new Set(sorted.map(initialOf));
+  let lastLetter = null;
+
   body.innerHTML = `
-    <div style="padding:1rem">
+    <div class="reg-list-page">
       <div style="display:flex;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap">
         <button class="export-btn" id="btn-add-student-row">+ Add New Student</button>
       </div>
-      <div class="reg-list">
-        ${sorted.map(st => `
-          <button class="reg-list-row" data-id="${escHtml(st.id)}">
-            <span class="reg-list-name">${escHtml(studentLabel(st))}</span>
-            ${dobOn(st) ? "" : `<span class="reg-list-flag">No date of birth</span>`}
-            <span class="reg-list-go" aria-hidden="true">›</span>
-          </button>`).join("")}
+      <div class="reg-list-wrap">
+        <div class="reg-list">
+          ${sorted.map((st, i) => {
+            const L = initialOf(st);
+            const head = L === lastLetter ? ""
+              : `<div class="reg-letter" id="reg-letter-${escHtml(letterId(L))}">${escHtml(L)}</div>`;
+            lastLetter = L;
+            // The number is the position in this list, so it also says how
+            // many students there are without anybody counting rows.
+            return head + `
+            <button class="reg-list-row" data-id="${escHtml(st.id)}">
+              <span class="reg-list-no">${i + 1}</span>
+              <span class="reg-list-name">${escHtml(studentLabel(st))}</span>
+              ${dobOn(st) ? "" : `<span class="reg-list-flag">No date of birth</span>`}
+              <span class="reg-list-go" aria-hidden="true">›</span>
+            </button>`;
+          }).join("")}
+        </div>
+        ${sorted.length ? `<div class="reg-rail">${LETTERS.map(L => `
+          <button type="button" class="reg-rail-btn" data-letter="${escHtml(letterId(L))}"
+            ${present.has(L) ? "" : "disabled"} aria-label="Jump to ${escHtml(L)}">${escHtml(L)}</button>`
+          ).join("")}</div>` : ""}
       </div>
-      ${sorted.length === 0 ? `<p class="empty-hint" style="padding:1rem">No students registered yet.</p>` : ""}
+      ${sorted.length === 0
+        ? `<p class="empty-hint" style="padding:1rem">No students registered yet.</p>`
+        : `<p class="reg-count">${sorted.length} student${sorted.length === 1 ? "" : "s"}</p>`}
     </div>`;
+
+  body.querySelectorAll(".reg-rail-btn").forEach(b => {
+    b.addEventListener("click", () => {
+      document.getElementById("reg-letter-" + b.dataset.letter)
+        ?.scrollIntoView({ block: "start", behavior: "smooth" });
+    });
+  });
 
   // studentLabel puts the note in brackets after the name, which is the
   // only thing telling three records called Caden Tan apart.
@@ -3856,6 +3892,11 @@ function regField(label, tip, control, { required = false, under = "" } = {}) {
 function renderStudentDetail(body, st) {
   const id = escHtml(st.id);
   const field = regField;
+  // Nine fields in one unbroken column gave no clue which of them the
+  // reports read, which is the question anybody opening this page has.
+  const group = (title, hint) => `
+    <h3 class="reg-group">${escHtml(title)}</h3>
+    ${hint ? `<p class="reg-group-hint">${escHtml(hint)}</p>` : ""}`;
   const text = (cls, value, placeholder, extra = "") => `
     <input class="admin-input ${cls}" data-id="${id}" value="${escHtml(value || "")}"
       placeholder="${escHtml(placeholder)}" autocomplete="off" ${extra} />`;
@@ -3866,26 +3907,36 @@ function renderStudentDetail(body, st) {
       <h2 class="reg-detail-title">${escHtml(studentLabel(st))}</h2>
       <p class="reg-req-note"><span class="reg-req">*</span> required</p>
 
+      ${group("Student Details",
+        "Who the student is. The name, the date of birth and the age worked out from it are the top rows of the report's Student Details table.")}
       ${field("Full Name", REG_TIPS.name,
         text("db-fullname-input", st.name, "e.g. Michelle Yeoh Choo Kheng"), { required: true })}
-      ${field("Full Name (Chinese)", REG_TIPS.nameZh,
-        text("db-fullname-zh-input", st.nameZh, "e.g. \u694a\u7d2b\u74ca"))}
       ${field("Gender", REG_TIPS.gender, genderSelectHtml(st), { required: true })}
-      ${field("Short Name", REG_TIPS.short,
-        text("db-shortname-input", st.preferredName, "e.g. Michelle"), { required: true })}
-      ${field("Short Name (Chinese)", REG_TIPS.shortZh,
-        text("db-shortname-zh-input", st.shortNameZh, "e.g. \u7d2b\u74ca"))}
       ${field("Date of Birth", REG_TIPS.dob,
         `<input type="date" class="admin-input db-dob-input" data-id="${id}" value="${escHtml(st.dob || "")}" />`,
         { required: true,
           under: `<div class="reg-field-under" id="reg-age-line">${ageOn(st) ? `Age today: ${escHtml(ageOn(st))}` : ""}</div>` })}
       ${field("Note", REG_TIPS.note,
         text("db-note-input", noteBare(st.note), "e.g. School Readiness"))}
+
+      ${group("For the Reports",
+        "What the writing calls this student, what the cover page says, and how often a report is made.")}
+      ${field("Short Name", REG_TIPS.short,
+        text("db-shortname-input", st.preferredName, "e.g. Michelle"), { required: true })}
       ${field("Program", REG_TIPS.program,
         text("db-program-input", st.program, "e.g. Early Intervention Programme"))}
       ${field("Report Type", REG_TIPS.reportType,
         `${(() => { const m = st.exportDuration === "monthly";
           return `<select class="db-export-dur-select admin-input" data-id="${id}"><option value="monthly"${m ? " selected" : ""}>Monthly</option><option value="every_session"${m ? "" : " selected"}>Every Session</option></select>`; })()}`)}
+
+      ${group("For a Chinese Report",
+        "Only read when the report is written in Chinese. Leave both empty otherwise.")}
+      ${field("Full Name (Chinese)", REG_TIPS.nameZh,
+        text("db-fullname-zh-input", st.nameZh, "e.g. \u694a\u7d2b\u74ca"))}
+      ${field("Short Name (Chinese)", REG_TIPS.shortZh,
+        text("db-shortname-zh-input", st.shortNameZh, "e.g. \u7d2b\u74ca"))}
+
+      ${group("Sessions", "")}
       ${field("Sessions Recorded", REG_TIPS.sessions,
         `<span class="reg-indiv-num" data-id="${id}">\u2026</span>
          <button type="button" class="reg-sessnum-btn" data-id="${id}">Change Session Number</button>`)}
