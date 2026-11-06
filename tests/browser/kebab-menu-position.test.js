@@ -30,7 +30,7 @@ try {
   await page.fixture({
     today: "2026-10-13", authUser: "daisy",
     students: [{
-      id: "caden", name: "Caden Tan", order: 1,
+      id: "aiden", name: "Aiden Lim", order: 1,
       targets: [{ id: "t1", name: "English", scale: 3, predefinedActivities: acts }],
     }],
     groups: [], sessions: [],
@@ -42,7 +42,7 @@ try {
   await page.resize(1280, 700);
   await settle(200);
   await page.eval(`(() => {
-    const s = window.__app.state.students.find(x => x.id === "caden");
+    const s = window.__app.state.students.find(x => x.id === "aiden");
     window.__app.openManageModal(s, s.targets[0]);
   })()`);
   await page.until(`document.querySelectorAll(".mn-kebab-btn").length >= 5`, "the activity rows");
@@ -179,7 +179,7 @@ try {
   r.section("a menu opened above a card that is waiting for approval");
 
   const covered = await page.eval(`(() => {
-    const s = window.__app.state.students.find(x => x.id === "caden");
+    const s = window.__app.state.students.find(x => x.id === "aiden");
     const acts = s.targets[0].predefinedActivities;
     // The last two rows proposed by somebody else, as an assistant's would be.
     for (const a of acts.slice(-2)) { a._pending = true; a.proposedBy = "rayhanah"; }

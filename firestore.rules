@@ -64,13 +64,19 @@ service cloud.firestore {
     // ── Student and group configuration ──────────────────────
     // Split by operation rather than testing request.method: on a delete there
     // is no request.resource to inspect at all.
+    // Deleting is the one thing here that cannot be undone from inside the
+    // app, and the screen already gates it behind the password and typing
+    // the student's full name -- which only a main teacher gets through.
+    // The rule now says the same thing, so a browser console cannot skip it.
     match /students/{studentId} {
-      allow read, delete: if signedIn();
+      allow read: if signedIn();
+      allow delete: if isMainTeacher();
       allow create, update: if signedIn() && request.resource.data.name is string;
     }
 
     match /groups/{groupId} {
-      allow read, delete: if signedIn();
+      allow read: if signedIn();
+      allow delete: if isMainTeacher();
       allow create, update: if signedIn() && request.resource.data.name is string;
     }
 

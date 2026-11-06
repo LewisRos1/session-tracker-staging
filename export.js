@@ -1880,7 +1880,7 @@ function safePathSegment(text) {
  * A student or group as they are named on a file: the name, and the note.
  *
  * Without the note, two students whose names match wrote to the same path in
- * the zip and the second quietly replaced the first. "Caden Tan" and "Caden Tan
+ * the zip and the second quietly replaced the first. "Aiden Lim" and "Aiden Lim
  * (School Readiness)" went in as one file, and nothing said so. The same two
  * records produced two identically named reports in a downloads folder, where
  * nothing marked which was which either.

@@ -188,8 +188,8 @@ try {
                       height: cn?.height || 0, fixedSize: !!cn?.fixedSize };
       } catch (e) { out[name] = { error: e.message }; }
     };
-    draw("overview", { kind: "overview", baseW: 700, title: "Caden (Jan 2026 - Jun 2026 Progress)",
-      titleZh: "Caden（Jan 2026 - Jun 2026）",
+    draw("overview", { kind: "overview", baseW: 700, title: "Aiden (Jan 2026 - Jun 2026 Progress)",
+      titleZh: "Aiden（Jan 2026 - Jun 2026）",
       rows: [{ name: "FEDC 2", delta: 12, tStart: 70, tEnd: 82 },
              { name: "Self-Regulation", delta: -10, tStart: 80, tEnd: 70 }] });
     draw("line", { kind: "line", target: "FEDC 2", labels: ["Jan", "Feb", "Mar"],
@@ -272,7 +272,7 @@ try {
       spec.values, spec.period, spec.year, spec.tStart, spec.tEnd, spec.delta, spec.direction));
     // The overview chart is the one whose colours the boss pointed at.
     const ov = grab(() => window.__app.redrawChartZh({ kind: "overview", baseW: 700,
-      title: "Caden", titleZh: "Caden",
+      title: "Aiden", titleZh: "Aiden",
       rows: [{ name: "FEDC 2", delta: 12, tStart: 70, tEnd: 82 }] }, zh));
     const find = (calls, needle) => calls.find(c => c.text.indexOf(needle) >= 0) || null;
     const months = (calls) => calls
@@ -366,14 +366,14 @@ try {
     return {
       plain:   window.__app.studentLabel(s),
       file:    window.__app.studentFileLabel(s),
-      none:    window.__app.studentFileLabel({ name: "Ryan Lee", note: "" }),
+      none:    window.__app.studentFileLabel({ name: "Elliot Toh", note: "" }),
       wrapped: window.__app.studentLabel({ name: "Hiew Cheng Yu", note: "(Assessment)" }),
       nasty:   window.__app.studentFileLabel({ name: "Mon/Wed", note: "a:b?c" }),
     };
   })()`);
   r.check("on screen", labels.plain, "Zhang Qi Pei (EIP)");
   r.check("and on the file", labels.file, "Zhang Qi Pei (EIP)");
-  r.check("no note, no brackets", labels.none, "Ryan Lee");
+  r.check("no note, no brackets", labels.none, "Elliot Toh");
   r.check("a note typed with its own brackets is not doubled",
     labels.wrapped, "Hiew Cheng Yu (Assessment)");
   // A note is free text, and Windows refuses these in a file name: a download

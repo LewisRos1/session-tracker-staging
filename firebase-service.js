@@ -91,11 +91,14 @@ const db = initializeFirestore(app, {
 // ─── AUTH ────────────────────────────────────────────────────
 // Each person signs in as themselves. There used to be one shared account for
 // the whole team, unlocked by a four digit PIN, with its address and password
-// prefix both sitting in this file -- which every visitor downloads. It could
-// not tell one person from another, so no rule about who may do what could
-// mean anything. It is gone along with the PIN screen that drove it; the
-// staff@ account can be deleted from the Firebase console once nobody is
-// signed in on it.
+// prefix both sitting in this file -- which every visitor downloads. Anyone
+// reading the repository could work the login out, and it could not tell one
+// person from another, so no rule about who may do what could mean anything.
+//
+// The staff@ account was deleted from both Firebase consoles on 2026-11-06,
+// along with the PIN that was still sitting in config.js spelling out half of
+// it. Account creation is switched off in both projects as well, so the only
+// logins that exist are the four made by hand in the console.
 //
 // browserLocalPersistence is the default for web — no setPersistence call needed.
 // Calling setPersistence after getAuth() can trigger an internal sign-out round-trip
@@ -1814,8 +1817,8 @@ export async function deleteGroupTargetDataFromSessions(groupId, targetName) {
 }
 
 // When a group roster slot is re-pointed at a different registered student
-// (e.g. it was linked to an auto-created placeholder like "Hayden" and gets
-// corrected to the real "Hayden Chan"), this is the same orphaning problem
+// (e.g. it was linked to an auto-created placeholder like "Marcus" and gets
+// corrected to the real "Marcus Yap"), this is the same orphaning problem
 // as renameActivityAcrossSessions, just one layer up: every existing session
 // for this group still has the OLD name/id baked into its attendees/
 // attendeeIds/attendeePersonalSessionNumbers/remarks, so the student

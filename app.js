@@ -227,13 +227,13 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2350";
+const APP_VERSION = "2351";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
 //     debugRecoverOptions()                                 // scan EVERY student
-//     debugRecoverOptions("Hayden Chan", "Math")            // one target
-//     debugRecoverOptions("Hayden Chan", "Math", true)      // write them back
+//     debugRecoverOptions("Marcus Yap", "Math")            // one target
+//     debugRecoverOptions("Marcus Yap", "Math", true)      // write them back
 //     debugRecoverOptions(null, null, true)                 // write them all back
 //
 //     Saving an activity while its panel was open read the option list from the
@@ -454,12 +454,12 @@ window.debugFindActivity = async function(text) {
 };
 
 // 1) List all stored activity names under a target:
-//    debugScanTarget("Hayden Chan", "Math")
+//    debugScanTarget("Marcus Yap", "Math")
 window.debugScanTarget = async function(studentName, targetName) {
   const students = await loadStudentsConfig();
-  // Three records can share the name "Caden Tan", separated only by their note,
+  // Three records can share the name "Aiden Lim", separated only by their note,
   // so an exact-name lookup would silently pick whichever came back first and
-  // search the wrong child's sessions. Accept "Caden Tan (School Readiness)"
+  // search the wrong child's sessions. Accept "Aiden Lim (School Readiness)"
   // too, and refuse to guess when a bare name is ambiguous.
   const _label = s => `${s.name}${noteBare(s.note) ? ` (${noteBare(s.note)})` : ""}`;
   let student = students.find(s => _label(s) === studentName);
@@ -492,12 +492,12 @@ window.debugScanTarget = async function(studentName, targetName) {
 //     entries holding the same remark text in the same session is the signature
 //     of a duplicate; an entry with records but no config is a stranded record.
 //     Writes nothing. Full data left on window.__dupCheck.
-//     debugDuplicates("Kayden Koh", "Learning")
+//     debugDuplicates("Jayden Lee", "Learning")
 window.debugDuplicates = async function(studentName, targetName) {
   const students = await loadStudentsConfig();
-  // Three records can share the name "Caden Tan", separated only by their note,
+  // Three records can share the name "Aiden Lim", separated only by their note,
   // so an exact-name lookup would silently pick whichever came back first and
-  // search the wrong child's sessions. Accept "Caden Tan (School Readiness)"
+  // search the wrong child's sessions. Accept "Aiden Lim (School Readiness)"
   // too, and refuse to guess when a bare name is ambiguous.
   const _label = s => `${s.name}${noteBare(s.note) ? ` (${noteBare(s.note)})` : ""}`;
   let student = students.find(s => _label(s) === studentName);
@@ -591,14 +591,14 @@ window.debugDuplicates = async function(studentName, targetName) {
 //     default; pass true as the last argument to write. Refuses any session
 //     that already holds a record for the destination, since repointing there
 //     would create a real duplicate inside one session.
-//     debugRepoint("Kayden Koh", "Learning", "amt73xzqm73w53", "amqknhgnoek9u")
-//     debugRepoint("Kayden Koh", "Learning", "amt73xzqm73w53", "amqknhgnoek9u", true)
+//     debugRepoint("Jayden Lee", "Learning", "aaaaaaaaaaaaa1", "aaaaaaaaaaaa2")
+//     debugRepoint("Jayden Lee", "Learning", "aaaaaaaaaaaaa1", "aaaaaaaaaaaa2", true)
 window.debugRepoint = async function(studentName, targetName, fromCfg, toCfg, apply = false) {
   const students = await loadStudentsConfig();
-  // A name is not unique: three records can share "Caden Tan", separated only by
+  // A name is not unique: three records can share "Aiden Lim", separated only by
   // their note. A bare-name lookup picks whichever came back first, which on a
   // WRITE tool means repairing the wrong child's data. Accept the full label
-  // "Caden Tan (School Readiness)", and refuse to guess when a name is shared.
+  // "Aiden Lim (School Readiness)", and refuse to guess when a name is shared.
   const _label = s => `${s.name}${noteBare(s.note) ? ` (${noteBare(s.note)})` : ""}`;
   let student = students.find(s => _label(s) === studentName);
   if (!student) {
@@ -660,14 +660,14 @@ window.debugRepoint = async function(studentName, targetName, fromCfg, toCfg, ap
 //     is empty, so a real selection is never destroyed and no note is
 //     overwritten. Omit configId to sweep every option-based activity in the
 //     target. DRY RUN by default.
-//     debugFixOldData("Kayden Koh", "Learning")
-//     debugFixOldData("Kayden Koh", "Learning", null, true)
+//     debugFixOldData("Jayden Lee", "Learning")
+//     debugFixOldData("Jayden Lee", "Learning", null, true)
 window.debugFixOldData = async function(studentName, targetName, configId = null, apply = false) {
   const students = await loadStudentsConfig();
-  // A name is not unique: three records can share "Caden Tan", separated only by
+  // A name is not unique: three records can share "Aiden Lim", separated only by
   // their note. A bare-name lookup picks whichever came back first, which on a
   // WRITE tool means repairing the wrong child's data. Accept the full label
-  // "Caden Tan (School Readiness)", and refuse to guess when a name is shared.
+  // "Aiden Lim (School Readiness)", and refuse to guess when a name is shared.
   const _label = s => `${s.name}${noteBare(s.note) ? ` (${noteBare(s.note)})` : ""}`;
   let student = students.find(s => _label(s) === studentName);
   if (!student) {
@@ -753,13 +753,13 @@ window.debugFixOldData = async function(studentName, targetName, configId = null
 // 1g) Merge two records for the same target inside ONE session: every remark
 //     on the dropped record moves to the kept one, then the emptied record is
 //     removed. Nothing is deleted, only re-pointed. DRY RUN by default.
-//     debugMergeInSession("Kayden Koh", "Learning", "2026-06-18", "amqknhgnoek9u", "amt73xzqm73w53")
+//     debugMergeInSession("Jayden Lee", "Learning", "2026-06-18", "aaaaaaaaaaaa2", "aaaaaaaaaaaaa1")
 window.debugMergeInSession = async function(studentName, targetName, sessionDate, keepCfg, dropCfg, apply = false) {
   const students = await loadStudentsConfig();
-  // A name is not unique: three records can share "Caden Tan", separated only by
+  // A name is not unique: three records can share "Aiden Lim", separated only by
   // their note. A bare-name lookup picks whichever came back first, which on a
   // WRITE tool means repairing the wrong child's data. Accept the full label
-  // "Caden Tan (School Readiness)", and refuse to guess when a name is shared.
+  // "Aiden Lim (School Readiness)", and refuse to guess when a name is shared.
   const _label = s => `${s.name}${noteBare(s.note) ? ` (${noteBare(s.note)})` : ""}`;
   let student = students.find(s => _label(s) === studentName);
   if (!student) {
@@ -806,13 +806,13 @@ window.debugMergeInSession = async function(studentName, targetName, sessionDate
 // 1f) Remove a config activity entry WITHOUT touching session data. Refuses
 //     while any record still points at it, so it can only be used after
 //     debugRepoint has emptied it. DRY RUN by default.
-//     debugDropConfigEntry("Kayden Koh", "Learning", "amt73xzqm73w53", true)
+//     debugDropConfigEntry("Jayden Lee", "Learning", "aaaaaaaaaaaaa1", true)
 window.debugDropConfigEntry = async function(studentName, targetName, configId, apply = false) {
   const students = await loadStudentsConfig();
-  // A name is not unique: three records can share "Caden Tan", separated only by
+  // A name is not unique: three records can share "Aiden Lim", separated only by
   // their note. A bare-name lookup picks whichever came back first, which on a
   // WRITE tool means repairing the wrong child's data. Accept the full label
-  // "Caden Tan (School Readiness)", and refuse to guess when a name is shared.
+  // "Aiden Lim (School Readiness)", and refuse to guess when a name is shared.
   const _label = s => `${s.name}${noteBare(s.note) ? ` (${noteBare(s.note)})` : ""}`;
   let student = students.find(s => _label(s) === studentName);
   if (!student) {
@@ -858,14 +858,14 @@ window.debugDropConfigEntry = async function(studentName, targetName, configId, 
 //     distinctive WORD rather than the report's phrasing: "hour", "toilet",
 //     "transition". Case-insensitive, searches the remark and its note.
 //     Writes nothing. Full rows left on window.__remarkHits.
-//       debugFindRemark("Caden Tan", "hour")
-//       debugFindRemark("Caden Tan", "recover", "2026-03", "2026-07")
+//       debugFindRemark("Aiden Lim", "hour")
+//       debugFindRemark("Aiden Lim", "recover", "2026-03", "2026-07")
 window.debugFindRemark = async function(studentName, needle, fromYm = null, toYm = null) {
   const students = await loadStudentsConfig();
-  // A name is not unique: three records can share "Caden Tan", separated only by
+  // A name is not unique: three records can share "Aiden Lim", separated only by
   // their note. A bare-name lookup picks whichever came back first, which on a
   // WRITE tool means repairing the wrong child's data. Accept the full label
-  // "Caden Tan (School Readiness)", and refuse to guess when a name is shared.
+  // "Aiden Lim (School Readiness)", and refuse to guess when a name is shared.
   const _label = s => `${s.name}${noteBare(s.note) ? ` (${noteBare(s.note)})` : ""}`;
   let student = students.find(s => _label(s) === studentName);
   if (!student) {
@@ -921,14 +921,14 @@ window.debugFindRemark = async function(studentName, needle, fromYm = null, toYm
 
 // 1y) READ-ONLY. Every remark in a date range, oldest first, for reading a whole
 //     period rather than hunting one word. Same shape as debugFindRemark.
-//       debugAllRemarks("Caden Tan", "2026-03", "2026-07")
-//       debugAllRemarks("Caden Tan", "2026-03", "2026-07", "Self-Regulation")
+//       debugAllRemarks("Aiden Lim", "2026-03", "2026-07")
+//       debugAllRemarks("Aiden Lim", "2026-03", "2026-07", "Self-Regulation")
 window.debugAllRemarks = async function(studentName, fromYm = null, toYm = null, targetName = null) {
   const students = await loadStudentsConfig();
-  // A name is not unique: three records can share "Caden Tan", separated only by
+  // A name is not unique: three records can share "Aiden Lim", separated only by
   // their note. A bare-name lookup picks whichever came back first, which on a
   // WRITE tool means repairing the wrong child's data. Accept the full label
-  // "Caden Tan (School Readiness)", and refuse to guess when a name is shared.
+  // "Aiden Lim (School Readiness)", and refuse to guess when a name is shared.
   const _label = s => `${s.name}${noteBare(s.note) ? ` (${noteBare(s.note)})` : ""}`;
   let student = students.find(s => _label(s) === studentName);
   if (!student) {
@@ -986,13 +986,13 @@ window.debugAllRemarks = async function(studentName, fromYm = null, toYm = null,
 //     configId. This is the honest answer to "which sessions hold data for this
 //     activity", because records that lost their configId are invisible to a
 //     configId lookup but still show on screen, matched by name.
-//     debugRecordsByName("Kayden Koh", "Learning", "b) 2 Animals instructions")
+//     debugRecordsByName("Jayden Lee", "Learning", "b) 2 Animals instructions")
 window.debugRecordsByName = async function(studentName, targetName, activityName) {
   const students = await loadStudentsConfig();
-  // A name is not unique: three records can share "Caden Tan", separated only by
+  // A name is not unique: three records can share "Aiden Lim", separated only by
   // their note. A bare-name lookup picks whichever came back first, which on a
   // WRITE tool means repairing the wrong child's data. Accept the full label
-  // "Caden Tan (School Readiness)", and refuse to guess when a name is shared.
+  // "Aiden Lim (School Readiness)", and refuse to guess when a name is shared.
   const _label = s => `${s.name}${noteBare(s.note) ? ` (${noteBare(s.note)})` : ""}`;
   let student = students.find(s => _label(s) === studentName);
   if (!student) {
@@ -1035,13 +1035,13 @@ window.debugRecordsByName = async function(studentName, targetName, activityName
 // 1c) READ-ONLY. Every session record for ONE activity, with its remark text,
 //     so a suspected duplicate can be compared against the original before
 //     anything is deleted. Writes nothing.
-//     debugActivityRecords("Kayden Koh", "Learning", "amt73xzqm73w53")
+//     debugActivityRecords("Jayden Lee", "Learning", "aaaaaaaaaaaaa1")
 window.debugActivityRecords = async function(studentName, targetName, configId) {
   const students = await loadStudentsConfig();
-  // A name is not unique: three records can share "Caden Tan", separated only by
+  // A name is not unique: three records can share "Aiden Lim", separated only by
   // their note. A bare-name lookup picks whichever came back first, which on a
   // WRITE tool means repairing the wrong child's data. Accept the full label
-  // "Caden Tan (School Readiness)", and refuse to guess when a name is shared.
+  // "Aiden Lim (School Readiness)", and refuse to guess when a name is shared.
   const _label = s => `${s.name}${noteBare(s.note) ? ` (${noteBare(s.note)})` : ""}`;
   let student = students.find(s => _label(s) === studentName);
   if (!student) {
@@ -1080,13 +1080,13 @@ window.debugActivityRecords = async function(studentName, targetName, configId) 
 };
 
 // 2) Show config dates for all activities in a target — reveals hidden activeTo/activeFrom:
-//    debugTargetConfig("Hayden Chan", "Math")
+//    debugTargetConfig("Marcus Yap", "Math")
 window.debugTargetConfig = async function(studentName, targetName) {
   const students = await loadStudentsConfig();
-  // A name is not unique: three records can share "Caden Tan", separated only by
+  // A name is not unique: three records can share "Aiden Lim", separated only by
   // their note. A bare-name lookup picks whichever came back first, which on a
   // WRITE tool means repairing the wrong child's data. Accept the full label
-  // "Caden Tan (School Readiness)", and refuse to guess when a name is shared.
+  // "Aiden Lim (School Readiness)", and refuse to guess when a name is shared.
   const _label = s => `${s.name}${noteBare(s.note) ? ` (${noteBare(s.note)})` : ""}`;
   let student = students.find(s => _label(s) === studentName);
   if (!student) {
@@ -1120,13 +1120,13 @@ window.debugTargetConfig = async function(studentName, targetName) {
 //     target config still lists, and show everything needed to rebuild the
 //     activities that the pre-2026-08-23 reorder bug deleted from the config.
 //     Writes nothing — the full result is also left on window.__recoveryPlan.
-//     debugRecoveryPlan("Hayden Chan", "Math")
+//     debugRecoveryPlan("Marcus Yap", "Math")
 window.debugRecoveryPlan = async function(studentName, targetName) {
   const students = await loadStudentsConfig();
-  // A name is not unique: three records can share "Caden Tan", separated only by
+  // A name is not unique: three records can share "Aiden Lim", separated only by
   // their note. A bare-name lookup picks whichever came back first, which on a
   // WRITE tool means repairing the wrong child's data. Accept the full label
-  // "Caden Tan (School Readiness)", and refuse to guess when a name is shared.
+  // "Aiden Lim (School Readiness)", and refuse to guess when a name is shared.
   const _label = s => `${s.name}${noteBare(s.note) ? ` (${noteBare(s.note)})` : ""}`;
   let student = students.find(s => _label(s) === studentName);
   if (!student) {
@@ -1198,13 +1198,13 @@ window.debugRecoveryPlan = async function(studentName, targetName) {
 };
 
 // 3) Clear legacy activeTo/activeFrom from all activities in a target:
-//    debugClearActivePeriod("Hayden Chan", "Math")
+//    debugClearActivePeriod("Marcus Yap", "Math")
 window.debugClearActivePeriod = async function(studentName, targetName) {
   const students = await loadStudentsConfig();
-  // A name is not unique: three records can share "Caden Tan", separated only by
+  // A name is not unique: three records can share "Aiden Lim", separated only by
   // their note. A bare-name lookup picks whichever came back first, which on a
   // WRITE tool means repairing the wrong child's data. Accept the full label
-  // "Caden Tan (School Readiness)", and refuse to guess when a name is shared.
+  // "Aiden Lim (School Readiness)", and refuse to guess when a name is shared.
   const _label = s => `${s.name}${noteBare(s.note) ? ` (${noteBare(s.note)})` : ""}`;
   let student = students.find(s => _label(s) === studentName);
   if (!student) {
@@ -1230,13 +1230,13 @@ window.debugClearActivePeriod = async function(studentName, targetName) {
 };
 
 // 4) Deep-check a specific activity name (must match exactly what debugScanTarget shows):
-//    debugDeleteCheck("Hayden Chan", "Math", "Writing/Spelling Numbers in Letters")
+//    debugDeleteCheck("Marcus Yap", "Math", "Writing/Spelling Numbers in Letters")
 window.debugDeleteCheck = async function(studentName, targetName, activityName) {
   const students = await loadStudentsConfig();
-  // A name is not unique: three records can share "Caden Tan", separated only by
+  // A name is not unique: three records can share "Aiden Lim", separated only by
   // their note. A bare-name lookup picks whichever came back first, which on a
   // WRITE tool means repairing the wrong child's data. Accept the full label
-  // "Caden Tan (School Readiness)", and refuse to guess when a name is shared.
+  // "Aiden Lim (School Readiness)", and refuse to guess when a name is shared.
   const _label = s => `${s.name}${noteBare(s.note) ? ` (${noteBare(s.note)})` : ""}`;
   let student = students.find(s => _label(s) === studentName);
   if (!student) {
@@ -1856,7 +1856,7 @@ function _propagationEnd(ok) {
 // independently, so a later rename's query could read Firestore before an
 // earlier rename's writes had landed, find zero matches under the
 // intermediate name, and silently break the chain — exactly what happened to
-// Caden Tan's "FEDC 1" activity (see runOneOffRepairs). Queue every
+// Aiden Lim's "FEDC 1" activity (see runOneOffRepairs). Queue every
 // propagation for the same student/group so each one only starts once the
 // previous one's writes have actually committed.
 const _renamePropagationQueues = new Map();
@@ -2684,11 +2684,22 @@ async function showHome() {
 // longer exists — remove the call once confirmed fixed rather than leaving
 // it as permanent dead weight.
 let _ranOneOffRepairs = false;
+/**
+ * Migrations that still have to run on open, and nothing else.
+ *
+ * This used to carry one-off repairs for named students -- a table of 39
+ * activity renames, and a restore of two deleted sub-activities. Each one
+ * paired a child's name with the therapy activity being corrected, in a
+ * file this site serves to every visitor from a public repository. They
+ * had run on every app start since v608 and had nothing left to do.
+ *
+ * The table is archived outside both repos, at
+ * Documents/Daisy/ZORA-one-off-repairs-ARCHIVE.txt, in case the Data
+ * Integrity Check ever surfaces one of those pairs again.
+ */
 function runOneOffRepairs() {
   if (_ranOneOffRepairs) return;
   _ranOneOffRepairs = true;
-
-  repairLevenChuaSubActivities().catch(err => console.error("repairLevenChuaSubActivities failed:", err));
 
   // One-time migration: set masteredOn = "2026-06-30" for all old-style mastered
   // activities (inactiveReason === 'mastered') that have no masteredOn date yet.
@@ -2713,108 +2724,14 @@ function runOneOffRepairs() {
     await applyMigration(state.groups,   g => saveGroup(g));
   })().catch(err => console.error("runOneOffRepairs (masteredOn migration) failed:", err));
 
-  // Caden Tan's "FEDC 1" target had an activity renamed without the rename
-  // propagating to historical sessions, leaving real recorded data stuck
-  // under the old name "Write FEDC 1's Comment in Self Regulation" while the
-  // current config just says "Comment".
-  const caden = state.students.find(s => s.name === "Caden Tan");
-  if (caden) {
-    renameActivityAcrossSessions(caden.id, "FEDC 1", "Write FEDC 1's Comment in Self Regulation", "Comment")
-      .catch(err => console.error("runOneOffRepairs (Caden Tan FEDC 1 Comment) failed:", err));
-  }
-
-  // Caden Tan's "Self Regulation" → "Self-Regulation" rename had the same
-  // missing-propagation bug as the FEDC 1 fix above. The "Functional
-  // Communication" → "Two-Way Communication" repairs that were here (v602,
-  // v603) are now REVERSED: the target was renamed back to "Functional
-  // Communication" in the student doc, so all session activities that were
-  // previously migrated to "Two-Way Communication" (or the earlier typo
-  // "Two Way Communication") need to come back to "Functional Communication".
-  if (caden) {
-    renameTargetAcrossSessions(caden.id, "Self Regulation", "Self-Regulation")
-      .catch(err => console.error("runOneOffRepairs (Caden Tan Self-Regulation) failed:", err));
-    renameTargetAcrossSessions(caden.id, "Two-Way Communication", "Functional Communication")
-      .catch(err => console.error("runOneOffRepairs (Caden Tan FC restore) failed:", err));
-    renameTargetAcrossSessions(caden.id, "Two Way Communication", "Functional Communication")
-      .catch(err => console.error("runOneOffRepairs (Caden Tan FC restore typo) failed:", err));
-  }
-
   migrateAwayFromMasteryType()
     .catch(err => console.error("runOneOffRepairs (mastery removal) failed:", err));
 
   migrateAwayFromMappedScoreType()
     .catch(err => console.error("runOneOffRepairs (mapped-score removal) failed:", err));
-
-  // v608 Data Integrity Check backlog — confirmed batch 1. Every pair here
-  // was surfaced by the report and manually reviewed (not auto-merged):
-  // either a wording/typo cleanup of the same activity, a list
-  // renumbering (only the leading letter/number changed), or the v606
-  // heading-rename bug (a "Comment Section" heading hijacking a "Comment"
-  // activity's data) recurring on FEDC 2/3/Attending in addition to the
-  // ones already fixed. Deliberately excludes a few report entries that
-  // looked too ambiguous to merge safely (e.g. Leven Chua's "Overall:",
-  // which the current config split into separate Part A/Part B activities;
-  // Liam Chua's per-session "Activity Name: ..." one-offs; Caspar Lim's
-  // "Behaviour 2", which might be tracking a distinct incident rather than
-  // a renamed duplicate of "Behaviour").
-  const BACKLOG_ACTIVITY_RENAMES_V608 = [
-    { student: "Leven Chua", target: "Learning", old: "d) Story Understanding", new: "d) Story Understanding ( Can organises the retelling)" },
-    { student: "Leven Chua", target: "Learning", old: "e) Response & Interaction", new: "e) Response & Interaction (Can Responds to Follow-Up Questions from the text)" },
-    { student: "Leven Chua", target: "Learning", old: "c) Matches clues to guess", new: "c) Matches clues to guess - Skill: Previous Event connection" },
-    { student: "Leven Chua", target: "Learning", old: "d) Explain the answer", new: "d) Explain the answer - Skill: Prediction" },
-    { student: "Leven Chua", target: "Learning", old: "b) Makes a guess", new: "b) Makes a guess - Skill: Thought inference" },
-    { student: "Leven Chua", target: "Learning", old: "a) Looks for clues", new: "a) Looks for clues - Skill : Emotion inference" },
-    { student: "Leven Chua", target: "Learning", old: "c) Sentence Structure", new: "c) Sentence Structure (Uses Clear Sentences)" },
-    { student: "Leven Chua", target: "Learning", old: "Sumarise story:", new: "c) Summarises the story" },
-    { student: "Leven Chua", target: "Learning", old: "Aesop Fable:", new: "Aesop Fable" },
-    { student: "Leven Chua", target: "Learning", old: "c) Understands the answers", new: "c) Understands the answers and discussion" },
-    { student: "Leven Chua", target: "Learning", old: "e) Response & Interaction (Can Responds to Follow-Up Questions)", new: "e) Response & Interaction (Can Responds to Follow-Up Questions from the text)" },
-
-    { student: "Liam Chua", target: "Learning", old: "3. Vocabulary - use suitable words related to the topic.", new: "Vocabulary - use suitable words related to the picture, characters, actions and setting." },
-    { student: "Liam Chua", target: "Learning", old: "Completing worksheet and comprehension", new: "Completing Worksheets - Applies Story Understanding in Worksheet Tasks" },
-    { student: "Liam Chua", target: "Learning", old: "7. Confidence - attempts to speak with less teacher support.", new: "Level of Support - attempts to speak with less teacher support." },
-    { student: "Liam Chua", target: "Learning", old: "2. Clarity - speak clearly enough to understand.", new: "Clarity - Speaks at an understandable volume and pace, with words clear enough for the listener to follow." },
-    { student: "Liam Chua", target: "Learning", old: "Completing Worksheets", new: "Completing Worksheets - Applies Story Understanding in Worksheet Tasks" },
-    { student: "Liam Chua", target: "Learning", old: "Clarity - speak clearly enough to understand.", new: "Clarity - Speaks at an understandable volume and pace, with words clear enough for the listener to follow." },
-    { student: "Liam Chua", target: "Learning", old: "Participation - attempts to speak with less teacher support.", new: "Level of Support - attempts to speak with less teacher support." },
-    { student: "Liam Chua", target: "Learning", old: "Vocabulary - use suitable words related to the topic.", new: "Vocabulary - use suitable words related to the picture, characters, actions and setting." },
-    { student: "Liam Chua", target: "Learning", old: "Story Discussion and Two-Way Communication", new: "Story Discussion and Two-Way Communication (Responds to and asks questions related to the story during discussion.)" },
-
-    { student: "Hayden Chan", target: "Math", old: "Counting forward and backwards (a. Movement b. written c. application- worksheets)", new: "Counting forward and backwards (a. Movement b. written c. Application- worksheets)" },
-    { student: "Hayden Chan", target: "Math", old: "Today, yesterday and tomorrow", new: "Identify today, yesterday and tomorrow" },
-    { student: "Hayden Chan", target: "Math", old: "Numbers", new: "Maths - Numbers" },
-
-    { student: "Kayden Koh", target: "Learning", old: "c. Listen to two instructions - Find two sentences from the story.", new: "b) Find two sentences from the story." },
-    { student: "Kayden Koh", target: "Learning", old: "e, Play a barrier game -", new: "d) Play a barrier game -" },
-    { student: "Kayden Koh", target: "Learning", old: "d. complete two movements circuits", new: "c) complete two movements circuits" },
-
-    { student: "Caden Tan", target: "FEDC 2", old: "Comment Section", new: "Comment" },
-    { student: "Caden Tan", target: "FEDC 3", old: "Comment Section", new: "Comment" },
-    { student: "Caden Tan", target: "Attending", old: "Comment Section", new: "Comment" },
-    { student: "Caden Tan", target: "Two-Way Communication", old: "7. Open the door", new: "9. Open the door" },
-    { student: "Caden Tan", target: "Two-Way Communication", old: "5. I am hungry (snack)", new: "5. I am hungry (snack)" },
-    { student: "Caden Tan", target: "Two-Way Communication", old: "6. Turn on the light", new: "8. Turn on the light" },
-    { student: "Caden Tan", target: "Two-Way Communication", old: "7. Water", new: "6. Water" },
-    { student: "Caden Tan", target: "Two-Way Communication", old: "4. Sounds are too loud.", new: "4. Sounds are too loud" },
-    { student: "Caden Tan", target: "Two-Way Communication",
-      old: `Verbalising Phase 1: a. Provide 3-5 seconds to provide an answer. b. To provide an alternative, simpler question that provides a clue to the answer. c. State the answer in a functional manner before asking the question again. d. Provide a sentence stem. e. Ask the question and provide the answer. f. Provide the sentence stem "I". Phase 2: Provide a visual of the sentence stem 'I' to elicit a response to a question. Phase 3: Provide Caden with a short phrase of 3-4 words. Provide a non-'wh' question. Phase 4: To answer independently what he wants to play in the playground.`,
-      new: `Phase 1: a. Provide 3-5 seconds to provide an answer. b. To provide an alternative, simpler question that provides a clue to the answer. c. State the answer in a functional manner before asking the question again. d. Provide a sentence stem. e. Ask the question and provide the answer. f. Provide the sentence stem "I". Phase 2: Provide a visual of the sentence stem 'I' to elicit a response to a question. Phase 3: Provide Caden with a short phrase of 3-4 words. Provide a non-'wh' question. Phase 4: To answer independently what he wants to play in the playground.` },
-    { student: "Caden Tan", target: "Attending",
-      old: `Attending Phase 1: a. Intro to whole body listening. 2. b. Use of a token board. 3. A stimulus to use outdoors. Phase 2 4. To sit on a convenient, safe surface to follow the instructor's instructions.`,
-      new: `Attending Phase 1: a. Intro to whole body listening. b. Use of a token board. c. A stimulus to use outdoors. Phase 2: d. To sit on a convenient, safe surface to follow the instructor's instructions. Phase 3: e. To stand still to listen to an instructions and to follow it.` },
-
-    { student: "Caspar Lim", target: "Target Behaviour", old: "Caspar has a tendency to pinch or say he wants to bite others when he is frustrated.", new: "Target Behaviour 2: Caspar tends to pinch or say he wants to bite others when he is frustrated" },
-    { student: "Caspar Lim", target: "ABC Chart", old: "Behaviour", new: "Behaviours" }
-  ];
-
-  for (const { student: studentName, target, old: oldName, new: newName } of BACKLOG_ACTIVITY_RENAMES_V608) {
-    const s = state.students.find(st => st.name === studentName);
-    if (s) {
-      renameActivityAcrossSessions(s.id, target, oldName, newName)
-        .catch(err => console.error(`runOneOffRepairs (v608 backlog: ${studentName}/${target}/${oldName}) failed:`, err));
-    }
-  }
 }
+
+
 
 // "Mastery Level + Free Text" was removed as a Activity Type — this converts
 // any activity still configured as isMastery into the equivalent Sentence
@@ -3600,7 +3517,7 @@ function noteLabel(note) {
   const t = noteBare(note);
   return t ? `(${t})` : "";
 }
-/** "Caden Tan (School Readiness)", or just the name when there is no note. */
+/** "Aiden Lim (School Readiness)", or just the name when there is no note. */
 /**
  * Another student already registered under this exact name and note, or null.
  *
@@ -3852,7 +3769,7 @@ async function renderStudentRegistryBody({ highlightAdd = false } = {}) {
   });
 
   // studentLabel puts the note in brackets after the name, which is the
-  // only thing telling three records called Caden Tan apart.
+  // only thing telling three records called Aiden Lim apart.
   body.querySelectorAll(".reg-list-row").forEach(row => {
     row.addEventListener("click", () => {
       _registryOpenId = row.dataset.id;
@@ -4226,7 +4143,7 @@ function wireStudentRegistryHandlers(body, sorted, highlightAdd) {
   // Deleting a student is unrecoverable from inside the app, so it asks three
   // separate times: the password, then a confirmation showing how much history
   // is attached, then the student's full name typed out. The session count is
-  // the point of the middle step — "delete Leven Chua" reads very differently
+  // the point of the middle step — "delete Devon Goh" reads very differently
   // once you can see 367 sessions sitting behind it.
   $("student-registry-body").querySelectorAll(".db-del-student").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -5294,10 +5211,10 @@ GLOBAL RULES (apply to every section):
 - CRITICAL: Some activities track NEGATIVE or PROBLEM BEHAVIOURS (e.g. snatching food, interrupting others, hitting, distracting behaviour). For these activities, scoring is INVERTED: a HIGH score (e.g. 3 out of 3) means the student did NOT exhibit the bad behaviour and showed good self-control, while a LOW score (e.g. 0) means the bad behaviour DID occur. Always interpret scores for problem/negative behaviour activities with this in mind: high = good, low = the behaviour occurred.
 - READABILITY: Write every section to a Flesch Reading Ease score of 60 to 70. Use short sentences and a natural tone. ABA terms that parents need to know (e.g. "self-regulation", "prompt", "generalisation") are allowed, but always explain them in plain words in the same sentence if they appear.
 - SENTENCE STRUCTURE: Write complete sentences, never fragments.
-  • ONE IDEA PER SENTENCE. If a sentence describes more than two actions, split it. "After initially refusing to correct his worksheet, Hayden used his regulation board to request a break and returned to a calm state to finish the task" stacks four actions; write it as two sentences instead.
+  • ONE IDEA PER SENTENCE. If a sentence describes more than two actions, split it. "After initially refusing to correct his worksheet, Marcus used his regulation board to request a break and returned to a calm state to finish the task" stacks four actions; write it as two sentences instead.
   • Put actions in the order they happened.
   • Put a short clarification in brackets rather than interrupting the sentence with it. Write "manage transitions (i.e. changes to his expected routine)", not "manage transitions, meaning changes to his expected routine, while staying focused".
-  • Start each point with the subject, e.g. "He greeted a new friend..." or "Hayden explained...", not with a bare verb like "Greeted a new friend...".
+  • Start each point with the subject, e.g. "He greeted a new friend..." or "Marcus explained...", not with a bare verb like "Greeted a new friend...".
   • When a point states something observed AND what it means, write it as TWO sentences. The first says what happened. The second says what it means.
   • VARY how that second sentence opens. Do NOT cycle through "This shows", "This reflects", "This demonstrates", "This highlights" as a set - that reads as a template. Across a list of five points, AT MOST TWO may begin with "This". Other ways in: "indicating that...", "suggesting that...", "a sign that...", "supporting his ability to...", or simply state the significance directly with no label at all. Read your points back: if they all open the same way, rewrite them.
   • NEVER join an observation to its meaning with a dash or a hyphen, and never use the phrase "this matters because".
@@ -5897,9 +5814,9 @@ EVERYDAY LANGUAGE IN THIS SECTION TOO. The WRITING STYLE word list in the GLOBAL
 SENTENCE 1 IS SHORT. It names ONE thing ${PRON.subj} did and stops. A reader has to be able to hold it in their head after reading it once, and a sentence that stacks the action, the trigger, a comparison and a duration on top of each other cannot be held at all.
 
 WHERE THE POINT IS AN IMPROVEMENT, WRITE IT AS THEN AND NOW, WITH A MONTH ON EACH. Do not squeeze the comparison into one sentence, and do not gesture at the past with "an earlier upset". MONTHS BELONG IN THIS SECTION: unlike the Weakness lines under each chart, these points exist to show progress, and the months are what show it. A then-and-now point has THREE sentences: the then, the now, and then what it means, which is never dropped.
-  WRONG, one crammed sentence with a vague back-reference: "Caden calmed down within a few minutes after being helped to join a group game he had been waiting for, unlike an earlier upset that lasted 45 minutes on and off."
-  WRONG, the same fault dressed differently: "Caden now calms down after being offered a choice or a short wait when something upsets him, a marked change from earlier in the year when a similar upset lasted 45 minutes on and off with no response to comforting."
-  RIGHT, then, now, and what it means: "In March, Caden was upset on and off for 45 minutes and did not respond to any attempts to comfort him. In July, he was able to tell the instructor he did not like a song, and he calmed down as soon as it was changed. This means he is learning to settle himself with just a little support instead of needing a long time to recover."
+  WRONG, one crammed sentence with a vague back-reference: "Aiden calmed down within a few minutes after being helped to join a group game he had been waiting for, unlike an earlier upset that lasted 45 minutes on and off."
+  WRONG, the same fault dressed differently: "Aiden now calms down after being offered a choice or a short wait when something upsets him, a marked change from earlier in the year when a similar upset lasted 45 minutes on and off with no response to comforting."
+  RIGHT, then, now, and what it means: "In March, Aiden was upset on and off for 45 minutes and did not respond to any attempts to comfort him. In July, he was able to tell the instructor he did not like a song, and he calmed down as soon as it was changed. This means he is learning to settle himself with just a little support instead of needing a long time to recover."
   NEVER a vague back-reference: "an earlier upset", "a previous occasion", "before", "at the start", "earlier in the year". Name the month.
 
 SENTENCE 2 NAMES A CHANGE IN THE CHILD, NOT A PLACE THE SKILL MIGHT BE HANDY. This is the whole difference between a line that lands as true and one that sounds invented. In a then-and-now point this is the third sentence, and it is required there exactly as it is everywhere else.
@@ -5985,15 +5902,15 @@ RETURN ONE BLOCK FOR EVERY TARGET, WITH NO EXCEPTIONS. ${targetsWithData.length}
 
 RULES FOR EVERY OBSERVATION BLOCK:
 - BEFORE WRITING A WEAKNESS, ASK WHAT A PARENT WOULD DO WITH IT. This is the first test and the one that matters most. A line reporting only which way a number moved is useless to them: they cannot picture it and cannot help with it. Every Weakness must say WHAT ${firstName} did, and where the data gives it, WHY. "Drops", "declines", "dips" and "falls" fail this test on their own: drops because of what? Give the reason from the data, or drop the word and describe what he actually did. NEVER invent a reason. If all the evidence shows is scores moving, go back to the remarks for the behaviour behind them, or write about something the data actually describes.
-  USELESS TO A PARENT: "Hayden's accuracy drops when he is asked to write longer sentences or facts about new topics, scoring as low as 33-38% on some sentence-writing tasks in May. This eased afterwards, and by June he was scoring 100% again."
-  USEFUL, the behaviour behind the numbers, where the remarks support it: "Hayden writes short sentences confidently, but longer ones about a topic he has not met before take him much more time and support. In May he needed several reminders to finish these, and by June he was completing them with far less help."
+  USELESS TO A PARENT: "Marcus's accuracy drops when he is asked to write longer sentences or facts about new topics, scoring as low as 33-38% on some sentence-writing tasks in May. This eased afterwards, and by June he was scoring 100% again."
+  USEFUL, the behaviour behind the numbers, where the remarks support it: "Marcus writes short sentences confidently, but longer ones about a topic he has not met before take him much more time and support. In May he needed several reminders to finish these, and by June he was completing them with far less help."
 - Each line answers a DIFFERENT question and must not repeat the other. Strength is a specific ability and what it is worth; Weakness is a difficulty and when it appears.
 - WRITE THE SHORTEST VERSION THAT SAYS IT. This is the rule most often broken. Strength is always exactly two sentences: the observation, then what it means. A WEAKNESS IS ONE SENTENCE WHEREVER ONE WILL DO, and two is the normal maximum. Before writing a second sentence, check that it adds a FACT the first does not; if a clause can be deleted without losing a fact, delete it. Three or four sentences are allowed for ONE reason only, to break up a sentence carrying more than two commas, never to say more. Do not weld facts together with "though", "a pattern that", or "and he has needed".
-  BEST, one sentence, because the data supports no more: "Caden is good at naming people he is familiar with, but still struggles with people he does not see often, such as peers or staff."
-  DRAGGING, padded and repeating itself: "On the rare occasions Caden becomes distressed now, such as when he has to wait for a turn or is asked to use the toilet, he still needs an adult to help him work through it rather than settling on his own. This happens only occasionally, but when it does, a small choice or a short break is what helps him calm down."
-  RIGHT, the same facts in two clean sentences: "Caden still gets upset occasionally, especially when asked to wait his turn or use the toilet. When this happens, he needs some adult support to calm down, such as being given a simple choice or a short break."
-  TOO MANY COMMAS, so and only so, it splits further: "Caden still needs help calming down within 15 minutes when something upsets him, and this has not changed much. When it happens now, it is usually because he has to wait, do something he does not enjoy, or go to the toilet, and he settles once he is spoken to calmly or given a choice."
-  RIGHT, split: "Caden still needs support to calm down within around 15 minutes when upset. This is usually triggered by waiting, a task he does not enjoy, or being asked to use the toilet. He settles when spoken to calmly or offered a choice."
+  BEST, one sentence, because the data supports no more: "Aiden is good at naming people he is familiar with, but still struggles with people he does not see often, such as peers or staff."
+  DRAGGING, padded and repeating itself: "On the rare occasions Aiden becomes distressed now, such as when he has to wait for a turn or is asked to use the toilet, he still needs an adult to help him work through it rather than settling on his own. This happens only occasionally, but when it does, a small choice or a short break is what helps him calm down."
+  RIGHT, the same facts in two clean sentences: "Aiden still gets upset occasionally, especially when asked to wait his turn or use the toilet. When this happens, he needs some adult support to calm down, such as being given a simple choice or a short break."
+  TOO MANY COMMAS, so and only so, it splits further: "Aiden still needs help calming down within 15 minutes when something upsets him, and this has not changed much. When it happens now, it is usually because he has to wait, do something he does not enjoy, or go to the toilet, and he settles once he is spoken to calmly or given a choice."
+  RIGHT, split: "Aiden still needs support to calm down within around 15 minutes when upset. This is usually triggered by waiting, a task he does not enjoy, or being asked to use the toilet. He settles when spoken to calmly or offered a choice."
 - PLAIN ENGLISH, NOT REPORT LANGUAGE. The WRITING STYLE word list in the GLOBAL RULES above does NOT apply inside a Strength or Weakness line. Write these the way you would say them out loud to a parent at the door: Grade 6-8 reading level, no clinical jargon. BANNED here: "spontaneous requesting", "preferred activities", "remains less consistent", "experiences difficulty", "demonstrates", "attends to", "would benefit from support in developing", "modalities", "regulatory capacity", "situational influences", "low-demand contexts", "work through it", "rather than settling on his own", "becomes distressed". Write "gets upset" and "calm down" instead: that is how a teacher actually speaks to a parent. And a person identifies PEOPLE, not names, so write "less familiar people", never "less familiar names". Write instead: "asking for things himself", "the activities he likes", "still not steady", "finds it hard", "does", "watches", "needs help with", "free play", "good days and bad days", "room noise". "Upset" is the right word here even though the global list prefers "distress".
   TOO DENSE, a parent has to stop and work it out: "This suggests his spontaneous requesting works well for preferred physical activities but remains less consistent for everyday needs like eating and drinking."
   RIGHT, the same meaning in ordinary words: "He is good at asking for the physical activities he likes, but not yet for everyday things like food and drink."
@@ -6001,10 +5918,10 @@ RULES FOR EVERY OBSERVATION BLOCK:
 - A WEAKNESS IS WHAT ${firstName} STILL NEEDS HELP WITH. Not a history of the period. Of the difficulties the data shows for this target, write about the one appearing in the MOST SESSIONS, not the most dramatic one and not the most recent one. Say how often it happens in plain words: "in most sessions", "about half the time", "only occasionally", "rarely".
   A difficulty that has STOPPED does not belong here at all: this line is for what is still a problem, so leave it out.
   ONE BACKWARD GLANCE, and only where the difficulty is still happening AND has clearly shrunk. One clause, never a sequence of months.
-    ALLOWED: "Caden still needs support to calm down when upset, though this now takes a few minutes rather than the 45 minutes seen in March."
+    ALLOWED: "Aiden still needs support to calm down when upset, though this now takes a few minutes rather than the 45 minutes seen in March."
     NOT ALLOWED, that is a timeline again: "In March this took 45 minutes, by April it was 20 minutes, and by June a few minutes."
 - DO NOT NAME A MONTH, unless that target's own Weakness instruction above tells you its data stops early. The chart heading directly above your line already states the reporting period, and everything in a Weakness is current by definition, so a month under every target is repetition the reader does not need. Where the instruction DOES say the data stops early, say when the difficulty last showed and that the target has not been worked on since: that is a fact about the records. NEVER claim it has stopped happening, which the records cannot show once sessions stopped.
-  RIGHT, target ran to the end of the period: "Caden still waits for an adult to offer a snack rather than asking himself, in most sessions."
+  RIGHT, target ran to the end of the period: "Aiden still waits for an adult to offer a snack rather than asking himself, in most sessions."
   RIGHT, target stopped early: "This last showed in April, and the target has not been worked on since."
   BANNED, all of them: "today", "currently", "at present", "these days", "his most recent sessions", because a report can be opened months after the last session it covers; the word "term" in any form; and "afterward", "afterwards", "later on", "subsequently", "over time".
 - NEVER A DAY-LEVEL DATE, IN EITHER LINE. Write "in July", never "on 12 July" or "on 19 and 26 July". A parent does not need the day, and a sentence carrying three of them is far harder to read. Months, and words like "early", "mid" or "late" in front of a month, are as precise as these two lines ever get.
@@ -6012,13 +5929,13 @@ RULES FOR EVERY OBSERVATION BLOCK:
   RIGHT: "In July, he needed reminders to stay seated and sometimes ran off unannounced. He also whined when a task felt too hard."
 - SMALL MECHANICS. Never "brief" or "briefly" for how long something lasts: write "it lasts only a short time". Write "reason", not "cause": "usually linked to a clear reason" is how people actually speak. And put a comma after an opening phrase, and around one dropped into the middle: "In July, he needed reminders to stay seated"; "now, whenever it happens, it lasts only a short time".
 - ONE ORDER, AND SAY EACH THING ONCE. For a difficulty the order is: when it happens, what happens, what he needs, what helps. For a comparison: the general ability first, then the one session that shows it. Never swing between a general statement, a session, a figure and a contrast inside one sentence. SAY THE FREQUENCY ONCE and SAY THE CONTRAST ONCE: "close family" and "the people he knows best" are the same idea written twice, and "on the rare occasions" followed by "this happens only occasionally" is the same word twice. Do not pile up negatives either, since "harder... less often... less familiar... less than half" in one sentence reads far heavier than the facts are.
-  WRONG, the same contrast made three times: "Caden is much more accurate at identifying close family members such as his mum and dad than he is at identifying less familiar people such as peers or other staff. In one session, he correctly named less than half of a group that included some classmates and less familiar names, while he continues to do well with the people he knows best."
-  RIGHT, one contrast, said once: "Caden is good at naming people he is familiar with, but still struggles with people he does not see often, such as peers or staff."
-  RIGHT where one session genuinely adds something: "Caden is more accurate at identifying familiar people, such as his parents, than less familiar people like peers or staff. In one session, he named fewer than half of a mixed group that included classmates."
+  WRONG, the same contrast made three times: "Aiden is much more accurate at identifying close family members such as his mum and dad than he is at identifying less familiar people such as peers or other staff. In one session, he correctly named less than half of a group that included some classmates and less familiar names, while he continues to do well with the people he knows best."
+  RIGHT, one contrast, said once: "Aiden is good at naming people he is familiar with, but still struggles with people he does not see often, such as peers or staff."
+  RIGHT where one session genuinely adds something: "Aiden is more accurate at identifying familiar people, such as his parents, than less familiar people like peers or staff. In one session, he named fewer than half of a mixed group that included classmates."
 - NEVER CONTRADICT YOURSELF BETWEEN THE SENTENCES, AND NEVER ADD ONE WHOSE ONLY JOB IS TO SAY IT IS STILL HAPPENING. If the first sentence says a skill still needs prompting, the second CANNOT turn round and call that same skill "coming along well"; a contrast is allowed only between two DIFFERENT things. And "This is still true today" adds nothing once the month anchor has done its job. Where a second sentence would carry only context, put that context in brackets on the end of the first instead.
-  WRONG, it argues with itself: "Caden still needs partial prompting to work out which way round his shirt or pants should go. This suggests the physical actions of dressing are coming along well, but orientation and checking remain an area he needs support with."
-  RIGHT, said straight: "Up till June, Caden still needed partial prompting to work out which way round his shirt and pants should go. He can put them on by himself, but he does not check which way round they are before he starts."
-  RIGHT, context in brackets rather than a filler sentence: "Through to June, Caden was still mostly waiting for the instructor to start playing before joining in, especially for activities he is less keen on (e.g. during table-based or quieter tasks)."
+  WRONG, it argues with itself: "Aiden still needs partial prompting to work out which way round his shirt or pants should go. This suggests the physical actions of dressing are coming along well, but orientation and checking remain an area he needs support with."
+  RIGHT, said straight: "Up till June, Aiden still needed partial prompting to work out which way round his shirt and pants should go. He can put them on by himself, but he does not check which way round they are before he starts."
+  RIGHT, context in brackets rather than a filler sentence: "Through to June, Aiden was still mostly waiting for the instructor to start playing before joining in, especially for activities he is less keen on (e.g. during table-based or quieter tasks)."
 - Do NOT summarise what the graph already shows. Add insight the graph cannot.
 - Warm and supportive, but completely honest. Never sugarcoat, but never sound cold.
 - ABSOLUTE: For Weakness, only name difficulties directly evidenced by remarks or low scores in the data provided. If an activity has no data at all, it does not appear here. Never extrapolate from one skill to another: if the data shows "identifies face", write about face identification only, not about name recognition or any other skill not in the data.
@@ -6271,7 +6188,7 @@ function aiPillHide() {
   if (el) el.style.display = "none";
 }
 
-/** The name a finished pill shows: "Done! → Caden (Custom Months Report)". */
+/** The name a finished pill shows: "Done! → Aiden (Custom Months Report)". */
 function aiDoneText(student, reportType) {
   const short = student?.preferredName || String(student?.name || "").split(" ")[0] || "Report";
   return `Done! → ${short} (${reportType})`;
@@ -10631,47 +10548,6 @@ async function renderRecentlyDeleted() {
       });
     });
   });
-}
-
-// One-time repair: restore Normal voice and Monster Voice for Leven Chua
-// (accidentally deleted 2026-07-27 when they showed as phantom sub-activities
-// due to parentActivity:"" bug). Safe to leave in forever — exits immediately
-// once the activities exist.
-async function repairLevenChuaSubActivities() {
-  const student = (state.students || []).find(s => s.name === "Leven Chua");
-  if (!student) return;
-  const target = (student.targets || []).find(t => t.name === "Practical Life (At ZORA)");
-  if (!target) return;
-  const acts = target.predefinedActivities || [];
-  const parentKey = "Social Skills (Voice volume: Maintain normal voice)";
-  if (!acts.some(a => (a.title || a.name) === parentKey)) return;
-  if (acts.some(a => a.title === "Normal voice" && a.parentActivity)
-   && acts.some(a => a.title === "Monster Voice" && a.parentActivity)) return;
-
-  const parentIdx = acts.findIndex(a => (a.title || a.name) === parentKey);
-  const insertAt = parentIdx + 1;
-
-  if (!acts.some(a => a.title === "Normal voice" && a.parentActivity)) {
-    acts.splice(insertAt, 0, {
-      id: cfgId("a"), title: "Normal voice", name: "", parentActivity: parentKey,
-      inlineOptions: "High/Low", optionScores: { "High": 3, "Low": 0 },
-      sentenceStarter: "", order: 0, createdOn: todayDateStr()
-    });
-  }
-  if (!acts.some(a => a.title === "Monster Voice" && a.parentActivity)) {
-    const mIdx = acts.findIndex(a => a.title === "Normal voice" && a.parentActivity);
-    acts.splice(mIdx >= 0 ? mIdx + 1 : insertAt + 1, 0, {
-      id: cfgId("a"), title: "Monster Voice", name: "", parentActivity: parentKey,
-      inlineOptions: "High/Low", optionScores: { "High": 0, "Low": 3 },
-      sentenceStarter: "", order: 0, createdOn: todayDateStr()
-    });
-  }
-  acts.forEach((a, i) => a.order = i);
-  target.predefinedActivities = acts;
-  const si = (state.students || []).findIndex(s => s.id === student.id);
-  if (si >= 0) state.students[si] = student;
-  await saveStudent(student);
-  console.log("[repair] Restored Normal voice + Monster Voice for Leven Chua");
 }
 
 // ============================================================
@@ -26014,7 +25890,7 @@ function mnRowKindName(a, acts) {
  *
  * Not every repeated name is a mistake. A Behaviour Chart is built as one
  * Antecedent / Behaviours / Consequence set per behaviour, each set under its
- * own section heading, and Leven has a Situation and a Comment under both
+ * own section heading, and Devon has a Situation and a Comment under both
  * "Social Detective" and "SSJ Diary". Those read correctly: the heading above
  * says which one you are looking at. Every duplicate name on live is of that
  * kind, so a blanket refusal would have outlawed the way the charts are
@@ -26033,7 +25909,7 @@ function mnRowKindName(a, acts) {
  *     This is the bug Lewis found -- a parent called "hello" showing no
  *     sub-activities while the session screen showed two.
  *
- * A finished activity does not hold its name. Hayden mastered "I can wait"
+ * A finished activity does not hold its name. Marcus mastered "I can wait"
  * and started it again months later, which is a decision, not a slip. The
  * exception is a finished PARENT, because parentOwningSubs falls back to one
  * when no live parent has the name.

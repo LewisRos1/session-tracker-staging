@@ -1,6 +1,6 @@
 // Which session records belong to which activity.
 //
-// Rayhanah added an activity called "Antecedent" to Hayden Chan's Behaviour
+// Rayhanah added an activity called "Antecedent" to Marcus Yap's Behaviour
 // Chart, under a heading that already had one. When she tried to remove it
 // again the app said it held data from 96 sessions and offered to delete it
 // all. It would have: the count and the delete both matched records by the
@@ -65,7 +65,7 @@ check("nor does it claim the second Antecedent's records",
   recordIdsForActivity(rec("amsgyfyx3hnkh"), NEW_ANT, ACTS, T, "2026-10-12"), []);
 
 console.log("\nan older record with no id on it");
-// Seven of Hayden's records predate ids, from June 2026. Behaviour 2's
+// Seven of Marcus's records predate ids, from June 2026. Behaviour 2's
 // activities were created that August, so those records can only be the
 // first Antecedent's.
 check("the only activity that existed then claims it",

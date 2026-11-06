@@ -23,10 +23,10 @@ const settle = (ms = 400) => new Promise(res => setTimeout(res, ms));
 const FIX = (who) => ({
   today: "2026-10-12", authUser: who,
   students: [
-    { id: "caden", name: "Caden Tan", order: 1, preferredName: "Caden",
+    { id: "aiden", name: "Aiden Lim", order: 1, preferredName: "Aiden",
       nameZh: "陈嘉登", shortNameZh: "嘉登",
       targets: [{ id: "t1", name: "FEDC (1) – 学习目标一", predefinedActivities: [] }] },
-    { id: "amy", name: "Amy Lim", order: 2, preferredName: "Amy", targets: [] },
+    { id: "amy", name: "Chloe Ng", order: 2, preferredName: "Amy", targets: [] },
   ],
   groups: [], sessions: [],
 });
@@ -84,7 +84,7 @@ try {
   r.check("and still offers nothing to drop on",
     await page.eval(`!!document.getElementById("tr-drop")`), false);
   r.ok("it names the student",
-    await page.eval(`/Amy Lim/.test(document.querySelector(".tr-blocked")?.textContent || "")`),
+    await page.eval(`/Chloe Ng/.test(document.querySelector(".tr-blocked")?.textContent || "")`),
     "the message does not say who");
   r.check("with a way to go and fix it",
     await page.eval(`!!document.getElementById("tr-goto-db")`), true);
@@ -93,7 +93,7 @@ try {
   r.section("a student who has one gets the drop zone");
   await page.eval(`(() => {
     const sel = document.getElementById("tr-student");
-    sel.value = "caden";
+    sel.value = "aiden";
     sel.dispatchEvent(new Event("change", { bubbles: true }));
   })()`);
   await page.until(`!!document.getElementById("tr-drop")`, "the drop zone");
@@ -113,7 +113,7 @@ try {
   // ── what the model is told ───────────────────────────────────────────
   r.section("what the model is told about this student");
   const ins = await page.eval(`(() => {
-    const s = window.__app.state.students.find(x => x.id === "caden");
+    const s = window.__app.state.students.find(x => x.id === "aiden");
     return window.__app.translateInstructions(s);
   })()`);
   r.ok("Simplified, never Traditional",

@@ -92,7 +92,7 @@ const ticked = d => ({ ...d, checks: { ...d.checks, p3_ray: { by: "ray", at: 3 }
 try {
   await page.fixture({
     today: "2026-11-02", authUser: "daisy",
-    students: [{ id: "s1", name: "Kayden Koh", order: 1,
+    students: [{ id: "s1", name: "Jayden Lee", order: 1,
       targets: [{ id: "t1", name: "Self-Regulation", scale: 3, predefinedActivities: [] }] }],
     groups: [],
     sessions: [],

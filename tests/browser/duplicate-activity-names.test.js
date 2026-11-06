@@ -9,11 +9,11 @@
 // A scan of live found 18 repeated names and every one of them was put there
 // on purpose:
 //
-//   Hayden's Behaviour Chart   "Behaviour 1" and "Behaviour 2", each with its
+//   Marcus's Behaviour Chart   "Behaviour 1" and "Behaviour 2", each with its
 //                              own Antecedent, Behaviours and Consequence
-//   Leven's Social Skills      "Social Detective" and "SSJ Diary", each with
+//   Devon's Social Skills      "Social Detective" and "SSJ Diary", each with
 //                              its own Situation and Comment
-//   Hayden's Social Skills     "I can wait", mastered, then started again
+//   Marcus's Social Skills     "I can wait", mastered, then started again
 //
 // So the rule is about what is distinguishable on the page, not about the
 // string. Same name under a different section heading is fine. Same name
@@ -80,7 +80,7 @@ const conflict = (acts, idx, proposed, asParent = false) => page.eval(`(() => {
   return hit ? (hit.title || hit.name || "(blank)") : null;
 })()`);
 
-// Hayden's Behaviour Chart, as it actually is on live.
+// Marcus's Behaviour Chart, as it actually is on live.
 const CHART = [
   { id: "h1", title: "Behaviour 1", name: "", isHeading: true, order: 0 },
   { id: "a1", title: "Antecedent",  name: "", order: 1, createdOn: "2026-01-01" },
@@ -117,7 +117,7 @@ try {
     await conflict(CHART, 5, "Antecedent"), null);
   r.check("nor does its Consequence",
     await conflict(CHART, 7, "Consequence"), null);
-  r.check("Leven's two Situations are the same shape and also fine",
+  r.check("Devon's two Situations are the same shape and also fine",
     await conflict(CHART, 6, "Behaviours"), null);
 
   r.section("2. but not twice under ONE heading");

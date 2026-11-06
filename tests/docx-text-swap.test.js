@@ -82,11 +82,11 @@ console.log("\nreading the text out");
 }
 {
   // The shape the reports are full of: a bold label, then the sentence.
-  const xml = `<w:body>${para("Calming Himself", ": Caden needed support.")}</w:body>`;
+  const xml = `<w:body>${para("Calming Himself", ": Aiden needed support.")}</w:body>`;
   const ps = docxParagraphs(xml);
   check("a bold label and its sentence are two runs", ps[0].runs.length, 2);
   check("read in order",
-    ps[0].runs.map(r => r.text), ["Calming Himself", ": Caden needed support."]);
+    ps[0].runs.map(r => r.text), ["Calming Himself", ": Aiden needed support."]);
 }
 {
   const xml = `<w:body>${para("  ")}${para("real")}</w:body>`;
@@ -124,11 +124,11 @@ check("markers in the wrong order still read correctly",
 
 console.log("\nputting it back");
 {
-  const xml = `<w:body>${para("Calming Himself", ": Caden needed support.")}</w:body>`;
+  const xml = `<w:body>${para("Calming Himself", ": Aiden needed support.")}</w:body>`;
   const ps = docxParagraphs(xml);
   const out = applyDocxText(xml, ps, [["自我平静", "：他需要协助"]]);
   check("the words changed", /自我平静/.test(out), true);
-  check("no English left", /Calming|Caden/.test(out), false);
+  check("no English left", /Calming|Aiden/.test(out), false);
   check("the bold is still there", (out.match(/<w:b\/>/g) || []).length, 2);
   check("so is the spacing", /<w:spacing w:after="0"\/>/.test(out), true);
   check("and xml:space, or Word eats the space before the colon",
@@ -214,7 +214,7 @@ console.log("\nthe round trip, on something shaped like a real report");
     + para("Progress")
     + `<w:tbl><w:tr><w:tc>${para("Target")}</w:tc><w:tc>${para("Score")}</w:tc></w:tr></w:tbl>`
     + para("Strengths")
-    + para("Calming Himself", ": Caden regulates well during movement play.")
+    + para("Calming Himself", ": Aiden regulates well during movement play.")
     + `<w:p><w:r><w:drawing><wp:inline><a:blip r:embed="rId7"/></wp:inline></w:drawing></w:r></w:p>`
     + `</w:body></w:document>`;
   const ps = docxParagraphs(xml);
@@ -627,11 +627,11 @@ check("his Chinese name and the months",
   overviewTitleZh({ name: "Zhang Qi Pei", nameZh: "张祺培" }, "Jan 2026 - Jun 2026"),
   "张祺培（2026年1月 – 2026年6月）");
 check("no Chinese name typed in, so the English one stands",
-  overviewTitleZh({ name: "Ryan Lee" }, "Jan 2026 - Jun 2026"),
-  "Ryan Lee（2026年1月 – 2026年6月）");
+  overviewTitleZh({ name: "Elliot Toh" }, "Jan 2026 - Jun 2026"),
+  "Elliot Toh（2026年1月 – 2026年6月）");
 check("an empty box counts as none",
-  overviewTitleZh({ name: "Ryan Lee", nameZh: "   " }, "Jul 2026"),
-  "Ryan Lee（2026年7月）");
+  overviewTitleZh({ name: "Elliot Toh", nameZh: "   " }, "Jul 2026"),
+  "Elliot Toh（2026年7月）");
 
 console.log("\nthe progress chart title is built when the report is translated");
 // It used to be written into the English file when the report was generated,
@@ -651,8 +651,8 @@ check("and an older one that does not",
                        titleZh: "Zhang Qi Pei（2026年1月–2026年6月）" }, qipei),
   "张祺培（2026年1月 – 2026年6月）");
 check("with no student to hand, the English name is taken from the title",
-  overviewChartTitle({ title: "Ryan Lee (Jul 2026 - Dec 2026 Progress)" }, null),
-  "Ryan Lee（2026年7月 – 2026年12月）");
+  overviewChartTitle({ title: "Elliot Toh (Jul 2026 - Dec 2026 Progress)" }, null),
+  "Elliot Toh（2026年7月 – 2026年12月）");
 // Nothing to work from: what the file already said, rather than a blank.
 check("a title in a shape this does not know is left alone",
   overviewChartTitle({ title: "Something else", titleZh: "其他" }, qipei), "其他");

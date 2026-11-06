@@ -28,12 +28,12 @@ const settle = (ms = 400) => new Promise(res => setTimeout(res, ms));
 // Three records of one child plus one of another: the shape that makes a
 // list of bare full names useless.
 const STUDENTS = [
-  { id: "c1", name: "Caden Tan", order: 1, preferredName: "Caden", gender: "male", targets: [] },
-  { id: "c2", name: "Caden Tan", order: 2, preferredName: "Caden", gender: "male",
+  { id: "c1", name: "Aiden Lim", order: 1, preferredName: "Aiden", gender: "male", targets: [] },
+  { id: "c2", name: "Aiden Lim", order: 2, preferredName: "Aiden", gender: "male",
     note: "School Readiness", targets: [] },
-  { id: "c3", name: "Caden Tan", order: 3, preferredName: "Caden", gender: "male",
+  { id: "c3", name: "Aiden Lim", order: 3, preferredName: "Aiden", gender: "male",
     note: "School Readiness 2", targets: [] },
-  { id: "k1", name: "Kayden Koh", order: 4, preferredName: "Kayden", gender: "male",
+  { id: "k1", name: "Jayden Lee", order: 4, preferredName: "Jayden", gender: "male",
     dob: "2018-10-18", program: "Personal Care", targets: [] },
 ];
 
@@ -96,16 +96,16 @@ try {
   r.section("1. one row per student, told apart by its note");
   const listed = await rows();
   r.check("every record is listed", listed.length, 4);
-  // Three records called Caden Tan. Without the note in brackets there is
+  // Three records called Aiden Lim. Without the note in brackets there is
   // no way to tell which row is which, or to click the right one.
   r.check("the note is what separates them", listed, [
-    "Caden Tan",
-    "Caden Tan (School Readiness)",
-    "Caden Tan (School Readiness 2)",
-    "Kayden Koh",
+    "Aiden Lim",
+    "Aiden Lim (School Readiness)",
+    "Aiden Lim (School Readiness 2)",
+    "Jayden Lee",
   ]);
   r.check("a student with no note is just the name",
-    listed.filter(x => x === "Caden Tan").length, 1);
+    listed.filter(x => x === "Aiden Lim").length, 1);
 
   // Date of birth was not asked for until v2342, so the records made before
   // it have none. They keep working -- the list just says which ones still
@@ -117,7 +117,7 @@ try {
   r.check("and each mark names what is missing", flags.find(x => x.flags.length)?.flags,
     ["No date of birth", "No program"]);
   r.check("the finished one is left alone",
-    flags.find(x => x.name === "Kayden Koh")?.flags, []);
+    flags.find(x => x.name === "Jayden Lee")?.flags, []);
 
   // The No. column. It is the position in the list, so it doubles as the
   // count -- nobody has to run a finger down the rows to total them.
@@ -135,11 +135,11 @@ try {
     rail: [...document.querySelectorAll(".reg-rail-btn")].map(b => b.textContent.trim()),
     live: [...document.querySelectorAll(".reg-rail-btn:not([disabled])")].map(b => b.textContent.trim()),
   }))()`);
-  // Three Caden Tans under one C, one Kayden Koh under K.
-  r.check("one heading each time the first letter changes", az.heads, ["C", "K"]);
+  // Three Aiden Lims under one A, one Jayden Lee under J.
+  r.check("one heading each time the first letter changes", az.heads, ["A", "J"]);
   r.check("and it sticks to the top as you scroll", az.sticky, "sticky");
   r.check("the rail runs # then A to Z", az.rail.length, 27);
-  r.check("only the letters that have somebody are live", az.live, ["C", "K"]);
+  r.check("only the letters that have somebody are live", az.live, ["A", "J"]);
 
   // Tapping a letter is checked at the end of this file, on a list long
   // enough to scroll. Four rows do not fill the window, so nothing moves.
@@ -160,11 +160,11 @@ try {
 
   // ── 3. one student ──────────────────────────────────────────────────
   r.section("3. a student's own page holds every field");
-  await openRow("Kayden Koh");
+  await openRow("Jayden Lee");
   const f = await fields();
   r.check("the list is gone", await rows(), []);
-  r.check("Full Name",            f["Full Name"]?.value, "Kayden Koh");
-  r.check("English Short Name",           f["English Short Name"]?.value, "Kayden");
+  r.check("Full Name",            f["Full Name"]?.value, "Jayden Lee");
+  r.check("English Short Name",           f["English Short Name"]?.value, "Jayden");
   r.check("Date of Birth",        f["Date of Birth"]?.value, "2018-10-18");
   r.check("Program",              f["Program"]?.value, "Personal Care");
   r.check("Report Type is there", !!f["Report Type"], true);
@@ -405,7 +405,7 @@ try {
   r.check("yes throws the typing away and goes back", (await rows()).length, 4);
   r.check("and still nothing was written", await stored("program"), "Speech and Language");
   await page.eval(`window.confirm = () => { window.__regAsked++; return false; };`);
-  await openRow("Kayden Koh");
+  await openRow("Jayden Lee");
 
   // Typing again makes the last save old news, so the message goes.
   await setBox("db-program-input", "Something else");
