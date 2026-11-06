@@ -227,7 +227,7 @@ function versionLineText() {
   return `Made by Lewis · Version ${APP_VERSION}`;
 }
 
-const APP_VERSION = "2349";
+const APP_VERSION = "2350";
 
 // Debug helpers — call from F12 console
 // -1) Recover multiple-choice options wiped by the v2072-and-earlier panel bug:
@@ -3877,7 +3877,7 @@ const REG_TIPS = {
   short:      "What the AI calls the student in a report, instead of the full name.",
   shortZh:    "Only needed for a Chinese report. Leave it empty otherwise.",
   dob:        "Fills Date of Birth and Age on the report's Student Details table.",
-  note:       "Shown in brackets after the name, here and everywhere else. It is what tells two records of the same student apart. No brackets needed.",
+  note:       "Shown in brackets after the name in home page e.g. Student Name (Note)",
   program:    "Shown on the report cover page, in the Program box.",
   reportType: "Whether this student gets a report every session or once a month.",
   sessions:   "How many individual sessions this student has. Change Session Number sets the true number of one of them, and the rest shift to match.",
@@ -3962,9 +3962,9 @@ function renderStudentDetail(body, st) {
 
       ${regCard("Chinese Report", `
         ${field("Chinese Full Name", REG_TIPS.nameZh,
-          text("db-fullname-zh-input", st.nameZh, "e.g. \u694a\u7d2b\u74ca"), { optional: true })}
+          text("db-fullname-zh-input", st.nameZh, "e.g. \u5f20\u5b89\u742a"), { optional: true })}
         ${field("Chinese Short Name", REG_TIPS.shortZh,
-          text("db-shortname-zh-input", st.shortNameZh, "e.g. \u7d2b\u74ca"), { optional: true })}`,
+          text("db-shortname-zh-input", st.shortNameZh, "e.g. \u5f20\u5b89\u742a"), { optional: true })}`,
         "(Only fill this in if the student requires a translated chinese report)")}
 
       <div class="reg-actions">

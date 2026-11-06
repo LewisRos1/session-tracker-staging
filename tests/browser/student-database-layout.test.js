@@ -235,8 +235,8 @@ try {
   r.section("4. the ? says where the field shows up");
   r.ok("Note says it appears after the name",
     /brackets after the name/i.test(f["Note"]?.hint || ""), f["Note"]?.hint);
-  r.ok("Note says it is what tells two records apart",
-    /tells two records of the same student apart/i.test(f["Note"]?.hint || ""), f["Note"]?.hint);
+  r.ok("Note shows the shape rather than describing it",
+    /Student Name \(Note\)/.test(f["Note"]?.hint || ""), f["Note"]?.hint);
   r.ok("Program says it appears on the report cover",
     /report cover/i.test(f["Program"]?.hint || ""), f["Program"]?.hint);
   r.ok("Date of Birth says it fills the age too",
@@ -292,8 +292,9 @@ try {
   r.section("5. the boxes show an example, and required fields are marked");
   r.ok("Full Name shows a whole name",
     /^e\.g\. \w+ \w+/.test(f["Full Name"]?.placeholder || ""), f["Full Name"]?.placeholder);
-  r.ok("the Chinese box shows Chinese",
-    /[一-鿿]/.test(f["Chinese Full Name"]?.placeholder || ""), f["Chinese Full Name"]?.placeholder);
+  r.check("both Chinese boxes show the same Chinese example",
+    [f["Chinese Full Name"]?.placeholder, f["Chinese Short Name"]?.placeholder],
+    ["e.g. 张安琪", "e.g. 张安琪"]);
   r.ok("the short name shows one name only",
     /^e\.g\. \w+$/.test(f["English Short Name"]?.placeholder || ""), f["English Short Name"]?.placeholder);
   r.ok("Note shows a note", /^e\.g\. /.test(f["Note"]?.placeholder || ""), f["Note"]?.placeholder);
